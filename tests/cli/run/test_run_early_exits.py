@@ -96,7 +96,7 @@ def test_run_edit_name_missing_exits(
     run_mod = _import_run_module()
     import invarlock.cli.run_runtime as runtime_mod
 
-    monkeypatch.setattr(run_mod, "get_registry", lambda: _StubRegistry())
+    monkeypatch.setattr("invarlock.core.registry.get_registry", lambda: _StubRegistry())
     monkeypatch.setattr(
         runtime_mod, "detect_model_profile", lambda model_id, adapter: _StubProfile()
     )

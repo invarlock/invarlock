@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 
-from invarlock.eval.metrics import (
-    MetricsConfig,
+from invarlock.eval.metrics import MetricsConfig
+from invarlock.eval.metrics_activation import (
     _calculate_sigma_max,
     _perform_pre_eval_checks,
 )

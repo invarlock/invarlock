@@ -6,11 +6,11 @@ import pytest
 import torch
 
 from invarlock.eval.metrics import (
-    _gini_vectorized,
     bootstrap_confidence_interval,
     compute_ppl,
     measure_latency,
 )
+from invarlock.eval.metrics_activation import _gini_vectorized
 
 
 def test_bootstrap_confidence_interval_validation_errors():
@@ -48,7 +48,7 @@ def test_compute_ppl_no_valid_tokens_raises():
     from invarlock.eval.metrics import ValidationError as MValidationError
 
     with pytest.raises(MValidationError):
-        compute_ppl(model, adapter=None, window=window, device="cpu")
+        compute_ppl(model, window=window, device="cpu")
 
 
 def test_measure_latency_returns_zero_for_short_samples():

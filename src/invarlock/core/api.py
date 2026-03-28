@@ -73,19 +73,35 @@ class ModelEdit(ABC):
         pass
 
     @abstractmethod
-    def apply(self, model: Any, adapter: ModelAdapter, **kwargs) -> dict[str, Any]:
+    def apply(
+        self,
+        model: Any,
+        adapter: ModelAdapter,
+        plan: dict[str, Any] | None = None,
+        runtime: EditRuntime | None = None,
+    ) -> dict[str, Any]:
         """
         Apply the edit to the model.
 
         Args:
             model: The model to edit
             adapter: Adapter for model-specific operations
-            **kwargs: Edit-specific parameters
+            plan: Canonical edit plan parameters
+            runtime: Imperative shell runtime context
 
         Returns:
             Dict with edit metadata and statistics
         """
         pass
+
+
+@dataclass(frozen=True)
+class EditRuntime:
+    """Imperative shell context for edit execution."""
+
+    console: Any | None = None
+    emit: bool = True
+    output_style: Any | None = None
 
 
 @runtime_checkable
@@ -94,7 +110,13 @@ class EditLike(Protocol):
 
     def can_edit(self, model_desc: dict[str, Any]) -> bool: ...
 
-    def apply(self, model: Any, adapter: ModelAdapter, **kwargs) -> dict[str, Any]: ...
+    def apply(
+        self,
+        model: Any,
+        adapter: ModelAdapter,
+        plan: dict[str, Any] | None = None,
+        runtime: EditRuntime | None = None,
+    ) -> dict[str, Any]: ...
 
 
 class Guard(ABC):

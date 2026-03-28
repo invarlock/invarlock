@@ -143,7 +143,7 @@ def _stub_env(
     )
     # Profile and tokenizer
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.detect_model_profile",
+        "invarlock.cli.run_execution.detect_model_profile",
         lambda *a, **k: SimpleNamespace(
             default_loss="ce",
             invariants=[],
@@ -182,7 +182,7 @@ def test_ci_skip_overhead_reuses_loaded_model_without_snapshot(
     tmp_path: Path, monkeypatch
 ):
     _stub_env(monkeypatch, tmp_path, with_snapshot=False)
-    monkeypatch.setattr("invarlock.cli.commands.run.RELEASE_MIN_WINDOWS_PER_ARM", 1)
+    monkeypatch.setattr("invarlock.cli.run_overhead.RELEASE_MIN_WINDOWS_PER_ARM", 1)
 
     loaded_model = SimpleNamespace(name="loaded-model")
     load_calls: list[dict[str, object] | None] = []
@@ -205,7 +205,7 @@ def test_ci_skip_overhead_reuses_loaded_model_without_snapshot(
         )
 
     monkeypatch.setattr(
-        "invarlock.cli.commands.run._load_model_with_cfg", _fake_load_model_with_cfg
+        "invarlock.cli.run_runtime_exec.load_model_with_cfg", _fake_load_model_with_cfg
     )
     monkeypatch.setattr(
         "invarlock.core.runner.CoreRunner", lambda: SimpleNamespace(execute=_exec)
@@ -223,7 +223,7 @@ def test_ci_skip_overhead_reuses_loaded_model_before_snapshot_setup(
     tmp_path: Path, monkeypatch
 ):
     _stub_env(monkeypatch, tmp_path, with_snapshot=True, broken_snapshot=True)
-    monkeypatch.setattr("invarlock.cli.commands.run.RELEASE_MIN_WINDOWS_PER_ARM", 1)
+    monkeypatch.setattr("invarlock.cli.run_overhead.RELEASE_MIN_WINDOWS_PER_ARM", 1)
 
     loaded_model = SimpleNamespace(name="loaded-model")
     load_calls: list[dict[str, object] | None] = []
@@ -246,7 +246,7 @@ def test_ci_skip_overhead_reuses_loaded_model_before_snapshot_setup(
         )
 
     monkeypatch.setattr(
-        "invarlock.cli.commands.run._load_model_with_cfg", _fake_load_model_with_cfg
+        "invarlock.cli.run_runtime_exec.load_model_with_cfg", _fake_load_model_with_cfg
     )
     monkeypatch.setattr(
         "invarlock.core.runner.CoreRunner", lambda: SimpleNamespace(execute=_exec)

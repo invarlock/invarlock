@@ -34,7 +34,14 @@ class EditStub:
     def can_edit(self, model_desc: dict[str, Any]) -> bool:
         return True
 
-    def apply(self, model: Any, adapter: ModelAdapter, **kwargs) -> dict[str, Any]:
+    def apply(
+        self,
+        model: Any,
+        adapter: ModelAdapter,
+        plan=None,
+        runtime=None,
+    ) -> dict[str, Any]:
+        _ = model, adapter, plan, runtime
         return dict(self._result)
 
 
@@ -258,14 +265,15 @@ def test_edit_phase_with_baseline_label(tmp_path):
         def can_edit(self, model_desc):
             return True
 
-        def apply(self, model, adapter, **kwargs):
+        def apply(self, model, adapter, plan=None, runtime=None):
+            _ = model, adapter, plan, runtime
             return {"name": self.name, "deltas": {}}
 
     from invarlock.core.api import RunReport
 
     report = RunReport()
     result = runner._edit_phase(
-        object(), DummyAdapter(), Edit(), {"n_layer": 0}, report, None
+        object(), DummyAdapter(), Edit(), {"n_layer": 0}, report, None, None
     )
     assert isinstance(result, dict) and report.meta.get("edit_name") == "baseline"
 

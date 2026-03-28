@@ -8,7 +8,38 @@ from typing import Any
 import typer
 from rich.console import Console
 
+from invarlock.core.provider_config import resolve_provider_kind_and_kwargs
 from invarlock.runtime_security import remote_code_allowed
+
+SPLIT_ALIASES: tuple[str, ...] = ("validation", "val", "dev", "eval", "test")
+
+
+def _resolve_requested_edit_name(kind: str) -> str:
+    normalized = kind.lower().strip()
+    try:
+        from invarlock.edits.registry import get_registry
+
+        registry = get_registry()
+        if registry.get_plugin(normalized) is not None:
+            return normalized
+    except ImportError:
+        pass
+    known_edits = {"quant_rtn", "noop", "orchestrator"}
+    if normalized in known_edits:
+        return normalized
+    raise ValueError(f"Unknown edit kind: {kind}")
+
+
+def _apply_requested_edit_override(
+    cfg: Any, edit_name: str, *, config_cls: type
+) -> Any:
+    cfg_dict = cfg.model_dump()
+    edit_section = cfg_dict.setdefault("edit", {})
+    if not isinstance(edit_section, dict):
+        edit_section = {}
+        cfg_dict["edit"] = edit_section
+    edit_section["name"] = edit_name
+    return config_cls(cfg_dict)
 
 
 def prepare_config_for_run(
@@ -19,15 +50,31 @@ def prepare_config_for_run(
     tier: str | None,
     probes: int | None,
     console: Console,
-    event_fn: Any,
-    invarlock_config_cls: type,
-    load_config_fn: Any,
-    apply_profile_fn: Any,
-    resolve_edit_kind_fn: Any,
-    apply_edit_override_fn: Any,
+    event_fn: Any | None = None,
+    invarlock_config_cls: type | None = None,
+    load_config_fn: Any | None = None,
+    apply_profile_fn: Any | None = None,
     apply_auto_adapter_fn: Any | None = None,
 ) -> Any:
     """Load config and apply profile/CLI overrides deterministically."""
+    if event_fn is None:
+        from invarlock.cli.run_shell_output import _event as event_fn
+    if invarlock_config_cls is None:
+        from invarlock.core.config_runtime import InvarLockConfig
+
+        invarlock_config_cls = InvarLockConfig
+    if load_config_fn is None:
+        from invarlock.core.config_runtime import load_config as load_config_fn
+    if apply_profile_fn is None:
+        from invarlock.core.config_runtime import apply_profile as apply_profile_fn
+    if apply_auto_adapter_fn is None:
+        try:
+            from invarlock.core.adapter_auto import (
+                apply_auto_adapter_if_needed as apply_auto_adapter_fn,
+            )
+        except Exception:  # pragma: no cover - optional adapter path
+            apply_auto_adapter_fn = None
+
     event_fn(
         console,
         "INIT",
@@ -57,7 +104,7 @@ def prepare_config_for_run(
 
     if edit:
         try:
-            edit_name = resolve_edit_kind_fn(edit)
+            edit_name = _resolve_requested_edit_name(edit)
             event_fn(
                 console,
                 "EXEC",
@@ -65,7 +112,11 @@ def prepare_config_for_run(
                 emoji="✂️",
                 profile=profile,
             )
-            cfg = apply_edit_override_fn(cfg, edit)
+            cfg = _apply_requested_edit_override(
+                cfg,
+                edit_name,
+                config_cls=invarlock_config_cls,
+            )
         except ValueError as exc:
             event_fn(console, "FAIL", str(exc), emoji="❌", profile=profile)
             raise typer.Exit(2) from exc
@@ -133,13 +184,28 @@ def resolve_device_and_output(
     device: str | None,
     out: str | None,
     console: Console,
-    event_fn: Any,
-    format_kv_line_fn: Any,
-    device_resolution_note_fn: Any,
-    resolve_device_fn: Any,
-    validate_device_fn: Any,
+    event_fn: Any | None = None,
+    format_kv_line_fn: Any | None = None,
+    device_resolution_note_fn: Any | None = None,
+    resolve_device_fn: Any | None = None,
+    validate_device_fn: Any | None = None,
 ) -> tuple[str, Path]:
     """Resolve device and output directory with validation and logging."""
+    if event_fn is None:
+        from invarlock.cli.run_shell_output import _event as event_fn
+    if format_kv_line_fn is None:
+        from invarlock.cli.run_shell_output import _format_kv_line as format_kv_line_fn
+    if device_resolution_note_fn is None:
+        from invarlock.cli.run_shell_output import (
+            _device_resolution_note as device_resolution_note_fn,
+        )
+    if resolve_device_fn is None:
+        from invarlock.cli.device import resolve_device as resolve_device_fn
+    if validate_device_fn is None:
+        from invarlock.cli.device import (
+            validate_device_for_config as validate_device_fn,
+        )
+
     try:
         cfg_device = getattr(cfg.model, "device", None)
     except Exception:
@@ -168,32 +234,29 @@ def resolve_provider_and_split(
     cfg: Any,
     model_profile: Any,
     *,
-    get_provider_fn: Any,
-    choose_dataset_split_fn: Any,
+    get_provider_fn: Any | None = None,
+    choose_dataset_split_fn: Any | None = None,
     provider_kwargs: dict[str, Any] | None = None,
     resolved_device: str | None = None,
     emit: Any = None,
 ) -> tuple[Any, str, bool]:
     """Resolve dataset provider/split and return provider, split, fallback flag."""
-    provider_name = None
+    if get_provider_fn is None:
+        from invarlock.eval.data import get_provider as get_provider_fn
+    if choose_dataset_split_fn is None:
+        from invarlock.core.run_policy import (
+            choose_dataset_split as choose_dataset_split_fn,
+        )
+
     provider_kwargs = dict(provider_kwargs or {})
     try:
         provider_val = cfg.dataset.provider
     except Exception:
         provider_val = None
-    if isinstance(provider_val, str) and provider_val:
-        provider_name = provider_val
-    else:
-        try:
-            provider_name = provider_val.kind  # type: ignore[attr-defined]
-            try:
-                for key, value in provider_val.items():  # type: ignore[attr-defined]
-                    if key != "kind" and value is not None and value != "":
-                        provider_kwargs[key] = value
-            except Exception:
-                pass
-        except Exception:
-            provider_name = None
+    provider_name, explicit_provider_kwargs = resolve_provider_kind_and_kwargs(
+        provider_val
+    )
+    provider_kwargs.update(explicit_provider_kwargs)
     if not provider_name:
         provider_name = getattr(model_profile, "default_provider", None) or "wikitext2"
 
@@ -218,6 +281,7 @@ def resolve_provider_and_split(
     resolved_split, used_fallback_split = choose_dataset_split_fn(
         requested=requested_split,
         available=available_splits,
+        split_aliases=SPLIT_ALIASES,
     )
     return data_provider, resolved_split, used_fallback_split
 
@@ -225,9 +289,13 @@ def resolve_provider_and_split(
 def extract_model_load_kwargs(
     cfg: Any,
     *,
-    invarlock_error_cls: type[BaseException],
+    invarlock_error_cls: type[BaseException] | None = None,
 ) -> dict[str, Any]:
     """Return adapter.load_model kwargs from config excluding core fields."""
+    if invarlock_error_cls is None:
+        from invarlock.core.exceptions import InvarlockError
+
+        invarlock_error_cls = InvarlockError
     try:
         data = cfg.model_dump()
     except Exception:

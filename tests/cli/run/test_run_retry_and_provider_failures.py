@@ -58,7 +58,7 @@ def _common_patches_detect_ce():
             },
         ),
         patch(
-            "invarlock.cli.run_runtime.detect_model_profile",
+            "invarlock.cli.run_execution.detect_model_profile",
             lambda model_id=None, adapter=None: SimpleNamespace(
                 default_loss="ce",
                 model_id=model_id,
@@ -292,7 +292,7 @@ def test_retry_summary_prints_and_snapshot_cleanup(tmp_path: Path, monkeypatch):
         )
         stack.enter_context(patch("invarlock.core.retry.RetryController", RC))
         stack.enter_context(
-            patch("invarlock.reporting.report_builder.make_report", make_cert)
+            patch("invarlock.reporting.report_make.make_report", make_cert)
         )
         stack.enter_context(
             patch(

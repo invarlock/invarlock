@@ -12,10 +12,55 @@ from .rmt_math import mp_bulk_edge, mp_bulk_edges, rmt_growth_ratio
 
 __all__ = [
     "capture_baseline_mp_stats",
+    "collect_linear_rmt_modules",
     "layer_svd_stats",
     "analyze_weight_distribution",
     "_iter_transformer_layers",
 ]
+
+
+def collect_linear_rmt_modules(
+    model: nn.Module,
+    allowed_suffixes: list[str] | None = None,
+    *,
+    allowed_module_names: list[str] | None = None,
+) -> list[tuple[str, nn.Module]]:
+    """Collect canonical linear modules in scope for RMT analysis."""
+    if allowed_suffixes is None:
+        allowed_suffixes = [
+            ".attn.c_attn",
+            ".attn.c_proj",
+            ".mlp.c_fc",
+            ".mlp.c_proj",
+        ]
+    try:
+        from transformers.pytorch_utils import Conv1D
+
+        module_types_with_conv1d: tuple[
+            type[nn.Linear], type[nn.Conv1d], type[Conv1D]
+        ] = (nn.Linear, nn.Conv1d, Conv1D)
+        module_types = module_types_with_conv1d
+    except ImportError:
+        module_types_without_conv1d: tuple[type[nn.Linear], type[nn.Conv1d]] = (
+            nn.Linear,
+            nn.Conv1d,
+        )
+        module_types = module_types_without_conv1d
+
+    allowed_set = None
+    if isinstance(allowed_module_names, list) and allowed_module_names:
+        allowed_set = {str(name).strip() for name in allowed_module_names if name}
+
+    candidates: list[tuple[str, nn.Module]] = []
+    for name, module in model.named_modules():
+        if not (isinstance(module, module_types) and hasattr(module, "weight")):
+            continue
+        if allowed_set is not None and name not in allowed_set:
+            continue
+        if any(name.endswith(suffix) for suffix in allowed_suffixes):
+            candidates.append((name, module))
+    candidates.sort(key=lambda item: item[0])
+    return candidates
 
 
 def _iter_weight_matrices(layer: nn.Module):
@@ -112,58 +157,38 @@ def capture_baseline_mp_stats(
     """Capture baseline MP statistics for the canonical linear-layer allowlist."""
     mp_stats: dict[str, dict[str, float]] = {}
 
-    try:
-        from transformers.pytorch_utils import Conv1D
+    for name, module in collect_linear_rmt_modules(
+        model,
+        allowed_module_names=allowed_module_names,
+    ):
+        for param_name, param in module.named_parameters(recurse=False):
+            if param.ndim == 2 and "weight" in param_name:
+                W = param.detach()
+                try:
+                    from transformers.pytorch_utils import Conv1D
 
-        module_types_with_conv1d: tuple[
-            type[nn.Linear], type[nn.Conv1d], type[Conv1D]
-        ] = (nn.Linear, nn.Conv1d, Conv1D)
-        module_types = module_types_with_conv1d
-    except ImportError:
-        module_types_without_conv1d: tuple[type[nn.Linear], type[nn.Conv1d]] = (
-            nn.Linear,
-            nn.Conv1d,
-        )
-        module_types = module_types_without_conv1d
+                    if isinstance(module, Conv1D):
+                        W = W.T
+                except ImportError:
+                    pass
 
-    allowed_suffixes = [".attn.c_attn", ".attn.c_proj", ".mlp.c_fc", ".mlp.c_proj"]
-    allowed_set = None
-    if isinstance(allowed_module_names, list) and allowed_module_names:
-        allowed_set = {str(name).strip() for name in allowed_module_names if name}
-
-    for name, module in model.named_modules():
-        if isinstance(module, module_types) and hasattr(module, "weight"):
-            if allowed_set is not None and name not in allowed_set:
-                continue
-            if any(name.endswith(suffix) for suffix in allowed_suffixes):
-                for param_name, param in module.named_parameters(recurse=False):
-                    if param.ndim == 2 and "weight" in param_name:
-                        W = param.detach()
-                        try:
-                            from transformers.pytorch_utils import Conv1D
-
-                            if isinstance(module, Conv1D):
-                                W = W.T
-                        except ImportError:
-                            pass
-
-                        if W.ndim == 2:
-                            m, n = W.shape
-                            if not torch.isfinite(W).all():
-                                continue
-                            try:
-                                s_actual = torch.linalg.svdvals(W.float().cpu())
-                                sigma_base = s_actual[0].item()
-                                mp_edge_base = mp_bulk_edge(m, n, whitened=False)
-                                r_mp_base = sigma_base / max(mp_edge_base, 1e-12)
-                                mp_stats[name] = {
-                                    "mp_bulk_edge_base": mp_edge_base,
-                                    "r_mp_base": r_mp_base,
-                                    "sigma_base": sigma_base,
-                                }
-                            except (RuntimeError, torch.linalg.LinAlgError):
-                                continue
-                        break
+                if W.ndim == 2:
+                    m, n = W.shape
+                    if not torch.isfinite(W).all():
+                        continue
+                    try:
+                        s_actual = torch.linalg.svdvals(W.float().cpu())
+                        sigma_base = s_actual[0].item()
+                        mp_edge_base = mp_bulk_edge(m, n, whitened=False)
+                        r_mp_base = sigma_base / max(mp_edge_base, 1e-12)
+                        mp_stats[name] = {
+                            "mp_bulk_edge_base": mp_edge_base,
+                            "r_mp_base": r_mp_base,
+                            "sigma_base": sigma_base,
+                        }
+                    except (RuntimeError, torch.linalg.LinAlgError):
+                        continue
+                break
 
     return mp_stats
 

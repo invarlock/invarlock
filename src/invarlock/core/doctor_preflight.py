@@ -106,9 +106,18 @@ def run_doctor_config_preflight(
         )
         lines.append(DETERMINISM_SHARDS_WARNING)
 
-    replicates = _mapping_get(
-        _mapping_get(getattr(cfg, "eval", None), "bootstrap"), "replicates"
-    )
+    section_fn = getattr(cfg, "section", None)
+    if callable(section_fn):
+        try:
+            eval_section = section_fn("eval")
+        except Exception:
+            eval_section = None
+    else:
+        try:
+            eval_section = cfg.eval
+        except Exception:
+            eval_section = None
+    replicates = _mapping_get(_mapping_get(eval_section, "bootstrap"), "replicates")
     findings.extend(build_bootstrap_replicates_findings(replicates))
 
     if baseline:

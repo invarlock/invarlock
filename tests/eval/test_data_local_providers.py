@@ -6,18 +6,20 @@ from pathlib import Path
 import pytest
 
 import invarlock.eval.data as data_mod
+import invarlock.eval.data_support as data_support_mod
 from invarlock.eval.data import (
     EvaluationWindow,
     compute_window_hash,
     get_provider,
     list_providers,
 )
+from invarlock.eval.data_providers import HFSeq2SeqProvider
 
 
 class _EncodeTokenizer:
     pad_token_id = 0
 
-    def encode(self, text, truncation=True, max_length=8):
+    def encode(self, text, truncation=True, max_length=8, padding="max_length"):
         base = (sum(ord(ch) for ch in text) % 97) + 1
         ids = [base + idx for idx in range(min(len(text), max_length))]
         return ids
@@ -26,7 +28,14 @@ class _EncodeTokenizer:
 class _CallTokenizer:
     pad_token_id = 3
 
-    def __call__(self, text, truncation=True, max_length=8):
+    def __call__(
+        self,
+        text,
+        truncation=True,
+        max_length=8,
+        padding="max_length",
+        return_attention_mask=True,
+    ):
         return {"input_ids": [len(text)]}
 
 
@@ -93,12 +102,14 @@ def test_local_jsonl_pairs_provider_windows_and_labels(tmp_path: Path):
 
 
 def test_hf_text_provider_windows_and_tokenize(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True, raising=False)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True, raising=False)
 
     def fake_load_dataset(path, name=None, split=None, cache_dir=None, **kwargs):
         return [{"text": "example one"}, {"text": "example two"}]
 
-    monkeypatch.setattr(data_mod, "load_dataset", fake_load_dataset, raising=False)
+    monkeypatch.setattr(
+        data_support_mod, "load_dataset", fake_load_dataset, raising=False
+    )
     provider = data_mod.HFTextProvider(dataset_name="dummy", max_samples=2)
     tok = _EncodeTokenizer()
     prev, fin = provider.windows(tok, preview_n=1, final_n=1, seq_len=4)
@@ -110,7 +121,7 @@ def test_hf_text_provider_windows_and_tokenize(monkeypatch):
 
 
 def test_hf_seq2seq_provider_windows_and_capacity(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True, raising=False)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True, raising=False)
 
     def fake_load_dataset(path, name=None, split=None, cache_dir=None, **kwargs):
         return [
@@ -118,8 +129,10 @@ def test_hf_seq2seq_provider_windows_and_capacity(monkeypatch):
             {"source": "src two", "target": "tgt two"},
         ]
 
-    monkeypatch.setattr(data_mod, "load_dataset", fake_load_dataset, raising=False)
-    provider = data_mod.HFSeq2SeqProvider("dummy")
+    monkeypatch.setattr(
+        data_support_mod, "load_dataset", fake_load_dataset, raising=False
+    )
+    provider = HFSeq2SeqProvider("dummy")
     prev, fin = provider.windows(_EncodeTokenizer(), preview_n=1, final_n=1, seq_len=6)
     assert len(prev.input_ids) == 1 and len(fin.input_ids) == 1
     assert provider.last_preview_labels and provider.last_final_labels

@@ -3,9 +3,8 @@ import types
 import torch
 import torch.nn as nn
 
-from invarlock.eval.metrics import (
-    MetricsConfig,
-    ResourceManager,
+from invarlock.eval.metrics import MetricsConfig, ResourceManager
+from invarlock.eval.metrics_activation import (
     _collect_activations,
     _extract_fc1_activations,
 )

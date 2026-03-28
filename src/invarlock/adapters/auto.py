@@ -85,11 +85,6 @@ def _detect_quantization_from_model(model: Any) -> str | None:
             return "hf_gptq"
         elif cfg_class in ("BitsAndBytesConfig", "BnbConfig"):
             return "hf_bnb"
-        # Check attributes
-        if getattr(quant_cfg, "load_in_8bit", False) or getattr(
-            quant_cfg, "load_in_4bit", False
-        ):
-            return "hf_bnb"
 
     return None
 
@@ -190,14 +185,6 @@ class _DelegatingAdapter(ModelAdapter):
     def restore(self, model: Any, blob: bytes) -> None:
         delegate = self._delegate or self._ensure_delegate_from_model(model)
         return delegate.restore(model, blob)
-
-    def __getattr__(self, item: str):  # pragma: no cover - passthrough
-        if item == "_delegate":
-            raise AttributeError(item)
-        delegate = self._delegate
-        if delegate is not None and hasattr(delegate, item):
-            return getattr(delegate, item)
-        raise AttributeError(item)
 
 
 class HF_Auto_Adapter(_DelegatingAdapter):

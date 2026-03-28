@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import torch
 
 from invarlock.eval import metrics as M
+from invarlock.eval.metrics_activation import _perform_pre_eval_checks
 
 
 def test_measure_memory_forward_exception_path():
@@ -38,6 +39,6 @@ def test_pre_eval_checks_dry_run_failure():
             }
 
     # Should not raise
-    M._perform_pre_eval_checks(
+    _perform_pre_eval_checks(
         CrashOnForward(), Loader(), device=torch.device("cpu"), config=M.MetricsConfig()
     )

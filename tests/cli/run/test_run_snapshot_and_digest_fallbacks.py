@@ -117,7 +117,7 @@ def _common_min(monkeypatch, tmp_path):
         "invarlock.eval.data.get_provider", lambda *a, **k: _provider_min()
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.detect_model_profile",
+        "invarlock.cli.run_execution.detect_model_profile",
         lambda model_id=None, adapter=None: SimpleNamespace(
             default_loss="ce",
             invariants=[],
@@ -292,7 +292,7 @@ def test_gfm_invariants_profile_checks_existing_string_and_model_invariants_merg
         lambda: _SNS(execute=lambda **k: _std_core_report_gfm()),
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.detect_model_profile",
+        "invarlock.cli.run_execution.detect_model_profile",
         lambda *a, **k: _SNS(
             default_loss="ce",
             invariants=["dim_check"],
@@ -440,7 +440,7 @@ def test_snapshot_mode_auto_prefers_bytes(monkeypatch, tmp_path):
     class DU:
         free = 50 * 1024 * 1024 * 1024  # 50GB
 
-    monkeypatch.setattr("invarlock.cli.commands.run.shutil.disk_usage", lambda path: DU)
+    monkeypatch.setattr("invarlock.cli.run_runtime_exec.shutil.disk_usage", lambda path: DU)
     run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"), profile=None)
 
 
@@ -585,7 +585,7 @@ def test_snapshot_cfg_bytes_fallback_to_chunked(monkeypatch, tmp_path):
         "invarlock.eval.data.get_provider", lambda *a, **k: _provider_min()
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.detect_model_profile",
+        "invarlock.cli.run_execution.detect_model_profile",
         lambda *a, **k: SimpleNamespace(
             default_loss="ce",
             invariants=[],
@@ -657,7 +657,7 @@ def test_snapshot_cfg_chunked_fallback_to_bytes(monkeypatch, tmp_path):
         "invarlock.eval.data.get_provider", lambda *a, **k: _provider_min()
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.detect_model_profile",
+        "invarlock.cli.run_execution.detect_model_profile",
         lambda *a, **k: SimpleNamespace(
             default_loss="ce",
             invariants=[],
@@ -710,7 +710,7 @@ def test_snapshot_env_bytes_fallback_to_chunked(monkeypatch, tmp_path):
         "invarlock.eval.data.get_provider", lambda *a, **k: _provider_min()
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.detect_model_profile",
+        "invarlock.cli.run_execution.detect_model_profile",
         lambda *a, **k: SimpleNamespace(
             default_loss="ce",
             invariants=[],
@@ -776,7 +776,7 @@ def test_snapshot_env_chunked_fallback_to_bytes(monkeypatch, tmp_path):
         "invarlock.eval.data.get_provider", lambda *a, **k: _provider_min()
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.detect_model_profile",
+        "invarlock.cli.run_execution.detect_model_profile",
         lambda *a, **k: SimpleNamespace(
             default_loss="ce",
             invariants=[],
@@ -858,7 +858,7 @@ def test_stratification_count_mismatch_final_only(monkeypatch, tmp_path):
         "invarlock.eval.data.get_provider", lambda *a, **k: _provider_min()
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.detect_model_profile",
+        "invarlock.cli.run_execution.detect_model_profile",
         lambda *a, **k: SimpleNamespace(
             default_loss="ce",
             invariants=[],
@@ -898,7 +898,7 @@ def test_snapshot_auto_both_memory_disk_queries_fail(monkeypatch, tmp_path):
         raise RuntimeError("du fail")
 
     monkeypatch.setattr("invarlock.cli.run_runtime.psutil.virtual_memory", _raise_vm)
-    monkeypatch.setattr("invarlock.cli.commands.run.shutil.disk_usage", _raise_du)
+    monkeypatch.setattr("invarlock.cli.run_runtime_exec.shutil.disk_usage", _raise_du)
 
     cfg = _basic_yaml(tmp_path)
     run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"), profile=None)

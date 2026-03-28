@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
+
+from .provider_config import resolve_provider_kind_and_kwargs
 
 
 def resolve_metric_and_provider(
@@ -12,23 +15,27 @@ def resolve_metric_and_provider(
 ) -> tuple[str, str, dict[str, float]]:
     """Resolve metric kind, provider kind, and metric options from config."""
 
+    def _metric_value(key: str) -> Any:
+        if isinstance(metric_cfg, Mapping):
+            return metric_cfg.get(key)
+        get_value = getattr(metric_cfg, "get", None)
+        if callable(get_value):
+            try:
+                return get_value(key)
+            except Exception:
+                pass
+        try:
+            return getattr(metric_cfg, key)
+        except Exception:
+            return None
+
     provider_val = None
     try:
         provider_val = cfg.dataset.provider
     except Exception:
         provider_val = None
 
-    provider_kind = None
-    if isinstance(provider_val, str) and provider_val:
-        provider_kind = provider_val
-    else:
-        try:
-            provider_kind = provider_val.kind
-        except Exception:
-            try:
-                provider_kind = provider_val.get("kind")  # type: ignore[attr-defined]
-            except Exception:
-                provider_kind = None
+    provider_kind, _provider_kwargs = resolve_provider_kind_and_kwargs(provider_val)
 
     if not provider_kind and hasattr(model_profile, "default_provider"):
         provider_kind = model_profile.default_provider
@@ -37,8 +44,16 @@ def resolve_metric_and_provider(
 
     metric_cfg = None
     try:
-        eval_section = cfg.eval
-        metric_cfg = getattr(eval_section, "metric", None)
+        section_fn = getattr(cfg, "section", None)
+        if callable(section_fn):
+            eval_section = section_fn("eval") or {}
+            if isinstance(eval_section, Mapping):
+                metric_cfg = eval_section.get("metric")
+        else:
+            try:
+                metric_cfg = cfg.eval.metric
+            except Exception:
+                metric_cfg = None
     except Exception:
         metric_cfg = None
 
@@ -51,30 +66,9 @@ def resolve_metric_and_provider(
     reps = None
     ci_level = None
     if metric_kind is None and metric_cfg is not None:
-        try:
-            metric_kind = (
-                metric_cfg.get("kind")
-                if isinstance(metric_cfg, dict)
-                else metric_cfg.kind
-            )
-        except Exception:
-            metric_kind = None
-        try:
-            reps = (
-                metric_cfg.get("reps")
-                if isinstance(metric_cfg, dict)
-                else metric_cfg.reps
-            )
-        except Exception:
-            reps = None
-        try:
-            ci_level = (
-                metric_cfg.get("ci_level")
-                if isinstance(metric_cfg, dict)
-                else metric_cfg.ci_level
-            )
-        except Exception:
-            ci_level = None
+        metric_kind = _metric_value("kind")
+        reps = _metric_value("reps")
+        ci_level = _metric_value("ci_level")
 
     if isinstance(metric_kind, str) and metric_kind:
         normalized_kind = metric_kind.strip().lower()

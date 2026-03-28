@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
+from invarlock.core.exceptions import InvarlockError
 from tests.cli.run._internal_cli import internal_run_app as cli
 
 
@@ -92,11 +93,9 @@ def _stub_env(monkeypatch, tmp_path: Path):
 
     # Model profile + tokenizer
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.detect_model_profile",
+        "invarlock.cli.run_execution.detect_model_profile",
         lambda *a, **k: (_ for _ in ()).throw(
-            __import__(
-                "invarlock.cli.commands.run", fromlist=["InvarlockError"]
-            ).InvarlockError("E003", "MASK-PARITY-MISMATCH", {})
+            InvarlockError("E003", "MASK-PARITY-MISMATCH", {})
         ),
         raising=True,
     )
@@ -105,7 +104,10 @@ def _stub_env(monkeypatch, tmp_path: Path):
 def test_release_profile_hard_abort_exit_3(tmp_path: Path, monkeypatch):
     _stub_env(monkeypatch, tmp_path)
     cfg = _cfg(tmp_path)
-    r = CliRunner().invoke(cli, ["run", "-c", cfg, "--profile", "release"])
+    r = CliRunner().invoke(
+        cli,
+        ["run", "-c", cfg, "--profile", "release", "--allow-host-execution"],
+    )
     assert r.exit_code == 3
     assert "[INVARLOCK:E003]" in r.stdout
 
@@ -128,10 +130,20 @@ def test_out_flag_precedence_over_config(tmp_path: Path, monkeypatch):
         )
 
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.detect_model_profile", lambda *a, **k: _profile()
+        "invarlock.cli.run_execution.detect_model_profile", lambda *a, **k: _profile()
     )
     r = CliRunner().invoke(
-        cli, ["run", "-c", cfg, "--profile", "dev", "--out", str(out_dir)]
+        cli,
+        [
+            "run",
+            "-c",
+            cfg,
+            "--profile",
+            "dev",
+            "--out",
+            str(out_dir),
+            "--allow-host-execution",
+        ],
     )
     s = r.stdout
     # Output dir precedence: anywhere in output paths the base dir should be the flag value

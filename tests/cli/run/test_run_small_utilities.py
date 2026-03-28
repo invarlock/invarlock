@@ -2,24 +2,22 @@ from __future__ import annotations
 
 import numpy as np
 
-from invarlock.cli.commands.run import _choose_dataset_split
 from invarlock.cli.run_pairing_helpers import (
     _compute_mask_positions_digest,
     _hash_sequences,
 )
+from invarlock.core.run_policy import choose_dataset_split
 
 
-def test_choose_dataset_split_behaviors():
+def testchoose_dataset_split_behaviors():
     # Requested exact split
-    s, fb = _choose_dataset_split(requested="test", available=["train", "test"])
+    s, fb = choose_dataset_split(requested="test", available=["train", "test"])
     assert s == "test" and fb is False
     # Alias in available triggers fallback True
-    s, fb = _choose_dataset_split(
-        requested=None, available=["val", "train"]
-    )  # includes alias
+    s, fb = choose_dataset_split(requested=None, available=["val", "train"])
     assert s in {"validation", "val"} and fb is True
     # No available list → default validation with fallback
-    s, fb = _choose_dataset_split(requested=None, available=None)
+    s, fb = choose_dataset_split(requested=None, available=None)
     assert s == "validation" and fb is True
 
 

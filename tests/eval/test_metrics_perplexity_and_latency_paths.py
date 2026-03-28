@@ -6,14 +6,16 @@ import torch.nn as nn
 from invarlock.eval.metrics import (
     InputValidator,
     MetricsConfig,
-    _calculate_head_energy,
-    _calculate_sigma_max,
-    _extract_fc1_activations,
-    _perform_pre_eval_checks,
     compute_perplexity,
     compute_perplexity_strict,
     measure_latency,
     measure_memory,
+)
+from invarlock.eval.metrics_activation import (
+    _calculate_head_energy,
+    _calculate_sigma_max,
+    _extract_fc1_activations,
+    _perform_pre_eval_checks,
 )
 
 
@@ -216,7 +218,7 @@ def test_mi_gini_gpu_oom_fallback_to_cpu():
             return fn
 
     # Should exercise the RuntimeError OOM path and return a float
-    from invarlock.eval.metrics import _calculate_mi_gini
+    from invarlock.eval.metrics_activation import _calculate_mi_gini
 
     val = _calculate_mi_gini(
         TinyLM(),

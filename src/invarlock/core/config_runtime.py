@@ -1,7 +1,7 @@
 """Runtime config ownership for InvarLock.
 
-Provides the lightweight, dict-backed config model plus runtime config loading,
-profile application, and edit override helpers used by shells and services.
+Provides the lightweight, dict-backed config model plus runtime config loading
+and profile application used by shells and services.
 """
 
 from __future__ import annotations
@@ -132,8 +132,6 @@ class ModelConfig(SectionMixin):
 class EditConfig(SectionMixin):
     name: str | None = None
     plan: dict[str, Any] = field(default_factory=dict)
-    parameters: Any = None
-    kind: str | None = None
     _extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -280,8 +278,7 @@ class InvarLockConfig(MutableMapping[str, Any]):
         if isinstance(value, dict):
             return copy.deepcopy(value)
         raise TypeError(
-            f"Config section '{name}' must be a mapping, got "
-            f"{type(value).__name__}."
+            f"Config section '{name}' must be a mapping, got {type(value).__name__}."
         )
 
     def require_section(self, name: str) -> dict[str, Any]:
@@ -322,32 +319,28 @@ class InvarLockConfig(MutableMapping[str, Any]):
     def auto(self) -> AutoConfig:
         value = self.data.get("auto")
         if not isinstance(value, AutoConfig):
-            value = AutoConfig()
-            self.data["auto"] = value
+            raise KeyError("Config section 'auto' is required.")
         return value
 
     @property
     def guards(self) -> GuardsConfig:
         value = self.data.get("guards")
         if not isinstance(value, GuardsConfig):
-            value = GuardsConfig()
-            self.data["guards"] = value
+            raise KeyError("Config section 'guards' is required.")
         return value
 
     @property
     def eval(self) -> EvalConfig:
         value = self.data.get("eval")
         if not isinstance(value, EvalConfig):
-            value = EvalConfig()
-            self.data["eval"] = value
+            raise KeyError("Config section 'eval' is required.")
         return value
 
     @property
     def context(self) -> dict[str, Any]:
         value = self.data.get("context")
         if value is None:
-            value = {}
-            self.data["context"] = value
+            raise KeyError("Config section 'context' is required.")
         if not isinstance(value, dict):
             raise TypeError("Config section 'context' must be a mapping.")
         return value
@@ -358,7 +351,7 @@ class DatasetConfig(SectionMixin):
     id: str | None = None
     seq_len: int = 512
     stride: int = 512
-    provider: str | None = None
+    provider: str | dict[str, Any] | None = None
     split: str = "validation"
     preview_n: int | None = None
     final_n: int | None = None
@@ -585,30 +578,3 @@ def apply_profile(cfg: InvarLockConfig, profile: str) -> InvarLockConfig:
     if overrides is None:
         raise ValueError(f"Unknown profile: {profile}")
     return InvarLockConfig(_deep_merge(cfg.model_dump(), overrides))
-
-
-def resolve_edit_kind(kind: str) -> str:
-    kind = kind.lower().strip()
-    # Check if the kind is a registered edit name (e.g., "noop", "quant_rtn")
-    try:
-        from invarlock.edits.registry import get_registry
-
-        registry = get_registry()
-        if registry.get_plugin(kind) is not None:
-            return kind
-    except ImportError:
-        pass
-    # Also allow well-known edit names directly
-    known_edits = {"quant_rtn", "noop", "orchestrator"}
-    if kind in known_edits:
-        return kind
-    raise ValueError(f"Unknown edit kind: {kind}")
-
-
-def apply_edit_override(cfg: InvarLockConfig, kind: str) -> InvarLockConfig:
-    cfgd = cfg.model_dump()
-    resolved = resolve_edit_kind(kind)
-    edit_section = cfgd.setdefault("edit", {})
-    edit_section["name"] = resolved
-    edit_section.pop("kind", None)
-    return InvarLockConfig(cfgd)

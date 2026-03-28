@@ -1,6 +1,7 @@
 import torch
 
-from invarlock.eval.metrics import MetricsConfig, _mi_gini_optimized_cpu_path
+from invarlock.eval.metrics import MetricsConfig
+from invarlock.eval.metrics_activation import _mi_gini_optimized_cpu_path
 
 
 def test_mi_gini_stack_failure_returns_nan(monkeypatch):
@@ -19,7 +20,7 @@ def test_mi_gini_stack_failure_returns_nan(monkeypatch):
 
             return fn
 
-    monkeypatch.setattr("invarlock.eval.metrics.DependencyManager", FakeDM)
+    monkeypatch.setattr("invarlock.eval.metrics_activation.DependencyManager", FakeDM)
 
     # Prepare small feature/target tensors: L=2, N=1, D=4
     feats = torch.randn(2, 1, 4)

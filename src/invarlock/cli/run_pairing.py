@@ -17,12 +17,52 @@ from invarlock.core.provider_parity import (
 )
 
 
+def _canonical_dataset_id(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        normalized = value.strip()
+        return normalized or None
+    if isinstance(value, dict):
+        candidate = (
+            value.get("kind")
+            or value.get("dataset")
+            or value.get("name")
+            or value.get("id")
+            or value.get("provider")
+        )
+        return _canonical_dataset_id(candidate)
+    if hasattr(value, "items"):
+        try:
+            return _canonical_dataset_id(dict(value.items()))
+        except Exception:
+            pass
+    for attr in ("kind", "dataset", "name", "id", "provider"):
+        try:
+            candidate = getattr(value, attr)
+        except Exception:
+            continue
+        normalized = _canonical_dataset_id(candidate)
+        if normalized is not None:
+            return normalized
+    try:
+        normalized = str(value).strip()
+    except Exception:
+        return None
+    return normalized or None
+
+
 def extract_pairing_schedule(
     report: dict[str, Any] | None,
     *,
-    tensor_or_list_to_ints_fn: Any,
+    tensor_or_list_to_ints_fn: Any | None = None,
 ) -> dict[str, Any] | None:
     """Extract sanitized pairing schedule from baseline-like report data."""
+    if tensor_or_list_to_ints_fn is None:
+        from invarlock.cli.run_pairing_helpers import _tensor_or_list_to_ints
+
+        tensor_or_list_to_ints_fn = _tensor_or_list_to_ints
+
     if not isinstance(report, dict):
         return None
     windows = report.get("evaluation_windows")
@@ -146,10 +186,14 @@ def extract_pairing_schedule(
 def compute_provider_digest(
     report: dict[str, Any],
     *,
-    compute_mask_positions_digest_fn: Any,
+    compute_mask_positions_digest_fn: Any | None = None,
 ) -> dict[str, str] | None:
     """Compute provider digest (ids/tokenizer/masking) from report context."""
     from invarlock.utils.digest import hash_json
+    if compute_mask_positions_digest_fn is None:
+        from invarlock.cli.run_pairing_helpers import _compute_mask_positions_digest
+
+        compute_mask_positions_digest_fn = _compute_mask_positions_digest
 
     windows = report.get("evaluation_windows") if isinstance(report, dict) else None
     if not isinstance(windows, dict) or not windows:
@@ -209,12 +253,26 @@ def validate_and_harvest_baseline_schedule(
     baseline_path_str: str | None = None,
     console: Console | None = None,
     event_fn: Any | None = None,
-    canonical_dataset_id_fn: Any,
-    tensor_or_list_to_ints_fn: Any,
-    hash_sequences_fn: Any,
-    invarlock_error_cls: type[BaseException],
+    canonical_dataset_id_fn: Any | None = None,
+    tensor_or_list_to_ints_fn: Any | None = None,
+    hash_sequences_fn: Any | None = None,
+    invarlock_error_cls: type[BaseException] | None = None,
 ) -> dict[str, Any]:
     """Validate baseline pairing compatibility and harvest dataset metadata."""
+    if canonical_dataset_id_fn is None:
+        canonical_dataset_id_fn = _canonical_dataset_id
+    if tensor_or_list_to_ints_fn is None:
+        from invarlock.cli.run_pairing_helpers import _tensor_or_list_to_ints
+
+        tensor_or_list_to_ints_fn = _tensor_or_list_to_ints
+    if hash_sequences_fn is None:
+        from invarlock.cli.run_pairing_helpers import _hash_sequences
+
+        hash_sequences_fn = _hash_sequences
+    if invarlock_error_cls is None:
+        from invarlock.core.exceptions import InvarlockError
+
+        invarlock_error_cls = InvarlockError
 
     def _emit(tag: str, message: str, emoji: str) -> None:
         if console is not None and event_fn is not None:
@@ -556,8 +614,12 @@ def enforce_provider_parity(
     baseline_digest: dict | None,
     *,
     profile: str | None,
-    invarlock_error_cls: type[BaseException],
+    invarlock_error_cls: type[BaseException] | None = None,
 ) -> None:
+    if invarlock_error_cls is None:
+        from invarlock.core.exceptions import InvarlockError
+
+        invarlock_error_cls = InvarlockError
     """Enforce tokenizer/masking parity rules for CI and release profiles."""
     _enforce_provider_parity_core(
         subject_digest,

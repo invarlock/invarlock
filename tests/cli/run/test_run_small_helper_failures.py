@@ -5,8 +5,8 @@ from types import SimpleNamespace
 import click
 from rich.console import Console
 
+from invarlock.cli import run_config as run_config_mod
 from invarlock.cli import run_pairing_helpers as pairing_mod
-from invarlock.cli.commands import run as run_mod
 
 
 def test_hash_sequences_falls_back_when_len_unavailable():
@@ -44,7 +44,7 @@ def test_resolve_provider_and_split_provider_and_split_access_errors():
         return Provider()
 
     cfg = SimpleNamespace(dataset=BadDataset())
-    provider, split, used = run_mod._resolve_provider_and_split(
+    provider, split, used = run_config_mod.resolve_provider_and_split(
         cfg,
         model_profile=SimpleNamespace(default_provider="synthetic"),
         get_provider_fn=_get_provider,
@@ -69,7 +69,7 @@ def test_extract_model_load_kwargs_dtype_aliasing_and_normalization():
                 }
             }
 
-    assert run_mod._extract_model_load_kwargs(_Cfg()) == {"dtype": "float16"}
+    assert run_config_mod.extract_model_load_kwargs(_Cfg()) == {"dtype": "float16"}
 
     class _Cfg2:
         def model_dump(self):
@@ -82,4 +82,4 @@ def test_extract_model_load_kwargs_dtype_aliasing_and_normalization():
                 }
             }
 
-    assert run_mod._extract_model_load_kwargs(_Cfg2()) == {"dtype": "custom_dtype"}
+    assert run_config_mod.extract_model_load_kwargs(_Cfg2()) == {"dtype": "custom_dtype"}

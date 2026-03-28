@@ -100,7 +100,9 @@ def _apply_mlm_masks(
         if masked == 0:
             candidate_positions = [
                 pos
-                for pos, (token, attn) in enumerate(zip(input_ids, attention, strict=False))
+                for pos, (token, attn) in enumerate(
+                    zip(input_ids, attention, strict=False)
+                )
                 if attn and int(token) not in special_ids
             ]
             if candidate_positions:
@@ -160,4 +162,3 @@ def _tokenizer_digest(tokenizer: Any) -> str:
         return hashlib.sha256(json.dumps(attrs, sort_keys=True).encode()).hexdigest()
     except Exception:
         return "unknown-tokenizer"
-

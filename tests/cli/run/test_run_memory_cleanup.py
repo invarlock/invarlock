@@ -3,6 +3,19 @@ from types import SimpleNamespace
 from invarlock.cli import run_runtime
 
 
+def test_optional_module_helpers_preserve_explicit_bindings(monkeypatch):
+    fake_psutil = SimpleNamespace(virtual_memory=lambda: "vm")
+    fake_torch = SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: False))
+
+    monkeypatch.setattr(run_runtime, "psutil", fake_psutil)
+    monkeypatch.setattr(run_runtime, "torch", fake_torch)
+
+    run_runtime.reset_optional_runtime_caches()
+
+    assert run_runtime.get_psutil() is fake_psutil
+    assert run_runtime.get_torch() is fake_torch
+
+
 def test_free_model_memory_invokes_cuda(monkeypatch):
     calls = {"empty_cache": 0, "synchronize": 0}
 

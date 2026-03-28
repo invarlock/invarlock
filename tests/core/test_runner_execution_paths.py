@@ -49,7 +49,14 @@ class DummyEdit(ModelEdit):
     def can_edit(self, model_desc: dict[str, Any]) -> bool:
         return self._can
 
-    def apply(self, model: Any, adapter: ModelAdapter, **kwargs) -> dict[str, Any]:
+    def apply(
+        self,
+        model: Any,
+        adapter: ModelAdapter,
+        plan=None,
+        runtime=None,
+    ) -> dict[str, Any]:
+        _ = model, adapter, plan, runtime
         return {
             "name": self.name,
             "deltas": {"params_changed": 1, "layers_modified": 0},
@@ -62,7 +69,14 @@ class NonDictEdit(ModelEdit):
     def can_edit(self, model_desc: dict[str, Any]) -> bool:
         return True
 
-    def apply(self, model: Any, adapter: ModelAdapter, **kwargs) -> Any:
+    def apply(
+        self,
+        model: Any,
+        adapter: ModelAdapter,
+        plan=None,
+        runtime=None,
+    ) -> Any:
+        _ = model, adapter, plan, runtime
         return "ok"  # Non-dict result to exercise fallback context updates
 
 
@@ -72,7 +86,14 @@ class MissingDeltasEdit(ModelEdit):
     def can_edit(self, model_desc: dict[str, Any]) -> bool:
         return True
 
-    def apply(self, model: Any, adapter: ModelAdapter, **kwargs) -> dict[str, Any]:
+    def apply(
+        self,
+        model: Any,
+        adapter: ModelAdapter,
+        plan=None,
+        runtime=None,
+    ) -> dict[str, Any]:
+        _ = model, adapter, plan, runtime
         return {"name": self.name}  # No 'deltas' key
 
 
@@ -82,7 +103,14 @@ class NonDictDeltasEdit(ModelEdit):
     def can_edit(self, model_desc: dict[str, Any]) -> bool:
         return True
 
-    def apply(self, model: Any, adapter: ModelAdapter, **kwargs) -> dict[str, Any]:
+    def apply(
+        self,
+        model: Any,
+        adapter: ModelAdapter,
+        plan=None,
+        runtime=None,
+    ) -> dict[str, Any]:
+        _ = model, adapter, plan, runtime
         return {"name": self.name, "deltas": 0}
 
 
@@ -845,7 +873,15 @@ def test_edit_phase_with_non_dict_report_context():
 
     report = RunReport()
     report.context = []  # type: ignore[assignment]
-    res = runner._edit_phase(model, adapter, edit, {}, report, edit_config=None)
+    res = runner._edit_phase(
+        model,
+        adapter,
+        edit,
+        {},
+        report,
+        edit_config=None,
+        edit_runtime=None,
+    )
     assert isinstance(res, dict) and isinstance(report.context, dict)
 
 

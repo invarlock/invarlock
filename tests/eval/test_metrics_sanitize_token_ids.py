@@ -1,6 +1,6 @@
 import pytest
 
-from invarlock.eval import metrics as metrics_mod
+from invarlock.eval import metrics_runtime as runtime_mod
 
 
 def test_sanitize_token_ids_clamps_out_of_range():
@@ -11,7 +11,7 @@ def test_sanitize_token_ids_clamps_out_of_range():
     labels = torch.tensor([[0, 10, 11]])
 
     cleaned_ids, cleaned_mask, cleaned_labels = (
-        metrics_mod._sanitize_token_ids_for_model(
+        runtime_mod._sanitize_token_ids_for_model(
             input_ids,
             attention_mask,
             labels,

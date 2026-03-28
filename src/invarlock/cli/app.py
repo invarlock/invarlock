@@ -90,7 +90,7 @@ def _emit_version() -> None:
 
         schema = None
         try:
-            from invarlock.reporting.report_builder import (
+            from invarlock.reporting.report_schema import (
                 REPORT_SCHEMA_VERSION as _SCHEMA,
             )
 

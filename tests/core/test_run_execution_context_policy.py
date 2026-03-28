@@ -133,8 +133,6 @@ def test_build_run_context_payload_skips_invalid_baseline_and_non_dict_context()
     )
 
     def _to_serialisable(obj: object) -> object:
-        if obj is cfg.eval:
-            return []
         if obj == "ignored":
             return "not-a-dict"
         if isinstance(obj, dict):
@@ -168,7 +166,8 @@ def test_build_run_context_payload_skips_invalid_baseline_and_non_dict_context()
         "shape_ok",
         "extra_ok",
     ]
-    assert payload["eval"] == []
+    assert payload["eval"]["max_pm_ratio"] == 1.5
+    assert payload["eval"]["loss"]["resolved_type"] == "ppl_causal"
 
 
 class _PlanWrapper:

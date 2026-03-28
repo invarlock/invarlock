@@ -3,7 +3,8 @@ from types import SimpleNamespace
 import torch
 import torch.nn as nn
 
-from invarlock.eval.metrics import MetricsConfig, _collect_activations
+from invarlock.eval.metrics import MetricsConfig
+from invarlock.eval.metrics_activation import _collect_activations
 
 
 def test_collect_activations_generator_with_attention_mask_first_batch_capture():

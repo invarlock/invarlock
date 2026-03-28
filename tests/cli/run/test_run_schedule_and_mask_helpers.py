@@ -5,21 +5,24 @@ import json
 from pathlib import Path
 
 from invarlock.cli import run_masking as masking_mod
-from invarlock.cli.commands import run as run_mod
+from invarlock.cli.run_artifacts import persist_ref_masks
+from invarlock.cli.run_pairing import extract_pairing_schedule
+from invarlock.core.exit_codes import resolve_command_exit_code
 from invarlock.core.exceptions import (
     ConfigError,
     DataError,
     InvarlockError,
     ValidationError,
 )
+from invarlock.core.run_policy import should_measure_overhead
 
 
 def test_should_measure_overhead_respects_config_and_profile() -> None:
-    assert run_mod._should_measure_overhead("ci", {}) == (True, False, None)
-    assert run_mod._should_measure_overhead("release", {}) == (True, False, None)
-    assert run_mod._should_measure_overhead("dev", {}) == (False, False, None)
+    assert should_measure_overhead("ci", {}) == (True, False, None)
+    assert should_measure_overhead("release", {}) == (True, False, None)
+    assert should_measure_overhead("dev", {}) == (False, False, None)
 
-    assert run_mod._should_measure_overhead(
+    assert should_measure_overhead(
         "ci", {"context": {"run": {"skip_overhead_check": True}}}
     ) == (False, True, "config:context.run.skip_overhead_check")
 
@@ -28,7 +31,7 @@ def test_persist_ref_masks_writes_artifact_when_present(tmp_path: Path) -> None:
     core_report = {
         "edit": {"artifacts": {"mask_payload": {"keep_indices": [1, 2, 3]}}},
     }
-    out = run_mod._persist_ref_masks(core_report, tmp_path)
+    out = persist_ref_masks(core_report, tmp_path)
     assert isinstance(out, Path)
     assert out.exists()
     payload = json.loads(out.read_text(encoding="utf-8"))
@@ -37,40 +40,40 @@ def test_persist_ref_masks_writes_artifact_when_present(tmp_path: Path) -> None:
 
 
 def test_persist_ref_masks_returns_none_when_missing_payload(tmp_path: Path) -> None:
-    assert run_mod._persist_ref_masks({}, tmp_path) is None
-    assert run_mod._persist_ref_masks({"edit": {}}, tmp_path) is None
-    assert run_mod._persist_ref_masks({"edit": {"artifacts": {}}}, tmp_path) is None
+    assert persist_ref_masks({}, tmp_path) is None
+    assert persist_ref_masks({"edit": {}}, tmp_path) is None
+    assert persist_ref_masks({"edit": {"artifacts": {}}}, tmp_path) is None
 
 
 def test_resolve_exit_code_covers_known_exceptions() -> None:
     assert (
-        run_mod._resolve_exit_code(ConfigError(code="E0", message="x"), profile="ci")
+        resolve_command_exit_code(ConfigError(code="E0", message="x"), profile="ci")
         == 2
     )
     assert (
-        run_mod._resolve_exit_code(
+        resolve_command_exit_code(
             ValidationError(code="E0", message="x"), profile=None
         )
         == 2
     )
     assert (
-        run_mod._resolve_exit_code(DataError(code="E0", message="x"), profile="release")
+        resolve_command_exit_code(DataError(code="E0", message="x"), profile="release")
         == 2
     )
     assert (
-        run_mod._resolve_exit_code(
+        resolve_command_exit_code(
             ValueError("Invalid RunReport structure"), profile=None
         )
         == 2
     )
     assert (
-        run_mod._resolve_exit_code(
+        resolve_command_exit_code(
             InvarlockError(code="E0", message="x"), profile="release"
         )
         == 3
     )
     assert (
-        run_mod._resolve_exit_code(
+        resolve_command_exit_code(
             InvarlockError(code="E0", message="x"), profile="dev"
         )
         == 1
@@ -96,7 +99,7 @@ def test_extract_pairing_schedule_sanitizes_attention_and_labels() -> None:
             },
         }
     }
-    sched = run_mod._extract_pairing_schedule(report)
+    sched = extract_pairing_schedule(report)
     assert isinstance(sched, dict)
     assert sched["preview"]["attention_masks"] == [[1, 1, 1]]
     assert sched["preview"]["labels"] == [[5, 6, -100]]
@@ -106,10 +109,10 @@ def test_extract_pairing_schedule_sanitizes_attention_and_labels() -> None:
 
 
 def test_extract_pairing_schedule_returns_none_on_invalid_shapes() -> None:
-    assert run_mod._extract_pairing_schedule(None) is None
-    assert run_mod._extract_pairing_schedule({"evaluation_windows": "nope"}) is None
+    assert extract_pairing_schedule(None) is None
+    assert extract_pairing_schedule({"evaluation_windows": "nope"}) is None
     assert (
-        run_mod._extract_pairing_schedule(
+        extract_pairing_schedule(
             {"evaluation_windows": {"preview": {"input_ids": "bad"}, "final": {}}}
         )
         is None
@@ -127,7 +130,7 @@ def test_extract_pairing_schedule_rejects_non_int_window_ids() -> None:
             "final": {"input_ids": [[1]]},
         }
     }
-    assert run_mod._extract_pairing_schedule(report) is None
+    assert extract_pairing_schedule(report) is None
 
 
 def test_apply_mlm_masks_handles_mask_random_and_original_modes(monkeypatch) -> None:

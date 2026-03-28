@@ -21,7 +21,10 @@ class DummyEdit:
     def can_edit(self, model_desc: dict[str, Any]) -> bool:
         return True
 
-    def apply(self, model: Any, adapter: Any, **kwargs) -> dict[str, Any]:
+    def apply(
+        self, model: Any, adapter: Any, plan=None, runtime=None
+    ) -> dict[str, Any]:
+        _ = plan, runtime
         return {
             "name": self.name,
             "deltas": {"params_changed": 0, "layers_modified": 0},

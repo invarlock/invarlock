@@ -108,4 +108,3 @@ def _compute_mask_positions_digest(windows: dict[str, Any]) -> str | None:
         return digest if digest else None
     except Exception:
         return None
-

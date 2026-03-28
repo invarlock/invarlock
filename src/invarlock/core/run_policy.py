@@ -6,6 +6,10 @@ import math
 from collections.abc import Sequence
 from typing import Any
 
+from invarlock.core.auto_tuning import resolve_tier_policies
+
+GUARD_OVERHEAD_THRESHOLD = 0.01
+
 
 def coerce_mapping(obj: object) -> dict[str, Any]:
     """Best-effort conversion of config-like objects to plain dicts."""
@@ -159,7 +163,7 @@ def resolve_pm_drift_band(
 def resolve_guard_overhead_threshold(
     cfg: object | None,
     *,
-    default_threshold: float = 0.01,
+    default_threshold: float = GUARD_OVERHEAD_THRESHOLD,
     coerce_mapping_fn=coerce_mapping,
 ) -> float:
     """Resolve guard-overhead threshold from config with safe default fallback."""
@@ -236,11 +240,26 @@ def should_measure_overhead(
     return measure_guard_overhead, skip_overhead, source
 
 
+def resolve_pm_min_tokens_target(
+    *,
+    tier: str | None,
+    profile: str | None,
+) -> int:
+    """Resolve the minimum PM token target from tier policy."""
+    resolved = resolve_tier_policies((tier or "balanced").lower(), profile=profile)
+    metrics = resolved.get("metrics", {}) if isinstance(resolved, dict) else {}
+    pm_ratio = metrics.get("pm_ratio", {}) if isinstance(metrics, dict) else {}
+    try:
+        return int(pm_ratio.get("min_tokens", 0) or 0)
+    except Exception:
+        return 0
+
+
 def choose_dataset_split(
     *,
     requested: str | None,
     available: list[str] | None,
-    split_aliases: Sequence[str],
+    split_aliases: Sequence[str] = ("validation", "val", "dev", "eval", "test"),
 ) -> tuple[str, bool]:
     """Choose a dataset split deterministically."""
     try:

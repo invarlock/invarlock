@@ -9,16 +9,18 @@ from invarlock.cli.device import (
     resolve_device,
     validate_device_for_config,
 )
+from invarlock.cli.run_config import (
+    _apply_requested_edit_override,
+    _resolve_requested_edit_name,
+)
 from invarlock.core.config_runtime import (
     DatasetConfig,
     EvalBootstrapConfig,
     InvarLockConfig,
     SpectralGuardConfig,
     VarianceGuardConfig,
-    apply_edit_override,
     apply_profile,
     load_config,
-    resolve_edit_kind,
 )
 
 
@@ -73,11 +75,15 @@ dataset: !include inc.yaml
     with pytest.raises(ValueError, match="Unknown profile"):
         apply_profile(cfg, "ci")
     cfg2 = cfg
-    # resolve_edit_kind and override
-    assert resolve_edit_kind("quant_rtn") == "quant_rtn"
+    # run_config edit resolution and override
+    assert _resolve_requested_edit_name("quant_rtn") == "quant_rtn"
     with pytest.raises(ValueError):
-        resolve_edit_kind("unknown")
-    cfg3 = apply_edit_override(cfg2, "quant_rtn")
+        _resolve_requested_edit_name("unknown")
+    cfg3 = _apply_requested_edit_override(
+        cfg2,
+        "quant_rtn",
+        config_cls=InvarLockConfig,
+    )
     assert cfg3.require_section("edit")["name"] == "quant_rtn"
     assert "kind" not in cfg3.data["edit"]
 

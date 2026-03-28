@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.cli.commands.run import _format_debug_metric_diffs
+from invarlock.reporting.run_metric_utils import format_debug_metric_diffs
 
 
 def test_debug_metric_diffs_logs_small_deltas():
@@ -14,7 +14,7 @@ def test_debug_metric_diffs_logs_small_deltas():
     metrics = {"primary_metric": pm}
 
     # Act
-    line = _format_debug_metric_diffs(pm, metrics, baseline_report_data=None)
+    line = format_debug_metric_diffs(pm, metrics, baseline_report_data=None)
 
     # Assert: expected keys present and tiny deltas
     assert "final:" in line or "preview:" in line or "ratio_vs_baseline" in line

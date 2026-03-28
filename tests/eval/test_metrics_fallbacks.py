@@ -1,6 +1,7 @@
 import torch
 
 from invarlock.eval import metrics as M
+from invarlock.eval.metrics_activation import _perform_pre_eval_checks
 
 
 def test_compute_perplexity_tuple_fallback():
@@ -44,6 +45,6 @@ def test_pre_eval_checks_warnings():
             return _gen()
 
     # Should not raise
-    M._perform_pre_eval_checks(
+    _perform_pre_eval_checks(
         DummyLM(), BadData(), torch.device("cpu"), M.MetricsConfig()
     )

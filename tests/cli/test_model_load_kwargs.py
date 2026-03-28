@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from invarlock.cli.commands import run as run_mod
+from invarlock.cli import run_config as run_config_mod
+from invarlock.cli import run_runtime_exec as run_runtime_exec_mod
 from invarlock.core.config_runtime import InvarLockConfig
 from invarlock.core.exceptions import InvarlockError
 
@@ -42,7 +43,10 @@ def test_extract_model_load_kwargs_excludes_core_fields(
         }
     )
 
-    assert run_mod._extract_model_load_kwargs(cfg) == {
+    assert run_config_mod.extract_model_load_kwargs(
+        cfg,
+        invarlock_error_cls=InvarlockError,
+    ) == {
         "dtype": "float16",
         "trust_remote_code": True,
     }
@@ -62,7 +66,10 @@ def test_extract_model_load_kwargs_rejects_removed_keys():
     )
 
     with pytest.raises(InvarlockError) as excinfo:
-        _ = run_mod._extract_model_load_kwargs(cfg)
+        _ = run_config_mod.extract_model_load_kwargs(
+            cfg,
+            invarlock_error_cls=InvarlockError,
+        )
 
     assert excinfo.value.code == "E007"
     assert excinfo.value.details.get("removed_keys") == ["torch_dtype"]
@@ -78,7 +85,7 @@ def test_load_model_with_cfg_passes_all_kwargs_to_var_kw_adapter(
     )
     adapter = DummyKwAdapter()
 
-    _ = run_mod._load_model_with_cfg(adapter, cfg, "cpu")
+    _ = run_runtime_exec_mod.load_model_with_cfg(adapter, cfg, "cpu")
 
     assert adapter.calls == [("foo", "cpu", {"trust_remote_code": True})]
 
@@ -88,7 +95,7 @@ def test_load_model_with_cfg_passes_local_files_only_to_var_kw_adapter():
     cfg = InvarLockConfig({"model": {"id": "foo", "adapter": "dummy"}})
     adapter = DummyKwAdapter()
 
-    _ = run_mod._load_model_with_cfg(
+    _ = run_runtime_exec_mod.load_model_with_cfg(
         adapter,
         cfg,
         "cpu",
@@ -108,7 +115,7 @@ def test_load_model_with_cfg_filters_unknown_kwargs_for_strict_adapter(
     )
     adapter = DummyNoKwAdapter()
 
-    _ = run_mod._load_model_with_cfg(adapter, cfg, "cpu")
+    _ = run_runtime_exec_mod.load_model_with_cfg(adapter, cfg, "cpu")
 
     assert adapter.calls == [("foo", "cpu")]
 
@@ -118,7 +125,7 @@ def test_load_model_with_cfg_omits_local_files_only_for_strict_adapter():
     cfg = InvarLockConfig({"model": {"id": "foo", "adapter": "dummy"}})
     adapter = DummyNoKwAdapter()
 
-    _ = run_mod._load_model_with_cfg(
+    _ = run_runtime_exec_mod.load_model_with_cfg(
         adapter,
         cfg,
         "cpu",
@@ -138,7 +145,10 @@ def test_extract_model_load_kwargs_rejects_remote_code_without_explicit_allow(
     )
 
     with pytest.raises(InvarlockError) as excinfo:
-        run_mod._extract_model_load_kwargs(cfg)
+        run_config_mod.extract_model_load_kwargs(
+            cfg,
+            invarlock_error_cls=InvarlockError,
+        )
 
     assert excinfo.value.code == "E008"
 
@@ -152,4 +162,7 @@ def test_extract_model_load_kwargs_allows_remote_code_with_explicit_allow(
         {"model": {"id": "foo", "adapter": "dummy", "trust_remote_code": True}}
     )
 
-    assert run_mod._extract_model_load_kwargs(cfg) == {"trust_remote_code": True}
+    assert run_config_mod.extract_model_load_kwargs(
+        cfg,
+        invarlock_error_cls=InvarlockError,
+    ) == {"trust_remote_code": True}

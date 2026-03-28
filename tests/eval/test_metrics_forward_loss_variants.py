@@ -3,7 +3,8 @@ from types import SimpleNamespace
 import torch
 import torch.nn as nn
 
-from invarlock.eval.metrics import _forward_loss_causal, compute_perplexity_strict
+from invarlock.eval.metrics import compute_perplexity_strict
+from invarlock.eval.metrics_model_io import forward_loss_causal
 
 
 class ModelWithOutput(nn.Module):
@@ -32,14 +33,14 @@ def test_forward_loss_handles_modeloutput_and_tuple():
     B, T = 1, 4
     input_ids = torch.randint(0, 5, (B, T))
     labels = input_ids.clone()
-    loss, logits = _forward_loss_causal(ModelWithOutput(), input_ids, None, labels)
+    loss, logits = forward_loss_causal(ModelWithOutput(), input_ids, None, labels)
     assert isinstance(loss, float) and logits is not None
 
-    loss2, logits2 = _forward_loss_causal(ModelWithOutput(), input_ids, None, labels)
+    loss2, logits2 = forward_loss_causal(ModelWithOutput(), input_ids, None, labels)
     assert isinstance(loss2, float) and logits2 is not None
 
     # Tuple path (loss first, logits second)
-    loss3, logits3 = _forward_loss_causal(ModelWithOutput(), input_ids, None, labels)
+    loss3, logits3 = forward_loss_causal(ModelWithOutput(), input_ids, None, labels)
     assert isinstance(loss3, float) and logits3 is not None
 
 
@@ -47,7 +48,7 @@ def test_forward_loss_manual_loss_when_only_logits():
     B, T = 1, 4
     input_ids = torch.randint(0, 5, (B, T))
     labels = input_ids.clone()
-    loss, logits = _forward_loss_causal(ModelLogitsOnly(), input_ids, None, labels)
+    loss, logits = forward_loss_causal(ModelLogitsOnly(), input_ids, None, labels)
     assert isinstance(loss, float) and logits is not None
 
 

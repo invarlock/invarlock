@@ -4,23 +4,39 @@ from pathlib import Path
 
 import pytest
 
-import invarlock.core.config_execution as config_execution
+import invarlock.cli.config_execution as config_execution
 
 
-def test_run_from_config_requires_explicit_impls(
+def test_run_from_config_executes_concrete_run_request(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    seen: dict[str, object] = {}
+    report_path = Path("reports/demo.report.json")
     monkeypatch.setattr(
         config_execution,
         "apply_runtime_allowances",
         lambda **kwargs: None,
         raising=True,
     )
-    with pytest.raises(
-        RuntimeError,
-        match="requires an explicit executor callable",
-    ):
-        config_execution.run_from_config(config="configs/demo.yaml", delegate=False)
+    monkeypatch.setattr(
+        config_execution,
+        "execute_config_run_request",
+        lambda request: (seen.__setitem__("request", request), str(report_path))[1],
+        raising=True,
+    )
+    monkeypatch.setattr(
+        config_execution,
+        "write_runtime_manifest",
+        lambda *args, **kwargs: None,
+        raising=True,
+    )
+
+    out = config_execution.run_from_config(config="configs/demo.yaml", delegate=False)
+
+    assert out == report_path.resolve()
+    assert seen["request"] == config_execution.ConfigExecutionRequest(
+        config="configs/demo.yaml"
+    )
 
 
 def test_run_from_config_executes_without_delegation_and_writes_manifest(
@@ -47,9 +63,12 @@ def test_run_from_config_executes_without_delegation_and_writes_manifest(
         raising=True,
     )
 
-    def _executor(request: config_execution.ConfigExecutionRequest):
-        seen["request"] = request
-        return str(report_path)
+    monkeypatch.setattr(
+        config_execution,
+        "execute_config_run_request",
+        lambda request: (seen.__setitem__("request", request), str(report_path))[1],
+        raising=True,
+    )
 
     out = config_execution.run_from_config(
         config="configs/demo.yaml",
@@ -61,7 +80,6 @@ def test_run_from_config_executes_without_delegation_and_writes_manifest(
         allow_third_party_plugins=True,
         command_name="proof-pack-run",
         delegate=False,
-        executor=_executor,
     )
 
     assert out == report_path.resolve()
@@ -171,9 +189,12 @@ def test_run_from_config_skips_manifest_for_missing_report(
         raising=True,
     )
 
-    def _executor(request: config_execution.ConfigExecutionRequest) -> str:
-        seen["request"] = request
-        return str(missing_report)
+    monkeypatch.setattr(
+        config_execution,
+        "execute_config_run_request",
+        lambda request: (seen.__setitem__("request", request), str(missing_report))[1],
+        raising=True,
+    )
 
     monkeypatch.setattr(
         config_execution,
@@ -186,7 +207,6 @@ def test_run_from_config_skips_manifest_for_missing_report(
         config="configs/demo.yaml",
         profile="ci",
         delegate=False,
-        executor=_executor,
     )
 
     assert out == missing_report.resolve()
@@ -203,7 +223,7 @@ def test_run_from_config_skips_manifest_for_missing_report(
     )
 
 
-def test_run_from_config_raises_when_executor_returns_none(
+def test_run_from_config_raises_when_run_execution_returns_none(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
@@ -219,9 +239,17 @@ def test_run_from_config_raises_when_executor_returns_none(
         raising=True,
     )
 
-    with pytest.raises(RuntimeError, match="executor did not return a report path"):
+    monkeypatch.setattr(
+        config_execution,
+        "execute_config_run_request",
+        lambda request: None,
+        raising=True,
+    )
+
+    with pytest.raises(
+        RuntimeError, match="run execution did not return a report path"
+    ):
         config_execution.run_from_config(
             config="configs/demo.yaml",
             delegate=False,
-            executor=lambda request: None,
         )

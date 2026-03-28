@@ -5,6 +5,7 @@ import torch
 from rich.console import Console
 
 import invarlock.edits.quant_rtn as quant_rtn_mod
+from invarlock.core.api import EditRuntime
 from invarlock.edits.quant_rtn import RTNQuantEdit
 
 
@@ -70,9 +71,8 @@ def test_quant_rtn_output_format() -> None:
     edit.apply(
         model,
         adapter,
-        scope="all",
-        max_modules=1,
-        console=console,
+        plan={"scope": "all", "max_modules": 1},
+        runtime=EditRuntime(console=console),
     )
 
     text = out.getvalue()
@@ -92,10 +92,8 @@ def test_quant_rtn_emit_flag_suppresses_output() -> None:
     edit.apply(
         model,
         adapter,
-        scope="all",
-        max_modules=1,
-        console=console,
-        emit=False,
+        plan={"scope": "all", "max_modules": 1},
+        runtime=EditRuntime(console=console, emit=False),
     )
 
     assert out.getvalue() == ""
@@ -110,25 +108,22 @@ def test_quant_rtn_logs_when_console_missing(caplog: pytest.LogCaptureFixture) -
         edit.apply(
             model,
             adapter,
-            scope="all",
-            max_modules=1,
-            emit=True,
+            plan={"scope": "all", "max_modules": 1},
+            runtime=EditRuntime(emit=True),
         )
 
     assert caplog.records
     assert any(record.message.startswith("[EDIT]") for record in caplog.records)
 
 
-def test_quant_rtn_apply_rejects_bits_alias() -> None:
+def test_quant_rtn_apply_rejects_unsupported_plan_fields() -> None:
     model = torch.nn.Linear(2, 2, bias=False)
     adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
     edit = RTNQuantEdit(scope="all", max_modules=1)
 
-    result = edit.apply(model, adapter, bits=8)
+    result = edit.apply(model, adapter, plan={"bits": 8})
 
-    assert result["error"] == (
-        "RTNQuantEdit uses the canonical 'bitwidth' field; 'bits' is not supported."
-    )
+    assert result["error"] == "Unsupported RTN plan fields: bits"
 
 
 def test_quant_rtn_apply_rejects_non_int8_bitwidth_override() -> None:
@@ -136,6 +131,6 @@ def test_quant_rtn_apply_rejects_non_int8_bitwidth_override() -> None:
     adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
     edit = RTNQuantEdit(scope="all", max_modules=1)
 
-    result = edit.apply(model, adapter, bitwidth=4)
+    result = edit.apply(model, adapter, plan={"bitwidth": 4})
 
     assert "only supports 8-bit quantization" in result["error"]

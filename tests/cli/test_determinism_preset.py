@@ -115,7 +115,16 @@ def test_determinism_preset_marks_tolerance_when_backend_access_raises(
     monkeypatch,
 ) -> None:
     class _BackendsRaises:
-        def __getattr__(self, _name: str):
+        @property
+        def cuda(self):
+            raise RuntimeError("nope")
+
+        @property
+        def cudnn(self):
+            raise RuntimeError("nope")
+
+        @property
+        def mps(self):
             raise RuntimeError("nope")
 
     fake_torch = SimpleNamespace(

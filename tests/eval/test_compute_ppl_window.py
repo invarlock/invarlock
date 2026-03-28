@@ -27,7 +27,7 @@ def test_compute_ppl_window_success():
         input_ids=[[1, 2, 3, 4], [4, 3, 2, 1]],
         attention_masks=[[1, 1, 1, 1], [1, 1, 1, 1]],
     )
-    ppl = compute_ppl(model, adapter=None, window=window, device="cpu")
+    ppl = compute_ppl(model, window=window, device="cpu")
     assert isinstance(ppl, float) and math.isfinite(ppl) and ppl >= 1.0
 
 
@@ -35,7 +35,7 @@ def test_compute_ppl_window_degenerate_raises():
     model = TinyCausal()
     window = SimpleNamespace(input_ids=[], attention_masks=[])
     with pytest.raises(MValidationError):
-        compute_ppl(model, adapter=None, window=window, device="cpu")
+        compute_ppl(model, window=window, device="cpu")
 
 
 def test_compute_ppl_window_masks_out_of_range_tokens():
@@ -45,5 +45,5 @@ def test_compute_ppl_window_masks_out_of_range_tokens():
         input_ids=[[1, 2, 999, 3]],
         attention_masks=[[1, 1, 1, 1]],
     )
-    ppl = compute_ppl(model, adapter=None, window=window, device="cpu")
+    ppl = compute_ppl(model, window=window, device="cpu")
     assert isinstance(ppl, float) and math.isfinite(ppl) and ppl >= 1.0

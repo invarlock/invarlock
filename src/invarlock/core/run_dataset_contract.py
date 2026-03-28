@@ -4,6 +4,24 @@ from dataclasses import dataclass
 from typing import Any
 
 
+def _cfg_auto_tier(cfg: Any) -> str | None:
+    section_fn = getattr(cfg, "section", None)
+    section = None
+    if callable(section_fn):
+        try:
+            section = section_fn("auto")
+        except Exception:
+            section = None
+    if isinstance(section, dict):
+        tier = section.get("tier")
+    else:
+        try:
+            tier = cfg.auto.tier
+        except Exception:
+            tier = None
+    return str(tier) if isinstance(tier, str) and tier else None
+
+
 @dataclass(frozen=True)
 class RunDatasetContractResult:
     resolved_split: str | None
@@ -85,7 +103,7 @@ def materialize_run_dataset(
             mask_seed=mask_seed,
             random_token_prob=random_token_prob,
             original_token_prob=original_token_prob,
-            resolved_tier=tier or getattr(getattr(cfg, "auto", None), "tier", None),
+            resolved_tier=tier or _cfg_auto_tier(cfg),
             profile=profile,
         )
         return RunDatasetContractResult(

@@ -148,7 +148,7 @@ class RMTGuard(Guard):
         self._last_result: dict[str, Any] | None = None
         self.adapter = None  # Store adapter for tying map access
 
-        # Linear layer scope enforcement - same as existing RMT
+        # Canonical linear-layer scope enforced by the RMT analysis owner.
         self.allowed_suffixes = [
             ".attn.c_attn",
             ".attn.c_proj",
@@ -288,39 +288,11 @@ class RMTGuard(Guard):
         return violations
 
     def _get_linear_modules(self, model: nn.Module) -> list[tuple[str, nn.Module]]:
-        """
-        Get linear modules that are in scope for RMT analysis.
-
-        Args:
-            model: Model to analyze
-
-        Returns:
-            List of (name, module) tuples for linear layers in scope
-        """
-        # Get module types
-        try:
-            from transformers.pytorch_utils import Conv1D
-
-            module_types_with_conv1d_2: tuple[
-                type[nn.Linear], type[nn.Conv1d], type[Conv1D]
-            ] = (nn.Linear, nn.Conv1d, Conv1D)
-            module_types = module_types_with_conv1d_2
-        except ImportError:
-            module_types_without_conv1d_2: tuple[type[nn.Linear], type[nn.Conv1d]] = (
-                nn.Linear,
-                nn.Conv1d,
-            )
-            module_types = module_types_without_conv1d_2
-
-        candidates: list[tuple[str, nn.Module]] = []
-        for name, module in model.named_modules():
-            if not (isinstance(module, module_types) and hasattr(module, "weight")):
-                continue
-            # Strict scope enforcement - only allowed linear layers
-            if any(name.endswith(suffix) for suffix in self.allowed_suffixes):
-                candidates.append((name, module))
-        candidates.sort(key=lambda t: t[0])
-        return candidates
+        """Get linear modules in scope using the canonical analysis owner."""
+        return rmt_analysis.collect_linear_rmt_modules(
+            model,
+            allowed_suffixes=self.allowed_suffixes,
+        )
 
     def _collect_calibration_batches(self, calib: Any, max_windows: int) -> list[Any]:
         """Collect a deterministic slice of calibration batches."""
@@ -860,135 +832,40 @@ class RMTGuard(Guard):
         Uses exact Step 5 detection rule: ratio = σ_max_post / bulk_edge_base
         Flag if ratio > (1+deadband)*margin
         """
-        per_layer = []
-        flagged_layers = []
-        corrected_layers = 0
-
-        # Get linear modules in scope
         modules_to_analyze = self._get_linear_modules(model)
-
         self._log_event(
             "rmt_correction",
             message=f"Applying Step 5 detection and correction to {len(modules_to_analyze)} modules",
         )
-
-        for idx, (module_name, module) in enumerate(modules_to_analyze):
-            # Get current stats
-            stats = rmt_analysis.layer_svd_stats(
-                module, self.baseline_sigmas, self.baseline_mp_stats, module_name
-            )
-
-            # Step 5 detection rule
-            has_outlier = False
-            skip_reason = None
-
-            if self.baseline_mp_stats and module_name in self.baseline_mp_stats:
-                sigma_post = stats["sigma_max"]
-                mp_stats = self.baseline_mp_stats[module_name]
-                sigma_base = mp_stats.get("sigma_base", 1.0)
-
-                # CORRECTED Step 5 detection rule: baseline-aware growth ratio
-                # Compare current σ_max to baseline σ_max, normalized for stability
-                ratio = sigma_post / max(sigma_base, 1e-12)
-                detection_threshold = (1.0 + self.deadband) * self.margin
-
-                if ratio > detection_threshold:
-                    has_outlier = True
-
-                    # Apply correction using enhanced logic with adapter support
-                    if self.correct:
-                        try:
-                            rmt_detection._apply_rmt_correction(
-                                module,
-                                0.95,  # Conservative factor (not used in Step 5 logic)
-                                self.baseline_sigmas,
-                                self.baseline_mp_stats,
-                                module_name,
-                                self.deadband,
-                                verbose=False,
-                                adapter=self.adapter,
-                            )
-                            corrected_layers += 1
-
-                            self._log_event(
-                                "rmt_correct",
-                                message=f"Applied correction to {module_name}",
-                                module_name=module_name,
-                                pre_ratio=ratio,
-                                threshold=detection_threshold,
-                            )
-
-                            # Re-compute stats after correction
-                            stats_post = rmt_analysis.layer_svd_stats(
-                                module,
-                                self.baseline_sigmas,
-                                self.baseline_mp_stats,
-                                module_name,
-                            )
-                            mp_stats = self.baseline_mp_stats[module_name]
-                            bulk_edge_base = mp_stats.get("mp_bulk_edge_base", 1.0)
-                            ratio_post = stats_post["sigma_max"] / max(
-                                bulk_edge_base, 1e-12
-                            )
-
-                            # Update has_outlier based on post-correction ratio
-                            has_outlier = ratio_post > detection_threshold
-
-                        except Exception as e:
-                            self._log_event(
-                                "rmt_correct_failed",
-                                level="ERROR",
-                                message=f"Correction failed for {module_name}: {str(e)}",
-                                module_name=module_name,
-                                error=str(e),
-                            )
-                else:
-                    skip_reason = (
-                        f"≤ threshold (ratio={ratio:.2f} ≤ {detection_threshold:.2f})"
-                    )
-            else:
-                # Fallback when no baseline MP stats
-                ratio = stats["worst_ratio"]
-                if ratio > self.margin:
-                    has_outlier = True
-                else:
-                    skip_reason = f"≤ margin (ratio={ratio:.2f} ≤ {self.margin:.2f})"
-
-            layer_info = {
-                "layer": idx,
-                "module_name": module_name,
-                "sigma_min": stats["sigma_min"],
-                "sigma_max": stats["sigma_max"],
-                "worst_ratio": stats["worst_ratio"],
-                "has_outlier": has_outlier,
-                "skip_reason": skip_reason,
-            }
-
-            if "worst_details" in stats:
-                layer_info["details"] = stats["worst_details"]
-
-            per_layer.append(layer_info)
-
-            if has_outlier:
-                flagged_layers.append(idx)
-
-        # Aggregate results
-        n_outliers = len(flagged_layers)
-        max_ratio = max((float(item["worst_ratio"]) for item in per_layer), default=0.0)
-        has_outliers = n_outliers > 0
-
-        return {
-            "has_outliers": has_outliers,
-            "n_layers_flagged": n_outliers,
-            "outlier_count": n_outliers,
-            "max_ratio": max_ratio,
-            "threshold": self.margin,
-            "correction_iterations": 1 if corrected_layers > 0 else 0,
-            "corrected_layers": corrected_layers,
-            "per_layer": per_layer,
-            "flagged_layers": flagged_layers,
-            "layers": {f"layer_{item['layer']}": item for item in per_layer},
-        }
+        result = rmt_detection.step5_detect_and_correct_modules(
+            modules_to_analyze,
+            baseline_sigmas=self.baseline_sigmas,
+            baseline_mp_stats=self.baseline_mp_stats,
+            deadband=self.deadband,
+            margin=self.margin,
+            correct=self.correct,
+            adapter=self.adapter,
+        )
+        for event in result.pop("events", []):
+            operation = str(event.get("operation", "rmt_event"))
+            module_name = event.get("module_name")
+            if operation == "rmt_correct":
+                self._log_event(
+                    operation,
+                    message=f"Applied correction to {module_name}",
+                    module_name=module_name,
+                    pre_ratio=event.get("pre_ratio"),
+                    threshold=event.get("threshold"),
+                )
+            elif operation == "rmt_correct_failed":
+                self._log_event(
+                    operation,
+                    level="ERROR",
+                    message=f"Correction failed for {module_name}: {event.get('error')}",
+                    module_name=module_name,
+                    error=event.get("error"),
+                )
+        return result
 
     def prepare(
         self,

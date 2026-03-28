@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import invarlock.eval.data as data_mod
+import invarlock.eval.data_support as data_support_mod
 
 
 def test_wikitext2_fast_capacity_without_network(monkeypatch):
     # Bypass datasets check and load
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
     monkeypatch.setattr(
         data_mod.WikiText2Provider, "_validate_dependencies", lambda self: None
     )

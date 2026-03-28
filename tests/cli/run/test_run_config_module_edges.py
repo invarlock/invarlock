@@ -31,8 +31,6 @@ def test_prepare_config_for_run_handles_model_dump_failure_without_auto_adapter(
         invarlock_config_cls=lambda payload: payload,
         load_config_fn=lambda path: _BrokenConfig(),  # noqa: ARG005
         apply_profile_fn=lambda cfg, profile: cfg,  # noqa: ARG005
-        resolve_edit_kind_fn=lambda edit: edit,
-        apply_edit_override_fn=lambda cfg, edit: cfg,  # noqa: ARG005
     )
 
     assert cfg == {"auto": {"tier": "balanced"}}

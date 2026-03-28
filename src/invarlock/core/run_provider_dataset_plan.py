@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
+
+from .provider_config import resolve_provider_kind_and_kwargs
 
 
 @dataclass(frozen=True)
@@ -46,6 +48,19 @@ SafeIntFn = Callable[[Any, int], int]
 TensorOrListToIntsFn = Callable[[Any], list[int]]
 
 
+def _section_value(section: Any, key: str) -> Any:
+    get_value = getattr(section, "get", None)
+    if callable(get_value):
+        try:
+            return get_value(key)
+        except Exception:
+            pass
+    try:
+        return getattr(section, key)
+    except (AttributeError, TypeError):
+        return None
+
+
 def _build_provider_kwargs(cfg_dataset: Any) -> dict[str, Any]:
     provider_kwargs: dict[str, Any] = {}
     for key in (
@@ -60,40 +75,39 @@ def _build_provider_kwargs(cfg_dataset: Any) -> dict[str, Any]:
         "path",
         "data_files",
     ):
-        try:
-            value = getattr(cfg_dataset, key)
-        except (AttributeError, TypeError):
-            value = None
+        value = _section_value(cfg_dataset, key)
         if value is not None and value != "":
             provider_kwargs[key] = value
 
-    provider_val = getattr(cfg_dataset, "provider", None)
-    if isinstance(provider_val, dict):
-        for key, value in provider_val.items():
-            if key != "kind" and value is not None and value != "":
-                provider_kwargs[key] = value
-        return provider_kwargs
-
-    if isinstance(provider_val, str):
-        return provider_kwargs
-
-    try:
-        _ = provider_val.get("kind")  # type: ignore[attr-defined]
-    except (AttributeError, TypeError):
-        return provider_kwargs
-
-    try:
-        items = provider_val._data.items()  # type: ignore[attr-defined]
-    except (AttributeError, TypeError):
-        try:
-            items = provider_val.items()  # type: ignore[attr-defined]
-        except (AttributeError, TypeError):
-            return provider_kwargs
-
-    for key, value in items:
-        if key != "kind" and value is not None and value != "":
+    _provider_kind, explicit_provider_kwargs = resolve_provider_kind_and_kwargs(
+        getattr(cfg_dataset, "provider", None)
+    )
+    for key, value in explicit_provider_kwargs.items():
+        if value is not None and value != "":
             provider_kwargs[key] = value
     return provider_kwargs
+
+
+def _section_dict(cfg: Any, name: str) -> dict[str, Any]:
+    section_fn = getattr(cfg, "section", None)
+    if callable(section_fn):
+        try:
+            section = section_fn(name)
+        except Exception:
+            section = None
+        if isinstance(section, dict):
+            return section
+    try:
+        value = getattr(cfg, name)
+    except Exception:
+        value = None
+    if isinstance(value, Mapping):
+        return dict(value)
+    if hasattr(value, "__dict__"):
+        return {
+            key: item for key, item in vars(value).items() if not key.startswith("_")
+        }
+    return {}
 
 
 def build_provider_dataset_plan(
@@ -129,6 +143,9 @@ def build_provider_dataset_plan(
     tensor_or_list_to_ints_fn: TensorOrListToIntsFn,
 ) -> ProviderDatasetPlanResult:
     notices: list[ProviderDatasetPlanNotice] = []
+    eval_section = _section_dict(cfg, "eval")
+    guards_section = _section_dict(cfg, "guards")
+    auto_section = _section_dict(cfg, "auto")
 
     def _provider_notice(tag: str, message: str, emoji: str | None = None) -> None:
         notices.append(ProviderDatasetPlanNotice(tag=tag, message=message, emoji=emoji))
@@ -153,7 +170,7 @@ def build_provider_dataset_plan(
     if release_profile and not pairing_schedule_present:
         estimate_fn = getattr(data_provider, "estimate_capacity", None)
         if callable(estimate_fn):
-            capacity_fast = bool(getattr(cfg.eval, "capacity_fast", False))
+            capacity_fast = bool(eval_section.get("capacity_fast", False))
             capacity_meta = estimate_fn(
                 tokenizer=tokenizer,
                 seq_len=cfg.dataset.seq_len,
@@ -162,9 +179,13 @@ def build_provider_dataset_plan(
                 target_total=requested_preview + requested_final,
                 fast_mode=capacity_fast,
             )
-            variance_policy = getattr(cfg.guards, "variance", None)
+            variance_policy = (
+                guards_section.get("variance")
+                if isinstance(guards_section.get("variance"), dict)
+                else None
+            )
             max_calibration = (
-                getattr(variance_policy, "max_calib", 0)
+                int(variance_policy.get("max_calib", 0))
                 if variance_policy is not None
                 else 0
             )
@@ -279,7 +300,7 @@ def build_provider_dataset_plan(
             )
 
     min_tokens_target = resolve_pm_min_tokens_target_fn(
-        tier=tier or getattr(getattr(cfg, "auto", None), "tier", None),
+        tier=tier or auto_section.get("tier"),
         profile=profile,
     )
     tokens_floor_met = (

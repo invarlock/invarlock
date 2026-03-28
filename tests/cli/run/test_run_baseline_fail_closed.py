@@ -106,7 +106,7 @@ def _patch_minimal_run():
         patch("invarlock.core.runner.CoreRunner", lambda: DummyRunner()),
         patch("invarlock.eval.data.get_provider", lambda *a, **k: Provider()),
         patch(
-            "invarlock.cli.run_runtime.detect_model_profile",
+            "invarlock.cli.run_execution.detect_model_profile",
             lambda *a, **k: SimpleNamespace(
                 default_loss="ce",
                 default_provider=None,

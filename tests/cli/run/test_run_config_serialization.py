@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.cli.commands import run
+from invarlock.cli import run_serialization as run_serial_mod
 from invarlock.core.config_runtime import load_config
 
 
@@ -21,7 +21,7 @@ guards:
     cfg = load_config(cfg_path)
     variance_cfg = cfg.guards.variance
 
-    as_dict = run._to_serialisable_dict(variance_cfg)
+    as_dict = run_serial_mod._to_serialisable_dict(variance_cfg)
     assert as_dict["mode"] == "ci"
     assert as_dict["calibration"]["windows"] == 6
 
@@ -47,7 +47,10 @@ guards:
 
 def test_prune_none_values_drops_list_and_tuple_entries():
     payload = {"a": None, "b": [1, None, {"c": None, "d": 2}], "e": (None, 3)}
-    assert run._prune_none_values(payload) == {"b": [1, {"d": 2}], "e": (3,)}
+    assert run_serial_mod._prune_none_values(payload) == {
+        "b": [1, {"d": 2}],
+        "e": (3,),
+    }
 
 
 def test_to_serialisable_dict_falls_back_when_dict_method_raises():
@@ -58,7 +61,7 @@ def test_to_serialisable_dict_falls_back_when_dict_method_raises():
         def dict(self):
             raise RuntimeError("boom")
 
-    assert run._to_serialisable_dict(ExplodingDict()) == {"x": 1}
+    assert run_serial_mod._to_serialisable_dict(ExplodingDict()) == {"x": 1}
 
 
 def test_to_serialisable_dict_uses_vars_when_data_getattr_raises():
@@ -71,7 +74,7 @@ def test_to_serialisable_dict_uses_vars_when_data_getattr_raises():
                 raise RuntimeError("boom")
             return object.__getattribute__(self, name)
 
-    assert run._to_serialisable_dict(Weird()) == {"y": 2}
+    assert run_serial_mod._to_serialisable_dict(Weird()) == {"y": 2}
 
 
 def test_to_serialisable_dict_returns_empty_dict_when_vars_fails():
@@ -81,4 +84,4 @@ def test_to_serialisable_dict_returns_empty_dict_when_vars_fails():
         def __init__(self):
             self.a = 1
 
-    assert run._to_serialisable_dict(NoVars()) == {}
+    assert run_serial_mod._to_serialisable_dict(NoVars()) == {}

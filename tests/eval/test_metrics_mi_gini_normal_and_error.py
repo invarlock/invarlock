@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 
-from invarlock.eval.metrics import MetricsConfig, _calculate_mi_gini
+from invarlock.eval.metrics import MetricsConfig
+from invarlock.eval.metrics_activation import _calculate_mi_gini
 
 
 def test_mi_gini_gpu_path_success_and_non_oom_error(monkeypatch):

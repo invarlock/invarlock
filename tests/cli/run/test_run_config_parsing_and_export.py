@@ -211,20 +211,20 @@ def _run_with_common_patches(
             return {"name": name, "module": f"{plugin_type}.{name}", "version": "test"}
 
     patches = [
-        patch("invarlock.cli.commands.run._prepare_config_for_run", lambda **k: cfg),
-        patch("invarlock.cli.run_runtime.detect_model_profile", _detect_profile),
+        patch("invarlock.cli.run_config.prepare_config_for_run", lambda **k: cfg),
+        patch("invarlock.cli.run_execution.detect_model_profile", _detect_profile),
         patch("invarlock.cli.run_runtime.resolve_tokenizer", lambda *_a, **_k: _tok()),
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch("invarlock.core.registry.get_registry", lambda: Registry()),
         patch(
-            "invarlock.cli.commands.run._should_measure_overhead",
+            "invarlock.core.run_orchestrator._should_measure_overhead_impl",
             lambda *_a: (False, False, None),
         ),
-        patch("invarlock.cli.commands.run._execute_guarded_run", exec_stub),
-        patch("invarlock.cli.commands.run._postprocess_and_summarize", post_stub),
+        patch("invarlock.cli.run_runtime_exec.execute_guarded_run", exec_stub),
+        patch("invarlock.cli.run_artifact_output.postprocess_and_summarize", post_stub),
         patch(
-            "invarlock.cli.commands.run._resolve_metric_and_provider",
+            "invarlock.cli.run_pairing.resolve_metric_and_provider",
             lambda *_a, **_k: ("ppl_causal", None, {}),
         ),
         patch(
@@ -281,7 +281,7 @@ def test_run_command_provider_dict_unwraps_nested_kwargs(tmp_path: Path) -> None
         exec_stub=exec_stub,
         post_stub=post_stub,
         extra_patches=(
-            patch("invarlock.cli.commands.run._resolve_provider_and_split", resolver),
+            patch("invarlock.cli.run_config.resolve_provider_and_split", resolver),
         ),
     )
 
@@ -338,7 +338,7 @@ def test_run_command_provider_mapping_like_unwraps_data_and_items_fallback(
         dataset_provider=ProviderObj(cfg_data, break_data=True),
     )
 
-    extra = (patch("invarlock.cli.commands.run._resolve_provider_and_split", resolver),)
+    extra = (patch("invarlock.cli.run_config.resolve_provider_and_split", resolver),)
     _run_with_common_patches(
         cfg=cfg, exec_stub=exec_stub, post_stub=post_stub, extra_patches=extra
     )
@@ -381,7 +381,7 @@ def test_run_command_extracts_edit_config_from_plan(tmp_path: Path) -> None:
     )
 
     extra = (
-        patch("invarlock.cli.commands.run._resolve_provider_and_split", resolver),
+        patch("invarlock.cli.run_config.resolve_provider_and_split", resolver),
         patch(
             "invarlock.eval.data.get_provider",
             lambda *_a, **_k: SimpleNamespace(
@@ -407,7 +407,7 @@ def test_run_command_rejects_legacy_edit_parameters(tmp_path: Path) -> None:
 
     extra = (
         patch(
-            "invarlock.cli.commands.run._resolve_provider_and_split",
+            "invarlock.cli.run_config.resolve_provider_and_split",
             lambda *_a, **_k: (
                 SimpleNamespace(windows=lambda **_kw: _provider_windows(1, 1)),
                 "validation",
@@ -440,7 +440,7 @@ def test_run_command_rejects_legacy_edit_kind(tmp_path: Path) -> None:
 
     extra = (
         patch(
-            "invarlock.cli.commands.run._resolve_provider_and_split",
+            "invarlock.cli.run_config.resolve_provider_and_split",
             lambda *_a, **_k: (
                 SimpleNamespace(windows=lambda **_kw: _provider_windows(1, 1)),
                 "validation",
@@ -489,7 +489,7 @@ def test_run_command_writes_telemetry_report(tmp_path: Path) -> None:
     )
 
     extra = (
-        patch("invarlock.cli.commands.run._resolve_provider_and_split", resolver),
+        patch("invarlock.cli.run_config.resolve_provider_and_split", resolver),
         patch(
             "invarlock.eval.data.get_provider",
             lambda *_a, **_k: SimpleNamespace(
@@ -611,11 +611,11 @@ def test_run_command_baseline_token_counts_provider_parity_export_and_classifica
 
     with ExitStack() as stack:
         for p in (
-            patch("invarlock.cli.commands.run.console", rec_console),
+            patch("invarlock.cli.run_execution.console", rec_console),
             patch(
-                "invarlock.cli.commands.run._prepare_config_for_run", lambda **k: cfg
+                "invarlock.cli.run_config.prepare_config_for_run", lambda **k: cfg
             ),
-            patch("invarlock.cli.run_runtime.detect_model_profile", _detect_profile),
+            patch("invarlock.cli.run_execution.detect_model_profile", _detect_profile),
             patch(
                 "invarlock.cli.run_runtime.resolve_tokenizer", lambda *_a, **_k: _tok()
             ),
@@ -624,13 +624,13 @@ def test_run_command_baseline_token_counts_provider_parity_export_and_classifica
                 "invarlock.cli.device.validate_device_for_config", lambda d: (True, "")
             ),
             patch(
-                "invarlock.cli.commands.run._should_measure_overhead",
+                "invarlock.core.run_orchestrator._should_measure_overhead_impl",
                 lambda *_a: (False, False, None),
             ),
-            patch("invarlock.cli.commands.run._execute_guarded_run", exec_stub),
-            patch("invarlock.cli.commands.run._postprocess_and_summarize", post_stub),
+            patch("invarlock.cli.run_runtime_exec.execute_guarded_run", exec_stub),
+            patch("invarlock.cli.run_artifact_output.postprocess_and_summarize", post_stub),
             patch(
-                "invarlock.cli.commands.run._resolve_metric_and_provider",
+                "invarlock.cli.run_pairing.resolve_metric_and_provider",
                 lambda *_a, **_k: ("ppl_causal", None, {}),
             ),
             patch(
@@ -639,13 +639,11 @@ def test_run_command_baseline_token_counts_provider_parity_export_and_classifica
             ),
             patch("invarlock.core.registry.get_registry", lambda: Registry()),
             patch(
-                "invarlock.cli.commands.run._compute_provider_digest", provider_digest
+                "invarlock.cli.run_pairing.compute_provider_digest", provider_digest
             ),
+            patch("invarlock.cli.run_pairing.enforce_provider_parity", enforce_parity),
             patch(
-                "invarlock.cli.commands.run._enforce_provider_parity", enforce_parity
-            ),
-            patch(
-                "invarlock.cli.commands.run._format_debug_metric_diffs",
+                "invarlock.reporting.run_metric_utils.format_debug_metric_diffs",
                 lambda *_a, **_k: "diffs",
             ),
         ):
@@ -730,9 +728,9 @@ def test_run_command_classification_pseudo_counts_and_export_env_dir(
     with ExitStack() as stack:
         for p in (
             patch(
-                "invarlock.cli.commands.run._prepare_config_for_run", lambda **k: cfg
+                "invarlock.cli.run_config.prepare_config_for_run", lambda **k: cfg
             ),
-            patch("invarlock.cli.run_runtime.detect_model_profile", _detect_profile),
+            patch("invarlock.cli.run_execution.detect_model_profile", _detect_profile),
             patch(
                 "invarlock.cli.run_runtime.resolve_tokenizer", lambda *_a, **_k: _tok()
             ),
@@ -741,11 +739,11 @@ def test_run_command_classification_pseudo_counts_and_export_env_dir(
                 "invarlock.cli.device.validate_device_for_config", lambda d: (True, "")
             ),
             patch(
-                "invarlock.cli.commands.run._should_measure_overhead",
+                "invarlock.core.run_orchestrator._should_measure_overhead_impl",
                 lambda *_a: (False, False, None),
             ),
             patch(
-                "invarlock.cli.commands.run._resolve_provider_and_split",
+                "invarlock.cli.run_config.resolve_provider_and_split",
                 lambda *_a, **_k: (
                     SimpleNamespace(
                         windows=lambda **_kw: (
@@ -761,10 +759,10 @@ def test_run_command_classification_pseudo_counts_and_export_env_dir(
                     False,
                 ),
             ),
-            patch("invarlock.cli.commands.run._execute_guarded_run", exec_stub),
-            patch("invarlock.cli.commands.run._postprocess_and_summarize", post_stub),
+            patch("invarlock.cli.run_runtime_exec.execute_guarded_run", exec_stub),
+            patch("invarlock.cli.run_artifact_output.postprocess_and_summarize", post_stub),
             patch(
-                "invarlock.cli.commands.run._resolve_metric_and_provider",
+                "invarlock.cli.run_pairing.resolve_metric_and_provider",
                 lambda *_a, **_k: ("ppl_causal", None, {}),
             ),
             patch(
@@ -772,7 +770,7 @@ def test_run_command_classification_pseudo_counts_and_export_env_dir(
                 _pm_stub,
             ),
             patch(
-                "invarlock.cli.commands.run._format_debug_metric_diffs",
+                "invarlock.reporting.run_metric_utils.format_debug_metric_diffs",
                 lambda *_a, **_k: "",
             ),
             patch("invarlock.core.registry.get_registry", lambda: Registry()),
@@ -858,9 +856,9 @@ def test_run_command_export_saves_tokenizer_artifacts(
     with ExitStack() as stack:
         for p in (
             patch(
-                "invarlock.cli.commands.run._prepare_config_for_run", lambda **k: cfg
+                "invarlock.cli.run_config.prepare_config_for_run", lambda **k: cfg
             ),
-            patch("invarlock.cli.run_runtime.detect_model_profile", _detect_profile),
+            patch("invarlock.cli.run_execution.detect_model_profile", _detect_profile),
             patch(
                 "invarlock.cli.run_runtime.resolve_tokenizer",
                 lambda *_a, **_k: (tokenizer, "tokhash123"),
@@ -870,11 +868,11 @@ def test_run_command_export_saves_tokenizer_artifacts(
                 "invarlock.cli.device.validate_device_for_config", lambda d: (True, "")
             ),
             patch(
-                "invarlock.cli.commands.run._should_measure_overhead",
+                "invarlock.core.run_orchestrator._should_measure_overhead_impl",
                 lambda *_a: (False, False, None),
             ),
             patch(
-                "invarlock.cli.commands.run._resolve_provider_and_split",
+                "invarlock.cli.run_config.resolve_provider_and_split",
                 lambda *_a, **_k: (
                     SimpleNamespace(
                         windows=lambda **_kw: (
@@ -890,10 +888,10 @@ def test_run_command_export_saves_tokenizer_artifacts(
                     False,
                 ),
             ),
-            patch("invarlock.cli.commands.run._execute_guarded_run", exec_stub),
-            patch("invarlock.cli.commands.run._postprocess_and_summarize", post_stub),
+            patch("invarlock.cli.run_runtime_exec.execute_guarded_run", exec_stub),
+            patch("invarlock.cli.run_artifact_output.postprocess_and_summarize", post_stub),
             patch(
-                "invarlock.cli.commands.run._resolve_metric_and_provider",
+                "invarlock.cli.run_pairing.resolve_metric_and_provider",
                 lambda *_a, **_k: ("ppl_causal", None, {}),
             ),
             patch(
@@ -1008,11 +1006,11 @@ def test_run_command_until_pass_auto_tune_head_budget_paths(tmp_path: Path) -> N
         with ExitStack() as stack:
             for p in (
                 patch(
-                    "invarlock.cli.commands.run._prepare_config_for_run",
+                    "invarlock.cli.run_config.prepare_config_for_run",
                     lambda **k: cfg,
                 ),
                 patch(
-                    "invarlock.cli.run_runtime.detect_model_profile", _detect_profile
+                    "invarlock.cli.run_execution.detect_model_profile", _detect_profile
                 ),
                 patch(
                     "invarlock.cli.run_runtime.resolve_tokenizer",
@@ -1025,15 +1023,15 @@ def test_run_command_until_pass_auto_tune_head_budget_paths(tmp_path: Path) -> N
                 ),
                 patch("invarlock.core.registry.get_registry", lambda: Registry()),
                 patch(
-                    "invarlock.cli.commands.run._should_measure_overhead",
+                    "invarlock.core.run_orchestrator._should_measure_overhead_impl",
                     lambda *_a: (False, False, None),
                 ),
-                patch("invarlock.cli.commands.run._execute_guarded_run", exec_stub),
+                patch("invarlock.cli.run_runtime_exec.execute_guarded_run", exec_stub),
                 patch(
-                    "invarlock.cli.commands.run._postprocess_and_summarize", post_stub
+                    "invarlock.cli.run_artifact_output.postprocess_and_summarize", post_stub
                 ),
                 patch("invarlock.core.retry.RetryController", RC),
-                patch("invarlock.reporting.report_builder.make_report", make_cert),
+                patch("invarlock.reporting.report_make.make_report", make_cert),
             ):
                 stack.enter_context(p)
             run_command(

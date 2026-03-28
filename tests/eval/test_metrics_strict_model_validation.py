@@ -5,11 +5,9 @@ from types import SimpleNamespace
 import torch
 import torch.nn as nn
 
-from invarlock.eval.metrics import (
-    InputValidator,
-    MetricsConfig,
-    _perform_pre_eval_checks,
-)
+from invarlock.eval import metrics_support as support_mod
+from invarlock.eval.metrics import InputValidator, MetricsConfig
+from invarlock.eval.metrics_activation import _perform_pre_eval_checks
 
 
 def test_validate_model_logs_when_empty_model_in_strict_mode(monkeypatch) -> None:
@@ -19,9 +17,7 @@ def test_validate_model_logs_when_empty_model_in_strict_mode(monkeypatch) -> Non
 
     cfg = MetricsConfig(strict_validation=True, use_cache=False)
     seen: list[str] = []
-    monkeypatch.setattr(
-        "invarlock.eval.metrics.logger.debug", lambda msg: seen.append(str(msg))
-    )
+    monkeypatch.setattr(support_mod.logger, "debug", lambda msg: seen.append(str(msg)))
     InputValidator.validate_model(EmptyModel(), cfg)
     assert any("Could not count model parameters" in msg for msg in seen)
 

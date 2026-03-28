@@ -93,7 +93,7 @@ output:
         patch("invarlock.core.runner.CoreRunner", lambda: DummyRunner()),
         patch("invarlock.eval.data.get_provider", lambda *args, **kwargs: Provider()),
         patch(
-            "invarlock.cli.run_runtime.detect_model_profile",
+            "invarlock.cli.run_execution.detect_model_profile",
             lambda model_id=None, adapter=None: SimpleNamespace(
                 default_loss="ce",
                 model_id=model_id,

@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-from invarlock.eval.metrics import _locate_transformer_blocks_enhanced
+from invarlock.eval.metrics_activation import _locate_transformer_blocks_enhanced
 
 
 class M1(nn.Module):

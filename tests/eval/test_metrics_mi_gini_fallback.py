@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import torch
 
 from invarlock.eval import metrics as M
+from invarlock.eval.metrics_activation import _calculate_mi_gini
 
 
 def test_mi_gini_gpu_oom_fallback(monkeypatch):
@@ -31,7 +32,7 @@ def test_mi_gini_gpu_oom_fallback(monkeypatch):
 
     cfg = M.MetricsConfig(progress_bars=False)
     # Call private implementation to exercise fallback branch without heavyweight setup
-    out = M._calculate_mi_gini(
+    out = _calculate_mi_gini(
         model=SimpleNamespace(),
         activation_data=activation_data,
         dep_manager=M.DependencyManager(),

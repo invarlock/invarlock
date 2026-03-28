@@ -13,9 +13,11 @@ from . import rmt_analysis, rmt_math
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "evaluate_step5_layer",
     "rmt_detect",
     "rmt_detect_report",
     "rmt_detect_with_names",
+    "step5_detect_and_correct_modules",
     "_apply_rmt_correction",
 ]
 
@@ -23,6 +25,137 @@ __all__ = [
 def _emit_verbose(verbose: bool, message: str) -> None:
     if verbose:
         logger.info(message)
+
+
+def evaluate_step5_layer(
+    stats: dict[str, Any],
+    *,
+    baseline_mp_stats: dict[str, dict[str, float]] | None,
+    module_name: str,
+    deadband: float,
+    margin: float,
+) -> tuple[bool, float, str | None]:
+    """Evaluate the canonical Step 5 outlier rule for a single module."""
+    if baseline_mp_stats and module_name in baseline_mp_stats:
+        sigma_post = float(stats.get("sigma_max", 0.0) or 0.0)
+        sigma_base = float(baseline_mp_stats[module_name].get("sigma_base", 1.0) or 1.0)
+        ratio = sigma_post / max(sigma_base, 1e-12)
+        threshold = (1.0 + deadband) * margin
+        if ratio > threshold:
+            return True, ratio, None
+        return False, ratio, f"≤ threshold (ratio={ratio:.2f} ≤ {threshold:.2f})"
+
+    ratio = float(stats.get("worst_ratio", 0.0) or 0.0)
+    if ratio > margin:
+        return True, ratio, None
+    return False, ratio, f"≤ margin (ratio={ratio:.2f} ≤ {margin:.2f})"
+
+
+def step5_detect_and_correct_modules(
+    modules_to_analyze: list[tuple[str, nn.Module]],
+    *,
+    baseline_sigmas: dict[str, float] | None,
+    baseline_mp_stats: dict[str, dict[str, float]] | None,
+    deadband: float,
+    margin: float,
+    correct: bool,
+    adapter: Any = None,
+) -> dict[str, Any]:
+    """Run the Step 5 detection/correction loop over explicit modules."""
+    per_layer: list[dict[str, Any]] = []
+    flagged_layers: list[int] = []
+    corrected_layers = 0
+    events: list[dict[str, Any]] = []
+
+    for idx, (module_name, module) in enumerate(modules_to_analyze):
+        stats = rmt_analysis.layer_svd_stats(
+            module,
+            baseline_sigmas,
+            baseline_mp_stats,
+            module_name,
+        )
+        has_outlier, ratio, skip_reason = evaluate_step5_layer(
+            stats,
+            baseline_mp_stats=baseline_mp_stats,
+            module_name=module_name,
+            deadband=deadband,
+            margin=margin,
+        )
+        can_correct = bool(baseline_mp_stats and module_name in baseline_mp_stats)
+
+        if has_outlier and correct and can_correct:
+            try:
+                _apply_rmt_correction(
+                    module,
+                    0.95,
+                    baseline_sigmas,
+                    baseline_mp_stats,
+                    module_name,
+                    deadband,
+                    verbose=False,
+                    adapter=adapter,
+                )
+                corrected_layers += 1
+                events.append(
+                    {
+                        "operation": "rmt_correct",
+                        "module_name": module_name,
+                        "pre_ratio": ratio,
+                        "threshold": (1.0 + deadband) * margin,
+                    }
+                )
+                stats = rmt_analysis.layer_svd_stats(
+                    module,
+                    baseline_sigmas,
+                    baseline_mp_stats,
+                    module_name,
+                )
+                has_outlier, ratio, skip_reason = evaluate_step5_layer(
+                    stats,
+                    baseline_mp_stats=baseline_mp_stats,
+                    module_name=module_name,
+                    deadband=deadband,
+                    margin=margin,
+                )
+            except Exception as exc:
+                events.append(
+                    {
+                        "operation": "rmt_correct_failed",
+                        "module_name": module_name,
+                        "error": str(exc),
+                    }
+                )
+
+        layer_info = {
+            "layer": idx,
+            "module_name": module_name,
+            "sigma_min": stats["sigma_min"],
+            "sigma_max": stats["sigma_max"],
+            "worst_ratio": stats["worst_ratio"],
+            "has_outlier": has_outlier,
+            "skip_reason": skip_reason,
+        }
+        if "worst_details" in stats:
+            layer_info["details"] = stats["worst_details"]
+        per_layer.append(layer_info)
+        if has_outlier:
+            flagged_layers.append(idx)
+
+    n_outliers = len(flagged_layers)
+    max_ratio = max((float(item["worst_ratio"]) for item in per_layer), default=0.0)
+    return {
+        "has_outliers": n_outliers > 0,
+        "n_layers_flagged": n_outliers,
+        "outlier_count": n_outliers,
+        "max_ratio": max_ratio,
+        "threshold": margin,
+        "correction_iterations": 1 if corrected_layers > 0 else 0,
+        "corrected_layers": corrected_layers,
+        "per_layer": per_layer,
+        "flagged_layers": flagged_layers,
+        "layers": {f"layer_{item['layer']}": item for item in per_layer},
+        "events": events,
+    }
 
 
 def rmt_detect(
@@ -45,10 +178,8 @@ def rmt_detect(
 
     per_layer: list[dict[str, Any]] = []
     flagged_layers: list[int] = []
-    modules_to_analyze = []
-    allowed_suffixes = [".attn.c_attn", ".attn.c_proj", ".mlp.c_fc", ".mlp.c_proj"]
-
     if layer_indices is not None or target_layers is not None:
+        modules_to_analyze = []
         for idx, layer in enumerate(rmt_analysis._iter_transformer_layers(model)):
             if layer_indices is not None and idx not in layer_indices:
                 continue
@@ -64,19 +195,10 @@ def rmt_detect(
                     continue
             modules_to_analyze.append((f"transformer_layer_{idx}", layer))
     else:
-        allowed_set = None
-        if isinstance(allowed_module_names, list) and allowed_module_names:
-            allowed_set = {str(name).strip() for name in allowed_module_names if name}
-        for name, module in model.named_modules():
-            if any(name.endswith(suffix) for suffix in allowed_suffixes):
-                if allowed_set is not None and name not in allowed_set:
-                    continue
-                has_2d_weights = any(
-                    param.ndim == 2 and "weight" in param_name
-                    for param_name, param in module.named_parameters(recurse=False)
-                )
-                if has_2d_weights:
-                    modules_to_analyze.append((name, module))
+        modules_to_analyze = rmt_analysis.collect_linear_rmt_modules(
+            model,
+            allowed_module_names=allowed_module_names,
+        )
 
     prev_outlier_count = float("inf")
     correction_iterations = 0
@@ -158,7 +280,9 @@ def rmt_detect(
                         f"(σ_max={stats['sigma_max']:.2f}, norm={normalization})",
                     )
             elif verbose and skip_reason:
-                _emit_verbose(verbose, f"      Module {module_name}: SKIP: {skip_reason}")
+                _emit_verbose(
+                    verbose, f"      Module {module_name}: SKIP: {skip_reason}"
+                )
 
         if not detect_only and current_outliers > 0 and correction_factor is not None:
             if correction_iterations == 0:
@@ -204,12 +328,16 @@ def rmt_detect(
 
     if verbose and has_outliers:
         baseline_note = (
-            " (baseline-aware)" if baseline_sigmas and baseline_mp_stats else " (absolute)"
+            " (baseline-aware)"
+            if baseline_sigmas and baseline_mp_stats
+            else " (absolute)"
         )
         deadband_note = f" with {deadband:.0%} deadband" if deadband > 0.0 else ""
         n_detected = n_outliers
         n_will_be_capped = n_outliers if not detect_only else 0
-        _emit_verbose(verbose, f"    ⚠️ RMT outliers detected{baseline_note}{deadband_note}:")
+        _emit_verbose(
+            verbose, f"    ⚠️ RMT outliers detected{baseline_note}{deadband_note}:"
+        )
         _emit_verbose(
             verbose,
             f"      Detected: {n_detected}, will correct: {n_will_be_capped}",
@@ -394,7 +522,11 @@ def _apply_rmt_correction(
                     s_vals = torch.linalg.svdvals(W.float().cpu())
                     sigma_pre = s_vals[0].item()
 
-                    if baseline_sigmas and baseline_mp_stats and layer_name in baseline_mp_stats:
+                    if (
+                        baseline_sigmas
+                        and baseline_mp_stats
+                        and layer_name in baseline_mp_stats
+                    ):
                         mp_stats = baseline_mp_stats[layer_name]
                         sigma_base = mp_stats.get("sigma_base", 1.0)
                         margin = 1.5
@@ -421,7 +553,9 @@ def _apply_rmt_correction(
                         if tied_params and adapter:
                             for tied_name in tied_params:
                                 try:
-                                    tied_param = adapter.get_parameter_by_name(tied_name)
+                                    tied_param = adapter.get_parameter_by_name(
+                                        tied_name
+                                    )
                                     if tied_param is not None:
                                         tied_param.mul_(scale)
                                 except Exception:

@@ -127,7 +127,7 @@ def test_snapshot_auto_ram_fraction_env(tmp_path: Path, monkeypatch):
         stack.enter_context(
             patch("invarlock.cli.run_runtime.psutil.virtual_memory", vm)
         )
-        stack.enter_context(patch("invarlock.cli.commands.run.shutil.disk_usage", du))
+        stack.enter_context(patch("invarlock.cli.run_runtime_exec.shutil.disk_usage", du))
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider())
         )
@@ -238,7 +238,7 @@ def test_snapshot_cfg_threshold_and_tempdir(tmp_path: Path, monkeypatch):
         stack.enter_context(
             patch("invarlock.cli.run_runtime.psutil.virtual_memory", vm)
         )
-        stack.enter_context(patch("invarlock.cli.commands.run.shutil.disk_usage", du))
+        stack.enter_context(patch("invarlock.cli.run_runtime_exec.shutil.disk_usage", du))
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider())
         )
@@ -334,7 +334,7 @@ def test_snapshot_bytes_supported_but_ram_low_prefers_chunked(tmp_path: Path):
         stack.enter_context(
             patch("invarlock.cli.run_runtime.psutil.virtual_memory", vm)
         )
-        stack.enter_context(patch("invarlock.cli.commands.run.shutil.disk_usage", du))
+        stack.enter_context(patch("invarlock.cli.run_runtime_exec.shutil.disk_usage", du))
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider())
         )

@@ -9,7 +9,8 @@ from unittest.mock import patch
 import click
 import pytest
 
-from invarlock.cli.commands.run import _plan_release_windows, run_command
+from invarlock.cli.commands.run import run_command
+from invarlock.cli.run_overhead import plan_release_windows
 
 
 def _base_cfg(tmp_path: Path, preview=2, final=2) -> Path:
@@ -50,7 +51,7 @@ output:
 def _common_ce():
     return (
         patch(
-            "invarlock.cli.run_runtime.detect_model_profile",
+            "invarlock.cli.run_execution.detect_model_profile",
             lambda model_id, adapter: SimpleNamespace(
                 default_loss="ce",
                 model_id=model_id,
@@ -89,7 +90,7 @@ def _common_ce():
 
 
 def test_plan_release_windows_requested_zero_target():
-    plan = _plan_release_windows(
+    plan = plan_release_windows(
         {
             "available_unique": 800,
             "available_nonoverlap": 800,

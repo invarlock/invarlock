@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 import torch
 
-from invarlock.eval import metrics
+from invarlock.eval import metrics_support as support_mod
 from invarlock.eval.metrics import (
     DependencyError,
     DependencyManager,
@@ -14,9 +14,11 @@ from invarlock.eval.metrics import (
     MetricsConfig,
     ResourceManager,
     ValidationError,
+    bootstrap_confidence_interval,
+)
+from invarlock.eval.metrics_activation import (
     _gini_vectorized,
     _mi_gini_optimized_cpu_path,
-    bootstrap_confidence_interval,
 )
 
 
@@ -43,7 +45,7 @@ def patch_virtual_memory(monkeypatch):
         total = 8 * 1024**3
         available = 6 * 1024**3
 
-    monkeypatch.setattr(metrics.psutil, "virtual_memory", lambda: VM())
+    monkeypatch.setattr(support_mod.psutil, "virtual_memory", lambda: VM())
 
 
 def test_bootstrap_confidence_interval_basic():
@@ -85,8 +87,8 @@ def test_metrics_config_validation(tmp_path):
 
 
 def test_resource_manager_device_selection(monkeypatch):
-    monkeypatch.setattr(metrics.torch.cuda, "is_available", lambda: False)
-    monkeypatch.setattr(metrics.torch.backends.mps, "is_available", lambda: False)
+    monkeypatch.setattr(support_mod.torch.cuda, "is_available", lambda: False)
+    monkeypatch.setattr(support_mod.torch.backends.mps, "is_available", lambda: False)
 
     manager = ResourceManager(MetricsConfig(force_cpu=True, use_cache=False))
     assert manager.device.type == "cpu"
@@ -106,9 +108,9 @@ def test_resource_manager_cpu_fallback(monkeypatch):
 def test_resource_manager_cleanup(monkeypatch):
     called = {}
 
-    monkeypatch.setattr(metrics.torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(support_mod.torch.cuda, "is_available", lambda: True)
     monkeypatch.setattr(
-        metrics.torch.cuda,
+        support_mod.torch.cuda,
         "empty_cache",
         lambda: called.setdefault("empty_cache", True),
     )
@@ -117,10 +119,12 @@ def test_resource_manager_cleanup(monkeypatch):
         total_memory = 4 * 1024**3
 
     monkeypatch.setattr(
-        metrics.torch.cuda, "get_device_properties", lambda *_args, **_kwargs: Props()
+        support_mod.torch.cuda,
+        "get_device_properties",
+        lambda *_args, **_kwargs: Props(),
     )
     monkeypatch.setattr(
-        metrics.torch.cuda, "memory_allocated", lambda *_args, **_kwargs: 0
+        support_mod.torch.cuda, "memory_allocated", lambda *_args, **_kwargs: 0
     )
 
     manager = ResourceManager(MetricsConfig(use_cache=False))

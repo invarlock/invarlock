@@ -4,12 +4,10 @@ import pytest
 import torch
 import torch.nn as nn
 
-from invarlock.eval.metrics import (
-    MetricsConfig,
-    ResourceManager,
+from invarlock.eval.metrics import MetricsConfig, ResourceManager, compute_perplexity
+from invarlock.eval.metrics_activation import (
     _collect_activations,
     _perform_pre_eval_checks,
-    compute_perplexity,
 )
 
 
@@ -95,9 +93,9 @@ def test_sigma_max_no_columns_and_no_gain_values():
                 hidden_states=[torch.randn(1, 4, 4) for _ in range(3)]
             )
 
-    out = __import__(
-        "invarlock.eval.metrics", fromlist=["_calculate_sigma_max"]
-    )._calculate_sigma_max(
+    from invarlock.eval.metrics_activation import _calculate_sigma_max
+
+    out = _calculate_sigma_max(
         Tiny().eval(),
         {"input_ids": torch.ones(1, 8, dtype=torch.long)},
         DM(),

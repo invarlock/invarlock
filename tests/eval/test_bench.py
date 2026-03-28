@@ -464,7 +464,9 @@ def test_execute_single_run_skips_tokenizer_hash_and_duration_paths(
     monkeypatch.setattr(core_registry, "get_registry", lambda: _Registry())
     monkeypatch.setattr(core_runner, "CoreRunner", _CoreRunner)
     monkeypatch.setattr(
-        bench_runner_mod.rmt_detection, "rmt_detect", lambda **_k: {"n_layers_flagged": 0}
+        bench_runner_mod.rmt_detection,
+        "rmt_detect",
+        lambda **_k: {"n_layers_flagged": 0},
     )
 
     scenario = ScenarioConfig(
@@ -1129,7 +1131,8 @@ class TestExecuteSingleRun:
         )
         monkeypatch.setattr("invarlock.core.runner.CoreRunner.execute", _fake_execute)
         monkeypatch.setattr(
-            "invarlock.eval.bench_runner.rmt_analysis.capture_baseline_mp_stats", _fake_capture
+            "invarlock.eval.bench_runner.rmt_analysis.capture_baseline_mp_stats",
+            _fake_capture,
         )
         monkeypatch.setattr(
             "invarlock.eval.bench_runner.rmt_detection.rmt_detect",

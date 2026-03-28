@@ -198,7 +198,7 @@ def test_save_report_missing_json_key_exits(tmp_path: Path):
 
 
 def test_release_planner_without_adjustment():
-    from invarlock.cli.commands.run import _plan_release_windows
+    from invarlock.cli.run_overhead import plan_release_windows
 
     cap = {
         "available_unique": 2000,
@@ -206,7 +206,7 @@ def test_release_planner_without_adjustment():
         "total_tokens": 1_000_000,
         "dedupe_rate": 0.05,
     }
-    plan = _plan_release_windows(
+    plan = plan_release_windows(
         cap,
         requested_preview=300,
         requested_final=300,
@@ -217,7 +217,7 @@ def test_release_planner_without_adjustment():
 
 
 def test_release_planner_candidate_limit_only_path():
-    from invarlock.cli.commands.run import _plan_release_windows
+    from invarlock.cli.run_overhead import plan_release_windows
 
     cap = {
         "available_unique": 2000,
@@ -226,7 +226,7 @@ def test_release_planner_candidate_limit_only_path():
         "dedupe_rate": 0.05,
         "candidate_limit": 1000,
     }
-    plan = _plan_release_windows(
+    plan = plan_release_windows(
         cap,
         requested_preview=400,
         requested_final=400,
@@ -287,7 +287,7 @@ def test_snapshot_auto_bytes_and_chunked_paths(tmp_path: Path):
         )  # 50MB
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.shutil.disk_usage",
+                "invarlock.cli.run_runtime_exec.shutil.disk_usage",
                 lambda path: SimpleNamespace(
                     total=0, used=0, free=10 * 1024 * 1024 * 1024
                 ),

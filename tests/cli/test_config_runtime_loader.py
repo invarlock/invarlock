@@ -4,11 +4,11 @@ from pathlib import Path
 
 import pytest
 
+from invarlock.cli.run_config import _resolve_requested_edit_name
 from invarlock.core.config_runtime import (
     InvarLockConfig,
     apply_profile,
     load_tiers,
-    resolve_edit_kind,
 )
 
 
@@ -32,10 +32,10 @@ def test_apply_profile_unknown_raises():
         )
 
 
-def test_resolve_edit_kind_positive():
-    assert resolve_edit_kind("quant_rtn") == "quant_rtn"
-    assert resolve_edit_kind("noop") == "noop"
-    assert resolve_edit_kind("orchestrator") == "orchestrator"
+def test_resolve_requested_edit_name_positive():
+    assert _resolve_requested_edit_name("quant_rtn") == "quant_rtn"
+    assert _resolve_requested_edit_name("noop") == "noop"
+    assert _resolve_requested_edit_name("orchestrator") == "orchestrator"
 
 
 def test_apply_profile_runtime_profile_success(tmp_path: Path, monkeypatch):

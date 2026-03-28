@@ -3,6 +3,10 @@ from pathlib import Path
 
 import pytest
 
+from invarlock.cli.run_config import (
+    _apply_requested_edit_override,
+    _resolve_requested_edit_name,
+)
 from invarlock.core import config_runtime as cfg_mod
 from invarlock.core.config_dependencies import (
     absolute_path_no_resolve,
@@ -19,25 +23,27 @@ from invarlock.core.config_runtime import (
     SpectralGuardConfig,
     VarianceGuardConfig,
     _deep_merge,
-    apply_edit_override,
     apply_profile,
     load_config,
-    resolve_edit_kind,
 )
 
 
-def test_resolve_edit_kind_and_apply_override_roundtrip():
+def test_resolve_requested_edit_name_and_apply_override_roundtrip():
     cfg = InvarLockConfig.from_sections(
         model={"id": "gpt2", "adapter": "hf_causal"},
         edit={"name": "quant_rtn", "plan": {}},
     )
-    name = resolve_edit_kind("quant_rtn")
+    name = _resolve_requested_edit_name("quant_rtn")
     assert name == "quant_rtn"
-    updated = apply_edit_override(cfg, "quant_rtn")
+    updated = _apply_requested_edit_override(
+        cfg,
+        "quant_rtn",
+        config_cls=InvarLockConfig,
+    )
     assert updated.require_section("edit")["name"] == "quant_rtn"
     assert "kind" not in updated.data["edit"]
     with pytest.raises(ValueError):
-        resolve_edit_kind("unknown")
+        _resolve_requested_edit_name("unknown")
 
 
 def test_dataset_and_variance_validators_raise():

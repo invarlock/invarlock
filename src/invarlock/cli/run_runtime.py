@@ -2,80 +2,42 @@
 
 from __future__ import annotations
 
+import builtins
+from types import ModuleType
 from typing import Any
 
-_IMPORT_UNSET = object()
-_psutil_module: Any = _IMPORT_UNSET
-_torch_module: Any = _IMPORT_UNSET
 
-
-class _LazyImportProxy:
-    """Expose a patch-friendly module surface while deferring the real import."""
-
-    def __init__(self, loader):
-        self._loader = loader
-
-    def _target(self) -> Any:
-        return self._loader()
-
-    def __getattr__(self, name: str) -> Any:
-        target = self._target()
-        if target is None:
-            raise AttributeError(name)
-        return getattr(target, name)
-
-    def __bool__(self) -> bool:
-        return self._target() is not None
-
-    def __repr__(self) -> str:  # pragma: no cover - debug helper
-        target = self._target()
-        if target is None:
-            return "<lazy-missing-module>"
-        return repr(target)
-
-
-def _load_psutil_module() -> Any:
-    global _psutil_module
-    if _psutil_module is _IMPORT_UNSET:
-        try:
-            import psutil as _psutil
-        except ImportError:
-            _psutil_module = None
-        else:
-            _psutil_module = _psutil
-    return None if _psutil_module is _IMPORT_UNSET else _psutil_module
-
-
-def _load_torch_module() -> Any:
-    global _torch_module
-    if _torch_module is _IMPORT_UNSET:
-        try:
-            import torch as _torch
-        except ImportError:
-            _torch_module = None
-        else:
-            _torch_module = _torch
-    return None if _torch_module is _IMPORT_UNSET else _torch_module
+def _import_optional_module(name: str) -> Any:
+    try:
+        return builtins.__import__(name)
+    except ImportError:
+        return None
 
 
 def get_psutil() -> Any:
+    global psutil
+    if psutil is None or isinstance(psutil, ModuleType):
+        psutil = _import_optional_module("psutil")
     return psutil
 
 
 def get_torch() -> Any:
+    global torch
+    if torch is None or isinstance(torch, ModuleType):
+        torch = _import_optional_module("torch")
     return torch
 
 
-psutil: Any = _LazyImportProxy(_load_psutil_module)
-torch: Any = _LazyImportProxy(_load_torch_module)
+psutil: Any = _import_optional_module("psutil")
+torch: Any = _import_optional_module("torch")
 
 
 def reset_optional_runtime_caches() -> None:
-    global _psutil_module, _torch_module
-    if isinstance(psutil, _LazyImportProxy):
-        _psutil_module = _IMPORT_UNSET
-    if isinstance(torch, _LazyImportProxy):
-        _torch_module = _IMPORT_UNSET
+    global psutil, torch
+    if psutil is None:
+        psutil = _import_optional_module("psutil")
+    if torch is None:
+        torch = _import_optional_module("torch")
 
 
 def detect_model_profile(model_id: str, adapter: str | None = None) -> Any:

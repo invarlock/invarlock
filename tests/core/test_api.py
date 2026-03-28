@@ -339,15 +339,18 @@ class TestAbstractInterfacesCoverage:
             def can_edit(self, model_desc):
                 return model_desc.get("n_layer", 0) > 0
 
-            def apply(self, model, adapter, **kwargs):
-                return {"applied": True, "changes": kwargs}
+            def apply(self, model, adapter, plan=None, runtime=None):
+                _ = model, adapter, runtime
+                return {"applied": True, "changes": plan or {}}
 
         edit = CompleteEdit()
         assert edit.name == "complete_edit"
         assert edit.can_edit({"n_layer": 12})
         assert not edit.can_edit({"n_layer": 0})
 
-        result = edit.apply(Mock(), Mock(), param1="value1", param2="value2")
+        result = edit.apply(
+            Mock(), Mock(), plan={"param1": "value1", "param2": "value2"}
+        )
         assert result["applied"]
         assert result["changes"] == {"param1": "value1", "param2": "value2"}
 

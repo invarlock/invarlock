@@ -65,7 +65,7 @@ def _common_patches_detect_ce():
             },
         ),
         patch(
-            "invarlock.cli.run_runtime.detect_model_profile",
+            "invarlock.cli.run_execution.detect_model_profile",
             lambda model_id=None, adapter=None: SimpleNamespace(
                 default_loss="ce",
                 model_id=model_id,
@@ -102,7 +102,7 @@ def test_edit_cli_override_invalid_exits(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.core.config_runtime.resolve_edit_kind",
+                "invarlock.cli.run_config._resolve_requested_edit_name",
                 side_effect=ValueError("bad edit"),
             )
         )
@@ -244,7 +244,7 @@ def test_invariants_profile_checks_merged(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.detect_model_profile",
+                "invarlock.cli.run_execution.detect_model_profile",
                 lambda *a, **k: SimpleNamespace(
                     default_loss="ce",
                     model_id=None,
@@ -303,7 +303,7 @@ def test_edit_name_invalid_exits(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.core.config_runtime.resolve_edit_kind",
+                "invarlock.cli.run_config._resolve_requested_edit_name",
                 side_effect=ValueError("bad edit"),
             )
         )
@@ -440,7 +440,7 @@ def _runner_min():
 
 def _detect_loss(loss_type: str = "ce"):
     return patch(
-        "invarlock.cli.run_runtime.detect_model_profile",
+        "invarlock.cli.run_execution.detect_model_profile",
         lambda model_id, adapter: SimpleNamespace(
             default_loss=loss_type,
             model_id=model_id,
@@ -546,7 +546,7 @@ def test_bare_overhead_measurement_pass(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.detect_model_profile",
+        "invarlock.cli.run_execution.detect_model_profile",
         lambda *a, **k: SimpleNamespace(
             default_loss="ce",
             module_selectors={},
@@ -626,7 +626,7 @@ def test_dataset_meta_tokenizer_hash_passthrough(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.detect_model_profile",
+        "invarlock.cli.run_execution.detect_model_profile",
         lambda *a, **k: SimpleNamespace(
             default_loss="ce",
             module_selectors={},
@@ -881,7 +881,7 @@ def test_baseline_missing_eval_windows_fallback(monkeypatch, tmp_path):
 
 
 def test_release_capacity_planner_path():
-    from invarlock.cli.commands.run import _plan_release_windows
+    from invarlock.cli.run_overhead import plan_release_windows
 
     capacity = {
         "available_unique": 1000,
@@ -891,7 +891,7 @@ def test_release_capacity_planner_path():
         "candidate_unique": 800,
         "candidate_limit": 1600,
     }
-    plan = _plan_release_windows(
+    plan = plan_release_windows(
         capacity,
         requested_preview=400,
         requested_final=400,

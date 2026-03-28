@@ -8,14 +8,19 @@ import pytest
 
 from invarlock.cli import run_masking as masking_mod
 from invarlock.cli import run_pairing_helpers as pairing_mod
-from invarlock.cli.commands import run as run_mod
+from invarlock.cli import run_serialization as run_serial_mod
+from invarlock.core import run_policy as run_policy_mod
+from invarlock.core.run_policy import GUARD_OVERHEAD_THRESHOLD
+from invarlock.core.run_policy import choose_dataset_split
+from invarlock.core.run_policy import resolve_guard_overhead_threshold
+from invarlock.core.run_policy import resolve_pm_acceptance_range
 
 
 def test_coerce_mapping_covers_multiple_sources_and_failures() -> None:
-    assert run_mod._coerce_mapping({"a": 1}) == {"a": 1}
+    assert run_serial_mod._coerce_mapping({"a": 1}) == {"a": 1}
 
     obj_with_data = SimpleNamespace(_data={"b": 2})
-    assert run_mod._coerce_mapping(obj_with_data) == {"b": 2}
+    assert run_serial_mod._coerce_mapping(obj_with_data) == {"b": 2}
 
     class _DataAttrRaises:
         def __getattribute__(self, name: str):  # noqa: ANN001
@@ -26,7 +31,7 @@ def test_coerce_mapping_covers_multiple_sources_and_failures() -> None:
         def model_dump(self):  # noqa: ANN001
             return {"c": 3}
 
-    assert run_mod._coerce_mapping(_DataAttrRaises()) == {"c": 3}
+    assert run_serial_mod._coerce_mapping(_DataAttrRaises()) == {"c": 3}
 
     class _ModelDumpRaises:
         def model_dump(self):  # noqa: ANN001
@@ -34,33 +39,33 @@ def test_coerce_mapping_covers_multiple_sources_and_failures() -> None:
 
     inst = _ModelDumpRaises()
     inst.x = 1  # type: ignore[attr-defined]
-    assert run_mod._coerce_mapping(inst) == {"x": 1}
+    assert run_serial_mod._coerce_mapping(inst) == {"x": 1}
 
     class _Slots:
         __slots__ = ()
 
-    assert run_mod._coerce_mapping(_Slots()) == {}
+    assert run_serial_mod._coerce_mapping(_Slots()) == {}
 
     class _C:
         x = 1
 
-    assert run_mod._coerce_mapping(_C) == {}
+    assert run_serial_mod._coerce_mapping(_C) == {}
 
 
 def test_resolve_pm_acceptance_range_parses_cfg_and_ignores_env(monkeypatch) -> None:
     monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MIN", raising=False)
     monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MAX", raising=False)
 
-    assert run_mod._resolve_pm_acceptance_range(None) == {}
-    assert run_mod._resolve_pm_acceptance_range({}) == {}
+    assert resolve_pm_acceptance_range(None) == {}
+    assert resolve_pm_acceptance_range({}) == {}
 
     cfg = {"primary_metric": {"acceptance_range": {"min": "bad", "max": "1.2"}}}
-    out = run_mod._resolve_pm_acceptance_range(cfg)
+    out = resolve_pm_acceptance_range(cfg)
     assert out == {"min": 0.95, "max": 1.2}
 
     monkeypatch.setenv("INVARLOCK_PM_ACCEPTANCE_MIN", "-1")
     monkeypatch.setenv("INVARLOCK_PM_ACCEPTANCE_MAX", "0")
-    out2 = run_mod._resolve_pm_acceptance_range(cfg)
+    out2 = resolve_pm_acceptance_range(cfg)
     assert out2 == {"min": 0.95, "max": 1.2}
 
 
@@ -69,7 +74,7 @@ def test_resolve_pm_acceptance_range_ignores_invalid_cfg_max(monkeypatch) -> Non
     monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MAX", raising=False)
 
     cfg = {"primary_metric": {"acceptance_range": {"min": "1.0", "max": "bad"}}}
-    out = run_mod._resolve_pm_acceptance_range(cfg)
+    out = resolve_pm_acceptance_range(cfg)
     assert out == {"min": 1.0, "max": 1.1}
 
 
@@ -77,17 +82,17 @@ def test_resolve_pm_acceptance_range_clamps_invalid_bounds(monkeypatch) -> None:
     monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MIN", raising=False)
     monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MAX", raising=False)
 
-    out_min = run_mod._resolve_pm_acceptance_range(
+    out_min = resolve_pm_acceptance_range(
         {"primary_metric": {"acceptance_range": {"min": -0.1, "max": 1.2}}}
     )
     assert out_min == {"min": 0.95, "max": 1.2}
 
-    out_max = run_mod._resolve_pm_acceptance_range(
+    out_max = resolve_pm_acceptance_range(
         {"primary_metric": {"acceptance_range": {"min": 1.0, "max": 0.0}}}
     )
     assert out_max == {"min": 1.0, "max": 1.1}
 
-    out_order = run_mod._resolve_pm_acceptance_range(
+    out_order = resolve_pm_acceptance_range(
         {"primary_metric": {"acceptance_range": {"min": 1.2, "max": 1.1}}}
     )
     assert out_order == {"min": 1.2, "max": 1.2}
@@ -100,9 +105,9 @@ def test_resolve_pm_acceptance_range_covers_outer_exception(monkeypatch) -> None
     def _boom(_cfg):  # noqa: ANN001
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(run_mod, "_coerce_mapping", _boom)
+    monkeypatch.setattr(run_policy_mod, "coerce_mapping", _boom)
     assert (
-        run_mod._resolve_pm_acceptance_range(
+        resolve_pm_acceptance_range(
             {"primary_metric": {"acceptance_range": {"min": 0.9, "max": 1.1}}}
         )
         == {}
@@ -110,40 +115,34 @@ def test_resolve_pm_acceptance_range_covers_outer_exception(monkeypatch) -> None
 
 
 def test_resolve_guard_overhead_threshold_from_config() -> None:
-    assert run_mod._resolve_guard_overhead_threshold(None) == pytest.approx(
-        run_mod.GUARD_OVERHEAD_THRESHOLD
+    assert resolve_guard_overhead_threshold(None) == pytest.approx(
+        GUARD_OVERHEAD_THRESHOLD
     )
-    assert run_mod._resolve_guard_overhead_threshold(
+    assert resolve_guard_overhead_threshold(
         {"primary_metric": {"overhead_threshold": 0.025}}
     ) == pytest.approx(0.025)
-    assert run_mod._resolve_guard_overhead_threshold(
+    assert resolve_guard_overhead_threshold(
         {"primary_metric": {"overhead_threshold": "bad"}}
-    ) == pytest.approx(run_mod.GUARD_OVERHEAD_THRESHOLD)
-    assert run_mod._resolve_guard_overhead_threshold(
+    ) == pytest.approx(GUARD_OVERHEAD_THRESHOLD)
+    assert resolve_guard_overhead_threshold(
         {"primary_metric": {"overhead_threshold": -1}}
-    ) == pytest.approx(run_mod.GUARD_OVERHEAD_THRESHOLD)
+    ) == pytest.approx(GUARD_OVERHEAD_THRESHOLD)
 
 
 def test_choose_dataset_split_covers_fallback_and_exception_path() -> None:
-    split, used = run_mod._choose_dataset_split(
-        requested="train", available=["validation"]
-    )
+    split, used = choose_dataset_split(requested="train", available=["validation"])
     assert split == "train"
     assert used is False
 
-    split, used = run_mod._choose_dataset_split(
-        requested=None, available=["val", "train"]
-    )
+    split, used = choose_dataset_split(requested=None, available=["val", "train"])
     assert split == "val"
     assert used is True
 
-    split, used = run_mod._choose_dataset_split(
-        requested=None, available=["zzz", "aaa"]
-    )
+    split, used = choose_dataset_split(requested=None, available=["zzz", "aaa"])
     assert split == "aaa"
     assert used is True
 
-    split, used = run_mod._choose_dataset_split(requested=None, available=None)
+    split, used = choose_dataset_split(requested=None, available=None)
     assert split == "validation"
     assert used is True
 
@@ -151,9 +150,7 @@ def test_choose_dataset_split_covers_fallback_and_exception_path() -> None:
         def __len__(self) -> int:
             raise RuntimeError("boom")
 
-    split, used = run_mod._choose_dataset_split(
-        requested=_BadStr("x"), available=["validation"]
-    )
+    split, used = choose_dataset_split(requested=_BadStr("x"), available=["validation"])
     assert split == "validation"
     assert used is True
 

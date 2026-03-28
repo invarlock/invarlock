@@ -170,7 +170,7 @@ def test_snapshot_auto_chunked_selected_when_large_and_disk_ok(
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.shutil.disk_usage",
+                "invarlock.cli.run_runtime_exec.shutil.disk_usage",
                 lambda path: _disk_usage(free_mb=2048),
             )
         )
@@ -361,11 +361,11 @@ def test_until_pass_materialize_sets_flags_and_retries_once(
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.run_runtime.detect_model_profile", detect_profile)
+            patch("invarlock.cli.run_execution.detect_model_profile", detect_profile)
         )
         stack.enter_context(patch("invarlock.core.retry.RetryController", RC))
         stack.enter_context(
-            patch("invarlock.reporting.report_builder.make_report", make_cert)
+            patch("invarlock.reporting.report_make.make_report", make_cert)
         )
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",
@@ -540,7 +540,7 @@ def test_snapshot_auto_bytes_when_small_model(tmp_path: Path, monkeypatch):
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.shutil.disk_usage",
+                "invarlock.cli.run_runtime_exec.shutil.disk_usage",
                 lambda path: _disk_usage(free_mb=0),
             )
         )
@@ -607,7 +607,7 @@ def test_snapshot_no_support_uses_reload(tmp_path: Path, monkeypatch):
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.shutil.disk_usage",
+                "invarlock.cli.run_runtime_exec.shutil.disk_usage",
                 lambda path: _disk_usage(free_mb=0),
             )
         )

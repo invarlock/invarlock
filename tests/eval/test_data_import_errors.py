@@ -3,10 +3,11 @@ from __future__ import annotations
 import pytest
 
 import invarlock.eval.data as data_mod
+import invarlock.eval.data_support as data_support_mod
 
 
 @pytest.mark.skipif(
-    getattr(data_mod, "HAS_DATASETS", False),
+    getattr(data_support_mod, "HAS_DATASETS", False),
     reason="datasets installed; skip import-error checks",
 )
 def test_wikitext2_provider_requires_datasets():
@@ -17,7 +18,7 @@ def test_wikitext2_provider_requires_datasets():
 
 
 @pytest.mark.skipif(
-    getattr(data_mod, "HAS_DATASETS", False),
+    getattr(data_support_mod, "HAS_DATASETS", False),
     reason="datasets installed; skip import-error checks",
 )
 def test_hf_text_provider_requires_datasets():

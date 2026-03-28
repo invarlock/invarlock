@@ -1149,6 +1149,35 @@ class TestInitModule:
         ):
             assert not hasattr(invarlock_adapters, name)
 
+    def test_hf_auto_adapter_exposes_only_explicit_adapter_surface(self):
+        class _Delegate:
+            def load_model(self, model_id: str, **kwargs):
+                return {"model_id": model_id, "kwargs": kwargs}
+
+            def describe(self, _model):
+                return {"model_type": "delegate"}
+
+            def snapshot(self, _model):
+                return b"snapshot"
+
+            def restore(self, _model, _blob):
+                return None
+
+            def tokenize(self, _text):
+                return ["should-not-be-exposed"]
+
+        adapter = HF_Auto_Adapter()
+        adapter._delegate = _Delegate()
+
+        assert adapter.load_model("demo/model", device="cpu") == {
+            "model_id": "demo/model",
+            "kwargs": {"device": "cpu"},
+        }
+        assert adapter.describe(object()) == {"model_type": "delegate"}
+        assert adapter.snapshot(object()) == b"snapshot"
+        adapter.restore(object(), b"snapshot")
+        assert not hasattr(adapter, "tokenize")
+
     def test_removed_component_behavior(self):
         """Removed-component shim type is gone."""
         assert not hasattr(invarlock_adapters, "_RemovedComponent")
@@ -1162,10 +1191,7 @@ class TestIntegration:
         assert not hasattr(invarlock_adapters, "HF_Causal_Adapter")
         assert hasattr(invarlock_adapters, "BaseAdapter")
         assert hasattr(invarlock_adapters, "AdapterConfig")
-
-        # Test utility functions
-        assert hasattr(invarlock_adapters, "quality_label")
-        assert callable(invarlock_adapters.quality_label)
+        assert not hasattr(invarlock_adapters, "quality_label")
 
     def test_end_to_end_adapter_workflow(self):
         """Test end-to-end adapter workflow."""

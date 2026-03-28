@@ -3,8 +3,8 @@ from types import SimpleNamespace
 import torch
 import torch.nn as nn
 
-from invarlock.eval.metrics import (
-    MetricsConfig,
+from invarlock.eval.metrics import MetricsConfig
+from invarlock.eval.metrics_activation import (
     _collect_activations,
     _locate_transformer_blocks_enhanced,
     _perform_pre_eval_checks,

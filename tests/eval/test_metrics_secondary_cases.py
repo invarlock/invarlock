@@ -5,13 +5,15 @@ import pytest
 import torch
 
 from invarlock.eval import metrics as M
+from invarlock.eval import metrics_environment as ME
+from invarlock.eval.metrics_activation import _mi_gini_optimized_cpu_path
 
 
 def test_get_metrics_info_and_validate_env():
-    info = M.get_metrics_info()
+    info = ME.get_metrics_info()
     assert {"sigma_max", "head_energy", "mi_gini"}.issubset(info["available_metrics"])
-    ok = M.validate_metrics_environment()
-    assert ok is True
+    report = ME.validate_metrics_environment()
+    assert report.ok is True
 
 
 def test_compute_ppl_with_partial_attention_mask():
@@ -67,7 +69,7 @@ def test_mi_gini_cpu_chunk_warning(monkeypatch):
     monkeypatch.setattr(M, "DependencyManager", lambda: StubDep())
 
     cfg = M.MetricsConfig(progress_bars=False)
-    out = M._mi_gini_optimized_cpu_path(feats, targ, max_per_layer=10, config=cfg)
+    out = _mi_gini_optimized_cpu_path(feats, targ, max_per_layer=10, config=cfg)
     assert isinstance(out, float) and (math.isnan(out) or out >= 0.0)
 
 

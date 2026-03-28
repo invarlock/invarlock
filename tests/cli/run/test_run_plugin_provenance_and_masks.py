@@ -68,7 +68,7 @@ def _common_ce():
             ),
         ),
         patch(
-            "invarlock.cli.run_runtime.detect_model_profile",
+            "invarlock.cli.run_execution.detect_model_profile",
             lambda model_id, adapter: SimpleNamespace(
                 default_loss="ce",
                 model_id=model_id,
@@ -162,11 +162,14 @@ def test_edit_override_invalid_raises(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.core.config_runtime.resolve_edit_kind", lambda name: name)
+            patch(
+                "invarlock.cli.run_config._resolve_requested_edit_name",
+                lambda name: name,
+            )
         )
         stack.enter_context(
             patch(
-                "invarlock.core.config_runtime.apply_edit_override",
+                "invarlock.cli.run_config._apply_requested_edit_override",
                 side_effect=ValueError("bad edit"),
             )
         )

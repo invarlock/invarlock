@@ -21,6 +21,28 @@ def _normalize_profile_checks(existing_checks: Any) -> list[str]:
     return []
 
 
+def _section_dict(cfg: Any, name: str) -> dict[str, Any]:
+    section_fn = getattr(cfg, "section", None)
+    if callable(section_fn):
+        try:
+            section = section_fn(name)
+        except Exception:
+            section = None
+        if isinstance(section, dict):
+            return section
+    try:
+        value = getattr(cfg, name)
+    except Exception:
+        value = None
+    if isinstance(value, Mapping):
+        return dict(value)
+    if hasattr(value, "__dict__"):
+        return {
+            key: item for key, item in vars(value).items() if not key.startswith("_")
+        }
+    return {}
+
+
 def _baseline_eval_windows(
     baseline_report_data: Mapping[str, Any] | None,
 ) -> dict[str, Any] | None:
@@ -65,11 +87,13 @@ def build_run_context_payload(
     tiny_relax_enabled: bool,
     to_serialisable_dict_fn: ToSerialisableDictFn,
 ) -> dict[str, Any]:
+    guards_section = _section_dict(cfg, "guards")
+    eval_section = _section_dict(cfg, "eval")
     guard_overrides = {
-        "spectral": to_serialisable_dict_fn(getattr(cfg.guards, "spectral", {})),
-        "rmt": to_serialisable_dict_fn(getattr(cfg.guards, "rmt", {})),
-        "variance": to_serialisable_dict_fn(getattr(cfg.guards, "variance", {})),
-        "invariants": to_serialisable_dict_fn(getattr(cfg.guards, "invariants", {})),
+        "spectral": to_serialisable_dict_fn(guards_section.get("spectral", {})),
+        "rmt": to_serialisable_dict_fn(guards_section.get("rmt", {})),
+        "variance": to_serialisable_dict_fn(guards_section.get("variance", {})),
+        "invariants": to_serialisable_dict_fn(guards_section.get("invariants", {})),
     }
 
     if getattr(model_profile, "invariants", None):
@@ -84,7 +108,7 @@ def build_run_context_payload(
         invariants_policy["profile_checks"] = checks_list
 
     run_context = {
-        "eval": to_serialisable_dict_fn(cfg.eval),
+        "eval": to_serialisable_dict_fn(eval_section),
         "dataset": to_serialisable_dict_fn(cfg.dataset),
         "guards": guard_overrides,
         "profile": profile if profile else "",
@@ -118,7 +142,7 @@ def build_run_context_payload(
         "invariants": getattr(model_profile, "invariants", []),
         "cert_lints": getattr(model_profile, "cert_lints", []),
     }
-    extra_context = to_serialisable_dict_fn(getattr(cfg, "context", {}))
+    extra_context = to_serialisable_dict_fn(_section_dict(cfg, "context"))
     if isinstance(extra_context, dict):
         run_context.update(extra_context)
     try:
@@ -150,20 +174,21 @@ def build_run_execution_config_payloads(
     cfg: Any,
     model_profile: Any,
 ) -> RunExecutionConfigPayloads:
+    auto_section = _section_dict(cfg, "auto")
     try:
-        auto_enabled = bool(cfg.auto.enabled)
+        auto_enabled = bool(auto_section.get("enabled"))
     except (AttributeError, TypeError, ValueError):
         auto_enabled = False
     try:
-        auto_tier = cfg.auto.tier
+        auto_tier = auto_section.get("tier") or "balanced"
     except (AttributeError, TypeError, ValueError):
         auto_tier = "balanced"
     try:
-        auto_probes = int(cfg.auto.probes)
+        auto_probes = int(auto_section.get("probes", 0))
     except (AttributeError, TypeError, ValueError):
         auto_probes = 0
     try:
-        auto_target_ratio = float(cfg.auto.target_pm_ratio)
+        auto_target_ratio = float(auto_section.get("target_pm_ratio", 2.0))
     except (AttributeError, TypeError, ValueError):
         auto_target_ratio = 2.0
 

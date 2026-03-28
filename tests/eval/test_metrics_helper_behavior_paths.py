@@ -3,8 +3,8 @@ import math
 import torch
 import torch.nn as nn
 
-from invarlock.eval.metrics import (
-    MetricsConfig,
+from invarlock.eval.metrics import MetricsConfig
+from invarlock.eval.metrics_activation import (
     _calculate_head_energy,
     _calculate_mi_gini,
     _calculate_sigma_max,

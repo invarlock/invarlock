@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
 
+from invarlock.core.run_orchestrator import RunExecutionRequest
 from invarlock.runtime_security import (
     apply_runtime_allowances,
     delegate_current_process_to_container,
@@ -12,37 +11,14 @@ from invarlock.runtime_security import (
     write_runtime_manifest,
 )
 
+from .run_execution import execute_config_run_request
+
 
 class RuntimeDelegationError(RuntimeError):
     """Raised when secure-default container delegation cannot start."""
 
 
-@dataclass(frozen=True)
-class ConfigExecutionRequest:
-    config: str
-    device: str | None = None
-    profile: str | None = None
-    out: str | None = None
-    edit: str | None = None
-    edit_label: str | None = None
-    tier: str | None = None
-    metric_kind: str | None = None
-    probes: int | None = None
-    until_pass: bool = False
-    max_attempts: int = 3
-    timeout: int | None = None
-    baseline: str | None = None
-    no_cleanup: bool = False
-    style: str | None = None
-    progress: bool = False
-    timing: bool = False
-    telemetry: bool = False
-    no_color: bool = False
-    prefer_local_files_only: bool = False
-
-
-class ConfigExecutionExecutor(Protocol):
-    def __call__(self, request: ConfigExecutionRequest) -> str | Path | None: ...
+ConfigExecutionRequest = RunExecutionRequest
 
 
 def run_from_config(
@@ -73,7 +49,6 @@ def run_from_config(
     prefer_local_files_only: bool = False,
     command_name: str = "run",
     delegate: bool = True,
-    executor: ConfigExecutionExecutor | None = None,
 ) -> Path:
     """Run a config-driven job and return the emitted report path."""
 
@@ -90,9 +65,6 @@ def run_from_config(
         except RuntimeError as exc:
             raise RuntimeDelegationError(str(exc)) from exc
         raise SystemExit(exit_code)
-
-    if executor is None:
-        raise RuntimeError("run_from_config requires an explicit executor callable")
 
     request = ConfigExecutionRequest(
         config=config,
@@ -117,10 +89,10 @@ def run_from_config(
         prefer_local_files_only=prefer_local_files_only,
     )
 
-    report_path = executor(request)
+    report_path = execute_config_run_request(request)
 
     if report_path is None:
-        raise RuntimeError("executor did not return a report path")
+        raise RuntimeError("run execution did not return a report path")
 
     report = Path(report_path).resolve()
     if report.exists():

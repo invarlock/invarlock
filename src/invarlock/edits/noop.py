@@ -11,7 +11,7 @@ from typing import Any
 
 import torch.nn as nn
 
-from invarlock.core.api import ModelAdapter, ModelEdit
+from invarlock.core.api import EditRuntime, ModelAdapter, ModelEdit
 
 
 class NoopEdit(ModelEdit):
@@ -28,8 +28,13 @@ class NoopEdit(ModelEdit):
         return {"name": self.name, "plan": {}}
 
     def apply(
-        self, model: nn.Module, adapter: ModelAdapter, **kwargs: Any
+        self,
+        model: nn.Module,
+        adapter: ModelAdapter,
+        plan: dict[str, Any] | None = None,
+        runtime: EditRuntime | None = None,
     ) -> dict[str, Any]:
+        _ = plan, runtime
         return {
             "name": self.name,
             "plan_digest": "noop",

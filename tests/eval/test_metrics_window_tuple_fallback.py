@@ -24,5 +24,5 @@ def test_compute_ppl_window_tuple_output_fallback():
             logits = self.out(torch.zeros(B, T, 4))
             return (logits,)
 
-    ppl = M.compute_ppl(DummyLM(), None, window)
+    ppl = M.compute_ppl(DummyLM(), window)
     assert isinstance(ppl, float) and ppl >= 1.0

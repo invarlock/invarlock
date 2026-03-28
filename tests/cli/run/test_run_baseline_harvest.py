@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 import typer
 
-from invarlock.cli.commands.run import _validate_and_harvest_baseline_schedule
+from invarlock.cli.run_pairing import validate_and_harvest_baseline_schedule
 from invarlock.core.exceptions import InvarlockError
 
 
@@ -37,7 +37,7 @@ def test_baseline_harvest_success() -> None:
             "window_plan": {"k": 1},
         }
     }
-    out = _validate_and_harvest_baseline_schedule(
+    out = validate_and_harvest_baseline_schedule(
         cfg,
         pairing,
         baseline,
@@ -66,7 +66,7 @@ def test_baseline_harvest_mismatch_raises() -> None:
         }
     }
     with pytest.raises(typer.Exit) as exc:
-        _validate_and_harvest_baseline_schedule(
+        validate_and_harvest_baseline_schedule(
             cfg,
             pairing,
             baseline,
@@ -100,7 +100,7 @@ def test_baseline_harvest_adjustment_prints(capsys) -> None:
         def print(self, *args, **kwargs):  # pragma: no cover - exercised by capture
             print(*args)
 
-    _validate_and_harvest_baseline_schedule(
+    validate_and_harvest_baseline_schedule(
         cfg,
         pairing,
         baseline,
@@ -137,7 +137,7 @@ def test_baseline_dataset_mismatch_emits_exit():
 
     console = CaptureConsole()
     with pytest.raises(typer.Exit):
-        _validate_and_harvest_baseline_schedule(
+        validate_and_harvest_baseline_schedule(
             cfg,
             pairing,
             baseline,
@@ -165,7 +165,7 @@ def test_baseline_tokenizer_hash_mismatch():
         }
     }
     with pytest.raises(typer.Exit) as exc:
-        _validate_and_harvest_baseline_schedule(
+        validate_and_harvest_baseline_schedule(
             cfg,
             pairing,
             baseline,
@@ -193,7 +193,7 @@ def test_baseline_harvest_preview_hash_mismatch_warns_in_dev_profile() -> None:
         }
     }
 
-    out = _validate_and_harvest_baseline_schedule(
+    out = validate_and_harvest_baseline_schedule(
         cfg,
         pairing,
         baseline,
@@ -223,7 +223,7 @@ def test_baseline_harvest_preview_hash_mismatch_fails_in_ci() -> None:
     }
 
     with pytest.raises(InvarlockError) as ei:
-        _validate_and_harvest_baseline_schedule(
+        validate_and_harvest_baseline_schedule(
             cfg,
             pairing,
             baseline,
@@ -252,7 +252,7 @@ def test_baseline_harvest_final_hash_mismatch_warns_in_dev_profile() -> None:
         }
     }
 
-    out = _validate_and_harvest_baseline_schedule(
+    out = validate_and_harvest_baseline_schedule(
         cfg,
         pairing,
         baseline,
@@ -282,7 +282,7 @@ def test_baseline_harvest_final_hash_mismatch_fails_in_ci() -> None:
     }
 
     with pytest.raises(InvarlockError) as ei:
-        _validate_and_harvest_baseline_schedule(
+        validate_and_harvest_baseline_schedule(
             cfg,
             pairing,
             baseline,
@@ -311,7 +311,7 @@ def test_baseline_harvest_dataset_hash_mismatch_warns_in_dev_profile() -> None:
         }
     }
 
-    out = _validate_and_harvest_baseline_schedule(
+    out = validate_and_harvest_baseline_schedule(
         cfg,
         pairing,
         baseline,
@@ -341,7 +341,7 @@ def test_baseline_harvest_dataset_hash_mismatch_fails_in_ci() -> None:
     }
 
     with pytest.raises(InvarlockError) as ei:
-        _validate_and_harvest_baseline_schedule(
+        validate_and_harvest_baseline_schedule(
             cfg,
             pairing,
             baseline,
@@ -367,7 +367,7 @@ def test_baseline_harvest_missing_final_section_fails() -> None:
     }
 
     with pytest.raises(typer.Exit) as exc:
-        _validate_and_harvest_baseline_schedule(
+        validate_and_harvest_baseline_schedule(
             cfg,
             pairing,
             baseline,
@@ -395,7 +395,7 @@ def test_baseline_harvest_empty_input_ids_fails() -> None:
     }
 
     with pytest.raises(typer.Exit) as exc:
-        _validate_and_harvest_baseline_schedule(
+        validate_and_harvest_baseline_schedule(
             cfg,
             pairing,
             baseline,
@@ -423,7 +423,7 @@ def test_baseline_harvest_window_id_length_mismatch_fails() -> None:
     }
 
     with pytest.raises(typer.Exit) as exc:
-        _validate_and_harvest_baseline_schedule(
+        validate_and_harvest_baseline_schedule(
             cfg,
             pairing,
             baseline,
@@ -455,7 +455,7 @@ def test_baseline_harvest_attention_mask_row_count_mismatch_fails() -> None:
     }
 
     with pytest.raises(typer.Exit) as exc:
-        _validate_and_harvest_baseline_schedule(
+        validate_and_harvest_baseline_schedule(
             cfg,
             pairing,
             baseline,
@@ -487,7 +487,7 @@ def test_baseline_harvest_attention_mask_row_not_list_fails() -> None:
     }
 
     with pytest.raises(typer.Exit) as exc:
-        _validate_and_harvest_baseline_schedule(
+        validate_and_harvest_baseline_schedule(
             cfg,
             pairing,
             baseline,

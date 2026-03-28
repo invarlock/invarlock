@@ -3,12 +3,13 @@ from __future__ import annotations
 import os
 
 import invarlock.eval.data as data_mod
+import invarlock.eval.data_support as data_support_mod
 
 
 class _EncodeTokenizer:
     pad_token_id = 0
 
-    def encode(self, text, truncation=True, max_length=8):
+    def encode(self, text, truncation=True, max_length=8, padding="max_length"):
         ids = list(range(1, min(len(text), max_length) + 1))
         return ids
 
@@ -18,8 +19,10 @@ def _fake_dataset(num_items: int = 50):
 
 
 def test_wikitext2_estimate_capacity_fast_mode(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True, raising=False)
-    monkeypatch.setattr(data_mod, "load_dataset", lambda *a, **k: _fake_dataset(30))
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True, raising=False)
+    monkeypatch.setattr(
+        data_support_mod, "load_dataset", lambda *a, **k: _fake_dataset(30)
+    )
     provider = data_mod.WikiText2Provider()
     env_backup = os.environ.get("INVARLOCK_CAPACITY_FAST")
     os.environ["INVARLOCK_CAPACITY_FAST"] = "1"
@@ -37,8 +40,10 @@ def test_wikitext2_estimate_capacity_fast_mode(monkeypatch):
 
 
 def test_wikitext2_windows_with_stubbed_tokenizer(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True, raising=False)
-    monkeypatch.setattr(data_mod, "load_dataset", lambda *a, **k: _fake_dataset(200))
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True, raising=False)
+    monkeypatch.setattr(
+        data_support_mod, "load_dataset", lambda *a, **k: _fake_dataset(200)
+    )
 
     def fake_collect(self, texts, indices, tokenizer, seq_len):
         results = []

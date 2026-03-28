@@ -1,4 +1,4 @@
-"""Pure RMT math helpers shared by legacy analysis code and direct tests."""
+"""Pure RMT math helpers shared by the RMT owner modules and direct tests."""
 
 from __future__ import annotations
 
@@ -57,8 +57,7 @@ def clip_full_svd(
     clip_val: float,
     return_components: bool = False,
 ) -> (
-    torch.Tensor
-    | tuple[torch.Tensor | None, torch.Tensor | None, torch.Tensor | None]
+    torch.Tensor | tuple[torch.Tensor | None, torch.Tensor | None, torch.Tensor | None]
 ):
     """Clip singular values of a matrix using full SVD."""
     if not torch.isfinite(W).all():

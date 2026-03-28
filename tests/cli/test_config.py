@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 import invarlock.core.config_runtime as config_mod
+from invarlock.cli.run_config import _resolve_requested_edit_name
 from invarlock.core.config_runtime import (
     AutoConfig,
     InvarLockConfig,
@@ -12,7 +13,6 @@ from invarlock.core.config_runtime import (
     SpectralGuardConfig,
     VarianceGuardConfig,
     apply_profile,
-    resolve_edit_kind,
 )
 
 
@@ -108,9 +108,9 @@ def test_auto_config_valid_values_pass() -> None:
     assert cfg.probes == 3 and cfg.target_pm_ratio == 1.1
 
 
-def test_resolve_edit_kind_unknown_raises():
+def test_resolve_requested_edit_name_unknown_raises():
     with pytest.raises(ValueError):
-        resolve_edit_kind("not-a-kind")
+        _resolve_requested_edit_name("not-a-kind")
 
 
 def test_apply_profile_ci_raises_when_runtime_profile_missing(monkeypatch):

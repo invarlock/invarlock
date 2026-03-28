@@ -5,16 +5,17 @@ import torch.nn as nn
 
 from invarlock.eval import metrics as metrics_mod
 from invarlock.eval.metrics import calculate_lens_metrics_for_model
+from invarlock.eval.metrics_activation import ResultCache
 
 
 def _patch_cache_to_return(monkeypatch, payload: dict[str, float]) -> None:
     monkeypatch.setattr(
-        metrics_mod.ResultCache,
+        ResultCache,
         "_get_cache_key",
         lambda _self, *_a, **_k: "cache-key",  # noqa: ARG005
     )
     monkeypatch.setattr(
-        metrics_mod.ResultCache,
+        ResultCache,
         "get",
         lambda _self, _key: payload,  # noqa: ARG005
     )

@@ -3,6 +3,10 @@ from types import SimpleNamespace
 import torch
 
 from invarlock.eval import metrics as M
+from invarlock.eval.metrics_environment import (
+    get_metrics_info,
+    validate_metrics_environment,
+)
 
 
 def test_measure_memory_cpu_path_returns_float():
@@ -29,7 +33,7 @@ def test_measure_memory_cpu_path_returns_float():
 
 
 def test_metrics_env_info_helpers():
-    info = M.get_metrics_info()
+    info = get_metrics_info()
     assert {"available_metrics", "default_config"}.issubset(info.keys())
-    ok = M.validate_metrics_environment()
-    assert isinstance(ok, bool)
+    report = validate_metrics_environment()
+    assert report.ok is True

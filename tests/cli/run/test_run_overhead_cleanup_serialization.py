@@ -156,7 +156,7 @@ def test_cleanup_rmtree_exception_is_swallowed(tmp_path: Path, monkeypatch):
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.shutil.rmtree",
+                "invarlock.core.checkpoint.shutil.rmtree",
                 side_effect=RuntimeError("boom"),
             )
         )
@@ -338,7 +338,7 @@ def test_until_pass_baseline_disappears_between_attempts(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(patch("invarlock.core.retry.RetryController", RC))
         stack.enter_context(
-            patch("invarlock.reporting.report_builder.make_report", make_cert)
+            patch("invarlock.reporting.report_make.make_report", make_cert)
         )
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",

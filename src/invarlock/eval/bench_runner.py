@@ -440,7 +440,7 @@ def execute_scenario(
 
     try:
         if bare_result.success and guarded_result.success:
-            from invarlock.reporting.report_builder import make_report
+            from invarlock.reporting.report_make import make_report
             from invarlock.reporting.report_telemetry import (
                 telemetry_output_enabled,
                 telemetry_summary_line,
