@@ -211,7 +211,7 @@ def _path_exists_in_obj(obj: Any, path: str) -> bool:
 
 
 def _sample_reports() -> list[dict[str, Any]]:
-    from invarlock.reporting.report_builder import make_report
+    from invarlock.reporting.report_make import make_report
 
     ppl_report = {
         "meta": {

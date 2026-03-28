@@ -151,7 +151,7 @@ Attested evaluations also emit `runtime.manifest.json` next to
 
 The example below shows a realistic, PM‑only report envelope. It follows
 the current validator in `invarlock.reporting.report_schema` and the
-fields produced by `invarlock.reporting.report_builder.make_report`.
+fields produced by `invarlock.reporting.report_make.make_report`.
 
 ```json
 {

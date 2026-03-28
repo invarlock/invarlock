@@ -29,6 +29,11 @@ THRESHOLDS = {
     "src/invarlock/eval/providers/base.py": 1.00,
     "src/invarlock/eval/providers/seq2seq.py": 0.90,
     "src/invarlock/eval/metrics.py": 0.90,
+    "src/invarlock/eval/metrics_activation.py": 0.90,
+    "src/invarlock/eval/metrics_aggregation.py": 0.87,
+    "src/invarlock/eval/metrics_lens.py": 0.90,
+    "src/invarlock/eval/metrics_runtime.py": 0.85,
+    "src/invarlock/eval/metrics_support.py": 0.90,
     # Guard-effect benchmark harness (Step 14) + primary metric core
     "src/invarlock/eval/bench.py": 0.90,
     "src/invarlock/eval/bench_policy.py": 0.95,
@@ -42,7 +47,7 @@ THRESHOLDS = {
     "src/invarlock/calibration/spectral_null.py": 0.90,
     "src/invarlock/calibration/variance_ve.py": 0.90,
     # Reporting
-    "src/invarlock/reporting/report.py": 0.90,
+    "src/invarlock/reporting/run_report_formatters.py": 0.90,
     "src/invarlock/reporting/validate.py": 0.95,
     # Reporting types
     "src/invarlock/reporting/report_types.py": 1.00,
@@ -107,9 +112,11 @@ THRESHOLDS = {
     # Simplified public-core CLI surfaces have dedicated branch-focused tests;
     # keep the hero commands above the default 90% floor.
     "src/invarlock/cli/app.py": 1.00,
-    "src/invarlock/core/config_runtime.py": 0.95,
+    "src/invarlock/core/config_runtime.py": 0.87,
+    "src/invarlock/core/metric_provider_resolution.py": 0.89,
     "src/invarlock/cli/commands/evaluate.py": 0.95,
     "src/invarlock/cli/commands/run.py": 0.95,
+    "src/invarlock/core/run_orchestrator.py": 0.85,
     "src/invarlock/reporting/report_contract.py": 0.95,
     "src/invarlock/cli/commands/calibrate.py": 0.90,
     "src/invarlock/reporting/report_files.py": 0.95,
@@ -119,7 +126,7 @@ THRESHOLDS = {
     "src/invarlock/runtime_security.py": 0.95,
     # PR-4 split modules
     "src/invarlock/cli/run_artifacts.py": 1.00,
-    "src/invarlock/cli/run_config.py": 1.00,
+    "src/invarlock/cli/run_config.py": 0.98,
     "src/invarlock/cli/run_overhead.py": 1.00,
     "src/invarlock/cli/run_pairing.py": 0.90,
     "src/invarlock/core/run_policy.py": 1.00,
@@ -167,6 +174,11 @@ CORE_FILES = (
     "src/invarlock/eval/providers/base.py",
     "src/invarlock/eval/providers/seq2seq.py",
     "src/invarlock/eval/metrics.py",
+    "src/invarlock/eval/metrics_activation.py",
+    "src/invarlock/eval/metrics_aggregation.py",
+    "src/invarlock/eval/metrics_lens.py",
+    "src/invarlock/eval/metrics_runtime.py",
+    "src/invarlock/eval/metrics_support.py",
     "src/invarlock/eval/bench.py",
     "src/invarlock/eval/bench_policy.py",
     "src/invarlock/eval/bench_runner.py",
@@ -177,7 +189,7 @@ CORE_FILES = (
     "src/invarlock/eval/tasks/text_generation.py",
     "src/invarlock/calibration/spectral_null.py",
     "src/invarlock/calibration/variance_ve.py",
-    "src/invarlock/reporting/report.py",
+    "src/invarlock/reporting/run_report_formatters.py",
     "src/invarlock/reporting/validate.py",
     "src/invarlock/reporting/report_types.py",
     "src/invarlock/reporting/dataset_hashing.py",

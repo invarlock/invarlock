@@ -56,7 +56,7 @@ ties the runtime contract back to reproducible maths:
   reports; any divergence is a bug to report.
 - Determinism is best-effort on some backends; enforce `|Δ ratio| ≤ 1e-6` when
   regenerating reports on the **same backend** (see
-  `tests/eval/test_report_builder.py::TestMakeEvaluationReport::test_evaluation_report_ratio_matches_weighted_log_delta`).
+  `tests/reporting/test_report_paired_ci_identity.py::test_paired_ci_identity_holds`).
 - Cross-device drift must stay within the bands listed in
   `docs/assurance/04-guard-contracts.md`; use `scripts/check_device_drift.py` in
   CI to guard the limit.

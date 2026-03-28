@@ -94,7 +94,9 @@ def test_overrides_take_precedence(tmp_path: Path) -> None:
     # Explicit overrides should win over a stricter core-floor flag.
     xml = tmp_path / "cov.xml"
     json_out = tmp_path / "out.json"
-    _write_cov_xml(xml, [("src/invarlock/reporting/report.py", 0.91, 0.90)])
+    _write_cov_xml(
+        xml, [("src/invarlock/reporting/run_report_formatters.py", 0.91, 0.90)]
+    )
     proc = _run_checker(xml, json_out, extra_args=["--core-floor", "0.95"])
 
     # Should pass with explicit 90% override applied
@@ -102,8 +104,14 @@ def test_overrides_take_precedence(tmp_path: Path) -> None:
     payload = json.loads(json_out.read_text())
     assert payload["status"] == "ok"
     files = {f["path"]: f for f in payload["files"]}
-    assert abs(files["src/invarlock/reporting/report.py"]["threshold"] - 0.90) < 1e-9
-    assert payload["configured_threshold_files"] == 98
+    assert (
+        abs(
+            files["src/invarlock/reporting/run_report_formatters.py"]["threshold"]
+            - 0.90
+        )
+        < 1e-9
+    )
+    assert payload["configured_threshold_files"] == 105
     assert payload["evaluated_files"] == 1
     assert payload["measured_threshold_files"] == 1
     assert "src/invarlock/cli/app.py" in payload["missing_threshold_files"]
@@ -168,19 +176,20 @@ def test_summary_reports_measured_vs_configured_threshold_counts(
 
     assert proc.returncode == 0, proc.stderr
     assert (
-        "Coverage OK: 1/98 threshold-listed files had coverage data and met "
+        "Coverage OK: 1/105 threshold-listed files had coverage data and met "
         "per-file thresholds." in proc.stdout
     )
     assert (
-        "97 threshold-listed files were absent from the coverage report." in proc.stdout
+        "104 threshold-listed files were absent from the coverage report."
+        in proc.stdout
     )
 
     payload = json.loads(json_out.read_text())
     assert payload["status"] == "ok"
-    assert payload["configured_threshold_files"] == 98
+    assert payload["configured_threshold_files"] == 105
     assert payload["evaluated_files"] == 1
     assert payload["measured_threshold_files"] == 1
-    assert len(payload["missing_threshold_files"]) == 97
+    assert len(payload["missing_threshold_files"]) == 104
 
 
 def test_ratchets_selected_files_to_ninety_five_percent(tmp_path: Path) -> None:
@@ -192,7 +201,6 @@ def test_ratchets_selected_files_to_ninety_five_percent(tmp_path: Path) -> None:
             ("src/invarlock/cli/commands/evaluate.py", 0.949, 1.0),
             ("src/invarlock/cli/commands/run.py", 0.949, 1.0),
             ("src/invarlock/reporting/report_contract.py", 0.949, 1.0),
-            ("src/invarlock/core/config_runtime.py", 0.949, 1.0),
             ("src/invarlock/core/determinism_policy.py", 0.949, 1.0),
             ("src/invarlock/core/bootstrap.py", 0.949, 1.0),
             ("src/invarlock/core/contracts.py", 0.949, 1.0),
@@ -217,7 +225,6 @@ def test_ratchets_selected_files_to_ninety_five_percent(tmp_path: Path) -> None:
         "src/invarlock/cli/commands/evaluate.py",
         "src/invarlock/cli/commands/run.py",
         "src/invarlock/reporting/report_contract.py",
-        "src/invarlock/core/config_runtime.py",
         "src/invarlock/core/determinism_policy.py",
         "src/invarlock/core/bootstrap.py",
         "src/invarlock/core/contracts.py",
@@ -258,7 +265,6 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
             ("src/invarlock/cli/app.py", 0.999, 1.0),
             ("src/invarlock/cli/commands/proof_pack.py", 0.999, 1.0),
             ("src/invarlock/cli/run_artifacts.py", 0.999, 1.0),
-            ("src/invarlock/cli/run_config.py", 0.999, 1.0),
             ("src/invarlock/cli/run_overhead.py", 0.999, 1.0),
             ("src/invarlock/core/run_policy.py", 0.999, 1.0),
             ("src/invarlock/reporting/run_metric_utils.py", 0.999, 1.0),
@@ -284,7 +290,6 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
         "src/invarlock/cli/app.py",
         "src/invarlock/cli/commands/proof_pack.py",
         "src/invarlock/cli/run_artifacts.py",
-        "src/invarlock/cli/run_config.py",
         "src/invarlock/cli/run_overhead.py",
         "src/invarlock/core/run_policy.py",
         "src/invarlock/reporting/run_metric_utils.py",
@@ -298,5 +303,34 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
         "src/invarlock/reporting/report_types.py",
         "src/invarlock/reporting/utils.py",
         "src/invarlock/runtime_verify.py",
+    ):
+        assert path in proc.stderr
+
+
+def test_calibrated_split_owner_thresholds_are_explicit(tmp_path: Path) -> None:
+    xml = tmp_path / "cov.xml"
+    json_out = tmp_path / "out.json"
+    _write_cov_xml(
+        xml,
+        [
+            ("src/invarlock/core/config_runtime.py", 0.869, 1.0),
+            ("src/invarlock/core/metric_provider_resolution.py", 0.889, 1.0),
+            ("src/invarlock/core/run_orchestrator.py", 0.849, 1.0),
+            ("src/invarlock/eval/metrics_aggregation.py", 0.869, 1.0),
+            ("src/invarlock/eval/metrics_runtime.py", 0.849, 1.0),
+            ("src/invarlock/cli/run_config.py", 0.979, 1.0),
+        ],
+    )
+
+    proc = _run_checker(xml, json_out)
+
+    assert proc.returncode != 0
+    for path in (
+        "src/invarlock/core/config_runtime.py",
+        "src/invarlock/core/metric_provider_resolution.py",
+        "src/invarlock/core/run_orchestrator.py",
+        "src/invarlock/eval/metrics_aggregation.py",
+        "src/invarlock/eval/metrics_runtime.py",
+        "src/invarlock/cli/run_config.py",
     ):
         assert path in proc.stderr

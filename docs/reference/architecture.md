@@ -8,7 +8,7 @@
 | **Audience** | Developers extending InvarLock, operators debugging pipelines, security reviewers. |
 | **Core components** | CLI shells, Core/runtime policy layer, Guard chain, Reporting/artifact subsystem. |
 | **Design goals** | Torch-independent core, edit-agnostic guards, deterministic evaluation, explicit artifact contracts, full provenance. |
-| **Source of truth** | `src/invarlock/core/*.py`, `src/invarlock/reporting/*.py`, `src/invarlock/cli/commands/*.py`, `src/invarlock/guards/*.py`. |
+| **Source of truth** | `src/invarlock/core/*.py`, `src/invarlock/reporting/*.py`, `src/invarlock/cli/commands/*.py`, `src/invarlock/cli/run_*.py`, `src/invarlock/guards/*.py`. |
 
 See the [Glossary](../assurance/glossary.md) for definitions of terms such as
 the canonical guard chain, policy digest, and measurement contract.
@@ -21,10 +21,11 @@ the canonical guard chain, policy digest, and measurement contract.
 4. [Pipeline Flow](#pipeline-flow)
 5. [Guard Chain Architecture](#guard-chain-architecture)
 6. [report Generation Flow](#report-generation-flow)
-7. [Key Design Decisions](#key-design-decisions)
-8. [Module Dependencies](#module-dependencies)
-9. [Extension Points](#extension-points)
-10. [Related Documentation](#related-documentation)
+7. [Architecture Guardrails](#architecture-guardrails)
+8. [Key Design Decisions](#key-design-decisions)
+9. [Module Dependencies](#module-dependencies)
+10. [Extension Points](#extension-points)
+11. [Related Documentation](#related-documentation)
 
 ## Quick Reference
 
@@ -69,13 +70,14 @@ InvarLock follows a layered architecture with clear separation of concerns:
 │                     CORE POLICY / CONTRACT LAYER                            │
 │  ┌─────────────────────────────────────────────────────────────────┐        │
 │  │ evaluate_plan · report_inputs · doctor_findings                │        │
-│  │ verify_contract · run_*_policy                                 │        │
+│  │ verify_contract · run_retry_policy · run_snapshot_contract     │        │
+│  │ run_guard_overhead_policy · run_provenance_contract            │        │
 │  └─────────────────────────────────────────────────────────────────┘        │
 │                                                                             │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                       CORE RUNTIME / SERVICES                               │
 │  ┌─────────────────────────────────────────────────────────────────┐        │
-│  │ runner.py + runner_* + config_execution.py                     │        │
+│  │ runner.py + runner_*                                          │        │
 │  │  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐     │        │
 │  │  │prepare │─▶│ guards │─▶│  edit  │─▶│ guards │─▶│  eval  │     │        │
 │  │  │ model  │  │(before)│  │ apply  │  │(after) │  │ final  │     │        │
@@ -92,8 +94,8 @@ InvarLock follows a layered architecture with clear separation of concerns:
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                          REPORTING / FILES LAYER                            │
 │  ┌──────────────┐ ┌──────────────┐ ┌────────────┐ ┌────────────┐            │
-│  │ report_build │ │ report_files │ │   render   │ │  manifest  │            │
-│  │ + policy     │ │ + evidence   │ │  (MD/HTML) │ │   (JSON)   │            │
+│  │ report_make  │ │ report_files │ │   render   │ │  manifest  │            │
+│  │ + console    │ │ + evidence   │ │  (MD/HTML) │ │   (JSON)   │            │
 │  └──────────────┘ └──────────────┘ └────────────┘ └────────────┘            │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -106,6 +108,12 @@ InvarLock follows a layered architecture with clear separation of concerns:
 Typer-based command shells providing user-facing entry points. The command
 modules should stay thin: parse arguments, call core/reporting owners, render
 output, and map failures to exit codes.
+
+Shell support modules such as `cli/config_execution.py`, `cli/run_execution.py`,
+`cli/run_config.py`, `cli/run_pairing.py`, `cli/run_overhead.py`, and
+`cli/run_artifacts.py` belong to this boundary layer as well. They can perform
+CLI-facing adaptation and console/event rendering, but they must not become
+policy owners.
 
 | Command | Purpose | Primary Output |
 | --- | --- | --- |
@@ -128,7 +136,12 @@ by the CLI and non-CLI entrypoints.
 | `report_inputs.py` | Canonical report path resolution and JSON-object validation |
 | `doctor_findings.py` | Structured doctor findings and optional report cross-check analysis |
 | `verify_contract.py` | Structured report-verification service used by `verify` and proof-pack flows |
-| `run_*_policy.py` | Snapshot, retry, and timing-policy helpers injected into `run` |
+| `run_policy.py` | Shared run policy helpers such as split choice, PM thresholds, and overhead policy |
+| `run_retry_policy.py` | Retry-attempt summaries and retry state transitions |
+| `run_snapshot_contract.py` + `run_snapshot_policy.py` | Snapshot planning, restore behavior, and retry transitions |
+| `run_guard_overhead_policy.py` | Guard-overhead normalization, summary building, and report shaping |
+| `run_provenance_contract.py` + `run_report_contract.py` | Run provenance and run-report assembly contracts |
+| `run_report_payload_policy.py` | Deterministic payload shaping for context, metrics, guards, and flags |
 
 ### Core Runtime (`src/invarlock/core/`)
 
@@ -140,7 +153,6 @@ Pipeline orchestration without direct torch imports (torch-independent coordinat
 | `api.py` | Protocol definitions for ModelAdapter, ModelEdit, Guard |
 | `bootstrap.py` | BCa bootstrap CI computation for paired metrics |
 | `checkpoint.py` | Snapshot/restore primitives for retry loops |
-| `config_execution.py` | Explicit run-from-config execution contract |
 | `registry.py` | Plugin discovery and registration |
 
 ### Guard Layer (`src/invarlock/guards/`)
@@ -160,11 +172,16 @@ Report generation, validation, persistence, and rendering.
 
 | Module | Responsibility |
 | --- | --- |
-| `report_builder.py` | Evaluation report assembly from paired baseline/subject runs |
-| `report_validation.py` | Schema and semantic validation |
-| `render.py` | Markdown report rendering |
+| `report_schema.py` | Evaluation report schema and structural validation |
+| `report_validation.py` | Canonical validation-flag computation |
+| `report_make.py` | Canonical evaluation-report assembly owner |
+| `report_bundle.py` | Evaluation-bundle persistence, manifest writing, and evidence attachment |
+| `report_contract.py` | Input loading and report-generation planning |
+| `report_console.py` | Console/report validation summary helpers used by CLI/reporting surfaces |
+| `report_summary.py` | Shared executive-summary/view-model derivation for reporting surfaces |
+| `render.py` | Markdown rendering for evaluation reports |
 | `html.py` | HTML export with styling |
-| `report_files.py` | Report/manifest persistence and artifact writing |
+| `report_files.py` | Raw run-report JSON/Markdown/HTML persistence |
 | `evidence.py` | Evidence file normalization and attachment helpers |
 | `telemetry.py` | Performance metrics collection |
 
@@ -296,6 +313,30 @@ Report generation, validation, persistence, and rendering.
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+## Architecture Guardrails
+
+The shell/core split is enforced by design and by targeted architecture guard
+tests. The intended invariants are:
+
+- No lazy exports in package roots such as `adapters/__init__.py` or
+  `guards/__init__.py`. Package roots should expose only explicit canonical
+  exports.
+- No `rmt_legacy` references in production source. RMT ownership lives in
+  `rmt.py`, `rmt_analysis.py`, `rmt_detection.py`, and `rmt_math.py`.
+- No dependency-map orchestration for `run`. The command shell must not rebuild
+  giant `deps` dictionaries or inject `run_impl` callables to preserve legacy
+  seams.
+- No compatibility-only command signatures once a canonical owner contract
+  exists. Example: lens-metric calculation takes a required `MetricsConfig`
+  instead of deprecated per-call overrides.
+- No CLI imports inside owner layers. Modules under `src/invarlock/core/` and
+  `src/invarlock/reporting/` must stay callable without importing
+  `invarlock.cli`.
+
+These guardrails keep the CLI as an imperative shell while policy, contracts,
+and verdict computation remain reusable from non-CLI flows such as proof-pack
+verification and programmatic execution.
+
 ## Key Design Decisions
 
 | Decision | Rationale | Implementation |
@@ -321,12 +362,21 @@ Report generation, validation, persistence, and rendering.
 │                           └──────┬──────┘                                   │
 │                                  │                                          │
 │                                  ▼                                          │
+│                   ┌──────────────────────────────┐                           │
+│                   │ cli shell support modules    │                           │
+│                   │ run_config/run_pairing/      │                           │
+│                   │ run_overhead/run_artifacts   │                           │
+│                   └─────────────┬────────────────┘                           │
+│                                 │                                            │
+│                                 ▼                                            │
 │                     ┌───────────────────────────┐                            │
 │                     │ core/reporting contracts  │                            │
 │                     │ evaluate_plan,            │                            │
 │                     │ report_inputs,            │                            │
 │                     │ doctor_findings,          │                            │
-│                     │ verify_contract, run_*    │                            │
+│                     │ verify_contract,          │                            │
+│                     │ run_policy, run_retry,    │                            │
+│                     │ run_snapshot, run_report  │                            │
 │                     └─────────────┬─────────────┘                            │
 │                                   │                                          │
 │              ┌────────────────────┼────────────────────┐                     │
