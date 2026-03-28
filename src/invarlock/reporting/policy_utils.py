@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 from __future__ import annotations
 
 import copy
@@ -10,6 +9,16 @@ from invarlock.core.auto_tuning import get_tier_policies, resolve_tier_policies
 
 from .report_policy import TIER_RATIO_LIMITS
 from .report_types import RunReport
+
+_NON_FATAL_EXCEPTIONS = (
+    AttributeError,
+    KeyError,
+    OSError,
+    OverflowError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 
 def _compute_variance_policy_digest(policy: dict[str, Any]) -> str:
@@ -60,7 +69,7 @@ def _compute_thresholds_payload(
     try:
         if ratio_limit_base is not None:
             ratio_limit_base = float(ratio_limit_base)
-    except Exception:
+    except _NON_FATAL_EXCEPTIONS:
         ratio_limit_base = None
     if ratio_limit_base is None:
         tier_defaults = get_tier_policies().get(tier_lc, {})
@@ -83,7 +92,7 @@ def _compute_thresholds_payload(
     def _safe_float_any(value: Any, default: float) -> float:
         try:
             return float(value)
-        except Exception:
+        except _NON_FATAL_EXCEPTIONS:
             return float(default)
 
     payload = {
@@ -141,10 +150,14 @@ def _resolve_policy_tier(report: RunReport) -> str:
     tier: Any = None
     try:
         meta = report.get("meta", {}) if isinstance(report, dict) else {}
-        auto_cfg: dict[str, Any] | None = (
-            meta.get("auto", {}) if isinstance(meta, dict) else {}
+        auto_cfg = (
+            meta.get("auto")
+            if isinstance(meta, dict) and isinstance(meta.get("auto"), dict)
+            else None
         )
-        tier = auto_cfg.get("tier") or meta.get("policy_tier")
+        tier = (auto_cfg.get("tier") if auto_cfg else None) or (
+            meta.get("policy_tier") if isinstance(meta, dict) else None
+        )
         if not tier:
             context = report.get("context", {}) if isinstance(report, dict) else {}
             if isinstance(context, dict):
@@ -156,7 +169,7 @@ def _resolve_policy_tier(report: RunReport) -> str:
         if not tier:
             tier = "balanced"
         return str(tier).lower()
-    except Exception:
+    except _NON_FATAL_EXCEPTIONS:
         return "balanced"
 
 
@@ -170,12 +183,12 @@ def _format_family_caps(caps: Any) -> dict[str, dict[str, float]]:
                 if isinstance(kappa_val, int | float):
                     try:
                         formatted[family_name] = {"kappa": float(kappa_val)}
-                    except Exception:
+                    except _NON_FATAL_EXCEPTIONS:
                         pass
             elif isinstance(data, int | float):
                 try:
                     formatted[family_name] = {"kappa": float(data)}
-                except Exception:
+                except _NON_FATAL_EXCEPTIONS:
                     pass
     return formatted
 
@@ -187,7 +200,7 @@ def _format_epsilon_map(epsilon_map: Any) -> dict[str, float]:
             if isinstance(value, int | float):
                 try:
                     formatted[str(family)] = float(value)
-                except Exception:
+                except _NON_FATAL_EXCEPTIONS:
                     pass
     return formatted
 
@@ -231,13 +244,11 @@ def _build_resolved_policies(
     if isinstance(base_spectral, dict):
         spectral_resolved.update(base_spectral)
     spectral_caps = spectral.get("family_caps") or spectral_resolved.get("family_caps")
-    from .policy_utils import _format_family_caps as _ffc  # self import safe
-
-    spectral_resolved["family_caps"] = _ffc(spectral_caps)
+    spectral_resolved["family_caps"] = _format_family_caps(spectral_caps)
     pol_sq = None
     try:
         pol_sq = (spectral.get("policy", {}) or {}).get("sigma_quantile")
-    except Exception:
+    except _NON_FATAL_EXCEPTIONS:
         pol_sq = None
     spectral_resolved["sigma_quantile"] = _safe_float(
         pol_sq
@@ -306,9 +317,7 @@ def _build_resolved_policies(
         "epsilon_default", rmt_resolved.get("epsilon_default", 0.1)
     )
     rmt_resolved["epsilon_default"] = _safe_float(epsilon_default_val, 0.1)
-    from .policy_utils import _format_epsilon_map as _fem
-
-    epsilon_map = _fem(
+    epsilon_map = _format_epsilon_map(
         rmt.get("epsilon_by_family") or rmt_resolved.get("epsilon_by_family") or {}
     )
     if epsilon_map:
@@ -394,36 +403,35 @@ def _build_resolved_policies(
         metrics = base.get("metrics", {}) if isinstance(base, dict) else {}
         if isinstance(metrics, dict) and metrics:
             resolved["metrics"] = copy.deepcopy(metrics)
-    except Exception:
+    except _NON_FATAL_EXCEPTIONS:
         pass
 
     # Confidence thresholds (optional policy knobs)
     try:
-        conf = None
-        metrics = (
-            resolved.get("metrics")
-            if isinstance(resolved.get("metrics"), dict)
-            else None
-        )
-        if isinstance(metrics, dict):
-            conf = metrics.get("confidence")
+        conf: dict[str, Any] | None = None
+        metrics_value = resolved.get("metrics")
+        metrics_config = metrics_value if isinstance(metrics_value, dict) else None
+        if isinstance(metrics_config, dict):
+            confidence_value = metrics_config.get("confidence")
+            conf = confidence_value if isinstance(confidence_value, dict) else None
         if isinstance(conf, dict) and conf:
-            resolved["confidence"] = {}
+            confidence_out: dict[str, float] = {}
             if "ppl_ratio_width_max" in conf:
                 try:
-                    resolved["confidence"]["ppl_ratio_width_max"] = float(
+                    confidence_out["ppl_ratio_width_max"] = float(
                         conf.get("ppl_ratio_width_max")
                     )
-                except Exception:
+                except _NON_FATAL_EXCEPTIONS:
                     pass
             if "accuracy_delta_pp_width_max" in conf:
                 try:
-                    resolved["confidence"]["accuracy_delta_pp_width_max"] = float(
+                    confidence_out["accuracy_delta_pp_width_max"] = float(
                         conf.get("accuracy_delta_pp_width_max")
                     )
-                except Exception:
+                except _NON_FATAL_EXCEPTIONS:
                     pass
-    except Exception:
+            resolved["confidence"] = confidence_out
+    except _NON_FATAL_EXCEPTIONS:
         pass
 
     return resolved
@@ -433,8 +441,10 @@ def _extract_effective_policies(report: RunReport) -> dict[str, Any]:
     """Extract the effective policies that were applied during the run."""
     policies: dict[str, Any] = {}
 
-    guard_entries: list[dict[str, Any]] = report.get("guards", [])
+    guard_entries = report.get("guards", [])
     for guard in guard_entries:
+        if not isinstance(guard, dict):
+            continue
         guard_name = guard.get("name", "").lower()
         guard_policy = guard.get("policy", {})
         original_policy = dict(guard_policy) if isinstance(guard_policy, dict) else {}

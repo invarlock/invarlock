@@ -993,7 +993,7 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
                 except (TypeError, ValueError):
                     guarded_str = "-"
                 try:
-                    delta_count = int(guarded_count) - int(bare_count)  # type: ignore[arg-type]
+                    delta_count = int(guarded_count) - int(bare_count)
                 except (
                     AttributeError,
                     ImportError,

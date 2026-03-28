@@ -36,7 +36,9 @@ def append_dataset_and_provenance_section(
         provider = dataset.get("provider") or "unknown"
         lines.append(f"- **Provider:** {provider}")
         seq_len_raw = dataset.get("seq_len")
-        seq_len_val = int(seq_len_raw) if isinstance(seq_len_raw, int | float) else seq_len_raw
+        seq_len_val = (
+            int(seq_len_raw) if isinstance(seq_len_raw, int | float) else seq_len_raw
+        )
         if seq_len_val is not None:
             lines.append(f"- **Sequence Length:** {seq_len_val}")
         windows_blk = (

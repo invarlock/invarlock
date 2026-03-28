@@ -1,45 +1,15 @@
-# mypy: ignore-errors
 from __future__ import annotations
 
-import hashlib
-import json
 import math
-from typing import Any, no_type_check
+from typing import Any
 
 from invarlock.core.auto_tuning import get_tier_policies
 
+from .guards_common import _baseline_guard_payload, _measurement_contract_digest
 from .policy_utils import _resolve_policy_tier
 from .report_types import RunReport
 
 
-def _measurement_contract_digest(contract: Any) -> str | None:
-    if not isinstance(contract, dict) or not contract:
-        return None
-    try:
-        canonical = json.dumps(contract, sort_keys=True, default=str)
-    except Exception:
-        return None
-    return hashlib.sha256(canonical.encode()).hexdigest()[:16]
-
-
-def _baseline_guard_payload(baseline: Any, guard_name: str) -> dict[str, Any]:
-    """Return baseline guard payload from either an evaluation report or run report."""
-    if not isinstance(baseline, dict):
-        return {}
-    block = baseline.get(guard_name)
-    if isinstance(block, dict) and block:
-        return block
-    for guard in baseline.get("guards", []) or []:
-        if str(guard.get("name", "")).lower() != guard_name:
-            continue
-        metrics = guard.get("metrics")
-        if isinstance(metrics, dict) and metrics:
-            return metrics
-        return {}
-    return {}
-
-
-@no_type_check
 def _extract_invariants(
     report: RunReport, baseline: RunReport | None = None
 ) -> dict[str, Any]:
@@ -268,7 +238,16 @@ def _extract_invariants(
             summary["fatal_violations"] = fatal_total
             summary["warning_violations"] = warn_total
             summary["violations_found"] = fatal_total + warn_total
-        except Exception:
+        except (
+            AttributeError,
+            ImportError,
+            KeyError,
+            OSError,
+            OverflowError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ):
             pass
 
         if fatal_total > 0:
@@ -307,7 +286,6 @@ def _extract_invariants(
     }
 
 
-@no_type_check
 def _extract_spectral_analysis(
     report: RunReport, baseline: dict[str, Any]
 ) -> dict[str, Any]:
@@ -338,7 +316,16 @@ def _extract_spectral_analysis(
         )
         try:
             caps_applied = int(raw)
-        except Exception:
+        except (
+            AttributeError,
+            ImportError,
+            KeyError,
+            OSError,
+            OverflowError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ):
             caps_applied = 0
     else:
         caps_applied = 0
@@ -353,7 +340,16 @@ def _extract_spectral_analysis(
         max_caps = default_max_caps
     try:
         max_caps = int(max_caps)
-    except Exception:
+    except (
+        AttributeError,
+        ImportError,
+        KeyError,
+        OSError,
+        OverflowError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ):
         max_caps = int(default_max_caps)
 
     try:
@@ -362,7 +358,16 @@ def _extract_spectral_analysis(
             or guard_metrics.get("max_spectral_norm")
             or 0.0
         )
-    except Exception:
+    except (
+        AttributeError,
+        ImportError,
+        KeyError,
+        OSError,
+        OverflowError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ):
         max_spectral_norm = 0.0
     try:
         mean_spectral_norm = float(
@@ -370,7 +375,16 @@ def _extract_spectral_analysis(
             or guard_metrics.get("mean_spectral_norm")
             or 0.0
         )
-    except Exception:
+    except (
+        AttributeError,
+        ImportError,
+        KeyError,
+        OSError,
+        OverflowError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ):
         mean_spectral_norm = 0.0
 
     baseline_max = None
@@ -488,7 +502,16 @@ def _extract_spectral_analysis(
                 db_raw = default_deadband
             if db_raw is not None:
                 deadband_used = float(db_raw)
-        except Exception:
+        except (
+            AttributeError,
+            ImportError,
+            KeyError,
+            OSError,
+            OverflowError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ):
             deadband_used = None
 
         # Resolve sigma_quantile for summary
@@ -501,7 +524,16 @@ def _extract_spectral_analysis(
                 pol_sq = default_sigma_quantile
             if pol_sq is not None:
                 sigma_q_used = float(pol_sq)
-        except Exception:
+        except (
+            AttributeError,
+            ImportError,
+            KeyError,
+            OSError,
+            OverflowError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ):
             sigma_q_used = None
 
         summary = {
@@ -523,7 +555,16 @@ def _extract_spectral_analysis(
                     guard_metrics.get("stability_score", 1.0),
                 )
             )
-        except Exception:
+        except (
+            AttributeError,
+            ImportError,
+            KeyError,
+            OSError,
+            OverflowError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ):
             pass
         # Prefer explicit family_z_quantiles when present; otherwise accept summary
         family_quantiles = (
@@ -556,22 +597,58 @@ def _extract_spectral_analysis(
                     if "max" in stats:
                         try:
                             entry["max"] = float(stats["max"])
-                        except Exception:
+                        except (
+                            AttributeError,
+                            ImportError,
+                            KeyError,
+                            OSError,
+                            OverflowError,
+                            RuntimeError,
+                            TypeError,
+                            ValueError,
+                        ):
                             pass
                     if "mean" in stats:
                         try:
                             entry["mean"] = float(stats["mean"])
-                        except Exception:
+                        except (
+                            AttributeError,
+                            ImportError,
+                            KeyError,
+                            OSError,
+                            OverflowError,
+                            RuntimeError,
+                            TypeError,
+                            ValueError,
+                        ):
                             pass
                     if "count" in stats:
                         try:
                             entry["count"] = int(stats["count"])
-                        except Exception:
+                        except (
+                            AttributeError,
+                            ImportError,
+                            KeyError,
+                            OSError,
+                            OverflowError,
+                            RuntimeError,
+                            TypeError,
+                            ValueError,
+                        ):
                             pass
                     if "violations" in stats:
                         try:
                             entry["violations"] = int(stats["violations"])
-                        except Exception:
+                        except (
+                            AttributeError,
+                            ImportError,
+                            KeyError,
+                            OSError,
+                            OverflowError,
+                            RuntimeError,
+                            TypeError,
+                            ValueError,
+                        ):
                             pass
                     # Propagate kappa from stats or family_caps
                     kappa = stats.get("kappa") if isinstance(stats, dict) else None
@@ -583,7 +660,16 @@ def _extract_spectral_analysis(
                     try:
                         if kappa is not None:
                             entry["kappa"] = float(kappa)
-                    except Exception:
+                    except (
+                        AttributeError,
+                        ImportError,
+                        KeyError,
+                        OSError,
+                        OverflowError,
+                        RuntimeError,
+                        TypeError,
+                        ValueError,
+                    ):
                         pass
                     if entry:
                         families[str(fam)] = entry
@@ -616,7 +702,16 @@ def _extract_spectral_analysis(
                     z = e.get("z")
                     try:
                         zf = float(z)
-                    except Exception:
+                    except (
+                        AttributeError,
+                        ImportError,
+                        KeyError,
+                        OSError,
+                        OverflowError,
+                        RuntimeError,
+                        TypeError,
+                        ValueError,
+                    ):
                         continue
                     cleaned.append({"module": mod, "z": zf})
                 if cleaned:
@@ -658,7 +753,16 @@ def _extract_spectral_analysis(
                     summary["median_sigma_ratio"] = float(
                         sorted(float_ratios)[len(float_ratios) // 2]
                     )
-                except Exception:
+                except (
+                    AttributeError,
+                    ImportError,
+                    KeyError,
+                    OSError,
+                    OverflowError,
+                    RuntimeError,
+                    TypeError,
+                    ValueError,
+                ):
                     pass
 
     # Multiple testing resolution
@@ -683,7 +787,16 @@ def _extract_spectral_analysis(
             if sq is not None:
                 try:
                     policy_out["sigma_quantile"] = float(sq)
-                except Exception:
+                except (
+                    AttributeError,
+                    ImportError,
+                    KeyError,
+                    OSError,
+                    OverflowError,
+                    RuntimeError,
+                    TypeError,
+                    ValueError,
+                ):
                     pass
         if tier == "balanced":
             policy_out["correction_enabled"] = False
@@ -701,7 +814,16 @@ def _extract_spectral_analysis(
     # Surface a stable/capped status on the summary for schema parity.
     try:
         summary["status"] = "stable" if int(caps_applied) == 0 else "capped"
-    except Exception:
+    except (
+        AttributeError,
+        ImportError,
+        KeyError,
+        OSError,
+        OverflowError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ):
         summary["status"] = "stable" if not caps_applied else "capped"
     if policy_out:
         result["policy"] = policy_out
@@ -714,7 +836,16 @@ def _extract_spectral_analysis(
     result["max_caps"] = max_caps_val
     try:
         summary["max_caps"] = max_caps_val
-    except Exception:
+    except (
+        AttributeError,
+        ImportError,
+        KeyError,
+        OSError,
+        OverflowError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ):
         pass
     if multiple_testing:
         mt_copy = dict(multiple_testing)
@@ -723,7 +854,16 @@ def _extract_spectral_analysis(
         )
         try:
             mt_copy["m"] = int(mt_copy.get("m") or len(families_present))
-        except Exception:
+        except (
+            AttributeError,
+            ImportError,
+            KeyError,
+            OSError,
+            OverflowError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ):
             mt_copy["m"] = len(families_present)
         result["multiple_testing"] = mt_copy
         result["bh_family_count"] = mt_copy["m"]
@@ -753,7 +893,16 @@ def _extract_spectral_analysis(
             z_score = violation.get("z_score")
             try:
                 entry["z_score"] = float(z_score)
-            except Exception:
+            except (
+                AttributeError,
+                ImportError,
+                KeyError,
+                OSError,
+                OverflowError,
+                RuntimeError,
+                TypeError,
+                ValueError,
+            ):
                 pass
             top_violations.append(entry)
         if top_violations:
@@ -771,7 +920,16 @@ def _extract_spectral_analysis(
         )
         if isinstance(mc, dict) and mc:
             measurement_contract = mc
-    except Exception:
+    except (
+        AttributeError,
+        ImportError,
+        KeyError,
+        OSError,
+        OverflowError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ):
         measurement_contract = None
     baseline_contract = None
     try:
@@ -782,7 +940,16 @@ def _extract_spectral_analysis(
         )
         if isinstance(bc, dict) and bc:
             baseline_contract = bc
-    except Exception:
+    except (
+        AttributeError,
+        ImportError,
+        KeyError,
+        OSError,
+        OverflowError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ):
         baseline_contract = None
     mc_hash = _measurement_contract_digest(measurement_contract)
     baseline_hash = _measurement_contract_digest(baseline_contract)
@@ -797,13 +964,31 @@ def _extract_spectral_analysis(
     result["caps_exceeded"] = bool(caps_exceeded)
     try:
         summary["caps_exceeded"] = bool(caps_exceeded)
-    except Exception:
+    except (
+        AttributeError,
+        ImportError,
+        KeyError,
+        OSError,
+        OverflowError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ):
         pass
     # Propagate modules_checked when present
     if modules_checked is not None:
         try:
             summary["modules_checked"] = int(modules_checked)
-        except Exception:
+        except (
+            AttributeError,
+            ImportError,
+            KeyError,
+            OSError,
+            OverflowError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ):
             pass
 
     if families:
@@ -820,7 +1005,6 @@ def _extract_spectral_analysis(
     return result
 
 
-@no_type_check
 def _extract_rmt_analysis(
     report: RunReport, baseline: dict[str, Any]
 ) -> dict[str, Any]:
@@ -849,7 +1033,16 @@ def _extract_rmt_analysis(
         )
         if isinstance(eps_def, int | float) and math.isfinite(float(eps_def)):
             epsilon_default = float(eps_def)
-    except Exception:
+    except (
+        AttributeError,
+        ImportError,
+        KeyError,
+        OSError,
+        OverflowError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ):
         pass
 
     baseline_rmt = _baseline_guard_payload(baseline, "rmt")
@@ -982,7 +1175,16 @@ def _extract_rmt_analysis(
         )
         if isinstance(mc, dict) and mc:
             measurement_contract = mc
-    except Exception:
+    except (
+        AttributeError,
+        ImportError,
+        KeyError,
+        OSError,
+        OverflowError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ):
         measurement_contract = None
 
     mc_hash = _measurement_contract_digest(measurement_contract)
@@ -1025,7 +1227,6 @@ def _extract_rmt_analysis(
     return result
 
 
-@no_type_check
 def _extract_variance_analysis(report: RunReport) -> dict[str, Any]:
     ve_enabled = False
     gain = None
@@ -1062,7 +1263,16 @@ def _extract_variance_analysis(report: RunReport) -> dict[str, Any]:
     if ratio_ci:
         try:
             result["ratio_ci"] = (float(ratio_ci[0]), float(ratio_ci[1]))
-        except Exception:
+        except (
+            AttributeError,
+            ImportError,
+            KeyError,
+            OSError,
+            OverflowError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ):
             pass
     if calibration:
         result["calibration"] = calibration
