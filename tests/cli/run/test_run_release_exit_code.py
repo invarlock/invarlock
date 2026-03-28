@@ -92,7 +92,7 @@ def _stub_env(monkeypatch, tmp_path: Path):
 
     # Model profile + tokenizer
     monkeypatch.setattr(
-        "invarlock.cli.commands.run.detect_model_profile",
+        "invarlock.cli.run_runtime.detect_model_profile",
         lambda *a, **k: (_ for _ in ()).throw(
             __import__(
                 "invarlock.cli.commands.run", fromlist=["InvarlockError"]
@@ -128,7 +128,7 @@ def test_out_flag_precedence_over_config(tmp_path: Path, monkeypatch):
         )
 
     monkeypatch.setattr(
-        "invarlock.cli.commands.run.detect_model_profile", lambda *a, **k: _profile()
+        "invarlock.cli.run_runtime.detect_model_profile", lambda *a, **k: _profile()
     )
     r = CliRunner().invoke(
         cli, ["run", "-c", cfg, "--profile", "dev", "--out", str(out_dir)]

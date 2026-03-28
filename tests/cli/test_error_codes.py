@@ -110,7 +110,7 @@ context:
         # Force tokenizer hash to match baseline so only mask parity differs
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.resolve_tokenizer",
+                "invarlock.cli.run_runtime.resolve_tokenizer",
                 lambda profile: (
                     SimpleNamespace(
                         eos_token="</s>", pad_token="</s>", vocab_size=50000

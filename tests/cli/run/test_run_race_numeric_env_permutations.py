@@ -106,7 +106,7 @@ def _common_ce_detect_ce():
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch("invarlock.core.registry.get_registry", lambda: _Registry()),
         patch(
-            "invarlock.cli.commands.run.detect_model_profile",
+            "invarlock.cli.run_runtime.detect_model_profile",
             lambda model_id, adapter: SimpleNamespace(
                 default_loss="ce",
                 model_id=model_id,
@@ -118,7 +118,7 @@ def _common_ce_detect_ce():
             ),
         ),
         patch(
-            "invarlock.cli.commands.run.resolve_tokenizer",
+            "invarlock.cli.run_runtime.resolve_tokenizer",
             lambda profile: (
                 SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
                 "tokhash123",
@@ -416,7 +416,7 @@ def test_env_var_poisoning_for_tmpdir_and_debug(tmp_path: Path, monkeypatch):
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.psutil.virtual_memory",
+                "invarlock.cli.run_runtime.psutil.virtual_memory",
                 lambda: SimpleNamespace(available=200 * 1024 * 1024),
             )
         )
@@ -470,11 +470,11 @@ def test_debug_trace_with_mlm_masks_prints(tmp_path: Path, monkeypatch):
             )
         )
         stack.enter_context(
-            patch("invarlock.cli.commands.run.detect_model_profile", detect_mlm)
+            patch("invarlock.cli.run_runtime.detect_model_profile", detect_mlm)
         )
         for target in (
-            "invarlock.cli.commands.run.resolve_tokenizer",
-            "invarlock.cli.commands.run.resolve_tokenizer",
+            "invarlock.cli.run_runtime.resolve_tokenizer",
+            "invarlock.cli.run_runtime.resolve_tokenizer",
         ):
             stack.enter_context(
                 patch(
@@ -618,11 +618,11 @@ def test_mlm_probability_inversion(tmp_path: Path):
             patch("invarlock.core.config_runtime.load_config", lambda p: Cfg())
         )
         stack.enter_context(
-            patch("invarlock.cli.commands.run.detect_model_profile", detect_mlm)
+            patch("invarlock.cli.run_runtime.detect_model_profile", detect_mlm)
         )
         for target in (
-            "invarlock.cli.commands.run.resolve_tokenizer",
-            "invarlock.cli.commands.run.resolve_tokenizer",
+            "invarlock.cli.run_runtime.resolve_tokenizer",
+            "invarlock.cli.run_runtime.resolve_tokenizer",
         ):
             stack.enter_context(
                 patch(
@@ -729,11 +729,11 @@ def test_baseline_mlm_no_masked_tokens_exit(tmp_path: Path):
             patch("invarlock.core.config_runtime.load_config", lambda p: Cfg())
         )
         stack.enter_context(
-            patch("invarlock.cli.commands.run.detect_model_profile", detect_mlm)
+            patch("invarlock.cli.run_runtime.detect_model_profile", detect_mlm)
         )
         for target in (
-            "invarlock.cli.commands.run.resolve_tokenizer",
-            "invarlock.cli.commands.run.resolve_tokenizer",
+            "invarlock.cli.run_runtime.resolve_tokenizer",
+            "invarlock.cli.run_runtime.resolve_tokenizer",
         ):
             stack.enter_context(
                 patch(

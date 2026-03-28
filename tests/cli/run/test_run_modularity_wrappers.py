@@ -4,6 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import invarlock.cli.commands.run as run_mod
+import invarlock.cli.run_runtime as runtime_mod
 
 
 class _DummyError(Exception):
@@ -103,7 +104,7 @@ def test_policy_wrappers_delegate(monkeypatch):
         snapshot_seen["estimate_model_bytes_fn"] is run_mod._estimate_model_bytes_impl
     )
     assert snapshot_seen["disk_usage_fn"] is run_mod.shutil.disk_usage
-    assert snapshot_seen["free_model_memory_fn"] is run_mod._free_model_memory
+    assert snapshot_seen["free_model_memory_fn"] is runtime_mod.free_model_memory
 
     retry_seen: dict[str, object] = {}
 

@@ -13,6 +13,7 @@ from rich.console import Console
 
 from invarlock.cli import run_masking as masking_mod
 from invarlock.cli import run_pairing_helpers as pairing_mod
+from invarlock.cli import run_runtime as runtime_mod
 from invarlock.cli.commands import run as run_mod
 
 
@@ -1326,7 +1327,7 @@ def test_run_bare_control_frees_private_reload_model(monkeypatch):
 
     monkeypatch.setattr(run_mod, "_load_model_with_cfg", _load_model_with_cfg)
     monkeypatch.setattr(
-        run_mod, "_free_model_memory", lambda m: events.append(("free", m))
+        runtime_mod, "free_model_memory", lambda m: events.append(("free", m))
     )
 
     run_mod._run_bare_control(

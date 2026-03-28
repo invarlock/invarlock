@@ -50,7 +50,7 @@ output:
 def _common_ce():
     return (
         patch(
-            "invarlock.cli.commands.run.detect_model_profile",
+            "invarlock.cli.run_runtime.detect_model_profile",
             lambda model_id, adapter: SimpleNamespace(
                 default_loss="ce",
                 model_id=model_id,
@@ -62,7 +62,7 @@ def _common_ce():
             ),
         ),
         patch(
-            "invarlock.cli.commands.run.resolve_tokenizer",
+            "invarlock.cli.run_runtime.resolve_tokenizer",
             lambda model_profile: (
                 SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
                 "tokhash123",
@@ -284,7 +284,7 @@ def test_guard_overhead_payload_present_ci(tmp_path: Path):
         # Patch the validator at both locations to guarantee the module ref is hit
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.commands.run.validate_guard_overhead",
+            "invarlock.cli.run_runtime.validate_guard_overhead",
         ):
             stack.enter_context(
                 patch(
@@ -345,7 +345,7 @@ def test_tokenizer_digest_non_string_keys_in_vocab(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.commands.run.resolve_tokenizer", resolver)
+            patch("invarlock.cli.run_runtime.resolve_tokenizer", resolver)
         )
         stack.enter_context(
             patch(
@@ -417,7 +417,7 @@ def test_tokenizer_digest_exception_unknown(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.commands.run.resolve_tokenizer", resolver)
+            patch("invarlock.cli.run_runtime.resolve_tokenizer", resolver)
         )
         stack.enter_context(
             patch(
@@ -482,7 +482,7 @@ def test_tokenizer_digest_vocab_attribute_non_mapping(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.commands.run.resolve_tokenizer", resolver)
+            patch("invarlock.cli.run_runtime.resolve_tokenizer", resolver)
         )
         stack.enter_context(
             patch(
@@ -682,7 +682,7 @@ def test_baseline_tokenizer_hash_mismatch_exit(tmp_path: Path):
         # Force tokenizer hash to be 'tokhash123' so a mismatch with baseline occurs
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.resolve_tokenizer",
+                "invarlock.cli.run_runtime.resolve_tokenizer",
                 lambda profile: (
                     SimpleNamespace(
                         eos_token="</s>", pad_token="</s>", vocab_size=50000

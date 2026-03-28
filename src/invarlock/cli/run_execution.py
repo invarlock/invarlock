@@ -474,8 +474,8 @@ def execute_run_request(
                     profile=profile_normalized,
                 )
 
-        requested_preview = int(getattr(cfg.dataset, "preview_n", 0))
-        requested_final = int(getattr(cfg.dataset, "final_n", 0))
+        requested_preview = _safe_int(getattr(cfg.dataset, "preview_n", 0), 0)
+        requested_final = _safe_int(getattr(cfg.dataset, "final_n", 0), 0)
         effective_preview = requested_preview
         effective_final = requested_final
         preview_count = effective_preview

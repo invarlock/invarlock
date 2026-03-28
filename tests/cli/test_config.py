@@ -37,6 +37,41 @@ def test_invarlock_config_section_accessors_fail_closed() -> None:
         cfg.section("extra")
 
 
+def test_eval_section_preserves_loss_and_runtime_fields() -> None:
+    cfg = InvarLockConfig(
+        eval={
+            "loss": {
+                "type": "mlm",
+                "mask_prob": 0.2,
+                "random_token_prob": 0.1,
+                "original_token_prob": 0.05,
+            },
+            "capacity_fast": True,
+            "max_pm_ratio": 1.25,
+            "spike_threshold": 2.5,
+        }
+    )
+
+    assert cfg.eval.loss is not None
+    assert cfg.eval.loss.type == "mlm"
+    assert cfg.eval.loss.mask_prob == pytest.approx(0.2)
+    assert cfg.eval.capacity_fast is True
+    assert cfg.eval.max_pm_ratio == pytest.approx(1.25)
+    assert cfg.eval.spike_threshold == pytest.approx(2.5)
+    assert cfg.section("eval") == {
+        "bootstrap": {"replicates": 1000, "alpha": 0.05, "ci_band": 0.1},
+        "loss": {
+            "type": "mlm",
+            "mask_prob": 0.2,
+            "random_token_prob": 0.1,
+            "original_token_prob": 0.05,
+        },
+        "spike_threshold": 2.5,
+        "max_pm_ratio": 1.25,
+        "capacity_fast": True,
+    }
+
+
 def test_guard_configs_family_caps_and_sigma_quantile():
     sg = SpectralGuardConfig(sigma_quantile=0.2)
     assert sg.sigma_quantile == 0.2

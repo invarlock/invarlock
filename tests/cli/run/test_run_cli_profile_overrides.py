@@ -77,12 +77,13 @@ def test_run_cli_profile_and_edit_override_paths(
     run_mod = _import_run_module()
     # Force device validation failure so we exit shortly after the profile/edit paths
     import invarlock.cli.device as dev_mod
+    import invarlock.cli.run_runtime as runtime_mod
 
     monkeypatch.setattr(
         dev_mod, "validate_device_for_config", lambda *a, **k: (False, "bad device")
     )
     monkeypatch.setattr(
-        run_mod, "detect_model_profile", lambda model_id, adapter: _StubProfile()
+        runtime_mod, "detect_model_profile", lambda model_id, adapter: _StubProfile()
     )
 
     with pytest.raises(typer.Exit) as ei:
@@ -122,12 +123,13 @@ def test_run_cli_adapter_auto_noop_then_exit(
     run_mod = _import_run_module()
     # Force device validation failure so we exit after adapter_auto check
     import invarlock.cli.device as dev_mod
+    import invarlock.cli.run_runtime as runtime_mod
 
     monkeypatch.setattr(
         dev_mod, "validate_device_for_config", lambda *a, **k: (False, "bad device")
     )
     monkeypatch.setattr(
-        run_mod, "detect_model_profile", lambda model_id, adapter: _StubProfile()
+        runtime_mod, "detect_model_profile", lambda model_id, adapter: _StubProfile()
     )
 
     with pytest.raises(typer.Exit) as ei:

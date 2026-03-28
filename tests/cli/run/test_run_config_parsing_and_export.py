@@ -212,8 +212,8 @@ def _run_with_common_patches(
 
     patches = [
         patch("invarlock.cli.commands.run._prepare_config_for_run", lambda **k: cfg),
-        patch("invarlock.cli.commands.run.detect_model_profile", _detect_profile),
-        patch("invarlock.cli.commands.run.resolve_tokenizer", lambda *_a, **_k: _tok()),
+        patch("invarlock.cli.run_runtime.detect_model_profile", _detect_profile),
+        patch("invarlock.cli.run_runtime.resolve_tokenizer", lambda *_a, **_k: _tok()),
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch("invarlock.core.registry.get_registry", lambda: Registry()),
@@ -615,9 +615,9 @@ def test_run_command_baseline_token_counts_provider_parity_export_and_classifica
             patch(
                 "invarlock.cli.commands.run._prepare_config_for_run", lambda **k: cfg
             ),
-            patch("invarlock.cli.commands.run.detect_model_profile", _detect_profile),
+            patch("invarlock.cli.run_runtime.detect_model_profile", _detect_profile),
             patch(
-                "invarlock.cli.commands.run.resolve_tokenizer", lambda *_a, **_k: _tok()
+                "invarlock.cli.run_runtime.resolve_tokenizer", lambda *_a, **_k: _tok()
             ),
             patch("invarlock.cli.device.resolve_device", lambda d: d),
             patch(
@@ -732,9 +732,9 @@ def test_run_command_classification_pseudo_counts_and_export_env_dir(
             patch(
                 "invarlock.cli.commands.run._prepare_config_for_run", lambda **k: cfg
             ),
-            patch("invarlock.cli.commands.run.detect_model_profile", _detect_profile),
+            patch("invarlock.cli.run_runtime.detect_model_profile", _detect_profile),
             patch(
-                "invarlock.cli.commands.run.resolve_tokenizer", lambda *_a, **_k: _tok()
+                "invarlock.cli.run_runtime.resolve_tokenizer", lambda *_a, **_k: _tok()
             ),
             patch("invarlock.cli.device.resolve_device", lambda d: d),
             patch(
@@ -860,9 +860,9 @@ def test_run_command_export_saves_tokenizer_artifacts(
             patch(
                 "invarlock.cli.commands.run._prepare_config_for_run", lambda **k: cfg
             ),
-            patch("invarlock.cli.commands.run.detect_model_profile", _detect_profile),
+            patch("invarlock.cli.run_runtime.detect_model_profile", _detect_profile),
             patch(
-                "invarlock.cli.commands.run.resolve_tokenizer",
+                "invarlock.cli.run_runtime.resolve_tokenizer",
                 lambda *_a, **_k: (tokenizer, "tokhash123"),
             ),
             patch("invarlock.cli.device.resolve_device", lambda d: d),
@@ -1012,10 +1012,10 @@ def test_run_command_until_pass_auto_tune_head_budget_paths(tmp_path: Path) -> N
                     lambda **k: cfg,
                 ),
                 patch(
-                    "invarlock.cli.commands.run.detect_model_profile", _detect_profile
+                    "invarlock.cli.run_runtime.detect_model_profile", _detect_profile
                 ),
                 patch(
-                    "invarlock.cli.commands.run.resolve_tokenizer",
+                    "invarlock.cli.run_runtime.resolve_tokenizer",
                     lambda *_a, **_k: _tok(),
                 ),
                 patch("invarlock.cli.device.resolve_device", lambda d: d),

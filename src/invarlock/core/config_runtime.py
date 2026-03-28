@@ -9,7 +9,7 @@ from __future__ import annotations
 import copy
 import os
 from collections.abc import Iterator, MutableMapping
-from dataclasses import asdict, dataclass, field, fields, is_dataclass
+from dataclasses import dataclass, field, fields, is_dataclass
 from importlib import resources as _ires
 from pathlib import Path
 from typing import Any
@@ -29,14 +29,46 @@ def _deep_merge(a: dict, b: dict) -> dict:
     return out
 
 
+def _normalize_section_value(value: Any) -> Any:
+    if is_dataclass(value):
+        return _section_dataclass_payload(value)
+    if isinstance(value, dict):
+        normalized_dict: dict[str, Any] = {}
+        for key, item in value.items():
+            normalized_item = _normalize_section_value(item)
+            if normalized_item is None:
+                continue
+            normalized_dict[key] = normalized_item
+        return normalized_dict
+    if isinstance(value, list):
+        return [
+            normalized_item
+            for item in value
+            if (normalized_item := _normalize_section_value(item)) is not None
+        ]
+    if isinstance(value, tuple):
+        return tuple(
+            normalized_item
+            for item in value
+            if (normalized_item := _normalize_section_value(item)) is not None
+        )
+    return copy.deepcopy(value)
+
+
 def _section_dataclass_payload(instance: Any) -> dict[str, Any]:
     if not is_dataclass(instance):
         raise TypeError(f"Expected dataclass instance, got {type(instance).__name__}")
-    payload = asdict(instance)
-    extra = payload.pop("_extra", None)
+    payload: dict[str, Any] = {}
+    for section_field in fields(instance):
+        if not section_field.init or section_field.name == "_extra":
+            continue
+        value = getattr(instance, section_field.name)
+        if value is None:
+            continue
+        payload[section_field.name] = _normalize_section_value(value)
+    extra = getattr(instance, "_extra", None)
     if isinstance(extra, dict):
-        payload.update(extra)
-    payload = {k: v for k, v in payload.items() if v is not None}
+        payload.update(_normalize_section_value(extra))
     return payload
 
 
@@ -127,9 +159,23 @@ class GuardsConfig(SectionMixin):
 
 
 @dataclass
+class EvalLossConfig(SectionMixin):
+    type: str | None = None
+    mask_prob: float | None = None
+    seed: int | None = None
+    random_token_prob: float | None = None
+    original_token_prob: float | None = None
+    _extra: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class EvalConfig(SectionMixin):
     metric: dict[str, Any] | None = None
     bootstrap: EvalBootstrapConfig | dict[str, Any] = field(default_factory=dict)
+    loss: EvalLossConfig | dict[str, Any] | None = None
+    spike_threshold: float = 2.0
+    max_pm_ratio: float = 1.5
+    capacity_fast: bool = False
     _extra: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -138,6 +184,9 @@ class EvalConfig(SectionMixin):
         elif isinstance(self.bootstrap, dict):
             known, extra = _split_known_fields(EvalBootstrapConfig, self.bootstrap)
             self.bootstrap = EvalBootstrapConfig(_extra=extra, **known)
+        if self.loss is not None and isinstance(self.loss, dict):
+            known, extra = _split_known_fields(EvalLossConfig, self.loss)
+            self.loss = EvalLossConfig(_extra=extra, **known)
 
 
 def _normalize_top_level_section(name: str, value: Any) -> Any:

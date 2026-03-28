@@ -60,7 +60,7 @@ def _common_ce():
             },
         ),
         patch(
-            "invarlock.cli.commands.run.resolve_tokenizer",
+            "invarlock.cli.run_runtime.resolve_tokenizer",
             lambda profile: (
                 SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
                 "tokhash123",
@@ -164,7 +164,7 @@ def test_snapshot_auto_chunked_selected_when_large_and_disk_ok(
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.psutil.virtual_memory",
+                "invarlock.cli.run_runtime.psutil.virtual_memory",
                 lambda: _psutil_vm(available_mb=512),
             )
         )
@@ -361,7 +361,7 @@ def test_until_pass_materialize_sets_flags_and_retries_once(
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.commands.run.detect_model_profile", detect_profile)
+            patch("invarlock.cli.run_runtime.detect_model_profile", detect_profile)
         )
         stack.enter_context(patch("invarlock.core.retry.RetryController", RC))
         stack.enter_context(
@@ -369,8 +369,8 @@ def test_until_pass_materialize_sets_flags_and_retries_once(
         )
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.commands.run.validate_guard_overhead",
-            "invarlock.cli.commands.run.validate_guard_overhead",
+            "invarlock.cli.run_runtime.validate_guard_overhead",
+            "invarlock.cli.run_runtime.validate_guard_overhead",
         ):
             stack.enter_context(
                 patch(
@@ -534,7 +534,7 @@ def test_snapshot_auto_bytes_when_small_model(tmp_path: Path, monkeypatch):
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.psutil.virtual_memory",
+                "invarlock.cli.run_runtime.psutil.virtual_memory",
                 lambda: _psutil_vm(available_mb=8192),
             )
         )
@@ -601,7 +601,7 @@ def test_snapshot_no_support_uses_reload(tmp_path: Path, monkeypatch):
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.psutil.virtual_memory",
+                "invarlock.cli.run_runtime.psutil.virtual_memory",
                 lambda: _psutil_vm(available_mb=0),
             )
         )

@@ -32,6 +32,7 @@ from rich.console import Console
 
 from invarlock.cli import run_masking as _run_masking
 from invarlock.cli import run_pairing_helpers as _run_pairing_helpers
+from invarlock.cli import run_runtime as _run_runtime
 from invarlock.cli.output import (
     OutputStyle,
     make_console,
@@ -262,98 +263,6 @@ from ...core.config_runtime import InvarLockConfig
 from ..overhead_utils import _extract_pm_snapshot_for_overhead
 
 console = make_console()
-_IMPORT_UNSET = object()
-_psutil_module: Any = _IMPORT_UNSET
-_torch_module: Any = _IMPORT_UNSET
-
-
-class _LazyImportProxy:
-    """Expose a patch-friendly module surface while deferring the real import."""
-
-    def __init__(self, loader: Callable[[], Any]) -> None:
-        self._loader = loader
-
-    def _target(self) -> Any:
-        return self._loader()
-
-    def __getattr__(self, name: str) -> Any:
-        target = self._target()
-        if target is None:
-            raise AttributeError(name)
-        return getattr(target, name)
-
-    def __bool__(self) -> bool:
-        return self._target() is not None
-
-    def __repr__(self) -> str:  # pragma: no cover - debug helper
-        target = self._target()
-        if target is None:
-            return "<lazy-missing-module>"
-        return repr(target)
-
-
-def _load_psutil_module() -> Any:
-    global _psutil_module
-    if _psutil_module is _IMPORT_UNSET:
-        try:
-            import psutil as _psutil
-        except ImportError:
-            _psutil_module = None
-        else:
-            _psutil_module = _psutil
-    return None if _psutil_module is _IMPORT_UNSET else _psutil_module
-
-
-def _load_torch_module() -> Any:
-    global _torch_module
-    if _torch_module is _IMPORT_UNSET:
-        try:
-            import torch as _torch
-        except ImportError:
-            _torch_module = None
-        else:
-            _torch_module = _torch
-    return None if _torch_module is _IMPORT_UNSET else _torch_module
-
-
-def _get_psutil() -> Any:
-    return psutil
-
-
-def _get_torch() -> Any:
-    return torch
-
-
-psutil: Any = _LazyImportProxy(_load_psutil_module)
-torch: Any = _LazyImportProxy(_load_torch_module)
-
-
-def _reset_optional_runtime_caches() -> None:
-    global _psutil_module, _torch_module
-    if isinstance(psutil, _LazyImportProxy):
-        _psutil_module = _IMPORT_UNSET
-    if isinstance(torch, _LazyImportProxy):
-        _torch_module = _IMPORT_UNSET
-
-
-def detect_model_profile(model_id: str, adapter: str | None = None) -> Any:
-    from invarlock.model_profile import detect_model_profile as _detect_model_profile
-
-    return _detect_model_profile(model_id=model_id, adapter=adapter)
-
-
-def resolve_tokenizer(profile: Any) -> tuple[Any, str]:
-    from invarlock.model_profile import resolve_tokenizer as _resolve_tokenizer
-
-    return _resolve_tokenizer(profile)
-
-
-def validate_guard_overhead(*args: Any, **kwargs: Any) -> Any:
-    from invarlock.reporting.validate import (
-        validate_guard_overhead as _validate_guard_overhead,
-    )
-
-    return _validate_guard_overhead(*args, **kwargs)
 
 
 def _style_from_console(console: Console, profile: str | None = None) -> OutputStyle:
@@ -743,24 +652,6 @@ def _resolve_skip_overhead_policy(
     return _resolve_skip_overhead_policy_impl(cfg, coerce_mapping_fn=_coerce_mapping)
 
 
-def _free_model_memory(model: object | None) -> None:
-    """Best-effort cleanup to release GPU memory for a model object."""
-    if model is None:
-        return
-    try:
-        import gc
-
-        torch_mod = _get_torch()
-        del model
-        gc.collect()
-        if torch_mod is not None and torch_mod.cuda.is_available():
-            torch_mod.cuda.empty_cache()
-            torch_mod.cuda.synchronize()
-    except (ImportError, RuntimeError, TypeError, ValueError, AttributeError):
-        # Cleanup should never raise; fallback is to proceed without cache purge
-        pass
-
-
 class _SnapshotRestoreFailed(RuntimeError):
     """Internal signal for snapshot restore failures during retries."""
 
@@ -915,7 +806,7 @@ def _prepare_guard_overhead_report(
         report=report,
         default_threshold=default_threshold,
         extract_pm_snapshot_for_overhead_fn=_extract_pm_snapshot_for_overhead,
-        validate_guard_overhead_fn=validate_guard_overhead,
+        validate_guard_overhead_fn=_run_runtime.validate_guard_overhead,
     )
 
 
@@ -997,7 +888,7 @@ def _build_provider_dataset_plan(
         tier=tier,
         get_provider_fn=get_provider,
         resolve_provider_and_split_fn=_resolve_provider_and_split,
-        resolve_tokenizer_fn=resolve_tokenizer,
+        resolve_tokenizer_fn=_run_runtime.resolve_tokenizer,
         maybe_plan_release_windows_fn=_maybe_plan_release_windows,
         resolve_effective_windows_fn=_resolve_effective_windows,
         apply_mlm_masks_fn=_run_masking._apply_mlm_masks,
@@ -1212,7 +1103,7 @@ def _assemble_run_report(
         build_guard_entries_fn=_build_guard_entries_impl,
         build_flags_payload_fn=_build_flags_payload_impl,
         enrich_run_report_metrics_fn=_enrich_run_report_metrics,
-        optional_torch_fn=_get_torch,
+        optional_torch_fn=_run_runtime.get_torch,
         environ=os.environ,
     )
 
@@ -1254,10 +1145,10 @@ def _build_snapshot_execution_plan(
         skip_overhead_source=skip_overhead_source,
         choose_snapshot_mode_fn=_choose_snapshot_mode_impl,
         estimate_model_bytes_fn=_estimate_model_bytes_impl,
-        psutil_module=_get_psutil(),
+        psutil_module=_run_runtime.get_psutil(),
         environ=os.environ,
         disk_usage_fn=shutil.disk_usage,
-        free_model_memory_fn=_free_model_memory,
+        free_model_memory_fn=_run_runtime.free_model_memory,
     )
 
 
@@ -1335,7 +1226,7 @@ def _materialize_run_dataset(
         validate_and_harvest_baseline_schedule_fn=_validate_and_harvest_baseline_schedule,
         materialize_baseline_pairing_schedule_fn=_materialize_baseline_pairing_schedule,
         build_provider_dataset_plan_fn=_build_provider_dataset_plan,
-        resolve_tokenizer_fn=resolve_tokenizer,
+        resolve_tokenizer_fn=_run_runtime.resolve_tokenizer,
     )
 
 
@@ -1733,7 +1624,7 @@ def _run_bare_control(
             )
     finally:
         if private_model_loaded:
-            _free_model_memory(bare_target_model)
+            _run_runtime.free_model_memory(bare_target_model)
 
     bare_ppl_final = None
     bare_ppl_preview = None
@@ -2025,7 +1916,7 @@ def _build_run_execution_deps() -> SimpleNamespace:
     monkeypatch behavior stable (resolved at call time).
     """
 
-    _reset_optional_runtime_caches()
+    _run_runtime.reset_optional_runtime_caches()
 
     return SimpleNamespace(
         **{
@@ -2061,7 +1952,7 @@ def _build_run_execution_deps() -> SimpleNamespace:
         "_format_debug_metric_diffs": _format_debug_metric_diffs,
         "_format_guard_chain": _format_guard_chain,
         "_format_kv_line": _format_kv_line,
-        "_free_model_memory": _free_model_memory,
+        "_free_model_memory": _run_runtime.free_model_memory,
             "_hash_sequences": _run_pairing_helpers._hash_sequences,
         "_init_retry_controller": _init_retry_controller,
         "_load_model_with_cfg": _load_model_with_cfg,
@@ -2118,7 +2009,7 @@ def _build_run_execution_deps() -> SimpleNamespace:
         "console": console,
         "copy": copy,
         "datetime": datetime,
-        "detect_model_profile": detect_model_profile,
+        "detect_model_profile": _run_runtime.detect_model_profile,
         "hashlib": hashlib,
         "json": json,
         "math": math,
@@ -2126,13 +2017,13 @@ def _build_run_execution_deps() -> SimpleNamespace:
         "os": os,
         "perf_counter": perf_counter,
         "print_timing_summary": print_timing_summary,
-        "get_psutil": _get_psutil,
+        "get_psutil": _run_runtime.get_psutil,
         "resolve_output_style": resolve_output_style,
         "set_seed": set_seed,
         "timed_step": timed_step,
-        "get_torch": _get_torch,
+        "get_torch": _run_runtime.get_torch,
         "typer": typer,
-            "validate_guard_overhead": validate_guard_overhead,
+            "validate_guard_overhead": _run_runtime.validate_guard_overhead,
         }
     )
 

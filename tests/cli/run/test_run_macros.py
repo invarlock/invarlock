@@ -128,6 +128,7 @@ class _CoreRunnerExit:
 def _patch_common(monkeypatch, run_mod, provider):
     # Registry and provider (patch source modules to affect inside-function imports)
     import invarlock.cli.device as dev_mod
+    import invarlock.cli.run_runtime as runtime_mod
     import invarlock.core.registry as reg_mod
     import invarlock.core.runner as runner_mod
     import invarlock.eval.data as data_mod
@@ -137,7 +138,21 @@ def _patch_common(monkeypatch, run_mod, provider):
     monkeypatch.setattr(data_mod, "get_provider", lambda *a, **k: provider)
     monkeypatch.setattr(data_mod, "EvaluationWindow", _EvalWin)
     # Tokenizer resolve
-    monkeypatch.setattr(run_mod, "resolve_tokenizer", lambda *a, **k: (object(), "tok"))
+    monkeypatch.setattr(
+        runtime_mod,
+        "resolve_tokenizer",
+        lambda *a, **k: (
+            types.SimpleNamespace(
+                eos_token="</s>",
+                pad_token="</s>",
+                eos_token_id=1,
+                pad_token_id=0,
+                vocab_size=32,
+                get_vocab=lambda: {"<pad>": 0, "</s>": 1},
+            ),
+            "tok",
+        ),
+    )
     # Device is valid CPU
     monkeypatch.setattr(dev_mod, "resolve_device", lambda *a, **k: "cpu")
     monkeypatch.setattr(

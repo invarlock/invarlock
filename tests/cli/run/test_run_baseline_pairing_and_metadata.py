@@ -67,7 +67,7 @@ def _common_patches_ce():
             ),
         ),
         patch(
-            "invarlock.cli.commands.run.detect_model_profile",
+            "invarlock.cli.run_runtime.detect_model_profile",
             lambda model_id, adapter: SimpleNamespace(
                 default_loss="ce",
                 default_provider=None,
@@ -81,7 +81,7 @@ def _common_patches_ce():
             ),
         ),
         patch(
-            "invarlock.cli.commands.run.resolve_tokenizer",
+            "invarlock.cli.run_runtime.resolve_tokenizer",
             lambda model_profile: (
                 SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
                 "tokhash123",
@@ -116,7 +116,7 @@ def _common_patches_mlm():
             ),
         ),
         patch(
-            "invarlock.cli.commands.run.detect_model_profile",
+            "invarlock.cli.run_runtime.detect_model_profile",
             lambda model_id, adapter: SimpleNamespace(
                 default_loss="mlm",
                 default_provider=None,
@@ -130,7 +130,7 @@ def _common_patches_mlm():
             ),
         ),
         patch(
-            "invarlock.cli.commands.run.resolve_tokenizer",
+            "invarlock.cli.run_runtime.resolve_tokenizer",
             lambda model_profile: (
                 SimpleNamespace(
                     mask_token_id=103,
@@ -216,7 +216,7 @@ def _supp_common_patches_detect_ce():
             },
         ),
         patch(
-            "invarlock.cli.commands.run.detect_model_profile",
+            "invarlock.cli.run_runtime.detect_model_profile",
             lambda model_id=None, adapter=None: _SNS(
                 default_loss="ce",
                 model_id=model_id,
@@ -361,7 +361,7 @@ def test_window_match_fraction_mismatch_exit(tmp_path: Path):
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.resolve_tokenizer",
+                "invarlock.cli.run_runtime.resolve_tokenizer",
                 lambda prof: (
                     _SNS(eos_token="</s>", pad_token="</s>", vocab_size=50000),
                     "tokhash123",
@@ -679,7 +679,7 @@ def test_module_selectors_injected_into_edit_config(tmp_path: Path):
         # override detect_model_profile after common patches
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.detect_model_profile",
+                "invarlock.cli.run_runtime.detect_model_profile",
                 lambda model_id, adapter: SimpleNamespace(
                     default_loss="ce",
                     model_id=model_id,
@@ -756,7 +756,7 @@ output:
     with ExitStack() as stack:
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.detect_model_profile",
+                "invarlock.cli.run_runtime.detect_model_profile",
                 lambda model_id, adapter: SimpleNamespace(
                     default_loss="ce",
                     model_id=model_id,
@@ -962,7 +962,7 @@ def test_metrics_window_plan_stats_and_capacity_mapping(tmp_path: Path):
         # Override profile to allow dataset meta to define loss_type via fallback
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.detect_model_profile",
+                "invarlock.cli.run_runtime.detect_model_profile",
                 lambda model_id, adapter: SimpleNamespace(
                     default_loss=None,
                     default_provider=None,
@@ -1407,7 +1407,7 @@ def test_dataset_meta_context_non_dict_path(tmp_path: Path):
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.resolve_tokenizer",
+                "invarlock.cli.run_runtime.resolve_tokenizer",
                 lambda prof: (
                     _SNS(eos_token="</s>", pad_token="</s>", vocab_size=50000),
                     "tokhash123",

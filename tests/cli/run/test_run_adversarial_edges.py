@@ -61,7 +61,7 @@ def _common_ce():
             ),
         ),
         patch(
-            "invarlock.cli.commands.run.resolve_tokenizer",
+            "invarlock.cli.run_runtime.resolve_tokenizer",
             lambda prof: (
                 SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
                 "tokhash123",
@@ -104,7 +104,7 @@ def test_overhead_percent_display_release_profile(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.validate_guard_overhead",
+                "invarlock.cli.run_runtime.validate_guard_overhead",
                 lambda *a, **k: Overhead(),
             )
         )
@@ -149,7 +149,7 @@ def test_counts_mismatch_exit_after_stratification(tmp_path: Path):
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.resolve_tokenizer",
+                "invarlock.cli.run_runtime.resolve_tokenizer",
                 lambda prof: (
                     SimpleNamespace(
                         eos_token="</s>", pad_token="</s>", vocab_size=50000
@@ -281,7 +281,7 @@ def test_snapshot_auto_bytes_and_chunked_paths(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.psutil.virtual_memory",
+                "invarlock.cli.run_runtime.psutil.virtual_memory",
                 lambda: SimpleNamespace(available=50 * 1024 * 1024),
             )
         )  # 50MB
@@ -483,7 +483,7 @@ def test_tokenizer_digest_nonstring_keys_fallback(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.commands.run.resolve_tokenizer", resolver)
+            patch("invarlock.cli.run_runtime.resolve_tokenizer", resolver)
         )
         stack.enter_context(
             patch(

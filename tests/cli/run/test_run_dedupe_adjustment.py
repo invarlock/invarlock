@@ -104,7 +104,7 @@ def test_dataset_dedupe_reduction_then_success(tmp_path: Path):
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.detect_model_profile",
+                "invarlock.cli.run_runtime.detect_model_profile",
                 lambda model_id, adapter: SimpleNamespace(
                     default_loss="ce",
                     model_id=model_id,
@@ -136,7 +136,7 @@ def test_dataset_dedupe_reduction_then_success(tmp_path: Path):
         stack.enter_context(
             patch("invarlock.reporting.report_files.save_report", cap_save)
         )
-        for target in ("invarlock.cli.commands.run.resolve_tokenizer",):
+        for target in ("invarlock.cli.run_runtime.resolve_tokenizer",):
             stack.enter_context(
                 patch(
                     target,

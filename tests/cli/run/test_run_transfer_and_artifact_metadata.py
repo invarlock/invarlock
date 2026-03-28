@@ -65,7 +65,7 @@ def _common_patches_detect_ce():
             },
         ),
         patch(
-            "invarlock.cli.commands.run.detect_model_profile",
+            "invarlock.cli.run_runtime.detect_model_profile",
             lambda model_id=None, adapter=None: SimpleNamespace(
                 default_loss="ce",
                 model_id=model_id,
@@ -77,7 +77,7 @@ def _common_patches_detect_ce():
             ),
         ),
         patch(
-            "invarlock.cli.commands.run.resolve_tokenizer",
+            "invarlock.cli.run_runtime.resolve_tokenizer",
             lambda prof: (
                 SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
                 "tokhash123",
@@ -135,7 +135,7 @@ def test_transfer_guard_extras_and_guard_recovered_flag(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.validate_guard_overhead",
+                "invarlock.cli.run_runtime.validate_guard_overhead",
                 lambda *a, **k: SimpleNamespace(
                     passed=True,
                     messages=[],
@@ -244,7 +244,7 @@ def test_invariants_profile_checks_merged(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.detect_model_profile",
+                "invarlock.cli.run_runtime.detect_model_profile",
                 lambda *a, **k: SimpleNamespace(
                     default_loss="ce",
                     model_id=None,
@@ -440,7 +440,7 @@ def _runner_min():
 
 def _detect_loss(loss_type: str = "ce"):
     return patch(
-        "invarlock.cli.commands.run.detect_model_profile",
+        "invarlock.cli.run_runtime.detect_model_profile",
         lambda model_id, adapter: SimpleNamespace(
             default_loss=loss_type,
             model_id=model_id,
@@ -546,7 +546,7 @@ def test_bare_overhead_measurement_pass(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.commands.run.detect_model_profile",
+        "invarlock.cli.run_runtime.detect_model_profile",
         lambda *a, **k: SimpleNamespace(
             default_loss="ce",
             module_selectors={},
@@ -560,7 +560,7 @@ def test_bare_overhead_measurement_pass(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.commands.run.resolve_tokenizer",
+        "invarlock.cli.run_runtime.resolve_tokenizer",
         lambda *_: (
             SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
             "tokhash123",
@@ -626,7 +626,7 @@ def test_dataset_meta_tokenizer_hash_passthrough(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.commands.run.detect_model_profile",
+        "invarlock.cli.run_runtime.detect_model_profile",
         lambda *a, **k: SimpleNamespace(
             default_loss="ce",
             module_selectors={},
@@ -640,7 +640,7 @@ def test_dataset_meta_tokenizer_hash_passthrough(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.commands.run.resolve_tokenizer",
+        "invarlock.cli.run_runtime.resolve_tokenizer",
         lambda *_: (
             SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
             "tokhash123",
@@ -733,7 +733,7 @@ def test_guard_overhead_ratio_display_path(monkeypatch, tmp_path):
     monkeypatch.setattr("invarlock.core.registry.get_registry", lambda: DummyRegistry())
     monkeypatch.setattr("invarlock.core.runner.CoreRunner", lambda: DummyRunner())
     monkeypatch.setattr(
-        "invarlock.cli.commands.run.validate_guard_overhead",
+        "invarlock.cli.run_runtime.validate_guard_overhead",
         lambda *a, **k: _OverheadRatio(),
     )
     monkeypatch.setattr(
@@ -916,7 +916,7 @@ def test_persist_ref_masks_positive(tmp_path: Path):
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner_min))
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.resolve_tokenizer",
+                "invarlock.cli.run_runtime.resolve_tokenizer",
                 lambda *_: (
                     SimpleNamespace(
                         eos_token="</s>", pad_token="</s>", vocab_size=50000

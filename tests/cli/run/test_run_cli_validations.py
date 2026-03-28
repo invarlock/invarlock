@@ -137,7 +137,7 @@ def test_run_command_invalid_probes(mock_load):
 
 
 @patch("invarlock.cli.commands.run.HAS_CORE_COMPONENTS", True)
-@patch("invarlock.cli.commands.run.validate_guard_overhead")
+@patch("invarlock.cli.run_runtime.validate_guard_overhead")
 @patch("invarlock.core.config_runtime.load_config")
 @patch("invarlock.core.config_runtime.apply_profile")
 @patch("invarlock.cli.device.resolve_device", return_value="cpu")
