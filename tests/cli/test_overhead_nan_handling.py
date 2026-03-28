@@ -13,6 +13,6 @@ def test_overhead_nan_marks_not_evaluated_and_passes() -> None:
         "overhead_percent": None,
         "evaluated": True,
     }
-    out = _norm(dict(payload), profile="dev")
+    out = _norm(dict(payload))
     assert out["evaluated"] is False
     assert out["passed"] is True

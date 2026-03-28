@@ -3,7 +3,6 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import click
-from rich.console import Console
 
 from invarlock.cli import run_config as run_config_mod
 from invarlock.cli import run_pairing_helpers as pairing_mod
@@ -49,7 +48,6 @@ def test_resolve_provider_and_split_provider_and_split_access_errors():
         model_profile=SimpleNamespace(default_provider="synthetic"),
         get_provider_fn=_get_provider,
         provider_kwargs=None,
-        console=Console(),
         resolved_device="cpu",
     )
     assert provider is not None
@@ -82,4 +80,6 @@ def test_extract_model_load_kwargs_dtype_aliasing_and_normalization():
                 }
             }
 
-    assert run_config_mod.extract_model_load_kwargs(_Cfg2()) == {"dtype": "custom_dtype"}
+    assert run_config_mod.extract_model_load_kwargs(_Cfg2()) == {
+        "dtype": "custom_dtype"
+    }

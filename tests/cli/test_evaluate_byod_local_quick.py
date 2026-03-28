@@ -106,7 +106,7 @@ def _stub_runtime(monkeypatch, tmp_path: Path):
 
     # Model profile and tokenizer stub
     monkeypatch.setattr(
-        "invarlock.cli.run_execution.detect_model_profile",
+        "invarlock.cli.run_runtime.detect_model_profile",
         lambda *a, **k: SimpleNamespace(
             default_loss="ce",
             invariants=[],

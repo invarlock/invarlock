@@ -309,7 +309,7 @@ output:
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_execution.detect_model_profile",
+                "invarlock.cli.run_runtime.detect_model_profile",
                 lambda *a, **k: SimpleNamespace(
                     default_loss="ce",
                     invariants=[],
@@ -600,7 +600,7 @@ def _stub_minimal_environment(monkeypatch, tmp_path: Path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_execution.detect_model_profile",
+        "invarlock.cli.run_runtime.detect_model_profile",
         lambda model_id=None, adapter=None: SimpleNamespace(
             default_loss="ce",
             invariants=[],
@@ -633,10 +633,10 @@ def test_schema_invalid_returns_2(tmp_path: Path, monkeypatch):
 def test_parity_error_dev_exit_1(tmp_path: Path, monkeypatch):
     _stub_minimal_environment(monkeypatch, tmp_path)
     cfg = Path(_cfg(tmp_path))
-    from invarlock.cli import run_execution as run_exec_mod
+    from invarlock.cli import run_runtime as run_runtime_mod
 
     monkeypatch.setattr(
-        run_exec_mod,
+        run_runtime_mod,
         "detect_model_profile",
         lambda *a, **k: (_ for _ in ()).throw(RuntimeError("parity boom")),
     )
@@ -647,11 +647,11 @@ def test_parity_error_dev_exit_1(tmp_path: Path, monkeypatch):
 def test_parity_error_ci_exit_3(tmp_path: Path, monkeypatch):
     _stub_minimal_environment(monkeypatch, tmp_path)
     cfg = Path(_cfg(tmp_path))
-    from invarlock.cli import run_execution as run_exec_mod
+    from invarlock.cli import run_runtime as run_runtime_mod
     from invarlock.core.exceptions import InvarlockError as CoreInvarlockError
 
     monkeypatch.setattr(
-        run_exec_mod,
+        run_runtime_mod,
         "detect_model_profile",
         lambda *a, **k: (_ for _ in ()).throw(
             CoreInvarlockError(code="E999", message="boom")

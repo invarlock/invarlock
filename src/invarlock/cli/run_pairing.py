@@ -190,6 +190,7 @@ def compute_provider_digest(
 ) -> dict[str, str] | None:
     """Compute provider digest (ids/tokenizer/masking) from report context."""
     from invarlock.utils.digest import hash_json
+
     if compute_mask_positions_digest_fn is None:
         from invarlock.cli.run_pairing_helpers import _compute_mask_positions_digest
 

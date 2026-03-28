@@ -361,7 +361,7 @@ def test_until_pass_materialize_sets_flags_and_retries_once(
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.run_execution.detect_model_profile", detect_profile)
+            patch("invarlock.cli.run_runtime.detect_model_profile", detect_profile)
         )
         stack.enter_context(patch("invarlock.core.retry.RetryController", RC))
         stack.enter_context(

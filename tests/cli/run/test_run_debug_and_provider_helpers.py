@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from invarlock.cli.run_overhead import plan_release_windows
+from invarlock.cli import run_pairing_helpers as pairing_helpers_mod
 from invarlock.cli.run_pairing import (
+    _canonical_dataset_id,
     compute_provider_digest,
     resolve_metric_and_provider,
 )
@@ -113,6 +115,64 @@ def test_resolve_metric_and_provider_attr_metric_and_bad_values() -> None:
 def test_compute_provider_digest_none_paths() -> None:
     assert compute_provider_digest({}) is None
     assert compute_provider_digest({"evaluation_windows": {}}) is None
+
+
+def test_canonical_dataset_id_and_provider_digest_fallbacks(monkeypatch) -> None:
+    class _ItemsThenAttr:
+        def __init__(self) -> None:
+            self.provider = "  wt103  "
+
+        def items(self):  # noqa: D401, ANN001
+            raise RuntimeError("boom")
+
+    class _AttrOnly:
+        def __init__(self) -> None:
+            self.dataset = "  c4  "
+
+    class _BadStr:
+        def __str__(self) -> str:
+            raise RuntimeError("bad str")
+
+    assert _canonical_dataset_id(None) is None
+    assert _canonical_dataset_id("   ") is None
+    assert _canonical_dataset_id({"kind": "  wikitext2  "}) == "wikitext2"
+    assert _canonical_dataset_id(_ItemsThenAttr()) == "wt103"
+    assert _canonical_dataset_id(_AttrOnly()) == "c4"
+    assert _canonical_dataset_id(_BadStr()) is None
+
+    monkeypatch.setattr(
+        pairing_helpers_mod,
+        "_compute_mask_positions_digest",
+        lambda windows: "masksha",  # noqa: ARG005
+    )
+
+    numeric_report = {
+        "evaluation_windows": {
+            "preview": {"window_ids": [1, 2]},
+            "final": {"window_ids": [3]},
+        },
+        "meta": {"tokenizer_hash": "tok-meta"},
+    }
+    numeric_digest = compute_provider_digest(numeric_report)
+    assert numeric_digest == {
+        "ids_sha256": numeric_digest["ids_sha256"],
+        "tokenizer_sha256": "tok-meta",
+        "masking_sha256": "masksha",
+    }
+
+    string_report = {
+        "evaluation_windows": {
+            "preview": {"window_ids": [1, "x"]},
+            "final": {"window_ids": ["y"]},
+        },
+        "data": {"tokenizer_hash": "tok-data"},
+    }
+    string_digest = compute_provider_digest(string_report)
+    assert string_digest == {
+        "ids_sha256": string_digest["ids_sha256"],
+        "tokenizer_sha256": "tok-data",
+        "masking_sha256": "masksha",
+    }
 
 
 def test_plan_release_windows_console_adjustment_message(capsys) -> None:

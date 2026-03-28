@@ -104,7 +104,7 @@ def test_dataset_dedupe_reduction_then_success(tmp_path: Path):
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_execution.detect_model_profile",
+                "invarlock.cli.run_runtime.detect_model_profile",
                 lambda model_id, adapter: SimpleNamespace(
                     default_loss="ce",
                     model_id=model_id,

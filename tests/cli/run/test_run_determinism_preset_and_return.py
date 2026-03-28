@@ -148,7 +148,7 @@ def test_run_command_returns_report_path_and_emits_determinism_meta(
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_execution.detect_model_profile",
+                "invarlock.cli.run_runtime.detect_model_profile",
                 lambda *a, **k: SimpleNamespace(
                     default_loss="ce",
                     invariants=[],
@@ -281,7 +281,7 @@ def test_run_command_persists_tiny_relax_context(tmp_path: Path, monkeypatch) ->
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_execution.detect_model_profile",
+                "invarlock.cli.run_runtime.detect_model_profile",
                 lambda *a, **k: SimpleNamespace(
                     default_loss="ce",
                     invariants=[],
@@ -414,7 +414,7 @@ def test_run_command_does_not_include_determinism_when_preset_empty(
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_execution.detect_model_profile",
+                "invarlock.cli.run_runtime.detect_model_profile",
                 lambda *a, **k: SimpleNamespace(
                     default_loss="ce",
                     invariants=[],
@@ -562,7 +562,7 @@ context:
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_execution.detect_model_profile",
+                "invarlock.cli.run_runtime.detect_model_profile",
                 lambda *a, **k: SimpleNamespace(
                     default_loss="ce",
                     invariants=[],

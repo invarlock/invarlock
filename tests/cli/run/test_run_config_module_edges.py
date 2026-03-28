@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import builtins
 from io import StringIO
+from pathlib import Path
+from types import SimpleNamespace
 
+import pytest
+import typer
 from rich.console import Console
 
 from invarlock.cli import run_config as run_config_mod
@@ -10,6 +15,14 @@ from invarlock.cli import run_config as run_config_mod
 class _BrokenConfig:
     def model_dump(self) -> dict:
         raise RuntimeError("broken dump")
+
+
+class _CfgWrap:
+    def __init__(self, payload: dict):
+        self._payload = payload
+
+    def model_dump(self) -> dict:
+        return self._payload
 
 
 def test_prepare_config_for_run_handles_model_dump_failure_without_auto_adapter() -> (
@@ -36,3 +49,255 @@ def test_prepare_config_for_run_handles_model_dump_failure_without_auto_adapter(
     assert cfg == {"auto": {"tier": "balanced"}}
     assert ("INIT", "Loading configuration: config.yaml") in events
     assert ("INIT", "Auto tier override: balanced") in events
+
+
+def test_resolve_requested_edit_name_import_error_falls_back_to_known_edit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    orig_import = builtins.__import__
+
+    def _import(name, globals=None, locals=None, fromlist=(), level=0):  # noqa: A002
+        if name == "invarlock.edits.registry":
+            raise ImportError("boom")
+        return orig_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", _import)
+    assert run_config_mod._resolve_requested_edit_name("noop") == "noop"
+
+
+def test_apply_requested_edit_override_normalizes_non_mapping_edit_section() -> None:
+    cfg = _CfgWrap({"edit": "not-a-mapping"})
+    out = run_config_mod._apply_requested_edit_override(
+        cfg,
+        "quant_rtn",
+        config_cls=_CfgWrap,
+    )
+
+    assert out.model_dump()["edit"] == {"name": "quant_rtn"}
+
+
+def test_prepare_config_for_run_applies_profile_edit_and_auto_overrides() -> None:
+    events: list[tuple[str, str]] = []
+
+    def _event_fn(console, tag: str, message: str, **kwargs) -> None:  # noqa: ARG001
+        events.append((tag, message))
+
+    class Cfg:
+        def model_dump(self) -> dict:
+            return {
+                "model": {"id": "gpt2", "adapter": "hf_causal", "device": "cpu"},
+                "edit": "not-a-dict",
+                "auto": "not-a-dict",
+            }
+
+    profile_calls: list[str] = []
+    auto_calls: list[object] = []
+
+    def _apply_profile(cfg, profile):  # noqa: ARG001
+        profile_calls.append(profile)
+        return cfg
+
+    def _apply_auto_adapter(cfg):
+        auto_calls.append(cfg)
+        return cfg
+
+    result = run_config_mod.prepare_config_for_run(
+        config_path="config.yaml",
+        profile="release",
+        edit="noop",
+        tier="balanced",
+        probes=3,
+        console=Console(file=StringIO(), force_terminal=False),
+        event_fn=_event_fn,
+        invarlock_config_cls=_CfgWrap,
+        load_config_fn=lambda path: Cfg(),  # noqa: ARG005
+        apply_profile_fn=_apply_profile,
+        apply_auto_adapter_fn=_apply_auto_adapter,
+    )
+
+    payload = result.model_dump()
+    assert profile_calls == ["release"]
+    assert len(auto_calls) == 1
+    assert payload["edit"] == {"name": "noop"}
+    assert payload["auto"]["tier"] == "balanced"
+    assert payload["auto"]["probes"] == 3
+    assert ("EXEC", "Edit override: noop") in events
+    assert ("INIT", "Applying profile: release") in events
+
+
+@pytest.mark.parametrize(
+    ("load_config_fn", "apply_profile_fn", "profile", "tier", "probes", "code"),
+    [
+        (
+            lambda path: (_ for _ in ()).throw(ValueError("bad config")),
+            lambda cfg, profile: cfg,
+            None,
+            None,
+            None,
+            2,
+        ),
+        (
+            lambda path: _CfgWrap({"model": {}, "edit": {}, "auto": {}}),
+            lambda cfg, profile: (_ for _ in ()).throw(RuntimeError("profile boom")),
+            "release",
+            None,
+            None,
+            1,
+        ),
+        (
+            lambda path: _CfgWrap({"model": {}, "edit": {}, "auto": {}}),
+            lambda cfg, profile: cfg,
+            None,
+            "invalid",
+            None,
+            1,
+        ),
+        (
+            lambda path: _CfgWrap({"model": {}, "edit": {}, "auto": {}}),
+            lambda cfg, profile: cfg,
+            None,
+            None,
+            11,
+            1,
+        ),
+    ],
+)
+def test_prepare_config_for_run_error_paths(
+    load_config_fn,
+    apply_profile_fn,
+    profile,
+    tier,
+    probes,
+    code,
+) -> None:
+    with pytest.raises(typer.Exit) as excinfo:
+        run_config_mod.prepare_config_for_run(
+            config_path="config.yaml",
+            profile=profile,
+            edit=None,
+            tier=tier,
+            probes=probes,
+            console=Console(file=StringIO(), force_terminal=False),
+            event_fn=lambda *args, **kwargs: None,
+            invarlock_config_cls=_CfgWrap,
+            load_config_fn=load_config_fn,
+            apply_profile_fn=apply_profile_fn,
+            apply_auto_adapter_fn=lambda cfg: cfg,
+        )
+
+    assert excinfo.value.exit_code == code
+
+
+def test_resolve_device_and_output_uses_cfg_defaults_and_rejects_bad_device() -> None:
+    class _Cfg:
+        model = SimpleNamespace()
+        output = SimpleNamespace(dir="custom-runs")
+
+    resolved, output_dir = run_config_mod.resolve_device_and_output(
+        _Cfg(),
+        device=None,
+        out=None,
+        console=Console(file=StringIO(), force_terminal=False),
+        format_kv_line_fn=lambda label, value: f"{label}: {value}",
+        device_resolution_note_fn=lambda target, resolved: "note",
+        resolve_device_fn=lambda target: "cpu",
+        validate_device_fn=lambda device: (True, ""),
+    )
+
+    assert resolved == "cpu"
+    assert output_dir == Path("custom-runs")
+
+
+def test_resolve_device_and_output_falls_back_to_runs_and_rejects_invalid_device() -> (
+    None
+):
+    class _Cfg:
+        model = SimpleNamespace()
+        output = SimpleNamespace()
+
+    resolved, output_dir = run_config_mod.resolve_device_and_output(
+        _Cfg(),
+        device=None,
+        out=None,
+        console=Console(file=StringIO(), force_terminal=False),
+        format_kv_line_fn=lambda label, value: f"{label}: {value}",
+        device_resolution_note_fn=lambda target, resolved: "note",
+        resolve_device_fn=lambda target: "cpu",
+        validate_device_fn=lambda device: (True, ""),
+    )
+
+    assert resolved == "cpu"
+    assert output_dir == Path("runs")
+
+    with pytest.raises(typer.Exit):
+        run_config_mod.resolve_device_and_output(
+            _Cfg(),
+            device="cuda",
+            out="outdir",
+            console=Console(file=StringIO(), force_terminal=False),
+            format_kv_line_fn=lambda label, value: f"{label}: {value}",
+            device_resolution_note_fn=lambda target, resolved: "note",
+            resolve_device_fn=lambda target: "cuda",
+            validate_device_fn=lambda device: (False, "bad device"),
+        )
+
+
+def test_resolve_provider_and_split_uses_emit_and_available_split_fallback() -> None:
+    calls: list[tuple[str, dict]] = []
+    emit_sentinel = object()
+
+    class Provider:
+        def available_splits(self):
+            raise RuntimeError("boom")
+
+    def _get_provider(name, **kwargs):  # noqa: ARG001
+        calls.append((name, dict(kwargs)))
+        return Provider()
+
+    provider, split, used = run_config_mod.resolve_provider_and_split(
+        SimpleNamespace(
+            dataset=SimpleNamespace(provider=None, split="val"),
+        ),
+        model_profile=SimpleNamespace(default_provider="wikitext2"),
+        get_provider_fn=_get_provider,
+        choose_dataset_split_fn=lambda **kwargs: ("validation", True),
+        provider_kwargs={"existing": True},
+        resolved_device="cpu",
+        emit=emit_sentinel,
+    )
+
+    assert isinstance(provider, Provider)
+    assert split == "validation"
+    assert used is True
+    assert calls[0][0] == "wikitext2"
+    assert calls[0][1]["existing"] is True
+    assert calls[0][1]["device_hint"] == "cpu"
+    assert "emit" in calls[0][1]
+    assert calls[0][1]["emit"] is not None
+
+
+def test_extract_model_load_kwargs_handles_model_dump_failure_and_removed_keys() -> (
+    None
+):
+    class _CfgFail:
+        def model_dump(self):
+            raise RuntimeError("boom")
+
+    assert run_config_mod.extract_model_load_kwargs(_CfgFail()) == {}
+
+    class _CfgRemoved:
+        def model_dump(self):
+            return {
+                "model": {
+                    "id": "foo",
+                    "adapter": "dummy",
+                    "device": "cpu",
+                    "load_in_8bit": True,
+                    "load_in_4bit": False,
+                }
+            }
+
+    with pytest.raises(Exception) as excinfo:
+        run_config_mod.extract_model_load_kwargs(_CfgRemoved())
+
+    assert getattr(excinfo.value, "code", None) == "E007"

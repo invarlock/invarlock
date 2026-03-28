@@ -51,9 +51,7 @@ def test_resolve_exit_code_covers_known_exceptions() -> None:
         == 2
     )
     assert (
-        resolve_command_exit_code(
-            ValidationError(code="E0", message="x"), profile=None
-        )
+        resolve_command_exit_code(ValidationError(code="E0", message="x"), profile=None)
         == 2
     )
     assert (
@@ -73,9 +71,7 @@ def test_resolve_exit_code_covers_known_exceptions() -> None:
         == 3
     )
     assert (
-        resolve_command_exit_code(
-            InvarlockError(code="E0", message="x"), profile="dev"
-        )
+        resolve_command_exit_code(InvarlockError(code="E0", message="x"), profile="dev")
         == 1
     )
 
@@ -131,6 +127,134 @@ def test_extract_pairing_schedule_rejects_non_int_window_ids() -> None:
         }
     }
     assert extract_pairing_schedule(report) is None
+
+
+def test_extract_pairing_schedule_single_row_fallbacks() -> None:
+    report = {
+        "evaluation_windows": {
+            "preview": {
+                "input_ids": [[1, 0, 2]],
+                "attention_masks": [1, 0, 1],
+                "labels": [7, 8],
+                "masked_token_counts": 4,
+                "actual_token_counts": 5,
+            },
+            "final": {
+                "input_ids": [[3, 4]],
+                "attention_masks": [1, 1],
+                "labels": [9],
+                "masked_token_counts": 2,
+                "actual_token_counts": 2,
+            },
+        }
+    }
+    sched = extract_pairing_schedule(report)
+    assert isinstance(sched, dict)
+    assert sched["preview"]["window_ids"] == [0]
+    assert sched["preview"]["attention_masks"] == [[1, 0, 1]]
+    assert sched["preview"]["labels"] == [[7, 8, -100]]
+    assert sched["preview"]["masked_token_counts"] == [4]
+    assert sched["preview"]["actual_token_counts"] == [5]
+    assert sched["final"]["window_ids"] == [1]
+    assert sched["final"]["attention_masks"] == [[1, 1]]
+    assert sched["final"]["labels"] == [[9, -100]]
+
+
+def test_extract_pairing_schedule_rejects_malformed_sections() -> None:
+    assert (
+        extract_pairing_schedule(
+            {"evaluation_windows": {"preview": "bad", "final": {}}}
+        )
+        is None
+    )
+    assert (
+        extract_pairing_schedule(
+            {"evaluation_windows": {"preview": {"input_ids": []}, "final": {}}}
+        )
+        is None
+    )
+    assert (
+        extract_pairing_schedule(
+            {
+                "evaluation_windows": {
+                    "preview": {"input_ids": [[1]], "window_ids": [1, 2]},
+                    "final": {"input_ids": [[2]]},
+                }
+            }
+        )
+        is None
+    )
+    assert (
+        extract_pairing_schedule(
+            {
+                "evaluation_windows": {
+                    "preview": {"input_ids": [[1]], "window_ids": ["bad"]},
+                    "final": {"input_ids": [[2]]},
+                }
+            }
+        )
+        is None
+    )
+    assert (
+        extract_pairing_schedule(
+            {
+                "evaluation_windows": {
+                    "preview": {
+                        "input_ids": [[1]],
+                        "window_ids": [1],
+                        "attention_masks": [[1, 1]],
+                    },
+                    "final": {"input_ids": [[2]]},
+                }
+            }
+        )
+        is None
+    )
+    assert (
+        extract_pairing_schedule(
+            {
+                "evaluation_windows": {
+                    "preview": {
+                        "input_ids": [[1], [2]],
+                        "window_ids": [1, 2],
+                        "labels": [[1], [2], [3]],
+                    },
+                    "final": {"input_ids": [[3]]},
+                }
+            }
+        )
+        is None
+    )
+    assert (
+        extract_pairing_schedule(
+            {
+                "evaluation_windows": {
+                    "preview": {
+                        "input_ids": [[1], [2]],
+                        "window_ids": [1, 2],
+                        "masked_token_counts": [1],
+                    },
+                    "final": {"input_ids": [[3]]},
+                }
+            }
+        )
+        is None
+    )
+    assert (
+        extract_pairing_schedule(
+            {
+                "evaluation_windows": {
+                    "preview": {"input_ids": [[1]], "window_ids": [1]},
+                    "final": {
+                        "input_ids": [[2]],
+                        "window_ids": [2],
+                        "attention_masks": [1, 1],
+                    },
+                }
+            }
+        )
+        is None
+    )
 
 
 def test_apply_mlm_masks_handles_mask_random_and_original_modes(monkeypatch) -> None:

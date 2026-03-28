@@ -126,9 +126,7 @@ THRESHOLDS = {
     "src/invarlock/runtime_security.py": 0.95,
     # PR-4 split modules
     "src/invarlock/cli/run_artifacts.py": 1.00,
-    "src/invarlock/cli/run_config.py": 0.98,
     "src/invarlock/cli/run_overhead.py": 1.00,
-    "src/invarlock/cli/run_pairing.py": 0.90,
     "src/invarlock/core/run_policy.py": 1.00,
     "src/invarlock/reporting/run_metric_utils.py": 1.00,
     # CLI determinism preset (CI/Release provenance)

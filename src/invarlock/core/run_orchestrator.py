@@ -149,6 +149,8 @@ class RunExecutionServices:
     tokenizer_digest: Callable[..., object]
     validate_retry_evaluation_report: Callable[..., object]
     validate_and_harvest_baseline_schedule: Callable[..., object]
+    materialize_baseline_pairing_schedule: Callable[..., object]
+    resolve_tokenizer: Callable[..., object]
     console: Any
     detect_model_profile: Callable[..., Any]
     get_psutil: Callable[[], Any | None]
@@ -245,6 +247,10 @@ def execute_run_request(
     _validate_and_harvest_baseline_schedule = (
         services.validate_and_harvest_baseline_schedule
     )
+    _materialize_baseline_pairing_schedule = (
+        services.materialize_baseline_pairing_schedule
+    )
+    _resolve_tokenizer = services.resolve_tokenizer
     console = services.console
     detect_model_profile = services.detect_model_profile
     get_psutil = services.get_psutil
@@ -819,6 +825,14 @@ def execute_run_request(
                     tokenizer=tokenizer,
                     tokenizer_hash=tokenizer_hash,
                     resolved_split=resolved_split,
+                    validate_and_harvest_baseline_schedule_fn=(
+                        _validate_and_harvest_baseline_schedule
+                    ),
+                    materialize_baseline_pairing_schedule_fn=(
+                        _materialize_baseline_pairing_schedule
+                    ),
+                    resolve_tokenizer_fn=_resolve_tokenizer,
+                    build_provider_dataset_plan_fn=_build_provider_dataset_plan,
                 )
             except ValueError as exc:
                 _fail_run(str(exc))

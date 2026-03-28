@@ -39,9 +39,11 @@ def coerce_mapping(obj: object) -> dict[str, Any]:
 def resolve_pm_acceptance_range(
     cfg: object | None,
     *,
-    coerce_mapping_fn=coerce_mapping,
+    coerce_mapping_fn: Any | None = None,
 ) -> dict[str, float]:
     """Resolve primary-metric acceptance bounds from config with safe defaults."""
+    if coerce_mapping_fn is None:
+        coerce_mapping_fn = coerce_mapping
     base_min = 0.95
     base_max = 1.10
 
@@ -99,9 +101,11 @@ def resolve_pm_acceptance_range(
 def resolve_pm_drift_band(
     cfg: object | None,
     *,
-    coerce_mapping_fn=coerce_mapping,
+    coerce_mapping_fn: Any | None = None,
 ) -> dict[str, float]:
     """Resolve preview→final drift band from config with safe defaults."""
+    if coerce_mapping_fn is None:
+        coerce_mapping_fn = coerce_mapping
     base_min = 0.95
     base_max = 1.05
 

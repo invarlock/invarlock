@@ -199,7 +199,7 @@ def test_until_pass_restore_failure_discards_model_and_reloads_next_attempt(
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_execution.detect_model_profile",
+                "invarlock.cli.run_runtime.detect_model_profile",
                 lambda *a, **k: SimpleNamespace(
                     default_loss="ce",
                     default_provider=None,

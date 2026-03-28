@@ -258,7 +258,7 @@ output:
             ),
         ),
         patch(
-            "invarlock.cli.run_execution.detect_model_profile",
+            "invarlock.cli.run_runtime.detect_model_profile",
             lambda model_id, adapter: SimpleNamespace(
                 default_loss="mlm",
                 model_id=model_id,
@@ -485,3 +485,30 @@ def test_plan_release_windows_console_adjustment_path():
     assert plan["actual_preview"] < plan["target_per_arm"]
     assert plan["capacity"].get("candidate_unique") == 800
     assert plan["capacity"].get("candidate_limit") == 1200
+
+
+def test_plan_release_windows_candidate_unique_zero_falls_back_to_available_unique():
+    events: list[tuple[str, str]] = []
+
+    plan = plan_release_windows(
+        {
+            "available_unique": 2000,
+            "available_nonoverlap": 2000,
+            "total_tokens": 1_000_000,
+            "dedupe_rate": 0.1,
+            "candidate_unique": 0,
+        },
+        requested_preview=500,
+        requested_final=500,
+        max_calibration=100,
+        console=Console(record=True),
+        event_fn=lambda console, tag, message, **kwargs: events.append(
+            (tag, message)
+        ),
+    )
+
+    assert plan["capacity"]["effective_unique"] == 2000
+    assert plan["capacity"]["candidate_unique"] == 0
+    assert any(
+        tag == "METRIC" and "candidate_unique=0" in message for tag, message in events
+    )
