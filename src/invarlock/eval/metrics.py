@@ -1,13 +1,10 @@
-"""
-invarlock.metrics
-=============
+"""Evaluation metrics owners for lens, runtime, and diagnostic calculations.
 
-Enhanced diagnostic helpers used by the Phase-2 notebooks with improved
-robustness, performance, and configurability.
-
-Public entry point
-------------------
-    >>> from invarlock.metrics import calculate_lens_metrics_for_model, MetricsConfig
+Public entry point:
+    >>> from invarlock.eval.metrics import (
+    ...     MetricsConfig,
+    ...     calculate_lens_metrics_for_model,
+    ... )
     >>> config = MetricsConfig(oracle_windows=32, max_tokens=512)
     >>> metrics = calculate_lens_metrics_for_model(model, dataloader, config=config)
 """
@@ -2232,31 +2229,14 @@ class AccuracyMetric:
 
 # ── Integration with existing system ───────────────────────────────────────
 
-# Update exports to include new functions (add to existing __all__ if it exists)
-try:
-    __all__.extend(
-        [
-            "bootstrap_confidence_interval",
-            "compute_ppl",
-            "measure_latency",
-            "measure_memory",
-            "compute_parameter_deltas",
-            "analyze_spectral_changes",
-            "Metric",
-            "PerplexityMetric",
-            "AccuracyMetric",
-        ]
-    )
-except NameError:
-    # If __all__ doesn't exist, create it with the new functions
-    __all__ = [
-        "bootstrap_confidence_interval",
-        "compute_ppl",
-        "measure_latency",
-        "measure_memory",
-        "compute_parameter_deltas",
-        "analyze_spectral_changes",
-        "Metric",
-        "PerplexityMetric",
-        "AccuracyMetric",
-    ]
+__all__ = [
+    "bootstrap_confidence_interval",
+    "compute_ppl",
+    "measure_latency",
+    "measure_memory",
+    "compute_parameter_deltas",
+    "analyze_spectral_changes",
+    "Metric",
+    "PerplexityMetric",
+    "AccuracyMetric",
+]

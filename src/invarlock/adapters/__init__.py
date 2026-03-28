@@ -21,25 +21,12 @@ from .capabilities import (
     detect_quantization_from_config,
 )
 
-
-# Simple quality label helper used by tests
-def quality_label(ratio: float) -> str:
-    if ratio <= 1.10:
-        return "Excellent"
-    if ratio <= 1.25:
-        return "Good"
-    if ratio <= 1.40:
-        return "Fair"
-    return "Degraded"
-
-
 __all__ = [
     "BaseAdapter",
     "AdapterConfig",
     "AdapterInterface",
     "DeviceManager",
     "BasePerformanceMetrics",
-    "quality_label",
     "INVARLOCK_CORE_ABI",
     # Capabilities
     "ModelCapabilities",

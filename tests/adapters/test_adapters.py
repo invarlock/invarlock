@@ -1117,18 +1117,9 @@ class TestHFCausalAdapterRopeDecoder:
 class TestInitModule:
     """Test __init__.py module functionality."""
 
-    def test_quality_label_function(self):
-        """Test quality label function."""
-        # Test different quality tiers
-        assert invarlock_adapters.quality_label(1.05) == "Excellent"
-        assert invarlock_adapters.quality_label(1.15) == "Good"
-        assert invarlock_adapters.quality_label(1.30) == "Fair"
-        assert invarlock_adapters.quality_label(1.50) == "Degraded"
-
-        # Test boundary conditions
-        assert invarlock_adapters.quality_label(1.10) == "Excellent"
-        assert invarlock_adapters.quality_label(1.25) == "Good"
-        assert invarlock_adapters.quality_label(1.40) == "Fair"
+    def test_test_only_quality_helper_is_not_exported(self):
+        """Test-only helpers should not leak into the adapter namespace."""
+        assert not hasattr(invarlock_adapters, "quality_label")
 
     def test_placeholder_adapters(self):
         """Removed compatibility placeholders are absent from the namespace."""
