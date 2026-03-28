@@ -14,7 +14,12 @@ from invarlock.reporting import (
     report_edit_summary,
     report_normalization,
 )
-from invarlock.reporting import report_make as cert
+from invarlock.reporting import (
+    report_make as cert,
+)
+from invarlock.reporting import (
+    report_primary_metric_analysis as pm_analysis_mod,
+)
 from invarlock.reporting import utils as report_utils
 from invarlock.reporting.report_make import make_report
 
@@ -205,8 +210,8 @@ def test_make_evaluation_report_raises_on_drift_identity(monkeypatch):
         lambda *args, **kwargs: (0.0, 0.0),
     )
     monkeypatch.setattr(
-        cert,
-        "_enforce_drift_ratio_identity",
+        pm_analysis_mod,
+        "enforce_drift_ratio_identity",
         lambda *args, **kwargs: (_ for _ in ()).throw(
             ValueError("Paired ΔlogNLL mean is inconsistent with reported drift ratio")
         ),
@@ -234,8 +239,8 @@ def test_make_evaluation_report_raises_on_ratio_ci_mismatch(monkeypatch):
         lambda *args, **kwargs: (0.0, 0.0),
     )
     monkeypatch.setattr(
-        cert,
-        "_enforce_ratio_ci_alignment",
+        pm_analysis_mod,
+        "enforce_ratio_ci_alignment",
         lambda *args, **kwargs: (_ for _ in ()).throw(ValueError("CI mismatch")),
         raising=False,
     )

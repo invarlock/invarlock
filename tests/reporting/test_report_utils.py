@@ -1,24 +1,28 @@
 from __future__ import annotations
 
-from invarlock.reporting import report_make as cert
 from invarlock.reporting import report_schema as schema_mod
 from invarlock.reporting.report_console import compute_console_validation_block
+from invarlock.reporting.report_make import (
+    _compute_confidence_label,
+    _compute_edit_digest,
+)
+from invarlock.reporting.report_primary_metric_policy import is_ppl_kind as _is_ppl_kind
 
 
 def test_is_ppl_kind_and_get_ppl_final() -> None:
-    assert cert._is_ppl_kind("ppl")
-    assert cert._is_ppl_kind("ppl_causal")
-    assert not cert._is_ppl_kind("accuracy")
+    assert _is_ppl_kind("ppl")
+    assert _is_ppl_kind("ppl_causal")
+    assert not _is_ppl_kind("accuracy")
 
     # Legacy _get_ppl_final removed; rely on normalized primary_metric in evaluation_reports.
 
 
 def test_compute_edit_digest_quant_and_default() -> None:
     rep_quant = {"edit": {"name": "quant_rtn", "config": {"bitwidth": 4}}}
-    d1 = cert._compute_edit_digest(rep_quant)
+    d1 = _compute_edit_digest(rep_quant)
     assert d1["family"] == "quantization"
     rep_none = {"edit": {"name": "noop"}}
-    d2 = cert._compute_edit_digest(rep_none)
+    d2 = _compute_edit_digest(rep_none)
     assert d2["family"] == "cert_only"
 
 
@@ -29,7 +33,7 @@ def test_confidence_label_paths() -> None:
         "primary_metric": {"kind": "ppl_causal", "display_ci": [1.00, 1.02]},
         "resolved_policy": {"confidence": {"ppl_ratio_width_max": 0.05}},
     }
-    out1 = cert._compute_confidence_label(c1)
+    out1 = _compute_confidence_label(c1)
     assert out1["label"] == "High"
     assert out1["basis"] == "ppl_ratio"
 
@@ -43,7 +47,7 @@ def test_confidence_label_paths() -> None:
         },
         "resolved_policy": {"confidence": {"accuracy_delta_pp_width_max": 0.5}},
     }
-    out2 = cert._compute_confidence_label(c2)
+    out2 = _compute_confidence_label(c2)
     assert out2["basis"] == "accuracy"
     assert out2["label"] in {"Medium", "Low"}
 

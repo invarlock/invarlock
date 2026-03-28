@@ -13,7 +13,12 @@ from invarlock.reporting import (
     report_overhead,
     report_validation,
 )
-from invarlock.reporting import report_make as cert_mod
+from invarlock.reporting import (
+    report_make as cert_mod,
+)
+from invarlock.reporting import (
+    report_primary_metric_policy as pm_policy,
+)
 from invarlock.reporting import report_schema as cert_schema_mod
 from invarlock.reporting import utils as report_utils
 from invarlock.reporting.report_make import make_report
@@ -227,7 +232,7 @@ def test_enforce_pairing_and_coverage_path_matrix() -> None:
     }
 
     # Pass-through: everything present.
-    cert_mod._enforce_pairing_and_coverage(
+    pm_policy.enforce_pairing_and_coverage(
         dict(base), window_plan_profile="ci", tier="balanced"
     )
 
@@ -235,21 +240,21 @@ def test_enforce_pairing_and_coverage_path_matrix() -> None:
     stats = dict(base)
     stats.pop("actual_preview")
     stats.pop("actual_final")
-    cert_mod._enforce_pairing_and_coverage(
+    pm_policy.enforce_pairing_and_coverage(
         stats, window_plan_profile="ci", tier="balanced"
     )
 
     # Mixed: actual_preview present, actual_final derived from coverage.
     stats = dict(base)
     stats["actual_final"] = None
-    cert_mod._enforce_pairing_and_coverage(
+    pm_policy.enforce_pairing_and_coverage(
         stats, window_plan_profile="ci", tier="balanced"
     )
 
     # Mixed: actual_final present, actual_preview derived from coverage.
     stats = dict(base)
     stats["actual_preview"] = None
-    cert_mod._enforce_pairing_and_coverage(
+    pm_policy.enforce_pairing_and_coverage(
         stats, window_plan_profile="ci", tier="balanced"
     )
 
@@ -263,7 +268,7 @@ def test_enforce_pairing_and_coverage_path_matrix() -> None:
         "coverage": None,
     }
     with pytest.raises(ValueError, match="preview/final window counts"):
-        cert_mod._enforce_pairing_and_coverage(
+        pm_policy.enforce_pairing_and_coverage(
             stats, window_plan_profile="ci", tier="balanced"
         )
 
@@ -271,7 +276,7 @@ def test_enforce_pairing_and_coverage_path_matrix() -> None:
     stats = dict(base)
     stats["actual_final"] = 179
     with pytest.raises(ValueError, match="matching preview/final counts"):
-        cert_mod._enforce_pairing_and_coverage(
+        pm_policy.enforce_pairing_and_coverage(
             stats, window_plan_profile="ci", tier="balanced"
         )
 
@@ -279,7 +284,7 @@ def test_enforce_pairing_and_coverage_path_matrix() -> None:
     stats = dict(base)
     stats["coverage"] = None
     with pytest.raises(ValueError, match="bootstrap coverage stats"):
-        cert_mod._enforce_pairing_and_coverage(
+        pm_policy.enforce_pairing_and_coverage(
             stats, window_plan_profile="ci", tier="balanced"
         )
 
@@ -291,7 +296,7 @@ def test_enforce_pairing_and_coverage_path_matrix() -> None:
         "replicates": {"used": None},
     }
     stats["bootstrap"] = {"replicates": 1200}
-    cert_mod._enforce_pairing_and_coverage(
+    pm_policy.enforce_pairing_and_coverage(
         stats, window_plan_profile="ci", tier="balanced"
     )
 
@@ -304,7 +309,7 @@ def test_enforce_pairing_and_coverage_path_matrix() -> None:
     }
     stats["bootstrap"] = "nope"
     with pytest.raises(ValueError, match="preview/final/replicates coverage stats"):
-        cert_mod._enforce_pairing_and_coverage(
+        pm_policy.enforce_pairing_and_coverage(
             stats, window_plan_profile="ci", tier="balanced"
         )
 
@@ -316,7 +321,7 @@ def test_enforce_pairing_and_coverage_path_matrix() -> None:
         "replicates": {"used": 1200},
     }
     with pytest.raises(ValueError, match="tier floors"):
-        cert_mod._enforce_pairing_and_coverage(
+        pm_policy.enforce_pairing_and_coverage(
             stats, window_plan_profile="ci", tier="balanced"
         )
 
@@ -328,7 +333,7 @@ def test_enforce_pairing_and_coverage_path_matrix() -> None:
         "replicates": {"used": 1199},
     }
     with pytest.raises(ValueError, match="bootstrap replicates"):
-        cert_mod._enforce_pairing_and_coverage(
+        pm_policy.enforce_pairing_and_coverage(
             stats, window_plan_profile="ci", tier="balanced"
         )
 

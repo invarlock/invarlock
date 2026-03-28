@@ -6,7 +6,12 @@ import pytest
 
 from invarlock.reporting import report_make as C
 from invarlock.reporting import report_normalization as normalization_mod
-from invarlock.reporting.utils import _coerce_interval, _infer_scope_from_modules
+from invarlock.reporting.report_primary_metric_policy import is_ppl_kind as _is_ppl_kind
+from invarlock.reporting.utils import (
+    _coerce_int,
+    _coerce_interval,
+    _infer_scope_from_modules,
+)
 
 
 class _RaisingStr:
@@ -22,8 +27,8 @@ class _RaisingGet:
 
 
 def test_is_ppl_kind_handles_str_exception() -> None:
-    assert C._is_ppl_kind(_RaisingStr()) is False
-    assert C._is_ppl_kind("ppl_causal") is True
+    assert _is_ppl_kind(_RaisingStr()) is False
+    assert _is_ppl_kind("ppl_causal") is True
 
 
 def test_get_ppl_final_handles_bad_metrics_get() -> None:
@@ -32,12 +37,12 @@ def test_get_ppl_final_handles_bad_metrics_get() -> None:
 
 
 def test_coerce_int_variants() -> None:
-    assert C._coerce_int(5) == 5
+    assert _coerce_int(5) == 5
     # Non-integer float rejected (only near-integers accepted)
-    assert C._coerce_int(5.8) is None
-    assert C._coerce_int("7") == 7
-    assert C._coerce_int(None) is None
-    assert C._coerce_int("bad") is None
+    assert _coerce_int(5.8) is None
+    assert _coerce_int("7") == 7
+    assert _coerce_int(None) is None
+    assert _coerce_int("bad") is None
 
 
 def test_sanitize_seed_bundle_partial_and_fallback() -> None:
