@@ -33,7 +33,7 @@ _validate_drift_band = _verify_checks._validate_drift_band
 _validate_tokenizer_hash = _verify_checks._validate_tokenizer_hash
 _validate_measurement_contracts = _verify_checks._validate_measurement_contracts
 _apply_profile_lints = _verify_checks._apply_profile_lints
-_report_builder = _verify_checks._report_builder
+_report_schema = _verify_checks._report_schema
 validate_report = _verify_checks.validate_report
 compute_validation_flags = _verify_checks.compute_validation_flags
 resolve_tiny_relax_from_report = _verify_checks.resolve_tiny_relax_from_report
@@ -49,7 +49,7 @@ class VerifyExecutionResult:
 def _validate_report_schema_strict(report: dict[str, Any]) -> bool:
     return _verify_checks._validate_report_schema_strict(
         report,
-        report_builder_module=_report_builder,
+        report_schema_module=_report_schema,
     )
 
 

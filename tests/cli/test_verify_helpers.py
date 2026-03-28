@@ -504,7 +504,7 @@ def test_validate_report_schema_strict_paths(monkeypatch) -> None:
 
     report = {"schema_version": REPORT_SCHEMA_VERSION}
 
-    monkeypatch.setattr(verify_mod._report_builder, "jsonschema", None, raising=False)
+    monkeypatch.setattr(verify_mod._report_schema, "jsonschema", None, raising=False)
     assert verify_mod._validate_report_schema_strict(report) is False
 
     class _SchemaFail:
@@ -513,7 +513,7 @@ def test_validate_report_schema_strict_paths(monkeypatch) -> None:
             raise RuntimeError("boom")
 
     monkeypatch.setattr(
-        verify_mod._report_builder, "jsonschema", _SchemaFail(), raising=False
+        verify_mod._report_schema, "jsonschema", _SchemaFail(), raising=False
     )
     assert verify_mod._validate_report_schema_strict(report) is False
 
@@ -523,7 +523,7 @@ def test_validate_report_schema_strict_paths(monkeypatch) -> None:
             return None
 
     monkeypatch.setattr(
-        verify_mod._report_builder, "jsonschema", _SchemaOk(), raising=False
+        verify_mod._report_schema, "jsonschema", _SchemaOk(), raising=False
     )
     assert verify_mod._validate_report_schema_strict(report) is True
 

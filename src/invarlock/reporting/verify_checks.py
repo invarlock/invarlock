@@ -7,14 +7,17 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from invarlock.reporting import report_builder as _report_builder
-from invarlock.reporting.report_builder import validate_report
+from invarlock.reporting import report_schema as _report_schema
 from invarlock.reporting.report_policy import (
     resolve_pm_acceptance_range_from_report,
     resolve_pm_drift_band_from_report,
     resolve_tiny_relax_from_report,
 )
-from invarlock.reporting.report_schema import REPORT_JSON_SCHEMA, REPORT_SCHEMA_VERSION
+from invarlock.reporting.report_schema import (
+    REPORT_JSON_SCHEMA,
+    REPORT_SCHEMA_VERSION,
+    validate_report,
+)
 from invarlock.reporting.report_validation import compute_validation_flags
 
 
@@ -44,14 +47,14 @@ def _validate_report_schema_strict(
     *,
     schema_version: str = REPORT_SCHEMA_VERSION,
     report_json_schema: dict[str, Any] = REPORT_JSON_SCHEMA,
-    report_builder_module: Any = _report_builder,
+    report_schema_module: Any = _report_schema,
 ) -> bool:
     if not isinstance(report, dict):
         return False
     if report.get("schema_version") != schema_version:
         return False
 
-    schema_lib = getattr(report_builder_module, "jsonschema", None)
+    schema_lib = getattr(report_schema_module, "jsonschema", None)
     if schema_lib is None:
         return False
 
@@ -829,5 +832,5 @@ __all__ = [
     "compute_validation_flags",
     "resolve_tiny_relax_from_report",
     "validate_report",
-    "_report_builder",
+    "_report_schema",
 ]
