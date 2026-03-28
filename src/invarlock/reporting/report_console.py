@@ -21,7 +21,7 @@ def load_console_labels() -> list[str]:
         data = load_json_contract("console_labels.json")
         if isinstance(data, list) and all(isinstance(x, str) for x in data):
             return list(data)
-    except Exception:
+    except (OSError, TypeError, ValueError):
         pass
     return list(_CONSOLE_LABELS_DEFAULT)
 
