@@ -211,8 +211,16 @@ def test_release_workflow_uses_trusted_publishing():
         == "${{ github.event_name == 'push' && github.ref || inputs.release_tag }}"
     )
 
+    dist_download_step = _find_step_by_name(steps, "Download dist artifacts")
+    assert dist_download_step["with"]["path"] == "_release_dist"
+
+    stage_step = _find_step_by_name(steps, "Stage publish distributions")
+    assert "rm -rf publish-dist" in stage_step["run"]
+    assert "cp _release_dist/*.whl publish-dist/" in stage_step["run"]
+    assert "cp _release_dist/*.tar.gz publish-dist/" in stage_step["run"]
+
     attest_step = _find_step_by_uses_prefix(steps, "actions/attest-build-provenance@")
-    assert attest_step["with"]["subject-path"] == "dist/*"
+    assert attest_step["with"]["subject-path"] == "publish-dist/*"
     assert attest_step["id"] == "attest_release"
 
     provenance_step = _find_step_by_name(steps, "Upload provenance bundle")
@@ -227,7 +235,7 @@ def test_release_workflow_uses_trusted_publishing():
     step_with = publish_step.get("with", {})
     assert "user" not in step_with
     assert "password" not in step_with
-    assert step_with["packages-dir"] == "dist"
+    assert step_with["packages-dir"] == "publish-dist"
     assert "steps.vars.outputs.publish_repository_url" in step_with["repository-url"]
     assert step_with["skip-existing"] is True
 
