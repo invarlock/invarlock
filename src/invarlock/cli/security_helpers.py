@@ -5,6 +5,9 @@ from typing import Any
 
 import typer
 
+from invarlock.cli.runtime_launch_plan import (
+    build_current_process_container_launch_plan,
+)
 from invarlock.core.runtime_attestation import (
     configure_runtime_security as _configure_runtime_security_core,
 )
@@ -12,7 +15,7 @@ from invarlock.core.runtime_attestation import (
     verify_runtime_attestation as _verify_runtime_attestation_core,
 )
 from invarlock.runtime_security import (
-    delegate_current_process_to_container,
+    delegate_container_command,
     host_execution_allowed,
     running_inside_container,
     write_runtime_manifest,
@@ -40,7 +43,7 @@ def maybe_delegate_model_command() -> None:
     if running_inside_container() or host_execution_allowed():
         return
     try:
-        code = delegate_current_process_to_container()
+        code = delegate_container_command(build_current_process_container_launch_plan())
     except RuntimeError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(1) from exc

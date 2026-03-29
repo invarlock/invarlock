@@ -8,7 +8,22 @@ import pytest
 import invarlock.runtime_security as runtime_security
 
 
-def test_apply_runtime_allowances_and_delegate_current_process(monkeypatch) -> None:
+def _plan(
+    argv: list[str],
+    *,
+    mounts: tuple[Path, ...] = (),
+    needs_mirror: bool = False,
+    gpu_passthrough: bool = False,
+) -> runtime_security.ContainerLaunchPlan:
+    return runtime_security.ContainerLaunchPlan(
+        argv=tuple(argv),
+        argv_mounts=mounts,
+        needs_cwd_host_mirror=needs_mirror,
+        gpu_passthrough=gpu_passthrough,
+    )
+
+
+def test_apply_runtime_allowances_and_delegate_container_command(monkeypatch) -> None:
     import invarlock.security as security_module
 
     seen: list[bool] = []
@@ -27,17 +42,25 @@ def test_apply_runtime_allowances_and_delegate_current_process(monkeypatch) -> N
         allow_unattested_artifacts=True,
     )
 
-    assert seen == [True]
-    assert runtime_security.network_allowed() is True
-    assert runtime_security.host_execution_allowed() is True
-    assert runtime_security.remote_code_allowed() is True
-    assert runtime_security.unattested_artifacts_allowed() is True
-    assert runtime_security.third_party_plugins_allowed() is True
+    runtime_security.apply_runtime_allowances(
+        allow_network=False,
+        allow_host_execution=False,
+        allow_third_party_plugins=False,
+        allow_remote_code=False,
+        allow_unattested_artifacts=False,
+    )
+
+    assert seen == [True, False]
+    assert runtime_security.network_allowed() is False
+    assert runtime_security.host_execution_allowed() is False
+    assert runtime_security.remote_code_allowed() is False
+    assert runtime_security.unattested_artifacts_allowed() is False
+    assert runtime_security.third_party_plugins_allowed() is False
 
     monkeypatch.setattr(
         runtime_security,
         "build_container_command",
-        lambda argv=None: ["docker", "run"],
+        lambda plan: ["docker", "run"],
         raising=True,
     )
     monkeypatch.setattr(
@@ -46,7 +69,7 @@ def test_apply_runtime_allowances_and_delegate_current_process(monkeypatch) -> N
         lambda command, check=False: SimpleNamespace(returncode=7),
         raising=True,
     )
-    assert runtime_security.delegate_current_process_to_container(["evaluate"]) == 7
+    assert runtime_security.delegate_container_command(_plan(["evaluate"])) == 7
 
 
 def test_apply_runtime_allowances_ignores_network_policy_errors(
@@ -133,7 +156,10 @@ def test_build_container_python_command_uses_python_entrypoint_for_repo_script(
 
     command = runtime_security.build_container_python_command(
         script_path,
-        ["--config", "configs/demo.yaml", "--out", "runs"],
+        _plan(
+            ["--config", "configs/demo.yaml", "--out", "runs"],
+            gpu_passthrough=True,
+        ),
     )
 
     assert command[:6] == [
@@ -158,7 +184,7 @@ def test_delegate_python_script_to_container_uses_python_builder(monkeypatch) ->
     monkeypatch.setattr(
         runtime_security,
         "build_container_python_command",
-        lambda script_path, argv=None: ["docker", "run", "python", str(script_path)],
+        lambda script_path, plan: ["docker", "run", "python", str(script_path)],
         raising=True,
     )
     monkeypatch.setattr(
@@ -171,7 +197,7 @@ def test_delegate_python_script_to_container_uses_python_builder(monkeypatch) ->
     assert (
         runtime_security.delegate_python_script_to_container(
             "scripts/proof_packs/python/run_from_config.py",
-            ["--config", "demo.yaml"],
+            _plan(["--config", "demo.yaml"]),
         )
         == 9
     )
@@ -191,7 +217,7 @@ def test_build_container_python_command_raises_for_missing_engine_or_image(
     )
     with pytest.raises(RuntimeError, match="no container engine"):
         runtime_security.build_container_python_command(
-            script_path, ["--config", "cfg"]
+            script_path, _plan(["--config", "cfg"])
         )
 
     monkeypatch.setattr(
@@ -226,7 +252,7 @@ def test_build_container_python_command_raises_for_missing_engine_or_image(
     )
     with pytest.raises(RuntimeError, match="not available locally"):
         runtime_security.build_container_python_command(
-            script_path, ["--config", "cfg"]
+            script_path, _plan(["--config", "cfg"])
         )
 
 
@@ -292,7 +318,7 @@ def test_build_container_python_command_leaves_external_script_as_host_path(
 
     command = runtime_security.build_container_python_command(
         script_path,
-        ["verify", "--help"],
+        _plan(["verify", "--help"]),
     )
 
     assert "--network" not in command
@@ -311,10 +337,10 @@ def test_build_container_command_raises_when_no_engine_is_available(
     )
 
     with pytest.raises(RuntimeError, match="no container engine"):
-        runtime_security.build_container_command(["evaluate", "--help"])
+        runtime_security.build_container_command(_plan(["evaluate", "--help"]))
 
 
-def test_build_container_command_uses_sys_argv_and_deduplicates_mounts(
+def test_build_container_command_uses_launch_plan_and_deduplicates_mounts(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     repo_root = tmp_path / "repo"
@@ -354,18 +380,6 @@ def test_build_container_command_uses_sys_argv_and_deduplicates_mounts(
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security.sys,
-        "argv",
-        ["invarlock", "evaluate", "--config", "cfg.yaml"],
-        raising=True,
-    )
-    monkeypatch.setattr(
-        runtime_security,
-        "_normalize_delegated_argv",
-        lambda argv, *, cwd: (list(argv), [shared_mount], True),
-        raising=True,
-    )
-    monkeypatch.setattr(
         runtime_security,
         "_container_pythonpath_entries",
         lambda *, cwd: (["/workspace/src"], [shared_mount]),
@@ -377,14 +391,14 @@ def test_build_container_command_uses_sys_argv_and_deduplicates_mounts(
         lambda *, cwd: ({"EXTRA": "1"}, [shared_mount]),
         raising=True,
     )
-    monkeypatch.setattr(
-        runtime_security,
-        "_needs_gpu_passthrough",
-        lambda argv: True,
-        raising=True,
+    command = runtime_security.build_container_command(
+        _plan(
+            ["evaluate", "--config", "cfg.yaml"],
+            mounts=(shared_mount,),
+            needs_mirror=True,
+            gpu_passthrough=True,
+        )
     )
-
-    command = runtime_security.build_container_command()
 
     assert command[:3] == ["docker", "run", "--rm"]
     assert "--gpus" in command

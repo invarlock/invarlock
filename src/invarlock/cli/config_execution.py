@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from invarlock.cli.runtime_launch_plan import build_request_container_launch_plan
 from invarlock.core.run_orchestrator import RunExecutionRequest
 from invarlock.runtime_security import (
     apply_runtime_allowances,
-    delegate_current_process_to_container,
+    delegate_container_command,
     host_execution_allowed,
     running_inside_container,
     write_runtime_manifest,
@@ -61,7 +62,33 @@ def run_from_config(
 
     if delegate and not running_inside_container() and not host_execution_allowed():
         try:
-            exit_code = delegate_current_process_to_container()
+            exit_code = delegate_container_command(
+                build_request_container_launch_plan(
+                    command_name,
+                    ConfigExecutionRequest(
+                        config=config,
+                        device=device,
+                        profile=profile,
+                        out=out,
+                        edit=edit,
+                        edit_label=edit_label,
+                        tier=tier,
+                        metric_kind=metric_kind,
+                        probes=probes,
+                        until_pass=until_pass,
+                        max_attempts=max_attempts,
+                        timeout=timeout,
+                        baseline=baseline,
+                        no_cleanup=no_cleanup,
+                        style=style,
+                        progress=progress,
+                        timing=timing,
+                        telemetry=telemetry,
+                        no_color=no_color,
+                        prefer_local_files_only=prefer_local_files_only,
+                    ),
+                )
+            )
         except RuntimeError as exc:
             raise RuntimeDelegationError(str(exc)) from exc
         raise SystemExit(exit_code)

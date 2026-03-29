@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import invarlock.cli.runtime_launch_plan as runtime_launch_plan
 import invarlock.runtime_security as runtime_security
 
 
@@ -55,12 +56,12 @@ def test_config_digest_falls_back_to_payload_when_path_is_missing() -> None:
     assert source == "inline"
 
 
-def test_set_env_flag_only_writes_when_explicitly_enabled(monkeypatch) -> None:
+def test_set_env_flag_writes_explicit_boolean_state(monkeypatch) -> None:
     flag = "INVARLOCK_TEST_RUNTIME_FLAG"
     monkeypatch.delenv(flag, raising=False)
 
     runtime_security._set_env_flag(flag, False)
-    assert runtime_security.os.environ.get(flag) is None
+    assert runtime_security.os.environ.get(flag) == "0"
 
     runtime_security._set_env_flag(flag, None)
     assert runtime_security.os.environ.get(flag) is None
@@ -69,7 +70,31 @@ def test_set_env_flag_only_writes_when_explicitly_enabled(monkeypatch) -> None:
     assert runtime_security.os.environ[flag] == "1"
 
 
-def test_iter_path_args_and_flag_occurrences_cover_split_and_inline_forms() -> None:
+def test_apply_runtime_allowances_can_disable_prior_allowances(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(runtime_security.ALLOW_NETWORK_ENV, "1")
+    monkeypatch.setenv(runtime_security.ALLOW_HOST_EXECUTION_ENV, "1")
+    monkeypatch.setenv(runtime_security.ALLOW_REMOTE_CODE_ENV, "1")
+    monkeypatch.setenv(runtime_security.ALLOW_THIRD_PARTY_PLUGINS_ENV, "1")
+    monkeypatch.setenv(runtime_security.ALLOW_UNATTESTED_ARTIFACTS_ENV, "1")
+
+    runtime_security.apply_runtime_allowances(
+        allow_network=False,
+        allow_host_execution=False,
+        allow_remote_code=False,
+        allow_third_party_plugins=False,
+        allow_unattested_artifacts=False,
+    )
+
+    assert runtime_security.network_allowed() is False
+    assert runtime_security.host_execution_allowed() is False
+    assert runtime_security.remote_code_allowed() is False
+    assert runtime_security.third_party_plugins_allowed() is False
+    assert runtime_security.unattested_artifacts_allowed() is False
+
+
+def test_flag_occurrences_cover_split_and_inline_forms() -> None:
     argv = [
         "evaluate",
         "--out",
@@ -81,12 +106,7 @@ def test_iter_path_args_and_flag_occurrences_cover_split_and_inline_forms() -> N
         "value",
     ]
 
-    assert runtime_security._iter_path_args(argv) == [
-        Path("reports"),
-        Path("baseline.json"),
-        Path("config.yaml"),
-    ]
-    assert runtime_security._iter_flag_occurrences(
+    assert runtime_launch_plan._iter_flag_occurrences(
         argv,
         flags={"--out", "--baseline-report", "-c"},
     ) == [
@@ -121,14 +141,14 @@ def test_runtime_security_helpers_cover_empty_and_deduplicated_path_sets(
 def test_replace_flag_value_updates_split_and_inline_tokens() -> None:
     argv = ["--out", "reports", "--baseline-report=baseline.json"]
 
-    runtime_security._replace_flag_value(
+    runtime_launch_plan._replace_flag_value(
         argv,
         token_index=0,
         flag="--out",
         value_index=1,
         new_value="artifacts",
     )
-    runtime_security._replace_flag_value(
+    runtime_launch_plan._replace_flag_value(
         argv,
         token_index=2,
         flag="--baseline-report",
@@ -395,7 +415,7 @@ def test_normalize_delegated_argv_rewrites_paths_and_collects_mounts(
         raising=True,
     )
 
-    rewritten, mounts, needs_mirror = runtime_security._normalize_delegated_argv(
+    plan = runtime_launch_plan.normalize_delegated_argv(
         [
             "evaluate",
             "--config",
@@ -410,7 +430,7 @@ def test_normalize_delegated_argv_rewrites_paths_and_collects_mounts(
         cwd=cwd,
     )
 
-    assert rewritten == [
+    assert list(plan.argv) == [
         "evaluate",
         "--config",
         str(config_path.resolve()),
@@ -421,8 +441,8 @@ def test_normalize_delegated_argv_rewrites_paths_and_collects_mounts(
         "--subject",
         "/workspace/subject",
     ]
-    assert mounts == [external_root]
-    assert needs_mirror is True
+    assert list(plan.argv_mounts) == [external_root]
+    assert plan.needs_cwd_host_mirror is True
 
 
 def test_path_env_value_and_delegated_env_pairs_translate_workspace_paths(

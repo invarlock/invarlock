@@ -19,8 +19,14 @@ def test_maybe_delegate_model_command_delegates_by_default(
 
     monkeypatch.setattr(
         security_helpers,
-        "delegate_current_process_to_container",
-        _delegate,
+        "build_current_process_container_launch_plan",
+        lambda: "plan",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        security_helpers,
+        "delegate_container_command",
+        lambda plan: _delegate() if plan == "plan" else 1,
         raising=True,
     )
 
