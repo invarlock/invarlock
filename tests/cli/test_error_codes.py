@@ -13,6 +13,38 @@ from invarlock.cli.run_pairing import enforce_provider_parity
 from invarlock.core.exceptions import InvarlockError
 
 
+def _detect_profile(model_id: str, adapter: str) -> SimpleNamespace:
+    return SimpleNamespace(
+        default_loss="ce",
+        default_provider=None,
+        default_metric=None,
+        model_id=model_id,
+        adapter=adapter,
+        family="gpt",
+        module_selectors={},
+        invariants=[],
+        cert_lints=[],
+    )
+
+
+class _DummyRegistry:
+    def get_adapter(self, name: str) -> SimpleNamespace:
+        return SimpleNamespace(name=name, load_model=lambda *_a, **_k: object())
+
+    def get_edit(self, name: str) -> SimpleNamespace:
+        return SimpleNamespace(name=name)
+
+    def get_guard(self, _name: str) -> SimpleNamespace:
+        raise KeyError("no guards in test")
+
+    def get_plugin_metadata(self, name: str, plugin_type: str) -> dict[str, object]:
+        return {
+            "name": name,
+            "module": f"tests.{plugin_type}.{name}",
+            "version": "test",
+        }
+
+
 def test_enforce_provider_parity_mask_mismatch_raises_invarlock_error():
     subj = {"ids_sha256": "ids", "tokenizer_sha256": "abc", "masking_sha256": "mask-A"}
     base = {"ids_sha256": "ids", "tokenizer_sha256": "abc", "masking_sha256": "mask-B"}
@@ -118,6 +150,30 @@ context:
                     ),
                     "tokhash123",
                 ),
+            )
+        )
+        stack.enter_context(
+            patch(
+                "invarlock.cli.run_runtime.detect_model_profile",
+                _detect_profile,
+            )
+        )
+        stack.enter_context(
+            patch(
+                "invarlock.cli.device.resolve_device",
+                lambda _device: "cpu",
+            )
+        )
+        stack.enter_context(
+            patch(
+                "invarlock.cli.device.validate_device_for_config",
+                lambda _device: (True, ""),
+            )
+        )
+        stack.enter_context(
+            patch(
+                "invarlock.core.registry.get_registry",
+                lambda: _DummyRegistry(),
             )
         )
         # Make CoreRunner.execute a no-op object with essentials

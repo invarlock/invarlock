@@ -38,6 +38,34 @@ def _should_auto_attest_verify_test(node: pytest.FixtureRequest) -> bool:
     ) and path.name != "test_unattested_verify_gate.py"
 
 
+def _should_preserve_secure_default_cli_test(node: pytest.FixtureRequest) -> bool:
+    path = Path(str(node.node.path))
+    return path.name in {
+        "test_container_delegation.py",
+        "test_security_default_contract.py",
+    }
+
+
+@pytest.fixture(autouse=True)
+def _default_cli_host_execution(
+    monkeypatch: pytest.MonkeyPatch,
+    request: pytest.FixtureRequest,
+) -> Generator[None, None, None]:
+    if _should_preserve_secure_default_cli_test(request):
+        yield
+        return
+
+    monkeypatch.setattr(
+        "invarlock.cli.config_execution.host_execution_allowed",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        "invarlock.cli.security_helpers.host_execution_allowed",
+        lambda: True,
+    )
+    yield
+
+
 def _write_test_runtime_manifest(report_path: Path) -> None:
     payload = {
         "manifest_version": RUNTIME_MANIFEST_VERSION,

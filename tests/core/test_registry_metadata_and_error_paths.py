@@ -192,6 +192,17 @@ def test_registry_entry_points_select_and_get_paths(monkeypatch):
     assert "ep_hello_guard" in r2.list_guards()
 
 
+def test_get_plugin_metadata_adds_name_and_type_for_known_plugin() -> None:
+    registry = reg.CoreRegistry()
+
+    metadata = registry.get_plugin_metadata("hello_guard", "guards")
+
+    assert metadata["name"] == "hello_guard"
+    assert metadata["type"] == "guards"
+    assert metadata["available"] is True
+    assert metadata["module"] != "unknown"
+
+
 def test_registry_entry_point_collision_and_typed_getters(monkeypatch):
     monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "1")
     adapter_cls, edit_cls, guard_cls = _install_plugin_module(

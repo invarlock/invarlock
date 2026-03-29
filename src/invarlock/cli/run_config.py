@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import typer
+import yaml
 from rich.console import Console
 
 from invarlock.core.provider_config import resolve_provider_kind_and_kwargs
@@ -84,7 +85,7 @@ def prepare_config_for_run(
     )
     try:
         cfg = load_config_fn(config_path)
-    except ValueError as exc:
+    except (ValueError, yaml.YAMLError) as exc:
         event_fn(console, "FAIL", str(exc), emoji="❌", profile=profile)
         raise typer.Exit(2) from exc
 

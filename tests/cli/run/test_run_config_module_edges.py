@@ -125,6 +125,62 @@ def test_prepare_config_for_run_applies_profile_edit_and_auto_overrides() -> Non
     assert ("INIT", "Applying profile: release") in events
 
 
+def test_prepare_config_for_run_uses_default_event_import_and_swallows_auto_adapter_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[tuple[str, str]] = []
+
+    def _event_fn(console, tag: str, message: str, **kwargs) -> None:  # noqa: ARG001
+        events.append((tag, message))
+
+    monkeypatch.setattr(
+        "invarlock.cli.run_shell_output._event",
+        _event_fn,
+    )
+
+    cfg = run_config_mod.prepare_config_for_run(
+        config_path="config.yaml",
+        profile=None,
+        edit=None,
+        tier=None,
+        probes=None,
+        console=Console(file=StringIO(), force_terminal=False),
+        load_config_fn=lambda path: _CfgWrap({"model": {}, "edit": {}, "auto": {}}),
+        apply_profile_fn=lambda cfg, profile: cfg,  # noqa: ARG005
+        apply_auto_adapter_fn=lambda cfg: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+
+    assert cfg.model_dump()["model"] == {}
+    assert ("INIT", "Loading configuration: config.yaml") in events
+
+
+def test_prepare_config_for_run_tolerates_default_auto_adapter_import_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    orig_import = builtins.__import__
+
+    def _import(name, globals=None, locals=None, fromlist=(), level=0):  # noqa: A002
+        if name == "invarlock.core.adapter_auto":
+            raise RuntimeError("optional adapter unavailable")
+        return orig_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", _import)
+
+    cfg = run_config_mod.prepare_config_for_run(
+        config_path="config.yaml",
+        profile=None,
+        edit=None,
+        tier=None,
+        probes=None,
+        console=Console(file=StringIO(), force_terminal=False),
+        event_fn=lambda *args, **kwargs: None,
+        load_config_fn=lambda path: _CfgWrap({"model": {}, "edit": {}, "auto": {}}),
+        apply_profile_fn=lambda cfg, profile: cfg,  # noqa: ARG005
+    )
+
+    assert cfg.model_dump()["auto"] == {}
+
+
 @pytest.mark.parametrize(
     ("load_config_fn", "apply_profile_fn", "profile", "tier", "probes", "code"),
     [
@@ -242,6 +298,41 @@ def test_resolve_device_and_output_falls_back_to_runs_and_rejects_invalid_device
         )
 
 
+def test_resolve_device_and_output_uses_default_shell_helpers_and_handles_cfg_model_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    printed: list[tuple[str, str]] = []
+
+    monkeypatch.setattr(
+        "invarlock.cli.run_shell_output._format_kv_line",
+        lambda label, value: printed.append((label, value)) or f"{label}: {value}",
+    )
+    monkeypatch.setattr(
+        "invarlock.cli.run_shell_output._device_resolution_note",
+        lambda target, resolved: f"{target}->{resolved}",
+    )
+
+    class _Cfg:
+        @property
+        def model(self):
+            raise RuntimeError("missing model")
+
+        output = SimpleNamespace(dir="custom-runs")
+
+    resolved, output_dir = run_config_mod.resolve_device_and_output(
+        _Cfg(),
+        device=None,
+        out=None,
+        console=Console(file=StringIO(), force_terminal=False),
+        resolve_device_fn=lambda target: "cpu",
+        validate_device_fn=lambda device: (True, ""),
+    )
+
+    assert resolved == "cpu"
+    assert output_dir == Path("custom-runs")
+    assert printed == [("Device", "cpu (auto->cpu)")]
+
+
 def test_resolve_provider_and_split_uses_emit_and_available_split_fallback() -> None:
     calls: list[tuple[str, dict]] = []
     emit_sentinel = object()
@@ -276,6 +367,32 @@ def test_resolve_provider_and_split_uses_emit_and_available_split_fallback() -> 
     assert calls[0][1]["emit"] is not None
 
 
+def test_resolve_provider_and_split_uses_default_provider_import(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, dict]] = []
+
+    class Provider:
+        pass
+
+    def _get_provider(name: str, **kwargs):
+        calls.append((name, dict(kwargs)))
+        return Provider()
+
+    monkeypatch.setattr("invarlock.eval.data.get_provider", _get_provider)
+
+    provider, split, used = run_config_mod.resolve_provider_and_split(
+        SimpleNamespace(dataset=SimpleNamespace(provider="custom", split=None)),
+        model_profile=SimpleNamespace(default_provider=None),
+        choose_dataset_split_fn=lambda **kwargs: ("test", False),
+    )
+
+    assert isinstance(provider, Provider)
+    assert split == "test"
+    assert used is False
+    assert calls == [("custom", {})]
+
+
 def test_extract_model_load_kwargs_handles_model_dump_failure_and_removed_keys() -> (
     None
 ):
@@ -301,3 +418,59 @@ def test_extract_model_load_kwargs_handles_model_dump_failure_and_removed_keys()
         run_config_mod.extract_model_load_kwargs(_CfgRemoved())
 
     assert getattr(excinfo.value, "code", None) == "E007"
+
+
+def test_extract_model_load_kwargs_rejects_remote_code_when_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(run_config_mod, "remote_code_allowed", lambda: False)
+
+    class _CfgRemoteCode:
+        def model_dump(self):
+            return {
+                "model": {
+                    "id": "foo",
+                    "adapter": "dummy",
+                    "device": "cpu",
+                    "trust_remote_code": True,
+                }
+            }
+
+    with pytest.raises(Exception) as excinfo:
+        run_config_mod.extract_model_load_kwargs(_CfgRemoteCode())
+
+    assert getattr(excinfo.value, "code", None) == "E008"
+
+
+def test_extract_model_load_kwargs_preserves_non_alias_dtype_strings() -> None:
+    class _CfgCustomDtype:
+        def model_dump(self):
+            return {
+                "model": {
+                    "id": "foo",
+                    "adapter": "dummy",
+                    "device": "cpu",
+                    "dtype": "float8_e4m3fn",
+                }
+            }
+
+    kwargs = run_config_mod.extract_model_load_kwargs(_CfgCustomDtype())
+
+    assert kwargs["dtype"] == "float8_e4m3fn"
+
+
+def test_extract_model_load_kwargs_drops_blank_dtype_strings() -> None:
+    class _CfgBlankDtype:
+        def model_dump(self):
+            return {
+                "model": {
+                    "id": "foo",
+                    "adapter": "dummy",
+                    "device": "cpu",
+                    "dtype": "   ",
+                }
+            }
+
+    kwargs = run_config_mod.extract_model_load_kwargs(_CfgBlankDtype())
+
+    assert kwargs["dtype"] == "   "

@@ -3,6 +3,7 @@ from __future__ import annotations
 import builtins
 import json
 import sys
+import textwrap
 import types
 from pathlib import Path
 from types import SimpleNamespace
@@ -44,7 +45,7 @@ def _import_run_module():
 
 
 def _write_yaml_cfg(path: Path, content: str) -> Path:
-    path.write_text(content.strip() + "\n", encoding="utf-8")
+    path.write_text(textwrap.dedent(content).strip() + "\n", encoding="utf-8")
     return path
 
 
@@ -201,7 +202,7 @@ def test_run_baseline_schedule_absent_release_exits(
             profile="release",
             baseline=str(baseline),
         )
-    assert ei.value.exit_code == 1
+    assert ei.value.exit_code == 3
 
 
 def test_run_baseline_schedule_mismatch_release_exits(
@@ -262,7 +263,7 @@ def test_run_baseline_schedule_mismatch_release_exits(
             profile="release",
             baseline=str(baseline),
         )
-    assert ei.value.exit_code == 1
+    assert ei.value.exit_code == 3
 
 
 def test_run_device_validation_error_exits(

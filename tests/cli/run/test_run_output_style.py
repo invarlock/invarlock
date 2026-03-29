@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from typer.testing import CliRunner
 
 from invarlock.cli import output as output_mod
+from invarlock.cli import run_execution as run_execution_mod
 from tests.cli.run._internal_cli import internal_run_app as cli
 from tests.cli.support import RecordingConsole
 
@@ -46,6 +47,8 @@ output:
 
 
 def _common_stubs(monkeypatch) -> None:
+    monkeypatch.setenv("INVARLOCK_ALLOW_HOST_EXECUTION", "1")
+
     class DummyRegistry:
         def get_adapter(self, name):
             return SimpleNamespace(
@@ -118,7 +121,17 @@ def test_run_ci_uses_semantic_prefixes_no_emojis(tmp_path: Path, monkeypatch) ->
 
     cfg = _cfg(tmp_path)
     r = CliRunner().invoke(
-        cli, ["run", "-c", cfg, "--profile", "ci", "--style", "audit"]
+        cli,
+        [
+            "run",
+            "-c",
+            cfg,
+            "--profile",
+            "ci",
+            "--style",
+            "audit",
+            "--allow-host-execution",
+        ],
     )
     assert r.exit_code == 0
     s = r.stdout
@@ -169,7 +182,17 @@ def test_run_audit_routes_provider_events_without_emojis(
 
     cfg = _cfg(tmp_path, provider="wikitext2")
     r = CliRunner().invoke(
-        cli, ["run", "-c", cfg, "--profile", "ci", "--style", "audit"]
+        cli,
+        [
+            "run",
+            "-c",
+            cfg,
+            "--profile",
+            "ci",
+            "--style",
+            "audit",
+            "--allow-host-execution",
+        ],
     )
     assert r.exit_code == 0
     s = r.stdout
@@ -268,6 +291,37 @@ def test_output_printing_and_style_assignment() -> None:
         output_mod.format_event_line("warn", "notice  ", style=friendly, emoji="⚠️")
         == "⚠️ notice"
     )
+
+
+def test_run_execution_output_style_resets_console_color_state(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    fake_console = SimpleNamespace(no_color=False, _invarlock_output_style=None)
+    monkeypatch.setattr(run_execution_mod, "console", fake_console, raising=True)
+
+    no_color_request = SimpleNamespace(
+        style=None,
+        profile="ci",
+        progress=False,
+        timing=False,
+        no_color=True,
+    )
+    color_request = SimpleNamespace(
+        style=None,
+        profile="dev",
+        progress=False,
+        timing=False,
+        no_color=False,
+    )
+
+    no_color_style = run_execution_mod._resolve_shell_output_style(no_color_request)
+    assert no_color_style.color is False
+    assert fake_console.no_color is True
+
+    color_style = run_execution_mod._resolve_shell_output_style(color_request)
+    assert color_style.color is True
+    assert fake_console.no_color is False
 
 
 def test_output_timing_helpers_cover_progress_and_summary(monkeypatch) -> None:
