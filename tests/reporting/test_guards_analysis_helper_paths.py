@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from invarlock.reporting import guards_analysis as GA
+from invarlock.reporting import guards_common as gc_mod
+from invarlock.reporting import guards_invariants as gi_mod
+from invarlock.reporting import guards_rmt as gr_mod
+from invarlock.reporting import guards_spectral as gs_mod
+from invarlock.reporting import guards_variance as gv_mod
 
 
 def test_measurement_contract_digest_handles_bad_str() -> None:
@@ -8,12 +12,12 @@ def test_measurement_contract_digest_handles_bad_str() -> None:
         def __str__(self) -> str:  # pragma: no cover
             raise RuntimeError("boom")
 
-    assert GA._measurement_contract_digest({"x": _BadStr()}) is None
+    assert gc_mod._measurement_contract_digest({"x": _BadStr()}) is None
 
 
 def test_measurement_contract_digest_success_and_empty() -> None:
-    assert GA._measurement_contract_digest({}) is None
-    digest = GA._measurement_contract_digest({"x": 1})
+    assert gc_mod._measurement_contract_digest({}) is None
+    digest = gc_mod._measurement_contract_digest({"x": 1})
     assert isinstance(digest, str) and len(digest) == 16
 
 
@@ -49,7 +53,7 @@ def test_extract_invariants_covers_fail_and_warn_paths() -> None:
             }
         ],
     }
-    out_fail = GA._extract_invariants(report_fail)
+    out_fail = gi_mod._extract_invariants(report_fail)
     assert out_fail["status"] == "fail"
     assert out_fail["failures"]
 
@@ -65,7 +69,7 @@ def test_extract_invariants_covers_fail_and_warn_paths() -> None:
             }
         ],
     }
-    out_warn = GA._extract_invariants(report_warn)
+    out_warn = gi_mod._extract_invariants(report_warn)
     assert out_warn["status"] == "warn"
 
 
@@ -80,7 +84,7 @@ def test_extract_invariants_guard_entry_no_violations_keeps_pass() -> None:
             }
         ],
     }
-    out = GA._extract_invariants(report)
+    out = gi_mod._extract_invariants(report)
     assert out["status"] == "pass"
 
 
@@ -99,14 +103,14 @@ def test_extract_spectral_analysis_caps_applied_int_fallback() -> None:
             }
         ]
     }
-    out = GA._extract_spectral_analysis(report, baseline={})
+    out = gs_mod._extract_spectral_analysis(report, baseline={})
     assert out["caps_applied"] == 0
     assert isinstance(out.get("max_caps"), int)
 
 
 def test_extract_spectral_analysis_baseline_metrics_spectral_not_dict() -> None:
     baseline = {"metrics": {"spectral": ["bad"]}}
-    out = GA._extract_spectral_analysis({"guards": []}, baseline=baseline)
+    out = gs_mod._extract_spectral_analysis({"guards": []}, baseline=baseline)
     assert out["evaluated"] is False
 
 
@@ -130,7 +134,7 @@ def test_extract_spectral_analysis_uses_guard_baseline_metrics_and_derives_quant
             }
         ]
     }
-    out = GA._extract_spectral_analysis(report, baseline={})
+    out = gs_mod._extract_spectral_analysis(report, baseline={})
     assert out["evaluated"] is True
     assert out["summary"]["baseline_max_spectral_norm"] == 1.0
     assert out["family_z_quantiles"]["ffn"]["count"] == 1
@@ -150,7 +154,7 @@ def test_extract_spectral_analysis_quantile_position_integer_path() -> None:
             }
         ]
     }
-    out = GA._extract_spectral_analysis(report, baseline={})
+    out = gs_mod._extract_spectral_analysis(report, baseline={})
     assert out["family_z_quantiles"]["ffn"]["q95"] == 19.0
 
 
@@ -167,7 +171,7 @@ def test_extract_spectral_analysis_summarize_returns_empty_when_family_map_empty
             }
         ]
     }
-    out = GA._extract_spectral_analysis(report, baseline={})
+    out = gs_mod._extract_spectral_analysis(report, baseline={})
     assert out.get("family_z_quantiles", {}) == {}
 
 
@@ -182,7 +186,7 @@ def test_extract_spectral_analysis_summarize_skips_modules_without_family() -> N
             }
         ]
     }
-    out = GA._extract_spectral_analysis(report, baseline={})
+    out = gs_mod._extract_spectral_analysis(report, baseline={})
     assert out.get("family_z_quantiles", {}) == {}
 
 
@@ -199,7 +203,7 @@ def test_extract_spectral_analysis_skips_guard_metrics_block_when_metrics_falsy_
             }
         ]
     }
-    out = GA._extract_spectral_analysis(report, baseline={})
+    out = gs_mod._extract_spectral_analysis(report, baseline={})
     assert out["evaluated"] is True
 
 
@@ -218,7 +222,7 @@ def test_extract_spectral_analysis_bad_sigma_quantile_and_deadband_omits_summary
             }
         ]
     }
-    out = GA._extract_spectral_analysis(report, baseline={})
+    out = gs_mod._extract_spectral_analysis(report, baseline={})
     assert "sigma_quantile" not in out["summary"]
     assert "deadband" not in out["summary"]
 
@@ -251,7 +255,7 @@ def test_extract_rmt_analysis_edge_risk_paths_and_contract_hashes() -> None:
             }
         ]
     }
-    out = GA._extract_rmt_analysis(report, baseline)
+    out = gr_mod._extract_rmt_analysis(report, baseline)
     assert out["evaluated"] is True
     assert out["measurement_contract_match"] is True
     assert out["epsilon_violations"]
@@ -287,7 +291,7 @@ def test_extract_spectral_analysis_uses_run_report_baseline_contract() -> None:
         ]
     }
 
-    out = GA._extract_spectral_analysis(report, baseline)
+    out = gs_mod._extract_spectral_analysis(report, baseline)
 
     assert out["evaluated"] is True
     assert out["measurement_contract_match"] is True
@@ -317,7 +321,7 @@ def test_extract_variance_analysis_provenance_window_ids_and_ratio_ci_fail() -> 
         ],
         "metrics": {"variance": {"gain": 0.1, "ppl_no_ve": 10.0, "ppl_with_ve": 9.0}},
     }
-    out = GA._extract_variance_analysis(report)
+    out = gv_mod._extract_variance_analysis(report)
     assert out["enabled"] is False
     assert out["gain"] == 0.1
     assert out["ppl_no_ve"] == 10.0
@@ -326,7 +330,7 @@ def test_extract_variance_analysis_provenance_window_ids_and_ratio_ci_fail() -> 
 
 
 def test_extract_variance_analysis_handles_non_dict_variance_metrics() -> None:
-    out = GA._extract_variance_analysis(
+    out = gv_mod._extract_variance_analysis(
         {"guards": [], "metrics": {"variance": ["bad"]}}
     )
     assert out["gain"] is None
@@ -341,5 +345,5 @@ def test_extract_variance_analysis_keeps_existing_window_ids() -> None:
             }
         ]
     }
-    out = GA._extract_variance_analysis(report)
+    out = gv_mod._extract_variance_analysis(report)
     assert out["ab_test"]["provenance"]["window_ids"] == [3, 1, 2]

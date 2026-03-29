@@ -24,8 +24,6 @@ _NON_FATAL_EXCEPTIONS = (
     KeyError,
     RuntimeError,
     OSError,
-    ImportError,
-    ModuleNotFoundError,
 )
 _NUMERIC_EXCEPTIONS = (TypeError, ValueError, OverflowError)
 

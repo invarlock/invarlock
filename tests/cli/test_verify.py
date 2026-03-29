@@ -415,7 +415,10 @@ def test_verify_family_mismatch_warning_includes_backends(tmp_path: Path):
     cert_path = tmp_path / "cert_family_mismatch.json"
     cert_path.write_text(json.dumps(cert))
 
-    result = runner.invoke(app, ["verify", str(cert_path)])
+    result = runner.invoke(
+        app,
+        ["verify", str(cert_path), "--baseline", str(baseline_path)],
+    )
     assert result.exit_code == 0
     out = result.stdout
     assert "Adapter family differs" in out

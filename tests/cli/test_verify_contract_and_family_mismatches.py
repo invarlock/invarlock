@@ -175,6 +175,6 @@ def test_verify_adapter_family_warning_human(tmp_path: Path, capsys) -> None:
     c["primary_metric"]["preview"] = 10.0
     p = _write_cert(tmp_path, c, "c.json")
     # Human mode success should print warning lines
-    verify_command([p], baseline=None, profile="dev", json_out=False)
+    verify_command([p], baseline=p_base_report, profile="dev", json_out=False)
     out = capsys.readouterr().out
     assert "Adapter family differs" in out

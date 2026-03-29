@@ -31,7 +31,11 @@ def test_warn_adapter_family_mismatch_covers_baseline_paths(
     # baseline path points to a missing file: p.exists() is False
     payload = copy.deepcopy(base_cert)
     payload["provenance"]["baseline"]["report_path"] = str(tmp_path / "missing.json")
-    verify_mod._warn_adapter_family_mismatch(cert_path, payload)
+    verify_mod._warn_adapter_family_mismatch(
+        cert_path,
+        payload,
+        trusted_baseline_path=tmp_path / "missing.json",
+    )
 
     # baseline file exists but meta.plugins is not a dict
     baseline_path = _write_json(
@@ -39,7 +43,11 @@ def test_warn_adapter_family_mismatch_covers_baseline_paths(
     )
     payload = copy.deepcopy(base_cert)
     payload["provenance"]["baseline"]["report_path"] = str(baseline_path)
-    verify_mod._warn_adapter_family_mismatch(cert_path, payload)
+    verify_mod._warn_adapter_family_mismatch(
+        cert_path,
+        payload,
+        trusted_baseline_path=baseline_path,
+    )
 
     # baseline file exists, adapter is not a dict
     baseline_path = _write_json(
@@ -48,7 +56,11 @@ def test_warn_adapter_family_mismatch_covers_baseline_paths(
     )
     payload = copy.deepcopy(base_cert)
     payload["provenance"]["baseline"]["report_path"] = str(baseline_path)
-    verify_mod._warn_adapter_family_mismatch(cert_path, payload)
+    verify_mod._warn_adapter_family_mismatch(
+        cert_path,
+        payload,
+        trusted_baseline_path=baseline_path,
+    )
 
     # baseline file exists, provenance is not a dict
     baseline_path = _write_json(
@@ -57,7 +69,11 @@ def test_warn_adapter_family_mismatch_covers_baseline_paths(
     )
     payload = copy.deepcopy(base_cert)
     payload["provenance"]["baseline"]["report_path"] = str(baseline_path)
-    verify_mod._warn_adapter_family_mismatch(cert_path, payload)
+    verify_mod._warn_adapter_family_mismatch(
+        cert_path,
+        payload,
+        trusted_baseline_path=baseline_path,
+    )
 
     # baseline file exists, family is missing/empty (val check branch)
     baseline_path = _write_json(
@@ -66,7 +82,11 @@ def test_warn_adapter_family_mismatch_covers_baseline_paths(
     )
     payload = copy.deepcopy(base_cert)
     payload["provenance"]["baseline"]["report_path"] = str(baseline_path)
-    verify_mod._warn_adapter_family_mismatch(cert_path, payload)
+    verify_mod._warn_adapter_family_mismatch(
+        cert_path,
+        payload,
+        trusted_baseline_path=baseline_path,
+    )
 
     # baseline file exists, family present (no mismatch warning when equal)
     baseline_path = _write_json(
@@ -75,7 +95,11 @@ def test_warn_adapter_family_mismatch_covers_baseline_paths(
     )
     payload = copy.deepcopy(base_cert)
     payload["provenance"]["baseline"]["report_path"] = str(baseline_path)
-    verify_mod._warn_adapter_family_mismatch(cert_path, payload)
+    verify_mod._warn_adapter_family_mismatch(
+        cert_path,
+        payload,
+        trusted_baseline_path=baseline_path,
+    )
 
 
 def test_warn_adapter_family_mismatch_swallows_invalid_baseline_json(
@@ -91,4 +115,40 @@ def test_warn_adapter_family_mismatch_swallows_invalid_baseline_json(
         "provenance": {"baseline": {"report_path": str(baseline_path)}},
     }
 
-    verify_mod._warn_adapter_family_mismatch(cert_path, payload)
+    verify_mod._warn_adapter_family_mismatch(
+        cert_path,
+        payload,
+        trusted_baseline_path=baseline_path,
+    )
+
+
+def test_warn_adapter_family_mismatch_ignores_untrusted_baseline_path(
+    tmp_path: Path,
+) -> None:
+    cert_path = tmp_path / "cert.json"
+    cert_path.write_text("{}", encoding="utf-8")
+    trusted_path = _write_json(tmp_path / "trusted.json", {"meta": {}})
+    untrusted_path = _write_json(
+        tmp_path / "untrusted.json",
+        {
+            "meta": {
+                "plugins": {
+                    "adapter": {"provenance": {"family": "ggml", "library": "ggml"}}
+                }
+            }
+        },
+    )
+    payload = {
+        "plugins": {
+            "adapter": {"provenance": {"family": "hf", "library": "transformers"}}
+        },
+        "provenance": {"baseline": {"report_path": str(untrusted_path)}},
+    }
+
+    warnings = verify_mod._warn_adapter_family_mismatch(
+        cert_path,
+        payload,
+        trusted_baseline_path=trusted_path,
+    )
+
+    assert warnings == ()

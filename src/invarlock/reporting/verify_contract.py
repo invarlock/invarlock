@@ -106,6 +106,8 @@ def _validate_evaluation_report_payload(
 def _warn_adapter_family_mismatch(
     cert_path: Path,
     report: dict[str, Any],
+    *,
+    trusted_baseline_path: Path | None = None,
 ) -> tuple[str, ...]:
     """Build a soft warning if adapter families differ between baseline and edited."""
 
@@ -137,7 +139,17 @@ def _warn_adapter_family_mismatch(
         base_ver = None
         if isinstance(baseline_report_path, str) and baseline_report_path:
             p = Path(baseline_report_path)
-            if p.exists():
+            trusted_path = (
+                trusted_baseline_path.resolve(strict=False)
+                if isinstance(trusted_baseline_path, Path)
+                else None
+            )
+            candidate_path = p.resolve(strict=False)
+            if (
+                trusted_path is not None
+                and candidate_path == trusted_path
+                and p.is_file()
+            ):
                 with p.open("r", encoding="utf-8") as fh:
                     baseline_report = json.load(fh)
                 meta = (
@@ -385,6 +397,7 @@ def run_verify_reports(
                             _warn_adapter_family_mismatch(
                                 cert_path,
                                 cert_obj,
+                                trusted_baseline_path=baseline,
                             )
                         )
                     except _VERIFY_RECOVERABLE_EXCEPTIONS:

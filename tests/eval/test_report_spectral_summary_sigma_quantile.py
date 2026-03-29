@@ -3,7 +3,7 @@ from unittest.mock import patch
 import pytest
 
 from invarlock.core.auto_tuning import TIER_POLICIES
-from invarlock.reporting.guards_analysis import _extract_spectral_analysis
+from invarlock.reporting.guards_spectral import _extract_spectral_analysis
 from invarlock.reporting.report_make import make_report
 
 

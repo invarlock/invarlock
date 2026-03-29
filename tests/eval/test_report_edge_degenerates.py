@@ -1,6 +1,6 @@
 import pytest
 
-from invarlock.reporting.guards_analysis import _extract_invariants
+from invarlock.reporting.guards_invariants import _extract_invariants
 from invarlock.reporting.policy_utils import _build_resolved_policies
 from invarlock.reporting.render import render_report_markdown
 from invarlock.reporting.report_make import make_report

@@ -1,4 +1,4 @@
-from invarlock.reporting.guards_analysis import _extract_spectral_analysis
+from invarlock.reporting.guards_spectral import _extract_spectral_analysis
 
 
 def test_extract_spectral_analysis_from_z_scores_fallback():

@@ -12,6 +12,16 @@ _NON_FATAL_EXCEPTIONS = (
 )
 
 
+def _sanitize_summary_value(value: Any) -> str | None:
+    if value is None:
+        return None
+    cleaned = "".join(
+        ch if ch.isprintable() and ch not in "\r\n\t" else " " for ch in str(value)
+    )
+    normalized = " ".join(cleaned.split())
+    return normalized or None
+
+
 def attach_quality_overhead(
     evaluation_report: dict[str, Any],
     raw_guard_ctx: Any,
@@ -208,7 +218,11 @@ def attach_system_overhead(
 ) -> None:
     try:
 
-        def _extract_sys_metrics(container: dict[str, Any] | None) -> dict[str, float]:
+        def _extract_sys_metrics(
+            container: dict[str, Any] | None,
+            *,
+            fallback_telemetry: dict[str, Any] | None = None,
+        ) -> dict[str, float]:
             out: dict[str, float] = {}
             if not isinstance(container, dict):
                 return out
@@ -217,7 +231,7 @@ def attach_system_overhead(
                 if isinstance(container.get("metrics"), dict)
                 else {}
             )
-            telem = telemetry if isinstance(telemetry, dict) else {}
+            telem = fallback_telemetry if isinstance(fallback_telemetry, dict) else {}
             for key in ("latency_ms_p50", "latency_ms_p95", "throughput_sps"):
                 val = metrics.get(key)
                 if isinstance(val, int | float) and math.isfinite(float(val)):
@@ -236,9 +250,10 @@ def attach_system_overhead(
                     out["throughput_sps"] = float(val)
             return out
 
-        edited_sys = _extract_sys_metrics(report)
+        edited_sys = _extract_sys_metrics(report, fallback_telemetry=telemetry)
         base_sys = _extract_sys_metrics(
-            baseline_raw if isinstance(baseline_raw, dict) else None
+            baseline_raw if isinstance(baseline_raw, dict) else None,
+            fallback_telemetry=None,
         )
         system_overhead: dict[str, Any] = {}
         for metric_key, edited_val in edited_sys.items():
@@ -305,6 +320,8 @@ def attach_telemetry_summary_line(
             kind = pm_try.get("kind")
         if not kind:
             kind = "ppl"
+        kind_text = _sanitize_summary_value(kind) or "ppl"
+        run_id_text = _sanitize_summary_value(current_run_id) or "unknown"
         windows_cfg = (
             evaluation_report.get("dataset", {}).get("windows", {})
             if isinstance(evaluation_report.get("dataset"), dict)
@@ -340,8 +357,8 @@ def attach_telemetry_summary_line(
         except _NON_FATAL_EXCEPTIONS:
             gate_ok = None
         parts = [
-            f"run_id={current_run_id}",
-            f"metric={kind}",
+            f"run_id={run_id_text}",
+            f"metric={kind_text}",
             f"nprev={n_prev}",
             f"nfinal={n_fin}",
             f"tokens={tokens_total}",
@@ -357,8 +374,9 @@ def attach_telemetry_summary_line(
                 split_fallback = (report.get("provenance", {}) or {}).get(
                     "split_fallback"
                 )
-            if split:
-                parts.append(f"split={split}{'*' if split_fallback else ''}")
+            split_text = _sanitize_summary_value(split)
+            if split_text:
+                parts.append(f"split={split_text}{'*' if split_fallback else ''}")
         except _NON_FATAL_EXCEPTIONS:
             pass
         if isinstance(ci_lo, int | float) and isinstance(ci_hi, int | float):

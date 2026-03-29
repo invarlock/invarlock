@@ -8,7 +8,10 @@ import pytest
 import invarlock.eval.primary_metric as primary_metric_mod
 from invarlock.reporting import (
     dataset_hashing,
-    guards_analysis,
+    guards_invariants,
+    guards_rmt,
+    guards_spectral,
+    guards_variance,
     policy_utils,
     primary_metric_utils,
     report_edit_summary,
@@ -141,22 +144,22 @@ def _stub_evaluation_report_extractors(
         dataset_hashing, "_extract_dataset_info", lambda *_: deepcopy(dataset_info)
     )
     monkeypatch.setattr(
-        guards_analysis,
+        guards_invariants,
         "_extract_invariants",
         lambda *args, **kwargs: invariants,
         raising=False,
     )
     monkeypatch.setattr(
-        guards_analysis,
+        guards_spectral,
         "_extract_spectral_analysis",
         lambda *_: spectral,
         raising=False,
     )
     monkeypatch.setattr(
-        guards_analysis, "_extract_rmt_analysis", lambda *_: rmt, raising=False
+        guards_rmt, "_extract_rmt_analysis", lambda *_: rmt, raising=False
     )
     monkeypatch.setattr(
-        guards_analysis,
+        guards_variance,
         "_extract_variance_analysis",
         lambda *_: variance,
         raising=False,
@@ -352,22 +355,22 @@ def test_make_evaluation_report_populates_optional_sections(monkeypatch):
         dataset_hashing, "_extract_dataset_info", lambda *_: deepcopy(dataset_info)
     )
     monkeypatch.setattr(
-        guards_analysis,
+        guards_invariants,
         "_extract_invariants",
         lambda *args, **kwargs: invariants,
         raising=False,
     )
     monkeypatch.setattr(
-        guards_analysis,
+        guards_spectral,
         "_extract_spectral_analysis",
         lambda *_: spectral,
         raising=False,
     )
     monkeypatch.setattr(
-        guards_analysis, "_extract_rmt_analysis", lambda *_: rmt, raising=False
+        guards_rmt, "_extract_rmt_analysis", lambda *_: rmt, raising=False
     )
     monkeypatch.setattr(
-        guards_analysis,
+        guards_variance,
         "_extract_variance_analysis",
         lambda *_: variance,
         raising=False,

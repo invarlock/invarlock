@@ -12,7 +12,7 @@ import pytest
 # otherwise, drive it via evaluation_report inputs in an integration test.
 from invarlock.core.runner_pairing import BOOTSTRAP_COVERAGE_REQUIREMENTS
 from invarlock.guards.variance import VarianceGuard
-from invarlock.reporting.guards_analysis import _extract_rmt_analysis
+from invarlock.reporting.guards_rmt import _extract_rmt_analysis
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import create_empty_report
 

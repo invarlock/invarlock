@@ -19,10 +19,16 @@ from invarlock.reporting.dataset_hashing import (
     _extract_dataset_info,
     compute_window_hashes,
 )
-from invarlock.reporting.guards_analysis import (
+from invarlock.reporting.guards_invariants import (
     _extract_invariants,
+)
+from invarlock.reporting.guards_rmt import (
     _extract_rmt_analysis,
+)
+from invarlock.reporting.guards_spectral import (
     _extract_spectral_analysis,
+)
+from invarlock.reporting.guards_variance import (
     _extract_variance_analysis,
 )
 from invarlock.reporting.policy_utils import (
@@ -35,10 +41,12 @@ from invarlock.reporting.policy_utils import (
     _format_family_caps,
     _resolve_policy_tier,
 )
-from invarlock.reporting.render import _compute_report_hash
 from invarlock.reporting.render_markdown import (
     _get_window_plan_summary,
     render_report_markdown,
+)
+from invarlock.reporting.report_console import (
+    compute_report_hash as _compute_report_hash,
 )
 from invarlock.reporting.report_edit_summary import (
     analyze_bitwidth_map as _analyze_bitwidth_map,

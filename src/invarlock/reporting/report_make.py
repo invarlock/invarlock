@@ -20,6 +20,10 @@ from invarlock.core.auto_tuning import get_tier_policies
 from invarlock.eval import tail_stats as tail_stats_mod
 from invarlock.eval.primary_metric import compute_primary_metric_from_report
 
+from . import guards_invariants as guards_invariants_mod
+from . import guards_rmt as guards_rmt_mod
+from . import guards_spectral as guards_spectral_mod
+from . import guards_variance as guards_variance_mod
 from . import policy_utils as report_policy_utils_mod
 from . import report_build_context as report_build_context_mod
 from . import report_edit_summary as report_edit_summary_mod
@@ -32,12 +36,6 @@ from . import report_provenance as report_provenance_mod
 from . import report_schema as report_schema_mod
 from . import report_validation as report_validation_mod
 from .dataset_hashing import _extract_dataset_info
-from .guards_analysis import (
-    _extract_invariants,
-    _extract_rmt_analysis,
-    _extract_spectral_analysis,
-    _extract_variance_analysis,
-)
 from .report_confidence import compute_confidence_label as _compute_confidence_label
 from .report_primary_metric_policy import (
     enforce_display_ci_alignment as _enforce_display_ci_alignment,
@@ -143,7 +141,6 @@ def _extract_report_meta(report: RunReport) -> dict[str, Any]:
 ## Dataset hashing helpers live in invarlock.reporting.dataset_hashing
 
 
-## Guard extractors moved to invarlock.reporting.guards_analysis and imported above
 def _generate_run_id(report: RunReport) -> str:
     """Generate a unique run ID from report metadata."""
     meta = (
@@ -182,8 +179,6 @@ def make_report(
         KeyError,
         RuntimeError,
         OSError,
-        ImportError,
-        ModuleNotFoundError,
     )
     evaluate_metric_tail = tail_stats_mod.evaluate_metric_tail
 
@@ -327,16 +322,22 @@ def make_report(
     ppl_metrics = report.get("metrics", {}) if isinstance(report, dict) else {}
 
     # Extract invariant status
-    invariants = _extract_invariants(report, baseline=baseline_report)
+    invariants = guards_invariants_mod._extract_invariants(
+        report,
+        baseline=baseline_report,
+    )
 
     # Extract spectral analysis
-    spectral = _extract_spectral_analysis(report, baseline_normalized)
+    spectral = guards_spectral_mod._extract_spectral_analysis(
+        report,
+        baseline_normalized,
+    )
 
     # Extract RMT analysis
-    rmt = _extract_rmt_analysis(report, baseline_normalized)
+    rmt = guards_rmt_mod._extract_rmt_analysis(report, baseline_normalized)
 
     # Extract variance guard info
-    variance = _extract_variance_analysis(report)
+    variance = guards_variance_mod._extract_variance_analysis(report)
 
     # Extract structural deltas
     structure = report_edit_summary_mod.extract_structural_deltas(report)

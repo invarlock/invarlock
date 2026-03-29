@@ -793,4 +793,8 @@ def test_warn_adapter_family_mismatch(tmp_path: Path) -> None:
         "provenance": {"baseline": {"report_path": str(baseline)}},
     }
     # Should not raise; may emit a soft warning to console
-    verify_mod._warn_adapter_family_mismatch(baseline, cert)
+    verify_mod._warn_adapter_family_mismatch(
+        baseline,
+        cert,
+        trusted_baseline_path=baseline,
+    )

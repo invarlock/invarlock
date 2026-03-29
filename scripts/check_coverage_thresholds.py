@@ -52,7 +52,6 @@ THRESHOLDS = {
     # Reporting types
     "src/invarlock/reporting/report_types.py": 1.00,
     "src/invarlock/reporting/dataset_hashing.py": 0.90,
-    "src/invarlock/reporting/guards_analysis.py": 0.90,
     "src/invarlock/reporting/primary_metric_utils.py": 0.90,
     "src/invarlock/reporting/utils.py": 1.00,
     # Shell modules: lifecycle/orchestration shells should stay branch-complete.
@@ -194,7 +193,6 @@ CORE_FILES = (
     "src/invarlock/reporting/report_types.py",
     "src/invarlock/reporting/dataset_hashing.py",
     "src/invarlock/reporting/report_schema.py",
-    "src/invarlock/reporting/guards_analysis.py",
     "src/invarlock/reporting/primary_metric_utils.py",
     "src/invarlock/reporting/utils.py",
     # Critical CLI commands

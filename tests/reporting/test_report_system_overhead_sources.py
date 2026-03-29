@@ -66,3 +66,14 @@ def test_system_overhead_sources_mixed_and_markdown_na() -> None:
     md = render_report_markdown(cert)
     # Ensure the section renders; check presence of latency row
     assert "System Overhead" in md and "Latency p50" in md
+
+
+def test_system_overhead_does_not_reuse_edited_fallback_for_baseline() -> None:
+    rep = _mk_report_latency_fallback()
+    base = {"meta": {"auto": {"tier": "balanced"}}, "metrics": {}}
+
+    cert = make_report(rep, base)
+
+    latency_entry = cert.get("system_overhead", {}).get("latency_ms_p50", {})
+    assert latency_entry.get("edited") == 11.0
+    assert "baseline" not in latency_entry
