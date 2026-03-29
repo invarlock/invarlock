@@ -207,6 +207,64 @@ def test_validate_manifest_and_load_json_object_cover_error_paths(
     assert errors == [f"demo must decode to a JSON object: {array_json}"]
 
 
+def test_jsonschema_helper_and_direct_validate_fallback_paths(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    class _ValidationError(Exception):
+        pass
+
+    monkeypatch.setattr(proof_pack_mod, "jsonschema", None, raising=False)
+    assert proof_pack_mod._jsonschema_validation_error_types() == ()
+
+    jsonschema_stub = SimpleNamespace(
+        ValidationError=_ValidationError,
+        validate=lambda instance, schema: None,
+    )
+    monkeypatch.setattr(proof_pack_mod, "jsonschema", jsonschema_stub, raising=False)
+    assert proof_pack_mod._jsonschema_validation_error_types() == (_ValidationError,)
+
+    manifest_path = tmp_path / "manifest.json"
+    _write_json(
+        manifest_path,
+        {
+            "format": proof_pack_mod.PROOF_PACK_FORMAT,
+            "checksums_sha256": "checksums.sha256",
+            "checksums_sha256_digest": "a" * 64,
+            "subject": {
+                "name": "final_verdict",
+                "path": "results/final_verdict.json",
+                "digest": "sha256:" + ("b" * 64),
+            },
+            "environment": {
+                "path": "metadata/environment.json",
+                "digest": "sha256:" + ("c" * 64),
+            },
+        },
+    )
+    calls: list[tuple[object, object]] = []
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "load_proof_pack_manifest_schema",
+        lambda: {"type": "object"},
+        raising=True,
+    )
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "jsonschema",
+        SimpleNamespace(
+            validate=lambda instance, schema: calls.append((instance, schema))
+        ),
+        raising=False,
+    )
+    assert proof_pack_mod.validate_manifest(manifest_path) == []
+    assert calls == [
+        (
+            json.loads(manifest_path.read_text(encoding="utf-8")),
+            {"type": "object"},
+        )
+    ]
+
+
 def test_material_and_reference_helpers_cover_invalid_paths(tmp_path: Path) -> None:
     assert proof_pack_mod._material_spec("missing-separator") is None
     assert proof_pack_mod._material_spec(" =demo.json") is None
@@ -569,6 +627,90 @@ def test_verify_reports_and_inspect_cover_error_paths(
     invalid_payload, exit_code = proof_pack_mod.inspect_proof_pack(invalid_pack)
     assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_FORMAT
     assert invalid_payload["ok"] is False
+
+
+def test_verify_reports_covers_remaining_payload_contract_branches(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    def _build_pack(name: str, *, with_errors: bool) -> Path:
+        pack_dir = tmp_path / name
+        report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
+        _write_manifest_and_checksums(
+            pack_dir,
+            report_path=report_path,
+            final_verdict=final_verdict,
+            environment=environment,
+        )
+        if with_errors:
+            error_dir = pack_dir / "reports" / "model" / "errors" / "noop"
+            error_dir.mkdir(parents=True, exist_ok=True)
+            (error_dir / "evaluation.report.json").write_text("{}", encoding="utf-8")
+        return pack_dir
+
+    pack_with_errors = _build_pack("with-errors", with_errors=True)
+
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "_run_verify_command",
+        lambda reports, *, profile: (
+            (0, {"ok": True}) if "clean" in str(reports[0]) else (0, ["bad-payload"])
+        ),
+        raising=True,
+    )
+    errors, payload = proof_pack_mod._verify_reports(
+        pack_with_errors, json_out_path=None, profile="dev"
+    )
+    assert errors == [
+        "error-injection report verification did not return a JSON object."
+    ]
+    assert payload == {"ok": True}
+
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "_run_verify_command",
+        lambda reports, *, profile: (
+            (0, None) if "clean" in str(reports[0]) else (0, {"ok": True})
+        ),
+        raising=True,
+    )
+    errors, payload = proof_pack_mod._verify_reports(
+        pack_with_errors, json_out_path=None, profile="dev"
+    )
+    assert errors == []
+    assert payload == {
+        "error_injection": {
+            "exit_code": 0,
+            "verify": {"ok": True},
+            "reports": ["reports/model/errors/noop/evaluation.report.json"],
+        }
+    }
+
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "_run_verify_command",
+        lambda reports, *, profile: (
+            (0, ["clean-bad"]) if "clean" in str(reports[0]) else (0, {"ok": True})
+        ),
+        raising=True,
+    )
+    errors, payload = proof_pack_mod._verify_reports(
+        pack_with_errors, json_out_path=None, profile="dev"
+    )
+    assert errors == ["clean report verification did not return a JSON object."]
+    assert payload == ["clean-bad"]
+
+    pack_clean_only = _build_pack("clean-only", with_errors=False)
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "_run_verify_command",
+        lambda reports, *, profile: (1, {"ok": False}),
+        raising=True,
+    )
+    errors, payload = proof_pack_mod._verify_reports(
+        pack_clean_only, json_out_path=None, profile="release"
+    )
+    assert errors == ["invarlock verify reported report verification failures."]
+    assert payload == {"ok": False}
 
 
 def test_build_and_verify_proof_pack_cover_usage_and_failure_paths(
