@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import invarlock.cli.runtime_launch_plan as runtime_launch_plan
 import invarlock.runtime_security as runtime_security
 
 
@@ -206,34 +207,35 @@ def test_container_engine_and_device_helpers(monkeypatch) -> None:
     )
     assert runtime_security.resolve_container_engine() == "podman"
 
-    assert runtime_security._requested_device(["evaluate"]) == "auto"
-    assert runtime_security._requested_device(["run"]) == "auto"
-    assert runtime_security._requested_device(["verify"]) is None
+    assert runtime_launch_plan._requested_device(["evaluate"]) == "auto"
+    assert runtime_launch_plan._requested_device(["run"]) == "auto"
+    assert runtime_launch_plan._requested_device(["verify"]) is None
     assert (
-        runtime_security._requested_device(["evaluate", "--device", "CUDA"]) == "cuda"
+        runtime_launch_plan._requested_device(["evaluate", "--device", "CUDA"])
+        == "cuda"
     )
-    assert runtime_security._requested_device(["evaluate", "--device"]) is None
+    assert runtime_launch_plan._requested_device(["evaluate", "--device"]) is None
 
     monkeypatch.setattr(
-        runtime_security,
+        runtime_launch_plan,
         "_host_nvidia_visible",
         lambda: True,
         raising=True,
     )
-    assert runtime_security._needs_gpu_passthrough(["evaluate"]) is True
+    assert runtime_launch_plan._needs_gpu_passthrough(["evaluate"]) is True
     assert (
-        runtime_security._needs_gpu_passthrough(["evaluate", "--device", "cpu"])
+        runtime_launch_plan._needs_gpu_passthrough(["evaluate", "--device", "cpu"])
         is False
     )
 
     monkeypatch.setattr(
-        runtime_security,
+        runtime_launch_plan,
         "_host_nvidia_visible",
         lambda: False,
         raising=True,
     )
     assert (
-        runtime_security._needs_gpu_passthrough(["evaluate", "--device", "cuda"])
+        runtime_launch_plan._needs_gpu_passthrough(["evaluate", "--device", "cuda"])
         is False
     )
 
@@ -256,7 +258,7 @@ def test_runtime_security_device_helpers_cover_missing_tokens_and_devnode(
 
     assert runtime_security.resolve_container_engine() is None
     assert runtime_security._host_nvidia_visible() is True
-    assert runtime_security._requested_device(["--help"]) is None
+    assert runtime_launch_plan._requested_device(["--help"]) is None
 
 
 def test_container_image_available_locally_and_runtime_verifier_binary(

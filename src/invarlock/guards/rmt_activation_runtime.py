@@ -27,11 +27,15 @@ def collect_calibration_batches(
                 return []
             count = min(int(max_windows), n)
             policy = (
-                (activation_sampling or {}).get("windows", {}) if isinstance(activation_sampling, Mapping) else {}
+                (activation_sampling or {}).get("windows", {})
+                if isinstance(activation_sampling, Mapping)
+                else {}
             )
             indices_policy = "evenly_spaced"
             if isinstance(policy, Mapping):
-                indices_policy = str(policy.get("indices_policy", indices_policy) or indices_policy)
+                indices_policy = str(
+                    policy.get("indices_policy", indices_policy) or indices_policy
+                )
             policy_name = indices_policy.strip().lower()
             if policy_name == "last":
                 idxs = list(range(max(0, n - count), n))
@@ -40,8 +44,7 @@ def collect_calibration_batches(
                     idxs = [0]
                 else:
                     idxs = [
-                        int(round(i * (n - 1) / float(count - 1)))
-                        for i in range(count)
+                        int(round(i * (n - 1) / float(count - 1))) for i in range(count)
                     ]
             else:
                 idxs = list(range(count))
@@ -202,9 +205,7 @@ def activation_edge_risk(
     eps = 1e-12
     try:
         mu = mat.mean(dtype=torch.float32)
-        norm = torch.linalg.vector_norm(
-            mat.reshape(-1), ord=2, dtype=torch.float32
-        )
+        norm = torch.linalg.vector_norm(mat.reshape(-1), ord=2, dtype=torch.float32)
         mean_sq = (norm * norm) / float(mat.numel())
         var = mean_sq - (mu * mu)
         std = torch.sqrt(var.clamp_min(eps))
@@ -219,7 +220,9 @@ def activation_edge_risk(
     try:
         from . import rmt_math
 
-        mp_edge_val = rmt_math.mp_bulk_edge(int(mat.shape[0]), int(mat.shape[1]), whitened=False)
+        mp_edge_val = rmt_math.mp_bulk_edge(
+            int(mat.shape[0]), int(mat.shape[1]), whitened=False
+        )
     except (AttributeError, RuntimeError, TypeError, ValueError):
         return None
     if not (math.isfinite(mp_edge_val) and mp_edge_val > 0.0):

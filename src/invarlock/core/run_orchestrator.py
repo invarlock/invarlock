@@ -95,8 +95,15 @@ class RunExecutionHooks:
     """Typed shell hooks for console/rendering concerns."""
 
     output_style: RunOutputStyle
+    apply_warning_filters_fn: Callable[[str | None], bool]
     emit_line_fn: Callable[[str, bool], None]
     emit_blank_line_fn: Callable[[], None]
+    emit_event_fn: Callable[..., None]
+    format_guard_chain_fn: Callable[..., str]
+    format_kv_line_fn: Callable[..., str]
+    print_guard_overhead_summary_fn: Callable[..., None]
+    print_pipeline_start_fn: Callable[..., None]
+    print_retry_summary_fn: Callable[..., None]
     print_timing_summary_fn: Callable[..., None]
     timed_step_fn: Callable[..., Any]
     abort_exception_types: tuple[type[BaseException], ...]
@@ -117,26 +124,19 @@ class RunExecutionServices:
     SnapshotRestoreFailed: type[BaseException]
     apply_mlm_masks: Callable[..., object]
     adjust_edit_params: Callable[..., object]
-    apply_warning_filters: Callable[[str | None], bool]
     assemble_run_report: Callable[..., object]
     build_snapshot_execution_plan: Callable[..., object]
     build_provider_dataset_plan: Callable[..., object]
-    event: Callable[..., None]
     execute_guarded_run: Callable[..., object]
     extract_pairing_schedule: Callable[..., object]
     load_baseline_pairing_evidence: Callable[..., object]
     materialize_run_dataset: Callable[..., object]
-    format_guard_chain: Callable[..., str]
-    format_kv_line: Callable[..., str]
     free_model_memory: Callable[..., None]
     hash_sequences: Callable[..., object]
     init_retry_controller: Callable[..., object]
     load_model_with_cfg: Callable[..., object]
     persist_run_report_outputs: Callable[..., object]
     prepare_config_for_run: Callable[..., object]
-    print_guard_overhead_summary: Callable[..., None]
-    print_pipeline_start: Callable[..., None]
-    print_retry_summary: Callable[..., None]
     resolve_device_and_output: Callable[..., object]
     resolve_exit_code: Callable[..., int]
     resolve_pm_min_tokens_target: Callable[..., object]
@@ -151,7 +151,6 @@ class RunExecutionServices:
     validate_and_harvest_baseline_schedule: Callable[..., object]
     materialize_baseline_pairing_schedule: Callable[..., object]
     resolve_tokenizer: Callable[..., object]
-    console: Any
     detect_model_profile: Callable[..., Any]
     get_psutil: Callable[[], Any | None]
     get_torch: Callable[[], Any | None]
@@ -213,26 +212,19 @@ def execute_run_request(
     _SnapshotRestoreFailed = services.SnapshotRestoreFailed
     _apply_mlm_masks = services.apply_mlm_masks
     _adjust_edit_params = services.adjust_edit_params
-    _apply_warning_filters = services.apply_warning_filters
     _assemble_run_report = services.assemble_run_report
     _build_snapshot_execution_plan = services.build_snapshot_execution_plan
     _build_provider_dataset_plan = services.build_provider_dataset_plan
-    _event = services.event
     _execute_guarded_run = services.execute_guarded_run
     _extract_pairing_schedule = services.extract_pairing_schedule
     _load_baseline_pairing_evidence = services.load_baseline_pairing_evidence
     _materialize_run_dataset = services.materialize_run_dataset
-    _format_guard_chain = services.format_guard_chain
-    _format_kv_line = services.format_kv_line
     _free_model_memory = services.free_model_memory
     _hash_sequences = services.hash_sequences
     _init_retry_controller = services.init_retry_controller
     _load_model_with_cfg = services.load_model_with_cfg
     _persist_run_report_outputs = services.persist_run_report_outputs
     _prepare_config_for_run = services.prepare_config_for_run
-    _print_guard_overhead_summary = services.print_guard_overhead_summary
-    _print_pipeline_start = services.print_pipeline_start
-    _print_retry_summary = services.print_retry_summary
     _resolve_device_and_output = services.resolve_device_and_output
     _resolve_exit_code = services.resolve_exit_code
     _resolve_pm_min_tokens_target = services.resolve_pm_min_tokens_target
@@ -251,15 +243,22 @@ def execute_run_request(
         services.materialize_baseline_pairing_schedule
     )
     _resolve_tokenizer = services.resolve_tokenizer
-    console = services.console
     detect_model_profile = services.detect_model_profile
     get_psutil = services.get_psutil
     get_torch = services.get_torch
     output_style = hooks.output_style
+    _apply_warning_filters = hooks.apply_warning_filters_fn
     emit_line_fn = hooks.emit_line_fn
     emit_blank_line_fn = hooks.emit_blank_line_fn
+    _event = hooks.emit_event_fn
+    _format_guard_chain = hooks.format_guard_chain_fn
+    _format_kv_line = hooks.format_kv_line_fn
+    _print_guard_overhead_summary = hooks.print_guard_overhead_summary_fn
+    _print_pipeline_start = hooks.print_pipeline_start_fn
+    _print_retry_summary = hooks.print_retry_summary_fn
     print_timing_summary_fn = hooks.print_timing_summary_fn
     timed_step_fn = hooks.timed_step_fn
+    console = None
 
     """
     Run InvarLock pipeline with the given configuration.
@@ -1662,7 +1661,17 @@ def execute_run_request(
     except preserved_abort_exceptions:
         # Preserve explicit exit codes (e.g., parity checks, user-triggered exits)
         raise
-    except Exception as e:
+    except (
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        RuntimeError,
+        OSError,
+        MemoryError,
+        ImportError,
+        ModuleNotFoundError,
+    ) as e:
         if os.environ.get("INVARLOCK_DEBUG_TRACE"):
             import traceback
 
@@ -1706,7 +1715,7 @@ def execute_run_request(
                     import shutil as _sh
 
                     _sh.rmtree(snapshot_tmpdir, ignore_errors=True)
-                except Exception:
+                except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
                     pass
                 finally:
                     _event(

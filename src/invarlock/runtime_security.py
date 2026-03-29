@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 import sys
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -37,6 +38,7 @@ __all__ = [
     "ALLOW_REMOTE_CODE_ENV",
     "ALLOW_THIRD_PARTY_PLUGINS_ENV",
     "ALLOW_UNATTESTED_ARTIFACTS_ENV",
+    "ContainerLaunchPlan",
     "CONTAINER_EXECUTION_ENV",
     "RUNTIME_IMAGE_ENV",
     "RUNTIME_IMAGE_DIGEST_ENV",
@@ -47,9 +49,11 @@ __all__ = [
     "RUNTIME_VERIFIER_CONTRACT_VERSION",
     "apply_runtime_allowances",
     "build_container_command",
+    "build_container_python_command",
     "container_image_available_locally",
     "current_execution_mode",
-    "delegate_current_process_to_container",
+    "delegate_container_command",
+    "delegate_python_script_to_container",
     "network_allowed",
     "host_execution_allowed",
     "load_runtime_manifest",
@@ -66,6 +70,16 @@ __all__ = [
 ]
 
 
+@dataclass(frozen=True)
+class ContainerLaunchPlan:
+    """Typed launch plan for delegated container execution."""
+
+    argv: tuple[str, ...]
+    argv_mounts: tuple[Path, ...]
+    needs_cwd_host_mirror: bool
+    gpu_passthrough: bool
+
+
 def _coerce_bool(value: str | None) -> bool | None:
     if value is None:
         return None
@@ -78,8 +92,10 @@ def _coerce_bool(value: str | None) -> bool | None:
 
 
 def _set_env_flag(name: str, enabled: bool | None) -> None:
-    if enabled is True:
-        os.environ[name] = "1"
+    if enabled is None:
+        os.environ.pop(name, None)
+        return
+    os.environ[name] = "1" if enabled else "0"
 
 
 def _json_safe(value: Any) -> Any:
@@ -182,7 +198,7 @@ def _inspect_container_image(engine: str, image: str) -> tuple[bool, str | None]
     if lines:
         try:
             payload = json.loads(lines[0])
-        except Exception:
+        except json.JSONDecodeError:
             payload = None
         if isinstance(payload, list):
             repo_digests = [str(item) for item in payload if isinstance(item, str)]
@@ -207,29 +223,9 @@ def _host_nvidia_visible() -> bool:
     return shutil.which("nvidia-smi") is not None
 
 
-def _command_tokens(argv: list[str]) -> list[str]:
-    return [token for token in argv if not token.startswith("-")]
-
-
-def _requested_device(argv: list[str]) -> str | None:
-    if "--device" in argv:
-        idx = argv.index("--device")
-        if idx + 1 < len(argv):
-            return str(argv[idx + 1]).strip().lower()
-        return None
-
-    command_tokens = _command_tokens(argv)
-    if not command_tokens:
-        return None
-    if command_tokens[0] in {"evaluate", "run", "calibrate"}:
-        return "auto"
-    return None
-
-
 _CONFIG_SCAN_ARG_FLAGS = {"--config", "-c", "--preset", "--edit-config"}
 _CONFIG_PATH_ARG_FLAGS = _CONFIG_SCAN_ARG_FLAGS | {"--baseline-report"}
 _OUTPUT_PATH_ARG_FLAGS = {"--out", "--report-out"}
-_PATH_ARG_FLAGS = _OUTPUT_PATH_ARG_FLAGS | _CONFIG_PATH_ARG_FLAGS
 _LOCAL_MODEL_ARG_FLAGS = {"--baseline", "--subject"}
 _PATH_ENV_VARS = {
     "INVARLOCK_CONFIG_ROOT",
@@ -263,25 +259,6 @@ _BEHAVIOR_ENV_VARS = {
 }
 
 
-def _iter_path_args(argv: list[str], *, flags: set[str] | None = None) -> list[Path]:
-    active_flags = flags or _PATH_ARG_FLAGS
-    paths: list[Path] = []
-    idx = 0
-    while idx < len(argv):
-        token = argv[idx]
-        if token in active_flags and idx + 1 < len(argv):
-            paths.append(Path(argv[idx + 1]).expanduser())
-            idx += 2
-            continue
-        for flag in active_flags:
-            prefix = f"{flag}="
-            if token.startswith(prefix):
-                paths.append(Path(token[len(prefix) :]).expanduser())
-                break
-        idx += 1
-    return paths
-
-
 def _minimize_mounts(mounts: list[Path] | set[Path]) -> list[Path]:
     ordered = sorted(set(mounts), key=lambda item: (len(item.parts), str(item)))
     minimized: list[Path] = []
@@ -292,42 +269,6 @@ def _minimize_mounts(mounts: list[Path] | set[Path]) -> list[Path]:
             continue
         minimized.append(mount)
     return minimized
-
-
-def _iter_flag_occurrences(
-    argv: list[str], *, flags: set[str]
-) -> list[tuple[int, str, str, int | None]]:
-    occurrences: list[tuple[int, str, str, int | None]] = []
-    idx = 0
-    while idx < len(argv):
-        token = argv[idx]
-        if token in flags and idx + 1 < len(argv):
-            occurrences.append((idx, token, argv[idx + 1], idx + 1))
-            idx += 2
-            continue
-        matched = False
-        for flag in flags:
-            prefix = f"{flag}="
-            if token.startswith(prefix):
-                occurrences.append((idx, flag, token[len(prefix) :], None))
-                matched = True
-                break
-        idx += 1 if not matched else 1
-    return occurrences
-
-
-def _replace_flag_value(
-    argv: list[str],
-    *,
-    token_index: int,
-    flag: str,
-    value_index: int | None,
-    new_value: str,
-) -> None:
-    if value_index is None:
-        argv[token_index] = f"{flag}={new_value}"
-    else:
-        argv[value_index] = new_value
 
 
 def _absolute_host_path(path: str | Path, *, cwd: Path) -> Path:
@@ -510,71 +451,6 @@ def _normalize_config_path_for_container(
     return str(host_path), mounts, needs_cwd_host_mirror
 
 
-def _normalize_delegated_argv(
-    argv: list[str], *, cwd: Path
-) -> tuple[list[str], list[Path], bool]:
-    rewritten = list(argv)
-    mounts: set[Path] = set()
-    needs_cwd_host_mirror = False
-
-    for token_index, flag, value, value_index in _iter_flag_occurrences(
-        rewritten, flags=_CONFIG_PATH_ARG_FLAGS
-    ):
-        scan_dependencies = flag in _CONFIG_SCAN_ARG_FLAGS
-        new_value, extra_mounts, needs_mirror = _normalize_config_path_for_container(
-            value,
-            cwd=cwd,
-            scan_dependencies=scan_dependencies,
-        )
-        mounts.update(extra_mounts)
-        needs_cwd_host_mirror = needs_cwd_host_mirror or needs_mirror
-        _replace_flag_value(
-            rewritten,
-            token_index=token_index,
-            flag=flag,
-            value_index=value_index,
-            new_value=new_value,
-        )
-
-    for token_index, flag, value, value_index in _iter_flag_occurrences(
-        rewritten, flags=_OUTPUT_PATH_ARG_FLAGS
-    ):
-        new_value, extra_mounts = _normalize_output_path_for_container(
-            value,
-            cwd=cwd,
-        )
-        mounts.update(extra_mounts)
-        _replace_flag_value(
-            rewritten,
-            token_index=token_index,
-            flag=flag,
-            value_index=value_index,
-            new_value=new_value,
-        )
-
-    for token_index, flag, value, value_index in _iter_flag_occurrences(
-        rewritten, flags=_LOCAL_MODEL_ARG_FLAGS
-    ):
-        new_value, extra_mounts, treated_as_path = (
-            _normalize_local_model_path_for_container(
-                value,
-                cwd=cwd,
-            )
-        )
-        if not treated_as_path:
-            continue
-        mounts.update(extra_mounts)
-        _replace_flag_value(
-            rewritten,
-            token_index=token_index,
-            flag=flag,
-            value_index=value_index,
-            new_value=new_value,
-        )
-
-    return rewritten, _minimize_mounts(mounts), needs_cwd_host_mirror
-
-
 def _path_env_value_for_container(
     raw_value: str,
     *,
@@ -622,13 +498,6 @@ def _delegated_env_pairs(*, cwd: Path) -> tuple[dict[str, str], list[Path]]:
         env_pairs[name] = container_value
         mounts.extend(extra_mounts)
     return env_pairs, _minimize_mounts(mounts)
-
-
-def _needs_gpu_passthrough(argv: list[str]) -> bool:
-    requested = _requested_device(argv)
-    if requested not in {"auto", "cuda"}:
-        return False
-    return _host_nvidia_visible()
 
 
 def container_image_available_locally(
@@ -680,16 +549,15 @@ def apply_runtime_allowances(
     _set_env_flag(ALLOW_THIRD_PARTY_PLUGINS_ENV, allow_third_party_plugins)
     _set_env_flag(ALLOW_REMOTE_CODE_ENV, allow_remote_code)
     _set_env_flag(ALLOW_UNATTESTED_ARTIFACTS_ENV, allow_unattested_artifacts)
-    if allow_network:
-        try:
-            from invarlock.security import enforce_network_policy
+    try:
+        from invarlock.security import enforce_network_policy
 
-            enforce_network_policy(True)
-        except Exception:
-            pass
+        enforce_network_policy(bool(allow_network))
+    except (AttributeError, ImportError, OSError, RuntimeError):
+        pass
 
 
-def build_container_command(argv: list[str] | None = None) -> list[str]:
+def build_container_command(plan: ContainerLaunchPlan) -> list[str]:
     engine = resolve_container_engine()
     if engine is None:
         raise RuntimeError(
@@ -709,22 +577,19 @@ def build_container_command(argv: list[str] | None = None) -> list[str]:
             f"{image!r} is not available locally. Build it with `make runtime-image` "
             f"or set {ALLOW_NETWORK_ENV}=1 to allow pulling the image."
         )
-    if argv is None:
-        argv = list(sys.argv[1:])
-    argv, argv_mounts, needs_cwd_host_mirror = _normalize_delegated_argv(argv, cwd=cwd)
     pythonpath_entries, pythonpath_mounts = _container_pythonpath_entries(cwd=cwd)
     env_pairs, env_mounts = _delegated_env_pairs(cwd=cwd)
     env_pairs[RUNTIME_IMAGE_DIGEST_ENV] = digest
     env_pairs["PYTHONPATH"] = os.pathsep.join(pythonpath_entries)
     command = [engine, "run", "--rm"]
-    if _needs_gpu_passthrough(argv):
+    if plan.gpu_passthrough:
         command.extend(["--gpus", "all"])
     if not network_allowed():
         command.extend(["--network", "none"])
     command.extend(["-v", f"{cwd}:/workspace", "-w", "/workspace"])
-    if needs_cwd_host_mirror:
+    if plan.needs_cwd_host_mirror:
         command.extend(["-v", f"{cwd}:{cwd}"])
-    extra_mounts = list(argv_mounts)
+    extra_mounts = list(plan.argv_mounts)
     extra_mounts.extend(env_mounts)
     for mount in pythonpath_mounts:
         if any(existing == mount for existing in extra_mounts):
@@ -735,19 +600,19 @@ def build_container_command(argv: list[str] | None = None) -> list[str]:
     for key, value in env_pairs.items():
         command.extend(["-e", f"{key}={value}"])
     # The runtime image already sets `python -m invarlock` as its entrypoint.
-    command.extend([image, *argv])
+    command.extend([image, *plan.argv])
     return command
 
 
-def delegate_current_process_to_container(argv: list[str] | None = None) -> int:
-    command = build_container_command(argv=argv)
+def delegate_container_command(plan: ContainerLaunchPlan) -> int:
+    command = build_container_command(plan)
     completed = subprocess.run(command, check=False)
     return int(completed.returncode)
 
 
 def build_container_python_command(
     script_path: str | os.PathLike[str],
-    argv: list[str] | None = None,
+    plan: ContainerLaunchPlan,
 ) -> list[str]:
     engine = resolve_container_engine()
     if engine is None:
@@ -768,9 +633,6 @@ def build_container_python_command(
             f"{image!r} is not available locally. Build it with `make runtime-image` "
             f"or set {ALLOW_NETWORK_ENV}=1 to allow pulling the image."
         )
-    if argv is None:
-        argv = list(sys.argv[1:])
-    argv, argv_mounts, needs_cwd_host_mirror = _normalize_delegated_argv(argv, cwd=cwd)
     pythonpath_entries, pythonpath_mounts = _container_pythonpath_entries(cwd=cwd)
     env_pairs, env_mounts = _delegated_env_pairs(cwd=cwd)
     env_pairs[RUNTIME_IMAGE_DIGEST_ENV] = digest
@@ -784,14 +646,14 @@ def build_container_python_command(
         container_script = str(script_host_path)
 
     command = [engine, "run", "--rm", "--entrypoint", "python"]
-    if _needs_gpu_passthrough(["run", *argv]):
+    if plan.gpu_passthrough:
         command.extend(["--gpus", "all"])
     if not network_allowed():
         command.extend(["--network", "none"])
     command.extend(["-v", f"{cwd}:/workspace", "-w", "/workspace"])
-    if needs_cwd_host_mirror:
+    if plan.needs_cwd_host_mirror:
         command.extend(["-v", f"{cwd}:{cwd}"])
-    extra_mounts = list(argv_mounts)
+    extra_mounts = list(plan.argv_mounts)
     extra_mounts.extend(env_mounts)
     extra_mounts.extend(pythonpath_mounts)
     extra_mounts.extend(script_mounts)
@@ -799,15 +661,15 @@ def build_container_python_command(
         command.extend(["-v", f"{mount}:{mount}"])
     for key, value in env_pairs.items():
         command.extend(["-e", f"{key}={value}"])
-    command.extend([image, container_script, *argv])
+    command.extend([image, container_script, *plan.argv])
     return command
 
 
 def delegate_python_script_to_container(
     script_path: str | os.PathLike[str],
-    argv: list[str] | None = None,
+    plan: ContainerLaunchPlan,
 ) -> int:
-    command = build_container_python_command(script_path, argv=argv)
+    command = build_container_python_command(script_path, plan)
     completed = subprocess.run(command, check=False)
     return int(completed.returncode)
 
@@ -883,6 +745,6 @@ def load_runtime_manifest(
         return manifest_path, None
     try:
         payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except Exception:
+    except (json.JSONDecodeError, OSError):
         return manifest_path, None
     return manifest_path, payload if isinstance(payload, dict) else None

@@ -2998,7 +2998,7 @@ class TestRMTEnhancedCoverage:
 
         with patch(
             "invarlock.guards.rmt.RMTGuard._collect_calibration_batches",
-            side_effect=Exception("Capture failed"),
+            side_effect=RuntimeError("Capture failed"),
         ):
             result = guard.prepare(
                 self.model,
@@ -3040,7 +3040,7 @@ class TestRMTEnhancedCoverage:
         guard.prepared = True
         with patch(
             "invarlock.guards.rmt.RMTGuard._compute_activation_edge_risk",
-            side_effect=Exception("Detection failed"),
+            side_effect=RuntimeError("Detection failed"),
         ):
             guard._calibration_batches = [{"input_ids": torch.randint(0, 100, (1, 64))}]
             guard.after_edit(self.model)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import textwrap
 import types
 from pathlib import Path
 
@@ -9,7 +10,7 @@ import typer
 
 
 def _write_yaml_cfg(path: Path, content: str) -> Path:
-    path.write_text(content.strip() + "\n", encoding="utf-8")
+    path.write_text(textwrap.dedent(content).strip() + "\n", encoding="utf-8")
     return path
 
 

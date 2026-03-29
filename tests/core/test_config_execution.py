@@ -110,6 +110,7 @@ def test_run_from_config_executes_without_delegation_and_writes_manifest(
 def test_run_from_config_delegates_when_secure_default_requires_container(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    seen: dict[str, object] = {}
     monkeypatch.setattr(
         config_execution,
         "apply_runtime_allowances",
@@ -130,8 +131,17 @@ def test_run_from_config_delegates_when_secure_default_requires_container(
     )
     monkeypatch.setattr(
         config_execution,
-        "delegate_current_process_to_container",
-        lambda: 7,
+        "build_request_container_launch_plan",
+        lambda command_name, request: (
+            seen.__setitem__("plan", (command_name, request)),
+            "plan",
+        )[1],
+        raising=True,
+    )
+    monkeypatch.setattr(
+        config_execution,
+        "delegate_container_command",
+        lambda plan: 7 if plan == "plan" else 99,
         raising=True,
     )
 
@@ -139,6 +149,10 @@ def test_run_from_config_delegates_when_secure_default_requires_container(
         config_execution.run_from_config(config="configs/demo.yaml")
 
     assert excinfo.value.code == 7
+    assert seen["plan"] == (
+        "run",
+        config_execution.ConfigExecutionRequest(config="configs/demo.yaml"),
+    )
 
 
 def test_run_from_config_wraps_runtime_delegation_failures(
@@ -164,8 +178,14 @@ def test_run_from_config_wraps_runtime_delegation_failures(
     )
     monkeypatch.setattr(
         config_execution,
-        "delegate_current_process_to_container",
-        lambda: (_ for _ in ()).throw(RuntimeError("no runtime image")),
+        "build_request_container_launch_plan",
+        lambda command_name, request: "plan",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        config_execution,
+        "delegate_container_command",
+        lambda plan: (_ for _ in ()).throw(RuntimeError("no runtime image")),
         raising=True,
     )
 

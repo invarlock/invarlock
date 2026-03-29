@@ -45,3 +45,16 @@ def _default_run_registry(monkeypatch: pytest.MonkeyPatch):
         lambda: _DummyRunRegistry(),
     )
     yield
+
+
+@pytest.fixture(autouse=True)
+def _default_run_host_execution(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        "invarlock.cli.config_execution.host_execution_allowed",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        "invarlock.cli.security_helpers.host_execution_allowed",
+        lambda: True,
+    )
+    yield

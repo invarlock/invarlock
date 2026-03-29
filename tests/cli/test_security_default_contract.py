@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import invarlock.cli.runtime_launch_plan as runtime_launch_plan
 import invarlock.core.registry as registry_mod
 import invarlock.runtime_security as runtime_security
 from invarlock.cli.run_config import extract_model_load_kwargs
@@ -54,6 +55,12 @@ def _delegated_argv(
 ) -> list[str]:
     image_idx = command.index(image)
     return command[image_idx + 1 :]
+
+
+def _build_container_command(argv: list[str]) -> list[str]:
+    return runtime_security.build_container_command(
+        runtime_launch_plan.build_current_process_container_launch_plan(argv)
+    )
 
 
 def _stub_container_launch(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -129,7 +136,7 @@ def test_container_launch_requires_local_image_when_network_is_disabled(
     )
 
     with pytest.raises(RuntimeError, match="runtime image"):
-        runtime_security.build_container_command(["evaluate", "--help"])
+        _build_container_command(["evaluate", "--help"])
 
 
 def test_runtime_image_prefers_local_build_when_available(
@@ -204,7 +211,7 @@ def test_container_launch_uses_runtime_image_entrypoint(
         raising=True,
     )
 
-    command = runtime_security.build_container_command(["evaluate", "--help"])
+    command = _build_container_command(["evaluate", "--help"])
 
     assert command[-3:] == ["invarlock-runtime:local", "evaluate", "--help"]
     assert "python" not in command[command.index("invarlock-runtime:local") + 1 :]
@@ -239,15 +246,13 @@ def test_container_launch_adds_gpu_passthrough_for_cuda_model_commands(
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_launch_plan,
         "_host_nvidia_visible",
         lambda: True,
         raising=True,
     )
 
-    command = runtime_security.build_container_command(
-        ["evaluate", "--device", "cuda", "--help"]
-    )
+    command = _build_container_command(["evaluate", "--device", "cuda", "--help"])
 
     assert command[:5] == ["docker", "run", "--rm", "--gpus", "all"]
 
@@ -281,15 +286,13 @@ def test_container_launch_skips_gpu_passthrough_for_cpu_model_commands(
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_launch_plan,
         "_host_nvidia_visible",
         lambda: True,
         raising=True,
     )
 
-    command = runtime_security.build_container_command(
-        ["evaluate", "--device", "cpu", "--help"]
-    )
+    command = _build_container_command(["evaluate", "--device", "cpu", "--help"])
 
     assert "--gpus" not in command
 
@@ -335,7 +338,7 @@ def test_container_launch_mounts_absolute_output_and_report_paths(
     out_path = out_parent / "run-out"
     report_path = report_parent / "report-out"
 
-    command = runtime_security.build_container_command(
+    command = _build_container_command(
         [
             "evaluate",
             "--config",
@@ -388,9 +391,7 @@ def test_container_launch_maps_repo_pythonpath_to_workspace_src(
         raising=True,
     )
 
-    command = runtime_security.build_container_command(
-        ["run", "--config", "config.yaml"]
-    )
+    command = _build_container_command(["run", "--config", "config.yaml"])
 
     assert _env_value(command, "PYTHONPATH") == "/workspace/src"
 
@@ -433,9 +434,7 @@ def test_container_launch_mounts_absolute_pythonpath_when_running_from_workdir(
         raising=True,
     )
 
-    command = runtime_security.build_container_command(
-        ["run", "--config", "config.yaml"]
-    )
+    command = _build_container_command(["run", "--config", "config.yaml"])
 
     assert _env_value(command, "PYTHONPATH") == str(src_dir)
     assert _path_is_mounted(command, src_dir)
@@ -478,7 +477,7 @@ def test_container_launch_mounts_absolute_model_paths_from_cli(
     subject_dir = tmp_path / "subject-model"
     subject_dir.mkdir()
 
-    command = runtime_security.build_container_command(
+    command = _build_container_command(
         [
             "evaluate",
             "--baseline",
@@ -529,7 +528,7 @@ def test_container_launch_mounts_absolute_source_and_edited_paths(
     edited_dir = tmp_path / "edited-model"
     edited_dir.mkdir()
 
-    command = runtime_security.build_container_command(
+    command = _build_container_command(
         [
             "evaluate",
             "--baseline",
@@ -588,7 +587,7 @@ def test_container_launch_mounts_absolute_preset_and_baseline_report_paths(
     baseline_report_path = baseline_report_dir / "baseline_report.json"
     baseline_report_path.write_text('{"ok": true}\n', encoding="utf-8")
 
-    command = runtime_security.build_container_command(
+    command = _build_container_command(
         [
             "evaluate",
             "--baseline",
@@ -642,7 +641,7 @@ def test_container_launch_mounts_absolute_config_root_from_env(
     config_root = tmp_path / "config-root"
     config_root.mkdir()
 
-    command = runtime_security.build_container_command(["evaluate", "--help"])
+    command = _build_container_command(["evaluate", "--help"])
 
     assert _path_is_mounted(command, config_root)
 
@@ -677,7 +676,7 @@ def test_container_launch_path_env_mounts_skip_recursive_symlink_walk(
         raising=True,
     )
 
-    command = runtime_security.build_container_command(["evaluate", "--help"])
+    command = _build_container_command(["evaluate", "--help"])
 
     assert recursive_flags == [False]
     assert _path_is_mounted(command, tmpdir_root)
@@ -725,7 +724,7 @@ def test_container_launch_mounts_external_symlink_targets_for_local_model_paths(
     blob_path.write_bytes(b"weights")
     (baseline_dir / "model.safetensors").symlink_to(blob_path)
 
-    command = runtime_security.build_container_command(
+    command = _build_container_command(
         [
             "evaluate",
             "--baseline",
@@ -779,9 +778,7 @@ def test_container_launch_mounts_absolute_model_paths_from_config(
         encoding="utf-8",
     )
 
-    command = runtime_security.build_container_command(
-        ["run", "--config", str(config_path)]
-    )
+    command = _build_container_command(["run", "--config", str(config_path)])
 
     assert _path_is_mounted(command, subject_dir)
 
@@ -796,7 +793,7 @@ def test_container_launch_preserves_repo_relative_output_args_and_mirrors_cwd_fo
     monkeypatch.chdir(repo_dir)
     _stub_container_launch(monkeypatch)
 
-    command = runtime_security.build_container_command(
+    command = _build_container_command(
         [
             "evaluate",
             "--config",
@@ -828,7 +825,7 @@ def test_container_launch_mounts_absolute_edit_config_paths(
     edit_path = edit_root / "overlay.yaml"
     edit_path.write_text("edit:\n  name: noop\n  plan: {}\n", encoding="utf-8")
 
-    command = runtime_security.build_container_command(
+    command = _build_container_command(
         [
             "evaluate",
             "--baseline",
@@ -853,7 +850,7 @@ def test_container_launch_leaves_missing_local_model_args_as_model_ids(
     monkeypatch.chdir(repo_dir)
     _stub_container_launch(monkeypatch)
 
-    command = runtime_security.build_container_command(
+    command = _build_container_command(
         [
             "evaluate",
             "--baseline",
@@ -913,9 +910,7 @@ def test_container_launch_forwards_reviewed_runtime_env_contract(
     monkeypatch.setenv("INVARLOCK_DETERMINISM", "strict")
     monkeypatch.setenv("HF_DATASETS_OFFLINE", "1")
 
-    command = runtime_security.build_container_command(
-        ["run", "--config", str(config_path)]
-    )
+    command = _build_container_command(["run", "--config", str(config_path)])
 
     assert _path_is_mounted(command, config_root)
     assert _path_is_mounted(command, hf_home)
@@ -965,9 +960,7 @@ def test_container_launch_scans_config_includes_and_absolute_references(
     _stub_container_launch(monkeypatch)
     monkeypatch.setenv("INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE", "1")
 
-    command = runtime_security.build_container_command(
-        ["run", "--config", "config.yaml"]
-    )
+    command = _build_container_command(["run", "--config", "config.yaml"])
 
     assert _path_is_mounted(command, external_root)
     assert _env_value(command, "INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE") == "1"
@@ -992,4 +985,4 @@ def test_container_launch_fails_closed_when_config_scan_rejects_include(
     _stub_container_launch(monkeypatch)
 
     with pytest.raises(RuntimeError, match="Delegated runtime config"):
-        runtime_security.build_container_command(["run", "--config", "config.yaml"])
+        _build_container_command(["run", "--config", "config.yaml"])
