@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Any
 
-import click
 import typer
 
 from invarlock.cli import overhead_utils as overhead_utils_mod
@@ -20,7 +19,6 @@ from invarlock.cli.output import (
     make_console,
     print_timing_summary,
     resolve_output_style,
-    timed_step,
 )
 from invarlock.cli.run_masking import _apply_mlm_masks, _tokenizer_digest
 from invarlock.cli.run_overhead import plan_release_windows as _plan_release_windows
@@ -32,11 +30,9 @@ from invarlock.cli.run_pairing_helpers import (
 from invarlock.cli.run_serialization import _to_serialisable_dict
 from invarlock.cli.run_shell_output import (
     _event,
-    _format_guard_chain,
     _format_kv_line,
     _print_guard_overhead_summary,
-    _print_pipeline_start,
-    _print_retry_summary,
+    _print_retry_summary as _shell_print_retry_summary,
 )
 from invarlock.core import metric_provider_resolution as metric_provider_resolution_mod
 from invarlock.core import provider_parity as provider_parity_mod
@@ -54,8 +50,7 @@ from invarlock.core.run_dataset_contract import (
     materialize_run_dataset as _materialize_run_dataset,
 )
 from invarlock.core.run_orchestrator import (
-    RunExecutionAbort,
-    RunExecutionHooks,
+    RunExecutionEvent,
     RunExecutionRequest,
     RunExecutionServices,
 )
@@ -98,6 +93,12 @@ if TYPE_CHECKING:
 console = make_console()
 
 
+def _print_retry_summary(_console: Any, retry_controller: Any | None) -> None:
+    """Compatibility shim retained for tests that patch the retry-summary seam."""
+
+    _shell_print_retry_summary(_console, retry_controller)
+
+
 def execute_config_run_request(request: ConfigExecutionRequest) -> str | None:
     run_runtime_mod.reset_optional_runtime_caches()
     return execute_run_request(request)
@@ -106,31 +107,25 @@ def execute_config_run_request(request: ConfigExecutionRequest) -> str | None:
 def _build_run_execution_services() -> RunExecutionServices:
     return RunExecutionServices(
         SnapshotRestoreFailed=run_runtime_exec_mod.SnapshotRestoreFailed,
-        apply_mlm_masks=_apply_mlm_masks,
         adjust_edit_params=_adjust_edit_params,
         assemble_run_report=_assemble_run_report_with_runtime_deps,
         build_snapshot_execution_plan=run_runtime_exec_mod.build_snapshot_execution_plan,
         build_provider_dataset_plan=_build_provider_dataset_plan_with_runtime_deps,
         execute_guarded_run=_execute_guarded_run_with_runtime_deps,
-        extract_pairing_schedule=run_pairing_mod.extract_pairing_schedule,
         load_baseline_pairing_evidence=_load_baseline_pairing_evidence_with_runtime_deps,
-        materialize_run_dataset=_materialize_run_dataset,
+        materialize_run_dataset=_materialize_run_dataset_with_runtime_deps,
         free_model_memory=run_runtime_mod.free_model_memory,
-        hash_sequences=_hash_sequences,
         init_retry_controller=_init_retry_controller_with_runtime_deps,
         load_model_with_cfg=run_runtime_exec_mod.load_model_with_cfg,
         persist_run_report_outputs=_persist_run_report_outputs_with_runtime_deps,
         prepare_config_for_run=_prepare_config_for_run_with_runtime_deps,
         resolve_device_and_output=_resolve_device_and_output_with_runtime_deps,
         resolve_exit_code=_resolve_exit_code,
-        resolve_pm_min_tokens_target=_resolve_pm_min_tokens_target,
         resolve_snapshot_config=_resolve_snapshot_config,
         resolve_snapshot_retry_transition=_resolve_snapshot_retry_transition_impl,
         run_bare_control=_run_bare_control_with_runtime_deps,
         safe_int=_safe_int,
-        tensor_or_list_to_ints=_tensor_or_list_to_ints,
         to_serialisable_dict=_to_serialisable_dict,
-        tokenizer_digest=_tokenizer_digest,
         validate_retry_evaluation_report=(
             _validate_retry_evaluation_report_with_runtime_deps
         ),
@@ -200,6 +195,14 @@ def _load_baseline_pairing_evidence_with_runtime_deps(**kwargs: Any) -> Any:
     return run_baseline_evidence_mod.load_baseline_pairing_evidence(
         **kwargs,
         extract_pairing_schedule_fn=run_pairing_mod.extract_pairing_schedule,
+    )
+
+
+def _materialize_run_dataset_with_runtime_deps(**kwargs: Any) -> Any:
+    kwargs.pop("console", None)
+    return _materialize_run_dataset(
+        **kwargs,
+        console=console,
     )
 
 
@@ -355,63 +358,369 @@ def _emit_console_blank_line() -> None:
     console.print("")
 
 
-def execute_run_request(request: RunExecutionRequest) -> str | None:
-    try:
-        output_style = _resolve_shell_output_style(request)
+def _render_run_execution_event(event: RunExecutionEvent) -> None:
+    kind = event.kind
+    name = event.name
+    payload = event.payload
+    profile = payload.get("profile")
 
-        def _emit_event_hook(
-            _console: Any, tag: str, message: str, **kwargs: Any
-        ) -> None:
-            _event(console, tag, message, **kwargs)
-
-        def _print_guard_overhead_summary_hook(
-            _console: Any,
-            guard_overhead_info: Any,
-            **kwargs: Any,
-        ) -> Any:
-            return _print_guard_overhead_summary(
-                console,
-                guard_overhead_info,
-                **kwargs,
-            )
-
-        def _timed_step_hook(**kwargs: Any) -> Any:
-            kwargs.pop("console", None)
-            return timed_step(console=console, **kwargs)
-
-        def _print_timing_summary_hook(
-            _console: Any, timings: dict[str, float], **kwargs: Any
-        ) -> Any:
-            kwargs.pop("console", None)
-            return print_timing_summary(console=console, timings=timings, **kwargs)
-
-        result = _execute_run_request_impl(
-            request,
-            services=_build_run_execution_services(),
-            hooks=RunExecutionHooks(
-                output_style=output_style,
-                apply_warning_filters_fn=run_warning_filters_mod._apply_warning_filters,
-                emit_line_fn=lambda line, markup=False: _emit_console_line(
-                    line, markup=markup
-                ),
-                emit_blank_line_fn=_emit_console_blank_line,
-                emit_event_fn=_emit_event_hook,
-                format_guard_chain_fn=_format_guard_chain,
-                format_kv_line_fn=_format_kv_line,
-                print_guard_overhead_summary_fn=_print_guard_overhead_summary_hook,
-                print_pipeline_start_fn=lambda _console=None: _print_pipeline_start(
-                    console
-                ),
-                print_retry_summary_fn=lambda _console,
-                retry_controller: _print_retry_summary(
-                    console,
-                    retry_controller,
-                ),
-                print_timing_summary_fn=_print_timing_summary_hook,
-                timed_step_fn=_timed_step_hook,
-                abort_exception_types=(typer.Exit, SystemExit, click.exceptions.Exit),
-            ),
+    if kind == "notice":
+        _event(
+            console,
+            str(payload.get("tag", "INFO")),
+            str(payload.get("message", "")),
+            emoji=payload.get("emoji"),
+            profile=str(profile) if profile is not None else None,
         )
-        return result.report_path
-    except RunExecutionAbort as exc:
-        raise typer.Exit(exc.code) from exc
+        return
+
+    if kind == "detail" and name == "kv":
+        _emit_console_line(
+            _format_kv_line(str(payload.get("label", "")), str(payload.get("value", ""))),
+            markup=False,
+        )
+        return
+
+    if kind == "detail" and name == "guard_chain":
+        label = str(payload.get("label", "Guards"))
+        guard_names = [str(item) for item in payload.get("guard_names", [])]
+        _emit_console_line(
+            _format_kv_line(label, " → ".join(guard_names)),
+            markup=False,
+        )
+        return
+
+    if kind == "layout" and name == "blank_line":
+        _emit_console_blank_line()
+        return
+
+    if kind == "line" and name == "plain":
+        _emit_console_line(str(payload.get("text", "")), markup=False)
+        return
+
+    if kind == "line" and name == "markup":
+        _emit_console_line(str(payload.get("text", "")), markup=True)
+        return
+
+    if kind == "summary" and name == "guard_overhead":
+        _print_guard_overhead_summary(
+            console,
+            payload.get("guard_overhead_info") or {},
+            default_threshold=float(payload.get("default_threshold", 0.01) or 0.01),
+        )
+        return
+
+    if kind == "summary" and name == "retry":
+        summary = payload.get("summary")
+        if isinstance(summary, dict):
+            _emit_console_blank_line()
+            _event(
+                console,
+                "METRIC",
+                f"Retry Summary: {summary.get('total_attempts', 0)} attempts in {float(summary.get('elapsed_time', 0.0) or 0.0):.1f}s",
+                emoji="📊",
+                profile=str(profile) if profile is not None else None,
+            )
+        return
+
+    if kind == "summary" and name == "timing":
+        print_timing_summary(
+            console=console,
+            timings=dict(payload.get("timings") or {}),
+            style=getattr(console, "_invarlock_output_style", None),
+            order=list(payload.get("order") or []),
+            extra_lines=list(payload.get("extra_lines") or []),
+        )
+        return
+
+    if kind != "status":
+        return
+
+    def _emit_status_line(tag: str, message: str, *, emoji: str | None = None) -> None:
+        _event(
+            console,
+            tag,
+            message,
+            emoji=emoji,
+            profile=str(profile) if profile is not None else None,
+        )
+
+    if name == "torch_missing":
+        _emit_status_line(
+            "FAIL",
+            'Torch is required for this command. Install extras with: pip install "invarlock[hf]" or "invarlock[adapters]".',
+            emoji="❌",
+        )
+        return
+    if name == "deterministic_seed_bundle":
+        torch_seed = payload.get("torch_seed")
+        torch_display = torch_seed if torch_seed is not None else "N/A"
+        _emit_status_line(
+            "INIT",
+            "Deterministic seeds → "
+            f"python={payload.get('python_seed')}, numpy={payload.get('numpy_seed')}, torch={torch_display}",
+            emoji="🎲",
+        )
+        return
+    if name == "baseline_schedule_loaded":
+        _emit_status_line(
+            "DATA",
+            "Loaded baseline evaluation schedule for pairing",
+            emoji="🧬",
+        )
+        return
+    if name == "baseline_schedule_fallback":
+        _emit_status_line(
+            "WARN",
+            f"{payload.get('message')}. Falling back to dataset schedule.",
+            emoji="⚠️",
+        )
+        return
+    if name == "pipeline_start":
+        _emit_status_line("INIT", "Starting InvarLock pipeline...", emoji="🚀")
+        return
+    if name == "edit_name_missing":
+        _emit_status_line(
+            "FAIL",
+            "Edit configuration must specify a non-empty `edit.name`.",
+            emoji="❌",
+        )
+        return
+    if name == "unknown_edit":
+        _emit_status_line(
+            "FAIL",
+            f"Unknown edit '{payload.get('edit_name', '')}'.",
+            emoji="❌",
+        )
+        return
+    if name == "guard_missing":
+        _emit_status_line(
+            "WARN",
+            f"Guard '{payload.get('guard_name', '')}' not found, skipping",
+            emoji="⚠️",
+        )
+        return
+    if name == "adapter_selected":
+        _emit_status_line(
+            "DATA",
+            f"Adapter: {payload.get('adapter_name', '')}",
+            emoji="🔌",
+        )
+        return
+    if name == "dataset_loading":
+        _emit_status_line(
+            "DATA",
+            f"Loading dataset: {payload.get('provider', '')}",
+            emoji="📊",
+        )
+        return
+    if name == "debug_calibration_batch_sizes":
+        _emit_console_line(
+            "[debug] calibration batch size => preview="
+            f"{payload.get('preview_count')} final={payload.get('final_count')} total={payload.get('total_count')}",
+            markup=False,
+        )
+        return
+    if name == "debug_masked_tokens":
+        _emit_console_line(
+            f"[debug] masked tokens (preview/final) = {payload.get('preview_masked')}/{payload.get('final_masked')}",
+            markup=False,
+        )
+        return
+    if name == "debug_preview_labels":
+        _emit_console_line(
+            f"[debug] sample labels first preview entry (first 10) = {payload.get('labels', [])}",
+            markup=False,
+        )
+        return
+    if name == "execute_pipeline":
+        _emit_status_line(
+            "EXEC",
+            f"Executing pipeline with {payload.get('guard_count', 0)} guards...",
+            emoji="⚙️",
+        )
+        return
+    if name == "load_model_once":
+        _emit_status_line(
+            "INIT",
+            f"Loading model once: {payload.get('model_id', '')}",
+            emoji="🔧",
+        )
+        return
+    if name == "snapshot_mode":
+        state = "enabled" if bool(payload.get("enabled")) else "disabled"
+        _emit_status_line("INIT", f"Snapshot mode: {state}", emoji="💾")
+        return
+    if name == "attempt_started":
+        max_attempts = payload.get("max_attempts")
+        message = (
+            f"Attempt {payload.get('attempt')}/{max_attempts}"
+            if max_attempts is not None
+            else f"Attempt {payload.get('attempt')}"
+        )
+        _emit_status_line("EXEC", message, emoji="🚀")
+        return
+    if name == "retry_attempt_started":
+        _emit_status_line(
+            "EXEC",
+            f"Retry attempt {payload.get('attempt')}/{payload.get('max_attempts')}",
+            emoji="🔄",
+        )
+        return
+    if name == "snapshot_restore_fallback":
+        _emit_status_line(
+            "WARN",
+            "Snapshot restore failed; switching to reload-per-attempt.",
+            emoji="⚠️",
+        )
+        error = payload.get("error")
+        if error:
+            _emit_status_line("WARN", f"↳ {error}")
+        return
+    if name == "baseline_windows_missing":
+        _emit_status_line("FAIL", str(payload.get("message", "")), emoji="❌")
+        return
+    if name == "invarlock_error":
+        _emit_status_line("FAIL", str(payload.get("message", "")), emoji="❌")
+        return
+    if name == "export_tokenizer_missing":
+        _emit_status_line(
+            "WARN",
+            "Exported model checkpoint without tokenizer artifacts; local tokenizer reload may fail.",
+            emoji="⚠️",
+        )
+        return
+    if name == "export_adapter_directory_missing":
+        _emit_status_line(
+            "WARN",
+            "Model export requested but adapter did not save a HF directory.",
+            emoji="⚠️",
+        )
+        return
+    if name == "export_failed":
+        _emit_status_line(
+            "WARN",
+            "Model export requested but failed due to an unexpected error.",
+            emoji="⚠️",
+        )
+        return
+    if name == "telemetry_saved":
+        _emit_status_line(
+            "DATA",
+            f"Telemetry: {payload.get('path', '')}",
+            emoji="📈",
+        )
+        return
+    if name == "telemetry_failed":
+        _emit_status_line(
+            "WARN",
+            f"Telemetry export failed: {payload.get('error', '')}",
+            emoji="⚠️",
+        )
+        return
+    if name == "primary_metric_summary":
+        _emit_status_line(
+            "METRIC",
+            f"Primary Metric [{payload.get('metric_kind', 'primary')}] — preview: {float(payload.get('preview', 0.0)):.3f}, final: {float(payload.get('final', 0.0)):.3f}",
+            emoji="📌",
+        )
+        return
+    if name == "baseline_ratio":
+        _emit_status_line(
+            "METRIC",
+            f"Ratio vs baseline [{payload.get('metric_kind', 'primary')}]: {float(payload.get('ratio', 0.0)):.3f}",
+            emoji="🔗",
+        )
+        return
+    if name == "guard_overhead_gate_failed":
+        _emit_status_line(
+            "FAIL",
+            "Guard overhead gate FAILED: Guards add more than the permitted budget",
+            emoji="⚠️",
+        )
+        return
+    if name == "guard_overhead_budget_exceeded":
+        threshold_fraction = float(payload.get("threshold_fraction", 0.01) or 0.01)
+        _emit_status_line(
+            "FAIL",
+            "Guard overhead gate exceeded the configured budget "
+            f"(>{threshold_fraction * 100:.1f}% increase)",
+            emoji="❌",
+        )
+        return
+    if name == "generating_evaluation_report":
+        _emit_status_line("EXEC", "Generating evaluation report...", emoji="📜")
+        return
+    if name == "evaluation_report_passed":
+        _emit_status_line("PASS", "Evaluation report PASSED all gates!", emoji="✅")
+        return
+    if name == "evaluation_report_failed":
+        _emit_status_line(
+            "FAIL",
+            "Evaluation report FAILED gates: "
+            + ", ".join(str(item) for item in payload.get("failed_gates", [])),
+            emoji="⚠️",
+        )
+        return
+    if name == "auto_tune_adjustment":
+        _emit_status_line(
+            "INIT",
+            "Auto-tune adjust: global_k → "
+            f"{payload.get('global_k')} "
+            f"(bounds {payload.get('keep_low')}-{payload.get('keep_high')})",
+            emoji="🔧",
+        )
+        return
+    if name == "retry_exhausted":
+        _emit_status_line(
+            "FAIL",
+            f"Exhausted retry budget after {payload.get('attempt')} attempts",
+            emoji="❌",
+        )
+        return
+    if name == "retry_validation_error":
+        _emit_status_line(
+            "WARN",
+            f"Evaluation report validation failed: {payload.get('message', '')}",
+            emoji="⚠️",
+        )
+        return
+    if name == "config_file_missing":
+        _emit_status_line(
+            "FAIL",
+            f"Configuration file not found: {payload.get('path', '')}",
+            emoji="❌",
+        )
+        return
+    if name == "schema_invalid_run_report":
+        _emit_status_line(
+            "FAIL",
+            "Schema invalid: run report structure failed validation",
+            emoji="❌",
+        )
+        return
+    if name == "pipeline_failed":
+        _emit_status_line(
+            "FAIL",
+            f"Pipeline execution failed: {payload.get('error', '')}",
+            emoji="❌",
+        )
+        return
+    if name == "cleanup_status":
+        status = "removed" if bool(payload.get("removed")) else "skipped"
+        _emit_status_line("INFO", f"Cleanup: {status}", emoji="🧹")
+
+
+def execute_run_request(request: RunExecutionRequest) -> str | None:
+    _resolve_shell_output_style(request)
+    run_warning_filters_mod._apply_warning_filters(
+        str(request.profile or "").strip().lower() or None
+    )
+    outcome = _execute_run_request_impl(
+        request,
+        services=_build_run_execution_services(),
+        observer=_render_run_execution_event,
+    )
+    if outcome.exit_code != 0:
+        raise typer.Exit(outcome.exit_code)
+    return outcome.result.report_path if outcome.result is not None else None

@@ -8,6 +8,17 @@ from typing import Any
 import torch
 import torch.nn as nn
 
+__all__ = [
+    "activation_edge_risk",
+    "activation_svd_outliers",
+    "batch_token_weight",
+    "collect_calibration_batches",
+    "compute_activation_edge_risk",
+    "compute_activation_outliers",
+    "get_activation_modules",
+    "prepare_activation_inputs",
+]
+
 
 def collect_calibration_batches(
     calib: Any,
@@ -275,6 +286,58 @@ def activation_edge_risk(
     return float(risk), float(sigma), float(mp_edge_val)
 
 
+def activation_svd_outliers(
+    activations: Any, *, margin: float, deadband: float
+) -> tuple[int, float, float]:
+    """Count activation singular values beyond the MP edge."""
+    if isinstance(activations, tuple | list):
+        activations = activations[0] if activations else None
+    if not isinstance(activations, torch.Tensor):
+        return 0, 0.0, 0.0
+
+    if activations.dim() < 2:
+        return 0, 0.0, 0.0
+
+    if activations.dim() > 2:
+        activations = activations.reshape(-1, activations.shape[-1])
+
+    if activations.numel() == 0:
+        return 0, 0.0, 0.0
+
+    try:
+        mat = activations.detach().float().cpu()
+    except (AttributeError, RuntimeError, TypeError, ValueError):
+        return 0, 0.0, 0.0
+
+    if not torch.isfinite(mat).all():
+        return 0, 0.0, 0.0
+
+    mat = mat - mat.mean()
+    std = float(mat.std().item())
+    if not math.isfinite(std) or std <= 0.0:
+        return 0, 0.0, 0.0
+
+    mat = mat / std
+    m, n = mat.shape
+    from . import rmt_math
+
+    mp_edge_val = rmt_math.mp_bulk_edge(m, n, whitened=False)
+    threshold = mp_edge_val * (1.0 + deadband) * margin
+
+    try:
+        s_vals = torch.linalg.svdvals(mat)
+    except (RuntimeError, torch.linalg.LinAlgError):
+        return 0, 0.0, 0.0
+
+    if s_vals.numel() == 0:
+        return 0, 0.0, 0.0
+
+    sigma_max = float(s_vals.max().item())
+    max_ratio = sigma_max / max(mp_edge_val, 1e-12)
+    outlier_count = int((s_vals > threshold).sum().item())
+    return outlier_count, float(max_ratio), sigma_max
+
+
 def compute_activation_edge_risk(
     model: nn.Module,
     batches: list[Any],
@@ -328,16 +391,16 @@ def compute_activation_edge_risk(
         except (AttributeError, RuntimeError, TypeError, ValueError):
             continue
 
-    model_was_training = model.training
-    model.eval()
-    try:
-        device = next(model.parameters()).device
-    except StopIteration:
-        return None
     batches_used = 0
     token_weight_total = 0
 
+    model_was_training = model.training
+    model.eval()
     try:
+        try:
+            device = next(model.parameters()).device
+        except StopIteration:
+            return None
         with torch.inference_mode():
             for batch in batches:
                 inputs, attention_mask = prepare_activation_inputs(batch, device)
@@ -400,4 +463,122 @@ def compute_activation_edge_risk(
         "edge_risk_by_family": edge_risk_by_family,
         "token_weight_total": int(token_weight_total),
         "batches_used": int(batches_used),
+    }
+
+
+def compute_activation_outliers(
+    guard: Any, model: nn.Module, batches: list[Any]
+) -> dict[str, Any] | None:
+    """Compute activation-based RMT outlier counts using a guard facade."""
+    if not batches:
+        return None
+
+    modules = guard._get_activation_modules(model)
+    if not modules:
+        return None
+
+    per_layer_map: dict[str, dict[str, Any]] = {}
+    batch_weight_holder = {"weight": 1}
+    for idx, (module_name, _module) in enumerate(modules):
+        per_layer_map[module_name] = {
+            "layer": idx,
+            "module_name": module_name,
+            "sigma_max": 0.0,
+            "worst_ratio": 0.0,
+            "outlier_count": 0,
+            "has_outlier": False,
+        }
+
+    handles: list[Any] = []
+
+    def _make_hook(name: str):
+        def _hook(_module: nn.Module, _inputs: tuple[Any, ...], output: Any):
+            try:
+                outliers, max_ratio, sigma_max = guard._activation_svd_outliers(
+                    output, margin=guard.margin, deadband=guard.deadband
+                )
+            except (AttributeError, RuntimeError, TypeError, ValueError):
+                return
+            stats = per_layer_map.get(name)
+            if stats is None:
+                return
+            weight = int(batch_weight_holder.get("weight", 1) or 1)
+            if outliers > 0:
+                increment = int(outliers) * weight
+                stats["outlier_count"] = int(stats.get("outlier_count", 0)) + increment
+                stats["has_outlier"] = True
+            stats["worst_ratio"] = max(
+                float(stats.get("worst_ratio", 0.0)), float(max_ratio)
+            )
+            stats["sigma_max"] = max(float(stats.get("sigma_max", 0.0)), float(sigma_max))
+
+        return _hook
+
+    for name, module in modules:
+        try:
+            handles.append(module.register_forward_hook(_make_hook(name)))
+        except (AttributeError, RuntimeError, TypeError, ValueError):
+            continue
+
+    batches_used = 0
+    token_weight_total = 0
+
+    model_was_training = model.training
+    model.eval()
+    try:
+        try:
+            device = next(model.parameters()).device
+        except StopIteration:
+            return None
+        with torch.inference_mode():
+            for batch in batches:
+                inputs, attention_mask = guard._prepare_activation_inputs(batch, device)
+                if inputs is None:
+                    continue
+                batch_weight = guard._batch_token_weight(inputs, attention_mask)
+                batch_weight_holder["weight"] = batch_weight
+                try:
+                    if attention_mask is not None:
+                        model(inputs, attention_mask=attention_mask)
+                    else:
+                        model(inputs)
+                    batches_used += 1
+                    token_weight_total += batch_weight
+                except TypeError:
+                    try:
+                        model(inputs)
+                        batches_used += 1
+                        token_weight_total += batch_weight
+                    except (AttributeError, RuntimeError, TypeError, ValueError):
+                        continue
+                except (AttributeError, RuntimeError, ValueError):
+                    continue
+    finally:
+        for handle in handles:
+            try:
+                handle.remove()
+            except (AttributeError, RuntimeError):
+                pass
+        if model_was_training:
+            model.train()
+
+    if batches_used == 0:
+        return None
+
+    per_layer = [per_layer_map[name] for name, _module in modules]
+    flagged_layers = [info["layer"] for info in per_layer if info.get("has_outlier")]
+    outlier_total = sum(int(info.get("outlier_count", 0) or 0) for info in per_layer)
+    max_ratio = max((float(info.get("worst_ratio", 0.0)) for info in per_layer), default=0.0)
+
+    return {
+        "has_outliers": bool(flagged_layers),
+        "n_layers_flagged": len(flagged_layers),
+        "outlier_count": outlier_total,
+        "max_ratio": max_ratio,
+        "threshold": (1.0 + guard.deadband) * guard.margin,
+        "per_layer": per_layer,
+        "flagged_layers": flagged_layers,
+        "analysis_source": "activations",
+        "token_weight_total": int(token_weight_total),
+        "token_weighted": True,
     }

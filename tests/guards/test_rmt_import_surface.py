@@ -6,13 +6,24 @@ import invarlock.guards.rmt as runtime_rmt
 import invarlock.guards.rmt_analysis as rmt_analysis
 import invarlock.guards.rmt_detection as rmt_detection
 import invarlock.guards.rmt_math as rmt_math
+import invarlock.guards.rmt_policy as rmt_policy
+import invarlock.guards.rmt_types as rmt_types
 
 
 def test_runtime_module_exposes_guard_surface_only() -> None:
     assert hasattr(runtime_rmt, "RMTGuard")
     assert hasattr(runtime_rmt, "get_rmt_policy")
+    assert hasattr(runtime_rmt, "RMTPolicy")
+    assert hasattr(runtime_rmt, "RMTPolicyDict")
     assert not hasattr(runtime_rmt, "rmt_detect")
     assert not hasattr(runtime_rmt, "capture_baseline_mp_stats")
+
+
+def test_policy_modules_expose_the_split_contracts() -> None:
+    assert hasattr(rmt_types, "RMTPolicy")
+    assert hasattr(rmt_types, "RMTPolicyDict")
+    assert hasattr(rmt_policy, "get_rmt_policy")
+    assert hasattr(rmt_policy, "create_custom_rmt_policy")
 
 
 def test_analysis_module_exposes_weight_analysis_helpers() -> None:

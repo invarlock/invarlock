@@ -13,7 +13,7 @@ from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
 
 try:  # pragma: no cover - exercised through tests/integration
     import jsonschema
-except Exception:  # pragma: no cover
+except ImportError:  # pragma: no cover
     jsonschema = None
 
 PROOF_PACK_FORMAT = "proof-pack-v1"
@@ -39,6 +39,26 @@ _MATERIAL_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 def _load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _json_load_error_types() -> tuple[type[BaseException], ...]:
+    return (OSError, json.JSONDecodeError)
+
+
+def _jsonschema_validation_error_types() -> tuple[type[BaseException], ...]:
+    if jsonschema is None:
+        return ()
+    exceptions_mod = getattr(jsonschema, "exceptions", None)
+    error_types: list[type[BaseException]] = []
+    for attr in ("ValidationError", "SchemaError"):
+        exc_type = None
+        if exceptions_mod is not None:
+            exc_type = getattr(exceptions_mod, attr, None)
+        if exc_type is None:
+            exc_type = getattr(jsonschema, attr, None)
+        if isinstance(exc_type, type) and issubclass(exc_type, BaseException):
+            error_types.append(exc_type)
+    return tuple(error_types)
 
 
 def _sha256_bytes(payload: bytes) -> str:
@@ -155,15 +175,19 @@ def _manual_validate_manifest(payload: Any) -> list[str]:
 def validate_manifest(path: Path) -> list[str]:
     try:
         payload = _load_json(path)
-    except Exception as exc:
+    except _json_load_error_types() as exc:
         return [f"manifest is not valid JSON: {exc}"]
 
     schema = load_proof_pack_manifest_schema()
     if schema and jsonschema is not None:
-        try:
+        validation_error_types = _jsonschema_validation_error_types()
+        if validation_error_types:
+            try:
+                jsonschema.validate(instance=payload, schema=schema)
+            except validation_error_types as exc:
+                return [f"manifest schema validation failed: {exc}"]
+        else:
             jsonschema.validate(instance=payload, schema=schema)
-        except Exception as exc:
-            return [f"manifest schema validation failed: {exc}"]
     return _manual_validate_manifest(payload)
 
 
@@ -197,7 +221,7 @@ def _load_json_object(
         return None, [f"{label} file not found: {path}"]
     try:
         payload = _load_json(path)
-    except Exception as exc:
+    except _json_load_error_types() as exc:
         return None, [f"{label} is not valid JSON: {exc}"]
     if not isinstance(payload, dict):
         return None, [f"{label} must decode to a JSON object: {path}"]
@@ -458,18 +482,48 @@ def _verify_reports(
         ], None
 
     exit_code, payload = _run_verify_command(clean_reports, profile=profile)
-    if json_out_path is not None and payload is not None:
-        json_out_path.write_text(
-            json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8"
-        )
+    verify_payload = dict(payload) if isinstance(payload, dict) else payload
     if error_reports:
         try:
-            _run_verify_command(error_reports, profile=profile)
-        except Exception:
-            pass
+            error_exit_code, error_payload = _run_verify_command(
+                error_reports, profile=profile
+            )
+        except (
+            ImportError,
+            ModuleNotFoundError,
+            OSError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ) as exc:
+            return [
+                f"error-injection report verification failed: {exc}"
+            ], verify_payload if isinstance(verify_payload, dict) else payload
+        if not isinstance(error_payload, dict):
+            return [
+                "error-injection report verification did not return a JSON object."
+            ], verify_payload if isinstance(verify_payload, dict) else payload
+        if verify_payload is None:
+            verify_payload = {}
+        if not isinstance(verify_payload, dict):
+            return [
+                "clean report verification did not return a JSON object."
+            ], payload
+        verify_payload["error_injection"] = {
+            "exit_code": int(error_exit_code),
+            "verify": error_payload,
+            "reports": [
+                str(path.relative_to(pack_dir)).replace("\\", "/")
+                for path in error_reports
+            ],
+        }
+    if json_out_path is not None and verify_payload is not None:
+        json_out_path.write_text(
+            json.dumps(verify_payload, sort_keys=True) + "\n", encoding="utf-8"
+        )
     if exit_code != 0:
-        return ["invarlock verify reported report verification failures."], payload
-    return [], payload
+        return ["invarlock verify reported report verification failures."], verify_payload
+    return [], verify_payload
 
 
 def inspect_proof_pack(pack_dir: Path) -> tuple[dict[str, Any], int]:

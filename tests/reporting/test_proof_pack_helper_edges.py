@@ -180,7 +180,9 @@ def test_validate_manifest_and_load_json_object_cover_error_paths(
     monkeypatch.setattr(
         proof_pack_mod.jsonschema,
         "validate",
-        lambda instance, schema: (_ for _ in ()).throw(ValueError("schema boom")),
+        lambda instance, schema: (_ for _ in ()).throw(
+            proof_pack_mod.jsonschema.exceptions.ValidationError("schema boom")
+        ),
         raising=True,
     )
     errors = proof_pack_mod.validate_manifest(manifest_path)
@@ -550,9 +552,10 @@ def test_verify_reports_and_inspect_cover_error_paths(
     errors, payload = proof_pack_mod._verify_reports(
         pack_dir, json_out_path=json_out, profile="release"
     )
-    assert errors == ["invarlock verify reported report verification failures."]
+    assert errors == [
+        "error-injection report verification failed: ignore nested error reports"
+    ]
     assert payload == {"ok": False}
-    assert json.loads(json_out.read_text(encoding="utf-8")) == {"ok": False}
     assert len(verify_calls) == 2
 
     missing_payload, exit_code = proof_pack_mod.inspect_proof_pack(tmp_path / "missing")
