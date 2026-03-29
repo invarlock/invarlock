@@ -30,6 +30,7 @@ from invarlock.cli.run_pairing_helpers import (
 )
 from invarlock.cli.run_serialization import _to_serialisable_dict
 from invarlock.cli.run_shell_output import (
+    _device_resolution_note,
     _event,
     _format_kv_line,
     _print_guard_overhead_summary,
@@ -45,6 +46,7 @@ from invarlock.core import (
 )
 from invarlock.core import run_guard_overhead_policy as run_guard_overhead_policy_mod
 from invarlock.core import run_report_payload_policy as run_report_payload_policy_mod
+from invarlock.core.exceptions import ValidationError
 from invarlock.core.exit_codes import (
     resolve_command_exit_code as _resolve_exit_code,
 )
@@ -123,7 +125,6 @@ def _build_run_execution_services() -> RunExecutionServices:
         persist_run_report_outputs=_persist_run_report_outputs_with_runtime_deps,
         prepare_config_for_run=_prepare_config_for_run_with_runtime_deps,
         resolve_device_and_output=_resolve_device_and_output_with_runtime_deps,
-        resolve_exit_code=_resolve_exit_code,
         resolve_snapshot_config=_resolve_snapshot_config,
         resolve_snapshot_retry_transition=_resolve_snapshot_retry_transition_impl,
         run_bare_control=_run_bare_control_with_runtime_deps,
@@ -147,22 +148,12 @@ def _build_run_execution_services() -> RunExecutionServices:
 
 def _prepare_config_for_run_with_runtime_deps(**kwargs: Any) -> Any:
     kwargs.pop("console", None)
-    return run_config_mod.prepare_config_for_run(
-        **kwargs,
-        console=console,
-        event_fn=_event,
-    )
+    return run_config_mod.prepare_config_for_run(**kwargs)
 
 
 def _resolve_device_and_output_with_runtime_deps(*args: Any, **kwargs: Any) -> Any:
     kwargs.pop("console", None)
-    return run_config_mod.resolve_device_and_output(
-        *args,
-        **kwargs,
-        console=console,
-        event_fn=_event,
-        format_kv_line_fn=_format_kv_line,
-    )
+    return run_config_mod.resolve_device_and_output(*args, **kwargs)
 
 
 def _init_retry_controller_with_runtime_deps(**kwargs: Any) -> Any:
@@ -234,10 +225,7 @@ def _load_baseline_pairing_evidence_with_runtime_deps(**kwargs: Any) -> Any:
 
 def _materialize_run_dataset_with_runtime_deps(**kwargs: Any) -> Any:
     kwargs.pop("console", None)
-    return _materialize_run_dataset(
-        **kwargs,
-        console=console,
-    )
+    return _materialize_run_dataset(**kwargs)
 
 
 def _materialize_baseline_pairing_schedule_with_runtime_deps(
@@ -306,12 +294,21 @@ def _assemble_run_report_with_runtime_deps(**kwargs: Any) -> Any:
 
 def _persist_run_report_outputs_with_runtime_deps(**kwargs: Any) -> Any:
     kwargs.pop("console", None)
-    return run_report_contract_mod.persist_run_report_outputs(
+    report = kwargs["report"]
+    run_dir = kwargs["run_dir"]
+    run_config = kwargs["run_config"]
+    persistence_result = run_report_contract_mod.persist_run_report_outputs(
         **kwargs,
-        console=console,
-        postprocess_and_summarize_fn=run_artifact_output_mod.postprocess_and_summarize,
         save_telemetry_report_fn=telemetry_mod.save_telemetry_report,
     )
+    run_artifact_output_mod.postprocess_and_summarize(
+        report=report,
+        run_dir=run_dir,
+        run_config=run_config,
+        console=console,
+        saved_files=persistence_result.saved_files,
+    )
+    return persistence_result
 
 
 def _prepare_guard_overhead_report_with_runtime_deps(*args: Any, **kwargs: Any) -> Any:
@@ -393,52 +390,111 @@ def _emit_console_blank_line() -> None:
 
 
 def _render_run_execution_event(event: RunExecutionEvent) -> None:
-    kind = event.kind
-    name = event.name
-    payload = event.payload
-    profile = payload.get("profile")
+    phase = event.phase
+    name = event.code
+    payload = event.details
 
-    if kind == "notice":
-        _event(
-            console,
-            str(payload.get("tag", "INFO")),
-            str(payload.get("message", "")),
-            emoji=payload.get("emoji"),
-            profile=str(profile) if profile is not None else None,
-        )
-        return
+    if phase == "metadata":
+        if name == "device_resolved":
+            resolved_device = str(payload.get("resolved_device", ""))
+            requested_device = str(payload.get("requested_device") or "auto")
+            resolution_note = _device_resolution_note(
+                requested_device,
+                resolved_device,
+            )
+            _emit_console_line(
+                _format_kv_line("Device", f"{resolved_device} ({resolution_note})"),
+                markup=False,
+            )
+            return
+        if name == "run_directory_ready":
+            _emit_console_line(
+                _format_kv_line("Output", str(payload.get("run_dir", ""))),
+                markup=False,
+            )
+            _emit_console_line(
+                _format_kv_line("Run ID", str(payload.get("run_id", ""))),
+                markup=False,
+            )
+            return
+        if name == "edit_selected":
+            _emit_console_line(
+                _format_kv_line("Edit", str(payload.get("edit_name", ""))),
+                markup=False,
+            )
+            return
+        if name == "guard_chain_resolved":
+            guard_names = [str(item) for item in payload.get("guard_names", [])]
+            _emit_console_line(
+                _format_kv_line("Guards", " → ".join(guard_names)),
+                markup=False,
+            )
+            return
 
-    if kind == "detail" and name == "kv":
-        _emit_console_line(
-            _format_kv_line(
-                str(payload.get("label", "")), str(payload.get("value", ""))
-            ),
-            markup=False,
-        )
-        return
+    if phase == "diagnostic":
+        if name == "guard_missing":
+            _event(
+                console,
+                "WARN",
+                f"Guard '{payload.get('guard_name', '')}' not found, skipping",
+                emoji="⚠️",
+            )
+            return
+        if name == "export_tokenizer_missing":
+            _event(
+                console,
+                "WARN",
+                "Exported model checkpoint without tokenizer artifacts; local tokenizer reload may fail.",
+                emoji="⚠️",
+            )
+            return
+        if name == "export_adapter_directory_missing":
+            _event(
+                console,
+                "WARN",
+                "Model export requested but adapter did not save a HF directory.",
+                emoji="⚠️",
+            )
+            return
+        if name == "export_failed":
+            _event(
+                console,
+                "WARN",
+                "Model export requested but failed due to an unexpected error.",
+                emoji="⚠️",
+            )
+            return
+        if name == "snapshot_restore_fallback":
+            _event(
+                console,
+                "WARN",
+                "Snapshot restore failed; switching to reload-per-attempt.",
+                emoji="⚠️",
+            )
+            error = payload.get("error")
+            if error:
+                _event(console, "WARN", f"↳ {error}")
+            return
+        if name == "retry_validation_telemetry_summary":
+            _emit_console_line(str(payload.get("summary", "")), markup=False)
+            return
+        if name == "metric_diffs_debug":
+            _emit_console_line(
+                f"[debug] DEBUG_METRIC_DIFFS: {payload.get('summary', '')}",
+                markup=False,
+            )
+            return
 
-    if kind == "detail" and name == "guard_chain":
-        label = str(payload.get("label", "Guards"))
-        guard_names = [str(item) for item in payload.get("guard_names", [])]
-        _emit_console_line(
-            _format_kv_line(label, " → ".join(guard_names)),
-            markup=False,
-        )
-        return
+        message = payload.get("message")
+        if isinstance(message, str) and message:
+            tag = str(payload.get("tag") or payload.get("severity") or "INFO").upper()
+            emoji = payload.get("emoji")
+            if not isinstance(emoji, str):
+                emoji = None
+            _event(console, tag, message, emoji=emoji)
+            return
 
-    if kind == "layout" and name == "blank_line":
-        _emit_console_blank_line()
-        return
-
-    if kind == "line" and name == "plain":
-        _emit_console_line(str(payload.get("text", "")), markup=False)
-        return
-
-    if kind == "line" and name == "markup":
-        _emit_console_line(str(payload.get("text", "")), markup=True)
-        return
-
-    if kind == "summary" and name == "guard_overhead":
+    if phase == "summary" and name == "guard_overhead_summary":
         _print_guard_overhead_summary(
             console,
             payload.get("guard_overhead_info") or {},
@@ -446,7 +502,7 @@ def _render_run_execution_event(event: RunExecutionEvent) -> None:
         )
         return
 
-    if kind == "summary" and name == "retry":
+    if phase == "summary" and name == "retry_summary":
         summary = payload.get("summary")
         if isinstance(summary, dict):
             _emit_console_blank_line()
@@ -455,31 +511,14 @@ def _render_run_execution_event(event: RunExecutionEvent) -> None:
                 "METRIC",
                 f"Retry Summary: {summary.get('total_attempts', 0)} attempts in {float(summary.get('elapsed_time', 0.0) or 0.0):.1f}s",
                 emoji="📊",
-                profile=str(profile) if profile is not None else None,
             )
         return
 
-    if kind == "summary" and name == "timing":
-        print_timing_summary(
-            console=console,
-            timings=dict(payload.get("timings") or {}),
-            style=getattr(console, "_invarlock_output_style", None),
-            order=list(payload.get("order") or []),
-            extra_lines=list(payload.get("extra_lines") or []),
-        )
-        return
-
-    if kind != "status":
+    if phase != "status":
         return
 
     def _emit_status_line(tag: str, message: str, *, emoji: str | None = None) -> None:
-        _event(
-            console,
-            tag,
-            message,
-            emoji=emoji,
-            profile=str(profile) if profile is not None else None,
-        )
+        _event(console, tag, message, emoji=emoji)
 
     if name == "torch_missing":
         _emit_status_line(
@@ -505,15 +544,17 @@ def _render_run_execution_event(event: RunExecutionEvent) -> None:
             emoji="🧬",
         )
         return
-    if name == "baseline_schedule_fallback":
-        _emit_status_line(
-            "WARN",
-            f"{payload.get('message')}. Falling back to dataset schedule.",
-            emoji="⚠️",
-        )
-        return
     if name == "pipeline_start":
         _emit_status_line("INIT", "Starting InvarLock pipeline...", emoji="🚀")
+        return
+    if name == "config_loading":
+        _emit_status_line(
+            "INIT",
+            f"Loading configuration: {payload.get('config_path', '')}",
+            emoji="📋",
+        )
+        return
+    if name == "config_loaded":
         return
     if name == "edit_name_missing":
         _emit_status_line(
@@ -603,42 +644,11 @@ def _render_run_execution_event(event: RunExecutionEvent) -> None:
             emoji="🔄",
         )
         return
-    if name == "snapshot_restore_fallback":
-        _emit_status_line(
-            "WARN",
-            "Snapshot restore failed; switching to reload-per-attempt.",
-            emoji="⚠️",
-        )
-        error = payload.get("error")
-        if error:
-            _emit_status_line("WARN", f"↳ {error}")
-        return
     if name == "baseline_windows_missing":
         _emit_status_line("FAIL", str(payload.get("message", "")), emoji="❌")
         return
     if name == "invarlock_error":
         _emit_status_line("FAIL", str(payload.get("message", "")), emoji="❌")
-        return
-    if name == "export_tokenizer_missing":
-        _emit_status_line(
-            "WARN",
-            "Exported model checkpoint without tokenizer artifacts; local tokenizer reload may fail.",
-            emoji="⚠️",
-        )
-        return
-    if name == "export_adapter_directory_missing":
-        _emit_status_line(
-            "WARN",
-            "Model export requested but adapter did not save a HF directory.",
-            emoji="⚠️",
-        )
-        return
-    if name == "export_failed":
-        _emit_status_line(
-            "WARN",
-            "Model export requested but failed due to an unexpected error.",
-            emoji="⚠️",
-        )
         return
     if name == "telemetry_saved":
         _emit_status_line(
@@ -684,7 +694,7 @@ def _render_run_execution_event(event: RunExecutionEvent) -> None:
             emoji="❌",
         )
         return
-    if name == "generating_evaluation_report":
+    if name == "evaluation_report_started":
         _emit_status_line("EXEC", "Generating evaluation report...", emoji="📜")
         return
     if name == "evaluation_report_passed":
@@ -748,16 +758,87 @@ def _render_run_execution_event(event: RunExecutionEvent) -> None:
         return
 
 
-def execute_run_request(request: RunExecutionRequest) -> str | None:
+def _to_core_run_execution_request(request: Any) -> RunExecutionRequest:
+    return RunExecutionRequest(
+        config=request.config,
+        device=getattr(request, "device", None),
+        profile=getattr(request, "profile", None),
+        out=getattr(request, "out", None),
+        edit=getattr(request, "edit", None),
+        edit_label=getattr(request, "edit_label", None),
+        tier=getattr(request, "tier", None),
+        metric_kind=getattr(request, "metric_kind", None),
+        probes=getattr(request, "probes", None),
+        until_pass=bool(getattr(request, "until_pass", False)),
+        max_attempts=int(getattr(request, "max_attempts", 3)),
+        timeout=getattr(request, "timeout", None),
+        baseline=getattr(request, "baseline", None),
+        no_cleanup=bool(getattr(request, "no_cleanup", False)),
+        capture_timings=bool(getattr(request, "timing", False)),
+        telemetry=bool(getattr(request, "telemetry", False)),
+        prefer_local_files_only=bool(
+            getattr(request, "prefer_local_files_only", False)
+        ),
+    )
+
+
+def _exit_code_for_failure(failure: Any, *, profile: str | None) -> int:
+    if failure is None:
+        return 1
+    code = str(getattr(failure, "code", "") or "")
+    message = str(
+        getattr(failure, "message", "")
+        or getattr(getattr(failure, "error", None), "message", "")
+        or ""
+    )
+    if code == "baseline_windows_missing":
+        return 3
+    if code in {"unknown_edit", "schema_invalid_run_report"}:
+        return 2
+    error = getattr(failure, "error", None)
+    if isinstance(error, ValidationError) and (
+        "Invalid tier" in message
+        or "Invalid probes" in message
+        or "Device validation failed" in message
+    ):
+        return 1
+    if isinstance(error, Exception):
+        return _resolve_exit_code(error, profile=profile)
+    if code in {"torch_missing", "config_file_missing", "edit_name_missing"}:
+        return 1
+    return 1
+
+
+def execute_run_request(request: Any) -> str | None:
     _resolve_shell_output_style(request)
     run_warning_filters_mod._apply_warning_filters(
         str(request.profile or "").strip().lower() or None
     )
+    core_request = _to_core_run_execution_request(request)
     outcome = _execute_run_request_impl(
-        request,
+        core_request,
         services=_build_run_execution_services(),
         observer=_render_run_execution_event,
     )
-    if outcome.exit_code != 0 or outcome.result is None:
-        raise typer.Exit(outcome.exit_code)
+    if not outcome.ok or outcome.result is None:
+        raise typer.Exit(
+            _exit_code_for_failure(
+                outcome.failure,
+                profile=str(getattr(request, "profile", None) or None),
+            )
+        )
+    output_style = getattr(console, "_invarlock_output_style", None)
+    if bool(getattr(request, "timing", False)) and output_style is not None:
+        print_timing_summary(
+            console=console,
+            timings=dict(outcome.result.timings),
+            style=output_style,
+            order=[
+                ("Load model", "load_model"),
+                ("Load dataset", "load_dataset"),
+                ("Execute", "execute"),
+                ("Total", "total"),
+            ],
+            extra_lines=[],
+        )
     return outcome.result.report_path if outcome.result is not None else None

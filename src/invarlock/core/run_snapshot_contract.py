@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 _NON_FATAL_SNAPSHOT_EXCEPTIONS: tuple[type[BaseException], ...] = (
@@ -11,8 +11,15 @@ _NON_FATAL_SNAPSHOT_EXCEPTIONS: tuple[type[BaseException], ...] = (
     KeyError,
     RuntimeError,
     OSError,
-    Exception,
 )
+
+
+@dataclass(frozen=True)
+class SnapshotDiagnostic:
+    code: str
+    message: str
+    severity: str = "warning"
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -24,7 +31,7 @@ class SnapshotExecutionPlan:
     snapshot_provenance: dict[str, bool]
     emitted_skip_overhead_warning: bool
     snapshot_enabled: bool | None
-    warning_notices: tuple[str, ...]
+    diagnostics: tuple[SnapshotDiagnostic, ...]
 
 
 def build_snapshot_execution_plan(
@@ -59,9 +66,16 @@ def build_snapshot_execution_plan(
             snapshot_provenance=snapshot_provenance,
             emitted_skip_overhead_warning=True,
             snapshot_enabled=None,
-            warning_notices=(
-                f"Overhead check skipped via config policy{source_note}",
-                "Reusing initially loaded model for guarded execution.",
+            diagnostics=(
+                SnapshotDiagnostic(
+                    code="snapshot.overhead_check_skipped",
+                    message=f"Overhead check skipped via config policy{source_note}",
+                    details={"source": skip_overhead_source},
+                ),
+                SnapshotDiagnostic(
+                    code="snapshot.loaded_model_reused",
+                    message="Reusing initially loaded model for guarded execution.",
+                ),
             ),
         )
 
@@ -117,7 +131,7 @@ def build_snapshot_execution_plan(
                 snapshot_provenance=snapshot_provenance,
                 emitted_skip_overhead_warning=False,
                 snapshot_enabled=True,
-                warning_notices=(),
+                diagnostics=(),
             )
         if mode == "bytes":
             try:
@@ -138,7 +152,7 @@ def build_snapshot_execution_plan(
                     snapshot_provenance=snapshot_provenance,
                     emitted_skip_overhead_warning=False,
                     snapshot_enabled=True,
-                    warning_notices=(),
+                    diagnostics=(),
                 )
 
             def _restore_bytes() -> None:
@@ -152,7 +166,7 @@ def build_snapshot_execution_plan(
                 snapshot_provenance=snapshot_provenance,
                 emitted_skip_overhead_warning=False,
                 snapshot_enabled=True,
-                warning_notices=(),
+                diagnostics=(),
             )
 
         free_model_memory_fn(model)
@@ -164,7 +178,7 @@ def build_snapshot_execution_plan(
             snapshot_provenance=snapshot_provenance,
             emitted_skip_overhead_warning=False,
             snapshot_enabled=False,
-            warning_notices=(),
+            diagnostics=(),
         )
     except non_fatal_exceptions:
         free_model_memory_fn(model)
@@ -176,7 +190,7 @@ def build_snapshot_execution_plan(
             snapshot_provenance=snapshot_provenance,
             emitted_skip_overhead_warning=False,
             snapshot_enabled=None,
-            warning_notices=(),
+            diagnostics=(),
         )
 
 
@@ -184,7 +198,7 @@ def build_snapshot_execution_plan(
 class SnapshotRetryTransition:
     skip_model_load: bool
     emitted_skip_overhead_warning: bool
-    warning_notices: tuple[str, ...]
+    diagnostics: tuple[SnapshotDiagnostic, ...]
 
 
 def resolve_snapshot_retry_transition(
@@ -198,14 +212,20 @@ def resolve_snapshot_retry_transition(
     restore_fn: Any | None,
     skip_model_load: bool,
 ) -> SnapshotRetryTransition:
-    notices: list[str] = []
+    diagnostics: list[SnapshotDiagnostic] = []
     updated_skip_model_load = skip_model_load
     warned = emitted_skip_overhead_warning
 
     if skip_overhead and profile_normalized in {"ci", "release"}:
         if not warned:
             source_note = f" ({skip_overhead_source})" if skip_overhead_source else ""
-            notices.append(f"Overhead check skipped via config policy{source_note}")
+            diagnostics.append(
+                SnapshotDiagnostic(
+                    code="snapshot.overhead_check_skipped",
+                    message=f"Overhead check skipped via config policy{source_note}",
+                    details={"source": skip_overhead_source},
+                )
+            )
             warned = True
         if (
             retry_controller is None
@@ -214,18 +234,22 @@ def resolve_snapshot_retry_transition(
             and not updated_skip_model_load
         ):
             updated_skip_model_load = True
-            notices.append(
-                "Snapshot restore unavailable; reusing initially loaded model for guarded execution."
+            diagnostics.append(
+                SnapshotDiagnostic(
+                    code="snapshot.restore_unavailable_reuse_loaded_model",
+                    message="Snapshot restore unavailable; reusing initially loaded model for guarded execution.",
+                )
             )
 
     return SnapshotRetryTransition(
         skip_model_load=updated_skip_model_load,
         emitted_skip_overhead_warning=warned,
-        warning_notices=tuple(notices),
+        diagnostics=tuple(diagnostics),
     )
 
 
 __all__ = [
+    "SnapshotDiagnostic",
     "SnapshotExecutionPlan",
     "SnapshotRetryTransition",
     "build_snapshot_execution_plan",

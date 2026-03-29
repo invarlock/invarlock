@@ -3,9 +3,10 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from invarlock.core.run_provider_dataset_plan import (
-    ProviderDatasetPlanNotice,
+    ProviderDatasetPlanDiagnostic,
     build_provider_dataset_plan,
 )
+from invarlock.eval.data_support import DatasetDiagnostic
 
 
 class _ProviderConfig:
@@ -26,6 +27,7 @@ class _DummyTokenizer:
 
 
 class _Seq2SeqProvider:
+    name = "seq2seq"
     last_preview_labels = [[11, 12]]
     last_final_labels = [[21, 22]]
     stratification_stats = {"mode": "balanced"}
@@ -48,7 +50,7 @@ def _cfg(*, provider: object, release: bool = False) -> SimpleNamespace:
     )
 
 
-def test_build_provider_dataset_plan_collects_notices_and_provider_kwargs() -> None:
+def test_build_provider_dataset_plan_collects_diagnostics_and_provider_kwargs() -> None:
     captured: dict[str, object] = {}
     provider = _Seq2SeqProvider()
 
@@ -58,17 +60,22 @@ def test_build_provider_dataset_plan_collects_notices_and_provider_kwargs() -> N
         *,
         get_provider_fn: object,
         provider_kwargs: dict[str, object] | None,
-        console: object,
         resolved_device: str | None,
-        emit: object,
     ) -> tuple[object, str, bool]:
-        del cfg, model_profile, get_provider_fn, console, resolved_device
+        del cfg, model_profile, get_provider_fn, resolved_device
         captured["provider_kwargs"] = provider_kwargs
-        emit("DATA", "provider resolved", "🔌")
         return provider, "validation", False
 
     def _resolve_effective_windows(**kwargs: object) -> dict[str, object]:
-        kwargs["event_fn"]("dedupe adjusted")
+        diagnostic_fn = kwargs["diagnostic_fn"]
+        diagnostic_fn(
+            DatasetDiagnostic(
+                kind="window.dedupe_adjustment",
+                severity="warning",
+                message="dedupe adjusted",
+                metadata={"tag": "WARN", "emoji": "⚠️"},
+            )
+        )
         return {
             "preview_records": [
                 {"input_ids": [1, 2], "attention_mask": [1, 1], "dataset_index": 7}
@@ -86,7 +93,6 @@ def test_build_provider_dataset_plan_collects_notices_and_provider_kwargs() -> N
     result = build_provider_dataset_plan(
         cfg=_cfg(provider=_ProviderConfig("local_jsonl", path="demo.jsonl")),
         model_profile=SimpleNamespace(),
-        console=object(),
         resolved_device="cpu",
         profile="dev",
         profile_normalized="dev",
@@ -124,9 +130,25 @@ def test_build_provider_dataset_plan_collects_notices_and_provider_kwargs() -> N
     assert result.dataset_meta["stratification"] == {"mode": "balanced"}
     assert result.dataset_meta["scorer_profile"] == {"kind": "seq2seq"}
     assert result.dataset_meta["loss_type"] == "ppl_seq2seq"
-    assert result.notices == (
-        ProviderDatasetPlanNotice("DATA", "provider resolved", "🔌"),
-        ProviderDatasetPlanNotice("WARN", "dedupe adjusted", "⚠️"),
+    assert result.diagnostics == (
+        ProviderDatasetPlanDiagnostic(
+            kind="provider.resolved",
+            message="provider resolved",
+            severity="info",
+            metadata={
+                "tag": "DATA",
+                "emoji": "🔌",
+                "provider": "seq2seq",
+                "split": "validation",
+                "used_fallback_split": False,
+            },
+        ),
+        ProviderDatasetPlanDiagnostic(
+            kind="window.dedupe_adjustment",
+            message="dedupe adjusted",
+            severity="warning",
+            metadata={"tag": "WARN", "emoji": "⚠️"},
+        ),
     )
 
 
@@ -136,7 +158,6 @@ def test_build_provider_dataset_plan_release_without_capacity_emits_warning() ->
     result = build_provider_dataset_plan(
         cfg=_cfg(provider="wikitext2", release=True),
         model_profile=SimpleNamespace(),
-        console=object(),
         resolved_device="cpu",
         profile="release",
         profile_normalized="release",
@@ -188,8 +209,8 @@ def test_build_provider_dataset_plan_release_without_capacity_emits_warning() ->
     assert result.window_plan["profile"] == "release"
     assert result.window_plan["coverage_ok"] is True
     assert any(
-        "does not expose capacity estimation" in notice.message
-        for notice in result.notices
+        diagnostic.kind == "provider.capacity_missing"
+        for diagnostic in result.diagnostics
     )
 
 
@@ -214,7 +235,6 @@ def test_build_provider_dataset_plan_mlm_populates_mask_counts_and_metadata() ->
     result = build_provider_dataset_plan(
         cfg=_cfg(provider="wikitext2"),
         model_profile=SimpleNamespace(),
-        console=object(),
         resolved_device="cpu",
         profile="dev",
         profile_normalized="dev",

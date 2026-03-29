@@ -108,27 +108,15 @@ class RTNQuantEdit(ModelEdit):
         # group_size is currently reserved for potential future variants; it is
         # ignored for the built-in INT8 demo edit.
         self._emit_enabled = True
-        self._emit_console = None
 
     def _configure_runtime(self, runtime: EditRuntime | None) -> None:
         self._emit_enabled = True if runtime is None else bool(runtime.emit)
-        console = None if runtime is None else runtime.console
-        if console is not None and hasattr(console, "print"):
-            self._emit_console = console
-        else:
-            self._emit_console = None
 
     def _emit(self, message: str) -> None:
         if not self._emit_enabled:
             return
         line = f"[EDIT] {message}".rstrip()
-        if self._emit_console is not None:
-            try:
-                self._emit_console.print(line, markup=False)
-            except TypeError:
-                self._emit_console.print(line)
-        else:
-            logger.info(line)
+        logger.info(line)
 
     def can_edit(self, model_desc: dict[str, Any]) -> bool:
         """Check if RTN quantization can be applied to this model."""

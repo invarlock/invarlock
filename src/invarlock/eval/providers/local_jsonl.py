@@ -5,7 +5,6 @@ from typing import Any
 
 from invarlock.core.exceptions import DataError as _DataErr
 
-from ..data_support import EventEmitter
 from ..data_tokenization import tokenize_texts_padded
 from ..data_windows import EvaluationWindow, split_window_by_index
 from .local_jsonl_shared import (
@@ -25,7 +24,6 @@ class LocalJSONLProvider:
         data_files: str | list[str] | None = None,
         text_field: str = "text",
         max_samples: int = 2000,
-        emit: EventEmitter | None = None,
     ) -> None:
         self.file = file
         self.path = path

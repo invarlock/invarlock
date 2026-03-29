@@ -19,7 +19,6 @@ from .data_providers import (
     SyntheticProvider,
     WikiText2Provider,
 )
-from .data_support import EventEmitter
 from .data_windows import EvaluationWindow, compute_window_hash
 from .providers.seq2seq import Seq2SeqProvider
 
@@ -34,9 +33,7 @@ _PROVIDERS: dict[str, type[object]] = {
 }
 
 
-def get_provider(
-    name: str, *, emit: EventEmitter | None = None, **kwargs: Any
-) -> DatasetProvider:
+def get_provider(name: str, **kwargs: Any) -> DatasetProvider:
     if name not in _PROVIDERS:
         available = ", ".join(_PROVIDERS.keys())
         raise _ValErr(
@@ -47,7 +44,7 @@ def get_provider(
 
     provider_class = _PROVIDERS[name]
     init_kwargs = dict(kwargs)
-    init_kwargs["emit"] = emit
+    init_kwargs.pop("emit", None)
     return provider_class(**init_kwargs)  # type: ignore[call-arg,return-value]
 
 

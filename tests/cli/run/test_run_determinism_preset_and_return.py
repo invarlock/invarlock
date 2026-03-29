@@ -97,7 +97,7 @@ def test_run_command_returns_report_path_and_emits_determinism_meta(
             status="success",
         )
 
-    def _fake_emit(*, report, out_dir, filename_prefix, console):  # noqa: ARG001
+    def _fake_save_report(report, out_dir, formats=None, filename_prefix="report"):  # noqa: ARG001
         return _emit_stub(
             captured,
             report=report,
@@ -174,7 +174,9 @@ def test_run_command_returns_report_path_and_emits_determinism_meta(
             )
         )
         stack.enter_context(
-            patch("invarlock.cli.run_artifact_output.emit_run_artifacts", _fake_emit)
+            patch(
+                "invarlock.reporting.run_report_contract.save_report", _fake_save_report
+            )
         )
 
         report_path = run_command(
@@ -230,7 +232,7 @@ def test_run_command_persists_tiny_relax_context(tmp_path: Path, monkeypatch) ->
             status="success",
         )
 
-    def _fake_emit(*, report, out_dir, filename_prefix, console):  # noqa: ARG001
+    def _fake_save_report(report, out_dir, formats=None, filename_prefix="report"):  # noqa: ARG001
         return _emit_stub(
             captured,
             report=report,
@@ -307,7 +309,9 @@ def test_run_command_persists_tiny_relax_context(tmp_path: Path, monkeypatch) ->
             )
         )
         stack.enter_context(
-            patch("invarlock.cli.run_artifact_output.emit_run_artifacts", _fake_emit)
+            patch(
+                "invarlock.reporting.run_report_contract.save_report", _fake_save_report
+            )
         )
 
         run_command(
@@ -363,7 +367,7 @@ def test_run_command_does_not_include_determinism_when_preset_empty(
             status="success",
         )
 
-    def _fake_emit(*, report, out_dir, filename_prefix, console):  # noqa: ARG001
+    def _fake_save_report(report, out_dir, formats=None, filename_prefix="report"):  # noqa: ARG001
         return _emit_stub(
             captured,
             report=report,
@@ -440,7 +444,9 @@ def test_run_command_does_not_include_determinism_when_preset_empty(
             )
         )
         stack.enter_context(
-            patch("invarlock.cli.run_artifact_output.emit_run_artifacts", _fake_emit)
+            patch(
+                "invarlock.reporting.run_report_contract.save_report", _fake_save_report
+            )
         )
         stack.enter_context(
             patch(
@@ -511,7 +517,7 @@ context:
             status="success",
         )
 
-    def _fake_emit(*, report, out_dir, filename_prefix, console):  # noqa: ARG001
+    def _fake_save_report(report, out_dir, formats=None, filename_prefix="report"):  # noqa: ARG001
         return _emit_stub(
             captured,
             report=report,
@@ -588,7 +594,9 @@ context:
             )
         )
         stack.enter_context(
-            patch("invarlock.cli.run_artifact_output.emit_run_artifacts", _fake_emit)
+            patch(
+                "invarlock.reporting.run_report_contract.save_report", _fake_save_report
+            )
         )
         stack.enter_context(
             patch(

@@ -4,11 +4,10 @@ Evaluation data runtime support.
 Owns dependency detection, lazy dataset loading, and local file signatures.
 """
 
-from __future__ import annotations
-
 import importlib.util
 import os
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -27,7 +26,24 @@ _load_dataset_cached: Any = _DATASETS_UNSET
 load_dataset: Any = None
 
 
-EventEmitter = Callable[[str, str, str | None], None]
+@dataclass(frozen=True)
+class DatasetDiagnostic:
+    kind: str
+    message: str
+    severity: str = "info"
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def tag(self) -> str:
+        tag = self.metadata.get("tag", self.kind)
+        return str(tag).upper()
+
+    @property
+    def emoji(self) -> str | None:
+        emoji = self.metadata.get("emoji")
+        if isinstance(emoji, str) and emoji:
+            return emoji
+        return None
 
 
 def _get_load_dataset() -> Any | None:
@@ -74,7 +90,7 @@ def _local_files_signature(files: Sequence[Path]) -> tuple[tuple[str, int, int],
 
 
 __all__ = [
-    "EventEmitter",
+    "DatasetDiagnostic",
     "HAS_DATASETS",
     "HAS_TORCH",
     "_get_load_dataset",

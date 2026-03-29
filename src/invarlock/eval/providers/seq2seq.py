@@ -10,7 +10,6 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
-from ..data_support import EventEmitter
 from ..data_windows import EvaluationWindow, split_window_by_index
 from .base import EvaluationProvider
 
@@ -29,14 +28,13 @@ class Seq2SeqProvider(EvaluationProvider):
 
     name = "seq2seq"
 
-    def __init__(self, emit: EventEmitter | None = None, **kwargs: Any) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         self._n = int(kwargs.get("n", 12))
         self._src_len = int(kwargs.get("src_len", 6))
         self._tgt_len = int(kwargs.get("tgt_len", 7))
         self._pad_id = int(kwargs.get("pad_id", 0))
         self._bos_id = int(kwargs.get("bos_id", 1))
         self._eos_id = int(kwargs.get("eos_id", 2))
-        self._emit_event = emit
         self._ids: list[str] = []
         self.last_preview_labels: list[list[int]] | None = None
         self.last_final_labels: list[list[int]] | None = None

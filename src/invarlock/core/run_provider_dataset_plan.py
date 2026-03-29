@@ -2,17 +2,32 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
+
+from invarlock.eval.data_support import DatasetDiagnostic
 
 from .provider_config import resolve_provider_kind_and_kwargs
 
 
 @dataclass(frozen=True)
-class ProviderDatasetPlanNotice:
-    tag: str
+class ProviderDatasetPlanDiagnostic:
+    kind: str
     message: str
-    emoji: str | None = None
+    severity: str = "info"
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def tag(self) -> str:
+        tag = self.metadata.get("tag", self.kind)
+        return str(tag).upper()
+
+    @property
+    def emoji(self) -> str | None:
+        emoji = self.metadata.get("emoji")
+        if isinstance(emoji, str) and emoji:
+            return emoji
+        return None
 
 
 @dataclass(frozen=True)
@@ -33,7 +48,7 @@ class ProviderDatasetPlanResult:
     final_mask_counts: list[int]
     preview_records: list[dict[str, Any]]
     final_records: list[dict[str, Any]]
-    notices: tuple[ProviderDatasetPlanNotice, ...]
+    diagnostics: tuple[ProviderDatasetPlanDiagnostic, ...]
 
 
 ResolveProviderAndSplitFn = Callable[..., tuple[Any, str, bool]]
@@ -114,7 +129,6 @@ def build_provider_dataset_plan(
     *,
     cfg: Any,
     model_profile: Any,
-    console: Any,
     resolved_device: str | None,
     profile: str | None,
     profile_normalized: str | None,
@@ -142,13 +156,20 @@ def build_provider_dataset_plan(
     safe_int_fn: SafeIntFn,
     tensor_or_list_to_ints_fn: TensorOrListToIntsFn,
 ) -> ProviderDatasetPlanResult:
-    notices: list[ProviderDatasetPlanNotice] = []
+    diagnostics: list[ProviderDatasetPlanDiagnostic] = []
     eval_section = _section_dict(cfg, "eval")
     guards_section = _section_dict(cfg, "guards")
     auto_section = _section_dict(cfg, "auto")
 
-    def _provider_notice(tag: str, message: str, emoji: str | None = None) -> None:
-        notices.append(ProviderDatasetPlanNotice(tag=tag, message=message, emoji=emoji))
+    def _collect_diagnostic(diagnostic: DatasetDiagnostic) -> None:
+        diagnostics.append(
+            ProviderDatasetPlanDiagnostic(
+                kind=diagnostic.kind,
+                message=diagnostic.message,
+                severity=diagnostic.severity,
+                metadata=dict(diagnostic.metadata),
+            )
+        )
 
     provider_kwargs = _build_provider_kwargs(cfg.dataset)
     data_provider, resolved_split, used_fallback_split = resolve_provider_and_split_fn(
@@ -156,9 +177,23 @@ def build_provider_dataset_plan(
         model_profile,
         get_provider_fn=get_provider_fn,
         provider_kwargs=provider_kwargs,
-        console=console,
         resolved_device=resolved_device,
-        emit=_provider_notice,
+    )
+    diagnostics.append(
+        ProviderDatasetPlanDiagnostic(
+            kind="provider.resolved",
+            message="provider resolved",
+            severity="info",
+            metadata={
+                "tag": "DATA",
+                "emoji": "🔌",
+                "provider": getattr(
+                    data_provider, "name", type(data_provider).__name__
+                ),
+                "split": resolved_split,
+                "used_fallback_split": bool(used_fallback_split),
+            },
+        )
     )
 
     tokenizer, tokenizer_hash = resolve_tokenizer_fn(model_profile)
@@ -194,7 +229,6 @@ def build_provider_dataset_plan(
                 requested_preview=requested_preview,
                 requested_final=requested_final,
                 max_calibration=max_calibration,
-                console=console,
             )
             actual_per_arm = int(window_plan["actual_preview"])
             effective_preview = actual_per_arm
@@ -203,14 +237,15 @@ def build_provider_dataset_plan(
                 cfg.dataset, "stride", getattr(cfg.dataset, "seq_len", 0)
             )
         else:
-            notices.append(
-                ProviderDatasetPlanNotice(
-                    tag="WARN",
+            diagnostics.append(
+                ProviderDatasetPlanDiagnostic(
+                    kind="provider.capacity_missing",
                     message=(
                         "Release profile requested but dataset provider does not expose "
                         "capacity estimation; using configured window counts."
                     ),
-                    emoji="⚠️",
+                    severity="warning",
+                    metadata={"tag": "WARN", "emoji": "⚠️"},
                 )
             )
 
@@ -274,9 +309,7 @@ def build_provider_dataset_plan(
         requested_final=requested_final,
         profile=profile_normalized,
         signature_transform=signature_transform,
-        event_fn=lambda message: notices.append(
-            ProviderDatasetPlanNotice(tag="WARN", message=message, emoji="⚠️")
-        ),
+        diagnostic_fn=_collect_diagnostic,
     )
 
     preview_records = list(effective_windows["preview_records"])
@@ -445,5 +478,5 @@ def build_provider_dataset_plan(
         final_mask_counts=final_mask_counts,
         preview_records=preview_records,
         final_records=final_records,
-        notices=tuple(notices),
+        diagnostics=tuple(diagnostics),
     )

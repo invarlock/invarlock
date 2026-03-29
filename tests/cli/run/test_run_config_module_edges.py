@@ -333,7 +333,7 @@ def test_resolve_device_and_output_uses_default_shell_helpers_and_handles_cfg_mo
     assert printed == [("Device", "cpu (auto->cpu)")]
 
 
-def test_resolve_provider_and_split_uses_emit_and_available_split_fallback() -> None:
+def test_resolve_provider_and_split_ignores_emit_and_available_split_fallback() -> None:
     calls: list[tuple[str, dict]] = []
     emit_sentinel = object()
 
@@ -363,8 +363,7 @@ def test_resolve_provider_and_split_uses_emit_and_available_split_fallback() -> 
     assert calls[0][0] == "wikitext2"
     assert calls[0][1]["existing"] is True
     assert calls[0][1]["device_hint"] == "cpu"
-    assert "emit" in calls[0][1]
-    assert calls[0][1]["emit"] is not None
+    assert "emit" not in calls[0][1]
 
 
 def test_resolve_provider_and_split_uses_default_provider_import(

@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ..data_support import EventEmitter
 from ..data_tokenization import tokenize_combined_pairs
 from ..data_windows import (
     EvaluationWindow,
@@ -28,7 +27,6 @@ class LocalJSONLPairsProvider:
         src_field: str = "source",
         tgt_field: str = "target",
         max_samples: int = 2000,
-        emit: EventEmitter | None = None,
     ) -> None:
         self.file = file
         self.path = path

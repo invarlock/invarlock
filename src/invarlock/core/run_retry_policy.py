@@ -4,6 +4,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from invarlock.core.retry import RetryDiagnostic
+
 
 def build_retry_result_summary(
     validation: Mapping[str, Any] | None,
@@ -22,7 +24,7 @@ def build_retry_result_summary(
 class RetryFailureTransition:
     should_retry: bool
     next_attempt: int
-    notices: tuple[str, ...]
+    diagnostics: tuple[RetryDiagnostic, ...]
 
 
 @dataclass(frozen=True)
@@ -39,7 +41,7 @@ class RetryValidationTransition:
     action: str
     updated_edit_config: dict[str, Any]
     failed_gates: tuple[str, ...]
-    notices: tuple[str, ...] = ()
+    diagnostics: tuple[RetryDiagnostic, ...] = ()
     next_attempt: int | None = None
     head_adjustment: dict[str, int] | None = None
     error_message: str | None = None
@@ -75,7 +77,7 @@ def decide_failed_retry_transition(
         return RetryFailureTransition(
             should_retry=False,
             next_attempt=attempt,
-            notices=(),
+            diagnostics=(),
         )
 
     record_retry_attempt(
@@ -85,13 +87,17 @@ def decide_failed_retry_transition(
         edit_config=edit_config,
     )
     should_retry = bool(retry_controller.should_retry(bool(passed)))
-    drain_notices = getattr(retry_controller, "drain_notices", None)
-    notices = tuple(drain_notices() if callable(drain_notices) else ())
+    drain_diagnostics = getattr(retry_controller, "drain_diagnostics", None)
+    if callable(drain_diagnostics):
+        diagnostics = tuple(drain_diagnostics())
+    else:
+        drain_notices = getattr(retry_controller, "drain_notices", None)
+        diagnostics = tuple(drain_notices() if callable(drain_notices) else ())
     next_attempt = attempt + 1 if should_retry else attempt
     return RetryFailureTransition(
         should_retry=should_retry,
         next_attempt=next_attempt,
-        notices=notices,
+        diagnostics=diagnostics,
     )
 
 
@@ -242,7 +248,7 @@ def resolve_retry_validation_transition(
             action=decision.action,
             updated_edit_config=decision.updated_edit_config,
             failed_gates=decision.failed_gates,
-            notices=transition.notices,
+            diagnostics=transition.diagnostics,
             next_attempt=transition.next_attempt,
             head_adjustment=decision.head_adjustment,
             error_message=decision.error_message,

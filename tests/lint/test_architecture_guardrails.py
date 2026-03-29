@@ -162,9 +162,6 @@ def test_owner_layers_do_not_import_cli_modules() -> None:
 
 def test_owner_layers_do_not_print_directly() -> None:
     offenders: set[str] = set()
-    excluded_files = {
-        REPO_ROOT / "src/invarlock/eval/bench.py",
-    }
     for root in (
         REPO_ROOT / "src/invarlock/core",
         REPO_ROOT / "src/invarlock/reporting",
@@ -172,8 +169,6 @@ def test_owner_layers_do_not_print_directly() -> None:
         REPO_ROOT / "src/invarlock/guards",
     ):
         for path in root.rglob("*.py"):
-            if path in excluded_files:
-                continue
             tree = ast.parse(_read_text(path), filename=str(path))
             for node in ast.walk(tree):
                 if isinstance(node, ast.Call):
@@ -198,6 +193,84 @@ def test_owner_layers_do_not_print_directly() -> None:
                         offenders.add(f"{path.relative_to(REPO_ROOT)} -> typer.echo(")
 
     assert not offenders, "\n".join(sorted(offenders))
+
+
+def test_eval_bench_is_not_a_shell_entrypoint() -> None:
+    path = REPO_ROOT / "src/invarlock/eval/bench.py"
+    text = _read_text(path)
+    offenders = []
+    for snippet in (
+        "import argparse",
+        "import sys",
+        "sys.exit(",
+        'if __name__ == "__main__"',
+    ):
+        if snippet in text:
+            offenders.append(snippet)
+
+    assert not offenders, "\n".join(offenders)
+
+
+def test_core_runtime_attestation_is_wrapper_only() -> None:
+    path = REPO_ROOT / "src/invarlock/core/runtime_attestation.py"
+    tree = ast.parse(_read_text(path), filename=str(path))
+
+    imports: list[str] = []
+    for node in tree.body:
+        if isinstance(node, ast.Import):
+            imports.extend(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            imports.append(node.module or "")
+
+    banned = {
+        "json",
+        "shutil",
+        "subprocess",
+        "pathlib",
+        "invarlock.runtime_security",
+    }
+    assert not banned.intersection(imports)
+
+    text = _read_text(path)
+    for snippet in (
+        "load_runtime_manifest",
+        "runtime_verifier_binary",
+        "unattested_artifacts_allowed",
+    ):
+        assert snippet not in text
+
+
+def test_run_report_contract_is_persistence_only() -> None:
+    path = REPO_ROOT / "src/invarlock/reporting/run_report_contract.py"
+    tree = ast.parse(_read_text(path), filename=str(path))
+    target = None
+    for node in tree.body:
+        if (
+            isinstance(node, ast.FunctionDef)
+            and node.name == "persist_run_report_outputs"
+        ):
+            target = node
+            break
+
+    assert target is not None, "persist_run_report_outputs not found"
+
+    arg_names = [arg.arg for arg in target.args.kwonlyargs]
+    assert arg_names == [
+        "report",
+        "run_dir",
+        "run_config",
+        "telemetry",
+        "save_telemetry_report_fn",
+    ]
+
+    text = _read_text(path)
+    for snippet in (
+        "console",
+        "postprocess_and_summarize_fn",
+        "subprocess",
+        "shutil",
+    ):
+        assert snippet not in text
 
 
 def test_lens_metrics_entrypoint_requires_metrics_config() -> None:

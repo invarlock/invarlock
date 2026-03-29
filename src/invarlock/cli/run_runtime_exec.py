@@ -14,7 +14,7 @@ from rich.console import Console
 
 from invarlock.cli.run_config import extract_model_load_kwargs
 from invarlock.cli.run_runtime import free_model_memory, get_psutil
-from invarlock.cli.run_shell_output import _event, _style_from_console
+from invarlock.cli.run_shell_output import _event
 from invarlock.cli.run_warning_filters import suppress_noisy_warnings
 from invarlock.core.exceptions import InvarlockError
 from invarlock.core.run_policy import GUARD_OVERHEAD_THRESHOLD
@@ -186,9 +186,7 @@ def run_bare_control(
     bare_context.setdefault("validation", {})["guard_overhead_mode"] = "bare"
     bare_config.context = bare_context
     edit_runtime = EditRuntime(
-        console=console,
         emit=edit_emit,
-        output_style=_style_from_console(console, profile=profile_normalized),
     )
 
     private_model_loaded = False
@@ -354,9 +352,7 @@ def execute_guarded_run(
             snapshot_provenance["reload_path_used"] = True
 
     edit_runtime = EditRuntime(
-        console=console,
         emit=True,
-        output_style=_style_from_console(console, profile=profile_normalized),
     )
 
     with suppress_noisy_warnings(

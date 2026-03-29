@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 from invarlock.cli.runtime_launch_plan import build_request_container_launch_plan
-from invarlock.core.run_orchestrator import RunExecutionRequest
 from invarlock.runtime_security import (
     apply_runtime_allowances,
     delegate_container_command,
@@ -19,7 +19,32 @@ class RuntimeDelegationError(RuntimeError):
     """Raised when secure-default container delegation cannot start."""
 
 
-ConfigExecutionRequest = RunExecutionRequest
+@dataclass(frozen=True)
+class ConfigExecutionRequest:
+    config: str
+    device: str | None = None
+    profile: str | None = None
+    out: str | None = None
+    edit: str | None = None
+    edit_label: str | None = None
+    tier: str | None = None
+    metric_kind: str | None = None
+    probes: int | None = None
+    until_pass: bool = False
+    max_attempts: int = 3
+    timeout: int | None = None
+    baseline: str | None = None
+    no_cleanup: bool = False
+    style: str | None = None
+    progress: bool = False
+    timing: bool = False
+    telemetry: bool = False
+    no_color: bool = False
+    allow_network: bool = False
+    allow_host_execution: bool = False
+    allow_third_party_plugins: bool = False
+    allow_remote_code: bool = False
+    prefer_local_files_only: bool = False
 
 
 def run_from_config(

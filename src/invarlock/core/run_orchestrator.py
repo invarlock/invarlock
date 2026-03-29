@@ -69,11 +69,8 @@ class RunExecutionRequest:
     timeout: int | None = None
     baseline: str | None = None
     no_cleanup: bool = False
-    style: str | None = None
-    progress: bool = False
-    timing: bool = False
+    capture_timings: bool = False
     telemetry: bool = False
-    no_color: bool = False
     prefer_local_files_only: bool = False
 
 
@@ -81,9 +78,9 @@ class RunExecutionRequest:
 class RunExecutionEvent:
     """Typed orchestration event emitted by the owner layer."""
 
-    kind: str
-    name: str
-    payload: dict[str, Any] = field(default_factory=dict)
+    phase: str
+    code: str
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -96,22 +93,33 @@ class RunExecutionResult:
 
 @dataclass(frozen=True)
 class RunExecutionOutcome:
-    """Typed orchestration outcome with event transcript and exit code."""
+    """Typed orchestration outcome with event transcript and failure state."""
 
-    exit_code: int
+    ok: bool
     result: RunExecutionResult | None
+    failure: RunExecutionFailure | None
     events: tuple[RunExecutionEvent, ...]
+
+
+@dataclass(frozen=True)
+class RunExecutionFailure:
+    """Typed failure contract produced by run orchestration."""
+
+    code: str
+    message: str | None = None
+    error: Exception | None = None
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 RunExecutionObserver = Callable[[RunExecutionEvent], None]
 
 
 class _RunExecutionHalt(RuntimeError):
-    """Internal control-flow sentinel carrying a typed exit code."""
+    """Internal control-flow sentinel carrying a typed failure."""
 
-    def __init__(self, exit_code: int):
-        super().__init__(f"run execution halted with exit code {exit_code}")
-        self.exit_code = int(exit_code)
+    def __init__(self, failure: RunExecutionFailure):
+        super().__init__(f"run execution halted: {failure.code}")
+        self.failure = failure
 
 
 @dataclass(frozen=True)
@@ -132,7 +140,6 @@ class RunExecutionServices:
     persist_run_report_outputs: Callable[..., object]
     prepare_config_for_run: Callable[..., object]
     resolve_device_and_output: Callable[..., object]
-    resolve_exit_code: Callable[..., int]
     resolve_snapshot_config: Callable[..., object]
     resolve_snapshot_retry_transition: Callable[..., object]
     run_bare_control: Callable[..., object]
@@ -184,6 +191,7 @@ def execute_run_request(
     timeout = request.timeout
     baseline = request.baseline
     no_cleanup = request.no_cleanup
+    capture_timings = request.capture_timings
     telemetry = request.telemetry
     prefer_local_files_only = request.prefer_local_files_only
 
@@ -212,7 +220,6 @@ def execute_run_request(
     _persist_run_report_outputs = services.persist_run_report_outputs
     _prepare_config_for_run = services.prepare_config_for_run
     _resolve_device_and_output = services.resolve_device_and_output
-    _resolve_exit_code = services.resolve_exit_code
     _resolve_snapshot_config = services.resolve_snapshot_config
     _resolve_snapshot_retry_transition = services.resolve_snapshot_retry_transition
     _run_bare_control = services.run_bare_control
@@ -246,46 +253,30 @@ def execute_run_request(
     no_cleanup = bool(no_cleanup)
     telemetry = bool(telemetry)
     timings: dict[str, float] = {}
-    collect_timings = bool(request.timing or telemetry)
+    collect_timings = bool(capture_timings or telemetry)
     total_start: float | None = perf_counter() if collect_timings else None
 
     # Use shared CLI coercers from invarlock.cli.utils
     report_path_out: str | None = None
     snapshot_tmpdir: str | None = None
     outcome_result: RunExecutionResult | None = None
-    outcome_exit_code = 0
+    outcome_failure: RunExecutionFailure | None = None
     emitted_events: list[RunExecutionEvent] = []
 
-    def _emit(kind: str, name: str, **payload: Any) -> None:
-        event = RunExecutionEvent(kind=kind, name=name, payload=dict(payload))
+    def _emit(phase: str, code: str, **details: Any) -> None:
+        event = RunExecutionEvent(phase=phase, code=code, details=dict(details))
         emitted_events.append(event)
         if observer is not None:
             observer(event)
 
-    def _emit_notice(tag: str, message: str, emoji: str | None = None) -> None:
-        _emit(
-            "notice",
-            "passthrough",
-            tag=tag,
-            message=message,
-            emoji=emoji,
-            profile=profile_normalized,
-        )
+    def _emit_status(code: str, **details: Any) -> None:
+        _emit("status", code, **details)
 
-    def _emit_status(name: str, **payload: Any) -> None:
-        _emit("status", name, profile=profile_normalized, **payload)
+    def _emit_diagnostic(code: str, **details: Any) -> None:
+        _emit("diagnostic", code, **details)
 
-    def _emit_detail(label: str, value: str) -> None:
-        _emit("detail", "kv", label=label, value=value)
-
-    def _emit_blank_line() -> None:
-        _emit("layout", "blank_line")
-
-    def _emit_plain_line(text: str) -> None:
-        _emit("line", "plain", text=text)
-
-    def _emit_markup_line(text: str) -> None:
-        _emit("line", "markup", text=text)
+    def _emit_metadata(code: str, **details: Any) -> None:
+        _emit("metadata", code, **details)
 
     def _emit_guard_overhead_summary(
         guard_overhead_info: dict[str, Any],
@@ -294,7 +285,7 @@ def execute_run_request(
     ) -> None:
         _emit(
             "summary",
-            "guard_overhead",
+            "guard_overhead_summary",
             guard_overhead_info=guard_overhead_info,
             default_threshold=default_threshold,
         )
@@ -310,41 +301,27 @@ def execute_run_request(
             return
         if not isinstance(summary, dict):
             return
-        _emit("summary", "retry", summary=summary)
+        _emit("summary", "retry_summary", summary=summary)
 
-    def _emit_timing_summary(
+    def _halt(
+        code: str,
         *,
-        order: list[str],
-        extra_lines: list[str],
-        summary_timings: dict[str, float],
+        message: str | None = None,
+        error: Exception | None = None,
+        **details: Any,
     ) -> None:
-        _emit(
-            "summary",
-            "timing",
-            order=order,
-            extra_lines=extra_lines,
-            timings=summary_timings,
-        )
-
-    def _extract_preserved_exit_code(exc: BaseException) -> int | None:
-        if isinstance(exc, SystemExit):
-            raw_code = exc.code
-        elif (
-            type(exc).__module__ == "click.exceptions" and type(exc).__name__ == "Exit"
-        ):
-            raw_code = getattr(exc, "exit_code", getattr(exc, "code", None))
+        if message is not None:
+            _emit_status(code, message=message, **details)
         else:
-            return None
-        if raw_code is None:
-            return 0
-        try:
-            return int(raw_code)
-        except (TypeError, ValueError):
-            return 1
-
-    def _halt(exit_code: int, event_name: str, **payload: Any) -> None:
-        _emit_status(event_name, **payload)
-        raise _RunExecutionHalt(exit_code)
+            _emit_status(code, **details)
+        raise _RunExecutionHalt(
+            RunExecutionFailure(
+                code=code,
+                message=message,
+                error=error,
+                details=dict(details),
+            )
+        )
 
     @contextmanager
     def _record_timed_step(key: str):
@@ -354,11 +331,42 @@ def execute_run_request(
         if collect_timings:
             timings[key] = elapsed
 
-    def _fail_run(message: str) -> None:
-        _halt(1, "pipeline_failed", error=message)
+    def _fail_run(message: str, *, error: Exception | None = None) -> None:
+        _halt("pipeline_failed", message=message, error=error)
 
-    def _provider_event(tag: str, message: str, emoji: str | None = None) -> None:
-        _emit_notice(tag, message, emoji=emoji)
+    def _emit_transition_diagnostic(source: str, diagnostic: Any) -> None:
+        code = getattr(diagnostic, "code", None)
+        if isinstance(code, str) and code:
+            details = getattr(diagnostic, "details", None)
+            payload = dict(details) if isinstance(details, dict) else {}
+            payload.setdefault("diagnostic_source", source)
+            message = getattr(diagnostic, "message", None)
+            if isinstance(message, str) and message:
+                payload.setdefault("message", message)
+            _emit_diagnostic(code, **payload)
+            return
+        kind = getattr(diagnostic, "kind", None)
+        if isinstance(kind, str) and kind:
+            payload = {}
+            metadata = getattr(diagnostic, "metadata", None)
+            if isinstance(metadata, dict):
+                payload.update(metadata)
+            payload.setdefault("diagnostic_source", source)
+            severity = getattr(diagnostic, "severity", None)
+            if isinstance(severity, str) and severity:
+                payload.setdefault("severity", severity)
+            message = getattr(diagnostic, "message", None)
+            if isinstance(message, str) and message:
+                payload.setdefault("message", message)
+            _emit_diagnostic(kind, **payload)
+            return
+        message = getattr(diagnostic, "message", None)
+        if isinstance(message, str) and message:
+            _emit_diagnostic(
+                "legacy_notice",
+                diagnostic_source=source,
+                message=message,
+            )
 
     def _cfg_section_value(cfg_obj: Any, name: str) -> Any:
         section_fn = getattr(cfg_obj, "section", None)
@@ -396,7 +404,7 @@ def execute_run_request(
         loaded = _optional_torch()
         if loaded is not None:
             return loaded
-        _halt(1, "torch_missing")
+        _halt("torch_missing")
 
     # use module-level _derive_mlm_seed
 
@@ -408,7 +416,7 @@ def execute_run_request(
         from invarlock.core.registry import get_registry
         from invarlock.core.runner import CoreRunner
 
-        # Load and validate configuration via helper (preserves console prints)
+        _emit_status("config_loading", config_path=config)
         cfg = _prepare_config_for_run(
             config_path=config,
             profile=profile,
@@ -416,6 +424,7 @@ def execute_run_request(
             tier=tier,
             probes=probes,
         )
+        _emit_status("config_loaded")
 
         # cfg prepared by helper above
         edit_payload: dict[str, Any] = {}
@@ -580,6 +589,11 @@ def execute_run_request(
         resolved_device, output_dir = _resolve_device_and_output(
             cfg, device=device, out=out
         )
+        _emit_metadata(
+            "device_resolved",
+            requested_device=device,
+            resolved_device=resolved_device,
+        )
 
         determinism_meta: dict[str, Any] | None = None
         try:
@@ -615,8 +629,7 @@ def execute_run_request(
 
         run_id = f"{output_dir.name}-{timestamp}" if output_dir.name else timestamp
 
-        _emit_detail("Output", str(run_dir))
-        _emit_detail("Run ID", run_id)
+        _emit_metadata("run_directory_ready", run_dir=str(run_dir), run_id=run_id)
 
         # Initialize retry controller if --until-pass mode enabled
         retry_controller = _init_retry_controller(
@@ -654,9 +667,10 @@ def execute_run_request(
             elif baseline_evidence.message:
                 if strict_baseline:
                     raise InvarlockError(code="E001", message=baseline_evidence.message)
-                _emit_status(
+                _emit_diagnostic(
                     "baseline_schedule_fallback",
                     message=baseline_evidence.message,
+                    severity="warning",
                 )
 
         requested_preview = _safe_int(getattr(cfg.dataset, "preview_n", 0), 0)
@@ -680,12 +694,11 @@ def execute_run_request(
         adapter = registry.get_adapter(cfg.model.adapter)
         edit_name = getattr(getattr(cfg, "edit", None), "name", None)
         if not isinstance(edit_name, str) or not edit_name.strip():
-            _halt(1, "edit_name_missing")
+            _halt("edit_name_missing")
         try:
             edit_op = registry.get_edit(edit_name.strip())
         except (AttributeError, KeyError) as exc:
-            _emit_status("unknown_edit", edit_name=edit_name.strip())
-            raise _RunExecutionHalt(2) from exc
+            _halt("unknown_edit", error=exc, edit_name=edit_name.strip())
 
         adapter_meta = registry.get_plugin_metadata(cfg.model.adapter, "adapters")
         try:
@@ -731,7 +744,7 @@ def execute_run_request(
                         registry.get_plugin_metadata(guard_name, "guards")
                     )
                 except KeyError:
-                    _emit_status("guard_missing", guard_name=guard_name)
+                    _emit_diagnostic("guard_missing", guard_name=guard_name)
         plugin_provenance = {
             "adapter": adapter_meta,
             "edit": edit_meta,
@@ -819,7 +832,7 @@ def execute_run_request(
                     build_provider_dataset_plan_fn=_build_provider_dataset_plan,
                 )
             except ValueError as exc:
-                _fail_run(str(exc))
+                _fail_run(str(exc), error=exc)
             except (
                 ImportError,
                 ModuleNotFoundError,
@@ -827,11 +840,10 @@ def execute_run_request(
                 RuntimeError,
                 TypeError,
             ) as exc:
-                _emit_status("pipeline_failed", error=str(exc))
-                raise _RunExecutionHalt(1) from exc
+                _fail_run(str(exc), error=exc)
 
-            for notice in dataset_result.notices:
-                _emit_notice(notice.tag, notice.message, emoji=notice.emoji)
+            for diagnostic in dataset_result.diagnostics:
+                _emit_transition_diagnostic("dataset", diagnostic)
 
             resolved_split = dataset_result.resolved_split
             used_fallback_split = dataset_result.used_fallback_split
@@ -899,11 +911,10 @@ def execute_run_request(
         auto_config = execution_payloads.auto_config
         edit_config = execution_payloads.edit_config
 
-        _emit_detail("Edit", str(edit_op.name))
+        _emit_metadata("edit_selected", edit_name=str(edit_op.name))
         _emit(
-            "detail",
-            "guard_chain",
-            label="Guards",
+            "metadata",
+            "guard_chain_resolved",
             guard_names=[str(getattr(guard, "name", "unknown")) for guard in guards],
         )
 
@@ -964,8 +975,8 @@ def execute_run_request(
                     "snapshot_mode",
                     enabled=bool(snapshot_plan.snapshot_enabled),
                 )
-            for notice in snapshot_plan.warning_notices:
-                _emit_notice("WARN", notice, emoji="⚠️")
+            for diagnostic in snapshot_plan.diagnostics:
+                _emit_transition_diagnostic("snapshot_plan", diagnostic)
         except OPTIONAL_RUNTIME_EXCEPTIONS:
             # On any failure, fall back to reload-per-attempt path
             _free_model_memory(model)
@@ -988,15 +999,14 @@ def execute_run_request(
         emitted_skip_overhead_warning = (
             snapshot_retry_transition.emitted_skip_overhead_warning
         )
-        for notice in snapshot_retry_transition.warning_notices:
-            _emit_notice("WARN", notice, emoji="⚠️")
+        for diagnostic in snapshot_retry_transition.diagnostics:
+            _emit_transition_diagnostic("snapshot_retry", diagnostic)
 
         while True:
             # Reset RNG streams each attempt to guarantee determinism across retries
             set_seed(seed_bundle["python"])
 
             if retry_controller:
-                _emit_blank_line()
                 _emit_status(
                     "attempt_started",
                     attempt=attempt,
@@ -1011,7 +1021,6 @@ def execute_run_request(
                     )
             else:
                 if attempt > 1:
-                    _emit_blank_line()
                     _emit_status(
                         "attempt_started",
                         attempt=attempt,
@@ -1025,8 +1034,8 @@ def execute_run_request(
                     edit_op.name, edit_config, attempt, None
                 )
                 edit_config = adjustment.params
-                for notice in adjustment.notices:
-                    _emit_notice("INIT", notice, emoji="🔧")
+                for diagnostic in adjustment.diagnostics:
+                    _emit_transition_diagnostic("retry_adjustment", diagnostic)
 
             guard_overhead_payload: dict[str, Any] | None = None
             try:
@@ -1102,7 +1111,7 @@ def execute_run_request(
                 _free_model_memory(model)
                 model = None
                 restore_fn = None
-                _emit_status("snapshot_restore_fallback", error=str(exc))
+                _emit_diagnostic("snapshot_restore_fallback", error=str(exc))
                 retry_transition = _decide_failed_retry_transition_impl(
                     retry_controller,
                     attempt=attempt,
@@ -1110,12 +1119,12 @@ def execute_run_request(
                     edit_config=edit_config,
                     passed=False,
                 )
-                for notice in retry_transition.notices:
-                    _emit_notice("WARN", notice, emoji="⚠️")
+                for diagnostic in retry_transition.diagnostics:
+                    _emit_transition_diagnostic("retry_failure", diagnostic)
                 if retry_transition.should_retry:
                     attempt = retry_transition.next_attempt
                     continue
-                raise _RunExecutionHalt(1) from exc
+                _halt("snapshot_restore_failed", error=exc)
 
             debug_metric_diffs_enabled = str(
                 os.environ.get("DEBUG_METRIC_DIFFS", "")
@@ -1168,21 +1177,17 @@ def execute_run_request(
 
             try:
                 if provenance_result.missing_evaluation_windows_for_baseline:
-                    _emit_status(
+                    _halt(
                         "baseline_windows_missing",
                         message=(
                             provenance_result.missing_evaluation_windows_message
                             or "[INVARLOCK:E001] PAIRING-SCHEDULE-MISMATCH: baseline pairing requested but evaluation windows were not produced. Check capacity/pairing config."
                         ),
                     )
-                    raise _RunExecutionHalt(3)
             except InvarlockError as ce:
-                _emit_status("invarlock_error", message=str(ce))
-                raise _RunExecutionHalt(
-                    _resolve_exit_code(ce, profile=profile)
-                ) from None
-            except RuntimeError as _e:
-                _fail_run(str(_e))
+                _halt("invarlock_error", message=str(ce), error=ce)
+            except RuntimeError as exc:
+                _fail_run(str(exc), error=exc)
 
             # Optional: export HF-loadable model snapshot when requested
             export_env = str(
@@ -1249,12 +1254,12 @@ def execute_run_request(
                             try:
                                 save_tokenizer(str(export_dir))
                             except OPTIONAL_RUNTIME_EXCEPTIONS:
-                                _emit_status("export_tokenizer_missing")
+                                _emit_diagnostic("export_tokenizer_missing")
                         report["artifacts"]["checkpoint_path"] = str(export_dir)
                     else:
-                        _emit_status("export_adapter_directory_missing")
+                        _emit_diagnostic("export_adapter_directory_missing")
                 except OPTIONAL_RUNTIME_EXCEPTIONS:
-                    _emit_status("export_failed")
+                    _emit_diagnostic("export_failed")
 
             pairing_violations = metrics_enrichment.pairing_violations
             if pairing_violations:
@@ -1264,14 +1269,11 @@ def execute_run_request(
                     message=violation.message,
                     details=violation.details,
                 )
-                code = _resolve_exit_code(err, profile=profile_normalized)
-                _emit_status("invarlock_error", message=str(err))
-                raise _RunExecutionHalt(code)
+                _halt("invarlock_error", message=str(err), error=err)
             if metrics_enrichment.debug_diffs_line:
-                _emit_markup_line(
-                    "[dim]DEBUG_METRIC_DIFFS: "
-                    + metrics_enrichment.debug_diffs_line
-                    + "[/dim]"
+                _emit_diagnostic(
+                    "metric_diffs_debug",
+                    summary=metrics_enrichment.debug_diffs_line,
                 )
 
             persistence_result = _persist_run_report_outputs(
@@ -1358,7 +1360,6 @@ def execute_run_request(
                         and str(loss_type_ctx).lower() != "mlm"
                     ):
                         _halt(
-                            1,
                             "guard_overhead_budget_exceeded",
                             threshold_fraction=float(threshold_fraction),
                         )
@@ -1367,14 +1368,17 @@ def execute_run_request(
 
             # Evaluation report validation for --until-pass mode
             if retry_controller and baseline:
-                _emit_status("generating_evaluation_report")
+                _emit_status("evaluation_report_started")
                 retry_validation = _validate_retry_evaluation_report(
                     report=report,
                     baseline_report_data=baseline_report_data,
                     baseline_path=Path(baseline) if baseline else None,
                 )
                 if retry_validation.telemetry_summary:
-                    _emit_plain_line(retry_validation.telemetry_summary)
+                    _emit_diagnostic(
+                        "retry_validation_telemetry_summary",
+                        summary=retry_validation.telemetry_summary,
+                    )
 
                 retry_decision = _resolve_retry_validation_transition_impl(
                     retry_controller,
@@ -1403,8 +1407,8 @@ def execute_run_request(
                             keep_high=head_adjustment["keep_high"],
                         )
 
-                    for notice in retry_decision.notices:
-                        _emit_notice("WARN", notice, emoji="⚠️")
+                    for diagnostic in retry_decision.diagnostics:
+                        _emit_transition_diagnostic("retry_validation", diagnostic)
                     if retry_decision.action == "retry":
                         attempt = retry_decision.next_attempt or (attempt + 1)
                         continue
@@ -1440,7 +1444,7 @@ def execute_run_request(
 
         _emit_retry_summary(retry_controller)
 
-        if request.timing:
+        if capture_timings:
             total_duration = (
                 max(0.0, float(perf_counter() - total_start))
                 if total_start is not None
@@ -1452,11 +1456,7 @@ def execute_run_request(
                 report=report if isinstance(report, dict) else None,
             )
             if summary_payload is not None:
-                _emit_timing_summary(
-                    order=list(summary_payload.order),
-                    extra_lines=list(summary_payload.extra_lines),
-                    summary_timings=dict(summary_payload.timings),
-                )
+                timings = dict(summary_payload.timings)
 
         outcome_result = RunExecutionResult(
             report_path=report_path_out,
@@ -1464,14 +1464,22 @@ def execute_run_request(
         )
 
     except FileNotFoundError as e:
+        outcome_failure = RunExecutionFailure(
+            code="config_file_missing",
+            message=str(e),
+            error=e,
+            details={"path": str(e)},
+        )
         _emit_status("config_file_missing", path=str(e))
-        outcome_exit_code = 1
     except InvarlockError as ce:
-        # InvarlockError → code 3 only in CI/Release; dev → 1
+        outcome_failure = RunExecutionFailure(
+            code="invarlock_error",
+            message=str(ce),
+            error=ce,
+        )
         _emit_status("invarlock_error", message=str(ce))
-        outcome_exit_code = _resolve_exit_code(ce, profile=profile)
     except _RunExecutionHalt as halt:
-        outcome_exit_code = halt.exit_code
+        outcome_failure = halt.failure
     except (
         AttributeError,
         TypeError,
@@ -1487,19 +1495,28 @@ def execute_run_request(
             import traceback
 
             traceback.print_exc()
-        preserved_exit_code = _extract_preserved_exit_code(e)
-        if preserved_exit_code is not None:
-            outcome_exit_code = preserved_exit_code
-        elif isinstance(e, ValueError) and "Invalid RunReport" in str(e):
+        if isinstance(e, ValueError) and "Invalid RunReport" in str(e):
             # Emit a clearer message for schema failures (exit 2)
+            outcome_failure = RunExecutionFailure(
+                code="schema_invalid_run_report",
+                message=str(e),
+                error=e,
+            )
             _emit_status("schema_invalid_run_report")
-            outcome_exit_code = 2
         elif isinstance(e, ModuleNotFoundError | ImportError) and "torch" in str(e):
+            outcome_failure = RunExecutionFailure(
+                code="torch_missing",
+                message=str(e),
+                error=e,
+            )
             _emit_status("torch_missing")
-            outcome_exit_code = 1
         else:
+            outcome_failure = RunExecutionFailure(
+                code="pipeline_failed",
+                message=str(e),
+                error=e,
+            )
             _emit_status("pipeline_failed", error=str(e))
-            outcome_exit_code = _resolve_exit_code(e, profile=profile)
     finally:
         # Cleanup snapshot directory if used (always print once per run)
         try:
@@ -1518,7 +1535,8 @@ def execute_run_request(
             # Best-effort cleanup printing; never raise from finally
             pass
     return RunExecutionOutcome(
-        exit_code=int(outcome_exit_code),
+        ok=outcome_failure is None and outcome_result is not None,
         result=outcome_result,
+        failure=outcome_failure,
         events=tuple(emitted_events),
     )

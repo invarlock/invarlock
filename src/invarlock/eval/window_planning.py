@@ -7,6 +7,7 @@ from collections.abc import Callable, Sequence
 from typing import Any, TypedDict
 
 from .data import EvaluationWindow
+from .data_support import DatasetDiagnostic
 
 
 class WindowRecord(TypedDict):
@@ -60,7 +61,7 @@ class CandidateSelectionResult(TypedDict):
 SignatureTransform = Callable[
     [list[WindowRecord], list[WindowRecord]], list[WindowRecord]
 ]
-PlannerEvent = Callable[[str], None]
+DiagnosticSink = Callable[[DatasetDiagnostic], None]
 
 
 def _tensor_or_list_to_ints(value: Any) -> list[int]:
@@ -168,7 +169,7 @@ def resolve_effective_windows(
     profile: str | None = None,
     release_min_windows_per_arm: int = 200,
     signature_transform: SignatureTransform | None = None,
-    event_fn: PlannerEvent | None = None,
+    diagnostic_fn: DiagnosticSink | None = None,
 ) -> EffectiveWindowPlanResult:
     requested_preview_n = int(requested_preview or preview_n)
     requested_final_n = int(requested_final or final_n)
@@ -250,10 +251,19 @@ def resolve_effective_windows(
             raise RuntimeError(
                 "Unable to construct non-overlapping windows within minimum window floor."
             )
-        if event_fn is not None:
-            event_fn(
-                f"Detected {deficit} duplicate windows; reducing per-arm windows to "
-                f"{proposed_per_arm} and retrying stratification."
+        if diagnostic_fn is not None:
+            diagnostic_fn(
+                DatasetDiagnostic(
+                    kind="window.dedupe_adjustment",
+                    severity="warning",
+                    message="Duplicate windows detected; reducing per-arm windows.",
+                    metadata={
+                        "tag": "WARN",
+                        "emoji": "⚠️",
+                        "deficit": int(deficit),
+                        "proposed_per_arm": int(proposed_per_arm),
+                    },
+                )
             )
         dedupe_adjustments.append(
             {
@@ -277,7 +287,7 @@ def choose_first_token_sufficient_candidate(
     profile: str | None = None,
     release_min_windows_per_arm: int = 200,
     signature_transform: SignatureTransform | None = None,
-    event_fn: PlannerEvent | None = None,
+    diagnostic_fn: DiagnosticSink | None = None,
 ) -> CandidateSelectionResult:
     effective_min_tokens = int(
         math.ceil(float(min_tokens_target) * float(headroom_ratio))
@@ -304,7 +314,7 @@ def choose_first_token_sufficient_candidate(
                 profile=profile,
                 release_min_windows_per_arm=release_min_windows_per_arm,
                 signature_transform=signature_transform,
-                event_fn=event_fn,
+                diagnostic_fn=diagnostic_fn,
             )
             total_tokens = int(planned["preview_total_tokens"]) + int(
                 planned["final_total_tokens"]

@@ -156,21 +156,18 @@ def test_run_ci_uses_semantic_prefixes_no_emojis(tmp_path: Path, monkeypatch) ->
         assert emoji not in s
 
 
-def test_run_audit_routes_provider_events_without_emojis(
+def test_run_audit_uses_structured_dataset_events_without_emojis(
     tmp_path: Path, monkeypatch
 ) -> None:
     _common_stubs(monkeypatch)
     monkeypatch.setattr("invarlock.cli.device.resolve_device", lambda _d: "cpu")
 
-    def _provider_factory(kind: str, *, emit=None, **kwargs):
+    def _provider_factory(kind: str, **kwargs):
         _ = kwargs
         assert kind == "wikitext2"
-        assert emit is not None
 
         def _windows(**kw):
             _ = kw
-            emit("DATA", "WikiText-2 validation: loading split...", "📚")
-            emit("DATA", "Creating evaluation windows:", "📊")
             return (
                 SimpleNamespace(input_ids=[[1, 2]], attention_masks=[[1, 1]]),
                 SimpleNamespace(input_ids=[[3, 4]], attention_masks=[[1, 1]]),
@@ -196,8 +193,7 @@ def test_run_audit_routes_provider_events_without_emojis(
     )
     assert r.exit_code == 0
     s = r.stdout
-    assert "[DATA] WikiText-2 validation: loading split..." in s
-    assert "[DATA] Creating evaluation windows:" in s
+    assert "[DATA] Loading dataset: wikitext2" in s
     assert "📚" not in s
     assert "📊" not in s
 

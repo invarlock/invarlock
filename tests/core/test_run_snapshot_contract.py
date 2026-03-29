@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from invarlock.core.run_snapshot_contract import (
+    SnapshotDiagnostic,
     build_snapshot_execution_plan,
     resolve_snapshot_retry_transition,
 )
@@ -26,7 +27,17 @@ def test_build_snapshot_execution_plan_direct_reuse_sets_skip_model_load() -> No
     assert plan.skip_model_load is True
     assert plan.snapshot_enabled is None
     assert plan.emitted_skip_overhead_warning is True
-    assert len(plan.warning_notices) == 2
+    assert plan.diagnostics == (
+        SnapshotDiagnostic(
+            code="snapshot.overhead_check_skipped",
+            message="Overhead check skipped via config policy (config:context.run.skip_overhead_check)",
+            details={"source": "config:context.run.skip_overhead_check"},
+        ),
+        SnapshotDiagnostic(
+            code="snapshot.loaded_model_reused",
+            message="Reusing initially loaded model for guarded execution.",
+        ),
+    )
 
 
 def test_build_snapshot_execution_plan_bytes_falls_back_to_chunked() -> None:
@@ -78,4 +89,14 @@ def test_resolve_snapshot_retry_transition_reuses_loaded_model() -> None:
 
     assert transition.skip_model_load is True
     assert transition.emitted_skip_overhead_warning is True
-    assert len(transition.warning_notices) == 2
+    assert transition.diagnostics == (
+        SnapshotDiagnostic(
+            code="snapshot.overhead_check_skipped",
+            message="Overhead check skipped via config policy (config:context.run.skip_overhead_check)",
+            details={"source": "config:context.run.skip_overhead_check"},
+        ),
+        SnapshotDiagnostic(
+            code="snapshot.restore_unavailable_reuse_loaded_model",
+            message="Snapshot restore unavailable; reusing initially loaded model for guarded execution.",
+        ),
+    )

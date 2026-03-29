@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import random
 from abc import abstractmethod
@@ -19,11 +20,13 @@ from .data_difficulty import (
 from .data_stratification import (
     stratify_wikitext_candidates as _stratify_wikitext_candidates,
 )
-from .data_support import EventEmitter, _require_load_dataset
+from .data_support import _require_load_dataset
 from .data_tokenization import tokenize_combined_pairs, tokenize_texts_padded
 from .data_windows import EvaluationWindow, split_labels_by_index, split_window_by_index
 from .providers.local_jsonl import LocalJSONLProvider
 from .providers.local_jsonl_pairs import LocalJSONLPairsProvider
+
+LOGGER = logging.getLogger(__name__)
 
 
 class DatasetProvider(Protocol):
@@ -70,11 +73,9 @@ class WikiText2Provider:
         self,
         cache_dir: Path | None = None,
         device_hint: str | None = None,
-        emit: EventEmitter | None = None,
         **_: Any,
     ):
         self.cache_dir = cache_dir
-        self._emit_event = emit
         self._validate_dependencies()
         self._last_stratification_stats: dict[str, Any] | None = None
         self._last_batch_size_used: int = 0
@@ -82,11 +83,6 @@ class WikiText2Provider:
         self._texts_cache: dict[str, list[str]] = {}
         normalized_hint = (device_hint or "").strip().lower()
         self._device_hint: str | None = normalized_hint or None
-
-    def _event(self, tag: str, message: str, *, emoji: str | None = None) -> None:
-        if self._emit_event is None:
-            return
-        self._emit_event(tag, message, emoji)
 
     def _validate_dependencies(self) -> None:
         _require_load_dataset(
@@ -117,7 +113,7 @@ class WikiText2Provider:
     def load(
         self, split: str = "validation", max_samples: int = 2000, **kwargs: Any
     ) -> list[str]:
-        self._event("DATA", f"WikiText-2 {split}: loading split...", emoji="📚")
+        LOGGER.info("WikiText-2 %s: loading split...", split)
         cached = self._texts_cache.get(split)
         if cached is not None and len(cached) >= max_samples:
             return cached[:max_samples]
@@ -157,7 +153,7 @@ class WikiText2Provider:
         if prev is None or len(valid_texts) > len(prev):
             self._texts_cache[split] = list(valid_texts)
 
-        self._event("DATA", f"Loaded {len(valid_texts)}/{len(dataset)} valid samples")
+        LOGGER.info("Loaded %s/%s valid samples", len(valid_texts), len(dataset))
         return valid_texts
 
     def windows(
@@ -203,9 +199,9 @@ class WikiText2Provider:
         used_indices: set[int] = set()
         cursor = 0
         chunk_size = max(64, min(256, target_pool))
-        self._event("DATA", "Creating evaluation windows:", emoji="📊")
-        self._event("DATA", f"Requested preview/final: {preview_n}/{final_n}")
-        self._event("DATA", f"Sampling pool target: {target_pool} (reserve {reserve})")
+        LOGGER.info("Creating evaluation windows")
+        LOGGER.info("Requested preview/final: %s/%s", preview_n, final_n)
+        LOGGER.info("Sampling pool target: %s (reserve %s)", target_pool, reserve)
 
         while len(candidates) < total_required + reserve and cursor < len(
             shuffled_indices
@@ -253,9 +249,9 @@ class WikiText2Provider:
         )
         self._last_stratification_stats = stratification_stats
 
-        self._event("DATA", f"Seed: {seed}, Seq length: {seq_len}")
-        self._event("DATA", f"Preview: {len(preview_window)} samples")
-        self._event("DATA", f"Final: {len(final_window)} samples")
+        LOGGER.info("Seed: %s, Seq length: %s", seed, seq_len)
+        LOGGER.info("Preview: %s samples", len(preview_window))
+        LOGGER.info("Final: %s samples", len(final_window))
         return preview_window, final_window
 
     def _collect_tokenized_samples(
@@ -316,9 +312,11 @@ class WikiText2Provider:
         input_ids_list = [entry[1] for entry in collected]
         attention_masks_list = [entry[2] for entry in collected]
         valid_indices = [entry[0] for entry in collected]
-        self._event(
-            "DATA",
-            f"{window_name}: {len(valid_indices)}/{len(indices)} samples tokenized",
+        LOGGER.info(
+            "%s: %s/%s samples tokenized",
+            window_name,
+            len(valid_indices),
+            len(indices),
         )
         return EvaluationWindow(
             input_ids=input_ids_list,
@@ -352,7 +350,6 @@ class SyntheticProvider:
     def __init__(
         self,
         base_samples: list[str] | None = None,
-        emit: EventEmitter | None = None,
     ):
         self.base_samples = base_samples or self._default_samples()
         self._load_cache: dict[int, list[str]] = {}
@@ -494,7 +491,6 @@ class HFTextProvider:
         cache_dir: str | None = None,
         trust_remote_code: bool = False,
         max_samples: int = 2000,
-        emit: EventEmitter | None = None,
     ):
         _require_load_dataset(
             "DEPENDENCY-MISSING: datasets library required for hf_text provider"
@@ -697,7 +693,6 @@ class HFSeq2SeqProvider:
         tgt_field: str = "target",
         cache_dir: str | None = None,
         max_samples: int = 2000,
-        emit: EventEmitter | None = None,
     ) -> None:
         _require_load_dataset(
             "DEPENDENCY-MISSING: datasets library required for hf_seq2seq provider"

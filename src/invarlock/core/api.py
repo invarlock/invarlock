@@ -97,11 +97,9 @@ class ModelEdit(ABC):
 
 @dataclass(frozen=True)
 class EditRuntime:
-    """Imperative shell context for edit execution."""
+    """Optional non-shell execution controls for edit operations."""
 
-    console: Any | None = None
     emit: bool = True
-    output_style: Any | None = None
 
 
 @runtime_checkable

@@ -127,31 +127,34 @@ def test_assemble_run_report_builds_report_and_metrics(tmp_path: Path) -> None:
 
 
 def test_persist_run_report_outputs_adds_telemetry_and_saved_paths(
+    monkeypatch,
     tmp_path: Path,
 ) -> None:
-    events: list[str] = []
-
-    def _postprocess(**kwargs):
-        events.append("saved")
-        return {"json": str(tmp_path / "report.json")}
-
     def _save_telemetry(report, run_dir, filename):
         out = run_dir / filename
         out.write_text("{}", encoding="utf-8")
         return out
+
+    def _save_report(report, out_dir, formats=None, filename_prefix="report"):
+        out = out_dir / "report.json"
+        out.write_text("{}", encoding="utf-8")
+        return {"json": out}
+
+    monkeypatch.setattr(
+        "invarlock.reporting.run_report_contract.save_report",
+        _save_report,
+    )
 
     report = {"artifacts": {}}
     result = persist_run_report_outputs(
         report=report,
         run_dir=tmp_path,
         run_config=SimpleNamespace(event_path=tmp_path / "events.jsonl"),
-        console=object(),
         telemetry=True,
-        postprocess_and_summarize_fn=_postprocess,
         save_telemetry_report_fn=_save_telemetry,
     )
 
-    assert events == ["saved"]
+    assert (tmp_path / "report.json").is_file()
     assert result.report_path_out == str(tmp_path / "report.json")
     assert result.telemetry_saved_path == str(tmp_path / "telemetry.json")
     assert report["artifacts"]["telemetry_path"].endswith("telemetry.json")

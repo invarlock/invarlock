@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from invarlock.core.retry import RetryDiagnostic
 from invarlock.core.run_retry_policy import (
     apply_mask_only_head_autotune,
     build_restore_failure_attempt_summary,
@@ -87,9 +88,11 @@ def test_apply_mask_only_head_autotune_fails_closed_on_bad_values() -> None:
 
 
 class _FakeRetryController:
-    def __init__(self, *, should_retry: bool, notices: tuple[str, ...] = ()) -> None:
+    def __init__(
+        self, *, should_retry: bool, diagnostics: tuple[RetryDiagnostic, ...] = ()
+    ) -> None:
         self._should_retry = should_retry
-        self._notices = list(notices)
+        self._diagnostics = list(diagnostics)
         self.recorded: list[tuple[int, dict[str, object], dict[str, object]]] = []
         self.last_passed: bool | None = None
 
@@ -105,10 +108,10 @@ class _FakeRetryController:
         self.last_passed = passed
         return self._should_retry
 
-    def drain_notices(self) -> tuple[str, ...]:
-        notices = tuple(self._notices)
-        self._notices.clear()
-        return notices
+    def drain_diagnostics(self) -> tuple[RetryDiagnostic, ...]:
+        diagnostics = tuple(self._diagnostics)
+        self._diagnostics.clear()
+        return diagnostics
 
 
 def test_record_retry_attempt_noops_without_controller() -> None:
@@ -139,10 +142,17 @@ def test_record_retry_attempt_normalizes_payloads() -> None:
     ]
 
 
-def test_decide_failed_retry_transition_advances_attempt_and_drains_notices() -> None:
+def test_decide_failed_retry_transition_advances_attempt_and_drains_diagnostics() -> (
+    None
+):
     controller = _FakeRetryController(
         should_retry=True,
-        notices=("Retry budget available",),
+        diagnostics=(
+            RetryDiagnostic(
+                code="retry.budget_available",
+                message="Retry budget available",
+            ),
+        ),
     )
 
     transition = decide_failed_retry_transition(
@@ -155,7 +165,12 @@ def test_decide_failed_retry_transition_advances_attempt_and_drains_notices() ->
     assert controller.last_passed is False
     assert transition.should_retry is True
     assert transition.next_attempt == 3
-    assert transition.notices == ("Retry budget available",)
+    assert transition.diagnostics == (
+        RetryDiagnostic(
+            code="retry.budget_available",
+            message="Retry budget available",
+        ),
+    )
     assert controller.recorded == [
         (
             2,
@@ -180,7 +195,7 @@ def test_decide_failed_retry_transition_holds_attempt_when_stopping() -> None:
 
     assert transition.should_retry is False
     assert transition.next_attempt == 3
-    assert transition.notices == ()
+    assert transition.diagnostics == ()
 
 
 def test_build_restore_failure_attempt_summary_is_stable() -> None:
@@ -253,7 +268,10 @@ def test_resolve_retry_validation_decision_marks_error_fail_closed() -> None:
 
 
 def test_resolve_retry_validation_transition_records_pass_without_retry() -> None:
-    controller = _FakeRetryController(should_retry=True, notices=("unused",))
+    controller = _FakeRetryController(
+        should_retry=True,
+        diagnostics=(RetryDiagnostic(code="retry.unused", message="unused"),),
+    )
     validation_result = type(
         "ValidationResult",
         (),
@@ -280,8 +298,11 @@ def test_resolve_retry_validation_transition_records_pass_without_retry() -> Non
     ]
 
 
-def test_resolve_retry_validation_transition_retries_with_notices() -> None:
-    controller = _FakeRetryController(should_retry=True, notices=("retry",))
+def test_resolve_retry_validation_transition_retries_with_diagnostics() -> None:
+    controller = _FakeRetryController(
+        should_retry=True,
+        diagnostics=(RetryDiagnostic(code="retry.retry", message="retry"),),
+    )
     validation_result = type(
         "ValidationResult",
         (),
@@ -315,7 +336,9 @@ def test_resolve_retry_validation_transition_retries_with_notices() -> None:
     )
 
     assert transition.action == "retry"
-    assert transition.notices == ("retry",)
+    assert transition.diagnostics == (
+        RetryDiagnostic(code="retry.retry", message="retry"),
+    )
     assert transition.next_attempt == 3
     assert transition.head_adjustment == {
         "global_k": 6,

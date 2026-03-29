@@ -9,6 +9,7 @@ import typer
 import yaml
 from rich.console import Console
 
+from invarlock.core.exceptions import ConfigError, ValidationError
 from invarlock.core.provider_config import resolve_provider_kind_and_kwargs
 from invarlock.runtime_security import remote_code_allowed
 
@@ -50,7 +51,7 @@ def prepare_config_for_run(
     edit: str | None,
     tier: str | None,
     probes: int | None,
-    console: Console,
+    console: Console | None = None,
     event_fn: Any | None = None,
     invarlock_config_cls: type | None = None,
     load_config_fn: Any | None = None,
@@ -58,7 +59,8 @@ def prepare_config_for_run(
     apply_auto_adapter_fn: Any | None = None,
 ) -> Any:
     """Load config and apply profile/CLI overrides deterministically."""
-    if event_fn is None:
+    shell_mode = console is not None
+    if event_fn is None and shell_mode:
         from invarlock.cli.run_shell_output import _event as event_fn
     if invarlock_config_cls is None:
         from invarlock.core.config_runtime import InvarLockConfig
@@ -76,71 +78,86 @@ def prepare_config_for_run(
         except Exception:  # pragma: no cover - optional adapter path
             apply_auto_adapter_fn = None
 
-    event_fn(
-        console,
-        "INIT",
-        f"Loading configuration: {config_path}",
-        emoji="📋",
-        profile=profile,
-    )
-    try:
-        cfg = load_config_fn(config_path)
-    except (ValueError, yaml.YAMLError) as exc:
-        event_fn(console, "FAIL", str(exc), emoji="❌", profile=profile)
-        raise typer.Exit(2) from exc
-
-    if profile and str(profile).lower() not in {"dev"}:
+    if shell_mode and callable(event_fn):
         event_fn(
             console,
             "INIT",
-            f"Applying profile: {profile}",
-            emoji="🎯",
+            f"Loading configuration: {config_path}",
+            emoji="📋",
             profile=profile,
         )
+    try:
+        cfg = load_config_fn(config_path)
+    except (ValueError, yaml.YAMLError) as exc:
+        if shell_mode and callable(event_fn):
+            event_fn(console, "FAIL", str(exc), emoji="❌", profile=profile)
+            raise typer.Exit(2) from exc
+        raise ConfigError(code="E002", message=str(exc)) from exc
+
+    if profile and str(profile).lower() not in {"dev"}:
+        if shell_mode and callable(event_fn):
+            event_fn(
+                console,
+                "INIT",
+                f"Applying profile: {profile}",
+                emoji="🎯",
+                profile=profile,
+            )
         try:
             cfg = apply_profile_fn(cfg, profile)
         except Exception as exc:
-            event_fn(console, "FAIL", str(exc), emoji="❌", profile=profile)
-            raise typer.Exit(1) from exc
+            if shell_mode and callable(event_fn):
+                event_fn(console, "FAIL", str(exc), emoji="❌", profile=profile)
+                raise typer.Exit(1) from exc
+            raise ValidationError(code="E003", message=str(exc)) from exc
 
     if edit:
         try:
             edit_name = _resolve_requested_edit_name(edit)
-            event_fn(
-                console,
-                "EXEC",
-                f"Edit override: {edit_name}",
-                emoji="✂️",
-                profile=profile,
-            )
+            if shell_mode and callable(event_fn):
+                event_fn(
+                    console,
+                    "EXEC",
+                    f"Edit override: {edit_name}",
+                    emoji="✂️",
+                    profile=profile,
+                )
             cfg = _apply_requested_edit_override(
                 cfg,
                 edit_name,
                 config_cls=invarlock_config_cls,
             )
         except ValueError as exc:
-            event_fn(console, "FAIL", str(exc), emoji="❌", profile=profile)
-            raise typer.Exit(2) from exc
+            if shell_mode and callable(event_fn):
+                event_fn(console, "FAIL", str(exc), emoji="❌", profile=profile)
+                raise typer.Exit(2) from exc
+            raise ConfigError(code="E002", message=str(exc)) from exc
 
     if tier or probes is not None:
         if tier and tier not in ["conservative", "balanced", "aggressive", "none"]:
-            event_fn(
-                console,
-                "FAIL",
-                f"Invalid tier '{tier}'. Valid options: conservative, balanced, aggressive, none",
-                emoji="❌",
-                profile=profile,
-            )
-            raise typer.Exit(1)
+            message = f"Invalid tier '{tier}'. Valid options: conservative, balanced, aggressive, none"
+            if shell_mode and callable(event_fn):
+                event_fn(
+                    console,
+                    "FAIL",
+                    message,
+                    emoji="❌",
+                    profile=profile,
+                )
+                raise typer.Exit(1)
+            raise ValidationError(code="E003", message=message)
         if probes is not None and (probes < 0 or probes > 10):
-            event_fn(
-                console,
-                "FAIL",
-                f"Invalid probes '{probes}'. Must be between 0 and 10",
-                emoji="❌",
-                profile=profile,
-            )
-            raise typer.Exit(1)
+            message = f"Invalid probes '{probes}'. Must be between 0 and 10"
+            if shell_mode and callable(event_fn):
+                event_fn(
+                    console,
+                    "FAIL",
+                    message,
+                    emoji="❌",
+                    profile=profile,
+                )
+                raise typer.Exit(1)
+            raise ValidationError(code="E003", message=message)
 
         try:
             cfg_dict = cfg.model_dump()
@@ -152,22 +169,24 @@ def prepare_config_for_run(
         cfg_dict["auto"] = auto_section
         if tier:
             auto_section["tier"] = tier
-            event_fn(
-                console,
-                "INIT",
-                f"Auto tier override: {tier}",
-                emoji="🎛️",
-                profile=profile,
-            )
+            if shell_mode and callable(event_fn):
+                event_fn(
+                    console,
+                    "INIT",
+                    f"Auto tier override: {tier}",
+                    emoji="🎛️",
+                    profile=profile,
+                )
         if probes is not None:
             auto_section["probes"] = probes
-            event_fn(
-                console,
-                "INIT",
-                f"Auto probes override: {probes}",
-                emoji="🔬",
-                profile=profile,
-            )
+            if shell_mode and callable(event_fn):
+                event_fn(
+                    console,
+                    "INIT",
+                    f"Auto probes override: {probes}",
+                    emoji="🔬",
+                    profile=profile,
+                )
         cfg = invarlock_config_cls(cfg_dict)
 
     if apply_auto_adapter_fn is not None:
@@ -184,7 +203,7 @@ def resolve_device_and_output(
     *,
     device: str | None,
     out: str | None,
-    console: Console,
+    console: Console | None = None,
     event_fn: Any | None = None,
     format_kv_line_fn: Any | None = None,
     device_resolution_note_fn: Any | None = None,
@@ -192,9 +211,10 @@ def resolve_device_and_output(
     validate_device_fn: Any | None = None,
 ) -> tuple[str, Path]:
     """Resolve device and output directory with validation and logging."""
-    if event_fn is None:
+    shell_mode = console is not None
+    if event_fn is None and shell_mode:
         from invarlock.cli.run_shell_output import _event as event_fn
-    if format_kv_line_fn is None:
+    if format_kv_line_fn is None and shell_mode:
         from invarlock.cli.run_shell_output import _format_kv_line as format_kv_line_fn
     if device_resolution_note_fn is None:
         from invarlock.cli.run_shell_output import (
@@ -214,11 +234,17 @@ def resolve_device_and_output(
     target_device = device or cfg_device or "auto"
     resolved_device = resolve_device_fn(target_device)
     resolution_note = device_resolution_note_fn(target_device, resolved_device)
-    console.print(format_kv_line_fn("Device", f"{resolved_device} ({resolution_note})"))
+    if shell_mode and format_kv_line_fn is not None:
+        console.print(
+            format_kv_line_fn("Device", f"{resolved_device} ({resolution_note})")
+        )
     is_valid, error_msg = validate_device_fn(resolved_device)
     if not is_valid:
-        event_fn(console, "FAIL", f"Device validation failed: {error_msg}", emoji="❌")
-        raise typer.Exit(1)
+        message = f"Device validation failed: {error_msg}"
+        if shell_mode and callable(event_fn):
+            event_fn(console, "FAIL", message, emoji="❌")
+            raise typer.Exit(1)
+        raise ValidationError(code="E003", message=message)
 
     if out:
         output_dir = Path(out)
@@ -263,10 +289,8 @@ def resolve_provider_and_split(
 
     if resolved_device and provider_name == "wikitext2":
         provider_kwargs.setdefault("device_hint", resolved_device)
-    if emit is not None and provider_name == "wikitext2":
-        data_provider = get_provider_fn(provider_name, emit=emit, **provider_kwargs)
-    else:
-        data_provider = get_provider_fn(provider_name, **provider_kwargs)
+    _ = emit
+    data_provider = get_provider_fn(provider_name, **provider_kwargs)
 
     requested_split = None
     try:

@@ -3,10 +3,16 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from invarlock.core.run_dataset_contract import materialize_run_dataset
+from invarlock.eval.data_support import DatasetDiagnostic
 
 
-def test_materialize_run_dataset_uses_provider_plan_notices() -> None:
-    notice = SimpleNamespace(tag="DATA", message="loaded", emoji="📊")
+def test_materialize_run_dataset_uses_provider_plan_diagnostics() -> None:
+    diagnostic = DatasetDiagnostic(
+        kind="provider.loaded",
+        severity="info",
+        message="loaded",
+        metadata={"tag": "DATA", "emoji": "📊"},
+    )
     result = materialize_run_dataset(
         pairing_schedule=None,
         cfg=SimpleNamespace(dataset=SimpleNamespace(provider="synthetic")),
@@ -15,7 +21,6 @@ def test_materialize_run_dataset_uses_provider_plan_notices() -> None:
         resolved_loss_type="ppl_causal",
         profile="dev",
         model_profile=SimpleNamespace(),
-        console=None,
         tokenizer=None,
         use_mlm=False,
         mask_prob=0.0,
@@ -49,14 +54,14 @@ def test_materialize_run_dataset_uses_provider_plan_notices() -> None:
             final_mask_counts=[],
             preview_records=[{"window_id": 0}],
             final_records=[{"window_id": 1}],
-            notices=[notice],
+            diagnostics=[diagnostic],
         ),
     )
 
     assert result.resolved_split == "validation"
     assert result.tokenizer_hash == "tok-hash"
     assert result.preview_count == 2
-    assert result.notices == (notice,)
+    assert result.diagnostics == (diagnostic,)
 
 
 def test_materialize_run_dataset_harvests_pairing_schedule() -> None:
@@ -85,7 +90,6 @@ def test_materialize_run_dataset_harvests_pairing_schedule() -> None:
         resolved_loss_type="ppl_mlm",
         profile="dev",
         model_profile=SimpleNamespace(),
-        console=None,
         tokenizer=None,
         use_mlm=True,
         mask_prob=0.15,
@@ -124,7 +128,6 @@ def test_materialize_run_dataset_returns_passthrough_defaults_without_provider()
         resolved_loss_type="ppl_causal",
         profile="dev",
         model_profile=SimpleNamespace(),
-        console=None,
         tokenizer="tok",
         use_mlm=False,
         mask_prob=0.0,

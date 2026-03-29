@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-import invarlock.core.runtime_attestation as attestation
+import invarlock.runtime_attestation as attestation
 
 
 def test_configure_runtime_security_forwards_allowances(

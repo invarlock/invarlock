@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from invarlock.eval.data_support import DatasetDiagnostic
+
 
 def _cfg_auto_tier(cfg: Any) -> str | None:
     section_fn = getattr(cfg, "section", None)
@@ -39,7 +41,7 @@ class RunDatasetContractResult:
     final_mask_counts: list[int]
     preview_records: list[dict[str, Any]]
     final_records: list[dict[str, Any]]
-    notices: tuple[Any, ...] = ()
+    diagnostics: tuple[DatasetDiagnostic, ...] = ()
 
 
 def materialize_run_dataset(
@@ -51,7 +53,6 @@ def materialize_run_dataset(
     resolved_loss_type: str,
     profile: str | None,
     model_profile: Any,
-    console: Any,
     tokenizer: Any,
     use_mlm: bool,
     mask_prob: float,
@@ -79,7 +80,6 @@ def materialize_run_dataset(
             tokenizer_hash=tokenizer_hash,
             resolved_loss_type=resolved_loss_type,
             profile=profile,
-            console=console,
         )
         dataset_meta = harvested["dataset_meta"]
         window_plan = harvested["window_plan"]
@@ -122,14 +122,13 @@ def materialize_run_dataset(
             final_mask_counts=materialized_baseline.final_mask_counts,
             preview_records=[],
             final_records=[],
-            notices=(),
+            diagnostics=(),
         )
 
     if cfg.dataset.provider:
         dataset_plan = build_provider_dataset_plan_fn(
             cfg=cfg,
             model_profile=model_profile,
-            console=console,
             resolved_device=resolved_device,
             profile=profile,
             profile_normalized=profile_normalized,
@@ -162,7 +161,7 @@ def materialize_run_dataset(
             final_mask_counts=dataset_plan.final_mask_counts,
             preview_records=dataset_plan.preview_records,
             final_records=dataset_plan.final_records,
-            notices=tuple(dataset_plan.notices),
+            diagnostics=tuple(dataset_plan.diagnostics),
         )
 
     return RunDatasetContractResult(
@@ -181,7 +180,7 @@ def materialize_run_dataset(
         final_mask_counts=[],
         preview_records=[],
         final_records=[],
-        notices=(),
+        diagnostics=(),
     )
 
 

@@ -1,13 +1,19 @@
 from __future__ import annotations
 
-import shutil
-import subprocess
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from . import report_files
+
 _NON_FATAL_EXCEPTIONS = (AttributeError, KeyError, OSError, TypeError, ValueError)
+
+
+def save_report(*args: Any, **kwargs: Any) -> Any:
+    """Compatibility wrapper so callers can patch either contract or report_files."""
+
+    return report_files.save_report(*args, **kwargs)
 
 
 @dataclass(frozen=True)
@@ -28,22 +34,7 @@ class RunReportPersistenceResult:
 
 def _detect_commit_value(cfg: Any) -> str:
     commit_value = getattr(getattr(cfg, "meta", None), "commit", "") or ""
-    if commit_value:
-        return str(commit_value)
-    try:
-        git_path = shutil.which("git")
-        if git_path:
-            return (
-                subprocess.check_output(
-                    [git_path, "rev-parse", "HEAD"],
-                    stderr=subprocess.DEVNULL,
-                )
-                .decode("utf-8", "ignore")
-                .strip()
-            )
-    except (OSError, subprocess.SubprocessError):
-        return ""
-    return ""
+    return str(commit_value) if commit_value else ""
 
 
 def _resolve_version() -> str | None:
@@ -331,9 +322,7 @@ def persist_run_report_outputs(
     report: dict[str, Any],
     run_dir: Path,
     run_config: Any,
-    console: Any,
     telemetry: bool,
-    postprocess_and_summarize_fn: Any,
     save_telemetry_report_fn: Any,
 ) -> RunReportPersistenceResult:
     telemetry_path: Path | None = None
@@ -341,12 +330,13 @@ def persist_run_report_outputs(
         telemetry_path = run_dir / "telemetry.json"
         report.setdefault("artifacts", {})["telemetry_path"] = str(telemetry_path)
 
-    saved_files = postprocess_and_summarize_fn(
-        report=report,
-        run_dir=run_dir,
-        run_config=run_config,
-        console=console,
+    saved_paths = save_report(
+        report,
+        run_dir,
+        formats=["json"],
+        filename_prefix="report",
     )
+    saved_files = {key: str(value) for key, value in saved_paths.items()}
 
     report_path_out = None
     try:
@@ -354,6 +344,8 @@ def persist_run_report_outputs(
             report_path_out = str(saved_files["json"])
     except (TypeError, KeyError):
         report_path_out = None
+    if not report_path_out:
+        raise RuntimeError("run report persistence did not return a json artifact path")
 
     telemetry_saved_path = None
     telemetry_error = None

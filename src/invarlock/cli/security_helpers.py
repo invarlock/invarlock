@@ -8,10 +8,10 @@ import typer
 from invarlock.cli.runtime_launch_plan import (
     build_current_process_container_launch_plan,
 )
-from invarlock.core.runtime_attestation import (
+from invarlock.runtime_attestation import (
     configure_runtime_security as _configure_runtime_security_core,
 )
-from invarlock.core.runtime_attestation import (
+from invarlock.runtime_attestation import (
     verify_runtime_attestation as _verify_runtime_attestation_core,
 )
 from invarlock.runtime_security import (

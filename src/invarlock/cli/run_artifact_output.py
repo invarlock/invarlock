@@ -28,10 +28,12 @@ def postprocess_and_summarize(
     run_dir: Path,
     run_config: Any,
     console: Console,
+    saved_files: dict[str, str] | None = None,
 ) -> dict[str, str]:
-    saved_files = emit_run_artifacts(
-        report=report, out_dir=run_dir, filename_prefix="report", console=console
-    )
+    if saved_files is None:
+        saved_files = emit_run_artifacts(
+            report=report, out_dir=run_dir, filename_prefix="report", console=console
+        )
     _event(console, "PASS", "Run completed successfully!", emoji="✅")
     _event(console, "DATA", f"Report: {saved_files['json']}", emoji="📄")
     if run_config.event_path:

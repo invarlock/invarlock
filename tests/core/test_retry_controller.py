@@ -4,7 +4,7 @@ Tests for RetryController and retry parameter adjustments.
 
 import time
 
-from invarlock.core.retry import RetryController, adjust_edit_params
+from invarlock.core.retry import RetryController, RetryDiagnostic, adjust_edit_params
 
 
 class TestRetryController:
@@ -75,7 +75,9 @@ class TestRetryController:
         controller.start_time = time.time() - 1
 
         assert controller.should_retry(False) is False
-        assert "Timeout 0s exceeded" in controller.drain_notices()[0]
+        diagnostic = controller.drain_diagnostics()[0]
+        assert diagnostic.code == "retry.timeout_exhausted"
+        assert "Timeout 0s exceeded" in diagnostic.message
 
 
 class TestAdjustEditParams:
@@ -83,13 +85,19 @@ class TestAdjustEditParams:
         params = {"bitwidth": 8}
         adjusted = adjust_edit_params("quant_rtn", params, attempt=1)
         assert adjusted.params["clamp_ratio"] == 0.01
-        assert adjusted.notices == ("Quant retry adjustment: added clamp_ratio=0.01",)
+        assert adjusted.diagnostics == (
+            RetryDiagnostic(
+                code="retry.quant_clamp_ratio_added",
+                message="Quant retry adjustment: added clamp_ratio=0.01",
+                details={"clamp_ratio": 0.01},
+            ),
+        )
 
     def test_adjust_unknown_edit_noop(self) -> None:
         params = {"some_param": "value"}
         adjusted = adjust_edit_params("unknown_edit", params, attempt=1)
         assert adjusted.params == params
-        assert adjusted.notices == ()
+        assert adjusted.diagnostics == ()
 
     def test_adjust_preserves_other_fields(self) -> None:
         params = {"bitwidth": 8, "scope": "ffn", "seed": 42}

@@ -1,8 +1,5 @@
-import io
-
 import pytest
 import torch
-from rich.console import Console
 
 import invarlock.edits.quant_rtn as quant_rtn_mod
 from invarlock.core.api import EditRuntime
@@ -61,42 +58,40 @@ def test_quant_rtn_module_has_no_functional_apply_shim() -> None:
     assert "apply" not in quant_rtn_mod.__dict__
 
 
-def test_quant_rtn_output_format() -> None:
+def test_quant_rtn_output_format(caplog: pytest.LogCaptureFixture) -> None:
     model = torch.nn.Linear(4, 4, bias=False)
     adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
     edit = RTNQuantEdit(scope="all", max_modules=1)
-    out = io.StringIO()
-    console = Console(file=out, force_terminal=False)
+    with caplog.at_level("INFO", logger="invarlock.edits.quant_rtn"):
+        edit.apply(
+            model,
+            adapter,
+            plan={"scope": "all", "max_modules": 1},
+            runtime=EditRuntime(emit=True),
+        )
 
-    edit.apply(
-        model,
-        adapter,
-        plan={"scope": "all", "max_modules": 1},
-        runtime=EditRuntime(console=console),
-    )
-
-    text = out.getvalue()
+    text = "\n".join(record.message for record in caplog.records)
     lines = [line for line in text.splitlines() if line.strip()]
     assert lines
     assert all(line.startswith("[EDIT]") for line in lines)
     assert all(ord(ch) < 128 for ch in text)
 
 
-def test_quant_rtn_emit_flag_suppresses_output() -> None:
+def test_quant_rtn_emit_flag_suppresses_output(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     model = torch.nn.Linear(2, 2, bias=False)
     adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
     edit = RTNQuantEdit(scope="all", max_modules=1)
-    out = io.StringIO()
-    console = Console(file=out, force_terminal=False)
+    with caplog.at_level("INFO", logger="invarlock.edits.quant_rtn"):
+        edit.apply(
+            model,
+            adapter,
+            plan={"scope": "all", "max_modules": 1},
+            runtime=EditRuntime(emit=False),
+        )
 
-    edit.apply(
-        model,
-        adapter,
-        plan={"scope": "all", "max_modules": 1},
-        runtime=EditRuntime(console=console, emit=False),
-    )
-
-    assert out.getvalue() == ""
+    assert not caplog.records
 
 
 def test_quant_rtn_logs_when_console_missing(caplog: pytest.LogCaptureFixture) -> None:
