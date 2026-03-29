@@ -7,7 +7,6 @@ their dedicated owner modules.
 
 from __future__ import annotations
 
-import itertools
 import math
 from dataclasses import dataclass
 from datetime import datetime
@@ -18,7 +17,13 @@ import torch.nn as nn
 
 from invarlock.core.api import Guard
 
-from . import rmt_analysis, rmt_detection, rmt_math
+from . import (
+    rmt_activation_runtime,
+    rmt_analysis,
+    rmt_detection,
+    rmt_math,
+    rmt_result_contract,
+)
 from ._contracts import guard_assert
 
 __all__ = [
@@ -295,360 +300,50 @@ class RMTGuard(Guard):
         )
 
     def _collect_calibration_batches(self, calib: Any, max_windows: int) -> list[Any]:
-        """Collect a deterministic slice of calibration batches."""
-        if calib is None or max_windows <= 0:
-            return []
-        source = getattr(calib, "dataloader", None) or calib
-        # Prefer index-based selection when possible so we can support simple
-        # deterministic policies (first/last/evenly_spaced) without consuming
-        # the entire iterator.
-        try:
-            if hasattr(source, "__len__") and hasattr(source, "__getitem__"):
-                n = int(len(source))  # type: ignore[arg-type]
-                if n <= 0:
-                    return []
-                count = min(int(max_windows), n)
-                policy = (
-                    (self.activation_sampling.get("windows") or {}).get(
-                        "indices_policy", "evenly_spaced"
-                    )
-                    if isinstance(self.activation_sampling, dict)
-                    else "evenly_spaced"
-                )
-                policy = str(policy or "evenly_spaced").strip().lower()
-                if policy == "last":
-                    idxs = list(range(max(0, n - count), n))
-                elif policy == "evenly_spaced":
-                    if count <= 1:
-                        idxs = [0]
-                    else:
-                        idxs = [
-                            int(round(i * (n - 1) / float(count - 1)))
-                            for i in range(count)
-                        ]
-                else:
-                    idxs = list(range(count))
-                batches: list[Any] = []
-                for idx in idxs:
-                    try:
-                        batches.append(source[idx])  # type: ignore[index]
-                    except Exception:
-                        continue
-                return batches
-        except Exception:
-            pass
-
-        # Iterable fallback: first-N only.
-        try:
-            iterator = iter(source)
-        except TypeError:
-            return []
-        return list(itertools.islice(iterator, max_windows))
+        return rmt_activation_runtime.collect_calibration_batches(
+            calib,
+            max_windows,
+            activation_sampling=self.activation_sampling,
+        )
 
     def _prepare_activation_inputs(
         self, batch: Any, device: torch.device
     ) -> tuple[torch.Tensor | None, torch.Tensor | None]:
-        """Normalize batch inputs to tensors on the target device."""
-        if isinstance(batch, dict):
-            input_ids = batch.get("input_ids", batch.get("inputs"))
-            attention_mask = batch.get("attention_mask")
-        elif isinstance(batch, tuple | list) and batch:
-            input_ids = batch[0]
-            attention_mask = batch[1] if len(batch) > 1 else None
-        else:
-            input_ids = batch
-            attention_mask = None
-
-        if input_ids is None:
-            return None, None
-
-        if not isinstance(input_ids, torch.Tensor):
-            input_ids = torch.as_tensor(input_ids)
-        if input_ids.dim() == 1:
-            input_ids = input_ids.unsqueeze(0)
-        try:
-            input_ids = input_ids.to(device)
-        except Exception:
-            input_ids = input_ids.clone()
-
-        if attention_mask is not None:
-            if not isinstance(attention_mask, torch.Tensor):
-                attention_mask = torch.as_tensor(attention_mask)
-            if attention_mask.dim() == 1:
-                attention_mask = attention_mask.unsqueeze(0)
-            try:
-                attention_mask = attention_mask.to(device)
-            except Exception:
-                attention_mask = attention_mask.clone()
-
-        return input_ids, attention_mask
+        return rmt_activation_runtime.prepare_activation_inputs(batch, device)
 
     @staticmethod
     def _batch_token_weight(
         input_ids: torch.Tensor | None, attention_mask: torch.Tensor | None
     ) -> int:
-        """Compute token-weight for a batch (used for activation outlier weighting)."""
-        weight = 0
-        if isinstance(attention_mask, torch.Tensor):
-            try:
-                weight = int(attention_mask.sum().item())
-            except Exception:
-                weight = 0
-        if weight <= 0 and isinstance(input_ids, torch.Tensor):
-            try:
-                weight = int(input_ids.numel())
-            except Exception:
-                weight = 0
-        return max(weight, 1)
+        return rmt_activation_runtime.batch_token_weight(input_ids, attention_mask)
 
     def _get_activation_modules(self, model: nn.Module) -> list[tuple[str, nn.Module]]:
-        """Return modules to analyze for activation-based RMT."""
-        modules: list[tuple[str, nn.Module]] = []
-        try:
-            from transformers.pytorch_utils import Conv1D
-
-            module_types_with_conv1d: tuple[
-                type[nn.Linear], type[nn.Conv1d], type[Conv1D]
-            ] = (nn.Linear, nn.Conv1d, Conv1D)
-            module_types = module_types_with_conv1d
-        except ImportError:
-            module_types_without_conv1d: tuple[type[nn.Linear], type[nn.Conv1d]] = (
-                nn.Linear,
-                nn.Conv1d,
-            )
-            module_types = module_types_without_conv1d
-
-        for name, module in model.named_modules():
-            if isinstance(module, nn.Embedding):
-                modules.append((name, module))
-                continue
-            if isinstance(module, nn.LayerNorm):
-                modules.append((name, module))
-                continue
-            if isinstance(module, module_types) and hasattr(module, "weight"):
-                name_lower = name.lower()
-                if any(
-                    name.endswith(suffix) for suffix in self.allowed_suffixes
-                ) or any(
-                    tok in name_lower
-                    for tok in (
-                        "attn",
-                        "attention",
-                        "mlp",
-                        "ffn",
-                        "router",
-                        "expert",
-                        "moe",
-                        "gate",
-                        "gating",
-                        "switch",
-                    )
-                ):
-                    modules.append((name, module))
-
-        modules.sort(key=lambda t: t[0])
-        return modules
+        return rmt_activation_runtime.get_activation_modules(
+            model,
+            allowed_suffixes=self.allowed_suffixes,
+        )
 
     def _activation_edge_risk(
         self, activations: Any
     ) -> tuple[float, float, float] | None:
-        """Compute activation edge-risk score r = σ̂max(A') / σ_MP(m,n).
-
-        A' is a centered + standardised view of the activation matrix. The σ̂max
-        estimator is matvec-based and avoids full SVD.
-        """
-        if isinstance(activations, tuple | list):
-            activations = activations[0] if activations else None
-        if not isinstance(activations, torch.Tensor):
-            return None
-        if activations.dim() < 2:
-            return None
-        if activations.dim() > 2:
-            activations = activations.reshape(-1, activations.shape[-1])
-        if activations.numel() == 0:
-            return None
-
-        mat = activations.detach()
-        if mat.shape[0] <= 0 or mat.shape[1] <= 0:
-            return None
-        if not torch.isfinite(mat).all():
-            return None
-
-        eps = 1e-12
-        try:
-            mu = mat.mean(dtype=torch.float32)
-            norm = torch.linalg.vector_norm(mat.reshape(-1), ord=2, dtype=torch.float32)
-            mean_sq = (norm * norm) / float(mat.numel())
-            var = mean_sq - (mu * mu)
-            std = torch.sqrt(var.clamp_min(eps))
-        except Exception:
-            return None
-        if not torch.isfinite(mu) or not torch.isfinite(std):
-            return None
-        std_val = float(std.item())
-        if not math.isfinite(std_val) or std_val <= 0.0:
-            return None
-
-        m, n = int(mat.shape[0]), int(mat.shape[1])
-        mp_edge_val = rmt_math.mp_bulk_edge(m, n, whitened=False)
-        if not (math.isfinite(mp_edge_val) and mp_edge_val > 0.0):
-            return None
-
-        try:
-            iters = int((self.estimator or {}).get("iters", 3) or 3)
-        except Exception:
-            iters = 3
-        if iters < 1:
-            iters = 1
-        init = str((self.estimator or {}).get("init", "ones") or "ones").strip().lower()
-        if init not in {"ones", "e0"}:
-            init = "ones"
-
-        device = mat.device
-        dtype = mat.dtype
-
-        with torch.inference_mode():
-            if init == "ones":
-                v = torch.ones((n,), device=device, dtype=dtype)
-            else:
-                v = torch.zeros((n,), device=device, dtype=dtype)
-                v[0] = 1
-            v = v / torch.linalg.vector_norm(v.float()).clamp_min(eps).to(dtype)
-
-            mu_d = mu.to(dtype)
-            inv_std_d = (1.0 / std.clamp_min(eps)).to(dtype)
-            ones_n = torch.ones((n,), device=device, dtype=dtype)
-
-            sigma = 0.0
-            for _ in range(iters):
-                v_sum = torch.sum(v.float())
-                u = mat @ v
-                u = (u - (mu_d * v_sum.to(dtype))) * inv_std_d
-                u_norm = torch.linalg.vector_norm(u.float()).clamp_min(eps)
-                sigma_val = float(u_norm.item())
-                if not math.isfinite(sigma_val):
-                    return None
-                u = u / u_norm.to(dtype)
-
-                u_sum = torch.sum(u.float())
-                v = mat.T @ u
-                v = (v - (mu_d * u_sum.to(dtype) * ones_n)) * inv_std_d
-                v_norm = torch.linalg.vector_norm(v.float()).clamp_min(eps)
-                v = v / v_norm.to(dtype)
-                sigma = sigma_val
-
-        risk = float(sigma) / max(float(mp_edge_val), eps)
-        return float(risk), float(sigma), float(mp_edge_val)
+        return rmt_activation_runtime.activation_edge_risk(
+            activations,
+            estimator=self.estimator,
+        )
 
     def _compute_activation_edge_risk(
         self, model: nn.Module, batches: list[Any]
     ) -> dict[str, Any] | None:
-        """Compute token-weighted activation edge-risk scores per module/family."""
-        if not batches:
-            return None
-
-        modules = self._get_activation_modules(model)
-        if not modules:
-            return None
-
-        acc: dict[str, dict[str, float]] = {}
-        for name, _module in modules:
-            acc[name] = {"weighted_sum": 0.0, "weight": 0.0, "max_risk": 0.0}
-
-        batch_weight_holder = {"weight": 1}
-        handles: list[Any] = []
-
-        def _make_hook(name: str):
-            def _hook(_module: nn.Module, _inputs: tuple[Any, ...], output: Any):
-                out = self._activation_edge_risk(output)
-                if out is None:
-                    return
-                risk, _sigma, _edge = out
-                try:
-                    weight = int(batch_weight_holder.get("weight", 1) or 1)
-                except Exception:
-                    weight = 1
-                row = acc.get(name)
-                if row is None:
-                    return
-                row["weighted_sum"] = float(row.get("weighted_sum", 0.0)) + float(
-                    risk
-                ) * float(weight)
-                row["weight"] = float(row.get("weight", 0.0)) + float(weight)
-                row["max_risk"] = max(float(row.get("max_risk", 0.0)), float(risk))
-
-            return _hook
-
-        for name, module in modules:
-            try:
-                handles.append(module.register_forward_hook(_make_hook(name)))
-            except Exception:
-                continue
-
-        model_was_training = model.training
-        model.eval()
-        device = next(model.parameters()).device
-        batches_used = 0
-        token_weight_total = 0
-
-        try:
-            with torch.inference_mode():
-                for batch in batches:
-                    inputs, attention_mask = self._prepare_activation_inputs(
-                        batch, device
-                    )
-                    if inputs is None:
-                        continue
-                    batch_weight = self._batch_token_weight(inputs, attention_mask)
-                    batch_weight_holder["weight"] = batch_weight
-                    try:
-                        if attention_mask is not None:
-                            model(inputs, attention_mask=attention_mask)
-                        else:
-                            model(inputs)
-                    except TypeError:
-                        model(inputs)
-                    batches_used += 1
-                    token_weight_total += batch_weight
-        finally:
-            for handle in handles:
-                try:
-                    handle.remove()
-                except Exception:
-                    pass
-            if model_was_training:
-                model.train()
-
-        if batches_used <= 0:
-            return None
-
-        edge_risk_by_module: dict[str, float] = {}
-        for name, row in acc.items():
-            w = float(row.get("weight", 0.0) or 0.0)
-            if w <= 0.0:
-                continue
-            edge_risk_by_module[name] = float(row.get("weighted_sum", 0.0) or 0.0) / w
-
-        if not edge_risk_by_module:
-            return None
-
-        edge_risk_by_family: dict[str, float] = {}
-        for name, risk in edge_risk_by_module.items():
-            family = self._classify_family(name)
-            edge_risk_by_family[family] = max(
-                float(edge_risk_by_family.get(family, 0.0)), float(risk)
-            )
-
-        for family_key in ("attn", "ffn", "embed", "other"):
-            edge_risk_by_family.setdefault(family_key, 0.0)
-
-        return {
-            "analysis_source": "activations_edge_risk",
-            "edge_risk_by_module": edge_risk_by_module,
-            "edge_risk_by_family": edge_risk_by_family,
-            "token_weight_total": int(token_weight_total),
-            "batches_used": int(batches_used),
-        }
+        return rmt_activation_runtime.compute_activation_edge_risk(
+            model,
+            batches,
+            allowed_suffixes=self.allowed_suffixes,
+            activation_sampling=self.activation_sampling,
+            estimator=self.estimator,
+            deadband=self.deadband,
+            margin=self.margin,
+            classify_family_fn=self._classify_family,
+        )
 
     def _activation_svd_outliers(
         self, activations: Any, margin: float, deadband: float
@@ -670,7 +365,7 @@ class RMTGuard(Guard):
 
         try:
             mat = activations.detach().float().cpu()
-        except Exception:
+        except (AttributeError, RuntimeError, TypeError, ValueError):
             return 0, 0.0, 0.0
 
         if not torch.isfinite(mat).all():
@@ -730,7 +425,7 @@ class RMTGuard(Guard):
                     outliers, max_ratio, sigma_max = self._activation_svd_outliers(
                         output, self.margin, self.deadband
                     )
-                except Exception:
+                except (AttributeError, RuntimeError, TypeError, ValueError):
                     return
                 stats = per_layer_map.get(name)
                 if stats is None:
@@ -754,12 +449,15 @@ class RMTGuard(Guard):
         for name, module in modules:
             try:
                 handles.append(module.register_forward_hook(_make_hook(name)))
-            except Exception:
+            except (AttributeError, RuntimeError, TypeError, ValueError):
                 continue
 
         model_was_training = model.training
         model.eval()
-        device = next(model.parameters()).device
+        try:
+            device = next(model.parameters()).device
+        except StopIteration:
+            return None
         batches_used = 0
         token_weight_total = 0
 
@@ -785,15 +483,15 @@ class RMTGuard(Guard):
                             model(inputs)
                             batches_used += 1
                             token_weight_total += batch_weight
-                        except Exception:
+                        except (AttributeError, RuntimeError, TypeError, ValueError):
                             continue
-                    except Exception:
+                    except (AttributeError, RuntimeError, ValueError):
                         continue
         finally:
             for handle in handles:
                 try:
                     handle.remove()
-                except Exception:
+                except (AttributeError, RuntimeError):
                     pass
             if model_was_training:
                 model.train()
@@ -928,7 +626,7 @@ class RMTGuard(Guard):
             if isinstance(estimator_policy, dict):
                 try:
                     iters = int(estimator_policy.get("iters", 3) or 3)
-                except Exception:
+                except (TypeError, ValueError):
                     iters = 3
                 if iters < 1:
                     iters = 1
@@ -949,7 +647,7 @@ class RMTGuard(Guard):
                         if windows.get("count") is not None:
                             try:
                                 cfg["count"] = int(windows.get("count") or 0)
-                            except Exception:
+                            except (TypeError, ValueError):
                                 pass
                         if windows.get("indices_policy") is not None:
                             cfg["indices_policy"] = str(
@@ -967,7 +665,7 @@ class RMTGuard(Guard):
             windows_cfg = self.activation_sampling.get("windows") or {}
             try:
                 window_count = int(windows_cfg.get("count", 0) or 0)
-            except Exception:
+            except (TypeError, ValueError):
                 window_count = 0
             self._calibration_batches = (
                 self._collect_calibration_batches(calib, window_count)
@@ -986,13 +684,13 @@ class RMTGuard(Guard):
                 self._activation_required_reason = "activation_required"
                 self._activation_ready = False
                 self.prepared = False
-                return {
-                    "ready": False,
-                    "baseline_metrics": {},
-                    "policy_applied": policy or {},
-                    "preparation_time": time.time() - start_time,
-                    "error": "Activation batches required but unavailable",
-                }
+                return rmt_result_contract.build_prepare_result(
+                    ready=False,
+                    baseline_metrics={},
+                    policy_applied=policy or {},
+                    preparation_time=time.time() - start_time,
+                    error="Activation batches required but unavailable",
+                )
 
             baseline = (
                 self._compute_activation_edge_risk(model, self._calibration_batches)
@@ -1005,22 +703,22 @@ class RMTGuard(Guard):
                     self._activation_required_reason = "activation_baseline_unavailable"
                     self._activation_ready = False
                     self.prepared = False
-                    return {
-                        "ready": False,
-                        "baseline_metrics": {},
-                        "policy_applied": policy or {},
-                        "preparation_time": time.time() - start_time,
-                        "error": "Activation baseline unavailable",
-                    }
+                    return rmt_result_contract.build_prepare_result(
+                        ready=False,
+                        baseline_metrics={},
+                        policy_applied=policy or {},
+                        preparation_time=time.time() - start_time,
+                        error="Activation baseline unavailable",
+                    )
                 # Non-required: treat as not ready and allow pipeline to continue.
                 self._activation_ready = False
                 self.prepared = True
-                return {
-                    "ready": True,
-                    "baseline_metrics": {},
-                    "policy_applied": policy or {},
-                    "preparation_time": time.time() - start_time,
-                }
+                return rmt_result_contract.build_prepare_result(
+                    ready=True,
+                    baseline_metrics={},
+                    policy_applied=policy or {},
+                    preparation_time=time.time() - start_time,
+                )
 
             self.baseline_edge_risk_by_module = dict(
                 baseline.get("edge_risk_by_module") or {}
@@ -1032,9 +730,9 @@ class RMTGuard(Guard):
             self.prepared = True
 
             preparation_time = time.time() - start_time
-            return {
-                "ready": True,
-                "baseline_metrics": {
+            return rmt_result_contract.build_prepare_result(
+                ready=True,
+                baseline_metrics={
                     "edge_risk_by_family": dict(self.baseline_edge_risk_by_family),
                     "measurement_contract": {
                         "kind": "activation_edge_risk",
@@ -1042,11 +740,11 @@ class RMTGuard(Guard):
                         "activation_sampling": self.activation_sampling,
                     },
                 },
-                "policy_applied": policy or {},
-                "preparation_time": preparation_time,
-            }
+                policy_applied=policy or {},
+                preparation_time=preparation_time,
+            )
 
-        except Exception as e:
+        except (AttributeError, KeyError, RuntimeError, TypeError, ValueError) as e:
             self.prepared = False
             self._log_event(
                 "prepare_failed",
@@ -1055,13 +753,13 @@ class RMTGuard(Guard):
                 error=str(e),
             )
 
-            return {
-                "baseline_metrics": {},
-                "policy_applied": policy or {},
-                "preparation_time": time.time() - start_time,
-                "ready": False,
-                "error": str(e),
-            }
+            return rmt_result_contract.build_prepare_result(
+                ready=False,
+                baseline_metrics={},
+                policy_applied=policy or {},
+                preparation_time=time.time() - start_time,
+                error=str(e),
+            )
 
     def before_edit(self, model: nn.Module) -> None:
         """
@@ -1090,11 +788,7 @@ class RMTGuard(Guard):
             if self._require_activation and not self._calibration_batches:
                 self._activation_required_failed = True
                 self._activation_required_reason = "activation_unavailable"
-                self._last_result = {
-                    "analysis_source": "activations_edge_risk",
-                    "edge_risk_by_module": {},
-                    "edge_risk_by_family": {},
-                }
+                self._last_result = rmt_result_contract.build_after_edit_result()
                 return
 
             current = (
@@ -1108,11 +802,7 @@ class RMTGuard(Guard):
                     self._activation_required_reason = (
                         "activation_edge_risk_unavailable"
                     )
-                self._last_result = {
-                    "analysis_source": "activations_edge_risk",
-                    "edge_risk_by_module": {},
-                    "edge_risk_by_family": {},
-                }
+                self._last_result = rmt_result_contract.build_after_edit_result()
                 return
 
             self.edge_risk_by_module = dict(current.get("edge_risk_by_module") or {})
@@ -1120,18 +810,14 @@ class RMTGuard(Guard):
             self._last_result = dict(current)
             self.epsilon_violations = self._compute_epsilon_violations()
 
-        except Exception as e:
+        except (AttributeError, KeyError, RuntimeError, TypeError, ValueError) as e:
             self._log_event(
                 "after_edit_failed",
                 level="ERROR",
                 message=f"RMT detection failed: {str(e)}",
                 error=str(e),
             )
-            self._last_result = {
-                "analysis_source": "activations_edge_risk",
-                "edge_risk_by_module": {},
-                "edge_risk_by_family": {},
-            }
+            self._last_result = rmt_result_contract.build_after_edit_result()
             self.epsilon_violations = []
 
     def validate(

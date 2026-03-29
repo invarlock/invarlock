@@ -207,7 +207,7 @@ def test_runtime_activation_module_and_edge_risk_guardrails(monkeypatch) -> None
     assert guard._activation_edge_risk(torch.randn(3, 2)) is not None
 
 
-def test_runtime_activation_collection_handles_bad_hooks(monkeypatch) -> None:
+def test_runtime_activation_collection_handles_bad_hooks() -> None:
     guard = runtime_rmt.RMTGuard()
     assert guard._compute_activation_edge_risk(nn.Linear(2, 2), []) is None
     assert guard._compute_activation_edge_risk(nn.Module(), [object()]) is None
@@ -249,13 +249,12 @@ def test_runtime_activation_collection_handles_bad_hooks(monkeypatch) -> None:
         def forward(self, input_ids, attention_mask=None):  # noqa: ANN001
             return self.attn(input_ids.float())
 
-    monkeypatch.setattr(guard, "_activation_edge_risk", lambda *_a, **_k: None)
-    assert (
-        guard._compute_activation_edge_risk(
-            BadHandleModel(), [{"input_ids": torch.ones(1, 2)}]
-        )
-        is None
+    result = guard._compute_activation_edge_risk(
+        BadHandleModel(), [{"input_ids": torch.ones(1, 2)}]
     )
+    assert result is not None
+    assert result["analysis_source"] == "activations_edge_risk"
+    assert result["batches_used"] == 1
 
 
 def test_runtime_detection_logs_correction_failure(monkeypatch) -> None:
