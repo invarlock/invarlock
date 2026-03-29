@@ -3,13 +3,11 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import invarlock.proof_pack as proof_pack_mod
 from invarlock.proof_pack import (
-    PROOF_PACK_VERIFY_INTEGRITY,
-    PROOF_PACK_VERIFY_OK,
-    PROOF_PACK_VERIFY_REPORTS,
-    PROOF_PACK_VERIFY_USAGE,
+    ProofPackStatus,
     validate_manifest,
     verify_manifest_attestation,
     verify_proof_pack,
@@ -135,8 +133,10 @@ def test_proof_pack_manifest_and_attestation_round_trip(tmp_path: Path) -> None:
     assert validate_manifest(pack_dir / "manifest.json") == []
     assert verify_manifest_attestation(pack_dir) == []
 
-    payload, exit_code = verify_proof_pack(pack_dir, skip_verify=True)
-    assert exit_code == PROOF_PACK_VERIFY_OK
+    result = verify_proof_pack(pack_dir, skip_verify=True)
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == ProofPackStatus.OK
     assert payload["ok"] is True
     assert "unsigned" in payload["warnings"][0]
 
@@ -147,11 +147,13 @@ def test_proof_pack_verify_rejects_json_out_inside_pack(tmp_path: Path) -> None:
         report_rel_path="reports/model/clean/noop/evaluation.report.json",
     )
 
-    payload, exit_code = verify_proof_pack(
+    result = verify_proof_pack(
         pack_dir, json_out_path=pack_dir / "verify.json", skip_verify=True
     )
+    payload = result.payload
+    exit_code = result.status
 
-    assert exit_code == PROOF_PACK_VERIFY_USAGE
+    assert exit_code == ProofPackStatus.USAGE
     assert payload["ok"] is False
     assert "--json-out must point outside the pack directory." in payload["errors"]
 
@@ -166,11 +168,13 @@ def test_proof_pack_verify_strict_rejects_extra_files(tmp_path: Path) -> None:
     proof_pack_mod._verify_gpg = lambda pack_dir, strict: ([], [], None)
 
     try:
-        payload, exit_code = verify_proof_pack(pack_dir, skip_verify=True, strict=True)
+        result = verify_proof_pack(pack_dir, skip_verify=True, strict=True)
     finally:
         proof_pack_mod._verify_gpg = original_verify_gpg
 
-    assert exit_code == PROOF_PACK_VERIFY_INTEGRITY
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == ProofPackStatus.INTEGRITY
     assert payload["ok"] is False
     assert any("extra files not covered" in error for error in payload["errors"])
 
@@ -181,9 +185,11 @@ def test_proof_pack_verify_requires_clean_reports(tmp_path: Path) -> None:
         report_rel_path="reports/model/errors/noop/evaluation.report.json",
     )
 
-    payload, exit_code = verify_proof_pack(pack_dir)
+    result = verify_proof_pack(pack_dir)
+    payload = result.payload
+    exit_code = result.status
 
-    assert exit_code == PROOF_PACK_VERIFY_REPORTS
+    assert exit_code == ProofPackStatus.REPORTS
     assert payload["ok"] is False
     assert any("No clean reports found" in error for error in payload["errors"])
 
@@ -200,19 +206,20 @@ def test_proof_pack_verify_writes_nested_verify_json(
     monkeypatch.setattr(
         proof_pack_mod,
         "_run_verify_command",
-        lambda reports, profile: (
-            0,
-            {
+        lambda reports, profile: SimpleNamespace(
+            status_code=0,
+            payload={
                 "format_version": "verify-v1",
                 "ok": True,
                 "reports": [str(path) for path in reports],
-                "resolution": {"exit_code": 0},
             },
         ),
     )
 
-    payload, exit_code = verify_proof_pack(pack_dir, json_out_path=json_out)
+    result = verify_proof_pack(pack_dir, json_out_path=json_out)
+    payload = result.payload
+    exit_code = result.status
 
-    assert exit_code == PROOF_PACK_VERIFY_OK
+    assert exit_code == ProofPackStatus.OK
     assert payload["verify"]["format_version"] == "verify-v1"
     assert json.loads(json_out.read_text(encoding="utf-8"))["ok"] is True

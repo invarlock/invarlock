@@ -162,7 +162,6 @@ def run_bare_control(
     snapshot_provenance: dict[str, bool] | None = None,
     skip_model_load: bool = False,
     prefer_local_files_only: bool = False,
-    edit_emit: bool = True,
 ) -> dict[str, Any] | None:
     """Execute the bare-control run for overhead estimation and return payload."""
     from invarlock.cli.overhead_utils import _extract_pm_snapshot_for_overhead
@@ -185,9 +184,7 @@ def run_bare_control(
     bare_context = copy.deepcopy(run_config.context)
     bare_context.setdefault("validation", {})["guard_overhead_mode"] = "bare"
     bare_config.context = bare_context
-    edit_runtime = EditRuntime(
-        emit=edit_emit,
-    )
+    edit_runtime = EditRuntime()
 
     private_model_loaded = False
     bare_target_model = None
@@ -351,9 +348,7 @@ def execute_guarded_run(
         if snapshot_provenance is not None:
             snapshot_provenance["reload_path_used"] = True
 
-    edit_runtime = EditRuntime(
-        emit=True,
-    )
+    edit_runtime = EditRuntime()
 
     with suppress_noisy_warnings(
         profile_normalized,

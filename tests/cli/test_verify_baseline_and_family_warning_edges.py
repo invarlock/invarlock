@@ -56,7 +56,7 @@ def test_verify_ppl_baseline_zero_is_error(tmp_path: Path, capsys) -> None:
     with pytest.raises(typer.Exit):
         verify_command([p], baseline=None, profile="dev", json_out=True)
     out = json.loads(capsys.readouterr().out)
-    assert out["resolution"]["exit_code"] != 0
+    assert "resolution" not in out
 
 
 def test_adapter_family_warning_swallows_internal_errors(

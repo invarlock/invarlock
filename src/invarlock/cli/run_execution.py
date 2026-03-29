@@ -47,7 +47,7 @@ from invarlock.core import (
 from invarlock.core import run_guard_overhead_policy as run_guard_overhead_policy_mod
 from invarlock.core import run_report_payload_policy as run_report_payload_policy_mod
 from invarlock.core.exceptions import ValidationError
-from invarlock.core.exit_codes import (
+from invarlock.exit_codes import (
     resolve_command_exit_code as _resolve_exit_code,
 )
 from invarlock.core.retry import adjust_edit_params as _adjust_edit_params
@@ -55,7 +55,11 @@ from invarlock.core.run_dataset_contract import (
     materialize_run_dataset as _materialize_run_dataset,
 )
 from invarlock.core.run_orchestrator import (
+    RunAggregateEvent,
+    RunContextEvent,
+    RunDiagnosticEvent,
     RunExecutionEvent,
+    RunLifecycleEvent,
     RunExecutionRequest,
     RunExecutionServices,
 )
@@ -390,11 +394,9 @@ def _emit_console_blank_line() -> None:
 
 
 def _render_run_execution_event(event: RunExecutionEvent) -> None:
-    phase = event.phase
-    name = event.code
-    payload = event.details
-
-    if phase == "metadata":
+    if isinstance(event, RunContextEvent):
+        name = event.name
+        payload = event.payload
         if name == "device_resolved":
             resolved_device = str(payload.get("resolved_device", ""))
             requested_device = str(payload.get("requested_device") or "auto")
@@ -431,7 +433,9 @@ def _render_run_execution_event(event: RunExecutionEvent) -> None:
             )
             return
 
-    if phase == "diagnostic":
+    if isinstance(event, RunDiagnosticEvent):
+        name = event.name
+        payload = event.payload
         if name == "guard_missing":
             _event(
                 console,
@@ -494,28 +498,33 @@ def _render_run_execution_event(event: RunExecutionEvent) -> None:
             _event(console, tag, message, emoji=emoji)
             return
 
-    if phase == "summary" and name == "guard_overhead_summary":
-        _print_guard_overhead_summary(
-            console,
-            payload.get("guard_overhead_info") or {},
-            default_threshold=float(payload.get("default_threshold", 0.01) or 0.01),
-        )
-        return
-
-    if phase == "summary" and name == "retry_summary":
-        summary = payload.get("summary")
-        if isinstance(summary, dict):
-            _emit_console_blank_line()
-            _event(
+    if isinstance(event, RunAggregateEvent):
+        name = event.name
+        payload = event.payload
+        if name == "guard_overhead_summary":
+            _print_guard_overhead_summary(
                 console,
-                "METRIC",
-                f"Retry Summary: {summary.get('total_attempts', 0)} attempts in {float(summary.get('elapsed_time', 0.0) or 0.0):.1f}s",
-                emoji="📊",
+                payload.get("guard_overhead_info") or {},
+                default_threshold=float(payload.get("default_threshold", 0.01) or 0.01),
             )
+            return
+        if name == "retry_summary":
+            summary = payload.get("summary")
+            if isinstance(summary, dict):
+                _emit_console_blank_line()
+                _event(
+                    console,
+                    "METRIC",
+                    f"Retry Summary: {summary.get('total_attempts', 0)} attempts in {float(summary.get('elapsed_time', 0.0) or 0.0):.1f}s",
+                    emoji="📊",
+                )
         return
 
-    if phase != "status":
+    if not isinstance(event, RunLifecycleEvent):
         return
+
+    name = event.name
+    payload = event.payload
 
     def _emit_status_line(tag: str, message: str, *, emoji: str | None = None) -> None:
         _event(console, tag, message, emoji=emoji)

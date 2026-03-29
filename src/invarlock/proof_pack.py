@@ -5,10 +5,15 @@ import json
 import re
 import shutil
 import subprocess
+from dataclasses import dataclass
+from enum import IntEnum
 from pathlib import Path
 from typing import Any
 
 from invarlock.public_contracts import load_proof_pack_manifest_schema
+from invarlock.reporting.verify_contract import VerifyExecutionResult
+from invarlock.reporting.verify_contract import VerifyOutcome
+from invarlock.reporting.verify_contract import run_verify_reports
 from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
 
 try:  # pragma: no cover - exercised through tests/integration
@@ -17,13 +22,23 @@ except ImportError:  # pragma: no cover
     jsonschema = None
 
 PROOF_PACK_FORMAT = "proof-pack-v1"
-PROOF_PACK_VERIFY_OK = 0
-PROOF_PACK_VERIFY_USAGE = 2
-PROOF_PACK_VERIFY_MISSING = 3
-PROOF_PACK_VERIFY_FORMAT = 4
-PROOF_PACK_VERIFY_SIGNATURE = 5
-PROOF_PACK_VERIFY_INTEGRITY = 6
-PROOF_PACK_VERIFY_REPORTS = 7
+_VERIFY_GPG_TIMEOUT_SECONDS = 30
+
+
+class ProofPackStatus(IntEnum):
+    OK = 0
+    USAGE = 2
+    MISSING = 3
+    FORMAT = 4
+    SIGNATURE = 5
+    INTEGRITY = 6
+    REPORTS = 7
+
+
+@dataclass(frozen=True)
+class ProofPackResult:
+    payload: dict[str, Any]
+    status: ProofPackStatus
 
 _CONTROL_FILES = {
     "checksums.sha256",
@@ -420,6 +435,7 @@ def _verify_gpg(
             capture_output=True,
             text=True,
             check=False,
+            timeout=_VERIFY_GPG_TIMEOUT_SECONDS,
         )
     except FileNotFoundError:
         if strict:
@@ -429,6 +445,10 @@ def _verify_gpg(
                 None,
             )
         return [], ["gpg not found; skipping manifest signature verification."], None
+    except subprocess.TimeoutExpired:
+        if strict:
+            return (["gpg verification timed out."], [], None)
+        return [], ["gpg verification timed out; skipping manifest signature verification."], None
     if result.returncode != 0:
         message = (result.stdout + result.stderr).strip()
         error = "manifest signature verification failed."
@@ -459,10 +479,19 @@ def _verify_gpg(
 
 def _run_verify_command(
     reports: list[Path], *, profile: str
-) -> tuple[int, dict[str, Any] | None]:
-    from invarlock.reporting.verify_contract import verify_reports_contract
+) -> VerifyExecutionResult:
+    return run_verify_reports(reports, profile=profile, json_mode=True)
 
-    return verify_reports_contract(reports, profile=profile, json_mode=True)
+
+def _verify_command_succeeded(result: Any) -> bool:
+    outcome = getattr(result, "outcome", None)
+    if outcome is not None:
+        return outcome == VerifyOutcome.OK
+    status_code = getattr(result, "status_code", 1)
+    try:
+        return int(status_code) == 0
+    except (TypeError, ValueError):
+        return False
 
 
 def _verify_reports(
@@ -481,13 +510,13 @@ def _verify_reports(
             "No clean reports found in pack (only error-injection reports present)."
         ], None
 
-    exit_code, payload = _run_verify_command(clean_reports, profile=profile)
-    verify_payload = dict(payload) if isinstance(payload, dict) else payload
+    clean_result = _run_verify_command(clean_reports, profile=profile)
+    if not isinstance(clean_result.payload, dict):
+        return ["clean report verification did not return a JSON object."], None
+    verify_payload = dict(clean_result.payload)
     if error_reports:
         try:
-            error_exit_code, error_payload = _run_verify_command(
-                error_reports, profile=profile
-            )
+            error_result = _run_verify_command(error_reports, profile=profile)
         except (
             ImportError,
             ModuleNotFoundError,
@@ -498,18 +527,15 @@ def _verify_reports(
         ) as exc:
             return [
                 f"error-injection report verification failed: {exc}"
-            ], verify_payload if isinstance(verify_payload, dict) else payload
-        if not isinstance(error_payload, dict):
+            ], verify_payload
+        if not isinstance(error_result.payload, dict):
             return [
                 "error-injection report verification did not return a JSON object."
-            ], verify_payload if isinstance(verify_payload, dict) else payload
+            ], verify_payload
         if verify_payload is None:
             verify_payload = {}
-        if not isinstance(verify_payload, dict):
-            return ["clean report verification did not return a JSON object."], payload
         verify_payload["error_injection"] = {
-            "exit_code": int(error_exit_code),
-            "verify": error_payload,
+            "verify": error_result.payload,
             "reports": [
                 str(path.relative_to(pack_dir)).replace("\\", "/")
                 for path in error_reports
@@ -519,14 +545,14 @@ def _verify_reports(
         json_out_path.write_text(
             json.dumps(verify_payload, sort_keys=True) + "\n", encoding="utf-8"
         )
-    if exit_code != 0:
+    if not _verify_command_succeeded(clean_result):
         return [
             "invarlock verify reported report verification failures."
         ], verify_payload
     return [], verify_payload
 
 
-def inspect_proof_pack(pack_dir: Path) -> tuple[dict[str, Any], int]:
+def inspect_proof_pack(pack_dir: Path) -> ProofPackResult:
     issues: list[str] = []
     payload: dict[str, Any] = {
         "pack": str(pack_dir),
@@ -546,20 +572,20 @@ def inspect_proof_pack(pack_dir: Path) -> tuple[dict[str, Any], int]:
     }
     if not pack_dir.is_dir():
         issues.append(f"Pack directory not found: {pack_dir}")
-        return payload, PROOF_PACK_VERIFY_MISSING
+        return ProofPackResult(payload=payload, status=ProofPackStatus.MISSING)
     manifest_path = pack_dir / "manifest.json"
     checksums_path = pack_dir / "checksums.sha256"
     if not manifest_path.is_file():
         issues.append("manifest.json missing in pack.")
-        return payload, PROOF_PACK_VERIFY_MISSING
+        return ProofPackResult(payload=payload, status=ProofPackStatus.MISSING)
     if not checksums_path.is_file():
         issues.append("checksums.sha256 missing in pack.")
-        return payload, PROOF_PACK_VERIFY_MISSING
+        return ProofPackResult(payload=payload, status=ProofPackStatus.MISSING)
 
     manifest_errors = validate_manifest(manifest_path)
     if manifest_errors:
         issues.extend(manifest_errors)
-        return payload, PROOF_PACK_VERIFY_FORMAT
+        return ProofPackResult(payload=payload, status=ProofPackStatus.FORMAT)
 
     manifest = _load_json(manifest_path)
     payload["manifest"] = {
@@ -613,7 +639,10 @@ def inspect_proof_pack(pack_dir: Path) -> tuple[dict[str, Any], int]:
         "manifest_attestation_ok": not attestation_errors,
         "extra_files": extra_files,
     }
-    payload["ok"] = True
+    integrity_errors_present = bool(
+        bind_errors or checksum_errors or attestation_errors or extra_files
+    )
+    payload["ok"] = not integrity_errors_present
     payload["strict_ready"] = (
         signature_present
         and not bind_errors
@@ -621,7 +650,14 @@ def inspect_proof_pack(pack_dir: Path) -> tuple[dict[str, Any], int]:
         and not attestation_errors
         and not extra_files
     )
-    return payload, PROOF_PACK_VERIFY_OK
+    return ProofPackResult(
+        payload=payload,
+        status=(
+            ProofPackStatus.INTEGRITY
+            if integrity_errors_present
+            else ProofPackStatus.OK
+        ),
+    )
 
 
 def build_proof_pack(
@@ -634,7 +670,7 @@ def build_proof_pack(
     material_specs: list[tuple[str, Path]] | None = None,
     readme_path: Path | None = None,
     profile: str = "dev",
-) -> tuple[dict[str, Any], int]:
+) -> ProofPackResult:
     warnings: list[str] = []
     errors: list[str] = []
     verify_payload: dict[str, Any] | None = None
@@ -651,10 +687,10 @@ def build_proof_pack(
 
     if not report_paths:
         errors.append("proof-pack build requires at least one --report input.")
-        return payload, PROOF_PACK_VERIFY_USAGE
+        return ProofPackResult(payload=payload, status=ProofPackStatus.USAGE)
     if out_dir.exists():
         errors.append(f"Output pack directory already exists: {out_dir}")
-        return payload, PROOF_PACK_VERIFY_USAGE
+        return ProofPackResult(payload=payload, status=ProofPackStatus.USAGE)
     seen_material_names: set[str] = set()
     for material_name, _material_path in material_specs:
         name_error = _validate_material_name(material_name)
@@ -689,15 +725,15 @@ def build_proof_pack(
             )
             errors.extend(runtime_manifest_errors)
     if errors:
-        return payload, PROOF_PACK_VERIFY_FORMAT
+        return ProofPackResult(payload=payload, status=ProofPackStatus.FORMAT)
 
-    verify_exit_code, verify_payload = _run_verify_command(
+    verify_result = _run_verify_command(
         report_paths, profile=profile
     )
-    if verify_exit_code != 0:
-        payload["verify"] = verify_payload
+    if not _verify_command_succeeded(verify_result):
+        payload["verify"] = verify_result.payload
         errors.append("Provided report inputs failed `invarlock verify`.")
-        return payload, PROOF_PACK_VERIFY_REPORTS
+        return ProofPackResult(payload=payload, status=ProofPackStatus.REPORTS)
 
     out_dir.mkdir(parents=True, exist_ok=False)
     rel_paths: list[str] = []
@@ -784,13 +820,13 @@ def build_proof_pack(
 
     payload["ok"] = True
     payload["reports"] = {"total": len(report_paths)}
-    payload["verify"] = verify_payload
+    payload["verify"] = verify_result.payload
     payload["files"] = {
         "hashed": len(rel_paths),
         "manifest": "manifest.json",
         "checksums": "checksums.sha256",
     }
-    return payload, PROOF_PACK_VERIFY_OK
+    return ProofPackResult(payload=payload, status=ProofPackStatus.OK)
 
 
 def verify_proof_pack(
@@ -800,7 +836,7 @@ def verify_proof_pack(
     skip_verify: bool = False,
     strict: bool = False,
     profile: str = "dev",
-) -> tuple[dict[str, Any], int]:
+) -> ProofPackResult:
     warnings: list[str] = []
     errors: list[str] = []
     verify_payload: dict[str, Any] | None = None
@@ -817,8 +853,8 @@ def verify_proof_pack(
             errors=errors,
             signer_fingerprint=signer_fingerprint,
             verify_payload=verify_payload,
-            exit_code=PROOF_PACK_VERIFY_MISSING,
-        ), PROOF_PACK_VERIFY_MISSING
+            status=ProofPackStatus.MISSING,
+        )
     if not (pack_dir / "manifest.json").is_file():
         errors.append("manifest.json missing in pack.")
         return _build_verify_result(
@@ -830,8 +866,8 @@ def verify_proof_pack(
             errors=errors,
             signer_fingerprint=signer_fingerprint,
             verify_payload=verify_payload,
-            exit_code=PROOF_PACK_VERIFY_MISSING,
-        ), PROOF_PACK_VERIFY_MISSING
+            status=ProofPackStatus.MISSING,
+        )
     if not (pack_dir / "checksums.sha256").is_file():
         errors.append("checksums.sha256 missing in pack.")
         return _build_verify_result(
@@ -843,8 +879,8 @@ def verify_proof_pack(
             errors=errors,
             signer_fingerprint=signer_fingerprint,
             verify_payload=verify_payload,
-            exit_code=PROOF_PACK_VERIFY_MISSING,
-        ), PROOF_PACK_VERIFY_MISSING
+            status=ProofPackStatus.MISSING,
+        )
     if json_out_path is not None and _path_within_dir(pack_dir, json_out_path):
         errors.append("--json-out must point outside the pack directory.")
         return _build_verify_result(
@@ -856,8 +892,8 @@ def verify_proof_pack(
             errors=errors,
             signer_fingerprint=signer_fingerprint,
             verify_payload=verify_payload,
-            exit_code=PROOF_PACK_VERIFY_USAGE,
-        ), PROOF_PACK_VERIFY_USAGE
+            status=ProofPackStatus.USAGE,
+        )
 
     errors.extend(validate_manifest(pack_dir / "manifest.json"))
     if errors:
@@ -870,8 +906,8 @@ def verify_proof_pack(
             errors=errors,
             signer_fingerprint=signer_fingerprint,
             verify_payload=verify_payload,
-            exit_code=PROOF_PACK_VERIFY_FORMAT,
-        ), PROOF_PACK_VERIFY_FORMAT
+            status=ProofPackStatus.FORMAT,
+        )
 
     signature_errors, signature_warnings, signer_fingerprint = _verify_gpg(
         pack_dir, strict=strict
@@ -888,8 +924,8 @@ def verify_proof_pack(
             errors=errors,
             signer_fingerprint=signer_fingerprint,
             verify_payload=verify_payload,
-            exit_code=PROOF_PACK_VERIFY_SIGNATURE,
-        ), PROOF_PACK_VERIFY_SIGNATURE
+            status=ProofPackStatus.SIGNATURE,
+        )
 
     errors.extend(_verify_manifest_binds_checksums(pack_dir))
     checksum_errors, covered_paths = _verify_checksums(pack_dir)
@@ -910,8 +946,8 @@ def verify_proof_pack(
             errors=errors,
             signer_fingerprint=signer_fingerprint,
             verify_payload=verify_payload,
-            exit_code=PROOF_PACK_VERIFY_INTEGRITY,
-        ), PROOF_PACK_VERIFY_INTEGRITY
+            status=ProofPackStatus.INTEGRITY,
+        )
 
     if not skip_verify:
         report_errors, verify_payload = _verify_reports(
@@ -928,8 +964,8 @@ def verify_proof_pack(
                 errors=errors,
                 signer_fingerprint=signer_fingerprint,
                 verify_payload=verify_payload,
-                exit_code=PROOF_PACK_VERIFY_REPORTS,
-            ), PROOF_PACK_VERIFY_REPORTS
+                status=ProofPackStatus.REPORTS,
+            )
 
     return _build_verify_result(
         pack_dir=pack_dir,
@@ -940,8 +976,8 @@ def verify_proof_pack(
         errors=errors,
         signer_fingerprint=signer_fingerprint,
         verify_payload=verify_payload,
-        exit_code=PROOF_PACK_VERIFY_OK,
-    ), PROOF_PACK_VERIFY_OK
+        status=ProofPackStatus.OK,
+    )
 
 
 def _build_verify_result(
@@ -954,8 +990,8 @@ def _build_verify_result(
     errors: list[str],
     signer_fingerprint: str | None,
     verify_payload: dict[str, Any] | None,
-    exit_code: int,
-) -> dict[str, Any]:
+    status: ProofPackStatus,
+) -> ProofPackResult:
     payload: dict[str, Any] = {
         "pack": str(pack_dir),
         "ok": ok,
@@ -963,24 +999,18 @@ def _build_verify_result(
         "skip_verify": skip_verify,
         "warnings": warnings,
         "errors": errors,
-        "resolution": {"exit_code": exit_code},
     }
     if signer_fingerprint:
         payload["signer_fingerprint"] = signer_fingerprint
     if verify_payload is not None:
         payload["verify"] = verify_payload
-    return payload
+    return ProofPackResult(payload=payload, status=status)
 
 
 __all__ = [
     "PROOF_PACK_FORMAT",
-    "PROOF_PACK_VERIFY_REPORTS",
-    "PROOF_PACK_VERIFY_FORMAT",
-    "PROOF_PACK_VERIFY_INTEGRITY",
-    "PROOF_PACK_VERIFY_MISSING",
-    "PROOF_PACK_VERIFY_OK",
-    "PROOF_PACK_VERIFY_SIGNATURE",
-    "PROOF_PACK_VERIFY_USAGE",
+    "ProofPackResult",
+    "ProofPackStatus",
     "validate_manifest",
     "verify_manifest_attestation",
     "verify_proof_pack",

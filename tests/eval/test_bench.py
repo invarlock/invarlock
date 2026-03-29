@@ -824,35 +824,23 @@ class TestCLIAndMain:
         """Test basic main function invocation."""
         mock_benchmark.return_value = {"overall_pass": True}
 
-        with pytest.raises(SystemExit) as exc_info:
-            main()
-
-        assert exc_info.value.code == 0
+        assert main() == 0
         mock_benchmark.assert_called_once()
 
     @patch("sys.argv", ["bench.py", "--edits", "invalid_edit"])
     def test_main_invalid_edit_type(self):
         """Test main function with invalid edit type."""
-        with pytest.raises(SystemExit) as exc_info:
-            main()
-
-        assert exc_info.value.code == 1
+        assert main() == 1
 
     @patch("sys.argv", ["bench.py", "--edits", "quant_rtn", "--tiers", "invalid_tier"])
     def test_main_invalid_tier(self):
         """Test main function with invalid tier."""
-        with pytest.raises(SystemExit) as exc_info:
-            main()
-
-        assert exc_info.value.code == 1
+        assert main() == 1
 
     @patch("sys.argv", ["bench.py", "--edits", "quant_rtn", "--probes", "-1"])
     def test_main_invalid_probe_count(self):
         """Test main function with invalid probe count."""
-        with pytest.raises(SystemExit) as exc_info:
-            main()
-
-        assert exc_info.value.code == 1
+        assert main() == 1
 
     @patch("sys.argv", ["bench.py", "--edits", "quant_rtn", "--profile", "ci"])
     @patch("invarlock.cli.bench.run_guard_effect_benchmark")
@@ -860,10 +848,7 @@ class TestCLIAndMain:
         """Test main function when benchmark fails gates."""
         mock_benchmark.return_value = {"overall_pass": False}
 
-        with pytest.raises(SystemExit) as exc_info:
-            main()
-
-        assert exc_info.value.code == 1
+        assert main() == 1
 
     @patch("sys.argv", ["bench.py", "--edits", "quant_rtn", "--profile", "ci"])
     @patch("invarlock.cli.bench.run_guard_effect_benchmark")
@@ -871,10 +856,7 @@ class TestCLIAndMain:
         """Test main function with keyboard interrupt."""
         mock_benchmark.side_effect = KeyboardInterrupt()
 
-        with pytest.raises(SystemExit) as exc_info:
-            main()
-
-        assert exc_info.value.code == 1
+        assert main() == 1
 
     @patch("sys.argv", ["bench.py", "--edits", "quant_rtn", "--profile", "ci"])
     @patch("invarlock.cli.bench.run_guard_effect_benchmark")
@@ -882,10 +864,7 @@ class TestCLIAndMain:
         """Test main function exception handling."""
         mock_benchmark.side_effect = RuntimeError("Test error")
 
-        with pytest.raises(SystemExit) as exc_info:
-            main()
-
-        assert exc_info.value.code == 1
+        assert main() == 1
 
     @patch(
         "sys.argv",
@@ -894,8 +873,7 @@ class TestCLIAndMain:
     @patch("invarlock.cli.bench.run_guard_effect_benchmark")
     def test_main_exception_verbose_traces(self, mock_benchmark):
         mock_benchmark.side_effect = RuntimeError("boom")
-        with pytest.raises(SystemExit):
-            main()
+        assert main() == 1
 
 
 class TestExecuteSingleRun:

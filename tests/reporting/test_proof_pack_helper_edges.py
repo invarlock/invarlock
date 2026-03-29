@@ -598,7 +598,7 @@ def test_verify_reports_and_inspect_cover_error_paths(
     def _fake_run_verify(reports: list[Path], *, profile: str):
         verify_calls.append([str(path) for path in reports])
         if len(verify_calls) == 1:
-            return 1, {"ok": False}
+            return SimpleNamespace(status_code=1, payload={"ok": False})
         raise RuntimeError("ignore nested error reports")
 
     monkeypatch.setattr(
@@ -616,16 +616,20 @@ def test_verify_reports_and_inspect_cover_error_paths(
     assert payload == {"ok": False}
     assert len(verify_calls) == 2
 
-    missing_payload, exit_code = proof_pack_mod.inspect_proof_pack(tmp_path / "missing")
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_MISSING
+    missing_result = proof_pack_mod.inspect_proof_pack(tmp_path / "missing")
+    missing_payload = missing_result.payload
+    exit_code = missing_result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.MISSING
     assert missing_payload["ok"] is False
 
     invalid_pack = tmp_path / "invalid"
     invalid_pack.mkdir()
     (invalid_pack / "manifest.json").write_text("{invalid", encoding="utf-8")
     (invalid_pack / "checksums.sha256").write_text("", encoding="utf-8")
-    invalid_payload, exit_code = proof_pack_mod.inspect_proof_pack(invalid_pack)
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_FORMAT
+    invalid_result = proof_pack_mod.inspect_proof_pack(invalid_pack)
+    invalid_payload = invalid_result.payload
+    exit_code = invalid_result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.FORMAT
     assert invalid_payload["ok"] is False
 
 
@@ -653,7 +657,9 @@ def test_verify_reports_covers_remaining_payload_contract_branches(
         proof_pack_mod,
         "_run_verify_command",
         lambda reports, *, profile: (
-            (0, {"ok": True}) if "clean" in str(reports[0]) else (0, ["bad-payload"])
+            SimpleNamespace(status_code=0, payload={"ok": True})
+            if "clean" in str(reports[0])
+            else SimpleNamespace(status_code=0, payload=["bad-payload"])
         ),
         raising=True,
     )
@@ -669,27 +675,9 @@ def test_verify_reports_covers_remaining_payload_contract_branches(
         proof_pack_mod,
         "_run_verify_command",
         lambda reports, *, profile: (
-            (0, None) if "clean" in str(reports[0]) else (0, {"ok": True})
-        ),
-        raising=True,
-    )
-    errors, payload = proof_pack_mod._verify_reports(
-        pack_with_errors, json_out_path=None, profile="dev"
-    )
-    assert errors == []
-    assert payload == {
-        "error_injection": {
-            "exit_code": 0,
-            "verify": {"ok": True},
-            "reports": ["reports/model/errors/noop/evaluation.report.json"],
-        }
-    }
-
-    monkeypatch.setattr(
-        proof_pack_mod,
-        "_run_verify_command",
-        lambda reports, *, profile: (
-            (0, ["clean-bad"]) if "clean" in str(reports[0]) else (0, {"ok": True})
+            SimpleNamespace(status_code=0, payload=None)
+            if "clean" in str(reports[0])
+            else SimpleNamespace(status_code=0, payload={"ok": True})
         ),
         raising=True,
     )
@@ -697,13 +685,29 @@ def test_verify_reports_covers_remaining_payload_contract_branches(
         pack_with_errors, json_out_path=None, profile="dev"
     )
     assert errors == ["clean report verification did not return a JSON object."]
-    assert payload == ["clean-bad"]
+    assert payload is None
+
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "_run_verify_command",
+        lambda reports, *, profile: (
+            SimpleNamespace(status_code=0, payload=["clean-bad"])
+            if "clean" in str(reports[0])
+            else SimpleNamespace(status_code=0, payload={"ok": True})
+        ),
+        raising=True,
+    )
+    errors, payload = proof_pack_mod._verify_reports(
+        pack_with_errors, json_out_path=None, profile="dev"
+    )
+    assert errors == ["clean report verification did not return a JSON object."]
+    assert payload is None
 
     pack_clean_only = _build_pack("clean-only", with_errors=False)
     monkeypatch.setattr(
         proof_pack_mod,
         "_run_verify_command",
-        lambda reports, *, profile: (1, {"ok": False}),
+        lambda reports, *, profile: SimpleNamespace(status_code=1, payload={"ok": False}),
         raising=True,
     )
     errors, payload = proof_pack_mod._verify_reports(
@@ -729,65 +733,75 @@ def test_build_and_verify_proof_pack_cover_usage_and_failure_paths(
     material = tmp_path / "material.json"
     _write_json(material, {"name": "demo"})
 
-    payload, exit_code = proof_pack_mod.build_proof_pack(
+    result = proof_pack_mod.build_proof_pack(
         tmp_path / "out-none",
         final_verdict_path=final_verdict,
         report_paths=[],
     )
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_USAGE
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.USAGE
     assert "at least one --report input" in payload["errors"][0]
 
     existing_out = tmp_path / "existing"
     existing_out.mkdir()
-    payload, exit_code = proof_pack_mod.build_proof_pack(
+    result = proof_pack_mod.build_proof_pack(
         existing_out,
         final_verdict_path=final_verdict,
         report_paths=[report_path],
     )
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_USAGE
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.USAGE
     assert "already exists" in payload["errors"][0]
 
-    payload, exit_code = proof_pack_mod.build_proof_pack(
+    result = proof_pack_mod.build_proof_pack(
         tmp_path / "out-invalid-material",
         final_verdict_path=final_verdict,
         report_paths=[report_path],
         material_specs=[("../bad", material), ("../bad", material)],
     )
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_FORMAT
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.FORMAT
     assert any("Invalid material name" in error for error in payload["errors"])
     assert any("Duplicate material name" in error for error in payload["errors"])
 
     runtime_manifest.unlink()
-    payload, exit_code = proof_pack_mod.build_proof_pack(
+    result = proof_pack_mod.build_proof_pack(
         tmp_path / "out-missing-sidecar",
         final_verdict_path=final_verdict,
         report_paths=[report_path],
     )
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_FORMAT
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.FORMAT
     assert any("report sidecar file not found" in error for error in payload["errors"])
     _write_json(runtime_manifest, {"ok": True})
 
     monkeypatch.setattr(
         proof_pack_mod,
         "_run_verify_command",
-        lambda reports, profile: (2, {"ok": False}),
+        lambda reports, profile: SimpleNamespace(status_code=2, payload={"ok": False}),
         raising=True,
     )
-    payload, exit_code = proof_pack_mod.build_proof_pack(
+    result = proof_pack_mod.build_proof_pack(
         tmp_path / "out-verify-fail",
         final_verdict_path=final_verdict,
         report_paths=[report_path],
     )
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_REPORTS
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.REPORTS
     assert payload["verify"] == {"ok": False}
 
     monkeypatch.setattr(
         proof_pack_mod,
         "_run_verify_command",
-        lambda reports, profile: (0, {"ok": True}),
+        lambda reports, profile: SimpleNamespace(status_code=0, payload={"ok": True}),
         raising=True,
     )
-    payload, exit_code = proof_pack_mod.build_proof_pack(
+    result = proof_pack_mod.build_proof_pack(
         tmp_path / "out-ok",
         final_verdict_path=final_verdict,
         report_paths=[report_path],
@@ -796,22 +810,28 @@ def test_build_and_verify_proof_pack_cover_usage_and_failure_paths(
         material_specs=[("demo", material)],
         readme_path=tmp_path / "missing-readme.md",
     )
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_OK
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.OK
     assert payload["ok"] is True
     assert any("README file not found" in warning for warning in payload["warnings"])
 
-    payload, exit_code = proof_pack_mod.verify_proof_pack(
+    result = proof_pack_mod.verify_proof_pack(
         tmp_path / "missing-pack", skip_verify=True
     )
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_MISSING
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.MISSING
     assert payload["ok"] is False
 
-    payload, exit_code = proof_pack_mod.verify_proof_pack(
+    result = proof_pack_mod.verify_proof_pack(
         tmp_path / "out-ok",
         json_out_path=(tmp_path / "out-ok" / "verify.json"),
         skip_verify=True,
     )
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_USAGE
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.USAGE
     assert "--json-out must point outside the pack directory." in payload["errors"]
 
 
@@ -834,18 +854,19 @@ def test_run_verify_command_delegates_to_verify_reports_contract(
         captured["reports"] = reports
         captured["profile"] = profile
         captured["json_mode"] = json_mode
-        return 0, {"ok": True}
+        return SimpleNamespace(status_code=0, payload={"ok": True})
 
     monkeypatch.setattr(
-        "invarlock.reporting.verify_contract.verify_reports_contract",
+        proof_pack_mod,
+        "run_verify_reports",
         _fake_verify_contract,
         raising=False,
     )
 
-    exit_code, payload = proof_pack_mod._run_verify_command([report], profile="release")
+    result = proof_pack_mod._run_verify_command([report], profile="release")
 
-    assert exit_code == 0
-    assert payload == {"ok": True}
+    assert result.status_code == 0
+    assert result.payload == {"ok": True}
     assert captured["reports"] == [report]
     assert captured["profile"] == "release"
     assert captured["json_mode"] is True
@@ -1038,8 +1059,10 @@ def test_inspect_proof_pack_reports_missing_manifest_and_checksums(
     missing_manifest.mkdir()
     _write_json(missing_manifest / "checksums.sha256", {})
 
-    payload, exit_code = proof_pack_mod.inspect_proof_pack(missing_manifest)
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_MISSING
+    result = proof_pack_mod.inspect_proof_pack(missing_manifest)
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.MISSING
     assert payload["issues"] == ["manifest.json missing in pack."]
 
     missing_checksums = tmp_path / "missing-checksums"
@@ -1053,8 +1076,10 @@ def test_inspect_proof_pack_reports_missing_manifest_and_checksums(
         },
     )
 
-    payload, exit_code = proof_pack_mod.inspect_proof_pack(missing_checksums)
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_MISSING
+    result = proof_pack_mod.inspect_proof_pack(missing_checksums)
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.MISSING
     assert payload["issues"] == ["checksums.sha256 missing in pack."]
 
 
@@ -1072,8 +1097,11 @@ def test_inspect_proof_pack_signed_pack_omits_unsigned_warning_and_reports_extra
     (pack_dir / "manifest.json.asc").write_text("sig", encoding="utf-8")
     (pack_dir / "extra.bin").write_text("extra", encoding="utf-8")
 
-    payload, exit_code = proof_pack_mod.inspect_proof_pack(pack_dir)
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_OK
+    result = proof_pack_mod.inspect_proof_pack(pack_dir)
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.INTEGRITY
+    assert payload["ok"] is False
     assert not any("pack is unsigned" in issue for issue in payload["issues"])
     assert any("extra files not covered" in issue for issue in payload["issues"])
 
@@ -1095,18 +1123,20 @@ def test_build_proof_pack_copies_readme_and_environment_without_optional_refs(
     monkeypatch.setattr(
         proof_pack_mod,
         "_run_verify_command",
-        lambda reports, profile: (0, {"ok": True}),
+        lambda reports, profile: SimpleNamespace(status_code=0, payload={"ok": True}),
         raising=True,
     )
 
-    payload, exit_code = proof_pack_mod.build_proof_pack(
+    result = proof_pack_mod.build_proof_pack(
         tmp_path / "out-readme",
         final_verdict_path=final_verdict,
         report_paths=[report_path],
         environment_path=environment,
         readme_path=readme,
     )
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_OK
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.OK
     assert payload["ok"] is True
     manifest = json.loads(
         (tmp_path / "out-readme" / "manifest.json").read_text(encoding="utf-8")
@@ -1132,17 +1162,19 @@ def test_build_proof_pack_copies_source_repo_without_environment_or_materials(
     monkeypatch.setattr(
         proof_pack_mod,
         "_run_verify_command",
-        lambda reports, profile: (0, {"ok": True}),
+        lambda reports, profile: SimpleNamespace(status_code=0, payload={"ok": True}),
         raising=True,
     )
 
-    payload, exit_code = proof_pack_mod.build_proof_pack(
+    result = proof_pack_mod.build_proof_pack(
         tmp_path / "out-source-only",
         final_verdict_path=final_verdict,
         report_paths=[report_path],
         source_repo_path=source_repo,
     )
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_OK
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.OK
     assert payload["ok"] is True
     manifest = json.loads(
         (tmp_path / "out-source-only" / "manifest.json").read_text(encoding="utf-8")
@@ -1161,10 +1193,12 @@ def test_verify_proof_pack_reports_missing_manifest_and_checksums(
     missing_manifest.mkdir()
     (missing_manifest / "checksums.sha256").write_text("", encoding="utf-8")
 
-    payload, exit_code = proof_pack_mod.verify_proof_pack(
+    result = proof_pack_mod.verify_proof_pack(
         missing_manifest, skip_verify=True
     )
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_MISSING
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.MISSING
     assert payload["errors"] == ["manifest.json missing in pack."]
 
     missing_checksums = tmp_path / "missing-checksums"
@@ -1178,10 +1212,12 @@ def test_verify_proof_pack_reports_missing_manifest_and_checksums(
         },
     )
 
-    payload, exit_code = proof_pack_mod.verify_proof_pack(
+    result = proof_pack_mod.verify_proof_pack(
         missing_checksums, skip_verify=True
     )
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_MISSING
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.MISSING
     assert payload["errors"] == ["checksums.sha256 missing in pack."]
 
 
@@ -1200,8 +1236,10 @@ def test_verify_proof_pack_returns_format_for_invalid_manifest(
     )
     (pack_dir / "checksums.sha256").write_text("", encoding="utf-8")
 
-    payload, exit_code = proof_pack_mod.verify_proof_pack(pack_dir, skip_verify=True)
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_FORMAT
+    result = proof_pack_mod.verify_proof_pack(pack_dir, skip_verify=True)
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.FORMAT
     assert payload["errors"]
     assert any(
         "schema validation failed" in error or "manifest format must be" in error
@@ -1228,8 +1266,10 @@ def test_verify_proof_pack_returns_signature_failure_payload(
         raising=True,
     )
 
-    payload, exit_code = proof_pack_mod.verify_proof_pack(pack_dir, skip_verify=True)
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_SIGNATURE
+    result = proof_pack_mod.verify_proof_pack(pack_dir, skip_verify=True)
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.SIGNATURE
     assert payload["errors"] == ["bad signature"]
     assert payload["signer_fingerprint"] == "FPR123"
 
@@ -1244,8 +1284,8 @@ def test_build_verify_result_includes_signer_and_verify_payload(tmp_path: Path) 
         errors=["err"],
         signer_fingerprint="ABC123",
         verify_payload={"ok": False},
-        exit_code=proof_pack_mod.PROOF_PACK_VERIFY_SIGNATURE,
+        status=proof_pack_mod.ProofPackStatus.OK,
     )
 
-    assert payload["signer_fingerprint"] == "ABC123"
-    assert payload["verify"] == {"ok": False}
+    assert payload.payload["signer_fingerprint"] == "ABC123"
+    assert payload.payload["verify"] == {"ok": False}

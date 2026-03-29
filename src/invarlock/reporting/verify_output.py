@@ -180,7 +180,6 @@ def build_verify_json_payload(
     *,
     ok: bool,
     reason: str,
-    exit_code: int,
     tolerance: float,
     load_report_fn: Callable[[Path], dict[str, Any]],
 ) -> dict[str, Any]:
@@ -205,7 +204,6 @@ def build_verify_json_payload(
         "summary": {"ok": ok, "reason": reason},
         "evaluation_report": {"count": len(reports)},
         "results": results,
-        "resolution": {"exit_code": exit_code},
     }
 
 
@@ -213,7 +211,6 @@ def build_verify_error_payload(
     report_path: Path | None,
     *,
     reason: str,
-    exit_code: int,
     encoded_error: dict[str, Any],
 ) -> dict[str, Any]:
     return {
@@ -230,7 +227,6 @@ def build_verify_error_payload(
                 "ci": None,
             }
         ],
-        "resolution": {"exit_code": exit_code},
         "error": encoded_error,
     }
 

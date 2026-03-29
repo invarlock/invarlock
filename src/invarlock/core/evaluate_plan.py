@@ -184,34 +184,9 @@ def build_subject_edit_run_config(
     return merged
 
 
-def build_evaluation_report_kwargs(
-    *,
-    edited_report: str,
-    baseline_report: str,
-    report_out: str,
-    style: str,
-    no_color: bool,
-    baseline_seconds: float,
-    subject_seconds: float,
-    report_start: float,
-) -> dict[str, Any]:
-    return {
-        "run": edited_report,
-        "format": "report",
-        "baseline": baseline_report,
-        "output": report_out,
-        "style": style,
-        "no_color": no_color,
-        "summary_baseline_seconds": baseline_seconds,
-        "summary_subject_seconds": subject_seconds,
-        "summary_report_start": report_start,
-    }
-
-
 __all__ = [
     "DEFAULT_EVALUATE_GUARDS_ORDER",
     "build_baseline_run_config",
-    "build_evaluation_report_kwargs",
     "build_subject_edit_run_config",
     "build_subject_noop_run_config",
     "deep_merge_dicts",

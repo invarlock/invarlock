@@ -14,10 +14,48 @@ from pathlib import Path
 
 from rich.console import Console
 
+from invarlock.exit_codes import resolve_command_exit_code
+
 from ...reporting.verify_contract import run_verify_reports
+from ...reporting.verify_contract import VerifyDiagnostic, VerifyExecutionResult, VerifyOutcome
 from .._json import emit as _emit_json
 
 console = Console()
+
+
+def _render_verify_diagnostic(diagnostic: VerifyDiagnostic) -> None:
+    level = str(diagnostic.level or "").lower()
+    message = diagnostic.message
+    if level == "pass":
+        console.print(f"[green]PASS[/green] {message}")
+        return
+    if level == "fail":
+        console.print(f"[red]FAIL[/red] {message}")
+        return
+    if level == "detail":
+        console.print(f"  ↳ {message}")
+        return
+    if level == "warning":
+        console.print(f"[yellow]⚠️  {message}[/yellow]")
+        return
+    if level == "error":
+        console.print(f"[red]❌ {message}[/red]")
+        return
+    console.print(message)
+
+
+def _verify_exit_code(
+    result: VerifyExecutionResult,
+    *,
+    profile: str | None,
+) -> int:
+    if result.outcome == VerifyOutcome.OK:
+        return 0
+    if isinstance(result.error, Exception):
+        return resolve_command_exit_code(result.error, profile=profile)
+    if result.outcome == VerifyOutcome.MALFORMED:
+        return 2
+    return 1
 
 
 def verify_command(
@@ -42,10 +80,11 @@ def verify_command(
         allow_unattested_artifacts=bool(allow_unattested_artifacts),
         json_mode=bool(json_out),
     )
+    exit_code = _verify_exit_code(result, profile=profile)
     if not json_out:
-        for line in result.human_lines:
-            console.print(line)
+        for diagnostic in result.diagnostics:
+            _render_verify_diagnostic(diagnostic)
     if json_out:
-        _emit_json(result.payload, result.exit_code)
-    if result.exit_code != 0:
-        raise SystemExit(result.exit_code)
+        _emit_json(result.payload, exit_code)
+    if exit_code != 0:
+        raise SystemExit(exit_code)

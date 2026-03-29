@@ -4,10 +4,12 @@ import hashlib
 import json
 import math
 from pathlib import Path
+from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
 from invarlock.cli.app import app
+import invarlock.proof_pack as proof_pack_mod
 from invarlock.reporting import verify_contract as verify_mod
 from invarlock.runtime_security import (
     RUNTIME_MANIFEST_FILENAME,
@@ -66,7 +68,6 @@ def _successful_verify_payload(reports: list[Path]) -> dict[str, object]:
         "format_version": "verify-v1",
         "ok": True,
         "reports": [str(path) for path in reports],
-        "resolution": {"exit_code": 0},
     }
 
 
@@ -223,7 +224,9 @@ def test_proof_pack_verify_json_round_trip(monkeypatch, tmp_path: Path) -> None:
 
     monkeypatch.setattr(
         "invarlock.proof_pack._run_verify_command",
-        lambda reports, profile: (0, _successful_verify_payload(reports)),
+        lambda reports, profile: SimpleNamespace(
+            status_code=0, payload=_successful_verify_payload(reports)
+        ),
         raising=False,
     )
 
@@ -255,7 +258,9 @@ def test_proof_pack_verify_human_success(monkeypatch, tmp_path: Path) -> None:
     )
     monkeypatch.setattr(
         "invarlock.proof_pack._run_verify_command",
-        lambda reports, profile: (0, _successful_verify_payload(reports)),
+        lambda reports, profile: SimpleNamespace(
+            status_code=0, payload=_successful_verify_payload(reports)
+        ),
         raising=False,
     )
 
@@ -277,14 +282,14 @@ def test_proof_pack_verify_human_failure_renders_errors(
     )
     monkeypatch.setattr(
         "invarlock.cli.commands.proof_pack.verify_proof_pack",
-        lambda *args, **kwargs: (
-            {
+        lambda *args, **kwargs: SimpleNamespace(
+            payload={
                 "pack": str(pack_dir),
                 "ok": False,
                 "warnings": [],
                 "errors": ["bad pack"],
             },
-            6,
+            status=proof_pack_mod.ProofPackStatus.INTEGRITY,
         ),
         raising=False,
     )
@@ -307,7 +312,9 @@ def test_proof_pack_verify_json_round_trip_with_verify_payload(
     )
     monkeypatch.setattr(
         "invarlock.proof_pack._run_verify_command",
-        lambda reports, profile: (0, _successful_verify_payload(reports)),
+        lambda reports, profile: SimpleNamespace(
+            status_code=0, payload=_successful_verify_payload(reports)
+        ),
         raising=False,
     )
 
@@ -320,7 +327,7 @@ def test_proof_pack_verify_json_round_trip_with_verify_payload(
     assert payload["format_version"] == "proof-pack-verify-v1"
     assert payload["ok"] is True
     assert payload["verify"]["format_version"] == "verify-v1"
-    assert payload["verify"]["resolution"]["exit_code"] == 0
+    assert payload["verify"]["ok"] is True
 
 
 def test_proof_pack_verify_json_round_trip_with_real_nested_verify(
@@ -341,7 +348,7 @@ def test_proof_pack_verify_json_round_trip_with_real_nested_verify(
     assert payload["ok"] is True
     assert payload["verify"]["format_version"] == "verify-v1"
     assert payload["verify"]["summary"]["reason"] == "ok"
-    assert payload["verify"]["resolution"]["exit_code"] == 0
+    assert payload["verify"]["summary"]["ok"] is True
 
 
 def test_proof_pack_verify_rejects_missing_pack(tmp_path: Path) -> None:
@@ -353,7 +360,7 @@ def test_proof_pack_verify_rejects_missing_pack(tmp_path: Path) -> None:
     assert result.exit_code == 3
     payload = json.loads(result.stdout.strip())
     assert payload["ok"] is False
-    assert payload["resolution"]["exit_code"] == 3
+    assert "resolution" not in payload
 
 
 def test_proof_pack_verify_human_failure(tmp_path: Path) -> None:
@@ -398,13 +405,13 @@ def test_proof_pack_inspect_human_success_and_failure(
 
     monkeypatch.setattr(
         "invarlock.cli.commands.proof_pack.inspect_proof_pack",
-        lambda path: (
-            {
+        lambda path: SimpleNamespace(
+            payload={
                 "pack": str(path),
                 "ok": True,
                 "issues": ["unsigned"],
             },
-            0,
+            status=proof_pack_mod.ProofPackStatus.OK,
         ),
         raising=False,
     )
@@ -417,13 +424,13 @@ def test_proof_pack_inspect_human_success_and_failure(
 
     monkeypatch.setattr(
         "invarlock.cli.commands.proof_pack.inspect_proof_pack",
-        lambda path: (
-            {
+        lambda path: SimpleNamespace(
+            payload={
                 "pack": str(path),
                 "ok": False,
                 "issues": ["missing manifest"],
             },
-            4,
+            status=proof_pack_mod.ProofPackStatus.FORMAT,
         ),
         raising=False,
     )
@@ -451,7 +458,9 @@ def test_proof_pack_build_json_round_trip(monkeypatch, tmp_path: Path) -> None:
     _write_runtime_manifest(report)
     monkeypatch.setattr(
         "invarlock.proof_pack._run_verify_command",
-        lambda reports, profile: (0, _successful_verify_payload(reports)),
+        lambda reports, profile: SimpleNamespace(
+            status_code=0, payload=_successful_verify_payload(reports)
+        ),
         raising=False,
     )
 
@@ -496,7 +505,7 @@ def test_proof_pack_build_json_round_trip(monkeypatch, tmp_path: Path) -> None:
     assert verify.exit_code == 0, verify.output
     verify_payload = json.loads(verify.stdout.strip())
     assert verify_payload["ok"] is True
-    assert verify_payload["verify"]["resolution"]["exit_code"] == 0
+    assert verify_payload["verify"]["ok"] is True
 
 
 def test_proof_pack_build_requires_reports(tmp_path: Path) -> None:
@@ -573,8 +582,8 @@ def test_proof_pack_build_human_success_and_failure(
 
     monkeypatch.setattr(
         "invarlock.cli.commands.proof_pack.build_proof_pack",
-        lambda *args, **kwargs: (
-            {
+        lambda *args, **kwargs: SimpleNamespace(
+            payload={
                 "pack": str(tmp_path / "pack"),
                 "ok": True,
                 "warnings": ["unsigned"],
@@ -583,7 +592,7 @@ def test_proof_pack_build_human_success_and_failure(
                 "verify": {"ok": True},
                 "files": {"hashed": 2},
             },
-            0,
+            status=proof_pack_mod.ProofPackStatus.OK,
         ),
         raising=False,
     )
@@ -606,8 +615,8 @@ def test_proof_pack_build_human_success_and_failure(
 
     monkeypatch.setattr(
         "invarlock.cli.commands.proof_pack.build_proof_pack",
-        lambda *args, **kwargs: (
-            {
+        lambda *args, **kwargs: SimpleNamespace(
+            payload={
                 "pack": str(tmp_path / "pack"),
                 "ok": False,
                 "warnings": [],
@@ -616,7 +625,7 @@ def test_proof_pack_build_human_success_and_failure(
                 "verify": None,
                 "files": None,
             },
-            7,
+            status=proof_pack_mod.ProofPackStatus.REPORTS,
         ),
         raising=False,
     )

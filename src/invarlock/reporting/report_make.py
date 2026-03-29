@@ -161,6 +161,23 @@ def _generate_run_id(report: RunReport) -> str:
     return hashlib.sha256(base_str.encode()).hexdigest()[:16]
 
 
+def _append_build_diagnostic(
+    diagnostics: list[dict[str, Any]],
+    *,
+    code: str,
+    message: str,
+    details: dict[str, Any] | None = None,
+) -> None:
+    entry: dict[str, Any] = {
+        "code": code,
+        "message": message,
+        "severity": "warning",
+    }
+    if details:
+        entry["details"] = details
+    diagnostics.append(entry)
+
+
 ## NOTE: _compute_report_hash moved to invarlock.reporting.render and is re-exported below.
 
 
@@ -181,6 +198,7 @@ def make_report(
         OSError,
     )
     evaluate_metric_tail = tail_stats_mod.evaluate_metric_tail
+    build_diagnostics: list[dict[str, Any]] = []
 
     report = report_normalization_mod.normalize_and_validate_run_report(report)
 
@@ -200,6 +218,11 @@ def make_report(
             )
     except NON_FATAL_EXCEPTIONS:  # pragma: no cover - baseline compare is best-effort
         baseline_report = None
+        _append_build_diagnostic(
+            build_diagnostics,
+            code="baseline.normalize_failed",
+            message="Baseline report normalization failed; invariant baseline comparison is unavailable.",
+        )
 
     # Extract core metadata with full seed bundle
     meta = _extract_report_meta(report)
@@ -216,7 +239,11 @@ def make_report(
         if isinstance(env_flags, dict) and env_flags:
             meta["env_flags"] = env_flags
     except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        pass
+        _append_build_diagnostic(
+            build_diagnostics,
+            code="meta.env_flags_unavailable",
+            message="Environment flag provenance could not be copied into the evaluation report.",
+        )
 
     # Determinism preset (CI/Release provenance) when present.
     try:
@@ -228,7 +255,11 @@ def make_report(
         if isinstance(det, dict) and det:
             meta["determinism"] = det
     except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        pass
+        _append_build_diagnostic(
+            build_diagnostics,
+            code="meta.determinism_unavailable",
+            message="Determinism provenance could not be copied into the evaluation report.",
+        )
 
     # Execution profile provenance when available via run context.
     try:
@@ -241,7 +272,11 @@ def make_report(
         if ctx_profile:
             meta["profile"] = ctx_profile
     except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        pass
+        _append_build_diagnostic(
+            build_diagnostics,
+            code="meta.profile_unavailable",
+            message="Execution profile provenance could not be copied into the evaluation report.",
+        )
 
     tokenizer_hash_meta = report["meta"].get("tokenizer_hash")
     if not tokenizer_hash_meta:
@@ -278,7 +313,11 @@ def make_report(
             if isinstance(windows, dict):
                 windows.setdefault("stats", {})
     except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        pass
+        _append_build_diagnostic(
+            build_diagnostics,
+            code="dataset.windows_stats_unavailable",
+            message="Dataset window statistics could not be initialized in the evaluation report.",
+        )
 
     # Baseline reference (PM-only). Derive a primary_metric snapshot from baseline windows.
     # Prefer explicit baseline primary_metric when provided; otherwise compute from windows
@@ -293,11 +332,21 @@ def make_report(
             baseline_pm = bm
     except NON_FATAL_EXCEPTIONS:  # pragma: no cover
         baseline_pm = None
+        _append_build_diagnostic(
+            build_diagnostics,
+            code="baseline.primary_metric_lookup_failed",
+            message="Baseline primary metric lookup failed; recomputing from baseline windows.",
+        )
     if not isinstance(baseline_pm, dict) or not baseline_pm:
         try:
             baseline_pm = compute_primary_metric_from_report(baseline_normalized)
         except NON_FATAL_EXCEPTIONS:  # pragma: no cover
             baseline_pm = {"kind": "ppl_causal", "final": float("nan")}
+            _append_build_diagnostic(
+                build_diagnostics,
+                code="baseline.primary_metric_unavailable",
+                message="Baseline primary metric could not be derived; baseline reference uses a NaN placeholder.",
+            )
     baseline_ref = {
         "run_id": baseline_normalized.get("run_id", "unknown"),
         "model_id": baseline_normalized.get("model_id", report["meta"]["model_id"]),
@@ -386,6 +435,11 @@ def make_report(
             profile = str(ctx.get("profile"))
     except NON_FATAL_EXCEPTIONS:
         profile = None
+        _append_build_diagnostic(
+            build_diagnostics,
+            code="policy.profile_from_context_failed",
+            message="Profile extraction from run context failed; policy resolution fell back to default profile handling.",
+        )
     try:
         window_plan = (
             report.get("metrics", {}).get("window_plan")
@@ -400,6 +454,11 @@ def make_report(
             profile = str(window_plan.get("profile"))
     except NON_FATAL_EXCEPTIONS:
         profile = None
+        _append_build_diagnostic(
+            build_diagnostics,
+            code="policy.profile_from_window_plan_failed",
+            message="Window-plan profile extraction failed; policy resolution fell back to context/default profile handling.",
+        )
     try:
         meta_cfg = (
             report.get("meta", {}).get("config")
@@ -414,6 +473,11 @@ def make_report(
                 explicit_overrides = cfg2.get("guards")
     except NON_FATAL_EXCEPTIONS:
         explicit_overrides = None
+        _append_build_diagnostic(
+            build_diagnostics,
+            code="policy.explicit_overrides_unavailable",
+            message="Explicit guard overrides could not be extracted from the run configuration.",
+        )
 
     resolved_policy = report_policy_utils_mod._build_resolved_policies(
         auto.get("tier", "balanced"),
@@ -594,7 +658,11 @@ def make_report(
             if "tiny_relax" not in flags:
                 flags.append("tiny_relax")
         except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-            pass
+            _append_build_diagnostic(
+                build_diagnostics,
+                code="provenance.tiny_relax_flag_unavailable",
+                message="Tiny-relax provenance could not be attached to the evaluation report.",
+            )
 
     report_enrichment_mod.attach_quality_overhead(
         evaluation_report,
@@ -606,7 +674,11 @@ def make_report(
     try:
         _propagate_pairing_stats(evaluation_report, ppl_analysis)
     except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        pass
+        _append_build_diagnostic(
+            build_diagnostics,
+            code="pairing.stats_unavailable",
+            message="Pairing statistics could not be propagated into the evaluation report.",
+        )
 
     report_enrichment_mod.attach_policy_digest(
         evaluation_report,
@@ -637,7 +709,11 @@ def make_report(
             if isinstance(pm_block, dict):
                 pm_block.setdefault("drift_band", dict(pm_drift_band))
     except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        pass
+        _append_build_diagnostic(
+            build_diagnostics,
+            code="primary_metric.drift_band_unavailable",
+            message="Primary-metric drift-band metadata could not be attached to the evaluation report.",
+        )
     _enforce_display_ci_alignment(
         ppl_analysis.get("stats", {}).get("pairing", "run_metrics"),
         evaluation_report.get("primary_metric"),
@@ -652,5 +728,7 @@ def make_report(
     report_enrichment_mod.attach_confidence_label(
         evaluation_report, _compute_confidence_label
     )
+    if build_diagnostics:
+        evaluation_report.setdefault("meta", {})["build_diagnostics"] = build_diagnostics
 
     return evaluation_report

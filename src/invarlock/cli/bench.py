@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import argparse
 import logging
-import sys
+from collections.abc import Sequence
 
 from invarlock.eval.bench import (
     BenchmarkConfig,
@@ -17,18 +17,16 @@ from invarlock.eval.bench import (
     ScenarioConfig,
     ScenarioResult,
     ValidationGates,
-    _config_to_dict,
-    _generate_step14_markdown,
-    _scenario_result_to_dict,
-    _summary_to_step14_json,
-    generate_scenarios,
-    resolve_epsilon_from_runtime,
-    run_guard_effect_benchmark,
-)
-from invarlock.eval.bench_runner import (
     DependencyChecker,
+    config_to_dict,
     execute_scenario,
     execute_single_run,
+    generate_scenarios,
+    generate_step14_markdown,
+    resolve_epsilon_from_runtime,
+    run_guard_effect_benchmark,
+    scenario_result_to_dict,
+    summary_to_step14_json,
 )
 
 __all__ = [
@@ -41,21 +39,21 @@ __all__ = [
     "ScenarioConfig",
     "ScenarioResult",
     "ValidationGates",
-    "_config_to_dict",
-    "_generate_step14_markdown",
-    "_scenario_result_to_dict",
-    "_summary_to_step14_json",
+    "config_to_dict",
+    "generate_step14_markdown",
+    "scenario_result_to_dict",
+    "summary_to_step14_json",
     "execute_scenario",
     "execute_single_run",
     "generate_scenarios",
+    "build_parser",
     "main",
     "resolve_epsilon_from_runtime",
     "run_guard_effect_benchmark",
 ]
 
 
-def main() -> None:
-    """CLI entry point for Step 14 specification."""
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="InvarLock Guard Effect Benchmark - Step 14",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -105,8 +103,13 @@ def main() -> None:
     parser.add_argument(
         "--verbose", "-v", action="store_true", help="Enable verbose logging"
     )
+    return parser
 
-    args = parser.parse_args()
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """CLI entry point for Step 14 specification."""
+    parser = build_parser()
+    args = parser.parse_args(list(argv) if argv is not None else None)
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
@@ -125,17 +128,17 @@ def main() -> None:
             print(
                 f"❌ Invalid edit type: {edit}. Valid: {', '.join(sorted(valid_edits))}"
             )
-            sys.exit(1)
+            return 1
 
     for tier in tiers:
         if tier not in valid_tiers:
             print(f"❌ Invalid tier: {tier}. Valid: {', '.join(sorted(valid_tiers))}")
-            sys.exit(1)
+            return 1
 
     for probe in probes:
         if probe < 0:
             print(f"❌ Invalid probe count: {probe}. Must be >= 0")
-            sys.exit(1)
+            return 1
 
     kwargs = {
         "dataset": args.dataset,
@@ -160,20 +163,20 @@ def main() -> None:
 
         if result["overall_pass"]:
             print("✅ All gates passed!")
-            sys.exit(0)
+            return 0
         print("❌ Some gates failed!")
-        sys.exit(1)
+        return 1
     except KeyboardInterrupt:
         print("\n❌ Benchmark interrupted by user")
-        sys.exit(1)
+        return 1
     except Exception as exc:
         print(f"❌ Benchmark failed: {exc}")
         if args.verbose:
             import traceback
 
             traceback.print_exc()
-        sys.exit(1)
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

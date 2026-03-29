@@ -6,7 +6,7 @@ from invarlock.core.exceptions import (
     InvarlockError,
     ValidationError,
 )
-from invarlock.core.exit_codes import resolve_command_exit_code
+from invarlock.exit_codes import resolve_command_exit_code
 
 
 def test_resolve_exit_code_invarlockerror_profiles() -> None:

@@ -140,9 +140,6 @@ class RetryController:
         self._pending_diagnostics.clear()
         return diagnostics
 
-    def drain_notices(self) -> tuple[RetryDiagnostic, ...]:
-        return self.drain_diagnostics()
-
     def get_attempt_summary(self) -> dict[str, Any]:
         """Get summary of all retry attempts."""
         return {

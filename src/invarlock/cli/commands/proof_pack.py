@@ -58,7 +58,7 @@ def verify_command(
         help="Execution profile to use for bundled report verification (dev|ci|release).",
     ),
 ) -> None:
-    payload, exit_code = verify_proof_pack(
+    result = verify_proof_pack(
         Path(pack),
         json_out_path=Path(json_file) if json_file else None,
         skip_verify=skip_verify,
@@ -67,7 +67,7 @@ def verify_command(
     )
     payload = {
         "format_version": PROOF_PACK_VERIFY_FORMAT_VERSION,
-        **payload,
+        **result.payload,
     }
 
     if json_out:
@@ -80,7 +80,7 @@ def verify_command(
         else:
             for error in payload["errors"]:
                 console.print(f"[red]ERROR:[/red] {error}")
-    raise typer.Exit(exit_code)
+    raise typer.Exit(result.status.value)
 
 
 @proof_pack_app.command(
@@ -93,10 +93,10 @@ def inspect_command(
         False, "--json", help="Emit machine-readable inspection JSON."
     ),
 ) -> None:
-    payload, exit_code = inspect_proof_pack(Path(pack))
+    result = inspect_proof_pack(Path(pack))
     payload = {
         "format_version": PROOF_PACK_INSPECT_FORMAT_VERSION,
-        **payload,
+        **result.payload,
     }
 
     if json_out:
@@ -109,7 +109,7 @@ def inspect_command(
         else:
             for issue in payload["issues"]:
                 console.print(f"[red]ERROR:[/red] {issue}")
-    raise typer.Exit(exit_code)
+    raise typer.Exit(result.status.value)
 
 
 @proof_pack_app.command(
@@ -187,7 +187,7 @@ def build_command(
                 console.print(f"[red]ERROR:[/red] {error}")
         raise typer.Exit(2)
 
-    payload, exit_code = build_proof_pack(
+    result = build_proof_pack(
         Path(out),
         final_verdict_path=Path(final_verdict),
         report_paths=[Path(path) for path in reports],
@@ -199,7 +199,7 @@ def build_command(
     )
     payload = {
         "format_version": PROOF_PACK_BUILD_FORMAT_VERSION,
-        **payload,
+        **result.payload,
     }
 
     if json_out:
@@ -212,4 +212,4 @@ def build_command(
         else:
             for error in payload["errors"]:
                 console.print(f"[red]ERROR:[/red] {error}")
-    raise typer.Exit(exit_code)
+    raise typer.Exit(result.status.value)

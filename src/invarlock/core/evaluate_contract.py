@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 from .exceptions import ConfigError, MetricsError, ValidationError
-from .exit_codes import resolve_command_exit_code
 from .report_inputs import (
     ReportInputError,
     load_report_input_json,
@@ -245,7 +244,6 @@ def _validate_evaluation_window_phase(
 class PrimaryMetricPolicyOutcome:
     payload: dict[str, Any]
     error: MetricsError | None
-    exit_code: int | None
     warning: str | None
 
 
@@ -264,7 +262,6 @@ def apply_edited_primary_metric_policy(
         return PrimaryMetricPolicyOutcome(
             payload=edited_payload,
             error=None,
-            exit_code=None,
             warning=None,
         )
 
@@ -277,7 +274,6 @@ def apply_edited_primary_metric_policy(
         return PrimaryMetricPolicyOutcome(
             payload=edited_payload,
             error=None,
-            exit_code=None,
             warning=None,
         )
 
@@ -289,7 +285,6 @@ def apply_edited_primary_metric_policy(
         return PrimaryMetricPolicyOutcome(
             payload=edited_payload,
             error=None,
-            exit_code=None,
             warning=None,
         )
 
@@ -333,7 +328,6 @@ def apply_edited_primary_metric_policy(
     return PrimaryMetricPolicyOutcome(
         payload=edited_payload,
         error=err,
-        exit_code=resolve_command_exit_code(err, profile=profile),
         warning=(
             "Primary metric degraded or non-finite; emitting evaluation report and "
             "marking task degraded. Primary metric computation failed."

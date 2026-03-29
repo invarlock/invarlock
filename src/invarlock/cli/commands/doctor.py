@@ -562,7 +562,6 @@ def doctor_command(
         result_obj = build_doctor_result(
             format_version=DOCTOR_FORMAT_VERSION,
             findings=accumulator.findings,
-            exit_code=exit_code,
             contracts=contract_catalog(),
             support_matrix=load_support_matrix(),
             model_family_catalog=load_model_family_catalog(),
@@ -572,6 +571,7 @@ def doctor_command(
             if "POLICY_META" in globals()
             else {"tier": (tier or "balanced").lower()},
         )
+        result_obj["resolution"] = {"exit_code": exit_code}
         typer.echo(_json_out.dumps(result_obj))
         raise typer.Exit(exit_code)
     else:

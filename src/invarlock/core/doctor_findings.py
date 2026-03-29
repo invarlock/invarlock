@@ -493,7 +493,6 @@ def build_doctor_result(
     *,
     format_version: str,
     findings: list[dict[str, object]],
-    exit_code: int,
     contracts: dict[str, Any],
     support_matrix: dict[str, Any],
     model_family_catalog: dict[str, Any],
@@ -514,7 +513,6 @@ def build_doctor_result(
         "plugin_compatibility": plugin_compatibility,
         "policy": policy,
         "findings": accumulator.findings,
-        "resolution": {"exit_code": exit_code},
     }
 
 

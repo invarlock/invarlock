@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from invarlock.core.evaluate_contract import (
+    apply_edited_primary_metric_policy,
     load_validated_baseline_report,
     require_run_report_artifact,
 )
@@ -151,3 +152,19 @@ def test_load_validated_baseline_report_rejects_non_regular_file(
             expected_tier="balanced",
             expected_adapter="hf_causal",
         )
+
+
+def test_apply_edited_primary_metric_policy_does_not_carry_exit_code() -> None:
+    outcome = apply_edited_primary_metric_policy(
+        {
+            "meta": {"device": "cpu", "adapter": "hf_causal"},
+            "edit": {"name": "quant_rtn"},
+            "metrics": {"primary_metric": {"final": {"bad": "value"}}},
+        },
+        profile="ci",
+    )
+
+    assert outcome.error is not None
+    assert outcome.error.code == "E111"
+    assert outcome.warning is not None
+    assert not hasattr(outcome, "exit_code")

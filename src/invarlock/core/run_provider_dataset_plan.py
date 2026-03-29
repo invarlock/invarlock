@@ -17,18 +17,6 @@ class ProviderDatasetPlanDiagnostic:
     severity: str = "info"
     metadata: dict[str, Any] = field(default_factory=dict)
 
-    @property
-    def tag(self) -> str:
-        tag = self.metadata.get("tag", self.kind)
-        return str(tag).upper()
-
-    @property
-    def emoji(self) -> str | None:
-        emoji = self.metadata.get("emoji")
-        if isinstance(emoji, str) and emoji:
-            return emoji
-        return None
-
 
 @dataclass(frozen=True)
 class ProviderDatasetPlanResult:
@@ -185,8 +173,6 @@ def build_provider_dataset_plan(
             message="provider resolved",
             severity="info",
             metadata={
-                "tag": "DATA",
-                "emoji": "🔌",
                 "provider": getattr(
                     data_provider, "name", type(data_provider).__name__
                 ),
@@ -245,7 +231,6 @@ def build_provider_dataset_plan(
                         "capacity estimation; using configured window counts."
                     ),
                     severity="warning",
-                    metadata={"tag": "WARN", "emoji": "⚠️"},
                 )
             )
 

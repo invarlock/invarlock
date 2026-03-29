@@ -101,5 +101,5 @@ def test_verify_ci_provider_parity_pass(tmp_path: Path, capsys) -> None:
     with pytest.raises(typer.Exit) as ei:
         verify_command([cp], baseline=bp, profile="ci", json_out=True)
     out = json.loads(capsys.readouterr().out)
-    assert out["resolution"]["exit_code"] == 0
+    assert "resolution" not in out
     assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 0

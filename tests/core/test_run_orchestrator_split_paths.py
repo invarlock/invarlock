@@ -4,6 +4,10 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from invarlock.core.run_orchestrator import (
+    RunAggregateEvent,
+    RunContextEvent,
+    RunDiagnosticEvent,
+    RunLifecycleEvent,
     RunExecutionRequest,
     RunExecutionServices,
     execute_run_request,
@@ -230,22 +234,45 @@ def test_execute_run_request_emits_typed_diagnostics_and_nonfatal_warnings(
     assert outcome.ok is True
     assert outcome.result is not None
     assert outcome.result.report_path == str(tmp_path / "report.json")
+    def _event_key(event):
+        if isinstance(event, RunDiagnosticEvent):
+            return ("diagnostic", event.name)
+        if isinstance(event, RunContextEvent):
+            return ("context", event.name)
+        if isinstance(event, RunAggregateEvent):
+            return ("aggregate", event.name)
+        if isinstance(event, RunLifecycleEvent):
+            return ("lifecycle", event.name)
+        raise AssertionError(f"unexpected event type: {event!r}")
+
     event_map = {
-        (event.phase, event.code): event.details
+        _event_key(event): event.payload
         for event in outcome.events
-        if event.code in {"dataset.code", "dataset.kind", "legacy_notice"}
+        if isinstance(event, RunDiagnosticEvent)
+        and event.name in {"dataset.code", "dataset.kind", "transition_diagnostic"}
     }
     assert event_map[("diagnostic", "dataset.code")]["diagnostic_source"] == "dataset"
     assert event_map[("diagnostic", "dataset.code")]["source"] == "inner"
     assert event_map[("diagnostic", "dataset.kind")]["marker"] == 1
     assert event_map[("diagnostic", "dataset.kind")]["severity"] == "warning"
-    assert event_map[("diagnostic", "legacy_notice")]["message"] == "legacy message"
+    assert (
+        event_map[("diagnostic", "transition_diagnostic")]["message"]
+        == "legacy message"
+    )
+    assert (
+        event_map[("diagnostic", "transition_diagnostic")]["diagnostic_source"]
+        == "dataset"
+    )
+    assert all(
+        not isinstance(event, RunDiagnosticEvent) or event.name != "legacy_notice"
+        for event in outcome.events
+    )
     assert ("diagnostic", "baseline_schedule_fallback") in {
-        (event.phase, event.code) for event in outcome.events
+        _event_key(event) for event in outcome.events
     }
-    assert ("status", "telemetry_failed") in {
-        (event.phase, event.code) for event in outcome.events
+    assert ("lifecycle", "telemetry_failed") in {
+        _event_key(event) for event in outcome.events
     }
-    assert ("summary", "retry_summary") not in {
-        (event.phase, event.code) for event in outcome.events
+    assert ("aggregate", "retry_summary") not in {
+        _event_key(event) for event in outcome.events
     }

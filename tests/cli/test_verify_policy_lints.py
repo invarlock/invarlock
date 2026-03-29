@@ -82,7 +82,7 @@ def test_verify_policy_lints_equals_gte_lte(tmp_path: Path, capsys) -> None:
     with pytest.raises(typer.Exit) as ei_ok:
         verify_command([p_ok], baseline=None, profile="dev", json_out=True)
     out_ok = json.loads(capsys.readouterr().out)
-    assert out_ok["resolution"]["exit_code"] == 0
+    assert "resolution" not in out_ok
     assert getattr(ei_ok.value, "exit_code", getattr(ei_ok.value, "code", None)) == 0
 
     # Failing lints (equals and gte)
@@ -107,5 +107,5 @@ def test_verify_policy_lints_equals_gte_lte(tmp_path: Path, capsys) -> None:
     with pytest.raises(typer.Exit) as ei_bad:
         verify_command([p_bad], baseline=None, profile="dev", json_out=True)
     out_bad = json.loads(capsys.readouterr().out)
-    assert out_bad["resolution"]["exit_code"] != 0
+    assert "resolution" not in out_bad
     assert getattr(ei_bad.value, "exit_code", getattr(ei_bad.value, "code", None)) != 0

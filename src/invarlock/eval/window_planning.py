@@ -258,8 +258,6 @@ def resolve_effective_windows(
                     severity="warning",
                     message="Duplicate windows detected; reducing per-arm windows.",
                     metadata={
-                        "tag": "WARN",
-                        "emoji": "⚠️",
                         "deficit": int(deficit),
                         "proposed_per_arm": int(proposed_per_arm),
                     },

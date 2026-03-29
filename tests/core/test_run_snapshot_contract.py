@@ -70,9 +70,56 @@ def test_build_snapshot_execution_plan_bytes_falls_back_to_chunked() -> None:
     )
 
     assert plan.snapshot_enabled is True
+    assert plan.diagnostics == (
+        SnapshotDiagnostic(
+            code="snapshot.bytes_failed_chunked_fallback",
+            message="Byte snapshot failed; falling back to chunked snapshot.",
+            details={
+                "error_type": "RuntimeError",
+                "error": "bytes failed",
+            },
+        ),
+    )
     assert plan.restore_fn is not None
     plan.restore_fn()
     assert calls == ["snapshot", "snapshot_chunked", "restore_chunked:/tmp/snap"]
+
+
+def test_build_snapshot_execution_plan_records_prepare_failure() -> None:
+    freed: list[object] = []
+
+    class Adapter:
+        def snapshot(self, model):  # noqa: ANN001
+            raise RuntimeError("snapshot failed")
+
+    plan = build_snapshot_execution_plan(
+        adapter=Adapter(),
+        model=object(),
+        cfg_snapshot={},
+        direct_reuse_loaded_model=False,
+        skip_overhead_source=None,
+        choose_snapshot_mode_fn=lambda **kwargs: "bytes",
+        estimate_model_bytes_fn=lambda model: 0,
+        psutil_module=None,
+        environ={},
+        disk_usage_fn=lambda path: SimpleNamespace(free=0),
+        free_model_memory_fn=freed.append,
+        non_fatal_exceptions=(RuntimeError,),
+    )
+
+    assert len(freed) == 1
+    assert plan.snapshot_enabled is False
+    assert plan.diagnostics == (
+        SnapshotDiagnostic(
+            code="snapshot.prepare_failed",
+            message="Snapshot preparation failed; falling back to reload-per-attempt execution.",
+            severity="error",
+            details={
+                "error_type": "RuntimeError",
+                "error": "snapshot failed",
+            },
+        ),
+    )
 
 
 def test_resolve_snapshot_retry_transition_reuses_loaded_model() -> None:

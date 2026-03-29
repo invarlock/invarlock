@@ -5,6 +5,7 @@ from collections.abc import Callable
 from typing import Any
 
 from .api import Guard, GuardWithContext, GuardWithPrepare, RunConfig, RunReport
+from .exceptions import GuardError, InvarlockError
 from .auto_tuning import resolve_tier_policies
 from .types import LogLevel
 
@@ -47,13 +48,6 @@ def resolve_guard_policies(
 
     try:
         policies = resolver(tier, edit_name, explicit_overrides)
-        runner._log_event(
-            "auto_tuning",
-            "tier_resolved",
-            LogLevel.INFO,
-            {"tier": tier, "edit": edit_name, "policies_count": len(policies)},
-        )
-        return policies
     except Exception as error:
         runner._log_event(
             "auto_tuning",
@@ -61,7 +55,15 @@ def resolve_guard_policies(
             LogLevel.ERROR,
             {"tier": tier, "error": str(error)},
         )
-        return {}
+        raise
+
+    runner._log_event(
+        "auto_tuning",
+        "tier_resolved",
+        LogLevel.INFO,
+        {"tier": tier, "edit": edit_name, "policies_count": len(policies)},
+    )
+    return policies
 
 
 def apply_guard_policy(runner: Any, guard: Guard, policy: dict[str, Any]) -> None:
@@ -85,6 +87,7 @@ def apply_guard_policy(runner: Any, guard: Guard, policy: dict[str, Any]) -> Non
             LogLevel.WARNING,
             {"guard": guard.name, "policy": policy, "error": str(error)},
         )
+        raise
 
 
 def prepare_guards_phase(
@@ -156,7 +159,7 @@ def prepare_guards_phase(
             report.meta.setdefault("guard_prepare_failures", []).append(
                 {"guard": guard.name, "error": str(error)}
             )
-            if strict_guard_prepare:
+            if strict_guard_prepare or not isinstance(error, InvarlockError):
                 raise RuntimeError(
                     f"Guard '{guard.name}' prepare failed: {error}"
                 ) from error
@@ -206,13 +209,13 @@ def guard_phase(
                 {"guard": guard.name, "status": status},
             )
         except Exception as error:
-            guard_results[guard.name] = {"passed": False, "error": str(error)}
             runner._log_event(
                 "guard",
                 "error",
                 LogLevel.ERROR,
                 {"guard": guard.name, "error": str(error)},
             )
+            raise
         finally:
             if guard_timings is not None:
                 guard_timings[guard.name] = max(

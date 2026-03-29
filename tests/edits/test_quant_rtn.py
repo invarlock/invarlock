@@ -67,14 +67,10 @@ def test_quant_rtn_output_format(caplog: pytest.LogCaptureFixture) -> None:
             model,
             adapter,
             plan={"scope": "all", "max_modules": 1},
-            runtime=EditRuntime(emit=True),
+            runtime=EditRuntime(),
         )
 
-    text = "\n".join(record.message for record in caplog.records)
-    lines = [line for line in text.splitlines() if line.strip()]
-    assert lines
-    assert all(line.startswith("[EDIT]") for line in lines)
-    assert all(ord(ch) < 128 for ch in text)
+    assert not caplog.records
 
 
 def test_quant_rtn_emit_flag_suppresses_output(
@@ -88,7 +84,7 @@ def test_quant_rtn_emit_flag_suppresses_output(
             model,
             adapter,
             plan={"scope": "all", "max_modules": 1},
-            runtime=EditRuntime(emit=False),
+            runtime=EditRuntime(),
         )
 
     assert not caplog.records
@@ -104,11 +100,10 @@ def test_quant_rtn_logs_when_console_missing(caplog: pytest.LogCaptureFixture) -
             model,
             adapter,
             plan={"scope": "all", "max_modules": 1},
-            runtime=EditRuntime(emit=True),
+            runtime=EditRuntime(),
         )
 
-    assert caplog.records
-    assert any(record.message.startswith("[EDIT]") for record in caplog.records)
+    assert not caplog.records
 
 
 def test_quant_rtn_apply_rejects_unsupported_plan_fields() -> None:

@@ -87,7 +87,7 @@ class ModelEdit(ABC):
             model: The model to edit
             adapter: Adapter for model-specific operations
             plan: Canonical edit plan parameters
-            runtime: Imperative shell runtime context
+            runtime: Optional execution context
 
         Returns:
             Dict with edit metadata and statistics
@@ -97,9 +97,7 @@ class ModelEdit(ABC):
 
 @dataclass(frozen=True)
 class EditRuntime:
-    """Optional non-shell execution controls for edit operations."""
-
-    emit: bool = True
+    """Optional typed execution context for edit operations."""
 
 
 @runtime_checkable

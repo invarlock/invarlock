@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -10,12 +11,8 @@ from invarlock.core.error_encoding import encode_error as _encode_error
 from invarlock.core.exceptions import InvarlockError
 from invarlock.core.exceptions import MetricsError as _MetricsError
 from invarlock.core.exceptions import ValidationError as _ValidationError
-from invarlock.core.exit_codes import resolve_command_exit_code
 from invarlock.core.provider_parity import enforce_provider_parity
-from invarlock.core.runtime_attestation import (
-    configure_runtime_security,
-    verify_runtime_attestation,
-)
+from invarlock.core.runtime_attestation import verify_runtime_attestation
 
 from . import verify_checks as _verify_checks
 from . import verify_output as _verify_output
@@ -51,10 +48,23 @@ resolve_tiny_relax_from_report = _verify_checks.resolve_tiny_relax_from_report
 
 
 @dataclass(frozen=True)
+class VerifyDiagnostic:
+    level: str
+    message: str
+
+
+class VerifyOutcome(str, Enum):
+    OK = "ok"
+    POLICY_FAIL = "policy_fail"
+    MALFORMED = "malformed"
+
+
+@dataclass(frozen=True)
 class VerifyExecutionResult:
-    exit_code: int
+    outcome: VerifyOutcome
     payload: dict[str, Any]
-    human_lines: tuple[str, ...]
+    diagnostics: tuple[VerifyDiagnostic, ...]
+    error: Exception | None = None
 
 
 def _validate_report_schema_strict(report: dict[str, Any]) -> bool:
@@ -108,7 +118,7 @@ def _warn_adapter_family_mismatch(
     report: dict[str, Any],
     *,
     trusted_baseline_path: Path | None = None,
-) -> tuple[str, ...]:
+) -> tuple[VerifyDiagnostic, ...]:
     """Build a soft warning if adapter families differ between baseline and edited."""
 
     try:
@@ -175,10 +185,31 @@ def _warn_adapter_family_mismatch(
             edited_backend = edited_lib or "—"
             edited_version = f"=={edited_ver}" if edited_lib and edited_ver else "—"
             return (
-                "[yellow]⚠️  Adapter family differs between baseline and edited runs:[/yellow]",
-                f"[yellow]   • baseline: family={baseline_family}, backend={base_backend} {base_version}[/yellow]",
-                f"[yellow]   • edited  : family={edited_family}, backend={edited_backend} {edited_version}[/yellow]",
-                "[yellow]   Ensure this cross-family comparison is intentional (Compare & Evaluate flows should normally match families).[/yellow]",
+                VerifyDiagnostic(
+                    level="warning",
+                    message="Adapter family differs between baseline and edited runs:",
+                ),
+                VerifyDiagnostic(
+                    level="warning",
+                    message=(
+                        f"baseline: family={baseline_family}, backend={base_backend} "
+                        f"{base_version}"
+                    ),
+                ),
+                VerifyDiagnostic(
+                    level="warning",
+                    message=(
+                        f"edited: family={edited_family}, backend={edited_backend} "
+                        f"{edited_version}"
+                    ),
+                ),
+                VerifyDiagnostic(
+                    level="warning",
+                    message=(
+                        "Ensure this cross-family comparison is intentional "
+                        "(Compare & Evaluate flows should normally match families)."
+                    ),
+                ),
             )
     except _VERIFY_RECOVERABLE_EXCEPTIONS:
         return ()
@@ -197,10 +228,7 @@ def run_verify_reports(
     """Verify reports and return structured machine + human output."""
 
     overall_ok = True
-    human_lines: list[str] = []
-    configure_runtime_security(
-        allow_unattested_artifacts=bool(allow_unattested_artifacts)
-    )
+    diagnostics: list[VerifyDiagnostic] = []
     try:
         tol = float(tolerance)
     except _VERIFY_RECOVERABLE_EXCEPTIONS:
@@ -250,12 +278,11 @@ def run_verify_reports(
                     )
 
             errors = _validate_evaluation_report_payload(cert_path, profile=profile)
-            errors.extend(
-                verify_runtime_attestation(
-                    cert_path,
-                    allow_unattested=bool(allow_unattested_artifacts),
-                )
+            attestation_result = verify_runtime_attestation(
+                cert_path,
+                allow_unattested=bool(allow_unattested_artifacts),
             )
+            errors.extend(issue.message for issue in attestation_result.issues)
             if json_mode and any(
                 "schema validation failed" in str(e).lower() for e in errors
             ):
@@ -316,8 +343,14 @@ def run_verify_reports(
                             ),
                         )
                     if not json_mode:
-                        human_lines.append(
-                            "[yellow]⚠️  Cannot recompute accuracy: missing aggregates (dev mode).[/yellow]"
+                        diagnostics.append(
+                            VerifyDiagnostic(
+                                level="warning",
+                                message=(
+                                    "Cannot recompute accuracy: missing aggregates "
+                                    "(dev mode)."
+                                ),
+                            )
                         )
             else:
                 if isinstance(pm, dict) and isinstance(fin, dict):
@@ -365,8 +398,15 @@ def run_verify_reports(
                                 ),
                             )
                         if not json_mode:
-                            human_lines.append(
-                                "[yellow]⚠️  Cannot recompute basis: evaluation_windows.final missing or incomplete (dev mode).[/yellow]"
+                            diagnostics.append(
+                                VerifyDiagnostic(
+                                    level="warning",
+                                    message=(
+                                        "Cannot recompute basis: "
+                                        "evaluation_windows.final missing or "
+                                        "incomplete (dev mode)."
+                                    ),
+                                )
                             )
 
             if (
@@ -386,14 +426,20 @@ def run_verify_reports(
             if errors:
                 overall_ok = False
                 if not json_mode:
-                    human_lines.append(f"[red]FAIL[/red] {cert_path}")
+                    diagnostics.append(
+                        VerifyDiagnostic(level="fail", message=str(cert_path))
+                    )
                     for err in errors:
-                        human_lines.append(f"  ↳ {err}")
+                        diagnostics.append(
+                            VerifyDiagnostic(level="detail", message=str(err))
+                        )
             else:
                 if not json_mode:
-                    human_lines.append(f"[green]PASS[/green] {cert_path}")
+                    diagnostics.append(
+                        VerifyDiagnostic(level="pass", message=str(cert_path))
+                    )
                     try:
-                        human_lines.extend(
+                        diagnostics.extend(
                             _warn_adapter_family_mismatch(
                                 cert_path,
                                 cert_obj,
@@ -409,67 +455,85 @@ def run_verify_reports(
                 reports,
                 ok=False,
                 reason="malformed" if malformed_any else "policy_fail",
-                exit_code=code,
                 tolerance=tol,
                 load_report_fn=_load_evaluation_report,
             )
             return VerifyExecutionResult(
-                exit_code=code,
+                outcome=(
+                    VerifyOutcome.MALFORMED
+                    if malformed_any
+                    else VerifyOutcome.POLICY_FAIL
+                ),
                 payload=payload,
-                human_lines=tuple(human_lines),
+                diagnostics=tuple(diagnostics),
             )
 
         payload = _verify_output.build_verify_json_payload(
             reports,
             ok=True,
             reason="ok",
-            exit_code=0,
             tolerance=tol,
             load_report_fn=_load_evaluation_report,
         )
         if not json_mode:
             try:
                 last = _load_evaluation_report(reports[-1]) if reports else {}
-                human_lines.append(_verify_output.build_verify_success_line(last))
+                diagnostics.append(
+                    VerifyDiagnostic(
+                        level="info",
+                        message=_verify_output.build_verify_success_line(last),
+                    )
+                )
             except _VERIFY_RECOVERABLE_EXCEPTIONS:
                 pass
         return VerifyExecutionResult(
-            exit_code=0,
+            outcome=VerifyOutcome.OK,
             payload=payload,
-            human_lines=tuple(human_lines),
+            diagnostics=tuple(diagnostics),
         )
 
     except InvarlockError as ce:
-        code = resolve_command_exit_code(ce, profile=profile)
         payload = _verify_output.build_verify_error_payload(
             reports[0] if reports else None,
             reason="malformed" if isinstance(ce, _ValidationError) else "policy_fail",
-            exit_code=code,
             encoded_error=_encode_error(ce),
         )
         if not json_mode:
-            human_lines.append(str(ce))
+            diagnostics.append(VerifyDiagnostic(level="error", message=str(ce)))
         return VerifyExecutionResult(
-            exit_code=code,
+            outcome=(
+                VerifyOutcome.MALFORMED
+                if isinstance(ce, _ValidationError)
+                else VerifyOutcome.POLICY_FAIL
+            ),
             payload=payload,
-            human_lines=tuple(human_lines),
+            diagnostics=tuple(diagnostics),
+            error=ce,
         )
     except _VERIFY_RECOVERABLE_EXCEPTIONS as e:
-        code = resolve_command_exit_code(e, profile=profile)
         payload = _verify_output.build_verify_error_payload(
             reports[0] if reports else None,
             reason="malformed"
             if isinstance(e, json.JSONDecodeError)
             else "policy_fail",
-            exit_code=code,
             encoded_error=_encode_error(e),
         )
         if not json_mode:
-            human_lines.append(f"[red]❌ Verification failed: {e}[/red]")
+            diagnostics.append(
+                VerifyDiagnostic(
+                    level="error",
+                    message=f"Verification failed: {e}",
+                )
+            )
         return VerifyExecutionResult(
-            exit_code=code,
+            outcome=(
+                VerifyOutcome.MALFORMED
+                if isinstance(e, json.JSONDecodeError)
+                else VerifyOutcome.POLICY_FAIL
+            ),
             payload=payload,
-            human_lines=tuple(human_lines),
+            diagnostics=tuple(diagnostics),
+            error=e,
         )
 
 
@@ -481,9 +545,9 @@ def verify_reports_contract(
     profile: str | None = "dev",
     allow_unattested_artifacts: bool = False,
     json_mode: bool = False,
-) -> tuple[int, dict[str, Any]]:
+) -> VerifyExecutionResult:
     """Verify reports and return a structured result without relying on CLI output."""
-    result = run_verify_reports(
+    return run_verify_reports(
         reports,
         baseline=baseline,
         tolerance=tolerance,
@@ -491,7 +555,12 @@ def verify_reports_contract(
         allow_unattested_artifacts=allow_unattested_artifacts,
         json_mode=json_mode,
     )
-    return result.exit_code, result.payload
 
 
-__all__ = ["run_verify_reports", "verify_reports_contract"]
+__all__ = [
+    "VerifyDiagnostic",
+    "VerifyExecutionResult",
+    "VerifyOutcome",
+    "run_verify_reports",
+    "verify_reports_contract",
+]

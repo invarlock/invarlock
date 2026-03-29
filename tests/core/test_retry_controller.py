@@ -18,7 +18,7 @@ class TestRetryController:
         controller = RetryController(max_attempts=3)
         assert controller.should_retry(report_passed=True) is False
         assert controller.attempt_history == []
-        assert controller.drain_notices() == ()
+        assert controller.drain_diagnostics() == ()
 
     def test_attempt_budget_enforced(self) -> None:
         controller = RetryController(max_attempts=3)

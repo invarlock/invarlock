@@ -7,7 +7,7 @@ from pathlib import Path
 from invarlock.cli import run_masking as masking_mod
 from invarlock.cli.run_artifacts import persist_ref_masks
 from invarlock.cli.run_pairing import extract_pairing_schedule
-from invarlock.core.exit_codes import resolve_command_exit_code
+from invarlock.exit_codes import resolve_command_exit_code
 from invarlock.core.exceptions import (
     ConfigError,
     DataError,

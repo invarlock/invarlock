@@ -33,18 +33,6 @@ class DatasetDiagnostic:
     severity: str = "info"
     metadata: dict[str, Any] = field(default_factory=dict)
 
-    @property
-    def tag(self) -> str:
-        tag = self.metadata.get("tag", self.kind)
-        return str(tag).upper()
-
-    @property
-    def emoji(self) -> str | None:
-        emoji = self.metadata.get("emoji")
-        if isinstance(emoji, str) and emoji:
-            return emoji
-        return None
-
 
 def _get_load_dataset() -> Any | None:
     global HAS_DATASETS, _load_dataset_cached

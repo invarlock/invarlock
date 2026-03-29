@@ -148,7 +148,6 @@ def test_build_verify_json_result_item_and_payload() -> None:
         [Path("a.json"), Path("b.json")],
         ok=True,
         reason="ok",
-        exit_code=0,
         tolerance=1e-9,
         load_report_fn=lambda path: report
         if path.name == "a.json"
@@ -156,7 +155,7 @@ def test_build_verify_json_result_item_and_payload() -> None:
     )
     assert payload["summary"] == {"ok": True, "reason": "ok"}
     assert payload["evaluation_report"] == {"count": 2}
-    assert payload["resolution"] == {"exit_code": 0}
+    assert "resolution" not in payload
     assert len(payload["results"]) == 2
     assert payload["results"][0]["kind"] == "accuracy"
     assert payload["results"][1]["kind"] == ""
@@ -167,7 +166,6 @@ def test_build_verify_error_payload_and_success_line() -> None:
     payload = verify_output.build_verify_error_payload(
         Path("cert.json"),
         reason="malformed",
-        exit_code=2,
         encoded_error={"code": "E601", "message": "bad schema"},
     )
     assert payload["summary"] == {"ok": False, "reason": "malformed"}

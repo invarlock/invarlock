@@ -75,12 +75,40 @@ class RunExecutionRequest:
 
 
 @dataclass(frozen=True)
-class RunExecutionEvent:
-    """Typed orchestration event emitted by the owner layer."""
+class RunLifecycleEvent:
+    """Lifecycle event emitted by the owner layer."""
 
-    phase: str
-    code: str
-    details: dict[str, Any] = field(default_factory=dict)
+    name: str
+    payload: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class RunDiagnosticEvent:
+    """Diagnostic emitted by the owner layer."""
+
+    name: str
+    payload: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class RunContextEvent:
+    """Context emitted by the owner layer."""
+
+    name: str
+    payload: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class RunAggregateEvent:
+    """Aggregate/summary payload emitted by the owner layer."""
+
+    name: str
+    payload: dict[str, Any] = field(default_factory=dict)
+
+
+RunExecutionEvent = (
+    RunLifecycleEvent | RunDiagnosticEvent | RunContextEvent | RunAggregateEvent
+)
 
 
 @dataclass(frozen=True)
@@ -263,20 +291,19 @@ def execute_run_request(
     outcome_failure: RunExecutionFailure | None = None
     emitted_events: list[RunExecutionEvent] = []
 
-    def _emit(phase: str, code: str, **details: Any) -> None:
-        event = RunExecutionEvent(phase=phase, code=code, details=dict(details))
+    def _emit(event: RunExecutionEvent) -> None:
         emitted_events.append(event)
         if observer is not None:
             observer(event)
 
     def _emit_status(code: str, **details: Any) -> None:
-        _emit("status", code, **details)
+        _emit(RunLifecycleEvent(name=code, payload=dict(details)))
 
     def _emit_diagnostic(code: str, **details: Any) -> None:
-        _emit("diagnostic", code, **details)
+        _emit(RunDiagnosticEvent(name=code, payload=dict(details)))
 
     def _emit_metadata(code: str, **details: Any) -> None:
-        _emit("metadata", code, **details)
+        _emit(RunContextEvent(name=code, payload=dict(details)))
 
     def _emit_guard_overhead_summary(
         guard_overhead_info: dict[str, Any],
@@ -284,10 +311,13 @@ def execute_run_request(
         default_threshold: float,
     ) -> None:
         _emit(
-            "summary",
-            "guard_overhead_summary",
-            guard_overhead_info=guard_overhead_info,
-            default_threshold=default_threshold,
+            RunAggregateEvent(
+                name="guard_overhead_summary",
+                payload={
+                    "guard_overhead_info": guard_overhead_info,
+                    "default_threshold": default_threshold,
+                },
+            )
         )
 
     def _emit_retry_summary(retry_controller: Any | None) -> None:
@@ -301,7 +331,7 @@ def execute_run_request(
             return
         if not isinstance(summary, dict):
             return
-        _emit("summary", "retry_summary", summary=summary)
+        _emit(RunAggregateEvent(name="retry_summary", payload={"summary": summary}))
 
     def _halt(
         code: str,
@@ -360,13 +390,21 @@ def execute_run_request(
                 payload.setdefault("message", message)
             _emit_diagnostic(kind, **payload)
             return
+        payload = {"diagnostic_source": source}
+        metadata = getattr(diagnostic, "metadata", None)
+        if isinstance(metadata, dict):
+            payload.update(metadata)
+        details = getattr(diagnostic, "details", None)
+        if isinstance(details, dict):
+            payload.update(details)
+        severity = getattr(diagnostic, "severity", None)
+        if isinstance(severity, str) and severity:
+            payload.setdefault("severity", severity)
         message = getattr(diagnostic, "message", None)
         if isinstance(message, str) and message:
-            _emit_diagnostic(
-                "legacy_notice",
-                diagnostic_source=source,
-                message=message,
-            )
+            payload.setdefault("message", message)
+        if len(payload) > 1:
+            _emit_diagnostic("transition_diagnostic", **payload)
 
     def _cfg_section_value(cfg_obj: Any, name: str) -> Any:
         section_fn = getattr(cfg_obj, "section", None)
@@ -912,8 +950,7 @@ def execute_run_request(
         edit_config = execution_payloads.edit_config
 
         _emit_metadata("edit_selected", edit_name=str(edit_op.name))
-        _emit(
-            "metadata",
+        _emit_metadata(
             "guard_chain_resolved",
             guard_names=[str(getattr(guard, "name", "unknown")) for guard in guards],
         )
@@ -1081,7 +1118,6 @@ def execute_run_request(
                         snapshot_provenance=snapshot_provenance,
                         skip_model_load=skip_model_load,
                         prefer_local_files_only=prefer_local_files_only,
-                        edit_emit=False,
                     )
 
                 # Ensure clean state for guarded run

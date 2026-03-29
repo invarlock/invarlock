@@ -110,7 +110,7 @@ def test_verify_release_fails_when_guard_overhead_missing(
         verify_command([path], baseline=None, profile="release", json_out=True)
 
     out = json.loads(capsys.readouterr().out)
-    assert out["resolution"]["exit_code"] == 1
+    assert "resolution" not in out
     assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 1
 
 
@@ -124,7 +124,7 @@ def test_verify_release_allows_explicit_overhead_skip_marker(
         verify_command([path], baseline=None, profile="release", json_out=True)
 
     out = json.loads(capsys.readouterr().out)
-    assert out["resolution"]["exit_code"] == 0
+    assert "resolution" not in out
     assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 0
 
 
@@ -143,7 +143,7 @@ def test_verify_release_requires_overhead_evaluated_when_not_skipped(
         verify_command([path], baseline=None, profile="release", json_out=True)
 
     out = json.loads(capsys.readouterr().out)
-    assert out["resolution"]["exit_code"] == 1
+    assert "resolution" not in out
     assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 1
 
 
@@ -162,7 +162,7 @@ def test_verify_release_requires_overhead_ratio_when_evaluated(
         verify_command([path], baseline=None, profile="release", json_out=True)
 
     out = json.loads(capsys.readouterr().out)
-    assert out["resolution"]["exit_code"] == 1
+    assert "resolution" not in out
     assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 1
 
 
@@ -183,7 +183,7 @@ def test_verify_release_passes_when_overhead_ratio_present(
         verify_command([path], baseline=None, profile="release", json_out=True)
 
     out = json.loads(capsys.readouterr().out)
-    assert out["resolution"]["exit_code"] == 0
+    assert "resolution" not in out
     assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 0
 
 
@@ -205,7 +205,7 @@ def test_verify_release_fails_when_guard_overhead_gate_failed(
         verify_command([path], baseline=None, profile="release", json_out=True)
 
     out = json.loads(capsys.readouterr().out)
-    assert out["resolution"]["exit_code"] == 1
+    assert "resolution" not in out
     assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 1
 
 
@@ -220,5 +220,5 @@ def test_verify_release_fails_when_canonical_gate_flagged(
         verify_command([path], baseline=None, profile="release", json_out=True)
 
     out = json.loads(capsys.readouterr().out)
-    assert out["resolution"]["exit_code"] == 1
+    assert "resolution" not in out
     assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 1

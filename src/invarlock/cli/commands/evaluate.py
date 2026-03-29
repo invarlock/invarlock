@@ -29,6 +29,7 @@ import typer
 from rich.console import Console
 
 from invarlock import __version__ as INVARLOCK_VERSION
+from invarlock.exit_codes import resolve_command_exit_code
 
 from ...core.adapter_auto import resolve_auto_adapter
 from ...core.evaluate_contract import (
@@ -695,7 +696,7 @@ def evaluate_command(
                 emoji="⚠️",
             )
             _emit_evaluation_report()
-            raise typer.Exit(int(outcome.exit_code or 1))
+            raise typer.Exit(resolve_command_exit_code(outcome.error, profile=profile))
 
     _emit_evaluation_report()
     if timing:

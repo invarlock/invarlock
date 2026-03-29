@@ -9,6 +9,7 @@ import typer
 
 from invarlock.cli.commands.verify import verify_command
 from invarlock.reporting import verify_contract as verify_mod
+from invarlock.reporting.verify_contract import VerifyOutcome
 
 
 def _write(path: Path, payload: dict) -> Path:
@@ -129,7 +130,7 @@ def test_verify_ignores_non_dict_baseline_provider_digest(
 
     payload = json.loads(capsys.readouterr().out)
     assert payload["summary"] == {"ok": True, "reason": "ok"}
-    assert payload["resolution"] == {"exit_code": 0}
+    assert "resolution" not in payload
     assert getattr(exc.value, "exit_code", getattr(exc.value, "code", None)) == 0
 
 
@@ -221,16 +222,17 @@ def test_verify_reports_contract_returns_structured_payload_without_stdout(
 ) -> None:
     cert_path = _write(tmp_path / "subject.json", _ppl_cert())
 
-    exit_code, payload = verify_mod.verify_reports_contract(
+    result = verify_mod.verify_reports_contract(
         [cert_path],
         baseline=None,
         profile="dev",
         json_mode=True,
     )
 
-    assert exit_code == 0
+    assert result.outcome == VerifyOutcome.OK
+    payload = result.payload
     assert payload["summary"] == {"ok": True, "reason": "ok"}
-    assert payload["resolution"] == {"exit_code": 0}
+    assert "resolution" not in payload
     assert capsys.readouterr().out == ""
 
 
@@ -246,7 +248,13 @@ def test_run_verify_reports_collects_human_lines_without_stdout(
         json_mode=False,
     )
 
-    assert result.exit_code == 0
-    assert any("PASS" in line for line in result.human_lines)
-    assert any("VERIFY OK" in line for line in result.human_lines)
+    assert result.outcome == VerifyOutcome.OK
+    assert any(
+        diag.level == "pass" and "subject.json" in diag.message
+        for diag in result.diagnostics
+    )
+    assert any(
+        diag.level == "info" and "VERIFY OK" in diag.message
+        for diag in result.diagnostics
+    )
     assert capsys.readouterr().out == ""

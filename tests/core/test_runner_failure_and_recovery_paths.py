@@ -1282,7 +1282,7 @@ def test_delta_ci_normal_no_mismatch():
     assert math.isfinite(lo) and math.isfinite(hi) and (hi - lo) >= 0.0
 
 
-def test_resolve_guard_policies_exception_returns_empty(monkeypatch):
+def test_resolve_guard_policies_exception_surfaces(monkeypatch):
     from invarlock.core.api import RunReport
 
     runner = CoreRunner()
@@ -1295,23 +1295,31 @@ def test_resolve_guard_policies_exception_returns_empty(monkeypatch):
     monkeypatch.setattr(runner_mod, "resolve_tier_policies", boom)
     report = RunReport()
     report.meta["config"] = {"guards": {}}
-    policies = runner._resolve_guard_policies(report, auto_config=None)
-    assert policies == {}
+    with pytest.raises(RuntimeError, match="boom"):
+        runner._resolve_guard_policies(report, auto_config=None)
 
 
 ## Removed flaky negative request coverage assertion; coverage for _resolve_limit
 ## with non-positive requests is exercised by other tests (preview/final zero cases).
 
 
-def test_eval_phase_no_calibration_fallback(tmp_path):
+def test_eval_phase_no_calibration_returns_non_evaluated_state(tmp_path):
     runner = CoreRunner()
     model = _toy_model_with_losses([1.0])
     adapter = DummyAdapter()
     edit = EditStub("e")
-    cfg = RunConfig(context={"run_id": "r"}, checkpoint_interval=0, event_path=None)
+    cfg = RunConfig(
+        context={"run_id": "r", "run": {"strict_eval": False}},
+        checkpoint_interval=0,
+        event_path=None,
+    )
     report = runner.execute(model, adapter, edit, [], cfg, calibration_data=None)
-    pm = report.metrics.get("primary_metric", {})
-    assert pm.get("preview") == 25.0 and pm.get("final") == 26.0
+    assert report.status == "success"
+    assert report.metrics["eval_state"] == {
+        "evaluated": False,
+        "reason": "missing_calibration_data",
+    }
+    assert "eval_error" not in report.metrics
 
 
 def test_zero_mask_batch_warning_debug(monkeypatch):
@@ -1788,7 +1796,7 @@ def test_soft_eval_error_warns_not_raises():
     assert eval_error.get("error") == "mlm_missing_masks"
 
 
-def test_eval_phase_without_calibration_uses_mock_metrics():
+def test_eval_phase_without_calibration_returns_non_evaluated_state():
     runner = CoreRunner()
     model = _toy_model_with_losses([0.3])
     adapter = DummyAdapter()
@@ -1804,8 +1812,11 @@ def test_eval_phase_without_calibration_uses_mock_metrics():
         config=RunConfig(),
     )
 
-    pm = metrics.get("primary_metric", {})
-    assert pm.get("preview") == 25.0 and pm.get("final") == 26.0
+    assert metrics["eval_state"] == {
+        "evaluated": False,
+        "reason": "missing_calibration_data",
+    }
+    assert "primary_metric" not in metrics
     assert report.evaluation_windows == {"preview": {}, "final": {}}
 
 

@@ -91,8 +91,7 @@ def decide_failed_retry_transition(
     if callable(drain_diagnostics):
         diagnostics = tuple(drain_diagnostics())
     else:
-        drain_notices = getattr(retry_controller, "drain_notices", None)
-        diagnostics = tuple(drain_notices() if callable(drain_notices) else ())
+        diagnostics = ()
     next_attempt = attempt + 1 if should_retry else attempt
     return RetryFailureTransition(
         should_retry=should_retry,

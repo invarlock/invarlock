@@ -136,7 +136,7 @@ def build_snapshot_execution_plan(
         if mode == "bytes":
             try:
                 base_blob = adapter.snapshot(model)  # type: ignore[attr-defined]
-            except non_fatal_exceptions:
+            except non_fatal_exceptions as exc:
                 if not supports_chunked:
                     raise
                 snapshot_tmpdir = adapter.snapshot_chunked(model)  # type: ignore[attr-defined]
@@ -152,7 +152,16 @@ def build_snapshot_execution_plan(
                     snapshot_provenance=snapshot_provenance,
                     emitted_skip_overhead_warning=False,
                     snapshot_enabled=True,
-                    diagnostics=(),
+                    diagnostics=(
+                        SnapshotDiagnostic(
+                            code="snapshot.bytes_failed_chunked_fallback",
+                            message="Byte snapshot failed; falling back to chunked snapshot.",
+                            details={
+                                "error_type": type(exc).__name__,
+                                "error": str(exc),
+                            },
+                        ),
+                    ),
                 )
 
             def _restore_bytes() -> None:
@@ -180,7 +189,7 @@ def build_snapshot_execution_plan(
             snapshot_enabled=False,
             diagnostics=(),
         )
-    except non_fatal_exceptions:
+    except non_fatal_exceptions as exc:
         free_model_memory_fn(model)
         return SnapshotExecutionPlan(
             model=None,
@@ -189,8 +198,18 @@ def build_snapshot_execution_plan(
             snapshot_tmpdir=None,
             snapshot_provenance=snapshot_provenance,
             emitted_skip_overhead_warning=False,
-            snapshot_enabled=None,
-            diagnostics=(),
+            snapshot_enabled=False,
+            diagnostics=(
+                SnapshotDiagnostic(
+                    code="snapshot.prepare_failed",
+                    message="Snapshot preparation failed; falling back to reload-per-attempt execution.",
+                    severity="error",
+                    details={
+                        "error_type": type(exc).__name__,
+                        "error": str(exc),
+                    },
+                ),
+            ),
         )
 
 

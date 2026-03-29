@@ -73,7 +73,7 @@ def test_build_provider_dataset_plan_collects_diagnostics_and_provider_kwargs() 
                 kind="window.dedupe_adjustment",
                 severity="warning",
                 message="dedupe adjusted",
-                metadata={"tag": "WARN", "emoji": "⚠️"},
+                metadata={"deficit": 1, "proposed_per_arm": 1},
             )
         )
         return {
@@ -136,8 +136,6 @@ def test_build_provider_dataset_plan_collects_diagnostics_and_provider_kwargs() 
             message="provider resolved",
             severity="info",
             metadata={
-                "tag": "DATA",
-                "emoji": "🔌",
                 "provider": "seq2seq",
                 "split": "validation",
                 "used_fallback_split": False,
@@ -147,7 +145,7 @@ def test_build_provider_dataset_plan_collects_diagnostics_and_provider_kwargs() 
             kind="window.dedupe_adjustment",
             message="dedupe adjusted",
             severity="warning",
-            metadata={"tag": "WARN", "emoji": "⚠️"},
+            metadata={"deficit": 1, "proposed_per_arm": 1},
         ),
     )
 

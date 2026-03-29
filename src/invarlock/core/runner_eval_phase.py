@@ -83,16 +83,16 @@ def eval_phase(
             "eval",
             "warning",
             LogLevel.WARNING,
-            {"message": "No calibration data provided, using mock metrics"},
+            {
+                "message": "No calibration data provided; evaluation skipped.",
+                "state": "not_evaluated",
+            },
         )
         metrics = {
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "preview": 25.0,
-                "final": 26.0,
+            "eval_state": {
+                "evaluated": False,
+                "reason": "missing_calibration_data",
             },
-            "latency_ms_per_tok": 15.0,
-            "memory_mb_peak": 1024.0,
         }
         eval_windows = {"preview": {}, "final": {}}
 

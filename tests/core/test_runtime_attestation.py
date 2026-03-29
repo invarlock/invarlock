@@ -37,15 +37,16 @@ def test_verify_runtime_attestation_short_circuits_when_unattested_allowed(
     monkeypatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr(attestation, "unattested_artifacts_allowed", lambda: False)
-    assert (
-        attestation.verify_runtime_attestation(
-            tmp_path / "report.json", allow_unattested=True
-        )
-        == []
+    result = attestation.verify_runtime_attestation(
+        tmp_path / "report.json", allow_unattested=True
     )
+    assert result.skipped is True
+    assert result.issues == ()
 
     monkeypatch.setattr(attestation, "unattested_artifacts_allowed", lambda: True)
-    assert attestation.verify_runtime_attestation(tmp_path / "report.json") == []
+    result = attestation.verify_runtime_attestation(tmp_path / "report.json")
+    assert result.skipped is True
+    assert result.issues == ()
 
 
 def test_verify_runtime_attestation_handles_missing_manifest(
@@ -61,9 +62,9 @@ def test_verify_runtime_attestation_handles_missing_manifest(
         lambda path: (manifest, None),
     )
 
-    errors = attestation.verify_runtime_attestation(report)
-    assert errors == [
-        "runtime.manifest.json missing or unreadable for report.json; pass --allow-unattested-artifacts to override."
+    result = attestation.verify_runtime_attestation(report)
+    assert [issue.message for issue in result.issues] == [
+        "runtime.manifest.json missing or unreadable for report.json."
     ]
 
 
@@ -80,9 +81,9 @@ def test_verify_runtime_attestation_rejects_non_container_execution_mode(
         lambda path: (manifest, {"execution_mode": "host"}),
     )
 
-    errors = attestation.verify_runtime_attestation(report)
-    assert errors == [
-        "runtime.manifest.json marks report.json as 'host'; pass --allow-unattested-artifacts to override."
+    result = attestation.verify_runtime_attestation(report)
+    assert [issue.message for issue in result.issues] == [
+        "runtime.manifest.json marks report.json as 'host'."
     ]
 
 
@@ -101,8 +102,8 @@ def test_verify_runtime_attestation_requires_verifier_binary(
     monkeypatch.setattr(attestation, "runtime_verifier_binary", lambda: "verify-bin")
     monkeypatch.setattr(attestation.shutil, "which", lambda binary: None)
 
-    errors = attestation.verify_runtime_attestation(report)
-    assert errors == [
+    result = attestation.verify_runtime_attestation(report)
+    assert [issue.message for issue in result.issues] == [
         "Runtime verifier 'verify-bin' is not installed; cannot verify report.json."
     ]
 
@@ -127,7 +128,9 @@ def test_verify_runtime_attestation_handles_subprocess_outcomes(
         "run",
         lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout="", stderr=""),
     )
-    assert attestation.verify_runtime_attestation(report) == []
+    result = attestation.verify_runtime_attestation(report)
+    assert result.verified is True
+    assert result.issues == ()
 
     monkeypatch.setattr(
         attestation.subprocess,
@@ -138,7 +141,8 @@ def test_verify_runtime_attestation_handles_subprocess_outcomes(
             stderr="",
         ),
     )
-    assert attestation.verify_runtime_attestation(report) == [
+    result = attestation.verify_runtime_attestation(report)
+    assert [issue.message for issue in result.issues] == [
         "hash mismatch",
         "digest missing",
     ]
@@ -152,13 +156,15 @@ def test_verify_runtime_attestation_handles_subprocess_outcomes(
             stderr="",
         ),
     )
-    assert attestation.verify_runtime_attestation(report) == ["not-json"]
+    result = attestation.verify_runtime_attestation(report)
+    assert [issue.message for issue in result.issues] == ["not-json"]
 
     monkeypatch.setattr(
         attestation.subprocess,
         "run",
         lambda *args, **kwargs: SimpleNamespace(returncode=1, stdout="", stderr=""),
     )
-    assert attestation.verify_runtime_attestation(report) == [
+    result = attestation.verify_runtime_attestation(report)
+    assert [issue.message for issue in result.issues] == [
         "Runtime verifier failed for report.json."
     ]

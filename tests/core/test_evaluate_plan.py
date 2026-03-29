@@ -3,7 +3,6 @@ from __future__ import annotations
 from invarlock.core.evaluate_plan import (
     DEFAULT_EVALUATE_GUARDS_ORDER,
     build_baseline_run_config,
-    build_evaluation_report_kwargs,
     build_subject_edit_run_config,
     default_preset_data_for_adapter,
     determine_subject_label,
@@ -110,23 +109,3 @@ def test_build_subject_edit_run_config_normalizes_placeholders_and_guards() -> N
     assert cfg["output"] == {"dir": "runs/edited"}
     assert cfg["context"] == {"profile": "ci", "tier": "balanced"}
     assert cfg["guards"] == {"order": ["invariants", "variance"]}
-
-
-def test_build_evaluation_report_kwargs_are_explicit() -> None:
-    kwargs = build_evaluation_report_kwargs(
-        edited_report="runs/edited/report.json",
-        baseline_report="runs/source/report.json",
-        report_out="reports/eval",
-        style="audit",
-        no_color=True,
-        baseline_seconds=1.0,
-        subject_seconds=2.0,
-        report_start=3.0,
-    )
-
-    assert kwargs["run"] == "runs/edited/report.json"
-    assert kwargs["baseline"] == "runs/source/report.json"
-    assert kwargs["output"] == "reports/eval"
-    assert kwargs["summary_baseline_seconds"] == 1.0
-    assert kwargs["summary_subject_seconds"] == 2.0
-    assert kwargs["summary_report_start"] == 3.0

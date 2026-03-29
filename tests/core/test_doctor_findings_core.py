@@ -221,7 +221,6 @@ def test_build_doctor_result_sorts_findings_and_summarizes() -> None:
             {"code": "D001", "severity": "error", "message": "error"},
             {"code": "D005", "severity": "warning", "message": "warning"},
         ],
-        exit_code=2,
         contracts={},
         support_matrix={},
         model_family_catalog={},
@@ -232,7 +231,7 @@ def test_build_doctor_result_sorts_findings_and_summarizes() -> None:
 
     assert [item["code"] for item in payload["findings"]] == ["D001", "D005", "D013"]
     assert payload["summary"] == {"errors": 1, "warnings": 1, "notes": 1}
-    assert payload["resolution"] == {"exit_code": 2}
+    assert "resolution" not in payload
 
 
 def test_mapping_get_handles_getter_exceptions() -> None:

@@ -265,6 +265,78 @@ def test_make_evaluation_report_uses_coverage_fallback(monkeypatch):
     assert stats["paired_windows"] == 5
 
 
+def test_make_report_records_explicit_build_diagnostics(monkeypatch) -> None:
+    class _BrokenMeta(dict):
+        def get(self, key, default=None):  # noqa: ANN001
+            if key in {"env_flags", "determinism"}:
+                raise RuntimeError(f"{key}-bad")
+            return super().get(key, default)
+
+    class _BrokenContext(dict):
+        def get(self, key, default=None):  # noqa: ANN001
+            if key == "profile":
+                raise RuntimeError("profile-bad")
+            return super().get(key, default)
+
+    class _BrokenWindows(dict):
+        def setdefault(self, key, default=None):  # noqa: ANN001
+            raise RuntimeError(f"{key}-bad")
+
+    report = _base_report()
+    baseline = _base_baseline()
+    baseline["metrics"].pop("primary_metric", None)
+    report["meta"] = _BrokenMeta(report["meta"])
+    report["context"] = _BrokenContext({"profile": "ci"})
+    _patch_common(monkeypatch, report, baseline)
+    _stub_evaluation_report_extractors(
+        monkeypatch,
+        dataset_info={"hash": {}, "windows": _BrokenWindows()},
+    )
+    monkeypatch.setattr(
+        cert,
+        "_extract_dataset_info",
+        lambda *_args, **_kwargs: {"hash": {}, "windows": _BrokenWindows()},
+        raising=False,
+    )
+    monkeypatch.setattr(
+        cert.report_primary_metric_analysis_mod,
+        "build_primary_metric_analysis",
+        lambda *_args, **_kwargs: ({}, "dev"),
+        raising=False,
+    )
+
+    monkeypatch.setattr(
+        cert.report_normalization_mod,
+        "normalize_and_validate_run_report",
+        lambda payload: (_ for _ in ()).throw(RuntimeError("baseline-bad"))
+        if payload is baseline
+        else report,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        cert,
+        "_extract_report_meta",
+        lambda _report: {"model_id": "demo-model", "adapter": "hf", "device": "cpu"},
+        raising=False,
+    )
+    monkeypatch.setattr(
+        cert,
+        "compute_primary_metric_from_report",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("pm-bad")),
+        raising=False,
+    )
+
+    evaluation_report = make_report(report, baseline)
+    diagnostics = evaluation_report["meta"]["build_diagnostics"]
+    codes = {entry["code"] for entry in diagnostics}
+    assert "baseline.normalize_failed" in codes
+    assert "meta.env_flags_unavailable" in codes
+    assert "meta.determinism_unavailable" in codes
+    assert "meta.profile_unavailable" in codes
+    assert "dataset.windows_stats_unavailable" in codes
+    assert "baseline.primary_metric_unavailable" in codes
+
+
 def test_make_evaluation_report_populates_optional_sections(monkeypatch):
     report = _base_report()
     baseline = _base_baseline()

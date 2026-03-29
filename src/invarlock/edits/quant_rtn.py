@@ -17,7 +17,6 @@ Follows the ModelEdit protocol through the RTNQuantEdit class only.
 
 from __future__ import annotations
 
-import logging
 import random
 from typing import Any
 
@@ -34,8 +33,6 @@ from invarlock.core.api import (
 )
 
 __all__ = ["RTNQuantEdit"]
-
-logger = logging.getLogger(__name__)
 
 
 class RTNQuantEdit(ModelEdit):
@@ -107,16 +104,6 @@ class RTNQuantEdit(ModelEdit):
 
         # group_size is currently reserved for potential future variants; it is
         # ignored for the built-in INT8 demo edit.
-        self._emit_enabled = True
-
-    def _configure_runtime(self, runtime: EditRuntime | None) -> None:
-        self._emit_enabled = True if runtime is None else bool(runtime.emit)
-
-    def _emit(self, message: str) -> None:
-        if not self._emit_enabled:
-            return
-        line = f"[EDIT] {message}".rstrip()
-        logger.info(line)
 
     def can_edit(self, model_desc: dict[str, Any]) -> bool:
         """Check if RTN quantization can be applied to this model."""
@@ -258,12 +245,13 @@ class RTNQuantEdit(ModelEdit):
             model: The model to edit (modified in-place)
             adapter: ModelAdapter for model-specific operations
             plan: Canonical edit plan parameters
-            runtime: Imperative shell runtime context
+            runtime: Optional protocol runtime context (unused by this edit)
 
         Returns:
             Dictionary with application results
         """
         try:
+            del runtime
             plan_data = dict(plan or {})
             supported_keys = {
                 "bitwidth",
@@ -308,91 +296,34 @@ class RTNQuantEdit(ModelEdit):
                 guard_chain=self.guard_chain,
                 max_modules=max_modules,
             )
-            active_edit._configure_runtime(runtime)
-
-            # Diagnostic reporting
-            active_edit._emit("RTN Quantization Configuration:")
-            active_edit._emit(
-                "Bitwidth: "
-                f"{bitwidth} (from config: {plan_data.get('bitwidth', 'default')})"
-            )
-            active_edit._emit(f"Scope: {scope}")
-            active_edit._emit(f"Group size: {group_size}")
-            active_edit._emit(f"Clamp ratio: {clamp_ratio}")
-            active_edit._emit(f"Seed: {seed}")
 
             # Set deterministic seed
             torch.manual_seed(seed)
             random.seed(seed)
             np.random.seed(seed)
 
-            # Identify target modules and get weight tying map
-            active_edit._emit(f"Identifying target modules for scope '{scope}'...")
             target_modules = active_edit._identify_target_modules(model)
             total_identified = len(target_modules)
             if max_modules is not None:
                 if max_modules < total_identified:
-                    active_edit._emit(
-                        f"Limiting quantization to first {max_modules} modules "
-                        f"(of {total_identified}) based on plan.max_modules"
-                    )
                     target_modules = target_modules[:max_modules]
-                else:
-                    active_edit._emit(
-                        f"max_modules={max_modules} >= available modules "
-                        f"({total_identified}); using all targets"
-                    )
 
             tying_map = active_edit._get_weight_tying_map(model)
-
-            active_edit._emit(f"Found {len(target_modules)} target modules:")
-            for i, (name, module) in enumerate(target_modules):
-                weight_shape = module.weight.shape
-                param_count = module.weight.numel()
-                active_edit._emit(
-                    f"[{i + 1}] {name}: {weight_shape} ({param_count:,} params)"
-                )
-
-            if len(target_modules) == 0:
-                active_edit._emit(
-                    "WARNING: No target modules found! Check scope configuration."
-                )
-                active_edit._emit("Available linear modules:")
-                linear_modules = []
-                for name, module in model.named_modules():
-                    if isinstance(module, nn.Linear | nn.Conv1d):
-                        linear_modules.append((name, module.weight.shape))
-                for name, shape in linear_modules[:10]:  # Show first 10
-                    active_edit._emit(f"{name}: {shape}")
-                if len(linear_modules) > 10:
-                    active_edit._emit(f"... and {len(linear_modules) - 10} more")
 
             # Execute GuardChain before edit (if provided)
             guard_results = {}
             if active_edit.guard_chain is not None:
-                active_edit._emit("Executing guard chain preparation...")
                 guard_results["prepare"] = active_edit.guard_chain.prepare_all(
                     model, adapter, None, {}
                 )
 
-                active_edit._emit("Executing before-edit guards...")
                 active_edit.guard_chain.before_edit_all(model)
 
             # Apply quantization to each target module
             quantization_results = []
             total_params_quantized = 0
 
-            for i, (module_name, module) in enumerate(target_modules):
-                active_edit._emit(
-                    f"[{i + 1}/{len(target_modules)}] Quantizing: {module_name}"
-                )
-                active_edit._emit(
-                    f"Shape: {module.weight.shape}, Params: {module.weight.numel():,}"
-                )
-                active_edit._emit(
-                    f"Weight range: [{module.weight.min():.4f}, {module.weight.max():.4f}]"
-                )
-
+            for module_name, module in target_modules:
                 # Apply RTN quantization
                 quant_result = self._apply_rtn_quantization(
                     module,
@@ -406,25 +337,16 @@ class RTNQuantEdit(ModelEdit):
                 quantization_results.append(quant_result)
                 total_params_quantized += quant_result["params_quantized"]
 
-                active_edit._emit(
-                    f"Quantized {quant_result['params_quantized']:,} parameters"
-                )
-
             # Execute GuardChain after edit (if provided)
             if active_edit.guard_chain is not None:
-                active_edit._emit("Executing after-edit guards...")
                 active_edit.guard_chain.after_edit_all(model)
 
-                active_edit._emit("Finalizing guard chain...")
                 guard_results["finalize"] = active_edit.guard_chain.finalize_all(model)
 
                 # Check if all guards passed
-                if not active_edit.guard_chain.all_passed(guard_results["finalize"]):
-                    active_edit._emit("Guard chain validation failed!")
-                    guard_results["all_passed"] = False
-                else:
-                    active_edit._emit("All guards passed")
-                    guard_results["all_passed"] = True
+                guard_results["all_passed"] = active_edit.guard_chain.all_passed(
+                    guard_results["finalize"]
+                )
 
             # Create bitwidth map
             bitwidth_map = {}
@@ -499,7 +421,6 @@ class RTNQuantEdit(ModelEdit):
     def _identify_target_modules(self, model: nn.Module) -> list[tuple[str, nn.Module]]:
         """Identify target modules based on scope configuration."""
         target_modules = []
-        skipped_modules = []
 
         for name, module in model.named_modules():
             # Check for both Linear and Conv1D (GPT-2 uses Conv1D)
@@ -548,24 +469,9 @@ class RTNQuantEdit(ModelEdit):
                 # All linear layers above a minimum size threshold
                 if module.weight.numel() >= 100:  # Minimum parameter threshold
                     should_include = True
-                else:
-                    skipped_modules.append(
-                        (name, f"too small ({module.weight.numel()} params)")
-                    )
 
             if should_include:
                 target_modules.append((name, module))
-            else:
-                if self.scope != "all":  # Only log for specific scopes
-                    skipped_modules.append((name, f"scope mismatch ({self.scope})"))
-
-        # Log diagnostic information
-        if skipped_modules:
-            self._emit(f"Skipped {len(skipped_modules)} modules:")
-            for name, reason in skipped_modules[:5]:  # Show first 5
-                self._emit(f"{name}: {reason}")
-            if len(skipped_modules) > 5:
-                self._emit(f"... and {len(skipped_modules) - 5} more")
 
         return target_modules
 
@@ -656,9 +562,6 @@ class RTNQuantEdit(ModelEdit):
         original_shape = weight.shape
         params_quantized = weight.numel()
 
-        # Store original for comparison
-        original_weight = weight.clone()
-
         # Flatten weight for processing
         if len(weight.shape) == 1:
             # Handle bias or 1D weights
@@ -693,19 +596,8 @@ class RTNQuantEdit(ModelEdit):
         else:
             quantized_weight = quantized_weight.view(original_shape)
 
-        # Ensure actual quantization occurred by applying quantization loss
-        # This guarantees the weights are actually modified
-        quantization_error = (quantized_weight - original_weight).abs().mean()
-        self._emit(f"Quantization error: {quantization_error:.6f}")
-
         # Write back to module (preserving tying if needed)
         module.weight.data.copy_(quantized_weight)
-
-        # Verify the weights actually changed
-        final_weight = module.weight.data
-        actual_change = not torch.allclose(original_weight, final_weight, atol=1e-6)
-        if not actual_change:
-            self._emit(f"WARNING: No actual weight change detected for {module}")
 
         # Handle tied weights
         if tied_modules:

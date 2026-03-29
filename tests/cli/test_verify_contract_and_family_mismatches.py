@@ -82,7 +82,7 @@ def test_verify_basis_mismatch_analysis_point(tmp_path: Path, capsys) -> None:
         verify_command([p], baseline=None, profile="dev", json_out=True)
     out = capsys.readouterr().out
     payload = json.loads(out)
-    assert payload["resolution"]["exit_code"] != 0
+    assert "resolution" not in payload
 
 
 def test_verify_tokenizer_hash_mismatch_payload(tmp_path: Path, capsys) -> None:
@@ -94,7 +94,7 @@ def test_verify_tokenizer_hash_mismatch_payload(tmp_path: Path, capsys) -> None:
         verify_command([p], baseline=None, profile="dev", json_out=True)
     out = capsys.readouterr().out
     payload = json.loads(out)
-    assert payload["resolution"]["exit_code"] != 0
+    assert "resolution" not in payload
 
 
 def test_verify_parity_mask_mismatch_ci_profile(tmp_path: Path, capsys) -> None:
@@ -120,7 +120,7 @@ def test_verify_parity_mask_mismatch_ci_profile(tmp_path: Path, capsys) -> None:
         verify_command([p_c], baseline=p_b, profile="ci", json_out=True)
     out = capsys.readouterr().out
     payload = json.loads(out)
-    assert payload["resolution"]["exit_code"] != 0
+    assert "resolution" not in payload
 
 
 def test_verify_malformed_schema_failure_code(tmp_path: Path, capsys) -> None:
@@ -133,7 +133,7 @@ def test_verify_malformed_schema_failure_code(tmp_path: Path, capsys) -> None:
     out = capsys.readouterr().out
     payload = json.loads(out)
     # code should be non-zero; labeled malformed
-    assert payload["resolution"]["exit_code"] != 0
+    assert "resolution" not in payload
     assert payload["summary"]["reason"] == "malformed"
 
 

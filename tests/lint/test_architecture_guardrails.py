@@ -211,6 +211,169 @@ def test_eval_bench_is_not_a_shell_entrypoint() -> None:
     assert not offenders, "\n".join(offenders)
 
 
+def test_dataset_diagnostics_do_not_encode_presentation_metadata() -> None:
+    offenders: list[str] = []
+    for path in (
+        REPO_ROOT / "src/invarlock/eval/data_support.py",
+        REPO_ROOT / "src/invarlock/core/run_provider_dataset_plan.py",
+        REPO_ROOT / "src/invarlock/eval/window_planning.py",
+    ):
+        text = _read_text(path)
+        for snippet in ('"tag"', '"emoji"', "def tag(", "def emoji("):
+            if snippet in text:
+                offenders.append(f"{path.relative_to(REPO_ROOT)} -> {snippet}")
+
+    assert not offenders, "\n".join(offenders)
+
+
+def test_retry_core_does_not_expose_legacy_notice_api() -> None:
+    offenders: list[str] = []
+    for path in (
+        REPO_ROOT / "src/invarlock/core/retry.py",
+        REPO_ROOT / "src/invarlock/core/run_retry_policy.py",
+    ):
+        text = _read_text(path)
+        if "drain_notices" in text:
+            offenders.append(str(path.relative_to(REPO_ROOT)))
+
+    assert not offenders, "\n".join(offenders)
+
+
+def test_hf_adapter_loading_info_stays_structured() -> None:
+    path = REPO_ROOT / "src/invarlock/adapters/hf_mixin.py"
+    text = _read_text(path)
+    offenders = []
+    for snippet in (
+        "Transformers load info",
+        "logging.getLogger(__name__).warning(",
+    ):
+        if snippet in text:
+            offenders.append(snippet)
+
+    assert not offenders, "\n".join(offenders)
+
+
+def test_quant_rtn_edit_does_not_embed_shell_output_helpers() -> None:
+    path = REPO_ROOT / "src/invarlock/edits/quant_rtn.py"
+    text = _read_text(path)
+    offenders = []
+    for snippet in (
+        "import logging",
+        "[EDIT]",
+        "def _emit(",
+        "def _configure_runtime(",
+    ):
+        if snippet in text:
+            offenders.append(snippet)
+
+    assert not offenders, "\n".join(offenders)
+
+
+def test_bench_cli_owns_exit_boundary_without_internal_sys_exit() -> None:
+    path = REPO_ROOT / "src/invarlock/cli/bench.py"
+    text = _read_text(path)
+    assert "sys.exit(" not in text
+    assert "raise SystemExit(main())" in text
+
+
+def test_runtime_verify_is_library_only() -> None:
+    path = REPO_ROOT / "src/invarlock/runtime_verify.py"
+    text = _read_text(path)
+    offenders = []
+    for snippet in (
+        "import argparse",
+        "print(",
+        "SystemExit",
+        'if __name__ == "__main__"',
+    ):
+        if snippet in text:
+            offenders.append(snippet)
+
+    assert not offenders, "\n".join(offenders)
+
+
+def test_verify_contract_stays_typed_and_cli_owns_exit_rendering() -> None:
+    path = REPO_ROOT / "src/invarlock/reporting/verify_contract.py"
+    text = _read_text(path)
+    offenders = []
+    for snippet in (
+        "status_code:",
+        "messages: tuple[str",
+        "resolve_command_exit_code",
+        "configure_runtime_security(",
+        "[red]",
+        "[green]",
+        "[yellow]",
+    ):
+        if snippet in text:
+            offenders.append(snippet)
+
+    assert not offenders, "\n".join(offenders)
+    assert "class VerifyOutcome" in text
+    assert "class VerifyDiagnostic" in text
+
+
+def test_run_orchestrator_uses_named_event_types_not_generic_phase_envelope() -> None:
+    path = REPO_ROOT / "src/invarlock/core/run_orchestrator.py"
+    text = _read_text(path)
+    offenders = []
+    for snippet in (
+        "class RunExecutionEvent",
+        "phase: str",
+        'RunExecutionEvent(phase=',
+    ):
+        if snippet in text:
+            offenders.append(snippet)
+
+    assert not offenders, "\n".join(offenders)
+    for required in (
+        "class RunLifecycleEvent",
+        "class RunDiagnosticEvent",
+        "class RunContextEvent",
+        "class RunAggregateEvent",
+    ):
+        assert required in text
+
+
+def test_edit_runtime_does_not_expose_shell_emit_controls() -> None:
+    path = REPO_ROOT / "src/invarlock/core/api.py"
+    text = _read_text(path)
+    offenders = []
+    for snippet in ("emit: bool", "Imperative shell runtime context"):
+        if snippet in text:
+            offenders.append(snippet)
+
+    assert not offenders, "\n".join(offenders)
+
+
+def test_runtime_attestation_does_not_embed_cli_flag_guidance() -> None:
+    path = REPO_ROOT / "src/invarlock/runtime_attestation.py"
+    text = _read_text(path)
+    offenders = []
+    for snippet in (
+        "--allow-unattested-artifacts",
+        "pass --allow-unattested-artifacts",
+    ):
+        if snippet in text:
+            offenders.append(snippet)
+
+    assert not offenders, "\n".join(offenders)
+
+
+def test_subprocess_verifiers_use_timeouts() -> None:
+    offenders: list[str] = []
+    expectations = {
+        REPO_ROOT / "src/invarlock/runtime_attestation.py": "timeout=",
+        REPO_ROOT / "src/invarlock/proof_pack.py": "timeout=",
+    }
+    for path, required in expectations.items():
+        text = _read_text(path)
+        if "subprocess.run(" in text and required not in text:
+            offenders.append(str(path.relative_to(REPO_ROOT)))
+
+    assert not offenders, "\n".join(offenders)
+
+
 def test_core_runtime_attestation_is_wrapper_only() -> None:
     path = REPO_ROOT / "src/invarlock/core/runtime_attestation.py"
     tree = ast.parse(_read_text(path), filename=str(path))

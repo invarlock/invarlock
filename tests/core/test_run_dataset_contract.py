@@ -11,7 +11,7 @@ def test_materialize_run_dataset_uses_provider_plan_diagnostics() -> None:
         kind="provider.loaded",
         severity="info",
         message="loaded",
-        metadata={"tag": "DATA", "emoji": "📊"},
+        metadata={"provider": "synthetic"},
     )
     result = materialize_run_dataset(
         pairing_schedule=None,
