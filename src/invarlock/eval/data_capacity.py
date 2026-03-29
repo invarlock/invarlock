@@ -93,9 +93,7 @@ def estimate_wikitext2_capacity(
         )
         subset_signatures = {
             tuple(
-                int(tok)
-                for tok, mask in zip(entry[1], entry[2], strict=False)
-                if mask
+                int(tok) for tok, mask in zip(entry[1], entry[2], strict=False) if mask
             )
             for entry in tokenized_subset
         }

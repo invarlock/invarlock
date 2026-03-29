@@ -242,12 +242,14 @@ class WikiText2Provider:
             )
 
         self._score_candidates_byte_ngram(candidates)
-        preview_window, final_window, stratification_stats = _stratify_wikitext_candidates(
-            candidates,
-            preview_n=preview_n,
-            final_n=final_n,
-            reserve=reserve,
-            batch_size_used=self._last_batch_size_used,
+        preview_window, final_window, stratification_stats = (
+            _stratify_wikitext_candidates(
+                candidates,
+                preview_n=preview_n,
+                final_n=final_n,
+                reserve=reserve,
+                batch_size_used=self._last_batch_size_used,
+            )
         )
         self._last_stratification_stats = stratification_stats
 

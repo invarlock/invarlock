@@ -410,7 +410,9 @@ def _render_run_execution_event(event: RunExecutionEvent) -> None:
 
     if kind == "detail" and name == "kv":
         _emit_console_line(
-            _format_kv_line(str(payload.get("label", "")), str(payload.get("value", ""))),
+            _format_kv_line(
+                str(payload.get("label", "")), str(payload.get("value", ""))
+            ),
             markup=False,
         )
         return

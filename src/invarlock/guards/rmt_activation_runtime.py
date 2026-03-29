@@ -510,7 +510,9 @@ def compute_activation_outliers(
             stats["worst_ratio"] = max(
                 float(stats.get("worst_ratio", 0.0)), float(max_ratio)
             )
-            stats["sigma_max"] = max(float(stats.get("sigma_max", 0.0)), float(sigma_max))
+            stats["sigma_max"] = max(
+                float(stats.get("sigma_max", 0.0)), float(sigma_max)
+            )
 
         return _hook
 
@@ -568,7 +570,9 @@ def compute_activation_outliers(
     per_layer = [per_layer_map[name] for name, _module in modules]
     flagged_layers = [info["layer"] for info in per_layer if info.get("has_outlier")]
     outlier_total = sum(int(info.get("outlier_count", 0) or 0) for info in per_layer)
-    max_ratio = max((float(info.get("worst_ratio", 0.0)) for info in per_layer), default=0.0)
+    max_ratio = max(
+        (float(info.get("worst_ratio", 0.0)) for info in per_layer), default=0.0
+    )
 
     return {
         "has_outliers": bool(flagged_layers),

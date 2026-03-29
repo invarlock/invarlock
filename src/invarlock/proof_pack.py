@@ -506,9 +506,7 @@ def _verify_reports(
         if verify_payload is None:
             verify_payload = {}
         if not isinstance(verify_payload, dict):
-            return [
-                "clean report verification did not return a JSON object."
-            ], payload
+            return ["clean report verification did not return a JSON object."], payload
         verify_payload["error_injection"] = {
             "exit_code": int(error_exit_code),
             "verify": error_payload,
@@ -522,7 +520,9 @@ def _verify_reports(
             json.dumps(verify_payload, sort_keys=True) + "\n", encoding="utf-8"
         )
     if exit_code != 0:
-        return ["invarlock verify reported report verification failures."], verify_payload
+        return [
+            "invarlock verify reported report verification failures."
+        ], verify_payload
     return [], verify_payload
 
 

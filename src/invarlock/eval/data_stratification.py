@@ -50,7 +50,10 @@ def stratify_wikitext_candidates(
         chosen: int | None = None
         while offset < total_candidates:
             for candidate_idx in (base_idx + offset, base_idx - offset):
-                if 0 <= candidate_idx < total_candidates and candidate_idx not in used_positions:
+                if (
+                    0 <= candidate_idx < total_candidates
+                    and candidate_idx not in used_positions
+                ):
                     chosen = candidate_idx
                     break
             if chosen is not None:
@@ -121,7 +124,9 @@ def stratify_wikitext_candidates(
                 final_n,
             )
 
-    assigned_ids = {id(candidate) for candidate in preview_candidates + final_candidates}
+    assigned_ids = {
+        id(candidate) for candidate in preview_candidates + final_candidates
+    }
     remaining = [
         candidate
         for candidate in selected_candidates

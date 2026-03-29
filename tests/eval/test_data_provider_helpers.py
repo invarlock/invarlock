@@ -18,10 +18,7 @@ def test_wikitext2_capacity_helper_fast_and_slow_paths(monkeypatch):
 
     def collect_fn(texts, indices, tokenizer, seq_len):  # noqa: ARG001
         calls.append(("collect", tuple(indices)))
-        return [
-            (idx, [idx + 1, idx + 2], [1, 1], 2)
-            for idx in indices
-        ]
+        return [(idx, [idx + 1, idx + 2], [1, 1], 2) for idx in indices]
 
     monkeypatch.setenv("INVARLOCK_CAPACITY_FAST", "1")
     fast = estimate_wikitext2_capacity(
@@ -100,4 +97,3 @@ def test_stratification_helper_builds_balanced_windows():
     assert stats["pool_size"] == 6
     assert stats["batch_size_used"] == 8
     assert "difficulty_gap" in stats
-
