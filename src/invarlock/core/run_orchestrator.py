@@ -324,6 +324,23 @@ def execute_run_request(
             timings=summary_timings,
         )
 
+    def _extract_preserved_exit_code(exc: BaseException) -> int | None:
+        if isinstance(exc, SystemExit):
+            raw_code = exc.code
+        elif (
+            type(exc).__module__ == "click.exceptions"
+            and type(exc).__name__ == "Exit"
+        ):
+            raw_code = getattr(exc, "exit_code", getattr(exc, "code", None))
+        else:
+            return None
+        if raw_code is None:
+            return 0
+        try:
+            return int(raw_code)
+        except (TypeError, ValueError):
+            return 1
+
     def _halt(exit_code: int, event_name: str, **payload: Any) -> None:
         _emit_status(event_name, **payload)
         raise _RunExecutionHalt(exit_code)
@@ -332,8 +349,9 @@ def execute_run_request(
     def _record_timed_step(key: str):
         start = perf_counter()
         yield
+        elapsed = max(0.0, float(perf_counter() - start))
         if collect_timings:
-            timings[key] = max(0.0, float(perf_counter() - start))
+            timings[key] = elapsed
 
     def _fail_run(message: str) -> None:
         _halt(1, "pipeline_failed", error=message)
@@ -381,9 +399,9 @@ def execute_run_request(
 
     # use module-level _derive_mlm_seed
 
-    _require_torch()
-
     try:
+        _require_torch()
+
         # Import InvarLock components
         from invarlock.core.api import RunConfig
         from invarlock.core.registry import get_registry
@@ -1467,8 +1485,11 @@ def execute_run_request(
             import traceback
 
             traceback.print_exc()
-        # Emit a clearer message for schema failures (exit 2)
-        if isinstance(e, ValueError) and "Invalid RunReport" in str(e):
+        preserved_exit_code = _extract_preserved_exit_code(e)
+        if preserved_exit_code is not None:
+            outcome_exit_code = preserved_exit_code
+        elif isinstance(e, ValueError) and "Invalid RunReport" in str(e):
+            # Emit a clearer message for schema failures (exit 2)
             _emit_status("schema_invalid_run_report")
             outcome_exit_code = 2
         elif isinstance(e, ModuleNotFoundError | ImportError) and "torch" in str(e):

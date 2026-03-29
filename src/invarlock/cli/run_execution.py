@@ -19,6 +19,7 @@ from invarlock.cli.output import (
     make_console,
     print_timing_summary,
     resolve_output_style,
+    timed_step,
 )
 from invarlock.cli.run_masking import _apply_mlm_masks, _tokenizer_digest
 from invarlock.cli.run_overhead import plan_release_windows as _plan_release_windows
@@ -116,7 +117,7 @@ def _build_run_execution_services() -> RunExecutionServices:
         materialize_run_dataset=_materialize_run_dataset_with_runtime_deps,
         free_model_memory=run_runtime_mod.free_model_memory,
         init_retry_controller=_init_retry_controller_with_runtime_deps,
-        load_model_with_cfg=run_runtime_exec_mod.load_model_with_cfg,
+        load_model_with_cfg=_load_model_with_cfg_with_runtime_deps,
         persist_run_report_outputs=_persist_run_report_outputs_with_runtime_deps,
         prepare_config_for_run=_prepare_config_for_run_with_runtime_deps,
         resolve_device_and_output=_resolve_device_and_output_with_runtime_deps,
@@ -180,10 +181,41 @@ def _run_bare_control_with_runtime_deps(**kwargs: Any) -> Any:
 
 def _execute_guarded_run_with_runtime_deps(**kwargs: Any) -> Any:
     kwargs.pop("console", None)
-    return run_runtime_exec_mod.execute_guarded_run(
-        **kwargs,
+    style = getattr(console, "_invarlock_output_style", None)
+    if style is None:
+        return run_runtime_exec_mod.execute_guarded_run(
+            **kwargs,
+            console=console,
+        )
+    with timed_step(
         console=console,
-    )
+        style=style,
+        timings=None,
+        key="execute",
+        tag="EXEC",
+        message="Execute pipeline",
+        emoji="⚙️",
+    ):
+        return run_runtime_exec_mod.execute_guarded_run(
+            **kwargs,
+            console=console,
+        )
+
+
+def _load_model_with_cfg_with_runtime_deps(*args: Any, **kwargs: Any) -> Any:
+    style = getattr(console, "_invarlock_output_style", None)
+    if style is None:
+        return run_runtime_exec_mod.load_model_with_cfg(*args, **kwargs)
+    with timed_step(
+        console=console,
+        style=style,
+        timings=None,
+        key="load_model",
+        tag="INIT",
+        message="Loading model",
+        emoji="🔧",
+    ):
+        return run_runtime_exec_mod.load_model_with_cfg(*args, **kwargs)
 
 
 def _resolve_provider_and_split_for_dataset_plan(*args: Any, **kwargs: Any) -> Any:
@@ -709,6 +741,7 @@ def _render_run_execution_event(event: RunExecutionEvent) -> None:
     if name == "cleanup_status":
         status = "removed" if bool(payload.get("removed")) else "skipped"
         _emit_status_line("INFO", f"Cleanup: {status}", emoji="🧹")
+        return
 
 
 def execute_run_request(request: RunExecutionRequest) -> str | None:
@@ -721,6 +754,6 @@ def execute_run_request(request: RunExecutionRequest) -> str | None:
         services=_build_run_execution_services(),
         observer=_render_run_execution_event,
     )
-    if outcome.exit_code != 0:
+    if outcome.exit_code != 0 or outcome.result is None:
         raise typer.Exit(outcome.exit_code)
     return outcome.result.report_path if outcome.result is not None else None
