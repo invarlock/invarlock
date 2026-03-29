@@ -33,6 +33,8 @@ from invarlock.cli.run_shell_output import (
     _event,
     _format_kv_line,
     _print_guard_overhead_summary,
+)
+from invarlock.cli.run_shell_output import (
     _print_retry_summary as _shell_print_retry_summary,
 )
 from invarlock.core import metric_provider_resolution as metric_provider_resolution_mod

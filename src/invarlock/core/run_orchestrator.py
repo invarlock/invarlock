@@ -300,7 +300,9 @@ def execute_run_request(
         )
 
     def _emit_retry_summary(retry_controller: Any | None) -> None:
-        if not retry_controller or not getattr(retry_controller, "attempt_history", None):
+        if not retry_controller or not getattr(
+            retry_controller, "attempt_history", None
+        ):
             return
         try:
             summary = retry_controller.get_attempt_summary()
@@ -328,8 +330,7 @@ def execute_run_request(
         if isinstance(exc, SystemExit):
             raw_code = exc.code
         elif (
-            type(exc).__module__ == "click.exceptions"
-            and type(exc).__name__ == "Exit"
+            type(exc).__module__ == "click.exceptions" and type(exc).__name__ == "Exit"
         ):
             raw_code = getattr(exc, "exit_code", getattr(exc, "code", None))
         else:
@@ -903,10 +904,7 @@ def execute_run_request(
             "detail",
             "guard_chain",
             label="Guards",
-            guard_names=[
-                str(getattr(guard, "name", "unknown"))
-                for guard in guards
-            ],
+            guard_names=[str(getattr(guard, "name", "unknown")) for guard in guards],
         )
 
         # Model load/snapshot strategy
@@ -1180,7 +1178,9 @@ def execute_run_request(
                     raise _RunExecutionHalt(3)
             except InvarlockError as ce:
                 _emit_status("invarlock_error", message=str(ce))
-                raise _RunExecutionHalt(_resolve_exit_code(ce, profile=profile))
+                raise _RunExecutionHalt(
+                    _resolve_exit_code(ce, profile=profile)
+                ) from None
             except RuntimeError as _e:
                 _fail_run(str(_e))
 
@@ -1332,7 +1332,9 @@ def execute_run_request(
                     default_threshold=guard_overhead_threshold,
                 )
                 threshold_fraction = float(
-                    guard_overhead_info.get("overhead_threshold", guard_overhead_threshold)
+                    guard_overhead_info.get(
+                        "overhead_threshold", guard_overhead_threshold
+                    )
                     or guard_overhead_threshold
                 )
                 if not guard_overhead_info.get("passed", True):
