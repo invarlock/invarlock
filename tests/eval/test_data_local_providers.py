@@ -76,6 +76,35 @@ def test_local_jsonl_provider_load_and_windows(tmp_path: Path):
     assert len(final.input_ids) == 1
 
 
+def test_local_jsonl_provider_skips_bad_data_files_entries_and_loads_valid_ones(
+    tmp_path: Path,
+):
+    data_file = tmp_path / "rows.jsonl"
+    _write_jsonl(data_file, [{"text": "alpha"}, {"text": "beta"}])
+
+    class _BadValueStr:
+        def __str__(self) -> str:
+            raise ValueError("bad data_files entry")
+
+    provider = data_mod.LocalJSONLProvider(
+        data_files=[_BadValueStr(), str(data_file)],
+        max_samples=2,
+    )
+
+    assert provider.load() == ["alpha", "beta"]
+
+
+def test_local_jsonl_provider_propagates_unexpected_data_files_errors() -> None:
+    class _BoomStr:
+        def __str__(self) -> str:
+            raise RuntimeError("boom")
+
+    provider = data_mod.LocalJSONLProvider(data_files=[_BoomStr()])
+
+    with pytest.raises(RuntimeError, match="boom"):
+        provider.load()
+
+
 def test_local_jsonl_provider_no_samples(tmp_path: Path):
     empty_file = tmp_path / "empty.jsonl"
     empty_file.write_text("", encoding="utf-8")
@@ -84,6 +113,31 @@ def test_local_jsonl_provider_no_samples(tmp_path: Path):
 
     with pytest.raises(DataError):
         provider.windows(_EncodeTokenizer(), preview_n=1, final_n=1)
+
+
+def test_local_jsonl_provider_skips_unreadable_files(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    readable = tmp_path / "readable.jsonl"
+    unreadable = tmp_path / "unreadable.jsonl"
+    _write_jsonl(readable, [{"text": "keep-me"}])
+    unreadable.write_text('{"text": "drop-me"}\n', encoding="utf-8")
+
+    original_open = Path.open
+
+    def _patched_open(self: Path, *args, **kwargs):
+        if self == unreadable:
+            raise OSError("permission denied")
+        return original_open(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", _patched_open, raising=True)
+
+    provider = data_mod.LocalJSONLProvider(
+        data_files=[str(readable), str(unreadable)],
+        max_samples=2,
+    )
+
+    assert provider.load() == ["keep-me"]
 
 
 def test_local_jsonl_pairs_provider_windows_and_labels(tmp_path: Path):
@@ -99,6 +153,23 @@ def test_local_jsonl_pairs_provider_windows_and_labels(tmp_path: Path):
     preview, final = provider.windows(_EncodeTokenizer(), preview_n=1, final_n=1)
     assert preview.indices == [0]
     assert provider.last_preview_labels and provider.last_final_labels
+
+
+def test_local_jsonl_pairs_provider_registry_survives_module_split(tmp_path: Path):
+    pairs_file = tmp_path / "pairs.jsonl"
+    _write_jsonl(
+        pairs_file,
+        [
+            {"source": "left", "target": "right"},
+        ],
+    )
+
+    provider = get_provider("local_jsonl_pairs", file=str(pairs_file), max_samples=1)
+
+    assert isinstance(provider, data_mod.LocalJSONLPairsProvider)
+    preview, final = provider.windows(_EncodeTokenizer(), preview_n=1, final_n=0)
+    assert len(preview.indices) == 1
+    assert len(final.indices) == 0
 
 
 def test_hf_text_provider_windows_and_tokenize(monkeypatch):
@@ -153,6 +224,7 @@ def test_compute_window_hash_include_data():
 def test_get_provider_registry_helpers():
     providers = list_providers()
     assert "local_jsonl" in providers
+    assert "local_jsonl_pairs" in providers
     from invarlock.core.exceptions import ValidationError
 
     with pytest.raises(ValidationError):
