@@ -39,10 +39,9 @@ from ...core.evaluate_plan import (
     build_evaluate_command_plan,
     build_subject_edit_run_config,
     build_subject_noop_run_config,
+    normalize_model_id,
     resolve_evaluate_execution_policy,
-)
-from ...core.evaluate_plan import (
-    normalize_model_id as _normalize_model_id,
+    resolve_evaluate_tmp_dir,
 )
 from ...core.exceptions import ConfigError, ValidationError
 
@@ -62,6 +61,14 @@ VERBOSITY_DEFAULT = 1
 VERBOSITY_VERBOSE = 2
 
 console = Console()
+
+
+def _normalize_model_id(model_id: str, adapter: str) -> str:
+    return normalize_model_id(model_id, adapter)
+
+
+def _resolve_evaluate_tmp_dir() -> Path:
+    return resolve_evaluate_tmp_dir(os.environ.get("INVARLOCK_EVALUATE_TMP_DIR"))
 
 
 def _render_banner_lines(title: str, context: str) -> list[str]:
@@ -238,11 +245,11 @@ def evaluate_command(
             mode=mode,
             allow_host_execution=allow_host_execution,
         )
-    except ValueError:
+    except ValueError as exc:
         raise typer.BadParameter(
             "Execution mode must be one of: attested, local.",
             param_hint="--mode",
-        )
+        ) from exc
     allow_host_execution = execution_policy.allow_host_execution
     prefer_local_files_only = execution_policy.prefer_local_files_only
     maybe_delegate_model_command()
@@ -292,20 +299,23 @@ def evaluate_command(
 
     src_id = str(baseline)
     edt_id = str(subject)
-    plan = build_evaluate_command_plan(
-        baseline_model_id=src_id,
-        subject_model_id=edt_id,
-        adapter=adapter,
-        profile=profile,
-        tier=tier,
-        preset=preset,
-        out=out,
-        edit_config=edit_config,
-        edit_label=edit_label,
-        resolve_auto_adapter_fn=resolve_auto_adapter,
-        load_yaml_fn=_load_yaml,
-        tmp_dir_candidate=os.environ.get("INVARLOCK_EVALUATE_TMP_DIR"),
-    )
+    try:
+        plan = build_evaluate_command_plan(
+            baseline_model_id=src_id,
+            subject_model_id=edt_id,
+            adapter=adapter,
+            profile=profile,
+            tier=tier,
+            preset=preset,
+            out=out,
+            edit_config=edit_config,
+            edit_label=edit_label,
+            resolve_auto_adapter_fn=resolve_auto_adapter,
+            load_yaml_fn=_load_yaml,
+            tmp_dir_candidate=os.environ.get("INVARLOCK_EVALUATE_TMP_DIR"),
+        )
+    except FileNotFoundError as exc:
+        _fail(f"Preset not found: {exc}", exit_code=2)
     profile_name = plan.profile_name
     tier_name = plan.tier_name
     eff_adapter = plan.adapter_name
@@ -328,10 +338,8 @@ def evaluate_command(
     # Choose preset. If none provided and repo preset is missing (pip install
     # scenario), fall back to a minimal built-in universal preset so the
     # flag-only quick start works without cloning the repo.
-    preset_path = plan.preset_path
     preset_data = plan.preset_data
     guards_order = plan.guards_order
-    norm_src_id = plan.source_model_id
     norm_edt_id = plan.subject_model_id
     baseline_cfg = plan.baseline_config
     baseline_label = plan.baseline_label

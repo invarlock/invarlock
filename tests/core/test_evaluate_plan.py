@@ -6,8 +6,8 @@ import pytest
 
 from invarlock.core.evaluate_plan import (
     DEFAULT_EVALUATE_GUARDS_ORDER,
-    build_evaluate_command_plan,
     build_baseline_run_config,
+    build_evaluate_command_plan,
     build_subject_edit_run_config,
     default_preset_data_for_adapter,
     determine_subject_label,

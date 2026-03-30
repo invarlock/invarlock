@@ -32,11 +32,7 @@ def is_device_available(device: str) -> bool:
 
         torch_mod: Any = _torch
 
-        if (
-            d == "cuda"
-            and hasattr(torch_mod, "cuda")
-            and torch_mod.cuda.is_available()
-        ):
+        if d == "cuda" and hasattr(torch_mod, "cuda") and torch_mod.cuda.is_available():
             return True
         if (
             d == "mps"

@@ -16,36 +16,38 @@ def initialize_run_report(
     start_time: float | None = None,
 ) -> RunReport:
     report = report_factory()
+    context = config.context
     report.meta["cuda_flags"] = cuda_flags
     report.meta["start_time"] = (
         float(start_time) if start_time is not None else float(time.time())
     )
     report.meta["config"] = serialized_config
 
-    if config.context:
-        normalized_context = dict(config.context)
+    if context:
+        normalized_context = dict(context)
         try:
             report.context.update(normalized_context)
         except (AttributeError, TypeError, ValueError, RuntimeError):
             report.context = normalized_context
 
-    run_id = config.context.get("run_id")
+    run_id = context.get("run_id") if context is not None else None
     if run_id:
         report.meta["run_id"] = run_id
-    plugins_meta = config.context.get("plugins")
+    plugins_meta = context.get("plugins") if context is not None else None
     if plugins_meta:
         report.meta["plugins"] = plugins_meta
 
     if auto_config:
         report.meta["auto"] = auto_config
-        existing_auto = config.context.get("auto")
-        if isinstance(existing_auto, dict):
+        existing_auto = context.get("auto") if context is not None else None
+        if isinstance(context, dict) and isinstance(existing_auto, dict):
             merged_auto = dict(existing_auto)
             merged_auto.update(auto_config)
-            config.context["auto"] = merged_auto
-        else:
-            config.context["auto"] = dict(auto_config)
-        report.context["auto"] = config.context["auto"]
+            context["auto"] = merged_auto
+            report.context["auto"] = context["auto"]
+        elif isinstance(context, dict):
+            context["auto"] = dict(auto_config)
+            report.context["auto"] = context["auto"]
 
     return report
 

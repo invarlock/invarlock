@@ -53,9 +53,9 @@ def gather_adapter_inventory_rows(
         names = [
             name
             for name in names
-            if str(registry.get_plugin_info(name, "adapters").get("module") or "").startswith(
-                "invarlock.plugins"
-            )
+            if str(
+                registry.get_plugin_info(name, "adapters").get("module") or ""
+            ).startswith("invarlock.plugins")
         ]
 
     rows: list[InventoryRow] = []
@@ -141,9 +141,7 @@ def gather_adapter_inventory_rows(
 
     rows.sort(
         key=lambda row: (
-            {"needs_extra": 0, "partial": 1, "ready": 2}.get(
-                str(row["status"]), 3
-            ),
+            {"needs_extra": 0, "partial": 1, "ready": 2}.get(str(row["status"]), 3),
             {"optional": 0, "core": 1, "auto": 2}.get(str(row["support"]), 3),
             str(row["name"]),
         )
@@ -157,15 +155,15 @@ def gather_generic_inventory_rows(
     plugin_type: PluginCategory,
     extras_checker: Callable[[str, str], str],
 ) -> list[InventoryRow]:
-    names = (
-        registry.list_guards() if plugin_type == "guards" else registry.list_edits()
-    )
+    names = registry.list_guards() if plugin_type == "guards" else registry.list_edits()
     rows: list[InventoryRow] = []
     for name in names:
         info = registry.get_plugin_info(name, plugin_type)
         module = str(info.get("module") or "")
         entry = info.get("entry_point")
-        support = "core" if module.startswith(f"invarlock.{plugin_type}") else "optional"
+        support = (
+            "core" if module.startswith(f"invarlock.{plugin_type}") else "optional"
+        )
         origin = "core" if support == "core" else "plugin"
         mode = "guard" if plugin_type == "guards" else "edit"
         extras_status = extras_checker(name, plugin_type)

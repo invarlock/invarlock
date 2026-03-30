@@ -70,6 +70,7 @@ def resolve_metric_and_provider(
         reps = _metric_value("reps")
         ci_level = _metric_value("ci_level")
 
+    normalized_kind: str | None
     if isinstance(metric_kind, str) and metric_kind:
         normalized_kind = metric_kind.strip().lower()
         if normalized_kind == "auto":

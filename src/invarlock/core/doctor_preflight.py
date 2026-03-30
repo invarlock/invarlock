@@ -190,7 +190,7 @@ def run_doctor_config_preflight(
             lines.append(DATASET_SPLIT_FALLBACK_WARNING)
             findings.extend(split_findings)
 
-    model_profile = None
+    model_profile: Any = None
     try:
         from invarlock import model_profile as model_profile_mod
 

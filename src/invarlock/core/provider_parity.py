@@ -8,7 +8,7 @@ def enforce_provider_parity(
     baseline_digest: dict | None,
     *,
     profile: str | None,
-    invarlock_error_cls: type[BaseException] = InvarlockError,
+    invarlock_error_cls: type[InvarlockError] = InvarlockError,
 ) -> None:
     """Enforce tokenizer/masking parity rules for CI and release profiles."""
 

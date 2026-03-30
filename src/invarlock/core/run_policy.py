@@ -51,7 +51,7 @@ def coerce_mapping(obj: object) -> dict[str, Any]:
         if isinstance(result, dict):
             return result
     try:
-        data = getattr(obj, "__dict__")
+        data = obj.__dict__
     except (AttributeError, TypeError):
         return {}
     return data if isinstance(data, dict) else {}

@@ -11,10 +11,10 @@ minimal environments.
 
 from __future__ import annotations
 
-import click
 import os
 from enum import Enum
 
+import click
 import typer
 from rich.console import Console
 from typer.core import TyperGroup
@@ -47,9 +47,7 @@ class OrderedGroup(TyperGroup):
             "version",
         ]
 
-    def get_command(
-        self, ctx: click.Context, cmd_name: str
-    ) -> click.Command | None:
+    def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
         command = super().get_command(ctx, cmd_name)
         if command is not None:
             return command

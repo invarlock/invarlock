@@ -6,8 +6,8 @@ Handles the 'invarlock advanced plugins' command for listing available plugins.
 Supports a minimal view via INVARLOCK_MINIMAL=1 to hide built‑in adapters.
 """
 
-import json
 import importlib
+import json
 import os
 import platform
 from typing import Any
@@ -17,12 +17,6 @@ from rich.console import Console
 from rich.markup import escape as _escape
 from rich.table import Table
 
-from invarlock.public_contracts import (
-    adapter_capability,
-    contract_catalog,
-    load_model_family_catalog,
-    load_support_matrix,
-)
 from invarlock.core.plugins_inventory import (
     adapter_inventory_json_items,
     combined_plugins_json_items,
@@ -33,6 +27,12 @@ from invarlock.core.plugins_inventory import (
     gather_generic_inventory_rows,
     generic_inventory_json_items,
     is_minimal_plugins_view,
+)
+from invarlock.public_contracts import (
+    adapter_capability,
+    contract_catalog,
+    load_model_family_catalog,
+    load_support_matrix,
 )
 
 from ..backend_runtime import bitsandbytes_runtime_available

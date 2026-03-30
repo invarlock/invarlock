@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import os
-from typing import Mapping, Protocol
+from collections.abc import Mapping
+from typing import Protocol
 
 from invarlock.core.run_orchestrator import RunExecutionRequest
 

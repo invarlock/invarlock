@@ -122,10 +122,10 @@ def build_snapshot_execution_plan(
 
     try:
         if mode == "chunked":
-            snapshot_tmpdir = adapter.snapshot_chunked(model)  # type: ignore[attr-defined]
+            snapshot_tmpdir = adapter.snapshot_chunked(model)
 
             def _restore() -> None:
-                adapter.restore_chunked(model, snapshot_tmpdir)  # type: ignore[attr-defined]
+                adapter.restore_chunked(model, snapshot_tmpdir)
 
             return SnapshotExecutionPlan(
                 model=model,
@@ -139,14 +139,14 @@ def build_snapshot_execution_plan(
             )
         if mode == "bytes":
             try:
-                base_blob = adapter.snapshot(model)  # type: ignore[attr-defined]
+                base_blob = adapter.snapshot(model)
             except bytes_fallback_exceptions as exc:
                 if not supports_chunked:
                     raise
-                snapshot_tmpdir = adapter.snapshot_chunked(model)  # type: ignore[attr-defined]
+                snapshot_tmpdir = adapter.snapshot_chunked(model)
 
                 def _restore_fallback_chunked() -> None:
-                    adapter.restore_chunked(model, snapshot_tmpdir)  # type: ignore[attr-defined]
+                    adapter.restore_chunked(model, snapshot_tmpdir)
 
                 return SnapshotExecutionPlan(
                     model=model,
@@ -169,7 +169,7 @@ def build_snapshot_execution_plan(
                 )
 
             def _restore_bytes() -> None:
-                adapter.restore(model, base_blob)  # type: ignore[attr-defined]
+                adapter.restore(model, base_blob)
 
             return SnapshotExecutionPlan(
                 model=model,

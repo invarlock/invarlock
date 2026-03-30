@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from time import perf_counter
-from typing import Any
+from typing import Any, NoReturn, cast
 
 import numpy as np
 
@@ -18,6 +18,50 @@ from invarlock.core.run_execution_context_policy import (
 )
 from invarlock.core.run_execution_context_policy import (
     build_run_execution_config_payloads as _build_run_execution_config_payloads_impl,
+)
+from invarlock.core.run_orchestrator_types import (
+    RunAdapterSelectedEvent,
+    RunAttemptStartedEvent,
+    RunAutoTuneAdjustmentEvent,
+    RunBaselineScheduleLoadedEvent,
+    RunCalibrationBatchSizesDebugEvent,
+    RunCleanupStatusEvent,
+    RunConfigLoadedEvent,
+    RunConfigLoadingEvent,
+    RunDatasetLoadingEvent,
+    RunDeterministicSeedsEvent,
+    RunDeviceResolvedEvent,
+    RunDiagnosticEvent,
+    RunEditSelectedEvent,
+    RunEvaluationReportFailedEvent,
+    RunEvaluationReportPassedEvent,
+    RunEvaluationReportStartedEvent,
+    RunExecutePipelineEvent,
+    RunExecutionEvent,
+    RunExecutionFailure,
+    RunExecutionObserver,
+    RunExecutionOutcome,
+    RunExecutionRequest,
+    RunExecutionResult,
+    RunExecutionServices,
+    RunFailureEvent,
+    RunGuardChainResolvedEvent,
+    RunGuardOverheadSummaryEvent,
+    RunLoadModelOnceEvent,
+    RunMaskedTokensDebugEvent,
+    RunOutputDirectoryReadyEvent,
+    RunPipelineStartedEvent,
+    RunPreviewLabelsDebugEvent,
+    RunPrimaryMetricSummaryEvent,
+    RunRetryAttemptStartedEvent,
+    RunRetryExhaustedEvent,
+    RunRetrySummaryEvent,
+    RunRetryValidationErrorEvent,
+    RunSnapshotModeEvent,
+    RunTelemetryFailedEvent,
+    RunTelemetrySavedEvent,
+    TimingSummaryPayload,
+    _RunExecutionHalt,
 )
 from invarlock.core.run_policy import (
     resolve_guard_overhead_threshold as _resolve_guard_overhead_threshold_impl,
@@ -45,51 +89,6 @@ from invarlock.core.run_retry_policy import (
 )
 from invarlock.core.run_timing_policy import (
     build_timing_summary_payload as _build_timing_summary_payload_impl,
-)
-from invarlock.core.run_orchestrator_types import (
-    RunAdapterSelectedEvent,
-    RunAttemptStartedEvent,
-    RunAutoTuneAdjustmentEvent,
-    RunBaselineScheduleLoadedEvent,
-    RunCalibrationBatchSizesDebugEvent,
-    RunCleanupStatusEvent,
-    RunConfigLoadedEvent,
-    RunConfigLoadingEvent,
-    RunContextEvent,
-    RunDatasetLoadingEvent,
-    RunDeterministicSeedsEvent,
-    RunDeviceResolvedEvent,
-    RunDiagnosticEvent,
-    RunEditSelectedEvent,
-    RunExecutePipelineEvent,
-    RunEvaluationReportFailedEvent,
-    RunEvaluationReportPassedEvent,
-    RunEvaluationReportStartedEvent,
-    RunExecutionEvent,
-    RunExecutionFailure,
-    RunExecutionObserver,
-    RunExecutionOutcome,
-    RunExecutionRequest,
-    RunExecutionResult,
-    RunExecutionServices,
-    RunFailureEvent,
-    RunGuardChainResolvedEvent,
-    RunGuardOverheadSummaryEvent,
-    RunLoadModelOnceEvent,
-    RunMaskedTokensDebugEvent,
-    RunOutputDirectoryReadyEvent,
-    RunPipelineStartedEvent,
-    RunPreviewLabelsDebugEvent,
-    RunPrimaryMetricSummaryEvent,
-    RunRetryAttemptStartedEvent,
-    RunRetryExhaustedEvent,
-    RunRetrySummaryEvent,
-    RunRetryValidationErrorEvent,
-    RunSnapshotModeEvent,
-    RunTelemetryFailedEvent,
-    RunTelemetrySavedEvent,
-    TimingSummaryPayload,
-    _RunExecutionHalt,
 )
 from invarlock.model_utils import set_seed
 
@@ -274,7 +273,7 @@ def execute_run_request(
         summary: str | None = None,
         error: Exception | None = None,
         **context: Any,
-    ) -> None:
+    ) -> NoReturn:
         failure = RunExecutionFailure(
             code=code,
             summary=summary,
@@ -548,14 +547,20 @@ def execute_run_request(
                 if hasattr(torch_mod.backends, "cudnn"):
                     torch_mod.backends.cudnn.benchmark = False
                     try:
-                        torch_mod.backends.cudnn.deterministic = True  # type: ignore[attr-defined]
+                        torch_mod.backends.cudnn.deterministic = True
                     except (AttributeError, TypeError, RuntimeError):
                         pass
             except OPTIONAL_RUNTIME_EXCEPTIONS:
                 # If we cannot enforce determinism here, we will rely on core checks
                 pass
         try:
-            numpy_seed = int(np.random.get_state()[1][0])
+            numpy_state = cast(tuple[Any, ...], np.random.get_state())
+            numpy_seed_state = numpy_state[1]
+            numpy_seed = (
+                int(numpy_seed_state[0])
+                if len(numpy_seed_state) > 0
+                else int(seed_value)
+            )
         except (
             AttributeError,
             IndexError,
@@ -570,16 +575,19 @@ def execute_run_request(
                 torch_seed = int(torch_mod.initial_seed())
             except (AttributeError, TypeError, ValueError, OverflowError, RuntimeError):
                 torch_seed = seed_value
+        python_seed = int(seed_value)
+        normalized_numpy_seed = int(numpy_seed)
+        normalized_torch_seed = int(torch_seed) if torch_seed is not None else None
         seed_bundle = {
-            "python": int(seed_value),
-            "numpy": int(numpy_seed),
-            "torch": int(torch_seed) if torch_seed is not None else None,
+            "python": python_seed,
+            "numpy": normalized_numpy_seed,
+            "torch": normalized_torch_seed,
         }
         _emit(
             RunDeterministicSeedsEvent(
-                python_seed=seed_bundle["python"],
-                numpy_seed=seed_bundle["numpy"],
-                torch_seed=seed_bundle["torch"],
+                python_seed=python_seed,
+                numpy_seed=normalized_numpy_seed,
+                torch_seed=normalized_torch_seed,
             )
         )
 
@@ -694,10 +702,11 @@ def execute_run_request(
         edit_name = getattr(getattr(cfg, "edit", None), "name", None)
         if not isinstance(edit_name, str) or not edit_name.strip():
             _halt("edit_name_missing")
+        edit_name_clean = edit_name.strip()
         try:
-            edit_op = registry.get_edit(edit_name.strip())
+            edit_op = registry.get_edit(edit_name_clean)
         except (AttributeError, KeyError) as exc:
-            _halt("unknown_edit", error=exc, edit_name=edit_name.strip())
+            _halt("unknown_edit", error=exc, edit_name=edit_name_clean)
 
         adapter_meta = registry.get_plugin_metadata(cfg.model.adapter, "adapters")
         try:
@@ -718,10 +727,10 @@ def execute_run_request(
             # Best-effort only; absence should not break runs
             pass
         try:
-            edit_meta = registry.get_plugin_metadata(edit_name.strip(), "edits")
+            edit_meta = registry.get_plugin_metadata(edit_name_clean, "edits")
         except KeyError:
             edit_meta = {
-                "name": edit_name.strip(),
+                "name": edit_name_clean,
                 "module": "edits.unknown",
                 "version": "unknown",
             }
@@ -927,7 +936,7 @@ def execute_run_request(
         # Model load/snapshot strategy
         model = None
         restore_fn = None
-        snapshot_tmpdir: str | None = None
+        snapshot_tmpdir = None
         snapshot_provenance: dict[str, bool] = {
             "restore_failed": False,
             "reload_path_used": False,
@@ -1009,7 +1018,7 @@ def execute_run_request(
 
         while True:
             # Reset RNG streams each attempt to guarantee determinism across retries
-            set_seed(seed_bundle["python"])
+            set_seed(python_seed)
 
             if retry_controller:
                 _emit(
@@ -1243,7 +1252,7 @@ def execute_run_request(
                     # Ensure directory exists
                     ok = False
                     if hasattr(adapter, "save_pretrained") and model is not None:
-                        ok = bool(adapter.save_pretrained(model, export_dir))  # type: ignore[attr-defined]
+                        ok = bool(adapter.save_pretrained(model, export_dir))
                     if ok:
                         save_tokenizer = getattr(tokenizer, "save_pretrained", None)
                         if callable(save_tokenizer):

@@ -7,7 +7,7 @@ from typing import Any
 def resolve_snapshot_config(
     context: object | None,
     *,
-    to_serialisable_dict_fn: Callable[[object], dict[str, Any]],
+    to_serialisable_dict_fn: Callable[[object], Any],
 ) -> dict[str, Any]:
     """Extract a plain snapshot policy mapping from run context."""
     try:
@@ -42,7 +42,7 @@ def estimate_model_bytes(model: Any) -> int:
     return total
 
 
-def _parse_float(value: object, default: float) -> float:
+def _parse_float(value: Any, default: float) -> float:
     try:
         parsed = float(value)
     except (TypeError, ValueError):

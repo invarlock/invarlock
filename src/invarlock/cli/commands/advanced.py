@@ -9,9 +9,7 @@ class AdvancedGroup(TyperGroup):
     def list_commands(self, ctx: click.Context) -> list[str]:
         return ["proof-pack", "policy", "plugins", "calibrate"]
 
-    def get_command(
-        self, ctx: click.Context, cmd_name: str
-    ) -> click.Command | None:
+    def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
         command = super().get_command(ctx, cmd_name)
         if command is not None:
             return command

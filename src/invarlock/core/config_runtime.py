@@ -547,8 +547,10 @@ def _load_runtime_yaml(*rel_parts: str) -> dict[str, Any] | None:
             res = res.joinpath(part)
         # Traversable API: try reading if file-like
         try:
-            if getattr(res, "is_file", None) and res.is_file():  # type: ignore[attr-defined]
-                text = res.read_text(encoding="utf-8")  # type: ignore[assignment]
+            is_file = getattr(res, "is_file", None)
+            read_text = getattr(res, "read_text", None)
+            if callable(is_file) and is_file() and callable(read_text):
+                text = read_text(encoding="utf-8")
                 data = yaml.safe_load(text) or {}
                 if not isinstance(data, dict):
                     raise ValueError("Runtime YAML must be a mapping")

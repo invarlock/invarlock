@@ -18,7 +18,10 @@ class _Registry:
     def __init__(self) -> None:
         self._adapters = {
             "hf_auto": {"module": "invarlock.adapters.hf", "entry_point": "auto"},
-            "hf_bnb": {"module": "invarlock.plugins.bitsandbytes", "entry_point": "bnb"},
+            "hf_bnb": {
+                "module": "invarlock.plugins.bitsandbytes",
+                "entry_point": "bnb",
+            },
         }
         self._guards = {
             "shape_guard": {"module": "invarlock.guards.shape", "entry_point": "shape"},
@@ -49,7 +52,12 @@ class _Registry:
 def test_is_minimal_plugins_view_and_cuda_detection() -> None:
     assert is_minimal_plugins_view("1") is True
     assert is_minimal_plugins_view("false") is False
-    assert detect_cuda_available(SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: True))) is True
+    assert (
+        detect_cuda_available(
+            SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: True))
+        )
+        is True
+    )
     assert detect_cuda_available(object()) is False
 
 
@@ -61,7 +69,9 @@ def test_gather_adapter_inventory_rows_and_json_payloads() -> None:
         minimal=False,
         has_cuda=False,
         is_linux=True,
-        extras_checker=lambda name, _kind: "⚠️ missing invarlock[gpu]" if name == "hf_bnb" else "",
+        extras_checker=lambda name, _kind: "⚠️ missing invarlock[gpu]"
+        if name == "hf_bnb"
+        else "",
         provenance_extractor=lambda name: (
             SimpleNamespace(library="bitsandbytes", version=None)
             if name == "hf_bnb"
@@ -70,7 +80,9 @@ def test_gather_adapter_inventory_rows_and_json_payloads() -> None:
         bitsandbytes_runtime_available=lambda: False,
     )
 
-    assert [row["name"] for row in filter_inventory_rows(rows, "optional")] == ["hf_bnb"]
+    assert [row["name"] for row in filter_inventory_rows(rows, "optional")] == [
+        "hf_bnb"
+    ]
     json_items = adapter_inventory_json_items(
         [{**row, "capability": {"kind": row["name"]}} for row in rows]
     )

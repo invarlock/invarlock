@@ -104,8 +104,10 @@ def load_evaluate_preset_data(
     preset: str | None,
     load_yaml_fn: Any,
 ) -> tuple[Path, dict[str, Any]]:
-    preset_path = Path(preset) if preset is not None else default_evaluate_preset_path(
-        adapter_name
+    preset_path = (
+        Path(preset)
+        if preset is not None
+        else default_evaluate_preset_path(adapter_name)
     )
     if preset is None and not preset_path.exists():
         return preset_path, default_preset_data_for_adapter(str(adapter_name))
