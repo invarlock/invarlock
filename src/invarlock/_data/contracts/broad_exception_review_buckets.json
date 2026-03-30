@@ -1,0 +1,219 @@
+{
+  "version": 1,
+  "scope_roots": [
+    "src/invarlock/core",
+    "src/invarlock/guards",
+    "src/invarlock/cli",
+    "src/invarlock/reporting"
+  ],
+  "policy": {
+    "acceptable": "Optional dependency probes, logging, cleanup, or shell-only formatting paths may keep a broad catch when the fallback is explicit and does not change trust-critical verdicts.",
+    "questionable": "Active paths that coerce config, pair data, or shape user-visible outputs need a narrower catch or stronger justification before they should remain broad.",
+    "should_remove": "Trust-critical determinism, guard evidence, guard execution, and pairing logic must not rely on blanket catches because they can hide correctness gaps or downgrade fail-closed behavior."
+  },
+  "entries": [
+    {
+      "path": "src/invarlock/core/adapter_auto.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [86],
+      "rationale": "Optional adapter-family probing may fall back to None without changing trust-critical verdicts."
+    },
+    {
+      "path": "src/invarlock/core/adapter_provenance.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [49],
+      "rationale": "Missing package-version metadata is best-effort provenance and is already surfaced as unsupported."
+    },
+    {
+      "path": "src/invarlock/core/config_runtime.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [560],
+      "rationale": "Importlib-resource fallback is a compatibility path and does not decide runtime trust policy by itself."
+    },
+    {
+      "path": "src/invarlock/core/error_encoding.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [13, 31],
+      "rationale": "Error encoding must not fail while packaging an already-raised exception."
+    },
+    {
+      "path": "src/invarlock/core/events.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [97, 140, 173, 179, 281],
+      "rationale": "Event logging and payload sanitization are best-effort observability paths with explicit fallback behavior."
+    },
+    {
+      "path": "src/invarlock/core/plugins_inventory.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [19, 83, 97],
+      "rationale": "Inventory hydration is an introspection surface; broad catches only guard optional metadata and plugin-probe failures."
+    },
+    {
+      "path": "src/invarlock/core/provider_config.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [17],
+      "rationale": "Provider-config itemization is a permissive mapping helper and safely falls back to an empty config."
+    },
+    {
+      "path": "src/invarlock/core/registry.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [110, 240, 287, 339, 345, 374, 380, 409, 415, 467, 480, 493],
+      "rationale": "Plugin discovery and load wrappers are optional-extension surfaces that already reclassify failures into explicit unavailability errors."
+    },
+    {
+      "path": "src/invarlock/core/runner.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [226],
+      "rationale": "The top-level run wrapper catches and records pipeline failures before returning a failed report."
+    },
+    {
+      "path": "src/invarlock/core/runner_context.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [51],
+      "rationale": "Torch-availability probing is a compatibility path."
+    },
+    {
+      "path": "src/invarlock/core/runner_eval_phase.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [35, 45, 57],
+      "rationale": "These broad catches only protect debug-trace logging and do not change evaluation verdicts."
+    },
+    {
+      "path": "src/invarlock/core/runner_finalize.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [137, 210],
+      "rationale": "Emergency rollback attempts are best-effort recovery paths that already preserve failure state in the report."
+    },
+    {
+      "path": "src/invarlock/core/runner_latency.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [35, 43, 51, 59, 74, 91, 97, 102, 113, 140, 146],
+      "rationale": "Latency measurement wraps arbitrary tensor/model calls and immediately re-raises with explicit phase-specific errors."
+    },
+    {
+      "path": "src/invarlock/guards/spectral.py",
+      "subsystem": "guards",
+      "bucket": "acceptable",
+      "lines": [258],
+      "rationale": "This catch only protects optional evidence dumping after guard evaluation completes."
+    },
+    {
+      "path": "src/invarlock/guards/tier_config.py",
+      "subsystem": "guards",
+      "bucket": "acceptable",
+      "lines": [169],
+      "rationale": "Tier-config loading is a compatibility helper that already emits explicit parse errors when strict config content is required."
+    },
+    {
+      "path": "src/invarlock/guards/variance.py",
+      "subsystem": "guards",
+      "bucket": "acceptable",
+      "lines": [497],
+      "rationale": "This catch only protects optional evidence dumping after variance evaluation completes."
+    },
+    {
+      "path": "src/invarlock/cli/app.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [99, 106, 112],
+      "rationale": "CLI bootstrap and top-level dispatch are shell surfaces with explicit fallback behavior."
+    },
+    {
+      "path": "src/invarlock/cli/backend_runtime.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [23],
+      "rationale": "Backend runtime probing is optional introspection for shell output."
+    },
+    {
+      "path": "src/invarlock/cli/bench.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [172],
+      "rationale": "Benchmark command error wrapping is a shell-only concern."
+    },
+    {
+      "path": "src/invarlock/cli/commands/explain_gates.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [41, 94, 111, 129, 191, 238, 259],
+      "rationale": "Gate explanation is a read-only reporting shell; these catches affect explanation output, not verdict enforcement."
+    },
+    {
+      "path": "src/invarlock/cli/commands/export_html.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [45, 57, 70],
+      "rationale": "HTML export is a shell formatting path with explicit nonzero exits."
+    },
+    {
+      "path": "src/invarlock/cli/commands/plugins.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [114, 368, 515, 561, 612],
+      "rationale": "Plugin listing is an introspection command and the broad catches only protect optional runtime and metadata probes."
+    },
+    {
+      "path": "src/invarlock/cli/device.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [43, 93],
+      "rationale": "Device listing is a probing command and these catches only protect shell diagnostics."
+    },
+    {
+      "path": "src/invarlock/cli/overhead_utils.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [27, 39, 54],
+      "rationale": "Overhead rendering helpers are shell-only formatting utilities."
+    },
+    {
+      "path": "src/invarlock/cli/run_artifacts.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [55],
+      "rationale": "Run-artifact shell fallback is best-effort output shaping."
+    },
+    {
+      "path": "src/invarlock/cli/run_config.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [207],
+      "rationale": "Run-config shell coercion is user-input handling and already degrades to explicit CLI defaults."
+    },
+    {
+      "path": "src/invarlock/cli/run_masking.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [66, 72],
+      "rationale": "Warning-mask rendering is a shell-only display path."
+    },
+    {
+      "path": "src/invarlock/cli/run_shell_output.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [118],
+      "rationale": "Shell-output formatting should stay best-effort."
+    },
+    {
+      "path": "src/invarlock/cli/run_warning_filters.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [126],
+      "rationale": "Warning filtering is a shell convenience layer and already degrades safely."
+    }
+  ]
+}

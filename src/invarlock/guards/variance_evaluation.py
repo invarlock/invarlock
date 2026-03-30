@@ -75,7 +75,10 @@ def evaluate_calibration_pass(
         guard._stats["predictive_gate"] = predictive_state.copy()
         return
 
-    device = next(model.parameters()).device
+    try:
+        device = next(model.parameters()).device
+    except StopIteration:
+        device = torch.device("cpu")
     torch.manual_seed(calib_seed)
     ppl_no_ve_samples, loss_no_ve_samples, token_counts = (
         guard._compute_ppl_for_batches(

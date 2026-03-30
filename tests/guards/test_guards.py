@@ -2433,8 +2433,8 @@ class TestSpectralGuardExceptionCoverage:
         assert isinstance(target, float)
         assert target > 0  # Should return a positive value
 
-        # Test exception handling by patching np.percentile to fail
-        with patch("numpy.percentile", side_effect=Exception("Percentile failed")):
+        # Test the narrowed percentile fallback path on supported measurement errors
+        with patch("numpy.percentile", side_effect=RuntimeError("Percentile failed")):
             target = auto_sigma_target(nn.Linear(10, 5), percentile=0.9)
             assert target == 0.9  # Should fall back to percentile on exception
 
