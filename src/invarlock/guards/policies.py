@@ -28,8 +28,8 @@ from invarlock.core.exceptions import (
 
 from .rmt import RMTPolicyDict
 from .spectral_types import SpectralPolicy
-from .tier_config import GuardType, TierName, check_drift as check_tier_drift
-from .tier_config import get_tier_guard_config
+from .tier_config import GuardType, TierName, get_tier_guard_config
+from .tier_config import check_drift as check_tier_drift
 
 # === Spectral Guard Policies ===
 

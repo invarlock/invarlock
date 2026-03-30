@@ -314,7 +314,12 @@ def resolve_target_modules(
                     desc = adapter.describe(model)
                     if isinstance(desc, dict):
                         n_layers = int(desc.get("n_layer", 0) or 0)
-                except (AttributeError, RuntimeError, TypeError, ValueError) as desc_exc:
+                except (
+                    AttributeError,
+                    RuntimeError,
+                    TypeError,
+                    ValueError,
+                ) as desc_exc:
                     guard._log_event(
                         "adapter_describe_error",
                         level="DEBUG",
