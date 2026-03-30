@@ -177,7 +177,9 @@ def run_bare_control(
     from invarlock.core.runner import CoreRunner
     from invarlock.model_utils import set_seed
 
-    set_seed(seed_bundle["python"])  # type: ignore[arg-type]
+    python_seed = seed_bundle.get("python")
+    if isinstance(python_seed, int):
+        set_seed(python_seed)
 
     bare_runner = CoreRunner()
     bare_config = copy.deepcopy(run_config)
@@ -301,7 +303,8 @@ def run_bare_control(
             }
         )
 
-    set_seed(seed_bundle["python"])  # type: ignore[arg-type]
+    if isinstance(python_seed, int):
+        set_seed(python_seed)
     return payload
 
 

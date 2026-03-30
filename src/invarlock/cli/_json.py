@@ -19,10 +19,9 @@ def emit(payload: Any, exit_code: int) -> None:
     - Accepts dicts or dataclasses
     - Exits with provided code via Typer
     """
-    if is_dataclass(payload):
-        payload = asdict(payload)  # type: ignore[assignment]
-    if isinstance(payload, dict):
-        payload.setdefault("ts", _ts())
-        payload.setdefault("component", "cli")
-    typer.echo(json.dumps(payload, sort_keys=True))
+    payload_obj: Any = asdict(payload) if is_dataclass(payload) else payload
+    if isinstance(payload_obj, dict):
+        payload_obj.setdefault("ts", _ts())
+        payload_obj.setdefault("component", "cli")
+    typer.echo(json.dumps(payload_obj, sort_keys=True))
     raise typer.Exit(exit_code)

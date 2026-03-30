@@ -213,11 +213,12 @@ def suppress_noisy_warnings(
                             line=line,
                         )
 
-                    warnings.showwarning = _showwarning  # type: ignore[assignment]
+                    showwarning_fn: Any = _showwarning
+                    warnings.showwarning = showwarning_fn
                     try:
                         yield
                     finally:
-                        warnings.showwarning = original_showwarning  # type: ignore[assignment]
+                        warnings.showwarning = original_showwarning
     finally:
         for handler in handlers:
             try:

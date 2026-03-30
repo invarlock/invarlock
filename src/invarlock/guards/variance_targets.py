@@ -224,8 +224,9 @@ def resolve_target_modules(
                 if dim in (2, 3):
                     return True
 
-            if isinstance(experts, nn.Module) and hasattr(experts, "_modules"):
-                iterable = experts._modules.values()  # type: ignore[attr-defined]
+            modules_map = getattr(experts, "_modules", None)
+            if isinstance(experts, nn.Module) and isinstance(modules_map, dict):
+                iterable = modules_map.values()
             else:
                 try:
                     iterable = list(experts)
@@ -275,11 +276,9 @@ def resolve_target_modules(
                 record_match(name, attn_proj)
 
         if scope in ["ffn", "both"]:
-            mlp_container = None
-            if hasattr(block, "mlp"):
-                mlp_container = block.mlp  # type: ignore[attr-defined]
-            elif hasattr(block, "block_sparse_moe"):
-                mlp_container = block.block_sparse_moe  # type: ignore[attr-defined]
+            mlp_container = getattr(block, "mlp", None)
+            if mlp_container is None:
+                mlp_container = getattr(block, "block_sparse_moe", None)
             if mlp_container is None:
                 continue
 

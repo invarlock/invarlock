@@ -33,7 +33,8 @@ def collect_calibration_batches(
     source = getattr(calib, "dataloader", None) or calib
     try:
         if hasattr(source, "__len__") and hasattr(source, "__getitem__"):
-            n = int(len(source))  # type: ignore[arg-type]
+            source_items: Any = source
+            n = int(len(source_items))
             if n <= 0:
                 return []
             count = min(int(max_windows), n)
@@ -62,7 +63,7 @@ def collect_calibration_batches(
             batches: list[Any] = []
             for idx in idxs:
                 try:
-                    batches.append(source[idx])  # type: ignore[index]
+                    batches.append(source_items[idx])
                 except (IndexError, KeyError, TypeError, ValueError, RuntimeError):
                     continue
             return batches

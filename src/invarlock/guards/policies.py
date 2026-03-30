@@ -11,7 +11,7 @@ code and config are synchronized.
 """
 
 import math
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 try:  # Python 3.12+
     from typing import NotRequired, TypedDict
@@ -28,7 +28,7 @@ from invarlock.core.exceptions import (
 
 from .rmt import RMTPolicyDict
 from .spectral_types import SpectralPolicy
-from .tier_config import check_drift as check_tier_drift
+from .tier_config import GuardType, TierName, check_drift as check_tier_drift
 from .tier_config import get_tier_guard_config
 
 # === Spectral Guard Policies ===
@@ -272,7 +272,9 @@ def get_spectral_policy(
     # Overlay calibrated values from tiers.yaml if available
     if use_yaml and name in ("balanced", "conservative", "aggressive"):
         try:
-            tier_config = get_tier_guard_config(name, "spectral_guard")  # type: ignore[arg-type]
+            tier_name = cast(TierName, name)
+            guard_key: GuardType = "spectral_guard"
+            tier_config = get_tier_guard_config(tier_name, guard_key)
             if tier_config:
                 # Update with calibrated values
                 if "sigma_quantile" in tier_config:
@@ -392,7 +394,9 @@ def get_rmt_policy(name: str = "balanced", *, use_yaml: bool = True) -> RMTPolic
     # Overlay calibrated values from tiers.yaml if available
     if use_yaml and name in ("balanced", "conservative", "aggressive"):
         try:
-            tier_config = get_tier_guard_config(name, "rmt_guard")  # type: ignore[arg-type]
+            tier_name = cast(TierName, name)
+            guard_key: GuardType = "rmt_guard"
+            tier_config = get_tier_guard_config(tier_name, guard_key)
             if tier_config:
                 # Update with calibrated values
                 if "deadband" in tier_config:
@@ -506,7 +510,9 @@ def get_variance_policy(
     # Overlay calibrated values from tiers.yaml if available
     if use_yaml and name in ("balanced", "conservative", "aggressive"):
         try:
-            tier_config = get_tier_guard_config(name, "variance_guard")  # type: ignore[arg-type]
+            tier_name = cast(TierName, name)
+            guard_key: GuardType = "variance_guard"
+            tier_config = get_tier_guard_config(tier_name, guard_key)
             if tier_config:
                 # Update with calibrated values
                 if "deadband" in tier_config:

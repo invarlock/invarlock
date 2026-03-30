@@ -312,9 +312,10 @@ def resolve_provider_and_split(
     except AttributeError:
         requested_split = None
     available_splits = None
-    if hasattr(data_provider, "available_splits"):
+    available_splits_fn = getattr(data_provider, "available_splits", None)
+    if callable(available_splits_fn):
         try:
-            available_splits = list(data_provider.available_splits())  # type: ignore[attr-defined]
+            available_splits = list(available_splits_fn())
         except (AttributeError, TypeError, ValueError):
             available_splits = None
     resolved_split, used_fallback_split = choose_dataset_split_fn(

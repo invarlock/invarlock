@@ -5,6 +5,7 @@ InvarLock CLI Doctor Command
 Handles the 'invarlock doctor' command for health checks.
 """
 
+import importlib
 import importlib.util
 import logging
 import os as _os
@@ -142,7 +143,9 @@ def doctor_command(
 
     # Environment facts (OS · Python · invarlock)
     try:
-        from invarlock import __version__ as _invarlock_version  # type: ignore
+        _invarlock_version = str(
+            getattr(importlib.import_module("invarlock"), "__version__", "unknown")
+        )
     except ImportError:
         _invarlock_version = "unknown"
     if not json_out:
@@ -529,7 +532,10 @@ def doctor_command(
 
         # Datasets summary (best effort; non-fatal)
         try:
-            from invarlock.eval.data import list_providers  # type: ignore
+            data_mod = importlib.import_module("invarlock.eval.data")
+            list_providers = getattr(data_mod, "list_providers", None)
+            if not callable(list_providers):
+                raise AttributeError("list_providers unavailable")
 
             providers = sorted(list_providers())
             if providers:

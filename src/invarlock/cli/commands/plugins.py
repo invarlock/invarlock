@@ -7,8 +7,10 @@ Supports a minimal view via INVARLOCK_MINIMAL=1 to hide built‑in adapters.
 """
 
 import json
+import importlib
 import os
 import platform
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -105,9 +107,10 @@ def plugins_command(
 
         def _gather_adapter_rows() -> list[dict]:
             try:
-                import torch  # type: ignore
+                import torch as _torch
 
-                has_cuda = detect_cuda_available(torch)
+                torch_mod: Any = _torch
+                has_cuda = detect_cuda_available(torch_mod)
             except Exception:
                 has_cuda = False
             from invarlock.core.adapter_provenance import extract_adapter_provenance
@@ -360,8 +363,7 @@ def plugins_command(
             )
 
             try:
-                import invarlock.eval.data as _data_mod  # type: ignore
-
+                _data_mod = importlib.import_module("invarlock.eval.data")
                 _providers_map = getattr(_data_mod, "_PROVIDERS", {}) or {}
             except Exception:
                 _providers_map = {}
@@ -508,8 +510,7 @@ def plugins_command(
 
             if json_out:
                 try:
-                    import invarlock.eval.data as _data_mod  # type: ignore
-
+                    _data_mod = importlib.import_module("invarlock.eval.data")
                     _providers_map = getattr(_data_mod, "_PROVIDERS", {}) or {}
                 except Exception:
                     _providers_map = {}

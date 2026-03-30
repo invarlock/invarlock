@@ -31,11 +31,17 @@ def _prune_none_values(value: Any) -> Any:
 def _to_serialisable_dict(section: object) -> dict[str, Any]:
     """Coerce config fragments to plain dicts."""
 
-    if hasattr(section, "model_dump"):
-        return section.model_dump()  # type: ignore[return-value]
-    if hasattr(section, "dict"):
+    model_dump = getattr(section, "model_dump", None)
+    if callable(model_dump):
+        dumped = model_dump()
+        if isinstance(dumped, dict):
+            return _coerce_mapping(dumped)
+    as_dict = getattr(section, "dict", None)
+    if callable(as_dict):
         try:
-            return section.dict()  # type: ignore[return-value]
+            dumped = as_dict()
+            if isinstance(dumped, dict):
+                return _coerce_mapping(dumped)
         except (TypeError, ValueError):
             pass
     try:
@@ -50,6 +56,8 @@ def _to_serialisable_dict(section: object) -> dict[str, Any]:
         data = vars(section)
         if isinstance(data, dict) and isinstance(data.get("_data"), dict):
             return data["_data"]
-        return _prune_none_values(data)  # type: ignore[return-value]
+        if isinstance(data, dict):
+            return _coerce_mapping(_prune_none_values(data))
+        return {}
     except TypeError:
         return {}
