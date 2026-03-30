@@ -190,3 +190,19 @@ def test_apply_edited_primary_metric_policy_does_not_carry_exit_code() -> None:
     assert "ratio_vs_baseline" not in outcome.payload["metrics"]["primary_metric"]
     assert not hasattr(outcome, "warning")
     assert not hasattr(outcome, "exit_code")
+
+
+def test_apply_edited_primary_metric_policy_reraises_unexpected_profile_errors() -> None:
+    class _BadProfile:
+        def __str__(self) -> str:
+            raise AssertionError("explode")
+
+    with pytest.raises(AssertionError, match="explode"):
+        apply_edited_primary_metric_policy(
+            {
+                "meta": {"device": "cpu", "adapter": "hf_causal"},
+                "edit": {"name": "quant_rtn"},
+                "metrics": {"primary_metric": {"final": 1.0}},
+            },
+            profile=_BadProfile(),
+        )

@@ -12,6 +12,9 @@ from .report_inputs import (
     resolve_report_input_path,
 )
 
+_TEXT_NORMALIZATION_ERRORS = (RuntimeError, TypeError, ValueError)
+_FINITE_NUMBER_ERRORS = (OverflowError, TypeError, ValueError)
+
 
 def require_run_report_artifact(run_result: str | Path | None, *, stage: str) -> Path:
     """Require the runner to return a concrete report artifact path."""
@@ -260,7 +263,7 @@ def apply_edited_primary_metric_policy(
 
     try:
         prof = str(profile or "").strip().lower()
-    except Exception:
+    except _TEXT_NORMALIZATION_ERRORS:
         prof = ""
     if prof not in {"ci", "ci_cpu", "release"}:
         return PrimaryMetricPolicyOutcome(
@@ -348,7 +351,7 @@ def apply_edited_primary_metric_policy(
 def _finite_number(value: Any) -> bool:
     try:
         return isinstance(value, (int, float)) and math.isfinite(float(value))
-    except Exception:
+    except _FINITE_NUMBER_ERRORS:
         return False
 
 

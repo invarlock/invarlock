@@ -27,13 +27,6 @@
       "rationale": "Missing package-version metadata is best-effort provenance and is already surfaced as unsupported."
     },
     {
-      "path": "src/invarlock/core/auto_tuning.py",
-      "subsystem": "core",
-      "bucket": "questionable",
-      "lines": [300, 332, 338],
-      "rationale": "Tier-policy YAML loading and numeric normalization still affect effective policy selection and should narrow to specific parse failures."
-    },
-    {
       "path": "src/invarlock/core/config_runtime.py",
       "subsystem": "core",
       "bucket": "acceptable",
@@ -46,20 +39,6 @@
       "bucket": "acceptable",
       "lines": [13, 31],
       "rationale": "Error encoding must not fail while packaging an already-raised exception."
-    },
-    {
-      "path": "src/invarlock/core/evaluate_contract.py",
-      "subsystem": "core",
-      "bucket": "questionable",
-      "lines": [263, 351],
-      "rationale": "Primary-metric contract coercion influences evaluation semantics and should use narrower data-shape handling."
-    },
-    {
-      "path": "src/invarlock/core/evaluate_plan.py",
-      "subsystem": "core",
-      "bucket": "questionable",
-      "lines": [49, 59],
-      "rationale": "Model-id normalization and preset sanitization are still active config-shaping paths, not purely observational helpers."
     },
     {
       "path": "src/invarlock/core/events.py",
@@ -109,13 +88,6 @@
       "bucket": "acceptable",
       "lines": [35, 45, 57],
       "rationale": "These broad catches only protect debug-trace logging and do not change evaluation verdicts."
-    },
-    {
-      "path": "src/invarlock/core/runner_eval_windows.py",
-      "subsystem": "core",
-      "bucket": "questionable",
-      "lines": [22, 31, 199],
-      "rationale": "Evaluation-window slicing and masked-label introspection are active metric inputs and should use narrower error handling."
     },
     {
       "path": "src/invarlock/core/runner_finalize.py",

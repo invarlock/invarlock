@@ -29,6 +29,15 @@ def test_normalize_model_id_strips_hf_prefix_for_hf_adapters() -> None:
     assert normalize_model_id("hf:org/model", "custom") == "hf:org/model"
 
 
+def test_normalize_model_id_reraises_unexpected_adapter_text_errors() -> None:
+    class _BadAdapterName:
+        def __str__(self) -> str:
+            raise AssertionError("explode")
+
+    with pytest.raises(AssertionError, match="explode"):
+        normalize_model_id("hf:org/model", _BadAdapterName())  # type: ignore[arg-type]
+
+
 def test_sanitize_preset_data_for_evaluate_removes_pinned_device() -> None:
     payload = {"model": {"device": "cuda", "id": "demo"}}
 

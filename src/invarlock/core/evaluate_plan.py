@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+_TEXT_NORMALIZATION_ERRORS = (RuntimeError, TypeError, ValueError)
+
 DEFAULT_EVALUATE_GUARDS_ORDER = [
     "invariants",
     "spectral",
@@ -46,7 +48,7 @@ def normalize_model_id(model_id: str, adapter_name: str) -> str:
     try:
         if str(adapter_name).startswith("hf_") and mid.startswith("hf:"):
             return mid.split(":", 1)[1]
-    except Exception:
+    except _TEXT_NORMALIZATION_ERRORS:
         pass
     return mid
 
@@ -56,7 +58,7 @@ def stable_text(value: object, fallback: str = "") -> str:
         return value
     try:
         return str(value)
-    except Exception:
+    except _TEXT_NORMALIZATION_ERRORS:
         return fallback
 
 

@@ -15,6 +15,17 @@ from typing import Any
 
 import yaml
 
+_RUNTIME_YAML_LOAD_ERRORS = (
+    AttributeError,
+    FileNotFoundError,
+    ModuleNotFoundError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+_NUMERIC_NORMALIZATION_ERRORS = (OverflowError, TypeError, ValueError)
+
 __all__ = [
     "clear_tier_policies_cache",
     "get_tier_policies",
@@ -297,7 +308,7 @@ def _load_runtime_yaml(
             if not isinstance(data, dict):
                 raise ValueError("Runtime YAML must be a mapping")
             return data
-    except Exception:
+    except _RUNTIME_YAML_LOAD_ERRORS:
         return None
 
     return None
@@ -329,13 +340,13 @@ def _normalize_multiple_testing(mt: Any) -> dict[str, Any]:
     try:
         if alpha is not None:
             out["alpha"] = float(alpha)
-    except Exception:
+    except _NUMERIC_NORMALIZATION_ERRORS:
         pass
     m_val = mt.get("m")
     try:
         if m_val is not None:
             out["m"] = int(m_val)
-    except Exception:
+    except _NUMERIC_NORMALIZATION_ERRORS:
         pass
     return out
 
