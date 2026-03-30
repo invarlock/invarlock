@@ -140,7 +140,7 @@ def fingerprint_targets(guard: Any) -> str | None:
                 hasher.update(key.encode("utf-8"))
                 hasher.update(data)
         return hasher.hexdigest()[:16]
-    except Exception:
+    except (AttributeError, RuntimeError, TypeError, ValueError):
         return None
 
 
@@ -219,7 +219,7 @@ def resolve_target_modules(
                     continue
                 try:
                     dim = candidate.dim()
-                except Exception:
+                except (AttributeError, RuntimeError, TypeError, ValueError):
                     dim = getattr(candidate, "ndim", None)
                 if dim in (2, 3):
                     return True
@@ -239,7 +239,7 @@ def resolve_target_modules(
                         continue
                     try:
                         dim = weight.dim()
-                    except Exception:
+                    except (AttributeError, RuntimeError, TypeError, ValueError):
                         dim = getattr(weight, "ndim", None)
                     if dim in (2, 3):
                         return True
@@ -254,7 +254,7 @@ def resolve_target_modules(
             return False
         try:
             dim = weight.dim()
-        except Exception:
+        except (AttributeError, RuntimeError, TypeError, ValueError):
             dim = getattr(weight, "ndim", None)
         return dim == 2
 
@@ -315,7 +315,7 @@ def resolve_target_modules(
                     desc = adapter.describe(model)
                     if isinstance(desc, dict):
                         n_layers = int(desc.get("n_layer", 0) or 0)
-                except Exception as desc_exc:
+                except (AttributeError, RuntimeError, TypeError, ValueError) as desc_exc:
                     guard._log_event(
                         "adapter_describe_error",
                         level="DEBUG",
@@ -324,7 +324,7 @@ def resolve_target_modules(
             if n_layers == 0:
                 try:
                     n_layers = sum(1 for _ in iter_transformer_layers(model))
-                except Exception:
+                except (AttributeError, RuntimeError, TypeError, ValueError):
                     pass
             if n_layers == 0:
                 config = getattr(unwrap_model(model), "config", None)
@@ -345,7 +345,7 @@ def resolve_target_modules(
             for index in range(n_layers):
                 try:
                     modules = adapter.get_layer_modules(model, index) or {}
-                except Exception as exc:
+                except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
                     record_rejection(
                         f"transformer.h.{index}", f"adapter_error:{exc}", None
                     )
@@ -372,7 +372,7 @@ def resolve_target_modules(
                     )
             if targets:
                 fallback_used = True
-        except Exception as exc:  # pragma: no cover - defensive logging
+        except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
             guard._log_event(
                 "target_resolution_fallback_error",
                 level="WARN",

@@ -8,7 +8,7 @@ def finite01(value: Any) -> bool:
     try:
         numeric = float(value)
         return math.isfinite(numeric) and 0.0 <= numeric <= 1.0
-    except Exception:
+    except (TypeError, ValueError):
         return False
 
 
@@ -18,7 +18,7 @@ def z_to_two_sided_pvalue(z: Any) -> float:
         if not math.isfinite(zf):
             return 1.0
         return float(math.erfc(abs(zf) / math.sqrt(2.0)))
-    except Exception:
+    except (TypeError, ValueError):
         return 1.0
 
 
@@ -30,7 +30,7 @@ def bh_reject_families(
         return set()
     try:
         alpha_f = float(alpha)
-    except Exception:
+    except (TypeError, ValueError):
         alpha_f = 0.05
     if not (0.0 < alpha_f <= 1.0):
         return set()
@@ -67,7 +67,7 @@ def bonferroni_reject_families(
         return set()
     try:
         alpha_f = float(alpha)
-    except Exception:
+    except (TypeError, ValueError):
         alpha_f = 0.05
     if not (0.0 < alpha_f <= 1.0):
         return set()
@@ -88,14 +88,14 @@ def select_budgeted_violations(
     method = str(mt.get("method", "bh")).lower()
     try:
         alpha = float(mt.get("alpha", 0.05) or 0.05)
-    except Exception:
+    except (TypeError, ValueError):
         alpha = 0.05
     m_raw = mt.get("m")
     m = None
     try:
         if m_raw is not None:
             m = int(m_raw)
-    except Exception:
+    except (TypeError, ValueError):
         m = None
 
     for violation in budgeted_violations:
@@ -116,7 +116,7 @@ def select_budgeted_violations(
         family = str(violation.get("family"))
         try:
             zf = float(violation.get("z_score"))
-        except Exception:
+        except (TypeError, ValueError):
             continue
         if not math.isfinite(zf):
             continue
@@ -157,7 +157,7 @@ def select_budgeted_violations(
         p_val: float | None = None
         try:
             zf = float(z_val)
-        except Exception:
+        except (TypeError, ValueError):
             zf = None
         if zf is not None and math.isfinite(zf):
             p_val = z_to_two_sided_pvalue(zf)

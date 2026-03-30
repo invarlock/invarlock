@@ -122,6 +122,7 @@ def test_registry_fallback_on_entry_points_error(monkeypatch, tmp_path):
     # Unknown plugin info and metadata behavior
     info = r.get_plugin_info("nope", "guards")
     assert info["available"] is False and info["module"] == "unknown"
+    assert "Plugin discovery failed" in info["status"]
     with pytest.raises(KeyError):
         r.get_plugin_metadata("nope", "guards")
 
@@ -130,6 +131,7 @@ def test_registry_fallback_on_entry_points_error(monkeypatch, tmp_path):
     )
     assert (
         not ok
+        and "Plugin discovery failed" in msg
         and "Unknown adapter" in msg
         and "Unknown edit" in msg
         and "Unknown guard" in msg

@@ -289,7 +289,7 @@ def get_spectral_policy(
                     policy["family_caps"] = tier_config["family_caps"]
                 if "multiple_testing" in tier_config:
                     policy["multiple_testing"] = tier_config["multiple_testing"]
-        except Exception:
+        except (AttributeError, RuntimeError, TypeError, ValueError):
             # Fallback to hardcoded values on any error
             pass
 
@@ -403,7 +403,7 @@ def get_rmt_policy(name: str = "balanced", *, use_yaml: bool = True) -> RMTPolic
                     policy["epsilon_default"] = tier_config["epsilon_default"]
                 if "epsilon_by_family" in tier_config:
                     policy["epsilon_by_family"] = tier_config["epsilon_by_family"]
-        except Exception:
+        except (AttributeError, RuntimeError, TypeError, ValueError):
             # Fallback to hardcoded values on any error
             pass
 
@@ -522,7 +522,7 @@ def get_variance_policy(
                 if "predictive_one_sided" in tier_config:
                     # Map predictive_one_sided to predictive_gate behavior
                     pass  # This is handled elsewhere in variance guard
-        except Exception:
+        except (AttributeError, RuntimeError, TypeError, ValueError):
             # Fallback to hardcoded values on any error
             pass
 
@@ -718,7 +718,7 @@ def enforce_validation_gate(metrics: dict[str, Any], gate: dict[str, Any]) -> No
                         "limit": limit,
                     }
                 )
-    except Exception:
+    except (AttributeError, RuntimeError, TypeError, ValueError):
         # Ignore malformed metrics here; gating purely best-effort
         pass
 
@@ -735,7 +735,7 @@ def enforce_validation_gate(metrics: dict[str, Any], gate: dict[str, Any]) -> No
                         "limit": limit,
                     }
                 )
-    except Exception:
+    except (AttributeError, RuntimeError, TypeError, ValueError):
         pass
 
     if isinstance(gate.get("require_branch_balance"), bool) and gate.get(

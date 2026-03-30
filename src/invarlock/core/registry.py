@@ -70,6 +70,7 @@ class CoreRegistry:
         self._adapters: dict[str, PluginInfo] = {}
         self._edits: dict[str, PluginInfo] = {}
         self._guards: dict[str, PluginInfo] = {}
+        self._discovery_issue: str | None = None
         self._initialized = False
 
     def _ensure_initialized(self) -> None:
@@ -82,6 +83,7 @@ class CoreRegistry:
 
     def _discover_plugins(self) -> None:
         """Discover all plugins through entry points with fallback registration."""
+        self._discovery_issue = None
         # Try third-party entry points only when explicitly enabled.
         if third_party_plugins_allowed():
             try:
@@ -106,6 +108,7 @@ class CoreRegistry:
                     self._guards[ep.name] = info
 
             except Exception as e:
+                self._discovery_issue = f"Plugin discovery failed: {e}"
                 warnings.warn(f"Plugin discovery failed: {e}", stacklevel=2)
 
         # Fallback registration for development
@@ -429,7 +432,8 @@ class CoreRegistry:
             raise ValueError(f"Unknown plugin type: {plugin_type}")
 
         if name not in registry:
-            return {"available": False, "status": "Not found", "module": "unknown"}
+            status = self._discovery_issue or "Not found"
+            return {"available": False, "status": status, "module": "unknown"}
 
         info = registry[name]
         return {
@@ -503,6 +507,8 @@ class CoreRegistry:
         self._ensure_initialized()
 
         issues = []
+        if self._discovery_issue:
+            issues.append(self._discovery_issue)
 
         # Check adapter
         if adapter_name not in self._adapters:
