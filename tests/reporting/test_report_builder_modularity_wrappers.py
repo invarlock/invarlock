@@ -6,6 +6,10 @@ from invarlock.reporting.report_overhead import (
     compute_quality_overhead_from_guard,
     prepare_guard_overhead_section,
 )
+from invarlock.reporting.report_make_support import (
+    build_baseline_reference,
+    extract_report_meta,
+)
 from invarlock.reporting.report_policy import (
     resolve_pm_acceptance_range_from_report,
     resolve_pm_drift_band_from_report,
@@ -13,6 +17,7 @@ from invarlock.reporting.report_policy import (
 )
 from invarlock.reporting.report_provenance import build_provenance_block
 from invarlock.reporting.report_validation import compute_validation_flags
+from invarlock.reporting.report_types import create_empty_report
 
 
 def test_reporting_owner_modules_expose_injection_points():
@@ -99,3 +104,24 @@ def test_reporting_owner_modules_expose_injection_points():
         get_tier_policies_fn=lambda: {"balanced": {"metrics": {"pm_ratio": {}}}},
     )
     assert flags["primary_metric_acceptable"] is True
+
+
+def test_report_make_support_helpers_expose_narrower_builder_boundaries():
+    report = create_empty_report()
+    report["meta"]["model_id"] = "model-x"
+    report["meta"]["adapter"] = "hf_causal"
+    report["meta"]["device"] = "cpu"
+    report["meta"]["ts"] = "now"
+    report["meta"]["commit"] = "abc"
+    report["meta"]["seed"] = 7
+    report["metrics"]["primary_metric"] = {
+        "kind": "ppl_causal",
+        "preview": 1.0,
+        "final": 1.0,
+    }
+
+    meta = extract_report_meta(report, [])
+    baseline_ref = build_baseline_reference(report, report, {"run_id": "base"})
+
+    assert meta["seed"] == 7
+    assert baseline_ref["primary_metric"]["final"] == 1.0
