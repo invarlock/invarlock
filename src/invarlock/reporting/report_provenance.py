@@ -60,6 +60,7 @@ def collect_backend_versions() -> dict[str, Any]:
     except _NON_FATAL_EXCEPTIONS:
         pass
 
+    torch: Any | None
     try:  # pragma: no cover - depends on torch availability
         import torch
     except ImportError:  # pragma: no cover - torch not available

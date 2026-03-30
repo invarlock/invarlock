@@ -14,7 +14,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import math
-from typing import Any
+from typing import Any, cast
 
 from invarlock.core.auto_tuning import get_tier_policies
 from invarlock.core.exceptions import MetricsError, ValidationError
@@ -128,14 +128,10 @@ def _extract_report_meta(
         if diagnostics is not None:
             _append_build_diagnostic(diagnostics, code=code, message=message)
 
-    meta_section = (
-        report.get("meta", {}) if isinstance(report.get("meta"), dict) else {}
+    raw_meta_section = report.get("meta")
+    meta_section: dict[str, Any] = (
+        dict(raw_meta_section) if isinstance(raw_meta_section, dict) else {}
     )
-    if not isinstance(report.get("meta"), dict):
-        _note(
-            "meta.section_unavailable",
-            "Run metadata block was not a mapping; evaluation report metadata fell back to defaults.",
-        )
     seed_value = _coerce_int(meta_section.get("seed"))
     seeds_bundle = _sanitize_seed_bundle(meta_section.get("seeds"), seed_value)
     primary_seed = (
@@ -182,11 +178,10 @@ def _extract_report_meta(
 
 def _generate_run_id(report: RunReport) -> str:
     """Generate a unique run ID from report metadata."""
-    meta = (
-        report.get("meta", {})
-        if isinstance(report, dict)
-        else getattr(report, "meta", {})
+    raw_meta = (
+        report.get("meta") if isinstance(report, dict) else getattr(report, "meta", {})
     )
+    meta = raw_meta if isinstance(raw_meta, dict) else {}
     if isinstance(meta, dict):
         existing = meta.get("run_id")
         if isinstance(existing, str) and existing:
@@ -196,8 +191,6 @@ def _generate_run_id(report: RunReport) -> str:
         model_id = _optional_text(meta.get("model_id")) or ""
         commit = str(meta.get("commit", meta.get("commit_sha", "")) or "")[:16]
         base_str = f"{timestamp_str}{model_id}{commit}"
-    else:
-        base_str = str(meta or report)
     return hashlib.sha256(base_str.encode()).hexdigest()[:16]
 
 
@@ -253,9 +246,11 @@ def make_report(
         )
 
     report = report_normalization_mod.normalize_and_validate_run_report(report)
+    report_map = cast(dict[str, Any], report)
 
     # Normalize baseline input
     baseline_raw = baseline
+    baseline_raw_map = cast(dict[str, Any], baseline_raw)
     baseline_normalized = report_normalization_mod.normalize_baseline(baseline_raw)
     baseline_report: RunReport | None = None
     try:
@@ -348,7 +343,7 @@ def make_report(
     # Extract auto-tuning configuration
     auto_config = report["meta"].get("auto")
     if auto_config:
-        auto = {
+        auto: dict[str, Any] = {
             "tier": auto_config.get("tier", "balanced"),
             "probes_used": auto_config.get("probes", auto_config.get("probes_used", 0)),
             "target_pm_ratio": auto_config.get("target_pm_ratio"),
@@ -357,7 +352,7 @@ def make_report(
         auto = {"tier": "none", "probes_used": 0, "target_pm_ratio": None}
 
     # Extract dataset configuration and compute hashes
-    dataset_info = _extract_dataset_info(report)
+    dataset_info = _extract_dataset_info(report_map)
     try:
         if isinstance(dataset_info, dict):
             windows = dataset_info.get("windows")
@@ -379,6 +374,11 @@ def make_report(
         def _is_finite_number(value: Any) -> bool:
             return isinstance(value, (int, float)) and math.isfinite(float(value))
 
+        def _coerce_finite_float(value: Any) -> float | None:
+            if not _is_finite_number(value):
+                return None
+            return float(value)
+
         report_kind = (
             report.get("metrics", {}).get("primary_metric", {}).get("kind")
             if isinstance(report.get("metrics"), dict)
@@ -390,13 +390,17 @@ def make_report(
         if isinstance(direct_pm, dict) and _is_finite_number(direct_pm.get("final")):
             return copy.deepcopy(direct_pm)
         if _is_finite_number(payload.get("ppl_final")):
-            preview_value = payload.get("ppl_preview")
-            if not _is_finite_number(preview_value):
-                preview_value = payload.get("ppl_final")
+            preview_value_raw = payload.get("ppl_preview")
+            if not _is_finite_number(preview_value_raw):
+                preview_value_raw = payload.get("ppl_final")
+            preview_value = _coerce_finite_float(preview_value_raw)
+            final_value = _coerce_finite_float(payload.get("ppl_final"))
+            if preview_value is None or final_value is None:
+                return None
             return {
                 "kind": default_kind,
-                "preview": float(preview_value),
-                "final": float(payload.get("ppl_final")),
+                "preview": preview_value,
+                "final": final_value,
             }
 
         metrics_block = payload.get("metrics")
@@ -407,13 +411,17 @@ def make_report(
             return copy.deepcopy(block_pm)
         ppl_final = metrics_block.get("ppl_final")
         if _is_finite_number(ppl_final):
-            ppl_preview = metrics_block.get("ppl_preview", ppl_final)
-            if not _is_finite_number(ppl_preview):
-                ppl_preview = ppl_final
+            ppl_preview_raw = metrics_block.get("ppl_preview", ppl_final)
+            if not _is_finite_number(ppl_preview_raw):
+                ppl_preview_raw = ppl_final
+            ppl_preview = _coerce_finite_float(ppl_preview_raw)
+            ppl_final_value = _coerce_finite_float(ppl_final)
+            if ppl_preview is None or ppl_final_value is None:
+                return None
             return {
                 "kind": default_kind,
-                "preview": float(ppl_preview),
-                "final": float(ppl_final),
+                "preview": ppl_preview,
+                "final": ppl_final_value,
             }
         return None
 
@@ -446,13 +454,13 @@ def make_report(
         baseline_pm = _direct_baseline_metric(baseline_normalized)
     if not isinstance(baseline_pm, dict) or not baseline_pm:
         try:
-            baseline_metric_source = baseline_normalized
+            baseline_metric_source: dict[str, Any] = baseline_normalized
             if (
                 isinstance(baseline_raw, dict)
-                and isinstance(baseline_raw.get("evaluation_windows"), dict)
+                and isinstance(baseline_raw_map.get("evaluation_windows"), dict)
                 and _direct_baseline_metric(baseline_normalized) is None
             ):
-                baseline_metric_source = baseline_raw
+                baseline_metric_source = baseline_raw_map
             baseline_pm = compute_primary_metric_from_report(baseline_metric_source)
         except NON_FATAL_EXCEPTIONS as exc:
             raise MetricsError(
@@ -502,13 +510,13 @@ def make_report(
 
     ppl_analysis, window_plan_profile = (
         report_primary_metric_analysis_mod.build_primary_metric_analysis(
-            report,
+            report_map,
             baseline_normalized,
             baseline_ref,
             dataset_info,
         )
     )
-    ppl_metrics = report.get("metrics", {}) if isinstance(report, dict) else {}
+    ppl_metrics = report_map.get("metrics", {})
 
     # Extract invariant status
     invariants = guards_invariants_mod._extract_invariants(
@@ -568,7 +576,7 @@ def make_report(
 
     # Resolve tier/profile policy (canonical) and merge observed guard policies.
     profile = None
-    explicit_overrides = None
+    explicit_overrides: dict[str, Any] | None = None
     try:
         ctx = report.get("context") if isinstance(report, dict) else None
         if isinstance(ctx, dict) and ctx.get("profile"):
@@ -611,8 +619,8 @@ def make_report(
         )
         if isinstance(meta_cfg, dict) and isinstance(meta_cfg.get("guards"), dict):
             explicit_overrides = meta_cfg.get("guards")
-        if explicit_overrides is None and isinstance(report.get("config"), dict):
-            cfg2 = report.get("config")
+        cfg2 = report.get("config")
+        if explicit_overrides is None and isinstance(cfg2, dict):
             if isinstance(cfg2.get("guards"), dict):
                 explicit_overrides = cfg2.get("guards")
     except NON_FATAL_EXCEPTIONS:
@@ -662,7 +670,12 @@ def make_report(
             if guard_name == "variance" and variance_policy_digest:
                 policies[guard_name]["policy_digest"] = variance_policy_digest
 
-    plugin_provenance = report.get("meta", {}).get("plugins", {})
+    plugin_provenance: dict[str, Any] = {}
+    meta_plugins = report_map.get("meta")
+    if isinstance(meta_plugins, dict):
+        raw_plugin_provenance = meta_plugins.get("plugins")
+        if isinstance(raw_plugin_provenance, dict):
+            plugin_provenance = raw_plugin_provenance
     edit_metadata = report_edit_summary_mod.extract_edit_metadata(
         report, plugin_provenance
     )
@@ -699,8 +712,8 @@ def make_report(
 
     current_run_id = _generate_run_id(report)
     provenance = report_provenance_mod.build_provenance_block(
-        report,
-        baseline_raw,
+        report_map,
+        baseline_raw_map,
         baseline_ref,
         artifacts_payload,
         policy_provenance,
@@ -723,12 +736,12 @@ def make_report(
     )
 
     pm_acceptance_range = report_policy_mod.resolve_pm_acceptance_range_from_report(
-        report,
+        report_map,
     )
     pm_drift_band = report_policy_mod.resolve_pm_drift_band_from_report(
-        report, drift_band_default=PM_DRIFT_BAND_DEFAULT
+        report_map, drift_band_default=PM_DRIFT_BAND_DEFAULT
     )
-    tiny_relax = report_policy_mod.resolve_tiny_relax_from_report(report)
+    tiny_relax = report_policy_mod.resolve_tiny_relax_from_report(report_map)
 
     pm_tail_result = report_build_context_mod.evaluate_primary_metric_tail(
         report,
@@ -737,31 +750,36 @@ def make_report(
         evaluate_metric_tail,
     )
 
-    validation_kwargs = {
-        "ppl": ppl_analysis,
-        "spectral": spectral,
-        "rmt": rmt,
-        "invariants": invariants,
-        "tier": auto.get("tier", "balanced"),
-        "_ppl_metrics": ppl_metrics,
-        "target_ratio": auto.get("target_pm_ratio"),
-        "guard_overhead": guard_overhead_section,
-        "primary_metric": report.get("metrics", {}).get("primary_metric")
-        if isinstance(report.get("metrics"), dict)
-        else None,
-        "moe": moe_section,
-        "dataset_capacity": {
+    target_ratio_raw = auto.get("target_pm_ratio")
+    target_ratio = (
+        float(target_ratio_raw)
+        if isinstance(target_ratio_raw, int | float)
+        else None
+    )
+
+    validation_flags = report_validation_mod.compute_validation_flags(
+        ppl=ppl_analysis,
+        spectral=spectral,
+        rmt=rmt,
+        invariants=invariants,
+        tier=str(auto.get("tier", "balanced")),
+        _ppl_metrics=ppl_metrics if isinstance(ppl_metrics, dict) else None,
+        target_ratio=target_ratio,
+        guard_overhead=guard_overhead_section,
+        primary_metric=(
+            report_map.get("metrics", {}).get("primary_metric")
+            if isinstance(report_map.get("metrics"), dict)
+            else None
+        ),
+        moe=moe_section,
+        dataset_capacity={
             "tokens_available": capacity_tokens,
             "examples_available": capacity_examples,
         },
-        "pm_acceptance_range": pm_acceptance_range,
-        "pm_drift_band": pm_drift_band,
-        "pm_tail": pm_tail_result,
-        "tiny_relax": tiny_relax,
-    }
-
-    validation_flags = report_validation_mod.compute_validation_flags(
-        **validation_kwargs,
+        pm_acceptance_range=pm_acceptance_range,
+        pm_drift_band=pm_drift_band,
+        pm_tail=pm_tail_result,
+        tiny_relax=tiny_relax,
         pm_drift_band_default=PM_DRIFT_BAND_DEFAULT,
         get_tier_policies_fn=get_tier_policies,
     )
@@ -774,7 +792,7 @@ def make_report(
     if provenance_blocking_issue:
         validation_filtered["primary_metric_acceptable"] = False
 
-    evaluation_report = {
+    evaluation_report: dict[str, Any] = {
         "schema_version": REPORT_SCHEMA_VERSION,
         "run_id": current_run_id,
         "meta": meta,
@@ -803,11 +821,14 @@ def make_report(
     # Record tiny-relax provenance explicitly when active.
     if tiny_relax:
         try:
-            evaluation_report.setdefault("auto", {})["tiny_relax"] = True
+            auto_section = evaluation_report.setdefault("auto", {})
+            if isinstance(auto_section, dict):
+                auto_section["tiny_relax"] = True
             prov = evaluation_report.setdefault("provenance", {})
-            flags = prov.setdefault("flags", [])
-            if "tiny_relax" not in flags:
-                flags.append("tiny_relax")
+            if isinstance(prov, dict):
+                flags = prov.setdefault("flags", [])
+                if isinstance(flags, list) and "tiny_relax" not in flags:
+                    flags.append("tiny_relax")
         except NON_FATAL_EXCEPTIONS:  # pragma: no cover
             _record_blocking_diagnostic(
                 code="provenance.tiny_relax_flag_unavailable",
@@ -817,7 +838,7 @@ def make_report(
     report_enrichment_mod.attach_quality_overhead(
         evaluation_report,
         raw_guard_ctx,
-        report,
+        report_map,
         report_overhead_mod.compute_quality_overhead_from_guard,
     )
 
@@ -833,25 +854,31 @@ def make_report(
         evaluation_report,
         auto,
         resolved_policy,
-        baseline_raw,
+        baseline_raw_map,
         baseline_normalized,
         _compute_thresholds_payload,
         _compute_thresholds_hash,
         POLICY_VERSION,
     )
-    report_enrichment_mod.attach_secondary_metrics(evaluation_report, report)
-    report_enrichment_mod.attach_classification(evaluation_report, report)
+    report_enrichment_mod.attach_secondary_metrics(evaluation_report, report_map)
+    report_enrichment_mod.attach_classification(evaluation_report, report_map)
     report_enrichment_mod.attach_system_overhead(
         evaluation_report,
-        report,
-        baseline_raw,
+        report_map,
+        baseline_raw_map,
         telemetry,
     )
 
     # Attach/normalize primary metric block (moved to helper)
     from .primary_metric_utils import attach_primary_metric as _attach_pm
 
-    _attach_pm(evaluation_report, report, baseline_raw, baseline_ref, ppl_analysis)
+    _attach_pm(
+        evaluation_report,
+        report_map,
+        baseline_raw_map,
+        baseline_ref,
+        ppl_analysis,
+    )
     try:
         if isinstance(pm_drift_band, dict) and pm_drift_band:
             pm_block = evaluation_report.get("primary_metric")
@@ -871,14 +898,14 @@ def make_report(
 
     report_enrichment_mod.ensure_primary_metric_display_ci(evaluation_report)
     report_enrichment_mod.attach_telemetry_summary_line(
-        evaluation_report, report, current_run_id
+        evaluation_report, report_map, current_run_id
     )
     report_enrichment_mod.attach_confidence_label(
         evaluation_report, _compute_confidence_label
     )
     if build_diagnostics:
-        evaluation_report.setdefault("meta", {})["build_diagnostics"] = (
-            build_diagnostics
-        )
+        meta_section = evaluation_report.setdefault("meta", {})
+        if isinstance(meta_section, dict):
+            meta_section["build_diagnostics"] = build_diagnostics
 
     return evaluation_report

@@ -9,6 +9,16 @@ from .report_console import compute_console_validation_block
 _PARSE_EXCEPTIONS = (AttributeError, KeyError, OverflowError, TypeError, ValueError)
 
 
+def _finite_float_or_nan(value: Any) -> float:
+    if not isinstance(value, int | float):
+        return float("nan")
+    try:
+        result = float(value)
+    except _PARSE_EXCEPTIONS:
+        return float("nan")
+    return result if math.isfinite(result) else float("nan")
+
+
 @dataclass(frozen=True)
 class SafetyDashboardRow:
     label: str
@@ -126,16 +136,8 @@ def build_safety_dashboard_summary(
         drift_ok = None
     drift_val = "N/A"
     try:
-        pv = (
-            float(pm.get("preview"))
-            if isinstance(pm.get("preview"), int | float)
-            else float("nan")
-        )
-        fv = (
-            float(pm.get("final"))
-            if isinstance(pm.get("final"), int | float)
-            else float("nan")
-        )
+        pv = _finite_float_or_nan(pm.get("preview"))
+        fv = _finite_float_or_nan(pm.get("final"))
         drift = (
             fv / pv
             if (math.isfinite(pv) and pv > 0 and math.isfinite(fv))
@@ -297,16 +299,8 @@ def build_quality_gates_summary(
         except _PARSE_EXCEPTIONS:
             pass
         try:
-            pv = (
-                float(pm_block.get("preview"))
-                if isinstance(pm_block.get("preview"), int | float)
-                else float("nan")
-            )
-            fv = (
-                float(pm_block.get("final"))
-                if isinstance(pm_block.get("final"), int | float)
-                else float("nan")
-            )
+            pv = _finite_float_or_nan(pm_block.get("preview"))
+            fv = _finite_float_or_nan(pm_block.get("final"))
             drift = (
                 fv / pv
                 if (math.isfinite(pv) and pv > 0 and math.isfinite(fv))

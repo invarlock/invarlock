@@ -20,6 +20,16 @@ _PARSE_EXCEPTIONS = (
 )
 
 
+def _finite_float_or_none(value: Any) -> float | None:
+    if not isinstance(value, int | float):
+        return None
+    try:
+        result = float(value)
+    except _PARSE_EXCEPTIONS:
+        return None
+    return result if math.isfinite(result) else None
+
+
 def _is_ppl_kind(name: Any) -> bool:
     """Return True when the metric kind is a ppl-like metric."""
 
@@ -270,19 +280,20 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
         )
         pm_kind = _normalize_kind(pm.get("kind")) if isinstance(pm, dict) else ""
         pm_is_ppl = _is_ppl_kind(pm_kind)
-        ppl_final = metrics_blk.get("ppl_final")
-        ppl_preview = metrics_blk.get("ppl_preview")
-        if (
-            not (isinstance(ppl_final, int | float) and math.isfinite(float(ppl_final)))
-            and pm_is_ppl
-        ):
+        metrics_ppl_final: float | None = _finite_float_or_none(
+            metrics_blk.get("ppl_final")
+        )
+        metrics_ppl_preview: float | None = _finite_float_or_none(
+            metrics_blk.get("ppl_preview")
+        )
+        if metrics_ppl_final is None and pm_is_ppl:
             try:
                 final_value = pm.get("final")
                 preview_value = pm.get("preview", final_value)
                 if isinstance(final_value, int | float):
-                    ppl_final = float(final_value)
+                    metrics_ppl_final = float(final_value)
                 if isinstance(preview_value, int | float):
-                    ppl_preview = float(preview_value)
+                    metrics_ppl_preview = float(preview_value)
             except _PARSE_EXCEPTIONS:  # pragma: no cover
                 pass
 
@@ -297,17 +308,14 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
             if isinstance(evaluation_windows, dict)
             else {}
         )
-        if ppl_final is None:
-            ppl_final = _derive_ppl_from_logloss_block(final_windows)
-        if ppl_preview is None:
-            ppl_preview = _derive_ppl_from_logloss_block(preview_windows)
-        if ppl_preview is None:
-            ppl_preview = ppl_final
+        if metrics_ppl_final is None:
+            metrics_ppl_final = _derive_ppl_from_logloss_block(final_windows)
+        if metrics_ppl_preview is None:
+            metrics_ppl_preview = _derive_ppl_from_logloss_block(preview_windows)
+        if metrics_ppl_preview is None:
+            metrics_ppl_preview = metrics_ppl_final
 
-        non_ppl_without_ppl_metrics = (
-            not (isinstance(ppl_final, int | float) and math.isfinite(float(ppl_final)))
-            and not pm_is_ppl
-        )
+        non_ppl_without_ppl_metrics = metrics_ppl_final is None and not pm_is_ppl
 
         baseline_eval_windows = {
             "final": {
@@ -358,13 +366,18 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
         if non_ppl_without_ppl_metrics:
             return baseline_out
 
-        ppl_final = _coerce_valid_ppl(ppl_final, label="metrics.ppl_final")
-        ppl_preview = _coerce_valid_ppl(
-            ppl_preview if ppl_preview is not None else ppl_final,
+        normalized_ppl_final = _coerce_valid_ppl(
+            metrics_ppl_final,
+            label="metrics.ppl_final",
+        )
+        normalized_ppl_preview = _coerce_valid_ppl(
+            metrics_ppl_preview
+            if metrics_ppl_preview is not None
+            else normalized_ppl_final,
             label="metrics.ppl_preview",
         )
-        baseline_out["ppl_final"] = ppl_final
-        baseline_out["ppl_preview"] = ppl_preview
+        baseline_out["ppl_final"] = normalized_ppl_final
+        baseline_out["ppl_preview"] = normalized_ppl_preview
         return baseline_out
 
     baseline_out = baseline.copy()
@@ -380,92 +393,78 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
             pm_kind = _normalize_kind(pm_top.get("kind"))
     pm_is_ppl = _is_ppl_kind(pm_kind)
 
-    ppl_final = baseline_out.get("ppl_final")
-    ppl_preview = baseline_out.get("ppl_preview")
+    legacy_ppl_final: float | None = _finite_float_or_none(baseline_out.get("ppl_final"))
+    legacy_ppl_preview: float | None = _finite_float_or_none(
+        baseline_out.get("ppl_preview")
+    )
 
-    if not (isinstance(ppl_final, int | float) and math.isfinite(float(ppl_final))):
+    if legacy_ppl_final is None:
         if isinstance(metrics_blk, dict):
             direct_final = metrics_blk.get("ppl_final")
             direct_preview = metrics_blk.get("ppl_preview", direct_final)
             if isinstance(direct_final, int | float) and math.isfinite(
                 float(direct_final)
             ):
-                ppl_final = float(direct_final)
+                legacy_ppl_final = float(direct_final)
             if isinstance(direct_preview, int | float) and math.isfinite(
                 float(direct_preview)
             ):
-                ppl_preview = float(direct_preview)
-            if (
-                not (
-                    isinstance(ppl_final, int | float)
-                    and math.isfinite(float(ppl_final))
-                )
-                and pm_is_ppl
-            ):
+                legacy_ppl_preview = float(direct_preview)
+            if legacy_ppl_final is None and pm_is_ppl:
                 pm = metrics_blk.get("primary_metric", {})
                 if isinstance(pm, dict):
                     final_value = pm.get("final")
                     preview_value = pm.get("preview", final_value)
                     if isinstance(final_value, int | float):
-                        ppl_final = float(final_value)
+                        legacy_ppl_final = float(final_value)
                     if isinstance(preview_value, int | float):
-                        ppl_preview = float(preview_value)
-        if (
-            not (isinstance(ppl_final, int | float) and math.isfinite(float(ppl_final)))
-            and pm_is_ppl
-        ):
+                        legacy_ppl_preview = float(preview_value)
+        if legacy_ppl_final is None and pm_is_ppl:
             pm_top = baseline_out.get("primary_metric", {})
             if isinstance(pm_top, dict):
                 final_value = pm_top.get("final")
                 preview_value = pm_top.get("preview", final_value)
                 if isinstance(final_value, int | float):
-                    ppl_final = float(final_value)
+                    legacy_ppl_final = float(final_value)
                 if isinstance(preview_value, int | float):
-                    ppl_preview = float(preview_value)
-        if not (isinstance(ppl_final, int | float) and math.isfinite(float(ppl_final))):
+                    legacy_ppl_preview = float(preview_value)
+        if legacy_ppl_final is None:
             evaluation_windows = baseline_out.get("evaluation_windows")
             if isinstance(evaluation_windows, dict):
-                ppl_final = _derive_ppl_from_logloss_block(
+                legacy_ppl_final = _derive_ppl_from_logloss_block(
                     evaluation_windows.get("final")
                 )
-                if ppl_preview is None:
-                    ppl_preview = _derive_ppl_from_logloss_block(
+                if legacy_ppl_preview is None:
+                    legacy_ppl_preview = _derive_ppl_from_logloss_block(
                         evaluation_windows.get("preview")
                     )
 
-    if (
-        not (isinstance(ppl_final, int | float) and math.isfinite(float(ppl_final)))
-        and not pm_is_ppl
-    ):
+    if legacy_ppl_final is None and not pm_is_ppl:
         if "ppl_final" in baseline_out:
-            try:
-                ppl_final_float = float(baseline_out.get("ppl_final"))
-            except _PARSE_EXCEPTIONS:
+            ppl_final_float = _finite_float_or_none(baseline_out.get("ppl_final"))
+            if ppl_final_float is None:
                 baseline_out.pop("ppl_final", None)
-            else:
-                if not math.isfinite(ppl_final_float) or ppl_final_float <= 0.0:
-                    baseline_out.pop("ppl_final", None)
+            elif ppl_final_float <= 0.0:
+                baseline_out.pop("ppl_final", None)
         if "ppl_preview" in baseline_out:
-            try:
-                ppl_preview_float = float(baseline_out.get("ppl_preview"))
-            except _PARSE_EXCEPTIONS:
+            ppl_preview_float = _finite_float_or_none(baseline_out.get("ppl_preview"))
+            if ppl_preview_float is None:
                 baseline_out.pop("ppl_preview", None)
-            else:
-                if not math.isfinite(ppl_preview_float) or ppl_preview_float <= 0.0:
-                    baseline_out.pop("ppl_preview", None)
+            elif ppl_preview_float <= 0.0:
+                baseline_out.pop("ppl_preview", None)
         return baseline_out
 
-    ppl_final = _coerce_valid_ppl(ppl_final, label="ppl_final")
-    if ppl_preview is None:
-        ppl_preview = ppl_final
+    legacy_ppl_final = _coerce_valid_ppl(legacy_ppl_final, label="ppl_final")
+    if legacy_ppl_preview is None:
+        legacy_ppl_preview = legacy_ppl_final
     else:
-        ppl_preview = _coerce_valid_ppl(ppl_preview, label="ppl_preview")
+        legacy_ppl_preview = _coerce_valid_ppl(legacy_ppl_preview, label="ppl_preview")
 
-    baseline_out["ppl_final"] = ppl_final
+    baseline_out["ppl_final"] = legacy_ppl_final
     if "ppl_preview" in baseline_out or not math.isclose(
-        float(ppl_preview), float(ppl_final), rel_tol=0.0, abs_tol=0.0
+        float(legacy_ppl_preview), float(legacy_ppl_final), rel_tol=0.0, abs_tol=0.0
     ):
-        baseline_out["ppl_preview"] = ppl_preview
+        baseline_out["ppl_preview"] = legacy_ppl_preview
     return baseline_out
 
 

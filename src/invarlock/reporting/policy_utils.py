@@ -21,6 +21,15 @@ _NON_FATAL_EXCEPTIONS = (
 )
 
 
+def _float_or_none(value: Any) -> float | None:
+    if not isinstance(value, int | float):
+        return None
+    try:
+        return float(value)
+    except _NON_FATAL_EXCEPTIONS:
+        return None
+
+
 def _compute_variance_policy_digest(policy: dict[str, Any]) -> str:
     """Compute a stable digest for the variance guard policy knobs."""
     canonical_keys = [
@@ -109,17 +118,9 @@ def _compute_thresholds_payload(
             "mode": str(pm_tail_policy.get("mode", "warn") or "warn").strip().lower(),
             "min_windows": int(pm_tail_policy.get("min_windows", 0) or 0),
             "quantile": _safe_float_any(pm_tail_policy.get("quantile", 0.95), 0.95),
-            "quantile_max": (
-                float(pm_tail_policy.get("quantile_max"))
-                if isinstance(pm_tail_policy.get("quantile_max"), int | float)
-                else None
-            ),
+            "quantile_max": _float_or_none(pm_tail_policy.get("quantile_max")),
             "epsilon": _safe_float_any(pm_tail_policy.get("epsilon", 0.0), 0.0),
-            "mass_max": (
-                float(pm_tail_policy.get("mass_max"))
-                if isinstance(pm_tail_policy.get("mass_max"), int | float)
-                else None
-            ),
+            "mass_max": _float_or_none(pm_tail_policy.get("mass_max")),
         },
         "accuracy": {
             "delta_min_pp": float(acc_policy.get("delta_min_pp", -1.0) or -1.0),
@@ -418,16 +419,16 @@ def _build_resolved_policies(
             confidence_out: dict[str, float] = {}
             if "ppl_ratio_width_max" in conf:
                 try:
-                    confidence_out["ppl_ratio_width_max"] = float(
-                        conf.get("ppl_ratio_width_max")
-                    )
+                    value = _float_or_none(conf.get("ppl_ratio_width_max"))
+                    if value is not None:
+                        confidence_out["ppl_ratio_width_max"] = value
                 except _NON_FATAL_EXCEPTIONS:
                     pass
             if "accuracy_delta_pp_width_max" in conf:
                 try:
-                    confidence_out["accuracy_delta_pp_width_max"] = float(
-                        conf.get("accuracy_delta_pp_width_max")
-                    )
+                    value = _float_or_none(conf.get("accuracy_delta_pp_width_max"))
+                    if value is not None:
+                        confidence_out["accuracy_delta_pp_width_max"] = value
                 except _NON_FATAL_EXCEPTIONS:
                     pass
             resolved["confidence"] = confidence_out
@@ -443,12 +444,16 @@ def _extract_effective_policies(report: RunReport) -> dict[str, Any]:
 
     guard_entries = report.get("guards", [])
     for guard in guard_entries:
-        if not isinstance(guard, dict):
-            continue
-        guard_name = guard.get("name", "").lower()
-        guard_policy = guard.get("policy", {})
-        original_policy = dict(guard_policy) if isinstance(guard_policy, dict) else {}
-        guard_metrics = guard.get("metrics", {})
+        guard_name = str(guard.get("name", "")).lower()
+        raw_guard_policy = guard.get("policy", {})
+        guard_policy: dict[str, Any] = (
+            dict(raw_guard_policy) if isinstance(raw_guard_policy, dict) else {}
+        )
+        original_policy = dict(guard_policy)
+        raw_guard_metrics = guard.get("metrics", {})
+        guard_metrics: dict[str, Any] = (
+            dict(raw_guard_metrics) if isinstance(raw_guard_metrics, dict) else {}
+        )
 
         if not guard_policy and guard_metrics:
             if guard_name == "rmt":
@@ -494,10 +499,12 @@ def _extract_effective_policies(report: RunReport) -> dict[str, Any]:
         if guard_policy:
             if guard_name == "spectral":
                 sanitized_policy = dict(guard_policy)
-                sigma_quantile = sanitized_policy.get("sigma_quantile")
-                if sigma_quantile is not None:
+                sanitized_sigma_quantile = sanitized_policy.get("sigma_quantile")
+                if sanitized_sigma_quantile is not None:
                     try:
-                        sanitized_policy["sigma_quantile"] = float(sigma_quantile)
+                        sanitized_policy["sigma_quantile"] = float(
+                            sanitized_sigma_quantile
+                        )
                     except (TypeError, ValueError):
                         pass
                 if sanitized_policy.get("max_spectral_norm") in (None, 0):

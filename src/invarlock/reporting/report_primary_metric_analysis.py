@@ -296,20 +296,28 @@ def build_primary_metric_analysis(
             except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
                 ratio_ci_source = "run_metrics"
 
-    def _finite_bounds(bounds: tuple[float, float]) -> bool:
-        return (
-            isinstance(bounds, tuple | list)
-            and len(bounds) == 2
-            and all(isinstance(v, int | float) and math.isfinite(v) for v in bounds)
-        )
+    def _coerce_bounds(bounds: Any) -> tuple[float, float] | None:
+        if not isinstance(bounds, tuple | list) or len(bounds) != 2:
+            return None
+        lower, upper = bounds
+        if not (
+            isinstance(lower, int | float)
+            and isinstance(upper, int | float)
+            and math.isfinite(lower)
+            and math.isfinite(upper)
+        ):
+            return None
+        return float(lower), float(upper)
 
     drift_ci = (float("nan"), float("nan"))
-    if _finite_bounds(preview_ci) and _finite_bounds(final_ci):
-        lower_preview = max(preview_ci[0], 1e-12)
-        upper_preview = max(preview_ci[1], 1e-12)
+    preview_bounds = _coerce_bounds(preview_ci)
+    final_bounds = _coerce_bounds(final_ci)
+    if preview_bounds is not None and final_bounds is not None:
+        lower_preview = max(preview_bounds[0], 1e-12)
+        upper_preview = max(preview_bounds[1], 1e-12)
         drift_ci = (
-            final_ci[0] / upper_preview if upper_preview > 0 else float("nan"),
-            final_ci[1] / max(lower_preview, 1e-12),
+            final_bounds[0] / upper_preview if upper_preview > 0 else float("nan"),
+            final_bounds[1] / max(lower_preview, 1e-12),
         )
 
     def _is_number(value: Any) -> bool:
@@ -326,9 +334,17 @@ def build_primary_metric_analysis(
     )
 
     ratio_from_delta = None
-    if _is_number(delta_mean) and not degenerate_delta:
+    delta_mean_float = (
+        float(delta_mean)
+        if isinstance(delta_mean, int | float) and math.isfinite(float(delta_mean))
+        else None
+    )
+    if delta_mean_float is not None and not degenerate_delta:
         ratio_from_delta = enforce_drift_ratio_identity(
-            paired_windows, float(delta_mean), drift_ratio, window_plan_profile
+            paired_windows,
+            delta_mean_float,
+            drift_ratio,
+            window_plan_profile,
         )
 
     if (
@@ -452,19 +468,22 @@ def build_primary_metric_analysis(
         },
     }
 
-    metrics_stats_source = {}
+    metrics_stats_source: dict[str, Any] = {}
     if isinstance(report.get("metrics"), dict):
-        metrics_stats_source = report["metrics"].get("stats", {}) or {}
-    if isinstance(metrics_stats_source, dict):
-        for key in (
+        raw_metrics_stats = report["metrics"].get("stats", {}) or {}
+        if isinstance(raw_metrics_stats, dict):
+            metrics_stats_source = raw_metrics_stats
+    stats_section = ppl_analysis.get("stats")
+    if isinstance(metrics_stats_source, dict) and isinstance(stats_section, dict):
+        for stats_key in (
             "requested_preview",
             "requested_final",
             "actual_preview",
             "actual_final",
             "coverage_ok",
         ):
-            if key in metrics_stats_source:
-                ppl_analysis["stats"][key] = metrics_stats_source[key]
+            if stats_key in metrics_stats_source:
+                stats_section[stats_key] = metrics_stats_source[stats_key]
 
     try:
         stats_obj = ppl_analysis.get("stats", {})
@@ -579,8 +598,9 @@ def build_primary_metric_analysis(
     except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
         auto_tier = "balanced"
 
+    stats_payload = ppl_analysis.get("stats", {})
     enforce_pairing_and_coverage(
-        ppl_analysis.get("stats", {}),
+        stats_payload if isinstance(stats_payload, dict) else {},
         window_plan_profile,
         auto_tier,
     )

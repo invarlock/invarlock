@@ -12,6 +12,19 @@ from .report_types import RunReport
 _PARSE_EXCEPTIONS = (AttributeError, KeyError, OverflowError, TypeError, ValueError)
 
 
+def _as_dict(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _to_float_or_none(value: Any) -> float | None:
+    if value in (None, "", 0, 0.0):
+        return None
+    try:
+        return float(value)
+    except _PARSE_EXCEPTIONS:
+        return None
+
+
 def _extract_spectral_analysis(
     report: RunReport, baseline: dict[str, Any]
 ) -> dict[str, Any]:
@@ -24,14 +37,15 @@ def _extract_spectral_analysis(
     default_caps = spectral_defaults.get("family_caps", {})
     default_max_caps = spectral_defaults.get("max_caps", 5)
 
-    spectral_guard = None
+    spectral_guard: dict[str, Any] | None = None
     for guard in report.get("guards", []) or []:
-        if str(guard.get("name", "")).lower() == "spectral":
-            spectral_guard = guard
+        guard_entry = _as_dict(guard)
+        if str(guard_entry.get("name", "")).lower() == "spectral":
+            spectral_guard = guard_entry
             break
 
-    guard_policy = spectral_guard.get("policy", {}) if spectral_guard else {}
-    guard_metrics = spectral_guard.get("metrics", {}) if spectral_guard else {}
+    guard_policy = _as_dict(spectral_guard.get("policy") if spectral_guard else {})
+    guard_metrics = _as_dict(spectral_guard.get("metrics") if spectral_guard else {})
     if guard_metrics:
         raw = (
             guard_metrics.get("violations_detected")
@@ -79,8 +93,8 @@ def _extract_spectral_analysis(
 
     baseline_max = None
     baseline_mean = None
-    baseline_spectral = _baseline_guard_payload(baseline, "spectral")
-    if isinstance(baseline_spectral, dict) and baseline_spectral:
+    baseline_spectral = _as_dict(_baseline_guard_payload(baseline, "spectral"))
+    if baseline_spectral:
         baseline_max = baseline_spectral.get(
             "max_spectral_norm", baseline_spectral.get("max_spectral_norm_final")
         )
@@ -98,16 +112,16 @@ def _extract_spectral_analysis(
                 baseline_mean = baseline_spectral_metrics.get(
                     "mean_spectral_norm_final"
                 )
-    guard_baseline_metrics = None
-    if spectral_guard and isinstance(spectral_guard.get("baseline_metrics"), dict):
-        guard_baseline_metrics = spectral_guard.get("baseline_metrics")
+    guard_baseline_metrics: dict[str, Any] | None = None
+    if spectral_guard:
+        baseline_metrics = spectral_guard.get("baseline_metrics")
+        if isinstance(baseline_metrics, dict):
+            guard_baseline_metrics = baseline_metrics
     if baseline_max is None and guard_baseline_metrics:
         baseline_max = guard_baseline_metrics.get("max_spectral_norm")
         baseline_mean = guard_baseline_metrics.get("mean_spectral_norm")
-    baseline_max = float(baseline_max) if baseline_max not in (None, 0, 0.0) else None
-    baseline_mean = (
-        float(baseline_mean) if baseline_mean not in (None, 0, 0.0) else None
-    )
+    baseline_max = _to_float_or_none(baseline_max)
+    baseline_mean = _to_float_or_none(baseline_mean)
 
     max_sigma_ratio = (
         max_spectral_norm / baseline_max if baseline_max and baseline_max > 0 else 1.0
@@ -219,30 +233,20 @@ def _extract_spectral_analysis(
         if deadband_used is not None:
             summary["deadband"] = deadband_used
         try:
-            summary["stability_score"] = float(
+            stability_score = _to_float_or_none(
                 guard_metrics.get(
                     "spectral_stability_score",
                     guard_metrics.get("stability_score", 1.0),
                 )
             )
+            if stability_score is not None:
+                summary["stability_score"] = stability_score
         except _PARSE_EXCEPTIONS:
             pass
-        family_quantiles = (
-            guard_metrics.get("family_z_quantiles")
-            if isinstance(guard_metrics.get("family_z_quantiles"), dict)
-            else {}
-        )
+        family_quantiles = _as_dict(guard_metrics.get("family_z_quantiles"))
         if not family_quantiles:
-            family_quantiles = (
-                guard_metrics.get("family_z_summary")
-                if isinstance(guard_metrics.get("family_z_summary"), dict)
-                else {}
-            )
-        families = (
-            guard_metrics.get("families")
-            if isinstance(guard_metrics.get("families"), dict)
-            else {}
-        )
+            family_quantiles = _as_dict(guard_metrics.get("family_z_summary"))
+        families = _as_dict(guard_metrics.get("families"))
         if not families:
             fzs = guard_metrics.get("family_z_summary")
             if not isinstance(fzs, dict) or not fzs:
@@ -285,41 +289,32 @@ def _extract_spectral_analysis(
                         pass
                     if entry:
                         families[str(fam)] = entry
-        family_caps = (
-            guard_metrics.get("family_caps")
-            if isinstance(guard_metrics.get("family_caps"), dict)
-            else {}
-        )
+        family_caps = _as_dict(guard_metrics.get("family_caps"))
         if not family_caps and isinstance(guard_policy, dict):
             fam_caps_pol = guard_policy.get("family_caps")
             if isinstance(fam_caps_pol, dict):
                 family_caps = fam_caps_pol
         if not family_caps and isinstance(default_caps, dict):
             family_caps = default_caps
-        raw_top = (
-            guard_metrics.get("top_z_scores")
-            if isinstance(guard_metrics.get("top_z_scores"), dict)
-            else {}
-        )
+        raw_top: dict[str, Any] = _as_dict(guard_metrics.get("top_z_scores"))
         top_z_scores = {}
-        if isinstance(raw_top, dict):
-            for fam, entries in raw_top.items():
-                if not isinstance(entries, list):
+        for fam, entries in raw_top.items():
+            if not isinstance(entries, list):
+                continue
+            cleaned: list[dict[str, Any]] = []
+            for entry_raw in entries:
+                entry = _as_dict(entry_raw)
+                if not entry:
                     continue
-                cleaned: list[dict[str, Any]] = []
-                for entry in entries:
-                    if not isinstance(entry, dict):
-                        continue
-                    mod = entry.get("module")
-                    z = entry.get("z")
-                    try:
-                        zf = float(z)
-                    except _PARSE_EXCEPTIONS:
-                        continue
-                    cleaned.append({"module": mod, "z": zf})
-                if cleaned:
-                    cleaned.sort(key=lambda d: abs(d.get("z", 0.0)), reverse=True)
-                    top_z_scores[str(fam)] = cleaned[:3]
+                mod = entry.get("module")
+                z = entry.get("z")
+                zf = _to_float_or_none(z)
+                if zf is None:
+                    continue
+                cleaned.append({"module": mod, "z": zf})
+            if cleaned:
+                cleaned.sort(key=lambda d: abs(d.get("z", 0.0)), reverse=True)
+                top_z_scores[str(fam)] = cleaned[:3]
 
     if spectral_guard:
         z_map_candidate = spectral_guard.get("final_z_scores") or guard_metrics.get(
@@ -441,10 +436,9 @@ def _extract_spectral_analysis(
                 "severity": violation.get("severity", "warn"),
             }
             z_score = violation.get("z_score")
-            try:
-                entry["z_score"] = float(z_score)
-            except _PARSE_EXCEPTIONS:
-                pass
+            z_score_value = _to_float_or_none(z_score)
+            if z_score_value is not None:
+                entry["z_score"] = z_score_value
             top_violations.append(entry)
         if top_violations:
             result["top_violations"] = top_violations
@@ -452,28 +446,8 @@ def _extract_spectral_analysis(
         result["family_z_quantiles"] = family_quantiles
     result["evaluated"] = bool(spectral_guard)
 
-    measurement_contract = None
-    try:
-        mc = (
-            guard_metrics.get("measurement_contract")
-            if isinstance(guard_metrics, dict)
-            else None
-        )
-        if isinstance(mc, dict) and mc:
-            measurement_contract = mc
-    except _PARSE_EXCEPTIONS:
-        measurement_contract = None
-    baseline_contract = None
-    try:
-        bc = (
-            baseline_spectral.get("measurement_contract")
-            if isinstance(baseline_spectral, dict)
-            else None
-        )
-        if isinstance(bc, dict) and bc:
-            baseline_contract = bc
-    except _PARSE_EXCEPTIONS:
-        baseline_contract = None
+    measurement_contract = _as_dict(guard_metrics.get("measurement_contract")) or None
+    baseline_contract = _as_dict(baseline_spectral.get("measurement_contract")) or None
     mc_hash = _measurement_contract_digest(measurement_contract)
     baseline_hash = _measurement_contract_digest(baseline_contract)
     if measurement_contract is not None:

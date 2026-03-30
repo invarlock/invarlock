@@ -12,23 +12,25 @@ def _extract_variance_analysis(report: RunReport) -> dict[str, Any]:
     gain = None
     ppl_no_ve = None
     ppl_with_ve = None
-    ratio_ci = None
-    calibration = {}
+    ratio_ci: Any = None
+    calibration: dict[str, Any] = {}
     guard_metrics: dict[str, Any] = {}
     guard_policy: dict[str, Any] | None = None
     for guard in report.get("guards", []) or []:
         if "variance" in str(guard.get("name", "")).lower():
             metrics = guard.get("metrics", {}) or {}
-            guard_metrics = metrics
+            guard_metrics = metrics if isinstance(metrics, dict) else {}
             gp = guard.get("policy", {}) or {}
             if isinstance(gp, dict) and gp:
                 guard_policy = dict(gp)
-            ve_enabled = metrics.get("ve_enabled", bool(metrics))
-            gain = metrics.get("ab_gain", metrics.get("gain", None))
-            ppl_no_ve = metrics.get("ppl_no_ve", None)
-            ppl_with_ve = metrics.get("ppl_with_ve", None)
-            ratio_ci = metrics.get("ratio_ci", ratio_ci)
-            calibration = metrics.get("calibration", calibration)
+            ve_enabled = bool(guard_metrics.get("ve_enabled", bool(guard_metrics)))
+            gain = guard_metrics.get("ab_gain", guard_metrics.get("gain", None))
+            ppl_no_ve = guard_metrics.get("ppl_no_ve", None)
+            ppl_with_ve = guard_metrics.get("ppl_with_ve", None)
+            ratio_ci = guard_metrics.get("ratio_ci", ratio_ci)
+            calibration_candidate = guard_metrics.get("calibration", calibration)
+            if isinstance(calibration_candidate, dict):
+                calibration = calibration_candidate
             break
     if gain is None:
         metrics_variance = (report.get("metrics", {}) or {}).get("variance", {})
@@ -39,8 +41,8 @@ def _extract_variance_analysis(report: RunReport) -> dict[str, Any]:
             ppl_with_ve = metrics_variance.get("ppl_with_ve", ppl_with_ve)
             if not guard_metrics:
                 guard_metrics = metrics_variance
-    result = {"enabled": ve_enabled, "gain": gain}
-    if ratio_ci:
+    result: dict[str, Any] = {"enabled": ve_enabled, "gain": gain}
+    if isinstance(ratio_ci, tuple | list) and len(ratio_ci) == 2:
         try:
             result["ratio_ci"] = (float(ratio_ci[0]), float(ratio_ci[1]))
         except _PARSE_EXCEPTIONS:

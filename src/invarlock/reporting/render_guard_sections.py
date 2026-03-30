@@ -348,11 +348,15 @@ def append_guard_observability_sections(
             lines.append("</details>")
             lines.append("")
 
-    rmt_info = evaluation_report.get("rmt", {}) or {}
+    rmt_info_raw = evaluation_report.get("rmt", {}) or {}
+    rmt_info: dict[str, Any] = rmt_info_raw if isinstance(rmt_info_raw, dict) else {}
     if rmt_info:
         lines.append("### RMT Guard")
         lines.append("")
-        families = rmt_info.get("families") or {}
+        raw_rmt_families = rmt_info.get("families")
+        rmt_families: dict[str, Any] = (
+            raw_rmt_families if isinstance(raw_rmt_families, dict) else {}
+        )
         stable = bool(rmt_info.get("stable", True))
         status = "✅ OK" if stable else "❌ FAIL"
         mode = rmt_info.get("mode")
@@ -381,11 +385,11 @@ def append_guard_observability_sections(
         if isinstance(delta_total, int):
             lines.append(f"- Δ total: {delta_total:+d}")
         lines.append(f"- Status: {status}")
-        lines.append(f"- Families: {len(families)}")
-        if families:
+        lines.append(f"- Families: {len(rmt_families)}")
+        if rmt_families:
             edge_risk_mode = any(
                 isinstance(data, dict) and ("edge_base" in data or "edge_cur" in data)
-                for data in families.values()
+                for data in rmt_families.values()
             )
             lines.append("")
             lines.append("<details>")
@@ -397,7 +401,7 @@ def append_guard_observability_sections(
             else:
                 lines.append("| Family | ε_f | Bare | Guarded | Δ |")
                 lines.append("|--------|-----|------|---------|---|")
-            for family, data in families.items():
+            for family, data in rmt_families.items():
                 epsilon_val = data.get("epsilon")
                 epsilon_str = (
                     f"{epsilon_val:.3f}"

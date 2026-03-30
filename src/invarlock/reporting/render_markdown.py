@@ -136,31 +136,13 @@ def _append_system_overhead_section(lines: list[str], sys_over: dict[str, Any]) 
         b_raw = ent.get("baseline")
         e_raw = ent.get("edited")
         # If both baseline and edited are missing or zero, present N/A to avoid implying measured zeros
-        try:
+        if isinstance(b_raw, int | float):
             b_val = float(b_raw)
-        except (
-            AttributeError,
-            ImportError,
-            KeyError,
-            OSError,
-            OverflowError,
-            RuntimeError,
-            TypeError,
-            ValueError,
-        ):
+        else:
             b_val = float("nan")
-        try:
+        if isinstance(e_raw, int | float):
             e_val = float(e_raw)
-        except (
-            AttributeError,
-            ImportError,
-            KeyError,
-            OSError,
-            OverflowError,
-            RuntimeError,
-            TypeError,
-            ValueError,
-        ):
+        else:
             e_val = float("nan")
         if (not math.isfinite(b_val) or b_val == 0.0) and (
             not math.isfinite(e_val) or e_val == 0.0

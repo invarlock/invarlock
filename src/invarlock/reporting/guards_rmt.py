@@ -12,6 +12,15 @@ from .report_types import RunReport
 _PARSE_EXCEPTIONS = (AttributeError, KeyError, OverflowError, TypeError, ValueError)
 
 
+def _to_float_or_none(value: Any) -> float | None:
+    if not isinstance(value, int | float):
+        return None
+    try:
+        return float(value)
+    except _PARSE_EXCEPTIONS:
+        return None
+
+
 def _extract_rmt_analysis(
     report: RunReport, baseline: dict[str, Any]
 ) -> dict[str, Any]:
@@ -71,15 +80,13 @@ def _extract_rmt_analysis(
     policy_out: dict[str, Any] | None = None
     if isinstance(guard_policy, dict) and guard_policy:
         policy_out = dict(guard_policy)
-        if isinstance(policy_out.get("epsilon_default"), int | float) and math.isfinite(
-            float(policy_out.get("epsilon_default"))
-        ):
-            epsilon_default = float(policy_out.get("epsilon_default"))
+        epsilon_default_value = _to_float_or_none(policy_out.get("epsilon_default"))
+        if epsilon_default_value is not None and math.isfinite(epsilon_default_value):
+            epsilon_default = epsilon_default_value
 
-    if isinstance(guard_metrics.get("epsilon_default"), int | float) and math.isfinite(
-        float(guard_metrics.get("epsilon_default"))
-    ):
-        epsilon_default = float(guard_metrics.get("epsilon_default"))
+    metric_epsilon_default = _to_float_or_none(guard_metrics.get("epsilon_default"))
+    if metric_epsilon_default is not None and math.isfinite(metric_epsilon_default):
+        epsilon_default = metric_epsilon_default
 
     edge_base: dict[str, float] = {}
     edge_cur: dict[str, float] = {}
@@ -115,21 +122,23 @@ def _extract_rmt_analysis(
             cur = float(edge_cur.get(family, 0.0) or 0.0)
             if base <= 0.0:
                 continue
-            eps = float(
+            eps_value = _to_float_or_none(
                 epsilon_map.get(
-                    family, default_epsilon_map.get(family, epsilon_default)
+                    family,
+                    default_epsilon_map.get(family, epsilon_default),
                 )
             )
-            allowed = (1.0 + eps) * base
-            if cur > allowed:
-                delta = (cur / base) - 1.0
+            eps = epsilon_default if eps_value is None else eps_value
+            threshold = (1.0 + eps) * base
+            if cur > threshold:
+                delta_ratio = (cur / base) - 1.0
                 epsilon_violations.append(
                     {
                         "family": family,
                         "edge_base": base,
                         "edge_cur": cur,
-                        "delta": float(delta),
-                        "allowed": allowed,
+                        "delta": float(delta_ratio),
+                        "allowed": threshold,
                         "epsilon": eps,
                     }
                 )
@@ -145,12 +154,13 @@ def _extract_rmt_analysis(
     for family in families_all:
         base = float(edge_base.get(family, 0.0) or 0.0)
         cur = float(edge_cur.get(family, 0.0) or 0.0)
-        eps = float(
+        eps_value = _to_float_or_none(
             epsilon_map.get(family, default_epsilon_map.get(family, epsilon_default))
         )
-        allowed = (1.0 + eps) * base if base > 0.0 else None
-        ratio = (cur / base) if base > 0.0 else None
-        delta = ((cur / base) - 1.0) if base > 0.0 else None
+        eps = epsilon_default if eps_value is None else eps_value
+        allowed: float | None = (1.0 + eps) * base if base > 0.0 else None
+        ratio: float | None = (cur / base) if base > 0.0 else None
+        delta: float | None = ((cur / base) - 1.0) if base > 0.0 else None
         if isinstance(ratio, float) and math.isfinite(ratio):
             ratios.append(ratio)
         if isinstance(delta, float) and math.isfinite(delta):

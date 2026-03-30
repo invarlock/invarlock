@@ -56,11 +56,12 @@ def extract_telemetry(report: RunReport, device_name: Any) -> dict[str, Any]:
 
 
 def build_artifacts_payload(report: RunReport) -> dict[str, Any]:
-    report_artifacts = (
-        report.get("artifacts", {}) if isinstance(report.get("artifacts"), dict) else {}
-    )
-    artifacts_payload = {
+    raw_artifacts = report.get("artifacts", {})
+    report_artifacts = dict(raw_artifacts) if isinstance(raw_artifacts, dict) else {}
+    artifacts_payload: dict[str, Any] = {
         "events_path": report_artifacts.get("events_path", ""),
+        "logs_path": report_artifacts.get("logs_path", ""),
+        "checkpoint_path": report_artifacts.get("checkpoint_path", ""),
         "report_path": report_artifacts.get(
             "report_path", report_artifacts.get("logs_path", "")
         ),

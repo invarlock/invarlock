@@ -130,17 +130,27 @@ def extract_compression_diagnostics(
     edit_config: dict[str, Any],
     deltas: dict[str, Any],
     structure: dict[str, Any],
-    inference_record: dict[str, Any],
+    inference_record: dict[str, Any] | None,
 ) -> dict[str, Any]:
     """Extract comprehensive compression diagnostics."""
-    diagnostics = {}
-
-    if inference_record is None:
-        inference_record = {
-            "flags": dict.fromkeys(("scope", "seed", "rank_policy", "frac"), False),
-            "sources": {},
-            "log": [],
-        }
+    diagnostics: dict[str, Any] = {}
+    if not isinstance(inference_record, dict):
+        inference_record = {}
+    flags = inference_record.setdefault(
+        "flags",
+        dict.fromkeys(("scope", "seed", "rank_policy", "frac"), False),
+    )
+    sources = inference_record.setdefault("sources", {})
+    log_entries = inference_record.setdefault("log", [])
+    if not isinstance(flags, dict):
+        flags = {}
+        inference_record["flags"] = flags
+    if not isinstance(sources, dict):
+        sources = {}
+        inference_record["sources"] = sources
+    if not isinstance(log_entries, list):
+        log_entries = []
+        inference_record["log"] = log_entries
 
     def mark(field: str, value: Any, source: str) -> bool:
         if value in (None, "unknown"):
@@ -149,23 +159,21 @@ def extract_compression_diagnostics(
         if current not in (None, "unknown"):
             return False
         edit_config[field] = value
-        if not inference_record["flags"].get(field):
-            inference_record["flags"][field] = True
-            inference_record.setdefault("sources", {})[field] = source
-            inference_record.setdefault("log", []).append(
-                f"{field} inferred from {source}: {value}"
-            )
+        if not bool(flags.get(field)):
+            flags[field] = True
+            sources[field] = source
+            log_entries.append(f"{field} inferred from {source}: {value}")
         return True
 
-    params_changed = deltas.get("params_changed", 0)
+    params_changed = _coerce_int(deltas.get("params_changed")) or 0
     diagnostics["execution_status"] = (
         "successful" if params_changed > 0 else "no_modifications"
     )
 
-    bitwidth_map = deltas.get("bitwidth_map", {})
+    bitwidth_map = _get_mapping(deltas, "bitwidth_map")
     num_quantized_modules = len(bitwidth_map) if bitwidth_map else 0
 
-    diagnostics["target_analysis"] = {
+    target_analysis: dict[str, Any] = {
         "modules_found": num_quantized_modules
         if bitwidth_map
         else deltas.get("layers_modified", 0),
@@ -177,31 +185,32 @@ def extract_compression_diagnostics(
         else deltas.get("layers_modified", 0),
         "scope": edit_config.get("scope", "unknown"),
     }
+    diagnostics["target_analysis"] = target_analysis
     existing_scope = edit_config.get("scope")
     if existing_scope not in (None, "unknown"):
-        diagnostics["target_analysis"]["scope"] = existing_scope
+        target_analysis["scope"] = existing_scope
     else:
         module_iter: Iterable[str]
         source_label = "modules"
         if isinstance(bitwidth_map, dict) and bitwidth_map:
             module_iter = bitwidth_map.keys()
             source_label = "bitwidth_map"
-        elif isinstance(deltas.get("rank_map"), dict) and deltas["rank_map"]:
-            module_iter = deltas["rank_map"].keys()
-            source_label = "rank_map"
         else:
-            module_iter = []
+            rank_map = _get_mapping(deltas, "rank_map")
+            if rank_map:
+                module_iter = rank_map.keys()
+                source_label = "rank_map"
+            else:
+                module_iter = []
         inferred_scope = _infer_scope_from_modules(module_iter)
         if inferred_scope != "unknown" and mark("scope", inferred_scope, source_label):
-            diagnostics["target_analysis"]["scope"] = inferred_scope
-    diagnostics["target_analysis"]["scope"] = edit_config.get(
-        "scope", diagnostics["target_analysis"].get("scope", "unknown")
-    )
+            target_analysis["scope"] = inferred_scope
+    target_analysis["scope"] = edit_config.get("scope", target_analysis.get("scope", "unknown"))
 
-    param_analysis = {}
+    param_analysis: dict[str, Any] = {}
 
-    if deltas.get("rank_map"):
-        rank_map = deltas["rank_map"]
+    rank_map = _get_mapping(deltas, "rank_map")
+    if rank_map:
         modules_modified = [
             name for name, info in rank_map.items() if not info.get("skipped", False)
         ]
@@ -212,7 +221,7 @@ def extract_compression_diagnostics(
                 name for name, info in rank_map.items() if info.get("skipped", False)
             ],
         }
-        diagnostics["target_analysis"]["modules_modified"] = len(modules_modified)
+        target_analysis["modules_modified"] = len(modules_modified)
         if modules_modified:
             diagnostics["execution_status"] = (
                 "partial"
@@ -268,7 +277,7 @@ def extract_compression_diagnostics(
 
     diagnostics["parameter_analysis"] = param_analysis
 
-    algo_details = {}
+    algo_details: dict[str, Any] = {}
     algo_details["scope_targeting"] = edit_config.get("scope", "unknown")
     algo_details["seed"] = edit_config.get("seed", "unknown")
 
@@ -293,7 +302,7 @@ def extract_compression_diagnostics(
 
     diagnostics["algorithm_details"] = algo_details
 
-    warnings = []
+    warnings: list[str] = []
     if params_changed == 0:
         warnings.append(
             "No parameters were modified - algorithm may be too conservative"
@@ -312,33 +321,33 @@ def extract_compression_diagnostics(
 
     diagnostics["warnings"] = warnings
 
-    diagnostics["inferred"] = inference_record["flags"]
-    if inference_record.get("sources"):
-        diagnostics["inference_source"] = inference_record["sources"]
-    if inference_record.get("log"):
-        diagnostics["inference_log"] = inference_record["log"]
+    diagnostics["inferred"] = flags
+    if sources:
+        diagnostics["inference_source"] = sources
+    if log_entries:
+        diagnostics["inference_log"] = log_entries
 
     return diagnostics
 
 
 def extract_structural_deltas(report: RunReport) -> dict[str, Any]:
     """Extract structural parameter changes with compression diagnostics."""
-    edit_section = report.get("edit", {}) if isinstance(report, dict) else {}
-    deltas = edit_section.get("deltas", {}) if isinstance(edit_section, dict) else {}
+    edit_section = _get_mapping(report, "edit")
+    deltas = _get_mapping(edit_section, "deltas")
 
-    primary_config = None
-    if isinstance(edit_section, dict):
-        if isinstance(edit_section.get("plan"), dict):
-            primary_config = edit_section["plan"]
-        elif isinstance(edit_section.get("config"), dict):
-            primary_config = edit_section["config"]
-    edit_config = dict(primary_config) if isinstance(primary_config, dict) else {}
+    primary_config = _get_mapping(edit_section, "plan")
+    if not primary_config:
+        primary_config = _get_mapping(edit_section, "config")
+    edit_config = dict(primary_config) if primary_config else {}
 
-    inference_record = {
+    inference_record: dict[str, Any] = {
         "flags": dict.fromkeys(("scope", "seed", "rank_policy", "frac"), False),
         "sources": {},
         "log": [],
     }
+    flags = inference_record["flags"]
+    sources = inference_record["sources"]
+    log_entries = inference_record["log"]
 
     def _infer(field: str, value: Any, source: str) -> bool:
         if value in (None, "unknown"):
@@ -347,9 +356,9 @@ def extract_structural_deltas(report: RunReport) -> dict[str, Any]:
         if current not in (None, "unknown"):
             return False
         edit_config[field] = value
-        inference_record["flags"][field] = True
-        inference_record["sources"][field] = source
-        inference_record["log"].append(f"{field} inferred from {source}: {value}")
+        flags[field] = True
+        sources[field] = source
+        log_entries.append(f"{field} inferred from {source}: {value}")
         return True
 
     if isinstance(edit_section, dict):
@@ -377,12 +386,9 @@ def extract_structural_deltas(report: RunReport) -> dict[str, Any]:
                 _infer("scope", "attn", "plan_digest")
             elif "embed" in plan_digest or "embedding" in plan_digest:
                 _infer("scope", "embed", "plan_digest")
-    try:
-        edit_name = (report.get("edit", {}) or {}).get("name", "unknown")
-    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        edit_name = "unknown"
+    edit_name = str(edit_section.get("name") or "unknown")
 
-    structure = {
+    structure: dict[str, Any] = {
         "params_changed": deltas.get("params_changed", 0),
         "layers_modified": deltas.get("layers_modified", 0),
     }
@@ -405,23 +411,22 @@ def extract_structural_deltas(report: RunReport) -> dict[str, Any]:
     )
     structure["compression_diagnostics"] = compression_diag
 
-    target_analysis = compression_diag.get("target_analysis", {})
-    algo_details = compression_diag.setdefault("algorithm_details", {})
+    target_analysis = _get_mapping(compression_diag, "target_analysis")
+    algo_details = _get_mapping(compression_diag, "algorithm_details")
+    if "algorithm_details" not in compression_diag:
+        compression_diag["algorithm_details"] = algo_details
 
-    fallback_scope = (
-        edit_section.get("scope") if isinstance(edit_section, dict) else None
-    )
+    fallback_scope = edit_section.get("scope")
     if _infer("scope", fallback_scope, "report.edit.scope"):
         target_analysis["scope"] = fallback_scope
     elif fallback_scope and target_analysis.get("scope") in (None, "unknown"):
         target_analysis["scope"] = fallback_scope
 
-    if isinstance(edit_section, dict):
-        edit_seed = edit_section.get("seed")
-        _infer("seed", edit_seed, "report.edit.seed")
+    edit_seed = edit_section.get("seed")
+    _infer("seed", edit_seed, "report.edit.seed")
 
-    if not inference_record["flags"].get("seed"):
-        meta = report.get("meta", {}) if isinstance(report, dict) else {}
+    if not bool(flags.get("seed")):
+        meta = _get_mapping(report, "meta")
         meta_seed = None
         seeds_bundle = meta.get("seeds")
         if isinstance(seeds_bundle, dict):
@@ -438,11 +443,11 @@ def extract_structural_deltas(report: RunReport) -> dict[str, Any]:
     final_seed = edit_config.get("seed", algo_details.get("seed", "unknown"))
     algo_details["seed"] = final_seed
 
-    compression_diag["inferred"] = inference_record["flags"]
-    if inference_record.get("sources"):
-        compression_diag["inference_source"] = inference_record["sources"]
-    if inference_record.get("log"):
-        compression_diag["inference_log"] = inference_record["log"]
+    compression_diag["inferred"] = flags
+    if sources:
+        compression_diag["inference_source"] = sources
+    if log_entries:
+        compression_diag["inference_log"] = log_entries
 
     return structure
 
@@ -457,7 +462,7 @@ def extract_edit_metadata(
 
     edit_name = str(edit_section.get("name", "") or "")
 
-    plugin_edit = {}
+    plugin_edit: dict[str, Any] = {}
     if isinstance(plugin_provenance, dict):
         candidate = plugin_provenance.get("edit")
         if isinstance(candidate, dict):
@@ -496,9 +501,6 @@ def extract_edit_metadata(
             config_plan = config_section.get("plan")
             if isinstance(config_plan, dict):
                 plan_dict = copy.deepcopy(config_plan)
-
-    if not isinstance(plan_dict, dict):
-        plan_dict = {}
 
     scope = plan_dict.get("scope") or edit_section.get("scope")
     ranking = plan_dict.get("ranking") or edit_section.get("ranking") or ""

@@ -48,8 +48,6 @@ def fallback_paired_windows(
 def propagate_pairing_stats(
     evaluation_report: dict[str, Any], ppl_analysis: dict[str, Any] | None
 ) -> None:
-    if not isinstance(evaluation_report, dict):
-        return
     dataset = evaluation_report.get("dataset", {})
     if not isinstance(dataset, dict):
         return
@@ -187,6 +185,7 @@ def enforce_display_ci_alignment(
         return
     if not _finite_bounds(ci):
         if _finite_bounds(logloss_delta_ci):
+            assert isinstance(logloss_delta_ci, tuple | list)
             primary_metric["ci"] = (
                 float(logloss_delta_ci[0]),
                 float(logloss_delta_ci[1]),
@@ -200,6 +199,7 @@ def enforce_display_ci_alignment(
                 )
             return
 
+    assert isinstance(ci, tuple | list)
     expected = tuple(math.exp(float(bound)) for bound in ci)
     if not _finite_bounds(display_ci):
         profile = (window_plan_profile or "dev").lower()
@@ -210,6 +210,7 @@ def enforce_display_ci_alignment(
         primary_metric["display_ci"] = [expected[0], expected[1]]
         return
 
+    assert isinstance(display_ci, tuple | list)
     for observed, expected_value in zip(display_ci, expected, strict=False):
         tolerance = 5e-4 * max(1.0, abs(expected_value))
         if abs(float(observed) - float(expected_value)) > tolerance:

@@ -29,7 +29,9 @@ def _format_secondary_metric_ratio(metric: dict[str, Any], kind: str) -> str:
     ratio = metric.get("ratio_vs_baseline")
     try:
         if kind.startswith("ppl"):
-            return f"{float(ratio):.3f}"
+            if isinstance(ratio, int | float):
+                return f"{float(ratio):.3f}"
+            return "N/A"
         return _fmt_by_kind(ratio, kind)
     except _NON_FATAL_EXCEPTIONS:
         return "N/A"
@@ -92,7 +94,10 @@ def append_primary_metric_section(
             lines.append("- Note: baseline < 5%; ratio suppressed; showing Δpp")
     else:
         try:
-            lines.append(f"| Ratio vs Baseline | {float(ratio):.3f} |")
+            if isinstance(ratio, int | float):
+                lines.append(f"| Ratio vs Baseline | {float(ratio):.3f} |")
+            else:
+                lines.append("| Ratio vs Baseline | N/A |")
         except _NON_FATAL_EXCEPTIONS:
             lines.append("| Ratio vs Baseline | N/A |")
     lines.append("")

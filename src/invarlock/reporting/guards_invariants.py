@@ -38,7 +38,7 @@ def _extract_invariants(
                 if recorded_violation:
                     continue
                 # No explicit violations list – treat as error
-                failure_entry = {"check": check_name}
+                failure_entry: dict[str, Any] = {"check": check_name}
                 failure_entry["type"] = str(check_result.get("type") or "failure")
                 failure_entry["severity"] = "error"
                 detail = {
@@ -57,13 +57,13 @@ def _extract_invariants(
                         {"check": check_name, "type": "failure", "severity": "error"}
                     )
 
-    guard_entry = None
+    guard_entry: Any = None
     for guard in report.get("guards", []) or []:
         if str(guard.get("name", "")).lower() == "invariants":
             guard_entry = guard
             break
 
-    baseline_guard_entry = None
+    baseline_guard_entry: Any = None
     if baseline is not None:
         for guard in baseline.get("guards", []) or []:
             if str(guard.get("name", "")).lower() == "invariants":
@@ -179,16 +179,18 @@ def _extract_invariants(
             for violation in violations:
                 if not isinstance(violation, dict):
                     continue
-                row = {
+                row: dict[str, Any] = {
                     "check": str(
                         violation.get("check") or violation.get("name") or "invariant"
                     ),
                     "type": str(violation.get("type") or "violation"),
                     "severity": str(violation.get("severity") or "warning"),
                 }
-                detail = {k: v for k, v in violation.items() if k not in row}
-                if detail:
-                    row["detail"] = detail
+                failure_detail: dict[str, Any] = {
+                    k: v for k, v in violation.items() if k not in row
+                }
+                if failure_detail:
+                    row["detail"] = failure_detail
                 failures.append(row)
         base_fatal = 0
         base_warn = 0
@@ -205,23 +207,25 @@ def _extract_invariants(
                     baseline_snapshot, current_snapshot
                 )
                 for violation in baseline_failures:
-                    check_name = violation.get("check")
-                    if not check_name:
-                        check_name = (
+                    baseline_check_name: Any = violation.get("check")
+                    if not baseline_check_name:
+                        baseline_check_name = (
                             violation.get("module")
                             or violation.get("type")
                             or "invariant"
                         )
-                    row = {
-                        "check": str(check_name),
+                    baseline_row: dict[str, Any] = {
+                        "check": str(baseline_check_name),
                         "type": str(violation.get("type") or "violation"),
                         "severity": str(violation.get("severity") or "warning"),
                     }
-                    detail = {k: v for k, v in violation.items() if k not in row}
-                    if detail:
-                        detail.setdefault("source", "baseline_compare")
-                        row["detail"] = detail
-                    failures.append(row)
+                    baseline_detail: dict[str, Any] = {
+                        k: v for k, v in violation.items() if k not in baseline_row
+                    }
+                    if baseline_detail:
+                        baseline_detail.setdefault("source", "baseline_compare")
+                        baseline_row["detail"] = baseline_detail
+                    failures.append(baseline_row)
 
         fatal_total = fatal_count + base_fatal
         warn_total = warning_count + base_warn
@@ -253,7 +257,7 @@ def _extract_invariants(
             "warning_violations": len(failures),
         }
 
-    details_out = invariants_data
+    details_out: dict[str, Any] = invariants_data
     if not details_out and guard_entry and isinstance(guard_entry.get("details"), dict):
         details_out = guard_entry.get("details", {})
 
