@@ -54,7 +54,9 @@ def test_reporting_broad_exception_count_stays_zero() -> None:
 
 def test_should_remove_bucket_is_empty() -> None:
     contract = _load_contract()
-    actual = [entry for entry in contract["entries"] if entry["bucket"] == "should_remove"]
+    actual = [
+        entry for entry in contract["entries"] if entry["bucket"] == "should_remove"
+    ]
     assert actual == []
 
 

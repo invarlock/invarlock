@@ -61,7 +61,13 @@ VERBOSITY_QUIET = 0
 VERBOSITY_DEFAULT = 1
 VERBOSITY_VERBOSE = 2
 _QUIET_REPORT_LOAD_ERRORS = (json.JSONDecodeError, OSError, TypeError, ValueError)
-_CONSOLE_SUMMARY_ERRORS = (AttributeError, KeyError, RuntimeError, TypeError, ValueError)
+_CONSOLE_SUMMARY_ERRORS = (
+    AttributeError,
+    KeyError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 _CHILD_RUN_REPLAY_ERRORS = (
     ConfigError,
     OSError,

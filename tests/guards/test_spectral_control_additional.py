@@ -207,7 +207,7 @@ def test_apply_spectral_control_reraises_unexpected_errors() -> None:
         apply_spectral_control(
             _Model({}),
             {"scope": "all"},
-            apply_relative_spectral_cap_fn=lambda *_args, **_kwargs: (_ for _ in ()).throw(
-                AssertionError("explode")
-            ),
+            apply_relative_spectral_cap_fn=lambda *_args, **_kwargs: (
+                _ for _ in ()
+            ).throw(AssertionError("explode")),
         )

@@ -132,7 +132,9 @@ def test_policy_checkpoint_rollback_reraises_unexpected_errors(tmp_path: Path):
             raise AssertionError("explode")
 
     adapter = ExplodingAdapter(tmp_path)
-    cp = PolicyCheckpoint(object(), adapter, type("P", (), {"enable_auto_rollback": False})())
+    cp = PolicyCheckpoint(
+        object(), adapter, type("P", (), {"enable_auto_rollback": False})()
+    )
     cp.create_checkpoint()
 
     with pytest.raises(AssertionError, match="explode"):

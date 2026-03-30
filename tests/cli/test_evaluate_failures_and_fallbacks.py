@@ -1360,6 +1360,206 @@ def test_evaluate_verbose_mode_prints_debug_lines(monkeypatch, tmp_path: Path) -
     assert "Edited report:" in joined
 
 
+def test_evaluate_quiet_mode_replays_baseline_child_output_on_typer_exit(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    console = RecordingConsole()
+
+    def fake_run(**kwargs):
+        run_mod.console.print("baseline child output")
+        raise typer.Exit(3)
+
+    monkeypatch.setattr(
+        "invarlock.cli.output.make_console", lambda **_: console, raising=False
+    )
+    monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
+
+    with pytest.raises(click.exceptions.Exit) as exc:
+        mod.evaluate_command(
+            baseline=str(src),
+            subject=str(edt),
+            adapter="hf_causal",
+            out=str(Path("runs")),
+            report_out=str(Path("reports")),
+            profile="dev",
+            quiet=True,
+        )
+
+    assert exc.value.exit_code == 3
+    assert "baseline child output" in console.joined()
+
+
+def test_evaluate_quiet_mode_replays_edited_child_output_on_typer_exit(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    baseline_report = _write_json(tmp_path / "baseline.json", {})
+    edit_config = tmp_path / "edit.yaml"
+    edit_config.write_text("edit:\n  name: quant_rtn\n", encoding="utf-8")
+    console = RecordingConsole()
+
+    def fake_run(**kwargs):
+        out_name = Path(kwargs["out"]).name
+        if out_name == "source":
+            return str(baseline_report)
+        run_mod.console.print("edited child output")
+        raise typer.Exit(4)
+
+    monkeypatch.setattr(
+        "invarlock.cli.output.make_console", lambda **_: console, raising=False
+    )
+    monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
+
+    with pytest.raises(click.exceptions.Exit) as exc:
+        mod.evaluate_command(
+            baseline=str(src),
+            subject=str(edt),
+            adapter="hf_causal",
+            out=str(Path("runs")),
+            report_out=str(Path("reports")),
+            profile="dev",
+            quiet=True,
+            edit_config=str(edit_config),
+        )
+
+    assert exc.value.exit_code == 4
+    assert "edited child output" in console.joined()
+
+
+def test_evaluate_quiet_mode_replays_noop_child_output_on_runtime_error(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    baseline_report = _write_json(tmp_path / "baseline.json", {})
+    console = RecordingConsole()
+
+    def fake_run(**kwargs):
+        out_name = Path(kwargs["out"]).name
+        if out_name == "source":
+            return str(baseline_report)
+        run_mod.console.print("subject child output")
+        raise RuntimeError("subject boom")
+
+    monkeypatch.setattr(
+        "invarlock.cli.output.make_console", lambda **_: console, raising=False
+    )
+    monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
+
+    with pytest.raises(RuntimeError, match="subject boom"):
+        mod.evaluate_command(
+            baseline=str(src),
+            subject=str(edt),
+            adapter="hf_causal",
+            out=str(Path("runs")),
+            report_out=str(Path("reports")),
+            profile="dev",
+            quiet=True,
+        )
+
+    assert "subject child output" in console.joined()
+
+
+def test_evaluate_nonquiet_edit_child_typer_exit_skips_buffer_replay(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    baseline_report = _write_json(tmp_path / "baseline.json", {})
+    edit_config = tmp_path / "edit.yaml"
+    edit_config.write_text("edit:\n  name: quant_rtn\n", encoding="utf-8")
+    console = RecordingConsole()
+
+    def fake_run(**kwargs):
+        out_name = Path(kwargs["out"]).name
+        if out_name == "source":
+            return str(baseline_report)
+        raise typer.Exit(4)
+
+    monkeypatch.setattr(
+        "invarlock.cli.output.make_console", lambda **_: console, raising=False
+    )
+    monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
+
+    with pytest.raises(click.exceptions.Exit) as exc:
+        mod.evaluate_command(
+            baseline=str(src),
+            subject=str(edt),
+            adapter="hf_causal",
+            out=str(Path("runs")),
+            report_out=str(Path("reports")),
+            profile="dev",
+            edit_config=str(edit_config),
+        )
+
+    assert exc.value.exit_code == 4
+    assert "nonquiet edited child output" not in console.joined()
+
+
+def test_evaluate_quiet_mode_replays_noop_child_output_on_typer_exit(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    baseline_report = _write_json(tmp_path / "baseline.json", {})
+    console = RecordingConsole()
+
+    def fake_run(**kwargs):
+        out_name = Path(kwargs["out"]).name
+        if out_name == "source":
+            return str(baseline_report)
+        run_mod.console.print("quiet subject typer output")
+        raise typer.Exit(5)
+
+    monkeypatch.setattr(
+        "invarlock.cli.output.make_console", lambda **_: console, raising=False
+    )
+    monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
+
+    with pytest.raises(click.exceptions.Exit) as exc:
+        mod.evaluate_command(
+            baseline=str(src),
+            subject=str(edt),
+            adapter="hf_causal",
+            out=str(Path("runs")),
+            report_out=str(Path("reports")),
+            profile="dev",
+            quiet=True,
+        )
+
+    assert exc.value.exit_code == 5
+    assert "quiet subject typer output" in console.joined()
+
+
+def test_evaluate_nonquiet_noop_child_runtime_error_skips_buffer_replay(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    baseline_report = _write_json(tmp_path / "baseline.json", {})
+    console = RecordingConsole()
+
+    def fake_run(**kwargs):
+        out_name = Path(kwargs["out"]).name
+        if out_name == "source":
+            return str(baseline_report)
+        raise RuntimeError("nonquiet subject boom")
+
+    monkeypatch.setattr(
+        "invarlock.cli.output.make_console", lambda **_: console, raising=False
+    )
+    monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
+
+    with pytest.raises(RuntimeError, match="nonquiet subject boom"):
+        mod.evaluate_command(
+            baseline=str(src),
+            subject=str(edt),
+            adapter="hf_causal",
+            out=str(Path("runs")),
+            report_out=str(Path("reports")),
+            profile="dev",
+        )
+
+    assert "nonquiet subject child output" not in console.joined()
+
+
 def test_evaluate_invalid_preset_guard_order_falls_back_to_default(
     monkeypatch, tmp_path: Path
 ) -> None:

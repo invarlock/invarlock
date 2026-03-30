@@ -192,7 +192,9 @@ def test_apply_edited_primary_metric_policy_does_not_carry_exit_code() -> None:
     assert not hasattr(outcome, "exit_code")
 
 
-def test_apply_edited_primary_metric_policy_reraises_unexpected_profile_errors() -> None:
+def test_apply_edited_primary_metric_policy_reraises_unexpected_profile_errors() -> (
+    None
+):
     class _BadProfile:
         def __str__(self) -> str:
             raise AssertionError("explode")
