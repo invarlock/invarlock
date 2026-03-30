@@ -21,6 +21,17 @@ from invarlock.public_contracts import (
     load_model_family_catalog,
     load_support_matrix,
 )
+from invarlock.core.plugins_inventory import (
+    adapter_inventory_json_items,
+    combined_plugins_json_items,
+    dataset_inventory_json_items,
+    detect_cuda_available,
+    filter_inventory_rows,
+    gather_adapter_inventory_rows,
+    gather_generic_inventory_rows,
+    generic_inventory_json_items,
+    is_minimal_plugins_view,
+)
 
 from ..backend_runtime import bitsandbytes_runtime_available
 from ..constants import PLUGINS_FORMAT_VERSION
@@ -90,142 +101,32 @@ def plugins_command(
         registry = get_registry()
 
         def _is_minimal() -> bool:
-            val = os.environ.get("INVARLOCK_MINIMAL", "").strip().lower()
-            return val not in ("", "0", "false", "no")
+            return is_minimal_plugins_view(os.environ.get("INVARLOCK_MINIMAL"))
 
         def _gather_adapter_rows() -> list[dict]:
             try:
                 import torch  # type: ignore
 
-                has_cuda = bool(
-                    getattr(torch, "cuda", None) and torch.cuda.is_available()
-                )
+                has_cuda = detect_cuda_available(torch)
             except Exception:
                 has_cuda = False
+            from invarlock.core.adapter_provenance import extract_adapter_provenance
 
-            names = registry.list_adapters()
-            is_linux = platform.system().lower() == "linux"
-            if _is_minimal():
-                names = [
-                    n
-                    for n in names
-                    if str(
-                        registry.get_plugin_info(n, "adapters").get("module") or ""
-                    ).startswith("invarlock.plugins")
-                ]
-
-            rows: list[dict] = []
-            for n in names:
-                info = registry.get_plugin_info(n, "adapters")
-                module = str(info.get("module") or "")
-                entry = info.get("entry_point")
-                # Classify support level independent of origin
-                if module.startswith("invarlock.adapters"):
-                    if n in {"hf_auto"}:
-                        support = "auto"
-                    else:
-                        support = "core"
-                else:
-                    support = "optional"
-
-                # Origin reflects where it comes from (builtin vs plugin)
-                origin = "core" if module.startswith("invarlock.adapters") else "plugin"
-                mode = "auto-matcher" if support == "auto" else "adapter"
-                backend_name = ""
-                backend_version = None
-                present = False
-                backend_present = False
-                try:
-                    from invarlock.core.adapter_provenance import (
-                        extract_adapter_provenance,
-                    )
-
-                    prov = extract_adapter_provenance(n)
-                    backend_name = prov.library or ""
-                    backend_version = prov.version
-                    present = backend_version is not None
-                    backend_present = present
-                except Exception:
-                    pass
-                status = "ready"
-                enable = ""
-                if support == "auto":
-                    status = "ready"
-                elif support == "optional" and not present:
-                    status = "needs_extra"
-                # Platform gating for Linux-only stacks
-                if backend_name in {"auto-gptq", "autoawq"} and not is_linux:
-                    status = "unsupported"
-                    enable = "Linux-only"
-                # Extras completeness for optional adapters.
-                try:
-                    extras_status = _check_plugin_extras(n, "adapters")
-                except Exception:
-                    extras_status = ""
-                if (
-                    support == "optional"
-                    and extras_status.startswith("⚠️")
-                    and "missing" in extras_status
-                ):
-                    status = "needs_extra"
-                    # If we have a normalized extra hint (invarlock[...] ), surface as enable action
-                    hint = extras_status.split("missing", 1)[-1].strip()
-                    if hint:
-                        enable = f"pip install '{hint}'"
-                if backend_name == "bitsandbytes" and present:
-                    backend_present = bitsandbytes_runtime_available()
-                    if not backend_present:
-                        status = "unsupported"
-                        if has_cuda:
-                            enable = "bitsandbytes unavailable on this host"
-                        else:
-                            enable = (
-                                "Requires CUDA or a compatible bitsandbytes runtime"
-                            )
-                extra_hint = {
-                    "hf_gptq": "invarlock[gptq]",
-                    "hf_awq": "invarlock[awq]",
-                    "hf_bnb": "invarlock[gpu]",
-                }.get(n)
-                if status == "needs_extra" and extra_hint:
-                    enable = f"pip install '{extra_hint}'"
-                rows.append(
-                    {
-                        "name": n,
-                        "backend": backend_name,
-                        "backend_version": backend_version,
-                        "backend_present": backend_present,
-                        "support": support,
-                        "origin": origin,
-                        "mode": mode,
-                        "status": status,
-                        "enable": enable,
-                        "module": module,
-                        "entry_point": entry,
-                    }
-                )
-            rows.sort(
-                key=lambda r: (
-                    {"needs_extra": 0, "partial": 1, "ready": 2}.get(r["status"], 3),
-                    {"optional": 0, "core": 1, "auto": 2}.get(r["support"], 3),
-                    r["name"],
-                )
+            rows = gather_adapter_inventory_rows(
+                registry=registry,
+                minimal=_is_minimal(),
+                has_cuda=has_cuda,
+                is_linux=platform.system().lower() == "linux",
+                extras_checker=_check_plugin_extras,
+                provenance_extractor=extract_adapter_provenance,
+                bitsandbytes_runtime_available=bitsandbytes_runtime_available,
             )
+            for row in rows:
+                row["capability"] = adapter_capability(str(row.get("name") or ""))
             return rows
 
         def _filter_only(rows: list[dict]) -> list[dict]:
-            if not only:
-                return rows
-            m = only.strip().lower()
-            if m == "missing":
-                return [r for r in rows if r["status"] == "needs_extra"]
-            if m == "ready":
-                return [r for r in rows if r["status"] == "ready"]
-            if m == "core":
-                return [r for r in rows if r["support"] == "core"]
-            if m == "optional":
-                return [r for r in rows if r["support"] == "optional"]
-            return rows
+            return filter_inventory_rows(rows, only)
 
         def _fmt_backend(backend: str | None, version: str | None) -> tuple[str, str]:
             name = backend or "—"
@@ -311,33 +212,7 @@ def plugins_command(
             console.print(table)
 
         def _print_adapters_json(rows: list[dict]) -> None:
-            unified = []
-            for r in rows:
-                backend_name = r.get("backend") or ""
-                backend_ver = r.get("backend_version")
-                backend_obj = None
-                if backend_name:
-                    backend_obj = {
-                        "name": backend_name,
-                        "present": bool(r.get("backend_present")),
-                    }
-                    if backend_ver:
-                        backend_obj["version"] = backend_ver
-                unified.append(
-                    {
-                        "name": r.get("name"),
-                        "kind": "adapter",
-                        "module": r.get("module"),
-                        "entry_point": r.get("entry_point"),
-                        "origin": "builtin"
-                        if str(r.get("module", "")).startswith("invarlock.")
-                        else "third_party",
-                        "status": r.get("status"),
-                        "backend": backend_obj,
-                        "capability": adapter_capability(str(r.get("name") or "")),
-                    }
-                )
-            _emit_plugins_json("adapters", unified)
+            _emit_plugins_json("adapters", adapter_inventory_json_items(rows))
 
         def _explain_adapter(name: str) -> None:
             rows = _gather_adapter_rows()
@@ -394,54 +269,11 @@ def plugins_command(
 
         # Generic (guards/edits) helpers for compact/verbose/json/explain
         def _gather_generic_rows(plugin_type: str) -> list[dict]:
-            names = (
-                registry.list_guards()
-                if plugin_type == "guards"
-                else registry.list_edits()
+            return gather_generic_inventory_rows(
+                registry=registry,
+                plugin_type=plugin_type,
+                extras_checker=_check_plugin_extras,
             )
-            rows: list[dict] = []
-            for n in names:
-                info = registry.get_plugin_info(n, plugin_type)
-                module = str(info.get("module") or "")
-                entry = info.get("entry_point")
-                support = (
-                    "core"
-                    if module.startswith(f"invarlock.{plugin_type}")
-                    else "optional"
-                )
-                origin = "core" if support == "core" else "plugin"
-                mode = "guard" if plugin_type == "guards" else "edit"
-                extras_status = _check_plugin_extras(n, plugin_type)
-                status = "ready"
-                enable = ""
-                if extras_status.startswith("⚠️") and "missing" in extras_status:
-                    status = "needs_extra"
-                    hint = extras_status.split("missing", 1)[-1].strip()
-                    if hint:
-                        enable = f"pip install '{hint}'"
-                rows.append(
-                    {
-                        "name": n,
-                        "backend": None,
-                        "backend_version": None,
-                        "support": support,
-                        "origin": origin,
-                        "mode": mode,
-                        "status": status,
-                        "enable": enable,
-                        "module": module,
-                        "entry_point": entry,
-                    }
-                )
-            # Sort with support first (core → optional), then status, then name
-            rows.sort(
-                key=lambda r: (
-                    {"core": 0, "optional": 1}.get(r["support"], 2),
-                    {"needs_extra": 0, "ready": 1}.get(r["status"], 2),
-                    r["name"],
-                )
-            )
-            return rows
 
         def _print_generic_compact(rows: list[dict], title: str) -> None:
             need = sum(1 for r in rows if r["status"] == "needs_extra")
@@ -509,20 +341,10 @@ def plugins_command(
             console.print(table)
 
         def _print_generic_json(rows: list[dict], kind: str) -> None:
-            unified: list[dict] = []
-            for r in rows:
-                unified.append(
-                    {
-                        "name": r.get("name"),
-                        "kind": "guard" if kind == "guards" else "edit",
-                        "module": r.get("module"),
-                        "entry_point": r.get("entry_point"),
-                        "origin": "builtin"
-                        if str(r.get("module", "")).startswith("invarlock.")
-                        else "third_party",
-                    }
-                )
-            _emit_plugins_json(kind, unified)
+            _emit_plugins_json(
+                kind,
+                generic_inventory_json_items(rows, kind=kind),
+            )
 
         def _render_dataset_table(
             title: str, providers: list[str], *, verbose: bool = False
@@ -691,17 +513,10 @@ def plugins_command(
                     _providers_map = getattr(_data_mod, "_PROVIDERS", {}) or {}
                 except Exception:
                     _providers_map = {}
-                items = []
-                for provider_name in providers:
-                    provider_cls = _providers_map.get(provider_name)
-                    items.append(
-                        {
-                            "name": provider_name,
-                            "module": getattr(provider_cls, "__module__", "unknown"),
-                            "status": "available",
-                        }
-                    )
-                _emit_plugins_json("datasets", items)
+                _emit_plugins_json(
+                    "datasets",
+                    dataset_inventory_json_items(providers, _providers_map),
+                )
             else:
                 show_plugins("Dataset Providers", providers, "datasets")
         elif category is None or category in ["list", "all"]:
@@ -718,58 +533,15 @@ def plugins_command(
             if json_out:
                 # Combine adapters + guards + edits
                 ad_rows = _gather_adapter_rows()
-                adapters_unified: list[dict] = []
-                for r in ad_rows:
-                    backend_name = r.get("backend") or ""
-                    backend_ver = r.get("backend_version")
-                    backend_obj = None
-                    if backend_name:
-                        backend_obj = {
-                            "name": backend_name,
-                            "present": bool(r.get("backend_present")),
-                        }
-                        if backend_ver:
-                            backend_obj["version"] = backend_ver
-                    adapters_unified.append(
-                        {
-                            "name": r.get("name"),
-                            "kind": "adapter",
-                            "module": r.get("module"),
-                            "entry_point": r.get("entry_point"),
-                            "origin": "builtin"
-                            if str(r.get("module", "")).startswith("invarlock.")
-                            else "third_party",
-                            "backend": backend_obj,
-                        }
-                    )
                 g_rows = _gather_generic_rows("guards")
-                guards_unified = [
-                    {
-                        "name": r.get("name"),
-                        "kind": "guard",
-                        "module": r.get("module"),
-                        "entry_point": r.get("entry_point"),
-                        "origin": "builtin"
-                        if str(r.get("module", "")).startswith("invarlock.")
-                        else "third_party",
-                    }
-                    for r in g_rows
-                ]
                 e_rows = _gather_generic_rows("edits")
-                edits_unified = [
-                    {
-                        "name": r.get("name"),
-                        "kind": "edit",
-                        "module": r.get("module"),
-                        "entry_point": r.get("entry_point"),
-                        "origin": "builtin"
-                        if str(r.get("module", "")).startswith("invarlock.")
-                        else "third_party",
-                    }
-                    for r in e_rows
-                ]
                 _emit_plugins_json(
-                    "plugins", adapters_unified + guards_unified + edits_unified
+                    "plugins",
+                    combined_plugins_json_items(
+                        adapter_rows=ad_rows,
+                        guard_rows=g_rows,
+                        edit_rows=e_rows,
+                    ),
                 )
             else:
                 # Fallback: print three tables

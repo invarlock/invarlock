@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+
 from invarlock.core.evaluate_plan import (
     DEFAULT_EVALUATE_GUARDS_ORDER,
+    build_evaluate_command_plan,
     build_baseline_run_config,
     build_subject_edit_run_config,
     default_preset_data_for_adapter,
     determine_subject_label,
     normalize_model_id,
+    resolve_evaluate_execution_policy,
+    resolve_evaluate_tmp_dir,
     resolve_guards_order,
     sanitize_preset_data_for_evaluate,
 )
@@ -109,3 +116,58 @@ def test_build_subject_edit_run_config_normalizes_placeholders_and_guards() -> N
     assert cfg["output"] == {"dir": "runs/edited"}
     assert cfg["context"] == {"profile": "ci", "tier": "balanced"}
     assert cfg["guards"] == {"order": ["invariants", "variance"]}
+
+
+def test_resolve_evaluate_execution_policy_rejects_unknown_mode() -> None:
+    with pytest.raises(ValueError):
+        resolve_evaluate_execution_policy(mode="remote", allow_host_execution=False)
+
+
+def test_resolve_evaluate_execution_policy_marks_local_mode_host_enabled() -> None:
+    policy = resolve_evaluate_execution_policy(
+        mode="local",
+        allow_host_execution=False,
+    )
+
+    assert policy.mode == "local"
+    assert policy.allow_host_execution is True
+    assert policy.prefer_local_files_only is True
+
+
+def test_resolve_evaluate_tmp_dir_uses_explicit_candidate(tmp_path: Path) -> None:
+    resolved = resolve_evaluate_tmp_dir(str(tmp_path / "chosen"))
+
+    assert resolved == (tmp_path / "chosen").resolve()
+    assert resolved.exists()
+
+
+def test_build_evaluate_command_plan_collects_core_execution_inputs(
+    tmp_path: Path,
+) -> None:
+    preset_path = tmp_path / "preset.yaml"
+    preset_path.write_text("guards:\n  order: [shape_ok]\n", encoding="utf-8")
+
+    plan = build_evaluate_command_plan(
+        baseline_model_id="hf:org/source",
+        subject_model_id="hf:org/subject",
+        adapter="auto",
+        profile="ci",
+        tier="balanced",
+        preset=str(preset_path),
+        out="runs",
+        edit_config=None,
+        edit_label=None,
+        resolve_auto_adapter_fn=lambda _model_id: "hf_causal",
+        load_yaml_fn=lambda _path: {"guards": {"order": ["shape_ok"]}},
+        tmp_dir_candidate=str(tmp_path / "scratch"),
+    )
+
+    assert plan.profile_name == "ci"
+    assert plan.adapter_name == "hf_causal"
+    assert plan.adapter_auto is True
+    assert plan.source_model_id == "org/source"
+    assert plan.subject_model_id == "org/subject"
+    assert plan.baseline_config["output"] == {"dir": "runs/source"}
+    assert plan.guards_order == ["shape_ok"]
+    assert plan.subject_label == "custom"
+    assert plan.tmp_dir == (tmp_path / "scratch").resolve()

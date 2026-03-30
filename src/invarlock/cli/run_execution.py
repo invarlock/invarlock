@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import os
 from functools import partial
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any
 
 import typer
 
@@ -51,6 +50,10 @@ from invarlock.core.exceptions import ValidationError
 from invarlock.core.retry import adjust_edit_params as _adjust_edit_params
 from invarlock.core.run_dataset_contract import (
     materialize_run_dataset as _materialize_run_dataset,
+)
+from invarlock.core.run_execution_request_policy import (
+    SupportsRunExecutionRequest,
+    build_run_execution_request as _build_run_execution_request_impl,
 )
 from invarlock.core.run_orchestrator import (
     RunAdapterSelectedEvent,
@@ -130,23 +133,6 @@ if TYPE_CHECKING:
     from .config_execution import ConfigExecutionRequest
 
 console = make_console()
-
-
-def _env_flag(name: str) -> bool:
-    return str(os.environ.get(name, "")).strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
-
-
-def _env_text(name: str) -> str | None:
-    value = os.environ.get(name)
-    if not isinstance(value, str):
-        return None
-    stripped = value.strip()
-    return stripped or None
 
 
 def _print_retry_summary(_console: Any, retry_controller: Any | None) -> None:
@@ -802,55 +788,10 @@ def _to_core_run_execution_request(
     return _build_core_run_execution_request(request)
 
 
-class SupportsRunExecutionRequest(Protocol):
-    config: str
-    device: str | None
-    profile: str | None
-    out: str | None
-    edit: str | None
-    edit_label: str | None
-    tier: str | None
-    metric_kind: str | None
-    probes: int | None
-    until_pass: bool
-    max_attempts: int
-    timeout: int | None
-    baseline: str | None
-    no_cleanup: bool
-    timing: bool
-    telemetry: bool
-    prefer_local_files_only: bool
-
-
 def _build_core_run_execution_request(
     request: SupportsRunExecutionRequest,
 ) -> RunExecutionRequest:
-    return RunExecutionRequest(
-        config=request.config,
-        device=request.device,
-        profile=request.profile,
-        out=request.out,
-        edit=request.edit,
-        edit_label=request.edit_label,
-        tier=request.tier,
-        metric_kind=request.metric_kind,
-        probes=request.probes,
-        until_pass=bool(request.until_pass),
-        max_attempts=int(request.max_attempts),
-        timeout=request.timeout,
-        baseline=request.baseline,
-        no_cleanup=bool(request.no_cleanup),
-        capture_timings=bool(request.timing or request.progress),
-        telemetry=bool(request.telemetry),
-        prefer_local_files_only=bool(request.prefer_local_files_only),
-        eval_device_override=_env_text("INVARLOCK_EVAL_DEVICE"),
-        determinism_mode=_env_text("PACK_DETERMINISM")
-        or _env_text("INVARLOCK_DETERMINISM"),
-        determinism_warn_only=_env_flag("INVARLOCK_DETERMINISM_WARN_ONLY"),
-        tiny_relax_enabled=_env_flag("INVARLOCK_TINY_RELAX"),
-        export_model_requested=_env_flag("INVARLOCK_EXPORT_MODEL"),
-        export_dir=_env_text("INVARLOCK_EXPORT_DIR"),
-    )
+    return _build_run_execution_request_impl(request)
 
 
 def _exit_code_for_failure(failure: Any, *, profile: str | None) -> int:

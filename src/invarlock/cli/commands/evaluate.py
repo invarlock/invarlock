@@ -14,12 +14,10 @@ Steps:
 
 from __future__ import annotations
 
-import builtins as _builtins
 import io
 import json
 import math
 import os
-import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -38,13 +36,10 @@ from ...core.evaluate_contract import (
     require_run_report_artifact,
 )
 from ...core.evaluate_plan import (
-    build_baseline_run_config,
+    build_evaluate_command_plan,
     build_subject_edit_run_config,
     build_subject_noop_run_config,
-    default_preset_data_for_adapter,
-    determine_subject_label,
-    resolve_guards_order,
-    sanitize_preset_data_for_evaluate,
+    resolve_evaluate_execution_policy,
 )
 from ...core.evaluate_plan import (
     normalize_model_id as _normalize_model_id,
@@ -210,27 +205,6 @@ def _dump_yaml(path: Path, data: dict[str, Any]) -> None:
         yaml.safe_dump(data, fh, sort_keys=False)
 
 
-def _resolve_evaluate_tmp_dir() -> Path:
-    """Return the on-disk scratch directory for `invarlock evaluate`.
-
-    Evaluate generates merged YAML configs for baseline/subject runs so
-    downstream `invarlock run` flows remain traceable. We keep these files
-    under `./tmp/.evaluate` by default to avoid cluttering the working tree.
-    Each invocation gets an isolated subdirectory so concurrent evaluate
-    commands cannot overwrite each other's generated YAMLs.
-    """
-
-    candidate = os.environ.get("INVARLOCK_EVALUATE_TMP_DIR")
-    if candidate:
-        tmp_dir = Path(candidate).expanduser()
-    else:
-        scratch_root = Path("tmp") / ".evaluate"
-        scratch_root.mkdir(parents=True, exist_ok=True)
-        tmp_dir = Path(tempfile.mkdtemp(prefix="run-", dir=str(scratch_root))).resolve()
-    tmp_dir.mkdir(parents=True, exist_ok=True)
-    return tmp_dir
-
-
 @runtime_security_scoped
 def evaluate_command(
     baseline: str,
@@ -259,15 +233,18 @@ def evaluate_command(
     no_color: bool = False,
 ):
     """Evaluate two checkpoints (baseline vs subject) with pinned windows."""
-    mode = str(mode).strip().lower()
-
-    if mode not in {"attested", "local"}:
+    try:
+        execution_policy = resolve_evaluate_execution_policy(
+            mode=mode,
+            allow_host_execution=allow_host_execution,
+        )
+    except ValueError:
         raise typer.BadParameter(
             "Execution mode must be one of: attested, local.",
             param_hint="--mode",
         )
-    allow_host_execution = allow_host_execution or mode == "local"
-    prefer_local_files_only = mode == "local"
+    allow_host_execution = execution_policy.allow_host_execution
+    prefer_local_files_only = execution_policy.prefer_local_files_only
     maybe_delegate_model_command()
 
     verbosity = _resolve_verbosity(bool(quiet), bool(verbose))
@@ -296,14 +273,6 @@ def evaluate_command(
     timings: dict[str, float] = {}
     total_start: float | None = perf_counter() if output_style.timing else None
 
-    def _stable_text(value: object, fallback: str = "") -> str:
-        if isinstance(value, _builtins.str):
-            return value
-        try:
-            return str(value)
-        except Exception:
-            return fallback
-
     def _info(message: str, *, tag: str = "INFO", emoji: str | None = None) -> None:
         if verbosity >= VERBOSITY_DEFAULT:
             print_event(console, tag, message, style=output_style, emoji=emoji)
@@ -323,15 +292,24 @@ def evaluate_command(
 
     src_id = str(baseline)
     edt_id = str(subject)
-    profile_name = _stable_text(profile, "dev")
-    tier_name = _stable_text(tier, "balanced")
-
-    # Resolve adapter when requested
-    eff_adapter = adapter
-    adapter_auto = False
-    if str(adapter).strip().lower() in {"auto", "auto_hf"}:
-        eff_adapter = resolve_auto_adapter(src_id)
-        adapter_auto = True
+    plan = build_evaluate_command_plan(
+        baseline_model_id=src_id,
+        subject_model_id=edt_id,
+        adapter=adapter,
+        profile=profile,
+        tier=tier,
+        preset=preset,
+        out=out,
+        edit_config=edit_config,
+        edit_label=edit_label,
+        resolve_auto_adapter_fn=resolve_auto_adapter,
+        load_yaml_fn=_load_yaml,
+        tmp_dir_candidate=os.environ.get("INVARLOCK_EVALUATE_TMP_DIR"),
+    )
+    profile_name = plan.profile_name
+    tier_name = plan.tier_name
+    eff_adapter = plan.adapter_name
+    adapter_auto = plan.adapter_auto
 
     show_banner = bool(banner) and verbosity >= VERBOSITY_DEFAULT
     if show_banner:
@@ -350,55 +328,15 @@ def evaluate_command(
     # Choose preset. If none provided and repo preset is missing (pip install
     # scenario), fall back to a minimal built-in universal preset so the
     # flag-only quick start works without cloning the repo.
-    default_universal = (
-        Path("configs/presets/masked_lm/wikitext2_128.yaml")
-        if eff_adapter == "hf_mlm"
-        else Path("configs/presets/causal_lm/wikitext2_512.yaml")
-    )
-    preset_path = Path(preset) if preset is not None else default_universal
-
-    preset_data: dict[str, Any]
-    if preset is None and not preset_path.exists():
-        # Inline minimal preset (wikitext2 universal) for pip installs
-        preset_data = default_preset_data_for_adapter(str(eff_adapter))
-    else:
-        if not preset_path.exists():
-            print_event(
-                console,
-                "FAIL",
-                f"Preset not found: {preset_path}",
-                style=output_style,
-                emoji="❌",
-            )
-            raise typer.Exit(1)
-        preset_data = sanitize_preset_data_for_evaluate(_load_yaml(preset_path))
-
-    guards_order = resolve_guards_order(preset_data)
-
-    # Create temp baseline config (no-op edit)
-    # Normalize possible "hf:" prefixes for HF adapters
-    norm_src_id = _normalize_model_id(src_id, eff_adapter)
-    norm_edt_id = _normalize_model_id(edt_id, eff_adapter)
-
-    baseline_cfg = build_baseline_run_config(
-        preset_data,
-        model_id=norm_src_id,
-        adapter_name=str(eff_adapter),
-        output_dir=str(Path(out) / "source"),
-        profile=profile_name,
-        tier=tier_name,
-        guards_order=guards_order,
-    )
-
-    baseline_label = "noop"
-    subject_label = determine_subject_label(
-        edit_label=edit_label,
-        edit_config=edit_config,
-        source_model_id=norm_src_id,
-        subject_model_id=norm_edt_id,
-    )
-
-    tmp_dir = _resolve_evaluate_tmp_dir()
+    preset_path = plan.preset_path
+    preset_data = plan.preset_data
+    guards_order = plan.guards_order
+    norm_src_id = plan.source_model_id
+    norm_edt_id = plan.subject_model_id
+    baseline_cfg = plan.baseline_config
+    baseline_label = plan.baseline_label
+    subject_label = plan.subject_label
+    tmp_dir = plan.tmp_dir
 
     baseline_report_path: Path
     if baseline_report:
