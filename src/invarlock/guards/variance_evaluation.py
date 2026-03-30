@@ -12,6 +12,15 @@ from invarlock.core.bootstrap import compute_paired_delta_log_ci
 from .variance_batching import safe_mean
 from .variance_policy import predictive_gate_outcome
 
+_VARIANCE_EVALUATION_ERRORS = (
+    ArithmeticError,
+    AttributeError,
+    OverflowError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 def evaluate_calibration_pass(
     guard: Any,
@@ -234,7 +243,7 @@ def evaluate_calibration_pass(
                 alpha=guard._policy.get("alpha", 0.05),
                 seed=calib_seed + 211,
             )
-        except Exception as exc:
+        except _VARIANCE_EVALUATION_ERRORS as exc:
             delta_ci = None
             guard._log_event(
                 "predictive_gate_error",
@@ -374,7 +383,7 @@ def refresh_after_edit_metrics(
         guard._scales = guard._compute_variance_scales(
             model, guard._calibration_batches
         )
-    except Exception as exc:
+    except _VARIANCE_EVALUATION_ERRORS as exc:
         guard._log_event(
             "post_edit_scale_failure",
             level="ERROR",

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import os
 import random
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -27,7 +27,7 @@ def _get_torch() -> Any:
     if torch is _TORCH_UNSET:
         try:
             import torch as _torch
-        except Exception:  # pragma: no cover
+        except ImportError:  # pragma: no cover
             torch = None
         else:
             torch = _torch
@@ -41,26 +41,31 @@ _THREAD_ENV_VARS: tuple[str, ...] = (
     "NUMEXPR_NUM_THREADS",
     "VECLIB_MAXIMUM_THREADS",
 )
+_INT_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
+_STRING_COERCION_ERRORS = (AttributeError, TypeError, ValueError)
+_NUMPY_STATE_ERRORS = (AttributeError, IndexError, RuntimeError, TypeError, ValueError)
+_TORCH_POLICY_ERRORS = (AttributeError, RuntimeError, TypeError, ValueError)
+_RANDOM_PROBE_ERRORS = (ArithmeticError, RuntimeError, TypeError, ValueError)
 
 
 def _coerce_int(value: Any, default: int) -> int:
     try:
         return int(value)
-    except Exception:
+    except _INT_COERCION_ERRORS:
         return int(default)
 
 
 def _coerce_profile(profile: str | None) -> str:
     try:
         return (profile or "").strip().lower()
-    except Exception:
+    except _STRING_COERCION_ERRORS:
         return ""
 
 
 def _coerce_device(device: str | None) -> str:
     try:
         return (device or "").strip().lower()
-    except Exception:
+    except _STRING_COERCION_ERRORS:
         return "cpu"
 
 
@@ -103,7 +108,7 @@ def apply_determinism_preset(
                     mem_bytes = int(torch.cuda.get_device_properties(0).total_memory)
                     if mem_bytes and mem_bytes < 8 * 1024**3:
                         selected = fallback
-                except Exception:
+                except _TORCH_POLICY_ERRORS + _INT_COERCION_ERRORS:
                     selected = preferred
             os.environ["CUBLAS_WORKSPACE_CONFIG"] = selected
         env_set["CUBLAS_WORKSPACE_CONFIG"] = os.environ.get("CUBLAS_WORKSPACE_CONFIG")
@@ -122,15 +127,16 @@ def apply_determinism_preset(
         "torch": None,
     }
     try:
-        numpy_seed = int(np.random.get_state()[1][0])
+        numpy_state = cast(tuple[Any, ...], np.random.get_state())
+        numpy_seed = int(numpy_state[1][0])
         seed_bundle["numpy"] = int(numpy_seed)
-    except Exception:
+    except _NUMPY_STATE_ERRORS:
         pass
     torch = _get_torch()
     if torch is not None:
         try:
             seed_bundle["torch"] = int(torch.initial_seed())
-        except Exception:
+        except _TORCH_POLICY_ERRORS:
             seed_bundle["torch"] = int(seed)
 
     # Torch-specific controls.
@@ -147,7 +153,7 @@ def apply_determinism_preset(
                 if hasattr(torch, "set_num_interop_threads"):
                     torch.set_num_interop_threads(threads_i)
                 torch_flags["torch_threads"] = threads_i
-            except Exception:
+            except _TORCH_POLICY_ERRORS:
                 level = "tolerance"
                 notes.append("torch_thread_caps_failed")
 
@@ -161,7 +167,7 @@ def apply_determinism_preset(
                 cudnn_mod = getattr(torch.backends, "cudnn", None)
                 if cudnn_mod is not None and hasattr(cudnn_mod, "allow_tf32"):
                     cudnn_mod.allow_tf32 = False
-            except Exception:
+            except _TORCH_POLICY_ERRORS:
                 level = "tolerance"
                 notes.append("tf32_policy_failed")
 
@@ -169,14 +175,14 @@ def apply_determinism_preset(
             try:
                 if hasattr(torch, "use_deterministic_algorithms"):
                     torch.use_deterministic_algorithms(True, warn_only=False)
-            except Exception:
+            except _TORCH_POLICY_ERRORS:
                 # Downgrade to tolerance-based determinism rather than crashing.
                 level = "tolerance"
                 notes.append("deterministic_algorithms_unavailable")
                 try:
                     if hasattr(torch, "use_deterministic_algorithms"):
                         torch.use_deterministic_algorithms(True, warn_only=True)
-                except Exception:
+                except _TORCH_POLICY_ERRORS:
                     pass
 
             # cuDNN knobs.
@@ -186,7 +192,7 @@ def apply_determinism_preset(
                     cudnn_mod.benchmark = False
                     if hasattr(cudnn_mod, "deterministic"):
                         cudnn_mod.deterministic = True
-            except Exception:
+            except _TORCH_POLICY_ERRORS:
                 level = "tolerance"
                 notes.append("cudnn_determinism_failed")
 
@@ -197,7 +203,7 @@ def apply_determinism_preset(
                 )
                 if callable(det_enabled):
                     torch_flags["deterministic_algorithms"] = bool(det_enabled())
-            except Exception:
+            except _TORCH_POLICY_ERRORS:
                 pass
             try:
                 cudnn_mod = getattr(torch.backends, "cudnn", None)
@@ -212,7 +218,7 @@ def apply_determinism_preset(
                         torch_flags["cudnn_allow_tf32"] = bool(
                             getattr(cudnn_mod, "allow_tf32", False)
                         )
-            except Exception:
+            except _TORCH_POLICY_ERRORS:
                 pass
             try:
                 matmul = getattr(
@@ -220,7 +226,7 @@ def apply_determinism_preset(
                 )
                 if matmul is not None and hasattr(matmul, "allow_tf32"):
                     torch_flags["cuda_matmul_allow_tf32"] = bool(matmul.allow_tf32)
-            except Exception:
+            except _TORCH_POLICY_ERRORS:
                 pass
 
     # Normalized level is always one of these.
@@ -233,7 +239,7 @@ def apply_determinism_preset(
     # Extra breadcrumb: random module state is not easily serializable; include a coarse marker.
     try:
         torch_flags["python_random"] = isinstance(random.random(), float)
-    except Exception:
+    except _RANDOM_PROBE_ERRORS:
         pass
 
     payload = {

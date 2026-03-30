@@ -48,13 +48,6 @@
       "rationale": "Importlib-resource fallback is a compatibility path and does not decide runtime trust policy by itself."
     },
     {
-      "path": "src/invarlock/core/determinism_policy.py",
-      "subsystem": "core",
-      "bucket": "should_remove",
-      "lines": [30, 49, 56, 63, 106, 128, 134, 151, 165, 173, 180, 190, 201, 216, 224, 237],
-      "rationale": "Determinism enforcement is a trust-critical surface; blanket catches currently downgrade strict mode and hide failed controls."
-    },
-    {
       "path": "src/invarlock/core/error_encoding.py",
       "subsystem": "core",
       "bucket": "acceptable",
@@ -146,39 +139,11 @@
       "rationale": "Emergency rollback attempts are best-effort recovery paths that already preserve failure state in the report."
     },
     {
-      "path": "src/invarlock/core/runner_guards.py",
-      "subsystem": "core",
-      "bucket": "should_remove",
-      "lines": [123, 155, 170, 226, 277],
-      "rationale": "Guard policy application, preparation, and validation are trust-critical control paths and should not depend on blanket catches."
-    },
-    {
       "path": "src/invarlock/core/runner_latency.py",
       "subsystem": "core",
       "bucket": "acceptable",
       "lines": [35, 43, 51, 59, 74, 91, 97, 102, 113, 140, 146],
       "rationale": "Latency measurement wraps arbitrary tensor/model calls and immediately re-raises with explicit phase-specific errors."
-    },
-    {
-      "path": "src/invarlock/core/runner_pairing.py",
-      "subsystem": "core",
-      "bucket": "should_remove",
-      "lines": [92, 110],
-      "rationale": "Baseline pairing integrity is trust-critical for compare-and-evaluate and should fail on specific corrupt-reference cases instead of blanket fallback."
-    },
-    {
-      "path": "src/invarlock/guards/_estimators.py",
-      "subsystem": "guards",
-      "bucket": "should_remove",
-      "lines": [38, 147],
-      "rationale": "Estimator helpers feed guard evidence directly; defaulting to neutral values on arbitrary failures can hide evidence gaps."
-    },
-    {
-      "path": "src/invarlock/guards/invariants.py",
-      "subsystem": "guards",
-      "bucket": "should_remove",
-      "lines": [344, 364, 368, 387, 403, 414, 436, 452, 472, 502, 508, 510, 614, 632],
-      "rationale": "Invariant evidence capture is a trust-critical guard surface and still contains blanket catches that can hide missing or incomplete evidence."
     },
     {
       "path": "src/invarlock/guards/rmt_detection.py",
@@ -202,20 +167,6 @@
       "rationale": "Spectral correction records per-module failures explicitly, but model-control operations still deserve narrower exceptions."
     },
     {
-      "path": "src/invarlock/guards/spectral_detection.py",
-      "subsystem": "guards",
-      "bucket": "should_remove",
-      "lines": [342, 375, 412, 414],
-      "rationale": "Spectral violation detection is an evidence path; broad catches here can suppress real degeneracy signals."
-    },
-    {
-      "path": "src/invarlock/guards/spectral_measurement.py",
-      "subsystem": "guards",
-      "bucket": "should_remove",
-      "lines": [61],
-      "rationale": "Sigma measurement feeds guard evidence directly and should not drop back to neutral defaults on arbitrary failure."
-    },
-    {
       "path": "src/invarlock/guards/tier_config.py",
       "subsystem": "guards",
       "bucket": "acceptable",
@@ -228,41 +179,6 @@
       "bucket": "acceptable",
       "lines": [497],
       "rationale": "This catch only protects optional evidence dumping after variance evaluation completes."
-    },
-    {
-      "path": "src/invarlock/guards/variance_batching.py",
-      "subsystem": "guards",
-      "bucket": "should_remove",
-      "lines": [256],
-      "rationale": "Variance calibration batch scoring contributes to predictive-gate evidence and should not quietly null out fallback loss computation."
-    },
-    {
-      "path": "src/invarlock/guards/variance_evaluation.py",
-      "subsystem": "guards",
-      "bucket": "should_remove",
-      "lines": [237, 377],
-      "rationale": "Predictive-gate calibration is a trust-critical guard path and still uses blanket catches around evidence generation."
-    },
-    {
-      "path": "src/invarlock/guards/variance_ops.py",
-      "subsystem": "guards",
-      "bucket": "should_remove",
-      "lines": [157, 198, 297, 335],
-      "rationale": "Variance enable/disable and rollback operations should not collapse arbitrary failures into partial-success booleans."
-    },
-    {
-      "path": "src/invarlock/guards/variance_prepare.py",
-      "subsystem": "guards",
-      "bucket": "should_remove",
-      "lines": [224],
-      "rationale": "Variance guard preparation is a trust-critical setup path and should fail with narrower, typed exceptions."
-    },
-    {
-      "path": "src/invarlock/guards/variance_scaling.py",
-      "subsystem": "guards",
-      "bucket": "should_remove",
-      "lines": [150],
-      "rationale": "Scale proposal generation feeds direct guard action and should not blanket-swallow per-module failures."
     },
     {
       "path": "src/invarlock/cli/app.py",

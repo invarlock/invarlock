@@ -7,6 +7,8 @@ import torch
 
 from ._estimators import power_iter_sigma_max
 
+_SPECTRAL_MEASUREMENT_ERRORS = (RuntimeError, TypeError, ValueError)
+
 
 def compute_sigma_max(
     weight_matrix: Any,
@@ -56,7 +58,10 @@ def auto_sigma_target(
                 if sigma > 0:
                     spectral_norms.append(sigma)
         if spectral_norms:
-            return float(np.percentile(spectral_norms, percentile * 100))
+            try:
+                return float(np.percentile(spectral_norms, percentile * 100))
+            except _SPECTRAL_MEASUREMENT_ERRORS:
+                return percentile
         return percentile
     except (
         ArithmeticError,

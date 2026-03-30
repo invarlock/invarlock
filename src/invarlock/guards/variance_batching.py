@@ -16,6 +16,13 @@ from invarlock.utils.bootstrap import (
 
 from .variance_types import CalibrationBatchContext
 
+_VARIANCE_BATCHING_ERRORS = (
+    AttributeError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 def safe_mean(
     samples: list[float] | np.ndarray, default: float | None = None
@@ -253,7 +260,7 @@ def compute_ppl_for_batches(
                             ).item()
                         else:
                             loss_val = outputs.float().pow(2).mean().item()
-                    except Exception:
+                    except _VARIANCE_BATCHING_ERRORS:
                         loss_val = None
 
                 if loss_val is None or not math.isfinite(loss_val):

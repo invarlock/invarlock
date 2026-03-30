@@ -14,6 +14,14 @@ import torch.nn as nn
 from invarlock.core.api import Guard
 from invarlock.core.types import GuardDiagnostic, GuardOutcome, GuardValidationResult
 
+_INVARIANT_CAPTURE_ERRORS = (
+    AttributeError,
+    OverflowError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 class InvariantsGuard(Guard):
     """
@@ -341,7 +349,7 @@ class InvariantsGuard(Guard):
         try:
             param_count = sum(p.numel() for p in model.parameters())
             checks["parameter_count"] = param_count
-        except Exception as exc:
+        except _INVARIANT_CAPTURE_ERRORS as exc:
             checks["parameter_count"] = None
             evidence_gaps.append(
                 {
@@ -361,11 +369,11 @@ class InvariantsGuard(Guard):
                 if isinstance(module, nn.Embedding):
                     try:
                         embedding_vocab_sizes[name] = int(module.num_embeddings)
-                    except Exception:
+                    except _INVARIANT_CAPTURE_ERRORS:
                         weight = getattr(module, "weight", None)
                         if getattr(weight, "shape", None):
                             embedding_vocab_sizes[name] = int(weight.shape[0])
-        except Exception as exc:
+        except _INVARIANT_CAPTURE_ERRORS as exc:
             layer_norm_paths = []
             embedding_vocab_sizes = {}
             structure_items = []
@@ -384,7 +392,7 @@ class InvariantsGuard(Guard):
         try:
             if config_vocab is not None:
                 checks["config_vocab_size"] = int(config_vocab)
-        except Exception as exc:
+        except _INVARIANT_CAPTURE_ERRORS as exc:
             evidence_gaps.append(
                 {
                     "check": "config_vocab_size",
@@ -400,7 +408,7 @@ class InvariantsGuard(Guard):
                 return False
             try:
                 return left.data_ptr() == right.data_ptr()
-            except Exception:
+            except _INVARIANT_CAPTURE_ERRORS:
                 return False
 
         # GPT-2 style (transformer.wte <-> lm_head)
@@ -411,7 +419,7 @@ class InvariantsGuard(Guard):
             head_weight = getattr(lm_head, "weight", None)
             if embed_weight is not None and head_weight is not None:
                 weight_tying_flags["gpt2"] = _is_tied(embed_weight, head_weight)
-        except Exception as exc:
+        except _INVARIANT_CAPTURE_ERRORS as exc:
             evidence_gaps.append(
                 {
                     "check": "weight_tying_gpt2",
@@ -433,7 +441,7 @@ class InvariantsGuard(Guard):
             decoder_weight = getattr(decoder, "weight", None)
             if embed_weight is not None and decoder_weight is not None:
                 weight_tying_flags["bert"] = _is_tied(embed_weight, decoder_weight)
-        except Exception as exc:
+        except _INVARIANT_CAPTURE_ERRORS as exc:
             evidence_gaps.append(
                 {
                     "check": "weight_tying_bert",
@@ -449,7 +457,7 @@ class InvariantsGuard(Guard):
             head_weight = getattr(getattr(model, "lm_head", None), "weight", None)
             if embed_weight is not None and head_weight is not None:
                 weight_tying_flags["embed_tokens"] = _is_tied(embed_weight, head_weight)
-        except Exception as exc:
+        except _INVARIANT_CAPTURE_ERRORS as exc:
             evidence_gaps.append(
                 {
                     "check": "weight_tying_embed_tokens",
@@ -469,7 +477,7 @@ class InvariantsGuard(Guard):
             checks["structure_hash"] = hashlib.sha256(
                 canonical.encode("utf-8")
             ).hexdigest()[:16]
-        except Exception as exc:
+        except _INVARIANT_CAPTURE_ERRORS as exc:
             checks["structure_hash"] = None
             evidence_gaps.append(
                 {
@@ -499,15 +507,15 @@ class InvariantsGuard(Guard):
                 try:
                     if not torch.isfinite(param).all():
                         locations.append(f"parameter::{name}")
-                except Exception:
+                except _INVARIANT_CAPTURE_ERRORS:
                     continue
             for name, buffer in model.named_buffers():
                 try:
                     if not torch.isfinite(buffer).all():
                         locations.append(f"buffer::{name}")
-                except Exception:
+                except _INVARIANT_CAPTURE_ERRORS:
                     continue
-        except Exception:
+        except _INVARIANT_CAPTURE_ERRORS:
             return locations
         return locations
 
@@ -611,7 +619,7 @@ def _check_standard_invariants(model: Any) -> dict[str, dict[str, Any]]:
             "count": param_count,
             "message": f"Parameter count: {param_count}",
         }
-    except Exception as e:
+    except _INVARIANT_CAPTURE_ERRORS as e:
         checks["parameter_count"] = {
             "passed": False,
             "message": f"Could not count parameters: {e}",
@@ -629,7 +637,7 @@ def _check_standard_invariants(model: Any) -> dict[str, dict[str, Any]]:
             "passed": not has_nan,
             "message": "NaN parameters detected" if has_nan else "No NaN parameters",
         }
-    except Exception as e:
+    except _INVARIANT_CAPTURE_ERRORS as e:
         checks["no_nan_parameters"] = {
             "passed": False,
             "message": f"Could not check for NaN: {e}",

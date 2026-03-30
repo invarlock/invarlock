@@ -52,19 +52,26 @@ def test_reporting_broad_exception_count_stays_zero() -> None:
     assert not reporting_paths, "\n".join(reporting_paths)
 
 
-def test_should_remove_bucket_keeps_trust_critical_surfaces_explicit() -> None:
+def test_should_remove_bucket_is_empty() -> None:
     contract = _load_contract()
-    must_include = {
+    actual = [entry for entry in contract["entries"] if entry["bucket"] == "should_remove"]
+    assert actual == []
+
+
+def test_former_trust_critical_paths_no_longer_use_broad_exception() -> None:
+    actual = _scan_broad_exception_sites()
+    must_be_absent = {
         "src/invarlock/core/determinism_policy.py",
         "src/invarlock/core/runner_guards.py",
         "src/invarlock/core/runner_pairing.py",
+        "src/invarlock/guards/_estimators.py",
         "src/invarlock/guards/invariants.py",
         "src/invarlock/guards/spectral_detection.py",
+        "src/invarlock/guards/spectral_measurement.py",
+        "src/invarlock/guards/variance_batching.py",
+        "src/invarlock/guards/variance_evaluation.py",
+        "src/invarlock/guards/variance_ops.py",
         "src/invarlock/guards/variance_prepare.py",
+        "src/invarlock/guards/variance_scaling.py",
     }
-    actual = {
-        str(entry["path"]).replace("\\", "/")
-        for entry in contract["entries"]
-        if entry["bucket"] == "should_remove"
-    }
-    assert must_include.issubset(actual)
+    assert must_be_absent.isdisjoint(actual)

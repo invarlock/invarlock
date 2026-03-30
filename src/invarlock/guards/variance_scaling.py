@@ -14,6 +14,7 @@ import torch.nn as nn
 from .variance_types import ScaleComputationResult
 
 ProgressPhase = Literal["calibration"]
+_VARIANCE_SCALING_ERRORS = (AttributeError, RuntimeError, TypeError, ValueError)
 
 
 @dataclass(frozen=True)
@@ -147,7 +148,7 @@ def equalise_residual_variance(
                 continue
             try:
                 dim = candidate.dim()
-            except Exception:
+            except _VARIANCE_SCALING_ERRORS:
                 dim = getattr(candidate, "ndim", None)
             if dim in (2, 3):
                 return [proj]

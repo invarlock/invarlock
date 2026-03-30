@@ -12,6 +12,14 @@ from .types import GuardDiagnostic, GuardValidationResult, LogLevel
 ResolveTierPoliciesFn = Callable[
     [str, str | None, dict[str, Any]], dict[str, dict[str, Any]]
 ]
+_HANDLED_GUARD_ERRORS = (
+    AttributeError,
+    InvarlockError,
+    KeyError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 
 def _coerce_diagnostics(raw: Any) -> list[dict[str, Any]]:
@@ -120,7 +128,7 @@ def resolve_guard_policies(
 
     try:
         policies = resolver(tier, edit_name, explicit_overrides)
-    except Exception as error:
+    except _HANDLED_GUARD_ERRORS as error:
         runner._log_event(
             "auto_tuning",
             "tier_resolution_failed",
@@ -152,7 +160,7 @@ def apply_guard_policy(runner: Any, guard: Guard, policy: dict[str, Any]) -> Non
                 guard_policy[param_name] = param_value
             else:
                 setattr(guard, param_name, param_value)
-    except Exception as error:
+    except _HANDLED_GUARD_ERRORS as error:
         runner._log_event(
             "auto_tuning",
             "policy_application_failed",
@@ -167,7 +175,7 @@ def _set_guard_run_context(guard: Guard, report: RunReport) -> None:
         return
     try:
         guard.set_run_context(report)
-    except Exception as exc:
+    except _HANDLED_GUARD_ERRORS as exc:
         raise RuntimeError(
             f"Guard '{guard.name}' run context setup failed: {exc}"
         ) from exc
@@ -223,7 +231,7 @@ def prepare_guards_phase(
                     LogLevel.INFO,
                     {"guard": guard.name, "reason": "no_prepare_method"},
                 )
-        except Exception as error:
+        except _HANDLED_GUARD_ERRORS as error:
             runner._log_event(
                 "guard_prepare",
                 "error",
@@ -274,7 +282,7 @@ def guard_phase(
                 LogLevel.INFO,
                 {"guard": guard.name, "status": status},
             )
-        except Exception as error:
+        except _HANDLED_GUARD_ERRORS as error:
             runner._log_event(
                 "guard",
                 "error",
