@@ -115,7 +115,8 @@ class TestEvaluationReportHelpers:
         section, passed = _prepare_guard_overhead_section(raw)
         # Missing/invalid inputs: mark not evaluated and soft-pass
         assert passed is True
-        assert section["errors"]
+        assert section["diagnostics"]
+        assert section["diagnostics"][0]["severity"] == "warning"
         assert section["evaluated"] is False
 
     def test_prepare_guard_overhead_structured_reports(self):
@@ -134,9 +135,14 @@ class TestEvaluationReportHelpers:
                     "bare_ppl": 98.0,
                     "guarded_ppl": 99.0,
                 }
-                self.messages = ["ok"]
-                self.warnings = []
-                self.errors = []
+                self.diagnostics = [
+                    {
+                        "kind": "guard_overhead_info",
+                        "severity": "info",
+                        "message": "ok",
+                        "details": {},
+                    }
+                ]
                 self.checks = {"ppl": True}
                 self.passed = True
 
@@ -158,6 +164,7 @@ class TestEvaluationReportHelpers:
         assert section["overhead_ratio"] == pytest.approx(1.015)
         assert section["source"] == "structured"
         assert section["checks"]["ppl"] is True
+        assert section["diagnostics"][0]["message"] == "ok"
 
     def test_pair_logloss_windows_invalid_inputs(self):
         assert _pair_logloss_windows(None, {}) is None

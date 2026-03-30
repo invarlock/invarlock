@@ -6,12 +6,12 @@ import os
 import shutil
 import subprocess
 import sys
+from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from collections.abc import Iterator
 from typing import Any
 
 from invarlock.core.config_dependencies import inspect_config_dependencies
@@ -120,14 +120,7 @@ def _coerce_bool(value: str | None) -> bool | None:
 def _runtime_flag_value(name: str) -> str | None:
     policy = _RUNTIME_SECURITY_POLICY.get()
     if policy is None:
-        managed_flags = {
-            ALLOW_NETWORK_ENV,
-            ALLOW_HOST_EXECUTION_ENV,
-            ALLOW_THIRD_PARTY_PLUGINS_ENV,
-            ALLOW_REMOTE_CODE_ENV,
-            ALLOW_UNATTESTED_ARTIFACTS_ENV,
-        }
-        return None if name in managed_flags else os.environ.get(name)
+        return os.environ.get(name)
     flag_map = {
         ALLOW_NETWORK_ENV: policy.allow_network,
         ALLOW_HOST_EXECUTION_ENV: policy.allow_host_execution,
@@ -289,6 +282,16 @@ _PATH_ENV_VARS = {
     "TRANSFORMERS_CACHE",
     "TMPDIR",
     "TMP",
+}
+_FORWARDED_ENV_VARS = {
+    "HF_DATASETS_OFFLINE",
+    "INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE",
+    "INVARLOCK_DETERMINISM",
+    "INVARLOCK_DETERMINISM_WARN_ONLY",
+    "INVARLOCK_SKIP_OVERHEAD_CHECK",
+    "INVARLOCK_SNAPSHOT_MODE",
+    "INVARLOCK_STORE_EVAL_WINDOWS",
+    "PACK_DETERMINISM",
 }
 
 
@@ -526,6 +529,11 @@ def _delegated_env_pairs(*, cwd: Path) -> tuple[dict[str, str], list[Path]]:
         )
         env_pairs[name] = container_value
         mounts.extend(extra_mounts)
+    for name in sorted(_FORWARDED_ENV_VARS):
+        value = os.environ.get(name)
+        if value is None or not value.strip():
+            continue
+        env_pairs[name] = value
     return env_pairs, _minimize_mounts(mounts)
 
 

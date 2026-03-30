@@ -245,7 +245,9 @@ def test_prepare_guard_overhead_section_fallback_paths():
     assert passed is True
 
     # Unavailable ratio path → not evaluated and soft-pass
-    out2, passed2 = report_overhead_mod.prepare_guard_overhead_section({"source": "unit"})
+    out2, passed2 = report_overhead_mod.prepare_guard_overhead_section(
+        {"source": "unit"}
+    )
     assert out2.get("evaluated") is False and out2.get("passed") is True
     assert any(
         "unavailable" in item.get("message", "").lower()

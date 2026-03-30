@@ -40,7 +40,9 @@ def normalize_family_caps(
     return default_family_caps() if default else {}
 
 
-def _policy_invalid(param: str, reason: str, *, value: Any | None = None) -> ValidationError:
+def _policy_invalid(
+    param: str, reason: str, *, value: Any | None = None
+) -> ValidationError:
     details: dict[str, Any] = {"param": param, "reason": reason}
     if value is not None:
         details["value"] = value
@@ -95,9 +97,13 @@ def normalize_multiple_testing_config(value: Any | None) -> dict[str, Any]:
     if method not in {"bh", "bonferroni"}:
         raise _policy_invalid("multiple_testing.method", "must be 'bh' or 'bonferroni'")
     alpha_value = mt_policy.get("alpha", 0.05)
-    alpha = _require_policy_float("multiple_testing.alpha", alpha_value, minimum=0.0, maximum=1.0)
+    alpha = _require_policy_float(
+        "multiple_testing.alpha", alpha_value, minimum=0.0, maximum=1.0
+    )
     if alpha <= 0.0:
-        raise _policy_invalid("multiple_testing.alpha", "must be > 0", value=alpha_value)
+        raise _policy_invalid(
+            "multiple_testing.alpha", "must be > 0", value=alpha_value
+        )
     m_value = mt_policy.get("m", 4)
     m = _require_policy_int("multiple_testing.m", m_value, minimum=1)
     return {"method": method, "alpha": alpha, "m": m}
@@ -109,7 +115,9 @@ def multiple_testing_alpha(value: Any | None) -> float:
 
 def normalize_estimator_config(value: Any | None) -> dict[str, Any]:
     estimator_policy = _require_policy_mapping("estimator", value)
-    iters = _require_policy_int("estimator.iters", estimator_policy.get("iters", 4), minimum=1)
+    iters = _require_policy_int(
+        "estimator.iters", estimator_policy.get("iters", 4), minimum=1
+    )
     init = str(estimator_policy.get("init", "ones") or "ones").strip().lower()
     if init not in {"ones", "e0"}:
         raise _policy_invalid("estimator.init", "must be 'ones' or 'e0'", value=init)

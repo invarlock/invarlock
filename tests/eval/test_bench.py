@@ -555,6 +555,183 @@ def test_execute_single_run_invalid_edit_payload_surfaces_failure(
     assert result.error_message is not None
     assert "invalid edit metadata payload" in result.error_message
 
+
+def test_bench_runner_helper_validations() -> None:
+    import invarlock.eval.bench_runner as bench_runner_mod
+
+    with pytest.raises(RuntimeError, match="dataset section must be a mapping"):
+        bench_runner_mod._assign_dataset_provider(
+            {"dataset": []}, "wikitext2", run_label="bare"
+        )
+
+    ok = RunResult("bare", _report_with_artifacts("report.json"), success=True)
+    assert (
+        bench_runner_mod._extract_success_report_path(ok, run_label="bare")
+        == "report.json"
+    )
+
+    with pytest.raises(RuntimeError, match="mapping report payload"):
+        bench_runner_mod._extract_success_report_path(
+            RunResult("bare", "bad", success=True), run_label="bare"
+        )
+    with pytest.raises(RuntimeError, match="artifacts metadata"):
+        bench_runner_mod._extract_success_report_path(
+            RunResult("bare", {"artifacts": []}, success=True),
+            run_label="bare",
+        )
+    with pytest.raises(RuntimeError, match="artifacts.report_path"):
+        bench_runner_mod._extract_success_report_path(
+            RunResult("bare", {"artifacts": {}}, success=True),
+            run_label="bare",
+        )
+
+
+def test_execute_single_run_plan_digest_none_and_non_dict_guards_are_tolerated(
+    monkeypatch, tmp_path: Path
+) -> None:
+    import types
+
+    import invarlock.core.registry as core_registry
+    import invarlock.core.runner as core_runner
+    import invarlock.eval.bench_runner as bench_runner_mod
+
+    class _Adapter:
+        def restore(self, _model, _blob):  # noqa: ANN001
+            return None
+
+    class _Registry:
+        def get_edit(self, _name: str):  # noqa: ANN001
+            return object()
+
+    class _CoreRunner:
+        def execute(self, **_kwargs):  # noqa: ANN001
+            return types.SimpleNamespace(
+                meta={},
+                edit={"plan_digest": None, "deltas": {}},
+                metrics={},
+                evaluation_windows=[],
+                guards={"variance": "skip-me"},
+                status="ok",
+            )
+
+    monkeypatch.setattr(core_registry, "get_registry", lambda: _Registry())
+    monkeypatch.setattr(core_runner, "CoreRunner", _CoreRunner)
+    monkeypatch.setattr(
+        bench_runner_mod.rmt_detection,
+        "rmt_detect",
+        lambda **_k: {"n_layers_flagged": 0},
+    )
+
+    scenario = ScenarioConfig(
+        edit="quant_rtn", tier="balanced", probes=0, profile="ci", device="cpu"
+    )
+    runtime = {
+        "adapter": _Adapter(),
+        "model": object(),
+        "baseline_snapshot": b"blob",
+        "pairing_schedule": {},
+        "calibration_data": [],
+        "rmt_baseline_mp_stats": {},
+        "rmt_baseline_sigmas": {},
+        "dataset_name": "wikitext2",
+        "split": "validation",
+    }
+
+    result = execute_single_run(
+        {"dataset": {"provider": "wikitext2"}, "edit": {"plan": {}}},
+        scenario,
+        "bare",
+        tmp_path,
+        runtime=runtime,
+    )
+    assert result.success is True
+    assert result.report["edit"]["plan_digest"] == ""
+    assert result.report["guards"] == []
+
+
+def test_execute_scenario_writes_pairing_schedule_and_telemetry_summary(
+    monkeypatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    import invarlock.eval.bench_runner as bench_runner_mod
+
+    bare = RunResult("bare", _report_with_artifacts("bare.json"), success=True)
+    guarded = RunResult("guarded", _report_with_artifacts("guarded.json"), success=True)
+
+    def _fake_execute_single_run(_cfg, _scenario, run_type, _dir, *, runtime):  # noqa: ANN001
+        runtime["pairing_schedule"] = {"preview": {}, "final": {}}
+        return bare if run_type == "bare" else guarded
+
+    monkeypatch.setattr(bench_runner_mod, "execute_single_run", _fake_execute_single_run)
+    monkeypatch.setattr(
+        bench_runner_mod,
+        "resolve_epsilon_from_runtime",
+        lambda _report: 0.2,
+    )
+    monkeypatch.setattr(
+        "invarlock.reporting.report_make.make_report",
+        lambda guarded_report, bare_report: {  # noqa: ARG005
+            "summary": {"status": "ok"}
+        },
+    )
+    monkeypatch.setattr(
+        "invarlock.reporting.report_telemetry.telemetry_output_enabled",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        "invarlock.reporting.report_telemetry.telemetry_summary_line",
+        lambda _report: "telemetry summary",
+    )
+
+    caplog.set_level("INFO")
+    scenario = ScenarioConfig(edit="quant_rtn", tier="balanced", probes=1)
+    config = BenchmarkConfig(
+        edits=["quant_rtn"],
+        tiers=["balanced"],
+        probes=[1],
+        dataset="wikitext2",
+        output_dir=tmp_path,
+    )
+
+    result = execute_scenario(scenario, config, tmp_path)
+    scenario_slug = f"{scenario.edit}__{scenario.tier}__p{scenario.probes}"
+    scenario_dir = tmp_path / "scenarios" / scenario_slug
+    assert (scenario_dir / "pairing_schedule.json").exists()
+    assert "evaluation_report" in result.artifacts
+    assert "telemetry summary" in caplog.text
+
+
+def test_execute_scenario_defaults_epsilon_when_runs_fail_without_reports(
+    monkeypatch, tmp_path: Path
+) -> None:
+    import invarlock.eval.bench_runner as bench_runner_mod
+
+    bare = RunResult("bare", create_empty_report(), success=False, error_message="bare")
+    guarded = RunResult(
+        "guarded", create_empty_report(), success=False, error_message="guarded"
+    )
+
+    monkeypatch.setattr(
+        bench_runner_mod,
+        "execute_single_run",
+        lambda _cfg, _scenario, run_type, _dir, *, runtime: (  # noqa: ARG005
+            bare if run_type == "bare" else guarded
+        ),
+    )
+
+    scenario = ScenarioConfig(edit="quant_rtn", tier="balanced", probes=1)
+    config = BenchmarkConfig(
+        edits=["quant_rtn"],
+        tiers=["balanced"],
+        probes=[1],
+        dataset="wikitext2",
+        output_dir=tmp_path,
+    )
+
+    result = execute_scenario(scenario, config, tmp_path)
+    assert result.epsilon_used == 0.10
+    assert "bare_report" not in result.artifacts
+    assert result.metrics == {"error_bare": "bare", "error_guarded": "guarded"}
+
     def test_compute_comparison_metrics_invalid_inputs(self):
         """Test comparison with invalid inputs."""
         bare_result = None
@@ -1310,9 +1487,7 @@ class TestExecuteSingleRun:
         assert calls["provider"] == 0
         assert calls["capture"] == 0
 
-    def test_execute_single_run_rmt_detection_failure_surfaces_error(
-        self, monkeypatch
-    ):
+    def test_execute_single_run_rmt_detection_failure_surfaces_error(self, monkeypatch):
         from types import SimpleNamespace
 
         from invarlock.eval.data import EvaluationWindow
@@ -1397,7 +1572,8 @@ class TestExecuteSingleRun:
             "invarlock.core.registry.get_registry", lambda: DummyRegistry()
         )
         monkeypatch.setattr(
-            "invarlock.core.runner.CoreRunner.execute", lambda *_a, **_k: DummyCoreReport()
+            "invarlock.core.runner.CoreRunner.execute",
+            lambda *_a, **_k: DummyCoreReport(),
         )
         monkeypatch.setattr(
             "invarlock.eval.bench_runner.rmt_analysis.capture_baseline_mp_stats",
@@ -1510,12 +1686,15 @@ class TestExecuteScenario:
         )
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch(
-                "invarlock.reporting.report_make.make_report",
-                return_value=create_empty_report(),
-            ), patch(
-                "invarlock.reporting.report_telemetry.telemetry_output_enabled",
-                return_value=False,
+            with (
+                patch(
+                    "invarlock.reporting.report_make.make_report",
+                    return_value=create_empty_report(),
+                ),
+                patch(
+                    "invarlock.reporting.report_telemetry.telemetry_output_enabled",
+                    return_value=False,
+                ),
             ):
                 result = execute_scenario(scenario, config, Path(temp_dir))
 
@@ -1579,15 +1758,19 @@ class TestExecuteScenario:
         config = BenchmarkConfig(edits=["quant_rtn"], tiers=["balanced"], probes=[1])
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch(
-                "invarlock.reporting.report_make.make_report",
-                side_effect=RuntimeError("report boom"),
-            ), patch(
-                "invarlock.reporting.report_telemetry.telemetry_output_enabled",
-                return_value=False,
-            ), pytest.raises(
-                RuntimeError,
-                match="Evaluation report generation failed for quant_rtn__balanced__p1",
+            with (
+                patch(
+                    "invarlock.reporting.report_make.make_report",
+                    side_effect=RuntimeError("report boom"),
+                ),
+                patch(
+                    "invarlock.reporting.report_telemetry.telemetry_output_enabled",
+                    return_value=False,
+                ),
+                pytest.raises(
+                    RuntimeError,
+                    match="Evaluation report generation failed for quant_rtn__balanced__p1",
+                ),
             ):
                 execute_scenario(scenario, config, Path(temp_dir))
 

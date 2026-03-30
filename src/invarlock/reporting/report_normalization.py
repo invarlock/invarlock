@@ -120,6 +120,15 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
         except _PARSE_EXCEPTIONS:
             return ""
 
+    def _optional_short_string(value: Any, *, limit: int | None = None) -> str | None:
+        try:
+            text = str(value).strip()
+        except _PARSE_EXCEPTIONS:
+            return None
+        if not text:
+            return None
+        return text[:limit] if limit is not None else text
+
     def _derive_ppl_from_logloss_block(block: Any) -> float | None:
         if not isinstance(block, dict):
             return None
@@ -211,17 +220,25 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
                         "primary metric block or finite ppl_final."
                     )
                 return {
-                    "run_id": baseline.get("meta", {}).get("commit_sha", "unknown")[
-                        :16
-                    ],
-                    "model_id": baseline.get("meta", {}).get("model_id", "unknown"),
+                    "run_id": _optional_short_string(
+                        baseline.get("meta", {}).get("commit_sha"),
+                        limit=16,
+                    ),
+                    "model_id": _optional_short_string(
+                        baseline.get("meta", {}).get("model_id")
+                    ),
                     "spectral": baseline.get("spectral_base", {}),
                     "rmt": baseline.get("rmt_base", {}),
                     "invariants": baseline.get("invariants", {}),
                 }
             out: dict[str, Any] = {
-                "run_id": baseline.get("meta", {}).get("commit_sha", "unknown")[:16],
-                "model_id": baseline.get("meta", {}).get("model_id", "unknown"),
+                "run_id": _optional_short_string(
+                    baseline.get("meta", {}).get("commit_sha"),
+                    limit=16,
+                ),
+                "model_id": _optional_short_string(
+                    baseline.get("meta", {}).get("model_id")
+                ),
                 "spectral": baseline.get("spectral_base", {}),
                 "rmt": baseline.get("rmt_base", {}),
                 "invariants": baseline.get("invariants", {}),
@@ -231,8 +248,13 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
             return out
         ppl_final = _coerce_valid_ppl(ppl_final_raw, label="metrics.ppl_final")
         return {
-            "run_id": baseline.get("meta", {}).get("commit_sha", "unknown")[:16],
-            "model_id": baseline.get("meta", {}).get("model_id", "unknown"),
+            "run_id": _optional_short_string(
+                baseline.get("meta", {}).get("commit_sha"),
+                limit=16,
+            ),
+            "model_id": _optional_short_string(
+                baseline.get("meta", {}).get("model_id")
+            ),
             "ppl_final": ppl_final,
             "spectral": baseline.get("spectral_base", {}),
             "rmt": baseline.get("rmt_base", {}),

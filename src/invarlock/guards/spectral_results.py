@@ -114,10 +114,14 @@ def build_spectral_diagnostics(
 ) -> list[dict[str, Any]]:
     diagnostics: list[dict[str, Any]] = []
     for violation in selected_violations:
-        severity = "error" if (
-            violation.get("severity") == "fatal"
-            or violation.get("type") == "max_spectral_norm"
-        ) else "warning"
+        severity = (
+            "error"
+            if (
+                violation.get("severity") == "fatal"
+                or violation.get("type") == "max_spectral_norm"
+            )
+            else "warning"
+        )
         diagnostics.append(
             {
                 "kind": str(violation.get("type", "spectral_violation")),

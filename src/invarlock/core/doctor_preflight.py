@@ -200,6 +200,7 @@ def run_doctor_config_preflight(
             adapter=getattr(model_cfg, "adapter", None),
         )
     except _DOCTOR_PREFLIGHT_NON_FATAL_EXCEPTIONS as exc:
+        model_profile = SimpleNamespace(default_loss=None)
         findings.append(
             _error_finding(
                 "D016",
@@ -210,80 +211,79 @@ def run_doctor_config_preflight(
         )
         had_error = True
 
-    if model_profile is not None:
-        try:
-            metric_kind, provider_kind, _metric_opts = (
-                metric_provider_resolution.resolve_metric_and_provider(
-                    cfg,
-                    model_profile,
-                    resolved_loss_type=getattr(model_profile, "default_loss", None),
-                )
+    try:
+        metric_kind, provider_kind, _metric_opts = (
+            metric_provider_resolution.resolve_metric_and_provider(
+                cfg,
+                model_profile,
+                resolved_loss_type=getattr(model_profile, "default_loss", None),
             )
-        except _DOCTOR_PREFLIGHT_NON_FATAL_EXCEPTIONS as exc:
-            metric_kind = None
-            provider_kind = None
-            findings.append(
-                _error_finding(
-                    "D017",
-                    "Metric/provider resolution failed",
-                    field="eval.primary_metric",
-                    exc=exc,
-                )
+        )
+    except _DOCTOR_PREFLIGHT_NON_FATAL_EXCEPTIONS as exc:
+        metric_kind = None
+        provider_kind = None
+        findings.append(
+            _error_finding(
+                "D017",
+                "Metric/provider resolution failed",
+                field="eval.primary_metric",
+                exc=exc,
             )
-            had_error = True
-        else:
-            lines.append(f"  Metric: {metric_kind} · Provider: {provider_kind}")
-            if provider_kind:
-                try:
-                    from invarlock import model_profile as model_profile_mod
-                    from invarlock.eval.data import get_provider
+        )
+        had_error = True
+    else:
+        lines.append(f"  Metric: {metric_kind} · Provider: {provider_kind}")
+        if provider_kind:
+            try:
+                from invarlock import model_profile as model_profile_mod
+                from invarlock.eval.data import get_provider
 
-                    provider = get_provider(provider_kind)
-                    tokenizer, tokenizer_hash = model_profile_mod.resolve_tokenizer(
-                        model_profile
+                provider = get_provider(provider_kind)
+                tokenizer, tokenizer_hash = model_profile_mod.resolve_tokenizer(
+                    model_profile
+                )
+                lines.append(
+                    f"  Tokenizer: {tokenizer.__class__.__name__} · hash={tokenizer_hash}"
+                )
+                estimate_capacity = getattr(provider, "estimate_capacity", None)
+                if callable(estimate_capacity):
+                    cap = estimate_capacity(
+                        tokenizer=tokenizer,
+                        seq_len=_mapping_get(dataset_cfg, "seq_len"),
+                        stride=_mapping_get(dataset_cfg, "stride"),
+                        split=_mapping_get(dataset_cfg, "split") or "validation",
+                        target_total=int(
+                            (_mapping_get(dataset_cfg, "preview_n") or 0)
+                            + (_mapping_get(dataset_cfg, "final_n") or 0)
+                        ),
+                        fast_mode=True,
                     )
+                    capacity_findings, insufficient, policy_meta = (
+                        build_capacity_findings(
+                            cap=cap if isinstance(cap, dict) else {},
+                            tier=(tier or "balanced"),
+                        )
+                    )
+                    had_error = _append_findings(
+                        findings,
+                        capacity_findings,
+                        had_error=had_error,
+                        incoming_error=insufficient,
+                    )
+                else:
                     lines.append(
-                        f"  Tokenizer: {tokenizer.__class__.__name__} · hash={tokenizer_hash}"
+                        "  [dim]Provider does not expose estimate_capacity()[/dim]"
                     )
-                    estimate_capacity = getattr(provider, "estimate_capacity", None)
-                    if callable(estimate_capacity):
-                        cap = estimate_capacity(
-                            tokenizer=tokenizer,
-                            seq_len=_mapping_get(dataset_cfg, "seq_len"),
-                            stride=_mapping_get(dataset_cfg, "stride"),
-                            split=_mapping_get(dataset_cfg, "split") or "validation",
-                            target_total=int(
-                                (_mapping_get(dataset_cfg, "preview_n") or 0)
-                                + (_mapping_get(dataset_cfg, "final_n") or 0)
-                            ),
-                            fast_mode=True,
-                        )
-                        capacity_findings, insufficient, policy_meta = (
-                            build_capacity_findings(
-                                cap=cap if isinstance(cap, dict) else {},
-                                tier=(tier or "balanced"),
-                            )
-                        )
-                        had_error = _append_findings(
-                            findings,
-                            capacity_findings,
-                            had_error=had_error,
-                            incoming_error=insufficient,
-                        )
-                    else:
-                        lines.append(
-                            "  [dim]Provider does not expose estimate_capacity()[/dim]"
-                        )
-                except _DOCTOR_PREFLIGHT_NON_FATAL_EXCEPTIONS as exc:
-                    findings.append(
-                        _error_finding(
-                            "D018",
-                            "Provider capacity inspection failed",
-                            field="dataset.provider",
-                            exc=exc,
-                        )
+            except _DOCTOR_PREFLIGHT_NON_FATAL_EXCEPTIONS as exc:
+                findings.append(
+                    _error_finding(
+                        "D018",
+                        "Provider capacity inspection failed",
+                        field="dataset.provider",
+                        exc=exc,
                     )
-                    had_error = True
+                )
+                had_error = True
 
     return DoctorConfigPreflightResult(
         lines=tuple(lines),

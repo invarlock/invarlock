@@ -192,9 +192,7 @@ class RTNQuantEdit(ModelEdit):
                 32 * scales_per_group / target_params
             )  # 32-bit scales
 
-        memory_reduction_estimate = (
-            target_params * (32 - bits_per_param) / 8
-        )  # bytes
+        memory_reduction_estimate = target_params * (32 - bits_per_param) / 8  # bytes
 
         preview_metrics = {
             "preview_duration": 0.0,
@@ -378,7 +376,9 @@ class RTNQuantEdit(ModelEdit):
                 "layers_modified": len(modified_layers),
             },
             "config": plan_data,
-            "model_desc": adapter.describe(model) if hasattr(adapter, "describe") else {},
+            "model_desc": adapter.describe(model)
+            if hasattr(adapter, "describe")
+            else {},
         }
 
     def _identify_target_modules(self, model: nn.Module) -> list[tuple[str, nn.Module]]:

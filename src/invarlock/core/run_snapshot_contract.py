@@ -114,6 +114,11 @@ def build_snapshot_execution_plan(
         env_ram_fraction=environ.get("INVARLOCK_SNAPSHOT_AUTO_RAM_FRACTION"),
         env_threshold_mb=environ.get("INVARLOCK_SNAPSHOT_THRESHOLD_MB"),
     )
+    bytes_fallback_exceptions = (
+        non_fatal_exceptions
+        if RuntimeError in non_fatal_exceptions
+        else non_fatal_exceptions + (RuntimeError,)
+    )
 
     try:
         if mode == "chunked":
@@ -135,7 +140,7 @@ def build_snapshot_execution_plan(
         if mode == "bytes":
             try:
                 base_blob = adapter.snapshot(model)  # type: ignore[attr-defined]
-            except non_fatal_exceptions as exc:
+            except bytes_fallback_exceptions as exc:
                 if not supports_chunked:
                     raise
                 snapshot_tmpdir = adapter.snapshot_chunked(model)  # type: ignore[attr-defined]

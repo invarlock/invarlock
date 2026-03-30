@@ -3,8 +3,8 @@ from __future__ import annotations
 from copy import deepcopy
 
 from invarlock.reporting import report_make as report_make_mod
-from invarlock.reporting import report_primary_metric_analysis as report_pm_analysis_mod
 from invarlock.reporting import report_normalization as report_normalization_mod
+from invarlock.reporting import report_primary_metric_analysis as report_pm_analysis_mod
 from invarlock.reporting.report_make import make_report
 from tests.reporting.test_report_full_context import _rich_run_report
 
@@ -149,7 +149,5 @@ def test_make_evaluation_report_rejects_non_contract_allowlist_source_in_ci(
     codes = {entry.get("code") for entry in diagnostics if isinstance(entry, dict)}
 
     assert "policy.validation_allowlist_source_invalid" in codes
-    assert "validation_allowlist_fallback" not in evaluation_report[
-        "policy_provenance"
-    ]
+    assert "validation_allowlist_fallback" not in evaluation_report["policy_provenance"]
     assert evaluation_report["validation"]["primary_metric_acceptable"] is False

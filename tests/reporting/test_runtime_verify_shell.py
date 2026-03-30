@@ -21,7 +21,9 @@ def test_runtime_verify_reports_verifier_errors(monkeypatch, tmp_path: Path) -> 
     report = tmp_path / "evaluation.report.json"
     manifest = tmp_path / "runtime.manifest.json"
     monkeypatch.setattr(
-        runtime_verify, "_verify_report_manifest", lambda *_: ["bad digest", "missing runtime"]
+        runtime_verify,
+        "_verify_report_manifest",
+        lambda *_: ["bad digest", "missing runtime"],
     )
 
     result = runtime_verify.verify_runtime_manifest(report, manifest)

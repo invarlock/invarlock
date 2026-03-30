@@ -61,7 +61,9 @@ def test_measure_latency_returns_zero_for_short_samples():
         attention_masks=[[1, 1], [1, 1]],
     )
     with pytest.raises(MValidationError) as exc_info:
-        measure_latency(model, window, device="cpu", warmup_steps=1, measurement_steps=1)
+        measure_latency(
+            model, window, device="cpu", warmup_steps=1, measurement_steps=1
+        )
     assert (
         exc_info.value.details["reason"]
         == "latency measurement requires at least one sequence longer than 10 tokens"

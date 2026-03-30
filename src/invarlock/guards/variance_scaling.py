@@ -3,10 +3,10 @@ from __future__ import annotations
 import itertools
 import math
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 
 import torch
 import torch.nn as nn

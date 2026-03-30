@@ -5,6 +5,7 @@ import invarlock.guards.spectral as spectral_guard
 import invarlock.guards.spectral_detection as spectral_detection
 import invarlock.guards.spectral_measurement as spectral_measurement
 import invarlock.guards.spectral_policy as spectral_policy
+from invarlock.core.exceptions import ValidationError
 
 
 class _TinyModel:
@@ -79,7 +80,7 @@ def test_spectral_prepare_with_aliases(monkeypatch):
     policy = {
         "sigma_quantile": 0.9,
         "multiple_testing": {"method": "bh", "alpha": 0.05, "m": 4},
-        "estimator": {"iters": -1, "init": "e0"},
+        "estimator": {"iters": 1, "init": "e0"},
         "degeneracy": {
             "enabled": True,
             "stable_rank": {"warn_ratio": 0.75, "fatal_ratio": 0.5},
@@ -95,9 +96,7 @@ def test_spectral_prepare_with_aliases(monkeypatch):
     assert g.estimator["init"] == "e0"
 
 
-def test_spectral_prepare_estimator_invalid_iters_and_init_defaults(
-    monkeypatch,
-) -> None:
+def test_spectral_prepare_estimator_invalid_policy_raises(monkeypatch) -> None:
     monkeypatch.setattr(
         "invarlock.guards.spectral_measurement.capture_baseline_sigmas",
         lambda *a, **k: {"m": 1.0},
@@ -123,15 +122,13 @@ def test_spectral_prepare_estimator_invalid_iters_and_init_defaults(
         def named_modules(self):
             return iter([])
 
-    out = g.prepare(
-        DummyModel(),
-        object(),
-        None,
-        {"estimator": {"iters": "bad", "init": "bad"}},
-    )
-    assert out["ready"] is True
-    assert g.estimator["iters"] == 4
-    assert g.estimator["init"] == "ones"
+    with pytest.raises(ValidationError, match="POLICY-PARAM-INVALID"):
+        g.prepare(
+            DummyModel(),
+            object(),
+            None,
+            {"estimator": {"iters": "bad", "init": "bad"}},
+        )
 
 
 def test_spectral_prepare_coerces_max_spectral_norm_from_policy(monkeypatch) -> None:
@@ -196,16 +193,16 @@ def test_spectral_prepare_percentile_failure_falls_back_to_sigma_quantile(
     assert g.target_sigma == pytest.approx(g.sigma_quantile)
 
 
-def test_spectral_guard_init_parses_estimator_and_degeneracy_branches() -> None:
-    g_default = spectral_guard.SpectralGuard(
-        estimator={"iters": "bad", "init": "bad"}, degeneracy="bad"
-    )
-    assert g_default.estimator["iters"] == 4
-    assert g_default.estimator["init"] == "ones"
+def test_spectral_guard_init_rejects_invalid_policy_and_accepts_valid_degeneracy() -> (
+    None
+):
+    with pytest.raises(ValidationError, match="POLICY-PARAM-INVALID"):
+        spectral_guard.SpectralGuard(
+            estimator={"iters": "bad", "init": "bad"}, degeneracy="bad"
+        )
 
-    g_min = spectral_guard.SpectralGuard(estimator={"iters": -1, "init": "e0"})
-    assert g_min.estimator["iters"] == 1
-    assert g_min.estimator["init"] == "e0"
+    with pytest.raises(ValidationError, match="POLICY-PARAM-INVALID"):
+        spectral_guard.SpectralGuard(estimator={"iters": -1, "init": "e0"})
 
     g_dict = spectral_guard.SpectralGuard(degeneracy={"enabled": False})
     assert g_dict.degeneracy["enabled"] is False

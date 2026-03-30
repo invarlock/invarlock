@@ -52,9 +52,7 @@ def test_mi_gini_optimized_cpu_path_subsamples_when_n_gt_max(monkeypatch) -> Non
 
     feats = torch.ones(L, N, D)
     targ = torch.arange(N)
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, strict_validation=False
-    )
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
 
     out = activation_mod._mi_gini_optimized_cpu_path(
         feats, targ, max_per_layer=max_per_layer, config=cfg
@@ -97,9 +95,7 @@ def test_extract_fc1_activations_returns_none_on_block_attr_error(monkeypatch) -
         activation_mod, "_locate_transformer_blocks_enhanced", lambda _m: [_BadBlock()]
     )
 
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, strict_validation=False
-    )
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
     out = activation_mod._extract_fc1_activations(
         nn.Linear(2, 2),
         output=SimpleNamespace(hidden_states=[]),
@@ -113,9 +109,7 @@ def test_calculate_sigma_max_skips_when_dependency_missing() -> None:
         def is_available(self, _name: str) -> bool:  # noqa: ANN001
             return False
 
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, strict_validation=False
-    )
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
     out = activation_mod._calculate_sigma_max(
         nn.Linear(2, 2),
         first_batch={"input_ids": [1]},
@@ -131,9 +125,7 @@ def test_calculate_sigma_max_skips_when_first_batch_missing() -> None:
         def is_available(self, _name: str) -> bool:  # noqa: ANN001
             return True
 
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, strict_validation=False
-    )
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
     out = activation_mod._calculate_sigma_max(
         nn.Linear(2, 2),
         first_batch=None,
@@ -167,9 +159,7 @@ def test_calculate_mi_gini_returns_nan_for_missing_dependency_and_missing_activa
         def is_available(self, _name: str) -> bool:  # noqa: ANN001
             return True
 
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, strict_validation=False
-    )
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
     activation_data = {
         "fc1_activations": [torch.zeros(1, 1, 1, 1)],
         "targets": [torch.zeros(1, 1)],
@@ -225,9 +215,7 @@ def test_calculate_lens_metrics_unwraps_base_model_and_returns_on_no_hidden_stat
         },
     )
 
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, strict_validation=False
-    )
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
     dataloader = [{"input_ids": torch.zeros(1, 2, dtype=torch.long)}]
     out = metrics_mod.calculate_lens_metrics_for_model(
         _Wrapped(), dataloader, config=cfg
@@ -244,9 +232,7 @@ def test_calculate_lens_metrics_strict_validation_raises_on_activation_failure(
         lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("boom")),
     )
 
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, strict_validation=True
-    )
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=True)
     dataloader = [{"input_ids": torch.zeros(1, 2, dtype=torch.long)}]
     with pytest.raises(MetricsError):
         lens_mod.calculate_lens_metrics_for_model(
@@ -263,9 +249,7 @@ def test_calculate_lens_metrics_non_strict_continues_on_activation_failure(
         lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("boom")),
     )
 
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, strict_validation=False
-    )
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
     dataloader = [{"input_ids": torch.zeros(1, 2, dtype=torch.long)}]
     out = lens_mod.calculate_lens_metrics_for_model(
         nn.Linear(2, 2), dataloader, config=cfg
@@ -293,9 +277,7 @@ def test_perform_pre_eval_checks_handles_missing_context_attr_and_no_warning_pat
         def forward(self, **_kwargs):  # noqa: ANN001
             return SimpleNamespace(logits=torch.zeros(1, 1, 1))
 
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, strict_validation=False
-    )
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
     dataloader = [{"input_ids": torch.zeros(1, 2, dtype=torch.long)}]
     activation_mod._perform_pre_eval_checks(
         _Model(), dataloader, torch.device("cpu"), cfg
@@ -318,9 +300,7 @@ def test_perform_pre_eval_checks_skips_warning_when_seq_len_within_model_limit()
         def forward(self, **_kwargs):  # noqa: ANN001
             return SimpleNamespace(logits=torch.zeros(1, 1, 1))
 
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, strict_validation=False
-    )
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
     dataloader = [{"input_ids": torch.zeros(1, 5, dtype=torch.long)}]
     activation_mod._perform_pre_eval_checks(
         _Model(), dataloader, torch.device("cpu"), cfg
@@ -334,9 +314,7 @@ def test_extract_fc1_activations_skips_blocks_without_mlp(monkeypatch) -> None:
     monkeypatch.setattr(
         activation_mod, "_locate_transformer_blocks_enhanced", lambda _m: [_Block()]
     )
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, strict_validation=False
-    )
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
     out = activation_mod._extract_fc1_activations(
         nn.Linear(2, 2),
         output=SimpleNamespace(hidden_states=[]),
@@ -401,9 +379,7 @@ def test_calculate_mi_gini_oom_calls_empty_cache_when_cuda_available(
 
             return _oom
 
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, strict_validation=False
-    )
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
     activation_data = {
         "fc1_activations": [torch.zeros(1, 1, 2, 1)],
         "targets": [torch.zeros(1, 2, dtype=torch.long)],
@@ -431,9 +407,7 @@ def test_calculate_mi_gini_runtime_error_non_oom_takes_raise_path(monkeypatch) -
 
             return _boom
 
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, strict_validation=False
-    )
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
     activation_data = {
         "fc1_activations": [torch.zeros(1, 1, 2, 1)],
         "targets": [torch.zeros(1, 2, dtype=torch.long)],

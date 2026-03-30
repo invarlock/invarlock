@@ -147,7 +147,9 @@ def test_prepare_config_for_run_uses_default_event_import_and_propagates_auto_ad
             console=Console(file=StringIO(), force_terminal=False),
             load_config_fn=lambda path: _CfgWrap({"model": {}, "edit": {}, "auto": {}}),
             apply_profile_fn=lambda cfg, profile: cfg,  # noqa: ARG005
-            apply_auto_adapter_fn=lambda cfg: (_ for _ in ()).throw(RuntimeError("boom")),
+            apply_auto_adapter_fn=lambda cfg: (_ for _ in ()).throw(
+                RuntimeError("boom")
+            ),
         )
 
     assert ("INIT", "Loading configuration: config.yaml") in events

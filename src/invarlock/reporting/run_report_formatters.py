@@ -325,9 +325,7 @@ def _generate_single_markdown(report: RunReport) -> list[str]:
                 lines.append("**Violations:**")
                 for violation in guard["violations"]:
                     if isinstance(violation, dict):
-                        lines.append(
-                            f"- ⚠️ {violation.get('message', str(violation))}"
-                        )
+                        lines.append(f"- ⚠️ {violation.get('message', str(violation))}")
                     else:
                         lines.append(f"- ⚠️ {violation}")
                 lines.append("")

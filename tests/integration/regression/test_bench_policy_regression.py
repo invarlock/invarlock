@@ -147,6 +147,9 @@ def test_bench_policy_regression_against_golden(tmp_path: Path, monkeypatch) -> 
                     "violations": [],
                 },
             ]
+        report["artifacts"]["report_path"] = str(
+            output_dir / f"{scenario.edit}-{scenario.tier}-{run_type}.report.json"
+        )
         report["flags"].update({"guard_recovered": False, "rollback_reason": None})
         return bench.RunResult(run_type=run_type, report=report, success=True)
 

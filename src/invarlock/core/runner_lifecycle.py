@@ -23,10 +23,18 @@ def initialize_run_report(
     report.meta["config"] = serialized_config
 
     if config.context:
-        if isinstance(config.context, dict):
-            report.context = dict(config.context)
-        else:
-            report.context = dict(config.context)
+        normalized_context = (
+            dict(config.context)
+            if isinstance(config.context, dict)
+            else dict(config.context)
+        )
+        try:
+            if isinstance(report.context, dict):
+                report.context.update(normalized_context)
+            else:
+                report.context = normalized_context
+        except (AttributeError, TypeError, ValueError, RuntimeError):
+            report.context = normalized_context
 
     if isinstance(config.context, dict):
         run_id = config.context.get("run_id")

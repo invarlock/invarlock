@@ -188,6 +188,37 @@ def test_extract_pairing_schedule_rejects_malformed_sections() -> None:
         extract_pairing_schedule(
             {
                 "evaluation_windows": {
+                    "preview": {
+                        "input_ids": [[1], [2]],
+                        "window_ids": [1, 2],
+                        "actual_token_counts": [1],
+                    },
+                    "final": {"input_ids": [[3]]},
+                }
+            }
+        )
+        is None
+    )
+
+
+def test_extract_pairing_schedule_falls_back_for_malformed_attention_rows() -> None:
+    report = {
+        "evaluation_windows": {
+            "preview": {
+                "input_ids": [[1, 2, 0], [3, 4, 0]],
+                "window_ids": [1, 2],
+                "attention_masks": [1, 0, 1],
+            },
+            "final": {"input_ids": [[5, 6]], "window_ids": [3]},
+        }
+    }
+    sched = extract_pairing_schedule(report)
+    assert isinstance(sched, dict)
+    assert sched["preview"]["attention_masks"] == [[1, 1, 0], [1, 1, 0]]
+    assert (
+        extract_pairing_schedule(
+            {
+                "evaluation_windows": {
                     "preview": {"input_ids": [[1]], "window_ids": ["bad"]},
                     "final": {"input_ids": [[2]]},
                 }

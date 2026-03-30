@@ -7,7 +7,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, TypeAlias
+from typing import Any, Literal
 
 import psutil
 import torch
@@ -26,7 +26,7 @@ class ResourceError(MetricsError):
     """Raised when insufficient resources are available."""
 
 
-MetricsProgressPhase: TypeAlias = Literal["activation_collection", "mi_gini_cpu"]
+type MetricsProgressPhase = Literal["activation_collection", "mi_gini_cpu"]
 
 
 @dataclass(frozen=True)
@@ -38,7 +38,7 @@ class MetricsProgressUpdate:
     total: int | None
 
 
-MetricsProgressObserver: TypeAlias = Callable[[MetricsProgressUpdate], None]
+type MetricsProgressObserver = Callable[[MetricsProgressUpdate], None]
 
 
 @dataclass
@@ -232,7 +232,10 @@ class InputValidator:
             raise ValidationError(
                 code="E402",
                 message="METRICS-VALIDATION-FAILED",
-                details={"reason": "Model parameter iteration failed", "error": str(exc)},
+                details={
+                    "reason": "Model parameter iteration failed",
+                    "error": str(exc),
+                },
             ) from exc
 
         if param_count == 0:

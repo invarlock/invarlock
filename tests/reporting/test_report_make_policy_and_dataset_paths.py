@@ -5,8 +5,8 @@ from copy import deepcopy
 
 import pytest
 
-from invarlock.core.exceptions import MetricsError, ValidationError
 import invarlock.eval.primary_metric as primary_metric_mod
+from invarlock.core.exceptions import MetricsError, ValidationError
 from invarlock.reporting import (
     dataset_hashing,
     guards_invariants,

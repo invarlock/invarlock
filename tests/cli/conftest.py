@@ -12,6 +12,7 @@ from invarlock.runtime_security import (
     RUNTIME_MANIFEST_FILENAME,
     RUNTIME_MANIFEST_VERSION,
     RUNTIME_VERIFIER_CONTRACT_VERSION,
+    RuntimeSecurityPolicy,
 )
 
 _VALID_TEST_IMAGE_DIGEST = "sha256:" + ("a" * 64)
@@ -60,8 +61,12 @@ def _default_cli_host_execution(
         lambda: True,
     )
     monkeypatch.setattr(
-        "invarlock.cli.security_helpers.host_execution_allowed",
-        lambda: True,
+        "invarlock.cli.config_execution.resolve_shell_runtime_security_policy",
+        lambda **_: RuntimeSecurityPolicy(allow_host_execution=True),
+    )
+    monkeypatch.setattr(
+        "invarlock.cli.security_helpers.resolve_shell_runtime_security_policy",
+        lambda **_: RuntimeSecurityPolicy(allow_host_execution=True),
     )
     yield
 

@@ -228,7 +228,9 @@ def finalize_guard(guard: Any, model: nn.Module) -> dict[str, Any]:
         policy=guard._policy,
     )
     result["decision"] = _decision_from_action(
-        "continue" if passed and not warnings else ("warn" if passed or guard._monitor_only else "abort")
+        "continue"
+        if passed and not warnings
+        else ("warn" if passed or guard._monitor_only else "abort")
     )
     result["diagnostics"] = [
         {

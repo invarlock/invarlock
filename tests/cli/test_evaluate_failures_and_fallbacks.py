@@ -461,7 +461,9 @@ def test_evaluate_ci_nonfinite_primary_metric_exits(monkeypatch, tmp_path):
         raising=False,
     )
     monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
-    monkeypatch.setattr(mod, "resolve_command_exit_code", lambda err, profile: 9, raising=False)
+    monkeypatch.setattr(
+        mod, "resolve_command_exit_code", lambda err, profile: 9, raising=False
+    )
 
     with pytest.raises(click.exceptions.Exit) as exc:
         mod.evaluate_command(
@@ -511,7 +513,9 @@ def test_evaluate_ci_nonfinite_primary_metric_handles_float_cast_failure(
         },
         raising=False,
     )
-    monkeypatch.setattr(mod, "resolve_command_exit_code", lambda err, profile: 9, raising=False)
+    monkeypatch.setattr(
+        mod, "resolve_command_exit_code", lambda err, profile: 9, raising=False
+    )
 
     with pytest.raises(click.exceptions.Exit) as exc:
         mod.evaluate_command(
@@ -1273,7 +1277,9 @@ def test_evaluate_degraded_primary_metric_emits_report_and_exits(
         lambda **kwargs: report_calls.append(kwargs),
         raising=False,
     )
-    monkeypatch.setattr(mod, "resolve_command_exit_code", lambda err, profile: 7, raising=False)
+    monkeypatch.setattr(
+        mod, "resolve_command_exit_code", lambda err, profile: 7, raising=False
+    )
 
     with pytest.raises(click.exceptions.Exit) as exc:
         mod.evaluate_command(

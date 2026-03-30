@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import copy
 import math
-from collections.abc import Callable
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 
 ValidateGuardOverheadFn = Callable[..., Any]
@@ -76,6 +75,26 @@ def _coerce_diagnostics(raw: Any) -> list[dict[str, Any]]:
                 }
             )
     return diagnostics
+
+
+def _extend_legacy_diagnostics(
+    diagnostics: list[dict[str, Any]],
+    *,
+    raw: Any,
+    severity: str,
+    kind: str,
+) -> None:
+    if not isinstance(raw, list | tuple):
+        return
+    for item in raw:
+        diagnostics.append(
+            {
+                "kind": kind,
+                "severity": severity,
+                "message": str(item),
+                "details": {},
+            }
+        )
 
 
 def prepare_guard_overhead_section(
@@ -172,6 +191,24 @@ def prepare_guard_overhead_section(
         sanitized["guarded_ppl"] = guarded_ppl
 
     diagnostics = _coerce_diagnostics(payload.get("diagnostics"))
+    _extend_legacy_diagnostics(
+        diagnostics,
+        raw=payload.get("messages"),
+        severity="info",
+        kind="guard_overhead_message",
+    )
+    _extend_legacy_diagnostics(
+        diagnostics,
+        raw=payload.get("warnings"),
+        severity="warning",
+        kind="guard_overhead_warning",
+    )
+    _extend_legacy_diagnostics(
+        diagnostics,
+        raw=payload.get("errors"),
+        severity="error",
+        kind="guard_overhead_error",
+    )
     sanitized["diagnostics"] = diagnostics
     checks = payload.get("checks")
     sanitized["checks"] = dict(checks) if isinstance(checks, dict) else {}

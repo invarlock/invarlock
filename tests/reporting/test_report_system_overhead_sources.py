@@ -70,7 +70,10 @@ def test_system_overhead_sources_mixed_and_markdown_na() -> None:
 
 def test_system_overhead_does_not_reuse_edited_fallback_for_baseline() -> None:
     rep = _mk_report_latency_fallback()
-    base = {"meta": {"auto": {"tier": "balanced"}}, "metrics": {}}
+    base = {
+        "meta": {"auto": {"tier": "balanced"}},
+        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
+    }
 
     cert = make_report(rep, base)
 

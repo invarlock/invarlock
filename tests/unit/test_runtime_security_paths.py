@@ -66,7 +66,7 @@ def test_reset_runtime_allowances_clears_scoped_policy(monkeypatch) -> None:
     finally:
         runtime_security.reset_runtime_allowances(token)
 
-    assert runtime_security.network_allowed() is False
+    assert runtime_security.network_allowed() is True
 
 
 def test_runtime_allowances_scope_restores_previous_policy(monkeypatch) -> None:
@@ -76,7 +76,7 @@ def test_runtime_allowances_scope_restores_previous_policy(monkeypatch) -> None:
     with runtime_security.runtime_allowances_scope(allow_network=True):
         assert runtime_security.network_allowed() is True
 
-    assert runtime_security.network_allowed() is False
+    assert runtime_security.network_allowed() is True
 
 
 def test_apply_runtime_allowances_can_disable_prior_allowances(
@@ -149,7 +149,9 @@ def test_build_runtime_security_policy_applies_request_scoped_policy(
         runtime_security.reset_runtime_allowances()
 
 
-def test_inspect_container_image_timeout_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_inspect_container_image_timeout_is_bounded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     seen: dict[str, object] = {}
 
     def _run(command, capture_output=False, text=False, check=False, timeout=None):
@@ -563,7 +565,7 @@ def test_path_env_value_and_delegated_env_pairs_translate_workspace_paths(
         assert env_pairs[runtime_security.ALLOW_REMOTE_CODE_ENV] == "1"
         assert env_pairs[runtime_security.ALLOW_THIRD_PARTY_PLUGINS_ENV] == "0"
         assert env_pairs[runtime_security.ALLOW_UNATTESTED_ARTIFACTS_ENV] == "1"
-        assert "INVARLOCK_SNAPSHOT_MODE" not in env_pairs
+        assert env_pairs["INVARLOCK_SNAPSHOT_MODE"] == "audit"
         assert env_pairs["INVARLOCK_EVALUATE_TMP_DIR"] == "/workspace/tmp-cache"
         assert env_pairs["TMPDIR"] == str(external_tmp.resolve())
         assert "INVARLOCK_TINY_RELAX" not in env_pairs

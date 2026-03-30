@@ -153,9 +153,7 @@ def test_hf_causal_describe_raises_when_no_spec_matches() -> None:
         ),
     )
 
-    with pytest.raises(
-        AdapterError, match="no matching HF causal adapter spec"
-    ):
+    with pytest.raises(AdapterError, match="no matching HF causal adapter spec"):
         HF_Causal_Adapter().describe(model)
 
 

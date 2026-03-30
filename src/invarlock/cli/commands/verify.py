@@ -16,8 +16,12 @@ from rich.console import Console
 
 from invarlock.exit_codes import resolve_command_exit_code
 
-from ...reporting.verify_contract import run_verify_reports
-from ...reporting.verify_contract import VerifyDiagnostic, VerifyExecutionResult, VerifyOutcome
+from ...reporting.verify_contract import (
+    VerifyDiagnostic,
+    VerifyExecutionResult,
+    VerifyOutcome,
+    run_verify_reports,
+)
 from .._json import emit as _emit_json
 
 console = Console()
@@ -85,6 +89,9 @@ def verify_command(
         for diagnostic in result.diagnostics:
             _render_verify_diagnostic(diagnostic)
     if json_out:
-        _emit_json(result.payload, exit_code)
+        payload = dict(result.payload)
+        if result.include_resolution:
+            payload["resolution"] = {"exit_code": exit_code}
+        _emit_json(payload, exit_code)
     if exit_code != 0:
         raise SystemExit(exit_code)

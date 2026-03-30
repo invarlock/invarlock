@@ -265,7 +265,7 @@ def evaluate_command(
         raise typer.BadParameter(
             "Execution mode must be one of: attested, local.",
             param_hint="--mode",
-    )
+        )
     allow_host_execution = allow_host_execution or mode == "local"
     prefer_local_files_only = mode == "local"
     maybe_delegate_model_command()

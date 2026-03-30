@@ -13,6 +13,21 @@ from invarlock.reporting.utils import (
 )
 
 
+def _baseline_report(model_id: str, preview: float, final: float) -> dict[str, object]:
+    return {
+        "meta": {"model_id": model_id},
+        "metrics": {
+            "ppl_final": final,
+            "ppl_preview": preview,
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": preview,
+                "final": final,
+            },
+        },
+    }
+
+
 def test_sanitize_seed_bundle_varied_inputs():
     # Fallback-only path (no bundle)
     out = _sanitize_seed_bundle(None, fallback=7)
@@ -116,7 +131,15 @@ def test_make_evaluation_report_raises_on_drift_vs_delta_mismatch(monkeypatch):
     baseline = {
         "run_id": "r0",
         "meta": {"model_id": "m"},
-        "metrics": {"ppl_final": 9.5, "ppl_preview": 9.4},
+        "metrics": {
+            "ppl_final": 9.5,
+            "ppl_preview": 9.4,
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 9.4,
+                "final": 9.5,
+            },
+        },
         "evaluation_windows": {
             "final": {"window_ids": window_ids, "logloss": logloss_vals}
         },
@@ -202,10 +225,7 @@ def test_make_evaluation_report_primary_seed_defaulted_when_missing(monkeypatch)
         },
         "plugins": {"adapter": {}, "edit": {}, "guards": []},
     }
-    baseline = {
-        "meta": {"model_id": "m"},
-        "metrics": {"ppl_final": 10.2, "ppl_preview": 10.1},
-    }
+    baseline = _baseline_report("m", preview=10.1, final=10.2)
     monkeypatch.setattr(
         "invarlock.reporting.report_normalization.validate_report", lambda _: True
     )
@@ -248,10 +268,7 @@ def test_make_evaluation_report_uses_tokenizer_hash_from_data(monkeypatch):
         },
         "plugins": {"adapter": {}, "edit": {}, "guards": []},
     }
-    baseline = {
-        "meta": {"model_id": "m"},
-        "metrics": {"ppl_final": 10.5, "ppl_preview": 10.1},
-    }
+    baseline = _baseline_report("m", preview=10.1, final=10.5)
     monkeypatch.setattr(
         "invarlock.reporting.report_normalization.validate_report", lambda _: True
     )
@@ -289,10 +306,7 @@ def test_make_evaluation_report_includes_cuda_flags_and_model_profile(monkeypatc
         },
         "plugins": {"adapter": {}, "edit": {}, "guards": []},
     }
-    baseline = {
-        "meta": {"model_id": "m"},
-        "metrics": {"ppl_final": 10.5, "ppl_preview": 10.1},
-    }
+    baseline = _baseline_report("m", preview=10.1, final=10.5)
     monkeypatch.setattr(
         "invarlock.reporting.report_normalization.validate_report", lambda _: True
     )
@@ -330,10 +344,7 @@ def test_make_evaluation_report_carries_window_plan(monkeypatch):
         },
         "plugins": {"adapter": {}, "edit": {}, "guards": []},
     }
-    baseline = {
-        "meta": {"model_id": "m"},
-        "metrics": {"ppl_final": 10.5, "ppl_preview": 10.1},
-    }
+    baseline = _baseline_report("m", preview=10.1, final=10.5)
     monkeypatch.setattr(
         "invarlock.reporting.report_normalization.validate_report", lambda _: True
     )

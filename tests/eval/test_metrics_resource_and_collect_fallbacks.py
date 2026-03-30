@@ -4,8 +4,8 @@ import pytest
 import torch
 import torch.nn as nn
 
-from invarlock.eval.metrics import MetricsConfig, ResourceManager, compute_perplexity
 from invarlock.eval import metrics_runtime as runtime_mod
+from invarlock.eval.metrics import MetricsConfig, ResourceManager, compute_perplexity
 from invarlock.eval.metrics_activation import (
     _collect_activations,
     _perform_pre_eval_checks,
@@ -147,6 +147,114 @@ def test_infer_model_vocab_size_propagates_embedding_probe_failures():
 
     with pytest.raises(RuntimeError, match="embedding boom"):
         runtime_mod._infer_model_vocab_size(BrokenEmbeddings())
+
+
+def test_metrics_runtime_helper_resolution_and_pad_token_paths(monkeypatch):
+    class Parameterless(nn.Module):
+        def forward(self, *args, **kwargs):  # noqa: ANN002, ANN003
+            raise NotImplementedError
+
+    class NoMPS:
+        @staticmethod
+        def is_available():
+            return False
+
+    monkeypatch.setattr(torch.backends, "mps", NoMPS(), raising=False)
+
+    assert runtime_mod._resolve_eval_device(Parameterless(), None).type == "cpu"
+    assert runtime_mod._resolve_eval_device(
+        nn.Linear(1, 1), torch.device("mps")
+    ).type == "cpu"
+
+    class EmbeddingsModel(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.emb = nn.Embedding(7, 2)
+            self.config = types.SimpleNamespace(pad_token_id=3, vocab_size=7)
+
+        def get_input_embeddings(self):
+            return self.emb
+
+    class ModuleFallback(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.emb_a = nn.Embedding(3, 2)
+            self.emb_b = nn.Embedding(9, 2)
+
+    class ConfigFallback(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.config = types.SimpleNamespace(vocab_size=11, pad_token_id=99)
+
+    assert runtime_mod._infer_model_vocab_size(EmbeddingsModel()) == 7
+    assert runtime_mod._infer_model_vocab_size(ModuleFallback()) == 9
+    assert runtime_mod._infer_model_vocab_size(ConfigFallback()) == 11
+    assert runtime_mod._resolve_pad_token_id(EmbeddingsModel(), 7) == 3
+    assert runtime_mod._resolve_pad_token_id(ConfigFallback(), 11) == 0
+    assert runtime_mod._resolve_pad_token_id(types.SimpleNamespace(config=None), None) == 0
+
+
+def test_runtime_perplexity_and_window_paths_warn_on_clamped_values(monkeypatch):
+    class TinyLM(nn.Module):
+        def __init__(self, vocab=5):
+            super().__init__()
+            self.emb = nn.Embedding(vocab, 4)
+            self.head = nn.Linear(4, vocab)
+            self.config = types.SimpleNamespace(vocab_size=vocab, pad_token_id=0)
+
+        def get_input_embeddings(self):
+            return self.emb
+
+        def forward(self, input_ids=None, attention_mask=None, return_dict=True):
+            logits = self.head(self.emb(input_ids))
+            return types.SimpleNamespace(logits=logits)
+
+    batch = {
+        "input_ids": torch.tensor([[0, 1, 2]]),
+        "attention_mask": torch.tensor([[1, 1, 1]]),
+    }
+    window = runtime_mod.EvaluationWindow([[0, 1, 2]], [[1, 1, 1]], [0])
+    model = TinyLM().eval()
+
+    monkeypatch.setattr(runtime_mod.math, "exp", lambda _value: 0.5)
+    assert runtime_mod.compute_perplexity(model, [batch], max_samples=1, device="cpu") == 1.0
+    assert runtime_mod.compute_ppl(model, window, device="cpu") == 1.0
+
+    monkeypatch.setattr(runtime_mod.math, "exp", lambda _value: float("inf"))
+    assert runtime_mod.compute_perplexity(model, [batch], max_samples=1, device="cpu") == float("inf")
+    assert runtime_mod.compute_ppl(model, window, device="cpu") == float("inf")
+
+
+def test_runtime_token_sanitizer_and_raw_tensor_batches_cover_skip_paths():
+    cleaned_ids, cleaned_mask, cleaned_labels = runtime_mod._sanitize_token_ids_for_model(
+        torch.tensor([[1, 9]]),
+        None,
+        torch.tensor([[1, 9]]),
+        vocab_size=0,
+        pad_token_id=0,
+    )
+    assert cleaned_ids.tolist() == [[1, 9]]
+    assert cleaned_mask is None
+    assert cleaned_labels.tolist() == [[1, 9]]
+
+    class TinyLM(nn.Module):
+        def __init__(self, vocab=5):
+            super().__init__()
+            self.emb = nn.Embedding(vocab, 4)
+            self.head = nn.Linear(4, vocab)
+            self.config = types.SimpleNamespace(vocab_size=vocab, pad_token_id=0)
+
+        def get_input_embeddings(self):
+            return self.emb
+
+        def forward(self, input_ids=None, attention_mask=None, return_dict=True):
+            logits = self.head(self.emb(input_ids))
+            return types.SimpleNamespace(logits=logits)
+
+    model = TinyLM().eval()
+    dataloader = ["bad-batch", torch.tensor([[1]]), torch.tensor([[1, 2, 3]])]
+    ppl = runtime_mod.compute_perplexity_strict(model, dataloader, device="cpu")
+    assert ppl >= 1.0
 
 
 def test_pre_eval_checks_dry_run_failure_and_compute_perplexity_no_valid_tokens():

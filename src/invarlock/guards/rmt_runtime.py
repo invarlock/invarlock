@@ -287,7 +287,9 @@ def validate_rmt_guard(
         }
         for item in result.get("errors", [])
     ]
-    action = str(result.get("action", "continue" if result.get("passed", False) else "warn"))
+    action = str(
+        result.get("action", "continue" if result.get("passed", False) else "warn")
+    )
     return GuardValidationResult(
         passed=bool(result.get("passed", False)),
         decision=_decision_from_action(action),

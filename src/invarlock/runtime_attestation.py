@@ -10,7 +10,6 @@ from enum import Enum
 from pathlib import Path
 
 from invarlock.runtime_security import (
-    RuntimeSecurityPolicy,
     apply_runtime_allowances,
     build_runtime_security_policy,
     load_runtime_manifest,

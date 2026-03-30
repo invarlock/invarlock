@@ -1,3 +1,6 @@
+import pytest
+
+from invarlock.core.exceptions import DataError
 from invarlock.eval.data import EvaluationWindow, HFTextProvider
 
 
@@ -58,5 +61,5 @@ def test_hf_simple_tokenize_mapping_and_exception(monkeypatch):
         def encode(self, *a, **k):  # noqa: ARG002
             raise ValueError("bad")
 
-    out2 = HFTextProvider._simple_tokenize(hp, ["a"], BadTok(), 3, [0])
-    assert len(out2) == 0
+    with pytest.raises(DataError, match="TOKENIZE-INSUFFICIENT"):
+        HFTextProvider._simple_tokenize(hp, ["a"], BadTok(), 3, [0])

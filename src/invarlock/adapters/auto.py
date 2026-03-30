@@ -27,7 +27,7 @@ def _detect_quantization_from_path(model_id: str) -> str | None:
 
     try:
         config_data = json.loads(config_path.read_text(encoding="utf-8"))
-    except (OSError, TypeError, ValueError, UnicodeDecodeError):
+    except (OSError, TypeError, ValueError):
         return None
     if not isinstance(config_data, dict):
         return None

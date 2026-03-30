@@ -104,10 +104,24 @@ def _build_paired_run_and_baseline(
     baseline = {
         "run_id": "baseline-seed",
         "model_id": "gpt2-small",
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "final": math.exp(
+                    float(
+                        np.average(
+                            [math.log(x) for x in baseline_final],
+                            weights=weights,
+                        )
+                    )
+                ),
+            }
+        },
         "evaluation_windows": {
             "final": {
                 "window_ids": [0, 1],
                 "logloss": [math.log(x) for x in baseline_final],
+                "token_counts": list(token_counts),
             }
         },
         "rmt": {"outliers": 2},

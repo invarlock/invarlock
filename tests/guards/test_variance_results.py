@@ -193,7 +193,6 @@ def test_build_finalize_metrics_and_result_copy_payloads() -> None:
         warnings=[],
         errors=[],
         finalize_time=0.5,
-        events=[{"operation": "finalize_complete"}],
         enabled_after_ab=True,
         ppl_no_ve=2.0,
         scales={"m": 1.1},

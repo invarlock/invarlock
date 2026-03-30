@@ -322,7 +322,10 @@ def test_retry_and_evaluate_contracts_use_typed_outcomes() -> None:
 
     report_overhead_path = REPO_ROOT / "src/invarlock/reporting/report_overhead.py"
     report_overhead_text = _read_text(report_overhead_path)
-    assert 'diagnostics = _coerce_diagnostics(payload.get("diagnostics"))' in report_overhead_text
+    assert (
+        'diagnostics = _coerce_diagnostics(payload.get("diagnostics"))'
+        in report_overhead_text
+    )
     for legacy in (
         '"messages": list(result.messages)',
         '"warnings": list(result.warnings)',
@@ -397,7 +400,9 @@ def test_quant_rtn_edit_does_not_embed_shell_output_helpers() -> None:
     assert not offenders, "\n".join(offenders)
 
 
-def test_guard_validation_and_report_contracts_do_not_use_legacy_action_transcripts() -> None:
+def test_guard_validation_and_report_contracts_do_not_use_legacy_action_transcripts() -> (
+    None
+):
     offenders: list[str] = []
     for path in (
         REPO_ROOT / "src/invarlock/guards/invariants.py",
@@ -440,7 +445,10 @@ def test_runner_guard_and_report_payload_contracts_use_typed_decisions() -> None
     report_overhead_text = _read_text(
         REPO_ROOT / "src/invarlock/reporting/report_overhead.py"
     )
-    assert 'diagnostics = _coerce_diagnostics(payload.get("diagnostics"))' in report_overhead_text
+    assert (
+        'diagnostics = _coerce_diagnostics(payload.get("diagnostics"))'
+        in report_overhead_text
+    )
 
 
 def test_eval_metrics_contract_does_not_expose_progress_bar_surface() -> None:
@@ -506,10 +514,10 @@ def test_run_orchestrator_uses_named_event_types_not_generic_phase_envelope() ->
     orchestrator_text = _read_text(orchestrator_path)
     offenders = []
     for snippet in (
-        "class RunLifecycleEvent:\n    \"\"\"Lifecycle event emitted by the owner layer.\"\"\"\n\n    name: str",
-        "class RunDiagnosticEvent:\n    \"\"\"Diagnostic emitted by the owner layer.\"\"\"\n\n    name: str",
-        "class RunContextEvent:\n    \"\"\"Context emitted by the owner layer.\"\"\"\n\n    name: str",
-        "class RunAggregateEvent:\n    \"\"\"Aggregate/summary payload emitted by the owner layer.\"\"\"\n\n    name: str",
+        'class RunLifecycleEvent:\n    """Lifecycle event emitted by the owner layer."""\n\n    name: str',
+        'class RunDiagnosticEvent:\n    """Diagnostic emitted by the owner layer."""\n\n    name: str',
+        'class RunContextEvent:\n    """Context emitted by the owner layer."""\n\n    name: str',
+        'class RunAggregateEvent:\n    """Aggregate/summary payload emitted by the owner layer."""\n\n    name: str',
         "payload: dict[str, Any] = field(default_factory=dict)",
         "def _emit_status(",
         "def _emit_metadata(",
@@ -636,7 +644,11 @@ def test_proof_pack_verify_results_use_typed_outcomes() -> None:
     path = REPO_ROOT / "src/invarlock/proof_pack.py"
     text = _read_text(path)
     offenders = []
-    for snippet in ("status_code", 'getattr(result, "outcome"', 'getattr(result, "status_code"'):
+    for snippet in (
+        "status_code",
+        'getattr(result, "outcome"',
+        'getattr(result, "status_code"',
+    ):
         if snippet in text:
             offenders.append(snippet)
 
@@ -736,8 +748,7 @@ def test_spectral_prepare_and_after_edit_do_not_swallow_runtime_failures() -> No
     after_edit_source = ast.get_source_segment(text, targets["after_edit_guard"]) or ""
     assert "except Exception" not in after_edit_source
     assert (
-        'raise RuntimeError("Post-edit spectral analysis failed.")'
-        in after_edit_source
+        'raise RuntimeError("Post-edit spectral analysis failed.")' in after_edit_source
     )
 
 
@@ -787,13 +798,20 @@ def test_metrics_runtime_does_not_hide_device_vocab_or_memory_failures() -> None
     resolve_source = ast.get_source_segment(text, targets["_resolve_eval_device"]) or ""
     assert "except Exception" not in resolve_source
 
-    vocab_source = ast.get_source_segment(text, targets["_infer_model_vocab_size"]) or ""
+    vocab_source = (
+        ast.get_source_segment(text, targets["_infer_model_vocab_size"]) or ""
+    )
     assert "except Exception" not in vocab_source
     assert "return None" in vocab_source
 
     memory_source = ast.get_source_segment(text, targets["measure_memory"]) or ""
-    assert "logger.debug(f\"Memory measurement failed" not in memory_source
-    assert 'raise RuntimeError(\n                    f"Memory measurement failed for sample {i}."' in memory_source or 'raise RuntimeError(f"Memory measurement failed for sample {i}.")' in memory_source
+    assert 'logger.debug(f"Memory measurement failed' not in memory_source
+    assert (
+        'raise RuntimeError(\n                    f"Memory measurement failed for sample {i}."'
+        in memory_source
+        or 'raise RuntimeError(f"Memory measurement failed for sample {i}.")'
+        in memory_source
+    )
     assert "_memory_validation_error(" in memory_source
 
 
@@ -822,7 +840,10 @@ def test_adapter_probe_helpers_do_not_hide_unexpected_failures() -> None:
 
     detect_target = None
     for node in ast.walk(auto_tree):
-        if isinstance(node, ast.FunctionDef) and node.name == "_detect_quantization_from_path":
+        if (
+            isinstance(node, ast.FunctionDef)
+            and node.name == "_detect_quantization_from_path"
+        ):
             detect_target = node
             break
 
@@ -934,9 +955,7 @@ def test_cli_runtime_helpers_do_not_hide_snapshot_reuse_failures() -> None:
             "bare_stub_model",
             "guarded_stub_model",
         ),
-        REPO_ROOT / "src/invarlock/cli/run_pairing.py": (
-            "except Exception as exc",
-        ),
+        REPO_ROOT / "src/invarlock/cli/run_pairing.py": ("except Exception as exc",),
     }
     offenders: list[str] = []
     for path, snippets in expectations.items():
@@ -958,7 +977,7 @@ def test_core_summary_helpers_do_not_embed_display_strings() -> None:
         REPO_ROOT / "src/invarlock/core/run_timing_policy.py": (
             "Peak Memory",
             "Peak GPU Mem",
-            '(\"Load model\", \"load_model\")',
+            '("Load model", "load_model")',
         ),
         REPO_ROOT / "src/invarlock/core/doctor_inventory.py": (
             "pip install",

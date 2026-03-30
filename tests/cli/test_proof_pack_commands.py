@@ -8,8 +8,8 @@ from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
-from invarlock.cli.app import app
 import invarlock.proof_pack as proof_pack_mod
+from invarlock.cli.app import app
 from invarlock.reporting import verify_contract as verify_mod
 from invarlock.runtime_security import (
     RUNTIME_MANIFEST_FILENAME,
@@ -69,6 +69,16 @@ def _successful_verify_payload(reports: list[Path]) -> dict[str, object]:
         "ok": True,
         "reports": [str(path) for path in reports],
     }
+
+
+def _successful_verify_result(
+    reports: list[Path],
+) -> verify_mod.VerifyExecutionResult:
+    return verify_mod.VerifyExecutionResult(
+        outcome=verify_mod.VerifyOutcome.OK,
+        payload=_successful_verify_payload(reports),
+        diagnostics=(),
+    )
 
 
 def _write_checksums(pack_dir: Path, rel_paths: list[str]) -> None:
@@ -224,9 +234,7 @@ def test_proof_pack_verify_json_round_trip(monkeypatch, tmp_path: Path) -> None:
 
     monkeypatch.setattr(
         "invarlock.proof_pack._run_verify_command",
-        lambda reports, profile: SimpleNamespace(
-            status_code=0, payload=_successful_verify_payload(reports)
-        ),
+        lambda reports, profile: _successful_verify_result(reports),
         raising=False,
     )
 
@@ -258,9 +266,7 @@ def test_proof_pack_verify_human_success(monkeypatch, tmp_path: Path) -> None:
     )
     monkeypatch.setattr(
         "invarlock.proof_pack._run_verify_command",
-        lambda reports, profile: SimpleNamespace(
-            status_code=0, payload=_successful_verify_payload(reports)
-        ),
+        lambda reports, profile: _successful_verify_result(reports),
         raising=False,
     )
 
@@ -312,9 +318,7 @@ def test_proof_pack_verify_json_round_trip_with_verify_payload(
     )
     monkeypatch.setattr(
         "invarlock.proof_pack._run_verify_command",
-        lambda reports, profile: SimpleNamespace(
-            status_code=0, payload=_successful_verify_payload(reports)
-        ),
+        lambda reports, profile: _successful_verify_result(reports),
         raising=False,
     )
 
@@ -458,9 +462,7 @@ def test_proof_pack_build_json_round_trip(monkeypatch, tmp_path: Path) -> None:
     _write_runtime_manifest(report)
     monkeypatch.setattr(
         "invarlock.proof_pack._run_verify_command",
-        lambda reports, profile: SimpleNamespace(
-            status_code=0, payload=_successful_verify_payload(reports)
-        ),
+        lambda reports, profile: _successful_verify_result(reports),
         raising=False,
     )
 

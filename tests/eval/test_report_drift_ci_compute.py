@@ -38,6 +38,13 @@ def test_drift_ci_computed_from_preview_and_final_ci():
     baseline = {
         "run_id": "b",
         "model_id": "m",
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+            }
+        },
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
     with patch(

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import os
+from functools import partial
 from typing import TYPE_CHECKING, Any, Protocol
 
 import typer
 
+from invarlock.cli import output as output_mod
 from invarlock.cli import overhead_utils as overhead_utils_mod
 from invarlock.cli import run_artifact_output as run_artifact_output_mod
 from invarlock.cli import run_artifacts as run_artifacts_mod
@@ -182,8 +184,9 @@ def _build_run_execution_services() -> RunExecutionServices:
         validate_retry_evaluation_report=(
             _validate_retry_evaluation_report_with_runtime_deps
         ),
-        validate_and_harvest_baseline_schedule=(
-            _validate_and_harvest_baseline_schedule_with_typed_failures
+        validate_and_harvest_baseline_schedule=partial(
+            run_pairing_mod.validate_and_harvest_baseline_schedule,
+            typed_failures=True,
         ),
         materialize_baseline_pairing_schedule=(
             _materialize_baseline_pairing_schedule_with_runtime_deps
@@ -203,16 +206,6 @@ def _prepare_config_for_run_with_runtime_deps(**kwargs: Any) -> Any:
 def _resolve_device_and_output_with_runtime_deps(*args: Any, **kwargs: Any) -> Any:
     kwargs.pop("console", None)
     return run_config_mod.resolve_device_and_output(*args, **kwargs)
-
-
-def _validate_and_harvest_baseline_schedule_with_typed_failures(
-    **kwargs: Any,
-) -> Any:
-    kwargs.pop("console", None)
-    return run_pairing_mod.validate_and_harvest_baseline_schedule(
-        **kwargs,
-        typed_failures=True,
-    )
 
 
 def _resolve_provider_and_split_for_dataset_plan(*args: Any, **kwargs: Any) -> Any:
@@ -393,6 +386,75 @@ def _emit_console_blank_line() -> None:
     console.print("")
 
 
+def _begin_progress_step(key: str) -> None:
+    output_style = getattr(console, "_invarlock_output_style", None)
+    if output_style is None or not bool(getattr(output_style, "progress", False)):
+        return
+    progress_steps = getattr(console, "_invarlock_progress_steps", None)
+    if not isinstance(progress_steps, dict):
+        progress_steps = {}
+        console._invarlock_progress_steps = progress_steps
+    progress_steps[key] = float(output_mod.perf_counter())
+
+
+def _complete_progress_step(
+    key: str,
+    *,
+    tag: str,
+    message: str,
+    emoji: str | None = None,
+) -> None:
+    output_style = getattr(console, "_invarlock_output_style", None)
+    if output_style is None or not bool(getattr(output_style, "progress", False)):
+        return
+    progress_steps = getattr(console, "_invarlock_progress_steps", None)
+    if not isinstance(progress_steps, dict):
+        return
+    start = progress_steps.pop(key, None)
+    if not isinstance(start, int | float):
+        return
+    completed_steps = getattr(console, "_invarlock_progress_completed", None)
+    if not isinstance(completed_steps, set):
+        completed_steps = set()
+        console._invarlock_progress_completed = completed_steps
+    completed_steps.add(key)
+    elapsed = max(0.0, float(output_mod.perf_counter() - float(start)))
+    _event(console, tag, f"{message} done ({elapsed:.2f}s)", emoji=emoji)
+
+
+def _transition_progress_step(
+    from_key: str,
+    *,
+    from_tag: str,
+    from_message: str,
+    to_key: str,
+    from_emoji: str | None = None,
+) -> None:
+    output_style = getattr(console, "_invarlock_output_style", None)
+    if output_style is None or not bool(getattr(output_style, "progress", False)):
+        return
+    progress_steps = getattr(console, "_invarlock_progress_steps", None)
+    if not isinstance(progress_steps, dict):
+        progress_steps = {}
+        console._invarlock_progress_steps = progress_steps
+    now = float(output_mod.perf_counter())
+    start = progress_steps.pop(from_key, None)
+    if isinstance(start, int | float):
+        completed_steps = getattr(console, "_invarlock_progress_completed", None)
+        if not isinstance(completed_steps, set):
+            completed_steps = set()
+            console._invarlock_progress_completed = completed_steps
+        completed_steps.add(from_key)
+        elapsed = max(0.0, now - float(start))
+        _event(
+            console,
+            from_tag,
+            f"{from_message} done ({elapsed:.2f}s)",
+            emoji=from_emoji,
+        )
+    progress_steps[to_key] = now
+
+
 def _render_run_execution_event(event: RunExecutionEvent) -> None:
     def _emit_status_line(tag: str, message: str, *, emoji: str | None = None) -> None:
         _event(console, tag, message, emoji=emoji)
@@ -553,9 +615,7 @@ def _render_run_execution_event(event: RunExecutionEvent) -> None:
             _emit_status_line("FAIL", str(failure.summary or ""), emoji="❌")
             return
         if code == "guard_overhead_budget_exceeded":
-            threshold_fraction = float(
-                context.get("threshold_fraction", 0.01) or 0.01
-            )
+            threshold_fraction = float(context.get("threshold_fraction", 0.01) or 0.01)
             _emit_status_line(
                 "FAIL",
                 "Guard overhead gate exceeded the configured budget "
@@ -645,6 +705,13 @@ def _render_run_execution_event(event: RunExecutionEvent) -> None:
         )
         return
     if isinstance(event, RunExecutePipelineEvent):
+        _transition_progress_step(
+            "load_model",
+            from_tag="INIT",
+            from_message="Loading model",
+            to_key="execute",
+            from_emoji="🔧",
+        )
         _emit_status_line(
             "EXEC",
             f"Executing pipeline with {event.guard_count} guards...",
@@ -652,6 +719,7 @@ def _render_run_execution_event(event: RunExecutionEvent) -> None:
         )
         return
     if isinstance(event, RunLoadModelOnceEvent):
+        _begin_progress_step("load_model")
         _emit_status_line(
             "INIT",
             f"Loading model once: {event.model_id}",
@@ -772,7 +840,7 @@ def _build_core_run_execution_request(
         timeout=request.timeout,
         baseline=request.baseline,
         no_cleanup=bool(request.no_cleanup),
-        capture_timings=bool(request.timing),
+        capture_timings=bool(request.timing or request.progress),
         telemetry=bool(request.telemetry),
         prefer_local_files_only=bool(request.prefer_local_files_only),
         eval_device_override=_env_text("INVARLOCK_EVAL_DEVICE"),
@@ -814,6 +882,8 @@ def _exit_code_for_failure(failure: Any, *, profile: str | None) -> int:
 
 def execute_run_request(request: Any) -> str | None:
     _resolve_shell_output_style(request)
+    console._invarlock_progress_steps = {}
+    console._invarlock_progress_completed = set()
     run_warning_filters_mod._apply_warning_filters(
         str(request.profile or "").strip().lower() or None
     )
@@ -823,6 +893,12 @@ def execute_run_request(request: Any) -> str | None:
         services=_build_run_execution_services(),
         observer=_render_run_execution_event,
     )
+    _complete_progress_step(
+        "execute",
+        tag="EXEC",
+        message="Execute pipeline",
+        emoji="⚙️",
+    )
     if not outcome.ok or outcome.result is None:
         raise typer.Exit(
             _exit_code_for_failure(
@@ -831,6 +907,18 @@ def execute_run_request(request: Any) -> str | None:
             )
         )
     output_style = getattr(console, "_invarlock_output_style", None)
+    if bool(getattr(request, "progress", False)) and output_style is not None:
+        completed_steps = getattr(console, "_invarlock_progress_completed", set())
+        progress_fallback_steps = (
+            ("load_model", "INIT", "Loading model", "🔧"),
+            ("execute", "EXEC", "Execute pipeline", "⚙️"),
+        )
+        for key, tag, message, emoji in progress_fallback_steps:
+            if key in completed_steps:
+                continue
+            elapsed = outcome.result.timings.get(key)
+            if isinstance(elapsed, int | float):
+                _event(console, tag, f"{message} done ({elapsed:.2f}s)", emoji=emoji)
     if bool(getattr(request, "timing", False)) and output_style is not None:
         timing_summary = outcome.result.timing_summary
         order = [

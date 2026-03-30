@@ -164,8 +164,9 @@ def test_input_validator_model_and_tensor(monkeypatch):
         InputValidator.validate_model(object(), config)
 
     empty_model = torch.nn.Module()
-    # Built-in Module has no parameters but should still pass validation.
-    InputValidator.validate_model(empty_model, config)
+    with pytest.raises(ValidationError) as excinfo:
+        InputValidator.validate_model(empty_model, config)
+    assert excinfo.value.details.get("reason") == "Model has no parameters"
     InputValidator.validate_model(
         empty_model, MetricsConfig(use_cache=False, strict_validation=False)
     )

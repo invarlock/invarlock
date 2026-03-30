@@ -653,7 +653,9 @@ def test_measure_latency_device_to_exception():
     # Nonstandard device object forces .to(device) to raise
     bad_device = object()
     sample = {"input_ids": [1, 2, 3], "attention_mask": [1, 1, 1]}
-    with pytest.raises(RuntimeError, match="Latency measurement device transfer failed"):
+    with pytest.raises(
+        RuntimeError, match="Latency measurement device transfer failed"
+    ):
         runner._measure_latency(M(), [sample], bad_device)
 
 
@@ -1401,9 +1403,11 @@ def test_compute_slice_missing_loss_debug(monkeypatch, tmp_path):
             final_n=1,
             config=cfg,
         )
-        # Should fallback from NaN ppl to default 50.0 due to invalid/empty summaries
         pm = metrics.get("primary_metric", {})
-        assert pm.get("preview") > 0 and pm.get("final") > 0
+        assert pm.get("invalid") is True
+        assert pm.get("degraded_reason") == "non_finite_pm"
+        assert pm.get("preview") is None
+        assert pm.get("final") is None
     finally:
         del os.environ["INVARLOCK_DEBUG_TRACE"]
 

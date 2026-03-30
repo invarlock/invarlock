@@ -117,18 +117,12 @@ def measure_latency(model: Any, sample_data: Any, device: Any) -> float:
                     )
 
             def call_model() -> Any:
+                kwargs: dict[str, Any] = {"labels": labels_t}
                 if attn_t is not None:
-                    return model(
-                        input_ids,
-                        attention_mask=attn_t,
-                        labels=labels_t,
-                        token_type_ids=token_type_t,
-                    )
-                return model(
-                    input_ids,
-                    labels=labels_t,
-                    token_type_ids=token_type_t,
-                )
+                    kwargs["attention_mask"] = attn_t
+                if token_type_t is not None:
+                    kwargs["token_type_ids"] = token_type_t
+                return model(input_ids, **kwargs)
 
             for _ in range(3):
                 _ = call_model()

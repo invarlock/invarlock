@@ -25,9 +25,13 @@ def test_configure_runtime_security_forwards_allowances(
 
     resets: list[object] = []
 
-    monkeypatch.setattr(attestation, "build_runtime_security_policy", lambda **kwargs: policy)
+    monkeypatch.setattr(
+        attestation, "build_runtime_security_policy", lambda **kwargs: policy
+    )
     monkeypatch.setattr(attestation, "apply_runtime_allowances", _capture)
-    monkeypatch.setattr(attestation, "reset_runtime_allowances", lambda token: resets.append(token))
+    monkeypatch.setattr(
+        attestation, "reset_runtime_allowances", lambda token: resets.append(token)
+    )
 
     with attestation.configure_runtime_security(
         allow_network=True,

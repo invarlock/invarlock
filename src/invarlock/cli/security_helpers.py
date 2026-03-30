@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Iterator, TypeVar, cast
+from typing import Any, TypeVar, cast
 
 import typer
 
@@ -24,10 +25,9 @@ from invarlock.runtime_security import (
     ALLOW_THIRD_PARTY_PLUGINS_ENV,
     ALLOW_UNATTESTED_ARTIFACTS_ENV,
     RuntimeSecurityPolicy,
-    delegate_container_command,
     build_runtime_security_policy,
     current_runtime_security_policy,
-    host_execution_allowed,
+    delegate_container_command,
     running_inside_container,
     write_runtime_manifest,
 )
@@ -89,7 +89,7 @@ def configure_runtime_security(
         yield
 
 
-def runtime_security_scoped(func: F) -> F:
+def runtime_security_scoped[F: Callable[..., Any]](func: F) -> F:
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         mode = str(kwargs.get("mode", "") or "").strip().lower()

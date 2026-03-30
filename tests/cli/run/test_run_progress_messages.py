@@ -126,5 +126,6 @@ def test_run_progress_done_messages(tmp_path: Path, monkeypatch) -> None:
     )
     assert r.exit_code == 0
     s = r.stdout
-    assert "done (1.00s)" in s
-    assert "done (2.00s)" in s
+    assert "Loading model done (" in s
+    assert "Execute pipeline done (" in s
+    assert s.count(" done (") >= 2

@@ -5,6 +5,8 @@ from types import SimpleNamespace
 import pytest
 
 from invarlock.core.run_guard_overhead_policy import (
+    _append_guard_overhead_diagnostic,
+    _coerce_guard_overhead_diagnostics,
     build_guard_overhead_summary,
     finalize_guard_overhead_payload,
     normalize_guard_overhead_result,
@@ -185,3 +187,147 @@ def test_prepare_guard_overhead_report_validates_and_finalizes() -> None:
     assert payload["passed"] is True
     assert payload["evaluated"] is True
     assert payload["diagnostics"][0]["message"] == "ok"
+
+
+def test_guard_overhead_diagnostic_helpers_filter_invalid_records() -> None:
+    diagnostics: list[dict[str, object]] = []
+
+    _append_guard_overhead_diagnostic(
+        diagnostics,
+        severity="warning",
+        message=123,
+    )
+
+    coerced = _coerce_guard_overhead_diagnostics(
+        [
+            "skip-me",
+            {"message": ""},
+            {"message": "default-severity", "severity": ""},
+            {
+                "kind": "guard_overhead_custom",
+                "message": "kept",
+                "details": "not-a-dict",
+            },
+        ]
+    )
+
+    assert diagnostics == [
+        {
+            "kind": "guard_overhead_warning",
+            "severity": "warning",
+            "message": "123",
+            "details": {},
+        }
+    ]
+    assert coerced == [
+        {
+            "kind": "guard_overhead_info",
+            "severity": "info",
+            "message": "default-severity",
+            "details": {},
+        },
+        {
+            "kind": "guard_overhead_custom",
+            "severity": "info",
+            "message": "kept",
+            "details": {},
+        },
+    ]
+
+
+def test_finalize_guard_overhead_payload_handles_non_mapping_metrics() -> None:
+    result = SimpleNamespace(
+        diagnostics=(),
+        checks=(),
+        metrics="not-a-dict",
+        overhead_ratio=1.01,
+        overhead_percent=1.0,
+        passed=True,
+    )
+
+    payload = finalize_guard_overhead_payload({"warnings": ["old"]}, result)
+
+    assert payload["checks"] == {}
+    assert payload["overhead_ratio"] == 1.01
+    assert payload["overhead_percent"] == 1.0
+    assert payload["diagnostics"] == []
+
+
+@pytest.mark.parametrize(
+    ("loss_type", "expected_kind"),
+    [
+        ("mlm", "ppl_mlm"),
+        ("seq2seq", "ppl_seq2seq"),
+    ],
+)
+def test_prepare_guard_overhead_report_selects_loss_specific_metric_kind(
+    loss_type: str,
+    expected_kind: str,
+) -> None:
+    calls: list[tuple[object, str]] = []
+
+    class Result:
+        diagnostics = ()
+        checks = {}
+        metrics = {"overhead_ratio": 1.0}
+        passed = True
+
+    def extract_pm(source, *, kind):  # type: ignore[no-untyped-def]
+        calls.append((source, kind))
+        if source == {"metrics": {}}:
+            return {}
+        return {"kind": kind, "final": 9.0}
+
+    payload = prepare_guard_overhead_report(
+        {"bare_report": {}},
+        resolved_loss_type=loss_type,
+        core_report={"metrics": {}},
+        report={"metrics": {"primary_metric": {"final": 9.0}}},
+        default_threshold=0.01,
+        extract_pm_snapshot_for_overhead_fn=extract_pm,
+        validate_guard_overhead_fn=lambda *args, **kwargs: Result(),
+    )
+
+    assert calls == [
+        ({"metrics": {}}, expected_kind),
+        ({"metrics": {"primary_metric": {"final": 9.0}}}, expected_kind),
+    ]
+    assert payload["guarded_report"] == {
+        "metrics": {"primary_metric": {"kind": expected_kind, "final": 9.0}}
+    }
+
+
+def test_prepare_guard_overhead_report_handles_snapshot_extraction_errors() -> None:
+    class Result:
+        diagnostics = ()
+        checks = {}
+        metrics = {}
+        passed = True
+
+    payload = prepare_guard_overhead_report(
+        {"bare_report": {}},
+        resolved_loss_type="causal",
+        core_report={},
+        report={},
+        default_threshold=0.01,
+        extract_pm_snapshot_for_overhead_fn=lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AttributeError("boom")
+        ),
+        validate_guard_overhead_fn=lambda *args, **kwargs: Result(),
+    )
+
+    assert payload["guarded_report"] is None
+
+
+def test_build_guard_overhead_summary_coerces_invalid_threshold_inputs() -> None:
+    negative_default = build_guard_overhead_summary(
+        {"overhead_threshold": "bad"},
+        default_threshold=-1.0,
+    )
+    invalid_runtime_threshold = build_guard_overhead_summary(
+        {"overhead_threshold": object()},
+        default_threshold=0.02,
+    )
+
+    assert negative_default.threshold_fraction == 0.01
+    assert invalid_runtime_threshold.threshold_fraction == 0.02

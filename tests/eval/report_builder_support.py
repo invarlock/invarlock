@@ -319,7 +319,10 @@ def create_mock_baseline(
         return {
             "schema_version": "baseline-v1",
             "meta": {"model_id": model_id, "commit_sha": "baseline123456789"},
-            "metrics": {"ppl_final": ppl_final},
+            "metrics": {
+                "ppl_final": ppl_final,
+                "primary_metric": {"kind": "ppl_causal", "final": ppl_final},
+            },
             "spectral_base": {"sigma_ratios": [1.0, 1.0, 1.0]},
             "rmt_base": {"outliers": 1},
             "invariants": {"weight_norm": {"passed": True}},
@@ -332,6 +335,7 @@ def create_mock_baseline(
             "run_id": "normalized123",
             "model_id": model_id,
             "ppl_final": ppl_final,
+            "metrics": {"primary_metric": {"kind": "ppl_causal", "final": ppl_final}},
             "spectral": {"sigma_ratios": [1.0, 1.0]},
             "rmt": {"outliers": 1},
             "invariants": {"all_passed": True},

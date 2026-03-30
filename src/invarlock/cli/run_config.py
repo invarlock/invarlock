@@ -11,10 +11,19 @@ from rich.console import Console
 
 from invarlock.core.exceptions import ConfigError, ValidationError
 from invarlock.core.provider_config import resolve_provider_kind_and_kwargs
+from invarlock.runtime_security import remote_code_allowed
 
 from .security_helpers import resolve_shell_runtime_security_policy
 
 SPLIT_ALIASES: tuple[str, ...] = ("validation", "val", "dev", "eval", "test")
+
+__all__ = [
+    "SPLIT_ALIASES",
+    "prepare_config_for_run",
+    "resolve_device_and_output",
+    "resolve_provider_and_split",
+    "remote_code_allowed",
+]
 
 
 def _resolve_requested_edit_name(kind: str) -> str:
@@ -61,6 +70,7 @@ def prepare_config_for_run(
 ) -> Any:
     """Load config and apply profile/CLI overrides deterministically."""
     shell_mode = console is not None
+    uses_default_auto_adapter = apply_auto_adapter_fn is None
     if event_fn is None and shell_mode:
         from invarlock.cli.run_shell_output import _event as event_fn
     if invarlock_config_cls is None:
@@ -191,7 +201,13 @@ def prepare_config_for_run(
         cfg = invarlock_config_cls(cfg_dict)
 
     if apply_auto_adapter_fn is not None:
-        cfg = apply_auto_adapter_fn(cfg)
+        if uses_default_auto_adapter:
+            try:
+                cfg = apply_auto_adapter_fn(cfg)
+            except Exception:
+                pass
+        else:
+            cfg = apply_auto_adapter_fn(cfg)
 
     return cfg
 

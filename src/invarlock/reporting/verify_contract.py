@@ -65,6 +65,7 @@ class VerifyExecutionResult:
     payload: dict[str, Any]
     diagnostics: tuple[VerifyDiagnostic, ...]
     error: Exception | None = None
+    include_resolution: bool = False
 
 
 def _validate_report_schema_strict(report: dict[str, Any]) -> bool:
@@ -199,7 +200,7 @@ def _warn_adapter_family_mismatch(
                 VerifyDiagnostic(
                     level="warning",
                     message=(
-                        f"edited: family={edited_family}, backend={edited_backend} "
+                        f"edited  : family={edited_family}, backend={edited_backend} "
                         f"{edited_version}"
                     ),
                 ),
@@ -247,9 +248,11 @@ def run_verify_reports(
         baseline_digest = None
 
     malformed_any = False
+    loaded_any_report = False
     try:
         for cert_path in reports:
             cert_obj = _load_evaluation_report(cert_path)
+            loaded_any_report = True
 
             try:
                 prof = (profile or "").strip().lower()
@@ -450,7 +453,6 @@ def run_verify_reports(
                         pass
 
         if not overall_ok:
-            code = 2 if malformed_any else 1
             payload = _verify_output.build_verify_json_payload(
                 reports,
                 ok=False,
@@ -509,6 +511,7 @@ def run_verify_reports(
             payload=payload,
             diagnostics=tuple(diagnostics),
             error=ce,
+            include_resolution=not loaded_any_report,
         )
     except _VERIFY_RECOVERABLE_EXCEPTIONS as e:
         payload = _verify_output.build_verify_error_payload(
@@ -534,6 +537,9 @@ def run_verify_reports(
             payload=payload,
             diagnostics=tuple(diagnostics),
             error=e,
+            include_resolution=(
+                not loaded_any_report and not isinstance(e, json.JSONDecodeError)
+            ),
         )
 
 

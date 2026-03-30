@@ -124,7 +124,9 @@ def eval_phase(
             else {}
         )
 
-        run_final = eval_windows.get("final", {}) if isinstance(eval_windows, dict) else {}
+        run_final = (
+            eval_windows.get("final", {}) if isinstance(eval_windows, dict) else {}
+        )
         base_final = (
             baseline_eval.get("final", {}) if isinstance(baseline_eval, dict) else {}
         )
@@ -134,7 +136,9 @@ def eval_phase(
         run_ids = run_final.get("window_ids") if isinstance(run_final, dict) else None
         run_ll = run_final.get("logloss") if isinstance(run_final, dict) else None
         run_tc = run_final.get("token_counts") if isinstance(run_final, dict) else None
-        base_ids = base_final.get("window_ids") if isinstance(base_final, dict) else None
+        base_ids = (
+            base_final.get("window_ids") if isinstance(base_final, dict) else None
+        )
         base_ll = base_final.get("logloss") if isinstance(base_final, dict) else None
 
         if (
@@ -149,7 +153,9 @@ def eval_phase(
                     baseline_val, int | float
                 ):
                     base_map[int(baseline_id)] = float(baseline_val)
-            for index, (run_id, run_val) in enumerate(zip(run_ids, run_ll, strict=False)):
+            for index, (run_id, run_val) in enumerate(
+                zip(run_ids, run_ll, strict=False)
+            ):
                 if not (
                     isinstance(run_id, int | float) and isinstance(run_val, int | float)
                 ):

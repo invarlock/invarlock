@@ -49,9 +49,7 @@ def _extract_success_report_path(result: RunResult, *, run_label: str) -> str | 
         raise RuntimeError(f"{run_label} run report is missing artifacts metadata")
     report_path = artifacts.get("report_path")
     if not isinstance(report_path, str) or not report_path:
-        raise RuntimeError(
-            f"{run_label} run report is missing artifacts.report_path"
-        )
+        raise RuntimeError(f"{run_label} run report is missing artifacts.report_path")
     return report_path
 
 

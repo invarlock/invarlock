@@ -147,7 +147,14 @@ def collect_optional_dependency_facts(
             if present:
                 try:
                     runtime_available = bitsandbytes_runtime_available_fn()
-                except (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError):
+                except (
+                    AttributeError,
+                    ImportError,
+                    OSError,
+                    RuntimeError,
+                    TypeError,
+                    ValueError,
+                ):
                     runtime_available = None
                     runtime_probe_failed = True
         results.append(

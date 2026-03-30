@@ -5,8 +5,8 @@ from collections.abc import Callable
 from typing import Any
 
 from .api import Guard, GuardWithContext, GuardWithPrepare, RunConfig, RunReport
-from .exceptions import GuardError, InvarlockError
 from .auto_tuning import resolve_tier_policies
+from .exceptions import InvarlockError
 from .types import GuardDiagnostic, GuardValidationResult, LogLevel
 
 ResolveTierPoliciesFn = Callable[
@@ -75,7 +75,12 @@ def _normalize_guard_result(raw: Any) -> dict[str, Any]:
             if isinstance(raw.get("violations", []), list | tuple)
         ],
     }
-    for extra_key in ("final_z_scores", "module_family_map", "baseline_metrics", "final_metrics"):
+    for extra_key in (
+        "final_z_scores",
+        "module_family_map",
+        "baseline_metrics",
+        "final_metrics",
+    ):
         if extra_key in raw:
             normalized[extra_key] = raw[extra_key]
     return normalized

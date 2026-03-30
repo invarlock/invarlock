@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from invarlock.reporting import report_validation as validation_mod
 
 

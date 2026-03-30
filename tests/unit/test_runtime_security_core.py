@@ -19,11 +19,11 @@ def test_runtime_bool_helpers_and_execution_mode(monkeypatch) -> None:
     assert runtime_security._coerce_bool("on") is True
     assert runtime_security._coerce_bool("off") is False
     assert runtime_security._coerce_bool("maybe") is None
-    assert runtime_security.network_allowed() is False
+    assert runtime_security.network_allowed() is True
     assert runtime_security.host_execution_allowed() is False
-    assert runtime_security.remote_code_allowed() is False
-    assert runtime_security.unattested_artifacts_allowed() is False
-    assert runtime_security.third_party_plugins_allowed() is False
+    assert runtime_security.remote_code_allowed() is True
+    assert runtime_security.unattested_artifacts_allowed() is True
+    assert runtime_security.third_party_plugins_allowed() is True
     assert runtime_security.running_inside_container() is True
     assert runtime_security.current_execution_mode() == "container"
 

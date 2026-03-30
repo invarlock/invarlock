@@ -6,14 +6,14 @@ from pathlib import Path
 from invarlock.cli.runtime_launch_plan import build_request_container_launch_plan
 from invarlock.runtime_security import (
     delegate_container_command,
-    runtime_allowances_scope,
     host_execution_allowed,
     running_inside_container,
+    runtime_allowances_scope,
     write_runtime_manifest,
 )
 
-from .security_helpers import resolve_shell_runtime_security_policy
 from .run_execution import execute_config_run_request
+from .security_helpers import resolve_shell_runtime_security_policy
 
 
 class RuntimeDelegationError(RuntimeError):

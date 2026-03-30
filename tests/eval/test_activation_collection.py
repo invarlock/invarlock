@@ -35,9 +35,7 @@ def test_collect_activations_shape_reconciliation():
     model = ToyModel(dims=(8, 6))
     # Two batches
     dl = [{"input_ids": torch.randint(0, 16, (1, 5))} for _ in range(2)]
-    cfg = MetricsConfig(
-        oracle_windows=2, max_tokens=5, strict_validation=False
-    )
+    cfg = MetricsConfig(oracle_windows=2, max_tokens=5, strict_validation=False)
     out = _collect_activations(model, dl, cfg, device=torch.device("cpu"))
     # hidden_states collected
     assert out["hidden_states"]

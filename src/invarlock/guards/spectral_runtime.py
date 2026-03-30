@@ -19,8 +19,7 @@ from .spectral_detection import (
     summarize_family_z_scores,
     summarize_sigmas,
 )
-from .spectral_policy import apply_policy_overrides
-from .spectral_policy import multiple_testing_alpha
+from .spectral_policy import apply_policy_overrides, multiple_testing_alpha
 from .spectral_results import (
     build_spectral_diagnostics,
     build_spectral_finalize_metrics,
@@ -284,9 +283,7 @@ def validate_guard(
     violations = guard._detect_spectral_violations(
         model, current_metrics, phase="validate"
     )
-    fatal_violations, budgeted_violations = partition_spectral_violations(
-        violations
-    )
+    fatal_violations, budgeted_violations = partition_spectral_violations(violations)
     selected_budgeted, mt_selection = guard._select_budgeted_violations(
         budgeted_violations
     )

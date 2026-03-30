@@ -244,6 +244,30 @@ def test_analyze_spectral_and_rmt_changes_happy_and_error_paths():
         s_err = analyze_spectral_changes(m1, m2)
         assert s_err.get("error")
 
+    fake_spec_missing = types.ModuleType("invarlock.guards.spectral_measurement")
+    with patch.dict(
+        sys.modules, {"invarlock.guards.spectral_measurement": fake_spec_missing}
+    ):
+        s_missing = analyze_spectral_changes(m1, m2)
+        assert s_missing == {"error": "spectral_analysis_unavailable"}
+
+
+def test_compute_parameter_deltas_handles_sparsity_and_failures() -> None:
+    before = nn.Sequential(nn.Linear(4, 4), nn.Linear(4, 4))
+    after = nn.Sequential(nn.Linear(4, 2))
+
+    deltas = compute_parameter_deltas(before, after)
+    assert deltas["params_changed"] >= 0
+    assert deltas["sparsity"] is not None
+    assert deltas["sparsity"] > 0
+
+    class BrokenParams(nn.Module):
+        def named_parameters(self, *args, **kwargs):  # noqa: ANN002, ANN003
+            raise RuntimeError("boom")
+
+    broken = compute_parameter_deltas(BrokenParams(), BrokenParams())
+    assert broken == {"params_changed": 0, "layers_modified": 0, "sparsity": None}
+
 
 def test_compute_and_measure_helpers():
     model = DummyCausalLM()

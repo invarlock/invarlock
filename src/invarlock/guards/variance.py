@@ -206,6 +206,20 @@ class VarianceGuard(Guard):
             for event in self._event_records
         ]
 
+    @property
+    def events(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "timestamp": event["timestamp"],
+                "component": event["component"],
+                "operation": event["kind"],
+                "level": event["level_code"],
+                "message": event["summary"],
+                "data": dict(event["details"]),
+            }
+            for event in self._event_records
+        ]
+
     def set_run_context(self, report: Any) -> None:
         self._report_meta = getattr(report, "meta", {}) or {}
         self._run_context = getattr(report, "context", {}) or {}

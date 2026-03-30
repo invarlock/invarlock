@@ -372,6 +372,51 @@ def make_report(
 
     # Baseline reference (PM-only). Derive a primary_metric snapshot from baseline windows.
     # Prefer explicit baseline primary_metric when provided; otherwise compute from windows
+    def _direct_baseline_metric(payload: Any) -> dict[str, Any] | None:
+        if not isinstance(payload, dict):
+            return None
+
+        def _is_finite_number(value: Any) -> bool:
+            return isinstance(value, (int, float)) and math.isfinite(float(value))
+
+        report_kind = (
+            report.get("metrics", {}).get("primary_metric", {}).get("kind")
+            if isinstance(report.get("metrics"), dict)
+            else None
+        )
+        default_kind = str(report_kind or "ppl_causal")
+
+        direct_pm = payload.get("primary_metric")
+        if isinstance(direct_pm, dict) and _is_finite_number(direct_pm.get("final")):
+            return copy.deepcopy(direct_pm)
+        if _is_finite_number(payload.get("ppl_final")):
+            preview_value = payload.get("ppl_preview")
+            if not _is_finite_number(preview_value):
+                preview_value = payload.get("ppl_final")
+            return {
+                "kind": default_kind,
+                "preview": float(preview_value),
+                "final": float(payload.get("ppl_final")),
+            }
+
+        metrics_block = payload.get("metrics")
+        if not isinstance(metrics_block, dict):
+            return None
+        block_pm = metrics_block.get("primary_metric")
+        if isinstance(block_pm, dict) and _is_finite_number(block_pm.get("final")):
+            return copy.deepcopy(block_pm)
+        ppl_final = metrics_block.get("ppl_final")
+        if _is_finite_number(ppl_final):
+            ppl_preview = metrics_block.get("ppl_preview", ppl_final)
+            if not _is_finite_number(ppl_preview):
+                ppl_preview = ppl_final
+            return {
+                "kind": default_kind,
+                "preview": float(ppl_preview),
+                "final": float(ppl_final),
+            }
+        return None
+
     baseline_pm = None
     try:
         bm = (
@@ -379,23 +424,33 @@ def make_report(
             if isinstance(baseline_raw.get("metrics"), dict)
             else None
         )
-        if isinstance(bm, dict) and bm:
+        if (
+            isinstance(bm, dict)
+            and bm
+            and "final" in bm
+            and bm.get("final") is not None
+        ):
             baseline_pm = bm
     except NON_FATAL_EXCEPTIONS as exc:
-        raise ValidationError(
+        raise MetricsError(
             code="E233",
             message=(
-                "Baseline primary metric lookup failed; the baseline report is "
-                "not structurally valid enough for evaluation report assembly."
+                "Evaluation report assembly requires a concrete baseline metric; "
+                "baseline primary metric lookup failed."
             ),
             details={"error": str(exc)},
         ) from exc
     if not isinstance(baseline_pm, dict) or not baseline_pm:
+        baseline_pm = _direct_baseline_metric(baseline_raw)
+    if not isinstance(baseline_pm, dict) or not baseline_pm:
+        baseline_pm = _direct_baseline_metric(baseline_normalized)
+    if not isinstance(baseline_pm, dict) or not baseline_pm:
         try:
             baseline_metric_source = baseline_normalized
-            if isinstance(baseline_raw, dict) and isinstance(
-                baseline_raw.get("evaluation_windows"),
-                dict,
+            if (
+                isinstance(baseline_raw, dict)
+                and isinstance(baseline_raw.get("evaluation_windows"), dict)
+                and _direct_baseline_metric(baseline_normalized) is None
             ):
                 baseline_metric_source = baseline_raw
             baseline_pm = compute_primary_metric_from_report(baseline_metric_source)
@@ -403,8 +458,8 @@ def make_report(
             raise MetricsError(
                 code="E234",
                 message=(
-                    "Baseline primary metric could not be derived; evaluation "
-                    "report assembly requires a concrete baseline metric."
+                    "Evaluation report assembly requires a concrete baseline metric; "
+                    "baseline primary metric could not be derived."
                 ),
                 details={"error": str(exc)},
             ) from exc
@@ -415,12 +470,12 @@ def make_report(
         raise MetricsError(
             code="E235",
             message=(
-                "Baseline primary metric is missing a concrete finite `final` value; "
-                "evaluation report assembly requires complete baseline evidence."
+                "Evaluation report assembly requires a concrete finite `final` value "
+                "for the baseline primary metric."
             ),
             details={"baseline_primary_metric": baseline_pm},
         )
-    baseline_ref = {
+    baseline_ref: dict[str, Any] = {
         "run_id": _optional_text(baseline_normalized.get("run_id")),
         "model_id": _optional_text(baseline_normalized.get("model_id")),
         "primary_metric": {
@@ -428,6 +483,18 @@ def make_report(
             "final": float(baseline_final),
         },
     }
+    baseline_metrics = (
+        baseline_raw.get("metrics")
+        if isinstance(baseline_raw, dict)
+        and isinstance(baseline_raw.get("metrics"), dict)
+        else None
+    )
+    if isinstance(baseline_metrics, dict):
+        classification_metrics = baseline_metrics.get("classification")
+        if isinstance(classification_metrics, dict) and classification_metrics:
+            baseline_ref["metrics"] = {
+                "classification": copy.deepcopy(classification_metrics)
+            }
     # Propagate baseline tokenizer hash for verify-time linting when available
     baseline_tok_hash = baseline_normalized.get("tokenizer_hash")
     if isinstance(baseline_tok_hash, str) and baseline_tok_hash:
@@ -810,6 +877,8 @@ def make_report(
         evaluation_report, _compute_confidence_label
     )
     if build_diagnostics:
-        evaluation_report.setdefault("meta", {})["build_diagnostics"] = build_diagnostics
+        evaluation_report.setdefault("meta", {})["build_diagnostics"] = (
+            build_diagnostics
+        )
 
     return evaluation_report

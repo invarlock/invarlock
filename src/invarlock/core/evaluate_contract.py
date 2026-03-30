@@ -166,9 +166,7 @@ def _validate_baseline_report_payload(
     if not isinstance(eval_windows, dict):
         raise ValidationError(
             code="E222",
-            message=(
-                "Baseline report missing evaluation window payloads."
-            ),
+            message=("Baseline report missing evaluation window payloads."),
             details={"path": str(resolved_report), "field": "evaluation_windows"},
         )
 
@@ -271,7 +269,9 @@ def apply_edited_primary_metric_policy(
             diagnostic=None,
         )
 
-    normalized_payload = dict(edited_payload) if isinstance(edited_payload, dict) else {}
+    normalized_payload = (
+        dict(edited_payload) if isinstance(edited_payload, dict) else {}
+    )
     metrics = normalized_payload.get("metrics", {})
     metrics = dict(metrics) if isinstance(metrics, dict) else {}
     pm = metrics.get("primary_metric", {})
@@ -286,7 +286,7 @@ def apply_edited_primary_metric_policy(
 
     pm_prev = pm.get("preview")
     pm_final = pm.get("final")
-    pm_ratio = pm.get("ratio_vs_baseline")
+    pm.get("ratio_vs_baseline")
     degraded = bool(pm.get("invalid") or pm.get("degraded"))
     if not degraded and _finite_number(pm_final):
         return PrimaryMetricPolicyOutcome(

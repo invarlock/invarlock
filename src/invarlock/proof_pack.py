@@ -11,9 +11,11 @@ from pathlib import Path
 from typing import Any
 
 from invarlock.public_contracts import load_proof_pack_manifest_schema
-from invarlock.reporting.verify_contract import VerifyExecutionResult
-from invarlock.reporting.verify_contract import VerifyOutcome
-from invarlock.reporting.verify_contract import run_verify_reports
+from invarlock.reporting.verify_contract import (
+    VerifyExecutionResult,
+    VerifyOutcome,
+    run_verify_reports,
+)
 from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
 
 try:  # pragma: no cover - exercised through tests/integration
@@ -39,6 +41,7 @@ class ProofPackStatus(IntEnum):
 class ProofPackResult:
     payload: dict[str, Any]
     status: ProofPackStatus
+
 
 _CONTROL_FILES = {
     "checksums.sha256",
@@ -450,7 +453,11 @@ def _verify_gpg(
     except subprocess.TimeoutExpired:
         if strict:
             return (["gpg verification timed out."], [], None)
-        return [], ["gpg verification timed out; skipping manifest signature verification."], None
+        return (
+            [],
+            ["gpg verification timed out; skipping manifest signature verification."],
+            None,
+        )
     if result.returncode != 0:
         message = (result.stdout + result.stderr).strip()
         error = "manifest signature verification failed."
@@ -479,9 +486,7 @@ def _verify_gpg(
     return [], [], signer_fpr
 
 
-def _run_verify_command(
-    reports: list[Path], *, profile: str
-) -> VerifyExecutionResult:
+def _run_verify_command(reports: list[Path], *, profile: str) -> VerifyExecutionResult:
     return run_verify_reports(reports, profile=profile, json_mode=True)
 
 
@@ -527,8 +532,6 @@ def _verify_reports(
             return [
                 "error-injection report verification did not return a JSON object."
             ], verify_payload
-        if verify_payload is None:
-            verify_payload = {}
         verify_payload["error_injection"] = {
             "verify": error_result.payload,
             "reports": [
@@ -668,7 +671,6 @@ def build_proof_pack(
 ) -> ProofPackResult:
     warnings: list[str] = []
     errors: list[str] = []
-    verify_payload: dict[str, Any] | None = None
     payload: dict[str, Any] = {
         "pack": str(out_dir),
         "ok": False,
@@ -722,9 +724,7 @@ def build_proof_pack(
     if errors:
         return ProofPackResult(payload=payload, status=ProofPackStatus.FORMAT)
 
-    verify_result = _run_verify_command(
-        report_paths, profile=profile
-    )
+    verify_result = _run_verify_command(report_paths, profile=profile)
     if not _verify_command_succeeded(verify_result):
         payload["verify"] = verify_result.payload
         errors.append("Provided report inputs failed `invarlock verify`.")

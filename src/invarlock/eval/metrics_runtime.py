@@ -129,9 +129,11 @@ def _infer_model_vocab_size(model: nn.Module) -> int | None:
                 return size
 
     max_embeddings = 0
-    for module in model.modules():
-        if isinstance(module, nn.Embedding):
-            max_embeddings = max(max_embeddings, int(module.num_embeddings))
+    modules_iter = getattr(model, "modules", None)
+    if callable(modules_iter):
+        for module in model.modules():
+            if isinstance(module, nn.Embedding):
+                max_embeddings = max(max_embeddings, int(module.num_embeddings))
     if max_embeddings > 0:
         return max_embeddings
 
@@ -409,7 +411,9 @@ def compute_perplexity(
     return ppl
 
 
-def _latency_validation_error(reason: str, details: dict[str, object]) -> ValidationError:
+def _latency_validation_error(
+    reason: str, details: dict[str, object]
+) -> ValidationError:
     return ValidationError(
         code="E402",
         message="METRICS-VALIDATION-FAILED",
@@ -417,7 +421,9 @@ def _latency_validation_error(reason: str, details: dict[str, object]) -> Valida
     )
 
 
-def _memory_validation_error(reason: str, details: dict[str, object]) -> ValidationError:
+def _memory_validation_error(
+    reason: str, details: dict[str, object]
+) -> ValidationError:
     return ValidationError(
         code="E402",
         message="METRICS-VALIDATION-FAILED",

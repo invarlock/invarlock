@@ -62,7 +62,9 @@ def finalize_phase(
 
     rollback_reason = None
     tail_failed = False
-    pm_tail = metrics.get("primary_metric_tail", {}) if isinstance(metrics, dict) else {}
+    pm_tail = (
+        metrics.get("primary_metric_tail", {}) if isinstance(metrics, dict) else {}
+    )
     if pm_tail:
         if not isinstance(pm_tail, dict):
             tail_payload_invalid = True

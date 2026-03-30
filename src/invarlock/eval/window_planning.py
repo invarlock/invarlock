@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable, Sequence
-from typing import Any, Literal, TypeAlias, TypedDict
+from typing import Any, Literal, TypedDict
 
 from .data import EvaluationWindow
 from .data_support import DatasetDiagnostic
@@ -16,8 +16,8 @@ class WindowRecord(TypedDict):
     dataset_index: int | None
 
 
-WindowSelectionStatus: TypeAlias = Literal["selected", "no_candidate"]
-WindowCandidateOutcome: TypeAlias = Literal[
+type WindowSelectionStatus = Literal["selected", "no_candidate"]
+type WindowCandidateOutcome = Literal[
     "selected",
     "insufficient_tokens",
     "resolution_failed",

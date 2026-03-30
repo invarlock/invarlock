@@ -127,9 +127,7 @@ def test_resolve_guard_overhead_threshold_from_config() -> None:
             {"primary_metric": {"overhead_threshold": "bad"}}
         )
     with pytest.raises(ConfigError, match="overhead_threshold"):
-        resolve_guard_overhead_threshold(
-            {"primary_metric": {"overhead_threshold": -1}}
-        )
+        resolve_guard_overhead_threshold({"primary_metric": {"overhead_threshold": -1}})
 
 
 def test_choose_dataset_split_covers_fallback_and_exception_path() -> None:

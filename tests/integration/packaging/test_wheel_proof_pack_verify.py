@@ -4,6 +4,7 @@ import hashlib
 import json
 import math
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -33,6 +34,8 @@ def _select_python(repo_root: Path) -> Path:
 
 
 def _build_wheel(tmp_path: Path, python_exe: Path) -> Path:
+    repo_root = Path(__file__).resolve().parents[3]
+    shutil.rmtree(repo_root / "build", ignore_errors=True)
     subprocess.run(
         [
             str(python_exe),

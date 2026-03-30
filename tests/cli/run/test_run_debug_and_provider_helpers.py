@@ -175,6 +175,33 @@ def test_canonical_dataset_id_and_provider_digest_fallbacks(monkeypatch) -> None
     }
 
 
+def test_canonical_dataset_id_and_provider_digest_edge_paths() -> None:
+    class _AttrNoneThenString:
+        provider = None
+
+        def __str__(self) -> str:
+            return "  fallback-dataset  "
+
+    class _BadItems:
+        def items(self):
+            return [("dataset", "wt103")]
+
+    assert _canonical_dataset_id(_AttrNoneThenString()) == "fallback-dataset"
+    assert _canonical_dataset_id(_BadItems()) == "wt103"
+
+    digest = compute_provider_digest(
+        {
+            "evaluation_windows": {
+                "preview": {"window_ids": []},
+                "final": {"window_ids": [3]},
+            },
+            "meta": {"tokenizer_hash": ""},
+        },
+        compute_mask_positions_digest_fn=lambda _windows: "",
+    )
+    assert digest == {"ids_sha256": digest["ids_sha256"]}
+
+
 def test_plan_release_windows_console_adjustment_message(capsys) -> None:
     class _Console:
         def print(self, *args, **kwargs):

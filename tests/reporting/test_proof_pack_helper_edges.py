@@ -1174,6 +1174,27 @@ def test_inspect_proof_pack_signed_pack_omits_unsigned_warning_and_reports_extra
     assert any("extra files not covered" in issue for issue in payload["issues"])
 
 
+def test_inspect_proof_pack_unsigned_clean_pack_reports_warning_without_extras(
+    tmp_path: Path,
+) -> None:
+    pack_dir = tmp_path / "unsigned-pack"
+    report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
+    _write_manifest_and_checksums(
+        pack_dir,
+        report_path=report_path,
+        final_verdict=final_verdict,
+        environment=environment,
+    )
+
+    result = proof_pack_mod.inspect_proof_pack(pack_dir)
+    payload = result.payload
+
+    assert result.status == proof_pack_mod.ProofPackStatus.OK
+    assert payload["ok"] is True
+    assert payload["integrity"]["extra_files"] == []
+    assert "manifest.json.asc missing; strict verification would fail." in payload["issues"]
+
+
 def test_build_proof_pack_copies_readme_and_environment_without_optional_refs(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -1269,9 +1290,7 @@ def test_verify_proof_pack_reports_missing_manifest_and_checksums(
     missing_manifest.mkdir()
     (missing_manifest / "checksums.sha256").write_text("", encoding="utf-8")
 
-    result = proof_pack_mod.verify_proof_pack(
-        missing_manifest, skip_verify=True
-    )
+    result = proof_pack_mod.verify_proof_pack(missing_manifest, skip_verify=True)
     payload = result.payload
     exit_code = result.status
     assert exit_code == proof_pack_mod.ProofPackStatus.MISSING
@@ -1288,9 +1307,7 @@ def test_verify_proof_pack_reports_missing_manifest_and_checksums(
         },
     )
 
-    result = proof_pack_mod.verify_proof_pack(
-        missing_checksums, skip_verify=True
-    )
+    result = proof_pack_mod.verify_proof_pack(missing_checksums, skip_verify=True)
     payload = result.payload
     exit_code = result.status
     assert exit_code == proof_pack_mod.ProofPackStatus.MISSING
@@ -1348,6 +1365,33 @@ def test_verify_proof_pack_returns_signature_failure_payload(
     assert exit_code == proof_pack_mod.ProofPackStatus.SIGNATURE
     assert payload["errors"] == ["bad signature"]
     assert payload["signer_fingerprint"] == "FPR123"
+
+
+def test_verify_proof_pack_skip_verify_succeeds_without_running_report_verify(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    pack_dir = tmp_path / "pack"
+    report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
+    _write_manifest_and_checksums(
+        pack_dir,
+        report_path=report_path,
+        final_verdict=final_verdict,
+        environment=environment,
+    )
+
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "_verify_reports",
+        lambda *args, **kwargs: pytest.fail("_verify_reports should not run when skip_verify=True"),
+        raising=True,
+    )
+
+    result = proof_pack_mod.verify_proof_pack(pack_dir, skip_verify=True)
+
+    assert result.status == proof_pack_mod.ProofPackStatus.OK
+    assert result.payload["ok"] is True
+    assert "verify" not in result.payload
+    assert result.payload["warnings"] == ["manifest.json.asc missing; pack is unsigned."]
 
 
 def test_build_verify_result_includes_signer_and_verify_payload(tmp_path: Path) -> None:

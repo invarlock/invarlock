@@ -34,7 +34,8 @@ def test_guard_overhead_prepare_invalid_ratio_and_threshold():
     sanitized, passed = prepare_guard_overhead_section(raw)
     # Invalid ratio and threshold should result in not evaluated but soft-pass
     assert sanitized["evaluated"] is False and passed is True
-    assert sanitized["errors"]
+    assert sanitized["diagnostics"]
+    assert sanitized["diagnostics"][0]["severity"] == "warning"
     flags = compute_validation_flags(
         ppl={"ratio_vs_baseline": 1.0, "preview_final_ratio": 1.0},
         spectral={"caps_applied": 0, "max_caps": 5},

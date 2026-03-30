@@ -227,7 +227,9 @@ def test_evaluate_command_resets_runtime_security_on_success(
     monkeypatch.setattr(security_helpers, "configure_runtime_security", fake_configure)
     monkeypatch.setattr(eval_mod, "maybe_delegate_model_command", lambda: None)
     monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
-    monkeypatch.setattr(eval_mod, "generate_reports", lambda **_kwargs: None, raising=False)
+    monkeypatch.setattr(
+        eval_mod, "generate_reports", lambda **_kwargs: None, raising=False
+    )
 
     evaluate_command(
         baseline=str(src),
@@ -286,7 +288,9 @@ def test_evaluate_command_resets_runtime_security_on_raise(
     monkeypatch.setattr(security_helpers, "configure_runtime_security", fake_configure)
     monkeypatch.setattr(eval_mod, "maybe_delegate_model_command", lambda: None)
     monkeypatch.setattr(run_mod, "run_command", failing_run, raising=False)
-    monkeypatch.setattr(eval_mod, "generate_reports", lambda **_kwargs: None, raising=False)
+    monkeypatch.setattr(
+        eval_mod, "generate_reports", lambda **_kwargs: None, raising=False
+    )
 
     with pytest.raises(RuntimeError, match="boom"):
         evaluate_command(

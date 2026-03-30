@@ -22,6 +22,7 @@ def test_run_from_config_executes_concrete_run_request(
         ),
         raising=True,
     )
+
     @contextmanager
     def _scope(*, policy):
         seen["policy"] = policy
@@ -71,6 +72,7 @@ def test_run_from_config_executes_without_delegation_and_writes_manifest(
         ),
         raising=True,
     )
+
     @contextmanager
     def _scope(*, policy):
         seen["policy"] = policy
@@ -145,6 +147,7 @@ def test_run_from_config_delegates_when_secure_default_requires_container(
         lambda **kwargs: runtime_security.build_runtime_security_policy(),
         raising=True,
     )
+
     @contextmanager
     def _scope(*, policy):
         seen["policy"] = policy
@@ -204,6 +207,7 @@ def test_run_from_config_wraps_runtime_delegation_failures(
         lambda **kwargs: runtime_security.build_runtime_security_policy(),
         raising=True,
     )
+
     @contextmanager
     def _scope(*, policy):
         yield
@@ -260,6 +264,7 @@ def test_run_from_config_skips_manifest_for_missing_report(
         ),
         raising=True,
     )
+
     @contextmanager
     def _scope(*, policy):
         seen["policy"] = policy
@@ -310,6 +315,7 @@ def test_run_from_config_raises_when_run_execution_returns_none(
         lambda **kwargs: runtime_security.build_runtime_security_policy(),
         raising=True,
     )
+
     @contextmanager
     def _scope(*, policy):
         yield

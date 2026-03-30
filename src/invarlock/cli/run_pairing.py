@@ -35,7 +35,7 @@ def _canonical_dataset_id(value: Any) -> str | None:
     if hasattr(value, "items"):
         try:
             return _canonical_dataset_id(dict(value.items()))
-        except (AttributeError, TypeError, ValueError):
+        except (AttributeError, KeyError, RuntimeError, TypeError, ValueError):
             pass
     for attr in ("kind", "dataset", "name", "id", "provider"):
         try:
@@ -47,7 +47,7 @@ def _canonical_dataset_id(value: Any) -> str | None:
             return normalized
     try:
         normalized = str(value).strip()
-    except (TypeError, ValueError):
+    except (RuntimeError, TypeError, ValueError):
         return None
     return normalized or None
 

@@ -23,6 +23,7 @@ class Model(nn.Module):
     def __init__(self, vocab=5):
         super().__init__()
         self.vocab = vocab
+        self.proj = nn.Linear(4, 4, bias=False)
         self.transformer = types.SimpleNamespace(h=[Block(), Block()])
 
     def forward(self, input_ids=None, output_hidden_states=False, **kwargs):

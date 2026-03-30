@@ -14,9 +14,7 @@ from invarlock.eval.metrics_activation import (
 def test_head_energy_strict_nan_returns_nan():
     # Hidden states contain NaNs; with strict_validation, validator raises, helper returns NaN
     hs = torch.full((2, 1, 4, 8), float("nan"))
-    res = _calculate_head_energy(
-        [hs], MetricsConfig(strict_validation=True)
-    )
+    res = _calculate_head_energy([hs], MetricsConfig(strict_validation=True))
     assert math.isnan(res)
 
 

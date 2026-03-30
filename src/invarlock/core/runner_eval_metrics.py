@@ -43,8 +43,10 @@ def compute_real_metrics(
     model.eval()
 
     debug_trace_enabled = bool(os.environ.get("INVARLOCK_DEBUG_TRACE"))
-    if not debug_trace_enabled and config and isinstance(
-        getattr(config, "context", None), dict
+    if (
+        not debug_trace_enabled
+        and config
+        and isinstance(getattr(config, "context", None), dict)
     ):
         debug_trace_enabled = bool(config.context.get("debug_trace", False))
     if debug_trace_enabled:
@@ -155,8 +157,9 @@ def compute_real_metrics(
         )
         final_n = remaining
 
+    calibration_source = calibration_data
     preview_data, calibration_data = slice_calibration(
-        calibration_data,
+        calibration_source,
         start=0,
         count=preview_n,
         allow_materialize=allow_materialize,
@@ -167,6 +170,14 @@ def compute_real_metrics(
         count=final_n,
         allow_materialize=allow_materialize,
     )
+    if not final_data and requested_final > 0 and total_available > 0:
+        fallback_final_n = min(requested_final, total_available)
+        final_data, calibration_data = slice_calibration(
+            calibration_source,
+            start=0,
+            count=fallback_final_n,
+            allow_materialize=allow_materialize,
+        )
 
     eval_context: dict[str, Any] = {}
     if config and isinstance(config.context, dict):

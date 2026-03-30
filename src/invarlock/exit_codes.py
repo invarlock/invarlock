@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from invarlock.core.exceptions import ConfigError, DataError, InvarlockError, ValidationError
+from invarlock.core.exceptions import (
+    ConfigError,
+    DataError,
+    InvarlockError,
+    ValidationError,
+)
 
 
 def resolve_command_exit_code(exc: Exception, *, profile: str | None) -> int:

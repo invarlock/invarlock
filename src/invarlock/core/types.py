@@ -128,6 +128,7 @@ class GuardValidationResult(dict[str, Any]):
         payload = {
             "passed": bool(passed),
             "decision": str(decision),
+            "action": decision_to_action(str(decision)),
             "metrics": dict(metrics or {}),
             "diagnostics": [
                 {
@@ -157,6 +158,13 @@ class GuardValidationResult(dict[str, Any]):
     @property
     def metrics(self) -> dict[str, Any]:
         return dict(self.get("metrics", {}))
+
+    @property
+    def action(self) -> str:
+        raw = self.get("action")
+        if isinstance(raw, str) and raw:
+            return raw
+        return decision_to_action(self.decision)
 
     @property
     def diagnostics(self) -> tuple[GuardDiagnostic, ...]:
@@ -197,6 +205,7 @@ class GuardValidationResult(dict[str, Any]):
         for key in (
             "passed",
             "decision",
+            "action",
             "metrics",
             "diagnostics",
             "policy",

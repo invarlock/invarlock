@@ -3009,9 +3009,7 @@ class TestRMTEnhancedCoverage:
 
         # Test without preparation (lines 1309-1315)
         guard.after_edit(self.model)
-        assert any(
-            e.get("severity") == "warning" for e in guard.diagnostic_records
-        )
+        assert any(e.get("severity") == "warning" for e in guard.diagnostic_records)
 
         # Test with preparation and no activation batches
         guard.prepare(self.model, None, None, {})
@@ -3025,9 +3023,7 @@ class TestRMTEnhancedCoverage:
         ):
             guard._calibration_batches = [{"input_ids": torch.randint(0, 100, (1, 64))}]
             guard.after_edit(self.model)
-            assert any(
-                e.get("severity") == "error" for e in guard.diagnostic_records
-            )
+            assert any(e.get("severity") == "error" for e in guard.diagnostic_records)
 
     def test_rmt_guard_validate_method(self):
         """Test RMTGuard validate method (lines 1399-1411)."""

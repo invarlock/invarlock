@@ -47,6 +47,8 @@ from invarlock.core.run_retry_policy import (
 )
 from invarlock.core.run_timing_policy import (
     TimingSummaryPayload,
+)
+from invarlock.core.run_timing_policy import (
     build_timing_summary_payload as _build_timing_summary_payload_impl,
 )
 from invarlock.model_utils import set_seed
@@ -879,9 +881,7 @@ def execute_run_request(
 
         run_id = f"{output_dir.name}-{timestamp}" if output_dir.name else timestamp
 
-        _emit(
-            RunOutputDirectoryReadyEvent(run_dir=str(run_dir), run_id=run_id)
-        )
+        _emit(RunOutputDirectoryReadyEvent(run_dir=str(run_dir), run_id=run_id))
 
         # Initialize retry controller if --until-pass mode enabled
         retry_controller = _init_retry_controller(
@@ -1636,8 +1636,7 @@ def execute_run_request(
                     edit_config=edit_config,
                 )
                 retry_disposition = str(
-                    getattr(retry_decision, "status", "error")
-                    or "error"
+                    getattr(retry_decision, "status", "error") or "error"
                 )
                 retry_gate_codes = tuple(
                     str(item)
@@ -1645,8 +1644,7 @@ def execute_run_request(
                 )
                 retry_error = getattr(retry_decision, "error", None)
                 retry_summary = str(
-                    getattr(retry_error, "message", None)
-                    or "Retry validation failed"
+                    getattr(retry_error, "message", None) or "Retry validation failed"
                 )
 
                 if retry_disposition == "passed":
@@ -1654,11 +1652,7 @@ def execute_run_request(
                     break
 
                 if retry_disposition in {"retry", "exhausted"}:
-                    _emit(
-                        RunEvaluationReportFailedEvent(
-                            gate_codes=retry_gate_codes
-                        )
-                    )
+                    _emit(RunEvaluationReportFailedEvent(gate_codes=retry_gate_codes))
 
                     edit_config = retry_decision.updated_edit_config
                     head_adjustment = retry_decision.head_adjustment
@@ -1680,18 +1674,10 @@ def execute_run_request(
                     break
 
                 if retry_disposition == "error":
-                    _emit(
-                        RunRetryValidationErrorEvent(
-                            summary=retry_summary
-                        )
-                    )
+                    _emit(RunRetryValidationErrorEvent(summary=retry_summary))
                     break
 
-                _emit(
-                    RunRetryValidationErrorEvent(
-                        summary=retry_summary
-                    )
-                )
+                _emit(RunRetryValidationErrorEvent(summary=retry_summary))
                 break
             else:
                 if retry_controller:

@@ -158,9 +158,7 @@ def test_build_provider_dataset_plan_collects_diagnostics_and_provider_kwargs() 
     )
 
 
-def test_build_provider_dataset_plan_leaves_missing_tokenizer_name_nullable() -> (
-    None
-):
+def test_build_provider_dataset_plan_leaves_missing_tokenizer_name_nullable() -> None:
     result = build_provider_dataset_plan(
         cfg=_cfg(provider=_ProviderConfig("local_jsonl", path="demo.jsonl")),
         model_profile=SimpleNamespace(),
