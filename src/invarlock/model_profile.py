@@ -18,26 +18,32 @@ TokenizerImpl: Any = _TOKENIZERS_UNSET
 class PreTrainedTokenizerBase:
     """Lightweight stub used when transformers is not installed."""
 
+    pad_token: Any = None
+    eos_token: Any = None
+    sep_token: Any = None
+    cls_token: Any = None
+    add_bos_token: bool = False
+    name_or_path: str = ""
+
     def __call__(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         raise RuntimeError(
             "Tokenization requires the 'transformers' extra. "
             "Install the invarlock adapters extra to enable tokenizer loading."
         )
 
+    def get_vocab(self) -> dict[str, int]:
+        return {}
+
 
 def _ensure_transformers_tokenizer_support() -> Any:
-    global AutoTokenizer, PreTrainedTokenizerBase
+    global AutoTokenizer
     if AutoTokenizer is _TRANSFORMERS_UNSET:
         try:
             from transformers import AutoTokenizer as _AutoTokenizer
-            from transformers.tokenization_utils_base import (
-                PreTrainedTokenizerBase as _PreTrainedTokenizerBase,
-            )
         except ModuleNotFoundError:
             AutoTokenizer = None
         else:  # pragma: no cover - transformers optional
             AutoTokenizer = _AutoTokenizer
-            PreTrainedTokenizerBase = _PreTrainedTokenizerBase
     return AutoTokenizer
 
 
@@ -45,11 +51,11 @@ def _ensure_tokenizers_support() -> Any:
     global TokenizerImpl
     if TokenizerImpl is _TOKENIZERS_UNSET:
         try:
-            from tokenizers import Tokenizer as _TokenizerImpl
+            import tokenizers  # type: ignore[import-untyped]
         except ModuleNotFoundError:
             TokenizerImpl = None
         else:  # pragma: no cover - tokenizers optional
-            TokenizerImpl = _TokenizerImpl
+            TokenizerImpl = tokenizers.Tokenizer
     return None if TokenizerImpl is _TOKENIZERS_UNSET else TokenizerImpl
 
 

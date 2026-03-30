@@ -26,7 +26,8 @@ def build_guard_evidence_payload(report: RunReport) -> dict[str, Any]:
         return {"guards_decisions": []}
 
     tiny: list[dict[str, object]] = []
-    for guard in guard_ctx:
+    guard_items: list[Any] = list(guard_ctx)
+    for guard in guard_items:
         if not isinstance(guard, dict):
             continue
         entry: dict[str, object] = {}

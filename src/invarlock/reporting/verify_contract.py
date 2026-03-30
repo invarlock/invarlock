@@ -62,7 +62,7 @@ class VerifyOutcome(str, Enum):
 @dataclass(frozen=True)
 class VerifyExecutionResult:
     outcome: VerifyOutcome
-    payload: dict[str, Any]
+    payload: Any
     diagnostics: tuple[VerifyDiagnostic, ...]
     error: Exception | None = None
     include_resolution: bool = False
@@ -141,7 +141,9 @@ def _warn_adapter_family_mismatch(
             else {}
         )
         baseline_report_path = None
-        baseline_ref = baseline_prov.get("baseline")
+        baseline_ref = (
+            baseline_prov.get("baseline") if isinstance(baseline_prov, dict) else None
+        )
         if isinstance(baseline_ref, dict):
             baseline_report_path = baseline_ref.get("report_path")
 

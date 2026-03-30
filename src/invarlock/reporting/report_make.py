@@ -12,11 +12,10 @@ from __future__ import annotations
 
 # Core evaluation report building and analysis orchestration lives here.
 import copy
-import math
 from typing import Any, cast
 
 from invarlock.core.auto_tuning import get_tier_policies
-from invarlock.core.exceptions import MetricsError, ValidationError
+from invarlock.core.exceptions import ValidationError
 from invarlock.eval import tail_stats as tail_stats_mod
 from invarlock.eval.primary_metric import compute_primary_metric_from_report
 
@@ -59,6 +58,16 @@ from .report_validation_allowlist import (
 from .report_validation_allowlist import (
     load_validation_allowlist_with_source as _load_validation_allowlist_with_source,
 )
+from .utils import _sanitize_seed_bundle as _sanitize_seed_bundle_impl
+
+# Backward-compatible private alias kept for older tests and internal imports.
+_extract_report_meta = extract_report_meta
+
+
+def _sanitize_seed_bundle(raw_seeds: Any, fallback: Any) -> dict[str, int | None]:
+    return _sanitize_seed_bundle_impl(raw_seeds, fallback)
+
+
 POLICY_VERSION = report_provenance_mod.POLICY_VERSION
 REPORT_SCHEMA_VERSION = report_schema_mod.REPORT_SCHEMA_VERSION
 REPORT_JSON_SCHEMA = report_schema_mod.REPORT_JSON_SCHEMA
@@ -265,6 +274,7 @@ def make_report(
         report,
         baseline_raw,
         baseline_normalized,
+        compute_primary_metric_from_report_fn=compute_primary_metric_from_report,
     )
 
     ppl_analysis, window_plan_profile = (
@@ -511,9 +521,7 @@ def make_report(
 
     target_ratio_raw = auto.get("target_pm_ratio")
     target_ratio = (
-        float(target_ratio_raw)
-        if isinstance(target_ratio_raw, int | float)
-        else None
+        float(target_ratio_raw) if isinstance(target_ratio_raw, int | float) else None
     )
 
     validation_flags = report_validation_mod.compute_validation_flags(

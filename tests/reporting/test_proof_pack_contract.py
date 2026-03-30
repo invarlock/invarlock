@@ -181,9 +181,7 @@ def test_proof_pack_verify_strict_rejects_extra_files(tmp_path: Path) -> None:
     assert any("extra files not covered" in error for error in payload["errors"])
 
 
-def test_proof_pack_verify_requires_clean_reports(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_proof_pack_verify_requires_clean_reports(monkeypatch, tmp_path: Path) -> None:
     pack_dir = _build_pack(
         tmp_path / "pack",
         report_rel_path="reports/model/errors/noop/evaluation.report.json",

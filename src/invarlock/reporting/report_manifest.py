@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from .evidence import maybe_dump_guard_evidence
 from .report_evidence import build_guard_evidence_payload
@@ -26,7 +26,9 @@ def write_report_manifest(
 ) -> None:
     """Write the bundle manifest and optional guard evidence as best effort."""
     try:
-        summary = build_report_manifest_summary(report, evaluation_report)
+        summary = build_report_manifest_summary(
+            cast(dict[str, Any], report), evaluation_report
+        )
         manifest: dict[str, Any] = {
             "generated_at": datetime.now().isoformat(),
             "files": {

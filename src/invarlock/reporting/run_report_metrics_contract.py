@@ -81,7 +81,7 @@ def enrich_run_report_metrics(
                 if hasattr(core_report, "evaluation_windows") and isinstance(
                     core_report.evaluation_windows, dict
                 ):
-                    evaluation_windows = core_report.evaluation_windows  # type: ignore[assignment]
+                    evaluation_windows = core_report.evaluation_windows
             except (AttributeError, TypeError):
                 evaluation_windows = {}
             if not evaluation_windows:
@@ -178,10 +178,15 @@ def enrich_run_report_metrics(
         if metric_kind_resolved:
             from invarlock.eval.primary_metric import compute_primary_metric_from_report
 
+            baseline_report = (
+                dict(baseline_report_data)
+                if isinstance(baseline_report_data, Mapping)
+                else None
+            )
             primary_metric = compute_primary_metric_from_report(
                 report,
                 kind=metric_kind_resolved,
-                baseline=baseline_report_data,
+                baseline=baseline_report,
             )
             core_primary_metric = None
             if hasattr(core_report, "metrics") and isinstance(
@@ -224,7 +229,7 @@ def enrich_run_report_metrics(
                     debug_diffs_line = format_debug_metric_diffs(
                         primary_metric,
                         report.get("metrics", {}),
-                        baseline_report_data,
+                        baseline_report,
                     )
             except (AttributeError, TypeError, ValueError):
                 pass

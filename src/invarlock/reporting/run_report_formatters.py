@@ -311,12 +311,13 @@ def _generate_single_markdown(report: RunReport) -> list[str]:
             diagnostics = guard.get("diagnostics", [])
             if diagnostics:
                 lines.append("**Diagnostics:**")
-                for diagnostic in diagnostics:
+                diagnostic_items: list[Any] = list(diagnostics)
+                for diagnostic in diagnostic_items:
                     if isinstance(diagnostic, dict):
                         severity = str(diagnostic.get("severity") or "info").upper()
                         message = str(diagnostic.get("message") or "")
                         lines.append(f"- [{severity}] {message}")
-                    else:
+                    elif isinstance(diagnostic, str):
                         lines.append(f"- {diagnostic}")
                 lines.append("")
 

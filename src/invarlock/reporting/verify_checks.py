@@ -49,11 +49,14 @@ def _coerce_int(value: Any) -> int | None:
 
 def _load_evaluation_report(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as handle:
-        return json.load(handle)
+        payload = json.load(handle)
+    if not isinstance(payload, dict):
+        raise ValueError("evaluation report must decode to a JSON object")
+    return payload
 
 
 def _validate_report_schema_strict(
-    report: dict[str, Any],
+    report: Any,
     *,
     schema_version: str = REPORT_SCHEMA_VERSION,
     report_json_schema: dict[str, Any] = REPORT_JSON_SCHEMA,
@@ -99,7 +102,11 @@ def _validate_logspace_ci_identity(
     if not kind.startswith("ppl"):
         return errors
 
-    stats = report.get("dataset", {}).get("windows", {}).get("stats", {}) or {}
+    dataset = report.get("dataset", {})
+    dataset_windows = dataset.get("windows", {}) if isinstance(dataset, dict) else {}
+    stats = (
+        dataset_windows.get("stats", {}) if isinstance(dataset_windows, dict) else {}
+    )
     if not isinstance(stats, dict):
         return errors
 
@@ -139,7 +146,12 @@ def _validate_logspace_ci_identity(
             )
         )
 
-    prof = (profile or "").strip().lower() if isinstance(profile, str | None) else "dev"
+    def _coerce_bounds(bounds: Any) -> tuple[float, float] | None:
+        if not _finite_bounds(bounds):
+            return None
+        return float(bounds[0]), float(bounds[1])
+
+    prof = (profile or "").strip().lower() if isinstance(profile, str) else "dev"
     ci = pm.get("ci")
     display_ci = pm.get("display_ci")
 
@@ -153,11 +165,13 @@ def _validate_logspace_ci_identity(
                 "primary_metric.display_ci missing for ppl-like metric under paired baseline in CI/Release."
             )
 
-    if not (_finite_bounds(ci) and _finite_bounds(display_ci)):
+    ci_bounds = _coerce_bounds(ci)
+    display_bounds = _coerce_bounds(display_ci)
+    if ci_bounds is None or display_bounds is None:
         return errors
 
-    expected = (math.exp(float(ci[0])), math.exp(float(ci[1])))
-    observed = (float(display_ci[0]), float(display_ci[1]))
+    expected = (math.exp(ci_bounds[0]), math.exp(ci_bounds[1]))
+    observed = display_bounds
     for obs, exp_val in zip(observed, expected, strict=False):
         tolerance = 5e-4 * max(1.0, abs(exp_val))
         if abs(obs - exp_val) > tolerance:
@@ -207,26 +221,29 @@ def _validate_primary_metric(report: dict[str, Any]) -> list[str]:
             bv = baseline_pm.get("final")
             if isinstance(bv, (int, float)):
                 baseline_final = float(bv)
-        if _is_finite_number(final) and _is_finite_number(baseline_final):
-            if float(baseline_final) <= 0.0:
+        final_value = _coerce_float(final)
+        baseline_final_value = _coerce_float(baseline_final)
+        if final_value is not None and baseline_final_value is not None:
+            if baseline_final_value <= 0.0:
                 errors.append(
                     f"Baseline final must be > 0.0 to compute ratio (found {baseline_final})."
                 )
             else:
-                expected_ratio = float(final) / float(baseline_final)
-                if not _is_finite_number(ratio_vs_baseline):
+                expected_ratio = final_value / baseline_final_value
+                ratio_value = _coerce_float(ratio_vs_baseline)
+                if ratio_value is None:
                     errors.append(
                         "report is missing a finite primary_metric.ratio_vs_baseline value."
                     )
                 elif not math.isclose(
-                    float(ratio_vs_baseline),
+                    ratio_value,
                     expected_ratio,
                     rel_tol=1e-6,
                     abs_tol=1e-6,
                 ):
                     errors.append(
                         "Primary metric ratio mismatch: "
-                        f"recorded={float(ratio_vs_baseline):.12f}, expected={expected_ratio:.12f}"
+                        f"recorded={ratio_value:.12f}, expected={expected_ratio:.12f}"
                     )
         else:
             if (isinstance(final, (int, float)) and not _is_finite_number(final)) and (
@@ -710,10 +727,9 @@ def _apply_profile_lints(report: dict[str, Any]) -> list[str]:
                     f"{message} Expected {path} == {expected!r}, observed {actual!r}."
                 )
         elif lint_type == "gte":
-            try:
-                actual_val = float(actual)
-                expected_val = float(expected)
-            except (TypeError, ValueError):
+            actual_val = _coerce_float(actual)
+            expected_val = _coerce_float(expected)
+            if actual_val is None or expected_val is None:
                 errors.append(
                     f"{message} Expected numeric comparison for {path}, observed {actual!r}."
                 )
@@ -723,10 +739,9 @@ def _apply_profile_lints(report: dict[str, Any]) -> list[str]:
                         f"{message} Expected {path} ≥ {expected_val}, observed {actual_val}."
                     )
         elif lint_type == "lte":
-            try:
-                actual_val = float(actual)
-                expected_val = float(expected)
-            except (TypeError, ValueError):
+            actual_val = _coerce_float(actual)
+            expected_val = _coerce_float(expected)
+            if actual_val is None or expected_val is None:
                 errors.append(
                     f"{message} Expected numeric comparison for {path}, observed {actual!r}."
                 )

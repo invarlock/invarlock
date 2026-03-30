@@ -46,8 +46,10 @@ def fallback_paired_windows(
 
 
 def propagate_pairing_stats(
-    evaluation_report: dict[str, Any], ppl_analysis: dict[str, Any] | None
+    evaluation_report: Any, ppl_analysis: dict[str, Any] | None
 ) -> None:
+    if not isinstance(evaluation_report, dict):
+        return
     dataset = evaluation_report.get("dataset", {})
     if not isinstance(dataset, dict):
         return

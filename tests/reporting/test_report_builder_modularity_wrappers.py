@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from invarlock.reporting.report_overhead import (
-    compute_quality_overhead_from_guard,
-    prepare_guard_overhead_section,
-)
 from invarlock.reporting.report_builder_support import (
     build_baseline_reference,
     extract_report_meta,
+)
+from invarlock.reporting.report_overhead import (
+    compute_quality_overhead_from_guard,
+    prepare_guard_overhead_section,
 )
 from invarlock.reporting.report_policy import (
     resolve_pm_acceptance_range_from_report,
@@ -16,8 +16,8 @@ from invarlock.reporting.report_policy import (
     resolve_tiny_relax_from_report,
 )
 from invarlock.reporting.report_provenance import build_provenance_block
-from invarlock.reporting.report_validation import compute_validation_flags
 from invarlock.reporting.report_types import create_empty_report
+from invarlock.reporting.report_validation import compute_validation_flags
 
 
 def test_reporting_owner_modules_expose_injection_points():

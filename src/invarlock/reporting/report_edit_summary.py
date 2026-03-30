@@ -205,7 +205,9 @@ def extract_compression_diagnostics(
         inferred_scope = _infer_scope_from_modules(module_iter)
         if inferred_scope != "unknown" and mark("scope", inferred_scope, source_label):
             target_analysis["scope"] = inferred_scope
-    target_analysis["scope"] = edit_config.get("scope", target_analysis.get("scope", "unknown"))
+    target_analysis["scope"] = edit_config.get(
+        "scope", target_analysis.get("scope", "unknown")
+    )
 
     param_analysis: dict[str, Any] = {}
 

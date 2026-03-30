@@ -37,8 +37,11 @@ def format_debug_metric_diffs(
     if not isinstance(pm, dict) or not isinstance(metrics, dict):
         return ""
     diffs: list[str] = []
+    pm_blk: dict[str, Any] = {}
     try:
-        pm_blk = metrics.get("primary_metric", {}) if isinstance(metrics, dict) else {}
+        raw_pm_blk: Any = metrics.get("primary_metric", {})
+        if isinstance(raw_pm_blk, dict):
+            pm_blk = raw_pm_blk
         ppl_final_v1 = float(pm_blk.get("final", float("nan")))
     except _PARSE_EXCEPTIONS:
         ppl_final_v1 = float("nan")
@@ -76,15 +79,26 @@ def format_debug_metric_diffs(
         ratio_v2 = float(pm.get("ratio_vs_baseline", float("nan")))
     except _PARSE_EXCEPTIONS:
         ratio_v2 = float("nan")
-    ratio_v1 = float(pm_blk.get("ratio_vs_baseline", float("nan")))
+    try:
+        ratio_v1 = float(pm_blk.get("ratio_vs_baseline", float("nan")))
+    except _PARSE_EXCEPTIONS:
+        ratio_v1 = float("nan")
     if (not math.isfinite(ratio_v1)) and isinstance(baseline_report_data, dict):
         try:
-            base_final = float(
-                (
-                    (baseline_report_data.get("metrics") or {}).get("primary_metric")
-                    or {}
-                ).get("final")
+            metrics_block = baseline_report_data.get("metrics") or {}
+            primary_metric_block = (
+                metrics_block.get("primary_metric", {})
+                if isinstance(metrics_block, dict)
+                else {}
             )
+            base_final_raw = (
+                primary_metric_block.get("final")
+                if isinstance(primary_metric_block, dict)
+                else None
+            )
+            if base_final_raw is None:
+                raise ValueError("missing baseline final metric")
+            base_final = float(base_final_raw)
             if (
                 math.isfinite(base_final)
                 and base_final > 0

@@ -12,18 +12,17 @@ def build_run_report_context(
     auto_config: Mapping[str, Any],
     run_context: Mapping[str, Any],
 ) -> dict[str, Any]:
-    run_policy_context = (
-        dict(run_context.get("run")) if isinstance(run_context.get("run"), dict) else {}
-    )
-    eval_policy_context = (
-        dict(run_context.get("eval"))
-        if isinstance(run_context.get("eval"), dict)
-        else {}
-    )
+    run_section = run_context.get("run")
+    run_policy_context = dict(run_section) if isinstance(run_section, dict) else {}
+    eval_section = run_context.get("eval")
+    eval_policy_context = dict(eval_section) if isinstance(eval_section, dict) else {}
+    assurance_section = run_context.get("assurance")
     return {
         "profile": profile_normalized,
         "auto": dict(auto_config),
-        "assurance": dict(run_context.get("assurance") or {}),
+        "assurance": (
+            dict(assurance_section) if isinstance(assurance_section, dict) else {}
+        ),
         "run": run_policy_context,
         "eval": eval_policy_context,
     }

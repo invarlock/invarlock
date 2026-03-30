@@ -82,6 +82,20 @@ def _write_manifest_and_checksums(
     _write_json(pack_dir / "manifest.json", manifest)
 
 
+def test_signature_warnings_to_errors_converts_gpg_paths() -> None:
+    assert proof_pack_mod._signature_warnings_to_errors(
+        [
+            "gpg not found; skipping manifest signature verification.",
+            "gpg verification timed out; skipping manifest signature verification.",
+            "other warning",
+        ]
+    ) == [
+        "gpg not found; default proof-pack verification requires signature verification.",
+        "gpg verification timed out.",
+        "other warning",
+    ]
+
+
 def test_manual_validate_manifest_reports_structural_errors() -> None:
     assert proof_pack_mod._manual_validate_manifest("bad") == [
         "manifest must decode to a JSON object"

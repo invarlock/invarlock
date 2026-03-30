@@ -63,8 +63,10 @@ def _harvest_tokenizer_hash(
 ) -> str | None:
     if tokenizer_hash:
         return tokenizer_hash
-    meta = report_data.get("meta") if isinstance(report_data.get("meta"), dict) else {}
-    data = report_data.get("data") if isinstance(report_data.get("data"), dict) else {}
+    meta_obj = report_data.get("meta")
+    meta = meta_obj if isinstance(meta_obj, dict) else {}
+    data_obj = report_data.get("data")
+    data = data_obj if isinstance(data_obj, dict) else {}
     candidate = meta.get("tokenizer_hash") or data.get("tokenizer_hash")
     if isinstance(candidate, str) and candidate:
         return candidate
@@ -194,12 +196,16 @@ def materialize_baseline_pairing_schedule(
             "window_id": f"preview::{window_id}",
         }
         if use_mlm:
-            labels_list: list[int] = []
+            preview_labels_list: list[int] = []
             if isinstance(preview_labels, list) and idx < len(preview_labels):
-                labels_list = tensor_or_list_to_ints_fn(preview_labels[idx])
-            if labels_list and any(token != -100 for token in labels_list):
-                entry["labels"] = labels_list
-                entry["mlm_masked"] = sum(1 for token in labels_list if token != -100)
+                preview_labels_list = tensor_or_list_to_ints_fn(preview_labels[idx])
+            if preview_labels_list and any(
+                token != -100 for token in preview_labels_list
+            ):
+                entry["labels"] = preview_labels_list
+                entry["mlm_masked"] = sum(
+                    1 for token in preview_labels_list if token != -100
+                )
             else:
                 entry["labels"] = []
                 entry["mlm_masked"] = 0
@@ -233,12 +239,14 @@ def materialize_baseline_pairing_schedule(
             "window_id": f"final::{window_id}",
         }
         if use_mlm:
-            labels_list: list[int] = []
+            final_labels_list: list[int] = []
             if isinstance(final_labels, list) and idx < len(final_labels):
-                labels_list = tensor_or_list_to_ints_fn(final_labels[idx])
-            if labels_list and any(token != -100 for token in labels_list):
-                entry["labels"] = labels_list
-                entry["mlm_masked"] = sum(1 for token in labels_list if token != -100)
+                final_labels_list = tensor_or_list_to_ints_fn(final_labels[idx])
+            if final_labels_list and any(token != -100 for token in final_labels_list):
+                entry["labels"] = final_labels_list
+                entry["mlm_masked"] = sum(
+                    1 for token in final_labels_list if token != -100
+                )
             else:
                 entry["labels"] = []
                 entry["mlm_masked"] = 0

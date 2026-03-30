@@ -393,7 +393,9 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
             pm_kind = _normalize_kind(pm_top.get("kind"))
     pm_is_ppl = _is_ppl_kind(pm_kind)
 
-    legacy_ppl_final: float | None = _finite_float_or_none(baseline_out.get("ppl_final"))
+    legacy_ppl_final: float | None = _finite_float_or_none(
+        baseline_out.get("ppl_final")
+    )
     legacy_ppl_preview: float | None = _finite_float_or_none(
         baseline_out.get("ppl_preview")
     )

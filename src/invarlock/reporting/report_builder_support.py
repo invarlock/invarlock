@@ -113,9 +113,7 @@ def generate_run_id(report: RunReport) -> str:
     return hashlib.sha256(base_str.encode()).hexdigest()[:16]
 
 
-def _direct_baseline_metric(
-    report: RunReport, payload: Any
-) -> dict[str, Any] | None:
+def _direct_baseline_metric(report: RunReport, payload: Any) -> dict[str, Any] | None:
     if not isinstance(payload, dict):
         return None
 
@@ -178,6 +176,8 @@ def build_baseline_reference(
     report: RunReport,
     baseline_raw: RunReport | dict[str, Any],
     baseline_normalized: dict[str, Any],
+    *,
+    compute_primary_metric_from_report_fn: Any = compute_primary_metric_from_report,
 ) -> dict[str, Any]:
     baseline_raw_map: dict[str, Any] = (
         dict(baseline_raw) if isinstance(baseline_raw, dict) else {}
@@ -185,7 +185,9 @@ def build_baseline_reference(
     baseline_pm = None
     try:
         raw_metrics = baseline_raw_map.get("metrics")
-        bm = raw_metrics.get("primary_metric") if isinstance(raw_metrics, dict) else None
+        bm = (
+            raw_metrics.get("primary_metric") if isinstance(raw_metrics, dict) else None
+        )
         if (
             isinstance(bm, dict)
             and bm
@@ -214,7 +216,7 @@ def build_baseline_reference(
                 and _direct_baseline_metric(report, baseline_normalized) is None
             ):
                 baseline_metric_source = baseline_raw_map
-            baseline_pm = compute_primary_metric_from_report(baseline_metric_source)
+            baseline_pm = compute_primary_metric_from_report_fn(baseline_metric_source)
         except _NON_FATAL_EXCEPTIONS as exc:
             raise MetricsError(
                 code="E234",

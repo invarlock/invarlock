@@ -79,7 +79,7 @@ def validate_pairing_report_metrics(
         )
         if violation is not None:
             violations.append(violation)
-        elif resolved_overlap_fraction > 1e-9:
+        elif resolved_overlap_fraction is not None and resolved_overlap_fraction > 1e-9:
             violations.append(
                 RunReportPolicyViolation(
                     code="E001",
