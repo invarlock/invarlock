@@ -57,7 +57,7 @@ def _load_json(path: Path) -> Any:
 
 
 def _json_load_error_types() -> tuple[type[BaseException], ...]:
-    return (OSError, json.JSONDecodeError)
+    return (OSError, UnicodeDecodeError, json.JSONDecodeError)
 
 
 def _jsonschema_validation_error_types() -> tuple[type[BaseException], ...]:
@@ -445,6 +445,8 @@ def _verify_gpg(
                 None,
             )
         return [], ["gpg not found; skipping manifest signature verification."], None
+    except UnicodeDecodeError as exc:
+        return [f"manifest signature verification failed. {exc}"], [], None
     except subprocess.TimeoutExpired:
         if strict:
             return (["gpg verification timed out."], [], None)
@@ -483,15 +485,8 @@ def _run_verify_command(
     return run_verify_reports(reports, profile=profile, json_mode=True)
 
 
-def _verify_command_succeeded(result: Any) -> bool:
-    outcome = getattr(result, "outcome", None)
-    if outcome is not None:
-        return outcome == VerifyOutcome.OK
-    status_code = getattr(result, "status_code", 1)
-    try:
-        return int(status_code) == 0
-    except (TypeError, ValueError):
-        return False
+def _verify_command_succeeded(result: VerifyExecutionResult) -> bool:
+    return result.outcome == VerifyOutcome.OK
 
 
 def _verify_reports(

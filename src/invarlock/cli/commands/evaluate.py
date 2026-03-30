@@ -54,9 +54,9 @@ from ...core.exceptions import ConfigError, ValidationError
 # Use the report group's programmatic entry for report generation
 from ...reporting.report_contract import generate_reports
 from ..security_helpers import (
-    configure_runtime_security,
     emit_runtime_manifest,
     maybe_delegate_model_command,
+    runtime_security_scoped,
 )
 
 _LAZY_RUN_IMPORT = True
@@ -231,6 +231,7 @@ def _resolve_evaluate_tmp_dir() -> Path:
     return tmp_dir
 
 
+@runtime_security_scoped
 def evaluate_command(
     baseline: str,
     subject: str,
@@ -264,16 +265,9 @@ def evaluate_command(
         raise typer.BadParameter(
             "Execution mode must be one of: attested, local.",
             param_hint="--mode",
-        )
+    )
     allow_host_execution = allow_host_execution or mode == "local"
     prefer_local_files_only = mode == "local"
-
-    configure_runtime_security(
-        allow_network=allow_network,
-        allow_host_execution=allow_host_execution,
-        allow_third_party_plugins=allow_third_party_plugins,
-        allow_remote_code=allow_remote_code,
-    )
     maybe_delegate_model_command()
 
     verbosity = _resolve_verbosity(bool(quiet), bool(verbose))
@@ -687,11 +681,11 @@ def evaluate_command(
             edited_payload,
             profile=profile,
         )
-        if outcome.warning is not None and outcome.error is not None:
+        if outcome.diagnostic is not None and outcome.error is not None:
             print_event(
                 console,
                 "WARN",
-                outcome.warning,
+                outcome.diagnostic.message,
                 style=output_style,
                 emoji="⚠️",
             )

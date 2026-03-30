@@ -5,6 +5,8 @@ import types
 
 import pytest
 
+from invarlock.runtime_security import runtime_allowances_scope
+
 
 def _clear_remote_code_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in (
@@ -46,9 +48,9 @@ def test_hf_bnb_uses_resolved_remote_code(monkeypatch: pytest.MonkeyPatch):
     adapter.load_model("demo/model")
     assert calls["kwargs"]["trust_remote_code"] is False
 
-    monkeypatch.setenv("INVARLOCK_ALLOW_REMOTE_CODE", "1")
-    adapter.load_model("demo/model", trust_remote_code=True)
-    assert calls["kwargs"]["trust_remote_code"] is True
+    with runtime_allowances_scope(allow_remote_code=True):
+        adapter.load_model("demo/model", trust_remote_code=True)
+        assert calls["kwargs"]["trust_remote_code"] is True
 
 
 @pytest.mark.unit
@@ -76,10 +78,9 @@ def test_hf_awq_uses_resolved_remote_code(monkeypatch: pytest.MonkeyPatch):
     loaded = adapter.load_model("demo/model")
     assert loaded["kwargs"]["trust_remote_code"] is False
 
-    monkeypatch.setenv("INVARLOCK_ALLOW_REMOTE_CODE", "1")
-    monkeypatch.setenv("INVARLOCK_TRUST_REMOTE_CODE", "1")
-    loaded = adapter.load_model("demo/model")
-    assert loaded["kwargs"]["trust_remote_code"] is True
+    with runtime_allowances_scope(allow_remote_code=True):
+        loaded = adapter.load_model("demo/model", trust_remote_code=True)
+        assert loaded["kwargs"]["trust_remote_code"] is True
 
 
 @pytest.mark.unit
@@ -107,6 +108,6 @@ def test_hf_gptq_uses_resolved_remote_code(monkeypatch: pytest.MonkeyPatch):
     loaded = adapter.load_model("demo/model")
     assert loaded["kwargs"]["trust_remote_code"] is False
 
-    monkeypatch.setenv("INVARLOCK_ALLOW_REMOTE_CODE", "1")
-    loaded = adapter.load_model("demo/model", trust_remote_code=True)
-    assert loaded["kwargs"]["trust_remote_code"] is True
+    with runtime_allowances_scope(allow_remote_code=True):
+        loaded = adapter.load_model("demo/model", trust_remote_code=True)
+        assert loaded["kwargs"]["trust_remote_code"] is True

@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 import invarlock.core.adapter_auto as mod
 from invarlock.core.adapter_auto import (
     _read_local_hf_config,
@@ -20,6 +22,8 @@ def test_read_local_hf_config_variants(tmp_path: Path):
     assert _read_local_hf_config(d) is None
     # Invalid JSON → None
     (d / "config.json").write_text("not-json", encoding="utf-8")
+    assert _read_local_hf_config(d) is None
+    (d / "config.json").write_bytes(b"\xff")
     assert _read_local_hf_config(d) is None
     # Valid mapping → dict
     (d / "config.json").write_text(json.dumps({"model_type": "gpt2"}), encoding="utf-8")
@@ -169,4 +173,5 @@ def test_apply_auto_adapter_if_needed_exception_path() -> None:
             raise RuntimeError("broken model")
 
     cfg = _BrokenConfig()
-    assert mod.apply_auto_adapter_if_needed(cfg) is cfg
+    with pytest.raises(RuntimeError, match="broken model"):
+        mod.apply_auto_adapter_if_needed(cfg)

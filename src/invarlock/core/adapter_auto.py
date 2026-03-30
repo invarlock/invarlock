@@ -53,7 +53,7 @@ def _read_local_hf_config(model_id: str | os.PathLike[str]) -> dict[str, Any] | 
     """Read config.json from a local HF directory if present."""
     try:
         p = Path(model_id)
-    except Exception:
+    except (OSError, TypeError, ValueError):
         return None
     cfg_path = p / "config.json"
     if not cfg_path.exists():
@@ -63,7 +63,7 @@ def _read_local_hf_config(model_id: str | os.PathLike[str]) -> dict[str, Any] | 
             data = json.load(fh)
         if isinstance(data, dict):
             return data
-    except Exception:
+    except (OSError, TypeError, ValueError, UnicodeDecodeError):
         return None
     return None
 
@@ -161,7 +161,7 @@ def apply_auto_adapter_if_needed(cfg: Any) -> Any:
         data = cfg.model_dump()
         data.setdefault("model", {})["adapter"] = resolved
         return cfg.__class__(data)  # re-wrap as InvarLockConfig
-    except Exception:
+    except (AttributeError, KeyError, TypeError, ValueError):
         return cfg
 
 

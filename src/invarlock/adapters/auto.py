@@ -26,23 +26,27 @@ def _detect_quantization_from_path(model_id: str) -> str | None:
         return None
 
     try:
-        config_data = json.loads(config_path.read_text())
-        quant_cfg = config_data.get("quantization_config", {})
+        config_data = json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError, UnicodeDecodeError):
+        return None
+    if not isinstance(config_data, dict):
+        return None
 
-        if not quant_cfg:
-            return None
+    quant_cfg = config_data.get("quantization_config", {})
+    if not isinstance(quant_cfg, dict) or not quant_cfg:
+        return None
 
-        quant_method = quant_cfg.get("quant_method", "").lower()
+    quant_method = quant_cfg.get("quant_method", "")
+    if not isinstance(quant_method, str):
+        return None
+    quant_method = quant_method.lower()
 
-        if quant_method == "awq":
-            return "hf_awq"
-        elif quant_method == "gptq":
-            return "hf_gptq"
-        elif "bitsandbytes" in quant_method or "bnb" in quant_method:
-            return "hf_bnb"
-
-    except Exception:
-        pass
+    if quant_method == "awq":
+        return "hf_awq"
+    if quant_method == "gptq":
+        return "hf_gptq"
+    if "bitsandbytes" in quant_method or "bnb" in quant_method:
+        return "hf_bnb"
 
     return None
 
@@ -69,7 +73,10 @@ def _detect_quantization_from_model(model: Any) -> str | None:
 
     # Handle dict-style config
     if isinstance(quant_cfg, dict):
-        quant_method = quant_cfg.get("quant_method", "").lower()
+        quant_method = quant_cfg.get("quant_method", "")
+        if not isinstance(quant_method, str):
+            return None
+        quant_method = quant_method.lower()
         if quant_method == "awq":
             return "hf_awq"
         elif quant_method == "gptq":

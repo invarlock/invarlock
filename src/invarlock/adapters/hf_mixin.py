@@ -133,6 +133,26 @@ def _load_chunked_tensor(path: Path) -> torch.Tensor:
     return tensor
 
 
+def _is_local_loader_cache_miss(error: Exception) -> bool:
+    if isinstance(error, FileNotFoundError):
+        return True
+    if not isinstance(error, OSError):
+        return False
+    message = str(error).strip().lower()
+    return any(
+        snippet in message
+        for snippet in (
+            "no such file",
+            "not found",
+            "could not locate",
+            "missing cached",
+            "local files only",
+            "cannot find",
+            "can't load the model",
+        )
+    )
+
+
 class HFAdapterMixin:
     """Reusable utilities for HuggingFace-backed adapters."""
 
@@ -229,20 +249,32 @@ class HFAdapterMixin:
             if "output_loading_info" not in str(exc):
                 raise
             if prefer_local_files_only:
-                loaded = loader.from_pretrained(
-                    model_id, local_files_only=True, **kwargs
-                )
+                try:
+                    loaded = loader.from_pretrained(
+                        model_id, local_files_only=True, **kwargs
+                    )
+                except Exception as local_error:
+                    if not _is_local_loader_cache_miss(local_error):
+                        raise
+                    try:
+                        loaded = loader.from_pretrained(
+                            model_id, output_loading_info=True, **kwargs
+                        )
+                    except TypeError as retry_exc:
+                        if "output_loading_info" not in str(retry_exc):
+                            raise
+                        loaded = loader.from_pretrained(model_id, **kwargs)
             else:
                 loaded = loader.from_pretrained(model_id, **kwargs)
-        except Exception:
-            if not prefer_local_files_only:
+        except Exception as exc:
+            if not prefer_local_files_only or not _is_local_loader_cache_miss(exc):
                 raise
             try:
                 loaded = loader.from_pretrained(
                     model_id, output_loading_info=True, **kwargs
                 )
-            except TypeError as exc:
-                if "output_loading_info" not in str(exc):
+            except TypeError as retry_exc:
+                if "output_loading_info" not in str(retry_exc):
                     raise
                 loaded = loader.from_pretrained(model_id, **kwargs)
 

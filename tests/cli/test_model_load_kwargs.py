@@ -26,6 +26,11 @@ class DummyNoKwAdapter:
         return object()
 
 
+class ExplodingAdapter:
+    def load_model(self, model_id: str, device: str | None = None, **kwargs):
+        raise RuntimeError(f"load failed for {model_id} on {device}")
+
+
 @pytest.mark.unit
 def test_extract_model_load_kwargs_excludes_core_fields(
     monkeypatch: pytest.MonkeyPatch,
@@ -133,6 +138,19 @@ def test_load_model_with_cfg_omits_local_files_only_for_strict_adapter():
     )
 
     assert adapter.calls == [("foo", "cpu")]
+
+
+@pytest.mark.unit
+def test_load_model_with_cfg_propagates_adapter_load_failures() -> None:
+    cfg = InvarLockConfig({"model": {"id": "foo", "adapter": "dummy"}})
+
+    with pytest.raises(RuntimeError, match="load failed for foo on cpu"):
+        run_runtime_exec_mod.load_model_with_cfg(
+            ExplodingAdapter(),
+            cfg,
+            "cpu",
+            prefer_local_files_only=True,
+        )
 
 
 @pytest.mark.unit

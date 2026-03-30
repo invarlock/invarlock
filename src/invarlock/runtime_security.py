@@ -6,9 +6,12 @@ import os
 import shutil
 import subprocess
 import sys
+from contextlib import contextmanager
+from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from collections.abc import Iterator
 from typing import Any
 
 from invarlock.core.config_dependencies import inspect_config_dependencies
@@ -28,10 +31,11 @@ RUNTIME_VERIFIER_BINARY_DEFAULT = "invarlock-runtime-verify"
 RUNTIME_VERIFIER_CONTRACT_VERSION = "runtime-manifest-v1"
 RUNTIME_IMAGE_LOCAL_DEFAULT = "invarlock-runtime:local"
 RUNTIME_IMAGE_DEFAULT = "ghcr.io/invarlock/invarlock-runtime:latest"
+_CONTAINER_INSPECT_TIMEOUT_SECONDS = 30
+_CONTAINER_EXECUTION_TIMEOUT_SECONDS = 24 * 60 * 60
 
 _TRUE_VALUES = {"1", "true", "yes", "on"}
 _FALSE_VALUES = {"0", "false", "no", "off"}
-
 __all__ = [
     "ALLOW_HOST_EXECUTION_ENV",
     "ALLOW_NETWORK_ENV",
@@ -39,6 +43,7 @@ __all__ = [
     "ALLOW_THIRD_PARTY_PLUGINS_ENV",
     "ALLOW_UNATTESTED_ARTIFACTS_ENV",
     "ContainerLaunchPlan",
+    "RuntimeSecurityPolicy",
     "CONTAINER_EXECUTION_ENV",
     "RUNTIME_IMAGE_ENV",
     "RUNTIME_IMAGE_DIGEST_ENV",
@@ -50,8 +55,10 @@ __all__ = [
     "apply_runtime_allowances",
     "build_container_command",
     "build_container_python_command",
+    "build_runtime_security_policy",
     "container_image_available_locally",
     "current_execution_mode",
+    "current_runtime_security_policy",
     "delegate_container_command",
     "delegate_python_script_to_container",
     "network_allowed",
@@ -61,6 +68,8 @@ __all__ = [
     "resolve_container_engine",
     "resolve_runtime_image",
     "resolve_runtime_image_digest",
+    "reset_runtime_allowances",
+    "runtime_allowances_scope",
     "runtime_verifier_binary",
     "running_inside_container",
     "serialize_canonical_json",
@@ -80,6 +89,23 @@ class ContainerLaunchPlan:
     gpu_passthrough: bool
 
 
+@dataclass(frozen=True)
+class RuntimeSecurityPolicy:
+    """Typed runtime-policy snapshot for request-scoped application."""
+
+    allow_network: bool = False
+    allow_host_execution: bool = False
+    allow_third_party_plugins: bool = False
+    allow_remote_code: bool = False
+    allow_unattested_artifacts: bool = False
+
+
+_RUNTIME_SECURITY_POLICY: ContextVar[RuntimeSecurityPolicy | None] = ContextVar(
+    "invarlock_runtime_security_policy",
+    default=None,
+)
+
+
 def _coerce_bool(value: str | None) -> bool | None:
     if value is None:
         return None
@@ -91,11 +117,27 @@ def _coerce_bool(value: str | None) -> bool | None:
     return None
 
 
-def _set_env_flag(name: str, enabled: bool | None) -> None:
-    if enabled is None:
-        os.environ.pop(name, None)
-        return
-    os.environ[name] = "1" if enabled else "0"
+def _runtime_flag_value(name: str) -> str | None:
+    policy = _RUNTIME_SECURITY_POLICY.get()
+    if policy is None:
+        managed_flags = {
+            ALLOW_NETWORK_ENV,
+            ALLOW_HOST_EXECUTION_ENV,
+            ALLOW_THIRD_PARTY_PLUGINS_ENV,
+            ALLOW_REMOTE_CODE_ENV,
+            ALLOW_UNATTESTED_ARTIFACTS_ENV,
+        }
+        return None if name in managed_flags else os.environ.get(name)
+    flag_map = {
+        ALLOW_NETWORK_ENV: policy.allow_network,
+        ALLOW_HOST_EXECUTION_ENV: policy.allow_host_execution,
+        ALLOW_THIRD_PARTY_PLUGINS_ENV: policy.allow_third_party_plugins,
+        ALLOW_REMOTE_CODE_ENV: policy.allow_remote_code,
+        ALLOW_UNATTESTED_ARTIFACTS_ENV: policy.allow_unattested_artifacts,
+    }
+    if name not in flag_map:
+        return os.environ.get(name)
+    return "1" if flag_map[name] else "0"
 
 
 def _json_safe(value: Any) -> Any:
@@ -105,7 +147,13 @@ def _json_safe(value: Any) -> Any:
         return str(value)
     if isinstance(value, dict):
         return {str(key): _json_safe(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple, set)):
+    if isinstance(value, set):
+        normalized_items = [_json_safe(item) for item in value]
+        return sorted(
+            normalized_items,
+            key=lambda item: json.dumps(item, sort_keys=True, separators=(",", ":")),
+        )
+    if isinstance(value, (list, tuple)):
         return [_json_safe(item) for item in value]
     return str(value)
 
@@ -123,23 +171,23 @@ def _sha256_path(path: Path) -> str:
 
 
 def network_allowed() -> bool:
-    return _coerce_bool(os.environ.get(ALLOW_NETWORK_ENV)) is True
+    return _coerce_bool(_runtime_flag_value(ALLOW_NETWORK_ENV)) is True
 
 
 def host_execution_allowed() -> bool:
-    return _coerce_bool(os.environ.get(ALLOW_HOST_EXECUTION_ENV)) is True
+    return _coerce_bool(_runtime_flag_value(ALLOW_HOST_EXECUTION_ENV)) is True
 
 
 def remote_code_allowed() -> bool:
-    return _coerce_bool(os.environ.get(ALLOW_REMOTE_CODE_ENV)) is True
+    return _coerce_bool(_runtime_flag_value(ALLOW_REMOTE_CODE_ENV)) is True
 
 
 def unattested_artifacts_allowed() -> bool:
-    return _coerce_bool(os.environ.get(ALLOW_UNATTESTED_ARTIFACTS_ENV)) is True
+    return _coerce_bool(_runtime_flag_value(ALLOW_UNATTESTED_ARTIFACTS_ENV)) is True
 
 
 def third_party_plugins_allowed() -> bool:
-    explicit = _coerce_bool(os.environ.get(ALLOW_THIRD_PARTY_PLUGINS_ENV))
+    explicit = _coerce_bool(_runtime_flag_value(ALLOW_THIRD_PARTY_PLUGINS_ENV))
     return explicit is True
 
 
@@ -178,19 +226,23 @@ def resolve_runtime_image_digest() -> str | None:
 
 
 def _inspect_container_image(engine: str, image: str) -> tuple[bool, str | None]:
-    completed = subprocess.run(
-        [
-            engine,
-            "image",
-            "inspect",
-            image,
-            "--format",
-            "{{json .RepoDigests}}\n{{.Id}}",
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        completed = subprocess.run(
+            [
+                engine,
+                "image",
+                "inspect",
+                image,
+                "--format",
+                "{{json .RepoDigests}}\n{{.Id}}",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=_CONTAINER_INSPECT_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        return False, None
     if completed.returncode != 0:
         return False, None
     lines = [line.strip() for line in completed.stdout.splitlines() if line.strip()]
@@ -237,25 +289,6 @@ _PATH_ENV_VARS = {
     "TRANSFORMERS_CACHE",
     "TMPDIR",
     "TMP",
-}
-_BEHAVIOR_ENV_VARS = {
-    "INVARLOCK_STORE_EVAL_WINDOWS",
-    "INVARLOCK_SNAPSHOT_MODE",
-    "INVARLOCK_SNAPSHOT_AUTO_RAM_FRACTION",
-    "INVARLOCK_SNAPSHOT_THRESHOLD_MB",
-    "INVARLOCK_SKIP_OVERHEAD_CHECK",
-    "INVARLOCK_WINDOW_OVERLAP_FRACTION",
-    "INVARLOCK_DETERMINISM",
-    "PACK_DETERMINISM",
-    "INVARLOCK_DETERMINISM_WARN_ONLY",
-    "INVARLOCK_OMP_THREADS",
-    "INVARLOCK_DEDUP_TEXTS",
-    "INVARLOCK_CAPACITY_FAST",
-    "INVARLOCK_TINY_RELAX",
-    "TOKENIZERS_PARALLELISM",
-    "HF_DATASETS_OFFLINE",
-    "TRANSFORMERS_OFFLINE",
-    "INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE",
 }
 
 
@@ -483,10 +516,6 @@ def _delegated_env_pairs(*, cwd: Path) -> tuple[dict[str, str], list[Path]]:
         CONTAINER_EXECUTION_ENV: "1",
     }
     mounts: list[Path] = []
-    for name in sorted(_BEHAVIOR_ENV_VARS):
-        value = os.environ.get(name)
-        if value is not None:
-            env_pairs[name] = value
     for name in sorted(_PATH_ENV_VARS):
         value = os.environ.get(name)
         if value is None or not value.strip():
@@ -536,25 +565,112 @@ def runtime_verifier_binary() -> str:
     return RUNTIME_VERIFIER_BINARY_DEFAULT
 
 
-def apply_runtime_allowances(
+def build_runtime_security_policy(
     *,
     allow_network: bool = False,
     allow_host_execution: bool = False,
     allow_third_party_plugins: bool = False,
     allow_remote_code: bool = False,
     allow_unattested_artifacts: bool = False,
-) -> None:
-    _set_env_flag(ALLOW_NETWORK_ENV, allow_network)
-    _set_env_flag(ALLOW_HOST_EXECUTION_ENV, allow_host_execution)
-    _set_env_flag(ALLOW_THIRD_PARTY_PLUGINS_ENV, allow_third_party_plugins)
-    _set_env_flag(ALLOW_REMOTE_CODE_ENV, allow_remote_code)
-    _set_env_flag(ALLOW_UNATTESTED_ARTIFACTS_ENV, allow_unattested_artifacts)
+) -> RuntimeSecurityPolicy:
+    return RuntimeSecurityPolicy(
+        allow_network=bool(allow_network),
+        allow_host_execution=bool(allow_host_execution),
+        allow_third_party_plugins=bool(allow_third_party_plugins),
+        allow_remote_code=bool(allow_remote_code),
+        allow_unattested_artifacts=bool(allow_unattested_artifacts),
+    )
+
+
+def current_runtime_security_policy() -> RuntimeSecurityPolicy | None:
+    return _RUNTIME_SECURITY_POLICY.get()
+
+
+def _resolve_runtime_security_policy(
+    *,
+    policy: RuntimeSecurityPolicy | None = None,
+    allow_network: bool = False,
+    allow_host_execution: bool = False,
+    allow_third_party_plugins: bool = False,
+    allow_remote_code: bool = False,
+    allow_unattested_artifacts: bool = False,
+) -> RuntimeSecurityPolicy:
+    if policy is not None:
+        return policy
+    return build_runtime_security_policy(
+        allow_network=allow_network,
+        allow_host_execution=allow_host_execution,
+        allow_third_party_plugins=allow_third_party_plugins,
+        allow_remote_code=allow_remote_code,
+        allow_unattested_artifacts=allow_unattested_artifacts,
+    )
+
+
+def apply_runtime_allowances(
+    *,
+    policy: RuntimeSecurityPolicy | None = None,
+    allow_network: bool = False,
+    allow_host_execution: bool = False,
+    allow_third_party_plugins: bool = False,
+    allow_remote_code: bool = False,
+    allow_unattested_artifacts: bool = False,
+) -> Token[RuntimeSecurityPolicy | None]:
+    resolved_policy = _resolve_runtime_security_policy(
+        policy=policy,
+        allow_network=allow_network,
+        allow_host_execution=allow_host_execution,
+        allow_third_party_plugins=allow_third_party_plugins,
+        allow_remote_code=allow_remote_code,
+        allow_unattested_artifacts=allow_unattested_artifacts,
+    )
+
+    token = _RUNTIME_SECURITY_POLICY.set(resolved_policy)
     try:
         from invarlock.security import enforce_network_policy
 
-        enforce_network_policy(bool(allow_network))
-    except (AttributeError, ImportError, OSError, RuntimeError):
-        pass
+        enforce_network_policy(bool(resolved_policy.allow_network))
+    except Exception:
+        _RUNTIME_SECURITY_POLICY.reset(token)
+        raise
+    return token
+
+
+def reset_runtime_allowances(
+    token: Token[RuntimeSecurityPolicy | None] | None = None,
+) -> None:
+    if token is None:
+        _RUNTIME_SECURITY_POLICY.set(None)
+    else:
+        _RUNTIME_SECURITY_POLICY.reset(token)
+
+    from invarlock.security import enforce_network_policy
+
+    enforce_network_policy(network_allowed())
+
+
+@contextmanager
+def runtime_allowances_scope(
+    *,
+    policy: RuntimeSecurityPolicy | None = None,
+    allow_network: bool = False,
+    allow_host_execution: bool = False,
+    allow_third_party_plugins: bool = False,
+    allow_remote_code: bool = False,
+    allow_unattested_artifacts: bool = False,
+) -> Iterator[RuntimeSecurityPolicy]:
+    resolved_policy = _resolve_runtime_security_policy(
+        policy=policy,
+        allow_network=allow_network,
+        allow_host_execution=allow_host_execution,
+        allow_third_party_plugins=allow_third_party_plugins,
+        allow_remote_code=allow_remote_code,
+        allow_unattested_artifacts=allow_unattested_artifacts,
+    )
+    token = apply_runtime_allowances(policy=resolved_policy)
+    try:
+        yield resolved_policy
+    finally:
+        reset_runtime_allowances(token)
 
 
 def build_container_command(plan: ContainerLaunchPlan) -> list[str]:
@@ -606,7 +722,17 @@ def build_container_command(plan: ContainerLaunchPlan) -> list[str]:
 
 def delegate_container_command(plan: ContainerLaunchPlan) -> int:
     command = build_container_command(plan)
-    completed = subprocess.run(command, check=False)
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            timeout=_CONTAINER_EXECUTION_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            "Container execution timed out after "
+            f"{_CONTAINER_EXECUTION_TIMEOUT_SECONDS} seconds."
+        ) from exc
     return int(completed.returncode)
 
 
@@ -670,7 +796,17 @@ def delegate_python_script_to_container(
     plan: ContainerLaunchPlan,
 ) -> int:
     command = build_container_python_command(script_path, plan)
-    completed = subprocess.run(command, check=False)
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            timeout=_CONTAINER_EXECUTION_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            "Container execution timed out after "
+            f"{_CONTAINER_EXECUTION_TIMEOUT_SECONDS} seconds."
+        ) from exc
     return int(completed.returncode)
 
 

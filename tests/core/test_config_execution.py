@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
 
 import invarlock.cli.config_execution as config_execution
+import invarlock.runtime_security as runtime_security
 
 
 def test_run_from_config_executes_concrete_run_request(
@@ -14,8 +16,21 @@ def test_run_from_config_executes_concrete_run_request(
     report_path = Path("reports/demo.report.json")
     monkeypatch.setattr(
         config_execution,
-        "apply_runtime_allowances",
-        lambda **kwargs: None,
+        "resolve_shell_runtime_security_policy",
+        lambda **kwargs: runtime_security.build_runtime_security_policy(
+            **kwargs,
+        ),
+        raising=True,
+    )
+    @contextmanager
+    def _scope(*, policy):
+        seen["policy"] = policy
+        yield
+
+    monkeypatch.setattr(
+        config_execution,
+        "runtime_allowances_scope",
+        _scope,
         raising=True,
     )
     monkeypatch.setattr(
@@ -37,6 +52,7 @@ def test_run_from_config_executes_concrete_run_request(
     assert seen["request"] == config_execution.ConfigExecutionRequest(
         config="configs/demo.yaml"
     )
+    assert seen["policy"] == runtime_security.build_runtime_security_policy()
 
 
 def test_run_from_config_executes_without_delegation_and_writes_manifest(
@@ -49,8 +65,21 @@ def test_run_from_config_executes_without_delegation_and_writes_manifest(
 
     monkeypatch.setattr(
         config_execution,
-        "apply_runtime_allowances",
-        lambda **kwargs: seen.setdefault("allowances", kwargs),
+        "resolve_shell_runtime_security_policy",
+        lambda **kwargs: runtime_security.build_runtime_security_policy(
+            **kwargs,
+        ),
+        raising=True,
+    )
+    @contextmanager
+    def _scope(*, policy):
+        seen["policy"] = policy
+        yield
+
+    monkeypatch.setattr(
+        config_execution,
+        "runtime_allowances_scope",
+        _scope,
         raising=True,
     )
     monkeypatch.setattr(
@@ -83,12 +112,11 @@ def test_run_from_config_executes_without_delegation_and_writes_manifest(
     )
 
     assert out == report_path.resolve()
-    assert seen["allowances"] == {
-        "allow_network": True,
-        "allow_host_execution": False,
-        "allow_third_party_plugins": True,
-        "allow_remote_code": True,
-    }
+    assert seen["policy"] == runtime_security.build_runtime_security_policy(
+        allow_network=True,
+        allow_third_party_plugins=True,
+        allow_remote_code=True,
+    )
     assert seen["request"] == config_execution.ConfigExecutionRequest(
         config="configs/demo.yaml",
         profile="ci",
@@ -113,8 +141,19 @@ def test_run_from_config_delegates_when_secure_default_requires_container(
     seen: dict[str, object] = {}
     monkeypatch.setattr(
         config_execution,
-        "apply_runtime_allowances",
-        lambda **kwargs: None,
+        "resolve_shell_runtime_security_policy",
+        lambda **kwargs: runtime_security.build_runtime_security_policy(),
+        raising=True,
+    )
+    @contextmanager
+    def _scope(*, policy):
+        seen["policy"] = policy
+        yield
+
+    monkeypatch.setattr(
+        config_execution,
+        "runtime_allowances_scope",
+        _scope,
         raising=True,
     )
     monkeypatch.setattr(
@@ -149,6 +188,7 @@ def test_run_from_config_delegates_when_secure_default_requires_container(
         config_execution.run_from_config(config="configs/demo.yaml")
 
     assert excinfo.value.code == 7
+    assert seen["policy"] == runtime_security.build_runtime_security_policy()
     assert seen["plan"] == (
         "run",
         config_execution.ConfigExecutionRequest(config="configs/demo.yaml"),
@@ -160,8 +200,18 @@ def test_run_from_config_wraps_runtime_delegation_failures(
 ) -> None:
     monkeypatch.setattr(
         config_execution,
-        "apply_runtime_allowances",
-        lambda **kwargs: None,
+        "resolve_shell_runtime_security_policy",
+        lambda **kwargs: runtime_security.build_runtime_security_policy(),
+        raising=True,
+    )
+    @contextmanager
+    def _scope(*, policy):
+        yield
+
+    monkeypatch.setattr(
+        config_execution,
+        "runtime_allowances_scope",
+        _scope,
         raising=True,
     )
     monkeypatch.setattr(
@@ -204,8 +254,21 @@ def test_run_from_config_skips_manifest_for_missing_report(
 
     monkeypatch.setattr(
         config_execution,
-        "apply_runtime_allowances",
-        lambda **kwargs: seen.setdefault("allowances", kwargs),
+        "resolve_shell_runtime_security_policy",
+        lambda **kwargs: runtime_security.build_runtime_security_policy(
+            **kwargs,
+        ),
+        raising=True,
+    )
+    @contextmanager
+    def _scope(*, policy):
+        seen["policy"] = policy
+        yield
+
+    monkeypatch.setattr(
+        config_execution,
+        "runtime_allowances_scope",
+        _scope,
         raising=True,
     )
 
@@ -231,12 +294,7 @@ def test_run_from_config_skips_manifest_for_missing_report(
 
     assert out == missing_report.resolve()
 
-    assert seen["allowances"] == {
-        "allow_network": False,
-        "allow_host_execution": False,
-        "allow_third_party_plugins": False,
-        "allow_remote_code": False,
-    }
+    assert seen["policy"] == runtime_security.build_runtime_security_policy()
     assert seen["request"] == config_execution.ConfigExecutionRequest(
         config="configs/demo.yaml",
         profile="ci",
@@ -248,8 +306,18 @@ def test_run_from_config_raises_when_run_execution_returns_none(
 ) -> None:
     monkeypatch.setattr(
         config_execution,
-        "apply_runtime_allowances",
-        lambda **kwargs: None,
+        "resolve_shell_runtime_security_policy",
+        lambda **kwargs: runtime_security.build_runtime_security_policy(),
+        raising=True,
+    )
+    @contextmanager
+    def _scope(*, policy):
+        yield
+
+    monkeypatch.setattr(
+        config_execution,
+        "runtime_allowances_scope",
+        _scope,
         raising=True,
     )
     monkeypatch.setattr(

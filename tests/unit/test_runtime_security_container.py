@@ -66,17 +66,45 @@ def test_apply_runtime_allowances_and_delegate_container_command(monkeypatch) ->
     monkeypatch.setattr(
         runtime_security.subprocess,
         "run",
-        lambda command, check=False: SimpleNamespace(returncode=7),
+        lambda command, check=False, timeout=None: SimpleNamespace(returncode=7),
         raising=True,
     )
-    assert runtime_security.delegate_container_command(_plan(["evaluate"])) == 7
+    try:
+        assert runtime_security.delegate_container_command(_plan(["evaluate"])) == 7
+    finally:
+        runtime_security.reset_runtime_allowances()
 
 
-def test_apply_runtime_allowances_ignores_network_policy_errors(
+def test_delegate_container_command_passes_timeout_and_surfaces_expiry(
+    monkeypatch,
+) -> None:
+    seen: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        runtime_security,
+        "build_container_command",
+        lambda plan: ["docker", "run"],
+        raising=True,
+    )
+
+    def _run(command, check=False, timeout=None):
+        seen["timeout"] = timeout
+        raise runtime_security.subprocess.TimeoutExpired(command, timeout)
+
+    monkeypatch.setattr(runtime_security.subprocess, "run", _run, raising=True)
+
+    with pytest.raises(RuntimeError, match="timed out"):
+        runtime_security.delegate_container_command(_plan(["evaluate"]))
+
+    assert seen["timeout"] == runtime_security._CONTAINER_EXECUTION_TIMEOUT_SECONDS
+
+
+def test_apply_runtime_allowances_rolls_back_network_policy_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import invarlock.security as security_module
 
+    monkeypatch.delenv(runtime_security.ALLOW_NETWORK_ENV, raising=False)
     monkeypatch.setattr(
         security_module,
         "enforce_network_policy",
@@ -84,9 +112,10 @@ def test_apply_runtime_allowances_ignores_network_policy_errors(
         raising=False,
     )
 
-    runtime_security.apply_runtime_allowances(allow_network=True)
+    with pytest.raises(RuntimeError, match="network boom"):
+        runtime_security.apply_runtime_allowances(allow_network=True)
 
-    assert runtime_security.network_allowed() is True
+    assert runtime_security.network_allowed() is False
 
 
 def test_build_container_python_command_uses_python_entrypoint_for_repo_script(
@@ -190,7 +219,7 @@ def test_delegate_python_script_to_container_uses_python_builder(monkeypatch) ->
     monkeypatch.setattr(
         runtime_security.subprocess,
         "run",
-        lambda command, check=False: SimpleNamespace(returncode=9),
+        lambda command, check=False, timeout=None: SimpleNamespace(returncode=9),
         raising=True,
     )
 
@@ -201,6 +230,32 @@ def test_delegate_python_script_to_container_uses_python_builder(monkeypatch) ->
         )
         == 9
     )
+
+
+def test_delegate_python_script_to_container_passes_timeout(monkeypatch) -> None:
+    seen: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        runtime_security,
+        "build_container_python_command",
+        lambda script_path, plan: ["docker", "run", "python", str(script_path)],
+        raising=True,
+    )
+
+    def _run(command, check=False, timeout=None):
+        seen["timeout"] = timeout
+        return SimpleNamespace(returncode=9)
+
+    monkeypatch.setattr(runtime_security.subprocess, "run", _run, raising=True)
+
+    assert (
+        runtime_security.delegate_python_script_to_container(
+            "scripts/proof_packs/python/run_from_config.py",
+            _plan(["--config", "demo.yaml"]),
+        )
+        == 9
+    )
+    assert seen["timeout"] == runtime_security._CONTAINER_EXECUTION_TIMEOUT_SECONDS
 
 
 def test_build_container_python_command_raises_for_missing_engine_or_image(

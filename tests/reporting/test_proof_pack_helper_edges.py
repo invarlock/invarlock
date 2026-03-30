@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 import invarlock.proof_pack as proof_pack_mod
+from invarlock.reporting.verify_contract import VerifyExecutionResult, VerifyOutcome
 from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
 
 
@@ -163,6 +164,10 @@ def test_validate_manifest_and_load_json_object_cover_error_paths(
     errors = proof_pack_mod.validate_manifest(manifest_path)
     assert "manifest is not valid JSON" in errors[0]
 
+    manifest_path.write_bytes(b"\xff")
+    errors = proof_pack_mod.validate_manifest(manifest_path)
+    assert "manifest is not valid JSON" in errors[0]
+
     _write_json(
         manifest_path,
         {
@@ -197,6 +202,12 @@ def test_validate_manifest_and_load_json_object_cover_error_paths(
     bad_json = tmp_path / "bad.json"
     bad_json.write_text("{invalid", encoding="utf-8")
     payload, errors = proof_pack_mod._load_json_object(bad_json, label="demo")
+    assert payload is None
+    assert "demo is not valid JSON" in errors[0]
+
+    bad_utf8 = tmp_path / "bad-utf8.json"
+    bad_utf8.write_bytes(b"\xff")
+    payload, errors = proof_pack_mod._load_json_object(bad_utf8, label="demo")
     assert payload is None
     assert "demo is not valid JSON" in errors[0]
 
@@ -440,6 +451,19 @@ def test_verify_gpg_covers_missing_binary_signature_failure_and_fingerprint_mism
     monkeypatch.setattr(
         proof_pack_mod.subprocess,
         "run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+        ),
+        raising=True,
+    )
+    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
+    assert "manifest signature verification failed." in errors[0]
+    assert warnings == []
+    assert fingerprint is None
+
+    monkeypatch.setattr(
+        proof_pack_mod.subprocess,
+        "run",
         lambda *args, **kwargs: SimpleNamespace(
             returncode=1, stdout="", stderr="bad signature"
         ),
@@ -598,7 +622,11 @@ def test_verify_reports_and_inspect_cover_error_paths(
     def _fake_run_verify(reports: list[Path], *, profile: str):
         verify_calls.append([str(path) for path in reports])
         if len(verify_calls) == 1:
-            return SimpleNamespace(status_code=1, payload={"ok": False})
+            return VerifyExecutionResult(
+                outcome=VerifyOutcome.OK,
+                payload={"ok": False},
+                diagnostics=(),
+            )
         raise RuntimeError("ignore nested error reports")
 
     monkeypatch.setattr(
@@ -657,9 +685,17 @@ def test_verify_reports_covers_remaining_payload_contract_branches(
         proof_pack_mod,
         "_run_verify_command",
         lambda reports, *, profile: (
-            SimpleNamespace(status_code=0, payload={"ok": True})
+            VerifyExecutionResult(
+                outcome=VerifyOutcome.OK,
+                payload={"ok": True},
+                diagnostics=(),
+            )
             if "clean" in str(reports[0])
-            else SimpleNamespace(status_code=0, payload=["bad-payload"])
+            else VerifyExecutionResult(
+                outcome=VerifyOutcome.OK,
+                payload=["bad-payload"],
+                diagnostics=(),
+            )
         ),
         raising=True,
     )
@@ -675,9 +711,17 @@ def test_verify_reports_covers_remaining_payload_contract_branches(
         proof_pack_mod,
         "_run_verify_command",
         lambda reports, *, profile: (
-            SimpleNamespace(status_code=0, payload=None)
+            VerifyExecutionResult(
+                outcome=VerifyOutcome.OK,
+                payload=None,
+                diagnostics=(),
+            )
             if "clean" in str(reports[0])
-            else SimpleNamespace(status_code=0, payload={"ok": True})
+            else VerifyExecutionResult(
+                outcome=VerifyOutcome.OK,
+                payload={"ok": True},
+                diagnostics=(),
+            )
         ),
         raising=True,
     )
@@ -691,9 +735,17 @@ def test_verify_reports_covers_remaining_payload_contract_branches(
         proof_pack_mod,
         "_run_verify_command",
         lambda reports, *, profile: (
-            SimpleNamespace(status_code=0, payload=["clean-bad"])
+            VerifyExecutionResult(
+                outcome=VerifyOutcome.OK,
+                payload=["clean-bad"],
+                diagnostics=(),
+            )
             if "clean" in str(reports[0])
-            else SimpleNamespace(status_code=0, payload={"ok": True})
+            else VerifyExecutionResult(
+                outcome=VerifyOutcome.OK,
+                payload={"ok": True},
+                diagnostics=(),
+            )
         ),
         raising=True,
     )
@@ -707,7 +759,11 @@ def test_verify_reports_covers_remaining_payload_contract_branches(
     monkeypatch.setattr(
         proof_pack_mod,
         "_run_verify_command",
-        lambda reports, *, profile: SimpleNamespace(status_code=1, payload={"ok": False}),
+        lambda reports, *, profile: VerifyExecutionResult(
+            outcome=VerifyOutcome.POLICY_FAIL,
+            payload={"ok": False},
+            diagnostics=(),
+        ),
         raising=True,
     )
     errors, payload = proof_pack_mod._verify_reports(
@@ -782,7 +838,11 @@ def test_build_and_verify_proof_pack_cover_usage_and_failure_paths(
     monkeypatch.setattr(
         proof_pack_mod,
         "_run_verify_command",
-        lambda reports, profile: SimpleNamespace(status_code=2, payload={"ok": False}),
+        lambda reports, profile: VerifyExecutionResult(
+            outcome=VerifyOutcome.POLICY_FAIL,
+            payload={"ok": False},
+            diagnostics=(),
+        ),
         raising=True,
     )
     result = proof_pack_mod.build_proof_pack(
@@ -798,7 +858,11 @@ def test_build_and_verify_proof_pack_cover_usage_and_failure_paths(
     monkeypatch.setattr(
         proof_pack_mod,
         "_run_verify_command",
-        lambda reports, profile: SimpleNamespace(status_code=0, payload={"ok": True}),
+        lambda reports, profile: VerifyExecutionResult(
+            outcome=VerifyOutcome.OK,
+            payload={"ok": True},
+            diagnostics=(),
+        ),
         raising=True,
     )
     result = proof_pack_mod.build_proof_pack(
@@ -854,7 +918,11 @@ def test_run_verify_command_delegates_to_verify_reports_contract(
         captured["reports"] = reports
         captured["profile"] = profile
         captured["json_mode"] = json_mode
-        return SimpleNamespace(status_code=0, payload={"ok": True})
+        return VerifyExecutionResult(
+            outcome=VerifyOutcome.OK,
+            payload={"ok": True},
+            diagnostics=(),
+        )
 
     monkeypatch.setattr(
         proof_pack_mod,
@@ -865,7 +933,7 @@ def test_run_verify_command_delegates_to_verify_reports_contract(
 
     result = proof_pack_mod._run_verify_command([report], profile="release")
 
-    assert result.status_code == 0
+    assert result.outcome == VerifyOutcome.OK
     assert result.payload == {"ok": True}
     assert captured["reports"] == [report]
     assert captured["profile"] == "release"
@@ -1123,7 +1191,11 @@ def test_build_proof_pack_copies_readme_and_environment_without_optional_refs(
     monkeypatch.setattr(
         proof_pack_mod,
         "_run_verify_command",
-        lambda reports, profile: SimpleNamespace(status_code=0, payload={"ok": True}),
+        lambda reports, profile: VerifyExecutionResult(
+            outcome=VerifyOutcome.OK,
+            payload={"ok": True},
+            diagnostics=(),
+        ),
         raising=True,
     )
 
@@ -1162,7 +1234,11 @@ def test_build_proof_pack_copies_source_repo_without_environment_or_materials(
     monkeypatch.setattr(
         proof_pack_mod,
         "_run_verify_command",
-        lambda reports, profile: SimpleNamespace(status_code=0, payload={"ok": True}),
+        lambda reports, profile: VerifyExecutionResult(
+            outcome=VerifyOutcome.OK,
+            payload={"ok": True},
+            diagnostics=(),
+        ),
         raising=True,
     )
 

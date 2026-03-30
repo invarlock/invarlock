@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
 
+from invarlock.runtime_security import network_allowed
+
 _TRANSFORMERS_UNSET = object()
 AutoTokenizer: Any = _TRANSFORMERS_UNSET
 _TOKENIZERS_UNSET = object()
@@ -19,7 +21,7 @@ class PreTrainedTokenizerBase:
     def __call__(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         raise RuntimeError(
             "Tokenization requires the 'transformers' extra. "
-            "Install it with: pip install 'invarlock[adapters]'."
+            "Install the invarlock adapters extra to enable tokenizer loading."
         )
 
 
@@ -31,7 +33,7 @@ def _ensure_transformers_tokenizer_support() -> Any:
             from transformers.tokenization_utils_base import (
                 PreTrainedTokenizerBase as _PreTrainedTokenizerBase,
             )
-        except Exception:
+        except ModuleNotFoundError:
             AutoTokenizer = None
         else:  # pragma: no cover - transformers optional
             AutoTokenizer = _AutoTokenizer
@@ -44,7 +46,7 @@ def _ensure_tokenizers_support() -> Any:
     if TokenizerImpl is _TOKENIZERS_UNSET:
         try:
             from tokenizers import Tokenizer as _TokenizerImpl
-        except Exception:
+        except ModuleNotFoundError:
             TokenizerImpl = None
         else:  # pragma: no cover - tokenizers optional
             TokenizerImpl = _TokenizerImpl
@@ -55,29 +57,29 @@ TokenizerFactory = Callable[[], tuple[PreTrainedTokenizerBase, str]]
 
 
 def _hash_tokenizer(tokenizer: PreTrainedTokenizerBase) -> str:
-    try:
-        if hasattr(tokenizer, "get_vocab"):
-            vocab_mapping = tokenizer.get_vocab()
-        else:
-            vocab_mapping = getattr(tokenizer, "vocab", {})
-        if hasattr(vocab_mapping, "items"):
-            vocab_items = list(vocab_mapping.items())
-        else:
-            vocab_items = []
-    except Exception:
+    if hasattr(tokenizer, "get_vocab"):
+        vocab_mapping = tokenizer.get_vocab()
+    else:
+        vocab_mapping = getattr(tokenizer, "vocab", {})
+    if hasattr(vocab_mapping, "items"):
+        vocab_items = list(vocab_mapping.items())
+    else:
         vocab_items = []
 
     hasher = hashlib.blake2s(digest_size=16)
-    try:
-        for token, idx in sorted(vocab_items, key=lambda x: x[0]):
-            token_str = token if isinstance(token, str) else str(token)
-            hasher.update(token_str.encode("utf-8", "ignore"))
-            try:
-                hasher.update(int(idx).to_bytes(4, "little", signed=False))
-            except Exception:
-                hasher.update(str(idx).encode("utf-8", "ignore"))
-    except Exception:
-        return "unknown"
+    for token, idx in sorted(vocab_items, key=lambda item: str(item[0])):
+        token_str = token if isinstance(token, str) else str(token)
+        hasher.update(token_str.encode("utf-8", "ignore"))
+        try:
+            idx_int = int(idx)
+        except (TypeError, ValueError, OverflowError):
+            hasher.update(str(idx).encode("utf-8", "ignore"))
+            continue
+        if idx_int < 0:
+            hasher.update(str(idx_int).encode("utf-8", "ignore"))
+            continue
+        byte_len = max(1, (idx_int.bit_length() + 7) // 8)
+        hasher.update(idx_int.to_bytes(byte_len, "little", signed=False))
 
     hasher.update(tokenizer.__class__.__name__.encode("utf-8", "ignore"))
     name_path = getattr(tokenizer, "name_or_path", "")
@@ -90,13 +92,13 @@ def _read_local_hf_config(model_id: str) -> dict[str, Any] | None:
 
     try:
         cfg_path = Path(model_id) / "config.json"
-    except Exception:
+    except (OSError, TypeError, ValueError):
         return None
     if not cfg_path.exists():
         return None
     try:
         data = json.loads(cfg_path.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, ValueError, TypeError, UnicodeDecodeError):
         return None
     return data if isinstance(data, dict) else None
 
@@ -106,7 +108,7 @@ def _read_local_json_file(path: Path) -> dict[str, Any] | None:
         return None
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, ValueError, TypeError, UnicodeDecodeError):
         return None
     return data if isinstance(data, dict) else None
 
@@ -352,7 +354,7 @@ class _LocalFastTokenizer(PreTrainedTokenizerBase):
 def _load_local_fast_tokenizer(candidate: str) -> PreTrainedTokenizerBase | None:
     try:
         candidate_path = Path(candidate)
-    except Exception:
+    except (OSError, TypeError, ValueError):
         return None
     tokenizer_path = candidate_path / "tokenizer.json"
     if (
@@ -366,12 +368,37 @@ def _load_local_fast_tokenizer(candidate: str) -> PreTrainedTokenizerBase | None
         return None
     try:
         tokenizer = tokenizer_impl.from_file(str(tokenizer_path))
-    except Exception:
+    except (OSError, TypeError, ValueError):
         return None
     return _LocalFastTokenizer(
         tokenizer=tokenizer,
         name_or_path=str(candidate_path),
         special_tokens=_load_local_tokenizer_metadata(candidate_path),
+    )
+
+
+def _is_tokenizer_cache_miss(error: Exception) -> bool:
+    if isinstance(error, FileNotFoundError):
+        return True
+    if not isinstance(error, (OSError, ValueError)):
+        return False
+    message = str(error).strip().lower()
+    return any(
+        snippet in message
+        for snippet in (
+            "no such file",
+            "not found",
+            "could not locate",
+            "missing cached",
+            "files missing",
+            "local files only",
+            "cannot find",
+            "can't load the model",
+            "can't load tokenizer",
+            "is not a local folder",
+            "is not a valid model identifier",
+            "does not appear to have a file named",
+        )
     )
 
 
@@ -416,7 +443,7 @@ def _load_tokenizer_for_model(
     if tokenizer_factory is None:
         raise RuntimeError(
             f"{family_label} tokenizers require the 'transformers' extra. "
-            "Install it with: pip install 'invarlock[adapters]'."
+            "Install the invarlock adapters extra to enable tokenizer loading."
         )
 
     for candidate in candidates:
@@ -425,26 +452,34 @@ def _load_tokenizer_for_model(
                 candidate, local_files_only=True
             )
             return cast("PreTrainedTokenizerBase", tokenizer)
-        except Exception:
+        except Exception as exc:
+            if not _is_tokenizer_cache_miss(exc):
+                raise
             continue
+
+    if not network_allowed():
+        raise RuntimeError(
+            f"Unable to load a cached {family_label} tokenizer for '{model_id}'. "
+            "Network tokenizer downloads are disabled."
+        )
 
     for candidate in candidates:
         try:
             candidate_path = Path(candidate)
-        except Exception:
+        except (OSError, TypeError, ValueError):
             candidate_path = None
         if candidate_path is not None and candidate_path.exists():
             continue
         try:
             tokenizer = tokenizer_factory.from_pretrained(candidate)
             return cast("PreTrainedTokenizerBase", tokenizer)
-        except Exception:
+        except Exception as exc:
+            if not _is_tokenizer_cache_miss(exc):
+                raise
             continue
 
     raise RuntimeError(
-        f"Unable to load a {family_label} tokenizer for '{model_id}'. "
-        "Set INVARLOCK_ALLOW_NETWORK=1 to allow fetching from the Hugging Face Hub, "
-        "or pre-cache the tokenizer locally."
+        f"Unable to load a {family_label} tokenizer for '{model_id}' from the local cache or trusted remote candidates."
     )
 
 
@@ -602,10 +637,7 @@ def _make_causal_auto_tokenizer(model_id: str):
         # Some causal tokenizers default to not adding a BOS token on encode;
         # enable it to guarantee at least one non-pad, non-zero token id.
         if hasattr(tokenizer, "add_bos_token"):
-            try:
-                tokenizer.add_bos_token = True
-            except Exception:
-                pass
+            tokenizer.add_bos_token = True
         if getattr(tokenizer, "pad_token", None) is None:
             raise ValueError(
                 f"Tokenizer for '{model_id}' does not define a pad token and no EOS fallback is available."

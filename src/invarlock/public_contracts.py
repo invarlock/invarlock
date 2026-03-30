@@ -45,64 +45,57 @@ def _load_contract_or_raise(filename: str) -> Any:
         ModuleNotFoundError,
         NotADirectoryError,
         OSError,
+        UnicodeDecodeError,
         json.JSONDecodeError,
     ) as exc:
         raise ContractLoadError(filename, reason=str(exc)) from exc
 
 
+def _load_object_contract_or_raise(filename: str) -> dict[str, Any]:
+    data = _load_contract_or_raise(filename)
+    if not isinstance(data, dict):
+        raise ContractLoadError(
+            filename,
+            reason=f"expected JSON object, got {type(data).__name__}",
+        )
+    return data
+
+
 def load_support_matrix() -> dict[str, Any]:
-    data = _load_contract_or_raise("support_matrix.json")
-    if isinstance(data, dict):
-        data.setdefault("lanes", [])
-        return data
-    return {"format_version": "support-matrix-v1", "lanes": []}
+    data = _load_object_contract_or_raise("support_matrix.json")
+    data.setdefault("lanes", [])
+    return data
 
 
 def load_adapter_capabilities() -> dict[str, Any]:
-    data = _load_contract_or_raise("adapter_capabilities.json")
-    if isinstance(data, dict):
-        data.setdefault("adapters", [])
-        return data
-    return {"format_version": "adapter-capabilities-v1", "adapters": []}
+    data = _load_object_contract_or_raise("adapter_capabilities.json")
+    data.setdefault("adapters", [])
+    return data
 
 
 def load_model_family_catalog() -> dict[str, Any]:
-    data = _load_contract_or_raise("model_family_catalog.json")
-    if isinstance(data, dict):
-        data.setdefault("declared_support", [])
-        data.setdefault("implemented_coverage", [])
-        data.setdefault("usage_only", [])
-        data.setdefault("recommended_additions", [])
-        return data
-    return {
-        "format_version": "model-family-catalog-v1",
-        "declared_support": [],
-        "implemented_coverage": [],
-        "usage_only": [],
-        "recommended_additions": [],
-    }
+    data = _load_object_contract_or_raise("model_family_catalog.json")
+    data.setdefault("declared_support", [])
+    data.setdefault("implemented_coverage", [])
+    data.setdefault("usage_only", [])
+    data.setdefault("recommended_additions", [])
+    return data
 
 
 def load_plugin_compatibility() -> dict[str, Any]:
-    data = _load_contract_or_raise("plugin_compatibility.json")
-    if isinstance(data, dict):
-        return data
-    return {"format_version": "plugin-compatibility-v1"}
+    return _load_object_contract_or_raise("plugin_compatibility.json")
 
 
 def load_policy_pack_schema() -> dict[str, Any]:
-    data = _load_contract_or_raise("policy_pack.schema.json")
-    return data if isinstance(data, dict) else {}
+    return _load_object_contract_or_raise("policy_pack.schema.json")
 
 
 def load_proof_pack_manifest_schema() -> dict[str, Any]:
-    data = _load_contract_or_raise("proof_pack_manifest.schema.json")
-    return data if isinstance(data, dict) else {}
+    return _load_object_contract_or_raise("proof_pack_manifest.schema.json")
 
 
 def load_runtime_manifest_schema() -> dict[str, Any]:
-    data = _load_contract_or_raise("runtime_manifest.schema.json")
-    return data if isinstance(data, dict) else {}
+    return _load_object_contract_or_raise("runtime_manifest.schema.json")
 
 
 def support_lanes() -> list[dict[str, Any]]:
@@ -144,19 +137,18 @@ def published_basis_lanes() -> list[dict[str, Any]]:
 def contract_reference(filename: str) -> dict[str, Any]:
     ref: dict[str, Any] = {"path": contract_relpath(filename)}
     try:
-        payload = _load_contract_or_raise(filename)
+        payload = _load_object_contract_or_raise(filename)
     except ContractLoadError as exc:
         ref["load_error"] = exc.reason
         return ref
-    if isinstance(payload, dict):
-        if isinstance(payload.get("format_version"), str):
-            ref["format_version"] = payload["format_version"]
-        if isinstance(payload.get("format"), str):
-            ref["format"] = payload["format"]
-        if isinstance(payload.get("core_abi"), str):
-            ref["core_abi"] = payload["core_abi"]
-        if isinstance(payload.get("match_policy"), str):
-            ref["match_policy"] = payload["match_policy"]
+    if isinstance(payload.get("format_version"), str):
+        ref["format_version"] = payload["format_version"]
+    if isinstance(payload.get("format"), str):
+        ref["format"] = payload["format"]
+    if isinstance(payload.get("core_abi"), str):
+        ref["core_abi"] = payload["core_abi"]
+    if isinstance(payload.get("match_policy"), str):
+        ref["match_policy"] = payload["match_policy"]
     return ref
 
 

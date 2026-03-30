@@ -49,6 +49,25 @@ def test_detect_model_profile_uses_local_config_hints_for_auto_adapter(
     assert profile.default_provider == "hf_text"
 
 
+def test_local_profile_config_helpers_tolerate_invalid_utf8(tmp_path: Path) -> None:
+    model_dir = tmp_path / "broken-local"
+    model_dir.mkdir()
+    (model_dir / "config.json").write_bytes(b"\xff")
+    (model_dir / "special_tokens_map.json").write_bytes(b"\xff")
+    (model_dir / "tokenizer_config.json").write_bytes(b"\xff")
+
+    assert mp._read_local_hf_config(str(model_dir)) is None
+    assert mp._load_local_tokenizer_metadata(model_dir) == {
+        "bos_token": None,
+        "cls_token": None,
+        "eos_token": None,
+        "mask_token": None,
+        "pad_token": None,
+        "sep_token": None,
+        "unk_token": None,
+    }
+
+
 @pytest.mark.parametrize(
     ("payload", "expected_family"),
     [
@@ -150,6 +169,122 @@ def test_resolve_tokenizer_uses_same_origin_fallback_for_local_checkpoint(
         (str(model_dir), True),
         ("mistralai/Mistral-7B-v0.1", True),
     ]
+
+
+def test_resolve_tokenizer_blocks_remote_fallback_when_network_disabled(
+    monkeypatch,
+) -> None:
+    calls: list[tuple[str, bool | None]] = []
+
+    class _Factory:
+        @classmethod
+        def from_pretrained(cls, model_id: str, **kwargs: object) -> _DummyTokenizer:
+            calls.append((model_id, kwargs.get("local_files_only")))
+            raise OSError("missing cached tokenizer files")
+
+    monkeypatch.setattr(mp, "AutoTokenizer", _Factory, raising=False)
+    monkeypatch.setattr(mp, "network_allowed", lambda: False)
+
+    profile = mp.detect_model_profile("facebook/opt-125m", adapter="hf_causal")
+
+    with pytest.raises(RuntimeError, match="Network tokenizer downloads are disabled"):
+        mp.resolve_tokenizer(profile)
+
+    assert calls == [("facebook/opt-125m", True)]
+
+
+def test_resolve_tokenizer_uses_remote_fallback_only_after_cache_miss(
+    monkeypatch,
+) -> None:
+    calls: list[tuple[str, bool | None]] = []
+
+    class _Factory:
+        @classmethod
+        def from_pretrained(cls, model_id: str, **kwargs: object) -> _DummyTokenizer:
+            calls.append((model_id, kwargs.get("local_files_only")))
+            if kwargs.get("local_files_only"):
+                raise OSError("missing cached tokenizer files")
+            return _DummyTokenizer(name_or_path=model_id)
+
+    monkeypatch.setattr(mp, "AutoTokenizer", _Factory, raising=False)
+    monkeypatch.setattr(mp, "network_allowed", lambda: True)
+
+    profile = mp.detect_model_profile("facebook/opt-125m", adapter="hf_causal")
+    tokenizer, _ = mp.resolve_tokenizer(profile)
+
+    assert tokenizer.name_or_path == "facebook/opt-125m"
+    assert calls == [
+        ("facebook/opt-125m", True),
+        ("facebook/opt-125m", None),
+    ]
+
+
+def test_resolve_tokenizer_does_not_retry_remote_on_non_cache_loader_error(
+    monkeypatch,
+) -> None:
+    calls: list[tuple[str, bool | None]] = []
+
+    class _Factory:
+        @classmethod
+        def from_pretrained(cls, model_id: str, **kwargs: object) -> _DummyTokenizer:
+            calls.append((model_id, kwargs.get("local_files_only")))
+            raise RuntimeError("deserializer exploded")
+
+    monkeypatch.setattr(mp, "AutoTokenizer", _Factory, raising=False)
+    monkeypatch.setattr(mp, "network_allowed", lambda: True)
+
+    profile = mp.detect_model_profile("facebook/opt-125m", adapter="hf_causal")
+
+    with pytest.raises(RuntimeError, match="deserializer exploded"):
+        mp.resolve_tokenizer(profile)
+
+    assert calls == [("facebook/opt-125m", True)]
+
+
+def test_hash_tokenizer_reraises_unexpected_vocab_failures() -> None:
+    class _BrokenTokenizer:
+        name_or_path = "broken"
+
+        def get_vocab(self):  # noqa: ANN001
+            raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError, match="boom"):
+        mp._hash_tokenizer(_BrokenTokenizer())
+
+
+def test_resolve_tokenizer_reraises_add_bos_token_mutation_failures(
+    monkeypatch,
+) -> None:
+    class _BrokenBosTokenizer:
+        def __init__(self, *, name_or_path: str) -> None:
+            self.name_or_path = name_or_path
+            self.pad_token = "<eos>"
+            self.eos_token = "<eos>"
+
+        def get_vocab(self) -> dict[str, int]:
+            return {"<eos>": 0, "hello": 1}
+
+        @property
+        def add_bos_token(self) -> bool:
+            return False
+
+        @add_bos_token.setter
+        def add_bos_token(self, _value: bool) -> None:
+            raise RuntimeError("bos-mutation-failed")
+
+    class _Factory:
+        @classmethod
+        def from_pretrained(
+            cls, model_id: str, **_kwargs: object
+        ) -> _BrokenBosTokenizer:
+            return _BrokenBosTokenizer(name_or_path=model_id)
+
+    monkeypatch.setattr(mp, "AutoTokenizer", _Factory, raising=False)
+
+    profile = mp.detect_model_profile("mistralai/Mistral-7B-v0.1", adapter="hf_causal")
+
+    with pytest.raises(RuntimeError, match="bos-mutation-failed"):
+        mp.resolve_tokenizer(profile)
 
 
 def test_resolve_tokenizer_uses_local_tokenizer_json_fast_path(

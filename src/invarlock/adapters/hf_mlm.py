@@ -21,6 +21,21 @@ from .hf_mixin import HFAdapterMixin
 TensorType = torch.Tensor
 ModuleType = nn.Module
 _ALLOW_DIRECT_SUBMODULE = False
+_MLM_FALLBACK_TOKENS = (
+    "maskedlm",
+    "masked language",
+    "for automodel",
+    "unrecognized configuration class",
+    "is not supported for this model",
+)
+
+
+def _should_retry_mlm_loader(exc: BaseException) -> bool:
+    cause = exc.__cause__ or exc
+    if not isinstance(cause, (AttributeError, ImportError, OSError, ValueError)):
+        return False
+    message = str(cause).strip().lower()
+    return any(token in message for token in _MLM_FALLBACK_TOKENS)
 
 
 class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
@@ -90,7 +105,9 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
                     model_id,
                     **kwargs,
                 )
-        except Exception:
+        except ModelLoadError as exc:
+            if not _should_retry_mlm_loader(exc):
+                raise
             if strategy.strategy != "auto":
                 try:
                     self._last_loader_strategy = auto_strategy.strategy
@@ -106,7 +123,9 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
                             model_id,
                             **kwargs,
                         )
-                except Exception:
+                except ModelLoadError as auto_exc:
+                    if not _should_retry_mlm_loader(auto_exc):
+                        raise
                     self._last_loader_strategy = fallback_strategy.strategy
                     self._last_loader_label = fallback_strategy.loader_label
                     with wrap_errors(

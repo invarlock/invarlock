@@ -56,42 +56,113 @@ def test_config_digest_falls_back_to_payload_when_path_is_missing() -> None:
     assert source == "inline"
 
 
-def test_set_env_flag_writes_explicit_boolean_state(monkeypatch) -> None:
-    flag = "INVARLOCK_TEST_RUNTIME_FLAG"
-    monkeypatch.delenv(flag, raising=False)
+def test_reset_runtime_allowances_clears_scoped_policy(monkeypatch) -> None:
+    monkeypatch.setenv(runtime_security.ALLOW_NETWORK_ENV, "1")
+    runtime_security.reset_runtime_allowances()
 
-    runtime_security._set_env_flag(flag, False)
-    assert runtime_security.os.environ.get(flag) == "0"
+    token = runtime_security.apply_runtime_allowances(allow_network=True)
+    try:
+        assert runtime_security.network_allowed() is True
+    finally:
+        runtime_security.reset_runtime_allowances(token)
 
-    runtime_security._set_env_flag(flag, None)
-    assert runtime_security.os.environ.get(flag) is None
+    assert runtime_security.network_allowed() is False
 
-    runtime_security._set_env_flag(flag, True)
-    assert runtime_security.os.environ[flag] == "1"
+
+def test_runtime_allowances_scope_restores_previous_policy(monkeypatch) -> None:
+    monkeypatch.setenv(runtime_security.ALLOW_NETWORK_ENV, "1")
+    runtime_security.reset_runtime_allowances()
+
+    with runtime_security.runtime_allowances_scope(allow_network=True):
+        assert runtime_security.network_allowed() is True
+
+    assert runtime_security.network_allowed() is False
 
 
 def test_apply_runtime_allowances_can_disable_prior_allowances(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv(runtime_security.ALLOW_NETWORK_ENV, "1")
-    monkeypatch.setenv(runtime_security.ALLOW_HOST_EXECUTION_ENV, "1")
-    monkeypatch.setenv(runtime_security.ALLOW_REMOTE_CODE_ENV, "1")
-    monkeypatch.setenv(runtime_security.ALLOW_THIRD_PARTY_PLUGINS_ENV, "1")
-    monkeypatch.setenv(runtime_security.ALLOW_UNATTESTED_ARTIFACTS_ENV, "1")
-
-    runtime_security.apply_runtime_allowances(
-        allow_network=False,
-        allow_host_execution=False,
-        allow_remote_code=False,
-        allow_third_party_plugins=False,
-        allow_unattested_artifacts=False,
+    token = runtime_security.apply_runtime_allowances(
+        allow_network=True,
+        allow_host_execution=True,
+        allow_remote_code=True,
+        allow_third_party_plugins=True,
+        allow_unattested_artifacts=True,
     )
 
-    assert runtime_security.network_allowed() is False
-    assert runtime_security.host_execution_allowed() is False
-    assert runtime_security.remote_code_allowed() is False
-    assert runtime_security.third_party_plugins_allowed() is False
-    assert runtime_security.unattested_artifacts_allowed() is False
+    try:
+        assert runtime_security.network_allowed() is True
+        assert runtime_security.host_execution_allowed() is True
+        assert runtime_security.remote_code_allowed() is True
+        assert runtime_security.third_party_plugins_allowed() is True
+        assert runtime_security.unattested_artifacts_allowed() is True
+
+        runtime_security.apply_runtime_allowances(
+            allow_network=False,
+            allow_host_execution=False,
+            allow_remote_code=False,
+            allow_third_party_plugins=False,
+            allow_unattested_artifacts=False,
+        )
+        assert runtime_security.network_allowed() is False
+        assert runtime_security.host_execution_allowed() is False
+        assert runtime_security.remote_code_allowed() is False
+        assert runtime_security.third_party_plugins_allowed() is False
+        assert runtime_security.unattested_artifacts_allowed() is False
+    finally:
+        runtime_security.reset_runtime_allowances(token)
+
+
+def test_build_runtime_security_policy_applies_request_scoped_policy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    policy = runtime_security.build_runtime_security_policy(
+        allow_network=True,
+        allow_host_execution=True,
+        allow_third_party_plugins=True,
+        allow_remote_code=True,
+        allow_unattested_artifacts=True,
+    )
+
+    assert policy == runtime_security.RuntimeSecurityPolicy(
+        allow_network=True,
+        allow_host_execution=True,
+        allow_third_party_plugins=True,
+        allow_remote_code=True,
+        allow_unattested_artifacts=True,
+    )
+
+    monkeypatch.delenv(runtime_security.ALLOW_NETWORK_ENV, raising=False)
+    monkeypatch.delenv(runtime_security.ALLOW_HOST_EXECUTION_ENV, raising=False)
+    monkeypatch.delenv(runtime_security.ALLOW_REMOTE_CODE_ENV, raising=False)
+    monkeypatch.delenv(runtime_security.ALLOW_THIRD_PARTY_PLUGINS_ENV, raising=False)
+    monkeypatch.delenv(runtime_security.ALLOW_UNATTESTED_ARTIFACTS_ENV, raising=False)
+    try:
+        runtime_security.apply_runtime_allowances(policy=policy)
+
+        assert runtime_security.network_allowed() is True
+        assert runtime_security.host_execution_allowed() is True
+        assert runtime_security.remote_code_allowed() is True
+        assert runtime_security.third_party_plugins_allowed() is True
+        assert runtime_security.unattested_artifacts_allowed() is True
+    finally:
+        runtime_security.reset_runtime_allowances()
+
+
+def test_inspect_container_image_timeout_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, object] = {}
+
+    def _run(command, capture_output=False, text=False, check=False, timeout=None):
+        seen["timeout"] = timeout
+        raise runtime_security.subprocess.TimeoutExpired(command, timeout)
+
+    monkeypatch.setattr(runtime_security.subprocess, "run", _run, raising=True)
+
+    exists, digest = runtime_security._inspect_container_image("docker", "demo:latest")
+
+    assert exists is False
+    assert digest is None
+    assert seen["timeout"] == runtime_security._CONTAINER_INSPECT_TIMEOUT_SECONDS
 
 
 def test_flag_occurrences_cover_split_and_inline_forms() -> None:
@@ -462,6 +533,41 @@ def test_path_env_value_and_delegated_env_pairs_translate_workspace_paths(
     monkeypatch.setenv("INVARLOCK_SNAPSHOT_MODE", "audit")
     monkeypatch.setenv("INVARLOCK_EVALUATE_TMP_DIR", str(inside_tmp))
     monkeypatch.setenv("TMPDIR", str(external_tmp))
+    monkeypatch.setenv("INVARLOCK_TINY_RELAX", "1")
+
+    with runtime_security.runtime_allowances_scope(
+        allow_network=True,
+        allow_remote_code=True,
+        allow_third_party_plugins=False,
+        allow_unattested_artifacts=True,
+    ):
+        translated_inside, inside_mounts = (
+            runtime_security._path_env_value_for_container(
+                str(inside_tmp),
+                cwd=cwd,
+            )
+        )
+        translated_external, external_mounts = (
+            runtime_security._path_env_value_for_container(
+                str(external_tmp),
+                cwd=cwd,
+            )
+        )
+        assert translated_inside == "/workspace/tmp-cache"
+        assert inside_mounts == []
+        assert translated_external == str(external_tmp.resolve())
+        assert external_mounts == [external_tmp]
+
+        env_pairs, mounts = runtime_security._delegated_env_pairs(cwd=cwd)
+        assert env_pairs[runtime_security.ALLOW_NETWORK_ENV] == "1"
+        assert env_pairs[runtime_security.ALLOW_REMOTE_CODE_ENV] == "1"
+        assert env_pairs[runtime_security.ALLOW_THIRD_PARTY_PLUGINS_ENV] == "0"
+        assert env_pairs[runtime_security.ALLOW_UNATTESTED_ARTIFACTS_ENV] == "1"
+        assert "INVARLOCK_SNAPSHOT_MODE" not in env_pairs
+        assert env_pairs["INVARLOCK_EVALUATE_TMP_DIR"] == "/workspace/tmp-cache"
+        assert env_pairs["TMPDIR"] == str(external_tmp.resolve())
+        assert "INVARLOCK_TINY_RELAX" not in env_pairs
+        assert mounts == [external_tmp]
 
     translated_inside, inside_mounts = runtime_security._path_env_value_for_container(
         str(inside_tmp),
@@ -477,15 +583,6 @@ def test_path_env_value_and_delegated_env_pairs_translate_workspace_paths(
     assert inside_mounts == []
     assert translated_external == str(external_tmp.resolve())
     assert external_mounts == [external_tmp]
-
-    env_pairs, mounts = runtime_security._delegated_env_pairs(cwd=cwd)
-    assert env_pairs[runtime_security.ALLOW_NETWORK_ENV] == "1"
-    assert env_pairs[runtime_security.ALLOW_REMOTE_CODE_ENV] == "0"
-    assert env_pairs[runtime_security.ALLOW_THIRD_PARTY_PLUGINS_ENV] == "1"
-    assert env_pairs["INVARLOCK_SNAPSHOT_MODE"] == "audit"
-    assert env_pairs["INVARLOCK_EVALUATE_TMP_DIR"] == "/workspace/tmp-cache"
-    assert env_pairs["TMPDIR"] == str(external_tmp.resolve())
-    assert mounts == [external_tmp]
 
 
 def test_runtime_verifier_binary_falls_back_to_default_when_no_candidates_exist(

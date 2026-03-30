@@ -138,6 +138,19 @@ def test_public_contract_helpers_raise_when_contracts_are_unavailable(
     }
 
 
+def test_public_contract_helpers_wrap_unicode_decode_errors(monkeypatch) -> None:
+    monkeypatch.setattr(
+        contracts,
+        "load_json_contract",
+        lambda _filename: (_ for _ in ()).throw(
+            UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+        ),
+    )
+
+    with pytest.raises(contracts.ContractLoadError, match="support_matrix.json"):
+        contracts.load_support_matrix()
+
+
 def test_public_contract_helpers_reject_non_mapping_payloads(monkeypatch) -> None:
     payloads = {
         "support_matrix.json": ["unexpected"],
@@ -154,27 +167,24 @@ def test_public_contract_helpers_reject_non_mapping_payloads(monkeypatch) -> Non
         lambda filename: payloads[filename],
     )
 
-    assert contracts.load_support_matrix() == {
-        "format_version": "support-matrix-v1",
-        "lanes": [],
-    }
-    assert contracts.load_adapter_capabilities() == {
-        "format_version": "adapter-capabilities-v1",
-        "adapters": [],
-    }
-    assert contracts.load_model_family_catalog() == {
-        "format_version": "model-family-catalog-v1",
-        "declared_support": [],
-        "implemented_coverage": [],
-        "usage_only": [],
-        "recommended_additions": [],
-    }
-    assert contracts.load_plugin_compatibility() == {
-        "format_version": "plugin-compatibility-v1"
-    }
-    assert contracts.load_policy_pack_schema() == {}
-    assert contracts.load_proof_pack_manifest_schema() == {}
-    assert contracts.load_runtime_manifest_schema() == {}
+    with pytest.raises(contracts.ContractLoadError, match="support_matrix.json"):
+        contracts.load_support_matrix()
+    with pytest.raises(contracts.ContractLoadError, match="adapter_capabilities.json"):
+        contracts.load_adapter_capabilities()
+    with pytest.raises(contracts.ContractLoadError, match="model_family_catalog.json"):
+        contracts.load_model_family_catalog()
+    with pytest.raises(contracts.ContractLoadError, match="plugin_compatibility.json"):
+        contracts.load_plugin_compatibility()
+    with pytest.raises(contracts.ContractLoadError, match="policy_pack.schema.json"):
+        contracts.load_policy_pack_schema()
+    with pytest.raises(
+        contracts.ContractLoadError, match="proof_pack_manifest.schema.json"
+    ):
+        contracts.load_proof_pack_manifest_schema()
+    with pytest.raises(
+        contracts.ContractLoadError, match="runtime_manifest.schema.json"
+    ):
+        contracts.load_runtime_manifest_schema()
 
 
 def test_public_contract_lane_and_adapter_helpers_cover_non_matching_entries(

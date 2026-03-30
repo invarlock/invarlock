@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from types import SimpleNamespace
 
 import invarlock.proof_pack as proof_pack_mod
 from invarlock.proof_pack import (
@@ -12,6 +11,7 @@ from invarlock.proof_pack import (
     verify_manifest_attestation,
     verify_proof_pack,
 )
+from invarlock.reporting.verify_contract import VerifyExecutionResult, VerifyOutcome
 from invarlock.runtime_security import (
     RUNTIME_MANIFEST_FILENAME,
     RUNTIME_VERIFIER_CONTRACT_VERSION,
@@ -206,13 +206,14 @@ def test_proof_pack_verify_writes_nested_verify_json(
     monkeypatch.setattr(
         proof_pack_mod,
         "_run_verify_command",
-        lambda reports, profile: SimpleNamespace(
-            status_code=0,
+        lambda reports, profile: VerifyExecutionResult(
+            outcome=VerifyOutcome.OK,
             payload={
                 "format_version": "verify-v1",
                 "ok": True,
                 "reports": [str(path) for path in reports],
             },
+            diagnostics=(),
         ),
     )
 

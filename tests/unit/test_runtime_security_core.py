@@ -19,13 +19,26 @@ def test_runtime_bool_helpers_and_execution_mode(monkeypatch) -> None:
     assert runtime_security._coerce_bool("on") is True
     assert runtime_security._coerce_bool("off") is False
     assert runtime_security._coerce_bool("maybe") is None
-    assert runtime_security.network_allowed() is True
+    assert runtime_security.network_allowed() is False
     assert runtime_security.host_execution_allowed() is False
-    assert runtime_security.remote_code_allowed() is True
-    assert runtime_security.unattested_artifacts_allowed() is True
-    assert runtime_security.third_party_plugins_allowed() is True
+    assert runtime_security.remote_code_allowed() is False
+    assert runtime_security.unattested_artifacts_allowed() is False
+    assert runtime_security.third_party_plugins_allowed() is False
     assert runtime_security.running_inside_container() is True
     assert runtime_security.current_execution_mode() == "container"
+
+    with runtime_security.runtime_allowances_scope(
+        allow_network=True,
+        allow_host_execution=True,
+        allow_remote_code=True,
+        allow_unattested_artifacts=True,
+        allow_third_party_plugins=True,
+    ):
+        assert runtime_security.network_allowed() is True
+        assert runtime_security.host_execution_allowed() is True
+        assert runtime_security.remote_code_allowed() is True
+        assert runtime_security.unattested_artifacts_allowed() is True
+        assert runtime_security.third_party_plugins_allowed() is True
 
 
 def test_serialize_canonical_json_normalizes_supported_types() -> None:
@@ -43,7 +56,7 @@ def test_serialize_canonical_json_normalizes_supported_types() -> None:
     decoded = json.loads(encoded)
 
     assert decoded["path"] == "artifact.txt"
-    assert sorted(decoded["values"]) == [1, 3]
+    assert decoded["values"] == [1, 3]
     assert decoded["nested"][0] == "nested.txt"
     assert decoded["nested"][1] == {"report": "payload.json"}
     assert decoded["nested"][2].startswith("namespace(")

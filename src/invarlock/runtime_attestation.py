@@ -3,13 +3,18 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
 from invarlock.runtime_security import (
+    RuntimeSecurityPolicy,
     apply_runtime_allowances,
+    build_runtime_security_policy,
     load_runtime_manifest,
+    reset_runtime_allowances,
     runtime_verifier_binary,
     unattested_artifacts_allowed,
 )
@@ -71,6 +76,7 @@ def _run_runtime_verifier(
     )
 
 
+@contextmanager
 def configure_runtime_security(
     *,
     allow_network: bool = False,
@@ -78,14 +84,19 @@ def configure_runtime_security(
     allow_third_party_plugins: bool = False,
     allow_remote_code: bool = False,
     allow_unattested_artifacts: bool = False,
-) -> None:
-    apply_runtime_allowances(
+) -> Iterator[None]:
+    policy = build_runtime_security_policy(
         allow_network=allow_network,
         allow_host_execution=allow_host_execution,
         allow_third_party_plugins=allow_third_party_plugins,
         allow_remote_code=allow_remote_code,
         allow_unattested_artifacts=allow_unattested_artifacts,
     )
+    token = apply_runtime_allowances(policy=policy)
+    try:
+        yield
+    finally:
+        reset_runtime_allowances(token)
 
 
 def verify_runtime_attestation(
@@ -174,7 +185,7 @@ def verify_runtime_attestation(
     if message:
         try:
             payload = json.loads(message)
-        except Exception:
+        except json.JSONDecodeError:
             pass
         else:
             errors = payload.get("errors")

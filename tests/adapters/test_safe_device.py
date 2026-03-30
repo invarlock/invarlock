@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 from unittest.mock import MagicMock, patch
 
+import pytest
 import torch.nn as nn
 
 from invarlock.adapters.capabilities import ModelCapabilities
@@ -394,3 +395,24 @@ class TestFilteredLoadingInfo:
         assert len(DummyLoader.calls) == 2
         assert DummyLoader.calls[0]["local_files_only"] is True
         assert "local_files_only" not in DummyLoader.calls[1]
+
+    def test_does_not_fall_back_online_on_arbitrary_loader_errors(self):
+        mixin = SimpleMixin()
+
+        class DummyLoader:
+            calls: list[dict[str, object]] = []
+
+            @classmethod
+            def from_pretrained(cls, model_id: str, **kwargs: object):
+                cls.calls.append({"model_id": model_id, **kwargs})
+                raise RuntimeError("loader boom")
+
+        with pytest.raises(RuntimeError, match="loader boom"):
+            mixin._load_pretrained_model(
+                DummyLoader,
+                "gpt2",
+                prefer_local_files_only=True,
+            )
+
+        assert len(DummyLoader.calls) == 1
+        assert DummyLoader.calls[0]["local_files_only"] is True

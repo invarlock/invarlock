@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import os
+from contextlib import contextmanager
+from functools import wraps
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Iterator, TypeVar, cast
 
 import typer
 
@@ -15,13 +18,52 @@ from invarlock.runtime_attestation import (
     verify_runtime_attestation as _verify_runtime_attestation_core,
 )
 from invarlock.runtime_security import (
+    ALLOW_HOST_EXECUTION_ENV,
+    ALLOW_NETWORK_ENV,
+    ALLOW_REMOTE_CODE_ENV,
+    ALLOW_THIRD_PARTY_PLUGINS_ENV,
+    ALLOW_UNATTESTED_ARTIFACTS_ENV,
+    RuntimeSecurityPolicy,
     delegate_container_command,
+    build_runtime_security_policy,
+    current_runtime_security_policy,
     host_execution_allowed,
     running_inside_container,
     write_runtime_manifest,
 )
 
+F = TypeVar("F", bound=Callable[..., Any])
 
+
+def _env_truthy(name: str) -> bool:
+    value = os.environ.get(name, "")
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def resolve_shell_runtime_security_policy(
+    *,
+    allow_network: bool = False,
+    allow_host_execution: bool = False,
+    allow_third_party_plugins: bool = False,
+    allow_remote_code: bool = False,
+    allow_unattested_artifacts: bool = False,
+) -> RuntimeSecurityPolicy:
+    policy = current_runtime_security_policy()
+    if policy is not None:
+        return policy
+    return build_runtime_security_policy(
+        allow_network=allow_network or _env_truthy(ALLOW_NETWORK_ENV),
+        allow_host_execution=allow_host_execution
+        or _env_truthy(ALLOW_HOST_EXECUTION_ENV),
+        allow_third_party_plugins=allow_third_party_plugins
+        or _env_truthy(ALLOW_THIRD_PARTY_PLUGINS_ENV),
+        allow_remote_code=allow_remote_code or _env_truthy(ALLOW_REMOTE_CODE_ENV),
+        allow_unattested_artifacts=allow_unattested_artifacts
+        or _env_truthy(ALLOW_UNATTESTED_ARTIFACTS_ENV),
+    )
+
+
+@contextmanager
 def configure_runtime_security(
     *,
     allow_network: bool = False,
@@ -29,18 +71,48 @@ def configure_runtime_security(
     allow_third_party_plugins: bool = False,
     allow_remote_code: bool = False,
     allow_unattested_artifacts: bool = False,
-) -> None:
-    _configure_runtime_security_core(
+) -> Iterator[None]:
+    policy = resolve_shell_runtime_security_policy(
         allow_network=allow_network,
         allow_host_execution=allow_host_execution,
         allow_third_party_plugins=allow_third_party_plugins,
         allow_remote_code=allow_remote_code,
         allow_unattested_artifacts=allow_unattested_artifacts,
     )
+    with _configure_runtime_security_core(
+        allow_network=policy.allow_network,
+        allow_host_execution=policy.allow_host_execution,
+        allow_third_party_plugins=policy.allow_third_party_plugins,
+        allow_remote_code=policy.allow_remote_code,
+        allow_unattested_artifacts=policy.allow_unattested_artifacts,
+    ):
+        yield
+
+
+def runtime_security_scoped(func: F) -> F:
+    @wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        mode = str(kwargs.get("mode", "") or "").strip().lower()
+        with configure_runtime_security(
+            allow_network=bool(kwargs.get("allow_network", False)),
+            allow_host_execution=bool(kwargs.get("allow_host_execution", False))
+            or mode == "local",
+            allow_third_party_plugins=bool(
+                kwargs.get("allow_third_party_plugins", False)
+            ),
+            allow_remote_code=bool(kwargs.get("allow_remote_code", False)),
+            allow_unattested_artifacts=bool(
+                kwargs.get("allow_unattested_artifacts", False)
+            ),
+        ):
+            return func(*args, **kwargs)
+
+    return cast(F, wrapper)
 
 
 def maybe_delegate_model_command() -> None:
-    if running_inside_container() or host_execution_allowed():
+    policy = resolve_shell_runtime_security_policy()
+    if running_inside_container() or policy.allow_host_execution:
         return
     try:
         code = delegate_container_command(build_current_process_container_launch_plan())
