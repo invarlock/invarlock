@@ -16,6 +16,9 @@ from invarlock.core.provider_parity import (
     enforce_provider_parity as _enforce_provider_parity_core,
 )
 
+_PAIRING_INT_ERRORS = (OverflowError, TypeError, ValueError)
+_PAIRING_ASSIGNMENT_ERRORS = (KeyError, TypeError, ValueError)
+
 
 def _canonical_dataset_id(value: Any) -> str | None:
     if value is None:
@@ -95,7 +98,7 @@ def extract_pairing_schedule(
             for wid in window_ids_raw:
                 try:
                     window_ids.append(int(wid))
-                except Exception:
+                except _PAIRING_INT_ERRORS:
                     return None
         else:
             window_ids = list(range(int(start_id), int(start_id) + len(input_ids)))
@@ -216,7 +219,7 @@ def compute_provider_digest(
         for raw in all_ids:
             try:
                 ids_int.append(int(raw))
-            except Exception:
+            except _PAIRING_INT_ERRORS:
                 use_ints = False
                 break
         if use_ints:
@@ -341,7 +344,7 @@ def validate_and_harvest_baseline_schedule(
             for idx, (wid, seq) in enumerate(zip(window_ids, input_ids, strict=False)):
                 try:
                     wid_int = int(wid)
-                except Exception:
+                except _PAIRING_INT_ERRORS:
                     _fail_schedule(
                         f"{label} window_ids contains non-int at index {idx}"
                     )
@@ -384,7 +387,7 @@ def validate_and_harvest_baseline_schedule(
             if masks_missing:
                 try:
                     section["attention_masks"] = masks_rows
-                except Exception:
+                except _PAIRING_ASSIGNMENT_ERRORS:
                     pass
 
             labels = section.get("labels")

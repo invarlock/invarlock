@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from invarlock.cli import run_masking as masking_mod
 from invarlock.cli.run_artifacts import persist_ref_masks
 from invarlock.cli.run_pairing import extract_pairing_schedule
@@ -127,6 +129,26 @@ def test_extract_pairing_schedule_rejects_non_int_window_ids() -> None:
         }
     }
     assert extract_pairing_schedule(report) is None
+
+
+def test_extract_pairing_schedule_reraises_unexpected_window_id_errors() -> None:
+    class _BadWindowId:
+        def __int__(self) -> int:
+            raise RuntimeError("boom")
+
+    report = {
+        "evaluation_windows": {
+            "preview": {
+                "window_ids": [_BadWindowId()],
+                "input_ids": [[1, 2, 3]],
+                "attention_masks": [[1, 1, 1]],
+            },
+            "final": {"input_ids": [[1]]},
+        }
+    }
+
+    with pytest.raises(RuntimeError, match="boom"):
+        extract_pairing_schedule(report)
 
 
 def test_extract_pairing_schedule_single_row_fallbacks() -> None:

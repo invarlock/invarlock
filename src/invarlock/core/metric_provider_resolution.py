@@ -5,6 +5,9 @@ from typing import Any
 
 from .provider_config import resolve_provider_kind_and_kwargs
 
+_METRIC_LOOKUP_ERRORS = (AttributeError, KeyError, TypeError, ValueError)
+_METRIC_COERCION_ERRORS = (OverflowError, TypeError, ValueError)
+
 
 def resolve_metric_and_provider(
     cfg: Any,
@@ -22,17 +25,17 @@ def resolve_metric_and_provider(
         if callable(get_value):
             try:
                 return get_value(key)
-            except Exception:
+            except _METRIC_LOOKUP_ERRORS:
                 pass
         try:
             return getattr(metric_cfg, key)
-        except Exception:
+        except _METRIC_LOOKUP_ERRORS:
             return None
 
     provider_val = None
     try:
         provider_val = cfg.dataset.provider
-    except Exception:
+    except _METRIC_LOOKUP_ERRORS:
         provider_val = None
 
     provider_kind, _provider_kwargs = resolve_provider_kind_and_kwargs(provider_val)
@@ -52,9 +55,9 @@ def resolve_metric_and_provider(
         else:
             try:
                 metric_cfg = cfg.eval.metric
-            except Exception:
+            except _METRIC_LOOKUP_ERRORS:
                 metric_cfg = None
-    except Exception:
+    except _METRIC_LOOKUP_ERRORS:
         metric_cfg = None
 
     metric_kind = None
@@ -98,12 +101,12 @@ def resolve_metric_and_provider(
     try:
         if reps is not None:
             metric_opts["reps"] = float(int(reps))
-    except Exception:
+    except _METRIC_COERCION_ERRORS:
         pass
     try:
         if ci_level is not None:
             metric_opts["ci_level"] = float(ci_level)
-    except Exception:
+    except _METRIC_COERCION_ERRORS:
         pass
 
     return str(normalized_kind), str(provider_kind), metric_opts

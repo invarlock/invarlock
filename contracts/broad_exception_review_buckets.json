@@ -34,13 +34,6 @@
       "rationale": "Tier-policy YAML loading and numeric normalization still affect effective policy selection and should narrow to specific parse failures."
     },
     {
-      "path": "src/invarlock/core/checkpoint.py",
-      "subsystem": "core",
-      "bucket": "questionable",
-      "lines": [118, 187, 215],
-      "rationale": "Checkpoint create and restore paths currently collapse storage and rollback failures into booleans, which is operationally useful but still too broad for recovery logic."
-    },
-    {
       "path": "src/invarlock/core/config_runtime.py",
       "subsystem": "core",
       "bucket": "acceptable",
@@ -74,13 +67,6 @@
       "bucket": "acceptable",
       "lines": [97, 140, 173, 179, 281],
       "rationale": "Event logging and payload sanitization are best-effort observability paths with explicit fallback behavior."
-    },
-    {
-      "path": "src/invarlock/core/metric_provider_resolution.py",
-      "subsystem": "core",
-      "bucket": "questionable",
-      "lines": [25, 29, 35, 55, 57, 101, 106],
-      "rationale": "Metric and provider resolution directly shapes evaluation behavior and should not rely on blanket coercion."
     },
     {
       "path": "src/invarlock/core/plugins_inventory.py",
@@ -158,13 +144,6 @@
       "bucket": "acceptable",
       "lines": [258],
       "rationale": "This catch only protects optional evidence dumping after guard evaluation completes."
-    },
-    {
-      "path": "src/invarlock/guards/spectral_control.py",
-      "subsystem": "guards",
-      "bucket": "questionable",
-      "lines": [38, 48, 111, 121, 174],
-      "rationale": "Spectral correction records per-module failures explicitly, but model-control operations still deserve narrower exceptions."
     },
     {
       "path": "src/invarlock/guards/tier_config.py",
@@ -277,13 +256,6 @@
       "bucket": "acceptable",
       "lines": [66, 72],
       "rationale": "Warning-mask rendering is a shell-only display path."
-    },
-    {
-      "path": "src/invarlock/cli/run_pairing.py",
-      "subsystem": "cli",
-      "bucket": "questionable",
-      "lines": [98, 219, 344, 387],
-      "rationale": "CLI pairing normalization still shapes baseline-reference payloads and provider digests, so it should narrow broad catches before it is considered stable shell code."
     },
     {
       "path": "src/invarlock/cli/run_shell_output.py",

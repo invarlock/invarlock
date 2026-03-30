@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from invarlock.core import metric_provider_resolution as mpr
 
 
@@ -72,3 +74,28 @@ def test_resolve_metric_and_provider_override_and_loss_fallback(monkeypatch):
     assert kind2 == "ppl_causal"
     assert provider2 == "wikitext2"
     assert opts2 == {}
+
+
+def test_resolve_metric_and_provider_reraises_unexpected_metric_lookup_errors(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        mpr, "resolve_provider_kind_and_kwargs", lambda _value: ("", {})
+    )
+
+    class _MetricBoom:
+        def get(self, _key: str) -> object:
+            raise RuntimeError("boom")
+
+    class _Cfg:
+        dataset = SimpleNamespace(provider=None)
+
+        def section(self, name: str):  # noqa: ANN001
+            if name == "eval":
+                return {"metric": _MetricBoom()}
+            return {}
+
+    profile = SimpleNamespace(default_provider=None, default_metric=None)
+
+    with pytest.raises(RuntimeError, match="boom"):
+        mpr.resolve_metric_and_provider(_Cfg(), profile, resolved_loss_type="mlm")

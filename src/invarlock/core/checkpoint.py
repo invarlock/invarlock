@@ -14,6 +14,15 @@ from typing import Any
 
 from .types import GuardOutcome, normalize_guard_decision
 
+_CHECKPOINT_OPERATION_ERRORS = (
+    AttributeError,
+    KeyError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 def _use_chunked_snapshot() -> bool:
     """Return True when chunked snapshot mode is enabled."""
@@ -115,7 +124,7 @@ class PolicyCheckpoint:
                 self.adapter.restore(self.model, blob)
             self.rollback_performed = True
             return True
-        except Exception:
+        except _CHECKPOINT_OPERATION_ERRORS:
             return False
 
     def cleanup(self) -> None:
@@ -184,7 +193,7 @@ class CheckpointManager:
                 }
             self.checkpoints[checkpoint_id] = checkpoint_data
             return checkpoint_id
-        except Exception as e:
+        except _CHECKPOINT_OPERATION_ERRORS as e:
             raise RuntimeError(f"Failed to create checkpoint: {e}") from e
 
     def restore_checkpoint(self, model: Any, adapter: Any, checkpoint_id: str) -> bool:
@@ -212,7 +221,7 @@ class CheckpointManager:
             else:
                 adapter.restore(model, checkpoint_data.get("blob"))
             return True
-        except Exception:
+        except _CHECKPOINT_OPERATION_ERRORS:
             return False
 
     def cleanup(self) -> None:

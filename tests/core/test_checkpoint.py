@@ -106,7 +106,13 @@ def test_policy_checkpoint_should_rollback_logic():
 
 
 def test_policy_checkpoint_rollback_guard_paths(tmp_path: Path):
-    adapter = DummyAdapter(tmp_path)
+    class CorruptBytesAdapter(DummyAdapter):
+        def restore(self, model, blob: bytes) -> None:  # type: ignore[override,no-untyped-def]
+            if blob is None:
+                raise TypeError("missing blob")
+            super().restore(model, blob)
+
+    adapter = CorruptBytesAdapter(tmp_path)
     model = object()
     policy = type("P", (), {"enable_auto_rollback": False})()
     cp = PolicyCheckpoint(model, adapter, policy)
@@ -118,6 +124,19 @@ def test_policy_checkpoint_rollback_guard_paths(tmp_path: Path):
     cp.create_checkpoint()
     cp.checkpoint_data["blob"] = None  # type: ignore[index]
     assert cp.rollback("corrupt") is False
+
+
+def test_policy_checkpoint_rollback_reraises_unexpected_errors(tmp_path: Path):
+    class ExplodingAdapter(DummyAdapter):
+        def restore(self, model, blob: bytes) -> None:  # type: ignore[override,no-untyped-def]
+            raise AssertionError("explode")
+
+    adapter = ExplodingAdapter(tmp_path)
+    cp = PolicyCheckpoint(object(), adapter, type("P", (), {"enable_auto_rollback": False})())
+    cp.create_checkpoint()
+
+    with pytest.raises(AssertionError, match="explode"):
+        cp.rollback("unexpected")
 
 
 def test_create_policy_checkpoint_context_manager(
@@ -204,3 +223,19 @@ def test_checkpoint_manager_create_error_raises(
     mgr = CheckpointManager()
     with pytest.raises(RuntimeError):
         _ = mgr.create_checkpoint(object(), adapter)
+
+
+def test_checkpoint_manager_reraises_unexpected_restore_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    class ExplodingAdapter(DummyAdapter):
+        def restore(self, model, blob: bytes) -> None:  # type: ignore[override,no-untyped-def]
+            raise AssertionError("explode")
+
+    monkeypatch.delenv("INVARLOCK_SNAPSHOT_MODE", raising=False)
+    adapter = ExplodingAdapter(tmp_path)
+    mgr = CheckpointManager()
+    checkpoint_id = mgr.create_checkpoint(object(), adapter)
+
+    with pytest.raises(AssertionError, match="explode"):
+        mgr.restore_checkpoint(object(), adapter, checkpoint_id)

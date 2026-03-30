@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from invarlock.cli import run_pairing_helpers as pairing_helpers_mod
 from invarlock.cli.run_overhead import plan_release_windows
 from invarlock.cli.run_pairing import (
@@ -200,6 +202,22 @@ def test_canonical_dataset_id_and_provider_digest_edge_paths() -> None:
         compute_mask_positions_digest_fn=lambda _windows: "",
     )
     assert digest == {"ids_sha256": digest["ids_sha256"]}
+
+
+def test_compute_provider_digest_reraises_unexpected_window_id_errors() -> None:
+    class _BadWindowId:
+        def __int__(self) -> int:
+            raise RuntimeError("boom")
+
+    report = {
+        "evaluation_windows": {
+            "preview": {"window_ids": [_BadWindowId()]},
+            "final": {"window_ids": []},
+        }
+    }
+
+    with pytest.raises(RuntimeError, match="boom"):
+        compute_provider_digest(report)
 
 
 def test_plan_release_windows_console_adjustment_message(capsys) -> None:
