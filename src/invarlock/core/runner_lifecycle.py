@@ -23,38 +23,29 @@ def initialize_run_report(
     report.meta["config"] = serialized_config
 
     if config.context:
-        normalized_context = (
-            dict(config.context)
-            if isinstance(config.context, dict)
-            else dict(config.context)
-        )
+        normalized_context = dict(config.context)
         try:
-            if isinstance(report.context, dict):
-                report.context.update(normalized_context)
-            else:
-                report.context = normalized_context
+            report.context.update(normalized_context)
         except (AttributeError, TypeError, ValueError, RuntimeError):
             report.context = normalized_context
 
-    if isinstance(config.context, dict):
-        run_id = config.context.get("run_id")
-        if run_id:
-            report.meta["run_id"] = run_id
-        plugins_meta = config.context.get("plugins")
-        if plugins_meta:
-            report.meta["plugins"] = plugins_meta
+    run_id = config.context.get("run_id")
+    if run_id:
+        report.meta["run_id"] = run_id
+    plugins_meta = config.context.get("plugins")
+    if plugins_meta:
+        report.meta["plugins"] = plugins_meta
 
     if auto_config:
         report.meta["auto"] = auto_config
-        if isinstance(config.context, dict):
-            existing_auto = config.context.get("auto")
-            if isinstance(existing_auto, dict):
-                merged_auto = dict(existing_auto)
-                merged_auto.update(auto_config)
-                config.context["auto"] = merged_auto
-            else:
-                config.context["auto"] = dict(auto_config)
-            report.context["auto"] = config.context["auto"]
+        existing_auto = config.context.get("auto")
+        if isinstance(existing_auto, dict):
+            merged_auto = dict(existing_auto)
+            merged_auto.update(auto_config)
+            config.context["auto"] = merged_auto
+        else:
+            config.context["auto"] = dict(auto_config)
+        report.context["auto"] = config.context["auto"]
 
     return report
 

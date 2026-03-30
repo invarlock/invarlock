@@ -806,7 +806,7 @@ def build_container_python_command(
     env_pairs[RUNTIME_IMAGE_DIGEST_ENV] = digest
     env_pairs["PYTHONPATH"] = os.pathsep.join(pythonpath_entries)
 
-    script_host_path = _absolute_host_path(script_path, cwd=cwd)
+    script_host_path = _absolute_host_path(Path(script_path), cwd=cwd)
     script_mounts: set[Path] = set()
     if _record_path_dependencies(script_host_path, script_mounts, cwd=cwd):
         container_script = _workspace_path(script_host_path, cwd=cwd)

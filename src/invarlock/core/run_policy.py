@@ -51,12 +51,10 @@ def coerce_mapping(obj: object) -> dict[str, Any]:
         if isinstance(result, dict):
             return result
     try:
-        data = vars(obj)
-        if isinstance(data, dict):
-            return data
-    except TypeError:
+        data = getattr(obj, "__dict__")
+    except (AttributeError, TypeError):
         return {}
-    return {}
+    return data if isinstance(data, dict) else {}
 
 
 def resolve_pm_acceptance_range(
@@ -233,7 +231,8 @@ def resolve_guard_overhead_threshold(
             candidate,
             "primary_metric.overhead_threshold must be a non-negative finite number.",
         )
-    threshold = parsed
+    assert parsed is not None
+    threshold = float(parsed)
     return float(threshold)
 
 

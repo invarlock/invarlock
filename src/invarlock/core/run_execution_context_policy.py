@@ -107,7 +107,7 @@ def build_run_context_payload(
                 checks_list.append(invariant_name)
         invariants_policy["profile_checks"] = checks_list
 
-    run_context = {
+    run_context: dict[str, Any] = {
         "eval": to_serialisable_dict_fn(eval_section),
         "dataset": to_serialisable_dict_fn(cfg.dataset),
         "guards": guard_overrides,
@@ -118,22 +118,24 @@ def build_run_context_payload(
         "run_id": run_id,
     }
     if tiny_relax_enabled:
-        run_context.setdefault("run", {})["tiny_relax"] = True
+        run_section = run_context.setdefault("run", {})
+        if isinstance(run_section, dict):
+            run_section["tiny_relax"] = True
 
     baseline_eval = _baseline_eval_windows(baseline_report_data)
     if baseline_eval is not None:
         run_context["baseline_eval_windows"] = baseline_eval
 
-    run_context.setdefault("primary_metric", {})["acceptance_range"] = (
-        pm_acceptance_range
-    )
+    primary_metric = run_context.setdefault("primary_metric", {})
+    if not isinstance(primary_metric, dict):
+        primary_metric = {}
+        run_context["primary_metric"] = primary_metric
+    primary_metric["acceptance_range"] = pm_acceptance_range
     run_context["pm_acceptance_range"] = pm_acceptance_range
     if pm_drift_band:
-        run_context.setdefault("primary_metric", {})["drift_band"] = pm_drift_band
+        primary_metric["drift_band"] = pm_drift_band
         run_context["pm_drift_band"] = pm_drift_band
-    run_context.setdefault("primary_metric", {})["overhead_threshold"] = (
-        guard_overhead_threshold
-    )
+    primary_metric["overhead_threshold"] = guard_overhead_threshold
     run_context["guard_overhead_threshold"] = guard_overhead_threshold
     run_context["model_profile"] = {
         "family": getattr(model_profile, "family", ""),
@@ -145,12 +147,11 @@ def build_run_context_payload(
     extra_context = to_serialisable_dict_fn(_section_dict(cfg, "context"))
     if isinstance(extra_context, dict):
         run_context.update(extra_context)
-    try:
-        run_context.setdefault("eval", {}).setdefault("loss", {})["resolved_type"] = (
-            resolved_loss_type
-        )
-    except (AttributeError, TypeError):
-        pass
+    eval_context = run_context.get("eval")
+    if isinstance(eval_context, dict):
+        loss_context = eval_context.setdefault("loss", {})
+        if isinstance(loss_context, dict):
+            loss_context["resolved_type"] = resolved_loss_type
 
     return run_context
 
@@ -163,7 +164,7 @@ def _normalize_edit_plan(plan_obj: Any) -> dict[str, Any]:
         return dict(plan_data)
     if hasattr(plan_obj, "items"):
         try:
-            return dict(plan_obj)  # type: ignore[arg-type]
+            return dict(plan_obj)
         except (TypeError, ValueError):
             return {}
     return {}
