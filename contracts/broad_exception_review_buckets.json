@@ -104,13 +104,6 @@
       "rationale": "Latency measurement wraps arbitrary tensor/model calls and immediately re-raises with explicit phase-specific errors."
     },
     {
-      "path": "src/invarlock/guards/rmt_detection.py",
-      "subsystem": "guards",
-      "bucket": "questionable",
-      "lines": [120, 549, 561],
-      "rationale": "RMT correction is active guard behavior, but the remaining broad catches already emit explicit failure events and need narrower exception classes rather than immediate removal-by-count."
-    },
-    {
       "path": "src/invarlock/guards/spectral.py",
       "subsystem": "guards",
       "bucket": "acceptable",
@@ -153,20 +146,6 @@
       "rationale": "Benchmark command error wrapping is a shell-only concern."
     },
     {
-      "path": "src/invarlock/cli/commands/calibrate.py",
-      "subsystem": "cli",
-      "bucket": "questionable",
-      "lines": [333, 349, 354, 590, 652],
-      "rationale": "Calibration command artifact synthesis and summary coercion are still active data-shaping paths, not just presentation helpers."
-    },
-    {
-      "path": "src/invarlock/cli/commands/evaluate.py",
-      "subsystem": "cli",
-      "bucket": "questionable",
-      "lines": [166, 184, 406, 437, 497, 549, 610, 616],
-      "rationale": "The evaluate shell still owns meaningful planning and report-loading logic and should narrow broad catches as shell/core ownership is cleaned up."
-    },
-    {
       "path": "src/invarlock/cli/commands/explain_gates.py",
       "subsystem": "cli",
       "bucket": "acceptable",
@@ -186,13 +165,6 @@
       "bucket": "acceptable",
       "lines": [114, 368, 515, 561, 612],
       "rationale": "Plugin listing is an introspection command and the broad catches only protect optional runtime and metadata probes."
-    },
-    {
-      "path": "src/invarlock/cli/commands/report.py",
-      "subsystem": "cli",
-      "bucket": "questionable",
-      "lines": [193, 283, 300, 412, 616],
-      "rationale": "Report command paths still shape validation summaries and CLI failure mode, so they should narrow catches before being treated as stable."
     },
     {
       "path": "src/invarlock/cli/device.py",

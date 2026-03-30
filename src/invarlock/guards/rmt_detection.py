@@ -11,6 +11,21 @@ import torch.nn as nn
 from . import rmt_analysis, rmt_math
 
 logger = logging.getLogger(__name__)
+_RMT_CORRECTION_ERRORS = (
+    AttributeError,
+    KeyError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+    torch.linalg.LinAlgError,
+)
+_RMT_TIED_PARAMETER_ERRORS = (
+    AttributeError,
+    KeyError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 __all__ = [
     "evaluate_step5_layer",
@@ -117,7 +132,7 @@ def step5_detect_and_correct_modules(
                     deadband=deadband,
                     margin=margin,
                 )
-            except Exception as exc:
+            except _RMT_CORRECTION_ERRORS as exc:
                 events.append(
                     {
                         "operation": "rmt_correct_failed",
@@ -546,7 +561,7 @@ def _apply_rmt_correction(
                                 tying_map = adapter.get_tying_map()
                                 full_param_name = f"{layer_name}.{name}"
                                 tied_params = tying_map.get(full_param_name, [])
-                            except Exception:
+                            except _RMT_TIED_PARAMETER_ERRORS:
                                 tied_params = []
 
                         param.mul_(scale)
@@ -558,7 +573,7 @@ def _apply_rmt_correction(
                                     )
                                     if tied_param is not None:
                                         tied_param.mul_(scale)
-                                except Exception:
+                                except _RMT_TIED_PARAMETER_ERRORS:
                                     pass
 
                         W_after = param.detach()

@@ -13,7 +13,7 @@ from .report_inputs import (
 )
 
 _TEXT_NORMALIZATION_ERRORS = (RuntimeError, TypeError, ValueError)
-_FINITE_NUMBER_ERRORS = (OverflowError, TypeError, ValueError)
+_FINITE_NUMBER_ERRORS = (OverflowError, RuntimeError, TypeError, ValueError)
 
 
 def require_run_report_artifact(run_result: str | Path | None, *, stage: str) -> Path:

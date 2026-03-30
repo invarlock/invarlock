@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any, NoReturn
 
 import typer
+import yaml
 from rich.console import Console
 
 from invarlock import __version__ as INVARLOCK_VERSION
@@ -59,6 +60,18 @@ PHASE_BAR_WIDTH = 67
 VERBOSITY_QUIET = 0
 VERBOSITY_DEFAULT = 1
 VERBOSITY_VERBOSE = 2
+_QUIET_REPORT_LOAD_ERRORS = (json.JSONDecodeError, OSError, TypeError, ValueError)
+_CONSOLE_SUMMARY_ERRORS = (AttributeError, KeyError, RuntimeError, TypeError, ValueError)
+_CHILD_RUN_REPLAY_ERRORS = (
+    ConfigError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValidationError,
+    ValueError,
+)
+_EDIT_CONFIG_LOAD_ERRORS = (OSError, TypeError, ValueError, yaml.YAMLError)
+_TEXT_NORMALIZATION_ERRORS = (RuntimeError, TypeError, ValueError)
 
 console = Console()
 
@@ -163,7 +176,7 @@ def _print_quiet_summary(
     try:
         with report_path.open("r", encoding="utf-8") as fh:
             evaluation_report = json.load(fh)
-    except Exception:
+    except _QUIET_REPORT_LOAD_ERRORS:
         console.print(f"Output: {report_path}")
         return
     if not isinstance(evaluation_report, dict):
@@ -181,7 +194,7 @@ def _print_quiet_summary(
             sum(1 for row in rows if row.get("ok")) if isinstance(rows, list) else 0
         )
         status = "PASS" if block.get("overall_pass") else "FAIL"
-    except Exception:
+    except _CONSOLE_SUMMARY_ERRORS:
         total = 0
         passed = 0
         status = "UNKNOWN"
@@ -196,8 +209,6 @@ def _print_quiet_summary(
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
-    import yaml
-
     with path.open("r", encoding="utf-8") as fh:
         data = yaml.safe_load(fh) or {}
     if not isinstance(data, dict):
@@ -206,8 +217,6 @@ def _load_yaml(path: Path) -> dict[str, Any]:
 
 
 def _dump_yaml(path: Path, data: dict[str, Any]) -> None:
-    import yaml
-
     with path.open("w", encoding="utf-8") as fh:
         yaml.safe_dump(data, fh, sort_keys=False)
 
@@ -403,7 +412,11 @@ def evaluate_command(
                         prefer_local_files_only=prefer_local_files_only,
                         no_color=no_color,
                     )
-            except Exception:
+            except typer.Exit:
+                if quiet_buffer is not None:
+                    console.print(quiet_buffer.getvalue(), markup=False)
+                raise
+            except _CHILD_RUN_REPLAY_ERRORS:
                 if quiet_buffer is not None:
                     console.print(quiet_buffer.getvalue(), markup=False)
                 raise
@@ -434,7 +447,7 @@ def evaluate_command(
         # Overlay subject model id/adapter and output/context onto the provided edit config
         try:
             cfg_loaded: dict[str, Any] = _load_yaml(edited_yaml)
-        except Exception as exc:  # noqa: BLE001
+        except _EDIT_CONFIG_LOAD_ERRORS as exc:
             print_event(
                 console,
                 "FAIL",
@@ -494,7 +507,11 @@ def evaluate_command(
                         prefer_local_files_only=prefer_local_files_only,
                         no_color=no_color,
                     )
-            except Exception:
+            except typer.Exit:
+                if quiet_buffer is not None:
+                    console.print(quiet_buffer.getvalue(), markup=False)
+                raise
+            except _CHILD_RUN_REPLAY_ERRORS:
                 if quiet_buffer is not None:
                     console.print(quiet_buffer.getvalue(), markup=False)
                 raise
@@ -546,7 +563,11 @@ def evaluate_command(
                         prefer_local_files_only=prefer_local_files_only,
                         no_color=no_color,
                     )
-            except Exception:
+            except typer.Exit:
+                if quiet_buffer is not None:
+                    console.print(quiet_buffer.getvalue(), markup=False)
+                raise
+            except _CHILD_RUN_REPLAY_ERRORS:
                 if quiet_buffer is not None:
                     console.print(quiet_buffer.getvalue(), markup=False)
                 raise
@@ -607,13 +628,13 @@ def evaluate_command(
     # CI/Release hard‑abort: fail fast when primary metric is not computable.
     try:
         prof = str(profile or "").strip().lower()
-    except Exception:
+    except _TEXT_NORMALIZATION_ERRORS:
         prof = ""
     if prof in {"ci", "ci_cpu", "release"}:
         try:
             with Path(edited_report).open("r", encoding="utf-8") as fh:
                 edited_payload = json.load(fh)
-        except Exception as exc:  # noqa: BLE001
+        except _QUIET_REPORT_LOAD_ERRORS as exc:
             print_event(
                 console,
                 "FAIL",

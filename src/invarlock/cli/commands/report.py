@@ -36,6 +36,16 @@ SECTION_WIDTH = 67
 KV_LABEL_WIDTH = 16
 GATE_LABEL_WIDTH = 32
 ARTIFACT_LABEL_WIDTH = 18
+_SUMMARY_FORMAT_ERRORS = (TypeError, ValueError)
+_REPORT_RENDER_ERRORS = (
+    AttributeError,
+    KeyError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+_REPORT_COMMAND_ERRORS = (OSError, RuntimeError, TypeError)
 
 
 def _raise_report_input_failure(message: str, *, no_color: bool = False) -> NoReturn:
@@ -190,7 +200,7 @@ def _render_generation_result(
                             0.0, float(perf_counter() - float(summary_report_start))
                         )
                         summary_suffix = f"[{(base + subject + report_elapsed):.2f}s]"
-                    except Exception:
+                    except _SUMMARY_FORMAT_ERRORS:
                         summary_suffix = None
                 _print_section_header(
                     console,
@@ -280,7 +290,7 @@ def _render_generation_result(
                 # In CLI report flow, do not hard-exit on validation failure; just display status.
                 # CI gating should be handled by dedicated verify commands.
 
-            except Exception as e:
+            except _REPORT_RENDER_ERRORS as e:
                 _event("WARN", f"Evaluation report validation error: {e}", emoji="⚠️")
                 # Exit non-zero on evaluation report generation error
                 raise typer.Exit(1) from e
@@ -297,7 +307,7 @@ def _render_generation_result(
         _raise_report_input_failure(str(e), no_color=no_color)
     except typer.Exit:
         raise
-    except Exception as e:
+    except _REPORT_RENDER_ERRORS as e:
         print_event(
             console,
             "FAIL",
@@ -409,7 +419,7 @@ def report_callback(
             )
             raise typer.Exit(1) from exc
         _raise_report_input_failure(message, no_color=no_color)
-    except Exception as exc:
+    except _REPORT_COMMAND_ERRORS as exc:
         print_event(
             console,
             "FAIL",
@@ -613,7 +623,7 @@ def report_validate(
         raise typer.Exit(2) from exc
     except typer.Exit:
         raise
-    except Exception as exc:  # noqa: BLE001
+    except _REPORT_RENDER_ERRORS as exc:
         _event("FAIL", f"Validation failed: {exc}", emoji="❌")
         raise typer.Exit(1) from exc
 
