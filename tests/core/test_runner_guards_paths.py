@@ -82,7 +82,9 @@ class _PrepareFailureGuard(Guard):
         _ = model, adapter, calib, policy_config
         raise InvarlockError(code="E999", message="prepare failed")
 
-    def validate(self, model: object, adapter: object, context: dict[str, object]) -> dict[str, object]:
+    def validate(
+        self, model: object, adapter: object, context: dict[str, object]
+    ) -> dict[str, object]:
         _ = model, adapter, context
         return {"passed": True}
 
@@ -185,7 +187,9 @@ def test_resolve_guard_policies_defaults_for_missing_or_invalid_auto_config() ->
     assert seen["overrides"] == {"spectral": {"deadband": 0.2}}
 
 
-def test_prepare_guards_phase_non_strict_invarlock_errors_are_recorded_and_skipped() -> None:
+def test_prepare_guards_phase_non_strict_invarlock_errors_are_recorded_and_skipped() -> (
+    None
+):
     runner = _RunnerStub(
         strict_guard_prepare=False,
         tier_policies={"steady": {"deadband": 0.2}},

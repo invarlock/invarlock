@@ -218,7 +218,9 @@ def test_prepare_guard_overhead_direct_ratio_mode_fallback_and_legacy_messages()
     ]
 
 
-def test_prepare_guard_overhead_zero_baseline_soft_passes_with_default_warning() -> None:
+def test_prepare_guard_overhead_zero_baseline_soft_passes_with_default_warning() -> (
+    None
+):
     payload, passed = overhead.prepare_guard_overhead_section(
         {
             "bare_ppl": 0,

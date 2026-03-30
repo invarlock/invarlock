@@ -82,13 +82,17 @@ def test_initialize_run_report_skips_auto_merge_for_non_dict_context() -> None:
     assert "auto" not in report.context
 
 
-def test_initialize_run_report_replaces_non_mapping_report_context_and_bad_auto() -> None:
+def test_initialize_run_report_replaces_non_mapping_report_context_and_bad_auto() -> (
+    None
+):
     class _ListContextReport(RunReport):
         def __init__(self) -> None:
             super().__init__()
             self.context = []
 
-    cfg = RunConfig(context={"run_id": "", "plugins": {"guards": ["spectral"]}, "auto": "bad"})
+    cfg = RunConfig(
+        context={"run_id": "", "plugins": {"guards": ["spectral"]}, "auto": "bad"}
+    )
     report = initialize_run_report(
         config=cfg,
         serialized_config={"profile": "dev"},

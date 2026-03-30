@@ -50,8 +50,12 @@ def test_section_mixin_exposes_known_and_extra_fields() -> None:
     assert edit._extra["other"] == 7
 
 
-def test_output_eval_and_guard_sections_normalize_runtime_values(tmp_path: Path) -> None:
-    output = OutputConfig(dir=str(tmp_path / "runs"), model_dir=str(tmp_path / "models"))
+def test_output_eval_and_guard_sections_normalize_runtime_values(
+    tmp_path: Path,
+) -> None:
+    output = OutputConfig(
+        dir=str(tmp_path / "runs"), model_dir=str(tmp_path / "models")
+    )
     assert output.dir == tmp_path / "runs"
     assert output.model_dir == tmp_path / "models"
 

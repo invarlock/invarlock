@@ -162,9 +162,10 @@ def test_metrics_runtime_helper_resolution_and_pad_token_paths(monkeypatch):
     monkeypatch.setattr(torch.backends, "mps", NoMPS(), raising=False)
 
     assert runtime_mod._resolve_eval_device(Parameterless(), None).type == "cpu"
-    assert runtime_mod._resolve_eval_device(
-        nn.Linear(1, 1), torch.device("mps")
-    ).type == "cpu"
+    assert (
+        runtime_mod._resolve_eval_device(nn.Linear(1, 1), torch.device("mps")).type
+        == "cpu"
+    )
 
     class EmbeddingsModel(nn.Module):
         def __init__(self):
@@ -191,7 +192,9 @@ def test_metrics_runtime_helper_resolution_and_pad_token_paths(monkeypatch):
     assert runtime_mod._infer_model_vocab_size(ConfigFallback()) == 11
     assert runtime_mod._resolve_pad_token_id(EmbeddingsModel(), 7) == 3
     assert runtime_mod._resolve_pad_token_id(ConfigFallback(), 11) == 0
-    assert runtime_mod._resolve_pad_token_id(types.SimpleNamespace(config=None), None) == 0
+    assert (
+        runtime_mod._resolve_pad_token_id(types.SimpleNamespace(config=None), None) == 0
+    )
 
 
 def test_runtime_perplexity_and_window_paths_warn_on_clamped_values(monkeypatch):
@@ -217,21 +220,28 @@ def test_runtime_perplexity_and_window_paths_warn_on_clamped_values(monkeypatch)
     model = TinyLM().eval()
 
     monkeypatch.setattr(runtime_mod.math, "exp", lambda _value: 0.5)
-    assert runtime_mod.compute_perplexity(model, [batch], max_samples=1, device="cpu") == 1.0
+    assert (
+        runtime_mod.compute_perplexity(model, [batch], max_samples=1, device="cpu")
+        == 1.0
+    )
     assert runtime_mod.compute_ppl(model, window, device="cpu") == 1.0
 
     monkeypatch.setattr(runtime_mod.math, "exp", lambda _value: float("inf"))
-    assert runtime_mod.compute_perplexity(model, [batch], max_samples=1, device="cpu") == float("inf")
+    assert runtime_mod.compute_perplexity(
+        model, [batch], max_samples=1, device="cpu"
+    ) == float("inf")
     assert runtime_mod.compute_ppl(model, window, device="cpu") == float("inf")
 
 
 def test_runtime_token_sanitizer_and_raw_tensor_batches_cover_skip_paths():
-    cleaned_ids, cleaned_mask, cleaned_labels = runtime_mod._sanitize_token_ids_for_model(
-        torch.tensor([[1, 9]]),
-        None,
-        torch.tensor([[1, 9]]),
-        vocab_size=0,
-        pad_token_id=0,
+    cleaned_ids, cleaned_mask, cleaned_labels = (
+        runtime_mod._sanitize_token_ids_for_model(
+            torch.tensor([[1, 9]]),
+            None,
+            torch.tensor([[1, 9]]),
+            vocab_size=0,
+            pad_token_id=0,
+        )
     )
     assert cleaned_ids.tolist() == [[1, 9]]
     assert cleaned_mask is None

@@ -92,7 +92,10 @@ def test_attestation_helpers_cover_reference_and_no_extra_paths(tmp_path: Path) 
     ]
     _write_json(pack_dir / "manifest.json", manifest)
 
-    assert proof_pack_mod._path_within_dir(pack_dir, pack_dir.parent / "outside.json") is False
+    assert (
+        proof_pack_mod._path_within_dir(pack_dir, pack_dir.parent / "outside.json")
+        is False
+    )
     assert proof_pack_mod.verify_manifest_attestation(pack_dir) == []
     covered_paths = set(proof_pack_mod._relative_file_paths(pack_dir))
     assert proof_pack_mod._verify_no_extra_files(
@@ -141,7 +144,9 @@ def test_verify_reports_success_writes_json_and_records_error_injection(
     assert json.loads(json_out.read_text(encoding="utf-8")) == payload
 
 
-def test_verify_gpg_timeout_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_verify_gpg_timeout_paths(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     pack_dir = tmp_path / "pack"
     _write_pack_scaffold(pack_dir)
     (pack_dir / "manifest.json.asc").write_text("sig", encoding="utf-8")

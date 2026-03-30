@@ -1192,7 +1192,10 @@ def test_inspect_proof_pack_unsigned_clean_pack_reports_warning_without_extras(
     assert result.status == proof_pack_mod.ProofPackStatus.OK
     assert payload["ok"] is True
     assert payload["integrity"]["extra_files"] == []
-    assert "manifest.json.asc missing; strict verification would fail." in payload["issues"]
+    assert (
+        "manifest.json.asc missing; strict verification would fail."
+        in payload["issues"]
+    )
 
 
 def test_build_proof_pack_copies_readme_and_environment_without_optional_refs(
@@ -1382,7 +1385,9 @@ def test_verify_proof_pack_skip_verify_succeeds_without_running_report_verify(
     monkeypatch.setattr(
         proof_pack_mod,
         "_verify_reports",
-        lambda *args, **kwargs: pytest.fail("_verify_reports should not run when skip_verify=True"),
+        lambda *args, **kwargs: pytest.fail(
+            "_verify_reports should not run when skip_verify=True"
+        ),
         raising=True,
     )
 
@@ -1391,7 +1396,9 @@ def test_verify_proof_pack_skip_verify_succeeds_without_running_report_verify(
     assert result.status == proof_pack_mod.ProofPackStatus.OK
     assert result.payload["ok"] is True
     assert "verify" not in result.payload
-    assert result.payload["warnings"] == ["manifest.json.asc missing; pack is unsigned."]
+    assert result.payload["warnings"] == [
+        "manifest.json.asc missing; pack is unsigned."
+    ]
 
 
 def test_build_verify_result_includes_signer_and_verify_payload(tmp_path: Path) -> None:

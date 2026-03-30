@@ -311,7 +311,9 @@ def test_finalize_phase_rejects_non_string_tail_mode() -> None:
     assert report.meta["rollback_reason"] == "primary_metric_tail_invalid"
 
 
-def test_finalize_phase_records_restore_exceptions(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_finalize_phase_records_restore_exceptions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     runner = CoreRunner()
     report = RunReport()
     report.meta["initial_checkpoint"] = "cp-1"

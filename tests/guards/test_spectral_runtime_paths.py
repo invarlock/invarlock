@@ -65,7 +65,9 @@ class _RuntimeGuard:
             calib,
             policy,
             classify_model_families_fn=lambda *_a, **_k: {"module": "ffn"},
-            compute_family_stats_fn=lambda *_a, **_k: {"ffn": {"mean": 1.0, "std": 0.1}},
+            compute_family_stats_fn=lambda *_a, **_k: {
+                "ffn": {"mean": 1.0, "std": 0.1}
+            },
             summarize_sigmas_fn=lambda sigmas: {"count": len(sigmas)},
             percentile_fn=lambda *_a, **_k: 1.0,
         )
@@ -103,7 +105,9 @@ def test_prepare_guard_success_without_degeneracy() -> None:
     assert guard.prepared is True
     assert guard.target_sigma == pytest.approx(1.25)
     assert guard.baseline_metrics["modules_checked"] == 1
-    assert guard.baseline_metrics["measurement_contract"]["degeneracy"] == guard.degeneracy
+    assert (
+        guard.baseline_metrics["measurement_contract"]["degeneracy"] == guard.degeneracy
+    )
 
 
 def test_prepare_guard_records_degeneracy_diagnostics_and_skip_conditions(
@@ -160,9 +164,13 @@ def test_prepare_guard_percentile_failure_logs_and_raises() -> None:
             calib=None,
             policy={},
             classify_model_families_fn=lambda *_a, **_k: {"module": "ffn"},
-            compute_family_stats_fn=lambda *_a, **_k: {"ffn": {"mean": 1.0, "std": 0.1}},
+            compute_family_stats_fn=lambda *_a, **_k: {
+                "ffn": {"mean": 1.0, "std": 0.1}
+            },
             summarize_sigmas_fn=lambda sigmas: {"captured": len(sigmas)},
-            percentile_fn=lambda *_a, **_k: (_ for _ in ()).throw(ValueError("bad percentile")),
+            percentile_fn=lambda *_a, **_k: (_ for _ in ()).throw(
+                ValueError("bad percentile")
+            ),
         )
 
     assert guard.prepared is False
@@ -222,7 +230,9 @@ def test_after_edit_guard_applies_control_when_enabled() -> None:
     ]
     seen: dict[str, object] = {}
 
-    def fake_apply_spectral_control(model: object, policy: dict[str, object]) -> dict[str, object]:
+    def fake_apply_spectral_control(
+        model: object, policy: dict[str, object]
+    ) -> dict[str, object]:
         seen["model"] = model
         seen["policy"] = dict(policy)
         return {"applied": True}
@@ -248,7 +258,9 @@ def test_after_edit_guard_applies_control_when_enabled() -> None:
 def test_after_edit_guard_logs_and_raises_on_failure() -> None:
     guard = _RuntimeGuard()
     guard.prepared = True
-    guard._capture_sigmas = lambda _model, phase: (_ for _ in ()).throw(ValueError("bad capture"))
+    guard._capture_sigmas = lambda _model, phase: (_ for _ in ()).throw(
+        ValueError("bad capture")
+    )
 
     with pytest.raises(RuntimeError, match="Post-edit spectral analysis failed."):
         spectral_runtime.after_edit_guard(guard, model=object())

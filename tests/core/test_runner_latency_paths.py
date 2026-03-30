@@ -97,7 +97,9 @@ def test_measure_latency_raises_for_tensor_conversion_failures(monkeypatch) -> N
         measure_latency(model, [[1, 2, 3]], "cpu")
 
 
-def test_measure_latency_raises_for_shape_transfer_and_numel_failures(monkeypatch) -> None:
+def test_measure_latency_raises_for_shape_transfer_and_numel_failures(
+    monkeypatch,
+) -> None:
     model = _LatencyModel()
     real_tensor = torch.tensor
 
@@ -262,7 +264,9 @@ def test_measure_latency_syncs_cuda_string_devices(monkeypatch) -> None:
             return len(self.values)
 
     class _CapturingModel:
-        def __call__(self, input_ids, attention_mask=None, labels=None, token_type_ids=None):
+        def __call__(
+            self, input_ids, attention_mask=None, labels=None, token_type_ids=None
+        ):
             calls.append(
                 {
                     "input_ids": input_ids,
@@ -274,7 +278,9 @@ def test_measure_latency_syncs_cuda_string_devices(monkeypatch) -> None:
             return SimpleNamespace(loss=0.1)
 
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
-    monkeypatch.setattr(torch, "tensor", lambda value, *args, **kwargs: _FakeCudaTensor(value))
+    monkeypatch.setattr(
+        torch, "tensor", lambda value, *args, **kwargs: _FakeCudaTensor(value)
+    )
 
     def _boom_sync() -> None:
         raise RuntimeError("sync failed")
@@ -347,9 +353,7 @@ def test_samples_to_dataloader_builds_labels_from_attention_mask() -> None:
 
 
 def test_samples_to_dataloader_coerces_explicit_labels_without_attention_mask() -> None:
-    dataloader = samples_to_dataloader(
-        [{"input_ids": [4, 5], "labels": [9, 8]}]
-    )
+    dataloader = samples_to_dataloader([{"input_ids": [4, 5], "labels": [9, 8]}])
 
     batch = next(iter(dataloader))
 

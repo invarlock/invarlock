@@ -203,9 +203,7 @@ def test_resolve_pm_acceptance_range_handles_empty_and_absent_bounds() -> None:
     assert policy.resolve_pm_acceptance_range(None) == {}
     assert policy.resolve_pm_acceptance_range({"primary_metric": {}}) == {}
     assert (
-        policy.resolve_pm_acceptance_range(
-            {"primary_metric": {"acceptance_range": {}}}
-        )
+        policy.resolve_pm_acceptance_range({"primary_metric": {"acceptance_range": {}}})
         == {}
     )
 

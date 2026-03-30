@@ -219,7 +219,9 @@ def _make_services(
     )
 
 
-def test_execute_run_request_reports_missing_baseline_windows(monkeypatch, tmp_path: Path) -> None:
+def test_execute_run_request_reports_missing_baseline_windows(
+    monkeypatch, tmp_path: Path
+) -> None:
     config = _Config()
     _install_common_monkeypatches(monkeypatch)
     services = _make_services(
@@ -312,9 +314,7 @@ def test_execute_run_request_emits_export_and_guard_overhead_failure(
     )
 
     diagnostic_codes = {
-        event.code
-        for event in outcome.events
-        if isinstance(event, RunDiagnosticEvent)
+        event.code for event in outcome.events if isinstance(event, RunDiagnosticEvent)
     }
     assert outcome.ok is False
     assert outcome.failure is not None
@@ -463,7 +463,9 @@ def test_execute_run_request_covers_diagnostic_and_seed_fallback_branches(
         event for event in outcome.events if isinstance(event, RunDiagnosticEvent)
     ]
     diagnostic_codes = {event.code for event in diagnostics}
-    generic = next(event for event in diagnostics if event.code == "transition_diagnostic")
+    generic = next(
+        event for event in diagnostics if event.code == "transition_diagnostic"
+    )
 
     assert outcome.ok is True
     assert outcome.failure is None
@@ -607,9 +609,7 @@ def test_execute_run_request_covers_export_fallback_branches(
     )
 
     diagnostic_codes = {
-        event.code
-        for event in outcome.events
-        if isinstance(event, RunDiagnosticEvent)
+        event.code for event in outcome.events if isinstance(event, RunDiagnosticEvent)
     }
 
     assert outcome.ok is True

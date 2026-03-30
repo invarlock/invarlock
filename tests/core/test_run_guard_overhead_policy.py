@@ -310,9 +310,9 @@ def test_prepare_guard_overhead_report_handles_snapshot_extraction_errors() -> N
         core_report={},
         report={},
         default_threshold=0.01,
-        extract_pm_snapshot_for_overhead_fn=lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AttributeError("boom")
-        ),
+        extract_pm_snapshot_for_overhead_fn=lambda *_args, **_kwargs: (
+            _ for _ in ()
+        ).throw(AttributeError("boom")),
         validate_guard_overhead_fn=lambda *args, **kwargs: Result(),
     )
 

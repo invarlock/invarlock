@@ -661,7 +661,9 @@ def test_execute_scenario_writes_pairing_schedule_and_telemetry_summary(
         runtime["pairing_schedule"] = {"preview": {}, "final": {}}
         return bare if run_type == "bare" else guarded
 
-    monkeypatch.setattr(bench_runner_mod, "execute_single_run", _fake_execute_single_run)
+    monkeypatch.setattr(
+        bench_runner_mod, "execute_single_run", _fake_execute_single_run
+    )
     monkeypatch.setattr(
         bench_runner_mod,
         "resolve_epsilon_from_runtime",
