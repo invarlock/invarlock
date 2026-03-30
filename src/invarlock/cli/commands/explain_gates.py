@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Mapping
 from pathlib import Path
 
 import typer
@@ -16,6 +17,52 @@ from invarlock.reporting.report_telemetry import (
 )
 
 console = Console()
+
+
+def _load_json_payload(path: Path) -> object:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _mapping_dict(value: object) -> dict[str, object]:
+    if isinstance(value, Mapping):
+        return dict(value)
+    return {}
+
+
+def _coerce_optional_float(value: object) -> float | None:
+    try:
+        coerced = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if not math.isfinite(coerced):
+        return None
+    return coerced
+
+
+def _coerce_int(value: object, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError, OverflowError):
+        return default
+
+
+def _dataset_split_line(report_payload: object) -> str | None:
+    provenance = _mapping_dict(_mapping_dict(report_payload).get("provenance"))
+    split = provenance.get("dataset_split")
+    if not split:
+        return None
+    line = f"Dataset split: {split}"
+    if provenance.get("split_fallback"):
+        line += " (fallback)"
+    return line
+
+
+def _drift_ratio(preview: object, final: object) -> float | None:
+    preview_value = _coerce_optional_float(preview)
+    final_value = _coerce_optional_float(final)
+    if preview_value is None or final_value is None or preview_value == 0.0:
+        return None
+    return final_value / preview_value
 
 
 def explain_gates_command(
@@ -36,9 +83,9 @@ def explain_gates_command(
         raise typer.Exit(1)
 
     try:
-        report_data = json.loads(report_path.read_text())
-        baseline_data = json.loads(baseline_path.read_text())
-    except Exception as exc:  # noqa: BLE001
+        report_data = _load_json_payload(report_path)
+        baseline_data = _load_json_payload(baseline_path)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         console.print(f"[red]Failed to load inputs: {exc}[/red]")
         raise typer.Exit(1) from exc
 
@@ -89,45 +136,23 @@ def explain_gates_command(
     )
     hysteresis_ratio = float(pm_policy.get("hysteresis_ratio", 0.0))
     min_tokens = int(pm_policy.get("min_tokens", 0))
-    try:
-        limit_base = float(pm_policy.get("ratio_limit_base"))
-    except Exception:
-        limit_base = None
-    if limit_base is None or not isinstance(limit_base, int | float):
-        limit_base = None
-    elif not float("-inf") < float(limit_base) < float("inf"):
-        limit_base = None
+    limit_base = _coerce_optional_float(pm_policy.get("ratio_limit_base"))
     if limit_base is None:
-        try:
-            fallback = (
-                tier_defaults.get("metrics", {})
-                if isinstance(tier_defaults, dict)
-                else {}
-            )
-            fallback_pm = (
-                fallback.get("pm_ratio", {}) if isinstance(fallback, dict) else {}
-            )
-            limit_base = float(fallback_pm.get("ratio_limit_base"))
-        except Exception:
-            limit_base = None
+        fallback = (
+            tier_defaults.get("metrics", {}) if isinstance(tier_defaults, dict) else {}
+        )
+        fallback_pm = fallback.get("pm_ratio", {}) if isinstance(fallback, dict) else {}
+        limit_base = _coerce_optional_float(fallback_pm.get("ratio_limit_base"))
     limit_with_hyst = (
         float(limit_base) + max(0.0, hysteresis_ratio)
         if isinstance(limit_base, int | float)
         else None
     )
-    tokens_ok = True
-    telem = (
-        evaluation_report.get("telemetry", {})
-        if isinstance(evaluation_report.get("telemetry"), dict)
-        else {}
+    telem = _mapping_dict(evaluation_report.get("telemetry"))
+    total_tokens = _coerce_int(telem.get("preview_total_tokens")) + _coerce_int(
+        telem.get("final_total_tokens")
     )
-    try:
-        total_tokens = int(telem.get("preview_total_tokens", 0)) + int(
-            telem.get("final_total_tokens", 0)
-        )
-        tokens_ok = (min_tokens == 0) or (total_tokens >= min_tokens) or tiny_relax
-    except Exception:
-        tokens_ok = True
+    tokens_ok = (min_tokens == 0) or (total_tokens >= min_tokens) or tiny_relax
 
     # Primary-metric ratio gate explanation (ppl-like kinds shown as ratios)
     ratio = None
@@ -160,7 +185,7 @@ def explain_gates_command(
         )
     token_state = "ok" if tokens_ok else "below floor"
     console.print(
-        f"  tokens: {token_state} (token floors: min_tokens={min_tokens or 0}, total={int(telem.get('preview_total_tokens', 0)) + int(telem.get('final_total_tokens', 0)) if telem else 0})"
+        f"  tokens: {token_state} (token floors: min_tokens={min_tokens or 0}, total={total_tokens})"
     )
     if hysteresis_applied:
         if isinstance(limit_with_hyst, int | float):
@@ -186,9 +211,8 @@ def explain_gates_command(
         )
 
         q = policy.get("quantile", 0.95)
-        try:
-            qf = float(q)
-        except Exception:
+        qf = _coerce_optional_float(q)
+        if qf is None:
             qf = 0.95
         qf = max(0.0, min(1.0, qf))
         q_key = f"q{int(round(100.0 * qf))}"
@@ -226,17 +250,9 @@ def explain_gates_command(
             console.print("  threshold: " + "; ".join(thr_parts))
 
     # Dataset split visibility from report provenance
-    try:
-        split = (report_data.get("provenance", {}) or {}).get("dataset_split")
-        sf = (report_data.get("provenance", {}) or {}).get("split_fallback")
-        if split:
-            line = f"Dataset split: {split}"
-            if sf:
-                line += " (fallback)"
-            # Click echo would be ideal, but we keep consistent console printing
-            console.print(line)
-    except Exception:
-        pass
+    split_line = _dataset_split_line(report_data)
+    if split_line:
+        console.print(split_line)
 
     # Drift gate explanation (ppl-like kinds only)
     drift = None
@@ -252,12 +268,7 @@ def explain_gates_command(
     if kind.startswith("ppl"):
         preview = pm.get("preview")
         final = pm.get("final")
-        if isinstance(preview, int | float) and isinstance(final, int | float):
-            try:
-                if float(preview) != 0.0:
-                    drift = float(final) / float(preview)
-            except Exception:
-                drift = None
+        drift = _drift_ratio(preview, final)
 
         console.print("\n[bold]Gate: Drift (final/preview)[/bold]")
         if isinstance(drift, int | float):

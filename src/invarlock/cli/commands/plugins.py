@@ -74,6 +74,14 @@ def _emit_plugins_json(category: str, rows, extra: dict | None = None) -> None:
     typer.echo(json.dumps(payload, ensure_ascii=False))
 
 
+def _load_provider_registry_map() -> dict[str, Any]:
+    try:
+        data_mod = importlib.import_module("invarlock.eval.data")
+        return getattr(data_mod, "_PROVIDERS", {}) or {}
+    except Exception:
+        return {}
+
+
 @runtime_security_scoped
 def plugins_command(
     category: str | None = None,
@@ -111,7 +119,7 @@ def plugins_command(
 
                 torch_mod: Any = _torch
                 has_cuda = detect_cuda_available(torch_mod)
-            except Exception:
+            except ImportError:
                 has_cuda = False
             from invarlock.core.adapter_provenance import extract_adapter_provenance
 
@@ -362,11 +370,7 @@ def plugins_command(
                 PROVIDER_PARAMS as provider_params,
             )
 
-            try:
-                _data_mod = importlib.import_module("invarlock.eval.data")
-                _providers_map = getattr(_data_mod, "_PROVIDERS", {}) or {}
-            except Exception:
-                _providers_map = {}
+            _providers_map = _load_provider_registry_map()
 
             def _net_label(name: str) -> str:
                 val = (provider_network.get(name, "") or "").lower()
@@ -509,11 +513,7 @@ def plugins_command(
             providers = sorted(list_providers())
 
             if json_out:
-                try:
-                    _data_mod = importlib.import_module("invarlock.eval.data")
-                    _providers_map = getattr(_data_mod, "_PROVIDERS", {}) or {}
-                except Exception:
-                    _providers_map = {}
+                _providers_map = _load_provider_registry_map()
                 _emit_plugins_json(
                     "datasets",
                     dataset_inventory_json_items(providers, _providers_map),
@@ -609,7 +609,7 @@ def _check_plugin_extras(plugin_name: str, plugin_type: str) -> str:
                     raise ImportError("awq not importable")
             else:
                 __import__(pkg)
-        except Exception:
+        except ImportError:
             missing_packages.append(pkg)
 
     # Format the result

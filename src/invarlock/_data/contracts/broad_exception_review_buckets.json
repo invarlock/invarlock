@@ -146,13 +146,6 @@
       "rationale": "Benchmark command error wrapping is a shell-only concern."
     },
     {
-      "path": "src/invarlock/cli/commands/explain_gates.py",
-      "subsystem": "cli",
-      "bucket": "acceptable",
-      "lines": [41, 94, 111, 129, 191, 238, 259],
-      "rationale": "Gate explanation is a read-only reporting shell; these catches affect explanation output, not verdict enforcement."
-    },
-    {
       "path": "src/invarlock/cli/commands/export_html.py",
       "subsystem": "cli",
       "bucket": "acceptable",
@@ -163,8 +156,8 @@
       "path": "src/invarlock/cli/commands/plugins.py",
       "subsystem": "cli",
       "bucket": "acceptable",
-      "lines": [114, 368, 515, 561, 612],
-      "rationale": "Plugin listing is an introspection command and the broad catches only protect optional runtime and metadata probes."
+      "lines": [81, 561],
+      "rationale": "Plugin listing is an introspection command and the remaining broad catches only protect optional provider-registry probing and the top-level shell error wrapper."
     },
     {
       "path": "src/invarlock/cli/device.py",
