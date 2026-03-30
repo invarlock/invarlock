@@ -101,48 +101,39 @@ def _resolve_eval_device(
     else:
         resolved = torch.device(device) if isinstance(device, str) else device
 
-    try:
-        if isinstance(resolved, torch.device) and resolved.type == "mps":
-            mps_backend = getattr(torch.backends, "mps", None)
-            is_available = bool(
-                mps_backend is not None
-                and hasattr(mps_backend, "is_available")
-                and mps_backend.is_available()
+    if isinstance(resolved, torch.device) and resolved.type == "mps":
+        mps_backend = getattr(torch.backends, "mps", None)
+        is_available = bool(
+            mps_backend is not None
+            and hasattr(mps_backend, "is_available")
+            and mps_backend.is_available()
+        )
+        if not is_available:
+            logger.warning(
+                "Requested device 'mps' for metrics evaluation but MPS backend "
+                "is not available; falling back to CPU."
             )
-            if not is_available:
-                logger.warning(
-                    "Requested device 'mps' for metrics evaluation but MPS backend "
-                    "is not available; falling back to CPU."
-                )
-                resolved = torch.device("cpu")
-    except Exception:
-        resolved = torch.device("cpu")
+            resolved = torch.device("cpu")
 
     return resolved
 
 
 def _infer_model_vocab_size(model: nn.Module) -> int | None:
-    try:
-        get_emb = getattr(model, "get_input_embeddings", None)
-        if callable(get_emb):
-            emb = get_emb()
-            weight = getattr(emb, "weight", None)
-            if weight is not None and hasattr(weight, "shape"):
-                size = int(weight.shape[0])
-                if size > 0:
-                    return size
-    except Exception:
-        pass
+    get_emb = getattr(model, "get_input_embeddings", None)
+    if callable(get_emb):
+        emb = get_emb()
+        weight = getattr(emb, "weight", None)
+        if weight is not None and hasattr(weight, "shape"):
+            size = int(weight.shape[0])
+            if size > 0:
+                return size
 
-    try:
-        max_embeddings = 0
-        for module in model.modules():
-            if isinstance(module, nn.Embedding):
-                max_embeddings = max(max_embeddings, int(module.num_embeddings))
-        if max_embeddings > 0:
-            return max_embeddings
-    except Exception:
-        pass
+    max_embeddings = 0
+    for module in model.modules():
+        if isinstance(module, nn.Embedding):
+            max_embeddings = max(max_embeddings, int(module.num_embeddings))
+    if max_embeddings > 0:
+        return max_embeddings
 
     config = getattr(model, "config", None)
     vocab_size = getattr(config, "vocab_size", None)
@@ -418,6 +409,22 @@ def compute_perplexity(
     return ppl
 
 
+def _latency_validation_error(reason: str, details: dict[str, object]) -> ValidationError:
+    return ValidationError(
+        code="E402",
+        message="METRICS-VALIDATION-FAILED",
+        details={"reason": reason, **details},
+    )
+
+
+def _memory_validation_error(reason: str, details: dict[str, object]) -> ValidationError:
+    return ValidationError(
+        code="E402",
+        message="METRICS-VALIDATION-FAILED",
+        details={"reason": reason, **details},
+    )
+
+
 @torch.no_grad()
 def compute_ppl(
     model: nn.Module,
@@ -518,7 +525,10 @@ def measure_latency(
     model.eval()
 
     if not window.input_ids:
-        return 0.0
+        raise _latency_validation_error(
+            "latency measurement requires a non-empty evaluation window",
+            {"window_size": 0},
+        )
 
     sample_input_ids = None
     sample_attention_mask = None
@@ -534,7 +544,10 @@ def measure_latency(
             break
 
     if sample_input_ids is None or sample_attention_mask is None:
-        return 0.0
+        raise _latency_validation_error(
+            "latency measurement requires at least one sequence longer than 10 tokens",
+            {"window_size": len(window.input_ids)},
+        )
 
     with torch.inference_mode():
         for _ in range(warmup_steps):
@@ -544,8 +557,8 @@ def measure_latency(
                     input_ids=sample_input_ids,
                     attention_mask=sample_attention_mask,
                 )
-            except Exception:
-                return 0.0
+            except Exception as exc:
+                raise RuntimeError("Latency warmup failed.") from exc
 
     if device_t.type == "cuda":
         torch.cuda.synchronize()
@@ -553,11 +566,14 @@ def measure_latency(
     start_time = time.perf_counter()
     with torch.inference_mode():
         for _ in range(measurement_steps):
-            _ = call_model(
-                model,
-                input_ids=sample_input_ids,
-                attention_mask=sample_attention_mask,
-            )
+            try:
+                _ = call_model(
+                    model,
+                    input_ids=sample_input_ids,
+                    attention_mask=sample_attention_mask,
+                )
+            except Exception as exc:
+                raise RuntimeError("Latency measurement failed.") from exc
 
     if device_t.type == "cuda":
         torch.cuda.synchronize()
@@ -565,7 +581,10 @@ def measure_latency(
     total_time_ms = (time.perf_counter() - start_time) * 1000
     total_tokens = int(sample_attention_mask.sum().item()) * measurement_steps
     if total_tokens == 0:
-        return 0.0
+        raise _latency_validation_error(
+            "latency measurement requires at least one attended token",
+            {"measurement_steps": measurement_steps},
+        )
 
     latency_ms_per_token = total_time_ms / total_tokens
     logger.debug(
@@ -594,6 +613,7 @@ def measure_memory(
         baseline_memory = process.memory_info().rss / (1024 * 1024)
 
     max_memory = baseline_memory
+    measured_samples = 0
 
     with torch.inference_mode():
         for i, (input_ids, attention_mask) in enumerate(
@@ -625,9 +645,19 @@ def measure_memory(
                     current_memory = process.memory_info().rss / (1024 * 1024)
 
                 max_memory = max(max_memory, current_memory)
-            except Exception as e:
-                logger.debug(f"Memory measurement failed for sample {i}: {e}")
-                continue
+                measured_samples += 1
+            except Exception as exc:
+                if device_t.type == "cuda":
+                    torch.cuda.empty_cache()
+                raise RuntimeError(
+                    f"Memory measurement failed for sample {i}."
+                ) from exc
+
+    if measured_samples == 0:
+        raise _memory_validation_error(
+            "memory measurement requires at least one non-empty sample",
+            {"window_size": len(window.input_ids)},
+        )
 
     logger.debug(f"Peak memory usage: {max_memory:.1f} MB")
     return max_memory

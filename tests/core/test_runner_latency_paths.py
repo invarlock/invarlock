@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
 import torch
 
 from invarlock.core.runner_latency import measure_latency, samples_to_dataloader
@@ -45,8 +46,8 @@ def test_measure_latency_handles_sync_unsqueeze_to_and_numel_failures(
 
     monkeypatch.setattr(torch.cuda, "synchronize", _boom_sync)
 
-    latency = measure_latency(model, [[1, 2, 3]], _CudaDevice())
-    assert latency == 0.0
+    with pytest.raises(RuntimeError, match="Latency measurement batch shaping failed"):
+        measure_latency(model, [[1, 2, 3]], _CudaDevice())
 
 
 def test_measure_latency_tolerates_attention_and_token_type_conversion_failures(
@@ -62,20 +63,21 @@ def test_measure_latency_tolerates_attention_and_token_type_conversion_failures(
 
     monkeypatch.setattr(torch, "tensor", fake_tensor)
 
-    latency = measure_latency(
-        model,
-        [
-            {
-                "input_ids": torch.tensor([1, 2, 3], dtype=torch.long),
-                "attention_mask": "bad-attn",
-                "token_type_ids": "bad-token",
-            }
-        ],
-        "cpu",
-    )
-
-    assert isinstance(latency, float)
-    assert latency >= 0.0
+    with pytest.raises(
+        RuntimeError,
+        match="Latency measurement attention-mask preparation failed",
+    ):
+        measure_latency(
+            model,
+            [
+                {
+                    "input_ids": torch.tensor([1, 2, 3], dtype=torch.long),
+                    "attention_mask": "bad-attn",
+                    "token_type_ids": "bad-token",
+                }
+            ],
+            "cpu",
+        )
 
 
 def test_samples_to_dataloader_skips_missing_inputs_and_keeps_2d_tensor_fields() -> (

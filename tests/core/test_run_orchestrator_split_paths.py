@@ -4,12 +4,13 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from invarlock.core.run_orchestrator import (
-    RunAggregateEvent,
-    RunContextEvent,
     RunDiagnosticEvent,
-    RunLifecycleEvent,
     RunExecutionRequest,
     RunExecutionServices,
+    RunFailureEvent,
+    RunPrimaryMetricSummaryEvent,
+    RunRetrySummaryEvent,
+    RunTelemetryFailedEvent,
     execute_run_request,
 )
 
@@ -70,11 +71,14 @@ def test_execute_run_request_emits_typed_diagnostics_and_nonfatal_warnings(
         "invarlock.core.run_orchestrator._resolve_retry_validation_transition_impl",
         lambda *_args, **_kwargs: SimpleNamespace(
             action="passed",
+            disposition="passed",
+            gate_codes=(),
             failed_gates=(),
             updated_edit_config={},
             head_adjustment=None,
             diagnostics=(),
             next_attempt=None,
+            summary="",
             error_message=None,
         ),
     )
@@ -234,45 +238,28 @@ def test_execute_run_request_emits_typed_diagnostics_and_nonfatal_warnings(
     assert outcome.ok is True
     assert outcome.result is not None
     assert outcome.result.report_path == str(tmp_path / "report.json")
-    def _event_key(event):
-        if isinstance(event, RunDiagnosticEvent):
-            return ("diagnostic", event.name)
-        if isinstance(event, RunContextEvent):
-            return ("context", event.name)
-        if isinstance(event, RunAggregateEvent):
-            return ("aggregate", event.name)
-        if isinstance(event, RunLifecycleEvent):
-            return ("lifecycle", event.name)
-        raise AssertionError(f"unexpected event type: {event!r}")
-
-    event_map = {
-        _event_key(event): event.payload
+    diagnostics = {
+        event.code: event
         for event in outcome.events
-        if isinstance(event, RunDiagnosticEvent)
-        and event.name in {"dataset.code", "dataset.kind", "transition_diagnostic"}
+        if isinstance(event, RunDiagnosticEvent) and isinstance(event.code, str)
     }
-    assert event_map[("diagnostic", "dataset.code")]["diagnostic_source"] == "dataset"
-    assert event_map[("diagnostic", "dataset.code")]["source"] == "inner"
-    assert event_map[("diagnostic", "dataset.kind")]["marker"] == 1
-    assert event_map[("diagnostic", "dataset.kind")]["severity"] == "warning"
+    assert diagnostics["dataset.code"].context["diagnostic_source"] == "dataset"
+    assert diagnostics["dataset.code"].context["source"] == "inner"
+    assert diagnostics["dataset.kind"].context["marker"] == 1
+    assert diagnostics["dataset.kind"].level == "warning"
+    assert diagnostics["transition_diagnostic"].summary == "legacy message"
     assert (
-        event_map[("diagnostic", "transition_diagnostic")]["message"]
-        == "legacy message"
+        diagnostics["transition_diagnostic"].context["diagnostic_source"] == "dataset"
     )
-    assert (
-        event_map[("diagnostic", "transition_diagnostic")]["diagnostic_source"]
-        == "dataset"
-    )
-    assert all(
-        not isinstance(event, RunDiagnosticEvent) or event.name != "legacy_notice"
+    assert "legacy_notice" not in diagnostics
+    assert "baseline_schedule_fallback" in diagnostics
+    assert any(isinstance(event, RunTelemetryFailedEvent) for event in outcome.events)
+    assert not any(isinstance(event, RunRetrySummaryEvent) for event in outcome.events)
+    metric_events = [
+        event
         for event in outcome.events
-    )
-    assert ("diagnostic", "baseline_schedule_fallback") in {
-        _event_key(event) for event in outcome.events
-    }
-    assert ("lifecycle", "telemetry_failed") in {
-        _event_key(event) for event in outcome.events
-    }
-    assert ("aggregate", "retry_summary") not in {
-        _event_key(event) for event in outcome.events
-    }
+        if isinstance(event, RunPrimaryMetricSummaryEvent)
+    ]
+    assert len(metric_events) == 1
+    assert metric_events[0].ratio_vs_baseline is None
+    assert not any(isinstance(event, RunFailureEvent) for event in outcome.events)

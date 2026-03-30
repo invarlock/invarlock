@@ -136,6 +136,23 @@ def test_load_validated_baseline_report_rejects_policy_and_window_mismatches(
         )
 
 
+def test_load_validated_baseline_report_missing_windows_has_no_env_remediation(
+    tmp_path: Path,
+) -> None:
+    missing_windows = _write_json(
+        tmp_path / "missing-windows.json",
+        _baseline_payload(evaluation_windows={"preview": {}, "final": {}}),
+    )
+    with pytest.raises(ValidationError) as excinfo:
+        load_validated_baseline_report(
+            missing_windows,
+            expected_profile="dev",
+            expected_tier="balanced",
+            expected_adapter="hf_causal",
+        )
+    assert "INVARLOCK_STORE_EVAL_WINDOWS" not in str(excinfo.value)
+
+
 def test_load_validated_baseline_report_rejects_non_regular_file(
     tmp_path: Path,
 ) -> None:
@@ -166,5 +183,10 @@ def test_apply_edited_primary_metric_policy_does_not_carry_exit_code() -> None:
 
     assert outcome.error is not None
     assert outcome.error.code == "E111"
-    assert outcome.warning is not None
+    assert outcome.diagnostic is not None
+    assert outcome.diagnostic.code == "evaluate.primary_metric_degraded"
+    assert outcome.diagnostic.details["reason"] == "non_finite_pm"
+    assert outcome.payload["metrics"]["primary_metric"]["final"] == {"bad": "value"}
+    assert "ratio_vs_baseline" not in outcome.payload["metrics"]["primary_metric"]
+    assert not hasattr(outcome, "warning")
     assert not hasattr(outcome, "exit_code")

@@ -232,7 +232,16 @@ output:
         json.dumps(
             {
                 "meta": {"tokenizer_hash": "tokhash123"},
-                "metrics": {"ppl_preview": 10.0, "ppl_final": 10.0},
+                "metrics": {
+                    "ppl_preview": 10.0,
+                    "ppl_final": 10.0,
+                    "primary_metric": {
+                        "name": "ppl_causal",
+                        "preview": 10.0,
+                        "final": 10.0,
+                        "ratio_vs_baseline": 1.0,
+                    },
+                },
                 "evaluation_windows": {
                     "preview": {"window_ids": [0], "input_ids": [[1, 2]]},
                     "final": {"window_ids": [1], "input_ids": [[3, 4]]},
@@ -383,6 +392,14 @@ def test_until_pass_retry_summary_printed(tmp_path: Path):
         json.dumps(
             {
                 "meta": {"tokenizer_hash": "tokhash123"},
+                "metrics": {
+                    "primary_metric": {
+                        "name": "ppl_causal",
+                        "preview": 1.0,
+                        "final": 1.0,
+                        "ratio_vs_baseline": 1.0,
+                    }
+                },
                 "evaluation_windows": {
                     "preview": {"window_ids": [0], "input_ids": [[1, 2]]},
                     "final": {"window_ids": [1], "input_ids": [[3, 4]]},

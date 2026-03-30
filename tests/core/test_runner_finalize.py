@@ -102,6 +102,70 @@ def test_finalize_skips_ratio_gate_when_preview_missing():
     assert status == RunStatus.SUCCESS.value
 
 
+def test_finalize_rolls_back_on_invalid_primary_metric_payload() -> None:
+    runner = CoreRunner()
+    report = RunReport()
+    metrics = {
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "preview": "bad",
+            "final": 2.0,
+        }
+    }
+    guard_results = {"spectral": {"passed": True}}
+    cfg = RunConfig(max_pm_ratio=1.01, spike_threshold=1.05)
+
+    status = runner._finalize_phase(
+        object(), object(), guard_results, metrics, cfg, report
+    )
+
+    assert status == RunStatus.ROLLBACK.value
+    assert report.meta.get("rollback_reason") == "primary_metric_invalid"
+
+
+def test_finalize_rolls_back_on_invalid_primary_metric_flag_even_with_finite_values() -> (
+    None
+):
+    runner = CoreRunner()
+    report = RunReport()
+    metrics = {
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "preview": 1.0,
+            "final": 1.01,
+            "invalid": True,
+            "degraded_reason": "non_finite_pm",
+        }
+    }
+    guard_results = {"spectral": {"passed": True}}
+    cfg = RunConfig(max_pm_ratio=10.0, spike_threshold=2.0)
+
+    status = runner._finalize_phase(
+        object(), object(), guard_results, metrics, cfg, report
+    )
+
+    assert status == RunStatus.ROLLBACK.value
+    assert report.meta.get("rollback_reason") == "primary_metric_invalid"
+
+
+def test_finalize_rolls_back_on_invalid_tail_payload() -> None:
+    runner = CoreRunner()
+    report = RunReport()
+    metrics = {
+        "primary_metric": {"kind": "ppl_causal", "preview": 1.0, "final": 1.02},
+        "primary_metric_tail": {"mode": "fail", "evaluated": "yes", "passed": False},
+    }
+    guard_results = {"spectral": {"passed": True}}
+    cfg = RunConfig(max_pm_ratio=10.0, spike_threshold=2.0)
+
+    status = runner._finalize_phase(
+        object(), object(), guard_results, metrics, cfg, report
+    )
+
+    assert status == RunStatus.ROLLBACK.value
+    assert report.meta.get("rollback_reason") == "primary_metric_tail_invalid"
+
+
 class DummyOutput:
     def __init__(self, loss: float) -> None:
         self.loss = torch.tensor(loss, dtype=torch.float32)
@@ -114,7 +178,13 @@ class DummyModel(nn.Module):
         self.ptr = 0
         self.weight = nn.Parameter(torch.zeros(1))
 
-    def forward(self, input_ids, attention_mask=None, labels=None):  # noqa: D401
+    def forward(
+        self,
+        input_ids,
+        attention_mask=None,
+        labels=None,
+        token_type_ids=None,
+    ):  # noqa: D401
         loss = self.losses[self.ptr % len(self.losses)]
         self.ptr += 1
         return DummyOutput(loss)

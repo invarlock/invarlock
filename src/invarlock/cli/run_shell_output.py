@@ -85,10 +85,18 @@ def _print_guard_overhead_summary(
     if not summary.evaluated:
         _event(console, "METRIC", "Guard Overhead: not evaluated", emoji="🛡️")
         return summary.threshold_fraction
+    status = "PASS" if summary.passed else "FAIL"
+    if summary.overhead_percent is not None:
+        overhead_display = f"{summary.overhead_percent:+.2f}%"
+    elif summary.overhead_ratio is not None:
+        overhead_display = f"{summary.overhead_ratio:.3f}x"
+    else:
+        overhead_display = "not evaluated"
+    threshold_display = f"≤ +{summary.threshold_fraction * 100:.1f}%"
     _event(
         console,
         "METRIC",
-        f"Guard Overhead: {summary.status} {summary.overhead_display} ({summary.threshold_display})",
+        f"Guard Overhead: {status} {overhead_display} ({threshold_display})",
         emoji="🛡️",
     )
     return summary.threshold_fraction

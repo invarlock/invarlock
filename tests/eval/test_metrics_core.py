@@ -94,9 +94,8 @@ def test_input_validator_strict_and_lenient():
     with pytest.raises(ValidationError):
         v.validate_model(object(), MetricsConfig())
 
-    # Both strict and lenient paths should not raise here since counting
-    # parameters may be guarded by fallback; tensor validation covers raising
-    v.validate_model(ModelNoParams(), MetricsConfig(strict_validation=True))
+    with pytest.raises(ValidationError):
+        v.validate_model(ModelNoParams(), MetricsConfig(strict_validation=True))
     v.validate_model(ModelNoParams(), MetricsConfig(strict_validation=False))
 
     # Dataloader validation

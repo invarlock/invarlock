@@ -52,16 +52,20 @@ def test_compute_ppl_no_valid_tokens_raises():
 
 
 def test_measure_latency_returns_zero_for_short_samples():
+    from invarlock.eval.metrics import ValidationError as MValidationError
+
     model = DummyLM()
-    # All sequences short (<=10), so measurement returns 0.0
+    # All sequences short (<=10), so measurement is invalid.
     window = SimpleNamespace(
         input_ids=[[1, 2], [3, 4]],
         attention_masks=[[1, 1], [1, 1]],
     )
-    ms = measure_latency(
-        model, window, device="cpu", warmup_steps=1, measurement_steps=1
+    with pytest.raises(MValidationError) as exc_info:
+        measure_latency(model, window, device="cpu", warmup_steps=1, measurement_steps=1)
+    assert (
+        exc_info.value.details["reason"]
+        == "latency measurement requires at least one sequence longer than 10 tokens"
     )
-    assert isinstance(ms, float) and ms == 0.0
 
 
 def test_gini_vectorized_empty_nan():

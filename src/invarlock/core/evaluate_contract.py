@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -167,8 +167,7 @@ def _validate_baseline_report_payload(
         raise ValidationError(
             code="E222",
             message=(
-                "Baseline report missing evaluation window payloads. "
-                "Re-run baseline with INVARLOCK_STORE_EVAL_WINDOWS=1."
+                "Baseline report missing evaluation window payloads."
             ),
             details={"path": str(resolved_report), "field": "evaluation_windows"},
         )
@@ -192,8 +191,7 @@ def _validate_evaluation_window_phase(
         raise ValidationError(
             code="E222",
             message=(
-                f"Baseline report missing evaluation_windows.{phase_name} payloads. "
-                "Re-run baseline with INVARLOCK_STORE_EVAL_WINDOWS=1."
+                f"Baseline report missing evaluation_windows.{phase_name} payloads."
             ),
             details={
                 "path": str(resolved_report),
@@ -241,10 +239,18 @@ def _validate_evaluation_window_phase(
 
 
 @dataclass(frozen=True)
+class PrimaryMetricPolicyDiagnostic:
+    code: str
+    message: str
+    details: dict[str, Any] = field(default_factory=dict)
+    severity: str = "warning"
+
+
+@dataclass(frozen=True)
 class PrimaryMetricPolicyOutcome:
     payload: dict[str, Any]
     error: MetricsError | None
-    warning: str | None
+    diagnostic: PrimaryMetricPolicyDiagnostic | None = None
 
 
 def apply_edited_primary_metric_policy(
@@ -262,19 +268,20 @@ def apply_edited_primary_metric_policy(
         return PrimaryMetricPolicyOutcome(
             payload=edited_payload,
             error=None,
-            warning=None,
+            diagnostic=None,
         )
 
-    metrics = (
-        edited_payload.get("metrics", {}) if isinstance(edited_payload, dict) else {}
-    )
-    pm = metrics.get("primary_metric", {}) if isinstance(metrics, dict) else {}
+    normalized_payload = dict(edited_payload) if isinstance(edited_payload, dict) else {}
+    metrics = normalized_payload.get("metrics", {})
+    metrics = dict(metrics) if isinstance(metrics, dict) else {}
+    pm = metrics.get("primary_metric", {})
+    pm = dict(pm) if isinstance(pm, dict) else {}
     has_metric_block = isinstance(pm, dict) and bool(pm)
     if not has_metric_block:
         return PrimaryMetricPolicyOutcome(
-            payload=edited_payload,
+            payload=normalized_payload or edited_payload,
             error=None,
-            warning=None,
+            diagnostic=None,
         )
 
     pm_prev = pm.get("preview")
@@ -283,14 +290,11 @@ def apply_edited_primary_metric_policy(
     degraded = bool(pm.get("invalid") or pm.get("degraded"))
     if not degraded and _finite_number(pm_final):
         return PrimaryMetricPolicyOutcome(
-            payload=edited_payload,
+            payload=normalized_payload or edited_payload,
             error=None,
-            warning=None,
+            diagnostic=None,
         )
 
-    fallback = pm_prev if _finite_number(pm_prev) else pm_final
-    if not _finite_number(fallback) or float(fallback) <= 0:
-        fallback = 1.0
     degraded_reason = pm.get("degraded_reason") or (
         "non_finite_pm"
         if (not _finite_number(pm_prev) or not _finite_number(pm_final))
@@ -304,33 +308,39 @@ def apply_edited_primary_metric_policy(
         (edited_payload.get("edit", {}) or {}).get("name")
         if isinstance(edited_payload, dict)
         else None
-    ) or "unknown"
+    )
 
     pm["degraded"] = True
     pm["invalid"] = pm.get("invalid") or True
-    pm["preview"] = pm_prev if _finite_number(pm_prev) else fallback
-    pm["final"] = pm_final if _finite_number(pm_final) else fallback
-    pm["ratio_vs_baseline"] = pm_ratio if _finite_number(pm_ratio) else 1.0
     pm["degraded_reason"] = degraded_reason
     metrics["primary_metric"] = pm
-    edited_payload.setdefault("metrics", {}).update(metrics)
+    normalized_payload["metrics"] = metrics
 
     err = MetricsError(
         code="E111",
         message=f"Primary metric degraded or non-finite ({degraded_reason}).",
         details={
             "reason": degraded_reason,
-            "adapter": adapter_name or "unknown",
-            "device": device or "unknown",
+            "adapter": adapter_name,
+            "device": device,
             "edit": edit_name,
         },
     )
     return PrimaryMetricPolicyOutcome(
-        payload=edited_payload,
+        payload=normalized_payload,
         error=err,
-        warning=(
-            "Primary metric degraded or non-finite; emitting evaluation report and "
-            "marking task degraded. Primary metric computation failed."
+        diagnostic=PrimaryMetricPolicyDiagnostic(
+            code="evaluate.primary_metric_degraded",
+            message=(
+                "Primary metric degraded or non-finite; emitting evaluation report "
+                "and marking task degraded. Primary metric computation failed."
+            ),
+            details={
+                "reason": degraded_reason,
+                "adapter": adapter_name,
+                "device": device,
+                "edit": edit_name,
+            },
         ),
     )
 
@@ -343,6 +353,7 @@ def _finite_number(value: Any) -> bool:
 
 
 __all__ = [
+    "PrimaryMetricPolicyDiagnostic",
     "PrimaryMetricPolicyOutcome",
     "apply_edited_primary_metric_policy",
     "load_validated_baseline_report",

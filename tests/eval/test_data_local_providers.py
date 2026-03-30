@@ -115,6 +115,36 @@ def test_local_jsonl_provider_no_samples(tmp_path: Path):
         provider.windows(_EncodeTokenizer(), preview_n=1, final_n=1)
 
 
+def test_local_jsonl_provider_fails_closed_on_partial_tokenization_error(
+    tmp_path: Path,
+):
+    file_main = tmp_path / "partial.jsonl"
+    _write_jsonl(
+        file_main,
+        [
+            {"text": "alpha entry"},
+            {"text": "beta entry"},
+        ],
+    )
+
+    class _FragileTokenizer(_EncodeTokenizer):
+        def encode(self, text, truncation=True, max_length=8, padding="max_length"):
+            if text.startswith("beta"):
+                raise RuntimeError("boom")
+            return super().encode(
+                text,
+                truncation=truncation,
+                max_length=max_length,
+                padding=padding,
+            )
+
+    provider = data_mod.LocalJSONLProvider(file=str(file_main), max_samples=2)
+    from invarlock.core.exceptions import DataError
+
+    with pytest.raises(DataError, match="TOKENIZE-INSUFFICIENT"):
+        provider.windows(_FragileTokenizer(), preview_n=1, final_n=1, seq_len=4)
+
+
 def test_local_jsonl_provider_skips_unreadable_files(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):

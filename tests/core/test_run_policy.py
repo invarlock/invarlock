@@ -5,6 +5,7 @@ from typing import Any
 import pytest
 
 from invarlock.core import run_policy as policy
+from invarlock.core.exceptions import ConfigError
 
 
 class _BadFloat:
@@ -13,10 +14,10 @@ class _BadFloat:
 
 
 def test_resolve_pm_drift_band_exception_paths(monkeypatch) -> None:
-    out_parse = policy.resolve_pm_drift_band(
-        {"primary_metric": {"drift_band": {"min": 0.9, "max": _BadFloat()}}}
-    )
-    assert out_parse == {"min": 0.9, "max": 1.05}
+    with pytest.raises(ConfigError, match="drift_band.max"):
+        policy.resolve_pm_drift_band(
+            {"primary_metric": {"drift_band": {"min": 0.9, "max": _BadFloat()}}}
+        )
 
     def _boom(_obj: object) -> dict[str, object]:
         raise RuntimeError("boom")
@@ -57,6 +58,15 @@ def test_resolve_pm_acceptance_range_and_drift_band_with_explicit_mapper() -> No
     assert drift_max == {"min": 0.95, "max": 1.2}
 
 
+def test_coerce_mapping_propagates_model_dump_errors() -> None:
+    class _BadDump:
+        def model_dump(self) -> dict[str, object]:
+            raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError, match="boom"):
+        policy.coerce_mapping(_BadDump())
+
+
 def test_resolve_guard_overhead_threshold_and_tier_target_exceptions(
     monkeypatch,
 ) -> None:
@@ -87,7 +97,8 @@ def test_resolve_guard_overhead_threshold_and_tier_target_exceptions(
         "resolve_tier_policies",
         lambda *args, **kwargs: {"metrics": {"pm_ratio": {"min_tokens": "bad"}}},
     )
-    assert policy.resolve_pm_min_tokens_target(tier=None, profile=None) == 0
+    with pytest.raises(ConfigError, match="min_tokens"):
+        policy.resolve_pm_min_tokens_target(tier=None, profile=None)
 
 
 def test_skip_policy_and_bool_coercion_edges() -> None:

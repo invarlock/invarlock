@@ -150,7 +150,7 @@ def test_build_guard_entries_flags_artifacts_and_snapshot_provenance() -> None:
     guards = {
         "spectral": {
             "passed": False,
-            "action": "rollback",
+            "decision": "block",
             "policy": {"threshold": 1.0},
             "metrics": {"delta": 2.0},
             "final_z_scores": [1.2],
@@ -163,13 +163,11 @@ def test_build_guard_entries_flags_artifacts_and_snapshot_provenance() -> None:
         {
             "name": "spectral",
             "passed": False,
-            "action": "rollback",
+            "decision": "block",
             "policy": {"threshold": 1.0},
             "metrics": {"delta": 2.0},
-            "actions": [],
+            "diagnostics": [],
             "violations": [],
-            "warnings": [],
-            "errors": [],
             "details": {},
             "final_z_scores": [1.2],
         }

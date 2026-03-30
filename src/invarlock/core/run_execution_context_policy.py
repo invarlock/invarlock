@@ -26,13 +26,13 @@ def _section_dict(cfg: Any, name: str) -> dict[str, Any]:
     if callable(section_fn):
         try:
             section = section_fn(name)
-        except Exception:
+        except (AttributeError, KeyError, TypeError):
             section = None
         if isinstance(section, dict):
             return section
     try:
         value = getattr(cfg, name)
-    except Exception:
+    except (AttributeError, KeyError, TypeError):
         value = None
     if isinstance(value, Mapping):
         return dict(value)

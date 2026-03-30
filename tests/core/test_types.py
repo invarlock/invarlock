@@ -1,4 +1,11 @@
-from invarlock.core.types import GuardOutcome, PolicyConfig, get_worst_action
+from invarlock.core.types import (
+    GuardOutcome,
+    PolicyConfig,
+    decision_to_action,
+    get_worst_action,
+    get_worst_decision,
+    normalize_guard_decision,
+)
 
 
 def test_policy_config_action_resolution():
@@ -26,8 +33,13 @@ def test_get_worst_action_and_guard_outcome_defaults():
 
     # Unknown actions retain their label but lowest priority
     assert get_worst_action(["foo"]) == "foo"
+    assert get_worst_decision(["allow", "monitor", "rollback", "block"]) == "block"
+    assert normalize_guard_decision("warn") == "monitor"
+    assert decision_to_action("block") == "abort"
 
     # GuardOutcome defaults populated
     o = GuardOutcome("g", True)
     assert isinstance(o.violations, list) and o.violations == []
     assert isinstance(o.metrics, dict) and o.metrics == {}
+    assert o.decision == "allow"
+    assert o.action == "none"

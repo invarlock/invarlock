@@ -2,24 +2,39 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
 import torch
 import torch.nn as nn
 
-from invarlock.eval import metrics_support as support_mod
+from invarlock.core.exceptions import ValidationError
 from invarlock.eval.metrics import InputValidator, MetricsConfig
 from invarlock.eval.metrics_activation import _perform_pre_eval_checks
 
 
-def test_validate_model_logs_when_empty_model_in_strict_mode(monkeypatch) -> None:
+def test_validate_model_raises_when_empty_model_in_strict_mode() -> None:
     class EmptyModel(nn.Module):
         def forward(self, **_kwargs):  # noqa: D401, ANN003
             return None
 
     cfg = MetricsConfig(strict_validation=True, use_cache=False)
-    seen: list[str] = []
-    monkeypatch.setattr(support_mod.logger, "debug", lambda msg: seen.append(str(msg)))
-    InputValidator.validate_model(EmptyModel(), cfg)
-    assert any("Could not count model parameters" in msg for msg in seen)
+    with pytest.raises(ValidationError) as exc_info:
+        InputValidator.validate_model(EmptyModel(), cfg)
+    assert exc_info.value.details["reason"] == "Model has no parameters"
+
+
+def test_validate_model_raises_when_parameter_iteration_fails() -> None:
+    class BrokenModel(nn.Module):
+        def forward(self, **_kwargs):  # noqa: D401, ANN003
+            return None
+
+        def parameters(self, recurse: bool = True):  # type: ignore[override]
+            raise RuntimeError("boom")
+
+    cfg = MetricsConfig(strict_validation=False, use_cache=False)
+    with pytest.raises(ValidationError) as exc_info:
+        InputValidator.validate_model(BrokenModel(), cfg)
+    assert exc_info.value.details["reason"] == "Model parameter iteration failed"
+    assert exc_info.value.details["error"] == "boom"
 
 
 def test_pre_eval_checks_warn_when_context_length_exceeded(tmp_path) -> None:

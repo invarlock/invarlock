@@ -25,7 +25,7 @@ class _CfgWrap:
         return self._payload
 
 
-def test_prepare_config_for_run_handles_model_dump_failure_without_auto_adapter() -> (
+def test_prepare_config_for_run_propagates_model_dump_failure_without_auto_adapter() -> (
     None
 ):
     events: list[tuple[str, str]] = []
@@ -33,22 +33,21 @@ def test_prepare_config_for_run_handles_model_dump_failure_without_auto_adapter(
     def _event_fn(console, tag: str, message: str, **kwargs) -> None:  # noqa: ARG001
         events.append((tag, message))
 
-    cfg = run_config_mod.prepare_config_for_run(
-        config_path="config.yaml",
-        profile="dev",
-        edit=None,
-        tier="balanced",
-        probes=None,
-        console=Console(file=StringIO(), force_terminal=False),
-        event_fn=_event_fn,
-        invarlock_config_cls=lambda payload: payload,
-        load_config_fn=lambda path: _BrokenConfig(),  # noqa: ARG005
-        apply_profile_fn=lambda cfg, profile: cfg,  # noqa: ARG005
-    )
+    with pytest.raises(RuntimeError, match="broken dump"):
+        run_config_mod.prepare_config_for_run(
+            config_path="config.yaml",
+            profile="dev",
+            edit=None,
+            tier="balanced",
+            probes=None,
+            console=Console(file=StringIO(), force_terminal=False),
+            event_fn=_event_fn,
+            invarlock_config_cls=lambda payload: payload,
+            load_config_fn=lambda path: _BrokenConfig(),  # noqa: ARG005
+            apply_profile_fn=lambda cfg, profile: cfg,  # noqa: ARG005
+        )
 
-    assert cfg == {"auto": {"tier": "balanced"}}
     assert ("INIT", "Loading configuration: config.yaml") in events
-    assert ("INIT", "Auto tier override: balanced") in events
 
 
 def test_resolve_requested_edit_name_import_error_falls_back_to_known_edit(
@@ -125,7 +124,7 @@ def test_prepare_config_for_run_applies_profile_edit_and_auto_overrides() -> Non
     assert ("INIT", "Applying profile: release") in events
 
 
-def test_prepare_config_for_run_uses_default_event_import_and_swallows_auto_adapter_failures(
+def test_prepare_config_for_run_uses_default_event_import_and_propagates_auto_adapter_failures(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     events: list[tuple[str, str]] = []
@@ -138,19 +137,19 @@ def test_prepare_config_for_run_uses_default_event_import_and_swallows_auto_adap
         _event_fn,
     )
 
-    cfg = run_config_mod.prepare_config_for_run(
-        config_path="config.yaml",
-        profile=None,
-        edit=None,
-        tier=None,
-        probes=None,
-        console=Console(file=StringIO(), force_terminal=False),
-        load_config_fn=lambda path: _CfgWrap({"model": {}, "edit": {}, "auto": {}}),
-        apply_profile_fn=lambda cfg, profile: cfg,  # noqa: ARG005
-        apply_auto_adapter_fn=lambda cfg: (_ for _ in ()).throw(RuntimeError("boom")),
-    )
+    with pytest.raises(RuntimeError, match="boom"):
+        run_config_mod.prepare_config_for_run(
+            config_path="config.yaml",
+            profile=None,
+            edit=None,
+            tier=None,
+            probes=None,
+            console=Console(file=StringIO(), force_terminal=False),
+            load_config_fn=lambda path: _CfgWrap({"model": {}, "edit": {}, "auto": {}}),
+            apply_profile_fn=lambda cfg, profile: cfg,  # noqa: ARG005
+            apply_auto_adapter_fn=lambda cfg: (_ for _ in ()).throw(RuntimeError("boom")),
+        )
 
-    assert cfg.model_dump()["model"] == {}
     assert ("INIT", "Loading configuration: config.yaml") in events
 
 
@@ -161,7 +160,7 @@ def test_prepare_config_for_run_tolerates_default_auto_adapter_import_failure(
 
     def _import(name, globals=None, locals=None, fromlist=(), level=0):  # noqa: A002
         if name == "invarlock.core.adapter_auto":
-            raise RuntimeError("optional adapter unavailable")
+            raise ImportError("optional adapter unavailable")
         return orig_import(name, globals, locals, fromlist, level)
 
     monkeypatch.setattr(builtins, "__import__", _import)
@@ -198,7 +197,7 @@ def test_prepare_config_for_run_tolerates_default_auto_adapter_import_failure(
             "release",
             None,
             None,
-            1,
+            None,
         ),
         (
             lambda path: _CfgWrap({"model": {}, "edit": {}, "auto": {}}),
@@ -226,6 +225,23 @@ def test_prepare_config_for_run_error_paths(
     probes,
     code,
 ) -> None:
+    if code is None:
+        with pytest.raises(RuntimeError, match="profile boom"):
+            run_config_mod.prepare_config_for_run(
+                config_path="config.yaml",
+                profile=profile,
+                edit=None,
+                tier=tier,
+                probes=probes,
+                console=Console(file=StringIO(), force_terminal=False),
+                event_fn=lambda *args, **kwargs: None,
+                invarlock_config_cls=_CfgWrap,
+                load_config_fn=load_config_fn,
+                apply_profile_fn=apply_profile_fn,
+                apply_auto_adapter_fn=lambda cfg: cfg,
+            )
+        return
+
     with pytest.raises(typer.Exit) as excinfo:
         run_config_mod.prepare_config_for_run(
             config_path="config.yaml",
@@ -298,7 +314,7 @@ def test_resolve_device_and_output_falls_back_to_runs_and_rejects_invalid_device
         )
 
 
-def test_resolve_device_and_output_uses_default_shell_helpers_and_handles_cfg_model_failure(
+def test_resolve_device_and_output_uses_default_shell_helpers_and_propagates_cfg_model_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     printed: list[tuple[str, str]] = []
@@ -319,18 +335,17 @@ def test_resolve_device_and_output_uses_default_shell_helpers_and_handles_cfg_mo
 
         output = SimpleNamespace(dir="custom-runs")
 
-    resolved, output_dir = run_config_mod.resolve_device_and_output(
-        _Cfg(),
-        device=None,
-        out=None,
-        console=Console(file=StringIO(), force_terminal=False),
-        resolve_device_fn=lambda target: "cpu",
-        validate_device_fn=lambda device: (True, ""),
-    )
+    with pytest.raises(RuntimeError, match="missing model"):
+        run_config_mod.resolve_device_and_output(
+            _Cfg(),
+            device=None,
+            out=None,
+            console=Console(file=StringIO(), force_terminal=False),
+            resolve_device_fn=lambda target: "cpu",
+            validate_device_fn=lambda device: (True, ""),
+        )
 
-    assert resolved == "cpu"
-    assert output_dir == Path("custom-runs")
-    assert printed == [("Device", "cpu (auto->cpu)")]
+    assert printed == []
 
 
 def test_resolve_provider_and_split_ignores_emit_and_available_split_fallback() -> None:
@@ -339,7 +354,7 @@ def test_resolve_provider_and_split_ignores_emit_and_available_split_fallback() 
 
     class Provider:
         def available_splits(self):
-            raise RuntimeError("boom")
+            return ["validation"]
 
     def _get_provider(name, **kwargs):  # noqa: ARG001
         calls.append((name, dict(kwargs)))
@@ -364,6 +379,22 @@ def test_resolve_provider_and_split_ignores_emit_and_available_split_fallback() 
     assert calls[0][1]["existing"] is True
     assert calls[0][1]["device_hint"] == "cpu"
     assert "emit" not in calls[0][1]
+
+
+def test_resolve_provider_and_split_propagates_available_splits_failures() -> None:
+    class Provider:
+        def available_splits(self):
+            raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError, match="boom"):
+        run_config_mod.resolve_provider_and_split(
+            SimpleNamespace(dataset=SimpleNamespace(provider=None, split="val")),
+            model_profile=SimpleNamespace(default_provider="wikitext2"),
+            get_provider_fn=lambda *_args, **_kwargs: Provider(),
+            choose_dataset_split_fn=lambda **kwargs: ("validation", True),
+            provider_kwargs={"existing": True},
+            resolved_device="cpu",
+        )
 
 
 def test_resolve_provider_and_split_uses_default_provider_import(
@@ -399,7 +430,8 @@ def test_extract_model_load_kwargs_handles_model_dump_failure_and_removed_keys()
         def model_dump(self):
             raise RuntimeError("boom")
 
-    assert run_config_mod.extract_model_load_kwargs(_CfgFail()) == {}
+    with pytest.raises(RuntimeError, match="boom"):
+        run_config_mod.extract_model_load_kwargs(_CfgFail())
 
     class _CfgRemoved:
         def model_dump(self):

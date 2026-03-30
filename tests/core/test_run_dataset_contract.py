@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
+from invarlock.core.exceptions import InvarlockError
 from invarlock.core.run_dataset_contract import materialize_run_dataset
 from invarlock.eval.data_support import DatasetDiagnostic
 
@@ -154,3 +157,42 @@ def test_materialize_run_dataset_returns_passthrough_defaults_without_provider()
     assert result.dataset_meta == {}
     assert result.preview_records == []
     assert result.final_records == []
+
+
+def test_materialize_run_dataset_requests_typed_baseline_schedule_failures() -> None:
+    observed: dict[str, object] = {}
+
+    def _raise_typed_failure(*args, **kwargs):
+        observed["typed_failures"] = kwargs.get("typed_failures")
+        raise InvarlockError(code="E001", message="PAIRING-EVIDENCE-MISSING")
+
+    with pytest.raises(InvarlockError):
+        materialize_run_dataset(
+            pairing_schedule={"preview": {}, "final": {}},
+            cfg=SimpleNamespace(dataset=SimpleNamespace(provider=None)),
+            baseline_report_data={"evaluation_windows": {}},
+            tokenizer_hash="tok",
+            resolved_loss_type="ppl_mlm",
+            profile="dev",
+            model_profile=SimpleNamespace(),
+            tokenizer=None,
+            use_mlm=True,
+            mask_prob=0.15,
+            mask_seed=43,
+            random_token_prob=0.1,
+            original_token_prob=0.1,
+            tier="balanced",
+            requested_preview=1,
+            requested_final=1,
+            effective_preview=1,
+            effective_final=1,
+            resolved_device="cpu",
+            profile_normalized="dev",
+            resolved_split=None,
+            validate_and_harvest_baseline_schedule_fn=_raise_typed_failure,
+            materialize_baseline_pairing_schedule_fn=lambda **kwargs: None,
+            resolve_tokenizer_fn=lambda profile: ("tok", "tok-hash"),
+            build_provider_dataset_plan_fn=lambda **kwargs: None,
+        )
+
+    assert observed["typed_failures"] is True

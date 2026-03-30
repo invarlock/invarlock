@@ -26,20 +26,18 @@ def test_build_timing_summary_payload_prefers_breakdown_order_and_peak_lines() -
 
     assert payload is not None
     assert payload.timings["total"] == 9.5
-    assert payload.order == (
-        ("Load model", "load_model"),
-        ("Prepare", "prepare"),
-        ("Prep guards", "prepare_guards"),
-        ("Edit", "edit"),
-        ("Guards", "guards"),
-        ("Eval", "eval"),
-        ("Finalize", "finalize"),
-        ("Total", "total"),
+    assert payload.ordered_keys == (
+        "load_model",
+        "prepare",
+        "prepare_guards",
+        "edit",
+        "guards",
+        "eval",
+        "finalize",
+        "total",
     )
-    assert payload.extra_lines == (
-        "  Peak Memory : 123.46 MB",
-        "  Peak GPU Mem: 78.90 MB",
-    )
+    assert payload.memory_mb_peak == 123.456
+    assert payload.gpu_memory_mb_peak == 78.9
 
 
 def test_build_timing_summary_payload_uses_execute_without_breakdown() -> None:
@@ -50,9 +48,9 @@ def test_build_timing_summary_payload_uses_execute_without_breakdown() -> None:
     )
 
     assert payload is not None
-    assert payload.order == (
-        ("Load data", "load_dataset"),
-        ("Execute", "execute"),
+    assert payload.ordered_keys == (
+        "load_dataset",
+        "execute",
     )
 
 

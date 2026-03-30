@@ -4,6 +4,8 @@ import math
 from types import SimpleNamespace
 from typing import Any
 
+import pytest
+
 import invarlock.core.runner_eval_metrics as rem
 
 
@@ -237,7 +239,7 @@ def test_compute_real_metrics_marks_primary_metric_invalid_on_ratio_ci_inconsist
     assert metrics["primary_metric"]["degraded_reason"] == "primary_metric_invalid"
 
 
-def test_compute_real_metrics_falls_back_for_non_finite_pm_and_delta(
+def test_compute_real_metrics_preserves_invalid_non_finite_pm_and_delta(
     monkeypatch,
 ) -> None:
     preview_summary = _summary(
@@ -303,7 +305,123 @@ def test_compute_real_metrics_falls_back_for_non_finite_pm_and_delta(
         config=SimpleNamespace(context={"eval": {"bootstrap": {"enabled": False}}}),
     )
 
-    assert metrics["primary_metric"]["preview"] == 1.0
-    assert metrics["primary_metric"]["final"] == 1.0
+    assert metrics["primary_metric"]["invalid"] is True
+    assert metrics["primary_metric"]["preview"] is None
+    assert metrics["primary_metric"]["final"] is None
     assert metrics["primary_metric"]["degraded_reason"] == "non_finite_pm"
-    assert metrics["logloss_delta"] == 0.0
+    assert not math.isfinite(metrics["logloss_delta"])
+
+
+def test_compute_real_metrics_marks_empty_slice_metrics_invalid(monkeypatch) -> None:
+    preview_summary = _summary(
+        ppl=float("nan"),
+        total_tokens=0,
+        weighted_log_loss=0.0,
+        num_batches=0,
+        log_losses=[],
+        window_ids=[],
+        token_counts=[],
+        actual_token_counts=[],
+    )
+    final_summary = _summary(
+        ppl=float("nan"),
+        total_tokens=0,
+        weighted_log_loss=0.0,
+        num_batches=0,
+        log_losses=[],
+        window_ids=[],
+        token_counts=[],
+        actual_token_counts=[],
+    )
+
+    def fake_slice_summary(*_args, start_idx: int, **_kwargs):
+        return (preview_summary, None) if start_idx == 0 else (final_summary, None)
+
+    monkeypatch.setattr(rem, "compute_slice_summary", fake_slice_summary)
+    monkeypatch.setattr(rem, "measure_latency", lambda *_args, **_kwargs: 0.0)
+    monkeypatch.setattr(
+        rem,
+        "compute_window_pairing_metrics",
+        lambda **_kwargs: {
+            "preview": {"matched": 0, "expected": 0, "reason": None},
+            "final": {"matched": 0, "expected": 0, "reason": None},
+            "match_fraction": 1.0,
+            "overlap_fraction": 0.0,
+            "duplicate_fraction": 0.0,
+            "count_mismatch": False,
+            "reason": None,
+        },
+    )
+    monkeypatch.setattr(
+        rem,
+        "assess_bootstrap_coverage",
+        lambda **_kwargs: {
+            "preview_required": 1,
+            "final_required": 1,
+            "replicates_required": 1,
+            "preview_ok": True,
+            "final_ok": True,
+            "replicates_ok": True,
+            "coverage": {},
+        },
+    )
+
+    metrics, _eval_windows = rem.compute_real_metrics(
+        _FakeRunner(),
+        _FakeModel(),
+        calibration_data=[{"input_ids": [1]}, {"input_ids": [2]}],
+        adapter=object(),
+        preview_n=1,
+        final_n=1,
+        config=SimpleNamespace(context={"eval": {"bootstrap": {"enabled": False}}}),
+    )
+
+    assert metrics["primary_metric"]["invalid"] is True
+    assert metrics["primary_metric"]["degraded_reason"] == "non_finite_pm"
+    assert metrics["primary_metric"]["preview"] is None
+    assert metrics["primary_metric"]["final"] is None
+
+
+def test_compute_real_metrics_propagates_pairing_metric_failures(monkeypatch) -> None:
+    preview_summary = _summary(
+        ppl=2.0,
+        total_tokens=1,
+        weighted_log_loss=math.log(2.0),
+        num_batches=1,
+        log_losses=[math.log(2.0)],
+        window_ids=[0],
+        token_counts=[1],
+        actual_token_counts=[1],
+    )
+    final_summary = _summary(
+        ppl=3.0,
+        total_tokens=1,
+        weighted_log_loss=math.log(3.0),
+        num_batches=1,
+        log_losses=[math.log(3.0)],
+        window_ids=[1],
+        token_counts=[1],
+        actual_token_counts=[1],
+    )
+
+    def fake_slice_summary(*_args, start_idx: int, **_kwargs):
+        return (preview_summary, None) if start_idx == 0 else (final_summary, None)
+
+    monkeypatch.setattr(rem, "compute_slice_summary", fake_slice_summary)
+    monkeypatch.setattr(rem, "measure_latency", lambda *_args, **_kwargs: 0.0)
+    monkeypatch.setattr(
+        rem,
+        "compute_window_pairing_metrics",
+        lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("pairing boom")),
+    )
+
+    with pytest.raises(RuntimeError, match="pairing boom"):
+        rem.compute_real_metrics(
+            _FakeRunner(),
+            _FakeModel(),
+            calibration_data=[{"input_ids": [1]}, {"input_ids": [2]}],
+            adapter=object(),
+            preview_n=1,
+            final_n=1,
+            config=SimpleNamespace(context={"eval": {"bootstrap": {"enabled": False}}}),
+        )

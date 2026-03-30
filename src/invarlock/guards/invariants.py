@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 
 from invarlock.core.api import Guard
-from invarlock.core.types import GuardOutcome
+from invarlock.core.types import GuardDiagnostic, GuardOutcome, GuardValidationResult
 
 
 class InvariantsGuard(Guard):
@@ -81,7 +81,7 @@ class InvariantsGuard(Guard):
 
     def validate(
         self, model: Any, adapter: Any, context: dict[str, Any]
-    ) -> dict[str, Any]:
+    ) -> GuardValidationResult:
         """
         Validate model invariants (Guard ABC interface).
 
@@ -91,24 +91,43 @@ class InvariantsGuard(Guard):
             context: Validation context
 
         Returns:
-            Dictionary with validation results
+            Typed validation result
         """
         if not self.prepared:
             # Auto-prepare if not already done
             self.prepare(model, adapter, None, {})
 
         outcome = self.finalize(model)
-
-        return {
-            "passed": outcome.passed,
-            "action": outcome.action,
-            "violations": outcome.violations,
-            "metrics": outcome.metrics,
-            "details": {
-                "baseline_checks": self.baseline_checks,
-                "current_checks": self.last_current_checks,
+        decision = _decision_from_action(outcome.action)
+        violations = tuple(dict(item) for item in (outcome.violations or []))
+        diagnostics = tuple(
+            GuardDiagnostic(
+                kind=str(violation.get("type", "invariant_violation")),
+                severity=str(violation.get("severity", "warning")),
+                message=str(violation.get("message", "")),
+                details={
+                    str(key): value
+                    for key, value in violation.items()
+                    if key not in {"type", "severity", "message"}
+                },
+            )
+            for violation in violations
+        )
+        return GuardValidationResult(
+            passed=bool(outcome.passed),
+            decision=decision,
+            metrics=dict(outcome.metrics or {}),
+            diagnostics=diagnostics,
+            policy={
+                "strict_mode": bool(self.strict_mode),
+                "on_fail": str(self.on_fail),
             },
-        }
+            details={
+                "baseline_checks": dict(self.baseline_checks),
+                "current_checks": dict(self.last_current_checks),
+            },
+            violations=violations,
+        )
 
     def finalize(self, model: Any) -> GuardOutcome:
         """
@@ -252,6 +271,7 @@ class InvariantsGuard(Guard):
             "violations_found": len(annotated_violations),
             "fatal_violations": fatal_count,
             "warning_violations": warning_count,
+            "decision": _decision_from_action(action),
         }
         if non_finite_locations:
             metrics["non_finite_found"] = len(non_finite_locations)
@@ -450,6 +470,17 @@ class InvariantsGuard(Guard):
             )
 
         return True
+
+
+def _decision_from_action(action: str) -> str:
+    normalized = str(action or "none").lower()
+    if normalized == "warn":
+        return "monitor"
+    if normalized == "rollback":
+        return "rollback"
+    if normalized in {"abort", "reject"}:
+        return "block"
+    return "allow"
 
 
 def check_adapter_aware_invariants(

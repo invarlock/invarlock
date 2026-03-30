@@ -7,14 +7,9 @@ from collections.abc import Sequence
 from typing import Any
 
 from invarlock.core.auto_tuning import resolve_tier_policies
+from invarlock.core.exceptions import ConfigError
 
 GUARD_OVERHEAD_THRESHOLD = 0.01
-
-_MAPPING_COERCE_EXCEPTIONS: tuple[type[BaseException], ...] = (
-    AttributeError,
-    TypeError,
-    ValueError,
-)
 
 
 def _coerce_optional_float(value: Any) -> float | None:
@@ -32,28 +27,35 @@ def _ensure_mapping(value: object) -> dict[str, Any]:
     return {}
 
 
+def _raise_config_error(path: str, value: Any, message: str) -> None:
+    raise ConfigError(
+        code="E002",
+        message=message,
+        details={"path": path, "value": value},
+    )
+
+
 def coerce_mapping(obj: object) -> dict[str, Any]:
     """Convert config-like objects to plain dicts without hiding programming errors."""
     if isinstance(obj, dict):
         return obj
     try:
         raw = getattr(obj, "_data", None)
-        if isinstance(raw, dict):
-            return raw
-    except _MAPPING_COERCE_EXCEPTIONS:
+    except AttributeError:
         raw = None
-    try:
-        dumped = obj.model_dump()  # type: ignore[attr-defined]
-        if isinstance(dumped, dict):
-            return dumped
-    except _MAPPING_COERCE_EXCEPTIONS:
-        dumped = None
+    if isinstance(raw, dict):
+        return raw
+    dumped = getattr(obj, "model_dump", None)
+    if callable(dumped):
+        result = dumped()
+        if isinstance(result, dict):
+            return result
     try:
         data = vars(obj)
         if isinstance(data, dict):
             return data
-    except _MAPPING_COERCE_EXCEPTIONS:
-        data = None
+    except TypeError:
+        return {}
     return {}
 
 
@@ -72,11 +74,32 @@ def resolve_pm_acceptance_range(
     pm_section = cfg_map.get("primary_metric") if isinstance(cfg_map, dict) else {}
     pm_map = coerce_mapping_fn(pm_section)
     acceptance = pm_map.get("acceptance_range") if isinstance(pm_map, dict) else None
+    if acceptance is None:
+        return {}
+    if not isinstance(acceptance, dict):
+        _raise_config_error(
+            "primary_metric.acceptance_range",
+            acceptance,
+            "primary_metric.acceptance_range must be a mapping with optional min/max bounds.",
+        )
     cfg_min = None
     cfg_max = None
-    if isinstance(acceptance, dict):
+    if "min" in acceptance:
         cfg_min = _coerce_optional_float(acceptance.get("min"))
+        if cfg_min is None:
+            _raise_config_error(
+                "primary_metric.acceptance_range.min",
+                acceptance.get("min"),
+                "primary_metric.acceptance_range.min must be a positive finite number.",
+            )
+    if "max" in acceptance:
         cfg_max = _coerce_optional_float(acceptance.get("max"))
+        if cfg_max is None:
+            _raise_config_error(
+                "primary_metric.acceptance_range.max",
+                acceptance.get("max"),
+                "primary_metric.acceptance_range.max must be a positive finite number.",
+            )
 
     has_explicit = any(v is not None for v in (cfg_min, cfg_max))
     if not has_explicit:
@@ -86,12 +109,24 @@ def resolve_pm_acceptance_range(
     max_val = cfg_max if cfg_max is not None else base_max
 
     if min_val <= 0:
-        min_val = base_min
+        _raise_config_error(
+            "primary_metric.acceptance_range.min",
+            min_val,
+            "primary_metric.acceptance_range.min must be greater than zero.",
+        )
     if max_val <= 0:
-        max_val = base_max
+        _raise_config_error(
+            "primary_metric.acceptance_range.max",
+            max_val,
+            "primary_metric.acceptance_range.max must be greater than zero.",
+        )
 
     if max_val < min_val:
-        max_val = min_val
+        _raise_config_error(
+            "primary_metric.acceptance_range",
+            acceptance,
+            "primary_metric.acceptance_range.max must be greater than or equal to min.",
+        )
 
     return {"min": float(min_val), "max": float(max_val)}
 
@@ -111,14 +146,42 @@ def resolve_pm_drift_band(
     pm_section = cfg_map.get("primary_metric") if isinstance(cfg_map, dict) else {}
     pm_map = coerce_mapping_fn(pm_section)
     drift_band = pm_map.get("drift_band") if isinstance(pm_map, dict) else None
+    if drift_band is None:
+        return {}
     cfg_min = None
     cfg_max = None
     if isinstance(drift_band, dict):
-        cfg_min = _coerce_optional_float(drift_band.get("min"))
-        cfg_max = _coerce_optional_float(drift_band.get("max"))
+        if "min" in drift_band:
+            cfg_min = _coerce_optional_float(drift_band.get("min"))
+            if cfg_min is None:
+                _raise_config_error(
+                    "primary_metric.drift_band.min",
+                    drift_band.get("min"),
+                    "primary_metric.drift_band.min must be a positive finite number.",
+                )
+        if "max" in drift_band:
+            cfg_max = _coerce_optional_float(drift_band.get("max"))
+            if cfg_max is None:
+                _raise_config_error(
+                    "primary_metric.drift_band.max",
+                    drift_band.get("max"),
+                    "primary_metric.drift_band.max must be a positive finite number.",
+                )
     elif isinstance(drift_band, list | tuple) and len(drift_band) == 2:
         cfg_min = _coerce_optional_float(drift_band[0])
         cfg_max = _coerce_optional_float(drift_band[1])
+        if cfg_min is None or cfg_max is None:
+            _raise_config_error(
+                "primary_metric.drift_band",
+                drift_band,
+                "primary_metric.drift_band list form must contain two positive finite numbers.",
+            )
+    else:
+        _raise_config_error(
+            "primary_metric.drift_band",
+            drift_band,
+            "primary_metric.drift_band must be a mapping or a two-item list/tuple.",
+        )
 
     has_explicit = any(v is not None for v in (cfg_min, cfg_max))
     if not has_explicit:
@@ -128,11 +191,23 @@ def resolve_pm_drift_band(
     max_val = cfg_max if cfg_max is not None else base_max
 
     if min_val <= 0:
-        min_val = base_min
+        _raise_config_error(
+            "primary_metric.drift_band.min",
+            min_val,
+            "primary_metric.drift_band.min must be greater than zero.",
+        )
     if max_val <= 0:
-        max_val = base_max
+        _raise_config_error(
+            "primary_metric.drift_band.max",
+            max_val,
+            "primary_metric.drift_band.max must be greater than zero.",
+        )
     if min_val >= max_val:
-        min_val, max_val = base_min, base_max
+        _raise_config_error(
+            "primary_metric.drift_band",
+            drift_band,
+            "primary_metric.drift_band.min must be less than max.",
+        )
 
     return {"min": float(min_val), "max": float(max_val)}
 
@@ -149,9 +224,16 @@ def resolve_guard_overhead_threshold(
     pm_section = cfg_map.get("primary_metric") if isinstance(cfg_map, dict) else {}
     pm_map = coerce_mapping_fn(pm_section)
     candidate = pm_map.get("overhead_threshold") if isinstance(pm_map, dict) else None
+    if candidate is None:
+        return float(threshold)
     parsed = _coerce_optional_float(candidate)
-    if parsed is not None and math.isfinite(parsed) and parsed >= 0.0:
-        threshold = parsed
+    if parsed is None or not math.isfinite(parsed) or parsed < 0.0:
+        _raise_config_error(
+            "primary_metric.overhead_threshold",
+            candidate,
+            "primary_metric.overhead_threshold must be a non-negative finite number.",
+        )
+    threshold = parsed
     return float(threshold)
 
 
@@ -221,9 +303,20 @@ def resolve_pm_min_tokens_target(
     metrics = resolved.get("metrics", {}) if isinstance(resolved, dict) else {}
     pm_ratio = metrics.get("pm_ratio", {}) if isinstance(metrics, dict) else {}
     try:
-        return int(pm_ratio.get("min_tokens", 0) or 0)
+        min_tokens = int(pm_ratio.get("min_tokens", 0) or 0)
     except (TypeError, ValueError):
-        return 0
+        _raise_config_error(
+            "tier_policies.metrics.pm_ratio.min_tokens",
+            pm_ratio.get("min_tokens"),
+            "Resolved tier policy min_tokens must be an integer.",
+        )
+    if min_tokens < 0:
+        _raise_config_error(
+            "tier_policies.metrics.pm_ratio.min_tokens",
+            min_tokens,
+            "Resolved tier policy min_tokens must be non-negative.",
+        )
+    return min_tokens
 
 
 def choose_dataset_split(
@@ -233,8 +326,10 @@ def choose_dataset_split(
     split_aliases: Sequence[str] = ("validation", "val", "dev", "eval", "test"),
 ) -> tuple[str, bool]:
     """Choose a dataset split deterministically."""
-    if isinstance(requested, str) and requested:
-        return requested, False
+    if isinstance(requested, str):
+        requested_text = str(requested)
+        if requested_text:
+            return requested_text, False
     avail = list(available) if isinstance(available, list) and available else []
     if avail:
         for cand in split_aliases:

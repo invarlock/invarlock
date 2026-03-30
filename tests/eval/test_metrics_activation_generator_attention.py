@@ -42,7 +42,7 @@ def test_collect_activations_generator_with_attention_mask_first_batch_capture()
     out = _collect_activations(
         Model().eval(),
         gen(),
-        MetricsConfig(progress_bars=False, oracle_windows=1),
+        MetricsConfig(oracle_windows=1),
         torch.device("cpu"),
     )
     assert isinstance(out.get("first_batch"), dict)

@@ -200,10 +200,22 @@ def test_runner_rollback_on_guard_failure(monkeypatch, tmp_path):
 
     monkeypatch.setattr(runner_mod, "resolve_tier_policies", fake_resolver)
 
+    class ValidateBoomGuard(Guard):
+        name = "bad"
+
+        def __init__(self):
+            self.policy = {}
+
+        def set_run_context(self, report):
+            self.policy["context"] = True
+
+        def validate(self, model: Any, adapter: ModelAdapter, context: dict[str, Any]):
+            raise RuntimeError("validate boom")
+
     model = DummyModel()
     adapter = DummyAdapter()
     edit = DummyEdit(name="edit-name")
-    guards = [BadGuard(), GoodGuard()]
+    guards = [ValidateBoomGuard(), GoodGuard()]
     cfg = make_config(tmp_path)
 
     report = runner.execute(model, adapter, edit, guards, cfg, calibration_data=None)
@@ -641,8 +653,8 @@ def test_measure_latency_device_to_exception():
     # Nonstandard device object forces .to(device) to raise
     bad_device = object()
     sample = {"input_ids": [1, 2, 3], "attention_mask": [1, 1, 1]}
-    ms = runner._measure_latency(M(), [sample], bad_device)
-    assert ms == 0.0 or ms > 0.0
+    with pytest.raises(RuntimeError, match="Latency measurement device transfer failed"):
+        runner._measure_latency(M(), [sample], bad_device)
 
 
 def test_runner_resolve_policies_error(monkeypatch, tmp_path):
@@ -1296,8 +1308,7 @@ def test_zero_mask_batch_warning(tmp_path, monkeypatch):
 
 
 def test_eval_device_override_no_move(tmp_path, monkeypatch):
-    # Setting INVARLOCK_EVAL_DEVICE equal to current device should not move model
-    import os
+    # Setting eval.device_override equal to current device should not move model
 
     import torch
 
@@ -1317,23 +1328,20 @@ def test_eval_device_override_no_move(tmp_path, monkeypatch):
     model = T()
     adapter = DummyAdapter()
     cfg = make_config(tmp_path)
-    os.environ["INVARLOCK_EVAL_DEVICE"] = "cpu"
-    try:
-        metrics, _ = runner._compute_real_metrics(
-            model,
-            [
-                {"input_ids": [1, 2, 3], "attention_mask": [1, 1, 1]},
-                {"input_ids": [4, 5, 6], "attention_mask": [1, 1, 1]},
-            ],
-            adapter,
-            preview_n=1,
-            final_n=1,
-            config=cfg,
-        )
-        pm = metrics.get("primary_metric", {})
-        assert pm.get("final") and pm.get("preview")
-    finally:
-        del os.environ["INVARLOCK_EVAL_DEVICE"]
+    cfg.context.setdefault("eval", {})["device_override"] = "cpu"
+    metrics, _ = runner._compute_real_metrics(
+        model,
+        [
+            {"input_ids": [1, 2, 3], "attention_mask": [1, 1, 1]},
+            {"input_ids": [4, 5, 6], "attention_mask": [1, 1, 1]},
+        ],
+        adapter,
+        preview_n=1,
+        final_n=1,
+        config=cfg,
+    )
+    pm = metrics.get("primary_metric", {})
+    assert pm.get("final") and pm.get("preview")
 
 
 def test_compute_metrics_preview_final_zero_and_empty(tmp_path):
@@ -1508,7 +1516,8 @@ def test_measure_latency_paths(tmp_path):
             raise RuntimeError("boom")
 
     sample = {"input_ids": [1, 2, 3], "attention_mask": [1, 1, 1]}
-    assert runner._measure_latency(RaisingModel(), [sample], "cpu") == 0.0
+    with pytest.raises(RuntimeError, match="boom"):
+        runner._measure_latency(RaisingModel(), [sample], "cpu")
 
 
 def test_finalize_metrics_unacceptable_no_checkpoint(monkeypatch, tmp_path):
@@ -1719,6 +1728,25 @@ def test_prepare_guards_phase_non_strict_still_raises_programming_errors(tmp_pat
 
     failures = report.meta.get("guard_prepare_failures", [])
     assert failures and failures[0]["guard"] == ErrPrepareGuard.name
+
+
+def test_prepare_guards_phase_context_errors_raise(tmp_path):
+    from invarlock.core.api import RunReport
+
+    runner = CoreRunner()
+    cfg = make_config(tmp_path)
+    report = RunReport()
+
+    with pytest.raises(RuntimeError, match="run context setup failed"):
+        runner._prepare_guards_phase(
+            DummyModel(),
+            DummyAdapter(),
+            [BadGuard()],
+            calibration_data=None,
+            report=report,
+            auto_config=None,
+            config=cfg,
+        )
 
 
 def test_eval_phase_strict_eval_raises(monkeypatch, tmp_path):

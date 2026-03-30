@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from invarlock.core.run_guard_overhead_policy import (
     build_guard_overhead_summary,
     finalize_guard_overhead_payload,
@@ -12,9 +14,26 @@ from invarlock.core.run_guard_overhead_policy import (
 
 def test_finalize_guard_overhead_payload_collects_validator_fields() -> None:
     result = SimpleNamespace(
-        messages=("ok",),
-        warnings=("warn",),
-        errors=("err",),
+        diagnostics=(
+            {
+                "kind": "validation_info",
+                "severity": "info",
+                "message": "ok",
+                "details": {},
+            },
+            {
+                "kind": "validation_warning",
+                "severity": "warning",
+                "message": "warn",
+                "details": {},
+            },
+            {
+                "kind": "validation_error",
+                "severity": "error",
+                "message": "err",
+                "details": {},
+            },
+        ),
         checks={"ratio_ok": False},
         metrics={"overhead_ratio": 1.02, "overhead_percent": 2.0},
         passed=False,
@@ -23,9 +42,26 @@ def test_finalize_guard_overhead_payload_collects_validator_fields() -> None:
         {"overhead_threshold": 0.01},
         result,
     )
-    assert payload["messages"] == ["ok"]
-    assert payload["warnings"] == ["warn"]
-    assert payload["errors"] == ["err"]
+    assert payload["diagnostics"] == [
+        {
+            "kind": "validation_info",
+            "severity": "info",
+            "message": "ok",
+            "details": {},
+        },
+        {
+            "kind": "validation_warning",
+            "severity": "warning",
+            "message": "warn",
+            "details": {},
+        },
+        {
+            "kind": "validation_error",
+            "severity": "error",
+            "message": "err",
+            "details": {},
+        },
+    ]
     assert payload["checks"] == {"ratio_ok": False}
     assert payload["overhead_ratio"] == 1.02
     assert payload["overhead_percent"] == 2.0
@@ -54,10 +90,10 @@ def test_build_guard_overhead_summary_formats_percent() -> None:
         {"evaluated": True, "passed": False, "overhead_percent": 1.23},
         default_threshold=0.02,
     )
-    assert summary.status == "FAIL"
-    assert summary.overhead_display == "+1.23%"
+    assert summary.passed is False
+    assert summary.overhead_percent == 1.23
+    assert summary.overhead_ratio is None
     assert summary.threshold_fraction == 0.02
-    assert summary.threshold_display == "≤ +2.0%"
 
 
 def test_build_guard_overhead_summary_falls_back_to_ratio_and_default() -> None:
@@ -65,8 +101,9 @@ def test_build_guard_overhead_summary_falls_back_to_ratio_and_default() -> None:
         {"evaluated": True, "passed": True, "overhead_ratio": 1.005},
         default_threshold="bad",  # type: ignore[arg-type]
     )
-    assert summary.status == "PASS"
-    assert summary.overhead_display == "1.005x"
+    assert summary.passed is True
+    assert summary.overhead_percent is None
+    assert summary.overhead_ratio == 1.005
     assert summary.threshold_fraction == 0.01
 
 
@@ -76,7 +113,8 @@ def test_build_guard_overhead_summary_marks_not_evaluated() -> None:
         default_threshold=0.02,
     )
     assert summary.evaluated is False
-    assert summary.overhead_display == "not evaluated"
+    assert summary.overhead_percent is None
+    assert summary.overhead_ratio is None
 
 
 def test_normalize_guard_overhead_result_marks_missing_ratio_as_not_evaluated() -> None:
@@ -95,6 +133,15 @@ def test_normalize_guard_overhead_result_handles_float_coercion_failure() -> Non
     assert out["passed"] is True
 
 
+def test_normalize_guard_overhead_result_propagates_unexpected_ratio_errors() -> None:
+    class BadInt(int):
+        def __float__(self) -> float:
+            raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError, match="boom"):
+        normalize_guard_overhead_result({"overhead_ratio": BadInt(1)})
+
+
 def test_prepare_guard_overhead_report_returns_skipped_payload() -> None:
     payload = prepare_guard_overhead_report(
         {"skipped": True, "reason": "config"},
@@ -110,9 +157,14 @@ def test_prepare_guard_overhead_report_returns_skipped_payload() -> None:
 
 def test_prepare_guard_overhead_report_validates_and_finalizes() -> None:
     class Result:
-        messages = ["ok"]
-        warnings = []
-        errors = []
+        diagnostics = (
+            {
+                "kind": "validation_info",
+                "severity": "info",
+                "message": "ok",
+                "details": {},
+            },
+        )
         checks = {"guard_overhead": True}
         metrics = {"overhead_ratio": 1.005, "overhead_percent": 0.5}
         passed = True
@@ -132,3 +184,4 @@ def test_prepare_guard_overhead_report_validates_and_finalizes() -> None:
     assert payload["guarded_report"] == {"metrics": {"primary_metric": {"final": 10.1}}}
     assert payload["passed"] is True
     assert payload["evaluated"] is True
+    assert payload["diagnostics"][0]["message"] == "ok"

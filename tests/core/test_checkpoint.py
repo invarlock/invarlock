@@ -83,14 +83,14 @@ def test_policy_checkpoint_should_rollback_logic():
 
     # Abort action takes priority
     outcomes = [
-        GuardOutcome("a", True, action="none"),
-        GuardOutcome("b", True, action="abort"),
+        GuardOutcome("a", True, decision="allow"),
+        GuardOutcome("b", True, decision="block"),
     ]
     should, reason = cp.should_rollback(outcomes)
     assert should and reason == "guard_abort"
 
     # Rollback action
-    outcomes = [GuardOutcome("a", True, action="rollback")]
+    outcomes = [GuardOutcome("a", True, decision="rollback")]
     should, reason = cp.should_rollback(outcomes)
     assert should and reason == "guard_rollback"
 

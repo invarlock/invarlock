@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from invarlock.cli import run_serialization as run_serial_mod
 from invarlock.core.config_runtime import load_config
 
@@ -61,7 +63,8 @@ def test_to_serialisable_dict_falls_back_when_dict_method_raises():
         def dict(self):
             raise RuntimeError("boom")
 
-    assert run_serial_mod._to_serialisable_dict(ExplodingDict()) == {"x": 1}
+    with pytest.raises(RuntimeError, match="boom"):
+        run_serial_mod._to_serialisable_dict(ExplodingDict())
 
 
 def test_to_serialisable_dict_uses_vars_when_data_getattr_raises():
@@ -74,7 +77,8 @@ def test_to_serialisable_dict_uses_vars_when_data_getattr_raises():
                 raise RuntimeError("boom")
             return object.__getattribute__(self, name)
 
-    assert run_serial_mod._to_serialisable_dict(Weird()) == {"y": 2}
+    with pytest.raises(RuntimeError, match="boom"):
+        run_serial_mod._to_serialisable_dict(Weird())
 
 
 def test_to_serialisable_dict_returns_empty_dict_when_vars_fails():

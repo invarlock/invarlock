@@ -36,13 +36,13 @@ def _to_serialisable_dict(section: object) -> dict[str, Any]:
     if hasattr(section, "dict"):
         try:
             return section.dict()  # type: ignore[return-value]
-        except Exception:
+        except (TypeError, ValueError):
             pass
     try:
         raw = getattr(section, "_data", None)
         if isinstance(raw, dict):
             return raw
-    except Exception:
+    except AttributeError:
         pass
     if isinstance(section, dict):
         return section

@@ -34,6 +34,14 @@ class _Seq2SeqProvider:
     scorer_profile = {"kind": "seq2seq"}
 
 
+class _TokenizerWithoutName:
+    vocab_size = 321
+    bos_token = None
+    eos_token = None
+    pad_token = None
+    add_prefix_space = None
+
+
 def _cfg(*, provider: object, release: bool = False) -> SimpleNamespace:
     return SimpleNamespace(
         dataset=SimpleNamespace(
@@ -132,22 +140,75 @@ def test_build_provider_dataset_plan_collects_diagnostics_and_provider_kwargs() 
     assert result.dataset_meta["loss_type"] == "ppl_seq2seq"
     assert result.diagnostics == (
         ProviderDatasetPlanDiagnostic(
-            kind="provider.resolved",
-            message="provider resolved",
-            severity="info",
-            metadata={
+            code="provider.resolved",
+            summary="provider resolved",
+            level="info",
+            context={
                 "provider": "seq2seq",
                 "split": "validation",
                 "used_fallback_split": False,
             },
         ),
         ProviderDatasetPlanDiagnostic(
-            kind="window.dedupe_adjustment",
-            message="dedupe adjusted",
-            severity="warning",
-            metadata={"deficit": 1, "proposed_per_arm": 1},
+            code="window.dedupe_adjustment",
+            summary="dedupe adjusted",
+            level="warning",
+            context={"deficit": 1, "proposed_per_arm": 1},
         ),
     )
+
+
+def test_build_provider_dataset_plan_leaves_missing_tokenizer_name_nullable() -> (
+    None
+):
+    result = build_provider_dataset_plan(
+        cfg=_cfg(provider=_ProviderConfig("local_jsonl", path="demo.jsonl")),
+        model_profile=SimpleNamespace(),
+        resolved_device="cpu",
+        profile="dev",
+        profile_normalized="dev",
+        requested_preview=1,
+        requested_final=1,
+        effective_preview=1,
+        effective_final=1,
+        pairing_schedule_present=False,
+        use_mlm=False,
+        mask_prob=0.15,
+        mask_seed=43,
+        random_token_prob=0.1,
+        original_token_prob=0.1,
+        resolved_loss_type="ppl_seq2seq",
+        tier="balanced",
+        get_provider_fn=object(),
+        resolve_provider_and_split_fn=lambda *args, **kwargs: (
+            _Seq2SeqProvider(),
+            "validation",
+            False,
+        ),
+        resolve_tokenizer_fn=lambda profile: (_TokenizerWithoutName(), None),
+        maybe_plan_release_windows_fn=lambda **kwargs: {"actual_preview": 1},
+        resolve_effective_windows_fn=lambda **kwargs: {
+            "preview_records": [
+                {"input_ids": [1, 2], "attention_mask": [1, 1], "dataset_index": 7}
+            ],
+            "final_records": [
+                {"input_ids": [3, 4], "attention_mask": [1, 1], "dataset_index": 9}
+            ],
+            "actual_preview": 1,
+            "actual_final": 1,
+            "preview_total_tokens": 2,
+            "final_total_tokens": 2,
+            "dedupe_adjustments": [],
+        },
+        apply_mlm_masks_fn=lambda *args, **kwargs: (0, []),
+        resolve_pm_min_tokens_target_fn=lambda **kwargs: 4,
+        hash_sequences_fn=lambda seqs: f"hash-{len(list(seqs))}",
+        tokenizer_digest_fn=lambda tokenizer: "digest",
+        safe_int_fn=lambda value, default=0: int(value or default),
+        tensor_or_list_to_ints_fn=lambda values: list(values),
+    )
+
+    assert result.dataset_meta["tokenizer_name"] is None
 
 
 def test_build_provider_dataset_plan_release_without_capacity_emits_warning() -> None:
@@ -207,7 +268,7 @@ def test_build_provider_dataset_plan_release_without_capacity_emits_warning() ->
     assert result.window_plan["profile"] == "release"
     assert result.window_plan["coverage_ok"] is True
     assert any(
-        diagnostic.kind == "provider.capacity_missing"
+        diagnostic.code == "provider.capacity_missing"
         for diagnostic in result.diagnostics
     )
 

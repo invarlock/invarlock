@@ -8,7 +8,13 @@ from typing import Any, cast
 import torch
 import torch.nn as nn
 
-from .metrics_support import DependencyManager, InputValidator, MetricsConfig
+from .metrics_support import (
+    DependencyManager,
+    InputValidator,
+    MetricsConfig,
+    MetricsProgressPhase,
+    MetricsProgressUpdate,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -17,35 +23,26 @@ def _call_model(model: nn.Module, /, *args: Any, **kwargs: Any) -> Any:
     return cast(Any, model)(*args, **kwargs)
 
 
-try:
-    from tqdm.auto import tqdm as _tqdm
-except Exception:  # pragma: no cover - exercised only when tqdm is absent
-
-    class _TqdmShim:
-        def __init__(self, iterable=None, total=None, **kwargs):
-            self._iterable = iterable
-            self.total = total
-
-        def __iter__(self):
-            if self._iterable is None:
-                return iter(())
-            return iter(self._iterable)
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
-        def update(self, n: int = 1) -> None:
-            return None
-
-    def _tqdm(iterable=None, *args, **kwargs):
-        return _TqdmShim(iterable=iterable, **kwargs)
-
-
-tqdm = _tqdm
 validator = InputValidator()
+
+
+def _emit_progress(
+    config: MetricsConfig,
+    *,
+    phase: MetricsProgressPhase,
+    completed: int,
+    total: int | None,
+) -> None:
+    observer = config.progress_observer
+    if observer is None:
+        return
+    observer(
+        MetricsProgressUpdate(
+            phase=phase,
+            completed=int(completed),
+            total=None if total is None else int(total),
+        )
+    )
 
 
 def _gini_vectorized(vec: torch.Tensor) -> float:
@@ -80,26 +77,25 @@ def _mi_gini_optimized_cpu_path(
     chunk_size = min(8, l_count)
     mi_scores_all: list[torch.Tensor] = []
 
-    with tqdm(
-        total=l_count,
-        desc="MI-Gini (CPU optimized)",
-        disable=not config.progress_bars,
-        leave=False,
-    ) as pbar:
-        for i in range(0, l_count, chunk_size):
-            end_idx = min(i + chunk_size, l_count)
-            chunk_feats = feats_cpu[i:end_idx]
-            chunk_scores: list[torch.Tensor] = []
-            for j in range(chunk_feats.shape[0]):
-                try:
-                    score = mi_scores_fn(chunk_feats[j], targ_cpu)
-                    chunk_scores.append(score)
-                except Exception as e:
-                    logger.warning(f"MI calculation failed for layer {i + j}: {e}")
-                    chunk_scores.append(torch.zeros_like(chunk_feats[j, 0, :]))
+    for i in range(0, l_count, chunk_size):
+        end_idx = min(i + chunk_size, l_count)
+        chunk_feats = feats_cpu[i:end_idx]
+        chunk_scores: list[torch.Tensor] = []
+        for j in range(chunk_feats.shape[0]):
+            try:
+                score = mi_scores_fn(chunk_feats[j], targ_cpu)
+                chunk_scores.append(score)
+            except Exception as e:
+                logger.warning(f"MI calculation failed for layer {i + j}: {e}")
+                chunk_scores.append(torch.zeros_like(chunk_feats[j, 0, :]))
 
-            mi_scores_all.extend(chunk_scores)
-            pbar.update(end_idx - i)
+        mi_scores_all.extend(chunk_scores)
+        _emit_progress(
+            config,
+            phase="mi_gini_cpu",
+            completed=end_idx,
+            total=l_count,
+        )
 
     if not mi_scores_all:
         return float("nan")
@@ -227,44 +223,44 @@ def _collect_activations(
         else config.oracle_windows
     )
 
-    with tqdm(
-        total=total_batches,
-        desc="Collecting activations",
-        disable=not config.progress_bars,
-    ) as pbar:
-        for i, batch in enumerate(dataloader):
-            if i >= config.oracle_windows:
-                break
+    for i, batch in enumerate(dataloader):
+        if i >= config.oracle_windows:
+            break
 
-            try:
-                if first_batch is None:
-                    first_batch = {
-                        k: v.to(device) if isinstance(v, torch.Tensor) else v
-                        for k, v in batch.items()
-                    }
+        try:
+            if first_batch is None:
+                first_batch = {
+                    k: v.to(device) if isinstance(v, torch.Tensor) else v
+                    for k, v in batch.items()
+                }
 
-                input_ids = batch["input_ids"].to(device)
-                if input_ids.shape[1] > config.max_tokens:
-                    input_ids = input_ids[:, : config.max_tokens]
+            input_ids = batch["input_ids"].to(device)
+            if input_ids.shape[1] > config.max_tokens:
+                input_ids = input_ids[:, : config.max_tokens]
 
-                output = _call_model(model, input_ids, output_hidden_states=True)
+            output = _call_model(model, input_ids, output_hidden_states=True)
 
-                if hasattr(output, "hidden_states") and len(output.hidden_states) > 2:
-                    hidden_states = torch.stack(output.hidden_states[1:-1])
-                    hidden_states = validator.validate_tensor(
-                        hidden_states, f"hidden_states_batch_{i}", config
-                    )
-                    hidden_states_list.append(hidden_states)
+            if hasattr(output, "hidden_states") and len(output.hidden_states) > 2:
+                hidden_states = torch.stack(output.hidden_states[1:-1])
+                hidden_states = validator.validate_tensor(
+                    hidden_states, f"hidden_states_batch_{i}", config
+                )
+                hidden_states_list.append(hidden_states)
 
-                fc1_acts = _extract_fc1_activations(model, output, config)
-                if fc1_acts is not None:
-                    fc1_activations_list.append(fc1_acts)
-                    targets_list.append(input_ids[:, 1:])
-
-                pbar.update(1)
-            except Exception as e:
-                logger.warning(f"Failed to process batch {i}: {e}")
-                continue
+            fc1_acts = _extract_fc1_activations(model, output, config)
+            if fc1_acts is not None:
+                fc1_activations_list.append(fc1_acts)
+                targets_list.append(input_ids[:, 1:])
+        except Exception as e:
+            logger.warning(f"Failed to process batch {i}: {e}")
+            continue
+        finally:
+            _emit_progress(
+                config,
+                phase="activation_collection",
+                completed=min(i + 1, total_batches),
+                total=total_batches,
+            )
 
     return {
         "hidden_states": hidden_states_list,
@@ -480,5 +476,4 @@ __all__ = [
     "_locate_transformer_blocks_enhanced",
     "_mi_gini_optimized_cpu_path",
     "_perform_pre_eval_checks",
-    "tqdm",
 ]

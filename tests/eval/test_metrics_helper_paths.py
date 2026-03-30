@@ -100,10 +100,9 @@ def test_validator_model_and_dataloader_paths():
         def __init__(self):
             super().__init__()
 
-    # Strict mode: NoParamModel is acceptable in current implementation
-    # (parameter counting may be guarded). Ensure call does not error.
-    with torch.no_grad():
-        InputValidator.validate_model(NoParamModel(), cfg_strict)
+    with pytest.raises(ValidationError):
+        with torch.no_grad():
+            InputValidator.validate_model(NoParamModel(), cfg_strict)
 
     # Non-strict mode -> no raise
     InputValidator.validate_model(NoParamModel(), cfg_nonstrict)
@@ -567,24 +566,27 @@ def test_calculate_sigma_max_variants_and_head_energy_empty():
 
 
 def test_measure_latency_early_and_error_paths_and_compute_perplexity_tuple_fallback():
-    # measure_latency early return when no suitable sample
+    # measure_latency now rejects windows without any usable long sample
     model = DummyCausalLM()
     short = EvaluationWindow([[1, 2, 3]], [[1, 1, 1]], [0])
-    assert measure_latency(model, short, device="cpu") == 0.0
+    with pytest.raises(ValidationError) as exc_info:
+        measure_latency(model, short, device="cpu")
+    assert (
+        exc_info.value.details["reason"]
+        == "latency measurement requires at least one sequence longer than 10 tokens"
+    )
 
-    # model raising during warmup -> returns 0.0
+    # model raising during warmup now surfaces the failure
     class FailModel(DummyCausalLM):
         def forward(self, *a, **k):
             raise RuntimeError("boom")
 
-    assert (
+    with pytest.raises(RuntimeError, match="Latency warmup failed"):
         measure_latency(
             FailModel(),
             EvaluationWindow([list(range(12))], [[1] * 12], [0]),
             device="cpu",
         )
-        == 0.0
-    )
 
     # compute_perplexity fallback path with tuple output
     class TupleModel(nn.Module):
@@ -613,8 +615,39 @@ def test_measure_latency_early_and_error_paths_and_compute_perplexity_tuple_fall
         bad_batch = {"input_ids": torch.tensor([[1]])}
         from invarlock.eval.metrics import ValidationError as MValidationError
 
-        with pytest.raises(MValidationError):
-            compute_perplexity(MinModel(), [bad_batch], max_samples=1, device="cpu")
+    with pytest.raises(MValidationError):
+        compute_perplexity(MinModel(), [bad_batch], max_samples=1, device="cpu")
+
+
+def test_measure_latency_raises_on_measurement_execution_failure():
+    class GoodModel(DummyCausalLM):
+        def forward(self, *a, **k):
+            return super().forward(*a, **k)
+
+    calls = {"count": 0}
+
+    def _call_model(_model, **_kwargs):
+        calls["count"] += 1
+        if calls["count"] > 1:
+            raise RuntimeError("measurement boom")
+        return SimpleNamespace(logits=torch.randn(1, 12, 16))
+
+    window = EvaluationWindow([list(range(12))], [[1] * 12], [0])
+    from invarlock.eval import metrics_runtime as metrics_runtime_mod
+
+    original = metrics_runtime_mod.call_model
+    metrics_runtime_mod.call_model = _call_model
+    try:
+        with pytest.raises(RuntimeError, match="Latency measurement failed"):
+            measure_latency(
+                GoodModel(),
+                window,
+                device="cpu",
+                warmup_steps=1,
+                measurement_steps=2,
+            )
+    finally:
+        metrics_runtime_mod.call_model = original
 
 
 def test_compute_perplexity_else_tensor_and_invalid_type():
@@ -677,26 +710,35 @@ def test_measure_memory_break_and_continue_and_latency_total_tokens_zero():
     # measure_latency total_tokens == 0 path
     zero = [0] * 12
     win2 = EvaluationWindow([list(range(12))], [zero], [0])
-    assert (
+    with pytest.raises(ValidationError) as exc_info:
         measure_latency(
             DummyCausalLM(), win2, device="cpu", warmup_steps=0, measurement_steps=1
         )
-        == 0.0
+    assert (
+        exc_info.value.details["reason"]
+        == "latency measurement requires at least one attended token"
     )
 
-    # No suitable sample (all sequences <=10) -> returns 0.0
+    # No suitable sample (all sequences <=10) -> invalid measurement input
     small = list(range(5))
     win3 = EvaluationWindow([small, small], [[1] * 5, [1] * 5], [0, 1])
-    assert (
+    with pytest.raises(ValidationError) as exc_info:
         measure_latency(
             DummyCausalLM(), win3, device="cpu", warmup_steps=0, measurement_steps=1
         )
-        == 0.0
+    assert (
+        exc_info.value.details["reason"]
+        == "latency measurement requires at least one sequence longer than 10 tokens"
     )
 
     # Empty window path
     empty = EvaluationWindow([], [], [])
-    assert measure_latency(DummyCausalLM(), empty, device="cpu") == 0.0
+    with pytest.raises(ValidationError) as exc_info:
+        measure_latency(DummyCausalLM(), empty, device="cpu")
+    assert (
+        exc_info.value.details["reason"]
+        == "latency measurement requires a non-empty evaluation window"
+    )
 
 
 def test_validate_env_failure_path():

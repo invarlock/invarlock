@@ -12,10 +12,10 @@ from .provider_config import resolve_provider_kind_and_kwargs
 
 @dataclass(frozen=True)
 class ProviderDatasetPlanDiagnostic:
-    kind: str
-    message: str
-    severity: str = "info"
-    metadata: dict[str, Any] = field(default_factory=dict)
+    code: str
+    summary: str
+    level: str = "info"
+    context: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -56,11 +56,11 @@ def _section_value(section: Any, key: str) -> Any:
     if callable(get_value):
         try:
             return get_value(key)
-        except Exception:
+        except (AttributeError, KeyError, TypeError):
             pass
     try:
         return getattr(section, key)
-    except (AttributeError, TypeError):
+    except (AttributeError, KeyError, TypeError):
         return None
 
 
@@ -96,13 +96,13 @@ def _section_dict(cfg: Any, name: str) -> dict[str, Any]:
     if callable(section_fn):
         try:
             section = section_fn(name)
-        except Exception:
+        except (AttributeError, KeyError, TypeError):
             section = None
         if isinstance(section, dict):
             return section
     try:
         value = getattr(cfg, name)
-    except Exception:
+    except (AttributeError, KeyError, TypeError):
         value = None
     if isinstance(value, Mapping):
         return dict(value)
@@ -111,6 +111,14 @@ def _section_dict(cfg: Any, name: str) -> dict[str, Any]:
             key: item for key, item in vars(value).items() if not key.startswith("_")
         }
     return {}
+
+
+def _optional_text(value: Any) -> str | None:
+    if isinstance(value, str):
+        text = value.strip()
+        if text:
+            return text
+    return None
 
 
 def build_provider_dataset_plan(
@@ -152,10 +160,10 @@ def build_provider_dataset_plan(
     def _collect_diagnostic(diagnostic: DatasetDiagnostic) -> None:
         diagnostics.append(
             ProviderDatasetPlanDiagnostic(
-                kind=diagnostic.kind,
-                message=diagnostic.message,
-                severity=diagnostic.severity,
-                metadata=dict(diagnostic.metadata),
+                code=diagnostic.code or diagnostic.kind,
+                summary=diagnostic.message,
+                level=diagnostic.severity,
+                context=dict(diagnostic.metadata),
             )
         )
 
@@ -169,10 +177,10 @@ def build_provider_dataset_plan(
     )
     diagnostics.append(
         ProviderDatasetPlanDiagnostic(
-            kind="provider.resolved",
-            message="provider resolved",
-            severity="info",
-            metadata={
+            code="provider.resolved",
+            summary="provider resolved",
+            level="info",
+            context={
                 "provider": getattr(
                     data_provider, "name", type(data_provider).__name__
                 ),
@@ -225,12 +233,12 @@ def build_provider_dataset_plan(
         else:
             diagnostics.append(
                 ProviderDatasetPlanDiagnostic(
-                    kind="provider.capacity_missing",
-                    message=(
+                    code="provider.capacity_missing",
+                    summary=(
                         "Release profile requested but dataset provider does not expose "
                         "capacity estimation; using configured window counts."
                     ),
-                    severity="warning",
+                    level="warning",
                 )
             )
 
@@ -408,7 +416,7 @@ def build_provider_dataset_plan(
     preview_hash = hash_sequences_fn(preview_sequences)
     final_hash = hash_sequences_fn(final_sequences)
     dataset_meta = {
-        "tokenizer_name": getattr(tokenizer, "name_or_path", "unknown"),
+        "tokenizer_name": _optional_text(getattr(tokenizer, "name_or_path", None)),
         "tokenizer_hash": (
             tokenizer_hash
             if tokenizer_hash is not None

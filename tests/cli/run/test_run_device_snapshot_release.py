@@ -636,6 +636,14 @@ def test_guard_overhead_bare_missing_ppl_and_status_warn(tmp_path: Path):
         and gh.get("evaluated") is True
         and gh.get("passed") is True
     )
+    diagnostics = gh.get("diagnostics", [])
+    assert any(
+        isinstance(item, dict)
+        and item.get("severity") == "warning"
+        and item.get("message")
+        == "Bare control primary metric unavailable for overhead diagnostics."
+        for item in diagnostics
+    )
 
 
 def test_evaluation_window_parity_mismatch_exit(tmp_path: Path):

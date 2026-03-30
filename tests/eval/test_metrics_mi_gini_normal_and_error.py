@@ -29,7 +29,7 @@ def test_mi_gini_gpu_path_success_and_non_oom_error(monkeypatch):
         model=nn.Linear(2, 2),
         activation_data=activation_data,
         dep_manager=DM(),
-        config=MetricsConfig(progress_bars=False),
+        config=MetricsConfig(),
         device=torch.device("cpu"),
     )
     assert isinstance(val, float)
@@ -46,7 +46,7 @@ def test_mi_gini_gpu_path_success_and_non_oom_error(monkeypatch):
         model=nn.Linear(2, 2),
         activation_data=activation_data,
         dep_manager=DMErr(),
-        config=MetricsConfig(progress_bars=False),
+        config=MetricsConfig(),
         device=torch.device("cpu"),
     )
     assert isinstance(val2, float) and (val2 != val2)  # NaN

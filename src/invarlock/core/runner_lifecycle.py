@@ -23,9 +23,9 @@ def initialize_run_report(
     report.meta["config"] = serialized_config
 
     if config.context:
-        try:
-            report.context.update(config.context)
-        except Exception:
+        if isinstance(config.context, dict):
+            report.context = dict(config.context)
+        else:
             report.context = dict(config.context)
 
     if isinstance(config.context, dict):
@@ -46,10 +46,7 @@ def initialize_run_report(
                 config.context["auto"] = merged_auto
             else:
                 config.context["auto"] = dict(auto_config)
-            try:
-                report.context["auto"] = config.context["auto"]
-            except Exception:
-                pass
+            report.context["auto"] = config.context["auto"]
 
     return report
 

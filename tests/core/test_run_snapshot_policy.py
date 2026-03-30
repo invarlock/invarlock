@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from invarlock.core.run_snapshot_policy import (
     choose_snapshot_mode,
     estimate_model_bytes,
@@ -51,12 +53,20 @@ def test_resolve_snapshot_config_extracts_nested_mapping() -> None:
     assert out == {"mode": "chunked", "threshold_mb": 10.0}
 
 
-def test_resolve_snapshot_config_fails_closed_on_bad_serializer() -> None:
+def test_resolve_snapshot_config_propagates_unexpected_serializer_failures() -> None:
+    with pytest.raises(RuntimeError, match="boom"):
+        resolve_snapshot_config(
+            object(),
+            to_serialisable_dict_fn=lambda _obj: (_ for _ in ()).throw(
+                RuntimeError("boom")
+            ),
+        )
+
+
+def test_resolve_snapshot_config_fails_closed_on_type_errors() -> None:
     out = resolve_snapshot_config(
         object(),
-        to_serialisable_dict_fn=lambda _obj: (_ for _ in ()).throw(
-            RuntimeError("boom")
-        ),
+        to_serialisable_dict_fn=lambda _obj: (_ for _ in ()).throw(TypeError("boom")),
     )
 
     assert out == {}

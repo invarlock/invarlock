@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 
 from invarlock.eval.metrics import MetricsConfig, ResourceManager, compute_perplexity
+from invarlock.eval import metrics_runtime as runtime_mod
 from invarlock.eval.metrics_activation import (
     _collect_activations,
     _perform_pre_eval_checks,
@@ -57,7 +58,7 @@ def test_collect_activations_malformed_batch_continues():
     out = _collect_activations(
         TinyLM().eval(),
         bad_then_stop(),
-        MetricsConfig(progress_bars=False),
+        MetricsConfig(),
         torch.device("cpu"),
     )
     # Expect empty collections and first_batch remains None due to early failure
@@ -99,7 +100,7 @@ def test_sigma_max_no_columns_and_no_gain_values():
         Tiny().eval(),
         {"input_ids": torch.ones(1, 8, dtype=torch.long)},
         DM(),
-        MetricsConfig(progress_bars=False),
+        MetricsConfig(),
         torch.device("cpu"),
     )
     # No gain values → NaN path
@@ -122,6 +123,30 @@ def test_validate_dataloader_falsy_first_batch_raises_and_allow_empty_allows():
     InputValidator.validate_dataloader(
         FalsyOnce(), MetricsConfig(allow_empty_data=True)
     )
+
+
+def test_resolve_eval_device_propagates_mps_backend_failures(monkeypatch):
+    class BrokenMPS:
+        @staticmethod
+        def is_available():
+            raise RuntimeError("mps boom")
+
+    monkeypatch.setattr(torch.backends, "mps", BrokenMPS(), raising=False)
+
+    with pytest.raises(RuntimeError, match="mps boom"):
+        runtime_mod._resolve_eval_device(nn.Linear(1, 1), torch.device("mps"))
+
+
+def test_infer_model_vocab_size_propagates_embedding_probe_failures():
+    class BrokenEmbeddings(nn.Module):
+        def __init__(self):
+            super().__init__()
+
+        def get_input_embeddings(self):
+            raise RuntimeError("embedding boom")
+
+    with pytest.raises(RuntimeError, match="embedding boom"):
+        runtime_mod._infer_model_vocab_size(BrokenEmbeddings())
 
 
 def test_pre_eval_checks_dry_run_failure_and_compute_perplexity_no_valid_tokens():

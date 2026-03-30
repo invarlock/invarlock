@@ -36,7 +36,7 @@ def test_mi_gini_stack_failure_returns_nan(monkeypatch):
 
     try:
         val = _mi_gini_optimized_cpu_path(
-            feats, targ, max_per_layer=10, config=MetricsConfig(progress_bars=False)
+            feats, targ, max_per_layer=10, config=MetricsConfig()
         )
         assert isinstance(val, float) and (val != val)  # NaN
     finally:

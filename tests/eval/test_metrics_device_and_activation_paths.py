@@ -70,7 +70,7 @@ def test_collect_activations_generator_dataloader_and_extract_fc1_exception(
         for _ in range(2):
             yield {"input_ids": torch.ones(1, 8, dtype=torch.long)}
 
-    cfg = MetricsConfig(oracle_windows=2, max_tokens=4, progress_bars=False)
+    cfg = MetricsConfig(oracle_windows=2, max_tokens=4)
     device = torch.device("cpu")
     data = _collect_activations(Model(), gen(), cfg, device)
     assert isinstance(data, dict) and data.get("first_batch") is not None

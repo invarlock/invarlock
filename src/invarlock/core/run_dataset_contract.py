@@ -12,14 +12,14 @@ def _cfg_auto_tier(cfg: Any) -> str | None:
     if callable(section_fn):
         try:
             section = section_fn("auto")
-        except Exception:
+        except (AttributeError, KeyError, TypeError):
             section = None
     if isinstance(section, dict):
         tier = section.get("tier")
     else:
         try:
             tier = cfg.auto.tier
-        except Exception:
+        except (AttributeError, KeyError, TypeError):
             tier = None
     return str(tier) if isinstance(tier, str) and tier else None
 
@@ -80,6 +80,7 @@ def materialize_run_dataset(
             tokenizer_hash=tokenizer_hash,
             resolved_loss_type=resolved_loss_type,
             profile=profile,
+            typed_failures=True,
         )
         dataset_meta = harvested["dataset_meta"]
         window_plan = harvested["window_plan"]

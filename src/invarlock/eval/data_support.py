@@ -9,7 +9,7 @@ import os
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, TypeAlias
 
 from invarlock.core.exceptions import DependencyError as _DepErr
 
@@ -26,12 +26,28 @@ _load_dataset_cached: Any = _DATASETS_UNSET
 load_dataset: Any = None
 
 
+DatasetDiagnosticSeverity: TypeAlias = Literal["info", "warning", "error"]
+DatasetDiagnosticCategory: TypeAlias = Literal["dataset", "provider", "window"]
+
+
 @dataclass(frozen=True)
 class DatasetDiagnostic:
     kind: str
     message: str
-    severity: str = "info"
+    severity: DatasetDiagnosticSeverity = "info"
     metadata: dict[str, Any] = field(default_factory=dict)
+    code: str | None = None
+    category: DatasetDiagnosticCategory | None = None
+
+    def __post_init__(self) -> None:
+        if self.code is None:
+            object.__setattr__(self, "code", str(self.kind))
+        if self.category is None:
+            kind = str(self.kind)
+            category = kind.split(".", 1)[0] if "." in kind else "dataset"
+            if category not in {"dataset", "provider", "window"}:
+                category = "dataset"
+            object.__setattr__(self, "category", category)
 
 
 def _get_load_dataset() -> Any | None:
@@ -79,6 +95,8 @@ def _local_files_signature(files: Sequence[Path]) -> tuple[tuple[str, int, int],
 
 __all__ = [
     "DatasetDiagnostic",
+    "DatasetDiagnosticCategory",
+    "DatasetDiagnosticSeverity",
     "HAS_DATASETS",
     "HAS_TORCH",
     "_get_load_dataset",

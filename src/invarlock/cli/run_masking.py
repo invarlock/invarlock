@@ -128,37 +128,37 @@ def _apply_mlm_masks(
 
 def _tokenizer_digest(tokenizer: Any) -> str:
     """Compute a stable digest for a tokenizer config."""
-    try:
-        if hasattr(tokenizer, "get_vocab"):
-            try:
-                items = getattr(tokenizer.get_vocab(), "items", None)
-                if callable(items):
-                    pairs = list(items())
-                    pairs = [
-                        (str(key), int(value))
-                        for key, value in pairs
-                        if isinstance(key, str | int)
-                    ]
-                    payload = json.dumps(sorted(pairs), separators=(",", ":")).encode()
-                    return hashlib.sha256(payload).hexdigest()
-            except Exception:
-                pass
-        vocab = getattr(tokenizer, "vocab", None)
-        if isinstance(vocab, list):
-            try:
-                payload = json.dumps(
-                    [(str(key), int(value)) for key, value in vocab],
-                    separators=(",", ":"),
-                ).encode()
+    if hasattr(tokenizer, "get_vocab"):
+        try:
+            items = getattr(tokenizer.get_vocab(), "items", None)
+            if callable(items):
+                pairs = list(items())
+                pairs = [
+                    (str(key), int(value))
+                    for key, value in pairs
+                    if isinstance(key, str | int)
+                ]
+                payload = json.dumps(sorted(pairs), separators=(",", ":")).encode()
                 return hashlib.sha256(payload).hexdigest()
-            except Exception:
-                pass
-        attrs = {
-            "name": getattr(tokenizer, "name_or_path", None),
-            "eos": getattr(tokenizer, "eos_token", None),
-            "pad": getattr(tokenizer, "pad_token", None),
-            "size": _safe_int(getattr(tokenizer, "vocab_size", 0)),
-        }
-        return hashlib.sha256(json.dumps(attrs, sort_keys=True).encode()).hexdigest()
-    except Exception:
-        return "unknown-tokenizer"
+        except (AttributeError, RuntimeError, TypeError, ValueError):
+            pass
+    vocab = getattr(tokenizer, "vocab", None)
+    if isinstance(vocab, list):
+        try:
+            payload = json.dumps(
+                [(str(key), int(value)) for key, value in vocab],
+                separators=(",", ":"),
+            ).encode()
+            return hashlib.sha256(payload).hexdigest()
+        except (TypeError, ValueError):
+            pass
+    name_or_path = getattr(tokenizer, "name_or_path", None)
+    eos_token = getattr(tokenizer, "eos_token", None)
+    pad_token = getattr(tokenizer, "pad_token", None)
+    attrs = {
+        "name": None if name_or_path is None else str(name_or_path),
+        "eos": None if eos_token is None else str(eos_token),
+        "pad": None if pad_token is None else str(pad_token),
+        "size": _safe_int(getattr(tokenizer, "vocab_size", 0)),
+    }
+    return hashlib.sha256(json.dumps(attrs, sort_keys=True).encode()).hexdigest()

@@ -68,7 +68,7 @@ def test_mi_gini_cpu_chunk_warning(monkeypatch):
 
     monkeypatch.setattr(M, "DependencyManager", lambda: StubDep())
 
-    cfg = M.MetricsConfig(progress_bars=False)
+    cfg = M.MetricsConfig()
     out = _mi_gini_optimized_cpu_path(feats, targ, max_per_layer=10, config=cfg)
     assert isinstance(out, float) and (math.isnan(out) or out >= 0.0)
 

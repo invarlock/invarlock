@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable, Sequence
-from typing import Any, TypedDict
+from typing import Any, Literal, TypeAlias, TypedDict
 
 from .data import EvaluationWindow
 from .data_support import DatasetDiagnostic
@@ -14,6 +14,14 @@ class WindowRecord(TypedDict):
     input_ids: list[int]
     attention_mask: list[int]
     dataset_index: int | None
+
+
+WindowSelectionStatus: TypeAlias = Literal["selected", "no_candidate"]
+WindowCandidateOutcome: TypeAlias = Literal[
+    "selected",
+    "insufficient_tokens",
+    "resolution_failed",
+]
 
 
 class EffectiveWindowPlanResult(TypedDict):
@@ -46,11 +54,14 @@ class CandidateEvaluation(TypedDict):
     headroom_ratio: float
     effective_min_tokens: int
     tokens_floor_met: bool
+    outcome: WindowCandidateOutcome
     reason: str
+    reason_detail: str | None
 
 
 class CandidateSelectionResult(TypedDict):
     status: str
+    selection_status: WindowSelectionStatus
     min_tokens_target: int
     headroom_ratio: float
     effective_min_tokens: int
@@ -261,6 +272,8 @@ def resolve_effective_windows(
                         "deficit": int(deficit),
                         "proposed_per_arm": int(proposed_per_arm),
                     },
+                    category="window",
+                    code="window.dedupe_adjustment",
                 )
             )
         dedupe_adjustments.append(
@@ -333,12 +346,15 @@ def choose_first_token_sufficient_candidate(
                 "headroom_ratio": float(headroom_ratio),
                 "effective_min_tokens": int(effective_min_tokens),
                 "tokens_floor_met": bool(tokens_floor_met),
+                "outcome": "selected" if tokens_floor_met else "insufficient_tokens",
                 "reason": "selected" if tokens_floor_met else "below_token_floor",
+                "reason_detail": None,
             }
             evaluations.append(evaluation)
             if tokens_floor_met and planned["coverage_ok"]:
                 return {
                     "status": "selected",
+                    "selection_status": "selected",
                     "min_tokens_target": int(min_tokens_target),
                     "headroom_ratio": float(headroom_ratio),
                     "effective_min_tokens": int(effective_min_tokens),
@@ -362,12 +378,15 @@ def choose_first_token_sufficient_candidate(
                     "headroom_ratio": float(headroom_ratio),
                     "effective_min_tokens": int(effective_min_tokens),
                     "tokens_floor_met": False,
+                    "outcome": "resolution_failed",
                     "reason": str(exc),
+                    "reason_detail": str(exc),
                 }
             )
 
     return {
         "status": "no_candidate",
+        "selection_status": "no_candidate",
         "min_tokens_target": int(min_tokens_target),
         "headroom_ratio": float(headroom_ratio),
         "effective_min_tokens": int(effective_min_tokens),

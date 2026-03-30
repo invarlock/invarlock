@@ -79,13 +79,15 @@ def test_prepare_and_eval_fallback(tmp_path: Path):
     # No checkpoint manager configured; no checkpoint id in meta
     assert "initial_checkpoint" not in rep.meta
 
-    # Eval phase without calibration data uses fallback metrics
+    # Eval phase without calibration data now fails closed without fabricating metrics.
     metrics = r._eval_phase(
         model, adapter, calibration_data=None, report=rep, config=cfg
     )
-    pm = metrics.get("primary_metric", {})
-    assert isinstance(pm, dict) and pm
-    assert pm.get("final") and pm.get("preview")
+    assert metrics.get("eval_state") == {
+        "evaluated": False,
+        "reason": "missing_calibration_data",
+    }
+    assert "primary_metric" not in metrics or metrics["primary_metric"] in ({}, None)
 
 
 def test_resolve_guard_policies_and_apply(monkeypatch: pytest.MonkeyPatch):
@@ -116,13 +118,13 @@ def test_resolve_guard_policies_and_apply(monkeypatch: pytest.MonkeyPatch):
     assert g.config["sigma_quantile"] == 0.9
     assert g.config["deadband"] == 0.1
 
-    # Error path: resolver raises -> empty dict returned
+    # Error path: resolver raises -> fail closed.
     def bad_resolve(*_a, **_k):
         raise RuntimeError("boom")
 
     monkeypatch.setattr("invarlock.core.runner.resolve_tier_policies", bad_resolve)
-    empty = r._resolve_guard_policies(rep)
-    assert empty == {}
+    with pytest.raises(RuntimeError, match="boom"):
+        r._resolve_guard_policies(rep)
 
 
 def test_samples_to_dataloader_and_latency():

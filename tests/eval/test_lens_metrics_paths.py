@@ -31,7 +31,7 @@ def _make_dl(n=2, seq_len=6):
 def test_calculate_lens_metrics_no_activations_path():
     model = NoActivationsModel()
     dl = _make_dl(2, 6)
-    cfg = MetricsConfig(oracle_windows=2, max_tokens=4, progress_bars=False)
+    cfg = MetricsConfig(oracle_windows=2, max_tokens=4)
     result = calculate_lens_metrics_for_model(model, dl, config=cfg)
     # With no activations and missing deps, metrics should be NaN
     assert (

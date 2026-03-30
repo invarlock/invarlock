@@ -30,6 +30,31 @@ from .bench_policy import (
 logger = logging.getLogger(__name__)
 
 
+def _assign_dataset_provider(
+    run_config: dict[str, Any], dataset_name: str, *, run_label: str
+) -> None:
+    dataset_config = run_config.setdefault("dataset", {})
+    if not isinstance(dataset_config, dict):
+        raise RuntimeError(f"{run_label} config dataset section must be a mapping")
+    dataset_config["provider"] = dataset_name
+
+
+def _extract_success_report_path(result: RunResult, *, run_label: str) -> str | None:
+    if not result.success:
+        return None
+    if not isinstance(result.report, dict):
+        raise RuntimeError(f"{run_label} run did not return a mapping report payload")
+    artifacts = result.report.get("artifacts", {})
+    if not isinstance(artifacts, dict):
+        raise RuntimeError(f"{run_label} run report is missing artifacts metadata")
+    report_path = artifacts.get("report_path")
+    if not isinstance(report_path, str) or not report_path:
+        raise RuntimeError(
+            f"{run_label} run report is missing artifacts.report_path"
+        )
+    return report_path
+
+
 class DependencyChecker:
     """Check for optional dependencies required by specific edit types."""
 
@@ -202,8 +227,10 @@ def execute_single_run(
             for guard_name in ("invariants", "spectral", "rmt", "variance"):
                 try:
                     guards.append(registry.get_guard(guard_name))
-                except Exception:
-                    continue
+                except Exception as exc:
+                    raise RuntimeError(
+                        f"Guard construction failed for {guard_name}: {exc}"
+                    ) from exc
             auto_config = {
                 "tier": scenario.tier,
                 "probes": scenario.probes,
@@ -272,21 +299,25 @@ def execute_single_run(
         )
 
         edit_meta = core_report.edit if hasattr(core_report, "edit") else {}
-        plan_digest = ""
-        try:
-            if isinstance(edit_meta, dict):
-                plan_digest = str(edit_meta.get("plan_digest", ""))
-        except Exception:
+        if not isinstance(edit_meta, dict):
+            raise RuntimeError("Core report returned invalid edit metadata payload")
+
+        plan_digest_raw = edit_meta.get("plan_digest", "")
+        if plan_digest_raw is None:
             plan_digest = ""
+        elif isinstance(plan_digest_raw, str):
+            plan_digest = plan_digest_raw
+        else:
+            raise RuntimeError("Core report returned non-string plan_digest")
+
+        deltas = edit_meta.get("deltas", report["edit"]["deltas"])
+        if not isinstance(deltas, dict):
+            raise RuntimeError("Core report returned invalid edit delta payload")
         report["edit"].update(
             {
                 "name": scenario.edit,
                 "plan_digest": plan_digest,
-                "deltas": (
-                    edit_meta.get("deltas", report["edit"]["deltas"])
-                    if isinstance(edit_meta, dict)
-                    else report["edit"]["deltas"]
-                ),
+                "deltas": deltas,
             }
         )
 
@@ -306,13 +337,11 @@ def execute_single_run(
                     {
                         "name": name,
                         "passed": guard_result.get("passed"),
-                        "action": guard_result.get("action"),
+                        "decision": guard_result.get("decision"),
                         "policy": guard_result.get("policy", {}),
                         "metrics": guard_result.get("metrics", {}),
-                        "actions": guard_result.get("actions", []),
+                        "diagnostics": guard_result.get("diagnostics", []),
                         "violations": guard_result.get("violations", []),
-                        "warnings": guard_result.get("warnings", []),
-                        "errors": guard_result.get("errors", []),
                         "details": guard_result.get("details", {}),
                     }
                 )
@@ -326,13 +355,15 @@ def execute_single_run(
                 baseline_mp_stats=rmt_baseline_mp_stats,
                 deadband=rmt_deadband,
             )
-            report["metrics"].setdefault("rmt", {})
-            if isinstance(report["metrics"].get("rmt"), dict):
-                report["metrics"]["rmt"]["outliers"] = int(
-                    detection.get("n_layers_flagged", 0) or 0
-                )
-        except Exception:
-            pass
+        except Exception as exc:
+            raise RuntimeError(
+                f"RMT detection failed for {scenario.edit} ({run_type}): {exc}"
+            ) from exc
+        report["metrics"].setdefault("rmt", {})
+        if isinstance(report["metrics"].get("rmt"), dict):
+            report["metrics"]["rmt"]["outliers"] = int(
+                detection.get("n_layers_flagged", 0) or 0
+            )
 
         status = getattr(core_report, "status", "")
         rollback_reason = (
@@ -398,19 +429,13 @@ def execute_scenario(
     runtime: dict[str, Any] = {"dataset_name": config.dataset}
 
     bare_config = config_manager.create_bare_config(scenario)
-    try:
-        bare_config.setdefault("dataset", {})["provider"] = config.dataset
-    except Exception:
-        pass
+    _assign_dataset_provider(bare_config, config.dataset, run_label="bare")
     bare_result = execute_single_run(
         bare_config, scenario, "bare", scenario_dir, runtime=runtime
     )
 
     guarded_config = config_manager.create_guarded_config(scenario)
-    try:
-        guarded_config.setdefault("dataset", {})["provider"] = config.dataset
-    except Exception:
-        pass
+    _assign_dataset_provider(guarded_config, config.dataset, run_label="guarded")
     guarded_result = execute_single_run(
         guarded_config, scenario, "guarded", scenario_dir, runtime=runtime
     )
@@ -423,23 +448,17 @@ def execute_scenario(
             json.dumps(pairing_schedule, indent=2), encoding="utf-8"
         )
         artifacts["pairing_schedule"] = str(pairing_path)
-    try:
-        if bare_result and bare_result.report:
-            artifacts["bare_report"] = bare_result.report.get("artifacts", {}).get(
-                "report_path"
-            )
-    except Exception:
-        pass
-    try:
-        if guarded_result and guarded_result.report:
-            artifacts["guarded_report"] = guarded_result.report.get(
-                "artifacts", {}
-            ).get("report_path")
-    except Exception:
-        pass
+    bare_report_path = _extract_success_report_path(bare_result, run_label="bare")
+    if bare_report_path is not None:
+        artifacts["bare_report"] = bare_report_path
+    guarded_report_path = _extract_success_report_path(
+        guarded_result, run_label="guarded"
+    )
+    if guarded_report_path is not None:
+        artifacts["guarded_report"] = guarded_report_path
 
-    try:
-        if bare_result.success and guarded_result.success:
+    if bare_result.success and guarded_result.success:
+        try:
             from invarlock.reporting.report_make import make_report
             from invarlock.reporting.report_telemetry import (
                 telemetry_output_enabled,
@@ -456,10 +475,10 @@ def execute_scenario(
                 json.dumps(evaluation_report, indent=2), encoding="utf-8"
             )
             artifacts["evaluation_report"] = str(report_path)
-    except Exception as exc:
-        logger.warning(
-            f"Evaluation report generation failed for {scenario_slug}: {exc}"
-        )
+        except Exception as exc:
+            raise RuntimeError(
+                f"Evaluation report generation failed for {scenario_slug}: {exc}"
+            ) from exc
 
     epsilon_used = config.epsilon
     if epsilon_used is None and guarded_result.success:

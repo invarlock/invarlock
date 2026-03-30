@@ -35,19 +35,19 @@ def _canonical_dataset_id(value: Any) -> str | None:
     if hasattr(value, "items"):
         try:
             return _canonical_dataset_id(dict(value.items()))
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             pass
     for attr in ("kind", "dataset", "name", "id", "provider"):
         try:
             candidate = getattr(value, attr)
-        except Exception:
+        except AttributeError:
             continue
         normalized = _canonical_dataset_id(candidate)
         if normalized is not None:
             return normalized
     try:
         normalized = str(value).strip()
-    except Exception:
+    except (TypeError, ValueError):
         return None
     return normalized or None
 
@@ -254,6 +254,7 @@ def validate_and_harvest_baseline_schedule(
     baseline_path_str: str | None = None,
     console: Console | None = None,
     event_fn: Any | None = None,
+    typed_failures: bool = False,
     canonical_dataset_id_fn: Any | None = None,
     tensor_or_list_to_ints_fn: Any | None = None,
     hash_sequences_fn: Any | None = None,
@@ -283,8 +284,11 @@ def validate_and_harvest_baseline_schedule(
         path = baseline_path_str or "baseline"
         prof = (profile or "dev").strip().lower()
         message = f"PAIRING-EVIDENCE-MISSING: {path}: {reason}"
-        if prof in {"ci", "release"}:
+        shell_mode = console is not None and event_fn is not None
+        if prof in {"ci", "release"} or typed_failures:
             raise invarlock_error_cls(code="E001", message=message)
+        if not shell_mode:
+            raise typer.Exit(1)
         _emit(
             "FAIL",
             f"Baseline pairing schedule '{path}' is incompatible: {reason}",
@@ -490,7 +494,7 @@ def validate_and_harvest_baseline_schedule(
         raise
     except typer.Exit:
         raise
-    except Exception as exc:
+    except (AttributeError, KeyError, TypeError, ValueError) as exc:
         _fail_schedule(f"failed to validate baseline schedule integrity ({exc})")
 
     baseline_preview = len(pairing_schedule["preview"].get("input_ids") or [])

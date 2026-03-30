@@ -30,7 +30,7 @@ def test_mi_gini_gpu_oom_fallback(monkeypatch):
 
     monkeypatch.setattr(M, "DependencyManager", lambda: StubDep())
 
-    cfg = M.MetricsConfig(progress_bars=False)
+    cfg = M.MetricsConfig()
     # Call private implementation to exercise fallback branch without heavyweight setup
     out = _calculate_mi_gini(
         model=SimpleNamespace(),

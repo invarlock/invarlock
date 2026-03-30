@@ -12,7 +12,7 @@ import shutil
 from contextlib import contextmanager
 from typing import Any
 
-from .types import GuardOutcome
+from .types import GuardOutcome, normalize_guard_decision
 
 
 def _use_chunked_snapshot() -> bool:
@@ -61,14 +61,22 @@ class PolicyCheckpoint:
         Returns:
             (should_rollback, reason) tuple
         """
-        # Check for abort actions
         for outcome in outcomes:
-            if hasattr(outcome, "action") and outcome.action == "abort":
+            decision = normalize_guard_decision(
+                getattr(outcome, "decision", None),
+                fallback_action=getattr(outcome, "action", None),
+                passed=getattr(outcome, "passed", None),
+            )
+            if decision == "block":
                 return True, "guard_abort"
 
-        # Check for rollback actions
         for outcome in outcomes:
-            if hasattr(outcome, "action") and outcome.action == "rollback":
+            decision = normalize_guard_decision(
+                getattr(outcome, "decision", None),
+                fallback_action=getattr(outcome, "action", None),
+                passed=getattr(outcome, "passed", None),
+            )
+            if decision == "rollback":
                 return True, "guard_rollback"
 
         # Check policy configuration

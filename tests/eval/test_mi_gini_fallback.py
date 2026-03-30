@@ -27,7 +27,7 @@ def test_mi_gini_cpu_fallback_on_oom():
         nn.Linear(1, 1),
         activation_data,
         FakeDep(),
-        MetricsConfig(progress_bars=False),
+        MetricsConfig(),
         torch.device("cpu"),
     )
     assert isinstance(res, float) and (math.isnan(res) or math.isfinite(res))

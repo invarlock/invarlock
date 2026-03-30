@@ -46,6 +46,7 @@ from invarlock.core.run_retry_policy import (
     resolve_retry_validation_transition as _resolve_retry_validation_transition_impl,
 )
 from invarlock.core.run_timing_policy import (
+    TimingSummaryPayload,
     build_timing_summary_payload as _build_timing_summary_payload_impl,
 )
 from invarlock.model_utils import set_seed
@@ -72,43 +73,214 @@ class RunExecutionRequest:
     capture_timings: bool = False
     telemetry: bool = False
     prefer_local_files_only: bool = False
+    eval_device_override: str | None = None
+    determinism_mode: str | None = None
+    determinism_warn_only: bool = False
+    tiny_relax_enabled: bool = False
+    export_model_requested: bool = False
+    export_dir: str | None = None
+
+
+class RunExecutionEvent:
+    """Marker base class for typed run-orchestration events."""
+
+
+class RunLifecycleEvent(RunExecutionEvent):
+    """Marker base class for lifecycle/progress events."""
 
 
 @dataclass(frozen=True)
-class RunLifecycleEvent:
-    """Lifecycle event emitted by the owner layer."""
+class RunDiagnosticEvent(RunExecutionEvent):
+    """Structured diagnostic emitted by the owner layer."""
 
-    name: str
-    payload: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
-class RunDiagnosticEvent:
-    """Diagnostic emitted by the owner layer."""
-
-    name: str
-    payload: dict[str, Any] = field(default_factory=dict)
+    source: str | None = None
+    code: str | None = None
+    summary: str | None = None
+    level: str | None = None
+    context: dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass(frozen=True)
-class RunContextEvent:
-    """Context emitted by the owner layer."""
+class RunContextEvent(RunExecutionEvent):
+    """Marker base class for context events."""
 
-    name: str
-    payload: dict[str, Any] = field(default_factory=dict)
+
+class RunAggregateEvent(RunExecutionEvent):
+    """Marker base class for aggregate/summary events."""
 
 
 @dataclass(frozen=True)
-class RunAggregateEvent:
-    """Aggregate/summary payload emitted by the owner layer."""
-
-    name: str
-    payload: dict[str, Any] = field(default_factory=dict)
+class RunConfigLoadingEvent(RunLifecycleEvent):
+    config_path: str
 
 
-RunExecutionEvent = (
-    RunLifecycleEvent | RunDiagnosticEvent | RunContextEvent | RunAggregateEvent
-)
+@dataclass(frozen=True)
+class RunConfigLoadedEvent(RunLifecycleEvent):
+    pass
+
+
+@dataclass(frozen=True)
+class RunPipelineStartedEvent(RunLifecycleEvent):
+    pass
+
+
+@dataclass(frozen=True)
+class RunDeterministicSeedsEvent(RunLifecycleEvent):
+    python_seed: int
+    numpy_seed: int
+    torch_seed: int | None
+
+
+@dataclass(frozen=True)
+class RunBaselineScheduleLoadedEvent(RunLifecycleEvent):
+    pass
+
+
+@dataclass(frozen=True)
+class RunAdapterSelectedEvent(RunLifecycleEvent):
+    adapter_name: str
+
+
+@dataclass(frozen=True)
+class RunDatasetLoadingEvent(RunLifecycleEvent):
+    provider: str
+
+
+@dataclass(frozen=True)
+class RunCalibrationBatchSizesDebugEvent(RunLifecycleEvent):
+    preview_count: int
+    final_count: int
+    total_count: int
+
+
+@dataclass(frozen=True)
+class RunMaskedTokensDebugEvent(RunLifecycleEvent):
+    preview_masked: int
+    final_masked: int
+
+
+@dataclass(frozen=True)
+class RunPreviewLabelsDebugEvent(RunLifecycleEvent):
+    labels: tuple[Any, ...]
+
+
+@dataclass(frozen=True)
+class RunExecutePipelineEvent(RunLifecycleEvent):
+    guard_count: int
+
+
+@dataclass(frozen=True)
+class RunLoadModelOnceEvent(RunLifecycleEvent):
+    model_id: str
+
+
+@dataclass(frozen=True)
+class RunSnapshotModeEvent(RunLifecycleEvent):
+    enabled: bool
+
+
+@dataclass(frozen=True)
+class RunAttemptStartedEvent(RunLifecycleEvent):
+    attempt: int
+    max_attempts: int | None = None
+
+
+@dataclass(frozen=True)
+class RunRetryAttemptStartedEvent(RunLifecycleEvent):
+    attempt: int
+    max_attempts: int
+
+
+@dataclass(frozen=True)
+class RunTelemetrySavedEvent(RunLifecycleEvent):
+    path: str
+
+
+@dataclass(frozen=True)
+class RunTelemetryFailedEvent(RunLifecycleEvent):
+    error: str
+
+
+@dataclass(frozen=True)
+class RunPrimaryMetricSummaryEvent(RunAggregateEvent):
+    metric_kind: str
+    preview: float
+    final: float
+    ratio_vs_baseline: float | None = None
+
+
+@dataclass(frozen=True)
+class RunEvaluationReportStartedEvent(RunLifecycleEvent):
+    pass
+
+
+@dataclass(frozen=True)
+class RunEvaluationReportPassedEvent(RunLifecycleEvent):
+    pass
+
+
+@dataclass(frozen=True)
+class RunEvaluationReportFailedEvent(RunLifecycleEvent):
+    gate_codes: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class RunAutoTuneAdjustmentEvent(RunLifecycleEvent):
+    global_k: int
+    keep_low: int
+    keep_high: int
+
+
+@dataclass(frozen=True)
+class RunRetryExhaustedEvent(RunLifecycleEvent):
+    attempt: int
+
+
+@dataclass(frozen=True)
+class RunRetryValidationErrorEvent(RunLifecycleEvent):
+    summary: str
+
+
+@dataclass(frozen=True)
+class RunCleanupStatusEvent(RunLifecycleEvent):
+    removed: bool
+
+
+@dataclass(frozen=True)
+class RunFailureEvent(RunLifecycleEvent):
+    failure: RunExecutionFailure
+
+
+@dataclass(frozen=True)
+class RunDeviceResolvedEvent(RunContextEvent):
+    requested_device: str
+    resolved_device: str
+
+
+@dataclass(frozen=True)
+class RunOutputDirectoryReadyEvent(RunContextEvent):
+    run_dir: str
+    run_id: str
+
+
+@dataclass(frozen=True)
+class RunEditSelectedEvent(RunContextEvent):
+    edit_name: str
+
+
+@dataclass(frozen=True)
+class RunGuardChainResolvedEvent(RunContextEvent):
+    guard_names: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class RunGuardOverheadSummaryEvent(RunAggregateEvent):
+    guard_overhead_info: dict[str, Any]
+    default_threshold: float
+
+
+@dataclass(frozen=True)
+class RunRetrySummaryEvent(RunAggregateEvent):
+    summary: dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -117,6 +289,7 @@ class RunExecutionResult:
 
     report_path: str | None
     timings: dict[str, float]
+    timing_summary: TimingSummaryPayload | None = None
 
 
 @dataclass(frozen=True)
@@ -134,9 +307,9 @@ class RunExecutionFailure:
     """Typed failure contract produced by run orchestration."""
 
     code: str
-    message: str | None = None
+    summary: str | None = None
     error: Exception | None = None
-    details: dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
 
 
 RunExecutionObserver = Callable[[RunExecutionEvent], None]
@@ -222,6 +395,12 @@ def execute_run_request(
     capture_timings = request.capture_timings
     telemetry = request.telemetry
     prefer_local_files_only = request.prefer_local_files_only
+    eval_device_override = request.eval_device_override
+    determinism_mode = request.determinism_mode
+    determinism_warn_only = request.determinism_warn_only
+    tiny_relax_enabled = request.tiny_relax_enabled
+    export_model_requested = request.export_model_requested
+    export_dir_override = request.export_dir
 
     CONFIG_VALUE_EXCEPTIONS = (AttributeError, TypeError, ValueError, KeyError)
     NUMERIC_EXCEPTIONS = (TypeError, ValueError, OverflowError)
@@ -281,6 +460,7 @@ def execute_run_request(
     no_cleanup = bool(no_cleanup)
     telemetry = bool(telemetry)
     timings: dict[str, float] = {}
+    timing_summary: TimingSummaryPayload | None = None
     collect_timings = bool(capture_timings or telemetry)
     total_start: float | None = perf_counter() if collect_timings else None
 
@@ -296,14 +476,23 @@ def execute_run_request(
         if observer is not None:
             observer(event)
 
-    def _emit_status(code: str, **details: Any) -> None:
-        _emit(RunLifecycleEvent(name=code, payload=dict(details)))
-
-    def _emit_diagnostic(code: str, **details: Any) -> None:
-        _emit(RunDiagnosticEvent(name=code, payload=dict(details)))
-
-    def _emit_metadata(code: str, **details: Any) -> None:
-        _emit(RunContextEvent(name=code, payload=dict(details)))
+    def _emit_diagnostic(
+        *,
+        origin: str | None = None,
+        code: str | None = None,
+        summary: str | None = None,
+        level: str | None = None,
+        **context: Any,
+    ) -> None:
+        _emit(
+            RunDiagnosticEvent(
+                source=origin,
+                code=code,
+                summary=summary,
+                level=level,
+                context=dict(context),
+            )
+        )
 
     def _emit_guard_overhead_summary(
         guard_overhead_info: dict[str, Any],
@@ -311,12 +500,9 @@ def execute_run_request(
         default_threshold: float,
     ) -> None:
         _emit(
-            RunAggregateEvent(
-                name="guard_overhead_summary",
-                payload={
-                    "guard_overhead_info": guard_overhead_info,
-                    "default_threshold": default_threshold,
-                },
+            RunGuardOverheadSummaryEvent(
+                guard_overhead_info=guard_overhead_info,
+                default_threshold=default_threshold,
             )
         )
 
@@ -331,27 +517,23 @@ def execute_run_request(
             return
         if not isinstance(summary, dict):
             return
-        _emit(RunAggregateEvent(name="retry_summary", payload={"summary": summary}))
+        _emit(RunRetrySummaryEvent(summary=summary))
 
     def _halt(
         code: str,
         *,
-        message: str | None = None,
+        summary: str | None = None,
         error: Exception | None = None,
-        **details: Any,
+        **context: Any,
     ) -> None:
-        if message is not None:
-            _emit_status(code, message=message, **details)
-        else:
-            _emit_status(code, **details)
-        raise _RunExecutionHalt(
-            RunExecutionFailure(
-                code=code,
-                message=message,
-                error=error,
-                details=dict(details),
-            )
+        failure = RunExecutionFailure(
+            code=code,
+            summary=summary,
+            error=error,
+            context=dict(context),
         )
+        _emit(RunFailureEvent(failure=failure))
+        raise _RunExecutionHalt(failure)
 
     @contextmanager
     def _record_timed_step(key: str):
@@ -362,18 +544,29 @@ def execute_run_request(
             timings[key] = elapsed
 
     def _fail_run(message: str, *, error: Exception | None = None) -> None:
-        _halt("pipeline_failed", message=message, error=error)
+        _halt("pipeline_failed", summary=message, error=error)
 
     def _emit_transition_diagnostic(source: str, diagnostic: Any) -> None:
         code = getattr(diagnostic, "code", None)
         if isinstance(code, str) and code:
             details = getattr(diagnostic, "details", None)
-            payload = dict(details) if isinstance(details, dict) else {}
+            context = getattr(diagnostic, "context", None)
+            payload = {}
+            if isinstance(details, dict):
+                payload.update(details)
+            if isinstance(context, dict):
+                payload.update(context)
             payload.setdefault("diagnostic_source", source)
-            message = getattr(diagnostic, "message", None)
-            if isinstance(message, str) and message:
-                payload.setdefault("message", message)
-            _emit_diagnostic(code, **payload)
+            summary = getattr(diagnostic, "summary", None)
+            if not isinstance(summary, str) or not summary:
+                message = getattr(diagnostic, "message", None)
+                summary = message if isinstance(message, str) and message else None
+            _emit_diagnostic(
+                origin=source,
+                code=code,
+                summary=summary,
+                **payload,
+            )
             return
         kind = getattr(diagnostic, "kind", None)
         if isinstance(kind, str) and kind:
@@ -381,14 +574,25 @@ def execute_run_request(
             metadata = getattr(diagnostic, "metadata", None)
             if isinstance(metadata, dict):
                 payload.update(metadata)
+            context = getattr(diagnostic, "context", None)
+            if isinstance(context, dict):
+                payload.update(context)
             payload.setdefault("diagnostic_source", source)
-            severity = getattr(diagnostic, "severity", None)
-            if isinstance(severity, str) and severity:
-                payload.setdefault("severity", severity)
-            message = getattr(diagnostic, "message", None)
-            if isinstance(message, str) and message:
-                payload.setdefault("message", message)
-            _emit_diagnostic(kind, **payload)
+            level = getattr(diagnostic, "level", None)
+            if not isinstance(level, str) or not level:
+                severity = getattr(diagnostic, "severity", None)
+                level = severity if isinstance(severity, str) and severity else None
+            summary = getattr(diagnostic, "summary", None)
+            if not isinstance(summary, str) or not summary:
+                message = getattr(diagnostic, "message", None)
+                summary = message if isinstance(message, str) and message else None
+            _emit_diagnostic(
+                origin=source,
+                code=kind,
+                summary=summary,
+                level=level,
+                **payload,
+            )
             return
         payload = {"diagnostic_source": source}
         metadata = getattr(diagnostic, "metadata", None)
@@ -397,14 +601,25 @@ def execute_run_request(
         details = getattr(diagnostic, "details", None)
         if isinstance(details, dict):
             payload.update(details)
-        severity = getattr(diagnostic, "severity", None)
-        if isinstance(severity, str) and severity:
-            payload.setdefault("severity", severity)
-        message = getattr(diagnostic, "message", None)
-        if isinstance(message, str) and message:
-            payload.setdefault("message", message)
-        if len(payload) > 1:
-            _emit_diagnostic("transition_diagnostic", **payload)
+        context = getattr(diagnostic, "context", None)
+        if isinstance(context, dict):
+            payload.update(context)
+        level = getattr(diagnostic, "level", None)
+        if not isinstance(level, str) or not level:
+            severity = getattr(diagnostic, "severity", None)
+            level = severity if isinstance(severity, str) and severity else None
+        summary = getattr(diagnostic, "summary", None)
+        if not isinstance(summary, str) or not summary:
+            message = getattr(diagnostic, "message", None)
+            summary = message if isinstance(message, str) and message else None
+        if len(payload) > 1 or (isinstance(summary, str) and summary):
+            _emit_diagnostic(
+                origin=source,
+                code="transition_diagnostic",
+                summary=summary,
+                level=level,
+                **payload,
+            )
 
     def _cfg_section_value(cfg_obj: Any, name: str) -> Any:
         section_fn = getattr(cfg_obj, "section", None)
@@ -454,7 +669,7 @@ def execute_run_request(
         from invarlock.core.registry import get_registry
         from invarlock.core.runner import CoreRunner
 
-        _emit_status("config_loading", config_path=config)
+        _emit(RunConfigLoadingEvent(config_path=config))
         cfg = _prepare_config_for_run(
             config_path=config,
             profile=profile,
@@ -462,7 +677,7 @@ def execute_run_request(
             tier=tier,
             probes=probes,
         )
-        _emit_status("config_loaded")
+        _emit(RunConfigLoadedEvent())
 
         # cfg prepared by helper above
         edit_payload: dict[str, Any] = {}
@@ -573,16 +788,11 @@ def execute_run_request(
         torch_mod = _optional_torch()
         if torch_mod is not None and profile_label in {"ci", "release"}:
             try:  # pragma: no cover - behavior depends on torch availability
-                determinism_mode = (
-                    os.environ.get("PACK_DETERMINISM")
-                    or os.environ.get("INVARLOCK_DETERMINISM")
-                    or "throughput"
-                )
+                resolved_determinism_mode = determinism_mode or "throughput"
                 warn_only = False
-                if determinism_mode and determinism_mode.lower() != "strict":
+                if resolved_determinism_mode.lower() != "strict":
                     warn_only = True
-                warn_only_env = os.environ.get("INVARLOCK_DETERMINISM_WARN_ONLY", "")
-                if warn_only_env.strip().lower() in {"1", "true", "yes", "y", "on"}:
+                if bool(determinism_warn_only):
                     warn_only = True
                 if hasattr(torch_mod, "use_deterministic_algorithms"):
                     torch_mod.use_deterministic_algorithms(True, warn_only=warn_only)
@@ -616,21 +826,23 @@ def execute_run_request(
             "numpy": int(numpy_seed),
             "torch": int(torch_seed) if torch_seed is not None else None,
         }
-        _emit_status(
-            "deterministic_seed_bundle",
-            python_seed=seed_bundle["python"],
-            numpy_seed=seed_bundle["numpy"],
-            torch_seed=seed_bundle["torch"],
+        _emit(
+            RunDeterministicSeedsEvent(
+                python_seed=seed_bundle["python"],
+                numpy_seed=seed_bundle["numpy"],
+                torch_seed=seed_bundle["torch"],
+            )
         )
 
         # Resolve device and output directory
         resolved_device, output_dir = _resolve_device_and_output(
             cfg, device=device, out=out
         )
-        _emit_metadata(
-            "device_resolved",
-            requested_device=device,
-            resolved_device=resolved_device,
+        _emit(
+            RunDeviceResolvedEvent(
+                requested_device=str(device or "auto"),
+                resolved_device=str(resolved_device),
+            )
         )
 
         determinism_meta: dict[str, Any] | None = None
@@ -667,7 +879,9 @@ def execute_run_request(
 
         run_id = f"{output_dir.name}-{timestamp}" if output_dir.name else timestamp
 
-        _emit_metadata("run_directory_ready", run_dir=str(run_dir), run_id=run_id)
+        _emit(
+            RunOutputDirectoryReadyEvent(run_dir=str(run_dir), run_id=run_id)
+        )
 
         # Initialize retry controller if --until-pass mode enabled
         retry_controller = _init_retry_controller(
@@ -701,14 +915,14 @@ def execute_run_request(
             pairing_schedule = baseline_evidence.pairing_schedule
             tokenizer_hash = baseline_evidence.tokenizer_hash
             if baseline_evidence.status == "loaded":
-                _emit_status("baseline_schedule_loaded")
+                _emit(RunBaselineScheduleLoadedEvent())
             elif baseline_evidence.message:
                 if strict_baseline:
                     raise InvarlockError(code="E001", message=baseline_evidence.message)
                 _emit_diagnostic(
-                    "baseline_schedule_fallback",
-                    message=baseline_evidence.message,
-                    severity="warning",
+                    code="baseline_schedule_fallback",
+                    summary=baseline_evidence.message,
+                    level="warning",
                 )
 
         requested_preview = _safe_int(getattr(cfg.dataset, "preview_n", 0), 0)
@@ -725,7 +939,7 @@ def execute_run_request(
         used_fallback_split: bool = False
 
         # Execute the pipeline using CoreRunner
-        _emit_status("pipeline_start")
+        _emit(RunPipelineStartedEvent())
 
         # Get registry and create components
         registry = get_registry()
@@ -782,7 +996,7 @@ def execute_run_request(
                         registry.get_plugin_metadata(guard_name, "guards")
                     )
                 except KeyError:
-                    _emit_diagnostic("guard_missing", guard_name=guard_name)
+                    _emit_diagnostic(code="guard_missing", guard_name=guard_name)
         plugin_provenance = {
             "adapter": adapter_meta,
             "edit": edit_meta,
@@ -792,9 +1006,8 @@ def execute_run_request(
         pm_drift_band = _resolve_pm_drift_band_impl(cfg)
         guard_overhead_threshold = _resolve_guard_overhead_threshold_impl(cfg)
 
-        _emit_status("adapter_selected", adapter_name=str(adapter.name))
+        _emit(RunAdapterSelectedEvent(adapter_name=str(adapter.name)))
 
-        tiny_relax_env = str(os.environ.get("INVARLOCK_TINY_RELAX", "")).strip().lower()
         run_context = _build_run_context_payload_impl(
             cfg=cfg,
             profile=profile,
@@ -808,9 +1021,12 @@ def execute_run_request(
             guard_overhead_threshold=guard_overhead_threshold,
             model_profile=model_profile,
             resolved_loss_type=resolved_loss_type,
-            tiny_relax_enabled=tiny_relax_env in {"1", "true", "yes", "on"},
+            tiny_relax_enabled=bool(tiny_relax_enabled),
             to_serialisable_dict_fn=_to_serialisable_dict,
         )
+        eval_context = run_context.get("eval")
+        if isinstance(eval_context, dict) and isinstance(eval_device_override, str):
+            eval_context["device_override"] = eval_device_override
         run_config = RunConfig(
             device=resolved_device,
             max_pm_ratio=_coerce_float(
@@ -836,7 +1052,7 @@ def execute_run_request(
         dataset_timing_start: float | None = perf_counter() if collect_timings else None
         if pairing_schedule or cfg.dataset.provider:
             if not pairing_schedule:
-                _emit_status("dataset_loading", provider=str(cfg.dataset.provider))
+                _emit(RunDatasetLoadingEvent(provider=str(cfg.dataset.provider)))
             try:
                 dataset_result = _materialize_run_dataset(
                     pairing_schedule=pairing_schedule,
@@ -913,11 +1129,12 @@ def execute_run_request(
             )
 
         if os.environ.get("INVARLOCK_DEBUG_TRACE"):
-            _emit_status(
-                "debug_calibration_batch_sizes",
-                preview_count=preview_count,
-                final_count=final_count,
-                total_count=len(calibration_data),
+            _emit(
+                RunCalibrationBatchSizesDebugEvent(
+                    preview_count=int(preview_count),
+                    final_count=int(final_count),
+                    total_count=len(calibration_data),
+                )
             )
             if use_mlm and calibration_data:
                 masked_preview = sum(
@@ -928,18 +1145,20 @@ def execute_run_request(
                     entry.get("mlm_masked", 0)
                     for entry in calibration_data[preview_count:]
                 )
-                _emit_status(
-                    "debug_masked_tokens",
-                    preview_masked=masked_preview,
-                    final_masked=masked_final,
+                _emit(
+                    RunMaskedTokensDebugEvent(
+                        preview_masked=int(masked_preview),
+                        final_masked=int(masked_final),
+                    )
                 )
-                _emit_status(
-                    "debug_preview_labels",
-                    labels=list(calibration_data[0]["labels"][:10]),
+                _emit(
+                    RunPreviewLabelsDebugEvent(
+                        labels=tuple(calibration_data[0]["labels"][:10])
+                    )
                 )
 
         # Execute the real pipeline using CoreRunner
-        _emit_status("execute_pipeline", guard_count=len(guards))
+        _emit(RunExecutePipelineEvent(guard_count=len(guards)))
         runner = CoreRunner()
 
         execution_payloads = _build_run_execution_config_payloads_impl(
@@ -949,10 +1168,13 @@ def execute_run_request(
         auto_config = execution_payloads.auto_config
         edit_config = execution_payloads.edit_config
 
-        _emit_metadata("edit_selected", edit_name=str(edit_op.name))
-        _emit_metadata(
-            "guard_chain_resolved",
-            guard_names=[str(getattr(guard, "name", "unknown")) for guard in guards],
+        _emit(RunEditSelectedEvent(edit_name=str(edit_op.name)))
+        _emit(
+            RunGuardChainResolvedEvent(
+                guard_names=tuple(
+                    str(getattr(guard, "name", "unknown")) for guard in guards
+                )
+            )
         )
 
         # Model load/snapshot strategy
@@ -967,7 +1189,7 @@ def execute_run_request(
         # Try single-load with snapshot/restore if adapter supports it; fallback to reload per attempt
         try:
             # Load once
-            _emit_status("load_model_once", model_id=str(cfg.model.id))
+            _emit(RunLoadModelOnceEvent(model_id=str(cfg.model.id)))
             with _record_timed_step("load_model"):
                 model = _load_model_with_cfg(
                     adapter,
@@ -1008,9 +1230,8 @@ def execute_run_request(
             snapshot_provenance = snapshot_plan.snapshot_provenance
             emitted_skip_overhead_warning = snapshot_plan.emitted_skip_overhead_warning
             if snapshot_plan.snapshot_enabled is not None:
-                _emit_status(
-                    "snapshot_mode",
-                    enabled=bool(snapshot_plan.snapshot_enabled),
+                _emit(
+                    RunSnapshotModeEvent(enabled=bool(snapshot_plan.snapshot_enabled))
                 )
             for diagnostic in snapshot_plan.diagnostics:
                 _emit_transition_diagnostic("snapshot_plan", diagnostic)
@@ -1044,26 +1265,22 @@ def execute_run_request(
             set_seed(seed_bundle["python"])
 
             if retry_controller:
-                _emit_status(
-                    "attempt_started",
-                    attempt=attempt,
-                    max_attempts=max_attempts,
-                    retry_enabled=True,
+                _emit(
+                    RunAttemptStartedEvent(
+                        attempt=int(attempt),
+                        max_attempts=int(max_attempts),
+                    )
                 )
                 if attempt > 1:
-                    _emit_status(
-                        "retry_attempt_started",
-                        attempt=attempt,
-                        max_attempts=max_attempts,
+                    _emit(
+                        RunRetryAttemptStartedEvent(
+                            attempt=int(attempt),
+                            max_attempts=int(max_attempts),
+                        )
                     )
             else:
                 if attempt > 1:
-                    _emit_status(
-                        "attempt_started",
-                        attempt=attempt,
-                        max_attempts=None,
-                        retry_enabled=False,
-                    )
+                    _emit(RunAttemptStartedEvent(attempt=int(attempt)))
 
             # Adjust parameters for retry attempts
             if retry_controller and attempt > 1:
@@ -1092,9 +1309,14 @@ def execute_run_request(
                         "mode": "skipped",
                         "source": skip_overhead_source
                         or "config:context.run.skip_overhead_check",
-                        "messages": ["Overhead check skipped via config policy"],
-                        "warnings": [],
-                        "errors": [],
+                        "diagnostics": [
+                            {
+                                "kind": "guard_overhead_info",
+                                "severity": "info",
+                                "message": "Overhead check skipped via config policy",
+                                "details": {},
+                            }
+                        ],
                         "checks": {},
                     }
                 elif measure_guard_overhead:
@@ -1147,7 +1369,7 @@ def execute_run_request(
                 _free_model_memory(model)
                 model = None
                 restore_fn = None
-                _emit_diagnostic("snapshot_restore_fallback", error=str(exc))
+                _emit_diagnostic(code="snapshot_restore_fallback", error=str(exc))
                 retry_transition = _decide_failed_retry_transition_impl(
                     retry_controller,
                     attempt=attempt,
@@ -1221,19 +1443,11 @@ def execute_run_request(
                         ),
                     )
             except InvarlockError as ce:
-                _halt("invarlock_error", message=str(ce), error=ce)
+                _halt("invarlock_error", summary=str(ce), error=ce)
             except RuntimeError as exc:
                 _fail_run(str(exc), error=exc)
 
             # Optional: export HF-loadable model snapshot when requested
-            export_env = str(
-                os.environ.get("INVARLOCK_EXPORT_MODEL", "")
-            ).strip().lower() in {
-                "1",
-                "true",
-                "yes",
-                "on",
-            }
             save_model_cfg = False
             try:
                 save_model_cfg = bool(
@@ -1241,7 +1455,7 @@ def execute_run_request(
                 )
             except (AttributeError, TypeError):
                 save_model_cfg = False
-            if export_env or save_model_cfg:
+            if bool(export_model_requested) or save_model_cfg:
                 try:
                     # Resolve destination with precedence:
                     # 1) cfg.output.model_dir (absolute or relative to run_dir)
@@ -1263,10 +1477,9 @@ def execute_run_request(
                     except OPTIONAL_RUNTIME_EXCEPTIONS:
                         export_dir = None
                     # (2) env override
-                    if export_dir is None:
-                        env_dir_raw = os.environ.get("INVARLOCK_EXPORT_DIR", "")
-                        if isinstance(env_dir_raw, str) and env_dir_raw.strip():
-                            p = Path(env_dir_raw.strip())
+                    if export_dir is None and isinstance(export_dir_override, str):
+                        if export_dir_override.strip():
+                            p = Path(export_dir_override.strip())
                             export_dir = p if p.is_absolute() else (run_dir / p)
                     # (3) config subdir
                     if export_dir is None:
@@ -1290,12 +1503,12 @@ def execute_run_request(
                             try:
                                 save_tokenizer(str(export_dir))
                             except OPTIONAL_RUNTIME_EXCEPTIONS:
-                                _emit_diagnostic("export_tokenizer_missing")
+                                _emit_diagnostic(code="export_tokenizer_missing")
                         report["artifacts"]["checkpoint_path"] = str(export_dir)
                     else:
-                        _emit_diagnostic("export_adapter_directory_missing")
+                        _emit_diagnostic(code="export_adapter_directory_missing")
                 except OPTIONAL_RUNTIME_EXCEPTIONS:
-                    _emit_diagnostic("export_failed")
+                    _emit_diagnostic(code="export_failed")
 
             pairing_violations = metrics_enrichment.pairing_violations
             if pairing_violations:
@@ -1305,10 +1518,10 @@ def execute_run_request(
                     message=violation.message,
                     details=violation.details,
                 )
-                _halt("invarlock_error", message=str(err), error=err)
+                _halt("invarlock_error", summary=str(err), error=err)
             if metrics_enrichment.debug_diffs_line:
                 _emit_diagnostic(
-                    "metric_diffs_debug",
+                    code="metric_diffs_debug",
                     summary=metrics_enrichment.debug_diffs_line,
                 )
 
@@ -1320,14 +1533,16 @@ def execute_run_request(
             )
             report_path_out = persistence_result.report_path_out or report_path_out
             if persistence_result.telemetry_saved_path:
-                _emit_status(
-                    "telemetry_saved",
-                    path=str(persistence_result.telemetry_saved_path),
+                _emit(
+                    RunTelemetrySavedEvent(
+                        path=str(persistence_result.telemetry_saved_path)
+                    )
                 )
             elif persistence_result.telemetry_error:
-                _emit_status(
-                    "telemetry_failed",
-                    error=str(persistence_result.telemetry_error),
+                _emit(
+                    RunTelemetryFailedEvent(
+                        error=str(persistence_result.telemetry_error)
+                    )
                 )
 
             # Metrics display
@@ -1341,23 +1556,22 @@ def execute_run_request(
                     pm_kind = str(pm_obj.get("kind", "primary")).lower()
                     pm_prev = pm_obj.get("preview")
                     pm_fin = pm_obj.get("final")
+                    ratio_vs_base = pm_obj.get("ratio_vs_baseline")
                     if isinstance(pm_prev, (int | float)) and isinstance(
                         pm_fin, (int | float)
                     ):
-                        _emit_status(
-                            "primary_metric_summary",
-                            metric_kind=pm_kind,
-                            preview=float(pm_prev),
-                            final=float(pm_fin),
-                        )
-                    ratio_vs_base = pm_obj.get("ratio_vs_baseline")
-                    if isinstance(ratio_vs_base, (int | float)) and math.isfinite(
-                        ratio_vs_base
-                    ):
-                        _emit_status(
-                            "baseline_ratio",
-                            metric_kind=pm_kind,
-                            ratio=float(ratio_vs_base),
+                        _emit(
+                            RunPrimaryMetricSummaryEvent(
+                                metric_kind=pm_kind,
+                                preview=float(pm_prev),
+                                final=float(pm_fin),
+                                ratio_vs_baseline=(
+                                    float(ratio_vs_base)
+                                    if isinstance(ratio_vs_base, (int | float))
+                                    and math.isfinite(ratio_vs_base)
+                                    else None
+                                ),
+                            )
                         )
                 except (TypeError, ValueError):
                     pass
@@ -1376,7 +1590,6 @@ def execute_run_request(
                     or guard_overhead_threshold
                 )
                 if not guard_overhead_info.get("passed", True):
-                    _emit_status("guard_overhead_gate_failed")
                     # Only fail hard when the overhead check was actually evaluated
                     # (e.g., for causal LMs with available bare/guarded PM). For
                     # masked LM flows where ppl-like PM is undefined, record as not evaluated
@@ -1404,7 +1617,7 @@ def execute_run_request(
 
             # Evaluation report validation for --until-pass mode
             if retry_controller and baseline:
-                _emit_status("evaluation_report_started")
+                _emit(RunEvaluationReportStartedEvent())
                 retry_validation = _validate_retry_evaluation_report(
                     report=report,
                     baseline_report_data=baseline_report_data,
@@ -1412,7 +1625,7 @@ def execute_run_request(
                 )
                 if retry_validation.telemetry_summary:
                     _emit_diagnostic(
-                        "retry_validation_telemetry_summary",
+                        code="retry_validation_telemetry_summary",
                         summary=retry_validation.telemetry_summary,
                     )
 
@@ -1422,45 +1635,62 @@ def execute_run_request(
                     validation_result=retry_validation,
                     edit_config=edit_config,
                 )
+                retry_disposition = str(
+                    getattr(retry_decision, "status", "error")
+                    or "error"
+                )
+                retry_gate_codes = tuple(
+                    str(item)
+                    for item in (getattr(retry_decision, "validation_gates", ()) or ())
+                )
+                retry_error = getattr(retry_decision, "error", None)
+                retry_summary = str(
+                    getattr(retry_error, "message", None)
+                    or "Retry validation failed"
+                )
 
-                if retry_decision.action == "passed":
-                    _emit_status("evaluation_report_passed")
+                if retry_disposition == "passed":
+                    _emit(RunEvaluationReportPassedEvent())
                     break
 
-                if retry_decision.action in {"retry", "exhausted"}:
-                    _emit_status(
-                        "evaluation_report_failed",
-                        failed_gates=list(retry_decision.failed_gates),
+                if retry_disposition in {"retry", "exhausted"}:
+                    _emit(
+                        RunEvaluationReportFailedEvent(
+                            gate_codes=retry_gate_codes
+                        )
                     )
 
                     edit_config = retry_decision.updated_edit_config
                     head_adjustment = retry_decision.head_adjustment
                     if head_adjustment is not None:
-                        _emit_status(
-                            "auto_tune_adjustment",
-                            global_k=head_adjustment["global_k"],
-                            keep_low=head_adjustment["keep_low"],
-                            keep_high=head_adjustment["keep_high"],
+                        _emit(
+                            RunAutoTuneAdjustmentEvent(
+                                global_k=int(head_adjustment["global_k"]),
+                                keep_low=int(head_adjustment["keep_low"]),
+                                keep_high=int(head_adjustment["keep_high"]),
+                            )
                         )
 
                     for diagnostic in retry_decision.diagnostics:
                         _emit_transition_diagnostic("retry_validation", diagnostic)
-                    if retry_decision.action == "retry":
+                    if retry_disposition == "retry":
                         attempt = retry_decision.next_attempt or (attempt + 1)
                         continue
-                    _emit_status("retry_exhausted", attempt=attempt)
+                    _emit(RunRetryExhaustedEvent(attempt=int(attempt)))
                     break
 
-                if retry_decision.action == "error":
-                    _emit_status(
-                        "retry_validation_error",
-                        message=str(retry_decision.error_message),
+                if retry_disposition == "error":
+                    _emit(
+                        RunRetryValidationErrorEvent(
+                            summary=retry_summary
+                        )
                     )
                     break
 
-                _emit_status(
-                    "retry_validation_error",
-                    message=str(retry_decision.error_message),
+                _emit(
+                    RunRetryValidationErrorEvent(
+                        summary=retry_summary
+                    )
                 )
                 break
             else:
@@ -1493,27 +1723,38 @@ def execute_run_request(
             )
             if summary_payload is not None:
                 timings = dict(summary_payload.timings)
+                timing_summary = summary_payload
 
         outcome_result = RunExecutionResult(
             report_path=report_path_out,
             timings=dict(timings),
+            timing_summary=timing_summary,
         )
 
     except FileNotFoundError as e:
         outcome_failure = RunExecutionFailure(
             code="config_file_missing",
-            message=str(e),
+            summary=str(e),
             error=e,
-            details={"path": str(e)},
+            context={"path": str(e)},
         )
-        _emit_status("config_file_missing", path=str(e))
+        _emit(
+            RunFailureEvent(
+                failure=RunExecutionFailure(
+                    code="config_file_missing",
+                    summary=str(e),
+                    error=e,
+                    context={"path": str(e)},
+                )
+            )
+        )
     except InvarlockError as ce:
         outcome_failure = RunExecutionFailure(
             code="invarlock_error",
-            message=str(ce),
+            summary=str(ce),
             error=ce,
         )
-        _emit_status("invarlock_error", message=str(ce))
+        _emit(RunFailureEvent(failure=outcome_failure))
     except _RunExecutionHalt as halt:
         outcome_failure = halt.failure
     except (
@@ -1535,24 +1776,24 @@ def execute_run_request(
             # Emit a clearer message for schema failures (exit 2)
             outcome_failure = RunExecutionFailure(
                 code="schema_invalid_run_report",
-                message=str(e),
+                summary=str(e),
                 error=e,
             )
-            _emit_status("schema_invalid_run_report")
+            _emit(RunFailureEvent(failure=outcome_failure))
         elif isinstance(e, ModuleNotFoundError | ImportError) and "torch" in str(e):
             outcome_failure = RunExecutionFailure(
                 code="torch_missing",
-                message=str(e),
+                summary=str(e),
                 error=e,
             )
-            _emit_status("torch_missing")
+            _emit(RunFailureEvent(failure=outcome_failure))
         else:
             outcome_failure = RunExecutionFailure(
                 code="pipeline_failed",
-                message=str(e),
+                summary=str(e),
                 error=e,
             )
-            _emit_status("pipeline_failed", error=str(e))
+            _emit(RunFailureEvent(failure=outcome_failure))
     finally:
         # Cleanup snapshot directory if used (always print once per run)
         try:
@@ -1564,9 +1805,9 @@ def execute_run_request(
                 except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
                     pass
                 finally:
-                    _emit_status("cleanup_status", removed=True)
+                    _emit(RunCleanupStatusEvent(removed=True))
             else:
-                _emit_status("cleanup_status", removed=False)
+                _emit(RunCleanupStatusEvent(removed=False))
         except (AttributeError, NameError, TypeError, OSError):
             # Best-effort cleanup printing; never raise from finally
             pass

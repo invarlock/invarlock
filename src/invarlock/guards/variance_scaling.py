@@ -4,42 +4,40 @@ import itertools
 import math
 from collections import defaultdict
 from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, Callable, Literal
 
 import torch
 import torch.nn as nn
 
 from .variance_types import ScaleComputationResult
 
-try:  # Optional dependency: tqdm (progress bars)
-    from tqdm.auto import tqdm as _tqdm
-except Exception:  # pragma: no cover - exercised only when tqdm is absent
-
-    class _TqdmShim:
-        def __init__(self, iterable=None, total=None, **kwargs):
-            self._iterable = iterable
-            self.total = total
-
-        def __iter__(self):
-            if self._iterable is None:
-                return iter(())
-            return iter(self._iterable)
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
-        def update(self, n: int = 1) -> None:
-            return None
-
-    def _tqdm(iterable=None, *args, **kwargs):
-        return _TqdmShim(iterable=iterable, **kwargs)
+ProgressPhase = Literal["calibration"]
 
 
-tqdm = _tqdm
+@dataclass(frozen=True)
+class VarianceScalingProgress:
+    phase: ProgressPhase
+    completed: int
+    total: int | None
+
+
+ProgressCallback = Callable[[VarianceScalingProgress], None]
+
+
+def _emit_progress(
+    callback: ProgressCallback | None, *, completed: int, total: int | None
+) -> None:
+    if callback is None:
+        return
+    callback(
+        VarianceScalingProgress(
+            phase="calibration",
+            completed=int(completed),
+            total=None if total is None else int(total),
+        )
+    )
 
 
 def unwrap_model(model: nn.Module) -> nn.Module:
@@ -91,6 +89,7 @@ def equalise_residual_variance(
     allow_empty: bool = False,
     clamp_range: tuple | None = (0.9, 1.1),
     apply: bool = True,
+    progress_callback: ProgressCallback | None = None,
 ) -> dict[str, float]:
     """Apply data-driven variance equalization to transformer branches."""
     torch.manual_seed(seed)
@@ -190,7 +189,8 @@ def equalise_residual_variance(
     if not batches and not allow_empty:
         raise ValueError("Empty dataloader provided and allow_empty=False")
 
-    for batch in tqdm(batches, desc="DD-VE Calibration", leave=False):
+    total_batches = len(batches)
+    for idx, batch in enumerate(batches, start=1):
         if isinstance(batch, dict):
             input_ids = batch.get("input_ids", batch.get("inputs", None))
         elif isinstance(batch, tuple | list):
@@ -205,6 +205,7 @@ def equalise_residual_variance(
                 input_ids = input_ids.unsqueeze(0)
             with torch.no_grad():
                 model(input_ids.to(device))
+        _emit_progress(progress_callback, completed=idx, total=total_batches)
 
     for hook in hooks.values():
         hook.remove()
@@ -488,4 +489,5 @@ __all__ = [
     "equalise_residual_variance",
     "iter_transformer_layers",
     "unwrap_model",
+    "VarianceScalingProgress",
 ]

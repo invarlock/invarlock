@@ -288,19 +288,21 @@ def build_guard_entries(core_guards: Mapping[str, Any] | None) -> list[dict[str,
     if not isinstance(core_guards, Mapping):
         return []
     entries: list[dict[str, Any]] = []
+
     for guard_name, guard_result in core_guards.items():
         if not isinstance(guard_result, Mapping):
             continue
+        decision = guard_result.get("decision")
+        if not isinstance(decision, str) or not decision:
+            decision = "allow" if bool(guard_result.get("passed", False)) else "block"
         guard_entry = {
             "name": guard_name,
             "passed": guard_result.get("passed"),
-            "action": guard_result.get("action"),
+            "decision": decision,
             "policy": guard_result.get("policy", {}),
             "metrics": guard_result.get("metrics", {}),
-            "actions": guard_result.get("actions", []),
+            "diagnostics": guard_result.get("diagnostics", []),
             "violations": guard_result.get("violations", []),
-            "warnings": guard_result.get("warnings", []),
-            "errors": guard_result.get("errors", []),
             "details": guard_result.get("details", {}),
         }
         for extra_key in ("final_z_scores", "module_family_map"):

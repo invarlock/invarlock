@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 from pathlib import Path
+
+import pytest
 
 from invarlock.cli.commands.evaluate import evaluate_command
 
@@ -182,6 +185,126 @@ def test_evaluate_command_local_mode_prefers_local_files_only(monkeypatch, tmp_p
     assert len(captured_runs) == 2
     for call in captured_runs:
         assert call["prefer_local_files_only"] is True
+
+
+def test_evaluate_command_resets_runtime_security_on_success(
+    monkeypatch, tmp_path
+) -> None:
+    src = tmp_path / "src_model"
+    edt = tmp_path / "edt_model"
+    src.mkdir()
+    edt.mkdir()
+    (src / "config.json").write_text(
+        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
+        encoding="utf-8",
+    )
+    (edt / "config.json").write_text(
+        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
+        encoding="utf-8",
+    )
+
+    import invarlock.cli.commands.evaluate as eval_mod
+    import invarlock.cli.commands.run as run_mod
+    import invarlock.cli.security_helpers as security_helpers
+
+    state = {"active": False, "configured": None, "enter": 0, "exit": 0}
+
+    @contextmanager
+    def fake_configure(**kwargs):
+        state["configured"] = kwargs
+        state["active"] = True
+        state["enter"] += 1
+        try:
+            yield
+        finally:
+            state["active"] = False
+            state["exit"] += 1
+
+    def fake_run(**kwargs):
+        out = Path(kwargs["out"])
+        return str(_stub_run(out))
+
+    monkeypatch.setattr(security_helpers, "configure_runtime_security", fake_configure)
+    monkeypatch.setattr(eval_mod, "maybe_delegate_model_command", lambda: None)
+    monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
+    monkeypatch.setattr(eval_mod, "generate_reports", lambda **_kwargs: None, raising=False)
+
+    evaluate_command(
+        baseline=str(src),
+        subject=str(edt),
+        adapter="auto",
+        profile="ci",
+        out=str(tmp_path / "runs"),
+        report_out=str(tmp_path / "reports"),
+        timing=False,
+        progress=False,
+        allow_network=True,
+    )
+
+    assert state["configured"]["allow_network"] is True
+    assert state["active"] is False
+    assert state["enter"] == 1
+    assert state["exit"] == 1
+
+
+def test_evaluate_command_resets_runtime_security_on_raise(
+    monkeypatch, tmp_path
+) -> None:
+    src = tmp_path / "src_model"
+    edt = tmp_path / "edt_model"
+    src.mkdir()
+    edt.mkdir()
+    (src / "config.json").write_text(
+        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
+        encoding="utf-8",
+    )
+    (edt / "config.json").write_text(
+        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
+        encoding="utf-8",
+    )
+
+    import invarlock.cli.commands.evaluate as eval_mod
+    import invarlock.cli.commands.run as run_mod
+    import invarlock.cli.security_helpers as security_helpers
+
+    state = {"active": False, "configured": None, "enter": 0, "exit": 0}
+
+    @contextmanager
+    def fake_configure(**kwargs):
+        state["configured"] = kwargs
+        state["active"] = True
+        state["enter"] += 1
+        try:
+            yield
+        finally:
+            state["active"] = False
+            state["exit"] += 1
+
+    def failing_run(**_kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(security_helpers, "configure_runtime_security", fake_configure)
+    monkeypatch.setattr(eval_mod, "maybe_delegate_model_command", lambda: None)
+    monkeypatch.setattr(run_mod, "run_command", failing_run, raising=False)
+    monkeypatch.setattr(eval_mod, "generate_reports", lambda **_kwargs: None, raising=False)
+
+    with pytest.raises(RuntimeError, match="boom"):
+        evaluate_command(
+            baseline=str(src),
+            subject=str(edt),
+            adapter="auto",
+            profile="ci",
+            out=str(tmp_path / "runs"),
+            report_out=str(tmp_path / "reports"),
+            timing=False,
+            progress=False,
+            allow_network=True,
+        )
+
+    assert state["configured"]["allow_network"] is True
+    assert state["active"] is False
+    assert state["enter"] == 1
+    assert state["exit"] == 1
 
 
 def test_evaluate_command_passes_concrete_run_defaults(monkeypatch, tmp_path) -> None:

@@ -76,7 +76,7 @@ def test_mi_gini_cpu_chunk_warnings(monkeypatch):
     L, N, D = 3, 5, 4
     feats_cpu = torch.randn(L, N, D)
     targ_cpu = torch.randint(0, 10, (N,))
-    cfg = MetricsConfig(progress_bars=False)
+    cfg = MetricsConfig()
     val = _mi_gini_optimized_cpu_path(feats_cpu, targ_cpu, max_per_layer=10, config=cfg)
     # Function should not crash and should produce a float (likely NaN)
     assert isinstance(val, float) and (math.isnan(val) or math.isfinite(val))

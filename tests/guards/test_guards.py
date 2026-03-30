@@ -317,9 +317,9 @@ class TestSpectralGuardComprehensive:
 
         assert isinstance(result, dict)
         assert "passed" in result
-        assert "action" in result
+        assert "decision" in result
         assert "metrics" in result
-        assert "message" in result
+        assert "diagnostics" in result
         assert isinstance(result["passed"], bool)
 
     def test_validate_aborts_when_caps_exceeded(self):
@@ -354,7 +354,7 @@ class TestSpectralGuardComprehensive:
         ):
             result = guard.validate(self.model, Mock(), {})
 
-        assert result["action"] == "abort"
+        assert result["decision"] == "block"
         assert result["metrics"]["caps_exceeded"] is True
         assert result["metrics"]["max_caps"] == 0
 
@@ -362,12 +362,8 @@ class TestSpectralGuardComprehensive:
         """Test guard validation with error handling."""
         mock_adapter = Mock()
 
-        # Test with None model to trigger error handling
-        result = self.guard.validate(None, mock_adapter, {})
-
-        assert isinstance(result, dict)
-        # Should handle gracefully and return a result
-        assert "passed" in result or "error" in result
+        with pytest.raises(AttributeError):
+            self.guard.validate(None, mock_adapter, {})
 
     def test_config_storage(self):
         """Test that configuration is properly stored."""
@@ -504,7 +500,7 @@ class TestSpectralGuardComprehensive:
 
         result = guard.validate(model, Mock(), {})
         assert result["passed"] is True
-        assert result["action"] == "warn"
+        assert result["decision"] == "monitor"
         families = {violation.get("family") for violation in result["violations"]}
         assert "attn" in families
         assert "ffn" not in families
@@ -897,8 +893,10 @@ class TestVarianceGuardComprehensive:
             result = self.guard.validate(self.model, Mock(), {})
 
         assert result["passed"] is False
-        assert result["action"] == "abort"
-        assert result["violations"] == ["gate failure"]
+        assert result["decision"] == "block"
+        assert result["violations"] == [
+            {"type": "variance_error", "severity": "error", "message": "gate failure"}
+        ]
 
     def test_validate_warns_when_monitor_only(self):
         """Monitor-only mode should downgrade aborts to warnings."""
@@ -914,7 +912,7 @@ class TestVarianceGuardComprehensive:
         with patch.object(guard, "finalize", return_value=failure_payload):
             result = guard.validate(self.model, Mock(), {})
 
-        assert result["action"] == "warn"
+        assert result["decision"] == "monitor"
         assert result["passed"] is False
 
 
@@ -1388,11 +1386,8 @@ class TestSpectralGuardEdgeCases:
         """Test error handling during validate."""
         mock_adapter = Mock()
 
-        # Test with None model to potentially trigger error handling
-        result = self.guard.validate(None, mock_adapter, {})
-        assert isinstance(result, dict)
-        # Should handle gracefully and return a result
-        assert "passed" in result or "error" in result
+        with pytest.raises(AttributeError):
+            self.guard.validate(None, mock_adapter, {})
 
     def test_config_updates(self):
         """Test that config can be updated after initialization."""
@@ -1527,8 +1522,10 @@ class TestRMTGuardEdgeCases:
         """Test after_edit when not prepared."""
         self.guard.after_edit(self.model)
         # Should not crash but log warning
-        assert len(self.guard.events) > 0
-        assert any(e.get("level") == "WARN" for e in self.guard.events)
+        assert len(self.guard.diagnostic_records) > 0
+        assert any(
+            e.get("severity") == "warning" for e in self.guard.diagnostic_records
+        )
 
     def test_apply_rmt_detection_and_correction(self):
         """Test RMT post-edit analysis populates edge-risk results."""
@@ -1595,8 +1592,11 @@ class TestVarianceGuardEdgeCases:
         """Test enable when not prepared."""
         result = self.guard.enable(self.model)
         assert not result
-        assert len(self.guard.events) > 0
-        assert any("not prepared" in e.get("message", "") for e in self.guard.events)
+        assert len(self.guard.diagnostic_records) > 0
+        assert any(
+            "not prepared" in e.get("summary", "")
+            for e in self.guard.diagnostic_records
+        )
 
     def test_disable_when_not_enabled(self):
         """Test disable when not enabled (idempotent)."""
@@ -2399,36 +2399,15 @@ class TestSpectralGuardExceptionCoverage:
     """Tests specifically designed to trigger exception handling paths in spectral functions."""
 
     def test_spectral_guard_validate_exception_handling(self):
-        """Test SpectralGuard.validate exception handling (lines 61-62)."""
+        """Unexpected validation failures should raise."""
         guard = SpectralGuard()
+        guard.prepared = True
+        guard._capture_sigmas = lambda *_a, **_k: (_ for _ in ()).throw(
+            RuntimeError("Forced validation error")
+        )
 
-        # Force an exception inside the validate method by patching something it uses
-        original_validate = guard.validate
-
-        def failing_validate(model, adapter, context):
-            # Trigger the exception path
-            raise Exception("Forced validation error")
-
-        # Replace the method temporarily to force exception
-        guard.validate = failing_validate
-
-        try:
-            # Call the original validate with the patched version to trigger exception handling
-            result = original_validate(guard, nn.Linear(10, 5), Mock(), {})
-        except Exception:
-            # If it throws, call the exception path manually
-            result = {
-                "passed": False,
-                "action": "warn",
-                "error": "Forced validation error",
-                "message": "Spectral validation failed: Forced validation error",
-            }
-
-        # Should catch exception and return error result (lines 61-62)
-        assert isinstance(result, dict)
-        assert not result["passed"]
-        assert result["action"] == "warn"
-        assert "error" in result
+        with pytest.raises(RuntimeError, match="Forced validation error"):
+            guard.validate(nn.Linear(10, 5), Mock(), {})
 
     def test_compute_sigma_max_exception_handling(self):
         """Test compute_sigma_max exception handling (lines 87-88)."""
@@ -3022,7 +3001,7 @@ class TestRMTEnhancedCoverage:
         # Test when prepared
         guard.prepared = True
         guard.before_edit(self.model)  # Should log event
-        assert len(guard.events) > 0
+        assert len(guard.diagnostic_records) > 0
 
     def test_rmt_guard_after_edit_comprehensive(self):
         """Test RMTGuard after_edit method comprehensively (lines 1317-1379)."""
@@ -3030,7 +3009,9 @@ class TestRMTEnhancedCoverage:
 
         # Test without preparation (lines 1309-1315)
         guard.after_edit(self.model)
-        assert any(e.get("level") == "WARN" for e in guard.events)
+        assert any(
+            e.get("severity") == "warning" for e in guard.diagnostic_records
+        )
 
         # Test with preparation and no activation batches
         guard.prepare(self.model, None, None, {})
@@ -3044,7 +3025,9 @@ class TestRMTEnhancedCoverage:
         ):
             guard._calibration_batches = [{"input_ids": torch.randint(0, 100, (1, 64))}]
             guard.after_edit(self.model)
-            assert any(e.get("level") == "ERROR" for e in guard.events)
+            assert any(
+                e.get("severity") == "error" for e in guard.diagnostic_records
+            )
 
     def test_rmt_guard_validate_method(self):
         """Test RMTGuard validate method (lines 1399-1411)."""
@@ -3054,8 +3037,8 @@ class TestRMTEnhancedCoverage:
         result = guard.validate(self.model, None, {})
         assert isinstance(result, dict)
         assert "passed" in result
-        assert "action" in result
-        assert "message" in result
+        assert "decision" in result
+        assert "diagnostics" in result
 
     def test_rmt_guard_finalize_not_prepared(self):
         """Test RMTGuard finalize when not prepared (lines 1441)."""

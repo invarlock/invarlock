@@ -111,9 +111,8 @@ def test_quant_rtn_apply_rejects_unsupported_plan_fields() -> None:
     adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
     edit = RTNQuantEdit(scope="all", max_modules=1)
 
-    result = edit.apply(model, adapter, plan={"bits": 8})
-
-    assert result["error"] == "Unsupported RTN plan fields: bits"
+    with pytest.raises(ValueError, match="Unsupported RTN plan fields: bits"):
+        edit.apply(model, adapter, plan={"bits": 8})
 
 
 def test_quant_rtn_apply_rejects_non_int8_bitwidth_override() -> None:
@@ -121,6 +120,42 @@ def test_quant_rtn_apply_rejects_non_int8_bitwidth_override() -> None:
     adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
     edit = RTNQuantEdit(scope="all", max_modules=1)
 
-    result = edit.apply(model, adapter, plan={"bitwidth": 4})
+    with pytest.raises(ValueError, match="only supports 8-bit quantization"):
+        edit.apply(model, adapter, plan={"bitwidth": 4})
 
-    assert "only supports 8-bit quantization" in result["error"]
+
+def test_quant_rtn_preview_propagates_unexpected_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model = torch.nn.Linear(2, 2, bias=False)
+    adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
+    edit = RTNQuantEdit(scope="all", max_modules=1)
+
+    def _raise(*_args, **_kwargs):  # noqa: ANN001
+        raise RuntimeError("preview boom")
+
+    monkeypatch.setattr(edit, "_compute_quantization_stats", _raise)
+
+    with pytest.raises(RuntimeError, match="preview boom"):
+        edit.preview(model, adapter, None)
+
+
+def test_quant_rtn_apply_propagates_unexpected_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model = torch.nn.Linear(2, 2, bias=False)
+    adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
+    edit = RTNQuantEdit(scope="all", max_modules=1)
+
+    def _raise(self, *_args, **_kwargs):  # noqa: ANN001
+        raise RuntimeError("apply boom")
+
+    monkeypatch.setattr(RTNQuantEdit, "_apply_rtn_quantization", _raise)
+    monkeypatch.setattr(
+        RTNQuantEdit,
+        "_identify_target_modules",
+        lambda self, _model: [("linear", model)],
+    )
+
+    with pytest.raises(RuntimeError, match="apply boom"):
+        edit.apply(model, adapter, plan={"scope": "all", "max_modules": 1})

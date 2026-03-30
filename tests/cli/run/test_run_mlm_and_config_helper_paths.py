@@ -9,6 +9,7 @@ import pytest
 from invarlock.cli import run_masking as masking_mod
 from invarlock.cli import run_pairing_helpers as pairing_mod
 from invarlock.cli import run_serialization as run_serial_mod
+from invarlock.core.exceptions import ConfigError
 from invarlock.core import run_policy as run_policy_mod
 from invarlock.core.run_policy import GUARD_OVERHEAD_THRESHOLD
 from invarlock.core.run_policy import choose_dataset_split
@@ -31,7 +32,8 @@ def test_coerce_mapping_covers_multiple_sources_and_failures() -> None:
         def model_dump(self):  # noqa: ANN001
             return {"c": 3}
 
-    assert run_serial_mod._coerce_mapping(_DataAttrRaises()) == {"c": 3}
+    with pytest.raises(RuntimeError, match="boom"):
+        run_serial_mod._coerce_mapping(_DataAttrRaises())
 
     class _ModelDumpRaises:
         def model_dump(self):  # noqa: ANN001
@@ -39,7 +41,8 @@ def test_coerce_mapping_covers_multiple_sources_and_failures() -> None:
 
     inst = _ModelDumpRaises()
     inst.x = 1  # type: ignore[attr-defined]
-    assert run_serial_mod._coerce_mapping(inst) == {"x": 1}
+    with pytest.raises(RuntimeError, match="boom"):
+        run_serial_mod._coerce_mapping(inst)
 
     class _Slots:
         __slots__ = ()
@@ -60,13 +63,13 @@ def test_resolve_pm_acceptance_range_parses_cfg_and_ignores_env(monkeypatch) -> 
     assert resolve_pm_acceptance_range({}) == {}
 
     cfg = {"primary_metric": {"acceptance_range": {"min": "bad", "max": "1.2"}}}
-    out = resolve_pm_acceptance_range(cfg)
-    assert out == {"min": 0.95, "max": 1.2}
+    with pytest.raises(ConfigError, match="acceptance_range.min"):
+        resolve_pm_acceptance_range(cfg)
 
     monkeypatch.setenv("INVARLOCK_PM_ACCEPTANCE_MIN", "-1")
     monkeypatch.setenv("INVARLOCK_PM_ACCEPTANCE_MAX", "0")
-    out2 = resolve_pm_acceptance_range(cfg)
-    assert out2 == {"min": 0.95, "max": 1.2}
+    with pytest.raises(ConfigError, match="acceptance_range.min"):
+        resolve_pm_acceptance_range(cfg)
 
 
 def test_resolve_pm_acceptance_range_ignores_invalid_cfg_max(monkeypatch) -> None:
@@ -74,28 +77,28 @@ def test_resolve_pm_acceptance_range_ignores_invalid_cfg_max(monkeypatch) -> Non
     monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MAX", raising=False)
 
     cfg = {"primary_metric": {"acceptance_range": {"min": "1.0", "max": "bad"}}}
-    out = resolve_pm_acceptance_range(cfg)
-    assert out == {"min": 1.0, "max": 1.1}
+    with pytest.raises(ConfigError, match="acceptance_range.max"):
+        resolve_pm_acceptance_range(cfg)
 
 
 def test_resolve_pm_acceptance_range_clamps_invalid_bounds(monkeypatch) -> None:
     monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MIN", raising=False)
     monkeypatch.delenv("INVARLOCK_PM_ACCEPTANCE_MAX", raising=False)
 
-    out_min = resolve_pm_acceptance_range(
-        {"primary_metric": {"acceptance_range": {"min": -0.1, "max": 1.2}}}
-    )
-    assert out_min == {"min": 0.95, "max": 1.2}
+    with pytest.raises(ConfigError, match="acceptance_range.min"):
+        resolve_pm_acceptance_range(
+            {"primary_metric": {"acceptance_range": {"min": -0.1, "max": 1.2}}}
+        )
 
-    out_max = resolve_pm_acceptance_range(
-        {"primary_metric": {"acceptance_range": {"min": 1.0, "max": 0.0}}}
-    )
-    assert out_max == {"min": 1.0, "max": 1.1}
+    with pytest.raises(ConfigError, match="acceptance_range.max"):
+        resolve_pm_acceptance_range(
+            {"primary_metric": {"acceptance_range": {"min": 1.0, "max": 0.0}}}
+        )
 
-    out_order = resolve_pm_acceptance_range(
-        {"primary_metric": {"acceptance_range": {"min": 1.2, "max": 1.1}}}
-    )
-    assert out_order == {"min": 1.2, "max": 1.2}
+    with pytest.raises(ConfigError, match="greater than or equal to min"):
+        resolve_pm_acceptance_range(
+            {"primary_metric": {"acceptance_range": {"min": 1.2, "max": 1.1}}}
+        )
 
 
 def test_resolve_pm_acceptance_range_covers_outer_exception(monkeypatch) -> None:
@@ -106,12 +109,10 @@ def test_resolve_pm_acceptance_range_covers_outer_exception(monkeypatch) -> None
         raise RuntimeError("boom")
 
     monkeypatch.setattr(run_policy_mod, "coerce_mapping", _boom)
-    assert (
+    with pytest.raises(RuntimeError, match="boom"):
         resolve_pm_acceptance_range(
             {"primary_metric": {"acceptance_range": {"min": 0.9, "max": 1.1}}}
         )
-        == {}
-    )
 
 
 def test_resolve_guard_overhead_threshold_from_config() -> None:
@@ -121,12 +122,14 @@ def test_resolve_guard_overhead_threshold_from_config() -> None:
     assert resolve_guard_overhead_threshold(
         {"primary_metric": {"overhead_threshold": 0.025}}
     ) == pytest.approx(0.025)
-    assert resolve_guard_overhead_threshold(
-        {"primary_metric": {"overhead_threshold": "bad"}}
-    ) == pytest.approx(GUARD_OVERHEAD_THRESHOLD)
-    assert resolve_guard_overhead_threshold(
-        {"primary_metric": {"overhead_threshold": -1}}
-    ) == pytest.approx(GUARD_OVERHEAD_THRESHOLD)
+    with pytest.raises(ConfigError, match="overhead_threshold"):
+        resolve_guard_overhead_threshold(
+            {"primary_metric": {"overhead_threshold": "bad"}}
+        )
+    with pytest.raises(ConfigError, match="overhead_threshold"):
+        resolve_guard_overhead_threshold(
+            {"primary_metric": {"overhead_threshold": -1}}
+        )
 
 
 def test_choose_dataset_split_covers_fallback_and_exception_path() -> None:
@@ -151,8 +154,8 @@ def test_choose_dataset_split_covers_fallback_and_exception_path() -> None:
             raise RuntimeError("boom")
 
     split, used = choose_dataset_split(requested=_BadStr("x"), available=["validation"])
-    assert split == "validation"
-    assert used is True
+    assert split == "x"
+    assert used is False
 
 
 def test_compute_mask_positions_digest_covers_none_digest_and_exception() -> None:
@@ -178,7 +181,8 @@ def test_compute_mask_positions_digest_covers_none_digest_and_exception() -> Non
         def get(self, *_a, **_k):  # noqa: ANN001
             raise RuntimeError("boom")
 
-    assert pairing_mod._compute_mask_positions_digest(_BadDict()) is None
+    with pytest.raises(RuntimeError, match="boom"):
+        pairing_mod._compute_mask_positions_digest(_BadDict())
 
 
 def test_tensor_or_list_to_ints_covers_tolist_numpy_iterable_and_exceptions(
@@ -205,7 +209,8 @@ def test_tensor_or_list_to_ints_covers_tolist_numpy_iterable_and_exceptions(
         def tolist(self):  # noqa: ANN001
             return _BadRaw()
 
-    assert pairing_mod._tensor_or_list_to_ints(_WithBad()) == []
+    with pytest.raises(RuntimeError, match="boom"):
+        pairing_mod._tensor_or_list_to_ints(_WithBad())
 
     monkeypatch.setattr(pairing_mod, "torch", None)
     assert pairing_mod._tensor_or_list_to_ints(np.array([1, 2])) == [1, 2]
@@ -215,7 +220,8 @@ def test_tensor_or_list_to_ints_covers_tolist_numpy_iterable_and_exceptions(
         def __iter__(self):  # noqa: ANN001
             raise RuntimeError("boom")
 
-    assert pairing_mod._tensor_or_list_to_ints(_BadIter()) == []
+    with pytest.raises(RuntimeError, match="boom"):
+        pairing_mod._tensor_or_list_to_ints(_BadIter())
 
 
 def test_apply_mlm_masks_zero_prob_sets_labels_and_counts() -> None:
@@ -329,4 +335,13 @@ def test_tokenizer_digest_covers_get_vocab_vocab_fallback_and_unknown() -> None:
     class _TokUnserializable:
         name_or_path = object()
 
-    assert masking_mod._tokenizer_digest(_TokUnserializable()) == "unknown-tokenizer"
+    digest4 = masking_mod._tokenizer_digest(_TokUnserializable())
+    assert isinstance(digest4, str) and len(digest4) == 64
+
+    class _TokExplodes:
+        @property
+        def name_or_path(self):  # noqa: ANN201
+            raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError, match="boom"):
+        masking_mod._tokenizer_digest(_TokExplodes())

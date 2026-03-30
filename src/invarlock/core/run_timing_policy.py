@@ -8,8 +8,9 @@ from typing import Any
 @dataclass(frozen=True)
 class TimingSummaryPayload:
     timings: dict[str, float]
-    order: tuple[tuple[str, str], ...]
-    extra_lines: tuple[str, ...]
+    ordered_keys: tuple[str, ...]
+    memory_mb_peak: float | None
+    gpu_memory_mb_peak: float | None
 
 
 def build_timing_summary_payload(
@@ -38,18 +39,18 @@ def build_timing_summary_payload(
         )
     )
 
-    order: list[tuple[str, str]] = []
-    for label, key in (
-        ("Load model", "load_model"),
-        ("Load data", "load_dataset"),
-        ("Prepare", "prepare"),
-        ("Prep guards", "prepare_guards"),
-        ("Edit", "edit"),
-        ("Guards", "guards"),
-        ("Eval", "eval"),
-        ("Finalize", "finalize"),
-        ("Execute", "execute"),
-        ("Total", "total"),
+    ordered_keys: list[str] = []
+    for key in (
+        "load_model",
+        "load_dataset",
+        "prepare",
+        "prepare_guards",
+        "edit",
+        "guards",
+        "eval",
+        "finalize",
+        "execute",
+        "total",
     ):
         if key == "execute" and has_breakdown:
             continue
@@ -57,22 +58,24 @@ def build_timing_summary_payload(
             if not has_breakdown:
                 continue
         if key in timings_for_summary:
-            order.append((label, key))
+            ordered_keys.append(key)
 
-    extra_lines: list[str] = []
+    memory_mb_peak: float | None = None
+    gpu_memory_mb_peak: float | None = None
     metrics_section = report.get("metrics", {}) if isinstance(report, Mapping) else {}
     if isinstance(metrics_section, Mapping):
         mem_peak = metrics_section.get("memory_mb_peak")
         gpu_peak = metrics_section.get("gpu_memory_mb_peak")
         if isinstance(mem_peak, int | float):
-            extra_lines.append(f"  Peak Memory : {float(mem_peak):.2f} MB")
+            memory_mb_peak = float(mem_peak)
         if isinstance(gpu_peak, int | float):
-            extra_lines.append(f"  Peak GPU Mem: {float(gpu_peak):.2f} MB")
+            gpu_memory_mb_peak = float(gpu_peak)
 
-    if not timings_for_summary or not order:
+    if not timings_for_summary or not ordered_keys:
         return None
     return TimingSummaryPayload(
         timings=timings_for_summary,
-        order=tuple(order),
-        extra_lines=tuple(extra_lines),
+        ordered_keys=tuple(ordered_keys),
+        memory_mb_peak=memory_mb_peak,
+        gpu_memory_mb_peak=gpu_memory_mb_peak,
     )

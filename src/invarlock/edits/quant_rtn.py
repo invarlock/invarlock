@@ -130,106 +130,90 @@ class RTNQuantEdit(ModelEdit):
         Returns:
             Dictionary with preview results including quantization plan
         """
-        try:
-            # Set deterministic seed
-            torch.manual_seed(self.seed)
-            random.seed(self.seed)
-            np.random.seed(self.seed)
+        # Set deterministic seed
+        torch.manual_seed(self.seed)
+        random.seed(self.seed)
+        np.random.seed(self.seed)
 
-            # Get model description
-            model_desc = adapter.describe(model)
+        # Get model description
+        model_desc = adapter.describe(model)
 
-            # Identify target modules
-            target_modules = self._identify_target_modules(model)
-            total_identified = len(target_modules)
+        # Identify target modules
+        target_modules = self._identify_target_modules(model)
+        total_identified = len(target_modules)
 
-            if (
-                isinstance(self.max_modules, int)
-                and self.max_modules > 0
-                and self.max_modules < total_identified
-            ):
-                target_modules = target_modules[: self.max_modules]
+        if (
+            isinstance(self.max_modules, int)
+            and self.max_modules > 0
+            and self.max_modules < total_identified
+        ):
+            target_modules = target_modules[: self.max_modules]
 
-            # Compute quantization statistics
-            quant_stats = self._compute_quantization_stats(target_modules)
+        # Compute quantization statistics
+        quant_stats = self._compute_quantization_stats(target_modules)
 
-            # Estimate parameter changes
-            total_params = sum(p.numel() for p in model.parameters())
-            target_params = sum(module.weight.numel() for _, module in target_modules)
+        # Estimate parameter changes
+        total_params = sum(p.numel() for p in model.parameters())
+        target_params = sum(module.weight.numel() for _, module in target_modules)
 
-            # Create quantization plan
-            plan = {
-                "operation": "rtn_quantization",
-                "bitwidth": self.bitwidth,
-                "per_channel": self.per_channel,
-                "group_size": self.group_size if self.bitwidth == 4 else None,
-                "clamp_ratio": self.clamp_ratio,
-                "scope": self.scope,
-                "seed": self.seed,
-                "target_modules": [name for name, _ in target_modules],
-                "quantization_stats": quant_stats,
-                "anti_tying_map": self._get_weight_tying_map(model),
-            }
-            if (
-                isinstance(self.max_modules, int)
-                and self.max_modules > 0
-                and self.max_modules < total_identified
-            ):
-                plan["max_modules"] = self.max_modules
+        # Create quantization plan
+        plan = {
+            "operation": "rtn_quantization",
+            "bitwidth": self.bitwidth,
+            "per_channel": self.per_channel,
+            "group_size": self.group_size if self.bitwidth == 4 else None,
+            "clamp_ratio": self.clamp_ratio,
+            "scope": self.scope,
+            "seed": self.seed,
+            "target_modules": [name for name, _ in target_modules],
+            "quantization_stats": quant_stats,
+            "anti_tying_map": self._get_weight_tying_map(model),
+        }
+        if (
+            isinstance(self.max_modules, int)
+            and self.max_modules > 0
+            and self.max_modules < total_identified
+        ):
+            plan["max_modules"] = self.max_modules
 
-            # Estimate sparsity (RTN doesn't create structural sparsity)
-            estimated_sparsity = {
-                "head_sparsity": 0.0,
-                "neuron_sparsity": 0.0,
-                "weight_sparsity": 0.0,  # RTN doesn't create weight sparsity
-            }
+        # Estimate sparsity (RTN doesn't create structural sparsity)
+        estimated_sparsity = {
+            "head_sparsity": 0.0,
+            "neuron_sparsity": 0.0,
+            "weight_sparsity": 0.0,  # RTN doesn't create weight sparsity
+        }
 
-            # Preview metrics
-            bits_per_param = self.bitwidth
-            if self.bitwidth == 4 and self.group_size:
-                # Account for scale storage
-                scales_per_group = target_params / self.group_size
-                bits_per_param = 4 + (
-                    32 * scales_per_group / target_params
-                )  # 32-bit scales
+        # Preview metrics
+        bits_per_param = self.bitwidth
+        if self.bitwidth == 4 and self.group_size:
+            # Account for scale storage
+            scales_per_group = target_params / self.group_size
+            bits_per_param = 4 + (
+                32 * scales_per_group / target_params
+            )  # 32-bit scales
 
-            memory_reduction_estimate = (
-                target_params * (32 - bits_per_param) / 8
-            )  # bytes
+        memory_reduction_estimate = (
+            target_params * (32 - bits_per_param) / 8
+        )  # bytes
 
-            preview_metrics = {
-                "preview_duration": 0.0,
-                "target_params": int(target_params),
-                "total_params": int(total_params),
-                "coverage_ratio": target_params / total_params
-                if total_params > 0
-                else 0.0,
-                "target_modules_count": len(target_modules),
-                "estimated_memory_saved_bytes": int(memory_reduction_estimate),
-                "estimated_bits_per_param": bits_per_param,
-                "will_use_clipping": self.clamp_ratio > 0.0,
-                "will_use_grouping": self.bitwidth == 4 and self.group_size is not None,
-            }
+        preview_metrics = {
+            "preview_duration": 0.0,
+            "target_params": int(target_params),
+            "total_params": int(total_params),
+            "coverage_ratio": target_params / total_params if total_params > 0 else 0.0,
+            "target_modules_count": len(target_modules),
+            "estimated_memory_saved_bytes": int(memory_reduction_estimate),
+            "estimated_bits_per_param": bits_per_param,
+            "will_use_clipping": self.clamp_ratio > 0.0,
+            "will_use_grouping": self.bitwidth == 4 and self.group_size is not None,
+        }
 
-            return {
-                "plan": plan,
-                "estimated_sparsity": estimated_sparsity,
-                "preview_metrics": preview_metrics,
-                "model_info": model_desc,
-            }
-
-        except Exception as e:
-            # Return error in preview
-            return {
-                "plan": {"operation": "failed", "error": str(e)},
-                "estimated_sparsity": {
-                    "head_sparsity": 0.0,
-                    "neuron_sparsity": 0.0,
-                    "weight_sparsity": 0.0,
-                },
-                "preview_metrics": {"error": str(e)},
-                "model_info": {},
-            }
+        return {
+            "plan": plan,
+            "estimated_sparsity": estimated_sparsity,
+            "preview_metrics": preview_metrics,
+            "model_info": model_desc,
+        }
 
     def apply(
         self,
@@ -250,173 +234,152 @@ class RTNQuantEdit(ModelEdit):
         Returns:
             Dictionary with application results
         """
-        try:
-            del runtime
-            plan_data = dict(plan or {})
-            supported_keys = {
-                "bitwidth",
-                "group_size",
-                "clamp_ratio",
-                "scope",
-                "seed",
-                "max_modules",
-            }
-            unexpected = sorted(set(plan_data) - supported_keys)
-            if unexpected:
-                raise ValueError(
-                    "Unsupported RTN plan fields: " + ", ".join(unexpected)
-                )
+        del runtime
+        plan_data = dict(plan or {})
+        supported_keys = {
+            "bitwidth",
+            "group_size",
+            "clamp_ratio",
+            "scope",
+            "seed",
+            "max_modules",
+        }
+        unexpected = sorted(set(plan_data) - supported_keys)
+        if unexpected:
+            raise ValueError("Unsupported RTN plan fields: " + ", ".join(unexpected))
 
-            raw_bitwidth = plan_data.get("bitwidth", self.bitwidth)
-            bitwidth = int(raw_bitwidth)
-            group_size = plan_data.get("group_size", self.group_size)
-            clamp_ratio = float(plan_data.get("clamp_ratio", self.clamp_ratio))
-            scope = str(plan_data.get("scope", self.scope))
-            seed = int(plan_data.get("seed", self.seed))
-            raw_max_modules = plan_data.get("max_modules", self.max_modules)
-            max_modules = (
-                int(raw_max_modules)
-                if isinstance(raw_max_modules, int | float) and int(raw_max_modules) > 0
-                else None
+        raw_bitwidth = plan_data.get("bitwidth", self.bitwidth)
+        bitwidth = int(raw_bitwidth)
+        group_size = plan_data.get("group_size", self.group_size)
+        clamp_ratio = float(plan_data.get("clamp_ratio", self.clamp_ratio))
+        scope = str(plan_data.get("scope", self.scope))
+        seed = int(plan_data.get("seed", self.seed))
+        raw_max_modules = plan_data.get("max_modules", self.max_modules)
+        max_modules = (
+            int(raw_max_modules)
+            if isinstance(raw_max_modules, int | float) and int(raw_max_modules) > 0
+            else None
+        )
+
+        self._validate_options(
+            bitwidth=bitwidth,
+            clamp_ratio=clamp_ratio,
+            scope=scope,
+        )
+
+        active_edit = RTNQuantEdit(
+            bitwidth=bitwidth,
+            per_channel=self.per_channel,
+            group_size=group_size,
+            clamp_ratio=clamp_ratio,
+            scope=scope,
+            seed=seed,
+            guard_chain=self.guard_chain,
+            max_modules=max_modules,
+        )
+
+        # Set deterministic seed
+        torch.manual_seed(seed)
+        random.seed(seed)
+        np.random.seed(seed)
+
+        target_modules = active_edit._identify_target_modules(model)
+        total_identified = len(target_modules)
+        if max_modules is not None:
+            if max_modules < total_identified:
+                target_modules = target_modules[:max_modules]
+
+        tying_map = active_edit._get_weight_tying_map(model)
+
+        # Execute GuardChain before edit (if provided)
+        guard_results = {}
+        if active_edit.guard_chain is not None:
+            guard_results["prepare"] = active_edit.guard_chain.prepare_all(
+                model, adapter, None, {}
             )
 
-            self._validate_options(
-                bitwidth=bitwidth,
-                clamp_ratio=clamp_ratio,
-                scope=scope,
+            active_edit.guard_chain.before_edit_all(model)
+
+        # Apply quantization to each target module
+        quantization_results = []
+        total_params_quantized = 0
+
+        for module_name, module in target_modules:
+            # Apply RTN quantization
+            quant_result = self._apply_rtn_quantization(
+                module,
+                bitwidth,
+                group_size,
+                clamp_ratio,
+                tying_map.get(module_name),
             )
 
-            active_edit = RTNQuantEdit(
-                bitwidth=bitwidth,
-                per_channel=self.per_channel,
-                group_size=group_size,
-                clamp_ratio=clamp_ratio,
-                scope=scope,
-                seed=seed,
-                guard_chain=self.guard_chain,
-                max_modules=max_modules,
+            quant_result["module_name"] = module_name
+            quantization_results.append(quant_result)
+            total_params_quantized += quant_result["params_quantized"]
+
+        # Execute GuardChain after edit (if provided)
+        if active_edit.guard_chain is not None:
+            active_edit.guard_chain.after_edit_all(model)
+
+            guard_results["finalize"] = active_edit.guard_chain.finalize_all(model)
+
+            # Check if all guards passed
+            guard_results["all_passed"] = active_edit.guard_chain.all_passed(
+                guard_results["finalize"]
             )
 
-            # Set deterministic seed
-            torch.manual_seed(seed)
-            random.seed(seed)
-            np.random.seed(seed)
-
-            target_modules = active_edit._identify_target_modules(model)
-            total_identified = len(target_modules)
-            if max_modules is not None:
-                if max_modules < total_identified:
-                    target_modules = target_modules[:max_modules]
-
-            tying_map = active_edit._get_weight_tying_map(model)
-
-            # Execute GuardChain before edit (if provided)
-            guard_results = {}
-            if active_edit.guard_chain is not None:
-                guard_results["prepare"] = active_edit.guard_chain.prepare_all(
-                    model, adapter, None, {}
-                )
-
-                active_edit.guard_chain.before_edit_all(model)
-
-            # Apply quantization to each target module
-            quantization_results = []
-            total_params_quantized = 0
-
-            for module_name, module in target_modules:
-                # Apply RTN quantization
-                quant_result = self._apply_rtn_quantization(
-                    module,
-                    bitwidth,
-                    group_size,
-                    clamp_ratio,
-                    tying_map.get(module_name),
-                )
-
-                quant_result["module_name"] = module_name
-                quantization_results.append(quant_result)
-                total_params_quantized += quant_result["params_quantized"]
-
-            # Execute GuardChain after edit (if provided)
-            if active_edit.guard_chain is not None:
-                active_edit.guard_chain.after_edit_all(model)
-
-                guard_results["finalize"] = active_edit.guard_chain.finalize_all(model)
-
-                # Check if all guards passed
-                guard_results["all_passed"] = active_edit.guard_chain.all_passed(
-                    guard_results["finalize"]
-                )
-
-            # Create bitwidth map
-            bitwidth_map = {}
-            for result in quantization_results:
-                bitwidth_map[result["module_name"]] = {
-                    "bitwidth": bitwidth,
-                    "group_size": group_size if bitwidth == 4 else None,
-                    "params": result["params_quantized"],
-                    "scale_stats": result.get("scale_stats", {}),
-                }
-
-            # Identify modified layers
-            modified_layers = []
-            for result in quantization_results:
-                # Extract layer name from module name (e.g., "transformer.h.0.mlp.c_fc" -> "layer_0")
-                name_parts = result["module_name"].split(".")
-                if "h" in name_parts:
-                    h_idx = name_parts.index("h")
-                    if h_idx + 1 < len(name_parts):
-                        layer_num = name_parts[h_idx + 1]
-                        layer_name = f"layer_{layer_num}"
-                        if layer_name not in modified_layers:
-                            modified_layers.append(layer_name)
-
-            # Store edit plan for evaluation report generation
-            modules_quantized = [r["module_name"] for r in quantization_results]
-
-            edit_plan = {
+        # Create bitwidth map
+        bitwidth_map = {}
+        for result in quantization_results:
+            bitwidth_map[result["module_name"]] = {
                 "bitwidth": bitwidth,
-                "scope": scope,
-                "group_size": group_size,
-                "clamp_ratio": clamp_ratio,
-                "seed": seed,
-                "total_modules_quantized": len(modules_quantized),
-                "total_params_quantized": total_params_quantized,
-                "modules_quantized": modules_quantized,
+                "group_size": group_size if bitwidth == 4 else None,
+                "params": result["params_quantized"],
+                "scale_stats": result.get("scale_stats", {}),
             }
 
-            # Return in the standard format expected by the framework
-            return {
-                "name": self.name,
-                "plan_digest": f"rtn_quantization_{bitwidth}bit_{scope}",
-                "plan": edit_plan,  # Include the plan for evaluation report generation
-                "deltas": {
-                    "params_changed": total_params_quantized,
-                    "sparsity": None,  # Quantization doesn't create sparsity
-                    "bitwidth_map": bitwidth_map,
-                    "layers_modified": len(modified_layers),
-                },
-                "config": plan_data,
-                "model_desc": adapter.describe(model)
-                if hasattr(adapter, "describe")
-                else {},
-            }
+        # Identify modified layers
+        modified_layers = []
+        for result in quantization_results:
+            # Extract layer name from module name (e.g., "transformer.h.0.mlp.c_fc" -> "layer_0")
+            name_parts = result["module_name"].split(".")
+            if "h" in name_parts:
+                h_idx = name_parts.index("h")
+                if h_idx + 1 < len(name_parts):
+                    layer_num = name_parts[h_idx + 1]
+                    layer_name = f"layer_{layer_num}"
+                    if layer_name not in modified_layers:
+                        modified_layers.append(layer_name)
 
-        except Exception as e:
-            # Return error in expected format
-            return {
-                "name": self.name,
-                "plan_digest": "rtn_quantization_failed",
-                "deltas": {
-                    "params_changed": 0,
-                    "sparsity": None,
-                    "bitwidth_map": None,
-                    "layers_modified": 0,
-                },
-                "config": dict(plan or {}),
-                "model_desc": {},
-                "error": str(e),
-            }
+        # Store edit plan for evaluation report generation
+        modules_quantized = [r["module_name"] for r in quantization_results]
+
+        edit_plan = {
+            "bitwidth": bitwidth,
+            "scope": scope,
+            "group_size": group_size,
+            "clamp_ratio": clamp_ratio,
+            "seed": seed,
+            "total_modules_quantized": len(modules_quantized),
+            "total_params_quantized": total_params_quantized,
+            "modules_quantized": modules_quantized,
+        }
+
+        # Return in the standard format expected by the framework
+        return {
+            "name": self.name,
+            "plan_digest": f"rtn_quantization_{bitwidth}bit_{scope}",
+            "plan": edit_plan,  # Include the plan for evaluation report generation
+            "deltas": {
+                "params_changed": total_params_quantized,
+                "sparsity": None,  # Quantization doesn't create sparsity
+                "bitwidth_map": bitwidth_map,
+                "layers_modified": len(modified_layers),
+            },
+            "config": plan_data,
+            "model_desc": adapter.describe(model) if hasattr(adapter, "describe") else {},
+        }
 
     def _identify_target_modules(self, model: nn.Module) -> list[tuple[str, nn.Module]]:
         """Identify target modules based on scope configuration."""

@@ -4,6 +4,8 @@ from typing import Any
 
 import torch.nn as nn
 
+from invarlock.core.types import GuardDiagnostic, GuardValidationResult
+
 from . import rmt_detection, rmt_result_contract
 from .rmt_policy import apply_rmt_policy_overrides, compute_epsilon_violations
 
@@ -15,6 +17,35 @@ __all__ = [
     "prepare_rmt_guard",
     "validate_rmt_guard",
 ]
+
+
+def _decision_from_action(action: str) -> str:
+    normalized = str(action or "continue").lower()
+    if normalized == "warn":
+        return "monitor"
+    if normalized == "rollback":
+        return "rollback"
+    if normalized in {"abort", "reject"}:
+        return "block"
+    return "allow"
+
+
+def _typed_diagnostics(
+    violations: list[dict[str, Any]],
+) -> tuple[GuardDiagnostic, ...]:
+    return tuple(
+        GuardDiagnostic(
+            kind=str(item.get("type", "rmt_violation")),
+            severity=str(item.get("severity", "error")),
+            message=str(item.get("message", "")),
+            details={
+                str(key): value
+                for key, value in item.items()
+                if key not in {"type", "severity", "message"}
+            },
+        )
+        for item in violations
+    )
 
 
 def apply_rmt_detection_and_correction(guard: Any, model: nn.Module) -> dict[str, Any]:
@@ -226,7 +257,7 @@ def after_edit_rmt_guard(guard: Any, model: nn.Module) -> None:
 
 def validate_rmt_guard(
     guard: Any, model: Any, adapter: Any, context: dict[str, Any]
-) -> dict[str, Any]:
+) -> GuardValidationResult:
     _ = context
     result = guard.finalize(model, adapter)
     if (
@@ -234,23 +265,36 @@ def validate_rmt_guard(
         and hasattr(result, "action")
         and hasattr(result, "metrics")
     ):
-        violations_list: list[str] = []
+        violations_list: list[dict[str, Any]] = []
         if hasattr(result, "violations") and result.violations:
-            violations_list = [str(v) for v in result.violations]
-        return {
-            "passed": bool(result.passed),
-            "action": str(result.action),
-            "metrics": dict(result.metrics),
-            "violations": violations_list,
-            "message": "RMT guard validation completed",
+            violations_list = [
+                dict(item) if isinstance(item, dict) else {"message": str(item)}
+                for item in result.violations
+            ]
+        action = str(result.action)
+        return GuardValidationResult(
+            passed=bool(result.passed),
+            decision=_decision_from_action(action),
+            metrics=dict(result.metrics),
+            diagnostics=_typed_diagnostics(violations_list),
+            violations=tuple(violations_list),
+        )
+    violations = [
+        {
+            "type": "rmt_error",
+            "severity": "error",
+            "message": str(item),
         }
-    return {
-        "passed": result.get("passed", False),
-        "action": "continue" if result.get("passed", False) else "warn",
-        "metrics": result.get("metrics", {}),
-        "violations": result.get("errors", []),
-        "message": "RMT guard validation completed",
-    }
+        for item in result.get("errors", [])
+    ]
+    action = str(result.get("action", "continue" if result.get("passed", False) else "warn"))
+    return GuardValidationResult(
+        passed=bool(result.get("passed", False)),
+        decision=_decision_from_action(action),
+        metrics=dict(result.get("metrics", {})),
+        diagnostics=_typed_diagnostics(violations),
+        violations=tuple(violations),
+    )
 
 
 def finalize_rmt_guard(
@@ -389,7 +433,20 @@ def finalize_rmt_guard(
         )
     return {
         "passed": stable,
-        "action": action,
         "metrics": metrics,
         "violations": violations,
+        "decision": _decision_from_action(action),
+        "diagnostics": [
+            {
+                "kind": str(item.get("type", "epsilon_band")),
+                "severity": str(item.get("severity", "error")),
+                "message": str(item.get("message", "")),
+                "details": {
+                    str(key): value
+                    for key, value in item.items()
+                    if key not in {"type", "severity", "message"}
+                },
+            }
+            for item in violations
+        ],
     }

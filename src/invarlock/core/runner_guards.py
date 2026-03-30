@@ -7,11 +7,78 @@ from typing import Any
 from .api import Guard, GuardWithContext, GuardWithPrepare, RunConfig, RunReport
 from .exceptions import GuardError, InvarlockError
 from .auto_tuning import resolve_tier_policies
-from .types import LogLevel
+from .types import GuardDiagnostic, GuardValidationResult, LogLevel
 
 ResolveTierPoliciesFn = Callable[
     [str, str | None, dict[str, Any]], dict[str, dict[str, Any]]
 ]
+
+
+def _coerce_diagnostics(raw: Any) -> list[dict[str, Any]]:
+    diagnostics: list[dict[str, Any]] = []
+    for item in raw if isinstance(raw, (list, tuple)) else ():
+        if isinstance(item, GuardDiagnostic):
+            diagnostics.append(
+                {
+                    "kind": item.kind,
+                    "severity": item.severity,
+                    "message": item.message,
+                    "details": dict(item.details),
+                }
+            )
+        elif isinstance(item, dict):
+            diagnostics.append(
+                {
+                    "kind": str(item.get("kind", "guard_diagnostic")),
+                    "severity": str(item.get("severity", "info")),
+                    "message": str(item.get("message", "")),
+                    "details": {
+                        str(key): value
+                        for key, value in item.items()
+                        if key not in {"kind", "severity", "message"}
+                    },
+                }
+            )
+    return diagnostics
+
+
+def _normalize_guard_result(raw: Any) -> dict[str, Any]:
+    if isinstance(raw, GuardValidationResult):
+        return {
+            "passed": bool(raw.passed),
+            "decision": str(raw.decision),
+            "metrics": dict(raw.metrics),
+            "diagnostics": _coerce_diagnostics(raw.diagnostics),
+            "policy": dict(raw.policy),
+            "details": dict(raw.details),
+            "violations": [dict(item) for item in raw.violations],
+            **dict(raw.extras),
+        }
+
+    if not isinstance(raw, dict):
+        raise TypeError(f"Unsupported guard result type: {type(raw)!r}")
+
+    diagnostics = _coerce_diagnostics(raw.get("diagnostics"))
+    decision = raw.get("decision")
+    if not isinstance(decision, str) or not decision:
+        decision = "allow" if bool(raw.get("passed", False)) else "block"
+    normalized = {
+        "passed": bool(raw.get("passed", False)),
+        "decision": str(decision),
+        "metrics": dict(raw.get("metrics", {})),
+        "diagnostics": diagnostics,
+        "policy": dict(raw.get("policy", {})),
+        "details": dict(raw.get("details", {})),
+        "violations": [
+            dict(item) if isinstance(item, dict) else {"message": str(item)}
+            for item in raw.get("violations", [])
+            if isinstance(raw.get("violations", []), list | tuple)
+        ],
+    }
+    for extra_key in ("final_z_scores", "module_family_map", "baseline_metrics", "final_metrics"):
+        if extra_key in raw:
+            normalized[extra_key] = raw[extra_key]
+    return normalized
 
 
 def resolve_guard_policies(
@@ -90,6 +157,17 @@ def apply_guard_policy(runner: Any, guard: Guard, policy: dict[str, Any]) -> Non
         raise
 
 
+def _set_guard_run_context(guard: Guard, report: RunReport) -> None:
+    if not isinstance(guard, GuardWithContext):
+        return
+    try:
+        guard.set_run_context(report)
+    except Exception as exc:
+        raise RuntimeError(
+            f"Guard '{guard.name}' run context setup failed: {exc}"
+        ) from exc
+
+
 def prepare_guards_phase(
     runner: Any,
     model: Any,
@@ -121,16 +199,7 @@ def prepare_guards_phase(
                     {"guard": guard.name, "policy": guard_policy},
                 )
 
-            if isinstance(guard, GuardWithContext):
-                try:
-                    guard.set_run_context(report)
-                except Exception as exc:
-                    runner._log_event(
-                        "guard_prepare",
-                        "context_error",
-                        LogLevel.WARNING,
-                        {"guard": guard.name, "error": str(exc)},
-                    )
+            _set_guard_run_context(guard, report)
 
             if isinstance(guard, GuardWithPrepare):
                 prepare_result = guard.prepare(
@@ -187,21 +256,13 @@ def guard_phase(
         runner._log_event("guard", "start", LogLevel.INFO, {"guard": guard.name})
         guard_start = time.perf_counter()
 
-        if isinstance(guard, GuardWithContext):
-            try:
-                guard.set_run_context(report)
-            except Exception as exc:  # pragma: no cover - defensive
-                runner._log_event(
-                    "guard",
-                    "context_error",
-                    LogLevel.WARNING,
-                    {"guard": guard.name, "error": str(exc)},
-                )
+        _set_guard_run_context(guard, report)
 
         try:
             result = guard.validate(model, adapter, report.context)
-            guard_results[guard.name] = result
-            status = "passed" if result.get("passed", False) else "failed"
+            normalized_result = _normalize_guard_result(result)
+            guard_results[guard.name] = normalized_result
+            status = "passed" if normalized_result.get("passed", False) else "failed"
             runner._log_event(
                 "guard",
                 "complete",

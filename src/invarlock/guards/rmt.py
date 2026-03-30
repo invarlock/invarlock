@@ -15,6 +15,7 @@ import torch
 import torch.nn as nn
 
 from invarlock.core.api import Guard
+from invarlock.core.types import GuardValidationResult
 
 from . import (
     rmt_activation_runtime,
@@ -155,7 +156,7 @@ class RMTGuard(Guard):
         self._run_profile: str | None = None
         self._run_tier: str | None = None
         self.prepared = False
-        self.events: list[dict[str, Any]] = []
+        self._event_records: list[dict[str, Any]] = []
         self._last_result: dict[str, Any] | None = None
         self.adapter = None  # Store adapter for tying map access
 
@@ -178,15 +179,40 @@ class RMTGuard(Guard):
         self, operation: str, level: str = "INFO", message: str = "", **data
     ):
         """Log an event with timestamp."""
-        event = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "component": "rmt_guard",
-            "operation": operation,
-            "level": level,
-            "message": message,
-            "data": data,
-        }
-        self.events.append(event)
+        level_code = str(level or "INFO").upper()
+        severity = {
+            "DEBUG": "debug",
+            "INFO": "info",
+            "WARN": "warning",
+            "WARNING": "warning",
+            "ERROR": "error",
+            "CRITICAL": "critical",
+        }.get(level_code, level_code.lower())
+        self._event_records.append(
+            {
+                "timestamp": datetime.utcnow().isoformat(),
+                "component": "rmt_guard",
+                "kind": operation,
+                "severity": severity,
+                "summary": message,
+                "details": dict(data),
+                "level_code": level_code,
+            }
+        )
+
+    @property
+    def diagnostic_records(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "timestamp": event["timestamp"],
+                "component": event["component"],
+                "kind": event["kind"],
+                "severity": event["severity"],
+                "summary": event["summary"],
+                "details": dict(event["details"]),
+            }
+            for event in self._event_records
+        ]
 
     def set_run_context(self, report: Any) -> None:
         """Capture tier/profile context for activation requirements."""
@@ -363,7 +389,7 @@ class RMTGuard(Guard):
 
     def validate(
         self, model: Any, adapter: Any, context: dict[str, Any]
-    ) -> dict[str, Any]:
+    ) -> GuardValidationResult:
         return _validate_rmt_guard_impl(self, model, adapter, context)
 
     def finalize(self, model: nn.Module, adapter=None) -> GuardOutcome | dict[str, Any]:

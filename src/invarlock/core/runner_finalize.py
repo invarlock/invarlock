@@ -28,24 +28,32 @@ def finalize_phase(
     pm_fin = pm.get("final") if isinstance(pm, dict) else None
     pm_kind = str(pm.get("kind", "")).lower() if isinstance(pm, dict) else ""
     is_ppl_metric = pm_kind.startswith("ppl")
+    metric_payload_invalid = bool(
+        isinstance(pm, dict) and (pm.get("invalid") or pm.get("degraded"))
+    )
+    tail_payload_invalid = False
 
     drift_ratio: float | None = None
     if is_ppl_metric:
-        try:
+        has_preview = isinstance(pm, dict) and "preview" in pm
+        has_final = isinstance(pm, dict) and "final" in pm
+        if has_preview and has_final:
             if isinstance(pm_fin, int | float) and isinstance(pm_prev, int | float):
                 pm_prev_val = float(pm_prev)
                 pm_fin_val = float(pm_fin)
-                if (
-                    pm_prev_val > 0.0
-                    and math.isfinite(pm_prev_val)
-                    and math.isfinite(pm_fin_val)
-                ):
-                    drift_ratio = pm_fin_val / pm_prev_val
-        except Exception:
-            drift_ratio = None
+                if math.isfinite(pm_prev_val) and math.isfinite(pm_fin_val):
+                    if pm_prev_val > 0.0:
+                        drift_ratio = pm_fin_val / pm_prev_val
+                else:
+                    metric_payload_invalid = True
+            else:
+                metric_payload_invalid = True
 
     spike_threshold = getattr(config, "spike_threshold", 2.0)
-    if drift_ratio is None:
+    if metric_payload_invalid:
+        is_catastrophic_spike = False
+        metrics_acceptable = False
+    elif drift_ratio is None:
         is_catastrophic_spike = False
         metrics_acceptable = True
     else:
@@ -54,15 +62,25 @@ def finalize_phase(
 
     rollback_reason = None
     tail_failed = False
-    try:
-        pm_tail = metrics.get("primary_metric_tail", {})
-        if isinstance(pm_tail, dict) and pm_tail:
-            mode = str(pm_tail.get("mode", "warn") or "warn").strip().lower()
-            evaluated = bool(pm_tail.get("evaluated", False))
-            passed = bool(pm_tail.get("passed", True))
-            tail_failed = bool(mode == "fail" and evaluated and (not passed))
-    except Exception:  # pragma: no cover
-        tail_failed = False
+    pm_tail = metrics.get("primary_metric_tail", {}) if isinstance(metrics, dict) else {}
+    if pm_tail:
+        if not isinstance(pm_tail, dict):
+            tail_payload_invalid = True
+        else:
+            mode_value = pm_tail.get("mode", "warn")
+            evaluated_value = pm_tail.get("evaluated", False)
+            passed_value = pm_tail.get("passed", True)
+            if not isinstance(mode_value, str):
+                tail_payload_invalid = True
+            else:
+                mode = mode_value.strip().lower() or "warn"
+                if mode == "fail":
+                    if not isinstance(evaluated_value, bool) or not isinstance(
+                        passed_value, bool
+                    ):
+                        tail_payload_invalid = True
+                    else:
+                        tail_failed = evaluated_value and (not passed_value)
 
     if is_catastrophic_spike:
         rollback_reason = (
@@ -79,6 +97,12 @@ def finalize_phase(
                 "immediate_rollback": True,
             },
         )
+    elif metric_payload_invalid:
+        rollback_reason = "primary_metric_invalid"
+        status = RunStatus.ROLLBACK.value
+    elif tail_payload_invalid:
+        rollback_reason = "primary_metric_tail_invalid"
+        status = RunStatus.ROLLBACK.value
     elif tail_failed:
         rollback_reason = "primary_metric_tail_failed"
         status = RunStatus.ROLLBACK.value
@@ -97,6 +121,7 @@ def finalize_phase(
         )
         return status
 
+    report.meta["rollback_reason"] = rollback_reason
     if runner.checkpoint_manager and "initial_checkpoint" in report.meta:
         checkpoint_id = report.meta["initial_checkpoint"]
         restored = False
@@ -130,8 +155,6 @@ def finalize_phase(
                     "error": restore_error or "restore_failed",
                 },
             )
-
-        report.meta["rollback_reason"] = rollback_reason
         report.meta["rollback_checkpoint"] = checkpoint_id
         report.meta["guard_recovered"] = bool(restored)
         report.meta["rollback_failed"] = not bool(restored)

@@ -63,7 +63,7 @@ def test_finalize_hydrates_edge_risk_and_returns_plain_dict(monkeypatch) -> None
     result = guard.finalize(nn.Linear(2, 2, bias=False), adapter=None)
 
     assert result["passed"] is True
-    assert result["action"] == "continue"
+    assert result["decision"] == "allow"
     assert result["metrics"]["edge_risk_by_family"]["attn"] == 0.2
     assert guard.edge_risk_by_module["layer"] == 0.2
 
@@ -79,8 +79,10 @@ def test_validate_uses_dict_finalize_path() -> None:
     result = guard.validate(model=None, adapter=None, context={})
 
     assert result["passed"] is False
-    assert result["action"] == "warn"
-    assert result["violations"] == ["boom"]
+    assert result["decision"] == "monitor"
+    assert result["violations"] == [
+        {"type": "rmt_error", "severity": "error", "message": "boom"}
+    ]
 
 
 def test_set_run_context_and_epsilon_setters_ignore_invalid_values() -> None:
@@ -283,7 +285,9 @@ def test_runtime_detection_logs_correction_failure(monkeypatch) -> None:
     result = guard._apply_rmt_detection_and_correction(nn.Identity())
 
     assert result["has_outliers"] is True
-    assert any(event["operation"] == "rmt_correct_failed" for event in guard.events)
+    assert any(
+        event["kind"] == "rmt_correct_failed" for event in guard.diagnostic_records
+    )
 
 
 def test_prepare_rejects_legacy_epsilon_parameter() -> None:

@@ -9,7 +9,6 @@ _NON_FATAL_SNAPSHOT_EXCEPTIONS: tuple[type[BaseException], ...] = (
     TypeError,
     ValueError,
     KeyError,
-    RuntimeError,
     OSError,
 )
 
@@ -17,9 +16,9 @@ _NON_FATAL_SNAPSHOT_EXCEPTIONS: tuple[type[BaseException], ...] = (
 @dataclass(frozen=True)
 class SnapshotDiagnostic:
     code: str
-    message: str
-    severity: str = "warning"
-    details: dict[str, Any] = field(default_factory=dict)
+    summary: str
+    level: str = "warning"
+    context: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -69,12 +68,12 @@ def build_snapshot_execution_plan(
             diagnostics=(
                 SnapshotDiagnostic(
                     code="snapshot.overhead_check_skipped",
-                    message=f"Overhead check skipped via config policy{source_note}",
-                    details={"source": skip_overhead_source},
+                    summary=f"Overhead check skipped via config policy{source_note}",
+                    context={"source": skip_overhead_source},
                 ),
                 SnapshotDiagnostic(
                     code="snapshot.loaded_model_reused",
-                    message="Reusing initially loaded model for guarded execution.",
+                    summary="Reusing initially loaded model for guarded execution.",
                 ),
             ),
         )
@@ -155,8 +154,8 @@ def build_snapshot_execution_plan(
                     diagnostics=(
                         SnapshotDiagnostic(
                             code="snapshot.bytes_failed_chunked_fallback",
-                            message="Byte snapshot failed; falling back to chunked snapshot.",
-                            details={
+                            summary="Byte snapshot failed; falling back to chunked snapshot.",
+                            context={
                                 "error_type": type(exc).__name__,
                                 "error": str(exc),
                             },
@@ -202,9 +201,9 @@ def build_snapshot_execution_plan(
             diagnostics=(
                 SnapshotDiagnostic(
                     code="snapshot.prepare_failed",
-                    message="Snapshot preparation failed; falling back to reload-per-attempt execution.",
-                    severity="error",
-                    details={
+                    summary="Snapshot preparation failed; falling back to reload-per-attempt execution.",
+                    level="error",
+                    context={
                         "error_type": type(exc).__name__,
                         "error": str(exc),
                     },
@@ -241,8 +240,8 @@ def resolve_snapshot_retry_transition(
             diagnostics.append(
                 SnapshotDiagnostic(
                     code="snapshot.overhead_check_skipped",
-                    message=f"Overhead check skipped via config policy{source_note}",
-                    details={"source": skip_overhead_source},
+                    summary=f"Overhead check skipped via config policy{source_note}",
+                    context={"source": skip_overhead_source},
                 )
             )
             warned = True
@@ -256,7 +255,7 @@ def resolve_snapshot_retry_transition(
             diagnostics.append(
                 SnapshotDiagnostic(
                     code="snapshot.restore_unavailable_reuse_loaded_model",
-                    message="Snapshot restore unavailable; reusing initially loaded model for guarded execution.",
+                    summary="Snapshot restore unavailable; reusing initially loaded model for guarded execution.",
                 )
             )
 

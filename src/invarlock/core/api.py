@@ -19,6 +19,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
+from .types import GuardValidationResult
+
 
 class ModelAdapter(ABC):
     """
@@ -128,7 +130,7 @@ class Guard(ABC):
     @abstractmethod
     def validate(
         self, model: Any, adapter: ModelAdapter, context: dict[str, Any]
-    ) -> dict[str, Any]:
+    ) -> GuardValidationResult:
         """
         Validate model state/behavior.
 
@@ -138,7 +140,7 @@ class Guard(ABC):
             context: Validation context (baseline metrics, etc.)
 
         Returns:
-            Dict with validation results and status
+            Typed validation result with domain diagnostics and decisions.
         """
         pass
 
@@ -249,14 +251,19 @@ class GuardChain:
 
     def get_worst_action(self, outcomes: list[Any]) -> str:
         """Get the worst action from all outcomes."""
+        decisions = []
         actions = []
         for outcome in outcomes:
+            if hasattr(outcome, "decision"):
+                decisions.append(outcome.decision)
             if hasattr(outcome, "action"):
                 actions.append(outcome.action)
 
         # Import from types to avoid circular dependency
-        from .types import get_worst_action
+        from .types import decision_to_action, get_worst_action, get_worst_decision
 
+        if decisions:
+            return decision_to_action(get_worst_decision(decisions))
         return get_worst_action(actions)
 
 

@@ -36,6 +36,12 @@ from invarlock.eval.bench import (
 from invarlock.reporting.report_types import create_empty_report
 
 
+def _report_with_artifacts(report_path: str = "report.json") -> dict[str, object]:
+    report = create_empty_report()
+    report["artifacts"]["report_path"] = report_path
+    return report
+
+
 class TestScenarioConfig:
     """Test ScenarioConfig class and its post-init logic."""
 
@@ -455,7 +461,7 @@ def test_execute_single_run_skips_tokenizer_hash_and_duration_paths(
             # Match the attribute shape expected by execute_single_run
             return types.SimpleNamespace(
                 meta={"duration": "bad"},
-                edit="not-a-dict",
+                edit={"plan_digest": "pd", "deltas": {}},
                 metrics={"rmt": "bad"},
                 guards={},
                 status="ok",
@@ -490,6 +496,64 @@ def test_execute_single_run_skips_tokenizer_hash_and_duration_paths(
     assert result.success is True
     assert "tokenizer_hash" not in result.report.get("meta", {})
     assert "duration_s" not in result.report.get("meta", {})
+
+
+def test_execute_single_run_invalid_edit_payload_surfaces_failure(
+    monkeypatch, tmp_path: Path
+):
+    import types
+
+    import invarlock.core.registry as core_registry
+    import invarlock.core.runner as core_runner
+    import invarlock.eval.bench_runner as bench_runner_mod
+
+    class _Adapter:
+        def restore(self, _model, _blob):  # noqa: ANN001
+            return None
+
+    class _Registry:
+        def get_edit(self, _name: str):  # noqa: ANN001
+            return object()
+
+    class _CoreRunner:
+        def execute(self, **_kwargs):  # noqa: ANN001
+            return types.SimpleNamespace(
+                meta={},
+                edit="not-a-dict",
+                metrics={"rmt": {}},
+                guards={},
+                status="ok",
+            )
+
+    monkeypatch.setattr(core_registry, "get_registry", lambda: _Registry())
+    monkeypatch.setattr(core_runner, "CoreRunner", _CoreRunner)
+    monkeypatch.setattr(
+        bench_runner_mod.rmt_detection,
+        "rmt_detect",
+        lambda **_k: {"n_layers_flagged": 0},
+    )
+
+    scenario = ScenarioConfig(
+        edit="quant_rtn", tier="balanced", probes=0, profile="ci", device="cpu"
+    )
+    run_config: dict = {"dataset": {"provider": "wikitext2"}, "edit": {"plan": {}}}
+    runtime = {
+        "adapter": _Adapter(),
+        "model": object(),
+        "baseline_snapshot": b"blob",
+        "pairing_schedule": {},
+        "calibration_data": [],
+        "rmt_baseline_mp_stats": {},
+        "rmt_baseline_sigmas": {},
+        "tokenizer_hash": None,
+        "dataset_name": "wikitext2",
+        "split": "validation",
+    }
+
+    result = execute_single_run(run_config, scenario, "bare", tmp_path, runtime=runtime)
+    assert result.success is False
+    assert result.error_message is not None
+    assert "invalid edit metadata payload" in result.error_message
 
     def test_compute_comparison_metrics_invalid_inputs(self):
         """Test comparison with invalid inputs."""
@@ -934,7 +998,7 @@ class TestExecuteSingleRun:
                 return DummyEdit()
 
             def get_guard(self, _name: str):
-                raise KeyError("no guards in stub")
+                return SimpleNamespace(name=_name)
 
         class DummyCoreReport:
             def __init__(self):
@@ -1007,6 +1071,109 @@ class TestExecuteSingleRun:
         assert result.error_message is not None
         assert "boom" in result.error_message
 
+    def test_execute_single_run_guard_construction_failure_surfaces_error(
+        self, monkeypatch
+    ):
+        """Guard construction failures should stop guarded execution immediately."""
+        from types import SimpleNamespace
+
+        from invarlock.eval.data import EvaluationWindow
+
+        class DummyProfile:
+            def make_tokenizer(self):
+                return object(), "tokhash"
+
+        class DummyProvider:
+            def windows(
+                self,
+                tokenizer,
+                *,
+                seq_len: int,
+                stride: int,
+                preview_n: int,
+                final_n: int,
+                seed: int,
+                split: str,
+            ):
+                preview = EvaluationWindow(
+                    input_ids=[[1] * seq_len for _ in range(preview_n)],
+                    attention_masks=[[1] * seq_len for _ in range(preview_n)],
+                    indices=list(range(preview_n)),
+                )
+                final = EvaluationWindow(
+                    input_ids=[[2] * seq_len for _ in range(final_n)],
+                    attention_masks=[[1] * seq_len for _ in range(final_n)],
+                    indices=list(range(final_n)),
+                )
+                return preview, final
+
+        class DummyAdapter:
+            def load_model(self, model_id: str, device: str = "auto", **_kwargs):
+                return SimpleNamespace(name=f"{model_id}:{device}")
+
+            def snapshot(self, _model):
+                return b"snapshot"
+
+            def restore(self, _model, _blob):
+                return None
+
+        class DummyEdit:
+            name = "quant_rtn"
+
+        class GuardingRegistry:
+            def get_adapter(self, _name: str):
+                return DummyAdapter()
+
+            def get_edit(self, _name: str):
+                return DummyEdit()
+
+            def get_guard(self, _name: str):
+                raise RuntimeError("guard boom")
+
+        calls = {"execute": 0}
+
+        def _execute(*_args, **_kwargs):
+            calls["execute"] += 1
+            raise AssertionError("CoreRunner.execute should not be called")
+
+        monkeypatch.setattr(
+            "invarlock.model_profile.detect_model_profile",
+            lambda *_a, **_k: DummyProfile(),
+        )
+        monkeypatch.setattr(
+            "invarlock.eval.data.get_provider", lambda *_a, **_k: DummyProvider()
+        )
+        monkeypatch.setattr(
+            "invarlock.core.registry.get_registry", lambda: GuardingRegistry()
+        )
+        monkeypatch.setattr("invarlock.core.runner.CoreRunner.execute", _execute)
+
+        scenario = ScenarioConfig(edit="quant_rtn", tier="balanced", probes=2)
+        run_config = ConfigurationManager.create_guarded_config(scenario)
+
+        runtime = {
+            "adapter": DummyAdapter(),
+            "model": SimpleNamespace(name="m"),
+            "baseline_snapshot": b"snapshot",
+            "pairing_schedule": {"preview": {}, "final": {}},
+            "calibration_data": [],
+            "tokenizer_hash": "tokhash",
+            "split": "validation",
+            "dataset_name": "wikitext2",
+            "rmt_baseline_mp_stats": {"layer": {}},
+            "rmt_baseline_sigmas": {"layer": 0.1},
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = execute_single_run(
+                run_config, scenario, "guarded", Path(temp_dir), runtime=runtime
+            )
+
+        assert result.success is False
+        assert result.error_message is not None
+        assert "guard boom" in result.error_message
+        assert calls["execute"] == 0
+
     def test_execute_single_run_reuses_runtime_without_recomputing_baselines(
         self, monkeypatch
     ):
@@ -1064,7 +1231,7 @@ class TestExecuteSingleRun:
                 return DummyEdit()
 
             def get_guard(self, _name: str):
-                raise KeyError("no guards in stub")
+                return SimpleNamespace(name=_name)
 
         class DummyCoreReport:
             def __init__(self):
@@ -1143,6 +1310,114 @@ class TestExecuteSingleRun:
         assert calls["provider"] == 0
         assert calls["capture"] == 0
 
+    def test_execute_single_run_rmt_detection_failure_surfaces_error(
+        self, monkeypatch
+    ):
+        from types import SimpleNamespace
+
+        from invarlock.eval.data import EvaluationWindow
+
+        class DummyProfile:
+            def make_tokenizer(self):
+                return object(), "tokhash"
+
+        class DummyProvider:
+            def windows(
+                self,
+                tokenizer,
+                *,
+                seq_len: int,
+                stride: int,
+                preview_n: int,
+                final_n: int,
+                seed: int,
+                split: str,
+            ):
+                preview = EvaluationWindow(
+                    input_ids=[[1] * seq_len for _ in range(preview_n)],
+                    attention_masks=[[1] * seq_len for _ in range(preview_n)],
+                    indices=list(range(preview_n)),
+                )
+                final = EvaluationWindow(
+                    input_ids=[[2] * seq_len for _ in range(final_n)],
+                    attention_masks=[[1] * seq_len for _ in range(final_n)],
+                    indices=list(range(final_n)),
+                )
+                return preview, final
+
+        class DummyAdapter:
+            def load_model(self, model_id: str, device: str = "auto", **_kwargs):
+                return SimpleNamespace(name=f"{model_id}:{device}")
+
+            def snapshot(self, _model):
+                return b"snapshot"
+
+            def restore(self, _model, _blob):
+                return None
+
+        class DummyEdit:
+            name = "quant_rtn"
+
+        class DummyRegistry:
+            def get_adapter(self, _name: str):
+                return DummyAdapter()
+
+            def get_edit(self, _name: str):
+                return DummyEdit()
+
+            def get_guard(self, _name: str):
+                return SimpleNamespace(name=_name)
+
+        class DummyCoreReport:
+            def __init__(self):
+                self.meta = {"duration": 0.01, "guard_recovered": False}
+                self.edit = {
+                    "plan_digest": "pd",
+                    "deltas": {"params_changed": 0, "layers_modified": 0},
+                }
+                self.metrics = {
+                    "primary_metric": {
+                        "kind": "ppl_causal",
+                        "preview": 1.0,
+                        "final": 1.0,
+                    }
+                }
+                self.guards = {}
+                self.evaluation_windows = {"preview": {}, "final": {}}
+                self.status = "success"
+
+        monkeypatch.setattr(
+            "invarlock.model_profile.detect_model_profile",
+            lambda *_a, **_k: DummyProfile(),
+        )
+        monkeypatch.setattr(
+            "invarlock.eval.data.get_provider", lambda *_a, **_k: DummyProvider()
+        )
+        monkeypatch.setattr(
+            "invarlock.core.registry.get_registry", lambda: DummyRegistry()
+        )
+        monkeypatch.setattr(
+            "invarlock.core.runner.CoreRunner.execute", lambda *_a, **_k: DummyCoreReport()
+        )
+        monkeypatch.setattr(
+            "invarlock.eval.bench_runner.rmt_analysis.capture_baseline_mp_stats",
+            lambda *_a, **_k: {},
+        )
+        monkeypatch.setattr(
+            "invarlock.eval.bench_runner.rmt_detection.rmt_detect",
+            lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("detect boom")),
+        )
+
+        scenario = ScenarioConfig(edit="quant_rtn", tier="balanced", probes=2)
+        run_config = ConfigurationManager.create_bare_config(scenario)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = execute_single_run(run_config, scenario, "bare", Path(temp_dir))
+
+        assert result.success is False
+        assert result.error_message is not None
+        assert "RMT detection failed for quant_rtn (bare)" in result.error_message
+
 
 class TestExecuteScenario:
     """Test execute_scenario function."""
@@ -1173,7 +1448,7 @@ class TestExecuteScenario:
         mock_check_deps.return_value = (True, "ok")
         bare = RunResult(
             run_type="bare",
-            report=create_empty_report(),
+            report=_report_with_artifacts("bare.report.json"),
             success=True,
             error_message=None,
         )
@@ -1209,13 +1484,13 @@ class TestExecuteScenario:
         mock_check_deps.return_value = (True, "ok")
         bare = RunResult(
             run_type="bare",
-            report=create_empty_report(),
+            report=_report_with_artifacts("bare.report.json"),
             success=True,
             error_message=None,
         )
         guarded = RunResult(
             run_type="guarded",
-            report=create_empty_report(),
+            report=_report_with_artifacts("guarded.report.json"),
             success=True,
             error_message=None,
         )
@@ -1235,10 +1510,86 @@ class TestExecuteScenario:
         )
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            result = execute_scenario(scenario, config, Path(temp_dir))
+            with patch(
+                "invarlock.reporting.report_make.make_report",
+                return_value=create_empty_report(),
+            ), patch(
+                "invarlock.reporting.report_telemetry.telemetry_output_enabled",
+                return_value=False,
+            ):
+                result = execute_scenario(scenario, config, Path(temp_dir))
 
         mock_validate_all_gates.assert_called_once()
         assert result.gates["quality"] is True
+
+    @patch("invarlock.eval.bench_runner.execute_single_run")
+    @patch("invarlock.eval.bench_runner.DependencyChecker.check_edit_dependencies")
+    def test_execute_scenario_success_requires_report_artifacts(
+        self,
+        mock_check_deps,
+        mock_execute_single_run,
+    ):
+        mock_check_deps.return_value = (True, "ok")
+        bare = RunResult(
+            run_type="bare",
+            report=create_empty_report(),
+            success=True,
+            error_message=None,
+        )
+        guarded = RunResult(
+            run_type="guarded",
+            report=_report_with_artifacts("guarded.report.json"),
+            success=True,
+            error_message=None,
+        )
+        mock_execute_single_run.side_effect = [bare, guarded]
+
+        scenario = ScenarioConfig(edit="quant_rtn", tier="balanced", probes=1)
+        config = BenchmarkConfig(edits=["quant_rtn"], tiers=["balanced"], probes=[1])
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with pytest.raises(
+                RuntimeError, match="bare run report is missing artifacts.report_path"
+            ):
+                execute_scenario(scenario, config, Path(temp_dir))
+
+    @patch("invarlock.eval.bench_runner.execute_single_run")
+    @patch("invarlock.eval.bench_runner.DependencyChecker.check_edit_dependencies")
+    def test_execute_scenario_report_generation_failure_raises(
+        self,
+        mock_check_deps,
+        mock_execute_single_run,
+    ):
+        mock_check_deps.return_value = (True, "ok")
+        bare = RunResult(
+            run_type="bare",
+            report=_report_with_artifacts("bare.report.json"),
+            success=True,
+            error_message=None,
+        )
+        guarded = RunResult(
+            run_type="guarded",
+            report=_report_with_artifacts("guarded.report.json"),
+            success=True,
+            error_message=None,
+        )
+        mock_execute_single_run.side_effect = [bare, guarded]
+
+        scenario = ScenarioConfig(edit="quant_rtn", tier="balanced", probes=1)
+        config = BenchmarkConfig(edits=["quant_rtn"], tiers=["balanced"], probes=[1])
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch(
+                "invarlock.reporting.report_make.make_report",
+                side_effect=RuntimeError("report boom"),
+            ), patch(
+                "invarlock.reporting.report_telemetry.telemetry_output_enabled",
+                return_value=False,
+            ), pytest.raises(
+                RuntimeError,
+                match="Evaluation report generation failed for quant_rtn__balanced__p1",
+            ):
+                execute_scenario(scenario, config, Path(temp_dir))
 
 
 class TestRunGuardEffectBenchmark:

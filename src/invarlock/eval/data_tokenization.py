@@ -8,6 +8,8 @@ import warnings
 from collections.abc import Sequence
 from typing import Any, cast
 
+from invarlock.core.exceptions import DataError as _DataErr
+
 from .data_windows import EvaluationWindow
 
 
@@ -181,6 +183,7 @@ def tokenize_texts_padded(
     input_ids_list: list[list[int]] = []
     attention_masks_list: list[list[int]] = []
     kept_positions: list[int] = []
+    failures: list[dict[str, Any]] = []
     for text, position in zip(texts, positions, strict=False):
         try:
             input_ids, attention_mask = materialize_token_row(
@@ -193,11 +196,26 @@ def tokenize_texts_padded(
             attention_masks_list.append(attention_mask)
             kept_positions.append(int(position))
         except Exception as exc:
+            failures.append({"position": int(position), "error": str(exc)})
             if warn_on_failure:
                 warnings.warn(
                     f"Failed to tokenize sample {position}: {exc}",
                     stacklevel=2,
                 )
+    if failures and not warn_on_failure:
+        raise _DataErr(
+            code="E304",
+            message=(
+                "TOKENIZE-INSUFFICIENT: failed to tokenize one or more evaluation "
+                "samples"
+            ),
+            details={
+                "requested": int(len(texts)),
+                "succeeded": int(len(kept_positions)),
+                "failed_positions": [item["position"] for item in failures],
+                "errors": [item["error"] for item in failures],
+            },
+        )
 
     return input_ids_list, attention_masks_list, kept_positions
 

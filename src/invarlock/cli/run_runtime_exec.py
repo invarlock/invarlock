@@ -7,14 +7,10 @@ import inspect
 import math
 import os
 import shutil
-from types import SimpleNamespace
 from typing import Any
-
-from rich.console import Console
 
 from invarlock.cli.run_config import extract_model_load_kwargs
 from invarlock.cli.run_runtime import free_model_memory, get_psutil
-from invarlock.cli.run_shell_output import _event
 from invarlock.cli.run_warning_filters import suppress_noisy_warnings
 from invarlock.core.exceptions import InvarlockError
 from invarlock.core.run_policy import GUARD_OVERHEAD_THRESHOLD
@@ -31,6 +27,23 @@ from invarlock.core.run_snapshot_policy import (
 
 class SnapshotRestoreFailed(RuntimeError):
     """Internal signal for snapshot restore failures during retries."""
+
+
+_SNAPSHOT_RESTORE_EXCEPTIONS = (
+    AttributeError,
+    KeyError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
+
+def _require_snapshot_reuse_model(*, model: Any, phase: str) -> Any:
+    if model is None:
+        raise SnapshotRestoreFailed(
+            f"Snapshot reuse requested for {phase} without a live model instance."
+        )
+    return model
 
 
 def build_snapshot_execution_plan(
@@ -69,10 +82,10 @@ def load_model_with_cfg(
     """Load a model with config-provided kwargs, filtering for strict adapters."""
     try:
         model_id = cfg.model.id
-    except Exception:
+    except (AttributeError, KeyError, TypeError):
         try:
             model_id = (cfg.model_dump().get("model") or {}).get("id")
-        except Exception:
+        except (AttributeError, KeyError, TypeError, ValueError):
             model_id = None
     if not isinstance(model_id, str) or not model_id:
         raise ValueError("Missing model.id in config")
@@ -83,11 +96,17 @@ def load_model_with_cfg(
         event_path=event_path,
         context=warning_context,
     ):
-        strict_accepts_local_files_only = False
         try:
             sig = inspect.signature(adapter.load_model)
+        except (TypeError, ValueError):
+            sig = None
+
+        if sig is not None:
             accepts_var_kw = any(
                 p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+            )
+            strict_accepts_local_files_only = (
+                "prefer_local_files_only" in sig.parameters
             )
             if accepts_var_kw:
                 allowed = dict(extra)
@@ -95,16 +114,16 @@ def load_model_with_cfg(
                     allowed["prefer_local_files_only"] = True
                 return adapter.load_model(model_id, device=device, **allowed)
             allowed = {k: v for k, v in extra.items() if k in sig.parameters}
-            strict_accepts_local_files_only = (
-                "prefer_local_files_only" in sig.parameters
-            )
             if prefer_local_files_only and strict_accepts_local_files_only:
                 allowed["prefer_local_files_only"] = True
             if allowed:
                 return adapter.load_model(model_id, device=device, **allowed)
-        except Exception:
-            pass
-        if prefer_local_files_only and strict_accepts_local_files_only:
+            if prefer_local_files_only and strict_accepts_local_files_only:
+                return adapter.load_model(
+                    model_id, device=device, prefer_local_files_only=True
+                )
+
+        if prefer_local_files_only and sig is None:
             return adapter.load_model(
                 model_id, device=device, prefer_local_files_only=True
             )
@@ -117,9 +136,9 @@ def init_retry_controller(
     max_attempts: int,
     timeout: int | None,
     baseline: str | None,
-    console: Console,
 ) -> Any:
-    """Initialize RetryController with consistent shell events."""
+    """Initialize RetryController for owner-managed retry handling."""
+    del baseline
     retry_controller = None
     if until_pass:
         from invarlock.core.retry import RetryController
@@ -127,16 +146,6 @@ def init_retry_controller(
         retry_controller = RetryController(
             max_attempts=max_attempts, timeout=timeout, verbose=True
         )
-        _event(
-            console,
-            "INIT",
-            f"Retry mode enabled: max {max_attempts} attempts",
-            emoji="🔄",
-        )
-        if baseline:
-            _event(console, "DATA", f"Using baseline: {baseline}", emoji="📋")
-    elif baseline:
-        _event(console, "DATA", f"Using baseline: {baseline}", emoji="📋")
     return retry_controller
 
 
@@ -155,7 +164,6 @@ def run_bare_control(
     seed_bundle: dict[str, int | None],
     resolved_device: str,
     restore_fn: Any | None,
-    console: Console,
     resolved_loss_type: str,
     overhead_threshold: float = GUARD_OVERHEAD_THRESHOLD,
     profile_normalized: str | None = None,
@@ -169,13 +177,6 @@ def run_bare_control(
     from invarlock.core.runner import CoreRunner
     from invarlock.model_utils import set_seed
 
-    _event(
-        console,
-        "EXEC",
-        "Running bare control (guards disabled) for overhead check",
-        emoji="🧪",
-        profile=profile_normalized,
-    )
     set_seed(seed_bundle["python"])  # type: ignore[arg-type]
 
     bare_runner = CoreRunner()
@@ -192,11 +193,14 @@ def run_bare_control(
         if restore_fn and model is not None:
             try:
                 restore_fn()
-            except Exception as exc:
+            except _SNAPSHOT_RESTORE_EXCEPTIONS as exc:
                 raise SnapshotRestoreFailed(str(exc)) from exc
             bare_target_model = model
         elif skip_model_load:
-            bare_target_model = model or SimpleNamespace(name="bare_stub_model")
+            bare_target_model = _require_snapshot_reuse_model(
+                model=model,
+                phase="bare control",
+            )
         else:
             bare_target_model = load_model_with_cfg(
                 adapter,
@@ -238,51 +242,64 @@ def run_bare_control(
         bare_ppl_final = bare_pm.get("final") if isinstance(bare_pm, dict) else None
         bare_ppl_preview = bare_pm.get("preview") if isinstance(bare_pm, dict) else None
 
-    if profile_normalized in {"ci", "release"}:
-
-        def _finite(x: Any) -> bool:
-            try:
-                return isinstance(x, int | float) and math.isfinite(float(x))
-            except Exception:
-                return False
-
-        if not (_finite(bare_ppl_preview) and _finite(bare_ppl_final)):
-            _event(
-                console,
-                "WARN",
-                "Primary metric non-finite during bare control; continuing with diagnostics.",
-                emoji="⚠️",
-                profile=profile_normalized,
-            )
-
     payload: dict[str, Any] = {
         "overhead_threshold": float(overhead_threshold),
-        "messages": [],
-        "warnings": [],
-        "errors": [],
+        "diagnostics": [],
         "checks": {},
         "source": f"{profile_normalized or 'ci'}_profile",
         "mode": "bare",
     }
 
+    if profile_normalized in {"ci", "release"}:
+
+        def _finite(x: Any) -> bool:
+            try:
+                return isinstance(x, int | float) and math.isfinite(float(x))
+            except (TypeError, ValueError):
+                return False
+
+        if not (_finite(bare_ppl_preview) and _finite(bare_ppl_final)):
+            payload["diagnostics"].append(
+                {
+                    "kind": "guard_overhead_warning",
+                    "severity": "warning",
+                    "message": (
+                        "Primary metric non-finite during bare control; continuing with "
+                        "diagnostics."
+                    ),
+                    "details": {},
+                }
+            )
+
     if getattr(bare_report, "status", "").lower() not in {"success", "completed", "ok"}:
-        payload["warnings"].append(
-            f"Bare run status: {getattr(bare_report, 'status', 'unknown')}"
+        payload["diagnostics"].append(
+            {
+                "kind": "guard_overhead_warning",
+                "severity": "warning",
+                "message": f"Bare run status: {getattr(bare_report, 'status', 'unknown')}",
+                "details": {},
+            }
         )
 
-    try:
-        lk = str(resolved_loss_type or "causal").lower()
-        if lk == "mlm":
-            pm_kind_bare = "ppl_mlm"
-        elif lk in {"seq2seq", "s2s", "t5"}:
-            pm_kind_bare = "ppl_seq2seq"
-        else:
-            pm_kind_bare = "ppl_causal"
-        pm_bare = _extract_pm_snapshot_for_overhead(bare_report, kind=pm_kind_bare)
-        if isinstance(pm_bare, dict) and pm_bare:
-            payload["bare_report"] = {"metrics": {"primary_metric": pm_bare}}
-    except Exception:
-        pass
+    lk = str(resolved_loss_type or "causal").lower()
+    if lk == "mlm":
+        pm_kind_bare = "ppl_mlm"
+    elif lk in {"seq2seq", "s2s", "t5"}:
+        pm_kind_bare = "ppl_seq2seq"
+    else:
+        pm_kind_bare = "ppl_causal"
+    pm_bare = _extract_pm_snapshot_for_overhead(bare_report, kind=pm_kind_bare)
+    if isinstance(pm_bare, dict) and pm_bare:
+        payload["bare_report"] = {"metrics": {"primary_metric": pm_bare}}
+    else:
+        payload["diagnostics"].append(
+            {
+                "kind": "guard_overhead_warning",
+                "severity": "warning",
+                "message": "Bare control primary metric unavailable for overhead diagnostics.",
+                "details": {},
+            }
+        )
 
     set_seed(seed_bundle["python"])  # type: ignore[arg-type]
     return payload
@@ -305,7 +322,6 @@ def execute_guarded_run(
     restore_fn: Any | None,
     resolved_device: str,
     profile_normalized: str | None = None,
-    console: Console,
     snapshot_provenance: dict[str, bool] | None = None,
     skip_model_load: bool = False,
     prefer_local_files_only: bool = False,
@@ -316,25 +332,21 @@ def execute_guarded_run(
     if restore_fn and model is not None:
         try:
             restore_fn()
-        except Exception as exc:
+        except _SNAPSHOT_RESTORE_EXCEPTIONS as exc:
             raise SnapshotRestoreFailed(str(exc)) from exc
     elif skip_model_load:
-        model = model or SimpleNamespace(name="guarded_stub_model")
-    else:
-        _event(
-            console,
-            "INIT",
-            f"Loading model: {cfg.model.id} (attempt 1)",
-            emoji="🔧",
-            profile=profile_normalized,
+        model = _require_snapshot_reuse_model(
+            model=model,
+            phase="guarded execution",
         )
+    else:
         warning_context: dict[str, Any] = {"phase": "load_model"}
         try:
             if hasattr(run_config, "context") and isinstance(run_config.context, dict):
                 rid = run_config.context.get("run_id")
                 if isinstance(rid, str) and rid:
                     warning_context["run_id"] = rid
-        except Exception:
+        except (AttributeError, TypeError):
             pass
         model = load_model_with_cfg(
             adapter,

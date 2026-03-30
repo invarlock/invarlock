@@ -10,10 +10,49 @@ from typing import Any
 class GuardOverheadSummary:
     evaluated: bool
     passed: bool
-    status: str
-    overhead_display: str
+    overhead_percent: float | None
+    overhead_ratio: float | None
     threshold_fraction: float
-    threshold_display: str
+
+
+def _append_guard_overhead_diagnostic(
+    diagnostics: list[dict[str, Any]],
+    *,
+    severity: str,
+    message: Any,
+) -> None:
+    diagnostics.append(
+        {
+            "kind": f"guard_overhead_{severity}",
+            "severity": severity,
+            "message": str(message),
+            "details": {},
+        }
+    )
+
+
+def _coerce_guard_overhead_diagnostics(raw: Any) -> list[dict[str, Any]]:
+    diagnostics: list[dict[str, Any]] = []
+    if isinstance(raw, list | tuple):
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            message = item.get("message")
+            if not isinstance(message, str) or not message:
+                continue
+            severity = item.get("severity")
+            if not isinstance(severity, str) or not severity:
+                severity = "info"
+            details = item.get("details")
+            diagnostics.append(
+                {
+                    "kind": str(item.get("kind") or f"guard_overhead_{severity}"),
+                    "severity": severity,
+                    "message": message,
+                    "details": dict(details) if isinstance(details, dict) else {},
+                }
+            )
+    return diagnostics
 
 
 def normalize_guard_overhead_result(
@@ -24,7 +63,7 @@ def normalize_guard_overhead_result(
     try:
         ratio = payload.get("overhead_ratio")
         value = float(ratio) if isinstance(ratio, int | float) else float("nan")
-    except Exception:
+    except (TypeError, ValueError):
         value = float("nan")
     if not (isinstance(value, float) and math.isfinite(value)):
         payload["evaluated"] = False
@@ -38,18 +77,13 @@ def finalize_guard_overhead_payload(
 ) -> dict[str, Any]:
     """Normalize validator output into the persisted guard-overhead payload."""
     resolved = dict(payload or {})
-    try:
-        messages = list(getattr(result, "messages", []))
-    except TypeError:  # pragma: no cover - defensive
-        messages = []
-    try:
-        warnings = list(getattr(result, "warnings", []))
-    except TypeError:  # pragma: no cover - defensive
-        warnings = []
-    try:
-        errors = list(getattr(result, "errors", []))
-    except TypeError:  # pragma: no cover - defensive
-        errors = []
+    diagnostics = _coerce_guard_overhead_diagnostics(resolved.pop("diagnostics", ()))
+    resolved.pop("messages", None)
+    resolved.pop("warnings", None)
+    resolved.pop("errors", None)
+    diagnostics.extend(
+        _coerce_guard_overhead_diagnostics(getattr(result, "diagnostics", ()))
+    )
     try:
         checks = dict(getattr(result, "checks", {}))
     except (TypeError, ValueError):  # pragma: no cover - defensive
@@ -68,9 +102,7 @@ def finalize_guard_overhead_payload(
 
     resolved.update(
         {
-            "messages": messages,
-            "warnings": warnings,
-            "errors": errors,
+            "diagnostics": diagnostics,
             "checks": checks,
             "overhead_ratio": overhead_ratio,
             "overhead_percent": overhead_percent,
@@ -137,46 +169,39 @@ def build_guard_overhead_summary(
     *,
     default_threshold: float,
 ) -> GuardOverheadSummary:
-    """Build a stable human-display summary for guard-overhead results."""
+    """Build a stable typed summary for guard-overhead results."""
     info = dict(guard_overhead_info or {})
     try:
         fallback_threshold = float(default_threshold)
         if fallback_threshold < 0.0 or not math.isfinite(fallback_threshold):
             fallback_threshold = 0.01
-    except Exception:
+    except (TypeError, ValueError):
         fallback_threshold = 0.01
 
     evaluated = bool(info.get("evaluated", True))
     passed = bool(info.get("passed", True))
-    status = "PASS" if passed else "FAIL"
 
+    resolved_overhead_percent: float | None = None
     overhead_percent = info.get("overhead_percent")
     if isinstance(overhead_percent, (int, float)) and math.isfinite(
         float(overhead_percent)
     ):
-        overhead_display = f"{float(overhead_percent):+.2f}%"
-    else:
-        ratio_value = info.get("overhead_ratio")
-        if isinstance(ratio_value, (int, float)) and math.isfinite(float(ratio_value)):
-            overhead_display = f"{float(ratio_value):.3f}x"
-        else:
-            overhead_display = "not evaluated"
+        resolved_overhead_percent = float(overhead_percent)
+
+    resolved_overhead_ratio: float | None = None
+    ratio_value = info.get("overhead_ratio")
+    if isinstance(ratio_value, (int, float)) and math.isfinite(float(ratio_value)):
+        resolved_overhead_ratio = float(ratio_value)
 
     threshold_value = info.get("overhead_threshold", fallback_threshold)
     try:
         threshold_fraction = float(threshold_value)
     except (TypeError, ValueError):
         threshold_fraction = fallback_threshold
-    threshold_display = f"≤ +{threshold_fraction * 100:.1f}%"
-
-    if not evaluated:
-        overhead_display = "not evaluated"
-
     return GuardOverheadSummary(
         evaluated=evaluated,
         passed=passed,
-        status=status,
-        overhead_display=overhead_display,
+        overhead_percent=resolved_overhead_percent,
+        overhead_ratio=resolved_overhead_ratio,
         threshold_fraction=threshold_fraction,
-        threshold_display=threshold_display,
     )

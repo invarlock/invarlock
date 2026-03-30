@@ -11,7 +11,8 @@ from rich.console import Console
 
 from invarlock.core.exceptions import ConfigError, ValidationError
 from invarlock.core.provider_config import resolve_provider_kind_and_kwargs
-from invarlock.runtime_security import remote_code_allowed
+
+from .security_helpers import resolve_shell_runtime_security_policy
 
 SPLIT_ALIASES: tuple[str, ...] = ("validation", "val", "dev", "eval", "test")
 
@@ -75,7 +76,7 @@ def prepare_config_for_run(
             from invarlock.core.adapter_auto import (
                 apply_auto_adapter_if_needed as apply_auto_adapter_fn,
             )
-        except Exception:  # pragma: no cover - optional adapter path
+        except ImportError:  # pragma: no cover - optional adapter path
             apply_auto_adapter_fn = None
 
     if shell_mode and callable(event_fn):
@@ -105,7 +106,7 @@ def prepare_config_for_run(
             )
         try:
             cfg = apply_profile_fn(cfg, profile)
-        except Exception as exc:
+        except (ConfigError, TypeError, ValueError, ValidationError) as exc:
             if shell_mode and callable(event_fn):
                 event_fn(console, "FAIL", str(exc), emoji="❌", profile=profile)
                 raise typer.Exit(1) from exc
@@ -161,7 +162,7 @@ def prepare_config_for_run(
 
         try:
             cfg_dict = cfg.model_dump()
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             cfg_dict = {}
         auto_section = (
             cfg_dict.get("auto") if isinstance(cfg_dict.get("auto"), dict) else {}
@@ -190,10 +191,7 @@ def prepare_config_for_run(
         cfg = invarlock_config_cls(cfg_dict)
 
     if apply_auto_adapter_fn is not None:
-        try:
-            cfg = apply_auto_adapter_fn(cfg)
-        except Exception:
-            pass
+        cfg = apply_auto_adapter_fn(cfg)
 
     return cfg
 
@@ -229,7 +227,7 @@ def resolve_device_and_output(
 
     try:
         cfg_device = getattr(cfg.model, "device", None)
-    except Exception:
+    except AttributeError:
         cfg_device = None
     target_device = device or cfg_device or "auto"
     resolved_device = resolve_device_fn(target_device)
@@ -251,7 +249,7 @@ def resolve_device_and_output(
     else:
         try:
             output_dir = Path(cfg.output.dir)
-        except Exception:
+        except AttributeError:
             output_dir = Path("runs")
     output_dir.mkdir(parents=True, exist_ok=True)
     return str(resolved_device), output_dir
@@ -278,7 +276,7 @@ def resolve_provider_and_split(
     provider_kwargs = dict(provider_kwargs or {})
     try:
         provider_val = cfg.dataset.provider
-    except Exception:
+    except AttributeError:
         provider_val = None
     provider_name, explicit_provider_kwargs = resolve_provider_kind_and_kwargs(
         provider_val
@@ -295,13 +293,13 @@ def resolve_provider_and_split(
     requested_split = None
     try:
         requested_split = getattr(cfg.dataset, "split", None)
-    except Exception:
+    except AttributeError:
         requested_split = None
     available_splits = None
     if hasattr(data_provider, "available_splits"):
         try:
             available_splits = list(data_provider.available_splits())  # type: ignore[attr-defined]
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             available_splits = None
     resolved_split, used_fallback_split = choose_dataset_split_fn(
         requested=requested_split,
@@ -323,7 +321,7 @@ def extract_model_load_kwargs(
         invarlock_error_cls = InvarlockError
     try:
         data = cfg.model_dump()
-    except Exception:
+    except (AttributeError, TypeError, ValueError):
         data = {}
     model = data.get("model") if isinstance(data, dict) else None
     if not isinstance(model, dict):
@@ -339,7 +337,7 @@ def extract_model_load_kwargs(
     if (
         isinstance(trust_remote_code, bool)
         and trust_remote_code
-        and not remote_code_allowed()
+        and not resolve_shell_runtime_security_policy().allow_remote_code
     ):
         raise invarlock_error_cls(
             code="E008",

@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+import pytest
 import torch
 import torch.nn as nn
 
@@ -69,7 +70,7 @@ def test_extract_fc1_inconsistent_shapes_filters_to_common_shape():
     # hidden_states for idx+1 access → supply >= 2
     hs = [torch.randn(1, 5, 4) for _ in range(3)]
     out = _extract_fc1_activations(
-        Model(), SimpleNamespace(hidden_states=hs), MetricsConfig(progress_bars=False)
+        Model(), SimpleNamespace(hidden_states=hs), MetricsConfig()
     )
     # Should return a stacked tensor with consistent last dim (most common shape)
     assert out is None or out.dim() in (4,)
@@ -98,7 +99,7 @@ def test_extract_fc1_success_returns_stacked_tensor():
 
     hs = [torch.randn(1, 5, 4) for _ in range(4)]
     out = _extract_fc1_activations(
-        Model(), SimpleNamespace(hidden_states=hs), MetricsConfig(progress_bars=False)
+        Model(), SimpleNamespace(hidden_states=hs), MetricsConfig()
     )
     assert isinstance(out, torch.Tensor)
 
@@ -140,7 +141,7 @@ def test_sigma_max_empty_filtered_gains_returns_nan():
         nn.Linear(2, 2),
         {"input_ids": torch.ones(1, 8, dtype=torch.long)},
         DM(),
-        MetricsConfig(progress_bars=False),
+        MetricsConfig(),
         torch.device("cpu"),
     )
     assert isinstance(val, float) and (val != val)  # NaN
@@ -160,7 +161,7 @@ def test_sigma_max_empty_filtered_gains_returns_nan():
         nn.Linear(2, 2),
         {"input_ids": torch.ones(1, 8, dtype=torch.long)},
         DM2(),
-        MetricsConfig(progress_bars=False),
+        MetricsConfig(),
         torch.device("cpu"),
     )
     assert isinstance(val2, float) and (val2 != val2)
@@ -224,7 +225,7 @@ def test_mi_gini_gpu_oom_fallback_to_cpu():
         TinyLM(),
         activation_data,
         DM(),
-        MetricsConfig(progress_bars=False),
+        MetricsConfig(),
         torch.device("cpu"),
     )
     assert isinstance(val, float)
@@ -272,6 +273,8 @@ def test_calculate_perplexity_raises_when_no_valid_tokens():
 
 
 def test_measure_latency_returns_zero_on_empty_or_short_window():
+    from invarlock.eval.metrics import ValidationError as MValidationError
+
     class LM2(nn.Module):
         def forward(self, input_ids=None, attention_mask=None):
             return SimpleNamespace(
@@ -286,17 +289,21 @@ def test_measure_latency_returns_zero_on_empty_or_short_window():
         input_ids = [[1, 2, 3]]
         attention_masks = [[1, 1, 1]]
 
-    assert (
+    with pytest.raises(MValidationError) as exc_info:
         measure_latency(
             LM2(), WEmpty(), device="cpu", warmup_steps=0, measurement_steps=1
         )
-        == 0.0
-    )
     assert (
+        exc_info.value.details["reason"]
+        == "latency measurement requires a non-empty evaluation window"
+    )
+    with pytest.raises(MValidationError) as exc_info:
         measure_latency(
             LM2(), WShort(), device="cpu", warmup_steps=0, measurement_steps=1
         )
-        == 0.0
+    assert (
+        exc_info.value.details["reason"]
+        == "latency measurement requires at least one sequence longer than 10 tokens"
     )
 
 

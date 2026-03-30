@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from invarlock.core.run_snapshot_contract import (
     SnapshotDiagnostic,
     build_snapshot_execution_plan,
@@ -30,12 +32,12 @@ def test_build_snapshot_execution_plan_direct_reuse_sets_skip_model_load() -> No
     assert plan.diagnostics == (
         SnapshotDiagnostic(
             code="snapshot.overhead_check_skipped",
-            message="Overhead check skipped via config policy (config:context.run.skip_overhead_check)",
-            details={"source": "config:context.run.skip_overhead_check"},
+            summary="Overhead check skipped via config policy (config:context.run.skip_overhead_check)",
+            context={"source": "config:context.run.skip_overhead_check"},
         ),
         SnapshotDiagnostic(
             code="snapshot.loaded_model_reused",
-            message="Reusing initially loaded model for guarded execution.",
+            summary="Reusing initially loaded model for guarded execution.",
         ),
     )
 
@@ -46,7 +48,7 @@ def test_build_snapshot_execution_plan_bytes_falls_back_to_chunked() -> None:
     class Adapter:
         def snapshot(self, model):  # noqa: ANN001
             calls.append("snapshot")
-            raise RuntimeError("bytes failed")
+            raise ValueError("bytes failed")
 
         def snapshot_chunked(self, model):  # noqa: ANN001
             calls.append("snapshot_chunked")
@@ -73,9 +75,9 @@ def test_build_snapshot_execution_plan_bytes_falls_back_to_chunked() -> None:
     assert plan.diagnostics == (
         SnapshotDiagnostic(
             code="snapshot.bytes_failed_chunked_fallback",
-            message="Byte snapshot failed; falling back to chunked snapshot.",
-            details={
-                "error_type": "RuntimeError",
+            summary="Byte snapshot failed; falling back to chunked snapshot.",
+            context={
+                "error_type": "ValueError",
                 "error": "bytes failed",
             },
         ),
@@ -90,7 +92,7 @@ def test_build_snapshot_execution_plan_records_prepare_failure() -> None:
 
     class Adapter:
         def snapshot(self, model):  # noqa: ANN001
-            raise RuntimeError("snapshot failed")
+            raise ValueError("snapshot failed")
 
     plan = build_snapshot_execution_plan(
         adapter=Adapter(),
@@ -104,7 +106,7 @@ def test_build_snapshot_execution_plan_records_prepare_failure() -> None:
         environ={},
         disk_usage_fn=lambda path: SimpleNamespace(free=0),
         free_model_memory_fn=freed.append,
-        non_fatal_exceptions=(RuntimeError,),
+        non_fatal_exceptions=(ValueError,),
     )
 
     assert len(freed) == 1
@@ -112,14 +114,35 @@ def test_build_snapshot_execution_plan_records_prepare_failure() -> None:
     assert plan.diagnostics == (
         SnapshotDiagnostic(
             code="snapshot.prepare_failed",
-            message="Snapshot preparation failed; falling back to reload-per-attempt execution.",
-            severity="error",
-            details={
-                "error_type": "RuntimeError",
+            summary="Snapshot preparation failed; falling back to reload-per-attempt execution.",
+            level="error",
+            context={
+                "error_type": "ValueError",
                 "error": "snapshot failed",
             },
         ),
     )
+
+
+def test_build_snapshot_execution_plan_propagates_runtime_errors() -> None:
+    class Adapter:
+        def snapshot(self, model):  # noqa: ANN001
+            raise RuntimeError("snapshot runtime failed")
+
+    with pytest.raises(RuntimeError, match="snapshot runtime failed"):
+        build_snapshot_execution_plan(
+            adapter=Adapter(),
+            model=object(),
+            cfg_snapshot={},
+            direct_reuse_loaded_model=False,
+            skip_overhead_source=None,
+            choose_snapshot_mode_fn=lambda **kwargs: "bytes",
+            estimate_model_bytes_fn=lambda model: 0,
+            psutil_module=None,
+            environ={},
+            disk_usage_fn=lambda path: SimpleNamespace(free=0),
+            free_model_memory_fn=lambda model: None,
+        )
 
 
 def test_resolve_snapshot_retry_transition_reuses_loaded_model() -> None:
@@ -139,11 +162,11 @@ def test_resolve_snapshot_retry_transition_reuses_loaded_model() -> None:
     assert transition.diagnostics == (
         SnapshotDiagnostic(
             code="snapshot.overhead_check_skipped",
-            message="Overhead check skipped via config policy (config:context.run.skip_overhead_check)",
-            details={"source": "config:context.run.skip_overhead_check"},
+            summary="Overhead check skipped via config policy (config:context.run.skip_overhead_check)",
+            context={"source": "config:context.run.skip_overhead_check"},
         ),
         SnapshotDiagnostic(
             code="snapshot.restore_unavailable_reuse_loaded_model",
-            message="Snapshot restore unavailable; reusing initially loaded model for guarded execution.",
+            summary="Snapshot restore unavailable; reusing initially loaded model for guarded execution.",
         ),
     )

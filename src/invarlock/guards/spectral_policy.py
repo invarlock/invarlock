@@ -40,6 +40,119 @@ def normalize_family_caps(
     return default_family_caps() if default else {}
 
 
+def _policy_invalid(param: str, reason: str, *, value: Any | None = None) -> ValidationError:
+    details: dict[str, Any] = {"param": param, "reason": reason}
+    if value is not None:
+        details["value"] = value
+    return ValidationError(
+        code="E501",
+        message="POLICY-PARAM-INVALID",
+        details=details,
+    )
+
+
+def _require_policy_mapping(param: str, value: Any | None) -> dict[str, Any]:
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise _policy_invalid(param, "must be a mapping")
+    return value
+
+
+def _require_policy_float(
+    param: str,
+    value: Any,
+    *,
+    minimum: float | None = None,
+    maximum: float | None = None,
+) -> float:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError) as exc:
+        raise _policy_invalid(param, "must be a finite float", value=value) from exc
+    if not math.isfinite(numeric):
+        raise _policy_invalid(param, "must be a finite float", value=value)
+    if minimum is not None and numeric < minimum:
+        raise _policy_invalid(param, f"must be >= {minimum}", value=value)
+    if maximum is not None and numeric > maximum:
+        raise _policy_invalid(param, f"must be <= {maximum}", value=value)
+    return numeric
+
+
+def _require_policy_int(param: str, value: Any, *, minimum: int | None = None) -> int:
+    try:
+        integer = int(value)
+    except (TypeError, ValueError) as exc:
+        raise _policy_invalid(param, "must be an integer", value=value) from exc
+    if minimum is not None and integer < minimum:
+        raise _policy_invalid(param, f"must be >= {minimum}", value=value)
+    return integer
+
+
+def normalize_multiple_testing_config(value: Any | None) -> dict[str, Any]:
+    mt_policy = _require_policy_mapping("multiple_testing", value)
+    method = str(mt_policy.get("method", "bh") or "bh").strip().lower()
+    if method not in {"bh", "bonferroni"}:
+        raise _policy_invalid("multiple_testing.method", "must be 'bh' or 'bonferroni'")
+    alpha_value = mt_policy.get("alpha", 0.05)
+    alpha = _require_policy_float("multiple_testing.alpha", alpha_value, minimum=0.0, maximum=1.0)
+    if alpha <= 0.0:
+        raise _policy_invalid("multiple_testing.alpha", "must be > 0", value=alpha_value)
+    m_value = mt_policy.get("m", 4)
+    m = _require_policy_int("multiple_testing.m", m_value, minimum=1)
+    return {"method": method, "alpha": alpha, "m": m}
+
+
+def multiple_testing_alpha(value: Any | None) -> float:
+    return float(normalize_multiple_testing_config(value).get("alpha", 0.05))
+
+
+def normalize_estimator_config(value: Any | None) -> dict[str, Any]:
+    estimator_policy = _require_policy_mapping("estimator", value)
+    iters = _require_policy_int("estimator.iters", estimator_policy.get("iters", 4), minimum=1)
+    init = str(estimator_policy.get("init", "ones") or "ones").strip().lower()
+    if init not in {"ones", "e0"}:
+        raise _policy_invalid("estimator.init", "must be 'ones' or 'e0'", value=init)
+    return {"type": "power_iter", "iters": iters, "init": init}
+
+
+def normalize_degeneracy_config(value: Any | None) -> dict[str, Any]:
+    degeneracy_policy = _require_policy_mapping("degeneracy", value)
+    stable_rank_cfg = _require_policy_mapping(
+        "degeneracy.stable_rank", degeneracy_policy.get("stable_rank")
+    )
+    norm_collapse_cfg = _require_policy_mapping(
+        "degeneracy.norm_collapse", degeneracy_policy.get("norm_collapse")
+    )
+    return {
+        "enabled": bool(degeneracy_policy.get("enabled", True)),
+        "stable_rank": {
+            "warn_ratio": _require_policy_float(
+                "degeneracy.stable_rank.warn_ratio",
+                stable_rank_cfg.get("warn_ratio", 0.5),
+                minimum=0.0,
+            ),
+            "fatal_ratio": _require_policy_float(
+                "degeneracy.stable_rank.fatal_ratio",
+                stable_rank_cfg.get("fatal_ratio", 0.25),
+                minimum=0.0,
+            ),
+        },
+        "norm_collapse": {
+            "warn_ratio": _require_policy_float(
+                "degeneracy.norm_collapse.warn_ratio",
+                norm_collapse_cfg.get("warn_ratio", 0.25),
+                minimum=0.0,
+            ),
+            "fatal_ratio": _require_policy_float(
+                "degeneracy.norm_collapse.fatal_ratio",
+                norm_collapse_cfg.get("fatal_ratio", 0.10),
+                minimum=0.0,
+            ),
+        },
+    }
+
+
 def serialize_policy(guard: Any) -> dict[str, Any]:
     """Snapshot current guard policy for report serialization."""
     return {
@@ -119,48 +232,29 @@ def apply_policy_overrides(guard: Any, policy: dict[str, Any]) -> None:
         )
 
     mt_policy = policy.get("multiple_testing")
-    if isinstance(mt_policy, dict):
-        guard.multiple_testing = mt_policy.copy()
+    if mt_policy is not None:
+        guard.multiple_testing = normalize_multiple_testing_config(mt_policy)
         policy["multiple_testing"] = guard.multiple_testing
         guard.config["multiple_testing"] = guard.multiple_testing
 
     estimator_policy = policy.get("estimator")
-    if isinstance(estimator_policy, dict):
-        try:
-            est_iters = int(estimator_policy.get("iters", 4) or 4)
-        except Exception:
-            est_iters = 4
-        if est_iters < 1:
-            est_iters = 1
-        est_init = str(estimator_policy.get("init", "ones") or "ones").strip().lower()
-        if est_init not in {"ones", "e0"}:
-            est_init = "ones"
-        guard.estimator = {"type": "power_iter", "iters": est_iters, "init": est_init}
+    if estimator_policy is not None:
+        guard.estimator = normalize_estimator_config(estimator_policy)
         guard.config["estimator"] = guard.estimator
 
     degeneracy_policy = policy.get("degeneracy")
-    if isinstance(degeneracy_policy, dict):
-        stable_rank_cfg = degeneracy_policy.get("stable_rank")
-        norm_collapse_cfg = degeneracy_policy.get("norm_collapse")
-        guard.degeneracy = {
-            "enabled": bool(degeneracy_policy.get("enabled", True)),
-            "stable_rank": {
-                "warn_ratio": float((stable_rank_cfg or {}).get("warn_ratio", 0.5)),
-                "fatal_ratio": float((stable_rank_cfg or {}).get("fatal_ratio", 0.25)),
-            },
-            "norm_collapse": {
-                "warn_ratio": float((norm_collapse_cfg or {}).get("warn_ratio", 0.25)),
-                "fatal_ratio": float(
-                    (norm_collapse_cfg or {}).get("fatal_ratio", 0.10)
-                ),
-            },
-        }
+    if degeneracy_policy is not None:
+        guard.degeneracy = normalize_degeneracy_config(degeneracy_policy)
         guard.config["degeneracy"] = guard.degeneracy
 
 
 __all__ = [
     "apply_policy_overrides",
     "default_family_caps",
+    "multiple_testing_alpha",
+    "normalize_degeneracy_config",
+    "normalize_estimator_config",
     "normalize_family_caps",
+    "normalize_multiple_testing_config",
     "serialize_policy",
 ]

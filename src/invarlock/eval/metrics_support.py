@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import gc
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, TypeAlias
 
 import psutil
 import torch
@@ -25,6 +26,21 @@ class ResourceError(MetricsError):
     """Raised when insufficient resources are available."""
 
 
+MetricsProgressPhase: TypeAlias = Literal["activation_collection", "mi_gini_cpu"]
+
+
+@dataclass(frozen=True)
+class MetricsProgressUpdate:
+    """Neutral progress update emitted by reusable metrics code."""
+
+    phase: MetricsProgressPhase
+    completed: int
+    total: int | None
+
+
+MetricsProgressObserver: TypeAlias = Callable[[MetricsProgressUpdate], None]
+
+
 @dataclass
 class MetricsConfig:
     """Configuration for metrics calculation with sensible defaults."""
@@ -39,7 +55,7 @@ class MetricsConfig:
 
     use_cache: bool = True
     cache_dir: Path | None = None
-    progress_bars: bool = True
+    progress_observer: MetricsProgressObserver | None = None
 
     clip_value: float = 1e3
     nan_replacement: float = 0.0
@@ -212,16 +228,21 @@ class InputValidator:
 
         try:
             param_count = sum(1 for _ in model.parameters())
-            if param_count == 0:
-                if config.strict_validation:
-                    raise ValidationError(
-                        code="E402",
-                        message="METRICS-VALIDATION-FAILED",
-                        details={"reason": "Model has no parameters"},
-                    )
-                logger.warning("Model has no parameters")
-        except Exception as e:
-            logger.debug(f"Could not count model parameters: {e}")
+        except Exception as exc:
+            raise ValidationError(
+                code="E402",
+                message="METRICS-VALIDATION-FAILED",
+                details={"reason": "Model parameter iteration failed", "error": str(exc)},
+            ) from exc
+
+        if param_count == 0:
+            if config.strict_validation:
+                raise ValidationError(
+                    code="E402",
+                    message="METRICS-VALIDATION-FAILED",
+                    details={"reason": "Model has no parameters"},
+                )
+            logger.warning("Model has no parameters")
 
     @staticmethod
     def validate_dataloader(dataloader, config: MetricsConfig) -> None:
@@ -298,6 +319,9 @@ __all__ = [
     "DependencyManager",
     "InputValidator",
     "MetricsConfig",
+    "MetricsProgressObserver",
+    "MetricsProgressPhase",
+    "MetricsProgressUpdate",
     "ResourceError",
     "ResourceManager",
 ]

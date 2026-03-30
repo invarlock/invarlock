@@ -212,9 +212,8 @@ def test_resolve_retry_validation_decision_marks_retry_and_applies_autotune() ->
         (),
         {
             "status": "failed",
-            "failed_gates": ("primary_metric_acceptable",),
+            "validation_gates": ("primary_metric_acceptable",),
             "validation": {"primary_metric_acceptable": False},
-            "error_message": None,
         },
     )()
 
@@ -233,8 +232,8 @@ def test_resolve_retry_validation_decision_marks_retry_and_applies_autotune() ->
         should_retry=True,
     )
 
-    assert decision.action == "retry"
-    assert decision.failed_gates == ("primary_metric_acceptable",)
+    assert decision.status == "retry"
+    assert decision.validation_gates == ("primary_metric_acceptable",)
     assert decision.head_adjustment == {
         "global_k": 6,
         "keep_low": 4,
@@ -250,9 +249,13 @@ def test_resolve_retry_validation_decision_marks_error_fail_closed() -> None:
         (),
         {
             "status": "error",
-            "failed_gates": (),
+            "validation_gates": (),
             "validation": {},
-            "error_message": "boom",
+            "diagnostic": RetryDiagnostic(
+                code="retry.validation_error",
+                message="boom",
+                severity="error",
+            ),
         },
     )()
 
@@ -262,9 +265,10 @@ def test_resolve_retry_validation_decision_marks_error_fail_closed() -> None:
         should_retry=False,
     )
 
-    assert decision.action == "error"
-    assert decision.failed_gates == ("report_error",)
-    assert decision.error_message == "boom"
+    assert decision.status == "error"
+    assert decision.validation_gates == ("report_error",)
+    assert decision.error is not None
+    assert decision.error.message == "boom"
 
 
 def test_resolve_retry_validation_transition_records_pass_without_retry() -> None:
@@ -278,9 +282,8 @@ def test_resolve_retry_validation_transition_records_pass_without_retry() -> Non
         {
             "status": "passed",
             "attempt_summary": {"passed": True, "failures": [], "validation": {}},
-            "failed_gates": (),
+            "validation_gates": (),
             "validation": {},
-            "error_message": None,
         },
     )()
 
@@ -291,7 +294,7 @@ def test_resolve_retry_validation_transition_records_pass_without_retry() -> Non
         edit_config={"energy_keep": 0.99},
     )
 
-    assert transition.action == "passed"
+    assert transition.status == "passed"
     assert transition.next_attempt == 2
     assert controller.recorded == [
         (2, {"passed": True, "failures": [], "validation": {}}, {"energy_keep": 0.99})
@@ -313,9 +316,8 @@ def test_resolve_retry_validation_transition_retries_with_diagnostics() -> None:
                 "failures": ["primary_metric_acceptable"],
                 "validation": {"primary_metric_acceptable": False},
             },
-            "failed_gates": ("primary_metric_acceptable",),
+            "validation_gates": ("primary_metric_acceptable",),
             "validation": {"primary_metric_acceptable": False},
-            "error_message": None,
         },
     )()
 
@@ -335,7 +337,7 @@ def test_resolve_retry_validation_transition_retries_with_diagnostics() -> None:
         },
     )
 
-    assert transition.action == "retry"
+    assert transition.status == "retry"
     assert transition.diagnostics == (
         RetryDiagnostic(code="retry.retry", message="retry"),
     )
@@ -362,9 +364,13 @@ def test_resolve_retry_validation_transition_stops_on_error_without_retry_probe(
                 "failures": ["report_error"],
                 "validation": {},
             },
-            "failed_gates": (),
+            "validation_gates": (),
             "validation": {},
-            "error_message": "boom",
+            "diagnostic": RetryDiagnostic(
+                code="retry.validation_error",
+                message="boom",
+                severity="error",
+            ),
         },
     )()
 
@@ -375,8 +381,9 @@ def test_resolve_retry_validation_transition_stops_on_error_without_retry_probe(
         edit_config={"energy_keep": 0.99},
     )
 
-    assert transition.action == "error"
-    assert transition.error_message == "boom"
+    assert transition.status == "error"
+    assert transition.error is not None
+    assert transition.error.message == "boom"
     assert controller.last_passed is None
 
 
@@ -386,9 +393,8 @@ def test_resolve_retry_validation_decision_marks_passed_without_mutation() -> No
         (),
         {
             "status": "passed",
-            "failed_gates": (),
+            "validation_gates": (),
             "validation": {},
-            "error_message": None,
         },
     )()
 
@@ -398,8 +404,8 @@ def test_resolve_retry_validation_decision_marks_passed_without_mutation() -> No
         should_retry=False,
     )
 
-    assert decision.action == "passed"
-    assert decision.failed_gates == ()
+    assert decision.status == "passed"
+    assert decision.validation_gates == ()
     assert decision.updated_edit_config == {"energy_keep": 0.99}
     assert decision.head_adjustment is None
 
@@ -410,9 +416,8 @@ def test_resolve_retry_validation_decision_marks_exhausted_when_budget_done() ->
         (),
         {
             "status": "failed",
-            "failed_gates": ("pm_ratio",),
+            "validation_gates": ("pm_ratio",),
             "validation": {"pm_ratio": False},
-            "error_message": None,
         },
     )()
 
@@ -422,6 +427,6 @@ def test_resolve_retry_validation_decision_marks_exhausted_when_budget_done() ->
         should_retry=False,
     )
 
-    assert decision.action == "exhausted"
-    assert decision.failed_gates == ("pm_ratio",)
+    assert decision.status == "exhausted"
+    assert decision.validation_gates == ("pm_ratio",)
     assert decision.updated_edit_config == {"energy_keep": 0.99}

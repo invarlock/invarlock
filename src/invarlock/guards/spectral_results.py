@@ -90,10 +90,13 @@ def evaluate_spectral_outcome(
     caps_exceeded = caps_applied > int(max_caps)
     passed = not fatal_violations and not caps_exceeded
     if fatal_violations or caps_exceeded:
+        decision = "block"
         action = "abort"
     elif caps_applied > 0:
+        decision = "monitor"
         action = "warn"
     else:
+        decision = "allow"
         action = "continue"
     return {
         "selected_violations": [*fatal_violations, *selected_budgeted],
@@ -101,8 +104,30 @@ def evaluate_spectral_outcome(
         "caps_applied": caps_applied,
         "caps_exceeded": caps_exceeded,
         "passed": passed,
+        "decision": decision,
         "action": action,
     }
+
+
+def build_spectral_diagnostics(
+    selected_violations: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    diagnostics: list[dict[str, Any]] = []
+    for violation in selected_violations:
+        severity = "error" if (
+            violation.get("severity") == "fatal"
+            or violation.get("type") == "max_spectral_norm"
+        ) else "warning"
+        diagnostics.append(
+            {
+                "kind": str(violation.get("type", "spectral_violation")),
+                "severity": severity,
+                "message": str(violation.get("message", "")),
+                "family": violation.get("family"),
+                "module": violation.get("module"),
+            }
+        )
+    return diagnostics
 
 
 def build_spectral_validation_metrics(
@@ -263,6 +288,7 @@ def categorize_spectral_messages(
 
 __all__ = [
     "build_spectral_finalize_metrics",
+    "build_spectral_diagnostics",
     "build_spectral_validation_metrics",
     "categorize_spectral_messages",
     "compute_family_observability",

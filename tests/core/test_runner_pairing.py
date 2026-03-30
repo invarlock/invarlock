@@ -60,8 +60,9 @@ def test_compare_with_baseline_paths() -> None:
         {"window_ids": [object(), 0], "input_ids": [[9, 9, 9], [1, 2, 3]]},
         "preview",
     )
-    assert baseline_with_invalid_ids["matched"] == 1
-    assert baseline_with_invalid_ids["expected"] == 1
+    assert baseline_with_invalid_ids["matched"] == 0
+    assert baseline_with_invalid_ids["expected"] == 2
+    assert baseline_with_invalid_ids["reason"] == "invalid_baseline_reference"
 
     stats = compare_with_baseline(
         [0, 1, "x"],

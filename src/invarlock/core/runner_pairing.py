@@ -83,13 +83,20 @@ def compare_with_baseline(
         return stats
 
     base_map: dict[int, bytes] = {}
+    invalid_baseline_reference = False
     for base_id, seq in zip(base_ids, base_tokens, strict=False):
         try:
             base_id_int = int(base_id)
+            seq_list = list(seq) if not isinstance(seq, list) else seq
+            base_map[base_id_int] = _hash_tokens(seq_list)
         except Exception:
-            continue
-        seq_list = list(seq) if not isinstance(seq, list) else seq
-        base_map[base_id_int] = _hash_tokens(seq_list)
+            invalid_baseline_reference = True
+            break
+
+    if invalid_baseline_reference or len(base_map) != len(base_ids):
+        stats["expected"] = max(len(base_ids), len(base_tokens))
+        stats["reason"] = "invalid_baseline_reference"
+        return stats
 
     stats["expected"] = len(base_map)
     matched = 0

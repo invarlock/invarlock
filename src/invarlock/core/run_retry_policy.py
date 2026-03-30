@@ -29,22 +29,23 @@ class RetryFailureTransition:
 
 @dataclass(frozen=True)
 class RetryValidationDecision:
-    action: str
+    status: str
     updated_edit_config: dict[str, Any]
-    failed_gates: tuple[str, ...]
+    validation_gates: tuple[str, ...] = ()
+    diagnostics: tuple[RetryDiagnostic, ...] = ()
     head_adjustment: dict[str, int] | None = None
-    error_message: str | None = None
+    error: RetryDiagnostic | None = None
 
 
 @dataclass(frozen=True)
 class RetryValidationTransition:
-    action: str
+    status: str
     updated_edit_config: dict[str, Any]
-    failed_gates: tuple[str, ...]
+    validation_gates: tuple[str, ...] = ()
     diagnostics: tuple[RetryDiagnostic, ...] = ()
     next_attempt: int | None = None
     head_adjustment: dict[str, int] | None = None
-    error_message: str | None = None
+    error: RetryDiagnostic | None = None
 
 
 def record_retry_attempt(
@@ -159,6 +160,28 @@ def apply_mask_only_head_autotune(
     return updated, None
 
 
+def _validation_gates_from_result(validation_result: Any) -> tuple[str, ...]:
+    gates = getattr(validation_result, "validation_gates", ())
+    return tuple(str(gate) for gate in (gates or ()))
+
+
+def _validation_error_diagnostic(
+    validation_result: Any,
+    *,
+    validation_gates: tuple[str, ...],
+) -> RetryDiagnostic:
+    diagnostic = getattr(validation_result, "diagnostic", None)
+    if isinstance(diagnostic, RetryDiagnostic):
+        return diagnostic
+
+    return RetryDiagnostic(
+        code="retry.validation_error",
+        message="Retry validation failed",
+        severity="error",
+        details={"validation_gates": validation_gates},
+    )
+
+
 def resolve_retry_validation_decision(
     *,
     edit_config: Mapping[str, Any] | None,
@@ -167,15 +190,13 @@ def resolve_retry_validation_decision(
 ) -> RetryValidationDecision:
     updated_edit_config = dict(edit_config or {})
     status = str(getattr(validation_result, "status", "error") or "error")
-    failed_gates = tuple(
-        str(gate) for gate in (getattr(validation_result, "failed_gates", ()) or ())
-    )
+    validation_gates = _validation_gates_from_result(validation_result)
 
     if status == "passed":
         return RetryValidationDecision(
-            action="passed",
+            status="passed",
             updated_edit_config=updated_edit_config,
-            failed_gates=failed_gates,
+            validation_gates=validation_gates,
         )
 
     if status == "failed":
@@ -184,18 +205,21 @@ def resolve_retry_validation_decision(
             getattr(validation_result, "validation", None),
         )
         return RetryValidationDecision(
-            action="retry" if should_retry else "exhausted",
+            status="retry" if should_retry else "exhausted",
             updated_edit_config=next_edit_config,
-            failed_gates=failed_gates,
+            validation_gates=validation_gates,
             head_adjustment=head_adjustment,
         )
 
-    error_message = getattr(validation_result, "error_message", None)
+    error = _validation_error_diagnostic(
+        validation_result, validation_gates=validation_gates or ("report_error",)
+    )
     return RetryValidationDecision(
-        action="error",
+        status="error",
         updated_edit_config=updated_edit_config,
-        failed_gates=failed_gates or ("report_error",),
-        error_message=str(error_message or "Retry validation failed"),
+        validation_gates=validation_gates or ("report_error",),
+        diagnostics=(error,),
+        error=error,
     )
 
 
@@ -222,12 +246,12 @@ def resolve_retry_validation_transition(
             should_retry=False,
         )
         return RetryValidationTransition(
-            action=decision.action,
+            status=decision.status,
             updated_edit_config=decision.updated_edit_config,
-            failed_gates=decision.failed_gates,
+            validation_gates=decision.validation_gates,
             next_attempt=attempt,
             head_adjustment=decision.head_adjustment,
-            error_message=decision.error_message,
+            error=decision.error,
         )
 
     if status == "failed":
@@ -244,13 +268,13 @@ def resolve_retry_validation_transition(
             should_retry=transition.should_retry,
         )
         return RetryValidationTransition(
-            action=decision.action,
+            status=decision.status,
             updated_edit_config=decision.updated_edit_config,
-            failed_gates=decision.failed_gates,
-            diagnostics=transition.diagnostics,
+            validation_gates=decision.validation_gates,
+            diagnostics=transition.diagnostics + decision.diagnostics,
             next_attempt=transition.next_attempt,
             head_adjustment=decision.head_adjustment,
-            error_message=decision.error_message,
+            error=decision.error,
         )
 
     record_retry_attempt(
@@ -265,10 +289,11 @@ def resolve_retry_validation_transition(
         should_retry=False,
     )
     return RetryValidationTransition(
-        action=decision.action,
+        status=decision.status,
         updated_edit_config=decision.updated_edit_config,
-        failed_gates=decision.failed_gates,
+        validation_gates=decision.validation_gates,
+        diagnostics=decision.diagnostics,
         next_attempt=attempt,
         head_adjustment=decision.head_adjustment,
-        error_message=decision.error_message,
+        error=decision.error,
     )

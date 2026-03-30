@@ -53,7 +53,7 @@ def test_sigma_max_no_name_column_and_all_nonfinite_gains():
         nn.Linear(2, 2),
         {"input_ids": torch.ones(1, 4, dtype=torch.long)},
         DM(),
-        MetricsConfig(progress_bars=False),
+        MetricsConfig(),
         torch.device("cpu"),
     )
     # Expect NaN result due to all non-finite

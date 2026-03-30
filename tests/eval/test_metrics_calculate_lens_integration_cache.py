@@ -76,7 +76,7 @@ def test_calculate_lens_metrics_integration_and_cache(monkeypatch):
 
     model = Model().eval()
     dl = [{"input_ids": torch.ones(1, 12, dtype=torch.long)}]
-    cfg = MetricsConfig(oracle_windows=1, progress_bars=False, use_cache=True)
+    cfg = MetricsConfig(oracle_windows=1, use_cache=True)
 
     # Compute (cache is per-instance; we just validate the path executes)
     res1 = calculate_lens_metrics_for_model(model, dl, config=cfg)

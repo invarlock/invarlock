@@ -12,13 +12,13 @@ def resolve_snapshot_config(
     """Extract a plain snapshot policy mapping from run context."""
     try:
         context_map = to_serialisable_dict_fn(context or {})
-    except Exception:
+    except (AttributeError, TypeError, ValueError):
         return {}
     if not isinstance(context_map, dict):
         return {}
     try:
         snapshot_map = to_serialisable_dict_fn(context_map.get("snapshot", {}))
-    except Exception:
+    except (AttributeError, TypeError, ValueError):
         return {}
     return snapshot_map if isinstance(snapshot_map, dict) else {}
 
