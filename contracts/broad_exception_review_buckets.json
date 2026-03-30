@@ -1,0 +1,387 @@
+{
+  "version": 1,
+  "scope_roots": [
+    "src/invarlock/core",
+    "src/invarlock/guards",
+    "src/invarlock/cli",
+    "src/invarlock/reporting"
+  ],
+  "policy": {
+    "acceptable": "Optional dependency probes, logging, cleanup, or shell-only formatting paths may keep a broad catch when the fallback is explicit and does not change trust-critical verdicts.",
+    "questionable": "Active paths that coerce config, pair data, or shape user-visible outputs need a narrower catch or stronger justification before they should remain broad.",
+    "should_remove": "Trust-critical determinism, guard evidence, guard execution, and pairing logic must not rely on blanket catches because they can hide correctness gaps or downgrade fail-closed behavior."
+  },
+  "entries": [
+    {
+      "path": "src/invarlock/core/adapter_auto.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [86],
+      "rationale": "Optional adapter-family probing may fall back to None without changing trust-critical verdicts."
+    },
+    {
+      "path": "src/invarlock/core/adapter_provenance.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [49],
+      "rationale": "Missing package-version metadata is best-effort provenance and is already surfaced as unsupported."
+    },
+    {
+      "path": "src/invarlock/core/auto_tuning.py",
+      "subsystem": "core",
+      "bucket": "questionable",
+      "lines": [300, 332, 338],
+      "rationale": "Tier-policy YAML loading and numeric normalization still affect effective policy selection and should narrow to specific parse failures."
+    },
+    {
+      "path": "src/invarlock/core/checkpoint.py",
+      "subsystem": "core",
+      "bucket": "questionable",
+      "lines": [118, 187, 215],
+      "rationale": "Checkpoint create and restore paths currently collapse storage and rollback failures into booleans, which is operationally useful but still too broad for recovery logic."
+    },
+    {
+      "path": "src/invarlock/core/config_runtime.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [560],
+      "rationale": "Importlib-resource fallback is a compatibility path and does not decide runtime trust policy by itself."
+    },
+    {
+      "path": "src/invarlock/core/determinism_policy.py",
+      "subsystem": "core",
+      "bucket": "should_remove",
+      "lines": [30, 49, 56, 63, 106, 128, 134, 151, 165, 173, 180, 190, 201, 216, 224, 237],
+      "rationale": "Determinism enforcement is a trust-critical surface; blanket catches currently downgrade strict mode and hide failed controls."
+    },
+    {
+      "path": "src/invarlock/core/error_encoding.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [13, 31],
+      "rationale": "Error encoding must not fail while packaging an already-raised exception."
+    },
+    {
+      "path": "src/invarlock/core/evaluate_contract.py",
+      "subsystem": "core",
+      "bucket": "questionable",
+      "lines": [263, 351],
+      "rationale": "Primary-metric contract coercion influences evaluation semantics and should use narrower data-shape handling."
+    },
+    {
+      "path": "src/invarlock/core/evaluate_plan.py",
+      "subsystem": "core",
+      "bucket": "questionable",
+      "lines": [49, 59],
+      "rationale": "Model-id normalization and preset sanitization are still active config-shaping paths, not purely observational helpers."
+    },
+    {
+      "path": "src/invarlock/core/events.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [97, 140, 173, 179, 281],
+      "rationale": "Event logging and payload sanitization are best-effort observability paths with explicit fallback behavior."
+    },
+    {
+      "path": "src/invarlock/core/metric_provider_resolution.py",
+      "subsystem": "core",
+      "bucket": "questionable",
+      "lines": [25, 29, 35, 55, 57, 101, 106],
+      "rationale": "Metric and provider resolution directly shapes evaluation behavior and should not rely on blanket coercion."
+    },
+    {
+      "path": "src/invarlock/core/plugins_inventory.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [19, 83, 97],
+      "rationale": "Inventory hydration is an introspection surface; broad catches only guard optional metadata and plugin-probe failures."
+    },
+    {
+      "path": "src/invarlock/core/provider_config.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [17],
+      "rationale": "Provider-config itemization is a permissive mapping helper and safely falls back to an empty config."
+    },
+    {
+      "path": "src/invarlock/core/registry.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [110, 240, 287, 339, 345, 374, 380, 409, 415, 467, 480, 493],
+      "rationale": "Plugin discovery and load wrappers are optional-extension surfaces that already reclassify failures into explicit unavailability errors."
+    },
+    {
+      "path": "src/invarlock/core/runner.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [226],
+      "rationale": "The top-level run wrapper catches and records pipeline failures before returning a failed report."
+    },
+    {
+      "path": "src/invarlock/core/runner_context.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [51],
+      "rationale": "Torch-availability probing is a compatibility path."
+    },
+    {
+      "path": "src/invarlock/core/runner_eval_phase.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [35, 45, 57],
+      "rationale": "These broad catches only protect debug-trace logging and do not change evaluation verdicts."
+    },
+    {
+      "path": "src/invarlock/core/runner_eval_windows.py",
+      "subsystem": "core",
+      "bucket": "questionable",
+      "lines": [22, 31, 199],
+      "rationale": "Evaluation-window slicing and masked-label introspection are active metric inputs and should use narrower error handling."
+    },
+    {
+      "path": "src/invarlock/core/runner_finalize.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [137, 210],
+      "rationale": "Emergency rollback attempts are best-effort recovery paths that already preserve failure state in the report."
+    },
+    {
+      "path": "src/invarlock/core/runner_guards.py",
+      "subsystem": "core",
+      "bucket": "should_remove",
+      "lines": [123, 155, 170, 226, 277],
+      "rationale": "Guard policy application, preparation, and validation are trust-critical control paths and should not depend on blanket catches."
+    },
+    {
+      "path": "src/invarlock/core/runner_latency.py",
+      "subsystem": "core",
+      "bucket": "acceptable",
+      "lines": [35, 43, 51, 59, 74, 91, 97, 102, 113, 140, 146],
+      "rationale": "Latency measurement wraps arbitrary tensor/model calls and immediately re-raises with explicit phase-specific errors."
+    },
+    {
+      "path": "src/invarlock/core/runner_pairing.py",
+      "subsystem": "core",
+      "bucket": "should_remove",
+      "lines": [92, 110],
+      "rationale": "Baseline pairing integrity is trust-critical for compare-and-evaluate and should fail on specific corrupt-reference cases instead of blanket fallback."
+    },
+    {
+      "path": "src/invarlock/guards/_estimators.py",
+      "subsystem": "guards",
+      "bucket": "should_remove",
+      "lines": [38, 147],
+      "rationale": "Estimator helpers feed guard evidence directly; defaulting to neutral values on arbitrary failures can hide evidence gaps."
+    },
+    {
+      "path": "src/invarlock/guards/invariants.py",
+      "subsystem": "guards",
+      "bucket": "should_remove",
+      "lines": [344, 364, 368, 387, 403, 414, 436, 452, 472, 502, 508, 510, 614, 632],
+      "rationale": "Invariant evidence capture is a trust-critical guard surface and still contains blanket catches that can hide missing or incomplete evidence."
+    },
+    {
+      "path": "src/invarlock/guards/rmt_detection.py",
+      "subsystem": "guards",
+      "bucket": "questionable",
+      "lines": [120, 549, 561],
+      "rationale": "RMT correction is active guard behavior, but the remaining broad catches already emit explicit failure events and need narrower exception classes rather than immediate removal-by-count."
+    },
+    {
+      "path": "src/invarlock/guards/spectral.py",
+      "subsystem": "guards",
+      "bucket": "acceptable",
+      "lines": [258],
+      "rationale": "This catch only protects optional evidence dumping after guard evaluation completes."
+    },
+    {
+      "path": "src/invarlock/guards/spectral_control.py",
+      "subsystem": "guards",
+      "bucket": "questionable",
+      "lines": [38, 48, 111, 121, 174],
+      "rationale": "Spectral correction records per-module failures explicitly, but model-control operations still deserve narrower exceptions."
+    },
+    {
+      "path": "src/invarlock/guards/spectral_detection.py",
+      "subsystem": "guards",
+      "bucket": "should_remove",
+      "lines": [342, 375, 412, 414],
+      "rationale": "Spectral violation detection is an evidence path; broad catches here can suppress real degeneracy signals."
+    },
+    {
+      "path": "src/invarlock/guards/spectral_measurement.py",
+      "subsystem": "guards",
+      "bucket": "should_remove",
+      "lines": [61],
+      "rationale": "Sigma measurement feeds guard evidence directly and should not drop back to neutral defaults on arbitrary failure."
+    },
+    {
+      "path": "src/invarlock/guards/tier_config.py",
+      "subsystem": "guards",
+      "bucket": "acceptable",
+      "lines": [169],
+      "rationale": "Tier-config loading is a compatibility helper that already emits explicit parse errors when strict config content is required."
+    },
+    {
+      "path": "src/invarlock/guards/variance.py",
+      "subsystem": "guards",
+      "bucket": "acceptable",
+      "lines": [497],
+      "rationale": "This catch only protects optional evidence dumping after variance evaluation completes."
+    },
+    {
+      "path": "src/invarlock/guards/variance_batching.py",
+      "subsystem": "guards",
+      "bucket": "should_remove",
+      "lines": [256],
+      "rationale": "Variance calibration batch scoring contributes to predictive-gate evidence and should not quietly null out fallback loss computation."
+    },
+    {
+      "path": "src/invarlock/guards/variance_evaluation.py",
+      "subsystem": "guards",
+      "bucket": "should_remove",
+      "lines": [237, 377],
+      "rationale": "Predictive-gate calibration is a trust-critical guard path and still uses blanket catches around evidence generation."
+    },
+    {
+      "path": "src/invarlock/guards/variance_ops.py",
+      "subsystem": "guards",
+      "bucket": "should_remove",
+      "lines": [157, 198, 297, 335],
+      "rationale": "Variance enable/disable and rollback operations should not collapse arbitrary failures into partial-success booleans."
+    },
+    {
+      "path": "src/invarlock/guards/variance_prepare.py",
+      "subsystem": "guards",
+      "bucket": "should_remove",
+      "lines": [224],
+      "rationale": "Variance guard preparation is a trust-critical setup path and should fail with narrower, typed exceptions."
+    },
+    {
+      "path": "src/invarlock/guards/variance_scaling.py",
+      "subsystem": "guards",
+      "bucket": "should_remove",
+      "lines": [150],
+      "rationale": "Scale proposal generation feeds direct guard action and should not blanket-swallow per-module failures."
+    },
+    {
+      "path": "src/invarlock/cli/app.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [99, 106, 112],
+      "rationale": "CLI bootstrap and top-level dispatch are shell surfaces with explicit fallback behavior."
+    },
+    {
+      "path": "src/invarlock/cli/backend_runtime.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [23],
+      "rationale": "Backend runtime probing is optional introspection for shell output."
+    },
+    {
+      "path": "src/invarlock/cli/bench.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [172],
+      "rationale": "Benchmark command error wrapping is a shell-only concern."
+    },
+    {
+      "path": "src/invarlock/cli/commands/calibrate.py",
+      "subsystem": "cli",
+      "bucket": "questionable",
+      "lines": [333, 349, 354, 590, 652],
+      "rationale": "Calibration command artifact synthesis and summary coercion are still active data-shaping paths, not just presentation helpers."
+    },
+    {
+      "path": "src/invarlock/cli/commands/evaluate.py",
+      "subsystem": "cli",
+      "bucket": "questionable",
+      "lines": [166, 184, 406, 437, 497, 549, 610, 616],
+      "rationale": "The evaluate shell still owns meaningful planning and report-loading logic and should narrow broad catches as shell/core ownership is cleaned up."
+    },
+    {
+      "path": "src/invarlock/cli/commands/explain_gates.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [41, 94, 111, 129, 191, 238, 259],
+      "rationale": "Gate explanation is a read-only reporting shell; these catches affect explanation output, not verdict enforcement."
+    },
+    {
+      "path": "src/invarlock/cli/commands/export_html.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [45, 57, 70],
+      "rationale": "HTML export is a shell formatting path with explicit nonzero exits."
+    },
+    {
+      "path": "src/invarlock/cli/commands/plugins.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [114, 368, 515, 561, 612],
+      "rationale": "Plugin listing is an introspection command and the broad catches only protect optional runtime and metadata probes."
+    },
+    {
+      "path": "src/invarlock/cli/commands/report.py",
+      "subsystem": "cli",
+      "bucket": "questionable",
+      "lines": [193, 283, 300, 412, 616],
+      "rationale": "Report command paths still shape validation summaries and CLI failure mode, so they should narrow catches before being treated as stable."
+    },
+    {
+      "path": "src/invarlock/cli/device.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [43, 93],
+      "rationale": "Device listing is a probing command and these catches only protect shell diagnostics."
+    },
+    {
+      "path": "src/invarlock/cli/overhead_utils.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [27, 39, 54],
+      "rationale": "Overhead rendering helpers are shell-only formatting utilities."
+    },
+    {
+      "path": "src/invarlock/cli/run_artifacts.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [55],
+      "rationale": "Run-artifact shell fallback is best-effort output shaping."
+    },
+    {
+      "path": "src/invarlock/cli/run_config.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [207],
+      "rationale": "Run-config shell coercion is user-input handling and already degrades to explicit CLI defaults."
+    },
+    {
+      "path": "src/invarlock/cli/run_masking.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [66, 72],
+      "rationale": "Warning-mask rendering is a shell-only display path."
+    },
+    {
+      "path": "src/invarlock/cli/run_pairing.py",
+      "subsystem": "cli",
+      "bucket": "questionable",
+      "lines": [98, 219, 344, 387],
+      "rationale": "CLI pairing normalization still shapes baseline-reference payloads and provider digests, so it should narrow broad catches before it is considered stable shell code."
+    },
+    {
+      "path": "src/invarlock/cli/run_shell_output.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [118],
+      "rationale": "Shell-output formatting should stay best-effort."
+    },
+    {
+      "path": "src/invarlock/cli/run_warning_filters.py",
+      "subsystem": "cli",
+      "bucket": "acceptable",
+      "lines": [126],
+      "rationale": "Warning filtering is a shell convenience layer and already degrades safely."
+    }
+  ]
+}
