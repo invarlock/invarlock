@@ -70,11 +70,9 @@ def test_evaluation_report_baseline_ref_includes_tokenizer_hash() -> None:
     assert cert["baseline_ref"]["tokenizer_hash"] == "tokhash-abc"
 
 
-def test_evaluation_report_uses_bca_when_env_enabled_and_many_paired_windows(
+def test_evaluation_report_uses_explicit_bca_when_many_paired_windows(
     monkeypatch,
 ) -> None:
-    monkeypatch.setenv("INVARLOCK_BOOTSTRAP_BCA", "1")
-
     report = create_empty_report()
     report["meta"]["model_id"] = "m"
     report["meta"]["adapter"] = "hf"
@@ -94,7 +92,7 @@ def test_evaluation_report_uses_bca_when_env_enabled_and_many_paired_windows(
         "final": 10.0,
     }
     report["metrics"]["bootstrap"] = {
-        "method": "percentile",
+        "method": "bca",
         "replicates": 10,
         "alpha": 0.05,
         "seed": 0,

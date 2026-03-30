@@ -73,11 +73,22 @@ def test_prepare_guard_overhead_section_with_reports():
 
 def test_prepare_guard_overhead_section_ratio_fallback():
     payload, passed = report_overhead_mod.prepare_guard_overhead_section(
-        {"bare_ppl": 10.0, "guarded_ppl": 11.0, "messages": ["note"]}
+        {
+            "bare_ppl": 10.0,
+            "guarded_ppl": 11.0,
+            "diagnostics": [
+                {
+                    "kind": "validation_info",
+                    "severity": "info",
+                    "message": "note",
+                    "details": {},
+                }
+            ],
+        }
     )
     assert passed is False
     assert payload["guarded_ppl"] == 11.0
-    assert payload["messages"] == ["note"]
+    assert payload["diagnostics"][0]["message"] == "note"
 
 
 def test_compute_quality_overhead_from_guard_handles_ratio(monkeypatch):

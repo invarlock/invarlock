@@ -136,12 +136,11 @@ def test_make_evaluation_report_uses_bca_when_method_explicit(monkeypatch) -> No
     assert seen.get("method") == "bca"
 
 
-def test_make_evaluation_report_env_bca_flag_ignored_when_windows_small(
+def test_make_evaluation_report_percentile_method_used_when_windows_small(
     monkeypatch,
 ) -> None:
     report = _mk_report(replicates=10, bootstrap_method="percentile")
     baseline = _mk_baseline()
-    monkeypatch.setenv("INVARLOCK_BOOTSTRAP_BCA", "1")
 
     seen: dict[str, object] = {}
 

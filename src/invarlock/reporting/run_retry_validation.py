@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from invarlock.core.retry import RetryDiagnostic
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_telemetry import (
     telemetry_output_enabled,
@@ -28,11 +29,11 @@ class RetryReportValidationResult:
     status: str
     passed: bool
     validation: dict[str, Any]
-    failed_gates: tuple[str, ...]
+    validation_gates: tuple[str, ...]
     attempt_summary: dict[str, Any]
     evaluation_report: dict[str, Any] | None = None
     telemetry_summary: str | None = None
-    error_message: str | None = None
+    diagnostic: RetryDiagnostic | None = None
 
 
 def validate_retry_evaluation_report(
@@ -68,24 +69,24 @@ def validate_retry_evaluation_report(
         if not isinstance(validation, dict):
             validation = {}
         attempt_summary = build_retry_result_summary_fn(validation)
-        failed_gates = tuple(attempt_summary.get("failures", []) or [])
+        validation_gates = tuple(attempt_summary.get("failures", []) or [])
         passed = bool(attempt_summary.get("passed"))
         return RetryReportValidationResult(
             status="passed" if passed else "failed",
             passed=passed,
             validation=validation,
-            failed_gates=failed_gates,
+            validation_gates=validation_gates,
             attempt_summary=attempt_summary,
             evaluation_report=evaluation_report,
             telemetry_summary=telemetry_summary,
-            error_message=None,
+            diagnostic=None,
         )
     except _VALIDATION_EXCEPTIONS as exc:
         return RetryReportValidationResult(
             status="error",
             passed=False,
             validation={},
-            failed_gates=("report_error",),
+            validation_gates=("report_error",),
             attempt_summary={
                 "passed": False,
                 "failures": ["report_error"],
@@ -93,5 +94,10 @@ def validate_retry_evaluation_report(
             },
             evaluation_report=None,
             telemetry_summary=None,
-            error_message=str(exc),
+            diagnostic=RetryDiagnostic(
+                code="retry.validation_report_error",
+                message=str(exc),
+                severity="error",
+                details={"validation_gates": ("report_error",)},
+            ),
         )

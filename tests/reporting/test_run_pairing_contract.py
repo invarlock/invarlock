@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from invarlock.reporting.run_pairing_contract import (
     build_dataset_window_stats,
     validate_pairing_report_metrics,
@@ -58,3 +60,32 @@ def test_build_dataset_window_stats_maps_pairing_and_capacity_fields() -> None:
         "min_tokens_target": 200,
         "tokens_floor_met": True,
     }
+
+
+def test_validate_pairing_report_metrics_flags_invalid_fraction_values() -> None:
+    violations = validate_pairing_report_metrics(
+        {
+            "window_match_fraction": "bad",
+            "window_overlap_fraction": object(),
+        },
+        baseline_requested=False,
+        profile="dev",
+        preview_count_report=1,
+        final_count_report=1,
+        expected_preview=1,
+        expected_final=1,
+    )
+
+    assert len(violations) == 2
+    assert "PAIRING-SCHEDULE-INVALID" in violations[0].message
+    assert "window_match_fraction" in violations[0].message
+    assert "window_overlap_fraction" in violations[1].message
+
+
+def test_build_dataset_window_stats_rejects_invalid_fraction_values() -> None:
+    with pytest.raises(ValueError, match="PAIRING-SCHEDULE-INVALID"):
+        build_dataset_window_stats(
+            match_fraction="bad",
+            overlap_fraction=0.0,
+            window_plan={},
+        )

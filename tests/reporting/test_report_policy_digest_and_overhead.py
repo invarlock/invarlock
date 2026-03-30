@@ -76,13 +76,17 @@ def test_evaluation_report_policy_digest_changed_and_hysteresis_applied() -> Non
 def test_evaluation_report_guard_overhead_not_evaluated_soft_pass() -> None:
     rep = _mk_pm_report(ratio=1.0)
     # Provide guard_overhead payload without bare/guarded metrics → not evaluated branch
-    rep["guard_overhead"] = {"messages": ["noop"]}
+    rep["guard_overhead"] = {"source": "unit"}
     base = {"metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}}}
     cert = make_report(rep, base)
     go = cert.get("guard_overhead", {})
     assert go.get("evaluated") is False
     assert go.get("passed") is True
-    assert any("unavailable" in m.lower() for m in (go.get("errors") or []))
+    assert any(
+        "unavailable" in item.get("message", "").lower()
+        for item in (go.get("diagnostics") or [])
+    )
+    assert "errors" not in go
 
 
 def test_evaluation_report_quality_overhead_from_guard_ratio() -> None:

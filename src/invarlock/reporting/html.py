@@ -16,7 +16,7 @@ from .report_schema import validate_report
 markdown_module: Any | None = None
 try:
     import markdown as _markdown  # type: ignore[import-untyped]
-except Exception:  # pragma: no cover - optional dependency
+except ImportError:  # pragma: no cover - optional dependency
     _markdown = None
 else:
     markdown_module = _markdown

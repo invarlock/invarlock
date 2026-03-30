@@ -296,6 +296,11 @@ def _generate_single_markdown(report: RunReport) -> list[str]:
             lines.append(f"### {guard['name']}")
             lines.append("")
 
+            decision = str(guard.get("decision") or "").strip()
+            if decision:
+                lines.append(f"**Decision:** {decision}")
+                lines.append("")
+
             # Guard metrics
             if guard["metrics"]:
                 lines.append("**Metrics:**")
@@ -303,18 +308,28 @@ def _generate_single_markdown(report: RunReport) -> list[str]:
                     lines.append(f"- {metric}: {value}")
                 lines.append("")
 
-            # Actions taken
-            if guard["actions"]:
-                lines.append("**Actions:**")
-                for action in guard["actions"]:
-                    lines.append(f"- {action}")
+            diagnostics = guard.get("diagnostics", [])
+            if diagnostics:
+                lines.append("**Diagnostics:**")
+                for diagnostic in diagnostics:
+                    if isinstance(diagnostic, dict):
+                        severity = str(diagnostic.get("severity") or "info").upper()
+                        message = str(diagnostic.get("message") or "")
+                        lines.append(f"- [{severity}] {message}")
+                    else:
+                        lines.append(f"- {diagnostic}")
                 lines.append("")
 
             # Violations
             if guard["violations"]:
                 lines.append("**Violations:**")
                 for violation in guard["violations"]:
-                    lines.append(f"- ⚠️ {violation}")
+                    if isinstance(violation, dict):
+                        lines.append(
+                            f"- ⚠️ {violation.get('message', str(violation))}"
+                        )
+                    else:
+                        lines.append(f"- ⚠️ {violation}")
                 lines.append("")
 
     # Status Flags

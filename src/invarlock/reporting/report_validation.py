@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-import os
 from collections.abc import Callable
 from typing import Any
 
@@ -24,6 +23,20 @@ def _coerce_finite_float(value: Any) -> float | None:
     except (TypeError, ValueError):
         return None
     return coerced if math.isfinite(coerced) else None
+
+
+def _guard_overhead_has_error_diagnostic(payload: Any) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    diagnostics = payload.get("diagnostics")
+    if not isinstance(diagnostics, list | tuple):
+        return False
+    for item in diagnostics:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("severity", "")).strip().lower() == "error":
+            return True
+    return False
 
 
 def compute_validation_flags(
@@ -56,16 +69,6 @@ def compute_validation_flags(
         tier_policies_fn = get_tier_policies_fn
 
     tier = (tier or "balanced").lower()
-    if not tiny_relax:
-        tiny_relax = str(
-            os.environ.get("INVARLOCK_TINY_RELAX", "")
-        ).strip().lower() in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        }
-    # Tiny-relax is policy/config-driven and applies only when explicitly set.
     if tiny_relax:
         tier = "aggressive"
 
@@ -267,7 +270,7 @@ def compute_validation_flags(
             guard_overhead_pass = bool(guard_overhead.get("passed"))
             if tiny_relax and (
                 not bool(guard_overhead.get("evaluated", True))
-                or guard_overhead.get("errors")
+                or _guard_overhead_has_error_diagnostic(guard_overhead)
             ):
                 guard_overhead_pass = True
         else:
@@ -410,6 +413,6 @@ def compute_validation_flags(
                 tail_ok = False
         flags["primary_metric_tail_acceptable"] = bool(tail_ok)
     except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        flags["primary_metric_tail_acceptable"] = True
+        flags["primary_metric_tail_acceptable"] = False
 
     return flags

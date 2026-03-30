@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 import math
-import os
 from typing import Any
 
 from invarlock.core import bootstrap as bootstrap_mod
@@ -214,17 +213,8 @@ def build_primary_metric_analysis(
         alpha = float(metrics_bootstrap.get("alpha", 0.05) or 0.05)
         seed = int(metrics_bootstrap.get("seed", 0) or 0)
         ci_method = "percentile"
-        try:
-            if "bca" in method:
-                ci_method = "bca"
-            else:
-                use_bca_flag = str(
-                    os.environ.get("INVARLOCK_BOOTSTRAP_BCA", "")
-                ).strip().lower() in {"1", "true", "yes", "on"}
-                if use_bca_flag and paired_windows >= 200:
-                    ci_method = "bca"
-        except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
-            pass
+        if "bca" in method:
+            ci_method = "bca"
         if replicates > 0:
             try:
                 delta_ci = bootstrap_mod.compute_paired_delta_log_ci(

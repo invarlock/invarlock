@@ -52,6 +52,39 @@ class ValidationResult:
         self.warnings = warnings or []
         self.errors = errors or []
 
+    @property
+    def diagnostics(self) -> list[dict[str, Any]]:
+        """Typed diagnostic view over legacy validation text buckets."""
+        diagnostics: list[dict[str, Any]] = []
+        for message in self.messages:
+            diagnostics.append(
+                {
+                    "kind": "validation_info",
+                    "severity": "info",
+                    "message": str(message),
+                    "details": {},
+                }
+            )
+        for warning in self.warnings:
+            diagnostics.append(
+                {
+                    "kind": "validation_warning",
+                    "severity": "warning",
+                    "message": str(warning),
+                    "details": {},
+                }
+            )
+        for error in self.errors:
+            diagnostics.append(
+                {
+                    "kind": "validation_error",
+                    "severity": "error",
+                    "message": str(error),
+                    "details": {},
+                }
+            )
+        return diagnostics
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {

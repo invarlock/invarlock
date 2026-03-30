@@ -5,6 +5,7 @@ from copy import deepcopy
 
 import pytest
 
+from invarlock.core.exceptions import MetricsError, ValidationError
 import invarlock.eval.primary_metric as primary_metric_mod
 from invarlock.reporting import (
     dataset_hashing,
@@ -265,7 +266,7 @@ def test_make_evaluation_report_uses_coverage_fallback(monkeypatch):
     assert stats["paired_windows"] == 5
 
 
-def test_make_report_records_explicit_build_diagnostics(monkeypatch) -> None:
+def test_make_report_surfaces_baseline_failures_explicitly(monkeypatch) -> None:
     class _BrokenMeta(dict):
         def get(self, key, default=None):  # noqa: ANN001
             if key in {"env_flags", "determinism"}:
@@ -316,7 +317,11 @@ def test_make_report_records_explicit_build_diagnostics(monkeypatch) -> None:
     monkeypatch.setattr(
         cert,
         "_extract_report_meta",
-        lambda _report: {"model_id": "demo-model", "adapter": "hf", "device": "cpu"},
+        lambda _report, *_args, **_kwargs: {
+            "model_id": "demo-model",
+            "adapter": "hf",
+            "device": "cpu",
+        },
         raising=False,
     )
     monkeypatch.setattr(
@@ -326,15 +331,28 @@ def test_make_report_records_explicit_build_diagnostics(monkeypatch) -> None:
         raising=False,
     )
 
-    evaluation_report = make_report(report, baseline)
-    diagnostics = evaluation_report["meta"]["build_diagnostics"]
-    codes = {entry["code"] for entry in diagnostics}
-    assert "baseline.normalize_failed" in codes
-    assert "meta.env_flags_unavailable" in codes
-    assert "meta.determinism_unavailable" in codes
-    assert "meta.profile_unavailable" in codes
-    assert "dataset.windows_stats_unavailable" in codes
-    assert "baseline.primary_metric_unavailable" in codes
+    with pytest.raises(ValidationError, match="requires a valid baseline report"):
+        make_report(report, baseline)
+
+    monkeypatch.setattr(
+        cert.report_normalization_mod,
+        "normalize_and_validate_run_report",
+        lambda payload: report,
+        raising=False,
+    )
+    with pytest.raises(MetricsError, match="requires a concrete baseline metric"):
+        make_report(report, baseline)
+
+
+def test_make_report_rejects_non_finite_baseline_primary_metric(monkeypatch) -> None:
+    report = _base_report()
+    baseline = _base_baseline()
+    baseline["metrics"]["primary_metric"] = {"kind": "ppl_causal", "final": "bad"}
+
+    _patch_common(monkeypatch, report, baseline)
+
+    with pytest.raises(MetricsError, match="concrete finite `final` value"):
+        make_report(report, baseline)
 
 
 def test_make_evaluation_report_populates_optional_sections(monkeypatch):
@@ -648,3 +666,39 @@ def test_make_evaluation_report_handles_missing_dataset_section(monkeypatch):
 
     evaluation_report = make_report(report, baseline)
     assert "tokenizer_hash" not in evaluation_report["meta"]
+
+
+def test_make_evaluation_report_preserves_nullable_provenance(monkeypatch):
+    report = _base_report()
+    baseline = _base_baseline()
+    report["meta"]["model_id"] = None
+    report["meta"]["adapter"] = ""
+    report["meta"]["device"] = None
+    report["edit"]["name"] = None
+    baseline["meta"].pop("model_id", None)
+    baseline.pop("model_id", None)
+    baseline.pop("run_id", None)
+
+    _patch_common(monkeypatch, report, baseline)
+    _stub_evaluation_report_extractors(
+        monkeypatch,
+        dataset_info={"hash": {}, "windows": {"stats": {}}},
+        resolved_policy={"spectral": {}, "variance": {}},
+    )
+
+    evaluation_report = make_report(report, baseline)
+
+    assert evaluation_report["meta"]["model_id"] is None
+    assert evaluation_report["meta"]["adapter"] is None
+    assert evaluation_report["meta"]["device"] is None
+    assert evaluation_report["edit_name"] is None
+    assert evaluation_report["edit"]["name"] is None
+    assert evaluation_report["baseline_ref"]["model_id"] is None
+    assert evaluation_report["baseline_ref"]["run_id"] is None
+    diagnostics = evaluation_report["meta"].get("build_diagnostics", [])
+    codes = {entry["code"] for entry in diagnostics}
+    assert {
+        "meta.model_id_unavailable",
+        "meta.adapter_unavailable",
+        "meta.device_unavailable",
+    }.issubset(codes)

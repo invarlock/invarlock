@@ -11,6 +11,7 @@ import os as _os
 import platform as _platform
 import shutil as _shutil
 import sys
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -50,6 +51,7 @@ from invarlock.public_contracts import (
 
 from ..backend_runtime import bitsandbytes_runtime_available
 from ..constants import DOCTOR_FORMAT_VERSION
+from ..security_helpers import resolve_shell_runtime_security_policy
 
 DETERMINISM_SHARDS_WARNING = _doctor_preflight.DETERMINISM_SHARDS_WARNING
 NON_FATAL_EXCEPTIONS = (
@@ -69,6 +71,20 @@ LOGGER = logging.getLogger(__name__)
 
 def _find_spec_safe(module_name: str) -> object | None:
     return find_spec_safe(module_name, find_spec_fn=importlib.util.find_spec)
+
+
+def _doctor_env_flag(name: str, *, environ: dict[str, str] | None = None) -> bool:
+    env_map = _os.environ if environ is None else environ
+    value = str(env_map.get(name, "")).strip().lower()
+    return value in {"1", "true", "yes", "on"}
+
+
+def _doctor_tiny_relax_enabled(*, environ: dict[str, str] | None = None) -> bool:
+    return _doctor_env_flag("INVARLOCK_TINY_RELAX", environ=environ)
+
+
+def _doctor_third_party_plugins_enabled() -> bool:
+    return bool(resolve_shell_runtime_security_policy().allow_third_party_plugins)
 
 
 def doctor_command(
@@ -358,12 +374,7 @@ def doctor_command(
 
     # D013: Tiny relax (dev) active — note only
     try:
-        tiny_env = str(_os.environ.get("INVARLOCK_TINY_RELAX", "")).strip().lower() in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        }
+        tiny_env = _doctor_tiny_relax_enabled()
     except NON_FATAL_EXCEPTIONS:
         tiny_env = False
 
@@ -406,7 +417,7 @@ def doctor_command(
             console.print(f"  Edits: {len(registry.list_edits())}")
             console.print(f"  Guards: {len(registry.list_guards())}")
         # Use module-level _os (avoid shadowing earlier uses)
-        if _os.getenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "").strip() == "1":
+        if _doctor_third_party_plugins_enabled():
             _add(
                 "D006",
                 "note",
@@ -420,6 +431,26 @@ def doctor_command(
             b = backend or "—"
             v = f"=={version}" if backend and version else "—"
             return b, v
+
+        def _inventory_status_action(row: Any) -> str:
+            if row.mode == "auto-matcher" or row.status == "ready":
+                return "Ready"
+            if row.status == "needs_extra":
+                if row.required_extra:
+                    return f"Needs extra: pip install '{row.required_extra}'"
+                return "Needs extra"
+            if row.detail:
+                return row.detail
+            return row.status
+
+        def _dataset_network_label(network_mode: str) -> str:
+            if network_mode == "cache":
+                return "Cache/Net"
+            if network_mode == "yes":
+                return "Yes"
+            if network_mode == "no":
+                return "No"
+            return "Unknown"
 
         try:
             bnb_runtime_ready = bitsandbytes_runtime_available()
@@ -454,23 +485,13 @@ def doctor_command(
             table.add_column("Status / Action", style="green")
             for row in rows:
                 backend_disp, ver_disp = _fmt_backend_ver(row.backend, row.version)
-                if row.mode == "auto-matcher":
-                    status_disp = "Ready"
-                elif row.status == "ready":
-                    status_disp = "Ready"
-                elif row.status == "needs_extra":
-                    status_disp = (
-                        f"Needs extra: {row.enable}" if row.enable else "Needs extra"
-                    )
-                else:
-                    status_disp = row.status
                 table.add_row(
                     row.name,
                     row.origin.capitalize(),
                     "Auto‑matcher" if row.mode == "auto-matcher" else "Adapter",
                     backend_disp,
                     ver_disp,
-                    status_disp,
+                    _inventory_status_action(row),
                 )
             console.print(table)
 
@@ -496,23 +517,13 @@ def doctor_command(
                 table.add_column("Status / Action", style="green")
                 for row in grows:
                     b, v = _fmt_backend_ver(row.backend, row.version)
-
-                    status_disp = (
-                        "Ready"
-                        if row.status == "ready"
-                        else (
-                            f"Needs extra: {row.enable}"
-                            if row.enable
-                            else "Needs extra"
-                        )
-                    )
                     table.add_row(
                         row.name,
                         row.origin.capitalize(),
                         ("Guard" if row.mode == "guard" else "Edit"),
                         b,
                         v,
-                        status_disp,
+                        _inventory_status_action(row),
                     )
                 console.print(table)
 
@@ -541,8 +552,8 @@ def doctor_command(
                 ):
                     dtable.add_row(
                         row.provider,
-                        row.network,
-                        row.status,
+                        _dataset_network_label(row.network_mode),
+                        "✓ Available" if row.available else "Unavailable",
                         row.params,
                     )
                 console.print(dtable)

@@ -145,7 +145,12 @@ def test_prepare_guard_overhead_section_triggers_validation():
         {"bare_report": bare, "guarded_report": guarded, "overhead_threshold": 0.01}
     )
     assert passed is False
-    assert "errors" in payload
+    assert any(
+        item.get("severity") == "error"
+        and "guard overhead failed" in item.get("message", "").lower()
+        for item in payload.get("diagnostics", [])
+    )
+    assert "errors" not in payload
 
 
 def test_compute_quality_overhead_from_guard_none_on_missing_data():

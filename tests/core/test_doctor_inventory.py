@@ -56,7 +56,7 @@ def test_build_adapter_inventory_rows_classifies_optional_backend_states() -> No
     assert rows[0].mode == "adapter"
     assert rows[0].backend == "transformers"
     assert rows[1].status == "needs_extra"
-    assert "invarlock[gpu]" in rows[1].enable
+    assert rows[1].required_extra == "invarlock[gpu]"
 
 
 def test_build_adapter_inventory_rows_marks_bitsandbytes_unsupported_without_runtime() -> (
@@ -74,7 +74,7 @@ def test_build_adapter_inventory_rows_marks_bitsandbytes_unsupported_without_run
 
     assert len(rows) == 1
     assert rows[0].status == "unsupported"
-    assert rows[0].enable == "bitsandbytes unavailable on this host"
+    assert rows[0].detail == "bitsandbytes unavailable on this host"
 
 
 def test_build_adapter_inventory_rows_marks_auto_adapter_and_linux_only_quantizers(
@@ -100,7 +100,7 @@ def test_build_adapter_inventory_rows_marks_auto_adapter_and_linux_only_quantize
     assert rows[0].origin == "core"
     assert rows[0].version == "4.0.0"
     assert rows[1].status == "unsupported"
-    assert rows[1].enable == "Linux-only"
+    assert rows[1].detail == "Linux-only"
 
 
 def test_package_version_tolerates_missing_and_generic_errors(monkeypatch) -> None:
@@ -135,7 +135,7 @@ def test_build_generic_inventory_rows_uses_plugin_extra_hints() -> None:
     assert len(rows) == 1
     assert rows[0].name == "quant_rtn"
     assert rows[0].status == "needs_extra"
-    assert "invarlock[quant]" in rows[0].enable
+    assert rows[0].required_extra == "invarlock[quant]"
 
 
 def test_build_generic_inventory_rows_tolerates_extra_lookup_errors() -> None:
@@ -168,8 +168,9 @@ def test_dataset_inventory_and_summary_rows_are_deterministic() -> None:
         )
     )
 
-    assert rows[0].network == "No"
-    assert rows[1].network == "Cache/Net"
+    assert rows[0].network_mode == "no"
+    assert rows[1].network_mode == "cache"
+    assert rows[0].available is True
     assert rows[1].params == "split,seq_len"
     assert summary == {
         "total": 1,
@@ -190,8 +191,8 @@ def test_dataset_inventory_rows_handles_unknown_network_labels() -> None:
     assert rows == [
         mod.DoctorDatasetRow(
             provider="custom",
-            network="Unknown",
-            status="✓ Available",
+            network_mode="unknown",
+            available=True,
             params="-",
         )
     ]

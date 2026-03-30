@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import math
 from collections.abc import Callable
+from collections.abc import Mapping
 from typing import Any
 
 ValidateGuardOverheadFn = Callable[..., Any]
@@ -19,6 +20,62 @@ _NON_FATAL_EXCEPTIONS = (
     TypeError,
     ValueError,
 )
+
+
+def _append_diagnostic(
+    diagnostics: list[dict[str, Any]],
+    *,
+    kind: str,
+    severity: str,
+    message: Any,
+    details: Mapping[str, Any] | None = None,
+) -> None:
+    diagnostics.append(
+        {
+            "kind": kind,
+            "severity": severity,
+            "message": str(message),
+            "details": dict(details or {}),
+        }
+    )
+
+
+def _coerce_diagnostics(raw: Any) -> list[dict[str, Any]]:
+    diagnostics: list[dict[str, Any]] = []
+    for item in raw if isinstance(raw, (list, tuple)) else ():
+        if isinstance(item, Mapping):
+            diagnostics.append(
+                {
+                    "kind": str(item.get("kind", "guard_overhead_diagnostic")),
+                    "severity": str(item.get("severity", "info")),
+                    "message": str(item.get("message", "")),
+                    "details": {
+                        str(key): value
+                        for key, value in item.items()
+                        if key not in {"kind", "severity", "message"}
+                    },
+                }
+            )
+        elif all(hasattr(item, attr) for attr in ("kind", "severity", "message")):
+            details = getattr(item, "details", {})
+            diagnostics.append(
+                {
+                    "kind": str(getattr(item, "kind", "guard_overhead_diagnostic")),
+                    "severity": str(getattr(item, "severity", "info")),
+                    "message": str(getattr(item, "message", "")),
+                    "details": dict(details) if isinstance(details, Mapping) else {},
+                }
+            )
+        else:
+            diagnostics.append(
+                {
+                    "kind": "guard_overhead_diagnostic",
+                    "severity": "info",
+                    "message": str(item),
+                    "details": {},
+                }
+            )
+    return diagnostics
 
 
 def prepare_guard_overhead_section(
@@ -83,15 +140,14 @@ def prepare_guard_overhead_section(
             bare_report, guarded_report, overhead_threshold=threshold
         )
         metrics = result.metrics or {}
+        diagnostics = _coerce_diagnostics(getattr(result, "diagnostics", ()))
         sanitized.update(
             {
                 "overhead_ratio": metrics.get("overhead_ratio"),
                 "overhead_percent": metrics.get("overhead_percent"),
                 "bare_ppl": metrics.get("bare_ppl"),
                 "guarded_ppl": metrics.get("guarded_ppl"),
-                "messages": list(result.messages),
-                "warnings": list(result.warnings),
-                "errors": list(result.errors),
+                "diagnostics": diagnostics,
                 "checks": dict(result.checks),
                 "evaluated": True,
                 "passed": bool(result.passed),
@@ -115,21 +171,8 @@ def prepare_guard_overhead_section(
     if guarded_ppl is not None:
         sanitized["guarded_ppl"] = guarded_ppl
 
-    sanitized["messages"] = (
-        [str(m) for m in payload.get("messages", [])]
-        if isinstance(payload.get("messages"), list)
-        else []
-    )
-    sanitized["warnings"] = (
-        [str(w) for w in payload.get("warnings", [])]
-        if isinstance(payload.get("warnings"), list)
-        else []
-    )
-    sanitized["errors"] = (
-        [str(e) for e in payload.get("errors", [])]
-        if isinstance(payload.get("errors"), list)
-        else []
-    )
+    diagnostics = _coerce_diagnostics(payload.get("diagnostics"))
+    sanitized["diagnostics"] = diagnostics
     checks = payload.get("checks")
     sanitized["checks"] = dict(checks) if isinstance(checks, dict) else {}
 
@@ -143,8 +186,15 @@ def prepare_guard_overhead_section(
 
     # Unable to compute ratio – treat as not evaluated and soft-pass
     # to align with CLI/run behavior and avoid spurious failures in tiny runs.
-    if not sanitized["errors"]:
-        sanitized["errors"] = ["Guard overhead ratio unavailable"]
+    if not diagnostics:
+        sanitized["diagnostics"] = [
+            {
+                "kind": "guard_overhead_unavailable",
+                "severity": "warning",
+                "message": "Guard overhead ratio unavailable",
+                "details": {},
+            }
+        ]
     sanitized["evaluated"] = False
     sanitized["passed"] = True
     return sanitized, True

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from invarlock.reporting import report_validation as validation_mod
 
 
@@ -100,6 +102,43 @@ def test_compute_validation_flags_core_gates_ppl_and_tail_fail(monkeypatch):
     assert flags["primary_metric_tail_acceptable"] is False
 
 
+def test_compute_validation_flags_tail_gate_fail_closes_on_broken_payload(
+    monkeypatch,
+):
+    class _BrokenTail(dict):
+        def get(self, key, default=None):  # noqa: ANN001
+            if key == "mode":
+                raise TypeError("tail payload broken")
+            return super().get(key, default)
+
+    fake_policies = {
+        "balanced": {
+            "metrics": {
+                "pm_ratio": {
+                    "hysteresis_ratio": 0.0,
+                    "min_tokens": 0,
+                    "min_token_fraction": 0.0,
+                    "ratio_limit_base": 1.10,
+                },
+            },
+            "spectral": {"max_caps": 1},
+        }
+    }
+    monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
+
+    flags = validation_mod.compute_validation_flags(
+        {"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.0},
+        {"caps_applied": 0, "summary": {}},
+        {"stable": True},
+        {"status": "ok"},
+        tier="balanced",
+        pm_tail=_BrokenTail({"mode": "fail", "evaluated": True, "passed": True}),
+        get_tier_policies_fn=lambda: dict(fake_policies),
+    )
+
+    assert flags["primary_metric_tail_acceptable"] is False
+
+
 def test_compute_validation_flags_tiny_relax_allows_unevaluated_overhead(monkeypatch):
     fake_policies = {
         "balanced": {
@@ -119,7 +158,18 @@ def test_compute_validation_flags_tiny_relax_allows_unevaluated_overhead(monkeyp
             "spectral": {"max_caps": 5},
         }
     }
-    guard_overhead = {"passed": False, "evaluated": False, "errors": ["missing"]}
+    guard_overhead = {
+        "passed": False,
+        "evaluated": False,
+        "diagnostics": [
+            {
+                "kind": "guard_overhead_error",
+                "severity": "error",
+                "message": "missing",
+                "details": {},
+            }
+        ],
+    }
     flags = validation_mod.compute_validation_flags(
         {"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.0},
         {"caps_applied": 0},

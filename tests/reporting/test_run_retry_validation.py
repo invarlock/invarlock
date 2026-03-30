@@ -28,7 +28,7 @@ def test_validate_retry_evaluation_report_passes_and_emits_telemetry(
 
     assert result.status == "passed"
     assert result.passed is True
-    assert result.failed_gates == ()
+    assert result.validation_gates == ()
     assert result.telemetry_summary == "telemetry-summary"
     assert result.attempt_summary["passed"] is True
 
@@ -50,7 +50,7 @@ def test_validate_retry_evaluation_report_failure_result() -> None:
 
     assert result.status == "failed"
     assert result.passed is False
-    assert result.failed_gates == ("pm_ratio", "window_overlap")
+    assert result.validation_gates == ("pm_ratio", "window_overlap")
     assert result.validation == {"pm_ratio": False}
     assert result.attempt_summary["failures"] == ["pm_ratio", "window_overlap"]
 
@@ -68,10 +68,11 @@ def test_validate_retry_evaluation_report_error_result() -> None:
 
     assert result.status == "error"
     assert result.passed is False
-    assert result.failed_gates == ("report_error",)
+    assert result.validation_gates == ("report_error",)
     assert result.attempt_summary == {
         "passed": False,
         "failures": ["report_error"],
         "validation": {},
     }
-    assert "Baseline report unavailable" in str(result.error_message)
+    assert result.diagnostic is not None
+    assert "Baseline report unavailable" in result.diagnostic.message

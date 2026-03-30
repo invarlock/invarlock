@@ -19,16 +19,26 @@ def test_prepare_guard_overhead_threshold_boundary():
     payload = {"bare_ppl": 100.0, "guarded_ppl": 101.5, "overhead_threshold": 0.015}
     out, passed = prepare_guard_overhead_section(payload)
     assert out.get("evaluated") is True and passed is True
-    # Messages/warnings/errors coercion should produce lists
+    # Diagnostics should flow through unchanged
     payload2 = {
         "bare_ppl": 100.0,
         "guarded_ppl": 101.5,
         "overhead_threshold": 0.015,
-        "messages": ["note"],
-        "warnings": ["warn"],
-        "errors": [],
+        "diagnostics": [
+            {
+                "kind": "validation_info",
+                "severity": "info",
+                "message": "note",
+                "details": {},
+            },
+            {
+                "kind": "validation_warning",
+                "severity": "warning",
+                "message": "warn",
+                "details": {},
+            },
+        ],
     }
     out2, _ = prepare_guard_overhead_section(payload2)
-    assert isinstance(out2.get("messages"), list) and isinstance(
-        out2.get("warnings"), list
-    )
+    assert out2["diagnostics"][0]["message"] == "note"
+    assert out2["diagnostics"][1]["severity"] == "warning"

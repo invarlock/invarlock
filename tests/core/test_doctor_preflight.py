@@ -141,7 +141,10 @@ def test_run_doctor_config_preflight_handles_baseline_split_and_metric_failures(
 
     codes = {finding.code for finding in result.findings}
     assert "D003" in codes
+    assert "D016" in codes
+    assert "D017" in codes
     assert result.metric_kind is None
+    assert result.had_error is True
     assert DATASET_SPLIT_FALLBACK_WARNING in result.lines
 
 
@@ -239,6 +242,8 @@ def test_run_doctor_config_preflight_tolerates_capacity_path_exceptions(
 
     assert result.metric_kind == "accuracy"
     assert any("Metric: accuracy" in line for line in result.lines)
+    assert {finding.code for finding in result.findings} >= {"D018"}
+    assert result.had_error is True
 
 
 def test_run_doctor_config_preflight_handles_worker_profile_and_metric_failures(
@@ -278,7 +283,8 @@ def test_run_doctor_config_preflight_handles_worker_profile_and_metric_failures(
     result = run_doctor_config_preflight(config_path=str(tmp_path / "cfg.yaml"))
 
     assert result.metric_kind is None
-    assert result.had_error is False
+    assert result.had_error is True
+    assert {finding.code for finding in result.findings} >= {"D015", "D016", "D017"}
     assert "D002" not in {finding.code for finding in result.findings}
 
 
@@ -356,3 +362,5 @@ def test_run_doctor_config_preflight_tolerates_provider_lookup_exceptions(
 
     assert result.metric_kind == "accuracy"
     assert any("Metric: accuracy" in line for line in result.lines)
+    assert {finding.code for finding in result.findings} >= {"D018"}
+    assert result.had_error is True

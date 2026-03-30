@@ -24,7 +24,7 @@ from invarlock.public_contracts import (
 
 from ..backend_runtime import bitsandbytes_runtime_available
 from ..constants import PLUGINS_FORMAT_VERSION
-from ..security_helpers import configure_runtime_security
+from ..security_helpers import runtime_security_scoped
 
 console = Console()
 
@@ -61,6 +61,7 @@ def _emit_plugins_json(category: str, rows, extra: dict | None = None) -> None:
     typer.echo(json.dumps(payload, ensure_ascii=False))
 
 
+@runtime_security_scoped
 def plugins_command(
     category: str | None = None,
     only: str | None = None,
@@ -83,10 +84,6 @@ def plugins_command(
         invarlock advanced plugins adapters --allow-third-party-plugins
     """
     try:
-        configure_runtime_security(
-            allow_third_party_plugins=bool(allow_third_party_plugins)
-        )
-
         from invarlock.core.registry import get_registry
         from invarlock.eval.data import list_providers
 

@@ -35,6 +35,8 @@ def test_collect_torch_runtime_facts_collects_cuda_and_memory() -> None:
     assert facts.cuda_available is True
     assert facts.gpu_memory_gb == 8.0
     assert facts.gpu_memory_low is False
+    assert facts.cuda_probe_failed is False
+    assert facts.gpu_memory_probe_failed is False
 
 
 def test_collect_torch_runtime_facts_tolerates_cuda_probe_errors() -> None:
@@ -58,6 +60,8 @@ def test_collect_torch_runtime_facts_tolerates_cuda_probe_errors() -> None:
     assert facts.cuda_available is None
     assert facts.gpu_memory_gb is None
     assert facts.gpu_memory_low is False
+    assert facts.cuda_probe_failed is True
+    assert facts.gpu_memory_probe_failed is True
 
 
 def test_collect_optional_dependency_facts_marks_bitsandbytes_runtime() -> None:
@@ -79,4 +83,22 @@ def test_collect_optional_dependency_facts_marks_bitsandbytes_runtime() -> None:
     assert by_name["auto_gptq"].present is False
     assert by_name["bitsandbytes"].present is True
     assert by_name["bitsandbytes"].runtime_available is False
+    assert by_name["bitsandbytes"].spec_probe_failed is False
+    assert by_name["bitsandbytes"].runtime_probe_failed is False
     assert by_name["bitsandbytes"].extra_hint == "gpu"
+
+
+def test_collect_optional_dependency_facts_marks_probe_failures() -> None:
+    facts = mod.collect_optional_dependency_facts(
+        has_cuda=False,
+        bitsandbytes_runtime_available_fn=lambda: (_ for _ in ()).throw(
+            RuntimeError("boom")
+        ),
+        find_spec_fn=lambda _name: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+
+    by_name = {fact.name: fact for fact in facts}
+    assert by_name["datasets"].present is False
+    assert by_name["datasets"].spec_probe_failed is True
+    assert by_name["bitsandbytes"].spec_probe_failed is True
+    assert by_name["bitsandbytes"].runtime_probe_failed is False

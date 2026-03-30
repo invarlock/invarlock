@@ -333,7 +333,7 @@ def build_provider_schema_findings(
         )
         try:
             exists = bool(raw_path) and Path(str(raw_path)).exists()
-        except Exception:
+        except (OSError, TypeError, ValueError):
             exists = False
         if not exists:
             findings.append(
@@ -399,7 +399,7 @@ def build_capacity_findings(
 ) -> tuple[list[DoctorFinding], bool, dict[str, Any] | None]:
     try:
         from invarlock.core.auto_tuning import get_tier_policies
-    except Exception:
+    except ImportError:
         return [], False, None
 
     use_tier = (tier or "balanced").lower()
@@ -544,16 +544,18 @@ def _format_report_input_error(*, label: str, exc: ReportInputError) -> str:
 
 
 def _mapping_get(value: object, key: str) -> Any:
+    if isinstance(value, dict):
+        return value.get(key)
     try:
-        if isinstance(value, dict):
-            return value.get(key)
-        if hasattr(value, key):
-            return getattr(value, key)
-        getter = getattr(value, "get", None)
-        if callable(getter):
+        return getattr(value, key)
+    except AttributeError:
+        pass
+    getter = getattr(value, "get", None)
+    if callable(getter):
+        try:
             return getter(key)
-    except Exception:
-        return None
+        except (AttributeError, KeyError, TypeError, ValueError):
+            return None
     return None
 
 

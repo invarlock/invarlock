@@ -25,9 +25,14 @@ def test_prepare_guard_overhead_imports_default_validator(monkeypatch) -> None:
                 "bare_ppl": 100.0,
                 "guarded_ppl": 101.0,
             },
-            messages=["ok"],
-            warnings=[],
-            errors=[],
+            diagnostics=[
+                {
+                    "kind": "validation_info",
+                    "severity": "info",
+                    "message": "ok",
+                    "details": {},
+                }
+            ],
             checks={"ratio_ok": True},
             passed=True,
         )
@@ -46,6 +51,10 @@ def test_prepare_guard_overhead_imports_default_validator(monkeypatch) -> None:
     assert called["used"] is True
     assert passed is True
     assert payload["evaluated"] is True
+    assert payload["diagnostics"][0]["message"] == "ok"
+    assert "messages" not in payload
+    assert "warnings" not in payload
+    assert "errors" not in payload
 
 
 def test_prepare_guard_overhead_handles_mode_skip_exceptions_and_preserves_errors() -> (
@@ -54,7 +63,14 @@ def test_prepare_guard_overhead_handles_mode_skip_exceptions_and_preserves_error
     raw = _ExplodingGetDict(
         {
             "skipped": True,
-            "errors": ["already-present"],
+            "diagnostics": [
+                {
+                    "kind": "validation_error",
+                    "severity": "error",
+                    "message": "already-present",
+                    "details": {},
+                }
+            ],
         }
     )
     payload, passed = overhead.prepare_guard_overhead_section(raw)
@@ -62,8 +78,8 @@ def test_prepare_guard_overhead_handles_mode_skip_exceptions_and_preserves_error
     assert payload.get("skipped") is True
     assert payload.get("skip_reason") is None
     assert payload.get("mode") is None
-    # Existing errors should avoid inserting the default "ratio unavailable" error.
-    assert payload.get("errors") == ["already-present"]
+    assert payload["diagnostics"][0]["severity"] == "error"
+    assert payload["diagnostics"][0]["message"] == "already-present"
     assert payload.get("evaluated") is False
 
 

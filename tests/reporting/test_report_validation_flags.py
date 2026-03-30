@@ -53,7 +53,9 @@ def test_compute_validation_flags_tiny_relax_and_tokens_floor(monkeypatch):
     assert flags.get("primary_metric_acceptable") is True
 
 
-def test_compute_validation_flags_tiny_relax_uses_env_fallback(monkeypatch) -> None:
+def test_compute_validation_flags_ignores_env_tiny_relax_without_provenance(
+    monkeypatch,
+) -> None:
     monkeypatch.setenv("INVARLOCK_TINY_RELAX", "yes")
 
     flags = report_validation_mod.compute_validation_flags(
@@ -65,7 +67,7 @@ def test_compute_validation_flags_tiny_relax_uses_env_fallback(monkeypatch) -> N
         primary_metric={"kind": "ppl_causal", "ratio_vs_baseline": 1.0},
     )
 
-    assert flags.get("preview_final_drift_acceptable") is True
+    assert flags.get("preview_final_drift_acceptable") is False
 
 
 def test_tiny_relax_relaxes_tokens_floor_for_ppl():
@@ -243,11 +245,13 @@ def test_prepare_guard_overhead_section_fallback_paths():
     assert passed is True
 
     # Unavailable ratio path → not evaluated and soft-pass
-    out2, passed2 = report_overhead_mod.prepare_guard_overhead_section(
-        {"messages": ["info"]}
-    )
+    out2, passed2 = report_overhead_mod.prepare_guard_overhead_section({"source": "unit"})
     assert out2.get("evaluated") is False and out2.get("passed") is True
-    assert any("unavailable" in e.lower() for e in out2.get("errors", []))
+    assert any(
+        "unavailable" in item.get("message", "").lower()
+        for item in out2.get("diagnostics", [])
+    )
+    assert "errors" not in out2
 
 
 def test_validation_flags_hysteresis_applied_and_moe_observed(monkeypatch):

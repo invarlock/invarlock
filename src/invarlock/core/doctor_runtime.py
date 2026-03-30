@@ -15,6 +15,8 @@ class DoctorTorchRuntimeFacts:
     cuda_available: bool | None
     gpu_memory_gb: float | None
     gpu_memory_low: bool
+    cuda_probe_failed: bool = False
+    gpu_memory_probe_failed: bool = False
 
 
 @dataclass(frozen=True)
@@ -24,6 +26,14 @@ class DoctorOptionalDependency:
     present: bool
     extra_hint: str
     runtime_available: bool | None = None
+    spec_probe_failed: bool = False
+    runtime_probe_failed: bool = False
+
+
+@dataclass(frozen=True)
+class DoctorSpecProbeResult:
+    spec: object | None
+    failed: bool
 
 
 OPTIONAL_DEPENDENCIES: tuple[tuple[str, str], ...] = (
@@ -49,12 +59,20 @@ def find_spec_safe(
     find_spec_fn: Callable[[str], object | None] | None = None,
 ) -> object | None:
     """Best-effort spec lookup that tolerates broken import hooks."""
+    return probe_module_spec(module_name, find_spec_fn=find_spec_fn).spec
 
+
+def probe_module_spec(
+    module_name: str,
+    *,
+    find_spec_fn: Callable[[str], object | None] | None = None,
+) -> DoctorSpecProbeResult:
+    """Probe a module spec while preserving whether the probe itself failed."""
     finder = find_spec_fn or importlib.util.find_spec
     try:
-        return finder(module_name)
-    except Exception:
-        return None
+        return DoctorSpecProbeResult(spec=finder(module_name), failed=False)
+    except (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError):
+        return DoctorSpecProbeResult(spec=None, failed=True)
 
 
 def collect_torch_runtime_facts(
@@ -74,6 +92,8 @@ def collect_torch_runtime_facts(
     cuda_available: bool | None = None
     gpu_memory_gb: float | None = None
     gpu_memory_low = False
+    cuda_probe_failed = False
+    gpu_memory_probe_failed = False
 
     try:
         cuda_toolkit_found = bool(which_fn("nvcc") or which_fn("nvidia-smi"))
@@ -81,18 +101,20 @@ def collect_torch_runtime_facts(
         cuda_available = bool(
             getattr(torch, "cuda", None) and torch.cuda.is_available()
         )
-    except Exception:
+    except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
         cuda_toolkit_found = None
         torch_cuda_build = None
         cuda_available = None
+        cuda_probe_failed = True
 
     try:
         if getattr(torch, "cuda", None) and torch.cuda.is_available():
             gpu_memory_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
             gpu_memory_low = gpu_memory_gb < 4.0
-    except Exception:
+    except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
         gpu_memory_gb = None
         gpu_memory_low = False
+        gpu_memory_probe_failed = True
 
     return DoctorTorchRuntimeFacts(
         version=torch_version,
@@ -102,6 +124,8 @@ def collect_torch_runtime_facts(
         cuda_available=cuda_available,
         gpu_memory_gb=gpu_memory_gb,
         gpu_memory_low=gpu_memory_low,
+        cuda_probe_failed=cuda_probe_failed,
+        gpu_memory_probe_failed=gpu_memory_probe_failed,
     )
 
 
@@ -115,10 +139,17 @@ def collect_optional_dependency_facts(
 
     results: list[DoctorOptionalDependency] = []
     for dep, description in OPTIONAL_DEPENDENCIES:
-        present = find_spec_safe(dep, find_spec_fn=find_spec_fn) is not None
+        probe = probe_module_spec(dep, find_spec_fn=find_spec_fn)
+        present = probe.spec is not None
         runtime_available: bool | None = None
+        runtime_probe_failed = False
         if dep == "bitsandbytes":
-            runtime_available = present and bitsandbytes_runtime_available_fn()
+            if present:
+                try:
+                    runtime_available = bitsandbytes_runtime_available_fn()
+                except (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError):
+                    runtime_available = None
+                    runtime_probe_failed = True
         results.append(
             DoctorOptionalDependency(
                 name=dep,
@@ -126,6 +157,8 @@ def collect_optional_dependency_facts(
                 present=present,
                 extra_hint=_OPTIONAL_DEP_HINTS.get(dep, dep),
                 runtime_available=runtime_available,
+                spec_probe_failed=probe.failed,
+                runtime_probe_failed=runtime_probe_failed,
             )
         )
     return results
@@ -133,9 +166,11 @@ def collect_optional_dependency_facts(
 
 __all__ = [
     "DoctorOptionalDependency",
+    "DoctorSpecProbeResult",
     "DoctorTorchRuntimeFacts",
     "OPTIONAL_DEPENDENCIES",
     "collect_optional_dependency_facts",
     "collect_torch_runtime_facts",
     "find_spec_safe",
+    "probe_module_spec",
 ]

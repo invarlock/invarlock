@@ -4,6 +4,8 @@ import builtins
 import json
 from pathlib import Path
 
+import pytest
+
 from invarlock.core import auto_tuning
 from invarlock.core import doctor_findings as mod
 from invarlock.core.report_inputs import ReportInputError
@@ -93,14 +95,10 @@ def test_build_provider_schema_findings_cover_missing_path_and_blank_text_field(
         def __str__(self) -> str:
             raise RuntimeError("boom")
 
-    findings, had_error = mod.build_provider_schema_findings(
-        {"kind": "local_jsonl", "file": BadPath(), "text_field": ""}
-    )
-
-    codes = {finding.code for finding in findings}
-    assert had_error is True
-    assert "D011" in codes
-    assert "D012" in codes
+    with pytest.raises(RuntimeError, match="boom"):
+        mod.build_provider_schema_findings(
+            {"kind": "local_jsonl", "file": BadPath(), "text_field": ""}
+        )
 
     class HFProvider:
         kind = "hf_text"
@@ -239,7 +237,8 @@ def test_mapping_get_handles_getter_exceptions() -> None:
         def get(self, _key: str) -> object:
             raise RuntimeError("boom")
 
-    assert mod._mapping_get(BadGetter(), "field") is None
+    with pytest.raises(RuntimeError, match="boom"):
+        mod._mapping_get(BadGetter(), "field")
 
 
 def test_format_report_input_error_covers_remaining_reasons(tmp_path: Path) -> None:

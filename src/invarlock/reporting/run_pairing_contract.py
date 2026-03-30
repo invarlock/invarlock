@@ -21,6 +21,23 @@ def _coerce_report_count(value: Any) -> int | None:
         return None
 
 
+def _coerce_fraction(
+    metric_name: str,
+    value: Any,
+) -> tuple[float | None, RunReportPolicyViolation | None]:
+    try:
+        return float(value), None
+    except (TypeError, ValueError, OverflowError):
+        return None, RunReportPolicyViolation(
+            code="E001",
+            message=(
+                "PAIRING-SCHEDULE-INVALID: "
+                f"{metric_name}={value!r} is not a finite numeric fraction"
+            ),
+            details={metric_name: value},
+        )
+
+
 def validate_pairing_report_metrics(
     metrics_section: Mapping[str, Any] | None,
     *,
@@ -36,37 +53,43 @@ def validate_pairing_report_metrics(
 
     match_fraction = metrics.get("window_match_fraction")
     if match_fraction is not None:
-        try:
-            if float(match_fraction) != 1.0:
-                violations.append(
-                    RunReportPolicyViolation(
-                        code="E001",
-                        message=(
-                            "PAIRING-SCHEDULE-MISMATCH: "
-                            f"window_match_fraction={float(match_fraction):.3f}"
-                        ),
-                        details={"window_match_fraction": float(match_fraction)},
-                    )
+        resolved_match_fraction, violation = _coerce_fraction(
+            "window_match_fraction",
+            match_fraction,
+        )
+        if violation is not None:
+            violations.append(violation)
+        elif resolved_match_fraction != 1.0:
+            violations.append(
+                RunReportPolicyViolation(
+                    code="E001",
+                    message=(
+                        "PAIRING-SCHEDULE-MISMATCH: "
+                        f"window_match_fraction={resolved_match_fraction:.3f}"
+                    ),
+                    details={"window_match_fraction": resolved_match_fraction},
                 )
-        except (TypeError, ValueError, OverflowError):
-            pass
+            )
 
     overlap_fraction = metrics.get("window_overlap_fraction")
     if overlap_fraction is not None:
-        try:
-            if float(overlap_fraction) > 1e-9:
-                violations.append(
-                    RunReportPolicyViolation(
-                        code="E001",
-                        message=(
-                            "PAIRING-SCHEDULE-MISMATCH: "
-                            f"window_overlap_fraction={float(overlap_fraction):.3f}"
-                        ),
-                        details={"window_overlap_fraction": float(overlap_fraction)},
-                    )
+        resolved_overlap_fraction, violation = _coerce_fraction(
+            "window_overlap_fraction",
+            overlap_fraction,
+        )
+        if violation is not None:
+            violations.append(violation)
+        elif resolved_overlap_fraction > 1e-9:
+            violations.append(
+                RunReportPolicyViolation(
+                    code="E001",
+                    message=(
+                        "PAIRING-SCHEDULE-MISMATCH: "
+                        f"window_overlap_fraction={resolved_overlap_fraction:.3f}"
+                    ),
+                    details={"window_overlap_fraction": resolved_overlap_fraction},
                 )
-        except (TypeError, ValueError, OverflowError):
-            pass
+            )
 
     profile_normalized = (profile or "").strip().lower()
     if baseline_requested and profile_normalized in {"ci", "release"}:
@@ -145,15 +168,21 @@ def build_dataset_window_stats(
 ) -> dict[str, Any]:
     stats: dict[str, Any] = {}
     if match_fraction is not None:
-        try:
-            stats["window_match_fraction"] = float(match_fraction)
-        except (TypeError, ValueError, OverflowError):
-            pass
+        resolved_match_fraction, violation = _coerce_fraction(
+            "window_match_fraction",
+            match_fraction,
+        )
+        if violation is not None:
+            raise ValueError(violation.message)
+        stats["window_match_fraction"] = resolved_match_fraction
     if overlap_fraction is not None:
-        try:
-            stats["window_overlap_fraction"] = float(overlap_fraction)
-        except (TypeError, ValueError, OverflowError):
-            pass
+        resolved_overlap_fraction, violation = _coerce_fraction(
+            "window_overlap_fraction",
+            overlap_fraction,
+        )
+        if violation is not None:
+            raise ValueError(violation.message)
+        stats["window_overlap_fraction"] = resolved_overlap_fraction
 
     if isinstance(window_plan, Mapping) and "coverage_ok" in window_plan:
         stats["coverage"] = bool(window_plan.get("coverage_ok"))
