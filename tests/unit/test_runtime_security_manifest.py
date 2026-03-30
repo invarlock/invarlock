@@ -67,7 +67,10 @@ def test_write_runtime_manifest_records_runtime_context(
 
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert payload["execution_mode"] == "container"
-    assert payload["runtime"]["image_ref"] == "ghcr.io/invarlock/invarlock-runtime:test"
+    assert (
+        payload["runtime"]["image_ref"]
+        == "ghcr.io/invarlock/invarlock-runtime:test@sha256:attested"
+    )
     assert payload["runtime"]["image_digest"] == "sha256:attested"
     assert payload["runtime"]["container_execution"] is True
     assert payload["config"]["source"] == "file"
@@ -90,7 +93,7 @@ def test_write_runtime_manifest_omits_context_for_empty_extra(
     monkeypatch.setattr(
         runtime_security,
         "resolve_runtime_image",
-        lambda: "ghcr.io/invarlock/invarlock-runtime:test",
+        lambda: runtime_security.RUNTIME_IMAGE_LOCAL_DEFAULT,
         raising=True,
     )
     monkeypatch.setattr(
@@ -128,3 +131,62 @@ def test_write_runtime_manifest_omits_context_for_empty_extra(
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
 
     assert "context" not in payload
+
+
+def test_write_runtime_manifest_rejects_mutable_remote_ref_without_digest(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    report_path = tmp_path / "evaluation.report.json"
+    report_path.write_text('{"ok": true}\n', encoding="utf-8")
+
+    monkeypatch.setattr(
+        runtime_security,
+        "current_execution_mode",
+        lambda: "container",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image",
+        lambda: runtime_security.RUNTIME_IMAGE_DEFAULT,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image_digest",
+        lambda: None,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "running_inside_container",
+        lambda: True,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "network_allowed",
+        lambda: False,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "remote_code_allowed",
+        lambda: False,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "third_party_plugins_allowed",
+        lambda: False,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "unattested_artifacts_allowed",
+        lambda: False,
+        raising=True,
+    )
+
+    with pytest.raises(RuntimeError, match="digest-pinned runtime image"):
+        runtime_security.write_runtime_manifest(report_path)

@@ -272,10 +272,10 @@ Use the package-native subcommands:
 - `invarlock advanced proof-pack verify <dir>`
 
 - Default: `invarlock advanced proof-pack verify <dir>`
-  - Verifies `checksums_sha256_digest`, validates digest-backed manifest references, validates `checksums.sha256`, and runs `invarlock verify`.
-  - Warns (but does not fail) if the pack is unsigned; this is evidence-grade verification.
+  - Verifies `checksums_sha256_digest`, validates digest-backed manifest references, validates `checksums.sha256`, requires a signed `manifest.json.asc`, and runs `invarlock verify`.
+  - Fails closed if the pack is unsigned or if signature verification cannot run.
 - Strict (recommended for distributable evidence): `invarlock advanced proof-pack verify <dir> --strict`
-  - Fails if `manifest.json.asc` is missing, `gpg` verification fails, or extra files exist outside `checksums.sha256`.
+  - Adds fail-closed checks for extra files outside `checksums.sha256` on top of the default signed-manifest requirement.
   - Repo-harness alternative: `PACK_STRICT_MODE=1 scripts/proof_packs/verify_pack.sh --pack <dir>`.
 
 `invarlock advanced proof-pack verify` returns structured exit codes:

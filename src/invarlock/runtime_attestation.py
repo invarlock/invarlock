@@ -10,6 +10,8 @@ from enum import Enum
 from pathlib import Path
 
 from invarlock.runtime_security import (
+    RuntimeManifestLoadIssueCode,
+    RuntimeManifestLoadResult,
     apply_runtime_allowances,
     build_runtime_security_policy,
     load_runtime_manifest,
@@ -30,6 +32,7 @@ class _RuntimeVerifierResult:
 
 class RuntimeAttestationIssueCode(str, Enum):
     MANIFEST_MISSING = "manifest_missing"
+    MANIFEST_INVALID = "manifest_invalid"
     EXECUTION_MODE_INVALID = "execution_mode_invalid"
     VERIFIER_UNAVAILABLE = "verifier_unavailable"
     VERIFIER_FAILED = "verifier_failed"
@@ -107,20 +110,45 @@ def verify_runtime_attestation(
         return RuntimeAttestationResult(verified=False, skipped=True)
 
     report = Path(report_path)
-    manifest_path, manifest = load_runtime_manifest(report)
+    load_result = load_runtime_manifest(report)
+    manifest_path = load_result.path
+    manifest = load_result.payload
     if manifest is None:
+        if load_result.issue_code == RuntimeManifestLoadIssueCode.MISSING:
+            return RuntimeAttestationResult(
+                verified=False,
+                skipped=False,
+                issues=(
+                    RuntimeAttestationIssue(
+                        code=RuntimeAttestationIssueCode.MANIFEST_MISSING,
+                        message=f"{manifest_path.name} missing for {report.name}.",
+                        details={
+                            "report": report.name,
+                            "manifest": manifest_path.name,
+                        },
+                    ),
+                ),
+            )
+        detail = (
+            load_result.issue_message.rstrip(".")
+            if load_result.issue_message
+            else f"{manifest_path.name} is unreadable"
+        )
         return RuntimeAttestationResult(
             verified=False,
             skipped=False,
             issues=(
                 RuntimeAttestationIssue(
-                    code=RuntimeAttestationIssueCode.MANIFEST_MISSING,
-                    message=(
-                        f"{manifest_path.name} missing or unreadable for {report.name}."
-                    ),
+                    code=RuntimeAttestationIssueCode.MANIFEST_INVALID,
+                    message=f"{manifest_path.name} is invalid for {report.name}: {detail}.",
                     details={
                         "report": report.name,
                         "manifest": manifest_path.name,
+                        "issue_code": (
+                            load_result.issue_code.value
+                            if load_result.issue_code is not None
+                            else "unknown"
+                        ),
                     },
                 ),
             ),
@@ -215,6 +243,8 @@ def verify_runtime_attestation(
 
 
 __all__ = [
+    "RuntimeManifestLoadIssueCode",
+    "RuntimeManifestLoadResult",
     "RuntimeAttestationIssue",
     "RuntimeAttestationIssueCode",
     "RuntimeAttestationResult",

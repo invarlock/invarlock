@@ -71,12 +71,17 @@ def test_verify_runtime_attestation_handles_missing_manifest(
     monkeypatch.setattr(
         attestation,
         "load_runtime_manifest",
-        lambda path: (manifest, None),
+        lambda path: attestation.RuntimeManifestLoadResult(
+            path=manifest,
+            payload=None,
+            issue_code=attestation.RuntimeManifestLoadIssueCode.MISSING,
+        ),
     )
 
     result = attestation.verify_runtime_attestation(report)
+    assert result.issues[0].code == attestation.RuntimeAttestationIssueCode.MANIFEST_MISSING
     assert [issue.message for issue in result.issues] == [
-        "runtime.manifest.json missing or unreadable for report.json."
+        "runtime.manifest.json missing for report.json."
     ]
 
 
@@ -90,7 +95,10 @@ def test_verify_runtime_attestation_rejects_non_container_execution_mode(
     monkeypatch.setattr(
         attestation,
         "load_runtime_manifest",
-        lambda path: (manifest, {"execution_mode": "host"}),
+        lambda path: attestation.RuntimeManifestLoadResult(
+            path=manifest,
+            payload={"execution_mode": "host"},
+        ),
     )
 
     result = attestation.verify_runtime_attestation(report)
@@ -109,7 +117,10 @@ def test_verify_runtime_attestation_requires_verifier_binary(
     monkeypatch.setattr(
         attestation,
         "load_runtime_manifest",
-        lambda path: (manifest, {"execution_mode": "container"}),
+        lambda path: attestation.RuntimeManifestLoadResult(
+            path=manifest,
+            payload={"execution_mode": "container"},
+        ),
     )
     monkeypatch.setattr(attestation, "runtime_verifier_binary", lambda: "verify-bin")
     monkeypatch.setattr(attestation.shutil, "which", lambda binary: None)
@@ -130,7 +141,10 @@ def test_verify_runtime_attestation_handles_subprocess_outcomes(
     monkeypatch.setattr(
         attestation,
         "load_runtime_manifest",
-        lambda path: (manifest, {"execution_mode": "container"}),
+        lambda path: attestation.RuntimeManifestLoadResult(
+            path=manifest,
+            payload={"execution_mode": "container"},
+        ),
     )
     monkeypatch.setattr(attestation, "runtime_verifier_binary", lambda: "verify-bin")
     monkeypatch.setattr(attestation.shutil, "which", lambda binary: "/usr/bin/verify")
@@ -193,7 +207,10 @@ def test_verify_runtime_attestation_handles_timeout(
     monkeypatch.setattr(
         attestation,
         "load_runtime_manifest",
-        lambda path: (manifest, {"execution_mode": "container"}),
+        lambda path: attestation.RuntimeManifestLoadResult(
+            path=manifest,
+            payload={"execution_mode": "container"},
+        ),
     )
     monkeypatch.setattr(attestation, "runtime_verifier_binary", lambda: "verify-bin")
     monkeypatch.setattr(attestation.shutil, "which", lambda binary: "/usr/bin/verify")
@@ -211,3 +228,34 @@ def test_verify_runtime_attestation_handles_timeout(
         "Runtime verifier timed out for report.json."
     ]
     assert seen["timeout"] == attestation._RUNTIME_VERIFIER_TIMEOUT_SECONDS
+
+
+def test_verify_runtime_attestation_distinguishes_invalid_manifest(
+    monkeypatch, tmp_path: Path
+) -> None:
+    report = tmp_path / "report.json"
+    manifest = tmp_path / "runtime.manifest.json"
+
+    monkeypatch.setattr(attestation, "unattested_artifacts_allowed", lambda: False)
+    monkeypatch.setattr(
+        attestation,
+        "load_runtime_manifest",
+        lambda path: attestation.RuntimeManifestLoadResult(
+            path=manifest,
+            payload=None,
+            issue_code=attestation.RuntimeManifestLoadIssueCode.INVALID_JSON,
+            issue_message="runtime.manifest.json is not valid JSON",
+        ),
+    )
+
+    result = attestation.verify_runtime_attestation(report)
+
+    assert result.verified is False
+    assert (
+        result.issues[0].code
+        == attestation.RuntimeAttestationIssueCode.MANIFEST_INVALID
+    )
+    assert result.issues[0].message == (
+        "runtime.manifest.json is invalid for report.json: "
+        "runtime.manifest.json is not valid JSON."
+    )

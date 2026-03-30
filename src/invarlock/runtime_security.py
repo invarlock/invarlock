@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -70,6 +71,8 @@ __all__ = [
     "resolve_runtime_image_digest",
     "reset_runtime_allowances",
     "runtime_allowances_scope",
+    "RuntimeManifestLoadIssueCode",
+    "RuntimeManifestLoadResult",
     "runtime_verifier_binary",
     "running_inside_container",
     "serialize_canonical_json",
@@ -98,6 +101,21 @@ class RuntimeSecurityPolicy:
     allow_third_party_plugins: bool = False
     allow_remote_code: bool = False
     allow_unattested_artifacts: bool = False
+
+
+class RuntimeManifestLoadIssueCode(str, Enum):
+    MISSING = "missing"
+    READ_FAILED = "read_failed"
+    INVALID_JSON = "invalid_json"
+    INVALID_PAYLOAD = "invalid_payload"
+
+
+@dataclass(frozen=True)
+class RuntimeManifestLoadResult:
+    path: Path
+    payload: dict[str, Any] | None
+    issue_code: RuntimeManifestLoadIssueCode | None = None
+    issue_message: str | None = None
 
 
 _RUNTIME_SECURITY_POLICY: ContextVar[RuntimeSecurityPolicy | None] = ContextVar(
@@ -216,6 +234,22 @@ def resolve_runtime_image_digest() -> str | None:
         return None
     _, digest = _inspect_container_image(engine, image)
     return digest
+
+
+def _attested_runtime_image_ref(image_ref: str, image_digest: str | None) -> str:
+    if image_ref == RUNTIME_IMAGE_LOCAL_DEFAULT:
+        return image_ref
+    if "@sha256:" in image_ref:
+        return image_ref
+    if image_digest:
+        return f"{image_ref}@{image_digest}"
+    if unattested_artifacts_allowed():
+        return image_ref
+    raise RuntimeError(
+        "Attested runtime manifests require a digest-pinned runtime image; "
+        f"set {RUNTIME_IMAGE_DIGEST_ENV}, use {RUNTIME_IMAGE_LOCAL_DEFAULT!r}, "
+        "or allow unattested artifacts explicitly."
+    )
 
 
 def _inspect_container_image(engine: str, image: str) -> tuple[bool, str | None]:
@@ -844,6 +878,8 @@ def write_runtime_manifest(
     digest, digest_source = _config_digest(
         config_path=config_path, config_payload=config_payload
     )
+    runtime_image = resolve_runtime_image()
+    runtime_digest = resolve_runtime_image_digest()
     manifest: dict[str, Any] = {
         "manifest_version": RUNTIME_MANIFEST_VERSION,
         "generated_at_utc": datetime.now(UTC).isoformat(),
@@ -862,8 +898,8 @@ def write_runtime_manifest(
         },
         "execution_mode": current_execution_mode(),
         "runtime": {
-            "image_ref": resolve_runtime_image(),
-            "image_digest": resolve_runtime_image_digest(),
+            "image_ref": _attested_runtime_image_ref(runtime_image, runtime_digest),
+            "image_digest": runtime_digest,
             "container_execution": running_inside_container(),
             "allow_network": network_allowed(),
             "allow_remote_code": remote_code_allowed(),
@@ -882,13 +918,36 @@ def write_runtime_manifest(
 
 def load_runtime_manifest(
     report_path: str | os.PathLike[str],
-) -> tuple[Path, dict[str, Any] | None]:
+) -> RuntimeManifestLoadResult:
     report = Path(report_path)
     manifest_path = report.parent / RUNTIME_MANIFEST_FILENAME
     if not manifest_path.exists():
-        return manifest_path, None
+        return RuntimeManifestLoadResult(
+            path=manifest_path,
+            payload=None,
+            issue_code=RuntimeManifestLoadIssueCode.MISSING,
+        )
     try:
         payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return manifest_path, None
-    return manifest_path, payload if isinstance(payload, dict) else None
+    except OSError:
+        return RuntimeManifestLoadResult(
+            path=manifest_path,
+            payload=None,
+            issue_code=RuntimeManifestLoadIssueCode.READ_FAILED,
+            issue_message=f"unable to read {manifest_path.name}",
+        )
+    except json.JSONDecodeError:
+        return RuntimeManifestLoadResult(
+            path=manifest_path,
+            payload=None,
+            issue_code=RuntimeManifestLoadIssueCode.INVALID_JSON,
+            issue_message=f"{manifest_path.name} is not valid JSON",
+        )
+    if not isinstance(payload, dict):
+        return RuntimeManifestLoadResult(
+            path=manifest_path,
+            payload=None,
+            issue_code=RuntimeManifestLoadIssueCode.INVALID_PAYLOAD,
+            issue_message=f"{manifest_path.name} must decode to a JSON object",
+        )
+    return RuntimeManifestLoadResult(path=manifest_path, payload=payload)

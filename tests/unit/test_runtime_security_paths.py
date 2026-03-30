@@ -29,21 +29,34 @@ def test_config_digest_and_load_runtime_manifest(tmp_path: Path) -> None:
     assert digest is None
     assert source == "missing"
 
-    manifest_path, payload = runtime_security.load_runtime_manifest(report_path)
-    assert manifest_path.name == runtime_security.RUNTIME_MANIFEST_FILENAME
-    assert payload is None
+    result = runtime_security.load_runtime_manifest(report_path)
+    assert result.path.name == runtime_security.RUNTIME_MANIFEST_FILENAME
+    assert result.payload is None
+    assert (
+        result.issue_code
+        == runtime_security.RuntimeManifestLoadIssueCode.MISSING
+    )
 
-    manifest_path.write_text("{invalid", encoding="utf-8")
-    _, payload = runtime_security.load_runtime_manifest(report_path)
-    assert payload is None
+    result.path.write_text("{invalid", encoding="utf-8")
+    result = runtime_security.load_runtime_manifest(report_path)
+    assert result.payload is None
+    assert (
+        result.issue_code
+        == runtime_security.RuntimeManifestLoadIssueCode.INVALID_JSON
+    )
 
-    manifest_path.write_text('["not-a-dict"]', encoding="utf-8")
-    _, payload = runtime_security.load_runtime_manifest(report_path)
-    assert payload is None
+    result.path.write_text('["not-a-dict"]', encoding="utf-8")
+    result = runtime_security.load_runtime_manifest(report_path)
+    assert result.payload is None
+    assert (
+        result.issue_code
+        == runtime_security.RuntimeManifestLoadIssueCode.INVALID_PAYLOAD
+    )
 
-    manifest_path.write_text('{"ok": true}', encoding="utf-8")
-    _, payload = runtime_security.load_runtime_manifest(report_path)
-    assert payload == {"ok": True}
+    result.path.write_text('{"ok": true}', encoding="utf-8")
+    result = runtime_security.load_runtime_manifest(report_path)
+    assert result.payload == {"ok": True}
+    assert result.issue_code is None
 
 
 def test_config_digest_falls_back_to_payload_when_path_is_missing() -> None:

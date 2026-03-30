@@ -16,7 +16,10 @@ from invarlock.reporting.verify_contract import (
     VerifyOutcome,
     run_verify_reports,
 )
-from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
+from invarlock.runtime_security import (
+    RUNTIME_MANIFEST_FILENAME,
+    unattested_artifacts_allowed,
+)
 
 try:  # pragma: no cover - exercised through tests/integration
     import jsonschema
@@ -486,6 +489,26 @@ def _verify_gpg(
     return [], [], signer_fpr
 
 
+def _signature_warnings_to_errors(warnings: list[str]) -> list[str]:
+    converted: list[str] = []
+    for warning in warnings:
+        if warning == "manifest.json.asc missing; pack is unsigned.":
+            converted.append(
+                "manifest.json.asc missing; signed manifest required by default."
+            )
+            continue
+        if warning == "gpg not found; skipping manifest signature verification.":
+            converted.append(
+                "gpg not found; default proof-pack verification requires signature verification."
+            )
+            continue
+        if warning == "gpg verification timed out; skipping manifest signature verification.":
+            converted.append("gpg verification timed out.")
+            continue
+        converted.append(warning)
+    return converted
+
+
 def _run_verify_command(reports: list[Path], *, profile: str) -> VerifyExecutionResult:
     return run_verify_reports(reports, profile=profile, json_mode=True)
 
@@ -907,6 +930,19 @@ def verify_proof_pack(
     signature_errors, signature_warnings, signer_fingerprint = _verify_gpg(
         pack_dir, strict=strict
     )
+    if signature_warnings and not strict and not unattested_artifacts_allowed():
+        errors.extend(_signature_warnings_to_errors(signature_warnings))
+        return _build_verify_result(
+            pack_dir=pack_dir,
+            ok=False,
+            strict=strict,
+            skip_verify=skip_verify,
+            warnings=warnings,
+            errors=errors,
+            signer_fingerprint=signer_fingerprint,
+            verify_payload=verify_payload,
+            status=ProofPackStatus.SIGNATURE,
+        )
     warnings.extend(signature_warnings)
     if signature_errors:
         errors.extend(signature_errors)

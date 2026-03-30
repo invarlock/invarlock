@@ -136,9 +136,11 @@ def test_proof_pack_manifest_and_attestation_round_trip(tmp_path: Path) -> None:
     result = verify_proof_pack(pack_dir, skip_verify=True)
     payload = result.payload
     exit_code = result.status
-    assert exit_code == ProofPackStatus.OK
-    assert payload["ok"] is True
-    assert "unsigned" in payload["warnings"][0]
+    assert exit_code == ProofPackStatus.SIGNATURE
+    assert payload["ok"] is False
+    assert payload["errors"] == [
+        "manifest.json.asc missing; signed manifest required by default."
+    ]
 
 
 def test_proof_pack_verify_rejects_json_out_inside_pack(tmp_path: Path) -> None:
@@ -179,10 +181,18 @@ def test_proof_pack_verify_strict_rejects_extra_files(tmp_path: Path) -> None:
     assert any("extra files not covered" in error for error in payload["errors"])
 
 
-def test_proof_pack_verify_requires_clean_reports(tmp_path: Path) -> None:
+def test_proof_pack_verify_requires_clean_reports(
+    monkeypatch, tmp_path: Path
+) -> None:
     pack_dir = _build_pack(
         tmp_path / "pack",
         report_rel_path="reports/model/errors/noop/evaluation.report.json",
+    )
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "unattested_artifacts_allowed",
+        lambda: True,
+        raising=True,
     )
 
     result = verify_proof_pack(pack_dir)
@@ -215,6 +225,12 @@ def test_proof_pack_verify_writes_nested_verify_json(
             },
             diagnostics=(),
         ),
+    )
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "unattested_artifacts_allowed",
+        lambda: True,
+        raising=True,
     )
 
     result = verify_proof_pack(pack_dir, json_out_path=json_out)

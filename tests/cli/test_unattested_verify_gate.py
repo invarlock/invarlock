@@ -74,7 +74,7 @@ def test_verify_fails_closed_without_runtime_manifest(
     )
 
     assert result.exit_code == 1
-    assert "runtime.manifest.json missing or unreadable" in result.output
+    assert "runtime.manifest.json missing for" in result.output
 
 
 def test_verify_allows_unattested_override(

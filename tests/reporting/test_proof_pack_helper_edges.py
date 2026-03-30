@@ -1370,7 +1370,7 @@ def test_verify_proof_pack_returns_signature_failure_payload(
     assert payload["signer_fingerprint"] == "FPR123"
 
 
-def test_verify_proof_pack_skip_verify_succeeds_without_running_report_verify(
+def test_verify_proof_pack_skip_verify_fails_closed_without_signature_override(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     pack_dir = tmp_path / "pack"
@@ -1388,6 +1388,50 @@ def test_verify_proof_pack_skip_verify_succeeds_without_running_report_verify(
         lambda *args, **kwargs: pytest.fail(
             "_verify_reports should not run when skip_verify=True"
         ),
+        raising=True,
+    )
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "unattested_artifacts_allowed",
+        lambda: False,
+        raising=True,
+    )
+
+    result = proof_pack_mod.verify_proof_pack(pack_dir, skip_verify=True)
+
+    assert result.status == proof_pack_mod.ProofPackStatus.SIGNATURE
+    assert result.payload["ok"] is False
+    assert "verify" not in result.payload
+    assert result.payload["warnings"] == []
+    assert result.payload["errors"] == [
+        "manifest.json.asc missing; signed manifest required by default."
+    ]
+
+
+def test_verify_proof_pack_skip_verify_allows_explicit_unattested_override(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    pack_dir = tmp_path / "pack"
+    report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
+    _write_manifest_and_checksums(
+        pack_dir,
+        report_path=report_path,
+        final_verdict=final_verdict,
+        environment=environment,
+    )
+
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "_verify_reports",
+        lambda *args, **kwargs: pytest.fail(
+            "_verify_reports should not run when skip_verify=True"
+        ),
+        raising=True,
+    )
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "unattested_artifacts_allowed",
+        lambda: True,
         raising=True,
     )
 
