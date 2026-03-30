@@ -153,6 +153,7 @@ class InvariantsGuard(Guard):
         self.last_current_checks = current_checks
         violations: list[dict[str, Any]] = []
         tokenizer_mismatches: list[dict[str, Any]] = []
+        evidence_gaps: list[dict[str, str]] = []
 
         # Non-finite detection
         non_finite_locations = self._detect_non_finite(model)
@@ -203,10 +204,40 @@ class InvariantsGuard(Guard):
 
         # Compare remaining invariants with baseline
         handled_keys = {
+            "evidence_gaps",
             "layer_norm_paths",
             "embedding_vocab_sizes",
             "config_vocab_size",
         }
+
+        for phase, checks in (
+            ("baseline", self.baseline_checks),
+            ("current", current_checks),
+        ):
+            raw_gaps = checks.get("evidence_gaps")
+            if not isinstance(raw_gaps, tuple | list):
+                continue
+            for gap in raw_gaps:
+                if not isinstance(gap, dict):
+                    continue
+                check_name = str(gap.get("check", "unknown"))
+                reason = str(gap.get("reason", "unknown"))
+                evidence_gaps.append(
+                    {
+                        "phase": phase,
+                        "check": check_name,
+                        "reason": reason,
+                    }
+                )
+
+        if evidence_gaps:
+            violations.append(
+                {
+                    "type": "evidence_gap",
+                    "message": "Invariant evidence capture failed",
+                    "gaps": evidence_gaps,
+                }
+            )
 
         for check_name, baseline_value in self.baseline_checks.items():
             if check_name in handled_keys:
@@ -228,7 +259,9 @@ class InvariantsGuard(Guard):
         # Classify violations by severity
         fatal_violation_types = {"non_finite_tensor", "tokenizer_mismatch"}
         if self.strict_mode:
-            fatal_violation_types.update({"layer_norm_missing", "invariant_violation"})
+            fatal_violation_types.update(
+                {"layer_norm_missing", "invariant_violation", "evidence_gap"}
+            )
 
         fatal_violations: list[dict[str, Any]] = []
         warning_violations: list[dict[str, Any]] = []
@@ -279,6 +312,8 @@ class InvariantsGuard(Guard):
             metrics["layer_norm_missing"] = missing_layer_norms
         if tokenizer_mismatches:
             metrics["tokenizer_mismatches"] = tokenizer_mismatches
+        if evidence_gaps:
+            metrics["evidence_gaps"] = len(evidence_gaps)
 
         return GuardOutcome(
             name=self.name,
@@ -299,14 +334,21 @@ class InvariantsGuard(Guard):
         Returns:
             Dictionary of invariant checks
         """
-        checks = {}
+        checks: dict[str, Any] = {}
+        evidence_gaps: list[dict[str, str]] = []
 
         # Check parameter count
         try:
             param_count = sum(p.numel() for p in model.parameters())
             checks["parameter_count"] = param_count
-        except Exception:
-            checks["parameter_count"] = -1
+        except Exception as exc:
+            checks["parameter_count"] = None
+            evidence_gaps.append(
+                {
+                    "check": "parameter_count",
+                    "reason": type(exc).__name__,
+                }
+            )
 
         layer_norm_paths: list[str] = []
         embedding_vocab_sizes: dict[str, int] = {}
@@ -323,10 +365,16 @@ class InvariantsGuard(Guard):
                         weight = getattr(module, "weight", None)
                         if getattr(weight, "shape", None):
                             embedding_vocab_sizes[name] = int(weight.shape[0])
-        except Exception:
+        except Exception as exc:
             layer_norm_paths = []
             embedding_vocab_sizes = {}
             structure_items = []
+            evidence_gaps.append(
+                {
+                    "check": "module_structure",
+                    "reason": type(exc).__name__,
+                }
+            )
         checks["layer_norm_paths"] = tuple(layer_norm_paths)
         if embedding_vocab_sizes:
             checks["embedding_vocab_sizes"] = embedding_vocab_sizes
@@ -336,8 +384,13 @@ class InvariantsGuard(Guard):
         try:
             if config_vocab is not None:
                 checks["config_vocab_size"] = int(config_vocab)
-        except Exception:
-            pass
+        except Exception as exc:
+            evidence_gaps.append(
+                {
+                    "check": "config_vocab_size",
+                    "reason": type(exc).__name__,
+                }
+            )
 
         # Check weight tying (for language models)
         weight_tying_flags: dict[str, bool] = {}
@@ -358,8 +411,13 @@ class InvariantsGuard(Guard):
             head_weight = getattr(lm_head, "weight", None)
             if embed_weight is not None and head_weight is not None:
                 weight_tying_flags["gpt2"] = _is_tied(embed_weight, head_weight)
-        except Exception:
-            pass
+        except Exception as exc:
+            evidence_gaps.append(
+                {
+                    "check": "weight_tying_gpt2",
+                    "reason": type(exc).__name__,
+                }
+            )
 
         # BERT style (bert.embeddings.word_embeddings <-> cls.predictions.decoder)
         try:
@@ -375,8 +433,13 @@ class InvariantsGuard(Guard):
             decoder_weight = getattr(decoder, "weight", None)
             if embed_weight is not None and decoder_weight is not None:
                 weight_tying_flags["bert"] = _is_tied(embed_weight, decoder_weight)
-        except Exception:
-            pass
+        except Exception as exc:
+            evidence_gaps.append(
+                {
+                    "check": "weight_tying_bert",
+                    "reason": type(exc).__name__,
+                }
+            )
 
         # Decoder embed_tokens style (model.embed_tokens <-> lm_head)
         try:
@@ -386,8 +449,13 @@ class InvariantsGuard(Guard):
             head_weight = getattr(getattr(model, "lm_head", None), "weight", None)
             if embed_weight is not None and head_weight is not None:
                 weight_tying_flags["embed_tokens"] = _is_tied(embed_weight, head_weight)
-        except Exception:
-            pass
+        except Exception as exc:
+            evidence_gaps.append(
+                {
+                    "check": "weight_tying_embed_tokens",
+                    "reason": type(exc).__name__,
+                }
+            )
 
         if weight_tying_flags:
             checks["weight_tying"] = all(weight_tying_flags.values())
@@ -401,13 +469,25 @@ class InvariantsGuard(Guard):
             checks["structure_hash"] = hashlib.sha256(
                 canonical.encode("utf-8")
             ).hexdigest()[:16]
-        except Exception:
-            checks["structure_hash"] = 0
+        except Exception as exc:
+            checks["structure_hash"] = None
+            evidence_gaps.append(
+                {
+                    "check": "structure_hash",
+                    "reason": type(exc).__name__,
+                }
+            )
 
         # Profile-specific invariants
         if getattr(self, "profile_checks", None):
             for name in self.profile_checks:
                 checks[f"profile::{name}"] = self._evaluate_profile_check(model, name)
+
+        if evidence_gaps:
+            checks["evidence_gaps"] = tuple(
+                {"check": gap["check"], "reason": gap["reason"]}
+                for gap in evidence_gaps
+            )
 
         return checks
 

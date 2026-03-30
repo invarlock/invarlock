@@ -226,6 +226,9 @@ def apply_determinism_preset(
     # Normalized level is always one of these.
     if level not in {"off", "strict", "tolerance"}:
         level = "tolerance" if requested == "strict" else "off"
+    strict_enforcement = "not_requested"
+    if requested == "strict":
+        strict_enforcement = "ok" if level == "strict" else "unsafe"
 
     # Extra breadcrumb: random module state is not easily serializable; include a coarse marker.
     try:
@@ -236,6 +239,7 @@ def apply_determinism_preset(
     payload = {
         "requested": requested,
         "level": level,
+        "strict_enforcement": strict_enforcement,
         "profile": prof or None,
         "device": dev,
         "threads": threads_i if requested == "strict" else None,

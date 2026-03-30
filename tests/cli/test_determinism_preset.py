@@ -29,6 +29,7 @@ def test_determinism_preset_off_in_dev_profile(monkeypatch) -> None:
     payload = apply_determinism_preset(profile="dev", device="cpu", seed=123, threads=2)
     assert payload["requested"] == "off"
     assert payload["level"] == "off"
+    assert payload["strict_enforcement"] == "not_requested"
     assert "env" not in payload
 
 
@@ -43,6 +44,7 @@ def test_determinism_preset_downgrades_when_torch_unavailable(monkeypatch) -> No
     )
     assert payload["requested"] == "strict"
     assert payload["level"] == "tolerance"
+    assert payload["strict_enforcement"] == "unsafe"
     assert payload["device"] == "cuda:0"
     assert "env" in payload
     assert payload["env"].get("CUBLAS_WORKSPACE_CONFIG") in {":16:8", ":4096:8", None}
@@ -92,6 +94,7 @@ def test_determinism_preset_marks_tolerance_when_deterministic_algos_fail(
     payload = apply_determinism_preset(profile="ci", device="cuda:0", seed=7, threads=1)
     assert payload["requested"] == "strict"
     assert payload["level"] == "tolerance"
+    assert payload["strict_enforcement"] == "unsafe"
     assert calls and calls[0] == (True, False)
 
 
@@ -142,6 +145,7 @@ def test_determinism_preset_marks_tolerance_when_backend_access_raises(
 
     payload = apply_determinism_preset(profile="ci", device="cuda:0", seed=7, threads=1)
     assert payload["level"] == "tolerance"
+    assert payload["strict_enforcement"] == "unsafe"
     assert payload.get("notes") is not None
 
 
@@ -160,6 +164,7 @@ def test_determinism_preset_strict_with_minimal_torch_stub_hits_false_paths(
 
     payload = apply_determinism_preset(profile="ci", device="cuda:0", seed=7, threads=1)
     assert payload["level"] == "strict"
+    assert payload["strict_enforcement"] == "ok"
 
 
 def test_determinism_preset_warn_only_fallback_failure(monkeypatch) -> None:
@@ -196,6 +201,7 @@ def test_determinism_preset_warn_only_fallback_failure(monkeypatch) -> None:
 
     payload = apply_determinism_preset(profile="ci", device="cuda:0", seed=7, threads=1)
     assert payload["level"] == "tolerance"
+    assert payload["strict_enforcement"] == "unsafe"
 
 
 def test_determinism_preset_cuda_low_memory_selects_cublas_fallback(
@@ -236,6 +242,7 @@ def test_determinism_preset_cuda_low_memory_selects_cublas_fallback(
 
     payload = apply_determinism_preset(profile="ci", device="cuda:0", seed=7, threads=2)
     assert payload["requested"] == "strict"
+    assert payload["strict_enforcement"] == "ok"
     assert payload["env"]["CUBLAS_WORKSPACE_CONFIG"] == ":16:8"
 
 
