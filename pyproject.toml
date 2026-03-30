@@ -230,7 +230,7 @@ hf_bnb = "invarlock.plugins.hf_bnb_adapter:HF_BNB_Adapter"
 # Console scripts
 [project.scripts]
 invarlock = "invarlock.cli.app:app"
-invarlock-runtime-verify = "invarlock.runtime_verify:main"
+invarlock-runtime-verify = "invarlock.cli.runtime_verify:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

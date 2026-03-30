@@ -52,14 +52,14 @@ def test_two_tier_policy_enforced(tmp_path: Path) -> None:
             ("src/invarlock/core/runner.py", 0.89, 0.90),  # core → FAIL (needs 0.90)
             (
                 "src/invarlock/cli/commands/run.py",
-                0.96,
+                1.0,
                 0.90,
             ),  # core meets floor → PASS
             (
                 "src/invarlock/reporting/report_contract.py",
-                0.91,
+                1.0,
                 0.90,
-            ),  # explicit shell override set to 0.90 → PASS
+            ),  # explicit shell override set to 1.00 → PASS
             (
                 "src/invarlock/cli/commands/plugins.py",
                 0.81,
@@ -72,7 +72,7 @@ def test_two_tier_policy_enforced(tmp_path: Path) -> None:
             ),  # explicit critical file → PASS
             (
                 "src/invarlock/eval/metrics.py",
-                0.91,
+                1.0,
                 0.90,
             ),  # explicit critical file → PASS
             ("src/invarlock/guards/spectral.py", 0.89, 0.90),  # core (guards) → FAIL
@@ -98,8 +98,15 @@ def test_overrides_take_precedence(tmp_path: Path) -> None:
         xml, [("src/invarlock/reporting/run_report_formatters.py", 0.91, 0.90)]
     )
     proc = _run_checker(xml, json_out, extra_args=["--core-floor", "0.95"])
+    assert proc.returncode != 0
+    assert "src/invarlock/reporting/run_report_formatters.py" in proc.stderr
 
-    # Should pass with explicit 90% override applied
+    _write_cov_xml(
+        xml, [("src/invarlock/reporting/run_report_formatters.py", 0.95, 0.90)]
+    )
+    proc = _run_checker(xml, json_out, extra_args=["--core-floor", "0.95"])
+
+    # Should pass with the explicit 95% override applied
     assert proc.returncode == 0, proc.stderr
     payload = json.loads(json_out.read_text())
     assert payload["status"] == "ok"
@@ -107,7 +114,7 @@ def test_overrides_take_precedence(tmp_path: Path) -> None:
     assert (
         abs(
             files["src/invarlock/reporting/run_report_formatters.py"]["threshold"]
-            - 0.90
+            - 0.95
         )
         < 1e-9
     )
@@ -199,22 +206,22 @@ def test_ratchets_selected_files_to_ninety_five_percent(tmp_path: Path) -> None:
         xml,
         [
             ("src/invarlock/cli/commands/evaluate.py", 0.949, 1.0),
-            ("src/invarlock/cli/commands/run.py", 0.949, 1.0),
-            ("src/invarlock/reporting/report_contract.py", 0.949, 1.0),
             ("src/invarlock/core/determinism_policy.py", 0.949, 1.0),
             ("src/invarlock/core/bootstrap.py", 0.949, 1.0),
-            ("src/invarlock/core/contracts.py", 0.949, 1.0),
-            ("src/invarlock/core/retry.py", 0.949, 1.0),
             ("src/invarlock/core/auto_tuning.py", 0.949, 1.0),
+            ("src/invarlock/core/runtime_manifest_verify.py", 0.949, 1.0),
+            ("src/invarlock/core/metric_provider_resolution.py", 0.949, 1.0),
             ("src/invarlock/eval/tail_stats.py", 0.949, 1.0),
-            ("src/invarlock/reporting/report_overhead.py", 0.949, 1.0),
+            ("src/invarlock/eval/metrics_activation.py", 0.949, 1.0),
             ("src/invarlock/reporting/report_policy.py", 0.949, 1.0),
-            ("src/invarlock/reporting/report_provenance.py", 0.949, 1.0),
             ("src/invarlock/reporting/report_validation.py", 0.949, 1.0),
+            ("src/invarlock/reporting/run_report_formatters.py", 0.949, 1.0),
             ("src/invarlock/reporting/validate.py", 0.949, 1.0),
             ("src/invarlock/guards/policies.py", 0.949, 1.0),
             ("src/invarlock/runtime_security.py", 0.949, 1.0),
             ("src/invarlock/eval/bench_policy.py", 0.949, 1.0),
+            ("src/invarlock/cli/commands/calibrate.py", 0.949, 1.0),
+            ("src/invarlock/cli/run_config.py", 0.949, 1.0),
         ],
     )
 
@@ -223,22 +230,22 @@ def test_ratchets_selected_files_to_ninety_five_percent(tmp_path: Path) -> None:
     assert proc.returncode != 0
     for path in (
         "src/invarlock/cli/commands/evaluate.py",
-        "src/invarlock/cli/commands/run.py",
-        "src/invarlock/reporting/report_contract.py",
         "src/invarlock/core/determinism_policy.py",
         "src/invarlock/core/bootstrap.py",
-        "src/invarlock/core/contracts.py",
-        "src/invarlock/core/retry.py",
         "src/invarlock/core/auto_tuning.py",
+        "src/invarlock/core/runtime_manifest_verify.py",
+        "src/invarlock/core/metric_provider_resolution.py",
         "src/invarlock/eval/tail_stats.py",
-        "src/invarlock/reporting/report_overhead.py",
+        "src/invarlock/eval/metrics_activation.py",
         "src/invarlock/reporting/report_policy.py",
-        "src/invarlock/reporting/report_provenance.py",
         "src/invarlock/reporting/report_validation.py",
+        "src/invarlock/reporting/run_report_formatters.py",
         "src/invarlock/reporting/validate.py",
         "src/invarlock/guards/policies.py",
         "src/invarlock/runtime_security.py",
         "src/invarlock/eval/bench_policy.py",
+        "src/invarlock/cli/commands/calibrate.py",
+        "src/invarlock/cli/run_config.py",
     ):
         assert path in proc.stderr
 
@@ -269,14 +276,29 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
             ("src/invarlock/core/run_policy.py", 0.999, 1.0),
             ("src/invarlock/reporting/run_metric_utils.py", 0.999, 1.0),
             ("src/invarlock/core/api.py", 0.999, 1.0),
+            ("src/invarlock/core/contracts.py", 0.999, 1.0),
+            ("src/invarlock/core/evaluate_plan.py", 0.999, 1.0),
             ("src/invarlock/core/registry.py", 0.999, 1.0),
+            ("src/invarlock/core/retry.py", 0.999, 1.0),
+            ("src/invarlock/eval/bench.py", 0.999, 1.0),
+            ("src/invarlock/eval/data.py", 0.999, 1.0),
+            ("src/invarlock/eval/metrics.py", 0.999, 1.0),
+            ("src/invarlock/eval/metrics_lens.py", 0.999, 1.0),
+            ("src/invarlock/eval/metrics_support.py", 0.999, 1.0),
             ("src/invarlock/eval/probes/fft.py", 0.999, 1.0),
+            ("src/invarlock/eval/providers/seq2seq.py", 0.999, 1.0),
             ("src/invarlock/eval/providers/base.py", 0.999, 1.0),
             ("src/invarlock/guards/variance_batching.py", 0.999, 1.0),
             ("src/invarlock/guards/variance_prepare.py", 0.999, 1.0),
             ("src/invarlock/proof_pack.py", 0.999, 1.0),
+            ("src/invarlock/reporting/dataset_hashing.py", 0.999, 1.0),
+            ("src/invarlock/reporting/report_contract.py", 0.999, 1.0),
+            ("src/invarlock/reporting/report_files.py", 0.999, 1.0),
+            ("src/invarlock/reporting/report_overhead.py", 0.999, 1.0),
+            ("src/invarlock/reporting/report_provenance.py", 0.999, 1.0),
             ("src/invarlock/reporting/report_types.py", 0.999, 1.0),
             ("src/invarlock/reporting/utils.py", 0.999, 1.0),
+            ("src/invarlock/cli/commands/run.py", 0.999, 1.0),
             ("src/invarlock/runtime_verify.py", 0.999, 1.0),
         ],
     )
@@ -294,14 +316,29 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
         "src/invarlock/core/run_policy.py",
         "src/invarlock/reporting/run_metric_utils.py",
         "src/invarlock/core/api.py",
+        "src/invarlock/core/contracts.py",
+        "src/invarlock/core/evaluate_plan.py",
         "src/invarlock/core/registry.py",
+        "src/invarlock/core/retry.py",
+        "src/invarlock/eval/bench.py",
+        "src/invarlock/eval/data.py",
+        "src/invarlock/eval/metrics.py",
+        "src/invarlock/eval/metrics_lens.py",
+        "src/invarlock/eval/metrics_support.py",
         "src/invarlock/eval/probes/fft.py",
+        "src/invarlock/eval/providers/seq2seq.py",
         "src/invarlock/eval/providers/base.py",
         "src/invarlock/guards/variance_batching.py",
         "src/invarlock/guards/variance_prepare.py",
         "src/invarlock/proof_pack.py",
+        "src/invarlock/reporting/dataset_hashing.py",
+        "src/invarlock/reporting/report_contract.py",
+        "src/invarlock/reporting/report_files.py",
+        "src/invarlock/reporting/report_overhead.py",
+        "src/invarlock/reporting/report_provenance.py",
         "src/invarlock/reporting/report_types.py",
         "src/invarlock/reporting/utils.py",
+        "src/invarlock/cli/commands/run.py",
         "src/invarlock/runtime_verify.py",
     ):
         assert path in proc.stderr
@@ -313,14 +350,14 @@ def test_calibrated_split_owner_thresholds_are_explicit(tmp_path: Path) -> None:
     _write_cov_xml(
         xml,
         [
-            ("src/invarlock/core/config_runtime.py", 0.869, 1.0),
-            ("src/invarlock/core/metric_provider_resolution.py", 0.889, 1.0),
-            ("src/invarlock/core/run_orchestrator.py", 0.849, 1.0),
+            ("src/invarlock/core/config_runtime.py", 0.899, 1.0),
+            ("src/invarlock/core/metric_provider_resolution.py", 0.949, 1.0),
+            ("src/invarlock/core/run_orchestrator.py", 0.899, 1.0),
             ("src/invarlock/core/run_provider_dataset_plan.py", 0.889, 1.0),
-            ("src/invarlock/cli/run_config.py", 0.939, 1.0),
-            ("src/invarlock/cli/run_pairing.py", 0.869, 1.0),
-            ("src/invarlock/eval/metrics_aggregation.py", 0.869, 1.0),
-            ("src/invarlock/eval/metrics_runtime.py", 0.849, 1.0),
+            ("src/invarlock/cli/run_config.py", 0.949, 1.0),
+            ("src/invarlock/cli/run_pairing.py", 0.899, 1.0),
+            ("src/invarlock/eval/metrics_aggregation.py", 0.899, 1.0),
+            ("src/invarlock/eval/metrics_runtime.py", 0.899, 1.0),
         ],
     )
 

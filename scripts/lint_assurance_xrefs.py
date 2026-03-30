@@ -343,8 +343,11 @@ def _sample_reports() -> list[dict[str, Any]]:
     ppl_baseline = {
         "run_id": "baseline-ppl",
         "model_id": "m",
+        "meta": {"model_id": "m", "adapter": "hf", "device": "cpu"},
+        "edit": {"name": "noop"},
         "ppl_final": 10.0,
         "ppl_preview": 10.0,
+        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
         "primary_metric": {"kind": "ppl_causal", "final": 10.0},
         "evaluation_windows": {
             "final": {
@@ -392,8 +395,11 @@ def _sample_reports() -> list[dict[str, Any]]:
     acc_baseline = {
         "run_id": "baseline-acc",
         "model_id": "m",
+        "meta": {"model_id": "m", "adapter": "hf", "device": "cpu"},
+        "edit": {"name": "noop"},
         "ppl_final": 10.0,
         "ppl_preview": 10.0,
+        "metrics": {"primary_metric": {"kind": "accuracy", "final": 0.79}},
         "primary_metric": {"kind": "accuracy", "final": 0.79},
     }
 
