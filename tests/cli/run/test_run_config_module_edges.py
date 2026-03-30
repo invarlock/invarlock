@@ -182,6 +182,31 @@ def test_prepare_config_for_run_tolerates_default_auto_adapter_import_failure(
     assert cfg.model_dump()["auto"] == {}
 
 
+def test_prepare_config_for_run_propagates_default_auto_adapter_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _boom(cfg):
+        raise RuntimeError("auto adapter failed")
+
+    monkeypatch.setattr(
+        "invarlock.core.adapter_auto.apply_auto_adapter_if_needed",
+        _boom,
+    )
+
+    with pytest.raises(RuntimeError, match="auto adapter failed"):
+        run_config_mod.prepare_config_for_run(
+            config_path="config.yaml",
+            profile=None,
+            edit=None,
+            tier=None,
+            probes=None,
+            console=Console(file=StringIO(), force_terminal=False),
+            event_fn=lambda *args, **kwargs: None,
+            load_config_fn=lambda path: _CfgWrap({"model": {}, "edit": {}, "auto": {}}),
+            apply_profile_fn=lambda cfg, profile: cfg,  # noqa: ARG005
+        )
+
+
 @pytest.mark.parametrize(
     ("load_config_fn", "apply_profile_fn", "profile", "tier", "probes", "code"),
     [

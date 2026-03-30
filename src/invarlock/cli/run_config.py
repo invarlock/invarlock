@@ -70,7 +70,6 @@ def prepare_config_for_run(
 ) -> Any:
     """Load config and apply profile/CLI overrides deterministically."""
     shell_mode = console is not None
-    uses_default_auto_adapter = apply_auto_adapter_fn is None
     if event_fn is None and shell_mode:
         from invarlock.cli.run_shell_output import _event as event_fn
     if invarlock_config_cls is None:
@@ -201,13 +200,7 @@ def prepare_config_for_run(
         cfg = invarlock_config_cls(cfg_dict)
 
     if apply_auto_adapter_fn is not None:
-        if uses_default_auto_adapter:
-            try:
-                cfg = apply_auto_adapter_fn(cfg)
-            except Exception:
-                pass
-        else:
-            cfg = apply_auto_adapter_fn(cfg)
+        cfg = apply_auto_adapter_fn(cfg)
 
     return cfg
 

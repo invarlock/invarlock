@@ -649,7 +649,7 @@ def test_dataset_meta_tokenizer_hash_passthrough(monkeypatch, tmp_path):
     run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"), profile=None)
 
 
-def test_auto_adapter_apply_ignored_on_error(monkeypatch, tmp_path):
+def test_auto_adapter_apply_fails_closed_on_error(monkeypatch, tmp_path):
     cfg = _cfg(tmp_path)
 
     class DummyRegistry:
@@ -679,7 +679,15 @@ def test_auto_adapter_apply_ignored_on_error(monkeypatch, tmp_path):
         "invarlock.core.adapter_auto.apply_auto_adapter_if_needed",
         lambda cfg: (_ for _ in ()).throw(RuntimeError("auto-err")),
     )
-    run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"), profile=None)
+    with pytest.raises(click.exceptions.Exit) as excinfo:
+        run_command(
+            config=str(cfg),
+            device="cpu",
+            out=str(tmp_path / "runs"),
+            profile=None,
+        )
+
+    assert excinfo.value.exit_code == 1
 
 
 def test_guard_overhead_ratio_display_path(monkeypatch, tmp_path):

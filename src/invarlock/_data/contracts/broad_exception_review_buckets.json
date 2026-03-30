@@ -188,13 +188,6 @@
       "rationale": "Run-artifact shell fallback is best-effort output shaping."
     },
     {
-      "path": "src/invarlock/cli/run_config.py",
-      "subsystem": "cli",
-      "bucket": "acceptable",
-      "lines": [207],
-      "rationale": "Run-config shell coercion is user-input handling and already degrades to explicit CLI defaults."
-    },
-    {
       "path": "src/invarlock/cli/run_masking.py",
       "subsystem": "cli",
       "bucket": "acceptable",
