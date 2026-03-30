@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -55,7 +55,7 @@ def test_to_json_and_sanitize_cover_invalid_and_non_json_values() -> None:
 
     report = _report(pm_preview=0.9, pm_final=1.0, pm_ratio=1.02)
     report["provenance"] = {
-        "captured_at": datetime(2026, 3, 30, tzinfo=timezone.utc),
+        "captured_at": datetime(2026, 3, 30, tzinfo=UTC),
         "owner": _Stringable(),
         "nested": [_Stringable()],
     }
@@ -63,7 +63,7 @@ def test_to_json_and_sanitize_cover_invalid_and_non_json_values() -> None:
     payload = json.loads(formatters.to_json(report))
     sanitized = formatters._sanitize_for_json(
         {
-            "captured_at": datetime(2026, 3, 30, tzinfo=timezone.utc),
+            "captured_at": datetime(2026, 3, 30, tzinfo=UTC),
             "fallback": _Stringable(),
         }
     )
