@@ -6,7 +6,7 @@ from invarlock.reporting.report_overhead import (
     compute_quality_overhead_from_guard,
     prepare_guard_overhead_section,
 )
-from invarlock.reporting.report_make_support import (
+from invarlock.reporting.report_builder_support import (
     build_baseline_reference,
     extract_report_meta,
 )

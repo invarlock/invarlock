@@ -36,12 +36,12 @@ from . import report_provenance as report_provenance_mod
 from . import report_schema as report_schema_mod
 from . import report_validation as report_validation_mod
 from .dataset_hashing import _extract_dataset_info
-from .report_make_support import (
+from .report_builder_support import (
     append_build_diagnostic as _append_build_diagnostic,
 )
-from .report_make_support import build_baseline_reference, extract_report_meta
-from .report_make_support import generate_run_id as _generate_run_id
-from .report_make_support import optional_text as _optional_text
+from .report_builder_support import build_baseline_reference, extract_report_meta
+from .report_builder_support import generate_run_id as _generate_run_id
+from .report_builder_support import optional_text as _optional_text
 from .report_confidence import compute_confidence_label as _compute_confidence_label
 from .report_primary_metric_policy import (
     enforce_display_ci_alignment as _enforce_display_ci_alignment,
