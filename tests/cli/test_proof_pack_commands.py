@@ -17,6 +17,7 @@ from invarlock.runtime_security import (
 )
 
 _VALID_TEST_IMAGE_DIGEST = "sha256:" + ("a" * 64)
+_ALLOW_UNATTESTED_ENV = {"INVARLOCK_ALLOW_UNATTESTED_ARTIFACTS": "1"}
 
 
 def _write_json(path: Path, payload: object) -> None:
@@ -249,6 +250,7 @@ def test_proof_pack_verify_json_round_trip(monkeypatch, tmp_path: Path) -> None:
             "--json-out",
             str(json_out),
         ],
+        env=_ALLOW_UNATTESTED_ENV,
     )
 
     assert result.exit_code == 0, result.output
@@ -271,7 +273,9 @@ def test_proof_pack_verify_human_success(monkeypatch, tmp_path: Path) -> None:
     )
 
     result = CliRunner().invoke(
-        app, ["advanced", "proof-pack", "verify", str(pack_dir)]
+        app,
+        ["advanced", "proof-pack", "verify", str(pack_dir)],
+        env=_ALLOW_UNATTESTED_ENV,
     )
 
     assert result.exit_code == 0, result.output
@@ -323,7 +327,9 @@ def test_proof_pack_verify_json_round_trip_with_verify_payload(
     )
 
     result = CliRunner().invoke(
-        app, ["advanced", "proof-pack", "verify", str(pack_dir), "--json"]
+        app,
+        ["advanced", "proof-pack", "verify", str(pack_dir), "--json"],
+        env=_ALLOW_UNATTESTED_ENV,
     )
 
     assert result.exit_code == 0, result.output
@@ -343,7 +349,9 @@ def test_proof_pack_verify_json_round_trip_with_real_nested_verify(
     )
 
     result = CliRunner().invoke(
-        app, ["advanced", "proof-pack", "verify", str(pack_dir), "--json"]
+        app,
+        ["advanced", "proof-pack", "verify", str(pack_dir), "--json"],
+        env=_ALLOW_UNATTESTED_ENV,
     )
 
     assert result.exit_code == 0, result.output
@@ -502,7 +510,9 @@ def test_proof_pack_build_json_round_trip(monkeypatch, tmp_path: Path) -> None:
     assert len(list(out_dir.glob("reports/**/evaluation.report.json"))) == 1
 
     verify = CliRunner().invoke(
-        app, ["advanced", "proof-pack", "verify", str(out_dir), "--json"]
+        app,
+        ["advanced", "proof-pack", "verify", str(out_dir), "--json"],
+        env=_ALLOW_UNATTESTED_ENV,
     )
     assert verify.exit_code == 0, verify.output
     verify_payload = json.loads(verify.stdout.strip())

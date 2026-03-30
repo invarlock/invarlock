@@ -73,14 +73,20 @@ def _create_venv(tmp_path: Path, python_exe: Path) -> tuple[Path, Path, Path]:
 
 
 def _run(
-    executable: Path, args: list[str], *, cwd: Path | None = None
+    executable: Path,
+    args: list[str],
+    *,
+    cwd: Path | None = None,
+    env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
+    resolved_env = None if env is None else {**os.environ, **env}
     return subprocess.run(
         [str(executable), *args],
         capture_output=True,
         text=True,
         check=False,
         cwd=cwd,
+        env=resolved_env,
     )
 
 
@@ -303,6 +309,7 @@ def test_wheel_install_can_verify_proof_pack_outside_repo_tree(tmp_path: Path) -
             "--json",
         ],
         cwd=tmp_path,
+        env={"INVARLOCK_ALLOW_UNATTESTED_ARTIFACTS": "1"},
     )
     assert verify.returncode == 0, verify.stdout + verify.stderr
     payload = json.loads(verify.stdout.strip().splitlines()[-1])

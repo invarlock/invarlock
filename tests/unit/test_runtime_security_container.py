@@ -209,6 +209,73 @@ def test_build_container_python_command_uses_python_entrypoint_for_repo_script(
     assert "/workspace/scripts/proof_packs/python/run_from_config.py" in command
 
 
+def test_build_container_python_command_adds_cwd_host_mirror(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_root = tmp_path / "repo"
+    script_path = repo_root / "scripts" / "run.py"
+    script_path.parent.mkdir(parents=True, exist_ok=True)
+    script_path.write_text("# stub\n", encoding="utf-8")
+
+    monkeypatch.chdir(repo_root)
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_container_engine",
+        lambda: "docker",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image",
+        lambda: "ghcr.io/invarlock/runtime:test",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "resolve_runtime_image_digest",
+        lambda: "sha256:abc",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "container_image_available_locally",
+        lambda image, engine=None: True,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "network_allowed",
+        lambda: False,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "_container_pythonpath_entries",
+        lambda *, cwd: ([], []),
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "_delegated_env_pairs",
+        lambda *, cwd: ({}, []),
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security,
+        "_host_nvidia_visible",
+        lambda: False,
+        raising=True,
+    )
+
+    command = runtime_security.build_container_python_command(
+        script_path,
+        _plan(["--help"], needs_mirror=True),
+    )
+
+    cwd = str(repo_root.resolve())
+    assert f"{cwd}:{cwd}" in command
+
+
 def test_delegate_python_script_to_container_uses_python_builder(monkeypatch) -> None:
     monkeypatch.setattr(
         runtime_security,
@@ -256,6 +323,28 @@ def test_delegate_python_script_to_container_passes_timeout(monkeypatch) -> None
         == 9
     )
     assert seen["timeout"] == runtime_security._CONTAINER_EXECUTION_TIMEOUT_SECONDS
+
+
+def test_delegate_python_script_to_container_surfaces_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        runtime_security,
+        "build_container_python_command",
+        lambda script_path, plan: ["docker", "run", "python", str(script_path)],
+        raising=True,
+    )
+
+    def _run(command, check=False, timeout=None):
+        raise runtime_security.subprocess.TimeoutExpired(command, timeout)
+
+    monkeypatch.setattr(runtime_security.subprocess, "run", _run, raising=True)
+
+    with pytest.raises(RuntimeError, match="timed out"):
+        runtime_security.delegate_python_script_to_container(
+            "scripts/proof_packs/python/run_from_config.py",
+            _plan(["--config", "demo.yaml"]),
+        )
 
 
 def test_build_container_python_command_raises_for_missing_engine_or_image(

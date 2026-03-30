@@ -32,17 +32,13 @@ def test_config_digest_and_load_runtime_manifest(tmp_path: Path) -> None:
     result = runtime_security.load_runtime_manifest(report_path)
     assert result.path.name == runtime_security.RUNTIME_MANIFEST_FILENAME
     assert result.payload is None
-    assert (
-        result.issue_code
-        == runtime_security.RuntimeManifestLoadIssueCode.MISSING
-    )
+    assert result.issue_code == runtime_security.RuntimeManifestLoadIssueCode.MISSING
 
     result.path.write_text("{invalid", encoding="utf-8")
     result = runtime_security.load_runtime_manifest(report_path)
     assert result.payload is None
     assert (
-        result.issue_code
-        == runtime_security.RuntimeManifestLoadIssueCode.INVALID_JSON
+        result.issue_code == runtime_security.RuntimeManifestLoadIssueCode.INVALID_JSON
     )
 
     result.path.write_text('["not-a-dict"]', encoding="utf-8")
@@ -57,6 +53,31 @@ def test_config_digest_and_load_runtime_manifest(tmp_path: Path) -> None:
     result = runtime_security.load_runtime_manifest(report_path)
     assert result.payload == {"ok": True}
     assert result.issue_code is None
+
+
+def test_load_runtime_manifest_reports_read_failures(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    report_path = tmp_path / "evaluation.report.json"
+    report_path.write_text('{"ok": true}\n', encoding="utf-8")
+    manifest_path = report_path.parent / runtime_security.RUNTIME_MANIFEST_FILENAME
+    manifest_path.write_text('{"ok": true}\n', encoding="utf-8")
+
+    original_read_text = Path.read_text
+
+    def _read_text(self: Path, *args, **kwargs) -> str:
+        if self == manifest_path:
+            raise OSError("boom")
+        return original_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", _read_text, raising=True)
+
+    result = runtime_security.load_runtime_manifest(report_path)
+
+    assert result.payload is None
+    assert (
+        result.issue_code == runtime_security.RuntimeManifestLoadIssueCode.READ_FAILED
+    )
 
 
 def test_config_digest_falls_back_to_payload_when_path_is_missing() -> None:
@@ -321,6 +342,25 @@ def test_iter_external_symlink_target_mounts_finds_external_targets_recursively(
     assert runtime_security._iter_external_symlink_target_mounts(tree, cwd=cwd) == [
         external_root
     ]
+
+
+def test_iter_external_symlink_target_mounts_skips_targets_already_covered_by_cwd(
+    tmp_path: Path,
+) -> None:
+    cwd = tmp_path / "repo"
+    cwd.mkdir()
+    covered_target = cwd / "models" / "baseline.bin"
+    covered_target.parent.mkdir(parents=True)
+    covered_target.write_text("ok\n", encoding="utf-8")
+
+    external_root = tmp_path / "external-links"
+    external_root.mkdir()
+    link_path = external_root / "baseline-link"
+    link_path.symlink_to(covered_target)
+
+    assert (
+        runtime_security._iter_external_symlink_target_mounts(link_path, cwd=cwd) == []
+    )
 
 
 def test_iter_absolute_pythonpath_entries_filters_relative_empty_and_duplicates(

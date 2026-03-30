@@ -79,7 +79,10 @@ def test_verify_runtime_attestation_handles_missing_manifest(
     )
 
     result = attestation.verify_runtime_attestation(report)
-    assert result.issues[0].code == attestation.RuntimeAttestationIssueCode.MANIFEST_MISSING
+    assert (
+        result.issues[0].code
+        == attestation.RuntimeAttestationIssueCode.MANIFEST_MISSING
+    )
     assert [issue.message for issue in result.issues] == [
         "runtime.manifest.json missing for report.json."
     ]

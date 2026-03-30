@@ -23,7 +23,9 @@ from invarlock.runtime_security import (
 _VERIFY_GPG_TIMEOUT_SECONDS = 30
 PROOF_PACK_FORMAT = proof_pack_manifest_mod.PROOF_PACK_FORMAT
 jsonschema = proof_pack_manifest_mod.jsonschema
-load_proof_pack_manifest_schema = proof_pack_manifest_mod.load_proof_pack_manifest_schema
+load_proof_pack_manifest_schema = (
+    proof_pack_manifest_mod.load_proof_pack_manifest_schema
+)
 _load_json = proof_pack_manifest_mod._load_json
 _json_load_error_types = proof_pack_manifest_mod._json_load_error_types
 _load_json_object = proof_pack_manifest_mod._load_json_object
@@ -121,8 +123,6 @@ def _write_checksums_file(pack_dir: Path, rel_paths: list[str]) -> None:
 def _copy_file(source_path: Path, dest_path: Path) -> None:
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(source_path, dest_path)
-
-
 
 
 def _verify_manifest_binds_checksums(pack_dir: Path) -> list[str]:
@@ -290,7 +290,10 @@ def _signature_warnings_to_errors(warnings: list[str]) -> list[str]:
                 "gpg not found; default proof-pack verification requires signature verification."
             )
             continue
-        if warning == "gpg verification timed out; skipping manifest signature verification.":
+        if (
+            warning
+            == "gpg verification timed out; skipping manifest signature verification."
+        ):
             converted.append("gpg verification timed out.")
             continue
         converted.append(warning)

@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 import invarlock.cli.runtime_launch_plan as runtime_launch_plan
 import invarlock.runtime_security as runtime_security
 
@@ -210,6 +212,25 @@ def test_inspect_container_image_handles_failures_and_digestless_images(
     )
     assert runtime_security._inspect_container_image("docker", "img") == (True, None)
 
+    monkeypatch.setattr(
+        runtime_security.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout=""),
+        raising=True,
+    )
+    assert runtime_security._inspect_container_image("docker", "img") == (True, None)
+
+    monkeypatch.setattr(
+        runtime_security.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(
+            returncode=0,
+            stdout='["ghcr.io/invarlock/runtime:test"]\nimage-id\n',
+        ),
+        raising=True,
+    )
+    assert runtime_security._inspect_container_image("docker", "img") == (True, None)
+
 
 def test_container_engine_and_device_helpers(monkeypatch) -> None:
     monkeypatch.setattr(
@@ -342,3 +363,30 @@ def test_runtime_verifier_binary_finds_repo_and_script_dir_candidates(
         runtime_security.sys, "argv", [str(script_dir / "cli")], raising=True
     )
     assert runtime_security.runtime_verifier_binary() == str(script_binary)
+
+
+def test_runtime_verifier_binary_uses_executable_dir_when_argv_is_empty(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_root = tmp_path / "repo"
+    module_path = repo_root / "src" / "invarlock" / "runtime_security.py"
+    module_path.parent.mkdir(parents=True, exist_ok=True)
+    module_path.write_text("# stub\n", encoding="utf-8")
+
+    script_dir = tmp_path / "venv" / "bin"
+    script_dir.mkdir(parents=True, exist_ok=True)
+    python_bin = script_dir / "python"
+    python_bin.write_text("#!/bin/sh\n", encoding="utf-8")
+    python_bin.chmod(0o755)
+    verifier = script_dir / runtime_security.RUNTIME_VERIFIER_BINARY_DEFAULT
+    verifier.write_text("#!/bin/sh\n", encoding="utf-8")
+    verifier.chmod(0o755)
+
+    monkeypatch.delenv(runtime_security.RUNTIME_VERIFIER_BINARY_ENV, raising=False)
+    monkeypatch.setattr(runtime_security, "__file__", str(module_path), raising=False)
+    monkeypatch.setattr(
+        runtime_security.sys, "executable", str(python_bin), raising=True
+    )
+    monkeypatch.setattr(runtime_security.sys, "argv", [], raising=True)
+
+    assert runtime_security.runtime_verifier_binary() == str(verifier)
