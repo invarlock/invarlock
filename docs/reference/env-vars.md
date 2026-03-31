@@ -151,7 +151,7 @@ Strictness/tiny-relax/overhead-skip are also config/profile policy:
 | `INVARLOCK_CONTAINER_EXECUTION` | unset | Internal recursion guard marking runtime-container execution. |
 | `INVARLOCK_RUNTIME_IMAGE` | unset | Override the OCI image used for containerized model execution. |
 | `INVARLOCK_RUNTIME_IMAGE_DIGEST` | unset | Supply the immutable digest recorded into `runtime.manifest.json`. |
-| `INVARLOCK_RUNTIME_VERIFIER` | unset | Override the `invarlock-runtime-verify` binary path. |
+| `INVARLOCK_RUNTIME_VERIFIER` | unset | Override the `invarlock-runtime-verify` binary path when using the external verifier; attested verification falls back to the packaged Python verifier when the binary is unavailable. |
 
 ### Docs build
 

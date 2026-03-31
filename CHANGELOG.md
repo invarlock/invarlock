@@ -8,67 +8,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-Since `v0.5.0`, the repo gained two distinct smoke lanes: a lightweight
-attested push gate built around `sshleifer/tiny-gpt2`, a local JSONL fixture,
-and the new `Tiny Attested Smoke` workflow, plus a retained GPT-2 canary path
-for scheduled and manually dispatched end-to-end checks. The repo also added a
-tracked broad-exception review-bucket contract so remaining blanket catches are
-classified and linted instead of drifting silently, and expanded the coverage
-enforcement inventory to treat newly split implementation owners and helper
-surfaces as first-class critical files.
+- Added a lightweight attested push smoke lane built around
+  `sshleifer/tiny-gpt2`, a local JSONL fixture, and the new `Tiny Attested
+  Smoke` workflow, while retaining a heavier GPT-2 canary path for scheduled
+  and manually dispatched end-to-end checks.
+- Added a tracked broad-exception review-bucket contract so remaining blanket
+  catches are explicitly classified and linted instead of drifting silently.
+- Expanded the coverage-enforcement inventory to include newly split
+  implementation owners and helper surfaces as first-class critical files.
 
 ### Changed
-This development cycle was dominated by a repo-wide hardening and architecture
-cleanup pass. Trust-critical evaluation, runtime attestation, proof-pack
-verification, determinism, registry, invariants, run orchestration, and
-reporting flows were pushed toward fail-closed behavior; CLI shells now hand
-policy and owner logic to typed core and reporting helpers instead of owning
-fallback decisions themselves; and the largest owner modules were decomposed
-into smaller implementation files across runtime security, run orchestration,
-run execution, report building, verification checks, and proof-pack handling.
-Compatibility facades were deliberately retired as the refactor progressed, the
-shell/core split is now backed by stronger guardrails, reporting remains at
-zero broad `except Exception` sites, and the refactored split owners now carry
-more aggressive 95% and 100% coverage thresholds where the suite supports it.
+- Drove a repo-wide hardening and architecture cleanup pass across trust-
+  critical evaluation, runtime attestation, proof-pack verification,
+  determinism, registry, invariants, run orchestration, and reporting flows.
+- Continued the shell/core split so CLI shells hand policy and owner logic to
+  typed core and reporting helpers instead of owning fallback decisions.
+- Decomposed the largest owner modules across runtime security, run
+  orchestration, run execution, report building, verification checks, and
+  proof-pack handling into smaller implementation files with stronger guardrail
+  coverage.
+- Ratcheted refactored split owners to stricter 95% and 100% per-file coverage
+  thresholds where the current suite supports it.
 
 ### Fixed
-Post-release fixes closed a long tail of trust and CI issues. Delegated and
-containerized evaluation reports now emit attested execution provenance into
-their runtime manifests, runtime attestation falls back to the in-process
-manifest verifier when the external `invarlock-runtime-verify` binary is not
-installed, tiny attested smoke exports now write to host-writable paths, and
-unsigned proof-pack smoke runs use an explicit unattested-artifact override
-instead of implicitly depending on legacy behavior. The cycle also narrowed
-active-path broad exception fallbacks across core, guards, and CLI flows,
-restored calibration and evaluate/report edge behavior after the refactors,
-fixed release publishing and recovery paths around existing tags and dist-only
-uploads, and resolved the post-split typing and coverage regressions that were
-surfaced by the tighter repo gates.
+- Delegated and containerized evaluation reports now emit attested execution
+  provenance into their runtime manifests.
+- Runtime attestation now falls back to the in-process manifest verifier when
+  the external `invarlock-runtime-verify` binary is unavailable.
+- Tiny attested smoke exports now write to host-writable paths, and unsigned
+  proof-pack smoke runs use an explicit unattested-artifact override instead of
+  implicitly depending on legacy behavior.
+- Narrowed active-path broad exception fallbacks across core, guards, and CLI
+  flows, and removed the remaining trust-critical broad catches.
+- Restored calibration and evaluate/report edge behavior after the refactors,
+  and resolved the post-split typing and coverage regressions surfaced by the
+  tighter repo gates.
+- Fixed release publishing and recovery paths around existing tags and
+  dist-only uploads.
 
 ### Removed
-The repo shed the remaining compatibility surfaces that no longer fit the
-stabilized architecture, including legacy command shims, reporting facades,
-owner-layer patch-sync wrappers, the retired legacy RMT module, stale lazy
-export placeholders, and other shell-leaking or test-only indirections that
-had survived earlier migrations.
+- Removed remaining compatibility surfaces that no longer fit the stabilized
+  architecture, including legacy command shims, reporting facades, owner-layer
+  patch-sync wrappers, the retired legacy RMT module, stale lazy export
+  placeholders, and other shell-leaking or test-only indirections that had
+  survived earlier migrations.
 
 ### Dependencies
-Dependency work in this cycle was mostly about tightening and hardening rather
-than broad version churn: vulnerable workflow locks were patched, smoke
-workflows now prefetch and cache their model assets more deterministically, and
-the verification and coverage gates were updated so the packaged verifier and
-the newly split owner modules are exercised directly in local and CI runs.
+- Patched vulnerable workflow locks and tightened smoke-workflow dependency and
+  asset caching behavior for more deterministic CI execution.
+- Updated verification and coverage gates so the packaged verifier and the
+  newly split owner modules are exercised directly in local and CI runs.
 
 ### Documentation
-Documentation was refreshed to match the post-`v0.5.0` architecture and
-operations model. The docs now reflect the shell/core redesign and current
-evaluate contract more clearly, include updated evaluate assurance examples and
-report-artifact guidance, carry remediation closeout records from the refactor
-program, and distinguish the lightweight push-gated tiny attested smoke from
-the heavier GPT-2 canary workflow. Proof-pack and evidence docs continue to
-document the default fail-closed verifier behavior, while the repo-only CI
-override for unsigned smoke packs is treated as maintainer workflow detail
-rather than a public CLI contract.
+- Refreshed docs to match the post-`v0.5.0` architecture and operations model,
+  including the shell/core redesign, current evaluate contract, and updated
+  report-artifact guidance.
+- Added remediation closeout records from the refactor program and updated the
+  maintainer smoke notes to distinguish the push-gated tiny attested smoke from
+  the heavier GPT-2 canary workflow.
+- Clarified runtime-verifier environment-variable guidance to reflect the new
+  Python-side attestation fallback when the external verifier binary is absent.
 
 ## [0.5.0] - 2026-03-25
 ### Added
