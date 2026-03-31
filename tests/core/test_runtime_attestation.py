@@ -110,7 +110,7 @@ def test_verify_runtime_attestation_rejects_non_container_execution_mode(
     ]
 
 
-def test_verify_runtime_attestation_requires_verifier_binary(
+def test_verify_runtime_attestation_falls_back_to_in_process_verifier(
     monkeypatch, tmp_path: Path
 ) -> None:
     report = tmp_path / "report.json"
@@ -127,10 +127,55 @@ def test_verify_runtime_attestation_requires_verifier_binary(
     )
     monkeypatch.setattr(attestation, "runtime_verifier_binary", lambda: "verify-bin")
     monkeypatch.setattr(attestation.shutil, "which", lambda binary: None)
+    monkeypatch.setattr(
+        attestation,
+        "verify_runtime_manifest",
+        lambda report_path, manifest_path: SimpleNamespace(
+            ok=True,
+            errors=(),
+            report=str(report_path),
+            manifest=str(manifest_path),
+        ),
+    )
 
     result = attestation.verify_runtime_attestation(report)
+    assert result.verified is True
+    assert result.issues == ()
+
+
+def test_verify_runtime_attestation_reports_in_process_fallback_failures(
+    monkeypatch, tmp_path: Path
+) -> None:
+    report = tmp_path / "report.json"
+    manifest = tmp_path / "runtime.manifest.json"
+
+    monkeypatch.setattr(attestation, "unattested_artifacts_allowed", lambda: False)
+    monkeypatch.setattr(
+        attestation,
+        "load_runtime_manifest",
+        lambda path: attestation.RuntimeManifestLoadResult(
+            path=manifest,
+            payload={"execution_mode": "container"},
+        ),
+    )
+    monkeypatch.setattr(attestation, "runtime_verifier_binary", lambda: "verify-bin")
+    monkeypatch.setattr(attestation.shutil, "which", lambda binary: None)
+    monkeypatch.setattr(
+        attestation,
+        "verify_runtime_manifest",
+        lambda report_path, manifest_path: SimpleNamespace(
+            ok=False,
+            errors=("hash mismatch", "digest missing"),
+            report=str(report_path),
+            manifest=str(manifest_path),
+        ),
+    )
+
+    result = attestation.verify_runtime_attestation(report)
+    assert result.verified is False
     assert [issue.message for issue in result.issues] == [
-        "Runtime verifier 'verify-bin' is not installed; cannot verify report.json."
+        "hash mismatch",
+        "digest missing",
     ]
 
 
