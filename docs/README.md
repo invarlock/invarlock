@@ -88,9 +88,9 @@ package-native verifier behavior remains fail-closed for unsigned packs.
 - [Programmatic Quickstart](reference/programmatic-quickstart.md)
 - [Environment Variables](reference/env-vars.md)
 
-<!-- Runbooks removed in minimal public footprint -->
+<!-- Runbooks intentionally omitted from this public docs index. -->
 
-<!-- Design docs removed in minimal public footprint -->
+<!-- Design docs intentionally omitted from this public docs index. -->
 
 ### Assurance
 
@@ -118,7 +118,7 @@ local or CI runs (typically under `runs/null_sweeps/**` and
 `reports/calibration/**`) and are not committed to the repository. Attach them
 to change proposals or releases when you update calibration.
 
-<!-- Developer docs removed in minimal public footprint. See project root CHANGELOG.md. -->
+<!-- Developer docs intentionally omitted from this public docs index. See project root CHANGELOG.md. -->
 
 ### Security
 
@@ -301,7 +301,7 @@ output:
 
 ---
 
-<!-- Quick CPU Demos section removed in minimal public footprint -->
+<!-- Quick CPU demos are intentionally omitted from this public docs index. -->
 
 ```bash
 NET=1 INCLUDE_MEASURED_CLS=1 RUN=0 bash scripts/run_tiny_all_matrix.sh

@@ -10,7 +10,7 @@
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | Run policy-tuning sweeps to empirically derive guard thresholds and tier policy recommendations. |
-| **Audience** | Operators recalibrating tier policies for new model families or updated guard contracts. |
+| **Audience** | Operators recalibrating tier policies for additional model families or revised guard contracts. |
 | **Primary commands** | `invarlock advanced calibrate null-sweep`, `invarlock advanced calibrate ve-sweep`. |
 | **Requires** | `invarlock[hf]` for HF workflows; base config YAML for each sweep type. |
 | **Network** | Offline by default; enable per command with `INVARLOCK_ALLOW_NETWORK=1`. |

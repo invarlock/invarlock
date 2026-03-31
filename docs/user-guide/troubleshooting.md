@@ -84,7 +84,7 @@ These errors relate to window pairing, tokenizer consistency, and evidence integ
 **Common causes:**
 
 - Different tokenizer versions or configurations
-- Model updated with new vocabulary
+- Model checkpoint with a different vocabulary
 - Trust-remote-code flag inconsistency
 
 **Fixes:**
@@ -240,7 +240,7 @@ These errors relate to window pairing, tokenizer consistency, and evidence integ
 **Notes:**
 
 - `invarlock evaluate` always emits a report before exiting on E111
-- legacy/internal `run` flows log a warning for non-finite PM but do not raise E111
+- internal `run` flows log a warning for non-finite PM but do not raise E111
 
 ---
 
