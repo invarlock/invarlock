@@ -68,7 +68,30 @@ seed_hf_cache_from_host() {
   return 0
 }
 
+prefetch_hf_assets_on_host() {
+  if [[ "${INVARLOCK_ALLOW_NETWORK:-0}" != "1" ]]; then
+    return 1
+  fi
+  mkdir -p "$HOST_HF_CACHE_ROOT" "$HOST_HF_CACHE_ROOT/hub" "$HOST_HF_CACHE_ROOT/datasets"
+  echo "[smoke] prefetching GPT-2 + WikiText-2 into host HF cache"
+  HF_HOME="$HOST_HF_CACHE_ROOT" \
+    HF_HUB_CACHE="$HOST_HF_CACHE_ROOT/hub" \
+    HF_DATASETS_CACHE="$HOST_HF_CACHE_ROOT/datasets" \
+    "$PYTHON_BIN" - <<'PY'
+from datasets import load_dataset
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+MODEL_ID = "gpt2"
+
+AutoTokenizer.from_pretrained(MODEL_ID)
+AutoModelForCausalLM.from_pretrained(MODEL_ID)
+load_dataset("wikitext", "wikitext-2-raw-v1", split="validation")
+PY
+}
+
 if seed_hf_cache_from_host; then
+  export INVARLOCK_SMOKE_CACHE_SEEDED=1
+elif prefetch_hf_assets_on_host && seed_hf_cache_from_host; then
   export INVARLOCK_SMOKE_CACHE_SEEDED=1
 fi
 

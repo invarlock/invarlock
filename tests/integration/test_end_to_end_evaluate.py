@@ -55,5 +55,7 @@ def test_gpt2_smoke_campaign_script_is_executable() -> None:
     assert 'CLI=("$PYTHON_BIN" -m invarlock)' in contents
     assert "command -v invarlock" not in contents
     assert "INVARLOCK_SMOKE_CACHE_COMPLETE" in contents
+    assert "prefetch_hf_assets_on_host" in contents
+    assert "prefetching GPT-2 + WikiText-2 into host HF cache" in contents
     assert "evaluation report verification failed" in contents
     assert "proof-pack verification failed" in contents
