@@ -121,6 +121,9 @@ THRESHOLDS = {
     "src/invarlock/reporting/verify_contract.py": 0.95,
     "src/invarlock/runtime_verify.py": 1.00,
     "src/invarlock/runtime_security.py": 1.00,
+    "src/invarlock/runtime_security_helpers.py": 0.95,
+    "src/invarlock/proof_pack_integrity.py": 0.90,
+    "src/invarlock/proof_pack_manifest.py": 0.90,
     # PR-4 split modules
     "src/invarlock/cli/run_artifacts.py": 1.00,
     "src/invarlock/cli/run_config.py": 0.95,
@@ -140,6 +143,8 @@ THRESHOLDS = {
     "src/invarlock/reporting/report_policy.py": 0.95,
     "src/invarlock/reporting/report_provenance.py": 1.00,
     "src/invarlock/reporting/report_validation.py": 0.95,
+    "src/invarlock/core/run_orchestrator_execute.py": 0.90,
+    "src/invarlock/reporting/verify_check_helpers.py": 0.95,
     # Existing 90% surfaces that now sustain 95%+ or 100% in repo coverage.
     "src/invarlock/core/abi.py": 1.00,
     "src/invarlock/core/adapter_auto.py": 0.95,

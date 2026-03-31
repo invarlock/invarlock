@@ -88,10 +88,13 @@ COVERAGE_MODULES := \
 	--cov=src/invarlock/eval --cov=src/invarlock/guards --cov=src/invarlock/calibration \
 	--cov=src/invarlock/cli --cov=src/invarlock/core --cov=src/invarlock/reporting \
 	--cov=invarlock.public_contracts --cov=invarlock.policy_pack \
+	--cov=invarlock.runtime_security_helpers \
+	--cov=invarlock.proof_pack_integrity \
+	--cov=invarlock.proof_pack_manifest \
 	--cov=invarlock.runtime_verify \
 	--cov=invarlock.proof_pack
 
-COVERAGE_INCLUDE := src/invarlock/eval/*,src/invarlock/guards/*,src/invarlock/calibration/*,src/invarlock/cli/*,src/invarlock/cli/commands/*,src/invarlock/core/*,src/invarlock/reporting/*,src/invarlock/public_contracts.py,src/invarlock/policy_pack.py,src/invarlock/proof_pack.py,src/invarlock/runtime_security.py,src/invarlock/runtime_verify.py,invarlock/eval/*,invarlock/guards/*,invarlock/calibration/*,invarlock/cli/*,invarlock/cli/commands/*,invarlock/core/*,invarlock/reporting/*,invarlock/public_contracts.py,invarlock/policy_pack.py,invarlock/proof_pack.py,invarlock/runtime_security.py,invarlock/runtime_verify.py
+COVERAGE_INCLUDE := src/invarlock/eval/*,src/invarlock/guards/*,src/invarlock/calibration/*,src/invarlock/cli/*,src/invarlock/cli/commands/*,src/invarlock/core/*,src/invarlock/reporting/*,src/invarlock/public_contracts.py,src/invarlock/policy_pack.py,src/invarlock/proof_pack.py,src/invarlock/proof_pack_integrity.py,src/invarlock/proof_pack_manifest.py,src/invarlock/runtime_security.py,src/invarlock/runtime_security_helpers.py,src/invarlock/runtime_verify.py,invarlock/eval/*,invarlock/guards/*,invarlock/calibration/*,invarlock/cli/*,invarlock/cli/commands/*,invarlock/core/*,invarlock/reporting/*,invarlock/public_contracts.py,invarlock/policy_pack.py,invarlock/proof_pack.py,invarlock/proof_pack_integrity.py,invarlock/proof_pack_manifest.py,invarlock/runtime_security.py,invarlock/runtime_security_helpers.py,invarlock/runtime_verify.py
 
 TEST_DIR_TARGETS := core cli eval guards edits adapters plugins scripts ci
 
