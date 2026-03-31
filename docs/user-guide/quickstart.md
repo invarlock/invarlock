@@ -84,8 +84,8 @@ paired evaluation report.
 
 ## Advanced And Demo Flows
 
-The built-in `quant_rtn` edit still ships for demos and smoke tests, but it is
-no longer the primary onboarding path.
+The built-in `quant_rtn` edit ships for demos and smoke tests, but the primary
+onboarding path is the secure-default evaluate flow shown above.
 
 ```bash
 INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \

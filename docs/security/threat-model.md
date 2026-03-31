@@ -113,7 +113,7 @@ provenance checks (e.g., model cards, hash verification) before evaluation.
 
 **Threat:** Unsafe deserialization executes arbitrary code during model load.
 
-**Mitigation:** InvarLock no longer uses pickle-capable adapter snapshot restore
+**Mitigation:** InvarLock does not use pickle-capable adapter snapshot restore
 in the default path, and adapters using `from_pretrained` inherit HF's
 safetensors preference.
 

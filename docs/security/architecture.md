@@ -35,7 +35,7 @@ Overview of the core security-related components and defaults.
 - `invarlock-runtime-verify` is the low-level package-native CLI for direct
   report/manifest checks, and it uses the same Python verifier implementation
   as runtime attestation.
-- Product attestation no longer depends on an external verifier binary or
+- Product attestation does not depend on an external verifier binary or
   `PATH` lookup, so verifier behavior stays stable across installs.
 - Use it before promotion or downstream automation to prevent policy regressions.
 

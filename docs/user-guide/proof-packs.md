@@ -29,7 +29,7 @@ verify reported outcomes, and provide structured outputs for downstream analysis
 > `calibrated_preset_<model>.yaml/json` for that suite run. It does not directly
 > modify global `runtime/tiers.yaml`. For global tier policy tuning, use
 > `invarlock advanced calibrate ...` (see [Tier Policy Tuning CLI](../reference/calibration.md)).
-> Calibration entrypoints still use the secure-default runtime container unless
+> Calibration entrypoints use the secure-default runtime container unless
 > a trusted repo-only workflow opts into local host execution.
 
 ## Entrypoint Guide
@@ -105,7 +105,7 @@ model-loading commands use the secure-default runtime container path and expect
 Validated secure-default parity contract for proof-pack wrappers:
 
 - Wrapper-provided `INVARLOCK_CONFIG_ROOT` and `INVARLOCK_STORE_EVAL_WINDOWS`
-  now survive delegated repo-only config-runner / `evaluate` calls.
+  survive delegated repo-only config-runner / `evaluate` calls.
 - External cache and temp overrides such as `HF_HOME`, `HF_HUB_CACHE`,
   `HF_DATASETS_CACHE`, `TRANSFORMERS_CACHE`, `TMPDIR`, and `TMP` remain visible
   inside the runtime container.
@@ -113,9 +113,9 @@ Validated secure-default parity contract for proof-pack wrappers:
   inputs are mounted automatically before delegation.
 - Configs that rely on `!include` outside the config directory must set
   `INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1`; otherwise the proof-pack wrapper
-  now fails before launch instead of starting an unusable container job.
+  fails before launch instead of starting an unusable container job.
 
-Bulk proof-pack entrypoints now default to `SKIP_FLASH_ATTN=true` and
+Bulk proof-pack entrypoints default to `SKIP_FLASH_ATTN=true` and
 `PACK_BASELINE_STORAGE_MODE=snapshot_copy`. That is the safe default for remote
 secure-default runs. Only opt back into flash-attn builds or
 `snapshot_symlink` baselines when you intentionally want the extra complexity.
@@ -148,9 +148,9 @@ Scenario selection is driven by `scripts/proof_packs/scenarios.json`. Scenarios 
 optionally declare `suites: ["subset", "showcase", "full", ...]`; during execution the
 suite writes the effective (filtered) manifest to `OUTPUT_DIR/state/scenarios.json`,
 and both task generation and final verdict compilation use that state manifest.
-`--scenario-ids` filters that manifest before queue generation, and the runtime now
+`--scenario-ids` filters that manifest before queue generation, and the runtime
 honors one-sided selections exactly: clean-only, stress-only, or single-scenario
-smokes no longer expand back to the default 8 edit scenarios. Disk estimation uses
+smokes do not expand back to the default 8 edit scenarios. Disk estimation uses
 the same filtered state manifest, so storage preflight reflects the selected
 scenario set rather than the suite defaults.
 
@@ -163,7 +163,7 @@ Proof packs require pinned model revisions for reproducibility:
 - Offline runs use `--net 0` (default) and error if the cache is missing.
 - The `PACK_NET` environment variable is exported as `1` or `0` to gate `HF_*_OFFLINE` settings.
 - Bulk proof-pack runs also require `INVARLOCK_ALLOW_REMOTE_CODE=1`; the
-  entrypoint now fails fast before queue creation when that opt-in is missing.
+  entrypoint fails fast before queue creation when that opt-in is missing.
 
 ## Promotion Sentinels
 
@@ -256,7 +256,7 @@ The manifest contract is published at `contracts/proof_pack_manifest.schema.json
 `invarlock advanced proof-pack verify` validates this schema before checksum and signature verification so
 malformed proof packs fail deterministically.
 
-Installed wheels now ship the public contracts and support package-native
+Installed wheels ship the public contracts and support package-native
 inspection, assembly, and verification via `invarlock advanced proof-pack inspect`,
 `invarlock advanced proof-pack build`, and `invarlock advanced proof-pack verify`. The repo shell verifier remains
 available for maintainers using the proof-pack harness directly.

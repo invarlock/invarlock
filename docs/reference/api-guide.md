@@ -37,7 +37,7 @@ print("primary metric:", report.metrics.get("primary_metric"))
 ```
 
 > For real primary-metric values, pass `calibration_data` (see Concepts). Without it,
-> the runner falls back to lightweight mock metrics so the pipeline can still finish.
+> the runner uses lightweight mock metrics so the pipeline can finish.
 
 ## Concepts
 
@@ -51,7 +51,7 @@ print("primary metric:", report.metrics.get("primary_metric"))
 - **reports**: generated from `RunReport` + baseline report via
   `invarlock.reporting.report_make.make_report`, then persisted as an
   evaluation bundle with `invarlock.reporting.report_bundle.save_evaluation_bundle`.
-- **Verification**: CLI-side `invarlock verify` now enforces
+- **Verification**: CLI-side `invarlock verify` enforces
   `runtime.manifest.json` attestation for attested outputs in addition to schema
   and pairing checks.
 
@@ -112,7 +112,7 @@ report = CoreRunner().execute(
 | `spike_threshold` | `2.0` | Catastrophic spike ratio for immediate rollback. |
 | `event_path` | `None` | Path to JSONL event log (optional). |
 | `checkpoint_interval` | `0` | 0 disables checkpoints. |
-| `dry_run` | `False` | Skip mutations, still produce report. |
+| `dry_run` | `False` | Skip mutations and still produce a report. |
 | `verbose` | `False` | Enables extra logging. |
 | `context` | `{}` | Free-form context passed to guards/eval. |
 

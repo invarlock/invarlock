@@ -100,7 +100,7 @@ reports/
 ## Observability
 
 - `evaluation.report.json` is the canonical distribution artifact.
-- scratch run artifacts still provide per-phase logs for debugging when needed.
+- scratch run artifacts provide per-phase logs for debugging when needed.
 
 ## Related Documentation
 

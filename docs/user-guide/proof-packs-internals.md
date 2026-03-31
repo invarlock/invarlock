@@ -521,7 +521,7 @@ Large runs can be storage-heavy (baseline + edits + error models):
 - Disk preflight estimates required storage and aborts early when insufficient.
   - Override with `PACK_SKIP_DISK_PREFLIGHT=1` (not recommended).
   - The minimum free space guard is `MIN_FREE_DISK_GB` (default 200).
-- `PACK_BASELINE_STORAGE_MODE=snapshot_symlink` now builds a local symlink tree
+- `PACK_BASELINE_STORAGE_MODE=snapshot_symlink` builds a local symlink tree
   that points into the Hugging Face cache snapshot. This avoids a second
   baseline copy under `OUTPUT_DIR`, but it still requires one full model copy in
   `HF_HUB_CACHE` when that cache shares the output filesystem.
@@ -599,7 +599,7 @@ Operational guidance for remote proof-pack work:
 - If you intentionally run from a work tree that is not the editable install
   behind `.venv`, either reinstall that work tree or export `PYTHONPATH=src` so
   `invarlock` resolves to the intended source tree.
-- `run_suite.sh` and `run_pack.sh` now default to `SKIP_FLASH_ATTN=true` and
+- `run_suite.sh` and `run_pack.sh` default to `SKIP_FLASH_ATTN=true` and
   `PACK_BASELINE_STORAGE_MODE=snapshot_copy` for bulk secure-default runs.
 - Bulk proof-pack runs fail fast unless `INVARLOCK_ALLOW_REMOTE_CODE=1` is set.
 - Export non-default runtime roots before launching the suite when you expect
@@ -608,7 +608,7 @@ Operational guidance for remote proof-pack work:
   `TRANSFORMERS_CACHE`, `TMPDIR`, `TMP`.
 - If a staged preset or profile uses `!include` outside its config directory,
   set `INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1` on the remote host before the
-  proof-pack entrypoint; the secure-default launcher now rejects that config
+  proof-pack entrypoint; the secure-default launcher rejects that config
   graph before container start when the override is missing.
 - After Qwen2.5-14B campaigns, run
   `scripts/proof_packs/run_qwen14_sentinels.sh` from the same fresh work tree to

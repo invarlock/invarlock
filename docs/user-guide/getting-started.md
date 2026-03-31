@@ -118,7 +118,7 @@ surfaces live under `invarlock advanced`:
 - `invarlock advanced calibrate ...`
 
 Optional adapter and backend installs use Python extras such as
-`pip install "invarlock[awq,gptq]"`; they are no longer managed through CLI
+`pip install "invarlock[awq,gptq]"`; they are not managed through CLI
 install or uninstall commands.
 
 ## Device Support

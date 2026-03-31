@@ -236,7 +236,7 @@ pip install "invarlock[hf]"
 pip install "invarlock[awq,gptq]"
 ```
 
-The CLI no longer provides plugin install or uninstall commands.
+Plugin install and uninstall commands are not part of the CLI surface.
 
 ## JSON Output
 
@@ -250,15 +250,13 @@ plugin surfaces.
 
 These commands emit a single JSON object suitable for CI parsing.
 
-## Migration Notes
+## Command Layout
 
-The CLI surface was simplified to reduce operator overhead.
-
-- The public top level is now `evaluate`, `verify`, `report`, `doctor`,
+- The public top level is `evaluate`, `verify`, `report`, `doctor`,
   `advanced`, and `version`.
-- Proof-pack, policy, plugin, and calibration workflows moved under
+- Proof-pack, policy, plugin, and calibration workflows live under
   `invarlock advanced ...`.
-- Trusted host execution for the core evaluation path is now expressed as
+- Trusted host execution for the core evaluation path is expressed as
   `--mode local`.
 - Optional runtime backends are installed with Python extras instead of CLI
   install and uninstall commands.

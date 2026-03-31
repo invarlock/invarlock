@@ -54,11 +54,11 @@ The CLI exposes these contracts directly:
 The first seven surfaces are available from installed packages. The low-level
 `invarlock-runtime-verify` command is the package-native runtime-manifest
 verifier used for direct report/manifest checks. The repo shell
-verifier remains available for proof-pack workflow maintainers, but pure wheel
-installs can now verify packs with `invarlock advanced proof-pack verify`.
+verifier remains available for proof-pack workflow maintainers, and pure wheel
+installs can verify packs with `invarlock advanced proof-pack verify`.
 
 For support-related automation, `plugins adapters --json` and `doctor --json`
-now expose both the strict `support_matrix` contract and the broader
+expose both the strict `support_matrix` contract and the broader
 `model_family_catalog` contract.
 
 ## Policy packs

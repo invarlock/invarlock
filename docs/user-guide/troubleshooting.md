@@ -149,7 +149,7 @@ These errors relate to window pairing, tokenizer consistency, and evidence integ
 
 **Common causes:**
 
-- Old baseline report generated before digest tracking was added
+- Baseline report missing digest-tracking metadata
 - Report truncated or missing `provenance` section
 - Windows not materialized due to `INVARLOCK_STORE_EVAL_WINDOWS=0`
 

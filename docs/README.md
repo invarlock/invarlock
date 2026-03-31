@@ -42,7 +42,7 @@ boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.
 
 Smoke asset note: `configs/presets/causal_lm/gpt2_smoke_128.yaml` ships the
 small GPT-2 canary preset used by `scripts/run_gpt2_smoke_campaign.sh` and the
-scheduled/workflow-dispatch GPT-2 smoke workflow. Push gating now uses
+scheduled/workflow-dispatch GPT-2 smoke workflow. Push gating uses
 `scripts/run_tiny_attested_smoke.sh` and the `Tiny Attested Smoke` workflow
 with `sshleifer/tiny-gpt2` plus a local JSONL fixture. Both smoke paths run
 under the shipped `dev` profile so they can complete the full `evaluate` →
@@ -162,7 +162,7 @@ configured acceptance envelopes even when aggressive compression is attempted.
   results, notebook stdout/stderr logs, and a machine-readable `summary.json`.
 - Placeholder/template snippets still need to stay parseable, but only concrete
   runnable examples should be treated as copy-paste-ready.
-- This verifier is currently local-only and is not enforced in GitHub Actions.
+- This verifier is local-only and is not enforced in GitHub Actions.
 
 ---
 
@@ -203,7 +203,7 @@ Notes
 | Qwen3.5 causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
 | Seq2Seq / local pairs | Yes | Yes | No | No |
 
-Published assurance basis currently covers GPT-2 and BERT profiles. Repo-shipped
+Published assurance basis covers GPT-2 and BERT profiles. Repo-shipped
 presets and pilot calibration configs for additional experimental families,
 including Mistral 7B, Qwen2 7B, Qwen2.5 14B, Qwen3, DeepSeek-R1-Distill-Qwen,
 Phi-4 text-only, TinyLlama 1.1B, OLMo 2, and Qwen3.5, do not become part of the published

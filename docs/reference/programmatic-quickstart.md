@@ -34,7 +34,7 @@ print("status:", report.status)
 ## Concepts
 
 - Prefer the CLI for full workflows (pairing, reports, reproducibility).
-- Programmatic runs still follow the same pipeline phases and produce a
+- Programmatic runs follow the same pipeline phases and produce a
   `RunReport` object.
 - Pass `calibration_data` to `CoreRunner.execute` for real primary-metric values.
 - Enable downloads per run with `INVARLOCK_ALLOW_NETWORK=1` when using remote

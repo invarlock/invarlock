@@ -146,7 +146,7 @@ by the CLI and non-CLI entrypoints.
 
 ### Runtime Attestation Ownership
 
-Runtime attestation now has a single verifier implementation:
+Runtime attestation uses a single verifier implementation:
 
 - `core/runtime_manifest_verify.py` is the authoritative verifier for
   `runtime.manifest.json` plus report-digest binding checks.
@@ -154,7 +154,7 @@ Runtime attestation now has a single verifier implementation:
   verifier for programmatic and CLI use.
 - `runtime_attestation.py` calls the same verifier when `invarlock verify`
   enforces attestation on attested reports.
-- Product behavior no longer depends on finding an external verifier binary on
+- Product behavior does not depend on finding an external verifier binary on
   `PATH`; verifier semantics are package-native and deterministic across
   installs.
 
