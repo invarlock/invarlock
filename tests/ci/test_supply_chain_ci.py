@@ -502,9 +502,9 @@ def test_gpt2_smoke_workflow_is_configured() -> None:
     workflow = _load_workflow(Path(".github/workflows/gpt2-smoke.yml"))
     triggers = workflow["on"]
 
-    assert triggers["push"]["branches"] == ["staging/next"]
     assert "workflow_dispatch" in triggers
     assert triggers["schedule"] == [{"cron": "0 4 * * 1"}]
+    assert "push" not in triggers
     assert workflow["permissions"] == {"contents": "read"}
 
     job = workflow["jobs"]["smoke"]
@@ -526,3 +526,32 @@ def test_gpt2_smoke_workflow_is_configured() -> None:
 
     smoke = _find_step_by_name(steps, "Run GPT-2 smoke campaign")
     assert "scripts/run_gpt2_smoke_campaign.sh" in smoke["run"]
+
+
+def test_tiny_attested_smoke_workflow_is_configured() -> None:
+    workflow = _load_workflow(Path(".github/workflows/tiny-attested-smoke.yml"))
+    triggers = workflow["on"]
+
+    assert triggers["push"]["branches"] == ["staging/next"]
+    assert "workflow_dispatch" in triggers
+    assert workflow["permissions"] == {"contents": "read"}
+
+    job = workflow["jobs"]["smoke"]
+    assert job["runs-on"] == "ubuntu-latest"
+    assert job["timeout-minutes"] == 45
+
+    env = job["env"]
+    assert env["INVARLOCK_ALLOW_NETWORK"] == "1"
+    assert env["INVARLOCK_SMOKE_MODE"] == "attested"
+    assert env["INVARLOCK_SMOKE_PROFILE"] == "dev"
+    assert env["INVARLOCK_RUNTIME_IMAGE"] == "invarlock-runtime:local"
+
+    steps = job["steps"]
+    install = _find_step_by_name(steps, "Install dependencies")
+    assert "pip install --require-hashes" in install["run"]
+
+    runtime_image = _find_step_by_name(steps, "Build runtime image")
+    assert "make runtime-image" in runtime_image["run"]
+
+    smoke = _find_step_by_name(steps, "Run tiny attested smoke campaign")
+    assert "scripts/run_tiny_attested_smoke.sh" in smoke["run"]

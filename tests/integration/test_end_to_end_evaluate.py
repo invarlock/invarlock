@@ -59,3 +59,18 @@ def test_gpt2_smoke_campaign_script_is_executable() -> None:
     assert "prefetching GPT-2 + WikiText-2 into host HF cache" in contents
     assert "evaluation report verification failed" in contents
     assert "proof-pack verification failed" in contents
+
+
+def test_tiny_attested_smoke_campaign_script_is_executable() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script_path = repo_root / "scripts" / "run_tiny_attested_smoke.sh"
+    assert script_path.exists(), "Expected scripts/run_tiny_attested_smoke.sh to exist"
+    assert os.access(script_path, os.X_OK), (
+        "run_tiny_attested_smoke.sh should be executable"
+    )
+    contents = script_path.read_text(encoding="utf-8")
+    assert "kind: local_jsonl" in contents
+    assert "sshleifer/tiny-gpt2" in contents
+    assert "prefetch_tiny_model_on_host" in contents
+    assert "evaluation report verification failed" in contents
+    assert "proof-pack verification failed" in contents

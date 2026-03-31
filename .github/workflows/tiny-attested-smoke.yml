@@ -1,12 +1,12 @@
-name: GPT-2 Smoke
+name: Tiny Attested Smoke
 
 on:
+  push:
+    branches: [ staging/next ]
   workflow_dispatch:
-  schedule:
-    - cron: "0 4 * * 1"
 
 concurrency:
-  group: gpt2-smoke-${{ github.ref }}
+  group: tiny-attested-smoke-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -15,7 +15,7 @@ permissions:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
     env:
       PYTHONPATH: ${{ github.workspace }}/src
       INVARLOCK_ALLOW_NETWORK: "1"
@@ -37,9 +37,9 @@ jobs:
         if: ${{ github.actor != 'nektos/act' }}
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-3.12-gpt2-smoke-${{ hashFiles('pyproject.toml', 'requirements/workflows/ci-hf-py312.txt') }}
+          key: ${{ runner.os }}-pip-3.12-tiny-attested-smoke-${{ hashFiles('pyproject.toml', 'requirements/workflows/ci-hf-py312.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-3.12-gpt2-smoke-
+            ${{ runner.os }}-pip-3.12-tiny-attested-smoke-
 
       - name: Install dependencies
         run: |
@@ -49,5 +49,5 @@ jobs:
         run: |
           make runtime-image
 
-      - name: Run GPT-2 smoke campaign
-        run: bash scripts/run_gpt2_smoke_campaign.sh "$RUNNER_TEMP/invarlock-gpt2-smoke"
+      - name: Run tiny attested smoke campaign
+        run: bash scripts/run_tiny_attested_smoke.sh "$RUNNER_TEMP/invarlock-tiny-attested-smoke"
