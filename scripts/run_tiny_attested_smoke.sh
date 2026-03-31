@@ -35,7 +35,6 @@ SMOKE_CACHE_ROOT="$WORK_ROOT/.hf"
 HOST_HF_CACHE_ROOT="${INVARLOCK_SMOKE_HOST_HF_CACHE_ROOT:-${HF_HOME:-${HOME}/.cache/huggingface}}"
 DATA_FILE="$WORK_ROOT/smoke.jsonl"
 PRESET_PATH="$WORK_ROOT/tiny_smoke_preset.yaml"
-EDIT_PATH="$WORK_ROOT/tiny_smoke_edit.yaml"
 
 copy_cached_tree_if_present() {
   local source_dir="$1"
@@ -136,19 +135,6 @@ eval:
   loss: {type: auto}
 EOF
 
-cat >"$EDIT_PATH" <<'EOF'
-edit:
-  name: quant_rtn
-  plan:
-    bitwidth: 8
-    per_channel: true
-    group_size: 128
-    clamp_ratio: 0.005
-    scope: attn
-    max_modules: 12
-    seed: 42
-EOF
-
 echo "[smoke] work_root=$WORK_ROOT"
 echo "[smoke] model_id=$MODEL_ID"
 echo "[smoke] preset=$PRESET_PATH"
@@ -162,7 +148,6 @@ echo "[smoke] hf_hub_cache=$HF_HUB_CACHE"
   --adapter hf_causal \
   --profile "$PROFILE" \
   --preset "$PRESET_PATH" \
-  --edit-config "$EDIT_PATH" \
   --mode "$MODE" \
   --device cpu \
   --out "$SMOKE_RUN_DIR" \
