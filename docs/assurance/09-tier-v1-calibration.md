@@ -60,12 +60,18 @@ Suppose you ran a baseline and extracted z-scores from the report:
 
 ```bash
 # 1. Run baseline
-INVARLOCK_ALLOW_HOST_EXECUTION=1 invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml \
-  --profile ci --tier balanced --out runs/baseline_calib
+INVARLOCK_ALLOW_HOST_EXECUTION=1 invarlock evaluate \
+  --baseline gpt2 \
+  --subject gpt2 \
+  --preset configs/presets/causal_lm/wikitext2_512.yaml \
+  --profile ci \
+  --tier balanced \
+  --out runs/baseline_calib \
+  --report-out reports/baseline_calib
 
 # 2. Extract z-scores (example using jq)
 jq '.guards[] | select(.name == "spectral") | .metrics.final_z_scores' \
-  runs/baseline_calib/*/report.json > z_scores.json
+  reports/baseline_calib/evaluation.report.json > z_scores.json
 ```
 
 With 120 total modules distributed as: FFN=40, Attn=40, Embed=8, Other=32.
@@ -101,9 +107,13 @@ With 120 total modules distributed as: FFN=40, Attn=40, Embed=8, Other=32.
 6. **Re-run with override:**
 
    ```bash
-   INVARLOCK_ALLOW_HOST_EXECUTION=1 invarlock run -c configs/presets/causal_lm/wikitext2_512.yaml \
-     -c configs/overrides/spectral_local.yaml \
-     --profile ci --tier balanced
+   INVARLOCK_ALLOW_HOST_EXECUTION=1 invarlock evaluate \
+     --baseline gpt2 \
+     --subject gpt2 \
+     --preset configs/presets/causal_lm/wikitext2_512.yaml \
+     --edit-config configs/overrides/spectral_local.yaml \
+     --profile ci \
+     --tier balanced
    ```
 
 7. **Verify.** Check `report.guards[spectral].metrics.warnings_count ≤ 5` on clean baselines.
