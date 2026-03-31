@@ -133,6 +133,11 @@ guards:
 eval:
   metric: {kind: ppl_causal}
   loss: {type: auto}
+context:
+  run:
+    tiny_relax: true
+  eval:
+    tiny_relax: true
 EOF
 
 echo "[smoke] work_root=$WORK_ROOT"

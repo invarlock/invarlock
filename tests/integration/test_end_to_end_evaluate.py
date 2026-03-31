@@ -71,6 +71,7 @@ def test_tiny_attested_smoke_campaign_script_is_executable() -> None:
     contents = script_path.read_text(encoding="utf-8")
     assert "kind: local_jsonl" in contents
     assert "sshleifer/tiny-gpt2" in contents
+    assert "tiny_relax: true" in contents
     assert "prefetch_tiny_model_on_host" in contents
     assert "evaluation report verification failed" in contents
     assert "proof-pack verification failed" in contents
