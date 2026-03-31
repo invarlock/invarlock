@@ -501,12 +501,6 @@ def test_until_pass_retry_summary_printed(tmp_path: Path):
                 },
             )
         )
-        stack.enter_context(
-            patch(
-                "invarlock.cli.run_execution._print_retry_summary",
-                lambda console, rc: None,
-            )
-        )
         run_command(
             config=str(cfg),
             device="cpu",

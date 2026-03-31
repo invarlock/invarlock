@@ -9,6 +9,7 @@ import pytest
 import invarlock.cli.runtime_launch_plan as runtime_launch_plan
 import invarlock.core.registry as registry_mod
 import invarlock.runtime_security as runtime_security
+import invarlock.runtime_security_helpers as runtime_security_helpers
 from invarlock.cli.run_config import extract_model_load_kwargs
 from invarlock.core.exceptions import InvarlockError
 
@@ -66,25 +67,25 @@ def _build_container_command(argv: list[str]) -> list[str]:
 def _stub_container_launch(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image=None, *, engine=None: True,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image",
         lambda: "invarlock-runtime:local",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image_digest",
         lambda: "sha256:test",
         raising=True,
@@ -123,13 +124,13 @@ def test_container_launch_requires_local_image_when_network_is_disabled(
 ) -> None:
     monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image=None, *, engine=None: False,
         raising=True,
@@ -144,13 +145,13 @@ def test_runtime_image_prefers_local_build_when_available(
 ) -> None:
     monkeypatch.delenv("INVARLOCK_RUNTIME_IMAGE", raising=False)
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image=None, *, engine=None: image == "invarlock-runtime:local",
         raising=True,
@@ -164,13 +165,13 @@ def test_runtime_image_defaults_to_registry_when_local_build_missing(
 ) -> None:
     monkeypatch.delenv("INVARLOCK_RUNTIME_IMAGE", raising=False)
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image=None, *, engine=None: False,
         raising=True,
@@ -187,25 +188,25 @@ def test_container_launch_uses_runtime_image_entrypoint(
 ) -> None:
     monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image=None, *, engine=None: True,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image",
         lambda: "invarlock-runtime:local",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image_digest",
         lambda: "sha256:test",
         raising=True,
@@ -222,25 +223,25 @@ def test_container_launch_adds_gpu_passthrough_for_cuda_model_commands(
 ) -> None:
     monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image=None, *, engine=None: True,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image",
         lambda: "invarlock-runtime:local",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image_digest",
         lambda: "sha256:test",
         raising=True,
@@ -262,25 +263,25 @@ def test_container_launch_skips_gpu_passthrough_for_cpu_model_commands(
 ) -> None:
     monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image=None, *, engine=None: True,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image",
         lambda: "invarlock-runtime:local",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image_digest",
         lambda: "sha256:test",
         raising=True,
@@ -305,25 +306,25 @@ def test_container_launch_mounts_absolute_output_and_report_paths(
     monkeypatch.chdir(repo_dir)
     monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image=None, *, engine=None: True,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image",
         lambda: "invarlock-runtime:local",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image_digest",
         lambda: "sha256:test",
         raising=True,
@@ -367,25 +368,25 @@ def test_container_launch_maps_repo_pythonpath_to_workspace_src(
     monkeypatch.setenv("PYTHONPATH", str(src_dir))
     monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image=None, *, engine=None: True,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image",
         lambda: "invarlock-runtime:local",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image_digest",
         lambda: "sha256:test",
         raising=True,
@@ -410,25 +411,25 @@ def test_container_launch_mounts_absolute_pythonpath_when_running_from_workdir(
     monkeypatch.setenv("PYTHONPATH", str(src_dir))
     monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image=None, *, engine=None: True,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image",
         lambda: "invarlock-runtime:local",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image_digest",
         lambda: "sha256:test",
         raising=True,
@@ -448,25 +449,25 @@ def test_container_launch_mounts_absolute_model_paths_from_cli(
     monkeypatch.chdir(repo_dir)
     monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image=None, *, engine=None: True,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image",
         lambda: "invarlock-runtime:local",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image_digest",
         lambda: "sha256:test",
         raising=True,
@@ -499,25 +500,25 @@ def test_container_launch_mounts_absolute_source_and_edited_paths(
     monkeypatch.chdir(repo_dir)
     monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image=None, *, engine=None: True,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image",
         lambda: "invarlock-runtime:local",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image_digest",
         lambda: "sha256:test",
         raising=True,
@@ -550,25 +551,25 @@ def test_container_launch_mounts_absolute_preset_and_baseline_report_paths(
     monkeypatch.chdir(repo_dir)
     monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image=None, *, engine=None: True,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image",
         lambda: "invarlock-runtime:local",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image_digest",
         lambda: "sha256:test",
         raising=True,
@@ -614,25 +615,25 @@ def test_container_launch_mounts_absolute_config_root_from_env(
     monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
     monkeypatch.setenv("INVARLOCK_CONFIG_ROOT", str(tmp_path / "config-root"))
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image=None, *, engine=None: True,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image",
         lambda: "invarlock-runtime:local",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image_digest",
         lambda: "sha256:test",
         raising=True,
@@ -657,12 +658,12 @@ def test_container_launch_path_env_mounts_skip_recursive_symlink_walk(
 
     tmpdir_root = tmp_path / "runtime-tmp"
     tmpdir_root.mkdir()
-    for name in runtime_security._PATH_ENV_VARS:
+    for name in runtime_security_helpers._PATH_ENV_VARS:
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("TMPDIR", str(tmpdir_root))
 
     recursive_flags: list[bool] = []
-    original = runtime_security._iter_external_symlink_target_mounts
+    original = runtime_security_helpers._iter_external_symlink_target_mounts
 
     def _spy(path: Path, *, cwd: Path, recursive: bool = True) -> list[Path]:
         if path.resolve(strict=False) == tmpdir_root.resolve(strict=False):
@@ -670,7 +671,7 @@ def test_container_launch_path_env_mounts_skip_recursive_symlink_walk(
         return original(path, cwd=cwd, recursive=recursive)
 
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "_iter_external_symlink_target_mounts",
         _spy,
         raising=True,
@@ -690,25 +691,25 @@ def test_container_launch_mounts_external_symlink_targets_for_local_model_paths(
     monkeypatch.chdir(repo_dir)
     monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image=None, *, engine=None: True,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image",
         lambda: "invarlock-runtime:local",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image_digest",
         lambda: "sha256:test",
         raising=True,
@@ -746,25 +747,25 @@ def test_container_launch_mounts_absolute_model_paths_from_config(
     monkeypatch.chdir(repo_dir)
     monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image=None, *, engine=None: True,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image",
         lambda: "invarlock-runtime:local",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image_digest",
         lambda: "sha256:test",
         raising=True,

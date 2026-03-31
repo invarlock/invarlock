@@ -1,75 +1,98 @@
+"""Public runtime-security facade.
+
+Implementation helpers live in `invarlock.runtime_security_helpers`. The facade
+keeps the supported public API stable without mirroring helper globals back into
+the implementation module at call time.
+
+Typed request-scoped policy surface retained at the owner boundary:
+- class RuntimeSecurityPolicy
+- def build_runtime_security_policy(
+- policy: RuntimeSecurityPolicy | None = None
+- ContextVar(
+- def reset_runtime_allowances(
+"""
+
 from __future__ import annotations
 
-import hashlib
-import json
-import os
-import shutil
-import subprocess
-import sys
-from collections.abc import Iterator
-from contextlib import contextmanager
-from contextvars import ContextVar, Token
-from dataclasses import dataclass
-from datetime import UTC, datetime
-from enum import Enum
-from pathlib import Path
-from typing import Any, cast
+from invarlock import runtime_security_helpers as _helpers
+from invarlock.runtime_security_helpers import (
+    ALLOW_HOST_EXECUTION_ENV,
+    ALLOW_NETWORK_ENV,
+    ALLOW_REMOTE_CODE_ENV,
+    ALLOW_THIRD_PARTY_PLUGINS_ENV,
+    ALLOW_UNATTESTED_ARTIFACTS_ENV,
+    CONTAINER_EXECUTION_ENV,
+    RUNTIME_IMAGE_DEFAULT,
+    RUNTIME_IMAGE_DIGEST_ENV,
+    RUNTIME_IMAGE_ENV,
+    RUNTIME_IMAGE_LOCAL_DEFAULT,
+    RUNTIME_MANIFEST_FILENAME,
+    RUNTIME_MANIFEST_VERSION,
+    RUNTIME_VERIFIER_BINARY_DEFAULT,
+    RUNTIME_VERIFIER_BINARY_ENV,
+    RUNTIME_VERIFIER_CONTRACT_VERSION,
+    ContainerLaunchPlan,
+    RuntimeManifestLoadIssueCode,
+    RuntimeManifestLoadResult,
+    RuntimeSecurityPolicy,
+    apply_runtime_allowances,
+    build_container_command,
+    build_container_python_command,
+    build_runtime_security_policy,
+    container_image_available_locally,
+    current_execution_mode,
+    current_runtime_security_policy,
+    delegate_container_command,
+    delegate_python_script_to_container,
+    host_execution_allowed,
+    load_runtime_manifest,
+    network_allowed,
+    remote_code_allowed,
+    reset_runtime_allowances,
+    resolve_container_engine,
+    resolve_runtime_image,
+    resolve_runtime_image_digest,
+    running_inside_container,
+    runtime_allowances_scope,
+    runtime_verifier_binary,
+    serialize_canonical_json,
+    third_party_plugins_allowed,
+    unattested_artifacts_allowed,
+    write_runtime_manifest,
+)
 
-from invarlock import runtime_security_helpers as runtime_security_helpers_mod
-from invarlock.core.config_dependencies import inspect_config_dependencies
+_CONTAINER_EXECUTION_TIMEOUT_SECONDS = _helpers._CONTAINER_EXECUTION_TIMEOUT_SECONDS
+_CONTAINER_INSPECT_TIMEOUT_SECONDS = _helpers._CONTAINER_INSPECT_TIMEOUT_SECONDS
+_PATH_ENV_VARS = _helpers._PATH_ENV_VARS
+_absolute_host_path = _helpers._absolute_host_path
+_attested_runtime_image_ref = _helpers._attested_runtime_image_ref
+_coerce_bool = _helpers._coerce_bool
+_config_digest = _helpers._config_digest
+_container_pythonpath_entries = _helpers._container_pythonpath_entries
+_delegated_env_pairs = _helpers._delegated_env_pairs
+_host_nvidia_visible = _helpers._host_nvidia_visible
+_inspect_container_image = _helpers._inspect_container_image
+_iter_absolute_pythonpath_entries = _helpers._iter_absolute_pythonpath_entries
+_iter_external_symlink_target_mounts = _helpers._iter_external_symlink_target_mounts
+_minimize_mounts = _helpers._minimize_mounts
+_mount_root_for_path = _helpers._mount_root_for_path
+_mount_root_for_resolved_path = _helpers._mount_root_for_resolved_path
+_normalize_config_path_for_container = _helpers._normalize_config_path_for_container
+_normalize_local_model_path_for_container = (
+    _helpers._normalize_local_model_path_for_container
+)
+_normalize_output_path_for_container = _helpers._normalize_output_path_for_container
+_path_env_value_for_container = _helpers._path_env_value_for_container
+_path_is_within = _helpers._path_is_within
+_runtime_flag_value = _helpers._runtime_flag_value
+_workspace_path = _helpers._workspace_path
+inspect_config_dependencies = _helpers.inspect_config_dependencies
+os = _helpers.os
+Path = _helpers.Path
+shutil = _helpers.shutil
+subprocess = _helpers.subprocess
+sys = _helpers.sys
 
-_RUNTIME_SECURITY_HELPER_DEFAULTS = {
-    name: getattr(runtime_security_helpers_mod, name)
-    for name in (
-        "_absolute_host_path",
-        "_container_pythonpath_entries",
-        "_delegated_env_pairs",
-        "_host_nvidia_visible",
-        "_inspect_container_image",
-        "_iter_absolute_pythonpath_entries",
-        "_iter_external_symlink_target_mounts",
-        "_minimize_mounts",
-        "_mount_is_already_covered",
-        "_mount_root_for_path",
-        "_mount_root_for_resolved_path",
-        "_normalize_config_path_for_container",
-        "_normalize_local_model_path_for_container",
-        "_normalize_output_path_for_container",
-        "_path_env_value_for_container",
-        "_path_is_within",
-        "_record_path_dependencies",
-        "_workspace_path",
-        "build_container_command",
-        "build_container_python_command",
-        "container_image_available_locally",
-        "delegate_container_command",
-        "delegate_python_script_to_container",
-        "resolve_container_engine",
-        "runtime_verifier_binary",
-    )
-}
-_RUNTIME_SECURITY_WRAPPER_DEFAULTS: dict[str, Any] = {}
-
-ALLOW_HOST_EXECUTION_ENV = "INVARLOCK_ALLOW_HOST_EXECUTION"
-ALLOW_NETWORK_ENV = "INVARLOCK_ALLOW_NETWORK"
-ALLOW_REMOTE_CODE_ENV = "INVARLOCK_ALLOW_REMOTE_CODE"
-ALLOW_THIRD_PARTY_PLUGINS_ENV = "INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS"
-ALLOW_UNATTESTED_ARTIFACTS_ENV = "INVARLOCK_ALLOW_UNATTESTED_ARTIFACTS"
-CONTAINER_EXECUTION_ENV = "INVARLOCK_CONTAINER_EXECUTION"
-RUNTIME_IMAGE_ENV = "INVARLOCK_RUNTIME_IMAGE"
-RUNTIME_IMAGE_DIGEST_ENV = "INVARLOCK_RUNTIME_IMAGE_DIGEST"
-RUNTIME_MANIFEST_FILENAME = "runtime.manifest.json"
-RUNTIME_MANIFEST_VERSION = 1
-RUNTIME_VERIFIER_BINARY_ENV = "INVARLOCK_RUNTIME_VERIFIER"
-RUNTIME_VERIFIER_BINARY_DEFAULT = "invarlock-runtime-verify"
-RUNTIME_VERIFIER_CONTRACT_VERSION = "runtime-manifest-v1"
-RUNTIME_IMAGE_LOCAL_DEFAULT = "invarlock-runtime:local"
-RUNTIME_IMAGE_DEFAULT = "ghcr.io/invarlock/invarlock-runtime:latest"
-_CONTAINER_INSPECT_TIMEOUT_SECONDS = 30
-_CONTAINER_EXECUTION_TIMEOUT_SECONDS = 24 * 60 * 60
-
-_TRUE_VALUES = {"1", "true", "yes", "on"}
-_FALSE_VALUES = {"0", "false", "no", "off"}
 __all__ = [
     "ALLOW_HOST_EXECUTION_ENV",
     "ALLOW_NETWORK_ENV",
@@ -79,8 +102,10 @@ __all__ = [
     "ContainerLaunchPlan",
     "RuntimeSecurityPolicy",
     "CONTAINER_EXECUTION_ENV",
+    "RUNTIME_IMAGE_DEFAULT",
     "RUNTIME_IMAGE_ENV",
     "RUNTIME_IMAGE_DIGEST_ENV",
+    "RUNTIME_IMAGE_LOCAL_DEFAULT",
     "RUNTIME_MANIFEST_FILENAME",
     "RUNTIME_MANIFEST_VERSION",
     "RUNTIME_VERIFIER_BINARY_ENV",
@@ -113,702 +138,3 @@ __all__ = [
     "unattested_artifacts_allowed",
     "write_runtime_manifest",
 ]
-
-
-@dataclass(frozen=True)
-class ContainerLaunchPlan:
-    """Typed launch plan for delegated container execution."""
-
-    argv: tuple[str, ...]
-    argv_mounts: tuple[Path, ...]
-    needs_cwd_host_mirror: bool
-    gpu_passthrough: bool
-
-
-@dataclass(frozen=True)
-class RuntimeSecurityPolicy:
-    """Typed runtime-policy snapshot for request-scoped application."""
-
-    allow_network: bool = False
-    allow_host_execution: bool = False
-    allow_third_party_plugins: bool = False
-    allow_remote_code: bool = False
-    allow_unattested_artifacts: bool = False
-
-
-class RuntimeManifestLoadIssueCode(str, Enum):
-    MISSING = "missing"
-    READ_FAILED = "read_failed"
-    INVALID_JSON = "invalid_json"
-    INVALID_PAYLOAD = "invalid_payload"
-
-
-@dataclass(frozen=True)
-class RuntimeManifestLoadResult:
-    path: Path
-    payload: dict[str, Any] | None
-    issue_code: RuntimeManifestLoadIssueCode | None = None
-    issue_message: str | None = None
-
-
-_RUNTIME_SECURITY_POLICY: ContextVar[RuntimeSecurityPolicy | None] = ContextVar(
-    "invarlock_runtime_security_policy",
-    default=None,
-)
-
-
-def _coerce_bool(value: str | None) -> bool | None:
-    if value is None:
-        return None
-    lowered = value.strip().lower()
-    if lowered in _TRUE_VALUES:
-        return True
-    if lowered in _FALSE_VALUES:
-        return False
-    return None
-
-
-def _runtime_flag_value(name: str) -> str | None:
-    policy = _RUNTIME_SECURITY_POLICY.get()
-    if policy is None:
-        return os.environ.get(name)
-    flag_map = {
-        ALLOW_NETWORK_ENV: policy.allow_network,
-        ALLOW_HOST_EXECUTION_ENV: policy.allow_host_execution,
-        ALLOW_THIRD_PARTY_PLUGINS_ENV: policy.allow_third_party_plugins,
-        ALLOW_REMOTE_CODE_ENV: policy.allow_remote_code,
-        ALLOW_UNATTESTED_ARTIFACTS_ENV: policy.allow_unattested_artifacts,
-    }
-    if name not in flag_map:
-        return os.environ.get(name)
-    return "1" if flag_map[name] else "0"
-
-
-def _json_safe(value: Any) -> Any:
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return value
-    if isinstance(value, Path):
-        return str(value)
-    if isinstance(value, dict):
-        return {str(key): _json_safe(item) for key, item in value.items()}
-    if isinstance(value, set):
-        normalized_items = [_json_safe(item) for item in value]
-        return sorted(
-            normalized_items,
-            key=lambda item: json.dumps(item, sort_keys=True, separators=(",", ":")),
-        )
-    if isinstance(value, (list, tuple)):
-        return [_json_safe(item) for item in value]
-    return str(value)
-
-
-def serialize_canonical_json(payload: Any) -> str:
-    return json.dumps(_json_safe(payload), sort_keys=True, separators=(",", ":"))
-
-
-def _sha256_bytes(payload: bytes) -> str:
-    return hashlib.sha256(payload).hexdigest()
-
-
-def _sha256_path(path: Path) -> str:
-    return _sha256_bytes(path.read_bytes())
-
-
-def network_allowed() -> bool:
-    return _coerce_bool(_runtime_flag_value(ALLOW_NETWORK_ENV)) is True
-
-
-def host_execution_allowed() -> bool:
-    return _coerce_bool(_runtime_flag_value(ALLOW_HOST_EXECUTION_ENV)) is True
-
-
-def remote_code_allowed() -> bool:
-    return _coerce_bool(_runtime_flag_value(ALLOW_REMOTE_CODE_ENV)) is True
-
-
-def unattested_artifacts_allowed() -> bool:
-    return _coerce_bool(_runtime_flag_value(ALLOW_UNATTESTED_ARTIFACTS_ENV)) is True
-
-
-def third_party_plugins_allowed() -> bool:
-    explicit = _coerce_bool(_runtime_flag_value(ALLOW_THIRD_PARTY_PLUGINS_ENV))
-    return explicit is True
-
-
-def running_inside_container() -> bool:
-    return _coerce_bool(os.environ.get(CONTAINER_EXECUTION_ENV)) is True
-
-
-def current_execution_mode() -> str:
-    return "container" if running_inside_container() else "host-bypass"
-
-
-def resolve_runtime_image() -> str:
-    image = os.environ.get(RUNTIME_IMAGE_ENV, "").strip()
-    if image:
-        return image
-    engine = resolve_container_engine()
-    if engine is not None and container_image_available_locally(
-        RUNTIME_IMAGE_LOCAL_DEFAULT, engine=engine
-    ):
-        return RUNTIME_IMAGE_LOCAL_DEFAULT
-    return RUNTIME_IMAGE_DEFAULT
-
-
-def resolve_runtime_image_digest() -> str | None:
-    explicit = os.environ.get(RUNTIME_IMAGE_DIGEST_ENV, "").strip()
-    if explicit:
-        return explicit
-    image = resolve_runtime_image()
-    if "@sha256:" in image:
-        return image.split("@", 1)[1]
-    engine = resolve_container_engine()
-    if engine is None:
-        return None
-    _, digest = _inspect_container_image(engine, image)
-    return digest
-
-
-def _attested_runtime_image_ref(image_ref: str, image_digest: str | None) -> str:
-    if image_ref == RUNTIME_IMAGE_LOCAL_DEFAULT:
-        return image_ref
-    if "@sha256:" in image_ref:
-        return image_ref
-    if image_digest:
-        return f"{image_ref}@{image_digest}"
-    if unattested_artifacts_allowed():
-        return image_ref
-    raise RuntimeError(
-        "Attested runtime manifests require a digest-pinned runtime image; "
-        f"set {RUNTIME_IMAGE_DIGEST_ENV}, use {RUNTIME_IMAGE_LOCAL_DEFAULT!r}, "
-        "or allow unattested artifacts explicitly."
-    )
-
-
-_CONFIG_SCAN_ARG_FLAGS = {"--config", "-c", "--preset", "--edit-config"}
-_CONFIG_PATH_ARG_FLAGS = _CONFIG_SCAN_ARG_FLAGS | {"--baseline-report"}
-_OUTPUT_PATH_ARG_FLAGS = {"--out", "--report-out"}
-_LOCAL_MODEL_ARG_FLAGS = {"--baseline", "--subject"}
-_PATH_ENV_VARS = {
-    "INVARLOCK_CONFIG_ROOT",
-    "INVARLOCK_EVALUATE_TMP_DIR",
-    "INVARLOCK_EXPORT_DIR",
-    "HF_HOME",
-    "HF_HUB_CACHE",
-    "HF_DATASETS_CACHE",
-    "TRANSFORMERS_CACHE",
-    "TMPDIR",
-    "TMP",
-}
-_FORWARDED_ENV_VARS = {
-    "HF_DATASETS_OFFLINE",
-    "INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE",
-    "INVARLOCK_DETERMINISM",
-    "INVARLOCK_DETERMINISM_WARN_ONLY",
-    "INVARLOCK_SKIP_OVERHEAD_CHECK",
-    "INVARLOCK_SNAPSHOT_MODE",
-    "INVARLOCK_STORE_EVAL_WINDOWS",
-    "PACK_DETERMINISM",
-}
-
-
-def _sync_runtime_security_helpers() -> None:
-    synced_globals = {
-        "_CONFIG_PATH_ARG_FLAGS": _CONFIG_PATH_ARG_FLAGS,
-        "_CONTAINER_EXECUTION_TIMEOUT_SECONDS": _CONTAINER_EXECUTION_TIMEOUT_SECONDS,
-        "_CONTAINER_INSPECT_TIMEOUT_SECONDS": _CONTAINER_INSPECT_TIMEOUT_SECONDS,
-        "_FORWARDED_ENV_VARS": _FORWARDED_ENV_VARS,
-        "_PATH_ENV_VARS": _PATH_ENV_VARS,
-        "ALLOW_NETWORK_ENV": ALLOW_NETWORK_ENV,
-        "ALLOW_REMOTE_CODE_ENV": ALLOW_REMOTE_CODE_ENV,
-        "ALLOW_THIRD_PARTY_PLUGINS_ENV": ALLOW_THIRD_PARTY_PLUGINS_ENV,
-        "ALLOW_UNATTESTED_ARTIFACTS_ENV": ALLOW_UNATTESTED_ARTIFACTS_ENV,
-        "CONTAINER_EXECUTION_ENV": CONTAINER_EXECUTION_ENV,
-        "Path": Path,
-        "RUNTIME_IMAGE_DIGEST_ENV": RUNTIME_IMAGE_DIGEST_ENV,
-        "RUNTIME_VERIFIER_BINARY_DEFAULT": RUNTIME_VERIFIER_BINARY_DEFAULT,
-        "__file__": __file__,
-        "inspect_config_dependencies": inspect_config_dependencies,
-        "network_allowed": network_allowed,
-        "os": os,
-        "remote_code_allowed": remote_code_allowed,
-        "resolve_runtime_image": resolve_runtime_image,
-        "resolve_runtime_image_digest": resolve_runtime_image_digest,
-        "shutil": shutil,
-        "subprocess": subprocess,
-        "sys": sys,
-        "third_party_plugins_allowed": third_party_plugins_allowed,
-        "unattested_artifacts_allowed": unattested_artifacts_allowed,
-    }
-    for name, helper_default in _RUNTIME_SECURITY_HELPER_DEFAULTS.items():
-        current = globals()[name]
-        wrapper_default = _RUNTIME_SECURITY_WRAPPER_DEFAULTS.get(name)
-        synced_globals[name] = (
-            helper_default
-            if wrapper_default is not None and current is wrapper_default
-            else current
-        )
-    for name, value in synced_globals.items():
-        setattr(runtime_security_helpers_mod, name, value)
-
-
-def _inspect_container_image(engine: str, image: str) -> tuple[bool, str | None]:
-    _sync_runtime_security_helpers()
-    return cast(
-        tuple[bool, str | None],
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_inspect_container_image"](engine, image),
-    )
-
-
-def resolve_container_engine() -> str | None:
-    _sync_runtime_security_helpers()
-    return cast(
-        str | None, _RUNTIME_SECURITY_HELPER_DEFAULTS["resolve_container_engine"]()
-    )
-
-
-def _host_nvidia_visible() -> bool:
-    _sync_runtime_security_helpers()
-    return cast(bool, _RUNTIME_SECURITY_HELPER_DEFAULTS["_host_nvidia_visible"]())
-
-
-def _minimize_mounts(mounts: list[Path] | set[Path]) -> list[Path]:
-    _sync_runtime_security_helpers()
-    return cast(
-        list[Path], _RUNTIME_SECURITY_HELPER_DEFAULTS["_minimize_mounts"](mounts)
-    )
-
-
-def _absolute_host_path(path: str | Path, *, cwd: Path) -> Path:
-    _sync_runtime_security_helpers()
-    return cast(
-        Path,
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_absolute_host_path"](path, cwd=cwd),
-    )
-
-
-def _path_is_within(path: Path, root: Path) -> bool:
-    _sync_runtime_security_helpers()
-    return cast(bool, _RUNTIME_SECURITY_HELPER_DEFAULTS["_path_is_within"](path, root))
-
-
-def _workspace_path(path: Path, *, cwd: Path) -> str:
-    _sync_runtime_security_helpers()
-    return cast(
-        str, _RUNTIME_SECURITY_HELPER_DEFAULTS["_workspace_path"](path, cwd=cwd)
-    )
-
-
-def _mount_root_for_path(path: Path) -> Path:
-    _sync_runtime_security_helpers()
-    return cast(Path, _RUNTIME_SECURITY_HELPER_DEFAULTS["_mount_root_for_path"](path))
-
-
-def _mount_root_for_resolved_path(path: Path) -> Path:
-    _sync_runtime_security_helpers()
-    return cast(
-        Path,
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_mount_root_for_resolved_path"](path),
-    )
-
-
-def _mount_is_already_covered(mount: Path, *, cwd: Path) -> bool:
-    _sync_runtime_security_helpers()
-    return cast(
-        bool,
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_mount_is_already_covered"](
-            mount,
-            cwd=cwd,
-        ),
-    )
-
-
-def _iter_external_symlink_target_mounts(
-    path: Path, *, cwd: Path, recursive: bool = True
-) -> list[Path]:
-    _sync_runtime_security_helpers()
-    return cast(
-        list[Path],
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_iter_external_symlink_target_mounts"](
-            path,
-            cwd=cwd,
-            recursive=recursive,
-        ),
-    )
-
-
-def _iter_absolute_pythonpath_entries() -> list[Path]:
-    _sync_runtime_security_helpers()
-    return cast(
-        list[Path],
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_iter_absolute_pythonpath_entries"](),
-    )
-
-
-def _container_pythonpath_entries(*, cwd: Path) -> tuple[list[str], list[Path]]:
-    _sync_runtime_security_helpers()
-    return cast(
-        tuple[list[str], list[Path]],
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_container_pythonpath_entries"](cwd=cwd),
-    )
-
-
-def _record_path_dependencies(
-    path: Path,
-    mounts: set[Path],
-    *,
-    cwd: Path,
-    recursive_symlink_scan: bool = True,
-) -> bool:
-    _sync_runtime_security_helpers()
-    return cast(
-        bool,
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_record_path_dependencies"](
-            path,
-            mounts,
-            cwd=cwd,
-            recursive_symlink_scan=recursive_symlink_scan,
-        ),
-    )
-
-
-def _normalize_output_path_for_container(
-    raw_value: str, *, cwd: Path
-) -> tuple[str, set[Path]]:
-    _sync_runtime_security_helpers()
-    return cast(
-        tuple[str, set[Path]],
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_normalize_output_path_for_container"](
-            raw_value,
-            cwd=cwd,
-        ),
-    )
-
-
-def _normalize_local_model_path_for_container(
-    raw_value: str, *, cwd: Path
-) -> tuple[str, set[Path], bool]:
-    _sync_runtime_security_helpers()
-    return cast(
-        tuple[str, set[Path], bool],
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_normalize_local_model_path_for_container"](
-            raw_value,
-            cwd=cwd,
-        ),
-    )
-
-
-def _normalize_config_path_for_container(
-    raw_value: str,
-    *,
-    cwd: Path,
-    scan_dependencies: bool,
-) -> tuple[str, set[Path], bool]:
-    _sync_runtime_security_helpers()
-    return cast(
-        tuple[str, set[Path], bool],
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_normalize_config_path_for_container"](
-            raw_value,
-            cwd=cwd,
-            scan_dependencies=scan_dependencies,
-        ),
-    )
-
-
-def _path_env_value_for_container(
-    raw_value: str,
-    *,
-    cwd: Path,
-) -> tuple[str, list[Path]]:
-    _sync_runtime_security_helpers()
-    return cast(
-        tuple[str, list[Path]],
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_path_env_value_for_container"](
-            raw_value,
-            cwd=cwd,
-        ),
-    )
-
-
-def _delegated_env_pairs(*, cwd: Path) -> tuple[dict[str, str], list[Path]]:
-    _sync_runtime_security_helpers()
-    return cast(
-        tuple[dict[str, str], list[Path]],
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_delegated_env_pairs"](cwd=cwd),
-    )
-
-
-def container_image_available_locally(
-    image: str | None = None, *, engine: str | None = None
-) -> bool:
-    _sync_runtime_security_helpers()
-    return cast(
-        bool,
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["container_image_available_locally"](
-            image,
-            engine=engine,
-        ),
-    )
-
-
-def runtime_verifier_binary() -> str:
-    _sync_runtime_security_helpers()
-    return cast(str, _RUNTIME_SECURITY_HELPER_DEFAULTS["runtime_verifier_binary"]())
-
-
-def build_runtime_security_policy(
-    *,
-    allow_network: bool = False,
-    allow_host_execution: bool = False,
-    allow_third_party_plugins: bool = False,
-    allow_remote_code: bool = False,
-    allow_unattested_artifacts: bool = False,
-) -> RuntimeSecurityPolicy:
-    return RuntimeSecurityPolicy(
-        allow_network=bool(allow_network),
-        allow_host_execution=bool(allow_host_execution),
-        allow_third_party_plugins=bool(allow_third_party_plugins),
-        allow_remote_code=bool(allow_remote_code),
-        allow_unattested_artifacts=bool(allow_unattested_artifacts),
-    )
-
-
-def current_runtime_security_policy() -> RuntimeSecurityPolicy | None:
-    return _RUNTIME_SECURITY_POLICY.get()
-
-
-def _resolve_runtime_security_policy(
-    *,
-    policy: RuntimeSecurityPolicy | None = None,
-    allow_network: bool = False,
-    allow_host_execution: bool = False,
-    allow_third_party_plugins: bool = False,
-    allow_remote_code: bool = False,
-    allow_unattested_artifacts: bool = False,
-) -> RuntimeSecurityPolicy:
-    if policy is not None:
-        return policy
-    return build_runtime_security_policy(
-        allow_network=allow_network,
-        allow_host_execution=allow_host_execution,
-        allow_third_party_plugins=allow_third_party_plugins,
-        allow_remote_code=allow_remote_code,
-        allow_unattested_artifacts=allow_unattested_artifacts,
-    )
-
-
-def apply_runtime_allowances(
-    *,
-    policy: RuntimeSecurityPolicy | None = None,
-    allow_network: bool = False,
-    allow_host_execution: bool = False,
-    allow_third_party_plugins: bool = False,
-    allow_remote_code: bool = False,
-    allow_unattested_artifacts: bool = False,
-) -> Token[RuntimeSecurityPolicy | None]:
-    resolved_policy = _resolve_runtime_security_policy(
-        policy=policy,
-        allow_network=allow_network,
-        allow_host_execution=allow_host_execution,
-        allow_third_party_plugins=allow_third_party_plugins,
-        allow_remote_code=allow_remote_code,
-        allow_unattested_artifacts=allow_unattested_artifacts,
-    )
-
-    token = _RUNTIME_SECURITY_POLICY.set(resolved_policy)
-    try:
-        from invarlock.security import enforce_network_policy
-
-        enforce_network_policy(bool(resolved_policy.allow_network))
-    except Exception:
-        _RUNTIME_SECURITY_POLICY.reset(token)
-        raise
-    return token
-
-
-def reset_runtime_allowances(
-    token: Token[RuntimeSecurityPolicy | None] | None = None,
-) -> None:
-    if token is None:
-        _RUNTIME_SECURITY_POLICY.set(None)
-    else:
-        _RUNTIME_SECURITY_POLICY.reset(token)
-
-    from invarlock.security import enforce_network_policy
-
-    enforce_network_policy(network_allowed())
-
-
-@contextmanager
-def runtime_allowances_scope(
-    *,
-    policy: RuntimeSecurityPolicy | None = None,
-    allow_network: bool = False,
-    allow_host_execution: bool = False,
-    allow_third_party_plugins: bool = False,
-    allow_remote_code: bool = False,
-    allow_unattested_artifacts: bool = False,
-) -> Iterator[RuntimeSecurityPolicy]:
-    resolved_policy = _resolve_runtime_security_policy(
-        policy=policy,
-        allow_network=allow_network,
-        allow_host_execution=allow_host_execution,
-        allow_third_party_plugins=allow_third_party_plugins,
-        allow_remote_code=allow_remote_code,
-        allow_unattested_artifacts=allow_unattested_artifacts,
-    )
-    token = apply_runtime_allowances(policy=resolved_policy)
-    try:
-        yield resolved_policy
-    finally:
-        reset_runtime_allowances(token)
-
-
-def build_container_command(plan: ContainerLaunchPlan) -> list[str]:
-    _sync_runtime_security_helpers()
-    return cast(
-        list[str],
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["build_container_command"](plan),
-    )
-
-
-def delegate_container_command(plan: ContainerLaunchPlan) -> int:
-    _sync_runtime_security_helpers()
-    return cast(
-        int,
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["delegate_container_command"](plan),
-    )
-
-
-def build_container_python_command(
-    script_path: str | os.PathLike[str],
-    plan: ContainerLaunchPlan,
-) -> list[str]:
-    _sync_runtime_security_helpers()
-    return cast(
-        list[str],
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["build_container_python_command"](
-            script_path,
-            plan,
-        ),
-    )
-
-
-def delegate_python_script_to_container(
-    script_path: str | os.PathLike[str],
-    plan: ContainerLaunchPlan,
-) -> int:
-    _sync_runtime_security_helpers()
-    return cast(
-        int,
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["delegate_python_script_to_container"](
-            script_path,
-            plan,
-        ),
-    )
-
-
-_RUNTIME_SECURITY_WRAPPER_DEFAULTS = {
-    name: globals()[name] for name in _RUNTIME_SECURITY_HELPER_DEFAULTS
-}
-
-
-def _config_digest(
-    *,
-    config_path: str | os.PathLike[str] | None = None,
-    config_payload: Any | None = None,
-) -> tuple[str | None, str]:
-    if config_path is not None:
-        path = Path(config_path)
-        if path.exists():
-            return _sha256_path(path), "file"
-    if config_payload is not None:
-        payload = serialize_canonical_json(config_payload).encode("utf-8")
-        return _sha256_bytes(payload), "inline"
-    return None, "missing"
-
-
-def write_runtime_manifest(
-    report_path: str | os.PathLike[str],
-    *,
-    config_path: str | os.PathLike[str] | None = None,
-    config_payload: Any | None = None,
-    extra: dict[str, Any] | None = None,
-) -> Path:
-    report = Path(report_path).resolve()
-    digest, digest_source = _config_digest(
-        config_path=config_path, config_payload=config_payload
-    )
-    runtime_image = resolve_runtime_image()
-    runtime_digest = resolve_runtime_image_digest()
-    manifest: dict[str, Any] = {
-        "manifest_version": RUNTIME_MANIFEST_VERSION,
-        "generated_at_utc": datetime.now(UTC).isoformat(),
-        "verifier_contract_version": RUNTIME_VERIFIER_CONTRACT_VERSION,
-        "report": {
-            "path": str(report),
-            "filename": report.name,
-            "sha256": _sha256_path(report),
-        },
-        "config": {
-            "path": str(Path(config_path).resolve())
-            if config_path is not None
-            else None,
-            "sha256": digest,
-            "source": digest_source,
-        },
-        "execution_mode": current_execution_mode(),
-        "runtime": {
-            "image_ref": _attested_runtime_image_ref(runtime_image, runtime_digest),
-            "image_digest": runtime_digest,
-            "container_execution": running_inside_container(),
-            "allow_network": network_allowed(),
-            "allow_remote_code": remote_code_allowed(),
-            "allow_third_party_plugins": third_party_plugins_allowed(),
-        },
-    }
-    if isinstance(extra, dict) and extra:
-        manifest["context"] = _json_safe(extra)
-    manifest_path = report.parent / RUNTIME_MANIFEST_FILENAME
-    manifest_path.write_text(
-        json.dumps(_json_safe(manifest), indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-    return manifest_path
-
-
-def load_runtime_manifest(
-    report_path: str | os.PathLike[str],
-) -> RuntimeManifestLoadResult:
-    report = Path(report_path)
-    manifest_path = report.parent / RUNTIME_MANIFEST_FILENAME
-    if not manifest_path.exists():
-        return RuntimeManifestLoadResult(
-            path=manifest_path,
-            payload=None,
-            issue_code=RuntimeManifestLoadIssueCode.MISSING,
-        )
-    try:
-        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except OSError:
-        return RuntimeManifestLoadResult(
-            path=manifest_path,
-            payload=None,
-            issue_code=RuntimeManifestLoadIssueCode.READ_FAILED,
-            issue_message=f"unable to read {manifest_path.name}",
-        )
-    except json.JSONDecodeError:
-        return RuntimeManifestLoadResult(
-            path=manifest_path,
-            payload=None,
-            issue_code=RuntimeManifestLoadIssueCode.INVALID_JSON,
-            issue_message=f"{manifest_path.name} is not valid JSON",
-        )
-    if not isinstance(payload, dict):
-        return RuntimeManifestLoadResult(
-            path=manifest_path,
-            payload=None,
-            issue_code=RuntimeManifestLoadIssueCode.INVALID_PAYLOAD,
-            issue_message=f"{manifest_path.name} must decode to a JSON object",
-        )
-    return RuntimeManifestLoadResult(path=manifest_path, payload=payload)

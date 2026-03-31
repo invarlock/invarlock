@@ -14,7 +14,7 @@ from invarlock.core.exceptions import ValidationError as _ValidationError
 from invarlock.core.provider_parity import enforce_provider_parity
 from invarlock.core.runtime_attestation import verify_runtime_attestation
 
-from . import verify_checks as _verify_checks
+from . import verify_check_helpers as _verify_checks
 from . import verify_output as _verify_output
 
 _VERIFY_RECOVERABLE_EXCEPTIONS = (

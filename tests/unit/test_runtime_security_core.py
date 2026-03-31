@@ -8,6 +8,7 @@ import pytest
 
 import invarlock.cli.runtime_launch_plan as runtime_launch_plan
 import invarlock.runtime_security as runtime_security
+import invarlock.runtime_security_helpers as runtime_security_helpers
 
 
 def test_runtime_bool_helpers_and_execution_mode(monkeypatch) -> None:
@@ -82,19 +83,19 @@ def test_resolve_runtime_image_digest_uses_inspection_when_needed(monkeypatch) -
     monkeypatch.delenv(runtime_security.RUNTIME_IMAGE_DIGEST_ENV, raising=False)
     monkeypatch.delenv(runtime_security.RUNTIME_IMAGE_ENV, raising=False)
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image",
         lambda: "ghcr.io/invarlock/invarlock-runtime:test",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "_inspect_container_image",
         lambda engine, image: (True, "sha256:inspected"),
         raising=True,
@@ -107,13 +108,13 @@ def test_resolve_runtime_image_digest_returns_none_without_engine(monkeypatch) -
     monkeypatch.delenv(runtime_security.RUNTIME_IMAGE_DIGEST_ENV, raising=False)
     monkeypatch.delenv(runtime_security.RUNTIME_IMAGE_ENV, raising=False)
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image",
         lambda: "ghcr.io/invarlock/invarlock-runtime:test",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: None,
         raising=True,
@@ -134,13 +135,13 @@ def test_resolve_runtime_image_prefers_explicit_local_and_default(monkeypatch) -
 
     monkeypatch.delenv(runtime_security.RUNTIME_IMAGE_ENV, raising=False)
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image, engine=None: image
         == runtime_security.RUNTIME_IMAGE_LOCAL_DEFAULT,
@@ -152,7 +153,7 @@ def test_resolve_runtime_image_prefers_explicit_local_and_default(monkeypatch) -
     )
 
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image, engine=None: False,
         raising=True,
@@ -299,7 +300,7 @@ def test_container_image_available_locally_and_runtime_verifier_binary(
     monkeypatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: None,
         raising=True,
@@ -307,13 +308,13 @@ def test_container_image_available_locally_and_runtime_verifier_binary(
     assert runtime_security.container_image_available_locally("img") is False
 
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "_inspect_container_image",
         lambda engine, image: (True, None),
         raising=True,
@@ -344,7 +345,12 @@ def test_runtime_verifier_binary_finds_repo_and_script_dir_candidates(
     debug_binary.chmod(0o755)
 
     monkeypatch.delenv(runtime_security.RUNTIME_VERIFIER_BINARY_ENV, raising=False)
-    monkeypatch.setattr(runtime_security, "__file__", str(module_path), raising=False)
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "__file__",
+        str(module_path),
+        raising=False,
+    )
     assert runtime_security.runtime_verifier_binary() == str(debug_binary)
 
     debug_binary.unlink()
@@ -383,7 +389,12 @@ def test_runtime_verifier_binary_uses_executable_dir_when_argv_is_empty(
     verifier.chmod(0o755)
 
     monkeypatch.delenv(runtime_security.RUNTIME_VERIFIER_BINARY_ENV, raising=False)
-    monkeypatch.setattr(runtime_security, "__file__", str(module_path), raising=False)
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "__file__",
+        str(module_path),
+        raising=False,
+    )
     monkeypatch.setattr(
         runtime_security.sys, "executable", str(python_bin), raising=True
     )

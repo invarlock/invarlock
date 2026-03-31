@@ -7,6 +7,7 @@ import pytest
 
 import invarlock.cli.runtime_launch_plan as runtime_launch_plan
 import invarlock.runtime_security as runtime_security
+import invarlock.runtime_security_helpers as runtime_security_helpers
 
 
 def test_config_digest_and_load_runtime_manifest(tmp_path: Path) -> None:
@@ -488,7 +489,7 @@ def test_normalize_config_path_for_container_scans_dependencies_and_wraps_errors
     external_ref.write_text("payload\n", encoding="utf-8")
 
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "inspect_config_dependencies",
         lambda _path: SimpleNamespace(
             config_paths=[config_path, external_config],
@@ -509,7 +510,7 @@ def test_normalize_config_path_for_container_scans_dependencies_and_wraps_errors
     assert needs_mirror is True
 
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "inspect_config_dependencies",
         lambda _path: (_ for _ in ()).throw(ValueError("broken dependency scan")),
         raising=True,
@@ -535,7 +536,7 @@ def test_normalize_delegated_argv_rewrites_paths_and_collects_mounts(
     external_root.mkdir()
 
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "inspect_config_dependencies",
         lambda _path: SimpleNamespace(config_paths=[config_path], referenced_paths=[]),
         raising=True,
@@ -654,7 +655,12 @@ def test_runtime_verifier_binary_falls_back_to_default_when_no_candidates_exist(
     python_bin.chmod(0o755)
 
     monkeypatch.delenv(runtime_security.RUNTIME_VERIFIER_BINARY_ENV, raising=False)
-    monkeypatch.setattr(runtime_security, "__file__", str(module_path), raising=False)
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "__file__",
+        str(module_path),
+        raising=False,
+    )
     monkeypatch.setattr(
         runtime_security.sys, "executable", str(python_bin), raising=True
     )

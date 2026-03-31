@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 import invarlock.runtime_security as runtime_security
+import invarlock.runtime_security_helpers as runtime_security_helpers
 
 
 def _plan(
@@ -137,49 +138,49 @@ def test_build_container_python_command_adds_cwd_host_mirror(
 
     monkeypatch.chdir(repo_root)
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image",
         lambda: "ghcr.io/invarlock/runtime:test",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image_digest",
         lambda: "sha256:abc",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image, engine=None: True,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "network_allowed",
         lambda: False,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "_container_pythonpath_entries",
         lambda *, cwd: ([], []),
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "_delegated_env_pairs",
         lambda *, cwd: ({}, []),
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "_host_nvidia_visible",
         lambda: False,
         raising=True,
@@ -198,7 +199,7 @@ def test_delegate_python_script_to_container_surfaces_timeout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "build_container_python_command",
         lambda script_path, plan: ["docker", "run", "python", str(script_path)],
         raising=True,
@@ -224,37 +225,37 @@ def test_build_container_command_skips_network_none_when_network_allowed(
 
     monkeypatch.chdir(repo_root)
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image",
         lambda: "ghcr.io/invarlock/runtime:test",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image_digest",
         lambda: "sha256:attested",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "network_allowed",
         lambda: True,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "_container_pythonpath_entries",
         lambda *, cwd: ([], []),
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "_delegated_env_pairs",
         lambda *, cwd: ({}, []),
         raising=True,
@@ -274,7 +275,12 @@ def test_runtime_verifier_binary_uses_executable_dir_when_argv_is_empty(
     module_path = repo_root / "src" / "invarlock" / "runtime_security.py"
     module_path.parent.mkdir(parents=True, exist_ok=True)
     module_path.write_text("# stub\n", encoding="utf-8")
-    monkeypatch.setattr(runtime_security, "__file__", str(module_path), raising=False)
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "__file__",
+        str(module_path),
+        raising=False,
+    )
 
     script_dir = tmp_path / "venv" / "bin"
     script_dir.mkdir(parents=True, exist_ok=True)

@@ -30,9 +30,6 @@ from invarlock.cli.run_pairing_helpers import (
 )
 from invarlock.cli.run_serialization import _to_serialisable_dict
 from invarlock.cli.run_shell_output import _event
-from invarlock.cli.run_shell_output import (
-    _print_retry_summary as _shell_print_retry_summary,
-)
 from invarlock.core import metric_provider_resolution as metric_provider_resolution_mod
 from invarlock.core import provider_parity as provider_parity_mod
 from invarlock.core import run_baseline_evidence as run_baseline_evidence_mod
@@ -97,12 +94,6 @@ if TYPE_CHECKING:
     from .config_execution import ConfigExecutionRequest
 
 console = make_console()
-
-
-def _print_retry_summary(_console: Any, retry_controller: Any | None) -> None:
-    """Compatibility shim retained for tests that patch the retry-summary seam."""
-
-    _shell_print_retry_summary(_console, retry_controller)
 
 
 def execute_config_run_request(request: ConfigExecutionRequest) -> str | None:

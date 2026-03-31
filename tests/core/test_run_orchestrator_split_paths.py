@@ -44,31 +44,31 @@ def test_execute_run_request_emits_typed_diagnostics_and_nonfatal_warnings(
     monkeypatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator._build_run_context_payload_impl",
+        "invarlock.core.run_orchestrator_execute._build_run_context_payload_impl",
         lambda **_kwargs: {"dataset": {}, "eval": {"loss": {"resolved_type": "ce"}}},
     )
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator._build_run_execution_config_payloads_impl",
+        "invarlock.core.run_orchestrator_execute._build_run_execution_config_payloads_impl",
         lambda **_kwargs: SimpleNamespace(auto_config={}, edit_config={}),
     )
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator._resolve_pm_acceptance_range_impl",
+        "invarlock.core.run_orchestrator_execute._resolve_pm_acceptance_range_impl",
         lambda _cfg: None,
     )
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator._resolve_pm_drift_band_impl",
+        "invarlock.core.run_orchestrator_execute._resolve_pm_drift_band_impl",
         lambda _cfg: None,
     )
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator._resolve_guard_overhead_threshold_impl",
+        "invarlock.core.run_orchestrator_execute._resolve_guard_overhead_threshold_impl",
         lambda _cfg: 0.01,
     )
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator._should_measure_overhead_impl",
+        "invarlock.core.run_orchestrator_execute._should_measure_overhead_impl",
         lambda _profile, _cfg: (False, False, None),
     )
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator._resolve_retry_validation_transition_impl",
+        "invarlock.core.run_orchestrator_execute._resolve_retry_validation_transition_impl",
         lambda *_args, **_kwargs: SimpleNamespace(
             action="passed",
             disposition="passed",

@@ -44,31 +44,31 @@ def _install_common_monkeypatches(
     should_measure_overhead=(False, False, None),
 ) -> None:
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator._build_run_context_payload_impl",
+        "invarlock.core.run_orchestrator_execute._build_run_context_payload_impl",
         lambda **_kwargs: {"dataset": {}, "eval": {"loss": {"resolved_type": "ce"}}},
     )
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator._build_run_execution_config_payloads_impl",
+        "invarlock.core.run_orchestrator_execute._build_run_execution_config_payloads_impl",
         lambda **_kwargs: SimpleNamespace(auto_config={}, edit_config={}),
     )
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator._resolve_pm_acceptance_range_impl",
+        "invarlock.core.run_orchestrator_execute._resolve_pm_acceptance_range_impl",
         lambda _cfg: None,
     )
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator._resolve_pm_drift_band_impl",
+        "invarlock.core.run_orchestrator_execute._resolve_pm_drift_band_impl",
         lambda _cfg: None,
     )
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator._resolve_guard_overhead_threshold_impl",
+        "invarlock.core.run_orchestrator_execute._resolve_guard_overhead_threshold_impl",
         lambda _cfg: 0.01,
     )
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator._should_measure_overhead_impl",
+        "invarlock.core.run_orchestrator_execute._should_measure_overhead_impl",
         lambda _profile, _cfg: should_measure_overhead,
     )
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator._resolve_retry_validation_transition_impl",
+        "invarlock.core.run_orchestrator_execute._resolve_retry_validation_transition_impl",
         lambda *_args, **_kwargs: SimpleNamespace(
             action="passed",
             disposition="passed",
@@ -366,7 +366,7 @@ def test_execute_run_request_covers_diagnostic_and_seed_fallback_branches(
     _install_common_monkeypatches(monkeypatch)
 
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator._build_run_context_payload_impl",
+        "invarlock.core.run_orchestrator_execute._build_run_context_payload_impl",
         lambda **_kwargs: {"dataset": object(), "eval": {}},
     )
     monkeypatch.setattr(
@@ -387,7 +387,7 @@ def test_execute_run_request_covers_diagnostic_and_seed_fallback_branches(
         ),
     )
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator.np.random.get_state",
+        "invarlock.core.run_orchestrator_execute.np.random.get_state",
         lambda: (_ for _ in ()).throw(ValueError("no numpy state")),
     )
     monkeypatch.setattr(
@@ -489,7 +489,7 @@ def test_execute_run_request_covers_retry_validation_and_timing_none(
     config = _Config()
     _install_common_monkeypatches(monkeypatch)
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator._build_timing_summary_payload_impl",
+        "invarlock.core.run_orchestrator_execute._build_timing_summary_payload_impl",
         lambda **_kwargs: None,
     )
 
@@ -513,7 +513,7 @@ def test_execute_run_request_covers_retry_validation_and_timing_none(
     )
 
     monkeypatch.setattr(
-        "invarlock.core.run_orchestrator._resolve_retry_validation_transition_impl",
+        "invarlock.core.run_orchestrator_execute._resolve_retry_validation_transition_impl",
         lambda *_args, **_kwargs: SimpleNamespace(
             status="unexpected",
             validation_gates=("gate-a",),

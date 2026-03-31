@@ -4,8 +4,8 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from invarlock.runtime_security import (
-    ContainerLaunchPlan,
+from invarlock.runtime_security import ContainerLaunchPlan
+from invarlock.runtime_security_helpers import (
     _host_nvidia_visible,
     _minimize_mounts,
     _normalize_config_path_for_container,

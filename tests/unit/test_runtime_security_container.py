@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 import invarlock.runtime_security as runtime_security
+import invarlock.runtime_security_helpers as runtime_security_helpers
 
 
 def _plan(
@@ -58,7 +59,7 @@ def test_apply_runtime_allowances_and_delegate_container_command(monkeypatch) ->
     assert runtime_security.third_party_plugins_allowed() is False
 
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "build_container_command",
         lambda plan: ["docker", "run"],
         raising=True,
@@ -81,7 +82,7 @@ def test_delegate_container_command_passes_timeout_and_surfaces_expiry(
     seen: dict[str, object] = {}
 
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "build_container_command",
         lambda plan: ["docker", "run"],
         raising=True,
@@ -135,49 +136,49 @@ def test_build_container_python_command_uses_python_entrypoint_for_repo_script(
 
     monkeypatch.chdir(repo_root)
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image",
         lambda: "ghcr.io/invarlock/runtime:test",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image_digest",
         lambda: "sha256:abc",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image, engine=None: True,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "network_allowed",
         lambda: False,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "_host_nvidia_visible",
         lambda: True,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "_container_pythonpath_entries",
         lambda *, cwd: (["/workspace/src"], []),
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "_delegated_env_pairs",
         lambda *, cwd: ({"EXTRA": "1"}, []),
         raising=True,
@@ -219,49 +220,49 @@ def test_build_container_python_command_adds_cwd_host_mirror(
 
     monkeypatch.chdir(repo_root)
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image",
         lambda: "ghcr.io/invarlock/runtime:test",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image_digest",
         lambda: "sha256:abc",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image, engine=None: True,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "network_allowed",
         lambda: False,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "_container_pythonpath_entries",
         lambda *, cwd: ([], []),
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "_delegated_env_pairs",
         lambda *, cwd: ({}, []),
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "_host_nvidia_visible",
         lambda: False,
         raising=True,
@@ -278,7 +279,7 @@ def test_build_container_python_command_adds_cwd_host_mirror(
 
 def test_delegate_python_script_to_container_uses_python_builder(monkeypatch) -> None:
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "build_container_python_command",
         lambda script_path, plan: ["docker", "run", "python", str(script_path)],
         raising=True,
@@ -303,7 +304,7 @@ def test_delegate_python_script_to_container_passes_timeout(monkeypatch) -> None
     seen: dict[str, object] = {}
 
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "build_container_python_command",
         lambda script_path, plan: ["docker", "run", "python", str(script_path)],
         raising=True,
@@ -329,7 +330,7 @@ def test_delegate_python_script_to_container_surfaces_timeout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "build_container_python_command",
         lambda script_path, plan: ["docker", "run", "python", str(script_path)],
         raising=True,
@@ -354,7 +355,7 @@ def test_build_container_python_command_raises_for_missing_engine_or_image(
     script_path.write_text("# stub\n", encoding="utf-8")
 
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: None,
         raising=True,
@@ -365,31 +366,31 @@ def test_build_container_python_command_raises_for_missing_engine_or_image(
         )
 
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image",
         lambda: "ghcr.io/invarlock/runtime:test",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image_digest",
         lambda: None,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "network_allowed",
         lambda: False,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image, engine=None: False,
         raising=True,
@@ -412,49 +413,49 @@ def test_build_container_python_command_leaves_external_script_as_host_path(
 
     monkeypatch.chdir(repo_root)
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image",
         lambda: "ghcr.io/invarlock/runtime:test",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image_digest",
         lambda: None,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image, engine=None: True,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "network_allowed",
         lambda: True,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "_container_pythonpath_entries",
         lambda *, cwd: (["/workspace/src"], []),
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "_delegated_env_pairs",
         lambda *, cwd: ({}, []),
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "_host_nvidia_visible",
         lambda: False,
         raising=True,
@@ -474,7 +475,7 @@ def test_build_container_command_raises_when_no_engine_is_available(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: None,
         raising=True,
@@ -494,43 +495,43 @@ def test_build_container_command_uses_launch_plan_and_deduplicates_mounts(
 
     monkeypatch.chdir(repo_root)
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_container_engine",
         lambda: "docker",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image",
         lambda: "ghcr.io/invarlock/runtime:test",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "resolve_runtime_image_digest",
         lambda: "sha256:attested",
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image, engine=None: True,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "network_allowed",
         lambda: False,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "_container_pythonpath_entries",
         lambda *, cwd: (["/workspace/src"], [shared_mount]),
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security,
+        runtime_security_helpers,
         "_delegated_env_pairs",
         lambda *, cwd: ({"EXTRA": "1"}, [shared_mount]),
         raising=True,
