@@ -139,7 +139,7 @@ def test_proof_pack_manifest_and_attestation_round_trip(tmp_path: Path) -> None:
     assert exit_code == ProofPackStatus.SIGNATURE
     assert payload["ok"] is False
     assert payload["errors"] == [
-        "manifest.json.asc missing; signed manifest required by default."
+        "manifest.signature.json missing; signed manifest required by default."
     ]
 
 
@@ -166,13 +166,13 @@ def test_proof_pack_verify_strict_rejects_extra_files(tmp_path: Path) -> None:
         report_rel_path="reports/model/clean/noop/evaluation.report.json",
     )
     (pack_dir / "extra.txt").write_text("extra", encoding="utf-8")
-    original_verify_gpg = proof_pack_mod._verify_gpg
-    proof_pack_mod._verify_gpg = lambda pack_dir, strict: ([], [], None)
+    original_verify_signature = proof_pack_mod._verify_signature
+    proof_pack_mod._verify_signature = lambda pack_dir, strict: ([], [], None)
 
     try:
         result = verify_proof_pack(pack_dir, skip_verify=True, strict=True)
     finally:
-        proof_pack_mod._verify_gpg = original_verify_gpg
+        proof_pack_mod._verify_signature = original_verify_signature
 
     payload = result.payload
     exit_code = result.status

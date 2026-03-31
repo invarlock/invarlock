@@ -194,9 +194,9 @@ pack_verify_no_extra_files() {
         printf '%s\n' \
             "checksums.sha256" \
             "manifest.json" \
-            "manifest.json.asc" \
+            "manifest.signature.json" \
             "metadata/manifest.json" \
-            "metadata/manifest.json.asc" \
+            "metadata/manifest.signature.json" \
             "metadata/checksums.sha256" \
             >> "${expected_file}"
         sort -u -o "${expected_file}" "${expected_file}"
@@ -226,50 +226,41 @@ pack_verify_no_extra_files() {
     return 0
 }
 
-pack_verify_gpg() {
+pack_verify_signature_helper() {
     local pack_dir="$1"
     local strict="$2"
+    local helper="${SCRIPT_DIR}/python/verify_signature.py"
 
-    if [[ ! -f "${pack_dir}/manifest.json.asc" ]]; then
-        if [[ "${strict}" == "1" ]]; then
-            echo "ERROR: manifest.json.asc missing (strict mode requires a signed manifest)." >&2
-            return 1
+    if [[ "${strict}" == "1" ]]; then
+        _cmd_python "${helper}" --strict "${pack_dir}"
+        return
+    fi
+    _cmd_python "${helper}" "${pack_dir}"
+}
+
+pack_verify_signature() {
+    local pack_dir="$1"
+    local strict="$2"
+    local tmp_err=""
+    local signer_fpr=""
+
+    tmp_err="$(mktemp 2>/dev/null || mktemp -t invarlock_pack_verify_sig.XXXXXXXX)" || return 1
+    if signer_fpr="$(pack_verify_signature_helper "${pack_dir}" "${strict}" 2>"${tmp_err}")"; then
+        if [[ -s "${tmp_err}" ]]; then
+            cat "${tmp_err}" >&2
         fi
-        pack_warn "manifest.json.asc missing; pack is unsigned."
+        rm -f "${tmp_err}"
+        if [[ -n "${signer_fpr}" ]]; then
+            PACK_SIGNER_FINGERPRINT="${signer_fpr}"
+            export PACK_SIGNER_FINGERPRINT
+        fi
         return 0
     fi
-
-    if ! command -v gpg >/dev/null 2>&1; then
-        if [[ "${strict}" == "1" ]]; then
-            echo "ERROR: gpg not found (strict mode requires signature verification)." >&2
-            return 1
-        fi
-        pack_warn "gpg not found; skipping manifest signature verification."
-        return 0
+    if [[ -s "${tmp_err}" ]]; then
+        cat "${tmp_err}" >&2
     fi
-
-    local out
-    if ! out="$(gpg --status-fd 1 --verify "${pack_dir}/manifest.json.asc" "${pack_dir}/manifest.json" 2>&1)"; then
-        echo "ERROR: manifest signature verification failed." >&2
-        printf '%s\n' "${out}" >&2
-        return 1
-    fi
-
-    local signer_fpr
-    signer_fpr="$(printf '%s\n' "${out}" | awk '/VALIDSIG / {print $3; exit}')"
-    if [[ -n "${signer_fpr}" ]]; then
-        PACK_SIGNER_FINGERPRINT="${signer_fpr}"
-        export PACK_SIGNER_FINGERPRINT
-
-        local recorded
-        recorded="$(pack_manifest_field "${pack_dir}/manifest.json" "signing_key_fingerprint" 2>/dev/null || true)"
-        if [[ -n "${recorded}" && "${recorded}" != "${signer_fpr}" ]]; then
-            echo "ERROR: manifest.json signing_key_fingerprint (${recorded}) does not match signature key (${signer_fpr})." >&2
-            return 1
-        fi
-    fi
-
-    return 0
+    rm -f "${tmp_err}"
+    return 1
 }
 
 pack_verify_reports() {
@@ -384,7 +375,7 @@ pack_verify_pack() {
     if ! pack_validate_manifest_schema "${pack_dir}"; then
         return "${PACK_VERIFY_FORMAT}"
     fi
-    if ! pack_verify_gpg "${pack_dir}" "${strict}"; then
+    if ! pack_verify_signature "${pack_dir}" "${strict}"; then
         return "${PACK_VERIFY_SIGNATURE}"
     fi
     if ! pack_verify_manifest_binds_checksums "${pack_dir}" "${strict}"; then

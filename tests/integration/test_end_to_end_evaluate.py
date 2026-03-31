@@ -81,9 +81,7 @@ def test_tiny_attested_smoke_campaign_script_is_executable() -> None:
         '"${CLI[@]}" report html -i "$EVAL_REPORT" -o "$SMOKE_EXPORT_DIR/evaluation.html"'
         in contents
     )
-    assert (
-        "proof_pack_unsigned=1; using explicit unattested-artifact override" in contents
-    )
-    assert "INVARLOCK_ALLOW_UNATTESTED_ARTIFACTS=1 \\" in contents
+    assert 'advanced proof-pack keygen "$PROOF_PACK_SIGNING_KEY"' in contents
+    assert '--signing-key "$PROOF_PACK_SIGNING_KEY"' in contents
     assert "evaluation report verification failed" in contents
     assert "proof-pack verification failed" in contents

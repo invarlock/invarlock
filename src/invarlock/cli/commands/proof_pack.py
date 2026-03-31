@@ -9,9 +9,11 @@ from rich.console import Console
 from invarlock.cli.constants import (
     PROOF_PACK_BUILD_FORMAT_VERSION,
     PROOF_PACK_INSPECT_FORMAT_VERSION,
+    PROOF_PACK_KEYGEN_FORMAT_VERSION,
     PROOF_PACK_VERIFY_FORMAT_VERSION,
 )
 from invarlock.proof_pack import (
+    _generate_signing_keypair,
     _material_spec,
     build_proof_pack,
     inspect_proof_pack,
@@ -84,6 +86,66 @@ def verify_command(
 
 
 @proof_pack_app.command(
+    "keygen",
+    help="Generate an Ed25519 signing keypair for package-native proof-pack manifests.",
+)
+def keygen_command(
+    private_key_out: str = typer.Argument(
+        ...,
+        help="Output path for the private signing key PEM.",
+    ),
+    public_key_out: str | None = typer.Option(
+        None,
+        "--public-key-out",
+        help="Optional output path for the public verification key PEM.",
+    ),
+    json_out: bool = typer.Option(
+        False, "--json", help="Emit machine-readable keygen JSON."
+    ),
+) -> None:
+    private_key_path = Path(private_key_out)
+    public_key_path = (
+        Path(public_key_out)
+        if public_key_out
+        else private_key_path.with_name(f"{private_key_path.stem}.pub.pem")
+    )
+    try:
+        fingerprint = _generate_signing_keypair(
+            private_key_path,
+            public_key_path=public_key_path,
+        )
+        payload = {
+            "format_version": PROOF_PACK_KEYGEN_FORMAT_VERSION,
+            "ok": True,
+            "algorithm": "ed25519",
+            "private_key": str(private_key_path),
+            "public_key": str(public_key_path),
+            "signing_key_fingerprint": fingerprint,
+        }
+        exit_code = 0
+    except FileExistsError as exc:
+        payload = {
+            "format_version": PROOF_PACK_KEYGEN_FORMAT_VERSION,
+            "ok": False,
+            "errors": [str(exc)],
+        }
+        exit_code = 2
+
+    if json_out:
+        typer.echo(json.dumps(payload))
+    else:
+        if payload["ok"]:
+            console.print("[green]Proof-pack signing keypair created[/green]")
+            console.print(f"Private key: {payload['private_key']}")
+            console.print(f"Public key: {payload['public_key']}")
+            console.print(f"Fingerprint: {payload['signing_key_fingerprint']}")
+        else:
+            for error in payload["errors"]:
+                console.print(f"[red]ERROR:[/red] {error}")
+    raise typer.Exit(exit_code)
+
+
+@proof_pack_app.command(
     "inspect",
     help="Inspect a proof-pack summary without running nested report verification.",
 )
@@ -151,6 +213,11 @@ def build_command(
         "--readme",
         help="Optional README markdown file to copy into the pack root.",
     ),
+    signing_key: str | None = typer.Option(
+        None,
+        "--signing-key",
+        help="Optional Ed25519 private key PEM used to sign manifest.json.",
+    ),
     profile: str = typer.Option(
         "dev",
         "--profile",
@@ -195,6 +262,7 @@ def build_command(
         environment_path=Path(environment) if environment else None,
         material_specs=material_specs,
         readme_path=Path(readme) if readme else None,
+        signing_key_path=Path(signing_key) if signing_key else None,
         profile=profile,
     )
     payload = {

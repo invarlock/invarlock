@@ -224,6 +224,7 @@ def test_proof_pack_help_lists_verify() -> None:
     assert "verify" in result.output
     assert "inspect" in result.output
     assert "build" in result.output
+    assert "keygen" in result.output
 
 
 def test_proof_pack_verify_json_round_trip(monkeypatch, tmp_path: Path) -> None:
@@ -406,7 +407,9 @@ def test_proof_pack_inspect_json_summary(tmp_path: Path) -> None:
     assert payload["integrity"]["checksums_bound"] is True
     assert payload["integrity"]["manifest_attestation_ok"] is True
     assert payload["strict_ready"] is False
-    assert any("manifest.json.asc missing" in issue for issue in payload["issues"])
+    assert any(
+        "manifest.signature.json missing" in issue for issue in payload["issues"]
+    )
 
 
 def test_proof_pack_inspect_human_success_and_failure(
@@ -518,6 +521,102 @@ def test_proof_pack_build_json_round_trip(monkeypatch, tmp_path: Path) -> None:
     verify_payload = json.loads(verify.stdout.strip())
     assert verify_payload["ok"] is True
     assert verify_payload["verify"]["ok"] is True
+
+
+def test_proof_pack_keygen_and_signed_build_round_trip(
+    monkeypatch, tmp_path: Path
+) -> None:
+    final_verdict = tmp_path / "final_verdict.json"
+    report = tmp_path / "evaluation.report.json"
+    out_dir = tmp_path / "proof_pack_signed"
+    private_key = tmp_path / "proof-pack-signing-key.pem"
+    public_key = tmp_path / "proof-pack-signing-key.pub.pem"
+
+    _write_json(final_verdict, {"verdict": "PASS"})
+    _write_json(report, _build_report_payload())
+    _write_runtime_manifest(report)
+    monkeypatch.setattr(
+        "invarlock.proof_pack._run_verify_command",
+        lambda reports, profile: _successful_verify_result(reports),
+        raising=False,
+    )
+
+    keygen = CliRunner().invoke(
+        app,
+        [
+            "advanced",
+            "proof-pack",
+            "keygen",
+            str(private_key),
+            "--public-key-out",
+            str(public_key),
+            "--json",
+        ],
+    )
+    assert keygen.exit_code == 0, keygen.output
+    keygen_payload = json.loads(keygen.stdout.strip())
+    assert keygen_payload["ok"] is True
+    assert private_key.is_file()
+    assert public_key.is_file()
+
+    build = CliRunner().invoke(
+        app,
+        [
+            "advanced",
+            "proof-pack",
+            "build",
+            str(out_dir),
+            "--final-verdict",
+            str(final_verdict),
+            "--report",
+            str(report),
+            "--signing-key",
+            str(private_key),
+            "--json",
+        ],
+    )
+    assert build.exit_code == 0, build.output
+    build_payload = json.loads(build.stdout.strip())
+    assert build_payload["ok"] is True
+    assert build_payload["signature"]["present"] is True
+    assert (out_dir / "manifest.signature.json").is_file()
+
+    verify = CliRunner().invoke(
+        app,
+        ["advanced", "proof-pack", "verify", str(out_dir), "--json"],
+    )
+    assert verify.exit_code == 0, verify.output
+    verify_payload = json.loads(verify.stdout.strip())
+    assert verify_payload["ok"] is True
+    assert (
+        verify_payload["signer_fingerprint"]
+        == keygen_payload["signing_key_fingerprint"]
+    )
+
+
+def test_proof_pack_keygen_console_paths_cover_success_and_existing_key(
+    tmp_path: Path,
+) -> None:
+    private_key = tmp_path / "console-signing-key.pem"
+
+    result = CliRunner().invoke(
+        app,
+        ["advanced", "proof-pack", "keygen", str(private_key)],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Proof-pack signing keypair created" in result.output
+    assert private_key.name in result.output
+    assert f"{private_key.stem}.pub.pem" in result.output
+    assert "Private key:" in result.output
+    assert "Public key:" in result.output
+    assert "Fingerprint:" in result.output
+
+    existing = CliRunner().invoke(
+        app,
+        ["advanced", "proof-pack", "keygen", str(private_key)],
+    )
+    assert existing.exit_code == 2, existing.output
+    assert "private key output already exists" in existing.output
 
 
 def test_proof_pack_build_requires_reports(tmp_path: Path) -> None:

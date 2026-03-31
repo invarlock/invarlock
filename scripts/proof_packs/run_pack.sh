@@ -196,6 +196,18 @@ pack_write_manifest() {
         --repeats "${repeats}"
 }
 
+pack_sign_manifest_helper() {
+    local manifest_path="$1"
+    local signing_key_path="${2:-}"
+    local helper="${RUN_PACK_SCRIPT_DIR}/python/sign_manifest.py"
+
+    if [[ -n "${signing_key_path}" ]]; then
+        _cmd_python "${helper}" --manifest "${manifest_path}" --signing-key "${signing_key_path}"
+        return
+    fi
+    _cmd_python "${helper}" --manifest "${manifest_path}" --generate-ephemeral
+}
+
 pack_require_passing_run_verdict() {
     local run_dir="$1"
     local verdict_file="${run_dir}/reports/final_verdict.json"
@@ -238,8 +250,7 @@ PY
 
 pack_sign_manifest() {
     local pack_dir="$1"
-    local strict="${PACK_STRICT_MODE:-0}"
-    if [[ "${PACK_GPG_SIGN:-1}" == "0" ]]; then
+    if [[ "${PACK_SIGN_MANIFEST:-1}" == "0" ]]; then
         return 0
     fi
 
@@ -248,68 +259,27 @@ pack_sign_manifest() {
         return 1
     fi
 
-    if ! command -v gpg >/dev/null 2>&1; then
-        if [[ "${strict}" == "1" ]]; then
-            echo "ERROR: gpg not found (strict mode requires signing)." >&2
-            return 1
-        fi
-        echo "WARNING: gpg not found; skipping manifest signature." >&2
-        return 0
-    fi
+    local signing_key_path="${PACK_SIGNING_KEY:-}"
+    local tmp_err=""
+    local signer_fpr=""
 
-    local tmp_sig="${pack_dir}/manifest.json.asc.tmp"
-    rm -f "${tmp_sig}"
-    if ! gpg --armor --detach-sign --output "${tmp_sig}" "${pack_dir}/manifest.json"; then
-        rm -f "${tmp_sig}"
-        if [[ "${strict}" == "1" ]]; then
-            echo "ERROR: gpg signing failed (strict mode)." >&2
-            return 1
-        fi
-        echo "WARNING: gpg signing failed; skipping manifest signature." >&2
-        return 0
-    fi
-
-    # Attempt to extract signer fingerprint for audit trails.
-    local verify_out=""
-    if verify_out="$(gpg --verify --status-fd 1 "${tmp_sig}" "${pack_dir}/manifest.json" 2>&1)"; then
-        local signer_fpr
-        signer_fpr="$(printf '%s\n' "${verify_out}" | awk '/VALIDSIG / {print $3; exit}')"
+    tmp_err="$(mktemp 2>/dev/null || mktemp -t invarlock_pack_sign.XXXXXXXX)" || return 1
+    if signer_fpr="$(pack_sign_manifest_helper "${pack_dir}/manifest.json" "${signing_key_path}" 2>"${tmp_err}")"; then
+        rm -f "${tmp_err}"
         if [[ -n "${signer_fpr}" ]]; then
-            python3 - "${pack_dir}/manifest.json" "${signer_fpr}" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-path = Path(sys.argv[1])
-fpr = sys.argv[2]
-payload = json.loads(path.read_text())
-payload["signing_key_fingerprint"] = fpr
-path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
-PY
+            PACK_SIGNER_FINGERPRINT="${signer_fpr}"
+            export PACK_SIGNER_FINGERPRINT
         fi
-    else
-        if [[ "${strict}" == "1" ]]; then
-            rm -f "${tmp_sig}"
-            echo "ERROR: gpg signature verification failed during signing (strict mode)." >&2
-            printf '%s\n' "${verify_out}" >&2
-            return 1
-        fi
-        echo "WARNING: gpg signature verification failed during signing; omitting signer fingerprint." >&2
-    fi
-
-    rm -f "${pack_dir}/manifest.json.asc"
-    if ! gpg --armor --detach-sign --output "${pack_dir}/manifest.json.asc" "${pack_dir}/manifest.json"; then
-        rm -f "${pack_dir}/manifest.json.asc" "${tmp_sig}"
-        if [[ "${strict}" == "1" ]]; then
-            echo "ERROR: gpg signing failed (strict mode)." >&2
-            return 1
-        fi
-        echo "WARNING: gpg signing failed; skipping manifest signature." >&2
         return 0
     fi
 
-    rm -f "${tmp_sig}"
-    return 0
+    echo "ERROR: manifest signing failed." >&2
+    if [[ -s "${tmp_err}" ]]; then
+        cat "${tmp_err}" >&2
+    fi
+    rm -f "${tmp_err}"
+    rm -f "${pack_dir}/manifest.signature.json"
+    return 1
 }
 
 pack_write_checksums() {
@@ -321,10 +291,10 @@ pack_write_checksums() {
         while IFS= read -r file; do
             [[ -n "${file}" ]] || continue
             case "${file}" in
-                ./checksums.sha256|./manifest.json|./manifest.json.asc)
+                ./checksums.sha256|./manifest.json|./manifest.signature.json)
                     continue
                     ;;
-                ./metadata/manifest.json|./metadata/manifest.json.asc|./metadata/checksums.sha256)
+                ./metadata/manifest.json|./metadata/manifest.signature.json|./metadata/checksums.sha256)
                     continue
                     ;;
                 ./.DS_Store|*/.DS_Store|./__MACOSX/*)
@@ -351,7 +321,7 @@ require a signed manifest, strict verification, and a PASS final verdict.
 ## Verify
 
 1) Verify the manifest signature (if present):
-   gpg --verify manifest.json.asc manifest.json
+   invarlock advanced proof-pack verify <pack-dir> --strict
 
 2) Verify file checksums:
    sha256sum -c checksums.sha256
@@ -475,8 +445,8 @@ pack_populate_pack_dir() {
         sign_rc=$?
     fi
     cp "${pack_dir}/manifest.json" "${pack_dir}/metadata/manifest.json"
-    if [[ -f "${pack_dir}/manifest.json.asc" ]]; then
-        cp "${pack_dir}/manifest.json.asc" "${pack_dir}/metadata/manifest.json.asc"
+    if [[ -f "${pack_dir}/manifest.signature.json" ]]; then
+        cp "${pack_dir}/manifest.signature.json" "${pack_dir}/metadata/manifest.signature.json"
     fi
     cp "${pack_dir}/checksums.sha256" "${pack_dir}/metadata/checksums.sha256"
 

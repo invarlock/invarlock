@@ -11,6 +11,7 @@ POLICY_PACK_VERIFY_FORMAT_VERSION = "policy-pack-verify-v1"
 PROOF_PACK_VERIFY_FORMAT_VERSION = "proof-pack-verify-v1"
 PROOF_PACK_INSPECT_FORMAT_VERSION = "proof-pack-inspect-v1"
 PROOF_PACK_BUILD_FORMAT_VERSION = "proof-pack-build-v1"
+PROOF_PACK_KEYGEN_FORMAT_VERSION = "proof-pack-keygen-v1"
 
 PROVIDER_NOTES: dict[str, str] = {
     # WikiText-2 is loaded via datasets; works offline if cached.
@@ -67,6 +68,7 @@ __all__ = [
     "POLICY_PACK_VERIFY_FORMAT_VERSION",
     "PROOF_PACK_BUILD_FORMAT_VERSION",
     "PROOF_PACK_INSPECT_FORMAT_VERSION",
+    "PROOF_PACK_KEYGEN_FORMAT_VERSION",
     "PROOF_PACK_VERIFY_FORMAT_VERSION",
     "VERIFY_FORMAT_VERSION",
     "PROVIDER_NOTES",

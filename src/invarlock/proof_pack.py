@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from dataclasses import dataclass
 from enum import IntEnum
 from pathlib import Path
@@ -37,6 +36,7 @@ _validate_material_name = proof_pack_manifest_mod._validate_material_name
 _validate_reference = proof_pack_manifest_mod._validate_reference
 verify_manifest_attestation = proof_pack_manifest_mod.verify_manifest_attestation
 _CONTROL_FILES = proof_pack_integrity_mod.CONTROL_FILES
+MANIFEST_SIGNATURE_FILENAME = proof_pack_integrity_mod.MANIFEST_SIGNATURE_FILENAME
 
 
 class ProofPackStatus(IntEnum):
@@ -124,13 +124,34 @@ def _verify_no_extra_files(
     )
 
 
-def _verify_gpg(
+def _sign_manifest(manifest_path: Path, *, signing_key_path: Path) -> str:
+    return proof_pack_integrity_mod.sign_manifest(
+        manifest_path,
+        signing_key_path=signing_key_path,
+    )
+
+
+def _validate_signing_key(path: Path) -> list[str]:
+    return proof_pack_integrity_mod.validate_signing_key(path)
+
+
+def _generate_signing_keypair(
+    private_key_path: Path,
+    *,
+    public_key_path: Path,
+) -> str:
+    return proof_pack_integrity_mod.generate_signing_keypair(
+        private_key_path,
+        public_key_path=public_key_path,
+    )
+
+
+def _verify_signature(
     pack_dir: Path, *, strict: bool
 ) -> tuple[list[str], list[str], str | None]:
-    return proof_pack_integrity_mod.verify_gpg(
+    return proof_pack_integrity_mod.verify_signature(
         pack_dir,
         strict=strict,
-        subprocess_module=subprocess,
         load_json_fn=_load_json,
     )
 
@@ -244,7 +265,7 @@ def inspect_proof_pack(pack_dir: Path) -> ProofPackResult:
         "format": manifest.get("format") if isinstance(manifest, dict) else None,
     }
 
-    signature_present = (pack_dir / "manifest.json.asc").is_file()
+    signature_present = (pack_dir / MANIFEST_SIGNATURE_FILENAME).is_file()
     payload["signature"] = {
         "present": signature_present,
         "signer_fingerprint": (
@@ -254,7 +275,9 @@ def inspect_proof_pack(pack_dir: Path) -> ProofPackResult:
         ),
     }
     if not signature_present:
-        issues.append("manifest.json.asc missing; strict verification would fail.")
+        issues.append(
+            f"{MANIFEST_SIGNATURE_FILENAME} missing; strict verification would fail."
+        )
 
     reports = sorted(pack_dir.glob("reports/**/evaluation.report.json"))
     clean_reports = [path for path in reports if "/errors/" not in path.as_posix()]
@@ -320,6 +343,7 @@ def build_proof_pack(
     environment_path: Path | None = None,
     material_specs: list[tuple[str, Path]] | None = None,
     readme_path: Path | None = None,
+    signing_key_path: Path | None = None,
     profile: str = "dev",
 ) -> ProofPackResult:
     warnings: list[str] = []
@@ -341,6 +365,8 @@ def build_proof_pack(
     if out_dir.exists():
         errors.append(f"Output pack directory already exists: {out_dir}")
         return ProofPackResult(payload=payload, status=ProofPackStatus.USAGE)
+    if signing_key_path is not None:
+        errors.extend(_validate_signing_key(signing_key_path))
     seen_material_names: set[str] = set()
     for material_name, _material_path in material_specs:
         name_error = _validate_material_name(material_name)
@@ -436,6 +462,7 @@ def build_proof_pack(
             rel_paths.append("README.md")
 
     _write_checksums_file(out_dir, rel_paths)
+    signer_fingerprint: str | None = None
     manifest: dict[str, Any] = {
         "format": PROOF_PACK_FORMAT,
         "checksums_sha256": "checksums.sha256",
@@ -462,9 +489,22 @@ def build_proof_pack(
         }
     if material_refs:
         manifest["materials"] = material_refs
+    if signing_key_path is not None:
+        signer_fingerprint = proof_pack_integrity_mod.public_key_fingerprint(
+            proof_pack_integrity_mod.load_private_signing_key(
+                signing_key_path
+            ).public_key()
+        )
+        manifest["signing_key_fingerprint"] = signer_fingerprint
     (out_dir / "manifest.json").write_text(
         json.dumps(manifest, sort_keys=True) + "\n", encoding="utf-8"
     )
+    if signing_key_path is not None:
+        _sign_manifest(out_dir / "manifest.json", signing_key_path=signing_key_path)
+    else:
+        warnings.append(
+            "No signing key provided; pack is unsigned and default verification will fail closed."
+        )
 
     payload["ok"] = True
     payload["reports"] = {"total": len(report_paths)}
@@ -474,6 +514,18 @@ def build_proof_pack(
         "manifest": "manifest.json",
         "checksums": "checksums.sha256",
     }
+    if signing_key_path is not None and signer_fingerprint is not None:
+        payload["signature"] = {
+            "present": True,
+            "file": MANIFEST_SIGNATURE_FILENAME,
+            "signer_fingerprint": signer_fingerprint,
+        }
+    else:
+        payload["signature"] = {
+            "present": False,
+            "file": None,
+            "signer_fingerprint": None,
+        }
     return ProofPackResult(payload=payload, status=ProofPackStatus.OK)
 
 
@@ -557,7 +609,7 @@ def verify_proof_pack(
             status=ProofPackStatus.FORMAT,
         )
 
-    signature_errors, signature_warnings, signer_fingerprint = _verify_gpg(
+    signature_errors, signature_warnings, signer_fingerprint = _verify_signature(
         pack_dir, strict=strict
     )
     if signature_warnings and not strict and not unattested_artifacts_allowed():

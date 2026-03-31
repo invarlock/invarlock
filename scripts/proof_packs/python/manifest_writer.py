@@ -53,7 +53,11 @@ def _collect_artifacts(pack_dir: Path) -> list[str]:
         if not path.is_file():
             continue
         rel = path.relative_to(pack_dir)
-        if rel.name in {"manifest.json", "manifest.json.asc", "checksums.sha256"}:
+        if rel.name in {
+            "manifest.json",
+            "manifest.signature.json",
+            "checksums.sha256",
+        }:
             continue
         artifacts.append(str(rel))
     return sorted(artifacts)

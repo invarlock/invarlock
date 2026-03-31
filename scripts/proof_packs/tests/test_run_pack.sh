@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
 
+pack_test_sign_manifest() {
+    local pack_dir="$1"
+    local repo_root="${TEST_ROOT:-$(pwd)}"
+    python3 "${repo_root}/scripts/proof_packs/python/sign_manifest.py" \
+        --manifest "${pack_dir}/manifest.json" \
+        --generate-ephemeral \
+        >/dev/null
+}
+
 test_run_pack_build_pack_collects_artifacts() {
     mock_reset
 
@@ -60,7 +69,7 @@ EOF
     chmod +x "${bin_dir}/invarlock"
     export PATH="${bin_dir}:${PATH}"
 
-    PACK_GPG_SIGN=0
+    PACK_SIGN_MANIFEST=0
     # run_suite.sh/validation_suite.sh may clobber SCRIPT_DIR at runtime; ensure
     # run_pack.sh packaging does not depend on it.
     SCRIPT_DIR="${TEST_TMPDIR}/bogus"
@@ -166,11 +175,11 @@ EOF
     chmod +x "${bin_dir}/invarlock"
     export PATH="${bin_dir}:${PATH}"
 
-    PACK_GPG_SIGN=0
+    PACK_SIGN_MANIFEST=0
     PACK_PACK_LAYOUT="v2"
     pack_sign_manifest() {
         local pack_dir="$1"
-        echo "sig" > "${pack_dir}/manifest.json.asc"
+        echo "sig" > "${pack_dir}/manifest.signature.json"
     }
 
     local pack_dir="${TEST_TMPDIR}/pack"
@@ -182,7 +191,7 @@ EOF
     assert_file_exists "${pack_dir}/metadata/source_repo.json" "source repo metadata written"
     assert_file_exists "${pack_dir}/metadata/environment.json" "environment metadata written"
     assert_file_exists "${pack_dir}/metadata/manifest.json" "manifest copied to metadata"
-    assert_file_exists "${pack_dir}/metadata/manifest.json.asc" "manifest signature copied to metadata"
+    assert_file_exists "${pack_dir}/metadata/manifest.signature.json" "manifest signature copied to metadata"
     assert_file_exists "${pack_dir}/metadata/checksums.sha256" "checksums copied to metadata"
     assert_file_exists "${pack_dir}/results/analysis/guard_intervention_summary.json" "intervention summary nested"
     [[ ! -f "${pack_dir}/results/final_verdict.txt" ]] || t_fail "legacy verdict path should not exist under v2 layout"
@@ -299,7 +308,7 @@ EOF
     chmod +x "${bin_dir}/invarlock"
     export PATH="${bin_dir}:${PATH}"
 
-    PACK_GPG_SIGN=0
+    PACK_SIGN_MANIFEST=0
 
     local pack_dir="${TEST_TMPDIR}/pack"
     pack_build_pack "${run_dir}" "${pack_dir}"
@@ -356,7 +365,7 @@ EOF
     chmod +x "${bin_dir}/invarlock"
     export PATH="${bin_dir}:${PATH}"
 
-    PACK_GPG_SIGN=0
+    PACK_SIGN_MANIFEST=0
 
     local pack_dir="${TEST_TMPDIR}/pack"
     run pack_build_pack "${run_dir}" "${pack_dir}"
@@ -421,7 +430,7 @@ EOF
     chmod +x "${bin_dir}/invarlock"
     export PATH="${bin_dir}:${PATH}"
 
-    PACK_GPG_SIGN=0
+    PACK_SIGN_MANIFEST=0
 
     local pack_dir="${TEST_TMPDIR}/pack"
     run pack_build_pack "${run_dir}" "${pack_dir}"
@@ -442,7 +451,7 @@ test_run_pack_checksums_include_files() {
     echo "{}" > "${pack_dir}/manifest.json"
     mkdir -p "${pack_dir}/metadata" "${pack_dir}/__MACOSX"
     echo "{}" > "${pack_dir}/metadata/manifest.json"
-    echo "sig" > "${pack_dir}/metadata/manifest.json.asc"
+    echo "sig" > "${pack_dir}/metadata/manifest.signature.json"
     echo "x" > "${pack_dir}/metadata/checksums.sha256"
     echo "junk" > "${pack_dir}/.DS_Store"
     echo "junk" > "${pack_dir}/__MACOSX/junk.txt"
@@ -490,7 +499,7 @@ test_run_pack_helpers_cover_error_paths() {
     assert_rc "1" "${RUN_RC}" "missing reports returns non-zero"
 }
 
-test_run_pack_sha256_cmd_fallback_and_sign_warning() {
+test_run_pack_sha256_cmd_fallback_and_sign_toggle() {
     mock_reset
 
     source ./scripts/proof_packs/run_pack.sh
@@ -520,24 +529,16 @@ EOF
     mkdir -p "${pack_dir}"
     echo "{}" > "${pack_dir}/manifest.json"
 
-    command() {
-        if [[ "${1:-}" == "-v" && "${2:-}" == "gpg" ]]; then
-            return 1
-        fi
-        builtin command "$@"
-    }
-
+    PACK_SIGN_MANIFEST=0
     run pack_sign_manifest "${pack_dir}"
-    assert_rc "0" "${RUN_RC}" "sign manifest returns 0 when gpg missing"
-    assert_match "gpg not found" "${RUN_ERR}" "warns when gpg missing"
-
-    unset -f command
+    assert_rc "0" "${RUN_RC}" "sign manifest returns 0 when signing is disabled"
+    [[ ! -f "${pack_dir}/manifest.signature.json" ]] || t_fail "signature bundle should not be written when signing is disabled"
 
     PATH="${original_path}"
 }
 
 
-test_run_pack_sign_manifest_with_gpg() {
+test_run_pack_sign_manifest_writes_package_native_signature() {
     mock_reset
 
     source ./scripts/proof_packs/run_pack.sh
@@ -546,45 +547,16 @@ test_run_pack_sign_manifest_with_gpg() {
     mkdir -p "${pack_dir}"
     echo '{"format":"proof-pack-v1"}' > "${pack_dir}/manifest.json"
 
-    local bin_dir="${TEST_TMPDIR}/bin"
-    mkdir -p "${bin_dir}"
-    cat > "${bin_dir}/gpg" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-if [[ "${1:-}" == "--verify" ]]; then
-    # Simulate gpg --status-fd output for fingerprint extraction.
-    printf '[GNUPG:] VALIDSIG %s 20240101T000000 0 0 0 0 0 0 0 0\n' "0123456789ABCDEF0123456789ABCDEF01234567"
-    exit 0
-fi
-out=""
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --output)
-            out="$2"
-            shift 2
-            ;;
-        *)
-            shift
-            ;;
-    esac
-done
-if [[ -n "${out}" ]]; then
-    printf 'sig' > "${out}"
-fi
-EOF
-    chmod +x "${bin_dir}/gpg"
-
-    local original_path="${PATH}"
-    PATH="${bin_dir}:${PATH}"
-
-    pack_sign_manifest "${pack_dir}"
-    assert_file_exists "${pack_dir}/manifest.json.asc" "gpg signature created"
-    assert_eq "0123456789ABCDEF0123456789ABCDEF01234567" "$(python3 -c 'import json;print(json.load(open("'"${pack_dir}/manifest.json"'"))["signing_key_fingerprint"])' < /dev/null)" "signer fingerprint recorded"
-
-    PATH="${original_path}"
+    run pack_sign_manifest "${pack_dir}"
+    assert_rc "0" "${RUN_RC}" "sign manifest succeeds"
+    assert_file_exists "${pack_dir}/manifest.signature.json" "signature bundle created"
+    assert_eq \
+        "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["signing_key_fingerprint"])' "${pack_dir}/manifest.json" < /dev/null)" \
+        "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["signing_key_fingerprint"])' "${pack_dir}/manifest.signature.json" < /dev/null)" \
+        "manifest and signature bundle record the same fingerprint"
 }
 
-test_run_pack_sign_manifest_warns_and_cleans_when_gpg_fails() {
+test_run_pack_sign_manifest_errors_and_cleans_when_helper_fails() {
     mock_reset
 
     source ./scripts/proof_packs/run_pack.sh
@@ -593,45 +565,21 @@ test_run_pack_sign_manifest_warns_and_cleans_when_gpg_fails() {
     mkdir -p "${pack_dir}"
     echo "{}" > "${pack_dir}/manifest.json"
 
-    local bin_dir="${TEST_TMPDIR}/bin"
-    mkdir -p "${bin_dir}"
-    cat > "${bin_dir}/gpg" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-
-out=""
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --output)
-            out="$2"
-            shift 2
-            ;;
-        *)
-            shift
-            ;;
-    esac
-done
-
-if [[ -n "${out}" ]]; then
-    printf 'partial' > "${out}"
-fi
-
-exit 2
-EOF
-    chmod +x "${bin_dir}/gpg"
-
-    local original_path="${PATH}"
-    PATH="${bin_dir}:${PATH}"
+    pack_sign_manifest_helper() {
+        local manifest_path="$1"
+        printf 'partial' > "$(dirname "${manifest_path}")/manifest.signature.json"
+        echo "helper failed" >&2
+        return 1
+    }
 
     run pack_sign_manifest "${pack_dir}"
-    assert_rc "0" "${RUN_RC}" "sign manifest returns 0 when gpg fails"
-    [[ ! -f "${pack_dir}/manifest.json.asc" ]] || t_fail "failed signature should be removed"
-    assert_match "gpg signing failed" "${RUN_ERR}" "warns when gpg signing fails"
-
-    PATH="${original_path}"
+    assert_rc "1" "${RUN_RC}" "sign manifest fails when helper fails"
+    [[ ! -f "${pack_dir}/manifest.signature.json" ]] || t_fail "failed signature bundle should be removed"
+    assert_match "manifest signing failed" "${RUN_ERR}" "signing error surfaced"
+    assert_match "helper failed" "${RUN_ERR}" "helper stderr surfaced"
 }
 
-test_run_pack_sign_manifest_warns_when_gpg_verify_fails() {
+test_run_pack_sign_manifest_accepts_explicit_signing_key() {
     mock_reset
 
     source ./scripts/proof_packs/run_pack.sh
@@ -639,111 +587,28 @@ test_run_pack_sign_manifest_warns_when_gpg_verify_fails() {
     local pack_dir="${TEST_TMPDIR}/pack"
     mkdir -p "${pack_dir}"
     echo '{"format":"proof-pack-v1"}' > "${pack_dir}/manifest.json"
+    local signing_key="${TEST_TMPDIR}/proof-pack-signing-key.pem"
+    local public_key="${TEST_TMPDIR}/proof-pack-signing-key.pub.pem"
 
-    local bin_dir="${TEST_TMPDIR}/bin"
-    mkdir -p "${bin_dir}"
-    cat > "${bin_dir}/gpg" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
+    PYTHONPATH=src python3 - "${signing_key}" "${public_key}" <<'PY'
+import sys
+from pathlib import Path
 
-for arg in "$@"; do
-    if [[ "${arg}" == "--verify" ]]; then
-        echo "verify failed" >&2
-        exit 2
-    fi
-done
+from invarlock.proof_pack_integrity import generate_signing_keypair
 
-out=""
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --output)
-            out="$2"
-            shift 2
-            ;;
-        *)
-            shift
-            ;;
-    esac
-done
+generate_signing_keypair(
+    Path(sys.argv[1]),
+    public_key_path=Path(sys.argv[2]),
+)
+PY
 
-if [[ -n "${out}" ]]; then
-    printf 'sig' > "${out}"
-fi
-
-exit 0
-EOF
-    chmod +x "${bin_dir}/gpg"
-
-    local original_path="${PATH}"
-    PATH="${bin_dir}:${PATH}"
-    export PATH
-
+    PACK_SIGNING_KEY="${signing_key}"
     run pack_sign_manifest "${pack_dir}"
-    assert_rc "0" "${RUN_RC}" "non-strict signing continues when verify fails"
-    assert_match "gpg signature verification failed during signing; omitting signer fingerprint" "${RUN_ERR}" "warns on verify failure"
-    assert_file_exists "${pack_dir}/manifest.json.asc" "signature still produced"
-
-    PATH="${original_path}"
+    assert_rc "0" "${RUN_RC}" "sign manifest succeeds with explicit signing key"
+    assert_file_exists "${pack_dir}/manifest.signature.json" "signature bundle created with explicit key"
 }
 
-test_run_pack_sign_manifest_warns_when_final_signature_fails() {
-    mock_reset
-
-    source ./scripts/proof_packs/run_pack.sh
-
-    local pack_dir="${TEST_TMPDIR}/pack"
-    mkdir -p "${pack_dir}"
-    echo '{"format":"proof-pack-v1"}' > "${pack_dir}/manifest.json"
-
-    local bin_dir="${TEST_TMPDIR}/bin"
-    mkdir -p "${bin_dir}"
-    cat > "${bin_dir}/gpg" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-
-for arg in "$@"; do
-    if [[ "${arg}" == "--verify" ]]; then
-        exit 0
-    fi
-done
-
-out=""
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --output)
-            out="$2"
-            shift 2
-            ;;
-        *)
-            shift
-            ;;
-    esac
-done
-
-if [[ -n "${out}" ]]; then
-    printf 'sig' > "${out}"
-    if [[ "${out}" == *manifest.json.asc ]]; then
-        exit 2
-    fi
-fi
-
-exit 0
-EOF
-    chmod +x "${bin_dir}/gpg"
-
-    local original_path="${PATH}"
-    PATH="${bin_dir}:${PATH}"
-    export PATH
-
-    run pack_sign_manifest "${pack_dir}"
-    assert_rc "0" "${RUN_RC}" "non-strict signing returns 0 when final signature fails"
-    assert_match "gpg signing failed; skipping manifest signature" "${RUN_ERR}" "warns on final signing failure"
-    [[ ! -f "${pack_dir}/manifest.json.asc" ]] || t_fail "final signature should be removed on failure"
-
-    PATH="${original_path}"
-}
-
-test_run_pack_sign_manifest_strict_error_paths() {
+test_run_pack_sign_manifest_error_paths() {
     mock_reset
 
     source ./scripts/proof_packs/run_pack.sh
@@ -755,134 +620,17 @@ test_run_pack_sign_manifest_strict_error_paths() {
     assert_rc "1" "${RUN_RC}" "sign fails when manifest missing"
     assert_match "manifest\\.json missing" "${RUN_ERR}" "missing manifest error"
 
-    local strict_missing_gpg="${TEST_TMPDIR}/pack_strict_missing_gpg"
-    mkdir -p "${strict_missing_gpg}"
-    echo "{}" > "${strict_missing_gpg}/manifest.json"
+    local invalid_key_dir="${TEST_TMPDIR}/pack_invalid_key"
+    mkdir -p "${invalid_key_dir}"
+    echo "{}" > "${invalid_key_dir}/manifest.json"
 
-    PACK_STRICT_MODE=1
-    command() {
-        if [[ "${1:-}" == "-v" && "${2:-}" == "gpg" ]]; then
-            return 1
-        fi
-        builtin command "$@"
-    }
-
-    run pack_sign_manifest "${strict_missing_gpg}"
-    assert_rc "1" "${RUN_RC}" "strict signing fails when gpg missing"
-    assert_match "gpg not found \\(strict mode requires signing\\)" "${RUN_ERR}" "strict gpg missing message"
-
-    unset -f command
-
-    local strict_detach_fail="${TEST_TMPDIR}/pack_strict_detach_fail"
-    mkdir -p "${strict_detach_fail}"
-    echo "{}" > "${strict_detach_fail}/manifest.json"
-
-    local bin_dir_detach_fail="${TEST_TMPDIR}/bin_detach_fail"
-    mkdir -p "${bin_dir_detach_fail}"
-    cat > "${bin_dir_detach_fail}/gpg" <<'EOF'
-#!/usr/bin/env bash
-exit 2
-EOF
-    chmod +x "${bin_dir_detach_fail}/gpg"
-    PATH="${bin_dir_detach_fail}:${PATH}"
-    export PATH
-
-    run pack_sign_manifest "${strict_detach_fail}"
-    assert_rc "1" "${RUN_RC}" "strict signing fails when gpg detach-sign fails"
-    assert_match "gpg signing failed \\(strict mode\\)" "${RUN_ERR}" "strict detach-sign failure message"
-
-    local strict_verify_fail="${TEST_TMPDIR}/pack_strict_verify_fail"
-    mkdir -p "${strict_verify_fail}"
-    echo "{}" > "${strict_verify_fail}/manifest.json"
-
-    local bin_dir_verify_fail="${TEST_TMPDIR}/bin_verify_fail"
-    mkdir -p "${bin_dir_verify_fail}"
-    cat > "${bin_dir_verify_fail}/gpg" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-
-for arg in "$@"; do
-    if [[ "${arg}" == "--verify" ]]; then
-        echo "verify failed" >&2
-        exit 2
-    fi
-done
-
-out=""
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --output)
-            out="$2"
-            shift 2
-            ;;
-        *)
-            shift
-            ;;
-    esac
-done
-
-if [[ -n "${out}" ]]; then
-    printf 'sig' > "${out}"
-fi
-exit 0
-EOF
-    chmod +x "${bin_dir_verify_fail}/gpg"
-    PATH="${bin_dir_verify_fail}:${PATH}"
-    export PATH
-
-    run pack_sign_manifest "${strict_verify_fail}"
-    assert_rc "1" "${RUN_RC}" "strict signing fails when gpg verify fails"
-    assert_match "signature verification failed during signing" "${RUN_ERR}" "strict verify failure message"
-
-    local strict_final_fail="${TEST_TMPDIR}/pack_strict_final_fail"
-    mkdir -p "${strict_final_fail}"
-    echo "{}" > "${strict_final_fail}/manifest.json"
-
-    local bin_dir_final_fail="${TEST_TMPDIR}/bin_final_fail"
-    mkdir -p "${bin_dir_final_fail}"
-    cat > "${bin_dir_final_fail}/gpg" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-
-for arg in "$@"; do
-    if [[ "${arg}" == "--verify" ]]; then
-        exit 0
-    fi
-done
-
-out=""
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --output)
-            out="$2"
-            shift 2
-            ;;
-        *)
-            shift
-            ;;
-    esac
-done
-
-if [[ -z "${out}" ]]; then
-    exit 0
-fi
-
-printf 'sig' > "${out}"
-if [[ "${out}" == *manifest.json.asc.tmp ]]; then
-    exit 0
-fi
-exit 2
-EOF
-    chmod +x "${bin_dir_final_fail}/gpg"
-    PATH="${bin_dir_final_fail}:${PATH}"
-    export PATH
-
-    run pack_sign_manifest "${strict_final_fail}"
-    assert_rc "1" "${RUN_RC}" "strict signing fails when final signature write fails"
-    assert_match "gpg signing failed \\(strict mode\\)" "${RUN_ERR}" "strict final signature failure message"
+    PACK_SIGNING_KEY="${TEST_TMPDIR}/missing-signing-key.pem"
+    run pack_sign_manifest "${invalid_key_dir}"
+    assert_rc "1" "${RUN_RC}" "sign fails when explicit signing key is missing"
+    assert_match "manifest signing failed" "${RUN_ERR}" "explicit signing key error surfaced"
 }
 
-test_run_pack_build_pack_strict_fails_when_signing_required() {
+test_run_pack_build_pack_fails_when_signing_fails() {
     mock_reset
 
     source ./scripts/proof_packs/run_pack.sh
@@ -895,19 +643,16 @@ test_run_pack_build_pack_strict_fails_when_signing_required() {
     echo "{}" > "${run_dir}/reports/final_verdict.json"
     echo "{}" > "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json"
 
-    PACK_STRICT_MODE=1
     PACK_SKIP_HTML=1
-    command() {
-        if [[ "${1:-}" == "-v" && "${2:-}" == "gpg" ]]; then
-            return 1
-        fi
-        builtin command "$@"
+    pack_sign_manifest_helper() {
+        echo "signature helper failed" >&2
+        return 1
     }
 
     local pack_dir="${TEST_TMPDIR}/pack"
     run pack_build_pack "${run_dir}" "${pack_dir}"
-    assert_rc "1" "${RUN_RC}" "pack build fails when signing required but gpg missing"
-    assert_match "gpg not found \\(strict mode requires signing\\)" "${RUN_ERR}" "strict signing error surfaced"
+    assert_rc "1" "${RUN_RC}" "pack build fails when signing helper fails"
+    assert_match "manifest signing failed" "${RUN_ERR}" "signing failure surfaced"
 }
 
 test_run_pack_build_pack_error_conditions() {

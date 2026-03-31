@@ -554,7 +554,7 @@ Those figures are for model weights only; the default preflight also requires
   `guard_signal_summary`, `scenario_signal_summary`) and key `analysis/*` artifacts.
 - Collects all reports into `proof_pack/reports/...`.
 - Generates `manifest.json`, `checksums.sha256`, optional
-  `manifest.json.asc`.
+  `manifest.signature.json`.
 - Writes pack-contained provenance metadata such as `metadata/source_repo.json`
   and `metadata/environment.json` before sealing the pack.
 - Stages the pack in a hidden sibling temporary directory and renames it into
@@ -569,7 +569,7 @@ run_pack.sh
   ├─ run_suite.sh → OUTPUT_DIR
   ├─ collect reports + sidecars
   ├─ write manifest + checksums
-  └─ optional HTML + GPG signature
+  └─ optional HTML + package-native signature
 ```
 
 `invarlock advanced proof-pack verify` checks the pack:
@@ -578,13 +578,22 @@ run_pack.sh
 - Verifies digest-backed manifest references (`subject`, `invocation.config_source`,
   `environment`, and `materials`) against on-pack files.
 - Verifies `checksums.sha256` (and thus all hashed artifacts).
-- Verifies the GPG signature when present; `--strict` requires it.
+- Verifies the package-native Ed25519 signature bundle when present; `--strict` requires it.
 - Enforces “no extra files” semantics in `--strict` mode.
 - Runs `invarlock verify` across all bundled reports (JSON output optional) with
   runtime-manifest enforcement on; each packaged `evaluation.report.json`
   carries an adjacent `runtime.manifest.json`.
 - Returns structured exit codes so callers can distinguish usage, missing-file,
   manifest-format, signature, integrity, and report-verification failures.
+
+The installed-wheel package-native CLI is self-contained:
+
+- `invarlock advanced proof-pack keygen` generates Ed25519 signing keys.
+- `invarlock advanced proof-pack build --signing-key ...` emits `manifest.signature.json`.
+- `invarlock advanced proof-pack verify` validates the signature bundle in-process and does not depend on external signature binaries.
+
+The repo shell harness remains a separate maintainer path, but it uses the same
+package-native Ed25519 manifest-signature format as the installed CLI.
 
 ## Remote setup helper
 
@@ -750,7 +759,8 @@ Primary metric acceptance/drift gates should be configured via profile/config
 | Variable | Default | Description |
 | --- | --- | --- |
 | `PACK_DIR` | `OUTPUT_DIR/proof_pack` | Proof pack output dir |
-| `PACK_GPG_SIGN` | `1` | Sign manifest if `gpg` available |
+| `PACK_SIGN_MANIFEST` | `1` | Sign `manifest.json` with a package-native Ed25519 key (auto-generated if `PACK_SIGNING_KEY` is unset) |
+| `PACK_SIGNING_KEY` | unset | Optional Ed25519 private key PEM for deterministic signer identity |
 | `PACK_SKIP_HTML` | `0` | Skip HTML rendering |
 | `PACK_VERIFY_PROFILE` | `dev` | Profile for `invarlock verify` |
 

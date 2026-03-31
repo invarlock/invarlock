@@ -241,6 +241,8 @@ mkdir -p "$SMOKE_EXPORT_DIR"
 "${CLI[@]}" report explain --report "$EDITED_REPORT" --baseline "$BASELINE_REPORT"
 
 printf '%s\n' '{"verdict":"PASS","note":"tiny attested smoke campaign"}' > "$WORK_ROOT/final_verdict.json"
+PROOF_PACK_SIGNING_KEY="$WORK_ROOT/proof_pack_signing_key.pem"
+PROOF_PACK_PUBLIC_KEY="$WORK_ROOT/proof_pack_signing_key.pub.pem"
 
 if [[ "$MODE" == "local" ]]; then
   echo "[smoke] skipping proof-pack build/verify in local mode; emitted artifacts are host-bypass."
@@ -248,19 +250,17 @@ if [[ "$MODE" == "local" ]]; then
   exit 0
 fi
 
+"${CLI[@]}" advanced proof-pack keygen "$PROOF_PACK_SIGNING_KEY" \
+  --public-key-out "$PROOF_PACK_PUBLIC_KEY" \
+  --json
 "${CLI[@]}" advanced proof-pack build "$PROOF_PACK_DIR" \
   --final-verdict "$WORK_ROOT/final_verdict.json" \
   --report "$EVAL_REPORT" \
+  --signing-key "$PROOF_PACK_SIGNING_KEY" \
   --profile "$PROFILE" \
   --json
 "${CLI[@]}" advanced proof-pack inspect "$PROOF_PACK_DIR" --json
-if [[ -f "$PROOF_PACK_DIR/manifest.json.asc" ]]; then
-  "${CLI[@]}" advanced proof-pack verify "$PROOF_PACK_DIR" --json || PROOF_PACK_VERIFY_RC=$?
-else
-  echo "[smoke] proof_pack_unsigned=1; using explicit unattested-artifact override"
-  INVARLOCK_ALLOW_UNATTESTED_ARTIFACTS=1 \
-    "${CLI[@]}" advanced proof-pack verify "$PROOF_PACK_DIR" --json || PROOF_PACK_VERIFY_RC=$?
-fi
+"${CLI[@]}" advanced proof-pack verify "$PROOF_PACK_DIR" --json || PROOF_PACK_VERIFY_RC=$?
 PROOF_PACK_VERIFY_RC="${PROOF_PACK_VERIFY_RC:-0}"
 echo "[smoke] proof_pack_verify_rc=$PROOF_PACK_VERIFY_RC"
 if [[ "$PROOF_PACK_VERIFY_RC" != "0" ]]; then

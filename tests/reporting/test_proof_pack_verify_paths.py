@@ -144,31 +144,32 @@ def test_verify_reports_success_writes_json_and_records_error_injection(
     assert json.loads(json_out.read_text(encoding="utf-8")) == payload
 
 
-def test_verify_gpg_timeout_paths(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_verify_signature_bundle_error_paths(tmp_path: Path) -> None:
     pack_dir = tmp_path / "pack"
     _write_pack_scaffold(pack_dir)
-    (pack_dir / "manifest.json.asc").write_text("sig", encoding="utf-8")
+    (pack_dir / "manifest.signature.json").write_text("{invalid", encoding="utf-8")
 
-    monkeypatch.setattr(
-        proof_pack_mod.subprocess,
-        "run",
-        lambda *args, **kwargs: (_ for _ in ()).throw(
-            proof_pack_mod.subprocess.TimeoutExpired(cmd="gpg", timeout=30)
-        ),
-        raising=True,
+    errors, warnings, fingerprint = proof_pack_mod._verify_signature(
+        pack_dir, strict=False
     )
-
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
-    assert errors == []
-    assert warnings == [
-        "gpg verification timed out; skipping manifest signature verification."
-    ]
+    assert "manifest.signature.json is not valid JSON" in errors[0]
+    assert warnings == []
     assert fingerprint is None
 
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=True)
-    assert errors == ["gpg verification timed out."]
+    _write_json(
+        pack_dir / "manifest.signature.json",
+        {
+            "format": "proof-pack-signature-v1",
+            "algorithm": "ed25519",
+            "signing_key_fingerprint": "sha256:" + ("a" * 64),
+            "public_key": {"encoding": "pem", "value": "bad-key"},
+            "signature": {"encoding": "base64", "value": "bad"},
+        },
+    )
+    errors, warnings, fingerprint = proof_pack_mod._verify_signature(
+        pack_dir, strict=False
+    )
+    assert "manifest signature verification failed." in errors[0]
     assert warnings == []
     assert fingerprint is None
 
@@ -193,7 +194,7 @@ def test_verify_proof_pack_covers_success_integrity_and_report_failure_paths(
 
     monkeypatch.setattr(
         proof_pack_mod,
-        "_verify_gpg",
+        "_verify_signature",
         _success_signature,
         raising=True,
     )

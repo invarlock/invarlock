@@ -69,6 +69,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refreshed docs to match the post-`v0.5.0` architecture and operations model,
   including the shell/core redesign, current evaluate contract, and updated
   report-artifact guidance.
+- Replaced the remaining proof-pack `gpg` path with the same package-native
+  Ed25519 manifest-signature flow used by the installed CLI, including
+  self-contained shell-harness signing and verification.
 - Added remediation closeout records from the refactor program and updated the
   maintainer smoke notes to distinguish the push-gated tiny attested smoke from
   the heavier GPT-2 canary workflow.

@@ -173,6 +173,8 @@ fi
 "${CLI[@]}" report explain --report "$EDITED_REPORT" --baseline "$BASELINE_REPORT"
 
 printf '%s\n' '{"verdict":"PASS","note":"gpt2 smoke campaign"}' > "$WORK_ROOT/final_verdict.json"
+PROOF_PACK_SIGNING_KEY="$WORK_ROOT/proof_pack_signing_key.pem"
+PROOF_PACK_PUBLIC_KEY="$WORK_ROOT/proof_pack_signing_key.pub.pem"
 
 if [[ "$MODE" == "local" ]]; then
   echo "[smoke] skipping proof-pack build/verify in local mode; emitted artifacts are host-bypass."
@@ -180,9 +182,13 @@ if [[ "$MODE" == "local" ]]; then
   exit 0
 fi
 
+"${CLI[@]}" advanced proof-pack keygen "$PROOF_PACK_SIGNING_KEY" \
+  --public-key-out "$PROOF_PACK_PUBLIC_KEY" \
+  --json
 "${CLI[@]}" advanced proof-pack build "$PROOF_PACK_DIR" \
   --final-verdict "$WORK_ROOT/final_verdict.json" \
   --report "$EVAL_REPORT" \
+  --signing-key "$PROOF_PACK_SIGNING_KEY" \
   --profile "$PROFILE" \
   --json
 "${CLI[@]}" advanced proof-pack inspect "$PROOF_PACK_DIR" --json

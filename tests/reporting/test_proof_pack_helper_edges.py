@@ -5,8 +5,11 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 import invarlock.proof_pack as proof_pack_mod
+import invarlock.proof_pack_integrity as proof_pack_integrity_mod
 from invarlock.reporting.verify_contract import VerifyExecutionResult, VerifyOutcome
 from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
 
@@ -82,18 +85,89 @@ def _write_manifest_and_checksums(
     _write_json(pack_dir / "manifest.json", manifest)
 
 
-def test_signature_warnings_to_errors_converts_gpg_paths() -> None:
+def _sign_pack(
+    pack_dir: Path,
+    tmp_path: Path,
+    *,
+    record_manifest_fingerprint: bool = True,
+    manifest_fingerprint_override: str | None = None,
+) -> str:
+    key_root = (
+        tmp_path
+        / f"proof-pack-signing-key-{len(list(tmp_path.glob('proof-pack-signing-key-*.pem'))):02d}.pem"
+    )
+    private_key = key_root
+    public_key = key_root.with_name(f"{key_root.stem}.pub.pem")
+    fingerprint = proof_pack_mod._generate_signing_keypair(
+        private_key,
+        public_key_path=public_key,
+    )
+    if record_manifest_fingerprint or manifest_fingerprint_override is not None:
+        manifest = json.loads((pack_dir / "manifest.json").read_text(encoding="utf-8"))
+        manifest["signing_key_fingerprint"] = (
+            fingerprint
+            if manifest_fingerprint_override is None
+            else manifest_fingerprint_override
+        )
+        _write_json(pack_dir / "manifest.json", manifest)
+    proof_pack_mod._sign_manifest(
+        pack_dir / "manifest.json", signing_key_path=private_key
+    )
+    return fingerprint
+
+
+def test_signature_warnings_to_errors_converts_signature_paths() -> None:
     assert proof_pack_mod._signature_warnings_to_errors(
         [
-            "gpg not found; skipping manifest signature verification.",
-            "gpg verification timed out; skipping manifest signature verification.",
+            "manifest.signature.json missing; pack is unsigned.",
             "other warning",
         ]
     ) == [
-        "gpg not found; default proof-pack verification requires signature verification.",
-        "gpg verification timed out.",
+        "manifest.signature.json missing; signed manifest required by default.",
         "other warning",
     ]
+
+
+def test_signing_key_validation_and_generation_error_paths(tmp_path: Path) -> None:
+    missing = tmp_path / "missing-key.pem"
+    assert proof_pack_integrity_mod.validate_signing_key(missing) == [
+        f"signing key file not found: {missing}"
+    ]
+
+    invalid_key = tmp_path / "invalid-key.pem"
+    invalid_key.write_text("not-a-pem", encoding="utf-8")
+    assert (
+        "signing key is invalid:"
+        in proof_pack_integrity_mod.validate_signing_key(invalid_key)[0]
+    )
+
+    rsa_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    rsa_key_path = tmp_path / "rsa-key.pem"
+    rsa_key_path.write_bytes(
+        rsa_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+    )
+    assert "Ed25519" in proof_pack_integrity_mod.validate_signing_key(rsa_key_path)[0]
+
+    private_key = tmp_path / "existing-private.pem"
+    public_key = tmp_path / "existing-public.pem"
+    private_key.write_text("exists", encoding="utf-8")
+    with pytest.raises(FileExistsError):
+        proof_pack_integrity_mod.generate_signing_keypair(
+            private_key,
+            public_key_path=public_key,
+        )
+
+    private_key.unlink()
+    public_key.write_text("exists", encoding="utf-8")
+    with pytest.raises(FileExistsError):
+        proof_pack_integrity_mod.generate_signing_keypair(
+            private_key,
+            public_key_path=public_key,
+        )
 
 
 def test_manual_validate_manifest_reports_structural_errors() -> None:
@@ -421,8 +495,8 @@ def test_checksum_and_extra_file_helpers_cover_error_paths(tmp_path: Path) -> No
     assert extra_warnings == []
 
 
-def test_verify_gpg_covers_missing_binary_signature_failure_and_fingerprint_mismatch(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+def test_verify_signature_covers_missing_signature_failure_and_fingerprint_mismatch(
+    tmp_path: Path,
 ) -> None:
     pack_dir = tmp_path / "pack"
     report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
@@ -433,82 +507,62 @@ def test_verify_gpg_covers_missing_binary_signature_failure_and_fingerprint_mism
         environment=environment,
     )
 
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
+    errors, warnings, fingerprint = proof_pack_mod._verify_signature(
+        pack_dir, strict=False
+    )
     assert errors == []
-    assert warnings == ["manifest.json.asc missing; pack is unsigned."]
+    assert warnings == ["manifest.signature.json missing; pack is unsigned."]
     assert fingerprint is None
 
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=True)
+    errors, warnings, fingerprint = proof_pack_mod._verify_signature(
+        pack_dir, strict=True
+    )
     assert errors == [
-        "manifest.json.asc missing (strict mode requires a signed manifest)."
+        "manifest.signature.json missing (strict mode requires a signed manifest)."
     ]
     assert warnings == []
     assert fingerprint is None
 
-    (pack_dir / "manifest.json.asc").write_text("sig", encoding="utf-8")
-    monkeypatch.setattr(
-        proof_pack_mod.subprocess,
-        "run",
-        lambda *args, **kwargs: (_ for _ in ()).throw(FileNotFoundError()),
-        raising=True,
+    (pack_dir / "manifest.signature.json").write_text("{invalid", encoding="utf-8")
+    errors, warnings, fingerprint = proof_pack_mod._verify_signature(
+        pack_dir, strict=False
     )
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
-    assert errors == []
-    assert "gpg not found" in warnings[0]
-    assert fingerprint is None
-
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=True)
-    assert errors == ["gpg not found (strict mode requires signature verification)."]
+    assert "manifest.signature.json is not valid JSON" in errors[0]
     assert warnings == []
     assert fingerprint is None
 
-    monkeypatch.setattr(
-        proof_pack_mod.subprocess,
-        "run",
-        lambda *args, **kwargs: (_ for _ in ()).throw(
-            UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
-        ),
-        raising=True,
-    )
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
-    assert "manifest signature verification failed." in errors[0]
-    assert warnings == []
-    assert fingerprint is None
-
-    monkeypatch.setattr(
-        proof_pack_mod.subprocess,
-        "run",
-        lambda *args, **kwargs: SimpleNamespace(
-            returncode=1, stdout="", stderr="bad signature"
-        ),
-        raising=True,
-    )
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
-    assert "manifest signature verification failed." in errors[0]
-    assert warnings == []
-    assert fingerprint is None
-
+    fingerprint = _sign_pack(pack_dir, tmp_path)
     manifest = json.loads((pack_dir / "manifest.json").read_text(encoding="utf-8"))
-    manifest["signing_key_fingerprint"] = "EXPECTED"
+    manifest["format"] = "tampered"
     _write_json(pack_dir / "manifest.json", manifest)
-    monkeypatch.setattr(
-        proof_pack_mod.subprocess,
-        "run",
-        lambda *args, **kwargs: SimpleNamespace(
-            returncode=0,
-            stdout="[GNUPG:] VALIDSIG ACTUAL 20260101 0 4 0 1 10 00 00\n",
-            stderr="",
-        ),
-        raising=True,
+    errors, warnings, fingerprint_out = proof_pack_mod._verify_signature(
+        pack_dir, strict=False
     )
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
+    assert "manifest signature verification failed." in errors[0]
+    assert warnings == []
+    assert fingerprint_out is None
+
+    _write_manifest_and_checksums(
+        pack_dir,
+        report_path=report_path,
+        final_verdict=final_verdict,
+        environment=environment,
+    )
+    mismatch_fingerprint = _sign_pack(
+        pack_dir,
+        tmp_path,
+        manifest_fingerprint_override="EXPECTED",
+    )
+    errors, warnings, fingerprint_out = proof_pack_mod._verify_signature(
+        pack_dir, strict=False
+    )
     assert "signing_key_fingerprint (EXPECTED) does not match" in errors[0]
     assert warnings == []
-    assert fingerprint == "ACTUAL"
+    assert fingerprint_out == mismatch_fingerprint
 
 
-def test_verify_gpg_uses_default_failure_text_and_ignores_short_validsig_lines(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+def test_verify_signature_uses_default_failure_text_and_rejects_malformed_bundle(
+    tmp_path: Path,
 ) -> None:
     pack_dir = tmp_path / "pack"
     report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
@@ -518,37 +572,98 @@ def test_verify_gpg_uses_default_failure_text_and_ignores_short_validsig_lines(
         final_verdict=final_verdict,
         environment=environment,
     )
-    (pack_dir / "manifest.json.asc").write_text("sig", encoding="utf-8")
-
-    monkeypatch.setattr(
-        proof_pack_mod.subprocess,
-        "run",
-        lambda *args, **kwargs: SimpleNamespace(returncode=1, stdout="", stderr=""),
-        raising=True,
+    _write_json(
+        pack_dir / "manifest.signature.json",
+        {
+            "format": "proof-pack-signature-v1",
+            "algorithm": "ed25519",
+            "signing_key_fingerprint": "sha256:" + ("a" * 64),
+            "public_key": {"encoding": "pem", "value": "bad-key"},
+            "signature": {"encoding": "base64", "value": ""},
+        },
     )
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
-    assert errors == ["manifest signature verification failed."]
+    errors, warnings, fingerprint = proof_pack_mod._verify_signature(
+        pack_dir, strict=False
+    )
+    assert (
+        "manifest.signature.json signature.value must be a non-empty base64 string."
+        in errors[0]
+    )
     assert warnings == []
     assert fingerprint is None
 
-    monkeypatch.setattr(
-        proof_pack_mod.subprocess,
-        "run",
-        lambda *args, **kwargs: SimpleNamespace(
-            returncode=0,
-            stdout="[GNUPG:] VALIDSIG\n",
-            stderr="",
-        ),
-        raising=True,
+    _write_json(
+        pack_dir / "manifest.signature.json",
+        {
+            "format": "wrong",
+            "algorithm": "ed25519",
+            "signing_key_fingerprint": "sha256:" + ("a" * 64),
+            "public_key": {"encoding": "pem", "value": "bad-key"},
+            "signature": {"encoding": "base64", "value": "abc"},
+        },
     )
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
-    assert errors == []
+    errors, warnings, fingerprint = proof_pack_mod._verify_signature(
+        pack_dir, strict=False
+    )
+    assert "manifest.signature.json format must be" in errors[0]
     assert warnings == []
     assert fingerprint is None
 
 
-def test_verify_gpg_skips_short_validsig_before_later_fingerprint(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+def test_signature_bundle_structure_and_decode_error_paths(tmp_path: Path) -> None:
+    signature_path = tmp_path / "manifest.signature.json"
+
+    _write_json(signature_path, ["not", "an", "object"])
+    bundle, errors = proof_pack_integrity_mod._load_signature_bundle(signature_path)
+    assert bundle is None
+    assert errors == ["manifest.signature.json must decode to a JSON object."]
+
+    _write_json(
+        signature_path,
+        {
+            "format": "wrong",
+            "algorithm": "rsa",
+            "public_key": "bad",
+            "signature": "bad",
+            "signing_key_fingerprint": "bad",
+        },
+    )
+    bundle, errors = proof_pack_integrity_mod._load_signature_bundle(signature_path)
+    assert bundle is None
+    assert "manifest.signature.json algorithm must be 'ed25519'." in errors
+    assert "manifest.signature.json public_key must be an object." in errors
+    assert "manifest.signature.json signature must be an object." in errors
+    assert (
+        "manifest.signature.json signing_key_fingerprint must be a sha256:... string."
+        in errors
+    )
+
+    _write_json(
+        signature_path,
+        {
+            "format": "proof-pack-signature-v1",
+            "algorithm": "ed25519",
+            "public_key": {"encoding": "der", "value": ""},
+            "signature": {"encoding": "hex", "value": ""},
+            "signing_key_fingerprint": "sha256:" + ("a" * 64),
+        },
+    )
+    bundle, errors = proof_pack_integrity_mod._load_signature_bundle(signature_path)
+    assert bundle is None
+    assert "manifest.signature.json public_key.encoding must be 'pem'." in errors
+    assert (
+        "manifest.signature.json public_key.value must be a non-empty PEM string."
+        in errors
+    )
+    assert "manifest.signature.json signature.encoding must be 'base64'." in errors
+    assert (
+        "manifest.signature.json signature.value must be a non-empty base64 string."
+        in errors
+    )
+
+
+def test_verify_signature_bundle_fingerprint_and_decode_error_paths(
+    tmp_path: Path,
 ) -> None:
     pack_dir = tmp_path / "pack"
     report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
@@ -558,29 +673,69 @@ def test_verify_gpg_skips_short_validsig_before_later_fingerprint(
         final_verdict=final_verdict,
         environment=environment,
     )
-    manifest = json.loads((pack_dir / "manifest.json").read_text(encoding="utf-8"))
-    manifest["signing_key_fingerprint"] = "ACTUAL"
-    (pack_dir / "manifest.json").write_text(
-        json.dumps(manifest, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    (pack_dir / "manifest.json.asc").write_text("sig", encoding="utf-8")
+    expected_fingerprint = _sign_pack(pack_dir, tmp_path)
+    signature_path = pack_dir / "manifest.signature.json"
 
-    monkeypatch.setattr(
-        proof_pack_mod.subprocess,
-        "run",
-        lambda *args, **kwargs: SimpleNamespace(
-            returncode=0,
-            stdout="[GNUPG:] VALIDSIG \n[GNUPG:] VALIDSIG ACTUAL EXTRA\n",
-            stderr="",
-        ),
-        raising=True,
+    bundle = json.loads(signature_path.read_text(encoding="utf-8"))
+    bundle["signing_key_fingerprint"] = "sha256:" + ("0" * 64)
+    _write_json(signature_path, bundle)
+    errors, warnings, fingerprint = proof_pack_integrity_mod.verify_signature(
+        pack_dir, strict=False
     )
-
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
-    assert errors == []
+    assert "does not match bundled public key" in errors[0]
     assert warnings == []
-    assert fingerprint == "ACTUAL"
+    assert fingerprint == expected_fingerprint
+
+    bundle = json.loads(signature_path.read_text(encoding="utf-8"))
+    bundle["signing_key_fingerprint"] = expected_fingerprint
+    bundle["signature"]["value"] = "%%%not-base64%%%"
+    _write_json(signature_path, bundle)
+    errors, warnings, fingerprint = proof_pack_integrity_mod.verify_signature(
+        pack_dir, strict=False
+    )
+    assert "manifest signature verification failed." in errors[0]
+    assert warnings == []
+    assert fingerprint is None
+
+
+def test_verify_signature_rejects_non_ed25519_public_key(tmp_path: Path) -> None:
+    pack_dir = tmp_path / "pack"
+    report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
+    _write_manifest_and_checksums(
+        pack_dir,
+        report_path=report_path,
+        final_verdict=final_verdict,
+        environment=environment,
+    )
+
+    rsa_private = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    public_pem = (
+        rsa_private.public_key()
+        .public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        .decode("ascii")
+    )
+    _write_json(
+        pack_dir / "manifest.signature.json",
+        {
+            "format": "proof-pack-signature-v1",
+            "algorithm": "ed25519",
+            "signing_key_fingerprint": "sha256:" + ("a" * 64),
+            "public_key": {"encoding": "pem", "value": public_pem},
+            "signature": {"encoding": "base64", "value": "YWJj"},
+        },
+    )
+
+    errors, warnings, fingerprint = proof_pack_integrity_mod.verify_signature(
+        pack_dir, strict=False
+    )
+    assert errors == [
+        "manifest signature verification failed. public key must be Ed25519."
+    ]
+    assert warnings == []
+    assert fingerprint is None
 
 
 def test_verify_reports_and_inspect_cover_error_paths(
@@ -1071,8 +1226,8 @@ def test_parse_checksums_ignores_blank_lines(tmp_path: Path) -> None:
     assert entries == [("a" * 64, "results/final_verdict.json")]
 
 
-def test_verify_gpg_success_without_validsig_returns_no_fingerprint(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+def test_verify_signature_success_without_manifest_fingerprint_returns_signer(
+    tmp_path: Path,
 ) -> None:
     pack_dir = tmp_path / "pack"
     report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
@@ -1082,27 +1237,21 @@ def test_verify_gpg_success_without_validsig_returns_no_fingerprint(
         final_verdict=final_verdict,
         environment=environment,
     )
-    (pack_dir / "manifest.json.asc").write_text("sig", encoding="utf-8")
-
-    monkeypatch.setattr(
-        proof_pack_mod.subprocess,
-        "run",
-        lambda *args, **kwargs: SimpleNamespace(
-            returncode=0,
-            stdout="[GNUPG:] GOODSIG TEST KEY\n",
-            stderr="",
-        ),
-        raising=True,
+    expected_fingerprint = _sign_pack(
+        pack_dir,
+        tmp_path,
+        record_manifest_fingerprint=False,
     )
-
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
+    errors, warnings, fingerprint = proof_pack_mod._verify_signature(
+        pack_dir, strict=False
+    )
     assert errors == []
     assert warnings == []
-    assert fingerprint is None
+    assert fingerprint == expected_fingerprint
 
 
-def test_verify_gpg_success_with_matching_fingerprint_returns_signer(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+def test_verify_signature_success_with_matching_fingerprint_returns_signer(
+    tmp_path: Path,
 ) -> None:
     pack_dir = tmp_path / "pack"
     report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
@@ -1112,26 +1261,13 @@ def test_verify_gpg_success_with_matching_fingerprint_returns_signer(
         final_verdict=final_verdict,
         environment=environment,
     )
-    manifest = json.loads((pack_dir / "manifest.json").read_text(encoding="utf-8"))
-    manifest["signing_key_fingerprint"] = "MATCHED"
-    _write_json(pack_dir / "manifest.json", manifest)
-    (pack_dir / "manifest.json.asc").write_text("sig", encoding="utf-8")
-
-    monkeypatch.setattr(
-        proof_pack_mod.subprocess,
-        "run",
-        lambda *args, **kwargs: SimpleNamespace(
-            returncode=0,
-            stdout="[GNUPG:] VALIDSIG MATCHED 20260101 0 4 0 1 10 00 00\n",
-            stderr="",
-        ),
-        raising=True,
+    expected_fingerprint = _sign_pack(pack_dir, tmp_path)
+    errors, warnings, fingerprint = proof_pack_mod._verify_signature(
+        pack_dir, strict=False
     )
-
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
     assert errors == []
     assert warnings == []
-    assert fingerprint == "MATCHED"
+    assert fingerprint == expected_fingerprint
 
 
 def test_inspect_proof_pack_reports_missing_manifest_and_checksums(
@@ -1176,7 +1312,7 @@ def test_inspect_proof_pack_signed_pack_omits_unsigned_warning_and_reports_extra
         final_verdict=final_verdict,
         environment=environment,
     )
-    (pack_dir / "manifest.json.asc").write_text("sig", encoding="utf-8")
+    _sign_pack(pack_dir, tmp_path)
     (pack_dir / "extra.bin").write_text("extra", encoding="utf-8")
 
     result = proof_pack_mod.inspect_proof_pack(pack_dir)
@@ -1207,7 +1343,7 @@ def test_inspect_proof_pack_unsigned_clean_pack_reports_warning_without_extras(
     assert payload["ok"] is True
     assert payload["integrity"]["extra_files"] == []
     assert (
-        "manifest.json.asc missing; strict verification would fail."
+        "manifest.signature.json missing; strict verification would fail."
         in payload["issues"]
     )
 
@@ -1371,7 +1507,7 @@ def test_verify_proof_pack_returns_signature_failure_payload(
 
     monkeypatch.setattr(
         proof_pack_mod,
-        "_verify_gpg",
+        "_verify_signature",
         lambda pack_dir, strict: (["bad signature"], [], "FPR123"),
         raising=True,
     )
@@ -1418,7 +1554,7 @@ def test_verify_proof_pack_skip_verify_fails_closed_without_signature_override(
     assert "verify" not in result.payload
     assert result.payload["warnings"] == []
     assert result.payload["errors"] == [
-        "manifest.json.asc missing; signed manifest required by default."
+        "manifest.signature.json missing; signed manifest required by default."
     ]
 
 
@@ -1455,7 +1591,7 @@ def test_verify_proof_pack_skip_verify_allows_explicit_unattested_override(
     assert result.payload["ok"] is True
     assert "verify" not in result.payload
     assert result.payload["warnings"] == [
-        "manifest.json.asc missing; pack is unsigned."
+        "manifest.signature.json missing; pack is unsigned."
     ]
 
 
