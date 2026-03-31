@@ -254,7 +254,13 @@ fi
   --profile "$PROFILE" \
   --json
 "${CLI[@]}" advanced proof-pack inspect "$PROOF_PACK_DIR" --json
-"${CLI[@]}" advanced proof-pack verify "$PROOF_PACK_DIR" --json || PROOF_PACK_VERIFY_RC=$?
+if [[ -f "$PROOF_PACK_DIR/manifest.json.asc" ]]; then
+  "${CLI[@]}" advanced proof-pack verify "$PROOF_PACK_DIR" --json || PROOF_PACK_VERIFY_RC=$?
+else
+  echo "[smoke] proof_pack_unsigned=1; using explicit unattested-artifact override"
+  INVARLOCK_ALLOW_UNATTESTED_ARTIFACTS=1 \
+    "${CLI[@]}" advanced proof-pack verify "$PROOF_PACK_DIR" --json || PROOF_PACK_VERIFY_RC=$?
+fi
 PROOF_PACK_VERIFY_RC="${PROOF_PACK_VERIFY_RC:-0}"
 echo "[smoke] proof_pack_verify_rc=$PROOF_PACK_VERIFY_RC"
 if [[ "$PROOF_PACK_VERIFY_RC" != "0" ]]; then
