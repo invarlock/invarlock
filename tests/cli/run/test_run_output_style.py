@@ -428,7 +428,7 @@ def test_run_execution_output_helpers_cover_fallback_and_progress_paths(
 
     progress_console = RecordingConsole()
     progress_console._invarlock_output_style = SimpleNamespace(progress=True)
-    perf_values = iter([10.0, 12.25, 20.0, 30.0])
+    perf_values = iter([10.0, 12.25, 20.0, 30.0, 30.0, 32.0])
     monkeypatch.setattr(output_mod, "perf_counter", lambda: next(perf_values))
 
     run_execution_output_mod.begin_progress_step(progress_console, "load")
@@ -465,6 +465,37 @@ def test_run_execution_output_helpers_cover_fallback_and_progress_paths(
     assert resumed_console._invarlock_progress_completed == {"load_model"}
     assert resumed_console._invarlock_progress_steps["execute"] == 30.0
     assert "Loading model done (2.00s)" in resumed_console.joined()
+
+    new_transition_console = RecordingConsole()
+    new_transition_console._invarlock_output_style = SimpleNamespace(progress=True)
+    run_execution_output_mod.transition_progress_step(
+        new_transition_console,
+        "missing",
+        from_tag="INIT",
+        from_message="Warmup",
+        to_key="execute",
+        from_emoji="🔧",
+    )
+    assert new_transition_console._invarlock_progress_steps == {"execute": 30.0}
+    assert not hasattr(new_transition_console, "_invarlock_progress_completed")
+
+    existing_completed_console = RecordingConsole()
+    existing_completed_console._invarlock_output_style = SimpleNamespace(progress=True)
+    existing_completed_console._invarlock_progress_steps = {"load_model": 30.0}
+    existing_completed_console._invarlock_progress_completed = {"warmup"}
+    run_execution_output_mod.transition_progress_step(
+        existing_completed_console,
+        "load_model",
+        from_tag="INIT",
+        from_message="Loading model",
+        to_key="execute",
+        from_emoji="🔧",
+    )
+    assert existing_completed_console._invarlock_progress_completed == {
+        "warmup",
+        "load_model",
+    }
+    assert existing_completed_console._invarlock_progress_steps["execute"] == 32.0
 
 
 def test_run_execution_event_rendering_covers_split_owner_branches(monkeypatch) -> None:
