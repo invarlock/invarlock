@@ -41,11 +41,15 @@ Security-default note: `evaluate` uses the runtime container by default. Use
 boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.
 
 Smoke asset note: `configs/presets/causal_lm/gpt2_smoke_128.yaml` ships the
-small GPT-2 smoke preset used by `scripts/run_gpt2_smoke_campaign.sh` and the
-repository smoke workflow. The smoke campaign runs under the shipped `dev`
-profile so it can complete the full `evaluate` → `verify` → `report` →
-`proof-pack` path on the cached GPT-2 assets without relying on the heavier
-release profile floors.
+small GPT-2 canary preset used by `scripts/run_gpt2_smoke_campaign.sh` and the
+scheduled/workflow-dispatch GPT-2 smoke workflow. Push gating now uses
+`scripts/run_tiny_attested_smoke.sh` and the `Tiny Attested Smoke` workflow
+with `sshleifer/tiny-gpt2` plus a local JSONL fixture. Both smoke paths run
+under the shipped `dev` profile so they can complete the full `evaluate` →
+`verify` → `report` → `proof-pack` path without depending on release-profile
+floors. The tiny push smoke also uses an explicit unattested-artifact override
+for proof-pack verification when CI produces an unsigned pack; the default
+package-native verifier behavior remains fail-closed for unsigned packs.
 
 ---
 
