@@ -84,6 +84,19 @@ def _needs_gpu_passthrough(argv: list[str]) -> bool:
     return _host_nvidia_visible()
 
 
+def _validate_requested_device(argv: list[str]) -> None:
+    requested = _requested_device(argv)
+    if requested != "cuda":
+        return
+    if _host_nvidia_visible():
+        return
+    raise RuntimeError(
+        "Requested --device cuda, but no NVIDIA runtime is visible on the host. "
+        "Install NVIDIA container support so `nvidia-smi` or `/dev/nvidiactl` is "
+        "available, or use --device auto/cpu."
+    )
+
+
 def normalize_delegated_argv(argv: list[str], *, cwd: Path) -> ContainerLaunchPlan:
     rewritten = list(argv)
     mounts: set[Path] = set()
@@ -143,6 +156,8 @@ def normalize_delegated_argv(argv: list[str], *, cwd: Path) -> ContainerLaunchPl
             value_index=value_index,
             new_value=new_value,
         )
+
+    _validate_requested_device(rewritten)
 
     return ContainerLaunchPlan(
         argv=tuple(rewritten),

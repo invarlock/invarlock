@@ -103,6 +103,27 @@ EOF
     assert_rc "0" "${RUN_RC}" "manifest carries attestation metadata"
 }
 
+test_run_pack_build_pack_fails_when_source_repo_metadata_fails() {
+    mock_reset
+
+    source ./scripts/proof_packs/run_pack.sh
+
+    local run_dir="${TEST_TMPDIR}/run"
+    mkdir -p "${run_dir}/reports" "${run_dir}/analysis" "${run_dir}/state"
+    echo "verdict" > "${run_dir}/reports/final_verdict.txt"
+    echo '{"verdict":"PASS"}' > "${run_dir}/reports/final_verdict.json"
+
+    pack_write_source_repo_metadata() {
+        local dest="$1"
+        echo "ERROR: git is required to collect proof-pack source provenance." >&2
+        return 1
+    }
+
+    run pack_build_pack "${run_dir}" "${TEST_TMPDIR}/pack"
+    assert_rc "1" "${RUN_RC}" "pack build fails when source repo metadata cannot be written"
+    assert_match "git is required to collect proof-pack source provenance" "${RUN_ERR}" "source provenance failure is surfaced"
+}
+
 test_run_pack_build_pack_rejects_failed_final_verdict() {
     mock_reset
 

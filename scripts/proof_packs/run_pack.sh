@@ -408,8 +408,8 @@ pack_populate_pack_dir() {
     pack_copy_optional "${run_dir}/state/model_revisions.json" "${revisions_dest}"
     pack_copy_optional "${run_dir}/state/scenarios.json" "${scenarios_dest}"
     pack_copy_optional "${run_dir}/state/tuned_edit_params.json" "${tuned_edit_params_dest}"
-    pack_write_source_repo_metadata "${source_repo_dest}"
-    pack_write_environment_metadata "${run_dir}" "${environment_dest}"
+    pack_write_source_repo_metadata "${source_repo_dest}" || return $?
+    pack_write_environment_metadata "${run_dir}" "${environment_dest}" || return $?
 
     local report
     while IFS= read -r report; do
@@ -435,9 +435,9 @@ pack_populate_pack_dir() {
         pack_generate_html "${pack_dir}"
     fi
 
-    pack_write_readme "${pack_dir}"
-    pack_write_checksums "${pack_dir}"
-    pack_write_manifest "${pack_dir}" "${run_dir}" "${PACK_SUITE:-}" "${PACK_NET:-0}" "${PACK_DETERMINISM:-}" "${PACK_REPEATS:-0}"
+    pack_write_readme "${pack_dir}" || return $?
+    pack_write_checksums "${pack_dir}" || return $?
+    pack_write_manifest "${pack_dir}" "${run_dir}" "${PACK_SUITE:-}" "${PACK_NET:-0}" "${PACK_DETERMINISM:-}" "${PACK_REPEATS:-0}" || return $?
     local sign_rc=0
     if pack_sign_manifest "${pack_dir}"; then
         sign_rc=0

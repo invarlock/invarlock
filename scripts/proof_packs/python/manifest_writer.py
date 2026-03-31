@@ -5,9 +5,11 @@ import datetime as dt
 import hashlib
 import json
 import os
-import subprocess
+import sys
 from pathlib import Path
 from typing import Any
+
+from source_repo_metadata import SourceRepoMetadataError, build_source_repo_payload
 
 UTC = getattr(dt, "UTC", dt.timezone.utc)  # noqa: UP017
 
@@ -81,26 +83,6 @@ def _maybe_get_invarlock_version() -> str:
         return ""
 
 
-def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[3]
-
-
-def _git_text(*args: str) -> str:
-    try:
-        proc = subprocess.run(
-            ["git", *args],
-            cwd=_repo_root(),
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-    except Exception:
-        return ""
-    if proc.returncode != 0:
-        return ""
-    return proc.stdout.strip()
-
-
 def _model_licenses_for(model_ids: set[str]) -> dict[str, str]:
     known_licenses = {
         "mistralai/Mistral-7B-v0.1": "Apache-2.0",
@@ -119,6 +101,18 @@ def _first_file(pack_dir: Path, *candidates: str) -> Path | None:
 def _load_metadata_object(pack_dir: Path, rel_path: str) -> dict[str, Any]:
     payload = _load_json(pack_dir / rel_path)
     return payload if isinstance(payload, dict) else {}
+
+
+def _load_required_metadata_object(
+    pack_dir: Path, rel_path: str
+) -> dict[str, Any] | None:
+    path = pack_dir / rel_path
+    if not path.is_file():
+        return None
+    payload = _load_json(path)
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"{rel_path} must contain a JSON object")
+    return payload
 
 
 def _file_reference(
@@ -152,18 +146,31 @@ def _subject(pack_dir: Path) -> dict[str, Any] | None:
 
 
 def _config_source(pack_dir: Path) -> dict[str, Any]:
-    payload = _load_metadata_object(pack_dir, "metadata/source_repo.json")
+    payload = _load_required_metadata_object(pack_dir, "metadata/source_repo.json")
     reference = _file_reference(pack_dir, "metadata/source_repo.json")
+    if payload is None:
+        payload = build_source_repo_payload()
+    uri = payload.get("uri")
+    commit = payload.get("commit")
+    branch = payload.get("branch")
+    describe = payload.get("describe")
+    dirty = payload.get("dirty")
+    if not isinstance(uri, str) or not uri.strip():
+        raise RuntimeError("source repo provenance must include a non-empty uri")
+    if not isinstance(commit, str) or not commit.strip():
+        raise RuntimeError("source repo provenance must include a non-empty commit")
+    if not isinstance(branch, str) or not branch.strip():
+        raise RuntimeError("source repo provenance must include a non-empty branch")
+    if not isinstance(describe, str) or not describe.strip():
+        raise RuntimeError("source repo provenance must include a non-empty describe")
+    if not isinstance(dirty, bool):
+        raise RuntimeError("source repo provenance must include a boolean dirty flag")
     result: dict[str, Any] = {
-        "uri": payload.get("uri") or "",
-        "commit": payload.get("commit") or _git_text("rev-parse", "HEAD"),
-        "branch": payload.get("branch")
-        or _git_text("rev-parse", "--abbrev-ref", "HEAD"),
-        "describe": payload.get("describe")
-        or _git_text("describe", "--tags", "--always", "--dirty"),
-        "dirty": bool(payload.get("dirty"))
-        if payload
-        else bool(_git_text("status", "--porcelain")),
+        "uri": uri,
+        "commit": commit,
+        "branch": branch,
+        "describe": describe,
+        "dirty": dirty,
     }
     if reference is not None:
         result.update(reference)
@@ -355,14 +362,18 @@ def main(argv: list[str] | None = None) -> int:
         repeats = int(args.repeats)
     except Exception:
         repeats = 0
-    write_manifest(
-        pack_dir=Path(args.pack_dir),
-        run_dir=Path(args.run_dir),
-        suite=str(args.suite),
-        net=str(args.net),
-        determinism=str(args.determinism),
-        repeats=repeats,
-    )
+    try:
+        write_manifest(
+            pack_dir=Path(args.pack_dir),
+            run_dir=Path(args.run_dir),
+            suite=str(args.suite),
+            net=str(args.net),
+            determinism=str(args.determinism),
+            repeats=repeats,
+        )
+    except (RuntimeError, SourceRepoMetadataError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
     return 0
 
 

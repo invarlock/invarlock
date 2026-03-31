@@ -98,6 +98,27 @@ def test_runtime_launch_plan_helper_functions_cover_device_and_flag_parsing(
     assert options == ["--config", "cfg.yaml", "--progress"]
 
 
+def test_normalize_delegated_argv_rejects_explicit_cuda_without_nvidia_visibility(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    cwd = tmp_path / "repo"
+    cwd.mkdir()
+
+    monkeypatch.setattr(
+        runtime_launch_plan,
+        "_host_nvidia_visible",
+        lambda: False,
+        raising=True,
+    )
+
+    with pytest.raises(RuntimeError, match="Requested --device cuda"):
+        runtime_launch_plan.normalize_delegated_argv(
+            ["evaluate", "--device", "cuda"],
+            cwd=cwd,
+        )
+
+
 def test_normalize_delegated_argv_rewrites_paths_and_builders(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

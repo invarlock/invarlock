@@ -306,6 +306,57 @@ def test_run_from_config_skips_manifest_for_missing_report(
     )
 
 
+def test_run_from_config_wraps_explicit_cuda_visibility_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        config_execution,
+        "resolve_shell_runtime_security_policy",
+        lambda **kwargs: runtime_security.build_runtime_security_policy(**kwargs),
+        raising=True,
+    )
+
+    @contextmanager
+    def _scope(*, policy):
+        yield
+
+    monkeypatch.setattr(
+        config_execution,
+        "runtime_allowances_scope",
+        _scope,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        config_execution,
+        "running_inside_container",
+        lambda: False,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        config_execution,
+        "host_execution_allowed",
+        lambda: False,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        config_execution,
+        "build_request_container_launch_plan",
+        lambda command_name, request: (_ for _ in ()).throw(
+            RuntimeError("Requested --device cuda, but no NVIDIA runtime is visible")
+        ),
+        raising=True,
+    )
+
+    with pytest.raises(
+        config_execution.RuntimeDelegationError,
+        match="Requested --device cuda",
+    ):
+        config_execution.run_from_config(
+            config="configs/demo.yaml",
+            device="cuda",
+        )
+
+
 def test_run_from_config_raises_when_run_execution_returns_none(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

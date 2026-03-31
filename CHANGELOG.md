@@ -48,6 +48,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tighter repo gates.
 - Fixed release publishing and recovery paths around existing tags and
   dist-only uploads.
+- Proof-pack maintainer packaging now fails closed when Git-backed source
+  provenance cannot be collected, and explicit `--device cuda` delegation now
+  rejects hosts without visible NVIDIA runtime support instead of silently
+  dropping GPU passthrough.
 
 ### Removed
 - Removed remaining compatibility surfaces that no longer fit the stabilized

@@ -595,6 +595,14 @@ The installed-wheel package-native CLI is self-contained:
 The repo shell harness remains a separate maintainer path, but it uses the same
 package-native Ed25519 manifest-signature format as the installed CLI.
 
+Maintainer proof-pack packaging also treats source provenance as fail-closed:
+
+- `run_pack.sh` writes `metadata/source_repo.json` from the current Git checkout.
+- If `git` is unavailable or the repository metadata cannot be collected, pack
+  creation stops instead of silently emitting partial provenance.
+- If you need to package from a detached artifact tree, write a complete
+  `metadata/source_repo.json` first rather than relying on fallback inference.
+
 ## Remote setup helper
 
 `scripts/proof_packs/lib/setup_remote.sh` is an optional bootstrap script for

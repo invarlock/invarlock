@@ -347,6 +347,22 @@ context:
 2. Force higher precision: `dtype: float32` in config
 3. Reduce edit scope or batch size
 
+### Explicit CUDA Request Rejected Before Container Launch
+
+**Symptom:** Secure-default `evaluate`, `run`, or `calibrate` exits early with a
+message that `--device cuda` was requested but no NVIDIA runtime is visible on
+the host.
+
+**Cause:** Explicit CUDA requests are fail-closed for delegated container runs.
+InvarLock requires either `/dev/nvidiactl` or `nvidia-smi` to be visible before
+it adds `--gpus all` to the container launch.
+
+**Fixes:**
+
+1. Install or expose NVIDIA container support so `nvidia-smi` works on the host
+2. Use `--device auto` if CPU fallback is acceptable
+3. Use `--device cpu` when you want a deterministic CPU-only run
+
 ## Debug Tools
 
 ### Doctor Command
