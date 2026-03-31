@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   orchestration, run execution, report building, verification checks, and
   proof-pack handling into smaller implementation files with stronger guardrail
   coverage.
+- Converged runtime-manifest verification onto a single package-native Python
+  path so product attestation, `invarlock-runtime-verify`, and
+  `make runtime-verify` all exercise the same verifier implementation.
 - Ratcheted refactored split owners to stricter 95% and 100% per-file coverage
   thresholds where the current suite supports it.
 
@@ -71,6 +74,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the heavier GPT-2 canary workflow.
 - Documented the Python-only runtime-verifier contract and removed the obsolete
   external-verifier environment-variable guidance.
+- Updated the architecture/security references so runtime attestation
+  ownership now explicitly points at the package-native verifier instead of an
+  external-binary model.
 
 ## [0.5.0] - 2026-03-25
 ### Added
