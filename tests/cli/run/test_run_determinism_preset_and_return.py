@@ -174,9 +174,7 @@ def test_run_command_returns_report_path_and_emits_determinism_meta(
             )
         )
         stack.enter_context(
-            patch(
-                "invarlock.reporting.run_report_contract.save_report", _fake_save_report
-            )
+            patch("invarlock.reporting.report_files.save_report", _fake_save_report)
         )
 
         report_path = run_command(
@@ -309,9 +307,7 @@ def test_run_command_persists_tiny_relax_context(tmp_path: Path, monkeypatch) ->
             )
         )
         stack.enter_context(
-            patch(
-                "invarlock.reporting.run_report_contract.save_report", _fake_save_report
-            )
+            patch("invarlock.reporting.report_files.save_report", _fake_save_report)
         )
 
         run_command(
@@ -444,9 +440,7 @@ def test_run_command_does_not_include_determinism_when_preset_empty(
             )
         )
         stack.enter_context(
-            patch(
-                "invarlock.reporting.run_report_contract.save_report", _fake_save_report
-            )
+            patch("invarlock.reporting.report_files.save_report", _fake_save_report)
         )
         stack.enter_context(
             patch(
@@ -594,9 +588,7 @@ context:
             )
         )
         stack.enter_context(
-            patch(
-                "invarlock.reporting.run_report_contract.save_report", _fake_save_report
-            )
+            patch("invarlock.reporting.report_files.save_report", _fake_save_report)
         )
         stack.enter_context(
             patch(

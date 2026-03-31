@@ -6,19 +6,14 @@ from pathlib import Path
 from typing import Any
 
 from . import report_files
+from .report_types import RunReport
 
 _NON_FATAL_EXCEPTIONS = (AttributeError, KeyError, OSError, TypeError, ValueError)
 
 
-def save_report(*args: Any, **kwargs: Any) -> Any:
-    """Compatibility wrapper so callers can patch either contract or report_files."""
-
-    return report_files.save_report(*args, **kwargs)
-
-
 @dataclass(frozen=True)
 class RunReportAssemblyResult:
-    report: dict[str, Any]
+    report: RunReport
     timings: dict[str, float]
     provenance_result: Any
     metrics_enrichment: Any
@@ -319,7 +314,7 @@ def assemble_run_report(
 
 def persist_run_report_outputs(
     *,
-    report: dict[str, Any],
+    report: RunReport,
     run_dir: Path,
     run_config: Any,
     telemetry: bool,
@@ -328,9 +323,9 @@ def persist_run_report_outputs(
     telemetry_path: Path | None = None
     if telemetry:
         telemetry_path = run_dir / "telemetry.json"
-        report.setdefault("artifacts", {})["telemetry_path"] = str(telemetry_path)
+        report["artifacts"]["telemetry_path"] = str(telemetry_path)
 
-    saved_paths = save_report(
+    saved_paths = report_files.save_report(
         report,
         run_dir,
         formats=["json"],

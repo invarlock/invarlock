@@ -17,3 +17,4 @@ def test_canonical_reporting_imports_are_available() -> None:
 def test_removed_reporting_facades_are_not_importable() -> None:
     assert importlib.util.find_spec("invarlock.reporting.report_builder") is None
     assert importlib.util.find_spec("invarlock.reporting.report_make_support") is None
+    assert importlib.util.find_spec("invarlock.reporting.verify_checks") is None

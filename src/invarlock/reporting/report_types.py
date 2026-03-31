@@ -145,6 +145,7 @@ class Artifacts(TypedDict):
     events_path: str  # Path to event log file
     logs_path: str  # Path to detailed logs
     checkpoint_path: str | None  # Path to model checkpoint (if saved)
+    telemetry_path: NotRequired[str]  # Path to saved telemetry payload
 
 
 class Flags(TypedDict):

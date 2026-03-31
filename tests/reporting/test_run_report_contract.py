@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+from invarlock.reporting.report_types import create_empty_report
 from invarlock.reporting.run_report_contract import (
     assemble_run_report,
     persist_run_report_outputs,
@@ -141,11 +142,11 @@ def test_persist_run_report_outputs_adds_telemetry_and_saved_paths(
         return {"json": out}
 
     monkeypatch.setattr(
-        "invarlock.reporting.run_report_contract.save_report",
+        "invarlock.reporting.report_files.save_report",
         _save_report,
     )
 
-    report = {"artifacts": {}}
+    report = create_empty_report()
     result = persist_run_report_outputs(
         report=report,
         run_dir=tmp_path,

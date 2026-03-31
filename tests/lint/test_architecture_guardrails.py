@@ -17,6 +17,7 @@ OWNER_LAYER_ROOTS = (
 REMOVED_REPORTING_MODULES = (
     REPO_ROOT / "src/invarlock/reporting/report_builder.py",
     REPO_ROOT / "src/invarlock/reporting/report_make_support.py",
+    REPO_ROOT / "src/invarlock/reporting/verify_checks.py",
 )
 RUN_COMMAND_PATH = REPO_ROOT / "src/invarlock/cli/commands/run.py"
 RUN_EXECUTION_PATH = REPO_ROOT / "src/invarlock/cli/run_execution.py"
@@ -66,8 +67,10 @@ def test_removed_reporting_facades_do_not_reappear() -> None:
     banned_refs = (
         "invarlock.reporting.report_builder",
         "invarlock.reporting.report_make_support",
+        "invarlock.reporting.verify_checks",
         "src/invarlock/reporting/report_builder.py",
         "src/invarlock/reporting/report_make_support.py",
+        "src/invarlock/reporting/verify_checks.py",
     )
     for root in (REPO_ROOT / "src", REPO_ROOT / "docs", REPO_ROOT / "scripts"):
         for path in root.rglob("*"):
