@@ -421,10 +421,10 @@ def test_calibrated_split_owner_thresholds_are_explicit(tmp_path: Path) -> None:
             ("src/invarlock/proof_pack_manifest.py", 0.899, 1.0),
             ("src/invarlock/reporting/verify_check_helpers.py", 0.949, 1.0),
             ("src/invarlock/runtime_security_helpers.py", 0.949, 1.0),
-            ("src/invarlock/cli/run_execution_output.py", 0.899, 1.0),
-            ("src/invarlock/cli/runtime_launch_plan.py", 0.899, 1.0),
-            ("src/invarlock/reporting/run_report_contract.py", 0.899, 1.0),
-            ("src/invarlock/reporting/report_builder_support.py", 0.899, 1.0),
+            ("src/invarlock/cli/run_execution_output.py", 0.949, 1.0),
+            ("src/invarlock/cli/runtime_launch_plan.py", 0.949, 1.0),
+            ("src/invarlock/reporting/run_report_contract.py", 0.949, 1.0),
+            ("src/invarlock/reporting/report_builder_support.py", 0.949, 1.0),
         ],
     )
 

@@ -19,6 +19,7 @@ def test_runtime_launch_plan_helper_functions_cover_device_and_flag_parsing(
     assert runtime_launch_plan._requested_device(["run"]) == "auto"
     assert runtime_launch_plan._requested_device(["calibrate"]) == "auto"
     assert runtime_launch_plan._requested_device(["verify"]) is None
+    assert runtime_launch_plan._requested_device(["--help"]) is None
     assert (
         runtime_launch_plan._requested_device(["evaluate", "--device", "CUDA"])
         == "cuda"
@@ -87,6 +88,14 @@ def test_runtime_launch_plan_helper_functions_cover_device_and_flag_parsing(
         runtime_launch_plan._needs_gpu_passthrough(["evaluate", "--device", "cuda"])
         is False
     )
+
+    options: list[str] = []
+    runtime_launch_plan._append_option(options, "--config", None)
+    runtime_launch_plan._append_bool_flag(options, "--progress", False)
+    assert options == []
+    runtime_launch_plan._append_option(options, "--config", "cfg.yaml")
+    runtime_launch_plan._append_bool_flag(options, "--progress", True)
+    assert options == ["--config", "cfg.yaml", "--progress"]
 
 
 def test_normalize_delegated_argv_rewrites_paths_and_builders(

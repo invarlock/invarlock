@@ -416,9 +416,19 @@ def test_run_execution_output_helpers_cover_fallback_and_progress_paths(
     )
     assert idle_console.calls == []
 
+    stalled_console = RecordingConsole()
+    stalled_console._invarlock_output_style = SimpleNamespace(progress=True)
+    run_execution_output_mod.complete_progress_step(
+        stalled_console,
+        "noop",
+        tag="PASS",
+        message="noop",
+    )
+    assert stalled_console.calls == []
+
     progress_console = RecordingConsole()
     progress_console._invarlock_output_style = SimpleNamespace(progress=True)
-    perf_values = iter([10.0, 12.25, 20.0])
+    perf_values = iter([10.0, 12.25, 20.0, 30.0])
     monkeypatch.setattr(output_mod, "perf_counter", lambda: next(perf_values))
 
     run_execution_output_mod.begin_progress_step(progress_console, "load")
@@ -440,6 +450,21 @@ def test_run_execution_output_helpers_cover_fallback_and_progress_paths(
     assert "load" in progress_console._invarlock_progress_completed
     assert progress_console._invarlock_progress_steps["execute"] == 20.0
     assert "Loading model done (2.25s)" in progress_console.lines[0]
+
+    resumed_console = RecordingConsole()
+    resumed_console._invarlock_output_style = SimpleNamespace(progress=True)
+    resumed_console._invarlock_progress_steps = {"load_model": 28.0}
+    run_execution_output_mod.transition_progress_step(
+        resumed_console,
+        "load_model",
+        from_tag="INIT",
+        from_message="Loading model",
+        to_key="execute",
+        from_emoji="🔧",
+    )
+    assert resumed_console._invarlock_progress_completed == {"load_model"}
+    assert resumed_console._invarlock_progress_steps["execute"] == 30.0
+    assert "Loading model done (2.00s)" in resumed_console.joined()
 
 
 def test_run_execution_event_rendering_covers_split_owner_branches(monkeypatch) -> None:
@@ -466,6 +491,10 @@ def test_run_execution_event_rendering_covers_split_owner_branches(monkeypatch) 
             code="snapshot_restore_fallback",
             context={"error": "boom"},
         ),
+    )
+    run_execution_output_mod.render_run_execution_event(
+        console,
+        RunDiagnosticEvent(code="snapshot_restore_fallback"),
     )
     run_execution_output_mod.render_run_execution_event(
         console,
@@ -504,7 +533,15 @@ def test_run_execution_event_rendering_covers_split_owner_branches(monkeypatch) 
     )
     run_execution_output_mod.render_run_execution_event(
         console,
+        RunDiagnosticEvent(summary="", level="info"),
+    )
+    run_execution_output_mod.render_run_execution_event(
+        console,
         RunCleanupStatusEvent(removed=False),
+    )
+    run_execution_output_mod.render_run_execution_event(
+        console,
+        RunCleanupStatusEvent(removed=True),
     )
     run_execution_output_mod.render_run_execution_event(
         console,
@@ -568,6 +605,7 @@ def test_run_execution_event_rendering_covers_split_owner_branches(monkeypatch) 
     assert "FAILED gates: pm, spectral" in output
     assert "schema mismatch" in output
     assert "Cleanup: skipped" in output
+    assert "Cleanup: removed" in output
     assert "Edit configuration must specify a non-empty `edit.name`." in output
     assert "Unknown edit 'bad-edit'." in output
     assert "baseline windows unavailable" in output

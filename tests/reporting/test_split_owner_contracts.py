@@ -12,6 +12,15 @@ from invarlock.reporting.report_types import create_empty_report
 
 
 def test_report_builder_support_covers_meta_and_baseline_fallback_paths() -> None:
+    class FlickerFloat(float):
+        def __new__(cls, *values: float):
+            obj = float.__new__(cls, values[0])
+            obj._values = iter(values)
+            return obj
+
+        def __float__(self) -> float:
+            return next(self._values)
+
     diagnostics: list[dict[str, object]] = []
     meta = report_builder_support.extract_report_meta({"meta": {}}, diagnostics)
     assert meta["seed"] == 0
@@ -46,6 +55,34 @@ def test_report_builder_support_covers_meta_and_baseline_fallback_paths() -> Non
     assert report_builder_support.generate_run_id(
         {"meta": {"run_id": "existing-run-id"}}
     ) == "existing-run-id"
+    assert report_builder_support.generate_run_id(
+        SimpleNamespace(
+            meta={
+                "ts": "2026-03-30",
+                "model_id": "object-report",
+                "commit_sha": "deadbeefcafebabe",
+            }
+        )
+    )
+
+    complete_diagnostics: list[dict[str, object]] = []
+    complete_meta = report_builder_support.extract_report_meta(
+        {
+            "meta": {
+                "model_id": "gpt2",
+                "adapter": "hf_causal",
+                "device": "cpu",
+                "seed": 11,
+                "seeds": {"python": 11},
+            }
+        },
+        complete_diagnostics,
+    )
+    assert complete_meta["model_id"] == "gpt2"
+    assert complete_meta["adapter"] == "hf_causal"
+    assert complete_meta["device"] == "cpu"
+    assert complete_meta["seed"] == 11
+    assert complete_diagnostics == []
 
     report = {
         "metrics": {"primary_metric": {"kind": "acc"}},
@@ -75,6 +112,35 @@ def test_report_builder_support_covers_meta_and_baseline_fallback_paths() -> Non
         report,
         {"metrics": {"ppl_final": 8.0, "ppl_preview": float("nan")}},
     ) == {"kind": "acc", "preview": 8.0, "final": 8.0}
+    assert (
+        report_builder_support._direct_baseline_metric(
+            report,
+            {"ppl_final": 2.0, "ppl_preview": FlickerFloat(1.0, float("nan"))},
+        )
+        is None
+    )
+    assert (
+        report_builder_support._direct_baseline_metric(
+            report,
+            {
+                "metrics": {
+                    "ppl_final": 2.0,
+                    "ppl_preview": FlickerFloat(1.0, float("nan")),
+                }
+            },
+        )
+        is None
+    )
+    assert (
+        report_builder_support._direct_baseline_metric(
+            report,
+            {
+                "primary_metric": {"kind": "acc", "final": "bad"},
+                "metrics": {"primary_metric": {"kind": "acc", "final": "bad"}},
+            },
+        )
+        is None
+    )
 
     baseline_ref = report_builder_support.build_baseline_reference(
         report,
@@ -90,6 +156,14 @@ def test_report_builder_support_covers_meta_and_baseline_fallback_paths() -> Non
     assert baseline_ref["primary_metric"]["final"] == 0.8
     assert baseline_ref["metrics"]["classification"] == {"f1": 0.9}
     assert baseline_ref["tokenizer_hash"] == "tokhash"
+    direct_baseline_ref = report_builder_support.build_baseline_reference(
+        report,
+        {"metrics": {"primary_metric": {"kind": "acc", "final": 0.95}}},
+        {"run_id": "direct", "model_id": "baseline"},
+    )
+    assert direct_baseline_ref["primary_metric"]["final"] == 0.95
+    assert "metrics" not in direct_baseline_ref
+    assert "tokenizer_hash" not in direct_baseline_ref
 
     class ExplodingMetrics(dict):
         def get(self, key, default=None):  # type: ignore[override]
