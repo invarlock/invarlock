@@ -29,6 +29,11 @@ from rich.console import Console
 
 from invarlock import __version__ as INVARLOCK_VERSION
 from invarlock.exit_codes import resolve_command_exit_code
+from invarlock.runtime_security import (
+    RuntimeManifestExecution,
+    resolve_runtime_image,
+    resolve_runtime_image_digest,
+)
 
 from ...core.adapter_auto import resolve_auto_adapter
 from ...core.evaluate_contract import (
@@ -124,6 +129,27 @@ def _format_ratio(value: Any) -> str:
     if not math.isfinite(val):
         return "N/A"
     return f"{val:.3f}"
+
+
+def _evaluation_report_manifest_execution(
+    *,
+    mode: str,
+    allow_network: bool,
+    allow_remote_code: bool,
+    allow_third_party_plugins: bool,
+) -> RuntimeManifestExecution | None:
+    normalized_mode = str(mode or "").strip().lower()
+    if normalized_mode != "attested":
+        return None
+    return RuntimeManifestExecution(
+        execution_mode="container",
+        container_execution=True,
+        image_ref=resolve_runtime_image(),
+        image_digest=resolve_runtime_image_digest(),
+        allow_network=allow_network,
+        allow_remote_code=allow_remote_code,
+        allow_third_party_plugins=allow_third_party_plugins,
+    )
 
 
 def _resolve_verbosity(quiet: bool, verbose: bool) -> int:
@@ -629,6 +655,12 @@ def evaluate_command(
                 "profile": profile_name,
                 "tier": tier_name,
             },
+            execution=_evaluation_report_manifest_execution(
+                mode=mode,
+                allow_network=allow_network,
+                allow_remote_code=allow_remote_code,
+                allow_third_party_plugins=allow_third_party_plugins,
+            ),
         )
 
     # CI/Release hard‑abort: fail fast when primary metric is not computable.

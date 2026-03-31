@@ -191,3 +191,45 @@ def test_write_runtime_manifest_rejects_mutable_remote_ref_without_digest(
 
     with pytest.raises(RuntimeError, match="digest-pinned runtime image"):
         runtime_security.write_runtime_manifest(report_path)
+
+
+def test_write_runtime_manifest_honors_execution_override(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    report_path = tmp_path / "evaluation.report.json"
+    report_path.write_text('{"ok": true}\n', encoding="utf-8")
+
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "current_execution_mode",
+        lambda: "host-bypass",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "running_inside_container",
+        lambda: False,
+        raising=True,
+    )
+
+    manifest_path = runtime_security.write_runtime_manifest(
+        report_path,
+        execution=runtime_security.RuntimeManifestExecution(
+            execution_mode="container",
+            container_execution=True,
+            image_ref="ghcr.io/invarlock/invarlock-runtime:test",
+            image_digest="sha256:attested",
+            allow_network=True,
+            allow_remote_code=False,
+            allow_third_party_plugins=False,
+        ),
+    )
+
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert payload["execution_mode"] == "container"
+    assert payload["runtime"]["container_execution"] is True
+    assert payload["runtime"]["image_digest"] == "sha256:attested"
+    assert (
+        payload["runtime"]["image_ref"]
+        == "ghcr.io/invarlock/invarlock-runtime:test@sha256:attested"
+    )

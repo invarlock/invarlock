@@ -330,3 +330,79 @@ def test_evaluate_quiet_summary_emits_status(monkeypatch, tmp_path, capsys):
     assert "INVARLOCK v" in out
     assert "Status: PASS" in out
     assert "Output:" in out
+
+
+def test_evaluate_attested_bundle_manifest_inherits_container_execution(
+    monkeypatch, tmp_path
+):
+    src = tmp_path / "src_model"
+    edt = tmp_path / "edt_model"
+    src.mkdir()
+    edt.mkdir()
+    (src / "config.json").write_text(
+        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
+        encoding="utf-8",
+    )
+    (edt / "config.json").write_text(
+        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
+        encoding="utf-8",
+    )
+
+    def fake_run(**kwargs):
+        out = Path(kwargs.get("out"))
+        return str(_stub_run(out))
+
+    def fake_report(**kwargs):
+        output_dir = Path(kwargs.get("output"))
+        output_dir.mkdir(parents=True, exist_ok=True)
+        report = {
+            "schema_version": "v1",
+            "primary_metric": {"kind": "ppl_causal", "ratio_vs_baseline": 1.0},
+            "validation": {
+                "primary_metric_acceptable": True,
+                "preview_final_drift_acceptable": True,
+                "invariants_pass": True,
+                "spectral_stable": True,
+                "rmt_stable": True,
+            },
+        }
+        (output_dir / "evaluation.report.json").write_text(
+            json.dumps(report), encoding="utf-8"
+        )
+
+    import invarlock.cli.commands.run as run_mod
+    from invarlock.cli.commands import evaluate as mod
+
+    monkeypatch.setattr(
+        run_mod, "run_command", lambda **kwargs: fake_run(**kwargs), raising=False
+    )
+    monkeypatch.setattr(mod, "generate_reports", fake_report, raising=False)
+    monkeypatch.setattr(
+        mod,
+        "resolve_runtime_image",
+        lambda: "ghcr.io/invarlock/invarlock-runtime:test",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        mod,
+        "resolve_runtime_image_digest",
+        lambda: "sha256:" + ("a" * 64),
+        raising=True,
+    )
+
+    evaluate_command(
+        baseline=str(src),
+        subject=str(edt),
+        adapter="auto",
+        profile="dev",
+        mode="attested",
+        out=str(tmp_path / "runs"),
+        report_out=str(tmp_path / "reports"),
+    )
+
+    manifest = json.loads(
+        (tmp_path / "reports" / "runtime.manifest.json").read_text(encoding="utf-8")
+    )
+    assert manifest["execution_mode"] == "container"
+    assert manifest["runtime"]["container_execution"] is True
+    assert manifest["runtime"]["image_digest"] == "sha256:" + ("a" * 64)

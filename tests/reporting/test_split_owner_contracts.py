@@ -52,9 +52,10 @@ def test_report_builder_support_covers_meta_and_baseline_fallback_paths() -> Non
     assert report_builder_support.generate_run_id(
         {"meta": {"ts": "2026-03-30", "model_id": "gpt2", "commit": "abc1234567890"}}
     )
-    assert report_builder_support.generate_run_id(
-        {"meta": {"run_id": "existing-run-id"}}
-    ) == "existing-run-id"
+    assert (
+        report_builder_support.generate_run_id({"meta": {"run_id": "existing-run-id"}})
+        == "existing-run-id"
+    )
     assert report_builder_support.generate_run_id(
         SimpleNamespace(
             meta={
@@ -149,7 +150,10 @@ def test_report_builder_support_covers_meta_and_baseline_fallback_paths() -> Non
             "metrics": {"classification": {"f1": 0.9}},
         },
         {"run_id": "base", "model_id": "baseline", "tokenizer_hash": "tokhash"},
-        compute_primary_metric_from_report_fn=lambda payload: {"kind": "acc", "final": 0.8}
+        compute_primary_metric_from_report_fn=lambda payload: {
+            "kind": "acc",
+            "final": 0.8,
+        }
         if "evaluation_windows" in payload
         else {"kind": "acc", "final": 0.7},
     )
@@ -181,9 +185,9 @@ def test_report_builder_support_covers_meta_and_baseline_fallback_paths() -> Non
             report,
             {},
             {},
-            compute_primary_metric_from_report_fn=lambda _payload: (_ for _ in ()).throw(
-                RuntimeError("no metric")
-            ),
+            compute_primary_metric_from_report_fn=lambda _payload: (
+                _ for _ in ()
+            ).throw(RuntimeError("no metric")),
         )
 
     with pytest.raises(MetricsError, match="E235"):
@@ -227,10 +231,13 @@ def test_run_report_contract_covers_env_collection_and_persistence_edges(
         "mps_available": True,
         "CUBLAS_WORKSPACE_CONFIG": ":16:8",
     }
-    assert run_report_contract._collect_env_flags(
-        lambda: (_ for _ in ()).throw(ValueError("boom")),
-        {},
-    ) == {}
+    assert (
+        run_report_contract._collect_env_flags(
+            lambda: (_ for _ in ()).throw(ValueError("boom")),
+            {},
+        )
+        == {}
+    )
     assert run_report_contract._collect_env_flags(
         lambda: SimpleNamespace(
             are_deterministic_algorithms_enabled=False,
@@ -334,7 +341,10 @@ def test_run_report_contract_covers_env_collection_and_persistence_edges(
         canonical_dataset_id_fn=lambda provider: provider,
         safe_int_fn=int,
         build_run_report_data_fn=lambda **kwargs: (
-            {"dataset": kwargs["canonical_dataset_id"], "preview_n": kwargs["preview_count"]},
+            {
+                "dataset": kwargs["canonical_dataset_id"],
+                "preview_n": kwargs["preview_count"],
+            },
             kwargs["tokenizer_hash"],
         ),
         build_snapshot_provenance_fn=lambda _payload: (_ for _ in ()).throw(
@@ -351,7 +361,9 @@ def test_run_report_contract_covers_env_collection_and_persistence_edges(
         prepare_guard_overhead_report_fn=lambda payload, **_kwargs: payload,
         finalize_run_provenance_fn=lambda **_kwargs: {"ok": True},
         build_guard_entries_fn=lambda guards: [] if guards is None else [{"name": "x"}],
-        build_flags_payload_fn=lambda guards: {} if guards is None else {"all_passed": True},
+        build_flags_payload_fn=lambda guards: {}
+        if guards is None
+        else {"all_passed": True},
         enrich_run_report_metrics_fn=lambda **kwargs: kwargs["report"],
         optional_torch_fn=lambda: None,
         environ={},

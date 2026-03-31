@@ -205,7 +205,9 @@ def test_normalize_delegated_argv_rewrites_paths_and_builders(
         raising=True,
     )
 
-    current_process_plan = runtime_launch_plan.build_current_process_container_launch_plan()
+    current_process_plan = (
+        runtime_launch_plan.build_current_process_container_launch_plan()
+    )
     assert list(current_process_plan.argv) == ["evaluate", "--help"]
     assert recorded["argv"] == ["evaluate", "--help"]
 

@@ -24,6 +24,7 @@ from invarlock.runtime_security import (
     ALLOW_REMOTE_CODE_ENV,
     ALLOW_THIRD_PARTY_PLUGINS_ENV,
     ALLOW_UNATTESTED_ARTIFACTS_ENV,
+    RuntimeManifestExecution,
     RuntimeSecurityPolicy,
     build_runtime_security_policy,
     current_runtime_security_policy,
@@ -128,6 +129,7 @@ def emit_runtime_manifest(
     config_path: str | Path | None = None,
     config_payload: Any | None = None,
     extra: dict[str, Any] | None = None,
+    execution: RuntimeManifestExecution | None = None,
 ) -> Path | None:
     if not report_path:
         return None
@@ -139,6 +141,7 @@ def emit_runtime_manifest(
         config_path=config_path,
         config_payload=config_payload,
         extra=extra,
+        execution=execution,
     )
 
 

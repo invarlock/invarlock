@@ -44,6 +44,7 @@ __all__ = [
     "ALLOW_THIRD_PARTY_PLUGINS_ENV",
     "ALLOW_UNATTESTED_ARTIFACTS_ENV",
     "ContainerLaunchPlan",
+    "RuntimeManifestExecution",
     "RuntimeSecurityPolicy",
     "CONTAINER_EXECUTION_ENV",
     "RUNTIME_IMAGE_ENV",
@@ -101,6 +102,19 @@ class RuntimeSecurityPolicy:
     allow_third_party_plugins: bool = False
     allow_remote_code: bool = False
     allow_unattested_artifacts: bool = False
+
+
+@dataclass(frozen=True)
+class RuntimeManifestExecution:
+    """Execution provenance recorded into a runtime manifest."""
+
+    execution_mode: str
+    container_execution: bool
+    image_ref: str
+    image_digest: str | None
+    allow_network: bool
+    allow_remote_code: bool
+    allow_third_party_plugins: bool
 
 
 class RuntimeManifestLoadIssueCode(str, Enum):
@@ -873,13 +887,21 @@ def write_runtime_manifest(
     config_path: str | os.PathLike[str] | None = None,
     config_payload: Any | None = None,
     extra: dict[str, Any] | None = None,
+    execution: RuntimeManifestExecution | None = None,
 ) -> Path:
     report = Path(report_path).resolve()
     digest, digest_source = _config_digest(
         config_path=config_path, config_payload=config_payload
     )
-    runtime_image = resolve_runtime_image()
-    runtime_digest = resolve_runtime_image_digest()
+    runtime_execution = execution or RuntimeManifestExecution(
+        execution_mode=current_execution_mode(),
+        container_execution=running_inside_container(),
+        image_ref=resolve_runtime_image(),
+        image_digest=resolve_runtime_image_digest(),
+        allow_network=network_allowed(),
+        allow_remote_code=remote_code_allowed(),
+        allow_third_party_plugins=third_party_plugins_allowed(),
+    )
     manifest: dict[str, Any] = {
         "manifest_version": RUNTIME_MANIFEST_VERSION,
         "generated_at_utc": datetime.now(UTC).isoformat(),
@@ -896,14 +918,17 @@ def write_runtime_manifest(
             "sha256": digest,
             "source": digest_source,
         },
-        "execution_mode": current_execution_mode(),
+        "execution_mode": runtime_execution.execution_mode,
         "runtime": {
-            "image_ref": _attested_runtime_image_ref(runtime_image, runtime_digest),
-            "image_digest": runtime_digest,
-            "container_execution": running_inside_container(),
-            "allow_network": network_allowed(),
-            "allow_remote_code": remote_code_allowed(),
-            "allow_third_party_plugins": third_party_plugins_allowed(),
+            "image_ref": _attested_runtime_image_ref(
+                runtime_execution.image_ref,
+                runtime_execution.image_digest,
+            ),
+            "image_digest": runtime_execution.image_digest,
+            "container_execution": runtime_execution.container_execution,
+            "allow_network": runtime_execution.allow_network,
+            "allow_remote_code": runtime_execution.allow_remote_code,
+            "allow_third_party_plugins": (runtime_execution.allow_third_party_plugins),
         },
     }
     if isinstance(extra, dict) and extra:
