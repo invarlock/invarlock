@@ -145,6 +145,10 @@ THRESHOLDS = {
     "src/invarlock/reporting/report_validation.py": 0.95,
     "src/invarlock/core/run_orchestrator_execute.py": 0.90,
     "src/invarlock/reporting/verify_check_helpers.py": 0.95,
+    "src/invarlock/cli/run_execution_output.py": 0.90,
+    "src/invarlock/cli/runtime_launch_plan.py": 0.90,
+    "src/invarlock/reporting/run_report_contract.py": 0.90,
+    "src/invarlock/reporting/report_builder_support.py": 0.90,
     # Existing 90% surfaces that now sustain 95%+ or 100% in repo coverage.
     "src/invarlock/core/abi.py": 1.00,
     "src/invarlock/core/adapter_auto.py": 0.95,

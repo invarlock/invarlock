@@ -7,6 +7,18 @@ from typer.testing import CliRunner
 
 from invarlock.cli import output as output_mod
 from invarlock.cli import run_execution as run_execution_mod
+from invarlock.cli import run_execution_output as run_execution_output_mod
+from invarlock.core.run_orchestrator import (
+    RunCleanupStatusEvent,
+    RunDiagnosticEvent,
+    RunEvaluationReportFailedEvent,
+    RunExecutionFailure,
+    RunFailureEvent,
+    RunLoadModelOnceEvent,
+    RunRetryAttemptStartedEvent,
+    RunRetryValidationErrorEvent,
+    RunTelemetryFailedEvent,
+)
 from tests.cli.run._internal_cli import internal_run_app as cli
 from tests.cli.support import RecordingConsole
 
@@ -375,3 +387,190 @@ def test_output_timing_helpers_cover_progress_and_summary(monkeypatch) -> None:
     assert rendered[1] == "TIMING SUMMARY"
     assert rendered[2].startswith("  Phase")
     assert rendered[-1] == "  extra"
+
+
+def test_run_execution_output_helpers_cover_fallback_and_progress_paths(
+    monkeypatch,
+) -> None:
+    fallback_console = RecordingConsole(fail_with_kwargs=True)
+    run_execution_output_mod.emit_console_line(
+        fallback_console,
+        "plain line",
+        markup=False,
+    )
+    run_execution_output_mod.emit_console_line(
+        fallback_console,
+        "[bold]markup[/bold]",
+        markup=True,
+    )
+    run_execution_output_mod.emit_console_blank_line(fallback_console)
+    assert fallback_console.lines == ["plain line", "[bold]markup[/bold]", ""]
+
+    idle_console = RecordingConsole()
+    run_execution_output_mod.begin_progress_step(idle_console, "noop")
+    run_execution_output_mod.complete_progress_step(
+        idle_console,
+        "noop",
+        tag="PASS",
+        message="noop",
+    )
+    assert idle_console.calls == []
+
+    progress_console = RecordingConsole()
+    progress_console._invarlock_output_style = SimpleNamespace(progress=True)
+    perf_values = iter([10.0, 12.25, 20.0])
+    monkeypatch.setattr(output_mod, "perf_counter", lambda: next(perf_values))
+
+    run_execution_output_mod.begin_progress_step(progress_console, "load")
+    run_execution_output_mod.complete_progress_step(
+        progress_console,
+        "load",
+        tag="PASS",
+        message="Loading model",
+        emoji="✅",
+    )
+    run_execution_output_mod.transition_progress_step(
+        progress_console,
+        "missing",
+        from_tag="INIT",
+        from_message="Warmup",
+        to_key="execute",
+        from_emoji="🔧",
+    )
+    assert "load" in progress_console._invarlock_progress_completed
+    assert progress_console._invarlock_progress_steps["execute"] == 20.0
+    assert "Loading model done (2.25s)" in progress_console.lines[0]
+
+
+def test_run_execution_event_rendering_covers_split_owner_branches(monkeypatch) -> None:
+    console = RecordingConsole()
+    console._invarlock_output_style = output_mod.OutputStyle(
+        name="audit",
+        progress=True,
+        timing=True,
+        color=True,
+    )
+    monkeypatch.setattr(output_mod, "perf_counter", lambda: 50.0)
+
+    run_execution_output_mod.render_run_execution_event(
+        console,
+        RunDiagnosticEvent(code="export_tokenizer_missing"),
+    )
+    run_execution_output_mod.render_run_execution_event(
+        console,
+        RunDiagnosticEvent(code="export_failed"),
+    )
+    run_execution_output_mod.render_run_execution_event(
+        console,
+        RunDiagnosticEvent(
+            code="snapshot_restore_fallback",
+            context={"error": "boom"},
+        ),
+    )
+    run_execution_output_mod.render_run_execution_event(
+        console,
+        RunDiagnosticEvent(
+            code="retry_validation_telemetry_summary",
+            context={"summary": "telemetry summary"},
+        ),
+    )
+    run_execution_output_mod.render_run_execution_event(
+        console,
+        RunDiagnosticEvent(
+            summary="plain diagnostic",
+            level="warn",
+            context={"emoji": "⚠️"},
+        ),
+    )
+    run_execution_output_mod.render_run_execution_event(
+        console,
+        RunLoadModelOnceEvent(model_id="gpt2"),
+    )
+    run_execution_output_mod.render_run_execution_event(
+        console,
+        RunRetryAttemptStartedEvent(attempt=2, max_attempts=4),
+    )
+    run_execution_output_mod.render_run_execution_event(
+        console,
+        RunTelemetryFailedEvent(error="disk full"),
+    )
+    run_execution_output_mod.render_run_execution_event(
+        console,
+        RunEvaluationReportFailedEvent(gate_codes=("pm", "spectral")),
+    )
+    run_execution_output_mod.render_run_execution_event(
+        console,
+        RunRetryValidationErrorEvent(summary="schema mismatch"),
+    )
+    run_execution_output_mod.render_run_execution_event(
+        console,
+        RunCleanupStatusEvent(removed=False),
+    )
+    run_execution_output_mod.render_run_execution_event(
+        console,
+        RunFailureEvent(
+            failure=RunExecutionFailure(code="edit_name_missing", context={})
+        ),
+    )
+    run_execution_output_mod.render_run_execution_event(
+        console,
+        RunFailureEvent(
+            failure=RunExecutionFailure(
+                code="unknown_edit",
+                context={"edit_name": "bad-edit"},
+            )
+        ),
+    )
+    run_execution_output_mod.render_run_execution_event(
+        console,
+        RunFailureEvent(
+            failure=RunExecutionFailure(
+                code="baseline_windows_missing",
+                summary="baseline windows unavailable",
+            )
+        ),
+    )
+    run_execution_output_mod.render_run_execution_event(
+        console,
+        RunFailureEvent(
+            failure=RunExecutionFailure(
+                code="config_file_missing",
+                context={"path": "/tmp/missing.yaml"},
+            )
+        ),
+    )
+    run_execution_output_mod.render_run_execution_event(
+        console,
+        RunFailureEvent(
+            failure=RunExecutionFailure(code="schema_invalid_run_report", context={})
+        ),
+    )
+    run_execution_output_mod.render_run_execution_event(
+        console,
+        RunFailureEvent(
+            failure=RunExecutionFailure(
+                code="pipeline_failed",
+                summary="core pipeline failure",
+            )
+        ),
+    )
+
+    output = console.joined()
+    assert "tokenizer artifacts" in output
+    assert "unexpected error" in output
+    assert "switching to reload-per-attempt" in output
+    assert "↳ boom" in output
+    assert "telemetry summary" in output
+    assert "plain diagnostic" in output
+    assert "Loading model once: gpt2" in output
+    assert "Retry attempt 2/4" in output
+    assert "Telemetry export failed: disk full" in output
+    assert "FAILED gates: pm, spectral" in output
+    assert "schema mismatch" in output
+    assert "Cleanup: skipped" in output
+    assert "Edit configuration must specify a non-empty `edit.name`." in output
+    assert "Unknown edit 'bad-edit'." in output
+    assert "baseline windows unavailable" in output
+    assert "Configuration file not found: /tmp/missing.yaml" in output
+    assert "Schema invalid: run report structure failed validation" in output
+    assert "Pipeline execution failed: core pipeline failure" in output
