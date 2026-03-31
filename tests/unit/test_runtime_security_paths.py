@@ -639,36 +639,3 @@ def test_path_env_value_and_delegated_env_pairs_translate_workspace_paths(
     assert inside_mounts == []
     assert translated_external == str(external_tmp.resolve())
     assert external_mounts == [external_tmp]
-
-
-def test_runtime_verifier_binary_falls_back_to_default_when_no_candidates_exist(
-    monkeypatch, tmp_path: Path
-) -> None:
-    repo_root = tmp_path / "repo"
-    module_path = repo_root / "src" / "invarlock" / "runtime_security.py"
-    module_path.parent.mkdir(parents=True, exist_ok=True)
-    module_path.write_text("# stub\n", encoding="utf-8")
-    script_dir = tmp_path / "venv" / "bin"
-    script_dir.mkdir(parents=True, exist_ok=True)
-    python_bin = script_dir / "python"
-    python_bin.write_text("#!/bin/sh\n", encoding="utf-8")
-    python_bin.chmod(0o755)
-
-    monkeypatch.delenv(runtime_security.RUNTIME_VERIFIER_BINARY_ENV, raising=False)
-    monkeypatch.setattr(
-        runtime_security_helpers,
-        "__file__",
-        str(module_path),
-        raising=False,
-    )
-    monkeypatch.setattr(
-        runtime_security.sys, "executable", str(python_bin), raising=True
-    )
-    monkeypatch.setattr(
-        runtime_security.sys, "argv", [str(script_dir / "cli")], raising=True
-    )
-
-    assert (
-        runtime_security.runtime_verifier_binary()
-        == runtime_security.RUNTIME_VERIFIER_BINARY_DEFAULT
-    )

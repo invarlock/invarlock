@@ -28,8 +28,6 @@ from invarlock.runtime_security_helpers import (
     RUNTIME_IMAGE_LOCAL_DEFAULT,
     RUNTIME_MANIFEST_FILENAME,
     RUNTIME_MANIFEST_VERSION,
-    RUNTIME_VERIFIER_BINARY_DEFAULT,
-    RUNTIME_VERIFIER_BINARY_ENV,
     RUNTIME_VERIFIER_CONTRACT_VERSION,
     ContainerLaunchPlan,
     RuntimeManifestExecution,
@@ -55,7 +53,6 @@ from invarlock.runtime_security_helpers import (
     resolve_runtime_image_digest,
     running_inside_container,
     runtime_allowances_scope,
-    runtime_verifier_binary,
     serialize_canonical_json,
     third_party_plugins_allowed,
     unattested_artifacts_allowed,
@@ -92,7 +89,6 @@ os = _helpers.os
 Path = _helpers.Path
 shutil = _helpers.shutil
 subprocess = _helpers.subprocess
-sys = _helpers.sys
 
 __all__ = [
     "ALLOW_HOST_EXECUTION_ENV",
@@ -110,8 +106,6 @@ __all__ = [
     "RUNTIME_IMAGE_LOCAL_DEFAULT",
     "RUNTIME_MANIFEST_FILENAME",
     "RUNTIME_MANIFEST_VERSION",
-    "RUNTIME_VERIFIER_BINARY_ENV",
-    "RUNTIME_VERIFIER_BINARY_DEFAULT",
     "RUNTIME_VERIFIER_CONTRACT_VERSION",
     "apply_runtime_allowances",
     "build_container_command",
@@ -133,7 +127,6 @@ __all__ = [
     "runtime_allowances_scope",
     "RuntimeManifestLoadIssueCode",
     "RuntimeManifestLoadResult",
-    "runtime_verifier_binary",
     "running_inside_container",
     "serialize_canonical_json",
     "third_party_plugins_allowed",

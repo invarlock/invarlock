@@ -33,8 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Delegated and containerized evaluation reports now emit attested execution
   provenance into their runtime manifests.
-- Runtime attestation now falls back to the in-process manifest verifier when
-  the external `invarlock-runtime-verify` binary is unavailable.
+- Runtime attestation now uses the packaged Python runtime-manifest verifier
+  directly, removing path-dependent behavior from product verification.
 - Tiny attested smoke exports now write to host-writable paths, and unsigned
   proof-pack smoke runs use an explicit unattested-artifact override instead of
   implicitly depending on legacy behavior.
@@ -52,6 +52,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   patch-sync wrappers, the retired legacy RMT module, stale lazy export
   placeholders, and other shell-leaking or test-only indirections that had
   survived earlier migrations.
+- Removed the repo-local Rust runtime verifier crate and the
+  `INVARLOCK_RUNTIME_VERIFIER` product override so runtime attestation now has
+  a single package-native verifier path.
 
 ### Dependencies
 - Patched vulnerable workflow locks and tightened smoke-workflow dependency and
@@ -66,8 +69,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added remediation closeout records from the refactor program and updated the
   maintainer smoke notes to distinguish the push-gated tiny attested smoke from
   the heavier GPT-2 canary workflow.
-- Clarified runtime-verifier environment-variable guidance to reflect the new
-  Python-side attestation fallback when the external verifier binary is absent.
+- Documented the Python-only runtime-verifier contract and removed the obsolete
+  external-verifier environment-variable guidance.
 
 ## [0.5.0] - 2026-03-25
 ### Added

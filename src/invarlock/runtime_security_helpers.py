@@ -5,7 +5,6 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
@@ -27,8 +26,6 @@ RUNTIME_IMAGE_ENV = "INVARLOCK_RUNTIME_IMAGE"
 RUNTIME_IMAGE_DIGEST_ENV = "INVARLOCK_RUNTIME_IMAGE_DIGEST"
 RUNTIME_MANIFEST_FILENAME = "runtime.manifest.json"
 RUNTIME_MANIFEST_VERSION = 1
-RUNTIME_VERIFIER_BINARY_ENV = "INVARLOCK_RUNTIME_VERIFIER"
-RUNTIME_VERIFIER_BINARY_DEFAULT = "invarlock-runtime-verify"
 RUNTIME_VERIFIER_CONTRACT_VERSION = "runtime-manifest-v1"
 RUNTIME_IMAGE_LOCAL_DEFAULT = "invarlock-runtime:local"
 RUNTIME_IMAGE_DEFAULT = "ghcr.io/invarlock/invarlock-runtime:latest"
@@ -51,8 +48,6 @@ __all__ = [
     "RUNTIME_IMAGE_DIGEST_ENV",
     "RUNTIME_MANIFEST_FILENAME",
     "RUNTIME_MANIFEST_VERSION",
-    "RUNTIME_VERIFIER_BINARY_ENV",
-    "RUNTIME_VERIFIER_BINARY_DEFAULT",
     "RUNTIME_VERIFIER_CONTRACT_VERSION",
     "apply_runtime_allowances",
     "build_container_command",
@@ -74,7 +69,6 @@ __all__ = [
     "runtime_allowances_scope",
     "RuntimeManifestLoadIssueCode",
     "RuntimeManifestLoadResult",
-    "runtime_verifier_binary",
     "running_inside_container",
     "serialize_canonical_json",
     "third_party_plugins_allowed",
@@ -594,31 +588,6 @@ def container_image_available_locally(
     resolved_image = image or resolve_runtime_image()
     exists, _ = _inspect_container_image(resolved_engine, resolved_image)
     return exists
-
-
-def runtime_verifier_binary() -> str:
-    binary = os.environ.get(RUNTIME_VERIFIER_BINARY_ENV, "").strip()
-    if binary:
-        return binary
-    repo_root = Path(__file__).resolve().parents[2]
-    for candidate in (
-        repo_root / "target" / "debug" / RUNTIME_VERIFIER_BINARY_DEFAULT,
-        repo_root / "target" / "release" / RUNTIME_VERIFIER_BINARY_DEFAULT,
-    ):
-        if candidate.is_file() and os.access(candidate, os.X_OK):
-            return str(candidate)
-    script_dirs = [Path(sys.executable).parent]
-    argv0 = Path(sys.argv[0]).parent if sys.argv else None
-    if argv0 is not None:
-        script_dirs.append(argv0)
-    for script_dir in script_dirs:
-        for candidate in (
-            script_dir / RUNTIME_VERIFIER_BINARY_DEFAULT,
-            script_dir / f"{RUNTIME_VERIFIER_BINARY_DEFAULT}.exe",
-        ):
-            if candidate.is_file() and os.access(candidate, os.X_OK):
-                return str(candidate)
-    return RUNTIME_VERIFIER_BINARY_DEFAULT
 
 
 def build_runtime_security_policy(

@@ -43,6 +43,7 @@ repo checkout when present or from packaged wheel data otherwise.
 The CLI exposes these contracts directly:
 
 - `invarlock verify --json`
+- `invarlock-runtime-verify --json`
 - `invarlock advanced plugins adapters --json`
 - `invarlock doctor --json`
 - `invarlock advanced proof-pack verify --json`
@@ -50,7 +51,9 @@ The CLI exposes these contracts directly:
 - `invarlock advanced policy verify`
 - `scripts/proof_packs/verify_pack.sh --strict`
 
-The first six surfaces are available from installed packages. The repo shell
+The first seven surfaces are available from installed packages. The low-level
+`invarlock-runtime-verify` command is the package-native runtime-manifest
+verifier used for direct report/manifest checks. The repo shell
 verifier remains available for proof-pack workflow maintainers, but pure wheel
 installs can now verify packs with `invarlock advanced proof-pack verify`.
 

@@ -12,7 +12,6 @@ COVERAGE := $(PYTHON) -m coverage
 MKDOCS := $(PYTHON) -m mkdocs
 PRE_COMMIT := $(PYTHON) -m pre_commit
 MODEL_EVIDENCE_ARGS ?=
-CARGO ?= cargo
 CONTAINER_ENGINE ?= $(shell if command -v docker >/dev/null 2>&1; then echo docker; elif command -v podman >/dev/null 2>&1; then echo podman; fi)
 RUNTIME_IMAGE ?= invarlock-runtime:local
 RUNTIME_IMAGE_DIGEST ?= sha256:local-runtime-image
@@ -239,9 +238,8 @@ runtime-smoke:  ## Smoke the local container runtime image
 		$(RUNTIME_IMAGE) \
 		-c "import datasets, safetensors, torch, transformers; print('runtime image imports ok')"
 
-runtime-verify:  ## Build and smoke the Rust runtime verifier on the fixture bundle
-	$(CARGO) build -p invarlock-runtime-verify
-	./target/debug/invarlock-runtime-verify \
+runtime-verify:  ## Smoke the Python runtime verifier on the fixture bundle
+	PYTHONPATH=src $(PYTHON) -m invarlock.cli.runtime_verify \
 		--report tests/fixtures/runtime_attestation/evaluation.report.json \
 		--manifest tests/fixtures/runtime_attestation/runtime.manifest.json \
 		--json

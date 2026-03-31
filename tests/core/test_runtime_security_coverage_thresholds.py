@@ -266,39 +266,6 @@ def test_build_container_command_skips_network_none_when_network_allowed(
     assert "--network" not in command
 
 
-def test_runtime_verifier_binary_uses_executable_dir_when_argv_is_empty(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    monkeypatch.delenv(runtime_security.RUNTIME_VERIFIER_BINARY_ENV, raising=False)
-
-    repo_root = tmp_path / "repo"
-    module_path = repo_root / "src" / "invarlock" / "runtime_security.py"
-    module_path.parent.mkdir(parents=True, exist_ok=True)
-    module_path.write_text("# stub\n", encoding="utf-8")
-    monkeypatch.setattr(
-        runtime_security_helpers,
-        "__file__",
-        str(module_path),
-        raising=False,
-    )
-
-    script_dir = tmp_path / "venv" / "bin"
-    script_dir.mkdir(parents=True, exist_ok=True)
-    python_bin = script_dir / "python"
-    python_bin.write_text("#!/bin/sh\n", encoding="utf-8")
-    python_bin.chmod(0o755)
-    verifier = script_dir / runtime_security.RUNTIME_VERIFIER_BINARY_DEFAULT
-    verifier.write_text("#!/bin/sh\n", encoding="utf-8")
-    verifier.chmod(0o755)
-
-    monkeypatch.setattr(
-        runtime_security.sys, "executable", str(python_bin), raising=True
-    )
-    monkeypatch.setattr(runtime_security.sys, "argv", [], raising=True)
-
-    assert runtime_security.runtime_verifier_binary() == str(verifier)
-
-
 def test_load_runtime_manifest_reports_read_failures(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

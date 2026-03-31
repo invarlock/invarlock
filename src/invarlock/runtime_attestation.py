@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import json
-import shutil
-import subprocess
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -16,26 +13,15 @@ from invarlock.runtime_security import (
     build_runtime_security_policy,
     load_runtime_manifest,
     reset_runtime_allowances,
-    runtime_verifier_binary,
     unattested_artifacts_allowed,
 )
 from invarlock.runtime_verify import verify_runtime_manifest
-
-_RUNTIME_VERIFIER_TIMEOUT_SECONDS = 30
-
-
-@dataclass(frozen=True)
-class _RuntimeVerifierResult:
-    returncode: int
-    stdout: str
-    stderr: str
 
 
 class RuntimeAttestationIssueCode(str, Enum):
     MANIFEST_MISSING = "manifest_missing"
     MANIFEST_INVALID = "manifest_invalid"
     EXECUTION_MODE_INVALID = "execution_mode_invalid"
-    VERIFIER_UNAVAILABLE = "verifier_unavailable"
     VERIFIER_FAILED = "verifier_failed"
 
 
@@ -53,36 +39,9 @@ class RuntimeAttestationResult:
     issues: tuple[RuntimeAttestationIssue, ...] = ()
 
 
-def _run_runtime_verifier(
-    report: Path,
-    manifest_path: Path,
-) -> _RuntimeVerifierResult:
-    binary = runtime_verifier_binary()
-    completed = subprocess.run(
-        [
-            binary,
-            "--report",
-            str(report),
-            "--manifest",
-            str(manifest_path),
-            "--json",
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=_RUNTIME_VERIFIER_TIMEOUT_SECONDS,
-    )
-    return _RuntimeVerifierResult(
-        returncode=completed.returncode,
-        stdout=completed.stdout,
-        stderr=completed.stderr,
-    )
-
-
 def _runtime_verifier_failed_result(
     report: Path,
     *,
-    binary: str,
     messages: tuple[str, ...],
 ) -> RuntimeAttestationResult:
     return RuntimeAttestationResult(
@@ -92,24 +51,22 @@ def _runtime_verifier_failed_result(
             RuntimeAttestationIssue(
                 code=RuntimeAttestationIssueCode.VERIFIER_FAILED,
                 message=message,
-                details={"report": report.name, "verifier": binary},
+                details={"report": report.name},
             )
             for message in messages
         ),
     )
 
 
-def _verify_runtime_manifest_in_process(
+def _verify_runtime_manifest(
     report: Path,
     manifest_path: Path,
-    *,
-    binary: str,
 ) -> RuntimeAttestationResult:
     result = verify_runtime_manifest(report, manifest_path)
     if result.ok:
         return RuntimeAttestationResult(verified=True, skipped=False)
     messages = result.errors or (f"Runtime verifier failed for {report.name}.",)
-    return _runtime_verifier_failed_result(report, binary=binary, messages=messages)
+    return _runtime_verifier_failed_result(report, messages=messages)
 
 
 @contextmanager
@@ -208,50 +165,7 @@ def verify_runtime_attestation(
             ),
         )
 
-    binary = runtime_verifier_binary()
-    if shutil.which(binary) is None:
-        return _verify_runtime_manifest_in_process(
-            report,
-            manifest_path,
-            binary=binary,
-        )
-
-    try:
-        completed = _run_runtime_verifier(report, manifest_path)
-    except subprocess.TimeoutExpired:
-        return RuntimeAttestationResult(
-            verified=False,
-            skipped=False,
-            issues=(
-                RuntimeAttestationIssue(
-                    code=RuntimeAttestationIssueCode.VERIFIER_FAILED,
-                    message=f"Runtime verifier timed out for {report.name}.",
-                    details={"report": report.name, "verifier": binary},
-                ),
-            ),
-        )
-    if completed.returncode == 0:
-        return RuntimeAttestationResult(verified=True, skipped=False)
-
-    message = (completed.stdout or completed.stderr or "").strip()
-    if message:
-        try:
-            payload = json.loads(message)
-        except json.JSONDecodeError:
-            pass
-        else:
-            errors = payload.get("errors")
-            if isinstance(errors, list) and errors:
-                return _runtime_verifier_failed_result(
-                    report,
-                    binary=binary,
-                    messages=tuple(str(item) for item in errors),
-                )
-    return _runtime_verifier_failed_result(
-        report,
-        binary=binary,
-        messages=(message or f"Runtime verifier failed for {report.name}.",),
-    )
+    return _verify_runtime_manifest(report, manifest_path)
 
 
 __all__ = [

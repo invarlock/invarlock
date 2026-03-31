@@ -4,8 +4,6 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-import pytest
-
 import invarlock.cli.runtime_launch_plan as runtime_launch_plan
 import invarlock.runtime_security as runtime_security
 import invarlock.runtime_security_helpers as runtime_security_helpers
@@ -296,9 +294,7 @@ def test_runtime_security_device_helpers_cover_missing_tokens_and_devnode(
     assert runtime_launch_plan._requested_device(["--help"]) is None
 
 
-def test_container_image_available_locally_and_runtime_verifier_binary(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_container_image_available_locally(monkeypatch) -> None:
     monkeypatch.setattr(
         runtime_security_helpers,
         "resolve_container_engine",
@@ -320,84 +316,3 @@ def test_container_image_available_locally_and_runtime_verifier_binary(
         raising=True,
     )
     assert runtime_security.container_image_available_locally("img") is True
-
-    verifier = tmp_path / runtime_security.RUNTIME_VERIFIER_BINARY_DEFAULT
-    verifier.write_text("#!/bin/sh\n", encoding="utf-8")
-    monkeypatch.setenv(runtime_security.RUNTIME_VERIFIER_BINARY_ENV, str(verifier))
-    assert runtime_security.runtime_verifier_binary() == str(verifier)
-
-
-def test_runtime_verifier_binary_finds_repo_and_script_dir_candidates(
-    monkeypatch, tmp_path: Path
-) -> None:
-    repo_root = tmp_path / "repo"
-    module_path = repo_root / "src" / "invarlock" / "runtime_security.py"
-    module_path.parent.mkdir(parents=True, exist_ok=True)
-    module_path.write_text("# stub\n", encoding="utf-8")
-    debug_binary = (
-        repo_root
-        / "target"
-        / "debug"
-        / runtime_security.RUNTIME_VERIFIER_BINARY_DEFAULT
-    )
-    debug_binary.parent.mkdir(parents=True, exist_ok=True)
-    debug_binary.write_text("#!/bin/sh\n", encoding="utf-8")
-    debug_binary.chmod(0o755)
-
-    monkeypatch.delenv(runtime_security.RUNTIME_VERIFIER_BINARY_ENV, raising=False)
-    monkeypatch.setattr(
-        runtime_security_helpers,
-        "__file__",
-        str(module_path),
-        raising=False,
-    )
-    assert runtime_security.runtime_verifier_binary() == str(debug_binary)
-
-    debug_binary.unlink()
-    script_dir = tmp_path / "venv" / "bin"
-    script_dir.mkdir(parents=True, exist_ok=True)
-    python_bin = script_dir / "python"
-    python_bin.write_text("#!/bin/sh\n", encoding="utf-8")
-    python_bin.chmod(0o755)
-    script_binary = script_dir / runtime_security.RUNTIME_VERIFIER_BINARY_DEFAULT
-    script_binary.write_text("#!/bin/sh\n", encoding="utf-8")
-    script_binary.chmod(0o755)
-    monkeypatch.setattr(
-        runtime_security.sys, "executable", str(python_bin), raising=True
-    )
-    monkeypatch.setattr(
-        runtime_security.sys, "argv", [str(script_dir / "cli")], raising=True
-    )
-    assert runtime_security.runtime_verifier_binary() == str(script_binary)
-
-
-def test_runtime_verifier_binary_uses_executable_dir_when_argv_is_empty(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    repo_root = tmp_path / "repo"
-    module_path = repo_root / "src" / "invarlock" / "runtime_security.py"
-    module_path.parent.mkdir(parents=True, exist_ok=True)
-    module_path.write_text("# stub\n", encoding="utf-8")
-
-    script_dir = tmp_path / "venv" / "bin"
-    script_dir.mkdir(parents=True, exist_ok=True)
-    python_bin = script_dir / "python"
-    python_bin.write_text("#!/bin/sh\n", encoding="utf-8")
-    python_bin.chmod(0o755)
-    verifier = script_dir / runtime_security.RUNTIME_VERIFIER_BINARY_DEFAULT
-    verifier.write_text("#!/bin/sh\n", encoding="utf-8")
-    verifier.chmod(0o755)
-
-    monkeypatch.delenv(runtime_security.RUNTIME_VERIFIER_BINARY_ENV, raising=False)
-    monkeypatch.setattr(
-        runtime_security_helpers,
-        "__file__",
-        str(module_path),
-        raising=False,
-    )
-    monkeypatch.setattr(
-        runtime_security.sys, "executable", str(python_bin), raising=True
-    )
-    monkeypatch.setattr(runtime_security.sys, "argv", [], raising=True)
-
-    assert runtime_security.runtime_verifier_binary() == str(verifier)

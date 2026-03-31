@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import sys
 from collections.abc import Generator
 from pathlib import Path
 
@@ -106,79 +105,11 @@ def _write_test_runtime_manifest(report_path: Path) -> None:
 def _auto_attest_verify_reports(
     monkeypatch: pytest.MonkeyPatch,
     request: pytest.FixtureRequest,
-    tmp_path_factory: pytest.TempPathFactory,
 ) -> Generator[None, None, None]:
     if not _should_auto_attest_verify_test(request):
         yield
         return
 
-    verifier_path = (
-        tmp_path_factory.mktemp("runtime-verifier") / "invarlock-runtime-verify"
-    )
-    verifier_path.write_text(
-        f"#!{sys.executable}\n"
-        + """from __future__ import annotations
-
-import argparse
-import hashlib
-import json
-import jsonschema
-from pathlib import Path
-import sys
-
-from invarlock.public_contracts import load_runtime_manifest_schema
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--report", required=True)
-    parser.add_argument("--manifest", required=True)
-    parser.add_argument("--json", action="store_true")
-    args = parser.parse_args()
-
-    report_path = Path(args.report)
-    manifest_path = Path(args.manifest)
-    errors: list[str] = []
-    if not report_path.exists():
-        errors.append(f"missing report: {report_path}")
-    if not manifest_path.exists():
-        errors.append(f"missing manifest: {manifest_path}")
-    manifest = {}
-    if not errors:
-        try:
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except Exception as exc:
-            errors.append(f"invalid manifest: {exc}")
-    if not errors:
-        try:
-            jsonschema.validate(
-                instance=manifest, schema=load_runtime_manifest_schema()
-            )
-        except jsonschema.ValidationError as exc:
-            errors.append(f"schema invalid: {exc.message}")
-    if not errors:
-        expected = hashlib.sha256(report_path.read_bytes()).hexdigest()
-        actual = ((manifest.get("report") or {}).get("sha256"))
-        if actual != expected:
-            errors.append("report digest mismatch")
-        if manifest.get("execution_mode") != "container":
-            errors.append("execution mode must be container")
-        runtime = manifest.get("runtime") or {}
-        if not runtime.get("image_digest"):
-            errors.append("missing runtime image digest")
-
-    payload = {"ok": not errors, "errors": errors}
-    print(json.dumps(payload))
-    return 0 if not errors else 1
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
-""",
-        encoding="utf-8",
-    )
-    verifier_path.chmod(0o755)
-    monkeypatch.setenv("INVARLOCK_RUNTIME_VERIFIER", str(verifier_path))
     from invarlock.reporting import verify_contract as verify_mod
 
     original_verify_runtime_attestation = verify_mod.verify_runtime_attestation
