@@ -74,6 +74,54 @@ AutoModelForCausalLM.from_pretrained(MODEL_ID)
 PY
 }
 
+resolve_container_engine() {
+  if command -v docker >/dev/null 2>&1; then
+    echo "docker"
+    return 0
+  fi
+  if command -v podman >/dev/null 2>&1; then
+    echo "podman"
+    return 0
+  fi
+  return 1
+}
+
+seed_runtime_image_digest() {
+  if [[ "$MODE" != "attested" ]]; then
+    return 0
+  fi
+  if [[ -n "${INVARLOCK_RUNTIME_IMAGE_DIGEST:-}" ]]; then
+    return 0
+  fi
+  if [[ -z "${INVARLOCK_RUNTIME_IMAGE:-}" ]]; then
+    return 0
+  fi
+  local engine
+  engine="$(resolve_container_engine || true)"
+  if [[ -z "$engine" ]]; then
+    return 0
+  fi
+  local digest
+  digest="$("$engine" image inspect "$INVARLOCK_RUNTIME_IMAGE" --format '{{.Id}}' 2>/dev/null || true)"
+  if [[ "$digest" == sha256:* ]]; then
+    export INVARLOCK_RUNTIME_IMAGE_DIGEST="$digest"
+    echo "[smoke] runtime_image_digest=$INVARLOCK_RUNTIME_IMAGE_DIGEST"
+  fi
+}
+
+debug_verify_failure() {
+  local manifest_path="$SMOKE_REPORT_DIR/runtime.manifest.json"
+  if [[ -f "$manifest_path" ]]; then
+    echo "[smoke] runtime_verify_diagnostics"
+    "$PYTHON_BIN" -m invarlock.cli.runtime_verify \
+      --report "$EVAL_REPORT" \
+      --manifest "$manifest_path" \
+      --json || true
+  fi
+  echo "[smoke] verify_plain_diagnostics"
+  "${CLI[@]}" verify "$EVAL_REPORT" "${VERIFY_ARGS[@]}" --profile "$PROFILE" || true
+}
+
 if seed_hf_cache_from_host; then
   export INVARLOCK_SMOKE_CACHE_SEEDED=1
 elif prefetch_tiny_model_on_host && seed_hf_cache_from_host; then
@@ -104,6 +152,7 @@ ensure_writable_hf_cache() {
 }
 
 ensure_writable_hf_cache
+seed_runtime_image_digest
 
 if [[ "${INVARLOCK_SMOKE_CACHE_COMPLETE:-0}" == "1" ]]; then
   export HF_HUB_OFFLINE=1
@@ -177,10 +226,11 @@ if [[ "$MODE" == "local" ]]; then
   VERIFY_ARGS+=(--allow-unattested-artifacts)
 fi
 
-"${CLI[@]}" verify "$EVAL_REPORT" "${VERIFY_ARGS[@]}" --json || VERIFY_RC=$?
+"${CLI[@]}" verify "$EVAL_REPORT" "${VERIFY_ARGS[@]}" --profile "$PROFILE" --json || VERIFY_RC=$?
 VERIFY_RC="${VERIFY_RC:-0}"
 echo "[smoke] verify_rc=$VERIFY_RC"
 if [[ "$VERIFY_RC" != "0" ]]; then
+  debug_verify_failure
   echo "[error] evaluation report verification failed" >&2
   exit "$VERIFY_RC"
 fi

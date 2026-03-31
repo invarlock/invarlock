@@ -73,5 +73,8 @@ def test_tiny_attested_smoke_campaign_script_is_executable() -> None:
     assert "sshleifer/tiny-gpt2" in contents
     assert "tiny_relax: true" in contents
     assert "prefetch_tiny_model_on_host" in contents
+    assert "INVARLOCK_RUNTIME_IMAGE_DIGEST" in contents
+    assert "runtime_verify_diagnostics" in contents
+    assert '--profile "$PROFILE" --json' in contents
     assert "evaluation report verification failed" in contents
     assert "proof-pack verification failed" in contents
