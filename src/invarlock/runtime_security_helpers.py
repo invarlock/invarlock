@@ -13,42 +13,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
-from invarlock import runtime_security_helpers as runtime_security_helpers_mod
 from invarlock.core.config_dependencies import inspect_config_dependencies
-
-_RUNTIME_SECURITY_HELPER_DEFAULTS = {
-    name: getattr(runtime_security_helpers_mod, name)
-    for name in (
-        "_absolute_host_path",
-        "_container_pythonpath_entries",
-        "_delegated_env_pairs",
-        "_host_nvidia_visible",
-        "_inspect_container_image",
-        "_iter_absolute_pythonpath_entries",
-        "_iter_external_symlink_target_mounts",
-        "_minimize_mounts",
-        "_mount_is_already_covered",
-        "_mount_root_for_path",
-        "_mount_root_for_resolved_path",
-        "_normalize_config_path_for_container",
-        "_normalize_local_model_path_for_container",
-        "_normalize_output_path_for_container",
-        "_path_env_value_for_container",
-        "_path_is_within",
-        "_record_path_dependencies",
-        "_workspace_path",
-        "build_container_command",
-        "build_container_python_command",
-        "container_image_available_locally",
-        "delegate_container_command",
-        "delegate_python_script_to_container",
-        "resolve_container_engine",
-        "runtime_verifier_binary",
-    )
-}
-_RUNTIME_SECURITY_WRAPPER_DEFAULTS: dict[str, Any] = {}
 
 ALLOW_HOST_EXECUTION_ENV = "INVARLOCK_ALLOW_HOST_EXECUTION"
 ALLOW_NETWORK_ENV = "INVARLOCK_ALLOW_NETWORK"
@@ -285,6 +252,56 @@ def _attested_runtime_image_ref(image_ref: str, image_digest: str | None) -> str
     )
 
 
+def _inspect_container_image(engine: str, image: str) -> tuple[bool, str | None]:
+    try:
+        completed = subprocess.run(
+            [
+                engine,
+                "image",
+                "inspect",
+                image,
+                "--format",
+                "{{json .RepoDigests}}\n{{.Id}}",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=_CONTAINER_INSPECT_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired:
+        return False, None
+    if completed.returncode != 0:
+        return False, None
+    lines = [line.strip() for line in completed.stdout.splitlines() if line.strip()]
+    repo_digests: list[str] = []
+    if lines:
+        try:
+            payload = json.loads(lines[0])
+        except json.JSONDecodeError:
+            payload = None
+        if isinstance(payload, list):
+            repo_digests = [str(item) for item in payload if isinstance(item, str)]
+    for digest_ref in repo_digests:
+        if "@sha256:" in digest_ref:
+            return True, digest_ref.split("@", 1)[1]
+    if len(lines) >= 2 and lines[1].startswith("sha256:"):
+        return True, lines[1]
+    return True, None
+
+
+def resolve_container_engine() -> str | None:
+    for candidate in ("docker", "podman"):
+        if shutil.which(candidate):
+            return candidate
+    return None
+
+
+def _host_nvidia_visible() -> bool:
+    if Path("/dev/nvidiactl").exists():
+        return True
+    return shutil.which("nvidia-smi") is not None
+
+
 _CONFIG_SCAN_ARG_FLAGS = {"--config", "-c", "--preset", "--edit-config"}
 _CONFIG_PATH_ARG_FLAGS = _CONFIG_SCAN_ARG_FLAGS | {"--baseline-report"}
 _OUTPUT_PATH_ARG_FLAGS = {"--out", "--report-out"}
@@ -312,145 +329,125 @@ _FORWARDED_ENV_VARS = {
 }
 
 
-def _sync_runtime_security_helpers() -> None:
-    synced_globals = {
-        "_CONFIG_PATH_ARG_FLAGS": _CONFIG_PATH_ARG_FLAGS,
-        "_CONTAINER_EXECUTION_TIMEOUT_SECONDS": _CONTAINER_EXECUTION_TIMEOUT_SECONDS,
-        "_CONTAINER_INSPECT_TIMEOUT_SECONDS": _CONTAINER_INSPECT_TIMEOUT_SECONDS,
-        "_FORWARDED_ENV_VARS": _FORWARDED_ENV_VARS,
-        "_PATH_ENV_VARS": _PATH_ENV_VARS,
-        "ALLOW_NETWORK_ENV": ALLOW_NETWORK_ENV,
-        "ALLOW_REMOTE_CODE_ENV": ALLOW_REMOTE_CODE_ENV,
-        "ALLOW_THIRD_PARTY_PLUGINS_ENV": ALLOW_THIRD_PARTY_PLUGINS_ENV,
-        "ALLOW_UNATTESTED_ARTIFACTS_ENV": ALLOW_UNATTESTED_ARTIFACTS_ENV,
-        "CONTAINER_EXECUTION_ENV": CONTAINER_EXECUTION_ENV,
-        "Path": Path,
-        "RUNTIME_IMAGE_DIGEST_ENV": RUNTIME_IMAGE_DIGEST_ENV,
-        "RUNTIME_VERIFIER_BINARY_DEFAULT": RUNTIME_VERIFIER_BINARY_DEFAULT,
-        "__file__": __file__,
-        "inspect_config_dependencies": inspect_config_dependencies,
-        "network_allowed": network_allowed,
-        "os": os,
-        "remote_code_allowed": remote_code_allowed,
-        "resolve_runtime_image": resolve_runtime_image,
-        "resolve_runtime_image_digest": resolve_runtime_image_digest,
-        "shutil": shutil,
-        "subprocess": subprocess,
-        "sys": sys,
-        "third_party_plugins_allowed": third_party_plugins_allowed,
-        "unattested_artifacts_allowed": unattested_artifacts_allowed,
-    }
-    for name, helper_default in _RUNTIME_SECURITY_HELPER_DEFAULTS.items():
-        current = globals()[name]
-        wrapper_default = _RUNTIME_SECURITY_WRAPPER_DEFAULTS.get(name)
-        synced_globals[name] = (
-            helper_default
-            if wrapper_default is not None and current is wrapper_default
-            else current
-        )
-    for name, value in synced_globals.items():
-        setattr(runtime_security_helpers_mod, name, value)
-
-
-def _inspect_container_image(engine: str, image: str) -> tuple[bool, str | None]:
-    _sync_runtime_security_helpers()
-    return cast(
-        tuple[bool, str | None],
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_inspect_container_image"](engine, image),
-    )
-
-
-def resolve_container_engine() -> str | None:
-    _sync_runtime_security_helpers()
-    return cast(
-        str | None, _RUNTIME_SECURITY_HELPER_DEFAULTS["resolve_container_engine"]()
-    )
-
-
-def _host_nvidia_visible() -> bool:
-    _sync_runtime_security_helpers()
-    return cast(bool, _RUNTIME_SECURITY_HELPER_DEFAULTS["_host_nvidia_visible"]())
-
-
 def _minimize_mounts(mounts: list[Path] | set[Path]) -> list[Path]:
-    _sync_runtime_security_helpers()
-    return cast(
-        list[Path], _RUNTIME_SECURITY_HELPER_DEFAULTS["_minimize_mounts"](mounts)
-    )
+    ordered = sorted(set(mounts), key=lambda item: (len(item.parts), str(item)))
+    minimized: list[Path] = []
+    for mount in ordered:
+        if any(
+            existing == mount or existing in mount.parents for existing in minimized
+        ):
+            continue
+        minimized.append(mount)
+    return minimized
 
 
 def _absolute_host_path(path: str | Path, *, cwd: Path) -> Path:
-    _sync_runtime_security_helpers()
-    return cast(
-        Path,
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_absolute_host_path"](path, cwd=cwd),
-    )
+    candidate = Path(path).expanduser()
+    if candidate.is_absolute():
+        return Path(os.path.abspath(str(candidate)))
+    return Path(os.path.abspath(str(cwd / candidate)))
 
 
 def _path_is_within(path: Path, root: Path) -> bool:
-    _sync_runtime_security_helpers()
-    return cast(bool, _RUNTIME_SECURITY_HELPER_DEFAULTS["_path_is_within"](path, root))
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
 
 
 def _workspace_path(path: Path, *, cwd: Path) -> str:
-    _sync_runtime_security_helpers()
-    return cast(
-        str, _RUNTIME_SECURITY_HELPER_DEFAULTS["_workspace_path"](path, cwd=cwd)
-    )
+    return str(Path("/workspace") / path.relative_to(cwd))
 
 
 def _mount_root_for_path(path: Path) -> Path:
-    _sync_runtime_security_helpers()
-    return cast(Path, _RUNTIME_SECURITY_HELPER_DEFAULTS["_mount_root_for_path"](path))
+    expanded = path.expanduser()
+    return expanded if expanded.exists() and expanded.is_dir() else expanded.parent
 
 
 def _mount_root_for_resolved_path(path: Path) -> Path:
-    _sync_runtime_security_helpers()
-    return cast(
-        Path,
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_mount_root_for_resolved_path"](path),
-    )
+    resolved = path.resolve(strict=False)
+    return resolved if resolved.exists() and resolved.is_dir() else resolved.parent
 
 
 def _mount_is_already_covered(mount: Path, *, cwd: Path) -> bool:
-    _sync_runtime_security_helpers()
-    return cast(
-        bool,
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_mount_is_already_covered"](
-            mount,
-            cwd=cwd,
-        ),
-    )
+    return mount == cwd or cwd in mount.parents
 
 
 def _iter_external_symlink_target_mounts(
     path: Path, *, cwd: Path, recursive: bool = True
 ) -> list[Path]:
-    _sync_runtime_security_helpers()
-    return cast(
-        list[Path],
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_iter_external_symlink_target_mounts"](
-            path,
-            cwd=cwd,
-            recursive=recursive,
-        ),
-    )
+    expanded = path.expanduser()
+    root_mount = _mount_root_for_path(expanded)
+    mounts: set[Path] = set()
+
+    def _record_symlink_target(link_path: Path) -> None:
+        target_mount = _mount_root_for_resolved_path(link_path)
+        if target_mount == root_mount or root_mount in target_mount.parents:
+            return
+        if _mount_is_already_covered(target_mount, cwd=cwd):
+            return
+        mounts.add(target_mount)
+
+    if expanded.is_symlink():
+        _record_symlink_target(expanded)
+
+    if not recursive:
+        return sorted(mounts, key=lambda item: (len(item.parts), str(item)))
+
+    walk_root = expanded.resolve(strict=False) if expanded.is_symlink() else expanded
+    if not walk_root.exists() or not walk_root.is_dir():
+        return sorted(mounts, key=lambda item: (len(item.parts), str(item)))
+
+    for current, dirnames, filenames in os.walk(walk_root, followlinks=False):
+        current_path = Path(current)
+        for name in (*dirnames, *filenames):
+            entry = current_path / name
+            if entry.is_symlink():
+                _record_symlink_target(entry)
+
+    return sorted(mounts, key=lambda item: (len(item.parts), str(item)))
 
 
 def _iter_absolute_pythonpath_entries() -> list[Path]:
-    _sync_runtime_security_helpers()
-    return cast(
-        list[Path],
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_iter_absolute_pythonpath_entries"](),
-    )
+    raw_value = os.environ.get("PYTHONPATH", "")
+    if not raw_value:
+        return []
+    entries: list[Path] = []
+    seen: set[Path] = set()
+    for raw_entry in raw_value.split(os.pathsep):
+        text = raw_entry.strip()
+        if not text:
+            continue
+        entry = Path(text).expanduser()
+        if not entry.is_absolute():
+            continue
+        resolved = entry.resolve(strict=False)
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        entries.append(resolved)
+    return entries
 
 
 def _container_pythonpath_entries(*, cwd: Path) -> tuple[list[str], list[Path]]:
-    _sync_runtime_security_helpers()
-    return cast(
-        tuple[list[str], list[Path]],
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_container_pythonpath_entries"](cwd=cwd),
-    )
+    host_entries = _iter_absolute_pythonpath_entries()
+    if not host_entries:
+        return ["/workspace/src"], []
+
+    container_entries: list[str] = []
+    mounts: set[Path] = set()
+    for entry in host_entries:
+        if entry == cwd or cwd in entry.parents:
+            rel = entry.relative_to(cwd)
+            container_entries.append(str(Path("/workspace") / rel))
+            continue
+        container_entries.append(str(entry))
+        mount = _mount_root_for_path(entry)
+        if not _mount_is_already_covered(mount, cwd=cwd):
+            mounts.add(mount)
+        mounts.update(_iter_external_symlink_target_mounts(entry, cwd=cwd))
+    return container_entries, _minimize_mounts(mounts)
 
 
 def _record_path_dependencies(
@@ -460,42 +457,43 @@ def _record_path_dependencies(
     cwd: Path,
     recursive_symlink_scan: bool = True,
 ) -> bool:
-    _sync_runtime_security_helpers()
-    return cast(
-        bool,
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_record_path_dependencies"](
+    mounts.update(
+        _iter_external_symlink_target_mounts(
             path,
-            mounts,
             cwd=cwd,
-            recursive_symlink_scan=recursive_symlink_scan,
-        ),
+            recursive=recursive_symlink_scan,
+        )
     )
+    if _path_is_within(path, cwd):
+        return True
+    mount = _mount_root_for_path(path)
+    if not _mount_is_already_covered(mount, cwd=cwd):
+        mounts.add(mount)
+    return False
 
 
 def _normalize_output_path_for_container(
     raw_value: str, *, cwd: Path
 ) -> tuple[str, set[Path]]:
-    _sync_runtime_security_helpers()
-    return cast(
-        tuple[str, set[Path]],
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_normalize_output_path_for_container"](
-            raw_value,
-            cwd=cwd,
-        ),
-    )
+    host_path = _absolute_host_path(raw_value, cwd=cwd)
+    mounts: set[Path] = set()
+    inside_cwd = _record_path_dependencies(host_path, mounts, cwd=cwd)
+    if inside_cwd:
+        return raw_value, mounts
+    return str(host_path), mounts
 
 
 def _normalize_local_model_path_for_container(
     raw_value: str, *, cwd: Path
 ) -> tuple[str, set[Path], bool]:
-    _sync_runtime_security_helpers()
-    return cast(
-        tuple[str, set[Path], bool],
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_normalize_local_model_path_for_container"](
-            raw_value,
-            cwd=cwd,
-        ),
-    )
+    host_path = _absolute_host_path(raw_value, cwd=cwd)
+    if not host_path.exists():
+        return raw_value, set(), False
+    mounts: set[Path] = set()
+    inside_cwd = _record_path_dependencies(host_path, mounts, cwd=cwd)
+    if inside_cwd:
+        return _workspace_path(host_path, cwd=cwd), mounts, True
+    return str(host_path), mounts, True
 
 
 def _normalize_config_path_for_container(
@@ -504,15 +502,23 @@ def _normalize_config_path_for_container(
     cwd: Path,
     scan_dependencies: bool,
 ) -> tuple[str, set[Path], bool]:
-    _sync_runtime_security_helpers()
-    return cast(
-        tuple[str, set[Path], bool],
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_normalize_config_path_for_container"](
-            raw_value,
-            cwd=cwd,
-            scan_dependencies=scan_dependencies,
-        ),
-    )
+    host_path = _absolute_host_path(raw_value, cwd=cwd)
+    mounts: set[Path] = set()
+    needs_cwd_host_mirror = _record_path_dependencies(host_path, mounts, cwd=cwd)
+    if scan_dependencies:
+        try:
+            scan = inspect_config_dependencies(host_path)
+        except (FileNotFoundError, ValueError) as exc:
+            raise RuntimeError(
+                f"Delegated runtime config {host_path} is not mountable: {exc}"
+            ) from exc
+        for config_path in scan.config_paths:
+            if _record_path_dependencies(config_path, mounts, cwd=cwd):
+                needs_cwd_host_mirror = True
+        for referenced_path in scan.referenced_paths:
+            if _record_path_dependencies(referenced_path, mounts, cwd=cwd):
+                needs_cwd_host_mirror = True
+    return str(host_path), mounts, needs_cwd_host_mirror
 
 
 def _path_env_value_for_container(
@@ -520,40 +526,85 @@ def _path_env_value_for_container(
     *,
     cwd: Path,
 ) -> tuple[str, list[Path]]:
-    _sync_runtime_security_helpers()
-    return cast(
-        tuple[str, list[Path]],
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_path_env_value_for_container"](
-            raw_value,
-            cwd=cwd,
-        ),
+    host_path = _absolute_host_path(raw_value, cwd=cwd)
+    mounts: set[Path] = set()
+    # Path-based env vars like TMPDIR and cache roots can point at very large
+    # trees. Mount the declared root and any direct symlink target, but avoid
+    # recursively scanning the full directory contents while building commands.
+    inside_cwd = _record_path_dependencies(
+        host_path,
+        mounts,
+        cwd=cwd,
+        recursive_symlink_scan=False,
     )
+    if inside_cwd:
+        return _workspace_path(host_path, cwd=cwd), _minimize_mounts(mounts)
+    return str(host_path), _minimize_mounts(mounts)
 
 
 def _delegated_env_pairs(*, cwd: Path) -> tuple[dict[str, str], list[Path]]:
-    _sync_runtime_security_helpers()
-    return cast(
-        tuple[dict[str, str], list[Path]],
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["_delegated_env_pairs"](cwd=cwd),
-    )
+    env_pairs: dict[str, str] = {
+        ALLOW_NETWORK_ENV: "1" if network_allowed() else "0",
+        ALLOW_REMOTE_CODE_ENV: "1" if remote_code_allowed() else "0",
+        ALLOW_THIRD_PARTY_PLUGINS_ENV: "1" if third_party_plugins_allowed() else "0",
+        ALLOW_UNATTESTED_ARTIFACTS_ENV: (
+            "1" if unattested_artifacts_allowed() else "0"
+        ),
+        CONTAINER_EXECUTION_ENV: "1",
+    }
+    mounts: list[Path] = []
+    for name in sorted(_PATH_ENV_VARS):
+        value = os.environ.get(name)
+        if value is None or not value.strip():
+            continue
+        container_value, extra_mounts = _path_env_value_for_container(
+            value,
+            cwd=cwd,
+        )
+        env_pairs[name] = container_value
+        mounts.extend(extra_mounts)
+    for name in sorted(_FORWARDED_ENV_VARS):
+        value = os.environ.get(name)
+        if value is None or not value.strip():
+            continue
+        env_pairs[name] = value
+    return env_pairs, _minimize_mounts(mounts)
 
 
 def container_image_available_locally(
     image: str | None = None, *, engine: str | None = None
 ) -> bool:
-    _sync_runtime_security_helpers()
-    return cast(
-        bool,
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["container_image_available_locally"](
-            image,
-            engine=engine,
-        ),
-    )
+    resolved_engine = engine or resolve_container_engine()
+    if resolved_engine is None:
+        return False
+    resolved_image = image or resolve_runtime_image()
+    exists, _ = _inspect_container_image(resolved_engine, resolved_image)
+    return exists
 
 
 def runtime_verifier_binary() -> str:
-    _sync_runtime_security_helpers()
-    return cast(str, _RUNTIME_SECURITY_HELPER_DEFAULTS["runtime_verifier_binary"]())
+    binary = os.environ.get(RUNTIME_VERIFIER_BINARY_ENV, "").strip()
+    if binary:
+        return binary
+    repo_root = Path(__file__).resolve().parents[2]
+    for candidate in (
+        repo_root / "target" / "debug" / RUNTIME_VERIFIER_BINARY_DEFAULT,
+        repo_root / "target" / "release" / RUNTIME_VERIFIER_BINARY_DEFAULT,
+    ):
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    script_dirs = [Path(sys.executable).parent]
+    argv0 = Path(sys.argv[0]).parent if sys.argv else None
+    if argv0 is not None:
+        script_dirs.append(argv0)
+    for script_dir in script_dirs:
+        for candidate in (
+            script_dir / RUNTIME_VERIFIER_BINARY_DEFAULT,
+            script_dir / f"{RUNTIME_VERIFIER_BINARY_DEFAULT}.exe",
+        ):
+            if candidate.is_file() and os.access(candidate, os.X_OK):
+                return str(candidate)
+    return RUNTIME_VERIFIER_BINARY_DEFAULT
 
 
 def build_runtime_security_policy(
@@ -664,53 +715,141 @@ def runtime_allowances_scope(
         reset_runtime_allowances(token)
 
 
-def build_container_command(plan: ContainerLaunchPlan) -> list[str]:
-    _sync_runtime_security_helpers()
-    return cast(
-        list[str],
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["build_container_command"](plan),
-    )
+def build_container_command(plan: Any) -> list[str]:
+    engine = resolve_container_engine()
+    if engine is None:
+        raise RuntimeError(
+            "Host execution is disabled by default and no container engine "
+            "(docker/podman) is available. Set "
+            f"{ALLOW_HOST_EXECUTION_ENV}=1 or install docker/podman."
+        )
+
+    cwd = Path.cwd().resolve()
+    image = resolve_runtime_image()
+    digest = resolve_runtime_image_digest() or ""
+    if not network_allowed() and not container_image_available_locally(
+        image, engine=engine
+    ):
+        raise RuntimeError(
+            "Host execution is disabled by default and runtime image "
+            f"{image!r} is not available locally. Build it with `make runtime-image` "
+            f"or set {ALLOW_NETWORK_ENV}=1 to allow pulling the image."
+        )
+    pythonpath_entries, pythonpath_mounts = _container_pythonpath_entries(cwd=cwd)
+    env_pairs, env_mounts = _delegated_env_pairs(cwd=cwd)
+    env_pairs[RUNTIME_IMAGE_DIGEST_ENV] = digest
+    env_pairs["PYTHONPATH"] = os.pathsep.join(pythonpath_entries)
+    command = [engine, "run", "--rm"]
+    if plan.gpu_passthrough:
+        command.extend(["--gpus", "all"])
+    if not network_allowed():
+        command.extend(["--network", "none"])
+    command.extend(["-v", f"{cwd}:/workspace", "-w", "/workspace"])
+    if plan.needs_cwd_host_mirror:
+        command.extend(["-v", f"{cwd}:{cwd}"])
+    extra_mounts = list(plan.argv_mounts)
+    extra_mounts.extend(env_mounts)
+    for mount in pythonpath_mounts:
+        if any(existing == mount for existing in extra_mounts):
+            continue
+        extra_mounts.append(mount)
+    for mount in _minimize_mounts(extra_mounts):
+        command.extend(["-v", f"{mount}:{mount}"])
+    for key, value in env_pairs.items():
+        command.extend(["-e", f"{key}={value}"])
+    # The runtime image already sets `python -m invarlock` as its entrypoint.
+    command.extend([image, *plan.argv])
+    return command
 
 
-def delegate_container_command(plan: ContainerLaunchPlan) -> int:
-    _sync_runtime_security_helpers()
-    return cast(
-        int,
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["delegate_container_command"](plan),
-    )
+def delegate_container_command(plan: Any) -> int:
+    command = build_container_command(plan)
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            timeout=_CONTAINER_EXECUTION_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            "Container execution timed out after "
+            f"{_CONTAINER_EXECUTION_TIMEOUT_SECONDS} seconds."
+        ) from exc
+    return int(completed.returncode)
 
 
 def build_container_python_command(
     script_path: str | os.PathLike[str],
-    plan: ContainerLaunchPlan,
+    plan: Any,
 ) -> list[str]:
-    _sync_runtime_security_helpers()
-    return cast(
-        list[str],
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["build_container_python_command"](
-            script_path,
-            plan,
-        ),
-    )
+    engine = resolve_container_engine()
+    if engine is None:
+        raise RuntimeError(
+            "Host execution is disabled by default and no container engine "
+            "(docker/podman) is available. Set "
+            f"{ALLOW_HOST_EXECUTION_ENV}=1 or install docker/podman."
+        )
+
+    cwd = Path.cwd().resolve()
+    image = resolve_runtime_image()
+    digest = resolve_runtime_image_digest() or ""
+    if not network_allowed() and not container_image_available_locally(
+        image, engine=engine
+    ):
+        raise RuntimeError(
+            "Host execution is disabled by default and runtime image "
+            f"{image!r} is not available locally. Build it with `make runtime-image` "
+            f"or set {ALLOW_NETWORK_ENV}=1 to allow pulling the image."
+        )
+    pythonpath_entries, pythonpath_mounts = _container_pythonpath_entries(cwd=cwd)
+    env_pairs, env_mounts = _delegated_env_pairs(cwd=cwd)
+    env_pairs[RUNTIME_IMAGE_DIGEST_ENV] = digest
+    env_pairs["PYTHONPATH"] = os.pathsep.join(pythonpath_entries)
+
+    script_host_path = _absolute_host_path(Path(script_path), cwd=cwd)
+    script_mounts: set[Path] = set()
+    if _record_path_dependencies(script_host_path, script_mounts, cwd=cwd):
+        container_script = _workspace_path(script_host_path, cwd=cwd)
+    else:
+        container_script = str(script_host_path)
+
+    command = [engine, "run", "--rm", "--entrypoint", "python"]
+    if plan.gpu_passthrough:
+        command.extend(["--gpus", "all"])
+    if not network_allowed():
+        command.extend(["--network", "none"])
+    command.extend(["-v", f"{cwd}:/workspace", "-w", "/workspace"])
+    if plan.needs_cwd_host_mirror:
+        command.extend(["-v", f"{cwd}:{cwd}"])
+    extra_mounts = list(plan.argv_mounts)
+    extra_mounts.extend(env_mounts)
+    extra_mounts.extend(pythonpath_mounts)
+    extra_mounts.extend(script_mounts)
+    for mount in _minimize_mounts(extra_mounts):
+        command.extend(["-v", f"{mount}:{mount}"])
+    for key, value in env_pairs.items():
+        command.extend(["-e", f"{key}={value}"])
+    command.extend([image, container_script, *plan.argv])
+    return command
 
 
 def delegate_python_script_to_container(
     script_path: str | os.PathLike[str],
-    plan: ContainerLaunchPlan,
+    plan: Any,
 ) -> int:
-    _sync_runtime_security_helpers()
-    return cast(
-        int,
-        _RUNTIME_SECURITY_HELPER_DEFAULTS["delegate_python_script_to_container"](
-            script_path,
-            plan,
-        ),
-    )
-
-
-_RUNTIME_SECURITY_WRAPPER_DEFAULTS = {
-    name: globals()[name] for name in _RUNTIME_SECURITY_HELPER_DEFAULTS
-}
+    command = build_container_python_command(script_path, plan)
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            timeout=_CONTAINER_EXECUTION_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            "Container execution timed out after "
+            f"{_CONTAINER_EXECUTION_TIMEOUT_SECONDS} seconds."
+        ) from exc
+    return int(completed.returncode)
 
 
 def _config_digest(
