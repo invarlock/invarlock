@@ -233,7 +233,7 @@ jobs:
           name: release-provenance
           path: provenance
       - name: Sign release artifacts
-        uses: sigstore/gh-action-sigstore-python@a5caf349bc536fbef3668a10ed7f5cd309a4b53d
+        uses: sigstore/gh-action-sigstore-python@04cffa1d795717b140764e8b640de88853c92acc
         with:
           inputs: dist/*
           upload-signing-artifacts: true
@@ -254,7 +254,7 @@ jobs:
             --provenance-dir provenance \
             --output-dir release-assets
       - name: Sign offline verification bundle
-        uses: sigstore/gh-action-sigstore-python@a5caf349bc536fbef3668a10ed7f5cd309a4b53d
+        uses: sigstore/gh-action-sigstore-python@04cffa1d795717b140764e8b640de88853c92acc
         with:
           inputs: release-assets/*-offline-bundle.tar.gz
           upload-signing-artifacts: false
