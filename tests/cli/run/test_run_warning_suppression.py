@@ -6,7 +6,10 @@ import sys
 import warnings
 from pathlib import Path
 
-from invarlock.cli.commands import run as run_mod
+from invarlock.cli.run_warning_filters import (
+    _apply_warning_filters,
+    suppress_noisy_warnings,
+)
 
 
 class _CaptureHandler(logging.Handler):
@@ -21,7 +24,7 @@ def test_warning_suppression_filters_and_event_logging(
     # Cover suppress-all branch in _apply_warning_filters().
     with warnings.catch_warnings():
         monkeypatch.setenv("INVARLOCK_SUPPRESS_WARNINGS", "1")
-        assert run_mod._apply_warning_filters("ci") is True
+        assert _apply_warning_filters("ci") is True
     monkeypatch.delenv("INVARLOCK_SUPPRESS_WARNINGS", raising=False)
 
     # Cover handler de-duplication in _iter_handlers() by attaching the same handler
@@ -42,7 +45,7 @@ def test_warning_suppression_filters_and_event_logging(
 
         warnings.showwarning = _noop_showwarning  # type: ignore[assignment]
         try:
-            with run_mod._suppress_noisy_warnings(
+            with suppress_noisy_warnings(
                 "ci",
                 event_path=event_path,
                 context={"source": "tests"},

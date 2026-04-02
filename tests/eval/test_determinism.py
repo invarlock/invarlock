@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 
-from invarlock.cli.commands.run import _hash_sequences
+from invarlock.cli.run_pairing_helpers import _hash_sequences
 
 
 def _gen_token_sequences(

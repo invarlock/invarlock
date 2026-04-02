@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
-
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import create_empty_report
 
 
@@ -72,11 +70,9 @@ def test_evaluation_report_baseline_ref_includes_tokenizer_hash() -> None:
     assert cert["baseline_ref"]["tokenizer_hash"] == "tokhash-abc"
 
 
-def test_evaluation_report_uses_bca_when_env_enabled_and_many_paired_windows(
+def test_evaluation_report_uses_explicit_bca_when_many_paired_windows(
     monkeypatch,
 ) -> None:
-    monkeypatch.setenv("INVARLOCK_BOOTSTRAP_BCA", "1")
-
     report = create_empty_report()
     report["meta"]["model_id"] = "m"
     report["meta"]["adapter"] = "hf"
@@ -96,7 +92,7 @@ def test_evaluation_report_uses_bca_when_env_enabled_and_many_paired_windows(
         "final": 10.0,
     }
     report["metrics"]["bootstrap"] = {
-        "method": "percentile",
+        "method": "bca",
         "replicates": 10,
         "alpha": 0.05,
         "seed": 0,
@@ -153,19 +149,15 @@ def test_evaluation_report_uses_bca_when_env_enabled_and_many_paired_windows(
         return (0.0, 0.0)
 
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci", _fake_ci
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci", _fake_ci
     )
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.logspace_to_ratio_ci",
+        "invarlock.core.bootstrap.logspace_to_ratio_ci",
         lambda _ci: (1.0, 1.0),
     )
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.compute_primary_metric_from_report",
+        "invarlock.reporting.report_make.compute_primary_metric_from_report",
         lambda *_a, **_k: {"kind": "ppl_causal", "final": 10.0},
-    )
-    monkeypatch.setattr(
-        "invarlock.reporting.report_builder.get_metric",
-        lambda *_a, **_k: SimpleNamespace(direction="lower"),
     )
 
     make_report(report, baseline)

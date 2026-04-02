@@ -19,8 +19,14 @@ def test_maybe_delegate_model_command_delegates_by_default(
 
     monkeypatch.setattr(
         security_helpers,
-        "delegate_current_process_to_container",
-        _delegate,
+        "build_current_process_container_launch_plan",
+        lambda: "plan",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        security_helpers,
+        "delegate_container_command",
+        lambda plan: _delegate() if plan == "plan" else 1,
         raising=True,
     )
 
@@ -29,3 +35,19 @@ def test_maybe_delegate_model_command_delegates_by_default(
 
     assert exc.value.exit_code == 0
     assert calls == ["delegated"]
+
+
+def test_maybe_delegate_model_command_respects_shell_host_exec_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("INVARLOCK_ALLOW_HOST_EXECUTION", "1")
+    monkeypatch.delenv("INVARLOCK_CONTAINER_EXECUTION", raising=False)
+
+    monkeypatch.setattr(
+        security_helpers,
+        "delegate_container_command",
+        lambda plan: pytest.fail("should not delegate when shell env allows host"),
+        raising=True,
+    )
+
+    security_helpers.maybe_delegate_model_command()

@@ -3,7 +3,8 @@ from types import SimpleNamespace
 import torch
 import torch.nn as nn
 
-from invarlock.eval.metrics import MetricsConfig, _collect_activations
+from invarlock.eval.metrics import MetricsConfig
+from invarlock.eval.metrics_activation import _collect_activations
 
 
 def test_collect_activations_from_generator_and_fc1_layer_error():
@@ -39,7 +40,7 @@ def test_collect_activations_from_generator_and_fc1_layer_error():
     out = _collect_activations(
         Model().eval(),
         gen(),
-        MetricsConfig(progress_bars=False, oracle_windows=1),
+        MetricsConfig(oracle_windows=1),
         torch.device("cpu"),
     )
     # Expect first_batch captured and at least one fc1 activation collected (from GoodCF)

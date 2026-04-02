@@ -22,6 +22,7 @@ task graph, scheduling, and artifact generation. It complements
 | Scheduling | Dynamic work-stealing, `small_first` priority strategy |
 | Multi-GPU | Profile-based; `required_gpus` grows only when memory requires it |
 | Output | Proof pack with `manifest.json`, `checksums.sha256`, and report bundles (`--layout v2` nests results + metadata) |
+| Source of truth | `scripts/proof_packs/run_suite.sh`, `scripts/proof_packs/run_pack.sh`, `src/invarlock/proof_pack.py`, `src/invarlock/cli/commands/proof_pack.py` |
 
 ## Quick Start (Context)
 
@@ -173,7 +174,7 @@ parameters at runtime.
 
 | Edit Type | Parameters | Scope |
 | --- | --- | --- |
-| Quantization RTN | tuned (`bits`, `group_size`) from tuned params file | FFN only |
+| Quantization RTN | tuned (`bitwidth`, `group_size`) from tuned params file | FFN only |
 | FP8 Quantization | tuned (`format`) from tuned params file | FFN only |
 | Magnitude Pruning | tuned (`prune_level`) from tuned params file | FFN only |
 | Low-Rank SVD | tuned (`rank`) from tuned params file | FFN only |
@@ -192,7 +193,7 @@ without manufacturing clean false positives.
 
 | Edit Type | Parameters | Scope |
 | --- | --- | --- |
-| Quantization RTN | `quant_rtn:4:32:all` (4-bit, group size 32) | All layers |
+| Quantization RTN | `quant_rtn:8:all` (8-bit) | All layers |
 | FP8 Quantization | `fp8_quant:e5m2:all` | All layers |
 | Magnitude Pruning | `magnitude_prune:0.5:all` (50% sparsity) | All layers |
 | Low-Rank SVD | `lowrank_svd:32:all` (rank 32) | All layers |
@@ -520,7 +521,7 @@ Large runs can be storage-heavy (baseline + edits + error models):
 - Disk preflight estimates required storage and aborts early when insufficient.
   - Override with `PACK_SKIP_DISK_PREFLIGHT=1` (not recommended).
   - The minimum free space guard is `MIN_FREE_DISK_GB` (default 200).
-- `PACK_BASELINE_STORAGE_MODE=snapshot_symlink` now builds a local symlink tree
+- `PACK_BASELINE_STORAGE_MODE=snapshot_symlink` builds a local symlink tree
   that points into the Hugging Face cache snapshot. This avoids a second
   baseline copy under `OUTPUT_DIR`, but it still requires one full model copy in
   `HF_HUB_CACHE` when that cache shares the output filesystem.
@@ -553,7 +554,7 @@ Those figures are for model weights only; the default preflight also requires
   `guard_signal_summary`, `scenario_signal_summary`) and key `analysis/*` artifacts.
 - Collects all reports into `proof_pack/reports/...`.
 - Generates `manifest.json`, `checksums.sha256`, optional
-  `manifest.json.asc`.
+  `manifest.signature.json`.
 - Writes pack-contained provenance metadata such as `metadata/source_repo.json`
   and `metadata/environment.json` before sealing the pack.
 - Stages the pack in a hidden sibling temporary directory and renames it into
@@ -568,7 +569,7 @@ run_pack.sh
   ├─ run_suite.sh → OUTPUT_DIR
   ├─ collect reports + sidecars
   ├─ write manifest + checksums
-  └─ optional HTML + GPG signature
+  └─ optional HTML + package-native signature
 ```
 
 `invarlock advanced proof-pack verify` checks the pack:
@@ -577,13 +578,30 @@ run_pack.sh
 - Verifies digest-backed manifest references (`subject`, `invocation.config_source`,
   `environment`, and `materials`) against on-pack files.
 - Verifies `checksums.sha256` (and thus all hashed artifacts).
-- Verifies the GPG signature when present; `--strict` requires it.
+- Verifies the package-native Ed25519 signature bundle when present; `--strict` requires it.
 - Enforces “no extra files” semantics in `--strict` mode.
 - Runs `invarlock verify` across all bundled reports (JSON output optional) with
   runtime-manifest enforcement on; each packaged `evaluation.report.json`
   carries an adjacent `runtime.manifest.json`.
 - Returns structured exit codes so callers can distinguish usage, missing-file,
   manifest-format, signature, integrity, and report-verification failures.
+
+The installed-wheel package-native CLI is self-contained:
+
+- `invarlock advanced proof-pack keygen` generates Ed25519 signing keys.
+- `invarlock advanced proof-pack build --signing-key ...` emits `manifest.signature.json`.
+- `invarlock advanced proof-pack verify` validates the signature bundle in-process and does not depend on external signature binaries.
+
+The repo shell harness remains a separate maintainer path, but it uses the same
+package-native Ed25519 manifest-signature format as the installed CLI.
+
+Maintainer proof-pack packaging also treats source provenance as fail-closed:
+
+- `run_pack.sh` writes `metadata/source_repo.json` from the current Git checkout.
+- If `git` is unavailable or the repository metadata cannot be collected, pack
+  creation stops instead of silently emitting partial provenance.
+- If you need to package from a detached artifact tree, write a complete
+  `metadata/source_repo.json` first rather than relying on fallback inference.
 
 ## Remote setup helper
 
@@ -598,7 +616,7 @@ Operational guidance for remote proof-pack work:
 - If you intentionally run from a work tree that is not the editable install
   behind `.venv`, either reinstall that work tree or export `PYTHONPATH=src` so
   `invarlock` resolves to the intended source tree.
-- `run_suite.sh` and `run_pack.sh` now default to `SKIP_FLASH_ATTN=true` and
+- `run_suite.sh` and `run_pack.sh` default to `SKIP_FLASH_ATTN=true` and
   `PACK_BASELINE_STORAGE_MODE=snapshot_copy` for bulk secure-default runs.
 - Bulk proof-pack runs fail fast unless `INVARLOCK_ALLOW_REMOTE_CODE=1` is set.
 - Export non-default runtime roots before launching the suite when you expect
@@ -607,7 +625,7 @@ Operational guidance for remote proof-pack work:
   `TRANSFORMERS_CACHE`, `TMPDIR`, `TMP`.
 - If a staged preset or profile uses `!include` outside its config directory,
   set `INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1` on the remote host before the
-  proof-pack entrypoint; the secure-default launcher now rejects that config
+  proof-pack entrypoint; the secure-default launcher rejects that config
   graph before container start when the override is missing.
 - After Qwen2.5-14B campaigns, run
   `scripts/proof_packs/run_qwen14_sentinels.sh` from the same fresh work tree to
@@ -749,7 +767,8 @@ Primary metric acceptance/drift gates should be configured via profile/config
 | Variable | Default | Description |
 | --- | --- | --- |
 | `PACK_DIR` | `OUTPUT_DIR/proof_pack` | Proof pack output dir |
-| `PACK_GPG_SIGN` | `1` | Sign manifest if `gpg` available |
+| `PACK_SIGN_MANIFEST` | `1` | Sign `manifest.json` with a package-native Ed25519 key (auto-generated if `PACK_SIGNING_KEY` is unset) |
+| `PACK_SIGNING_KEY` | unset | Optional Ed25519 private key PEM for deterministic signer identity |
 | `PACK_SKIP_HTML` | `0` | Skip HTML rendering |
 | `PACK_VERIFY_PROFILE` | `dev` | Profile for `invarlock verify` |
 

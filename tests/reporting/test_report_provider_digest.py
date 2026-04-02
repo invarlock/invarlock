@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 
 
 def test_evaluation_report_includes_provider_digest_in_provenance():

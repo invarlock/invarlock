@@ -38,5 +38,5 @@ def test_verify_json_envelope_is_stable(tmp_path: Path):
     last = res.stdout.strip().splitlines()[-1]
     obj = json.loads(last)
     assert obj.get("format_version") == "verify-v1"
-    assert {"summary", "resolution"} <= set(obj.keys())
-    assert "exit_code" in (obj.get("resolution") or {})
+    assert {"summary", "results"} <= set(obj.keys())
+    assert "resolution" not in obj

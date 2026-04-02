@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from invarlock.reporting.render import (
-    compute_console_validation_block,
-    render_report_markdown,
-)
-from invarlock.reporting.report_builder import REPORT_SCHEMA_VERSION
+from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.report_console import compute_console_validation_block
+from invarlock.reporting.report_make import REPORT_SCHEMA_VERSION
 
 
 def _minimal_cert(pm_kind: str = "ppl_causal", guard_evaluated: bool = False) -> dict:

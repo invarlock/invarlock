@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.cli.commands import run as run_mod
+from invarlock.reporting.run_metric_utils import merge_primary_metric_health
 
 
 def test_merge_primary_metric_health_prefers_core_flags() -> None:
@@ -20,7 +20,7 @@ def test_merge_primary_metric_health_prefers_core_flags() -> None:
         "degraded_reason": "non_finite_pm",
     }
 
-    merged = run_mod._merge_primary_metric_health(primary_metric, core_primary_metric)
+    merged = merge_primary_metric_health(primary_metric, core_primary_metric)
 
     assert merged["preview"] == primary_metric["preview"]
     assert merged["final"] == primary_metric["final"]

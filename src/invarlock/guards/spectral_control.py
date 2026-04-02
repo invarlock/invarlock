@@ -4,6 +4,14 @@ from typing import Any
 
 import torch
 
+_SPECTRAL_CONTROL_ERRORS = (
+    ArithmeticError,
+    AttributeError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 def apply_weight_rescale(
     model: Any,
@@ -35,7 +43,7 @@ def apply_weight_rescale(
                         if hasattr(module, "bias") and module.bias is not None:
                             module.bias.mul_(scale_factor)
                     rescaled_modules.append(name)
-            except Exception as error:
+            except _SPECTRAL_CONTROL_ERRORS as error:
                 failed_modules.append((name, str(error)))
 
         return {
@@ -45,7 +53,7 @@ def apply_weight_rescale(
             "failed_modules": failed_modules,
             "message": f"Rescaled {len(rescaled_modules)} modules with factor {scale_factor}",
         }
-    except Exception as error:
+    except _SPECTRAL_CONTROL_ERRORS as error:
         return {
             "applied": False,
             "error": str(error),
@@ -108,7 +116,7 @@ def apply_relative_spectral_cap(
                                 "scale_factor": scale_factor,
                             }
                         )
-            except Exception as error:
+            except _SPECTRAL_CONTROL_ERRORS as error:
                 failed_modules.append((name, str(error)))
 
         return {
@@ -118,7 +126,7 @@ def apply_relative_spectral_cap(
             "failed_modules": failed_modules,
             "message": f"Applied spectral capping to {len(capped_modules)} modules",
         }
-    except Exception as error:
+    except _SPECTRAL_CONTROL_ERRORS as error:
         return {
             "applied": False,
             "error": str(error),
@@ -171,7 +179,7 @@ def apply_spectral_control(
             f"rescaling={results['rescaling_applied']}"
         )
         return results
-    except Exception as error:
+    except _SPECTRAL_CONTROL_ERRORS as error:
         return {
             "applied": False,
             "error": str(error),

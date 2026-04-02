@@ -7,6 +7,8 @@ from typing import Any
 import numpy as np
 import torch
 
+from invarlock.core.types import GuardDiagnostic, GuardValidationResult
+
 from ._contracts import guard_assert
 from ._estimators import frobenius_norm_sq, row_col_norm_extrema
 from .spectral_control import apply_spectral_control
@@ -17,8 +19,9 @@ from .spectral_detection import (
     summarize_family_z_scores,
     summarize_sigmas,
 )
-from .spectral_policy import apply_policy_overrides
+from .spectral_policy import apply_policy_overrides, multiple_testing_alpha
 from .spectral_results import (
+    build_spectral_diagnostics,
     build_spectral_finalize_metrics,
     build_spectral_validation_metrics,
     categorize_spectral_messages,
@@ -27,6 +30,30 @@ from .spectral_results import (
     partition_spectral_violations,
     spectral_validation_message,
 )
+
+
+def _typed_guard_diagnostics(
+    diagnostics: list[dict[str, Any]],
+) -> tuple[GuardDiagnostic, ...]:
+    return tuple(
+        GuardDiagnostic(
+            kind=str(item.get("kind", "spectral_violation")),
+            severity=str(item.get("severity", "warning")),
+            message=str(item.get("message", "")),
+            details={
+                str(key): value
+                for key, value in item.items()
+                if key not in {"kind", "severity", "message"}
+            },
+        )
+        for item in diagnostics
+    )
+
+
+def _raise_prepare_failure(message: str, *, error: Exception | None = None) -> None:
+    if error is None:
+        raise RuntimeError(message)
+    raise RuntimeError(message) from error
 
 
 def prepare_guard(
@@ -73,18 +100,23 @@ def prepare_guard(
             )
 
         baseline_stats: dict[str, Any] = summarize_sigmas_fn(guard.baseline_sigmas)
-        try:
-            values = np.array(list(guard.baseline_sigmas.values()), dtype=float)
-            guard.target_sigma = (
-                float(percentile_fn(values, float(guard.sigma_quantile) * 100.0))
-                if values.size
-                else float(guard.sigma_quantile)
-            )
-        except Exception:
+        values = np.array(list(guard.baseline_sigmas.values()), dtype=float)
+        if values.size:
+            try:
+                guard.target_sigma = float(
+                    percentile_fn(values, float(guard.sigma_quantile) * 100.0)
+                )
+            except (RuntimeError, TypeError, ValueError) as exc:
+                _raise_prepare_failure(
+                    "Spectral target-sigma computation failed.",
+                    error=exc,
+                )
+        else:
             guard.target_sigma = float(guard.sigma_quantile)
         baseline_stats["target_sigma"] = guard.target_sigma
 
         guard.baseline_degeneracy = {}
+        degeneracy_diagnostics: list[dict[str, Any]] = []
         if bool((guard.degeneracy or {}).get("enabled")):
             eps = 1e-12
             for name, module in scoped_modules:
@@ -109,11 +141,20 @@ def prepare_guard(
                         "stable_rank": float(stable_rank),
                         "norm_collapse": float(collapse),
                     }
-                except Exception:
-                    continue
+                except (RuntimeError, TypeError, ValueError) as exc:
+                    degeneracy_diagnostics.append(
+                        {
+                            "kind": "spectral_degeneracy_unavailable",
+                            "severity": "warning",
+                            "message": f"Degeneracy metrics unavailable for {name}.",
+                            "details": {"module": name, "error": str(exc)},
+                        }
+                    )
         baseline_stats["baseline_degeneracy"] = {
             name: values.copy() for name, values in guard.baseline_degeneracy.items()
         }
+        if degeneracy_diagnostics:
+            baseline_stats["degeneracy_diagnostics"] = degeneracy_diagnostics
         baseline_stats["family_stats"] = {
             family: stats.copy()
             for family, stats in guard.baseline_family_stats.items()
@@ -144,7 +185,7 @@ def prepare_guard(
             "scope": guard.scope,
             "preparation_time": preparation_time,
         }
-    except Exception as error:
+    except (RuntimeError, TypeError, ValueError) as error:
         guard.prepared = False
         guard._log_event(
             "prepare_failed",
@@ -152,11 +193,7 @@ def prepare_guard(
             message=f"Failed to prepare spectral guard: {str(error)}",
             error=str(error),
         )
-        return {
-            "ready": False,
-            "error": str(error),
-            "preparation_time": time.time() - start_time,
-        }
+        raise RuntimeError("Failed to prepare spectral guard.") from error
 
 
 def before_edit_guard(
@@ -224,107 +261,98 @@ def after_edit_guard(
             "after_edit",
             message=f"Post-edit analysis complete, {len(violations)} violations detected",
         )
-    except Exception as error:
+    except (RuntimeError, TypeError, ValueError) as error:
         guard._log_event(
             "after_edit_failed",
             level="ERROR",
             message=f"Post-edit spectral analysis failed: {str(error)}",
             error=str(error),
         )
+        raise RuntimeError("Post-edit spectral analysis failed.") from error
 
 
 def validate_guard(
     guard: Any, model: Any, adapter: Any, context: dict[str, Any]
-) -> dict[str, Any]:
+) -> GuardValidationResult:
     """Validate model spectral properties."""
     _ = context
-    try:
-        if not guard.prepared:
-            guard.prepare(model, adapter, None, {})
+    if not guard.prepared:
+        guard.prepare(model, adapter, None, {})
 
-        current_metrics = guard._capture_sigmas(model, phase="validate")
-        violations = guard._detect_spectral_violations(
-            model, current_metrics, phase="validate"
-        )
-        fatal_violations, budgeted_violations = partition_spectral_violations(
-            violations
-        )
-        selected_budgeted, mt_selection = guard._select_budgeted_violations(
-            budgeted_violations
-        )
-        outcome = evaluate_spectral_outcome(
-            fatal_violations=fatal_violations,
-            budgeted_violations=budgeted_violations,
-            selected_budgeted=selected_budgeted,
-            max_caps=int(guard.max_caps),
-        )
-        selected_violations = outcome["selected_violations"]
-        candidate_budgeted = int(outcome["candidate_budgeted"])
-        caps_applied = int(outcome["caps_applied"])
-        caps_exceeded = bool(outcome["caps_exceeded"])
-        passed = bool(outcome["passed"])
-        action = str(outcome["action"])
+    current_metrics = guard._capture_sigmas(model, phase="validate")
+    violations = guard._detect_spectral_violations(
+        model, current_metrics, phase="validate"
+    )
+    fatal_violations, budgeted_violations = partition_spectral_violations(violations)
+    selected_budgeted, mt_selection = guard._select_budgeted_violations(
+        budgeted_violations
+    )
+    outcome = evaluate_spectral_outcome(
+        fatal_violations=fatal_violations,
+        budgeted_violations=budgeted_violations,
+        selected_budgeted=selected_budgeted,
+        max_caps=int(guard.max_caps),
+    )
+    selected_violations = outcome["selected_violations"]
+    candidate_budgeted = int(outcome["candidate_budgeted"])
+    caps_applied = int(outcome["caps_applied"])
+    caps_exceeded = bool(outcome["caps_exceeded"])
+    passed = bool(outcome["passed"])
+    decision = str(outcome["decision"])
+    _ = str(outcome["action"])
 
-        family_summary = summarize_family_z_scores(
-            guard.latest_z_scores, guard.module_family_map, guard.family_caps
-        )
-        family_quantiles, top_z_scores = compute_family_observability(
-            guard.latest_z_scores or {}, guard.module_family_map
-        )
-        metrics = build_spectral_validation_metrics(
-            current_metrics=current_metrics,
-            candidate_violations=violations,
-            selected_violations=selected_violations,
-            fatal_violations=fatal_violations,
-            candidate_budgeted=candidate_budgeted,
-            caps_applied=caps_applied,
-            caps_exceeded=caps_exceeded,
-            family_summary=family_summary,
-            family_caps=guard.family_caps,
-            sigma_quantile=guard.sigma_quantile,
-            deadband=guard.deadband,
-            max_caps=int(guard.max_caps),
-            multiple_testing=guard.multiple_testing,
-            multiple_testing_selection=mt_selection,
-            estimator=guard.estimator,
-            degeneracy=guard.degeneracy,
-            family_quantiles=family_quantiles,
-            top_z_scores=top_z_scores,
-        )
-        message = spectral_validation_message(
-            passed=passed,
-            fatal_violations=fatal_violations,
-            caps_applied=caps_applied,
-            max_caps=int(guard.max_caps),
-        )
+    family_summary = summarize_family_z_scores(
+        guard.latest_z_scores, guard.module_family_map, guard.family_caps
+    )
+    family_quantiles, top_z_scores = compute_family_observability(
+        guard.latest_z_scores or {}, guard.module_family_map
+    )
+    metrics = build_spectral_validation_metrics(
+        current_metrics=current_metrics,
+        candidate_violations=violations,
+        selected_violations=selected_violations,
+        fatal_violations=fatal_violations,
+        candidate_budgeted=candidate_budgeted,
+        caps_applied=caps_applied,
+        caps_exceeded=caps_exceeded,
+        family_summary=family_summary,
+        family_caps=guard.family_caps,
+        sigma_quantile=guard.sigma_quantile,
+        deadband=guard.deadband,
+        max_caps=int(guard.max_caps),
+        multiple_testing=guard.multiple_testing,
+        multiple_testing_selection=mt_selection,
+        estimator=guard.estimator,
+        degeneracy=guard.degeneracy,
+        family_quantiles=family_quantiles,
+        top_z_scores=top_z_scores,
+    )
+    _ = spectral_validation_message(
+        passed=passed,
+        fatal_violations=fatal_violations,
+        caps_applied=caps_applied,
+        max_caps=int(guard.max_caps),
+    )
 
-        mt = guard.multiple_testing or {}
-        try:
-            alpha = float(mt.get("alpha", 0.05)) if isinstance(mt, dict) else 0.05
-        except Exception:
-            alpha = 0.05
-        guard_assert(guard.deadband >= 0.0, "spectral.deadband must be >= 0")
-        guard_assert(0.0 < alpha <= 1.0, "spectral.multiple_testing.alpha out of range")
-        guard_assert(guard.max_caps >= 0, "spectral.max_caps must be >= 0")
+    alpha = multiple_testing_alpha(guard.multiple_testing)
+    guard_assert(guard.deadband >= 0.0, "spectral.deadband must be >= 0")
+    guard_assert(0.0 < alpha <= 1.0, "spectral.multiple_testing.alpha out of range")
+    guard_assert(guard.max_caps >= 0, "spectral.max_caps must be >= 0")
 
-        return {
-            "passed": passed,
-            "action": action,
-            "metrics": metrics,
-            "violations": selected_violations,
-            "message": message,
-            "policy": guard._serialize_policy(),
+    diagnostics = build_spectral_diagnostics(selected_violations)
+    return GuardValidationResult(
+        passed=passed,
+        decision=decision,
+        metrics=metrics,
+        diagnostics=_typed_guard_diagnostics(diagnostics),
+        policy=guard._serialize_policy(),
+        details={},
+        violations=tuple(dict(item) for item in selected_violations),
+        extras={
             "final_z_scores": guard.latest_z_scores.copy(),
             "module_family_map": dict(guard.module_family_map),
-        }
-    except Exception as error:
-        return {
-            "passed": False,
-            "action": "warn",
-            "error": str(error),
-            "metrics": {},
-            "message": f"Spectral validation failed: {error}",
-        }
+        },
+    )
 
 
 def finalize_guard(guard: Any, model: Any) -> dict[str, Any]:
@@ -335,7 +363,13 @@ def finalize_guard(guard: Any, model: Any) -> dict[str, Any]:
             "metrics": {},
             "warnings": ["Spectral guard not properly prepared"],
             "errors": ["Preparation failed or not called"],
-            "events": guard.events,
+            "diagnostics": [
+                {
+                    "kind": "spectral_preparation",
+                    "severity": "error",
+                    "message": "Preparation failed or not called",
+                }
+            ],
         }
 
     final_metrics = guard._capture_sigmas(model, phase="finalize")
@@ -367,6 +401,7 @@ def finalize_guard(guard: Any, model: Any) -> dict[str, Any]:
     caps_applied = int(outcome["caps_applied"])
     caps_exceeded = bool(outcome["caps_exceeded"])
     passed = bool(outcome["passed"])
+    decision = str(outcome["decision"])
 
     metrics = build_spectral_finalize_metrics(
         final_metrics=final_metrics,
@@ -397,11 +432,12 @@ def finalize_guard(guard: Any, model: Any) -> dict[str, Any]:
 
     result = {
         "passed": passed,
+        "decision": decision,
         "metrics": metrics,
         "warnings": warnings,
         "errors": errors,
         "violations": selected_final_violations,
-        "events": guard.events,
+        "diagnostics": build_spectral_diagnostics(selected_final_violations),
         "baseline_metrics": guard.baseline_metrics,
         "final_metrics": final_metrics,
         "final_z_scores": guard.latest_z_scores,

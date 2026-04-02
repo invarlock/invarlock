@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import importlib
 import json
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -148,24 +147,12 @@ def _coerce_bool(val: Any) -> bool | None:
 def resolve_trust_remote_code(
     kwargs: dict[str, Any] | None = None, *, default: bool = False
 ) -> bool:
-    """Resolve trust_remote_code with config override and env opt-in."""
+    """Resolve trust_remote_code from explicit load kwargs only."""
     requested: bool | None = None
     if kwargs and "trust_remote_code" in kwargs:
         coerced = _coerce_bool(kwargs.get("trust_remote_code"))
         if coerced is not None:
             requested = coerced
-
-    if requested is None:
-        for env_name in (
-            "INVARLOCK_TRUST_REMOTE_CODE",
-            "TRUST_REMOTE_CODE_BOOL",
-            "ALLOW_REMOTE_CODE",
-        ):
-            env_val = os.environ.get(env_name)
-            coerced = _coerce_bool(env_val)
-            if coerced is not None:
-                requested = coerced
-                break
 
     if requested is None:
         requested = default
@@ -175,8 +162,7 @@ def resolve_trust_remote_code(
     if not remote_code_allowed():
         raise RuntimeError(
             "Remote model code is disabled by default. "
-            "Pass --allow-remote-code or set INVARLOCK_ALLOW_REMOTE_CODE=1 "
-            "to enable trust_remote_code."
+            "Enable the runtime remote-code policy before requesting trust_remote_code."
         )
     return True
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.cli.commands import verify as V
+from invarlock.reporting import verify_contract as V
 
 
 def test_validate_primary_metric_nonppl_requires_ratio() -> None:

@@ -1,4 +1,4 @@
-from invarlock.reporting.guards_analysis import _extract_invariants
+from invarlock.reporting.guards_invariants import _extract_invariants
 
 
 def test_invariants_mixed_severity_status_fail():

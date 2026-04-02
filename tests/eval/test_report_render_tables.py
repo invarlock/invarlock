@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 
 
 def _base_minimal():
@@ -60,7 +60,7 @@ def _base_minimal():
 def test_render_spectral_tables_and_plugins_missing_fields():
     report, baseline = _base_minimal()
     with patch(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci",
         return_value=(-0.1, 0.1),
     ):
         cert = make_report(report, baseline)

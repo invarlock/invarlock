@@ -1,9 +1,8 @@
-import io
-
 import pytest
 import torch
-from rich.console import Console
 
+import invarlock.edits.quant_rtn as quant_rtn_mod
+from invarlock.core.api import EditRuntime
 from invarlock.edits.quant_rtn import RTNQuantEdit
 
 
@@ -55,42 +54,108 @@ def test_quant_rtn_rejects_non_int8_bitwidth() -> None:
         RTNQuantEdit(bitwidth=4)
 
 
-def test_quant_rtn_output_format() -> None:
+def test_quant_rtn_module_has_no_functional_apply_shim() -> None:
+    assert "apply" not in quant_rtn_mod.__dict__
+
+
+def test_quant_rtn_output_format(caplog: pytest.LogCaptureFixture) -> None:
     model = torch.nn.Linear(4, 4, bias=False)
     adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
     edit = RTNQuantEdit(scope="all", max_modules=1)
-    out = io.StringIO()
-    console = Console(file=out, force_terminal=False)
+    with caplog.at_level("INFO", logger="invarlock.edits.quant_rtn"):
+        edit.apply(
+            model,
+            adapter,
+            plan={"scope": "all", "max_modules": 1},
+            runtime=EditRuntime(),
+        )
 
-    edit.apply(
-        model,
-        adapter,
-        scope="all",
-        max_modules=1,
-        console=console,
-    )
-
-    text = out.getvalue()
-    lines = [line for line in text.splitlines() if line.strip()]
-    assert lines
-    assert all(line.startswith("[EDIT]") for line in lines)
-    assert all(ord(ch) < 128 for ch in text)
+    assert not caplog.records
 
 
-def test_quant_rtn_emit_flag_suppresses_output() -> None:
+def test_quant_rtn_emit_flag_suppresses_output(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     model = torch.nn.Linear(2, 2, bias=False)
     adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
     edit = RTNQuantEdit(scope="all", max_modules=1)
-    out = io.StringIO()
-    console = Console(file=out, force_terminal=False)
+    with caplog.at_level("INFO", logger="invarlock.edits.quant_rtn"):
+        edit.apply(
+            model,
+            adapter,
+            plan={"scope": "all", "max_modules": 1},
+            runtime=EditRuntime(),
+        )
 
-    edit.apply(
-        model,
-        adapter,
-        scope="all",
-        max_modules=1,
-        console=console,
-        emit=False,
+    assert not caplog.records
+
+
+def test_quant_rtn_logs_when_console_missing(caplog: pytest.LogCaptureFixture) -> None:
+    model = torch.nn.Linear(2, 2, bias=False)
+    adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
+    edit = RTNQuantEdit(scope="all", max_modules=1)
+
+    with caplog.at_level("INFO", logger="invarlock.edits.quant_rtn"):
+        edit.apply(
+            model,
+            adapter,
+            plan={"scope": "all", "max_modules": 1},
+            runtime=EditRuntime(),
+        )
+
+    assert not caplog.records
+
+
+def test_quant_rtn_apply_rejects_unsupported_plan_fields() -> None:
+    model = torch.nn.Linear(2, 2, bias=False)
+    adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
+    edit = RTNQuantEdit(scope="all", max_modules=1)
+
+    with pytest.raises(ValueError, match="Unsupported RTN plan fields: bits"):
+        edit.apply(model, adapter, plan={"bits": 8})
+
+
+def test_quant_rtn_apply_rejects_non_int8_bitwidth_override() -> None:
+    model = torch.nn.Linear(2, 2, bias=False)
+    adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
+    edit = RTNQuantEdit(scope="all", max_modules=1)
+
+    with pytest.raises(ValueError, match="only supports 8-bit quantization"):
+        edit.apply(model, adapter, plan={"bitwidth": 4})
+
+
+def test_quant_rtn_preview_propagates_unexpected_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model = torch.nn.Linear(2, 2, bias=False)
+    adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
+    edit = RTNQuantEdit(scope="all", max_modules=1)
+
+    def _raise(*_args, **_kwargs):  # noqa: ANN001
+        raise RuntimeError("preview boom")
+
+    monkeypatch.setattr(edit, "_compute_quantization_stats", _raise)
+
+    with pytest.raises(RuntimeError, match="preview boom"):
+        edit.preview(model, adapter, None)
+
+
+def test_quant_rtn_apply_propagates_unexpected_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model = torch.nn.Linear(2, 2, bias=False)
+    adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
+    edit = RTNQuantEdit(scope="all", max_modules=1)
+
+    def _raise(self, *_args, **_kwargs):  # noqa: ANN001
+        raise RuntimeError("apply boom")
+
+    monkeypatch.setattr(RTNQuantEdit, "_apply_rtn_quantization", _raise)
+    monkeypatch.setattr(
+        RTNQuantEdit,
+        "_identify_target_modules",
+        lambda self, _model: [("linear", model)],
     )
 
-    assert out.getvalue() == ""
+    with pytest.raises(RuntimeError, match="apply boom"):
+        edit.apply(model, adapter, plan={"scope": "all", "max_modules": 1})

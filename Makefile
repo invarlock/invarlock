@@ -12,7 +12,6 @@ COVERAGE := $(PYTHON) -m coverage
 MKDOCS := $(PYTHON) -m mkdocs
 PRE_COMMIT := $(PYTHON) -m pre_commit
 MODEL_EVIDENCE_ARGS ?=
-CARGO ?= cargo
 CONTAINER_ENGINE ?= $(shell if command -v docker >/dev/null 2>&1; then echo docker; elif command -v podman >/dev/null 2>&1; then echo podman; fi)
 RUNTIME_IMAGE ?= invarlock-runtime:local
 RUNTIME_IMAGE_DIGEST ?= sha256:local-runtime-image
@@ -64,13 +63,17 @@ COVERAGE_TESTS_CLI_COMMANDS := \
 
 COVERAGE_TESTS_CLI_HELPERS := \
 	tests/cli/test_adapter_auto*.py tests/cli/test_no_color.py \
-	tests/cli/test_json_helpers.py tests/unit/test_overhead_extraction.py
+	tests/cli/test_json_helpers.py tests/cli/test_runtime_launch_plan_contract.py \
+	tests/unit/test_overhead_extraction.py
 
 COVERAGE_TESTS_RUNTIME := \
 	tests/cli/test_security_default_contract.py \
 	tests/cli/test_container_delegation.py \
 	tests/reporting/test_runtime_manifest_contract.py \
-	tests/unit/test_runtime_security_helpers.py
+	tests/unit/test_runtime_security_container.py \
+	tests/unit/test_runtime_security_core.py \
+	tests/unit/test_runtime_security_manifest.py \
+	tests/unit/test_runtime_security_paths.py
 
 COVERAGE_TESTS := \
 	$(COVERAGE_TESTS_CORE) \
@@ -85,9 +88,13 @@ COVERAGE_MODULES := \
 	--cov=src/invarlock/eval --cov=src/invarlock/guards --cov=src/invarlock/calibration \
 	--cov=src/invarlock/cli --cov=src/invarlock/core --cov=src/invarlock/reporting \
 	--cov=invarlock.public_contracts --cov=invarlock.policy_pack \
+	--cov=invarlock.runtime_security_helpers \
+	--cov=invarlock.proof_pack_integrity \
+	--cov=invarlock.proof_pack_manifest \
+	--cov=invarlock.runtime_verify \
 	--cov=invarlock.proof_pack
 
-COVERAGE_INCLUDE := src/invarlock/eval/*,src/invarlock/guards/*,src/invarlock/calibration/*,src/invarlock/cli/*,src/invarlock/cli/commands/*,src/invarlock/core/*,src/invarlock/reporting/*,src/invarlock/public_contracts.py,src/invarlock/policy_pack.py,src/invarlock/proof_pack.py,src/invarlock/runtime_security.py,invarlock/eval/*,invarlock/guards/*,invarlock/calibration/*,invarlock/cli/*,invarlock/cli/commands/*,invarlock/core/*,invarlock/reporting/*,invarlock/public_contracts.py,invarlock/policy_pack.py,invarlock/proof_pack.py,invarlock/runtime_security.py
+COVERAGE_INCLUDE := src/invarlock/eval/*,src/invarlock/guards/*,src/invarlock/calibration/*,src/invarlock/cli/*,src/invarlock/cli/commands/*,src/invarlock/core/*,src/invarlock/reporting/*,src/invarlock/public_contracts.py,src/invarlock/policy_pack.py,src/invarlock/proof_pack.py,src/invarlock/proof_pack_integrity.py,src/invarlock/proof_pack_manifest.py,src/invarlock/runtime_security.py,src/invarlock/runtime_security_helpers.py,src/invarlock/runtime_verify.py,invarlock/eval/*,invarlock/guards/*,invarlock/calibration/*,invarlock/cli/*,invarlock/cli/commands/*,invarlock/core/*,invarlock/reporting/*,invarlock/public_contracts.py,invarlock/policy_pack.py,invarlock/proof_pack.py,invarlock/proof_pack_integrity.py,invarlock/proof_pack_manifest.py,invarlock/runtime_security.py,invarlock/runtime_security_helpers.py,invarlock/runtime_verify.py
 
 TEST_DIR_TARGETS := core cli eval guards edits adapters plugins scripts ci
 
@@ -231,9 +238,8 @@ runtime-smoke:  ## Smoke the local container runtime image
 		$(RUNTIME_IMAGE) \
 		-c "import datasets, safetensors, torch, transformers; print('runtime image imports ok')"
 
-runtime-verify:  ## Build and smoke the Rust runtime verifier on the fixture bundle
-	$(CARGO) build -p invarlock-runtime-verify
-	./target/debug/invarlock-runtime-verify \
+runtime-verify:  ## Smoke the Python runtime verifier on the fixture bundle
+	PYTHONPATH=src $(PYTHON) -m invarlock.cli.runtime_verify \
 		--report tests/fixtures/runtime_attestation/evaluation.report.json \
 		--manifest tests/fixtures/runtime_attestation/runtime.manifest.json \
 		--json

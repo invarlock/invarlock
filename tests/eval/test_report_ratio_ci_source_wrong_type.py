@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 
 
 def test_evaluation_report_ratio_ci_source_run_metrics_on_wrong_type_return():
@@ -64,7 +64,7 @@ def test_evaluation_report_ratio_ci_source_run_metrics_on_wrong_type_return():
     # Return a wrong type that doesn't raise immediately from the patched function,
     # but will cause conversion (logspace_to_ratio_ci) to raise inside the try.
     with patch(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci",
         return_value="bad-type",
     ):
         cert = make_report(report, baseline)

@@ -3,7 +3,6 @@
 test_pack_build_pack_and_verify_pack_end_to_end_v2_layout() {
     mock_reset
 
-    PACK_GPG_SIGN=0
     PACK_SKIP_HTML=1
     PACK_PACK_LAYOUT=v2
     PACK_SUITE=subset
@@ -34,8 +33,10 @@ test_pack_build_pack_and_verify_pack_end_to_end_v2_layout() {
     assert_file_exists "${pack_dir}/README.md" "readme written"
     assert_file_exists "${pack_dir}/results/verification_summary.json" "verification summary written"
     assert_file_exists "${pack_dir}/reports/m/clean/quant_rtn/evaluation.report.json" "report copied"
+    assert_file_exists "${pack_dir}/manifest.signature.json" "signature bundle written"
 
     assert_file_exists "${pack_dir}/metadata/manifest.json" "manifest copied to metadata"
+    assert_file_exists "${pack_dir}/metadata/manifest.signature.json" "signature copied to metadata"
     assert_file_exists "${pack_dir}/metadata/checksums.sha256" "checksums copied to metadata"
     assert_file_exists "${pack_dir}/metadata/source_repo.json" "source repo metadata copied"
     assert_file_exists "${pack_dir}/metadata/environment.json" "environment metadata copied"

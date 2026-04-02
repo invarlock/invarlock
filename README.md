@@ -120,6 +120,10 @@ invarlock verify --json reports/eval/evaluation.report.json
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
 
+If you pass a directory to `invarlock report`, it must contain canonical
+`report.json` or `evaluation.report.json`; other report-like filenames are not
+auto-selected.
+
 Example output (abridged; counts vary by profile/config):
 
 ```text
@@ -131,12 +135,12 @@ Output: reports/eval/evaluation.report.json
 Attestation: reports/eval/runtime.manifest.json
 ```
 
-## Breaking Surface Changes
+## Command Surface
 
 - Core workflow: `invarlock evaluate` → `invarlock verify` →
   `invarlock report html`.
-- Advanced workflows now live under `invarlock advanced ...`.
-- Trusted host execution for the core evaluate path now uses `--mode local`.
+- Advanced workflows live under `invarlock advanced ...`.
+- Trusted host execution for the core evaluate path uses `--mode local`.
 - Optional adapter/backend installs use normal Python extras such as
   `pip install "invarlock[hf]"` rather than CLI install commands.
 
@@ -150,7 +154,7 @@ Proof packs bundle reports + verification metadata into a distributable artifact
 - Repo harness alternative: `scripts/proof_packs/verify_pack.sh --pack <dir> --strict`
 
 Note: `configs/` and most `scripts/` remain repo resources and are not shipped in
-wheels. Installed wheels now include the public contracts and the
+wheels. Installed wheels include the public contracts and the
 `invarlock advanced proof-pack verify` verifier.
 
 ## Installation

@@ -4,7 +4,14 @@ import math
 
 import pytest
 
-from invarlock.reporting import report_builder as C
+from invarlock.reporting import report_make as C
+from invarlock.reporting import report_normalization as normalization_mod
+from invarlock.reporting.report_primary_metric_policy import is_ppl_kind as _is_ppl_kind
+from invarlock.reporting.utils import (
+    _coerce_int,
+    _coerce_interval,
+    _infer_scope_from_modules,
+)
 
 
 class _RaisingStr:
@@ -20,8 +27,8 @@ class _RaisingGet:
 
 
 def test_is_ppl_kind_handles_str_exception() -> None:
-    assert C._is_ppl_kind(_RaisingStr()) is False
-    assert C._is_ppl_kind("ppl_causal") is True
+    assert _is_ppl_kind(_RaisingStr()) is False
+    assert _is_ppl_kind("ppl_causal") is True
 
 
 def test_get_ppl_final_handles_bad_metrics_get() -> None:
@@ -30,12 +37,12 @@ def test_get_ppl_final_handles_bad_metrics_get() -> None:
 
 
 def test_coerce_int_variants() -> None:
-    assert C._coerce_int(5) == 5
+    assert _coerce_int(5) == 5
     # Non-integer float rejected (only near-integers accepted)
-    assert C._coerce_int(5.8) is None
-    assert C._coerce_int("7") == 7
-    assert C._coerce_int(None) is None
-    assert C._coerce_int("bad") is None
+    assert _coerce_int(5.8) is None
+    assert _coerce_int("7") == 7
+    assert _coerce_int(None) is None
+    assert _coerce_int("bad") is None
 
 
 def test_sanitize_seed_bundle_partial_and_fallback() -> None:
@@ -49,25 +56,27 @@ def test_sanitize_seed_bundle_partial_and_fallback() -> None:
 
 
 def test_infer_scope_from_modules_variants() -> None:
-    assert C._infer_scope_from_modules([]) == "unknown"
-    assert C._infer_scope_from_modules(["model.attn.block"]) == "attn"
-    assert C._infer_scope_from_modules(["decoder.mlp.fc"]) == "ffn"
-    assert C._infer_scope_from_modules(["wte.embedding"]) == "embed"
-    mixed = C._infer_scope_from_modules(["layer.attention", "mlp.ffn", "tok.embed"])
+    assert _infer_scope_from_modules([]) == "unknown"
+    assert _infer_scope_from_modules(["model.attn.block"]) == "attn"
+    assert _infer_scope_from_modules(["decoder.mlp.fc"]) == "ffn"
+    assert _infer_scope_from_modules(["wte.embedding"]) == "embed"
+    mixed = _infer_scope_from_modules(["layer.attention", "mlp.ffn", "tok.embed"])
     assert mixed in {"attn+embed+ffn", "attn+ffn+embed"}
 
 
 def test_coerce_interval_from_string_and_list() -> None:
-    lo, hi = C._coerce_interval("(1.5, 2.5)")
+    lo, hi = _coerce_interval("(1.5, 2.5)")
     assert math.isclose(lo, 1.5) and math.isclose(hi, 2.5)
-    lo2, hi2 = C._coerce_interval("not a tuple")
+    lo2, hi2 = _coerce_interval("not a tuple")
     assert math.isnan(lo2) and math.isnan(hi2)
-    lo3, hi3 = C._coerce_interval(["x", 2])
+    lo3, hi3 = _coerce_interval(["x", 2])
     assert math.isnan(lo3) and math.isnan(hi3)
 
 
 def test_compute_edit_digest_quant_and_default() -> None:
-    d = C._compute_edit_digest({"edit": {"name": "quant_rtn", "config": {"bits": 8}}})
+    d = C._compute_edit_digest(
+        {"edit": {"name": "quant_rtn", "config": {"bitwidth": 8}}}
+    )
     assert d["family"] == "quantization" and isinstance(d["impl_hash"], str)
     d2 = C._compute_edit_digest({"edit": {"name": "noop"}})
     assert d2["family"] == "cert_only"
@@ -94,6 +103,20 @@ def test_extract_report_meta_defaults_seed_to_zero() -> None:
     assert meta["seed"] == 0
 
 
+def test_extract_report_meta_records_missing_fields() -> None:
+    diagnostics: list[dict[str, object]] = []
+    report = {"meta": {"adapter": "", "device": None}}
+    meta = C._extract_report_meta(report, diagnostics)
+
+    assert meta["model_id"] is None
+    assert meta["adapter"] is None
+    assert meta["device"] is None
+    codes = {entry["code"] for entry in diagnostics}
+    assert "meta.model_id_unavailable" in codes
+    assert "meta.adapter_unavailable" in codes
+    assert "meta.device_unavailable" in codes
+
+
 def test_normalize_and_validate_report_rejects_invalid() -> None:
     with pytest.raises(ValueError):
-        C._normalize_and_validate_report("oops")  # type: ignore[arg-type]
+        normalization_mod.normalize_and_validate_run_report("oops")  # type: ignore[arg-type]

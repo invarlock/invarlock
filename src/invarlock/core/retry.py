@@ -12,9 +12,29 @@ Manages retry logic for automated evaluation workflows with:
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass, field
 from typing import Any
 
-__all__ = ["RetryController", "adjust_edit_params"]
+__all__ = [
+    "EditAdjustmentResult",
+    "RetryController",
+    "RetryDiagnostic",
+    "adjust_edit_params",
+]
+
+
+@dataclass(frozen=True)
+class RetryDiagnostic:
+    code: str
+    message: str
+    severity: str = "info"
+    details: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class EditAdjustmentResult:
+    params: dict[str, Any]
+    diagnostics: tuple[RetryDiagnostic, ...] = ()
 
 
 class RetryController:
@@ -44,6 +64,7 @@ class RetryController:
         self.verbose = verbose
         self.start_time = time.time()
         self.attempt_history: list[dict[str, Any]] = []
+        self._pending_diagnostics: list[RetryDiagnostic] = []
 
     def should_retry(self, report_passed: bool) -> bool:
         """
@@ -62,7 +83,14 @@ class RetryController:
         # Check attempt budget (attempt count equals history length)
         if len(self.attempt_history) >= self.max_attempts:
             if self.verbose:
-                print(f"Exhausted {self.max_attempts} attempts, stopping retry")
+                self._pending_diagnostics.append(
+                    RetryDiagnostic(
+                        code="retry.attempt_budget_exhausted",
+                        message=f"Exhausted {self.max_attempts} attempts, stopping retry",
+                        severity="warning",
+                        details={"max_attempts": int(self.max_attempts)},
+                    )
+                )
             return False
 
         # Check timeout budget
@@ -70,8 +98,16 @@ class RetryController:
             elapsed = time.time() - self.start_time
             if elapsed > self.timeout:
                 if self.verbose:
-                    print(
-                        f"Timeout {self.timeout}s exceeded ({elapsed:.1f}s), stopping retry"
+                    self._pending_diagnostics.append(
+                        RetryDiagnostic(
+                            code="retry.timeout_exhausted",
+                            message=f"Timeout {self.timeout}s exceeded ({elapsed:.1f}s), stopping retry",
+                            severity="warning",
+                            details={
+                                "timeout_seconds": int(self.timeout),
+                                "elapsed_seconds": float(elapsed),
+                            },
+                        )
                     )
                 return False
 
@@ -99,6 +135,11 @@ class RetryController:
             }
         )
 
+    def drain_diagnostics(self) -> tuple[RetryDiagnostic, ...]:
+        diagnostics = tuple(self._pending_diagnostics)
+        self._pending_diagnostics.clear()
+        return diagnostics
+
     def get_attempt_summary(self) -> dict[str, Any]:
         """Get summary of all retry attempts."""
         return {
@@ -115,7 +156,7 @@ def adjust_edit_params(
     edit_params: dict[str, Any],
     attempt: int,
     report_result: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+) -> EditAdjustmentResult:
     """
     Adjust edit parameters for retry attempt based on edit type and failure mode.
 
@@ -129,18 +170,25 @@ def adjust_edit_params(
         report_result: Optional evaluation report result for failure analysis
 
     Returns:
-        Adjusted parameters for next attempt
+        Adjusted parameters plus typed retry diagnostics for the next attempt
     """
     adjusted = edit_params.copy()
+    diagnostics: list[RetryDiagnostic] = []
 
     # Quantization adjustments
     if "quant" in edit_name.lower():
         # Add clamp_ratio for stability
         if "clamp_ratio" not in adjusted:
             adjusted["clamp_ratio"] = 0.01
-            print("  Quant retry adjustment: added clamp_ratio=0.01")
+            diagnostics.append(
+                RetryDiagnostic(
+                    code="retry.quant_clamp_ratio_added",
+                    message="Quant retry adjustment: added clamp_ratio=0.01",
+                    details={"clamp_ratio": 0.01},
+                )
+            )
         else:
             # Could increase existing clamp_ratio if needed
             pass
 
-    return adjusted
+    return EditAdjustmentResult(params=adjusted, diagnostics=tuple(diagnostics))

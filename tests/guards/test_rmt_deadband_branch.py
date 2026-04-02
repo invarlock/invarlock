@@ -1,6 +1,6 @@
 import torch
 
-import invarlock.guards.rmt_legacy as R
+import invarlock.guards.rmt_detection as R
 
 
 class TinyModel(torch.nn.Module):

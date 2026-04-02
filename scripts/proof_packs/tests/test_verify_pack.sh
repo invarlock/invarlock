@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
 
+pack_test_sign_manifest() {
+    local pack_dir="$1"
+    local repo_root="${TEST_ROOT:-$(pwd)}"
+    python3 "${repo_root}/scripts/proof_packs/python/sign_manifest.py" \
+        --manifest "${pack_dir}/manifest.json" \
+        --generate-ephemeral \
+        >/dev/null
+}
+
 test_verify_pack_validates_checksums_and_reports() {
     mock_reset
 
@@ -261,7 +270,7 @@ EOF
     PATH="${original_path}"
 }
 
-test_verify_pack_skip_verify_and_gpg_warning() {
+test_verify_pack_skip_verify_and_unsigned_warning() {
     mock_reset
 
     source ./scripts/proof_packs/verify_pack.sh
@@ -269,7 +278,6 @@ test_verify_pack_skip_verify_and_gpg_warning() {
     local pack_dir="${TEST_TMPDIR}/pack"
     mkdir -p "${pack_dir}"
     echo "payload" > "${pack_dir}/payload.txt"
-    echo "sig" > "${pack_dir}/manifest.json.asc"
 
     local sha_cmd
     sha_cmd="$(pack_sha256_cmd)"
@@ -281,37 +289,14 @@ test_verify_pack_skip_verify_and_gpg_warning() {
     local checksums_digest
     checksums_digest="$(cd "${pack_dir}" && python3 -c 'import hashlib;print(hashlib.sha256(open("checksums.sha256","rb").read()).hexdigest())' < /dev/null)"
     printf '%s\n' "{\"format\":\"proof-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
-
-    mkdir -p "${TEST_TMPDIR}/bin"
-    local repo_root
-    repo_root="$(pwd)"
-    cat > "${TEST_TMPDIR}/bin/shasum" <<EOF
-#!/usr/bin/env bash
-set -euo pipefail
-exec python3 "${repo_root}/scripts/proof_packs/python/shasum_mock.py" "\$@"
-EOF
-    chmod +x "${TEST_TMPDIR}/bin/shasum"
-
-    local original_path="${PATH}"
-    PATH="${TEST_TMPDIR}/bin:${original_path}"
-
-    command() {
-        if [[ "${1:-}" == "-v" && "${2:-}" == "gpg" ]]; then
-            return 1
-        fi
-        builtin command "$@"
-    }
 
     run pack_verify_pack --pack "${pack_dir}" --skip-verify
     assert_rc "0" "${RUN_RC}" "skip-verify succeeds"
-    assert_match "gpg not found" "${RUN_ERR}" "warn when gpg missing"
-
-    unset -f command
-    PATH="${original_path}"
+    assert_match "manifest\\.signature\\.json missing; pack is unsigned" "${RUN_ERR}" "warns when signature bundle is missing"
 }
 
 
-test_verify_pack_gpg_present_verifies_signature() {
+test_verify_pack_signed_manifest_verifies_signature() {
     mock_reset
 
     source ./scripts/proof_packs/verify_pack.sh
@@ -319,7 +304,6 @@ test_verify_pack_gpg_present_verifies_signature() {
     local pack_dir="${TEST_TMPDIR}/pack"
     mkdir -p "${pack_dir}"
     echo "payload" > "${pack_dir}/payload.txt"
-    echo "sig" > "${pack_dir}/manifest.json.asc"
 
     local sha_cmd
     sha_cmd="$(pack_sha256_cmd)"
@@ -331,25 +315,10 @@ test_verify_pack_gpg_present_verifies_signature() {
     local checksums_digest
     checksums_digest="$(cd "${pack_dir}" && python3 -c 'import hashlib;print(hashlib.sha256(open("checksums.sha256","rb").read()).hexdigest())' < /dev/null)"
     printf '%s\n' "{\"format\":\"proof-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
-
-    local bin_dir="${TEST_TMPDIR}/bin"
-    mkdir -p "${bin_dir}"
-    cat > "${bin_dir}/gpg" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-printf '%s\n' "$@" > "${TEST_TMPDIR}/gpg.calls"
-exit 0
-EOF
-    chmod +x "${bin_dir}/gpg"
-
-    local original_path="${PATH}"
-    PATH="${bin_dir}:${PATH}"
+    pack_test_sign_manifest "${pack_dir}"
 
     run pack_verify_pack --pack "${pack_dir}" --skip-verify
-    assert_rc "0" "${RUN_RC}" "verify succeeds with gpg present"
-    assert_file_exists "${TEST_TMPDIR}/gpg.calls" "gpg invoked"
-
-    PATH="${original_path}"
+    assert_rc "0" "${RUN_RC}" "verify succeeds with package-native signature present"
 }
 
 
@@ -436,24 +405,10 @@ test_verify_pack_strict_rejects_extra_files() {
     checksums_digest="$(cd "${pack_dir}" && python3 -c 'import hashlib;print(hashlib.sha256(open("checksums.sha256","rb").read()).hexdigest())' < /dev/null)"
     printf '%s\n' "{\"format\":\"proof-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
 
-    echo "sig" > "${pack_dir}/manifest.json.asc"
-
-    local bin_dir="${TEST_TMPDIR}/bin"
-    mkdir -p "${bin_dir}"
-    cat > "${bin_dir}/gpg" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-exit 0
-EOF
-    chmod +x "${bin_dir}/gpg"
-
-    local original_path="${PATH}"
-    PATH="${bin_dir}:${PATH}"
+    pack_test_sign_manifest "${pack_dir}"
 
     run pack_verify_pack --pack "${pack_dir}" --skip-verify --strict
     assert_rc "6" "${RUN_RC}" "strict mode rejects extra files"
-
-    PATH="${original_path}"
 }
 
 test_verify_pack_warns_on_extra_files_in_non_strict_mode() {
@@ -611,7 +566,7 @@ EOF
     PATH="${original_path}"
 }
 
-test_verify_pack_strict_requires_gpg_when_signature_present() {
+test_verify_pack_rejects_signature_helper_errors() {
     mock_reset
 
     source ./scripts/proof_packs/verify_pack.sh
@@ -619,20 +574,17 @@ test_verify_pack_strict_requires_gpg_when_signature_present() {
     local pack_dir="${TEST_TMPDIR}/pack"
     mkdir -p "${pack_dir}"
     echo "payload" > "${pack_dir}/payload.txt"
-    echo "sig" > "${pack_dir}/manifest.json.asc"
     echo "{}" > "${pack_dir}/checksums.sha256"
     printf '%s\n' '{"format":"proof-pack-v1","checksums_sha256":"checksums.sha256","checksums_sha256_digest":"0000000000000000000000000000000000000000000000000000000000000000"}' > "${pack_dir}/manifest.json"
 
-    command() {
-        if [[ "${1:-}" == "-v" && "${2:-}" == "gpg" ]]; then
-            return 1
-        fi
-        builtin command "$@"
+    pack_verify_signature_helper() {
+        echo "signature helper exploded" >&2
+        return 1
     }
 
-    run pack_verify_pack --pack "${pack_dir}" --skip-verify --strict
-    assert_rc "5" "${RUN_RC}" "strict verification fails when gpg missing"
-    assert_match "gpg not found \\(strict mode requires signature verification\\)" "${RUN_ERR}" "strict gpg missing error"
+    run pack_verify_pack --pack "${pack_dir}" --skip-verify
+    assert_rc "5" "${RUN_RC}" "signature helper failures surface as signature errors"
+    assert_match "signature helper exploded" "${RUN_ERR}" "helper stderr surfaced"
 }
 
 test_verify_pack_rejects_bad_manifest_signature() {
@@ -643,27 +595,31 @@ test_verify_pack_rejects_bad_manifest_signature() {
     local pack_dir="${TEST_TMPDIR}/pack"
     mkdir -p "${pack_dir}"
     echo "payload" > "${pack_dir}/payload.txt"
-    echo "sig" > "${pack_dir}/manifest.json.asc"
-    echo "{}" > "${pack_dir}/checksums.sha256"
-    printf '%s\n' '{"format":"proof-pack-v1","checksums_sha256":"checksums.sha256","checksums_sha256_digest":"0000000000000000000000000000000000000000000000000000000000000000"}' > "${pack_dir}/manifest.json"
+    local sha_cmd
+    sha_cmd="$(pack_sha256_cmd)"
+    (
+        cd "${pack_dir}"
+        ${sha_cmd} payload.txt > checksums.sha256
+    )
+    local checksums_digest
+    checksums_digest="$(cd "${pack_dir}" && python3 -c 'import hashlib;print(hashlib.sha256(open("checksums.sha256","rb").read()).hexdigest())' < /dev/null)"
+    printf '%s\n' "{\"format\":\"proof-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
+    pack_test_sign_manifest "${pack_dir}"
+    python3 - "${pack_dir}/manifest.json" <<'PY'
+import json
+import sys
 
-    local bin_dir="${TEST_TMPDIR}/bin"
-    mkdir -p "${bin_dir}"
-    cat > "${bin_dir}/gpg" <<'EOF'
-#!/usr/bin/env bash
-echo "BAD SIG" >&2
-exit 2
-EOF
-    chmod +x "${bin_dir}/gpg"
-
-    local original_path="${PATH}"
-    PATH="${bin_dir}:${PATH}"
+path = sys.argv[1]
+payload = json.load(open(path, encoding="utf-8"))
+payload["checksums_sha256_digest"] = "0" * 64
+with open(path, "w", encoding="utf-8") as handle:
+    json.dump(payload, handle, sort_keys=True)
+    handle.write("\n")
+PY
 
     run pack_verify_pack --pack "${pack_dir}" --skip-verify
     assert_rc "5" "${RUN_RC}" "invalid signature must fail"
     assert_match "manifest signature verification failed" "${RUN_ERR}" "signature failure surfaced"
-
-    PATH="${original_path}"
 }
 
 test_verify_pack_rejects_signature_when_manifest_records_mismatched_fingerprint() {
@@ -674,27 +630,33 @@ test_verify_pack_rejects_signature_when_manifest_records_mismatched_fingerprint(
     local pack_dir="${TEST_TMPDIR}/pack"
     mkdir -p "${pack_dir}"
     echo "payload" > "${pack_dir}/payload.txt"
-    echo "sig" > "${pack_dir}/manifest.json.asc"
-    echo "{}" > "${pack_dir}/checksums.sha256"
-    printf '%s\n' '{"format":"proof-pack-v1","checksums_sha256":"checksums.sha256","checksums_sha256_digest":"0000000000000000000000000000000000000000000000000000000000000000","signing_key_fingerprint":"DEADBEEFDEADBEEF"}' > "${pack_dir}/manifest.json"
+    local sha_cmd
+    sha_cmd="$(pack_sha256_cmd)"
+    (
+        cd "${pack_dir}"
+        ${sha_cmd} payload.txt > checksums.sha256
+    )
+    local checksums_digest
+    checksums_digest="$(cd "${pack_dir}" && python3 -c 'import hashlib;print(hashlib.sha256(open("checksums.sha256","rb").read()).hexdigest())' < /dev/null)"
+    printf '%s\n' "{\"format\":\"proof-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\",\"signing_key_fingerprint\":\"sha256:$(printf '0%.0s' {1..64})\"}" > "${pack_dir}/manifest.json"
+    local signing_key="${TEST_TMPDIR}/proof-pack-signing-key.pem"
+    local public_key="${TEST_TMPDIR}/proof-pack-signing-key.pub.pem"
+    PYTHONPATH=src python3 - "${signing_key}" "${public_key}" "${pack_dir}/manifest.json" <<'PY'
+import sys
+from pathlib import Path
 
-    local bin_dir="${TEST_TMPDIR}/bin"
-    mkdir -p "${bin_dir}"
-    cat > "${bin_dir}/gpg" <<'EOF'
-#!/usr/bin/env bash
-printf '[GNUPG:] VALIDSIG %s 20240101T000000 0 0 0 0 0 0 0 0\n' "0123456789ABCDEF0123456789ABCDEF01234567"
-exit 0
-EOF
-    chmod +x "${bin_dir}/gpg"
+from invarlock.proof_pack_integrity import generate_signing_keypair, sign_manifest
 
-    local original_path="${PATH}"
-    PATH="${bin_dir}:${PATH}"
+private_key = Path(sys.argv[1])
+public_key = Path(sys.argv[2])
+manifest = Path(sys.argv[3])
+generate_signing_keypair(private_key, public_key_path=public_key)
+sign_manifest(manifest, signing_key_path=private_key)
+PY
 
     run pack_verify_pack --pack "${pack_dir}" --skip-verify
     assert_rc "5" "${RUN_RC}" "mismatched fingerprint must fail"
     assert_match "does not match signature key" "${RUN_ERR}" "fingerprint mismatch surfaced"
-
-    PATH="${original_path}"
 }
 
 test_verify_pack_verify_reports_attempts_error_injection_reports_best_effort() {
@@ -770,4 +732,26 @@ test_verify_pack_rejects_tampered_payload_when_checksums_bound() {
 
     run pack_verify_pack --pack "${pack_dir}" --skip-verify
     assert_rc "6" "${RUN_RC}" "tampered payload must fail checksum verification"
+}
+
+test_verify_pack_returns_integrity_error_when_manifest_attestation_fails() {
+    mock_reset
+
+    source ./scripts/proof_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}"
+    printf '%s\n' '{}' > "${pack_dir}/manifest.json"
+    printf '%s\n' 'hash  payload' > "${pack_dir}/checksums.sha256"
+
+    pack_validate_manifest_schema() { return 0; }
+    pack_verify_signature() { return 0; }
+    pack_verify_manifest_binds_checksums() { return 0; }
+    pack_verify_checksums() { return 0; }
+    pack_verify_manifest_attestation() { return 1; }
+    pack_verify_no_extra_files() { return 0; }
+    pack_verify_reports() { return 0; }
+
+    run pack_verify_pack --pack "${pack_dir}" --skip-verify
+    assert_rc "${PACK_VERIFY_INTEGRITY}" "${RUN_RC}" "manifest attestation failure maps to integrity exit code"
 }

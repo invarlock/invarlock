@@ -1,9 +1,10 @@
 import os
 from pathlib import Path
 
-from invarlock.cli.config import load_config
+from invarlock.core.config_runtime import load_config
 
 EXPECTED_CONFIGS = [
+    ("presets/causal_lm", "gpt2_smoke_128.yaml", None),
     ("presets/causal_lm", "wikitext2_512.yaml", None),
     ("overlays/edits/quant_rtn", "8bit_attn.yaml", None),
     ("overlays/edits/quant_rtn", "8bit_full.yaml", None),
@@ -24,15 +25,13 @@ def test_small_workflow_configs_present() -> None:
         assert cfg_path.exists(), f"Expected config {primary} (or fallback) to exist"
 
         config = load_config(str(cfg_path))
-        model_section = getattr(config, "model", None)
-        if model_section is not None:
-            assert isinstance(model_section.id, str) and len(model_section.id) > 0
-        dataset_section = getattr(config, "dataset", None)
-        if dataset_section is not None:
-            assert dataset_section.provider == "wikitext2"
+        if "model" in config:
+            assert isinstance(config.model.id, str) and len(config.model.id) > 0
+        if "dataset" in config:
+            assert config.dataset.provider == "wikitext2"
         # For edit configs, verify an edit is specified; task presets may omit edit.
-        if subdir.startswith("edits"):
-            assert getattr(config.edit, "name", None)
+        if subdir.startswith("edits") and "edit" in config:
+            assert config.edit.name
         # Presets carry tier context via profile; auto tier may not be set at top-level
 
 
@@ -41,3 +40,105 @@ def test_eval_script_is_executable() -> None:
     script_path = repo_root / "scripts" / "eval_once.sh"
     assert script_path.exists(), "Expected scripts/eval_once.sh to exist"
     assert os.access(script_path, os.X_OK), "eval_once.sh should be executable"
+
+
+def test_gpt2_smoke_campaign_script_is_executable() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script_path = repo_root / "scripts" / "run_gpt2_smoke_campaign.sh"
+    assert script_path.exists(), "Expected scripts/run_gpt2_smoke_campaign.sh to exist"
+    assert os.access(script_path, os.X_OK), (
+        "run_gpt2_smoke_campaign.sh should be executable"
+    )
+    contents = script_path.read_text(encoding="utf-8")
+    assert "ensure_writable_hf_cache" in contents
+    assert "INVARLOCK_SMOKE_HOST_HF_CACHE_ROOT" in contents
+    assert 'CLI=("$PYTHON_BIN" -m invarlock)' in contents
+    assert "command -v invarlock" not in contents
+    assert "INVARLOCK_SMOKE_CACHE_COMPLETE" in contents
+    assert "prefetch_hf_assets_on_host" in contents
+    assert "ensure_current_runtime_image" in contents
+    assert 'echo "[smoke] refreshing local attested runtime image"' in contents
+    assert "make runtime-image" in contents
+    assert "prefetching GPT-2 + WikiText-2 into host HF cache" in contents
+    assert "evaluation report verification failed" in contents
+    assert "proof-pack verification failed" in contents
+
+
+def test_tiny_attested_smoke_campaign_script_is_executable() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script_path = repo_root / "scripts" / "run_tiny_attested_smoke.sh"
+    assert script_path.exists(), "Expected scripts/run_tiny_attested_smoke.sh to exist"
+    assert os.access(script_path, os.X_OK), (
+        "run_tiny_attested_smoke.sh should be executable"
+    )
+    contents = script_path.read_text(encoding="utf-8")
+    assert "kind: local_jsonl" in contents
+    assert "sshleifer/tiny-gpt2" in contents
+    assert "tiny_relax: true" in contents
+    assert "prefetch_tiny_model_on_host" in contents
+    assert "ensure_current_runtime_image" in contents
+    assert 'echo "[smoke] refreshing local attested runtime image"' in contents
+    assert "make runtime-image" in contents
+    assert "INVARLOCK_RUNTIME_IMAGE_DIGEST" in contents
+    assert "runtime_verify_diagnostics" in contents
+    assert '--profile "$PROFILE" --json' in contents
+    assert 'mkdir -p "$SMOKE_EXPORT_DIR"' in contents
+    assert (
+        '"${CLI[@]}" report html -i "$EVAL_REPORT" -o "$SMOKE_EXPORT_DIR/evaluation.html"'
+        in contents
+    )
+    assert 'advanced proof-pack keygen "$PROOF_PACK_SIGNING_KEY"' in contents
+    assert '--signing-key "$PROOF_PACK_SIGNING_KEY"' in contents
+    assert "evaluation report verification failed" in contents
+    assert "proof-pack verification failed" in contents
+
+
+def test_cli_exhaustive_smoke_uses_repo_selected_python() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script_path = repo_root / "scripts" / "cli_exhaustive_smoke.sh"
+    assert script_path.exists(), "Expected scripts/cli_exhaustive_smoke.sh to exist"
+    assert os.access(script_path, os.X_OK), (
+        "cli_exhaustive_smoke.sh should be executable"
+    )
+
+    contents = script_path.read_text(encoding="utf-8")
+    assert 'PYTHON_BIN="${INVARLOCK_PYTHON:-}"' in contents
+    assert 'PYTHON_BIN="$(bash "$ROOT/scripts/select_python.sh")"' in contents
+    assert 'export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"' in contents
+    assert "printf -v CLI '%q ' \"$PYTHON_BIN\" -m invarlock" in contents
+    assert "\"$PYTHON_BIN\" - <<'PY'" in contents
+    assert "command -v invarlock" not in contents
+
+
+def test_run_cpu_telemetry_uses_repo_selected_python() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script_path = repo_root / "scripts" / "run_cpu_telemetry.sh"
+    assert script_path.exists(), "Expected scripts/run_cpu_telemetry.sh to exist"
+    assert os.access(script_path, os.X_OK), "run_cpu_telemetry.sh should be executable"
+
+    contents = script_path.read_text(encoding="utf-8")
+    assert 'PYTHON_BIN="${INVARLOCK_PYTHON:-}"' in contents
+    assert 'PYTHON_BIN="$(bash "$ROOT/scripts/select_python.sh")"' in contents
+    assert 'export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"' in contents
+    assert 'CLI=("$PYTHON_BIN" -m invarlock)' in contents
+    assert (
+        'PRESET="${PRESET:-configs/presets/causal_lm/wikitext2_512.yaml}"' in contents
+    )
+    assert 'INVARLOCK_ALLOW_NETWORK=1 "${CLI[@]}" evaluate' in contents
+    assert "EVAL_RC=$?" in contents
+    assert (
+        'if [[ "${EVAL_RC}" != "3" || ! -f "${REPORT_ROOT}/evaluation.report.json" ]]; then'
+        in contents
+    )
+    assert '"${CLI[@]}" report validate' in contents
+    assert '"${CLI[@]}" verify' not in contents
+    assert "command -v invarlock" not in contents
+
+
+def test_cli_exhaustive_smoke_uses_reporting_verify_contract_helpers() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script_path = repo_root / "scripts" / "cli_exhaustive_smoke.sh"
+    contents = script_path.read_text(encoding="utf-8")
+
+    assert "from invarlock.reporting import verify_contract as verify_mod" in contents
+    assert "from invarlock.cli.commands import verify as verify_mod" not in contents

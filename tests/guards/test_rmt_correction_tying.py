@@ -1,12 +1,12 @@
 import torch
 import torch.nn as nn
 
-import invarlock.guards.rmt_legacy as R
+import invarlock.guards.rmt_detection as rmt_detection
 
 
 def test_apply_rmt_correction_scales_tied_params(monkeypatch):
     # Ensure Conv1D symbol exists for isinstance checks
-    monkeypatch.setattr(R, "Conv1D", nn.Linear, raising=False)
+    monkeypatch.setattr(rmt_detection, "Conv1D", nn.Linear, raising=False)
 
     layer = nn.Linear(8, 8)
     with torch.no_grad():
@@ -30,7 +30,7 @@ def test_apply_rmt_correction_scales_tied_params(monkeypatch):
     pre_layer_sigma = torch.linalg.svdvals(layer.weight.float()).max().item()
     pre_tied = tied_param.detach().clone()
 
-    R._apply_rmt_correction(
+    rmt_detection._apply_rmt_correction(
         layer,
         factor=0.9,
         baseline_sigmas=baseline_sigmas,

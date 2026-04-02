@@ -11,6 +11,7 @@ __all__ = [
     "row_col_norm_extrema",
     "stable_rank_estimate",
 ]
+_ESTIMATOR_COERCION_ERRORS = (OverflowError, TypeError, ValueError)
 
 
 def _as_matrix(tensor: torch.Tensor) -> torch.Tensor:
@@ -35,7 +36,7 @@ def power_iter_sigma_max(
     """
     try:
         iters_i = int(iters)
-    except Exception:
+    except _ESTIMATOR_COERCION_ERRORS:
         iters_i = 4
     if iters_i < 1:
         iters_i = 1
@@ -144,7 +145,7 @@ def stable_rank_estimate(
     """Estimate stable rank: ||W||_F^2 / ||W||_2^2, using a provided σ̂max."""
     try:
         denom = float(sigma_max) ** 2
-    except Exception:
+    except _ESTIMATOR_COERCION_ERRORS:
         return 0.0
     if not math.isfinite(denom) or denom <= 0.0:
         return 0.0

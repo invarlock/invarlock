@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.guards_analysis import _extract_invariants
+from invarlock.reporting.guards_invariants import _extract_invariants
 
 
 def test_invariants_baseline_compare_tokenizer_mismatch_fails() -> None:

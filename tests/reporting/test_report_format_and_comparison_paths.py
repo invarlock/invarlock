@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from invarlock.reporting.report import to_evaluation_report, to_html
+from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import create_empty_report
+from invarlock.reporting.run_report_formatters import to_html
 
 
 def _mk_report(pm_kind: str = "ppl_causal", pm_final: float = 10.0) -> dict:
@@ -21,15 +22,15 @@ def _mk_report(pm_kind: str = "ppl_causal", pm_final: float = 10.0) -> dict:
     return r
 
 
-def test_to_evaluation_report_bad_format_raises() -> None:
+def test_make_report_bad_baseline_raises() -> None:
     rep = _mk_report()
     base = {
         "schema_version": "baseline-v1",
         "meta": {},
-        "metrics": {"primary_metric": {"final": 10.0}},
+        "metrics": {"primary_metric": {}},
     }
     with pytest.raises(ValueError):
-        to_evaluation_report(rep, base, format="txt")
+        make_report(rep, base)
 
 
 def test_comparison_html_one_side_has_guards() -> None:

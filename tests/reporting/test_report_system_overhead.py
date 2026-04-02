@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 
 
 def _mk_minimal_report(metrics: dict) -> dict:
@@ -41,6 +41,11 @@ def _mk_minimal_report(metrics: dict) -> dict:
             "ppl_preview_ci": (10.0, 10.0),
             "ppl_final_ci": (10.0, 10.0),
             "ppl_ratio_ci": (1.0, 1.0),
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+            },
             "latency_ms_per_tok": 2.0,
             "throughput_tok_per_s": 50.0,
             **metrics,
@@ -55,6 +60,11 @@ def test_evaluation_report_system_overhead_table_and_primary_metric_metadata():
     baseline = _mk_minimal_report(
         {"latency_ms_per_tok": 1.6, "throughput_tok_per_s": 60.0}
     )
+    baseline["metrics"]["primary_metric"] = {
+        "kind": "accuracy",
+        "preview": 0.80,
+        "final": 0.80,
+    }
 
     # Include a primary metric snapshot with metadata
     report.setdefault("metrics", {})["primary_metric"] = {

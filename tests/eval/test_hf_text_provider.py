@@ -1,9 +1,10 @@
 def test_hf_text_provider_windows_monkeypatched(monkeypatch):
     # Import module under test
     import invarlock.eval.data as data_mod
+    import invarlock.eval.data_support as data_support_mod
 
     # Pretend datasets is available
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True, raising=False)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True, raising=False)
 
     # Stub load_dataset to return an iterable of rows with 'text'
     class DummyDS:
@@ -24,7 +25,9 @@ def test_hf_text_provider_windows_monkeypatched(monkeypatch):
     ):
         return DummyDS()
 
-    monkeypatch.setattr(data_mod, "load_dataset", fake_load_dataset, raising=False)
+    monkeypatch.setattr(
+        data_support_mod, "load_dataset", fake_load_dataset, raising=False
+    )
 
     # Create provider; verify load works without network
     prov = data_mod.HFTextProvider(
@@ -38,7 +41,7 @@ def test_hf_text_provider_windows_monkeypatched(monkeypatch):
     class T:
         pad_token_id = 0
 
-        def encode(self, text, truncation=True, max_length=8):  # noqa: ARG002
+        def encode(self, text, truncation=True, max_length=8, padding="max_length"):  # noqa: ARG002
             suffix = int(text.rsplit(" ", 1)[-1])
             return [1, suffix + 2, suffix + 3]
 
@@ -50,9 +53,12 @@ def test_hf_text_provider_windows_monkeypatched(monkeypatch):
 
 def test_get_provider_hf_text_kwargs(monkeypatch):
     import invarlock.eval.data as data_mod
+    import invarlock.eval.data_support as data_support_mod
 
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True, raising=False)
-    monkeypatch.setattr(data_mod, "load_dataset", lambda *a, **k: [], raising=False)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True, raising=False)
+    monkeypatch.setattr(
+        data_support_mod, "load_dataset", lambda *a, **k: [], raising=False
+    )
 
     prov = data_mod.get_provider(
         "hf_text",
@@ -100,6 +106,7 @@ def test_hf_text_provider_windows_respects_seeded_sampling(monkeypatch):
 
 def test_hf_text_provider_windows_keep_sampling_until_unique(monkeypatch):
     import invarlock.eval.data as data_mod
+    import invarlock.eval.data_providers as data_providers_mod
 
     hp = data_mod.HFTextProvider(
         dataset_name="dummy", config_name=None, text_field="text", max_samples=16
@@ -126,7 +133,7 @@ def test_hf_text_provider_windows_keep_sampling_until_unique(monkeypatch):
         def shuffle(self, values):
             return None
 
-    monkeypatch.setattr(data_mod.random, "Random", NoShuffle)
+    monkeypatch.setattr(data_providers_mod.random, "Random", NoShuffle)
 
     token_map = {
         "dup-a": [11, 12],

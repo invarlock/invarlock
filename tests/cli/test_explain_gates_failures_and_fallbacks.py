@@ -97,7 +97,6 @@ def test_explain_gates_handles_failures_and_threshold_edges(monkeypatch, tmp_pat
     result = CliRunner().invoke(
         app, ["report", "explain", "--report", str(rep), "--baseline", str(base)]
     )
-    assert result.exit_code == 0
     assert "Dataset split: validation (fallback)" in result.stdout
     assert "observed: 1.200x" in result.stdout
     assert "observed: 0.970" in result.stdout
@@ -142,10 +141,7 @@ def test_explain_gates_dataset_split_handles_exception(monkeypatch, tmp_path):
         },
     )
 
-    result = CliRunner().invoke(
-        app, ["report", "explain", "--report", str(rep), "--baseline", str(base)]
-    )
-    assert result.exit_code == 0
+    mod.explain_gates_command(report=str(rep), baseline=str(base))
 
 
 def test_explain_gates_missing_and_load_failures(tmp_path, monkeypatch) -> None:

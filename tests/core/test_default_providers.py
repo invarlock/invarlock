@@ -26,7 +26,7 @@ def test_default_provider_known_for_bert():
 
 def test_run_fallback_provider_is_known(monkeypatch):
     # Ensure run command fallback picks a known provider name (wikitext2)
-    from invarlock.cli.commands import run as run_mod
+    from invarlock.core.metric_provider_resolution import resolve_metric_and_provider
 
     class DummyCfg:
         class dataset:
@@ -35,6 +35,6 @@ def test_run_fallback_provider_is_known(monkeypatch):
     # Use a dummy model_profile-like object
     dummy_profile = type("P", (), {"default_provider": None})()
 
-    kind, provider, _ = run_mod._resolve_metric_and_provider(DummyCfg, dummy_profile)
+    kind, provider, _ = resolve_metric_and_provider(DummyCfg, dummy_profile)
     assert provider in {"wikitext2", "hf_text", "synthetic"}
     assert provider == "wikitext2"

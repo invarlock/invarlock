@@ -4,14 +4,15 @@ from datetime import datetime
 
 import pytest
 
-from invarlock.reporting.report import (
+from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.report_make import make_report
+from invarlock.reporting.report_types import create_empty_report
+from invarlock.reporting.run_report_formatters import (
     _sanitize_for_json,
-    _validate_baseline_or_report,
     to_html,
     to_json,
     to_markdown,
 )
-from invarlock.reporting.report_types import create_empty_report
 
 
 def _minimal_report():
@@ -103,7 +104,8 @@ def test_sanitize_for_json_properties():
     assert isinstance(out["dt"], str) and out["num"] == 1 and out["lst"][1] == "x"
 
 
-def test_validate_baseline_v1_schema():
+def test_make_report_accepts_baseline_v1_schema():
+    report = _minimal_report()
     baseline = {
         "schema_version": "baseline-v1",
         "meta": {"tokenizer_hash": "abc"},
@@ -111,7 +113,7 @@ def test_validate_baseline_v1_schema():
             "primary_metric": {"kind": "ppl_causal", "preview": 10.0, "final": 9.5}
         },
     }
-    assert _validate_baseline_or_report(baseline) is True
+    assert make_report(report, baseline)["schema_version"] == "v1"
 
 
 def test_to_markdown_default_title():
@@ -128,19 +130,17 @@ def test_to_html_with_compare():
 
 
 def test_save_report_cert_requires_baseline(tmp_path):
-    from invarlock.reporting.report import save_report
+    from invarlock.reporting.report_files import save_report
 
     r = _minimal_report()
-    with pytest.raises(ValueError):
-        save_report(r, tmp_path, formats=["report"])  # missing baseline
+    with pytest.raises(ValueError, match="save_evaluation_bundle"):
+        save_report(r, tmp_path, formats=["report"])
 
 
-def test_to_evaluation_report_markdown_smoke():
-    from invarlock.reporting.report import to_evaluation_report
-
+def test_make_report_markdown_smoke():
     r = _minimal_report()
     baseline = _minimal_report()
-    md = to_evaluation_report(r, baseline, format="markdown")
+    md = render_report_markdown(make_report(r, baseline))
     assert isinstance(md, str) and len(md) > 0
 
 
@@ -171,4 +171,5 @@ def test_markdown_guard_reports_section():
 
 
 def test_validate_baseline_invalid_returns_false():
-    assert _validate_baseline_or_report({"schema_version": "x", "metrics": {}}) is False
+    with pytest.raises(ValueError):
+        make_report(_minimal_report(), {"schema_version": "x", "metrics": {}})

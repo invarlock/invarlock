@@ -56,7 +56,7 @@ def test_run_command_invarlock_error_in_ci(
     run_mod = _import_run_module()
     cfg = tmp_path / "cfg.yaml"
     cfg.write_text("model: {id: gpt2, adapter: hf_causal}\n")
-    import invarlock.cli.config as cfg_mod
+    import invarlock.core.config_runtime as cfg_mod
     from invarlock.core.exceptions import InvarlockError
 
     def _raise_invarlock(*a, **k):
@@ -78,7 +78,7 @@ def test_run_command_schema_invalid_value_error(
     def _raise_val(*a, **k):
         raise ValueError("Invalid RunReport blah")
 
-    import invarlock.cli.config as cfg_mod
+    import invarlock.core.config_runtime as cfg_mod
 
     monkeypatch.setattr(cfg_mod, "load_config", _raise_val)
     with pytest.raises(typer.Exit) as ei:

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from invarlock.reporting.report import to_html, to_markdown
 from invarlock.reporting.report_types import RunReport, create_empty_report
+from invarlock.reporting.run_report_formatters import to_html, to_markdown
 
 
 def _mk_report(pm_kind: str = "ppl_causal", pm_final: float = 10.0) -> RunReport:

@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_builder import (
-    _compute_quality_overhead_from_guard,
-    _compute_validation_flags,
-)
+from invarlock.reporting.report_overhead import compute_quality_overhead_from_guard
+from invarlock.reporting.report_validation import compute_validation_flags
 
 
 def test_accuracy_min_examples_fraction_precedence() -> None:
     # accuracy path: enforce min_examples_fraction over n_final
     pm = {"kind": "accuracy", "ratio_vs_baseline": 0.5, "n_final": 100}
-    flags = _compute_validation_flags(
+    flags = compute_validation_flags(
         ppl={"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.0},
         spectral={},
         rmt={},
@@ -25,7 +23,7 @@ def test_accuracy_min_examples_fraction_precedence() -> None:
 
 def test_tiny_relax_mode_widens_acceptance() -> None:
     # In tiny relax, undefined ratio becomes acceptable and tokens floors relax
-    flags = _compute_validation_flags(
+    flags = compute_validation_flags(
         ppl={"preview_final_ratio": 1.0, "ratio_vs_baseline": float("nan")},
         spectral={},
         rmt={},
@@ -51,7 +49,7 @@ def test_quality_overhead_from_guard_accuracy_delta_pp() -> None:
             "classification": {"final": {"correct_total": 73, "total": 100}},
         }
     }
-    qo = _compute_quality_overhead_from_guard(
+    qo = compute_quality_overhead_from_guard(
         {"bare_report": bare, "guarded_report": guarded}, pm_kind_hint="accuracy"
     )
     assert qo and qo.get("basis") == "delta_pp" and abs(qo.get("value") - 3.0) < 1e-6

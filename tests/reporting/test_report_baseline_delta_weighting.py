@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import copy
 
-from invarlock.reporting.report_builder import make_report, validate_report
+from invarlock.reporting.report_make import make_report
+from invarlock.reporting.report_schema import validate_report
 from invarlock.reporting.report_types import RunReport, create_empty_report
 
 
@@ -84,7 +85,7 @@ def test_make_evaluation_report_handles_bad_window_entries_in_weighted_mean_loop
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci",
         lambda *_a, **_k: (-0.01, 0.01),
     )
     report = _mk_report_with_bad_window_entries()
@@ -97,7 +98,7 @@ def test_make_evaluation_report_handles_nonfinite_token_counts_in_weights(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci",
         lambda *_a, **_k: (-0.01, 0.01),
     )
     report = _mk_report_with_bad_window_entries()
@@ -112,7 +113,7 @@ def test_make_evaluation_report_handles_empty_token_counts_path(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci",
         lambda *_a, **_k: (-0.01, 0.01),
     )
     report = _mk_report_with_bad_window_entries()
@@ -127,7 +128,7 @@ def test_make_evaluation_report_derives_window_counts_from_stats_and_coverage(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci",
         lambda *_a, **_k: (-0.01, 0.01),
     )
     report = _mk_report_with_bad_window_entries()

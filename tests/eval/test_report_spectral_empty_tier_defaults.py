@@ -1,10 +1,12 @@
-from invarlock.reporting.guards_analysis import _extract_spectral_analysis
+from invarlock.reporting.guards_spectral import _extract_spectral_analysis
 
 
 def test_extract_spectral_analysis_with_empty_tier_defaults(monkeypatch):
     # Empty TIER_POLICIES should not break spectral extraction
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.TIER_POLICIES", {}, raising=False
+        "invarlock.reporting.guards_spectral.get_tier_policies",
+        lambda *_a, **_k: {},
+        raising=False,
     )
     report = {
         "metrics": {"spectral": {}},

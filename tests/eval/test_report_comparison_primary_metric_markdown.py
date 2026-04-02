@@ -1,7 +1,7 @@
 from copy import deepcopy
 
-from invarlock.reporting.report import to_markdown
 from invarlock.reporting.report_types import create_empty_report
+from invarlock.reporting.run_report_formatters import to_markdown
 
 
 def _report_with_pm(final_value: float):

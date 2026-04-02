@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 import typer
 
-from invarlock.cli.commands import verify as verify_mod
 from invarlock.cli.commands.verify import verify_command
+from invarlock.reporting import verify_contract as verify_mod
 
 
 def _write_cert(tmp_path: Path, payload: dict, name: str = "cert.json") -> Path:
@@ -108,7 +108,7 @@ def test_verify_json_success_and_failure(
     out_ok = capsys.readouterr().out
     payload_ok = json.loads(out_ok)
     assert payload_ok["summary"]["ok"] is True
-    assert payload_ok["resolution"]["exit_code"] == 0
+    assert "resolution" not in payload_ok
     assert getattr(ei_ok.value, "exit_code", getattr(ei_ok.value, "code", None)) == 0
 
     # Failure case due to ratio mismatch (JSON mode)
@@ -119,7 +119,7 @@ def test_verify_json_success_and_failure(
     out_bad = capsys.readouterr().out
     payload_bad = json.loads(out_bad)
     assert payload_bad["summary"]["ok"] is False
-    assert payload_bad["resolution"]["exit_code"] == 1
+    assert "resolution" not in payload_bad
     assert getattr(ei_bad.value, "exit_code", getattr(ei_bad.value, "code", None)) == 1
 
 
@@ -134,7 +134,7 @@ def test_verify_recompute_dev_warning_json(
         verify_command([cert_path], baseline=None, profile="dev", json_out=True)
     out = capsys.readouterr().out
     payload = json.loads(out)
-    assert payload["resolution"]["exit_code"] in (0, 1, 2)
+    assert "resolution" not in payload
     assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) in (0, 1, 2)
 
 
@@ -160,7 +160,7 @@ def test_verify_ci_profile_enforces_provider_digest(
         verify_command([path], baseline=None, profile="ci", json_out=True)
     out = capsys.readouterr().out
     payload = json.loads(out)
-    assert payload["resolution"]["exit_code"] == 3
+    assert "resolution" not in payload
     assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 3
 
 
@@ -178,7 +178,7 @@ def test_verify_json_failure_envelope_multiple(
     assert isinstance(payload.get("results"), list) and len(payload["results"]) == 2
     reasons = {r.get("reason") for r in payload["results"]}
     assert reasons.issubset({"malformed", "policy_fail"}) and reasons
-    assert payload["resolution"]["exit_code"] == 2
+    assert "resolution" not in payload
     assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 2
 
 
@@ -218,7 +218,7 @@ def test_verify_ci_tokenizer_mismatch_parity(
     out = capsys.readouterr().out
     payload = json.loads(out)
     # Exit must be non-zero due to parity failure
-    assert payload["resolution"]["exit_code"] != 0
+    assert "resolution" not in payload
     assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) != 0
 
 

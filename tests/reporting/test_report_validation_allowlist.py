@@ -1,23 +1,20 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-from invarlock.reporting import report_builder as cert
+from invarlock.reporting import report_make as cert
+from invarlock.reporting import report_validation_allowlist as allowlist_mod
 
 
 def test_load_validation_allowlist_returns_default_when_missing(monkeypatch):
-    monkeypatch.setattr(Path, "exists", lambda self: False, raising=False)
+    monkeypatch.setattr(
+        allowlist_mod,
+        "load_json_contract",
+        lambda _filename: (_ for _ in ()).throw(FileNotFoundError),
+    )
     allowlist = cert._load_validation_allowlist()
-    assert allowlist == set(cert._VALIDATION_ALLOWLIST_DEFAULT)
+    assert allowlist == set(allowlist_mod.DEFAULT_VALIDATION_ALLOWLIST)
 
 
 def test_load_validation_allowlist_handles_non_list_payload(monkeypatch):
-    monkeypatch.setattr(Path, "exists", lambda self: True, raising=False)
-    monkeypatch.setattr(
-        Path,
-        "read_text",
-        lambda self, encoding="utf-8": "{}",
-        raising=False,
-    )
+    monkeypatch.setattr(allowlist_mod, "load_json_contract", lambda _filename: {})
     allowlist = cert._load_validation_allowlist()
-    assert allowlist == set(cert._VALIDATION_ALLOWLIST_DEFAULT)
+    assert allowlist == set(allowlist_mod.DEFAULT_VALIDATION_ALLOWLIST)

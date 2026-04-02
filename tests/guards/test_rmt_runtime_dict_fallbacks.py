@@ -63,7 +63,7 @@ def test_finalize_hydrates_edge_risk_and_returns_plain_dict(monkeypatch) -> None
     result = guard.finalize(nn.Linear(2, 2, bias=False), adapter=None)
 
     assert result["passed"] is True
-    assert result["action"] == "continue"
+    assert result["decision"] == "allow"
     assert result["metrics"]["edge_risk_by_family"]["attn"] == 0.2
     assert guard.edge_risk_by_module["layer"] == 0.2
 
@@ -79,8 +79,10 @@ def test_validate_uses_dict_finalize_path() -> None:
     result = guard.validate(model=None, adapter=None, context={})
 
     assert result["passed"] is False
-    assert result["action"] == "warn"
-    assert result["violations"] == ["boom"]
+    assert result["decision"] == "monitor"
+    assert result["violations"] == [
+        {"type": "rmt_error", "severity": "error", "message": "boom"}
+    ]
 
 
 def test_set_run_context_and_epsilon_setters_ignore_invalid_values() -> None:
@@ -193,11 +195,13 @@ def test_runtime_activation_module_and_edge_risk_guardrails(monkeypatch) -> None
     assert guard._activation_edge_risk(torch.randn(3, 2)) is None
 
     monkeypatch.setattr(torch, "sqrt", original_sqrt)
-    original_mp_bulk_edge = runtime_rmt.mp_bulk_edge
-    monkeypatch.setattr(runtime_rmt, "mp_bulk_edge", lambda *_a, **_k: float("nan"))
+    original_mp_bulk_edge = runtime_rmt.rmt_math.mp_bulk_edge
+    monkeypatch.setattr(
+        runtime_rmt.rmt_math, "mp_bulk_edge", lambda *_a, **_k: float("nan")
+    )
     assert guard._activation_edge_risk(torch.randn(3, 2)) is None
 
-    monkeypatch.setattr(runtime_rmt, "mp_bulk_edge", original_mp_bulk_edge)
+    monkeypatch.setattr(runtime_rmt.rmt_math, "mp_bulk_edge", original_mp_bulk_edge)
     guard.estimator = {"iters": "bad", "init": "bogus"}
     assert guard._activation_edge_risk(torch.randn(3, 2)) is not None
 
@@ -205,7 +209,7 @@ def test_runtime_activation_module_and_edge_risk_guardrails(monkeypatch) -> None
     assert guard._activation_edge_risk(torch.randn(3, 2)) is not None
 
 
-def test_runtime_activation_collection_handles_bad_hooks(monkeypatch) -> None:
+def test_runtime_activation_collection_handles_bad_hooks() -> None:
     guard = runtime_rmt.RMTGuard()
     assert guard._compute_activation_edge_risk(nn.Linear(2, 2), []) is None
     assert guard._compute_activation_edge_risk(nn.Module(), [object()]) is None
@@ -247,13 +251,12 @@ def test_runtime_activation_collection_handles_bad_hooks(monkeypatch) -> None:
         def forward(self, input_ids, attention_mask=None):  # noqa: ANN001
             return self.attn(input_ids.float())
 
-    monkeypatch.setattr(guard, "_activation_edge_risk", lambda *_a, **_k: None)
-    assert (
-        guard._compute_activation_edge_risk(
-            BadHandleModel(), [{"input_ids": torch.ones(1, 2)}]
-        )
-        is None
+    result = guard._compute_activation_edge_risk(
+        BadHandleModel(), [{"input_ids": torch.ones(1, 2)}]
     )
+    assert result is not None
+    assert result["analysis_source"] == "activations_edge_risk"
+    assert result["batches_used"] == 1
 
 
 def test_runtime_detection_logs_correction_failure(monkeypatch) -> None:
@@ -264,7 +267,7 @@ def test_runtime_detection_logs_correction_failure(monkeypatch) -> None:
 
     monkeypatch.setattr(guard, "_get_linear_modules", lambda _model: [("layer", layer)])
     monkeypatch.setattr(
-        runtime_rmt,
+        runtime_rmt.rmt_analysis,
         "layer_svd_stats",
         lambda *_a, **_k: {
             "sigma_min": 0.0,
@@ -274,7 +277,7 @@ def test_runtime_detection_logs_correction_failure(monkeypatch) -> None:
         },
     )
     monkeypatch.setattr(
-        runtime_rmt,
+        runtime_rmt.rmt_detection,
         "_apply_rmt_correction",
         lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("boom")),
     )
@@ -282,7 +285,9 @@ def test_runtime_detection_logs_correction_failure(monkeypatch) -> None:
     result = guard._apply_rmt_detection_and_correction(nn.Identity())
 
     assert result["has_outliers"] is True
-    assert any(event["operation"] == "rmt_correct_failed" for event in guard.events)
+    assert any(
+        event["kind"] == "rmt_correct_failed" for event in guard.diagnostic_records
+    )
 
 
 def test_prepare_rejects_legacy_epsilon_parameter() -> None:

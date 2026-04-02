@@ -7,7 +7,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from invarlock.cli.app import app
-from invarlock.cli.commands import verify as verify_mod
+from invarlock.reporting import verify_contract as verify_mod
 
 
 def _attestation_gate_cert() -> dict:
@@ -74,7 +74,7 @@ def test_verify_fails_closed_without_runtime_manifest(
     )
 
     assert result.exit_code == 1
-    assert "runtime.manifest.json missing or unreadable" in result.output
+    assert "runtime.manifest.json missing for" in result.output
 
 
 def test_verify_allows_unattested_override(

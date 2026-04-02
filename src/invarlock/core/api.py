@@ -19,6 +19,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
+from .types import GuardValidationResult
+
 
 class ModelAdapter(ABC):
     """
@@ -73,19 +75,31 @@ class ModelEdit(ABC):
         pass
 
     @abstractmethod
-    def apply(self, model: Any, adapter: ModelAdapter, **kwargs) -> dict[str, Any]:
+    def apply(
+        self,
+        model: Any,
+        adapter: ModelAdapter,
+        plan: dict[str, Any] | None = None,
+        runtime: EditRuntime | None = None,
+    ) -> dict[str, Any]:
         """
         Apply the edit to the model.
 
         Args:
             model: The model to edit
             adapter: Adapter for model-specific operations
-            **kwargs: Edit-specific parameters
+            plan: Canonical edit plan parameters
+            runtime: Optional execution context
 
         Returns:
             Dict with edit metadata and statistics
         """
         pass
+
+
+@dataclass(frozen=True)
+class EditRuntime:
+    """Optional typed execution context for edit operations."""
 
 
 @runtime_checkable
@@ -94,7 +108,13 @@ class EditLike(Protocol):
 
     def can_edit(self, model_desc: dict[str, Any]) -> bool: ...
 
-    def apply(self, model: Any, adapter: ModelAdapter, **kwargs) -> dict[str, Any]: ...
+    def apply(
+        self,
+        model: Any,
+        adapter: ModelAdapter,
+        plan: dict[str, Any] | None = None,
+        runtime: EditRuntime | None = None,
+    ) -> dict[str, Any]: ...
 
 
 class Guard(ABC):
@@ -110,7 +130,7 @@ class Guard(ABC):
     @abstractmethod
     def validate(
         self, model: Any, adapter: ModelAdapter, context: dict[str, Any]
-    ) -> dict[str, Any]:
+    ) -> GuardValidationResult:
         """
         Validate model state/behavior.
 
@@ -120,7 +140,7 @@ class Guard(ABC):
             context: Validation context (baseline metrics, etc.)
 
         Returns:
-            Dict with validation results and status
+            Typed validation result with domain diagnostics and decisions.
         """
         pass
 
@@ -231,14 +251,19 @@ class GuardChain:
 
     def get_worst_action(self, outcomes: list[Any]) -> str:
         """Get the worst action from all outcomes."""
+        decisions = []
         actions = []
         for outcome in outcomes:
+            if hasattr(outcome, "decision"):
+                decisions.append(outcome.decision)
             if hasattr(outcome, "action"):
                 actions.append(outcome.action)
 
         # Import from types to avoid circular dependency
-        from .types import get_worst_action
+        from .types import decision_to_action, get_worst_action, get_worst_decision
 
+        if decisions:
+            return decision_to_action(get_worst_decision(decisions))
         return get_worst_action(actions)
 
 

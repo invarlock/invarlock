@@ -15,6 +15,7 @@ import torch.nn as nn
 
 from invarlock.core.api import Guard
 from invarlock.core.bootstrap import compute_paired_delta_log_ci
+from invarlock.core.types import GuardValidationResult
 
 from . import variance_batching as _variance_batching
 from . import variance_evaluation as _variance_evaluation
@@ -85,7 +86,7 @@ class VarianceGuard(Guard):
         self._stats: dict[str, Any] = {}
         self._prepared = False
         self._baseline_state: dict[str, Any] | None = None
-        self.events: list[dict[str, Any]] = []
+        self._event_records: list[dict[str, Any]] = []
         self._calibration_stats: dict[str, Any] = {
             "requested": 0,
             "coverage": 0,
@@ -170,15 +171,54 @@ class VarianceGuard(Guard):
     def _log_event(
         self, operation: str, level: str = "INFO", message: str = "", **data
     ):
-        event = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "component": "variance_guard",
-            "operation": operation,
-            "level": level,
-            "message": message,
-            "data": data,
-        }
-        self.events.append(event)
+        level_code = str(level or "INFO").upper()
+        severity = {
+            "DEBUG": "debug",
+            "INFO": "info",
+            "WARN": "warning",
+            "WARNING": "warning",
+            "ERROR": "error",
+            "CRITICAL": "critical",
+        }.get(level_code, level_code.lower())
+        self._event_records.append(
+            {
+                "timestamp": datetime.utcnow().isoformat(),
+                "component": "variance_guard",
+                "kind": operation,
+                "severity": severity,
+                "summary": message,
+                "details": dict(data),
+                "level_code": level_code,
+            }
+        )
+
+    @property
+    def diagnostic_records(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "timestamp": event["timestamp"],
+                "component": event["component"],
+                "kind": event["kind"],
+                "severity": event["severity"],
+                "summary": event["summary"],
+                "details": dict(event["details"]),
+            }
+            for event in self._event_records
+        ]
+
+    @property
+    def events(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "timestamp": event["timestamp"],
+                "component": event["component"],
+                "operation": event["kind"],
+                "level": event["level_code"],
+                "message": event["summary"],
+                "data": dict(event["details"]),
+            }
+            for event in self._event_records
+        ]
 
     def set_run_context(self, report: Any) -> None:
         self._report_meta = getattr(report, "meta", {}) or {}
@@ -433,13 +473,13 @@ class VarianceGuard(Guard):
 
     def validate(
         self, model: Any, adapter: Any, context: dict[str, Any]
-    ) -> dict[str, Any]:
+    ) -> GuardValidationResult:
         return _variance_runtime.validate_guard(self, model, adapter, context)
 
     def finalize(self, model: nn.Module) -> dict[str, Any]:
         result = _variance_runtime.finalize_guard(self, model)
         try:
-            from invarlock.cli._evidence import maybe_dump_guard_evidence
+            from invarlock.reporting.evidence import maybe_dump_guard_evidence
 
             maybe_dump_guard_evidence(
                 ".",

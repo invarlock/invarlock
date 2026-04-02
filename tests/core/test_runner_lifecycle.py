@@ -82,6 +82,35 @@ def test_initialize_run_report_skips_auto_merge_for_non_dict_context() -> None:
     assert "auto" not in report.context
 
 
+def test_initialize_run_report_replaces_non_mapping_report_context_and_bad_auto() -> (
+    None
+):
+    class _ListContextReport(RunReport):
+        def __init__(self) -> None:
+            super().__init__()
+            self.context = []
+
+    cfg = RunConfig(
+        context={"run_id": "", "plugins": {"guards": ["spectral"]}, "auto": "bad"}
+    )
+    report = initialize_run_report(
+        config=cfg,
+        serialized_config={"profile": "dev"},
+        cuda_flags={"cuda": False},
+        auto_config={"tier": "balanced"},
+        report_factory=_ListContextReport,
+        start_time=5.0,
+    )
+
+    assert report.context == {
+        "run_id": "",
+        "plugins": {"guards": ["spectral"]},
+        "auto": {"tier": "balanced"},
+    }
+    assert report.meta["plugins"] == {"guards": ["spectral"]}
+    assert cfg.context["auto"] == {"tier": "balanced"}
+
+
 def test_finalize_run_report_records_duration_when_start_time_exists() -> None:
     report = RunReport()
     report.meta["start_time"] = 10.0
@@ -136,3 +165,19 @@ def test_merge_execution_metrics_handles_empty_memory_snapshots() -> None:
     )
 
     assert report.metrics == {}
+
+
+def test_merge_execution_metrics_preserves_non_numeric_existing_peak() -> None:
+    report = RunReport()
+    report.metrics = {"memory_mb_peak": "bad"}
+
+    merge_execution_metrics(
+        report,
+        timings={"finalize": 0.5},
+        guard_timings={},
+        memory_snapshots=[{"phase": "finalize", "rss_mb": 3.0}],
+        memory_summary={"memory_mb_peak": 2.0},
+    )
+
+    assert report.metrics["timings"] == {"finalize": 0.5}
+    assert report.metrics["memory_mb_peak"] == 2.0

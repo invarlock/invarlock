@@ -90,10 +90,12 @@ class GuardReport(TypedDict):
     """Report from a single guard."""
 
     name: str  # Guard identifier
+    passed: bool  # Whether the guard approved the run
+    decision: str  # Domain decision (allow/monitor/block/rollback)
     policy: dict[str, Any]  # Policy parameters used
     metrics: dict[str, float]  # Computed metrics
-    actions: list[str]  # Actions taken by the guard
-    violations: list[str]  # Policy violations detected
+    diagnostics: list[dict[str, Any]]  # Structured diagnostics emitted by the guard
+    violations: list[dict[str, Any] | str]  # Policy violations detected
 
 
 class EvalMetrics(TypedDict, total=False):
@@ -143,6 +145,7 @@ class Artifacts(TypedDict):
     events_path: str  # Path to event log file
     logs_path: str  # Path to detailed logs
     checkpoint_path: str | None  # Path to model checkpoint (if saved)
+    telemetry_path: NotRequired[str]  # Path to saved telemetry payload
 
 
 class Flags(TypedDict):

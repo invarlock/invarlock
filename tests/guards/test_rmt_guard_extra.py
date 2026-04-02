@@ -2,8 +2,8 @@ import pytest
 import torch
 import torch.nn as nn
 
-from invarlock.guards.rmt import RMTGuard
-from invarlock.guards.rmt_legacy import _apply_rmt_correction, rmt_detect_with_names
+import invarlock.guards.rmt as runtime_rmt
+import invarlock.guards.rmt_detection as rmt_detection
 
 
 class DummyAdapter:
@@ -30,21 +30,20 @@ class DummyAdapter:
 class DummyLayer(nn.Module):
     def __init__(self, scale: float = 10.0):
         super().__init__()
-        self.attn = nn.Linear(4, 4, bias=False)
-        self.mlp = nn.Linear(4, 4, bias=False)
+        self.attn = nn.Module()
+        self.attn.c_attn = nn.Linear(4, 4, bias=False)
+        self.mlp = nn.Module()
+        self.mlp.c_fc = nn.Linear(4, 4, bias=False)
         with torch.no_grad():
-            self.attn.weight.copy_(torch.eye(4) * scale)
-            self.mlp.weight.copy_(torch.eye(4))
+            self.attn.c_attn.weight.copy_(torch.eye(4) * scale)
+            self.mlp.c_fc.weight.copy_(torch.eye(4))
 
 
 class DummyModel(nn.Module):
     def __init__(self, layer: nn.Module):
         super().__init__()
-        self.layer0 = layer
-
-    def named_modules(self):
-        yield ("model", self)
-        yield ("layer0", self.layer0)
+        self.transformer = nn.Module()
+        self.transformer.h = nn.ModuleList([layer])
 
 
 def test_apply_rmt_correction_scales_weight_and_tied_param():
@@ -56,7 +55,7 @@ def test_apply_rmt_correction_scales_weight_and_tied_param():
     baseline_sigmas = {"layer": 1.0}
     baseline_mp = {"layer": {"sigma_base": 1.0}}
 
-    _apply_rmt_correction(
+    rmt_detection._apply_rmt_correction(
         layer,
         factor=1.5,
         baseline_sigmas=baseline_sigmas,
@@ -74,7 +73,24 @@ def test_apply_rmt_correction_scales_weight_and_tied_param():
 
 def test_rmt_detect_with_names_fallback_path():
     model = DummyModel(DummyLayer())
-    report = rmt_detect_with_names(model, threshold=0.9, verbose=False)
+    guard = runtime_rmt.RMTGuard(margin=0.9, correct=False)
+    guard.baseline_mp_stats = {}
+    guard.baseline_sigmas = {}
+    original = runtime_rmt.rmt_analysis.layer_svd_stats
+
+    def _fake_layer_svd_stats(_module, *_args, **_kwargs):
+        return {
+            "sigma_min": 1.0,
+            "sigma_max": 2.0,
+            "worst_ratio": 2.0,
+            "worst_details": {"name": "attn.c_attn", "s_max": 2.0},
+        }
+
+    runtime_rmt.rmt_analysis.layer_svd_stats = _fake_layer_svd_stats
+    try:
+        report = guard._apply_rmt_detection_and_correction(model)
+    finally:
+        runtime_rmt.rmt_analysis.layer_svd_stats = original
 
     assert report["has_outliers"] is True
     assert report["flagged_layers"]
@@ -83,7 +99,7 @@ def test_rmt_detect_with_names_fallback_path():
 
 def test_rmt_guard_validate_uses_detection(monkeypatch):
     _ = monkeypatch
-    guard = RMTGuard()
+    guard = runtime_rmt.RMTGuard()
     guard.prepared = True
     guard.baseline_edge_risk_by_family = {"attn": 1.0}
     guard.edge_risk_by_family = {"attn": 2.0}
@@ -97,7 +113,7 @@ def test_rmt_guard_validate_uses_detection(monkeypatch):
 
 
 def test_rmt_guard_set_epsilon_from_dict_and_scalar():
-    guard = RMTGuard(
+    guard = runtime_rmt.RMTGuard(
         epsilon_default=0.08,
         epsilon_by_family={"attn": 0.05, "ffn": "0.08", "invalid": "x"},  # type: ignore[arg-type]
     )
@@ -114,7 +130,7 @@ def test_rmt_guard_set_epsilon_from_dict_and_scalar():
 
 
 def test_rmt_guard_compute_epsilon_violations_detects_overages():
-    guard = RMTGuard(epsilon_default=0.0)
+    guard = runtime_rmt.RMTGuard(epsilon_default=0.0)
     guard.baseline_edge_risk_by_family = {"attn": 1.0, "embed": 1.0}
     guard.edge_risk_by_family = {"attn": 2.0, "embed": 1.2}
     guard.epsilon_by_family["embed"] = 0.05
@@ -127,7 +143,7 @@ def test_rmt_guard_compute_epsilon_violations_detects_overages():
 
 
 def test_rmt_guard_compute_epsilon_violations_respects_allowed_threshold():
-    guard = RMTGuard(epsilon_by_family={"attn": 0.5})
+    guard = runtime_rmt.RMTGuard(epsilon_by_family={"attn": 0.5})
     guard.baseline_edge_risk_by_family = {"attn": 2.0}
     guard.edge_risk_by_family = {"attn": 3.0}
 
@@ -136,7 +152,7 @@ def test_rmt_guard_compute_epsilon_violations_respects_allowed_threshold():
 
 
 def test_rmt_guard_compute_epsilon_violations_skips_zero_baseline_and_uses_default_epsilon():
-    guard = RMTGuard(epsilon_default=0.10)
+    guard = runtime_rmt.RMTGuard(epsilon_default=0.10)
     guard.baseline_edge_risk_by_family = {"ffn": 0.0, "attn": 10.0}
     guard.edge_risk_by_family = {"ffn": 100.0, "attn": 12.0}
     guard.epsilon_by_family = {"attn": 0.10}

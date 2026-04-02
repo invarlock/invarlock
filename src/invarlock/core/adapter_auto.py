@@ -1,0 +1,168 @@
+"""
+Auto adapter resolution utilities.
+
+These helpers map a model identifier (HF directory or Hub ID) to a
+concrete built-in adapter name (hf_causal, hf_mlm, hf_seq2seq) without
+adding a hard dependency on Transformers.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+from typing import Any
+
+_CAUSAL_MODEL_TYPES = {
+    "deepseek",
+    "falcon",
+    "gemma",
+    "gemma2",
+    "gemma3",
+    "glm",
+    "gpt2",
+    "gpt_neox",
+    "gptj",
+    "llama",
+    "mistral",
+    "mixtral",
+    "olmo",
+    "olmo2",
+    "opt",
+    "phi",
+    "phi3",
+    "qwen",
+    "qwen2",
+    "qwen2_moe",
+    "qwen3",
+    "qwen3_moe",
+    "yi",
+}
+
+_MLM_MODEL_TYPES = {
+    "albert",
+    "bert",
+    "deberta",
+    "deberta-v2",
+    "distilbert",
+    "roberta",
+}
+
+
+def _read_local_hf_config(model_id: str | os.PathLike[str]) -> dict[str, Any] | None:
+    """Read config.json from a local HF directory if present."""
+    try:
+        p = Path(model_id)
+    except (OSError, TypeError, ValueError):
+        return None
+    cfg_path = p / "config.json"
+    if not cfg_path.exists():
+        return None
+    try:
+        with cfg_path.open("r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        if isinstance(data, dict):
+            return data
+    except (OSError, TypeError, ValueError, UnicodeDecodeError):
+        return None
+    return None
+
+
+def _detect_quant_family_from_cfg(cfg: dict[str, Any]) -> str | None:
+    """Detect quantization family from a HF config dict.
+
+    Returns one of: 'hf_gptq', 'hf_awq', 'hf_bnb' or None if not detected.
+    """
+    try:
+        q = cfg.get("quantization_config") or {}
+        if isinstance(q, dict):
+            method = str(q.get("quant_method", q.get("quant_method_full", ""))).lower()
+            if any(tok in method for tok in ("gptq",)):
+                return "hf_gptq"
+            if any(tok in method for tok in ("awq",)):
+                return "hf_awq"
+            if "bitsandbytes" in method or "bnb" in method:
+                return "hf_bnb"
+    except Exception:
+        return None
+    return None
+
+
+def resolve_auto_adapter(
+    model_id: str | os.PathLike[str], default: str = "hf_causal"
+) -> str:
+    """Resolve an appropriate built-in adapter name for a model.
+
+    Heuristics:
+      - Prefer local config.json (no network). Inspect `model_type` and
+        `architectures` to classify causal vs masked-LM vs seq2seq.
+      - Fallback to simple name heuristics on the model_id string.
+      - Default to `hf_causal` when unsure.
+    """
+    cfg = _read_local_hf_config(model_id)
+    model_id_str = str(model_id)
+
+    def _from_cfg(c: dict[str, Any]) -> str | None:
+        # Prefer explicit quantization families first
+        fam = _detect_quant_family_from_cfg(c)
+        if fam:
+            return fam
+        mt = str(c.get("model_type", "")).lower()
+        if mt in _CAUSAL_MODEL_TYPES:
+            return "hf_causal"
+        if bool(c.get("is_encoder_decoder", False)):
+            return "hf_seq2seq"
+        archs = [str(a) for a in c.get("architectures", []) if isinstance(a, str)]
+        arch_blob = " ".join(archs)
+        if "ConditionalGeneration" in arch_blob or "Seq2SeqLM" in arch_blob:
+            return "hf_seq2seq"
+        # Treat masked-LM families as BERT-like
+        if mt in _MLM_MODEL_TYPES or "MaskedLM" in arch_blob:
+            return "hf_mlm"
+        # Causal LM families (best-effort; structural validation happens in the adapter).
+        if "CausalLM" in arch_blob or "ForCausalLM" in arch_blob:
+            return "hf_causal"
+        return None
+
+    if isinstance(cfg, dict):
+        resolved = _from_cfg(cfg)
+        if resolved:
+            return resolved
+
+    # String heuristics as last resort
+    lower_id = model_id_str.lower()
+    # Quantized repo heuristics
+    if any(k in lower_id for k in ["gptq", "-gptq", "_gptq"]):
+        return "hf_gptq"
+    if any(k in lower_id for k in ["awq", "-awq", "_awq"]):
+        return "hf_awq"
+    if any(
+        k in lower_id for k in ["bnb", "bitsandbytes", "-4bit", "-8bit", "4bit", "8bit"]
+    ):
+        return "hf_bnb"
+    if any(k in lower_id for k in ["t5", "bart"]):
+        return "hf_seq2seq"
+    if any(k in lower_id for k in ["bert", "roberta", "albert", "deberta"]):
+        return "hf_mlm"
+    return default
+
+
+def apply_auto_adapter_if_needed(cfg: Any) -> Any:
+    """Mutate/clone a InvarLockConfig to resolve adapter:auto → concrete adapter.
+
+    Returns the same config object if no change is needed.
+    """
+    try:
+        adapter = str(getattr(cfg.model, "adapter", ""))
+        if adapter.strip().lower() not in {"auto", "auto_hf"}:
+            return cfg
+        model_id = str(getattr(cfg.model, "id", ""))
+        resolved = resolve_auto_adapter(model_id)
+        data = cfg.model_dump()
+        data.setdefault("model", {})["adapter"] = resolved
+        return cfg.__class__(data)  # re-wrap as InvarLockConfig
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return cfg
+
+
+__all__ = ["resolve_auto_adapter", "apply_auto_adapter_if_needed"]

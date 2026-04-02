@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_builder import _compute_validation_flags
+from invarlock.reporting.report_validation import compute_validation_flags
 
 
 def test_guard_overhead_not_evaluated_with_errors_soft_pass() -> None:
     # When guard_overhead not evaluated or has errors, the flag soft-passes
-    flags = _compute_validation_flags(
+    flags = compute_validation_flags(
         ppl={"ratio_vs_baseline": 1.0, "ratio_ci": (1.0, 1.0)},
         spectral={},
         rmt={},

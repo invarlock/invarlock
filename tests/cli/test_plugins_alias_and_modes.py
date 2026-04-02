@@ -7,13 +7,11 @@ from typer.testing import CliRunner
 from invarlock.cli.app import app
 
 
-def test_plugins_adapter_alias_json():
-    r1 = CliRunner().invoke(app, ["advanced", "plugins", "adapters", "--json"])
-    r2 = CliRunner().invoke(app, ["advanced", "plugins", "adapter", "--json"])
-    assert r1.exit_code == 0 and r2.exit_code == 0
-    p1 = json.loads(r1.stdout.strip().splitlines()[-1])
-    p2 = json.loads(r2.stdout.strip().splitlines()[-1])
-    assert p1.get("items") == p2.get("items")
+def test_plugins_adapters_json():
+    result = CliRunner().invoke(app, ["advanced", "plugins", "adapters", "--json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout.strip().splitlines()[-1])
+    assert isinstance(payload.get("items"), list)
 
 
 def test_plugins_guards_and_edits_text_and_json():

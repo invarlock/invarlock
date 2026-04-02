@@ -13,11 +13,11 @@
 ## Quick Start
 
 ```python
-from invarlock.adapters import HF_Auto_Adapter
+from invarlock.adapters.auto import HF_Auto_Adapter
 from invarlock.core.api import RunConfig
 from invarlock.core.runner import CoreRunner
 from invarlock.edits import RTNQuantEdit
-from invarlock.guards import InvariantsGuard
+from invarlock.guards.invariants import InvariantsGuard
 
 adapter = HF_Auto_Adapter()
 model = adapter.load_model("gpt2", device="auto")
@@ -34,7 +34,7 @@ print("status:", report.status)
 ## Concepts
 
 - Prefer the CLI for full workflows (pairing, reports, reproducibility).
-- Programmatic runs still follow the same pipeline phases and produce a
+- Programmatic runs follow the same pipeline phases and produce a
   `RunReport` object.
 - Pass `calibration_data` to `CoreRunner.execute` for real primary-metric values.
 - Enable downloads per run with `INVARLOCK_ALLOW_NETWORK=1` when using remote
@@ -54,7 +54,8 @@ print("status:", report.status)
 ## Observability
 
 - Inspect `report.meta`, `report.guards`, and `report.metrics`.
-- For report generation, use `invarlock.reporting.report_builder.make_report`.
+- For report generation, use `invarlock.reporting.report_make.make_report`, then
+  persist the evaluation bundle with `invarlock.reporting.report_bundle.save_evaluation_bundle`.
 
 ## Related Documentation
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_builder import _compute_validation_flags
+from invarlock.reporting.report_validation import compute_validation_flags
 
 
 def test_primary_metric_vqa_accuracy_gating_and_render():
@@ -17,7 +17,7 @@ def test_primary_metric_vqa_accuracy_gating_and_render():
         "n_final": 400,
     }
 
-    flags = _compute_validation_flags(
+    flags = compute_validation_flags(
         ppl,
         spectral,
         rmt,

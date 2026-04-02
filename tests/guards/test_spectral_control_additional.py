@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 import torch
 
 from invarlock.guards.spectral_control import (
@@ -186,3 +187,27 @@ def test_apply_spectral_control_handles_cap_rescale_and_exception() -> None:
     )
     assert no_rescale["applied"] is False
     assert no_rescale["rescaling_applied"] is False
+
+
+def test_apply_spectral_control_reraises_unexpected_errors() -> None:
+    class _ExplodingWeight:
+        ndim = 2
+        dtype = torch.float32
+
+        def mul_(self, _scale):
+            raise AssertionError("explode")
+
+    with pytest.raises(AssertionError, match="explode"):
+        apply_weight_rescale(
+            _Model({"boom": _Module(_ExplodingWeight())}),
+            scale_factor=0.5,
+        )
+
+    with pytest.raises(AssertionError, match="explode"):
+        apply_spectral_control(
+            _Model({}),
+            {"scope": "all"},
+            apply_relative_spectral_cap_fn=lambda *_args, **_kwargs: (
+                _ for _ in ()
+            ).throw(AssertionError("explode")),
+        )

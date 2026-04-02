@@ -70,6 +70,7 @@ class CoreRegistry:
         self._adapters: dict[str, PluginInfo] = {}
         self._edits: dict[str, PluginInfo] = {}
         self._guards: dict[str, PluginInfo] = {}
+        self._discovery_issue: str | None = None
         self._initialized = False
 
     def _ensure_initialized(self) -> None:
@@ -82,6 +83,7 @@ class CoreRegistry:
 
     def _discover_plugins(self) -> None:
         """Discover all plugins through entry points with fallback registration."""
+        self._discovery_issue = None
         # Try third-party entry points only when explicitly enabled.
         if third_party_plugins_allowed():
             try:
@@ -106,6 +108,7 @@ class CoreRegistry:
                     self._guards[ep.name] = info
 
             except Exception as e:
+                self._discovery_issue = f"Plugin discovery failed: {e}"
                 warnings.warn(f"Plugin discovery failed: {e}", stacklevel=2)
 
         # Fallback registration for development
@@ -144,13 +147,29 @@ class CoreRegistry:
 
         # Register built-in adapters
         _fallback(
-            self._adapters, "hf_causal", "invarlock.adapters", "HF_Causal_Adapter"
+            self._adapters,
+            "hf_causal",
+            "invarlock.adapters.hf_causal",
+            "HF_Causal_Adapter",
         )
-        _fallback(self._adapters, "hf_mlm", "invarlock.adapters", "HF_MLM_Adapter")
         _fallback(
-            self._adapters, "hf_seq2seq", "invarlock.adapters", "HF_Seq2Seq_Adapter"
+            self._adapters,
+            "hf_mlm",
+            "invarlock.adapters.hf_mlm",
+            "HF_MLM_Adapter",
         )
-        _fallback(self._adapters, "hf_auto", "invarlock.adapters", "HF_Auto_Adapter")
+        _fallback(
+            self._adapters,
+            "hf_seq2seq",
+            "invarlock.adapters.hf_seq2seq",
+            "HF_Seq2Seq_Adapter",
+        )
+        _fallback(
+            self._adapters,
+            "hf_auto",
+            "invarlock.adapters.auto",
+            "HF_Auto_Adapter",
+        )
         # Optional plugin adapters (verify runtime dependencies)
         _fallback(
             self._adapters,
@@ -183,10 +202,25 @@ class CoreRegistry:
         _fallback(self._edits, "noop", "invarlock.edits.noop", "NoopEdit")
 
         # Register built-in guards
-        _fallback(self._guards, "invariants", "invarlock.guards", "InvariantsGuard")
-        _fallback(self._guards, "spectral", "invarlock.guards", "SpectralGuard")
-        _fallback(self._guards, "variance", "invarlock.guards", "VarianceGuard")
-        _fallback(self._guards, "rmt", "invarlock.guards", "RMTGuard")
+        _fallback(
+            self._guards,
+            "invariants",
+            "invarlock.guards.invariants",
+            "InvariantsGuard",
+        )
+        _fallback(
+            self._guards,
+            "spectral",
+            "invarlock.guards.spectral",
+            "SpectralGuard",
+        )
+        _fallback(
+            self._guards,
+            "variance",
+            "invarlock.guards.variance",
+            "VarianceGuard",
+        )
+        _fallback(self._guards, "rmt", "invarlock.guards.rmt", "RMTGuard")
         _fallback(self._guards, "hello_guard", "invarlock.plugins", "HelloGuard")
 
     def _check_runtime_dependencies(self, deps: list[str]) -> list[str]:
@@ -398,7 +432,8 @@ class CoreRegistry:
             raise ValueError(f"Unknown plugin type: {plugin_type}")
 
         if name not in registry:
-            return {"available": False, "status": "Not found", "module": "unknown"}
+            status = self._discovery_issue or "Not found"
+            return {"available": False, "status": status, "module": "unknown"}
 
         info = registry[name]
         return {
@@ -472,6 +507,8 @@ class CoreRegistry:
         self._ensure_initialized()
 
         issues = []
+        if self._discovery_issue:
+            issues.append(self._discovery_issue)
 
         # Check adapter
         if adapter_name not in self._adapters:

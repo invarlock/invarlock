@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from invarlock.cli.commands.verify import _validate_evaluation_report_payload
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
+from invarlock.reporting.verify_contract import _validate_evaluation_report_payload
 
 
 def _mk_report() -> dict:

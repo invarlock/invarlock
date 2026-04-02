@@ -7,6 +7,22 @@ from typing import Any
 
 from .types import LogLevel
 
+_CALIBRATION_ACCESS_ERRORS = (
+    AttributeError,
+    IndexError,
+    KeyError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+_LABEL_SNAPSHOT_ERRORS = (
+    AttributeError,
+    IndexError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 def slice_calibration(
     calibration_data: Any,
@@ -19,7 +35,7 @@ def slice_calibration(
     try:
         sliced = calibration_data[start:end]
         return (sliced if isinstance(sliced, list) else list(sliced), calibration_data)
-    except Exception as error:
+    except _CALIBRATION_ACCESS_ERRORS as error:
         if hasattr(calibration_data, "__getitem__") and hasattr(
             calibration_data, "__len__"
         ):
@@ -28,7 +44,7 @@ def slice_calibration(
                     [calibration_data[i] for i in range(start, end)],
                     calibration_data,
                 )
-            except Exception:
+            except _CALIBRATION_ACCESS_ERRORS:
                 pass
         if allow_materialize and hasattr(calibration_data, "__iter__"):
             materialized = (
@@ -196,7 +212,7 @@ def compute_slice_summary(
                 sample_labels = None
                 try:
                     sample_labels = labels_t[0].detach().cpu().tolist()[:8]
-                except Exception:  # pragma: no cover - defensive
+                except _LABEL_SNAPSHOT_ERRORS:  # pragma: no cover - defensive
                     sample_labels = None
                 runner._log_event(
                     "eval",

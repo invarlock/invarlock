@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from invarlock.reporting.report_builder import _normalize_baseline
+from invarlock.reporting.report_normalization import normalize_baseline
 from invarlock.reporting.report_types import create_empty_report
 from invarlock.reporting.validate import save_baseline as _save_baseline
 
@@ -66,7 +66,7 @@ def test_normalize_baseline_raises_for_invalid_ppl():
     baseline = _build_baseline_report(ppl_final=0.0)
 
     with pytest.raises(ValueError, match="Invalid baseline"):
-        _normalize_baseline(baseline)
+        normalize_baseline(baseline)
 
 
 def test_normalize_baseline_preserves_valid_values():
@@ -74,7 +74,7 @@ def test_normalize_baseline_preserves_valid_values():
     baseline = _build_baseline_report(ppl_final=35.2)
     baseline["metrics"]["ppl_preview"] = 34.8
 
-    normalized = _normalize_baseline(baseline)
+    normalized = normalize_baseline(baseline)
 
     assert normalized["ppl_final"] == pytest.approx(35.2)
     assert normalized["ppl_preview"] == pytest.approx(34.8)

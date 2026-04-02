@@ -21,7 +21,7 @@ def main(argv: list[str] | None = None) -> int:
     out_path = Path(args.out)
 
     try:
-        from invarlock.reporting.report_builder import make_report
+        from invarlock.reporting.report_make import make_report
     except Exception as exc:
         print(f"Evaluation report generation warning: {exc}", file=sys.stderr)
         return 1

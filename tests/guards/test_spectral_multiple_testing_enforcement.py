@@ -84,8 +84,8 @@ def test_spectral_max_caps_applied_after_multiple_testing() -> None:
     bh = _run_case("bh", max_caps=2)
     bonf = _run_case("bonferroni", max_caps=2)
 
-    assert bh.get("action") == "abort"
+    assert bh.get("decision") == "block"
     assert bh.get("passed") is False
 
-    assert bonf.get("action") == "warn"
+    assert bonf.get("decision") == "monitor"
     assert bonf.get("passed") is True

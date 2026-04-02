@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_builder import _compute_quality_overhead_from_guard
+from invarlock.reporting.report_overhead import compute_quality_overhead_from_guard
 
 
 def _ppl_report(point: float) -> dict:
@@ -16,7 +16,7 @@ def _ppl_report(point: float) -> dict:
 def test_quality_overhead_ppl_ratio_basis():
     bare = _ppl_report(10.0)
     guarded = _ppl_report(10.5)
-    out = _compute_quality_overhead_from_guard(
+    out = compute_quality_overhead_from_guard(
         {"bare_report": bare, "guarded_report": guarded}, pm_kind_hint="ppl_causal"
     )
     assert isinstance(out, dict)

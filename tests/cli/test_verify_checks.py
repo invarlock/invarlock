@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
 
-from invarlock.cli.commands import verify as v
+from invarlock.reporting import verify_contract as v
 
 
 def _cert_base(pm: dict[str, Any]) -> dict[str, Any]:
@@ -214,7 +214,11 @@ def test_resolve_path_and_warn_adapter_family(tmp_path: Path):
         cert["provenance"]["baseline"] = {"report_path": fh.name}
 
     # Should not raise; soft warning path covered
-    v._warn_adapter_family_mismatch(tmp_path / "cert.json", cert)
+    v._warn_adapter_family_mismatch(
+        tmp_path / "cert.json",
+        cert,
+        trusted_baseline_path=Path(fh.name),
+    )
 
 
 def test_validate_evaluation_report_payload_success_and_fail(

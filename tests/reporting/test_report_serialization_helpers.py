@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from invarlock.reporting.report import _validate_baseline_or_report, to_json
+import pytest
+
+from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import RunReport, create_empty_report
+from invarlock.reporting.run_report_formatters import to_json
 
 
 def _mk_report() -> RunReport:
@@ -19,21 +22,23 @@ def _mk_report() -> RunReport:
     return r
 
 
-def test_validate_baseline_or_report_variants() -> None:
+def test_make_report_baseline_variants() -> None:
+    report = _mk_report()
     base_ok = {
         "schema_version": "baseline-v1",
         "meta": {},
         "metrics": {"primary_metric": {"final": 10.0}},
     }
-    assert _validate_baseline_or_report(base_ok) is True
+    assert make_report(report, base_ok)["schema_version"] == "v1"
     base_bad = {"schema_version": "baseline-v1", "meta": {}, "metrics": {}}
-    assert _validate_baseline_or_report(base_bad) is False
+    with pytest.raises(ValueError):
+        make_report(report, base_bad)
     base_v1 = {
         "schema_version": "baseline-v1",
         "meta": {},
         "metrics": {"primary_metric": {"final": 5.0}},
     }
-    assert _validate_baseline_or_report(base_v1) is True
+    assert make_report(report, base_v1)["schema_version"] == "v1"
 
 
 def test_to_json_sanitizes_non_serializable(tmp_path: Path) -> None:

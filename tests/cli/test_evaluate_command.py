@@ -12,7 +12,7 @@ class _StubCLIExit(Exception):
     pass
 
 
-def _stub_run(out_dir: Path, baseline: Path | None = None):
+def _stub_run(out_dir: Path, baseline: Path | None = None) -> Path:
     # Create a deterministic timestamp directory and write a minimal report.json
     ts_dir = out_dir / "20250101_000000"
     ts_dir.mkdir(parents=True, exist_ok=True)
@@ -22,7 +22,9 @@ def _stub_run(out_dir: Path, baseline: Path | None = None):
         "metrics": {"ppl_ratio": 1.0, "ppl_final": 10.0},
         "data": {"preview_n": 1, "final_n": 1},
     }
-    (ts_dir / "report.json").write_text(json.dumps(report), encoding="utf-8")
+    report_path = ts_dir / "report.json"
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+    return report_path
 
 
 def test_evaluate_orchestrates_runs_and_cert(monkeypatch, tmp_path):
@@ -47,7 +49,7 @@ def test_evaluate_orchestrates_runs_and_cert(monkeypatch, tmp_path):
         calls["runs"].append(
             {k: kwargs.get(k) for k in ["config", "profile", "out", "baseline"]}
         )
-        _stub_run(out)
+        return str(_stub_run(out))
 
     def fake_report(**kwargs):
         calls["reports"].append(kwargs)
@@ -60,13 +62,12 @@ def test_evaluate_orchestrates_runs_and_cert(monkeypatch, tmp_path):
     monkeypatch.setattr(
         run_mod, "run_command", lambda **kwargs: fake_run(**kwargs), raising=False
     )
-    # Patch the report entry already imported as _report in evaluate module
-    monkeypatch.setattr(mod, "_report", fake_report, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", fake_report, raising=False)
 
     # Act
     evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
@@ -135,7 +136,7 @@ def test_evaluate_reuses_baseline_report_skipping_baseline_run(monkeypatch, tmp_
         calls["runs"].append(
             {k: kwargs.get(k) for k in ["config", "profile", "out", "baseline"]}
         )
-        _stub_run(out)
+        return str(_stub_run(out))
 
     def fake_report(**kwargs):  # noqa: ANN001
         calls["reports"].append(kwargs)
@@ -144,11 +145,11 @@ def test_evaluate_reuses_baseline_report_skipping_baseline_run(monkeypatch, tmp_
     from invarlock.cli.commands import evaluate as mod
 
     monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
-    monkeypatch.setattr(mod, "_report", fake_report, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", fake_report, raising=False)
 
     evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         baseline_report=str(baseline_report),
         adapter="auto",
         profile="ci",
@@ -198,8 +199,8 @@ def test_evaluate_baseline_report_requires_windows(monkeypatch, tmp_path):
 
     with pytest.raises(click.exceptions.Exit):
         evaluate_command(
-            source=str(src),
-            edited=str(edt),
+            baseline=str(src),
+            subject=str(edt),
             baseline_report=str(baseline_report),
             adapter="auto",
             profile="ci",
@@ -233,7 +234,7 @@ def test_evaluate_autogen_uses_device_auto(monkeypatch, tmp_path):
             {k: kwargs.get(k) for k in ("config", "profile", "out", "tier", "device")}
         )
         out = Path(kwargs.get("out"))
-        _stub_run(out)
+        return str(_stub_run(out))
 
     def fake_report(**_kwargs):
         return None
@@ -244,13 +245,13 @@ def test_evaluate_autogen_uses_device_auto(monkeypatch, tmp_path):
     monkeypatch.setattr(
         run_mod, "run_command", lambda **kwargs: fake_run(**kwargs), raising=False
     )
-    monkeypatch.setattr(mod, "_report", fake_report, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", fake_report, raising=False)
 
     # Act
     repo_root = Path(__file__).resolve().parents[2]
     evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="auto",
         profile="ci",
         preset=str(
@@ -288,7 +289,7 @@ def test_evaluate_quiet_summary_emits_status(monkeypatch, tmp_path, capsys):
 
     def fake_run(**kwargs):
         out = Path(kwargs.get("out"))
-        _stub_run(out)
+        return str(_stub_run(out))
 
     def fake_report(**kwargs):
         output_dir = Path(kwargs.get("output"))
@@ -313,11 +314,11 @@ def test_evaluate_quiet_summary_emits_status(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(
         run_mod, "run_command", lambda **kwargs: fake_run(**kwargs), raising=False
     )
-    monkeypatch.setattr(mod, "_report", fake_report, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", fake_report, raising=False)
 
     evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
@@ -329,3 +330,79 @@ def test_evaluate_quiet_summary_emits_status(monkeypatch, tmp_path, capsys):
     assert "INVARLOCK v" in out
     assert "Status: PASS" in out
     assert "Output:" in out
+
+
+def test_evaluate_attested_bundle_manifest_inherits_container_execution(
+    monkeypatch, tmp_path
+):
+    src = tmp_path / "src_model"
+    edt = tmp_path / "edt_model"
+    src.mkdir()
+    edt.mkdir()
+    (src / "config.json").write_text(
+        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
+        encoding="utf-8",
+    )
+    (edt / "config.json").write_text(
+        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
+        encoding="utf-8",
+    )
+
+    def fake_run(**kwargs):
+        out = Path(kwargs.get("out"))
+        return str(_stub_run(out))
+
+    def fake_report(**kwargs):
+        output_dir = Path(kwargs.get("output"))
+        output_dir.mkdir(parents=True, exist_ok=True)
+        report = {
+            "schema_version": "v1",
+            "primary_metric": {"kind": "ppl_causal", "ratio_vs_baseline": 1.0},
+            "validation": {
+                "primary_metric_acceptable": True,
+                "preview_final_drift_acceptable": True,
+                "invariants_pass": True,
+                "spectral_stable": True,
+                "rmt_stable": True,
+            },
+        }
+        (output_dir / "evaluation.report.json").write_text(
+            json.dumps(report), encoding="utf-8"
+        )
+
+    import invarlock.cli.commands.run as run_mod
+    from invarlock.cli.commands import evaluate as mod
+
+    monkeypatch.setattr(
+        run_mod, "run_command", lambda **kwargs: fake_run(**kwargs), raising=False
+    )
+    monkeypatch.setattr(mod, "generate_reports", fake_report, raising=False)
+    monkeypatch.setattr(
+        mod,
+        "resolve_runtime_image",
+        lambda: "ghcr.io/invarlock/invarlock-runtime:test",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        mod,
+        "resolve_runtime_image_digest",
+        lambda: "sha256:" + ("a" * 64),
+        raising=True,
+    )
+
+    evaluate_command(
+        baseline=str(src),
+        subject=str(edt),
+        adapter="auto",
+        profile="dev",
+        mode="attested",
+        out=str(tmp_path / "runs"),
+        report_out=str(tmp_path / "reports"),
+    )
+
+    manifest = json.loads(
+        (tmp_path / "reports" / "runtime.manifest.json").read_text(encoding="utf-8")
+    )
+    assert manifest["execution_mode"] == "container"
+    assert manifest["runtime"]["container_execution"] is True
+    assert manifest["runtime"]["image_digest"] == "sha256:" + ("a" * 64)

@@ -49,7 +49,7 @@ output:
 def _common_ce():
     return (
         patch(
-            "invarlock.cli.commands.run.detect_model_profile",
+            "invarlock.cli.run_runtime.detect_model_profile",
             lambda model_id, adapter: SimpleNamespace(
                 default_loss="ce",
                 model_id=model_id,
@@ -61,7 +61,7 @@ def _common_ce():
             ),
         ),
         patch(
-            "invarlock.cli.commands.run.resolve_tokenizer",
+            "invarlock.cli.run_runtime.resolve_tokenizer",
             lambda model_profile: (
                 SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
                 "tokhash123",
@@ -70,7 +70,7 @@ def _common_ce():
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report.save_report",
+            "invarlock.reporting.report_files.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
             },
@@ -598,8 +598,8 @@ def test_guard_overhead_bare_missing_ppl_and_status_warn(tmp_path: Path):
         # Patch validator to avoid exit; we only inspect warnings/errors aggregated pre-validation
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.commands.run.validate_guard_overhead",
-            "invarlock.cli.commands.run.validate_guard_overhead",
+            "invarlock.cli.run_runtime.validate_guard_overhead",
+            "invarlock.cli.run_runtime.validate_guard_overhead",
         ):
             stack.enter_context(
                 patch(
@@ -618,7 +618,9 @@ def test_guard_overhead_bare_missing_ppl_and_status_warn(tmp_path: Path):
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider_min())
         )
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         # Ensure profile that measures overhead (ci)
         run_command(
             config=str(cfg),
@@ -633,6 +635,14 @@ def test_guard_overhead_bare_missing_ppl_and_status_warn(tmp_path: Path):
         isinstance(gh, dict)
         and gh.get("evaluated") is True
         and gh.get("passed") is True
+    )
+    diagnostics = gh.get("diagnostics", [])
+    assert any(
+        isinstance(item, dict)
+        and item.get("severity") == "warning"
+        and item.get("message")
+        == "Bare control primary metric unavailable for overhead diagnostics."
+        for item in diagnostics
     )
 
 
@@ -710,7 +720,7 @@ def test_tokenizer_hash_populated_from_context_when_missing(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.commands.run.resolve_tokenizer", resolver)
+            patch("invarlock.cli.run_runtime.resolve_tokenizer", resolver)
         )
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider_min())
@@ -719,7 +729,7 @@ def test_tokenizer_hash_populated_from_context_when_missing(tmp_path: Path):
         # Capture save but don't need to inspect
         stack.enter_context(
             patch(
-                "invarlock.reporting.report.save_report",
+                "invarlock.reporting.report_files.save_report",
                 lambda report, run_dir, formats, filename_prefix: {
                     "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
                 },

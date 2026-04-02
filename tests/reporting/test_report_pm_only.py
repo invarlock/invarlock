@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 
 
 def test_evaluation_report_has_no_ppl_block_pm_only():
@@ -32,7 +32,7 @@ def test_evaluation_report_has_no_ppl_block_pm_only():
     baseline = {"run_id": "b", "model_id": "m", "ppl_final": 10.0}
 
     with patch(
-        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+        "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):
         cert = make_report(report, baseline)
 

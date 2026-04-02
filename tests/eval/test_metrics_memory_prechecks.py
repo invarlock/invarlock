@@ -1,8 +1,10 @@
 from types import SimpleNamespace
 
+import pytest
 import torch
 
 from invarlock.eval import metrics as M
+from invarlock.eval.metrics_activation import _perform_pre_eval_checks
 
 
 def test_measure_memory_forward_exception_path():
@@ -15,8 +17,23 @@ def test_measure_memory_forward_exception_path():
         def parameters(self):  # pragma: no cover
             yield from ()
 
-    mem = M.measure_memory(Crashy(), window, device="cpu")
-    assert isinstance(mem, float) and mem >= 0.0
+    with pytest.raises(RuntimeError, match="Memory measurement failed for sample 0"):
+        M.measure_memory(Crashy(), window, device="cpu")
+
+
+def test_measure_memory_raises_when_window_has_no_non_empty_samples():
+    window = SimpleNamespace(input_ids=[[]], attention_masks=[[]])
+
+    class Tiny(torch.nn.Module):
+        def forward(self, *args, **kwargs):  # noqa: D401
+            return None
+
+    with pytest.raises(M.ValidationError) as exc_info:
+        M.measure_memory(Tiny(), window, device="cpu")
+    assert (
+        exc_info.value.details["reason"]
+        == "memory measurement requires at least one non-empty sample"
+    )
 
 
 def test_pre_eval_checks_dry_run_failure():
@@ -38,6 +55,6 @@ def test_pre_eval_checks_dry_run_failure():
             }
 
     # Should not raise
-    M._perform_pre_eval_checks(
+    _perform_pre_eval_checks(
         CrashOnForward(), Loader(), device=torch.device("cpu"), config=M.MetricsConfig()
     )

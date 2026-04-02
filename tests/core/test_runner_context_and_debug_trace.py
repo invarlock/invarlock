@@ -42,8 +42,14 @@ class _DummyEdit(ModelEdit):
     ) -> bool:  # pragma: no cover - not used
         return True
 
-    def apply(self, model: Any, adapter: ModelAdapter, **kwargs) -> dict[str, Any]:
-        _ = model, adapter, kwargs
+    def apply(
+        self,
+        model: Any,
+        adapter: ModelAdapter,
+        plan=None,
+        runtime=None,
+    ) -> dict[str, Any]:
+        _ = model, adapter, plan, runtime
         return {"name": self.name, "deltas": {"params_changed": 0}}
 
 

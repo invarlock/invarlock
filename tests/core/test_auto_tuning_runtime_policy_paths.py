@@ -55,6 +55,15 @@ def test_normalize_family_caps_and_multiple_testing_variants() -> None:
     )
 
 
+def test_normalize_multiple_testing_reraises_unexpected_numeric_errors() -> None:
+    class _BadFloat:
+        def __float__(self) -> float:
+            raise AssertionError("explode")
+
+    with pytest.raises(AssertionError, match="explode"):
+        at._normalize_multiple_testing({"alpha": _BadFloat()})
+
+
 def test_tier_entry_to_policy_maps_sections_and_skips_bad_sections() -> None:
     out = at._tier_entry_to_policy(
         {

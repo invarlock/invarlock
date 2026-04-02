@@ -4,16 +4,17 @@ from pathlib import Path
 
 import pytest
 
-from invarlock.reporting.report import (
+from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.report_bundle import save_evaluation_bundle
+from invarlock.reporting.report_files import save_report
+from invarlock.reporting.report_make import make_report
+from invarlock.reporting.report_types import create_empty_report
+from invarlock.reporting.run_report_formatters import (
     _sanitize_for_json,
-    _validate_baseline_or_report,
-    save_report,
-    to_evaluation_report,
     to_html,
     to_json,
     to_markdown,
 )
-from invarlock.reporting.report_types import create_empty_report
 
 
 def _minimal_report() -> dict:
@@ -112,28 +113,30 @@ def test_to_markdown_and_html_single_and_compare():
 
 def test_evaluation_report_json_and_markdown_and_save(tmp_path: Path):
     rep = _minimal_report()
-    # baseline accepted as RunReport
-    report_json = to_evaluation_report(rep, rep, format="json")
+    cert = make_report(rep, rep)
+    report_json = json.dumps(cert, indent=2, ensure_ascii=False)
     assert json.loads(report_json)
-    report_md = to_evaluation_report(rep, rep, format="markdown")
+    report_md = render_report_markdown(cert)
     assert isinstance(report_md, str) and len(report_md) > 0
 
     # save_report writes files for multiple formats
-    out = save_report(
-        rep, tmp_path, formats=["json", "markdown", "html", "report"], baseline=rep
+    out = save_report(rep, tmp_path, formats=["json", "markdown", "html"])
+    out.update(
+        save_evaluation_bundle(
+            run_report=rep,
+            output_dir=tmp_path,
+            evaluation_report=cert,
+        )
     )
     assert {"json", "markdown", "html", "report", "report_md"}.issubset(out.keys())
 
-    # report without baseline raises
-    with pytest.raises(ValueError):
-        save_report(rep, tmp_path, formats=["report"], baseline=None)
+    with pytest.raises(ValueError, match="save_evaluation_bundle"):
+        save_report(rep, tmp_path, formats=["report"])
 
 
-def test_validate_baseline_or_report_variants():
+def test_make_report_accepts_run_report_and_baseline_v1():
     rep = _minimal_report()
-    # Valid as RunReport
-    assert _validate_baseline_or_report(rep) is True
-    # Valid baseline v1
+    assert make_report(rep, rep)["schema_version"] == "v1"
     baseline = {
         "schema_version": "baseline-v1",
         "meta": {},
@@ -141,9 +144,6 @@ def test_validate_baseline_or_report_variants():
             "primary_metric": {"kind": "ppl_causal", "preview": 10.0, "final": 10.1}
         },
     }
-    assert _validate_baseline_or_report(baseline) is True
-    # Invalid baseline
-    assert (
-        _validate_baseline_or_report({"schema_version": "baseline-v1", "meta": {}})
-        is False
-    )
+    assert make_report(rep, baseline)["schema_version"] == "v1"
+    with pytest.raises(ValueError):
+        make_report(rep, {"schema_version": "baseline-v1", "meta": {}})

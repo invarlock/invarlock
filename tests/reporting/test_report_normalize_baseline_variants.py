@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import math
 
-import pytest
-
-from invarlock.reporting import report_builder as C
+from invarlock.reporting.report_normalization import normalize_baseline
 
 
 def test_normalize_baseline_v1_schema() -> None:
@@ -15,7 +13,7 @@ def test_normalize_baseline_v1_schema() -> None:
         "spectral_base": {"caps": 0},
         "rmt_base": {"epsilon": {}},
     }
-    norm = C._normalize_baseline(base_v1)
+    norm = normalize_baseline(base_v1)
     assert norm.get("ppl_final") == 10.0 and norm.get("model_id") == "m"
 
 
@@ -31,7 +29,7 @@ def test_normalize_baseline_runreport_derives_ppl_from_pm() -> None:
             "primary_metric": {"kind": "ppl_causal", "final": 12.0, "preview": 12.0}
         },
     }
-    norm = C._normalize_baseline(base)
+    norm = normalize_baseline(base)
     assert norm.get("ppl_final") == 12.0
 
 
@@ -45,12 +43,12 @@ def test_normalize_baseline_v1_derives_weighted_ppl_from_windows() -> None:
         },
     }
 
-    norm = C._normalize_baseline(base_v1)
+    norm = normalize_baseline(base_v1)
     expected = math.exp((1.0 * 1.0 + 3.0 * 3.0) / 4.0)
     assert math.isclose(float(norm["ppl_final"]), expected, rel_tol=1e-12, abs_tol=0.0)
 
 
-def test_normalize_baseline_v1_rejects_non_finite_window_logloss() -> None:
+def test_normalize_baseline_v1_non_finite_window_logloss_does_not_infer_ppl() -> None:
     base_v1 = {
         "schema_version": "baseline-v1",
         "meta": {"model_id": "m", "commit_sha": "cafebabecafebabe"},
@@ -60,8 +58,9 @@ def test_normalize_baseline_v1_rejects_non_finite_window_logloss() -> None:
         },
     }
 
-    with pytest.raises(ValueError, match="metrics\\.ppl_final"):
-        C._normalize_baseline(base_v1)
+    norm = normalize_baseline(base_v1)
+    assert norm.get("model_id") == "m"
+    assert "ppl_final" not in norm
 
 
 def test_normalize_baseline_runreport_zero_weights_falls_back_to_unweighted_mean() -> (
@@ -89,7 +88,7 @@ def test_normalize_baseline_runreport_zero_weights_falls_back_to_unweighted_mean
         },
     }
 
-    out = C._normalize_baseline(baseline)
+    out = normalize_baseline(baseline)
     expected = math.exp((0.2 + 0.4) / 2.0)
     assert math.isclose(float(out["ppl_final"]), expected, rel_tol=1e-12, abs_tol=0.0)
     assert math.isclose(float(out["ppl_preview"]), expected, rel_tol=1e-12, abs_tol=0.0)
@@ -109,7 +108,7 @@ def test_normalize_baseline_runreport_accuracy_zero_final_does_not_raise() -> No
         "evaluation_windows": {},
     }
 
-    out = C._normalize_baseline(baseline)
+    out = normalize_baseline(baseline)
     assert out.get("model_id") == "acc-model"
     assert "ppl_final" not in out
 
@@ -121,7 +120,7 @@ def test_normalize_baseline_v1_accuracy_zero_final_does_not_raise() -> None:
         "metrics": {"primary_metric": {"kind": "accuracy", "final": 0.0}},
     }
 
-    out = C._normalize_baseline(baseline)
+    out = normalize_baseline(baseline)
     assert out.get("model_id") == "acc-v1"
     assert "ppl_final" not in out
 
@@ -135,7 +134,7 @@ def test_normalize_baseline_normalized_accuracy_strips_invalid_ppl_fields() -> N
         "ppl_preview": 0.0,
     }
 
-    out = C._normalize_baseline(baseline)
+    out = normalize_baseline(baseline)
     assert out.get("model_id") == "acc-model"
     assert "ppl_final" not in out
     assert "ppl_preview" not in out
@@ -152,7 +151,7 @@ def test_normalize_baseline_normalized_top_level_accuracy_strips_invalid_ppl_fie
         "ppl_preview": -1.0,
     }
 
-    out = C._normalize_baseline(baseline)
+    out = normalize_baseline(baseline)
     assert out.get("model_id") == "acc-model-top"
     assert "ppl_final" not in out
     assert "ppl_preview" not in out
@@ -165,9 +164,22 @@ def test_normalize_baseline_normalized_top_level_ppl_derives_ppl_fields() -> Non
         "primary_metric": {"kind": "ppl_causal", "final": 11.0, "preview": 10.5},
     }
 
-    out = C._normalize_baseline(baseline)
+    out = normalize_baseline(baseline)
     assert out.get("ppl_final") == 11.0
     assert out.get("ppl_preview") == 10.5
+
+
+def test_normalize_baseline_missing_kind_does_not_infer_ppl_fields() -> None:
+    baseline = {
+        "run_id": "r4",
+        "model_id": "unknown-kind-model",
+        "primary_metric": {"final": 11.0, "preview": 10.5},
+    }
+
+    out = normalize_baseline(baseline)
+    assert out.get("model_id") == "unknown-kind-model"
+    assert "ppl_final" not in out
+    assert "ppl_preview" not in out
 
 
 def test_normalize_baseline_handles_unstringable_kind_value() -> None:
@@ -181,5 +193,6 @@ def test_normalize_baseline_handles_unstringable_kind_value() -> None:
         "metrics": {"primary_metric": {"kind": _BadKind(), "final": 0.0}},
     }
 
-    with pytest.raises(ValueError, match="metrics\\.ppl_final"):
-        C._normalize_baseline(baseline)
+    norm = normalize_baseline(baseline)
+    assert norm.get("model_id") == "m"
+    assert "ppl_final" not in norm

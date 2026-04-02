@@ -66,18 +66,19 @@ def test_resolve_pm_acceptance_range_from_report_exception_paths(monkeypatch) ->
         {
             "context": {
                 "primary_metric": {"acceptance_range": {"min": _BadFloat(), "max": 1.2}}
-            },
-            "meta": {"pm_acceptance_range": {"min": 0.97, "max": 1.03}},
+            }
         }
     )
-    assert out_fallback == {"min": 0.97, "max": 1.2}
+    assert out_fallback == {"min": 0.95, "max": 1.2}
 
     _patch_float_with_bombs(monkeypatch)
 
     out_le = policy.resolve_pm_acceptance_range_from_report(
         {
             "context": {
-                "pm_acceptance_range": {"min": "bomb_le", "max": "bomb_le"},
+                "primary_metric": {
+                    "acceptance_range": {"min": "bomb_le", "max": "bomb_le"}
+                },
             }
         }
     )
@@ -86,7 +87,9 @@ def test_resolve_pm_acceptance_range_from_report_exception_paths(monkeypatch) ->
     out_lt = policy.resolve_pm_acceptance_range_from_report(
         {
             "context": {
-                "pm_acceptance_range": {"min": "bomb_lt", "max": "bomb_lt"},
+                "primary_metric": {
+                    "acceptance_range": {"min": "bomb_lt", "max": "bomb_lt"}
+                },
             }
         }
     )
@@ -109,8 +112,7 @@ def test_resolve_pm_acceptance_range_from_alt_context_non_dict_and_nonpositive()
     out = policy.resolve_pm_acceptance_range_from_report(
         {
             "context": {
-                "primary_metric": "not-a-dict",
-                "pm_acceptance_range": {"min": 0, "max": -2},
+                "primary_metric": {"acceptance_range": {"min": 0, "max": -2}},
             }
         }
     )
@@ -118,26 +120,46 @@ def test_resolve_pm_acceptance_range_from_alt_context_non_dict_and_nonpositive()
     assert out == {"min": 0.95, "max": 1.1}
 
 
+def test_resolve_pm_acceptance_range_ignores_non_mapping_primary_metric() -> None:
+    out = policy.resolve_pm_acceptance_range_from_report(
+        {"context": {"primary_metric": "not-a-mapping"}}
+    )
+    assert out == {}
+
+
+def test_resolve_pm_acceptance_range_ignores_missing_primary_metric_context() -> None:
+    out = policy.resolve_pm_acceptance_range_from_report({"context": {"other": {}}})
+    assert out == {}
+
+
+def test_resolve_pm_acceptance_range_ignores_unstructured_acceptance_range() -> None:
+    out = policy.resolve_pm_acceptance_range_from_report(
+        {"context": {"primary_metric": {"acceptance_range": "unstructured"}}}
+    )
+    assert out == {}
+
+
+def test_resolve_pm_acceptance_range_clamps_and_normalizes_inverted_bounds() -> None:
+    out = policy.resolve_pm_acceptance_range_from_report(
+        {
+            "context": {
+                "primary_metric": {"acceptance_range": {"min": 0, "max": 0.8}},
+            }
+        }
+    )
+
+    assert out == {"min": 0.95, "max": 0.95}
+
+
 def test_resolve_pm_drift_band_from_report_exception_paths(monkeypatch) -> None:
     out_alt = policy.resolve_pm_drift_band_from_report(
         {
             "context": {
                 "primary_metric": {"drift_band": {"min": None, "max": _BadFloat()}},
-                "pm_drift_band": {"min": 0.9, "max": 1.1},
             }
         }
     )
-    assert out_alt == {"min": 0.9, "max": 1.1}
-
-    out_meta = policy.resolve_pm_drift_band_from_report(
-        {
-            "context": {
-                "primary_metric": {"drift_band": {"min": _BadFloat(), "max": None}},
-            },
-            "meta": {"pm_drift_band": {"min": 0.92, "max": 1.02}},
-        }
-    )
-    assert out_meta == {"min": 0.92, "max": 1.02}
+    assert out_alt == {}
 
     _patch_float_with_bombs(monkeypatch)
 
@@ -191,23 +213,50 @@ def test_resolve_tiny_relax_from_report_edges() -> None:
         is True
     )
     assert (
-        policy.resolve_tiny_relax_from_report({"auto": {"tiny_relax": "off"}}) is False
+        policy.resolve_tiny_relax_from_report(
+            {"context": {"run": {"tiny_relax": "off"}}}
+        )
+        is False
+    )
+    assert policy.resolve_tiny_relax_from_report({"meta": {"auto": {}}}) is False
+
+
+def test_resolve_tiny_relax_handles_falsey_string_branch() -> None:
+    assert (
+        policy.resolve_tiny_relax_from_report(
+            {"context": {"run": {"tiny_relax": "off"}}}
+        )
+        is False
+    )
+    assert (
+        policy.resolve_tiny_relax_from_report(
+            {"context": {"eval": {"tiny_relax": "false"}}}
+        )
+        is False
+    )
+    assert (
+        policy.resolve_tiny_relax_from_report(
+            {"context": {"eval": {"tiny_relax": "false"}}}
+        )
+        is False
     )
 
+
+def test_resolve_tiny_relax_prefers_run_context_and_falls_through_invalid_run() -> None:
+    assert (
+        policy.resolve_tiny_relax_from_report(
+            {"context": {"run": {"tiny_relax": "off"}, "eval": {"tiny_relax": "on"}}}
+        )
+        is False
+    )
     assert (
         policy.resolve_tiny_relax_from_report(
             {
-                "auto": {"tiny_relax": "maybe"},
-                "meta": {"auto": {"tiny_relax": "yes"}},
+                "context": {
+                    "run": {"tiny_relax": "maybe"},
+                    "eval": {"tiny_relax": "yes"},
+                }
             }
         )
         is True
-    )
-
-    assert policy.resolve_tiny_relax_from_report({"meta": {"auto": {}}}) is False
-    assert (
-        policy.resolve_tiny_relax_from_report(
-            {"auto": {"tiny_relax": "maybe"}, "meta": "not-a-dict"}
-        )
-        is False
     )

@@ -27,11 +27,22 @@ from invarlock.guards.policies import (
     get_variance_policy,
 )
 from invarlock.guards.rmt import RMTGuard
-from invarlock.guards.rmt_legacy import (
+from invarlock.guards.rmt_analysis import (
     capture_baseline_mp_stats,
     layer_svd_stats,
-    mp_bulk_edge,
+)
+from invarlock.guards.rmt_detection import (
+    _apply_rmt_correction,
     rmt_detect,
+    rmt_detect_report,
+    rmt_detect_with_names,
+)
+from invarlock.guards.rmt_math import (
+    clip_full_svd,
+    mp_bulk_edge,
+    mp_bulk_edges,
+    rmt_growth_ratio,
+    within_deadband,
 )
 from invarlock.guards.spectral import SpectralGuard
 from invarlock.guards.spectral_control import (
@@ -306,9 +317,9 @@ class TestSpectralGuardComprehensive:
 
         assert isinstance(result, dict)
         assert "passed" in result
-        assert "action" in result
+        assert "decision" in result
         assert "metrics" in result
-        assert "message" in result
+        assert "diagnostics" in result
         assert isinstance(result["passed"], bool)
 
     def test_validate_aborts_when_caps_exceeded(self):
@@ -343,7 +354,7 @@ class TestSpectralGuardComprehensive:
         ):
             result = guard.validate(self.model, Mock(), {})
 
-        assert result["action"] == "abort"
+        assert result["decision"] == "block"
         assert result["metrics"]["caps_exceeded"] is True
         assert result["metrics"]["max_caps"] == 0
 
@@ -351,12 +362,8 @@ class TestSpectralGuardComprehensive:
         """Test guard validation with error handling."""
         mock_adapter = Mock()
 
-        # Test with None model to trigger error handling
-        result = self.guard.validate(None, mock_adapter, {})
-
-        assert isinstance(result, dict)
-        # Should handle gracefully and return a result
-        assert "passed" in result or "error" in result
+        with pytest.raises(AttributeError):
+            self.guard.validate(None, mock_adapter, {})
 
     def test_config_storage(self):
         """Test that configuration is properly stored."""
@@ -493,7 +500,7 @@ class TestSpectralGuardComprehensive:
 
         result = guard.validate(model, Mock(), {})
         assert result["passed"] is True
-        assert result["action"] == "warn"
+        assert result["decision"] == "monitor"
         families = {violation.get("family") for violation in result["violations"]}
         assert "attn" in families
         assert "ffn" not in families
@@ -886,8 +893,10 @@ class TestVarianceGuardComprehensive:
             result = self.guard.validate(self.model, Mock(), {})
 
         assert result["passed"] is False
-        assert result["action"] == "abort"
-        assert result["violations"] == ["gate failure"]
+        assert result["decision"] == "block"
+        assert result["violations"] == [
+            {"type": "variance_error", "severity": "error", "message": "gate failure"}
+        ]
 
     def test_validate_warns_when_monitor_only(self):
         """Monitor-only mode should downgrade aborts to warnings."""
@@ -903,7 +912,7 @@ class TestVarianceGuardComprehensive:
         with patch.object(guard, "finalize", return_value=failure_payload):
             result = guard.validate(self.model, Mock(), {})
 
-        assert result["action"] == "warn"
+        assert result["decision"] == "monitor"
         assert result["passed"] is False
 
 
@@ -1377,11 +1386,8 @@ class TestSpectralGuardEdgeCases:
         """Test error handling during validate."""
         mock_adapter = Mock()
 
-        # Test with None model to potentially trigger error handling
-        result = self.guard.validate(None, mock_adapter, {})
-        assert isinstance(result, dict)
-        # Should handle gracefully and return a result
-        assert "passed" in result or "error" in result
+        with pytest.raises(AttributeError):
+            self.guard.validate(None, mock_adapter, {})
 
     def test_config_updates(self):
         """Test that config can be updated after initialization."""
@@ -1516,8 +1522,10 @@ class TestRMTGuardEdgeCases:
         """Test after_edit when not prepared."""
         self.guard.after_edit(self.model)
         # Should not crash but log warning
-        assert len(self.guard.events) > 0
-        assert any(e.get("level") == "WARN" for e in self.guard.events)
+        assert len(self.guard.diagnostic_records) > 0
+        assert any(
+            e.get("severity") == "warning" for e in self.guard.diagnostic_records
+        )
 
     def test_apply_rmt_detection_and_correction(self):
         """Test RMT post-edit analysis populates edge-risk results."""
@@ -1584,8 +1592,11 @@ class TestVarianceGuardEdgeCases:
         """Test enable when not prepared."""
         result = self.guard.enable(self.model)
         assert not result
-        assert len(self.guard.events) > 0
-        assert any("not prepared" in e.get("message", "") for e in self.guard.events)
+        assert len(self.guard.diagnostic_records) > 0
+        assert any(
+            "not prepared" in e.get("summary", "")
+            for e in self.guard.diagnostic_records
+        )
 
     def test_disable_when_not_enabled(self):
         """Test disable when not enabled (idempotent)."""
@@ -1741,13 +1752,7 @@ class TestAdditionalUtilityFunctions:
 
     def test_rmt_functions_comprehensive(self):
         """Test RMT functions comprehensively."""
-        from invarlock.guards.rmt_legacy import (
-            analyze_weight_distribution,
-            clip_full_svd,
-            mp_bulk_edges,
-            rmt_growth_ratio,
-            within_deadband,
-        )
+        from invarlock.guards.rmt_analysis import analyze_weight_distribution
 
         # Test mp_bulk_edges
         min_edge, max_edge = mp_bulk_edges(100, 50, whitened=True)
@@ -1894,8 +1899,6 @@ class TestRMTGuardCoverageBoost:
 
     def test_rmt_detect_with_names(self):
         """Test rmt_detect_with_names function."""
-        from invarlock.guards.rmt_legacy import rmt_detect_with_names
-
         result = rmt_detect_with_names(self.model, threshold=1.5, verbose=True)
         assert isinstance(result, dict)
         assert "has_outliers" in result
@@ -1905,8 +1908,6 @@ class TestRMTGuardCoverageBoost:
 
     def test_rmt_detect_report(self):
         """Test rmt_detect_report function."""
-        from invarlock.guards.rmt_legacy import rmt_detect_report
-
         summary, per_layer = rmt_detect_report(self.model, threshold=1.5)
         assert isinstance(summary, dict)
         assert isinstance(per_layer, list)
@@ -1939,8 +1940,6 @@ class TestRMTGuardCoverageBoost:
 
     def test_mp_bulk_functions(self):
         """Test MP bulk edge functions comprehensively."""
-        from invarlock.guards.rmt_legacy import mp_bulk_edge, mp_bulk_edges
-
         # Test mp_bulk_edges with different parameters
         min_edge, max_edge = mp_bulk_edges(100, 50, whitened=False)
         assert isinstance(min_edge, float)
@@ -1963,8 +1962,6 @@ class TestRMTGuardCoverageBoost:
 
     def test_clip_full_svd_edge_cases(self):
         """Test clip_full_svd with edge cases."""
-        from invarlock.guards.rmt_legacy import clip_full_svd
-
         # Test with various matrix shapes
         W = torch.randn(20, 10)
         W_clipped = clip_full_svd(W, clip_val=2.0)
@@ -1984,7 +1981,7 @@ class TestRMTGuardCoverageBoost:
 
     def test_analyze_weight_distribution(self):
         """Test analyze_weight_distribution function comprehensively."""
-        from invarlock.guards.rmt_legacy import analyze_weight_distribution
+        from invarlock.guards.rmt_analysis import analyze_weight_distribution
 
         stats = analyze_weight_distribution(self.model, n_bins=20)
         assert isinstance(stats, dict)
@@ -2402,36 +2399,15 @@ class TestSpectralGuardExceptionCoverage:
     """Tests specifically designed to trigger exception handling paths in spectral functions."""
 
     def test_spectral_guard_validate_exception_handling(self):
-        """Test SpectralGuard.validate exception handling (lines 61-62)."""
+        """Unexpected validation failures should raise."""
         guard = SpectralGuard()
+        guard.prepared = True
+        guard._capture_sigmas = lambda *_a, **_k: (_ for _ in ()).throw(
+            RuntimeError("Forced validation error")
+        )
 
-        # Force an exception inside the validate method by patching something it uses
-        original_validate = guard.validate
-
-        def failing_validate(model, adapter, context):
-            # Trigger the exception path
-            raise Exception("Forced validation error")
-
-        # Replace the method temporarily to force exception
-        guard.validate = failing_validate
-
-        try:
-            # Call the original validate with the patched version to trigger exception handling
-            result = original_validate(guard, nn.Linear(10, 5), Mock(), {})
-        except Exception:
-            # If it throws, call the exception path manually
-            result = {
-                "passed": False,
-                "action": "warn",
-                "error": "Forced validation error",
-                "message": "Spectral validation failed: Forced validation error",
-            }
-
-        # Should catch exception and return error result (lines 61-62)
-        assert isinstance(result, dict)
-        assert not result["passed"]
-        assert result["action"] == "warn"
-        assert "error" in result
+        with pytest.raises(RuntimeError, match="Forced validation error"):
+            guard.validate(nn.Linear(10, 5), Mock(), {})
 
     def test_compute_sigma_max_exception_handling(self):
         """Test compute_sigma_max exception handling (lines 87-88)."""
@@ -2457,8 +2433,8 @@ class TestSpectralGuardExceptionCoverage:
         assert isinstance(target, float)
         assert target > 0  # Should return a positive value
 
-        # Test exception handling by patching np.percentile to fail
-        with patch("numpy.percentile", side_effect=Exception("Percentile failed")):
+        # Test the narrowed percentile fallback path on supported measurement errors
+        with patch("numpy.percentile", side_effect=RuntimeError("Percentile failed")):
             target = auto_sigma_target(nn.Linear(10, 5), percentile=0.9)
             assert target == 0.9  # Should fall back to percentile on exception
 
@@ -2588,8 +2564,6 @@ class TestRMTEnhancedCoverage:
 
     def test_mp_bulk_functions_comprehensive(self):
         """Test MP bulk edge functions with edge cases (lines 102, 149)."""
-        from invarlock.guards.rmt_legacy import mp_bulk_edge, mp_bulk_edges
-
         # Test whitened parameter variations (line 102)
         min_edge, max_edge = mp_bulk_edges(100, 50, whitened=True)
         assert isinstance(min_edge, float)
@@ -2605,15 +2579,12 @@ class TestRMTEnhancedCoverage:
         assert min_zero == 0.0
         assert max_zero == 0.0
 
-        # Test within_deadband function (line 149)
-        from invarlock.guards.rmt_legacy import within_deadband
-
         assert within_deadband(1.05, 1.0, 0.1)
         assert not within_deadband(1.15, 1.0, 0.1)
 
     def test_layer_svd_stats_edge_cases(self):
         """Test layer_svd_stats with various edge cases (lines 176, 186-187, 211, 224-227)."""
-        from invarlock.guards.rmt_legacy import layer_svd_stats
+        from invarlock.guards.rmt_analysis import layer_svd_stats
 
         # Test with empty weight matrices (line 176)
         empty_layer = nn.Module()
@@ -2654,7 +2625,7 @@ class TestRMTEnhancedCoverage:
         # Test with transformers import failure simulation (lines 286-287)
         import sys
 
-        from invarlock.guards.rmt_legacy import capture_baseline_mp_stats
+        from invarlock.guards.rmt_analysis import capture_baseline_mp_stats
 
         if "transformers" in sys.modules:
             # Temporarily remove transformers to simulate import failure
@@ -2714,7 +2685,7 @@ class TestRMTEnhancedCoverage:
 
     def test_iter_transformer_layers(self):
         """Test iter_transformer_layers with different model types (lines 346-356)."""
-        from invarlock.guards.rmt_legacy import _iter_transformer_layers
+        from invarlock.guards.rmt_analysis import _iter_transformer_layers
 
         # Test GPT-2 style (covered in main tests)
         layers = list(_iter_transformer_layers(self.model))
@@ -2745,8 +2716,6 @@ class TestRMTEnhancedCoverage:
 
     def test_rmt_detect_comprehensive_branches(self):
         """Test rmt_detect with various parameter combinations (lines 457-470, 473-482, 487-488)."""
-        from invarlock.guards.rmt_legacy import rmt_detect
-
         # Test detect_only=False with correction (lines 457-470)
         baseline_mp_stats = capture_baseline_mp_stats(self.model)
         baseline_sigmas = {
@@ -2782,8 +2751,6 @@ class TestRMTEnhancedCoverage:
 
     def test_rmt_detect_iteration_and_correction(self):
         """Test rmt_detect iteration logic and correction (lines 511-515, 522-537, 542-547)."""
-        from invarlock.guards.rmt_legacy import rmt_detect
-
         # Test with max_iterations and correction stalling (lines 522-537)
         result = rmt_detect(
             self.model,
@@ -2810,8 +2777,6 @@ class TestRMTEnhancedCoverage:
 
     def test_rmt_detect_verbose_output(self):
         """Test rmt_detect verbose output and reporting (lines 555-580)."""
-        from invarlock.guards.rmt_legacy import rmt_detect
-
         # Create a model likely to have outliers for verbose testing
         outlier_model = nn.Module()
         outlier_model.transformer = nn.Module()
@@ -2833,8 +2798,6 @@ class TestRMTEnhancedCoverage:
 
     def test_rmt_detect_with_names_comprehensive(self):
         """Test rmt_detect_with_names with different model styles (lines 648-660, 681-691)."""
-        from invarlock.guards.rmt_legacy import rmt_detect_with_names
-
         # Test model.layers style model (lines 648-660)
         model_layers_model = nn.Module()
         model_layers_model.model = nn.Module()
@@ -2880,8 +2843,6 @@ class TestRMTEnhancedCoverage:
 
     def test_rmt_detect_report_function(self):
         """Test rmt_detect_report function (lines 707-716)."""
-        from invarlock.guards.rmt_legacy import rmt_detect_report
-
         summary, per_layer = rmt_detect_report(self.model, threshold=1.5)
 
         assert isinstance(summary, dict)
@@ -2891,8 +2852,6 @@ class TestRMTEnhancedCoverage:
 
     def test_apply_rmt_correction_comprehensive(self):
         """Test _apply_rmt_correction function (lines 744-834)."""
-        from invarlock.guards.rmt_legacy import _apply_rmt_correction
-
         # Create a test layer
         test_layer = nn.Linear(64, 128)
 
@@ -2957,8 +2916,6 @@ class TestRMTEnhancedCoverage:
 
     def test_clip_full_svd_edge_cases(self):
         """Test clip_full_svd with edge cases (lines 861-865)."""
-        from invarlock.guards.rmt_legacy import clip_full_svd
-
         # Test normal case
         W = torch.randn(20, 15)
         W_clipped = clip_full_svd(W, clip_val=2.0)
@@ -2981,7 +2938,7 @@ class TestRMTEnhancedCoverage:
 
     def test_analyze_weight_distribution_edge_cases(self):
         """Test analyze_weight_distribution with edge cases (lines 894-895, 898)."""
-        from invarlock.guards.rmt_legacy import analyze_weight_distribution
+        from invarlock.guards.rmt_analysis import analyze_weight_distribution
 
         # Test with model that has no 2D weights (line 898)
         empty_model = nn.Module()
@@ -3020,7 +2977,7 @@ class TestRMTEnhancedCoverage:
 
         with patch(
             "invarlock.guards.rmt.RMTGuard._collect_calibration_batches",
-            side_effect=Exception("Capture failed"),
+            side_effect=RuntimeError("Capture failed"),
         ):
             result = guard.prepare(
                 self.model,
@@ -3044,7 +3001,7 @@ class TestRMTEnhancedCoverage:
         # Test when prepared
         guard.prepared = True
         guard.before_edit(self.model)  # Should log event
-        assert len(guard.events) > 0
+        assert len(guard.diagnostic_records) > 0
 
     def test_rmt_guard_after_edit_comprehensive(self):
         """Test RMTGuard after_edit method comprehensively (lines 1317-1379)."""
@@ -3052,7 +3009,7 @@ class TestRMTEnhancedCoverage:
 
         # Test without preparation (lines 1309-1315)
         guard.after_edit(self.model)
-        assert any(e.get("level") == "WARN" for e in guard.events)
+        assert any(e.get("severity") == "warning" for e in guard.diagnostic_records)
 
         # Test with preparation and no activation batches
         guard.prepare(self.model, None, None, {})
@@ -3062,11 +3019,11 @@ class TestRMTEnhancedCoverage:
         guard.prepared = True
         with patch(
             "invarlock.guards.rmt.RMTGuard._compute_activation_edge_risk",
-            side_effect=Exception("Detection failed"),
+            side_effect=RuntimeError("Detection failed"),
         ):
             guard._calibration_batches = [{"input_ids": torch.randint(0, 100, (1, 64))}]
             guard.after_edit(self.model)
-            assert any(e.get("level") == "ERROR" for e in guard.events)
+            assert any(e.get("severity") == "error" for e in guard.diagnostic_records)
 
     def test_rmt_guard_validate_method(self):
         """Test RMTGuard validate method (lines 1399-1411)."""
@@ -3076,8 +3033,8 @@ class TestRMTEnhancedCoverage:
         result = guard.validate(self.model, None, {})
         assert isinstance(result, dict)
         assert "passed" in result
-        assert "action" in result
-        assert "message" in result
+        assert "decision" in result
+        assert "diagnostics" in result
 
     def test_rmt_guard_finalize_not_prepared(self):
         """Test RMTGuard finalize when not prepared (lines 1441)."""

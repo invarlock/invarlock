@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import builtins
 import importlib.machinery
-import io
 import json
 import sys
 import types
@@ -10,9 +9,9 @@ from types import SimpleNamespace
 
 import pytest
 import typer
-from rich.console import Console
 
 from invarlock.cli.commands import doctor as doctor_mod
+from invarlock.core.doctor_findings import build_cross_check_findings
 
 
 class DummyConsole:
@@ -136,12 +135,12 @@ def _setup_config_env(monkeypatch, cfg):
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.cli.config.load_config",
+        "invarlock.core.config_runtime.load_config",
         lambda path: cfg,
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.cli.config.apply_profile",
+        "invarlock.core.config_runtime.apply_profile",
         lambda cfg_obj, profile: cfg_obj,
         raising=False,
     )
@@ -156,7 +155,7 @@ def _setup_config_env(monkeypatch, cfg):
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.cli.commands.run._resolve_metric_and_provider",
+        "invarlock.core.metric_provider_resolution.resolve_metric_and_provider",
         lambda cfg_obj, model_profile, resolved_loss_type=None: (
             "mlm",
             "synthetic",
@@ -289,52 +288,68 @@ def test_doctor_config_preflight_findings(monkeypatch, tmp_path, capsys):
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.cli.config.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.cli.config.apply_profile", lambda cfg, profile: cfg, raising=False
+        "invarlock.core.config_runtime.apply_profile",
+        lambda cfg, profile: cfg,
+        raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.cli.config.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.cli.config.apply_profile", lambda cfg, profile: cfg, raising=False
+        "invarlock.core.config_runtime.apply_profile",
+        lambda cfg, profile: cfg,
+        raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.cli.config.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.cli.config.apply_profile", lambda cfg, profile: cfg, raising=False
+        "invarlock.core.config_runtime.apply_profile",
+        lambda cfg, profile: cfg,
+        raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.cli.config.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.cli.config.apply_profile", lambda cfg, profile: cfg, raising=False
+        "invarlock.core.config_runtime.apply_profile",
+        lambda cfg, profile: cfg,
+        raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.cli.config.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.cli.config.apply_profile", lambda cfg, profile: cfg, raising=False
+        "invarlock.core.config_runtime.apply_profile",
+        lambda cfg, profile: cfg,
+        raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.cli.config.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.cli.config.apply_profile", lambda cfg, profile: cfg, raising=False
+        "invarlock.core.config_runtime.apply_profile",
+        lambda cfg, profile: cfg,
+        raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.cli.config.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.cli.config.apply_profile", lambda cfg, profile: cfg, raising=False
+        "invarlock.core.config_runtime.apply_profile",
+        lambda cfg, profile: cfg,
+        raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.cli.config.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.cli.config.apply_profile", lambda cfg, profile: cfg, raising=False
+        "invarlock.core.config_runtime.apply_profile",
+        lambda cfg, profile: cfg,
+        raising=False,
     )
     monkeypatch.setattr(
         "invarlock.model_profile.detect_model_profile",
@@ -347,7 +362,7 @@ def test_doctor_config_preflight_findings(monkeypatch, tmp_path, capsys):
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.cli.commands.run._resolve_metric_and_provider",
+        "invarlock.core.metric_provider_resolution.resolve_metric_and_provider",
         lambda cfg, model_profile, resolved_loss_type=None: (
             "accuracy",
             "synthetic",
@@ -387,7 +402,10 @@ def test_doctor_config_preflight_findings(monkeypatch, tmp_path, capsys):
     )
 
     tiny_report = tmp_path / "tiny.json"
-    tiny_report.write_text(json.dumps({"auto": {"tiny_relax": True}}), encoding="utf-8")
+    tiny_report.write_text(
+        json.dumps({"context": {"run": {"tiny_relax": True}}}),
+        encoding="utf-8",
+    )
 
     with pytest.raises(typer.Exit) as exc:
         doctor_mod.doctor_command(
@@ -402,7 +420,7 @@ def test_doctor_config_preflight_findings(monkeypatch, tmp_path, capsys):
     ]
     payload = json.loads(lines[-1])
     codes = {f["code"] for f in payload.get("findings", [])}
-    assert {"D001", "D002", "D004", "D013"}.issubset(codes)
+    assert {"D001", "D002", "D004"}.issubset(codes)
 
 
 def test_doctor_config_provider_string_kind_error(monkeypatch, capsys, tmp_path):
@@ -577,7 +595,21 @@ def test_doctor_baseline_quick_check_missing_path(monkeypatch, tmp_path):
     missing = tmp_path / "missing.json"
     with pytest.raises((SystemExit, typer.Exit)) as exc:
         doctor_mod.doctor_command(json_out=True, baseline=str(missing))
-    assert getattr(exc.value, "exit_code", getattr(exc.value, "code", None)) == 0
+    assert getattr(exc.value, "exit_code", getattr(exc.value, "code", None)) == 1
+
+
+def test_doctor_baseline_quick_check_missing_path_emits_d014(
+    monkeypatch, tmp_path, capsys
+):
+    _install_fake_torch(monkeypatch, cuda_available=False)
+    _patch_minimal_doctor_env(monkeypatch)
+    missing = tmp_path / "missing.json"
+    with pytest.raises((SystemExit, typer.Exit)):
+        doctor_mod.doctor_command(json_out=True, baseline=str(missing))
+
+    payload = json.loads(capsys.readouterr().out.splitlines()[-1])
+    codes = {f["code"] for f in payload.get("findings", [])}
+    assert "D014" in codes
 
 
 def test_doctor_baseline_split_warning_console(monkeypatch, tmp_path):
@@ -632,10 +664,12 @@ def test_doctor_config_capacity_floors(monkeypatch, tmp_path, capsys):
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.cli.config.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.cli.config.apply_profile", lambda cfg, profile: cfg, raising=False
+        "invarlock.core.config_runtime.apply_profile",
+        lambda cfg, profile: cfg,
+        raising=False,
     )
     monkeypatch.setattr(
         "invarlock.model_profile.detect_model_profile",
@@ -648,7 +682,7 @@ def test_doctor_config_capacity_floors(monkeypatch, tmp_path, capsys):
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.cli.commands.run._resolve_metric_and_provider",
+        "invarlock.core.metric_provider_resolution.resolve_metric_and_provider",
         lambda cfg, model_profile, resolved_loss_type=None: (
             "ppl_causal",
             "synthetic",
@@ -807,10 +841,12 @@ def test_doctor_determinism_warning_prints(monkeypatch, tmp_path):
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.cli.config.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.cli.config.apply_profile", lambda cfg, profile: cfg, raising=False
+        "invarlock.core.config_runtime.apply_profile",
+        lambda cfg, profile: cfg,
+        raising=False,
     )
     monkeypatch.setattr(
         "invarlock.model_profile.detect_model_profile",
@@ -823,7 +859,7 @@ def test_doctor_determinism_warning_prints(monkeypatch, tmp_path):
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.cli.commands.run._resolve_metric_and_provider",
+        "invarlock.core.metric_provider_resolution.resolve_metric_and_provider",
         lambda cfg, model_profile, resolved_loss_type=None: (
             "accuracy",
             "synthetic",
@@ -1037,23 +1073,14 @@ def _run_cross_check(tmp_path, baseline_payload, subject_payload, **kwargs):
     subject = tmp_path / "subject_cc.json"
     baseline.write_text(json.dumps(baseline_payload), encoding="utf-8")
     subject.write_text(json.dumps(subject_payload), encoding="utf-8")
-    calls: list[tuple[str, str]] = []
-    console = Console(file=io.StringIO())
-
-    def _capture(code, severity, message, **extra):
-        calls.append((code, severity))
-
-    had_error = doctor_mod._cross_check_reports(
+    findings, had_error = build_cross_check_findings(
         str(baseline),
         str(subject),
         cfg_metric_kind=kwargs.get("cfg_metric_kind"),
         strict=kwargs.get("strict", False),
         profile=kwargs.get("profile"),
-        json_out=True,
-        console=console,
-        add_fn=_capture,
     )
-    return had_error, calls
+    return had_error, [(finding.code, finding.severity) for finding in findings]
 
 
 def test_cross_checks_d009_tokenizer(tmp_path):

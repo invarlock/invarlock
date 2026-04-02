@@ -3,8 +3,8 @@ import math
 import torch
 import torch.nn as nn
 
-from invarlock.eval.metrics import (
-    MetricsConfig,
+from invarlock.eval.metrics import MetricsConfig
+from invarlock.eval.metrics_activation import (
     _calculate_head_energy,
     _calculate_mi_gini,
     _calculate_sigma_max,
@@ -14,9 +14,7 @@ from invarlock.eval.metrics import (
 def test_head_energy_strict_nan_returns_nan():
     # Hidden states contain NaNs; with strict_validation, validator raises, helper returns NaN
     hs = torch.full((2, 1, 4, 8), float("nan"))
-    res = _calculate_head_energy(
-        [hs], MetricsConfig(strict_validation=True, progress_bars=False)
-    )
+    res = _calculate_head_energy([hs], MetricsConfig(strict_validation=True))
     assert math.isnan(res)
 
 
@@ -55,7 +53,7 @@ def test_sigma_max_empty_filtered_returns_nan():
         M(),
         {},
         FakeDep(),
-        MetricsConfig(progress_bars=False),
+        MetricsConfig(),
         device=torch.device("cpu"),
     )
     assert math.isnan(res)
@@ -77,7 +75,7 @@ def test_mi_gini_dep_available_but_no_activations():
         nn.Linear(1, 1),
         activation_data,
         FakeDep2(),
-        MetricsConfig(progress_bars=False),
+        MetricsConfig(),
         torch.device("cpu"),
     )
     assert math.isnan(res)

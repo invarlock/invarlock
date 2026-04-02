@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from invarlock.reporting.report import _validate_baseline_or_report, to_html
+import pytest
+
+from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import RunReport, create_empty_report
+from invarlock.reporting.run_report_formatters import to_html
 
 
 def _mk_report() -> RunReport:
@@ -21,16 +24,19 @@ def _mk_report() -> RunReport:
 
 
 def test_baseline_v1_missing_pm_final_rejects() -> None:
+    report = _mk_report()
     base_v1_bad = {
         "schema_version": "baseline-v1",
         "meta": {},
         "metrics": {"primary_metric": {}},
     }
-    assert _validate_baseline_or_report(base_v1_bad) is False
+    with pytest.raises(ValueError):
+        make_report(report, base_v1_bad)
 
 
 def test_baseline_rejects_non_dict() -> None:
-    assert _validate_baseline_or_report(None) is False
+    with pytest.raises(ValueError):
+        make_report(_mk_report(), None)  # type: ignore[arg-type]
 
 
 def test_single_html_renders_bullet_items() -> None:

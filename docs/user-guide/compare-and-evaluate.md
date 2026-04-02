@@ -52,8 +52,8 @@ Outputs:
 ## Reuse a baseline report (skip baseline evaluation)
 
 When evaluating many subjects against the same baseline, you can reuse a single
-baseline `report.json` and skip Phase 1/3 (baseline evaluation) by passing
-`--baseline-report`.
+baseline `report.json` file and skip Phase 1/3 (baseline evaluation) by passing
+`--baseline-report` the exact emitted report path.
 
 Requirements:
 
@@ -76,8 +76,9 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_STORE_EVAL_WINDOWS=1 INVARLOCK_DEDUP_TEXTS=1
   --report-out reports/eval_baseline_once
 
 # 2) Reuse it for many subjects (skips baseline evaluation)
+#    Use the exact report path from step 1, e.g. runs/baseline_once/source/<timestamp>/report.json
 INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
-  --baseline-report runs/baseline_once/source \
+  --baseline-report runs/baseline_once/source/<timestamp>/report.json \
   --baseline sshleifer/tiny-gpt2 \
   --subject /path/to/your/edited-model \
   --adapter auto \

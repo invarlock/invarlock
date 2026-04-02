@@ -9,9 +9,11 @@ from rich.console import Console
 from invarlock.cli.constants import (
     PROOF_PACK_BUILD_FORMAT_VERSION,
     PROOF_PACK_INSPECT_FORMAT_VERSION,
+    PROOF_PACK_KEYGEN_FORMAT_VERSION,
     PROOF_PACK_VERIFY_FORMAT_VERSION,
 )
 from invarlock.proof_pack import (
+    _generate_signing_keypair,
     _material_spec,
     build_proof_pack,
     inspect_proof_pack,
@@ -58,7 +60,7 @@ def verify_command(
         help="Execution profile to use for bundled report verification (dev|ci|release).",
     ),
 ) -> None:
-    payload, exit_code = verify_proof_pack(
+    result = verify_proof_pack(
         Path(pack),
         json_out_path=Path(json_file) if json_file else None,
         skip_verify=skip_verify,
@@ -67,7 +69,7 @@ def verify_command(
     )
     payload = {
         "format_version": PROOF_PACK_VERIFY_FORMAT_VERSION,
-        **payload,
+        **result.payload,
     }
 
     if json_out:
@@ -77,6 +79,66 @@ def verify_command(
             console.print(f"[yellow]WARNING:[/yellow] {warning}")
         if payload["ok"]:
             console.print("[green]Proof pack verified[/green]")
+        else:
+            for error in payload["errors"]:
+                console.print(f"[red]ERROR:[/red] {error}")
+    raise typer.Exit(result.status.value)
+
+
+@proof_pack_app.command(
+    "keygen",
+    help="Generate an Ed25519 signing keypair for package-native proof-pack manifests.",
+)
+def keygen_command(
+    private_key_out: str = typer.Argument(
+        ...,
+        help="Output path for the private signing key PEM.",
+    ),
+    public_key_out: str | None = typer.Option(
+        None,
+        "--public-key-out",
+        help="Optional output path for the public verification key PEM.",
+    ),
+    json_out: bool = typer.Option(
+        False, "--json", help="Emit machine-readable keygen JSON."
+    ),
+) -> None:
+    private_key_path = Path(private_key_out)
+    public_key_path = (
+        Path(public_key_out)
+        if public_key_out
+        else private_key_path.with_name(f"{private_key_path.stem}.pub.pem")
+    )
+    try:
+        fingerprint = _generate_signing_keypair(
+            private_key_path,
+            public_key_path=public_key_path,
+        )
+        payload = {
+            "format_version": PROOF_PACK_KEYGEN_FORMAT_VERSION,
+            "ok": True,
+            "algorithm": "ed25519",
+            "private_key": str(private_key_path),
+            "public_key": str(public_key_path),
+            "signing_key_fingerprint": fingerprint,
+        }
+        exit_code = 0
+    except FileExistsError as exc:
+        payload = {
+            "format_version": PROOF_PACK_KEYGEN_FORMAT_VERSION,
+            "ok": False,
+            "errors": [str(exc)],
+        }
+        exit_code = 2
+
+    if json_out:
+        typer.echo(json.dumps(payload))
+    else:
+        if payload["ok"]:
+            console.print("[green]Proof-pack signing keypair created[/green]")
+            console.print(f"Private key: {payload['private_key']}")
+            console.print(f"Public key: {payload['public_key']}")
+            console.print(f"Fingerprint: {payload['signing_key_fingerprint']}")
         else:
             for error in payload["errors"]:
                 console.print(f"[red]ERROR:[/red] {error}")
@@ -93,10 +155,10 @@ def inspect_command(
         False, "--json", help="Emit machine-readable inspection JSON."
     ),
 ) -> None:
-    payload, exit_code = inspect_proof_pack(Path(pack))
+    result = inspect_proof_pack(Path(pack))
     payload = {
         "format_version": PROOF_PACK_INSPECT_FORMAT_VERSION,
-        **payload,
+        **result.payload,
     }
 
     if json_out:
@@ -109,7 +171,7 @@ def inspect_command(
         else:
             for issue in payload["issues"]:
                 console.print(f"[red]ERROR:[/red] {issue}")
-    raise typer.Exit(exit_code)
+    raise typer.Exit(result.status.value)
 
 
 @proof_pack_app.command(
@@ -126,7 +188,10 @@ def build_command(
     reports: list[str] = typer.Option(
         [],
         "--report",
-        help="Path to an evaluation.report.json file to verify and package.",
+        help=(
+            "Path to an explicit evaluation.report.json file to verify and "
+            "package (requires adjacent runtime.manifest.json)."
+        ),
     ),
     source_repo: str | None = typer.Option(
         None,
@@ -147,6 +212,11 @@ def build_command(
         None,
         "--readme",
         help="Optional README markdown file to copy into the pack root.",
+    ),
+    signing_key: str | None = typer.Option(
+        None,
+        "--signing-key",
+        help="Optional Ed25519 private key PEM used to sign manifest.json.",
     ),
     profile: str = typer.Option(
         "dev",
@@ -184,7 +254,7 @@ def build_command(
                 console.print(f"[red]ERROR:[/red] {error}")
         raise typer.Exit(2)
 
-    payload, exit_code = build_proof_pack(
+    result = build_proof_pack(
         Path(out),
         final_verdict_path=Path(final_verdict),
         report_paths=[Path(path) for path in reports],
@@ -192,11 +262,12 @@ def build_command(
         environment_path=Path(environment) if environment else None,
         material_specs=material_specs,
         readme_path=Path(readme) if readme else None,
+        signing_key_path=Path(signing_key) if signing_key else None,
         profile=profile,
     )
     payload = {
         "format_version": PROOF_PACK_BUILD_FORMAT_VERSION,
-        **payload,
+        **result.payload,
     }
 
     if json_out:
@@ -209,4 +280,4 @@ def build_command(
         else:
             for error in payload["errors"]:
                 console.print(f"[red]ERROR:[/red] {error}")
-    raise typer.Exit(exit_code)
+    raise typer.Exit(result.status.value)

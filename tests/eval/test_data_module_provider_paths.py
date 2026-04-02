@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 import invarlock.eval.data as data_mod
+import invarlock.eval.data_support as data_support_mod
 from invarlock.eval.data import (
     EvaluationWindow,
     HFTextProvider,
@@ -16,10 +17,15 @@ from invarlock.eval.data import (
     get_provider,
     list_providers,
 )
+from invarlock.eval.providers.seq2seq import Seq2SeqProvider
 
 
 def _data_module_path() -> Path:
     return Path(__file__).resolve().parents[2] / "src/invarlock/eval/data.py"
+
+
+def _data_support_module_path() -> Path:
+    return Path(__file__).resolve().parents[2] / "src/invarlock/eval/data_support.py"
 
 
 def test_get_provider_known_and_unknown():
@@ -41,11 +47,11 @@ def test_compute_window_hash_include_data_path():
     assert isinstance(h1, str) and isinstance(h2, str) and h1 != h2
 
 
-def test_eval_data_module_reimport_without_dependencies(monkeypatch):
-    """Reload data module to exercise import fallbacks for datasets/torch."""
-    data_path = _data_module_path()
+def test_eval_data_support_reimport_without_dependencies(monkeypatch):
+    """Reload support module to exercise import fallbacks for datasets/torch."""
+    data_path = _data_support_module_path()
     spec = importlib.util.spec_from_file_location(
-        "invarlock.eval.data_nodeps", data_path
+        "invarlock.eval.data_support_nodeps", data_path
     )
     module = importlib.util.module_from_spec(spec)
     orig_import = builtins.__import__
@@ -60,14 +66,14 @@ def test_eval_data_module_reimport_without_dependencies(monkeypatch):
         assert spec.loader is not None
         spec.loader.exec_module(module)
     finally:
-        sys.modules.pop("invarlock.eval.data_nodeps", None)
+        sys.modules.pop("invarlock.eval.data_support_nodeps", None)
     assert module._get_load_dataset() is None
     assert isinstance(module.HAS_DATASETS, bool)
     assert isinstance(module.HAS_TORCH, bool)
 
 
 def test_wikitext2_estimate_capacity_slow_without_target_total(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
     provider = WikiText2Provider()
     monkeypatch.setattr(provider, "load", lambda **kw: ["text sample" * 3] * 4)
 
@@ -84,7 +90,7 @@ def test_wikitext2_estimate_capacity_slow_without_target_total(monkeypatch):
 
 
 def test_wikitext2_estimate_capacity_fast_target_total(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
     provider = WikiText2Provider()
     monkeypatch.setattr(provider, "load", lambda **kw: ["long text"] * 3)
     cap = provider.estimate_capacity(
@@ -96,7 +102,7 @@ def test_wikitext2_estimate_capacity_fast_target_total(monkeypatch):
 
 def test_wikitext2_dependency_check_and_fast_capacity(monkeypatch):
     # Allow construction by pretending datasets is present
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
     pt = WikiText2Provider()
     # Monkeypatch load to avoid HF datasets
     monkeypatch.setattr(pt, "load", lambda **kw: ["a" * 30] * 5)
@@ -135,7 +141,7 @@ def test_wikitext2_dependency_check_and_fast_capacity(monkeypatch):
 
 
 def test_wikitext2_requires_datasets(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", False)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", False)
     from invarlock.core.exceptions import DependencyError
 
     with pytest.raises(DependencyError):
@@ -143,7 +149,7 @@ def test_wikitext2_requires_datasets(monkeypatch):
 
 
 def test_hf_text_provider_requires_datasets(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", False)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", False)
     from invarlock.core.exceptions import DependencyError
 
     with pytest.raises(DependencyError):
@@ -151,7 +157,7 @@ def test_hf_text_provider_requires_datasets(monkeypatch):
 
 
 def test_wikitext2_windows_insufficient_and_nonpositive(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
     pt = WikiText2Provider()
     from invarlock.core.exceptions import DataError, ValidationError
 
@@ -163,8 +169,25 @@ def test_wikitext2_windows_insufficient_and_nonpositive(monkeypatch):
         pt.windows(tokenizer=SimpleNamespace(), preview_n=4, final_n=4)
 
 
+def test_wikitext2_load_without_emit_sink_stays_off_stdout(
+    monkeypatch, capsys: pytest.CaptureFixture[str]
+):
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
+
+    def fake_load_dataset(*args, **kwargs):  # noqa: ARG001
+        return [{"text": "alpha sample with enough length"}]
+
+    monkeypatch.setattr(data_support_mod, "load_dataset", fake_load_dataset)
+    provider = WikiText2Provider()
+    texts = provider.load(max_samples=1)
+    captured = capsys.readouterr()
+    assert texts == ["alpha sample with enough length"]
+    assert captured.out == ""
+    assert captured.err == ""
+
+
 def test_wikitext2_windows_tokenization_failure(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
     pt = WikiText2Provider()
     monkeypatch.setattr(pt, "load", lambda **kw: ["z" * 30] * 20)
 
@@ -202,13 +225,15 @@ def test_synthetic_provider_paths():
     assert d["length"] == 2 and "input_ids" in d
 
 
-def test_synthetic_simple_tokenize_fallback_no_encode():
+def test_synthetic_simple_tokenize_requires_supported_tokenizer():
     class NoEnc:
         pad_token_id = 0
 
     sp = SyntheticProvider(base_samples=["abc def ghi" * 2])
-    win_prev, _ = sp.windows(tokenizer=NoEnc(), seq_len=8, preview_n=1, final_n=0)
-    assert len(win_prev.input_ids[0]) == 8 and len(win_prev.attention_masks[0]) == 8
+    from invarlock.core.exceptions import DataError
+
+    with pytest.raises(DataError, match="TOKENIZE-INSUFFICIENT"):
+        sp.windows(tokenizer=NoEnc(), seq_len=8, preview_n=1, final_n=0)
 
 
 def test_hf_text_provider_empty_raises(monkeypatch):
@@ -223,7 +248,7 @@ def test_hf_text_provider_empty_raises(monkeypatch):
 
 
 def test_collect_tokenized_samples_paths(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
     pt = WikiText2Provider()
 
     class Tok:
@@ -265,7 +290,7 @@ def test_collect_tokenized_samples_paths(monkeypatch):
                     "attention_mask": FakeTensor([1, 1, 0, 0]),
                 }
 
-        monkeypatch.setattr(data_mod, "HAS_TORCH", True)
+        monkeypatch.setattr(data_support_mod, "HAS_TORCH", True)
         out3 = pt._collect_tokenized_samples(["cc"], [0], TokTorch(), 4)
         if not out3:
             import pytest
@@ -279,13 +304,13 @@ def test_collect_tokenized_samples_paths(monkeypatch):
 
 
 def test_byte_ngram_scoring_empty_returns_false(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
     pt = WikiText2Provider()
     assert pt._score_candidates_byte_ngram([]) is False
 
 
 def test_wikitext2_windows_success(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
     pt = WikiText2Provider()
     # Provide enough texts and a simple collector
     monkeypatch.setattr(pt, "load", lambda **kw: ["z" * 30] * 20)
@@ -305,7 +330,7 @@ def test_wikitext2_windows_success(monkeypatch):
 
 
 def test_wikitext2_windows_full_path_scored(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
     pt = WikiText2Provider()
     # Provide many texts
     monkeypatch.setattr(pt, "load", lambda **kw: ["t" * 30] * 20)
@@ -341,7 +366,7 @@ def test_wikitext2_windows_full_path_scored(monkeypatch):
 
 
 def test_wikitext2_windows_frequency_fallback(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
     pt = WikiText2Provider()
     monkeypatch.setattr(pt, "load", lambda **kw: ["text sample long enough"] * 20)
 
@@ -363,7 +388,7 @@ def test_wikitext2_windows_frequency_fallback(monkeypatch):
 
 
 def test_wikitext2_frequency_lone_and_remaining(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
     pt = WikiText2Provider()
     monkeypatch.setattr(
         pt, "load", lambda **kw: [f"text {i} long enough" for i in range(12)]
@@ -389,7 +414,7 @@ def test_wikitext2_frequency_lone_and_remaining(monkeypatch):
 
 def test_wikitext2_selection_collision_rounding(monkeypatch):
     """Force equidistant selection loop to exercise collision offsets."""
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
     provider = WikiText2Provider()
     # Provide exactly preview+final texts so total_candidates == selection_count
     monkeypatch.setattr(provider, "load", lambda **kw: ["text long enough"] * 4)
@@ -407,7 +432,7 @@ def test_wikitext2_selection_collision_rounding(monkeypatch):
 
 
 def test_wikitext2_candidate_shortfall_raises(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
     pt = WikiText2Provider()
     monkeypatch.setattr(pt, "load", lambda **kw: ["text sample long enough"] * 50)
 
@@ -422,7 +447,7 @@ def test_wikitext2_candidate_shortfall_raises(monkeypatch):
 
 
 def test_wikitext_load_cache_and_dedupe(monkeypatch, tmp_path):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
     calls = {"count": 0}
 
     def fake_load_dataset(*args, **kwargs):  # noqa: ARG001, ARG002
@@ -433,7 +458,7 @@ def test_wikitext_load_cache_and_dedupe(monkeypatch, tmp_path):
             {"text": "Beta content that is long enough"},
         ]
 
-    monkeypatch.setattr(data_mod, "load_dataset", fake_load_dataset)
+    monkeypatch.setattr(data_support_mod, "load_dataset", fake_load_dataset)
     provider = WikiText2Provider(cache_dir=tmp_path)
     monkeypatch.setenv("INVARLOCK_DEDUP_TEXTS", "1")
     texts = provider.load(max_samples=5)
@@ -446,7 +471,7 @@ def test_wikitext_load_cache_and_dedupe(monkeypatch, tmp_path):
     def _fail_load(*args, **kwargs):  # noqa: ARG001, ARG002
         raise AssertionError("load_dataset should not be called when cache hits")
 
-    monkeypatch.setattr(data_mod, "load_dataset", _fail_load)
+    monkeypatch.setattr(data_support_mod, "load_dataset", _fail_load)
     cached = provider.load(max_samples=1)
     assert cached == ["Alpha sample with letters"]
     monkeypatch.delenv("INVARLOCK_DEDUP_TEXTS", raising=False)
@@ -519,7 +544,7 @@ def test_local_jsonl_pairs_windows_and_labels(tmp_path):
     class _Tok:
         pad_token_id = 0
 
-        def encode(self, text, truncation=True, max_length=4):  # noqa: ARG002
+        def encode(self, text, truncation=True, max_length=4, padding="max_length"):  # noqa: ARG002
             limit = int(max_length)
             return [ord(c) % 5 + 1 for c in text][:limit]
 
@@ -549,7 +574,7 @@ def test_local_jsonl_pairs_truncates_targets(tmp_path):
     class LongTok:
         pad_token_id = 0
 
-        def encode(self, text, truncation=True, max_length=4):  # noqa: ARG002
+        def encode(self, text, truncation=True, max_length=4, padding="max_length"):  # noqa: ARG002
             return list(range(max_length + 3))
 
     provider = data_mod.LocalJSONLPairsProvider(file=str(pairs_file), max_samples=1)
@@ -573,7 +598,7 @@ def test_local_jsonl_pairs_missing_fields(tmp_path):
     )
 
     class Tok:
-        def encode(self, text, truncation=True, max_length=4):  # noqa: ARG002
+        def encode(self, text, truncation=True, max_length=4, padding="max_length"):  # noqa: ARG002
             return list(range(1, max_length + 1))
 
     provider = data_mod.LocalJSONLPairsProvider(file=str(data), max_samples=2)
@@ -612,7 +637,7 @@ def test_local_jsonl_pairs_load_handles_io_errors(tmp_path, monkeypatch):
 
 
 def test_wikitext2_estimate_capacity_fast_env(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
     provider = WikiText2Provider()
     monkeypatch.setattr(provider, "load", lambda **kw: ["text sample long enough"] * 4)
 
@@ -628,7 +653,7 @@ def test_wikitext2_estimate_capacity_fast_env(monkeypatch):
 
 
 def test_wikitext2_capacity_respects_target_total(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
     provider = WikiText2Provider()
     monkeypatch.setattr(provider, "load", lambda **kw: ["text sample long enough"] * 10)
 
@@ -643,7 +668,7 @@ def test_wikitext2_capacity_respects_target_total(monkeypatch):
 
 
 def test_wikitext2_load_filters_and_cache_updates(monkeypatch, tmp_path):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
     samples = [
         {"text": "too short"},
         {"text": "A valid sample that is long enough 12345"},
@@ -656,7 +681,7 @@ def test_wikitext2_load_filters_and_cache_updates(monkeypatch, tmp_path):
         records["calls"] += 1
         return list(samples)
 
-    monkeypatch.setattr(data_mod, "load_dataset", fake_load_dataset)
+    monkeypatch.setattr(data_support_mod, "load_dataset", fake_load_dataset)
     provider = WikiText2Provider(cache_dir=tmp_path)
     texts = provider.load(split="validation", max_samples=5)
     assert len(texts) == 2
@@ -668,53 +693,23 @@ def test_wikitext2_load_filters_and_cache_updates(monkeypatch, tmp_path):
     assert len(texts_updated) == 3
 
 
-def test_seq2seq_provider_windows_and_masks(monkeypatch):
-    class DummySeq2Seq:
-        def __init__(self, **kwargs):
-            self._n = kwargs.get("n", 1)
-
-        def batches(self, seed, batch_size):  # noqa: ARG002
-            yield {
-                "src_ids": [[1, 2, 0], [3, 4, 5]],
-                "src_mask": [[1, 1, 0], [1, 1, 1]],
-                "tgt_ids": [[6, 7], [8, 9, 10]],
-            }
-
-    monkeypatch.setattr(
-        "invarlock.eval.providers.seq2seq.Seq2SeqProvider", DummySeq2Seq, raising=False
-    )
-
+def test_seq2seq_provider_windows_and_masks():
     class _Tok:
         pad_token_id = 0
 
-    provider = data_mod.Seq2SeqDataProvider(n=1)
+    provider = Seq2SeqProvider(n=2, src_len=3, tgt_len=2, pad_id=0)
     prev, fin = provider.windows(_Tok(), seq_len=4, preview_n=1, final_n=1)
     assert len(prev.input_ids[0]) == 4
     assert provider.last_final_labels and provider.last_final_labels[0][-1] == -100
 
 
-def test_seq2seq_attention_mask_inferred(monkeypatch):
-    class DummySeq2Seq:
-        def __init__(self, **kwargs):
-            self._n = kwargs.get("n", 1)
-
-        def batches(self, seed, batch_size):  # noqa: ARG002
-            yield {
-                "src_ids": [[1, 2, 0]],
-                "src_mask": [[1]],
-                "tgt_ids": [[3]],
-            }
-
-    monkeypatch.setattr(
-        "invarlock.eval.providers.seq2seq.Seq2SeqProvider", DummySeq2Seq, raising=False
-    )
-
+def test_seq2seq_attention_mask_tracks_padding():
     class Tok:
         pad_token_id = 0
 
-    provider = data_mod.Seq2SeqDataProvider()
+    provider = Seq2SeqProvider(n=1, src_len=3, tgt_len=2, pad_id=0)
     prev, _ = provider.windows(Tok(), seq_len=4, preview_n=1, final_n=0)
-    assert prev.attention_masks[0] == [1, 1, 0, 0]
+    assert prev.attention_masks[0] == [1, 1, 1, 0]
 
 
 def test_seq2seq_provider_capacity(monkeypatch):
@@ -732,7 +727,7 @@ def test_seq2seq_provider_capacity(monkeypatch):
     monkeypatch.setattr(
         "invarlock.eval.providers.seq2seq.Seq2SeqProvider", DummySeq2Seq, raising=False
     )
-    provider = data_mod.Seq2SeqDataProvider(n=1)
+    provider = Seq2SeqProvider(n=1)
     cap = provider.estimate_capacity(tokenizer=None, seq_len=4, stride=2)
     assert cap["examples_available"] >= 1
     assert cap["tokens_available"] >= 4
@@ -740,7 +735,7 @@ def test_seq2seq_provider_capacity(monkeypatch):
 
 def test_wt2_frequency_fallback_lone_candidate(monkeypatch):
     # Force datasets present
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
     pt = WikiText2Provider()
     # Provide enough long texts
     monkeypatch.setattr(pt, "load", lambda **kw: ["z" * 30] * 21)
@@ -757,7 +752,7 @@ def test_wt2_frequency_fallback_lone_candidate(monkeypatch):
 
 def test_wikitext2_balancing_swap_reverted(monkeypatch):
     """Craft deterministic difficulties so balancing swap worsens gap and reverts."""
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
     provider = WikiText2Provider()
     monkeypatch.setattr(provider, "load", lambda **kw: ["z" * 40] * 6)
 
@@ -782,7 +777,7 @@ def test_wikitext2_balancing_swap_reverted(monkeypatch):
 
 
 def test_wikitext2_duplicate_indices_skipped(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
     pt = WikiText2Provider()
     monkeypatch.setattr(pt, "load", lambda **kw: ["text " + str(i) for i in range(40)])
 
@@ -805,7 +800,7 @@ def test_wikitext2_duplicate_indices_skipped(monkeypatch):
 
 
 def test_collect_tokenized_samples_warns_on_failure(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
     pt = WikiText2Provider()
 
     class BadTokenizer:

@@ -49,7 +49,14 @@ class DummyEdit(ModelEdit):
     def can_edit(self, model_desc: dict[str, Any]) -> bool:
         return self._can
 
-    def apply(self, model: Any, adapter: ModelAdapter, **kwargs) -> dict[str, Any]:
+    def apply(
+        self,
+        model: Any,
+        adapter: ModelAdapter,
+        plan=None,
+        runtime=None,
+    ) -> dict[str, Any]:
+        _ = model, adapter, plan, runtime
         return {
             "name": self.name,
             "deltas": {"params_changed": 1, "layers_modified": 0},
@@ -62,7 +69,14 @@ class NonDictEdit(ModelEdit):
     def can_edit(self, model_desc: dict[str, Any]) -> bool:
         return True
 
-    def apply(self, model: Any, adapter: ModelAdapter, **kwargs) -> Any:
+    def apply(
+        self,
+        model: Any,
+        adapter: ModelAdapter,
+        plan=None,
+        runtime=None,
+    ) -> Any:
+        _ = model, adapter, plan, runtime
         return "ok"  # Non-dict result to exercise fallback context updates
 
 
@@ -72,7 +86,14 @@ class MissingDeltasEdit(ModelEdit):
     def can_edit(self, model_desc: dict[str, Any]) -> bool:
         return True
 
-    def apply(self, model: Any, adapter: ModelAdapter, **kwargs) -> dict[str, Any]:
+    def apply(
+        self,
+        model: Any,
+        adapter: ModelAdapter,
+        plan=None,
+        runtime=None,
+    ) -> dict[str, Any]:
+        _ = model, adapter, plan, runtime
         return {"name": self.name}  # No 'deltas' key
 
 
@@ -82,7 +103,14 @@ class NonDictDeltasEdit(ModelEdit):
     def can_edit(self, model_desc: dict[str, Any]) -> bool:
         return True
 
-    def apply(self, model: Any, adapter: ModelAdapter, **kwargs) -> dict[str, Any]:
+    def apply(
+        self,
+        model: Any,
+        adapter: ModelAdapter,
+        plan=None,
+        runtime=None,
+    ) -> dict[str, Any]:
+        _ = model, adapter, plan, runtime
         return {"name": self.name, "deltas": 0}
 
 
@@ -172,19 +200,28 @@ def test_runner_rollback_on_guard_failure(monkeypatch, tmp_path):
 
     monkeypatch.setattr(runner_mod, "resolve_tier_policies", fake_resolver)
 
+    class ValidateBoomGuard(Guard):
+        name = "bad"
+
+        def __init__(self):
+            self.policy = {}
+
+        def set_run_context(self, report):
+            self.policy["context"] = True
+
+        def validate(self, model: Any, adapter: ModelAdapter, context: dict[str, Any]):
+            raise RuntimeError("validate boom")
+
     model = DummyModel()
     adapter = DummyAdapter()
     edit = DummyEdit(name="edit-name")
-    guards = [BadGuard(), GoodGuard()]
+    guards = [ValidateBoomGuard(), GoodGuard()]
     cfg = make_config(tmp_path)
 
     report = runner.execute(model, adapter, edit, guards, cfg, calibration_data=None)
 
-    assert report.status == "rollback"
-    # Check that rollback metadata was set
-    assert "rollback_checkpoint" in report.meta
-    assert "rollback_reason" in report.meta
-    # Adapter.restore should have been invoked by rollback path
+    assert report.status == "failed"
+    assert isinstance(report.error, str) and "validate boom" in report.error
     assert model._restored is True
 
 
@@ -616,12 +653,14 @@ def test_measure_latency_device_to_exception():
     # Nonstandard device object forces .to(device) to raise
     bad_device = object()
     sample = {"input_ids": [1, 2, 3], "attention_mask": [1, 1, 1]}
-    ms = runner._measure_latency(M(), [sample], bad_device)
-    assert ms == 0.0 or ms > 0.0
+    with pytest.raises(
+        RuntimeError, match="Latency measurement device transfer failed"
+    ):
+        runner._measure_latency(M(), [sample], bad_device)
 
 
 def test_runner_resolve_policies_error(monkeypatch, tmp_path):
-    # Ensure the error path in _resolve_guard_policies returns {} and does not crash
+    # Resolver failures should now surface instead of being normalized away.
     from invarlock.core import runner as runner_mod
 
     monkeypatch.setattr(
@@ -638,7 +677,7 @@ def test_runner_resolve_policies_error(monkeypatch, tmp_path):
     cfg = make_config(tmp_path)
     # Call prepare guards phase directly to isolate the branch
     r._initialize_services(cfg)
-    try:
+    with pytest.raises(RuntimeError, match="oops"):
         r._prepare_guards_phase(
             model,
             adapter,
@@ -648,12 +687,7 @@ def test_runner_resolve_policies_error(monkeypatch, tmp_path):
             auto_config=None,
             config=cfg,
         )
-    except (
-        Exception
-    ):  # The private method should not raise; but guard against unexpected behavior
-        pytest.fail("_prepare_guards_phase unexpectedly raised")
-    finally:
-        r._cleanup_services()
+    r._cleanup_services()
 
 
 def test_runner_compute_real_metrics_smoke(tmp_path):
@@ -711,12 +745,14 @@ def test_runner_eval_fallback_no_calibration(tmp_path):
     guards = [GoodGuard()]
     cfg = make_config(tmp_path)
 
-    # No calibration_data triggers fallback metrics path
+    # No calibration_data should produce an explicit non-evaluated state.
     report = runner.execute(model, adapter, edit, guards, cfg, calibration_data=None)
-    pm = report.metrics.get("primary_metric", {})
-    assert pm.get("preview") == 25.0
-    assert pm.get("final") == 26.0
-    assert report.metrics.get("latency_ms_per_tok") == 15.0
+    assert report.status == "success"
+    assert report.metrics["eval_state"] == {
+        "evaluated": False,
+        "reason": "missing_calibration_data",
+    }
+    assert "primary_metric" not in report.metrics
 
 
 def test_execute_with_auto_config_passthrough(tmp_path, monkeypatch):
@@ -845,7 +881,15 @@ def test_edit_phase_with_non_dict_report_context():
 
     report = RunReport()
     report.context = []  # type: ignore[assignment]
-    res = runner._edit_phase(model, adapter, edit, {}, report, edit_config=None)
+    res = runner._edit_phase(
+        model,
+        adapter,
+        edit,
+        {},
+        report,
+        edit_config=None,
+        edit_runtime=None,
+    )
     assert isinstance(res, dict) and isinstance(report.context, dict)
 
 
@@ -903,6 +947,10 @@ def test_apply_guard_policy_exception_path(monkeypatch):
     class WeirdGuard(GoodGuard):
         name = "weird"
 
+        def __init__(self):
+            super().__init__()
+            object.__setattr__(self, "oops", 0)
+
         def __setattr__(self, name, value):
             if name == "oops":
                 raise RuntimeError("nope")
@@ -912,9 +960,8 @@ def test_apply_guard_policy_exception_path(monkeypatch):
     g = WeirdGuard()
     g.config = {}
     g.policy = {}
-    # Should not raise despite exception setting attribute
-    runner._apply_guard_policy(g, {"oops": 1, "cfg": 2})
-    assert g.config.get("cfg") == 2
+    with pytest.raises(RuntimeError, match="nope"):
+        runner._apply_guard_policy(g, {"oops": 1, "cfg": 2})
 
 
 def test_prepare_phase_no_checkpoint_and_missing_nlayer(tmp_path):
@@ -1263,8 +1310,7 @@ def test_zero_mask_batch_warning(tmp_path, monkeypatch):
 
 
 def test_eval_device_override_no_move(tmp_path, monkeypatch):
-    # Setting INVARLOCK_EVAL_DEVICE equal to current device should not move model
-    import os
+    # Setting eval.device_override equal to current device should not move model
 
     import torch
 
@@ -1284,23 +1330,20 @@ def test_eval_device_override_no_move(tmp_path, monkeypatch):
     model = T()
     adapter = DummyAdapter()
     cfg = make_config(tmp_path)
-    os.environ["INVARLOCK_EVAL_DEVICE"] = "cpu"
-    try:
-        metrics, _ = runner._compute_real_metrics(
-            model,
-            [
-                {"input_ids": [1, 2, 3], "attention_mask": [1, 1, 1]},
-                {"input_ids": [4, 5, 6], "attention_mask": [1, 1, 1]},
-            ],
-            adapter,
-            preview_n=1,
-            final_n=1,
-            config=cfg,
-        )
-        pm = metrics.get("primary_metric", {})
-        assert pm.get("final") and pm.get("preview")
-    finally:
-        del os.environ["INVARLOCK_EVAL_DEVICE"]
+    cfg.context.setdefault("eval", {})["device_override"] = "cpu"
+    metrics, _ = runner._compute_real_metrics(
+        model,
+        [
+            {"input_ids": [1, 2, 3], "attention_mask": [1, 1, 1]},
+            {"input_ids": [4, 5, 6], "attention_mask": [1, 1, 1]},
+        ],
+        adapter,
+        preview_n=1,
+        final_n=1,
+        config=cfg,
+    )
+    pm = metrics.get("primary_metric", {})
+    assert pm.get("final") and pm.get("preview")
 
 
 def test_compute_metrics_preview_final_zero_and_empty(tmp_path):
@@ -1360,9 +1403,11 @@ def test_compute_slice_missing_loss_debug(monkeypatch, tmp_path):
             final_n=1,
             config=cfg,
         )
-        # Should fallback from NaN ppl to default 50.0 due to invalid/empty summaries
         pm = metrics.get("primary_metric", {})
-        assert pm.get("preview") > 0 and pm.get("final") > 0
+        assert pm.get("invalid") is True
+        assert pm.get("degraded_reason") == "non_finite_pm"
+        assert pm.get("preview") is None
+        assert pm.get("final") is None
     finally:
         del os.environ["INVARLOCK_DEBUG_TRACE"]
 
@@ -1475,7 +1520,8 @@ def test_measure_latency_paths(tmp_path):
             raise RuntimeError("boom")
 
     sample = {"input_ids": [1, 2, 3], "attention_mask": [1, 1, 1]}
-    assert runner._measure_latency(RaisingModel(), [sample], "cpu") == 0.0
+    with pytest.raises(RuntimeError, match="boom"):
+        runner._measure_latency(RaisingModel(), [sample], "cpu")
 
 
 def test_finalize_metrics_unacceptable_no_checkpoint(monkeypatch, tmp_path):
@@ -1665,7 +1711,7 @@ def test_resolve_policy_flags_precedence(monkeypatch, tmp_path):
     assert flags["allow_calibration_materialize"] is True
 
 
-def test_prepare_guards_phase_non_strict_allows_failure(tmp_path):
+def test_prepare_guards_phase_non_strict_still_raises_programming_errors(tmp_path):
     from invarlock.core.api import RunReport
 
     runner = CoreRunner()
@@ -1673,18 +1719,38 @@ def test_prepare_guards_phase_non_strict_allows_failure(tmp_path):
     cfg.context.setdefault("run", {})["strict_guard_prepare"] = False
     report = RunReport()
 
-    runner._prepare_guards_phase(
-        DummyModel(),
-        DummyAdapter(),
-        [ErrPrepareGuard()],
-        calibration_data=None,
-        report=report,
-        auto_config=None,
-        config=cfg,
-    )
+    with pytest.raises(RuntimeError, match="Guard 'err' prepare failed"):
+        runner._prepare_guards_phase(
+            DummyModel(),
+            DummyAdapter(),
+            [ErrPrepareGuard()],
+            calibration_data=None,
+            report=report,
+            auto_config=None,
+            config=cfg,
+        )
 
     failures = report.meta.get("guard_prepare_failures", [])
     assert failures and failures[0]["guard"] == ErrPrepareGuard.name
+
+
+def test_prepare_guards_phase_context_errors_raise(tmp_path):
+    from invarlock.core.api import RunReport
+
+    runner = CoreRunner()
+    cfg = make_config(tmp_path)
+    report = RunReport()
+
+    with pytest.raises(RuntimeError, match="run context setup failed"):
+        runner._prepare_guards_phase(
+            DummyModel(),
+            DummyAdapter(),
+            [BadGuard()],
+            calibration_data=None,
+            report=report,
+            auto_config=None,
+            config=cfg,
+        )
 
 
 def test_eval_phase_strict_eval_raises(monkeypatch, tmp_path):

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.guards_analysis import _extract_spectral_analysis
+from invarlock.reporting.guards_spectral import _extract_spectral_analysis
 
 
 def test_spectral_policy_multiple_testing_merge_and_caps():

@@ -1,13 +1,15 @@
 import torch
 import torch.nn as nn
 
-from invarlock.guards.rmt_legacy import (
+import invarlock.guards.rmt as runtime_rmt
+from invarlock.guards.rmt_analysis import (
     _iter_transformer_layers,
     capture_baseline_mp_stats,
     layer_svd_stats,
+)
+from invarlock.guards.rmt_math import (
     mp_bulk_edge,
     mp_bulk_edges,
-    rmt_detect_report,
     rmt_growth_ratio,
     within_deadband,
 )
@@ -50,11 +52,18 @@ def test_layer_svd_stats_fallback_98th_percentile():
     assert stats["sigma_max"] >= 0.0
 
 
-def test_rmt_detect_report_smoke():
+def test_runtime_detection_report_smoke():
     model = TinyModel()
-    summary, per_layer = rmt_detect_report(model, threshold=10.0)
+    guard = runtime_rmt.RMTGuard(correct=False)
+    guard.baseline_mp_stats = capture_baseline_mp_stats(model)
+    guard.baseline_sigmas = {
+        name: float(stats.get("sigma_base", 0.0) or 0.0)
+        for name, stats in guard.baseline_mp_stats.items()
+        if isinstance(stats, dict)
+    }
+    summary = guard._apply_rmt_detection_and_correction(model)
     assert "has_outliers" in summary
-    assert isinstance(per_layer, list)
+    assert isinstance(summary.get("per_layer"), list)
 
 
 def test_capture_baseline_and_helpers():

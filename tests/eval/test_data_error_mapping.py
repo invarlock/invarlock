@@ -21,8 +21,9 @@ def test_wikitext2_missing_dependency_maps_to_dependency_error(
     monkeypatch: pytest.MonkeyPatch,
 ):
     data_mod = importlib.import_module("invarlock.eval.data")
+    data_support_mod = importlib.import_module("invarlock.eval.data_support")
     # Simulate datasets missing by forcing HAS_DATASETS = False
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", False, raising=True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", False, raising=True)
     with pytest.raises(Exception) as ei:
         data_mod.WikiText2Provider()
     err = ei.value
@@ -48,7 +49,13 @@ def test_windows_not_enough_samples_maps_to_data_error(monkeypatch: pytest.Monke
     class Tok:
         pad_token_id = 0
 
-        def encode(self, text, truncation=True, max_length=128):  # type: ignore[no-untyped-def]
+        def encode(  # type: ignore[no-untyped-def]
+            self,
+            text,
+            truncation=True,
+            max_length=128,
+            padding="max_length",
+        ):
             return [1, 2, 3]
 
     with pytest.raises(Exception) as ei:

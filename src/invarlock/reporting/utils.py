@@ -5,6 +5,8 @@ import math
 from collections.abc import Iterable
 from typing import Any
 
+_PARSE_EXCEPTIONS = (AttributeError, KeyError, OverflowError, TypeError, ValueError)
+
 
 def _coerce_int(value: Any) -> int | None:
     if value is None:
@@ -87,7 +89,7 @@ def _weighted_mean(values: list[Any], weights: list[Any]) -> float:
         try:
             vf = float(v)
             wf = float(w)
-        except Exception:
+        except _PARSE_EXCEPTIONS:
             continue
         if not math.isfinite(vf) or not math.isfinite(wf) or wf <= 0:
             continue

@@ -14,11 +14,11 @@ from invarlock.eval.metrics import (
     PerplexityStatus,
     ResourceManager,
     ValidationError,
-    _forward_loss_causal,
     bootstrap_confidence_interval,
     validate_perplexity,
 )
 from invarlock.eval.metrics import ValidationError as MValidationError
+from invarlock.eval.metrics_model_io import forward_loss_causal
 
 
 def test_bootstrap_confidence_interval_valid_and_errors():
@@ -94,9 +94,8 @@ def test_input_validator_strict_and_lenient():
     with pytest.raises(ValidationError):
         v.validate_model(object(), MetricsConfig())
 
-    # Both strict and lenient paths should not raise here since counting
-    # parameters may be guarded by fallback; tensor validation covers raising
-    v.validate_model(ModelNoParams(), MetricsConfig(strict_validation=True))
+    with pytest.raises(ValidationError):
+        v.validate_model(ModelNoParams(), MetricsConfig(strict_validation=True))
     v.validate_model(ModelNoParams(), MetricsConfig(strict_validation=False))
 
     # Dataloader validation
@@ -167,9 +166,9 @@ def test_forward_loss_causal_variants():
             return (torch.randn(B, T, V),)
 
     # Dict-style returning loss
-    loss, logits = _forward_loss_causal(DictModel(), input_ids, labels=labels)
+    loss, logits = forward_loss_causal(DictModel(), input_ids, labels=labels)
     assert math.isfinite(loss) and logits is not None and logits.shape == (B, T, V)
 
     # Tuple-style without loss
-    loss2, logits2 = _forward_loss_causal(TupleModel(), input_ids, labels=labels)
+    loss2, logits2 = forward_loss_causal(TupleModel(), input_ids, labels=labels)
     assert math.isfinite(loss2) and isinstance(logits2, torch.Tensor)

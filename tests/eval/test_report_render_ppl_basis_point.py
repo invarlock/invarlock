@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 
 
 def test_render_markdown_uses_point_basis_when_no_ratio_ci():
@@ -35,7 +35,7 @@ def test_render_markdown_uses_point_basis_when_no_ratio_ci():
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
     with patch(
-        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+        "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):
         cert = make_report(report, baseline)
     # Lower the auto target ratio to exercise the ratio_limit=min(...) path

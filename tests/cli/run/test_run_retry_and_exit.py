@@ -160,7 +160,7 @@ def stubbed_run_environment(monkeypatch, tmp_path):
     )
     # Tokenizer
     monkeypatch.setattr(
-        "invarlock.cli.commands.run.resolve_tokenizer",
+        "invarlock.cli.run_runtime.resolve_tokenizer",
         lambda *a, **k: (
             SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=10),
             "tokhash123",
@@ -232,7 +232,16 @@ output:
         json.dumps(
             {
                 "meta": {"tokenizer_hash": "tokhash123"},
-                "metrics": {"ppl_preview": 10.0, "ppl_final": 10.0},
+                "metrics": {
+                    "ppl_preview": 10.0,
+                    "ppl_final": 10.0,
+                    "primary_metric": {
+                        "name": "ppl_causal",
+                        "preview": 10.0,
+                        "final": 10.0,
+                        "ratio_vs_baseline": 1.0,
+                    },
+                },
                 "evaluation_windows": {
                     "preview": {"window_ids": [0], "input_ids": [[1, 2]]},
                     "final": {"window_ids": [1], "input_ids": [[3, 4]]},
@@ -309,7 +318,7 @@ output:
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.detect_model_profile",
+                "invarlock.cli.run_runtime.detect_model_profile",
                 lambda *a, **k: SimpleNamespace(
                     default_loss="ce",
                     invariants=[],
@@ -321,7 +330,7 @@ output:
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.resolve_tokenizer",
+                "invarlock.cli.run_runtime.resolve_tokenizer",
                 lambda *a, **k: (
                     SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=10),
                     "tokhash123",
@@ -383,6 +392,14 @@ def test_until_pass_retry_summary_printed(tmp_path: Path):
         json.dumps(
             {
                 "meta": {"tokenizer_hash": "tokhash123"},
+                "metrics": {
+                    "primary_metric": {
+                        "name": "ppl_causal",
+                        "preview": 1.0,
+                        "final": 1.0,
+                        "ratio_vs_baseline": 1.0,
+                    }
+                },
                 "evaluation_windows": {
                     "preview": {"window_ids": [0], "input_ids": [[1, 2]]},
                     "final": {"window_ids": [1], "input_ids": [[3, 4]]},
@@ -478,16 +495,10 @@ def test_until_pass_retry_summary_printed(tmp_path: Path):
         )
         stack.enter_context(
             patch(
-                "invarlock.reporting.report.save_report",
+                "invarlock.reporting.report_files.save_report",
                 lambda report, run_dir, formats, filename_prefix: {
                     "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
                 },
-            )
-        )
-        stack.enter_context(
-            patch(
-                "invarlock.cli.commands.run._print_retry_summary",
-                lambda console, rc: None,
             )
         )
         run_command(
@@ -600,7 +611,7 @@ def _stub_minimal_environment(monkeypatch, tmp_path: Path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.commands.run.detect_model_profile",
+        "invarlock.cli.run_runtime.detect_model_profile",
         lambda model_id=None, adapter=None: SimpleNamespace(
             default_loss="ce",
             invariants=[],
@@ -610,7 +621,7 @@ def _stub_minimal_environment(monkeypatch, tmp_path: Path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.commands.run.resolve_tokenizer",
+        "invarlock.cli.run_runtime.resolve_tokenizer",
         lambda *a, **k: (
             SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=10),
             "tokhash123",
@@ -633,15 +644,12 @@ def test_schema_invalid_returns_2(tmp_path: Path, monkeypatch):
 def test_parity_error_dev_exit_1(tmp_path: Path, monkeypatch):
     _stub_minimal_environment(monkeypatch, tmp_path)
     cfg = Path(_cfg(tmp_path))
-    from invarlock.cli.commands import run as runmod
+    from invarlock.cli import run_runtime as run_runtime_mod
 
     monkeypatch.setattr(
-        runmod, "InvarlockError", type("InvarlockError", (Exception,), {})
-    )
-    monkeypatch.setattr(
-        runmod,
+        run_runtime_mod,
         "detect_model_profile",
-        lambda *a, **k: (_ for _ in ()).throw(runmod.InvarlockError()),
+        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("parity boom")),
     )
     r = CliRunner().invoke(cli, ["run", "-c", str(cfg), "--profile", "dev"])
     assert r.exit_code == 1
@@ -650,15 +658,15 @@ def test_parity_error_dev_exit_1(tmp_path: Path, monkeypatch):
 def test_parity_error_ci_exit_3(tmp_path: Path, monkeypatch):
     _stub_minimal_environment(monkeypatch, tmp_path)
     cfg = Path(_cfg(tmp_path))
-    from invarlock.cli.commands import run as runmod
+    from invarlock.cli import run_runtime as run_runtime_mod
+    from invarlock.core.exceptions import InvarlockError as CoreInvarlockError
 
     monkeypatch.setattr(
-        runmod, "InvarlockError", type("InvarlockError", (Exception,), {})
-    )
-    monkeypatch.setattr(
-        runmod,
+        run_runtime_mod,
         "detect_model_profile",
-        lambda *a, **k: (_ for _ in ()).throw(runmod.InvarlockError()),
+        lambda *a, **k: (_ for _ in ()).throw(
+            CoreInvarlockError(code="E999", message="boom")
+        ),
     )
     r = CliRunner().invoke(cli, ["run", "-c", str(cfg), "--profile", "ci"])
     assert r.exit_code == 3

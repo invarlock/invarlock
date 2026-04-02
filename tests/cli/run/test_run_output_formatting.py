@@ -6,8 +6,9 @@ from types import SimpleNamespace
 
 import pytest
 
+from invarlock.cli import run_shell_output as run_output_mod
 from invarlock.cli.commands import evaluate as evaluate_mod
-from invarlock.cli.commands import run as run_mod
+from invarlock.cli.run_warning_filters import suppress_noisy_warnings
 
 
 def test_format_guard_chain_preserves_configured_order() -> None:
@@ -17,30 +18,32 @@ def test_format_guard_chain_preserves_configured_order() -> None:
         SimpleNamespace(name="invariants"),
     ]
     assert (
-        run_mod._format_guard_chain(guards)
+        run_output_mod._format_guard_chain(guards)
         == "invariants \u2192 spectral \u2192 invariants"
     )
 
 
 def test_device_resolution_note_variants() -> None:
-    assert run_mod._device_resolution_note("auto", "cpu") == "auto-resolved"
-    assert run_mod._device_resolution_note("cpu", "cpu") == "requested"
-    assert run_mod._device_resolution_note("cuda", "cuda:0") == "resolved from cuda"
+    assert run_output_mod._device_resolution_note("auto", "cpu") == "auto-resolved"
+    assert run_output_mod._device_resolution_note("cpu", "cpu") == "requested"
+    assert (
+        run_output_mod._device_resolution_note("cuda", "cuda:0") == "resolved from cuda"
+    )
 
 
 def test_format_kv_line_alignment() -> None:
-    assert run_mod._format_kv_line("Device", "cpu") == "  Device    : cpu"
+    assert run_output_mod._format_kv_line("Device", "cpu") == "  Device    : cpu"
 
 
 def test_suppress_noisy_warnings_env_override(monkeypatch) -> None:
     monkeypatch.setenv("INVARLOCK_SUPPRESS_WARNINGS", "1")
-    with run_mod._suppress_noisy_warnings("dev"):
+    with suppress_noisy_warnings("dev"):
         warnings.warn("noisy", UserWarning, stacklevel=2)
 
 
 def test_suppress_noisy_warnings_passthrough(monkeypatch) -> None:
     monkeypatch.delenv("INVARLOCK_SUPPRESS_WARNINGS", raising=False)
-    with run_mod._suppress_noisy_warnings("dev"):
+    with suppress_noisy_warnings("dev"):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             warnings.warn("noisy", UserWarning, stacklevel=2)
@@ -51,7 +54,7 @@ def test_suppress_noisy_warnings_dev_filters_known_messages(monkeypatch) -> None
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         with pytest.raises(UserWarning):
-            with run_mod._suppress_noisy_warnings("dev"):
+            with suppress_noisy_warnings("dev"):
                 warnings.warn(
                     "loss_type=None is unrecognized by this model",
                     UserWarning,
@@ -75,7 +78,7 @@ def test_suppress_noisy_warnings_release_suppresses_transformers_logs(
     logger.propagate = False
     logger.addHandler(handler)
     try:
-        with run_mod._suppress_noisy_warnings("release"):
+        with suppress_noisy_warnings("release"):
             logger.warning("loss_type=None is unrecognized by this model")
         handler.flush()
         assert stream.getvalue() == ""
@@ -89,7 +92,7 @@ def test_suppress_noisy_warnings_release_filters_stderr_output(
     monkeypatch, capsys
 ) -> None:
     monkeypatch.delenv("INVARLOCK_SUPPRESS_WARNINGS", raising=False)
-    with run_mod._suppress_noisy_warnings("release"):
+    with suppress_noisy_warnings("release"):
         print(
             "`loss_type=None` was set in the config but it is unrecognized. "
             "Using the default loss: `ForCausalLMLoss`.",

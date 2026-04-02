@@ -21,9 +21,10 @@ import typer
 import yaml
 from rich.console import Console
 
-from invarlock.core.config_execution import RuntimeDelegationError, run_from_config
+from invarlock.cli.config_execution import RuntimeDelegationError, run_from_config
 
 console = Console()
+_NUMERIC_COERCION_ERRORS = (OverflowError, TypeError, ValueError)
 
 calibrate_app = typer.Typer(
     name="calibrate",
@@ -94,7 +95,7 @@ def _run_calibration_config(
     allow_host_execution: bool,
     allow_third_party_plugins: bool,
     allow_remote_code: bool,
-) -> str | None:
+) -> Path:
     try:
         return run_from_config(
             config=str(config),
@@ -238,22 +239,6 @@ def null_sweep(
         help="Target run-level spectral warning rate under the null.",
     ),
 ) -> None:
-    try:
-        from typer.models import OptionInfo as _OptionInfo  # type: ignore
-    except Exception:  # pragma: no cover
-
-        class _OptionInfo:  # type: ignore
-            pass
-
-    if isinstance(allow_network, _OptionInfo):
-        allow_network = False
-    if isinstance(allow_host_execution, _OptionInfo):
-        allow_host_execution = False
-    if isinstance(allow_third_party_plugins, _OptionInfo):
-        allow_third_party_plugins = False
-    if isinstance(allow_remote_code, _OptionInfo):
-        allow_remote_code = False
-
     # Optional deps: calibration sweeps require torch/guards, but docs/tests may
     # import this module without heavy deps. Import lazily so CLI example
     # validation can parse `invarlock calibrate ...` without installing torch.
@@ -305,8 +290,6 @@ def null_sweep(
             allow_third_party_plugins=allow_third_party_plugins,
             allow_remote_code=allow_remote_code,
         )
-        if not isinstance(report_path, str):
-            continue
         report = json.loads(Path(report_path).read_text(encoding="utf-8"))
         reports_by_tier[spec.tier].append(report)
 
@@ -348,7 +331,7 @@ def null_sweep(
         caps_applied = metrics.get("caps_applied")
         try:
             caps_applied = int(caps_applied) if caps_applied is not None else 0
-        except Exception:
+        except _NUMERIC_COERCION_ERRORS:
             caps_applied = 0
         row: dict[str, Any] = {
             "tier": spec.tier,
@@ -364,12 +347,12 @@ def null_sweep(
             try:
                 if max_z is not None and not math.isnan(float(max_z)):
                     row[f"max_z_{fam}"] = float(max_z)
-            except Exception:
+            except _NUMERIC_COERCION_ERRORS:
                 continue
         for fam, count in candidate_counts.items():
             try:
                 row[f"candidate_{fam}"] = int(count)
-            except Exception:
+            except _NUMERIC_COERCION_ERRORS:
                 continue
         for fam, count in selected_by_family.items():
             row[f"selected_{fam}"] = int(count)
@@ -509,22 +492,6 @@ def ve_sweep(
         help="Safety margin applied to min_effect recommendations.",
     ),
 ) -> None:
-    try:
-        from typer.models import OptionInfo as _OptionInfo  # type: ignore
-    except Exception:  # pragma: no cover
-
-        class _OptionInfo:  # type: ignore
-            pass
-
-    if isinstance(allow_network, _OptionInfo):
-        allow_network = False
-    if isinstance(allow_host_execution, _OptionInfo):
-        allow_host_execution = False
-    if isinstance(allow_third_party_plugins, _OptionInfo):
-        allow_third_party_plugins = False
-    if isinstance(allow_remote_code, _OptionInfo):
-        allow_remote_code = False
-
     # Optional deps: see null_sweep() note.
     try:
         from invarlock.calibration.variance_ve import summarize_ve_sweep_reports
@@ -599,8 +566,6 @@ def ve_sweep(
             allow_third_party_plugins=allow_third_party_plugins,
             allow_remote_code=allow_remote_code,
         )
-        if not isinstance(report_path, str):
-            continue
         report = json.loads(Path(report_path).read_text(encoding="utf-8"))
         reports_by_tier[spec.tier].append(report)
         reports_by_tier_window[(spec.tier, win)].append(report)
@@ -623,7 +588,7 @@ def ve_sweep(
                 if isinstance(delta_ci, tuple | list) and len(delta_ci) == 2
                 else None
             )
-        except Exception:
+        except _NUMERIC_COERCION_ERRORS:
             ci_width = None
         run_rows.append(
             {
@@ -685,7 +650,7 @@ def ve_sweep(
             if isinstance(delta_ci, tuple | list) and len(delta_ci) == 2:
                 try:
                     widths.append(float(delta_ci[1]) - float(delta_ci[0]))
-                except Exception:
+                except _NUMERIC_COERCION_ERRORS:
                     continue
         power_curve.append(
             {

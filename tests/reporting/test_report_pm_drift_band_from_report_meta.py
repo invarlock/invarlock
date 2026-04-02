@@ -1,4 +1,4 @@
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 
 
 def _report_with_meta_pm_drift_band():
@@ -8,8 +8,8 @@ def _report_with_meta_pm_drift_band():
             "adapter": "hf_causal",
             "seed": 7,
             "device": "cpu",
-            "pm_drift_band": {"min": 0.9, "max": 1.3},
         },
+        "context": {"primary_metric": {"drift_band": {"min": 0.9, "max": 1.3}}},
         "data": {
             "dataset": "dummy",
             "split": "validation",
@@ -56,7 +56,7 @@ def _baseline():
     }
 
 
-def test_make_evaluation_report_uses_pm_drift_band_from_report_meta():
+def test_make_evaluation_report_uses_pm_drift_band_from_report_context():
     cert = make_report(_report_with_meta_pm_drift_band(), _baseline())
     assert cert["primary_metric"]["drift_band"] == {"min": 0.9, "max": 1.3}
     assert cert["validation"]["preview_final_drift_acceptable"] is True

@@ -68,7 +68,7 @@ def _common_ce():
             ),
         ),
         patch(
-            "invarlock.cli.commands.run.detect_model_profile",
+            "invarlock.cli.run_runtime.detect_model_profile",
             lambda model_id, adapter: SimpleNamespace(
                 default_loss="ce",
                 model_id=model_id,
@@ -80,14 +80,14 @@ def _common_ce():
             ),
         ),
         patch(
-            "invarlock.cli.commands.run.resolve_tokenizer",
+            "invarlock.cli.run_runtime.resolve_tokenizer",
             lambda profile: (
                 SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=1000),
                 "tokhash123",
             ),
         ),
         patch(
-            "invarlock.reporting.report.save_report",
+            "invarlock.reporting.report_files.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
             },
@@ -162,11 +162,14 @@ def test_edit_override_invalid_raises(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.config.resolve_edit_kind", lambda name: name)
+            patch(
+                "invarlock.cli.run_config._resolve_requested_edit_name",
+                lambda name: name,
+            )
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.config.apply_edit_override",
+                "invarlock.cli.run_config._apply_requested_edit_override",
                 side_effect=ValueError("bad edit"),
             )
         )
@@ -261,7 +264,7 @@ def test_unknown_guards_skipped_and_known_kept(tmp_path: Path):
             patch("invarlock.core.registry.get_registry", lambda: Reg())
         )
         stack.enter_context(
-            patch("invarlock.cli.config.load_config", lambda p: DummyCfg())
+            patch("invarlock.core.config_runtime.load_config", lambda p: DummyCfg())
         )
         stack.enter_context(
             patch(
@@ -303,7 +306,9 @@ def test_dataset_meta_stratification_scorer_profile(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: Provider())
         )
@@ -363,7 +368,9 @@ def test_metrics_window_plan_stats_map(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         stack.enter_context(
             patch(
                 "invarlock.core.runner.CoreRunner",
@@ -417,7 +424,9 @@ def test_metrics_window_plan_capacity_map(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         stack.enter_context(
             patch(
                 "invarlock.core.runner.CoreRunner",
@@ -468,7 +477,9 @@ def test_persist_ref_masks_artifact(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         stack.enter_context(
             patch(
                 "invarlock.core.runner.CoreRunner",
@@ -520,8 +531,8 @@ def test_overhead_bare_warning_present(tmp_path: Path):
         # Validator passes but we expect bare warning to be captured
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.commands.run.validate_guard_overhead",
-            "invarlock.cli.commands.run.validate_guard_overhead",
+            "invarlock.cli.run_runtime.validate_guard_overhead",
+            "invarlock.cli.run_runtime.validate_guard_overhead",
         ):
             stack.enter_context(
                 patch(
@@ -536,7 +547,9 @@ def test_overhead_bare_warning_present(tmp_path: Path):
                     ),
                 )
             )
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
             patch(
@@ -664,7 +677,7 @@ def test_plugin_provenance_counts_present(tmp_path: Path):
             patch("invarlock.core.registry.get_registry", lambda: Reg())
         )
         stack.enter_context(
-            patch("invarlock.cli.config.load_config", lambda p: DummyCfg())
+            patch("invarlock.core.config_runtime.load_config", lambda p: DummyCfg())
         )
         stack.enter_context(
             patch(
@@ -873,7 +886,9 @@ def test_metrics_optional_pairing_fields_passthrough(tmp_path: Path, key: str):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         stack.enter_context(
             patch(
                 "invarlock.core.runner.CoreRunner",
@@ -924,7 +939,9 @@ def test_edit_optional_fields_transfer(tmp_path: Path, opt_key: str):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         stack.enter_context(
             patch(
                 "invarlock.core.runner.CoreRunner",

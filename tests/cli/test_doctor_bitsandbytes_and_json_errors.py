@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 import builtins
-import io
 import json
 from types import SimpleNamespace
 
 import pytest
 import typer
-from rich.console import Console
 
 from invarlock.cli.commands import doctor as doctor_mod
+from invarlock.core.doctor_findings import build_cross_check_findings
 from tests.cli.test_doctor_preflight_and_cross_checks import (
     DummyConsole,
     _install_fake_torch,
@@ -106,21 +105,77 @@ def test_doctor_bitsandbytes_runtime_unavailable_with_cuda(
     assert any("runtime unavailable on this host" in line for line in lines)
 
 
-def test_cross_check_reports_ignore_missing_paths(tmp_path):
-    adds: list[tuple] = []
-    console = Console(file=io.StringIO())
-    result = doctor_mod._cross_check_reports(
+def test_cross_check_reports_report_missing_paths_as_errors(tmp_path):
+    findings, had_error = build_cross_check_findings(
         str(tmp_path / "missing_baseline.json"),
         str(tmp_path / "missing_subject.json"),
         cfg_metric_kind=None,
         strict=False,
         profile=None,
-        json_out=True,
-        console=console,
-        add_fn=lambda *args, **kwargs: adds.append((args, kwargs)),
     )
-    assert result is False
-    assert not adds
+    assert had_error is True
+    assert len(findings) == 2
+    assert all(finding.code == "D014" for finding in findings)
+
+
+def test_cross_check_reports_reject_invalid_json_inputs(tmp_path):
+    baseline = tmp_path / "baseline.json"
+    subject = tmp_path / "subject.json"
+    baseline.write_text("{not-json", encoding="utf-8")
+    subject.write_text(json.dumps({}), encoding="utf-8")
+
+    findings, had_error = build_cross_check_findings(
+        str(baseline),
+        str(subject),
+        cfg_metric_kind=None,
+        strict=False,
+        profile=None,
+    )
+
+    assert had_error is True
+    assert any(finding.code == "D014" for finding in findings)
+
+
+def test_cross_check_reports_accepts_canonical_directories(tmp_path):
+    baseline_dir = tmp_path / "baseline"
+    baseline_dir.mkdir()
+    subject_dir = tmp_path / "subject"
+    subject_dir.mkdir()
+    (baseline_dir / "report.json").write_text(json.dumps({}), encoding="utf-8")
+    (subject_dir / "evaluation.report.json").write_text(
+        json.dumps({}),
+        encoding="utf-8",
+    )
+
+    findings, had_error = build_cross_check_findings(
+        str(baseline_dir),
+        str(subject_dir),
+        cfg_metric_kind=None,
+        strict=False,
+        profile=None,
+    )
+
+    assert had_error is False
+    assert not findings
+
+
+def test_cross_check_reports_reject_noncanonical_directory_inputs(tmp_path):
+    baseline_dir = tmp_path / "baseline"
+    baseline_dir.mkdir()
+    subject = tmp_path / "subject.json"
+    subject.write_text(json.dumps({}), encoding="utf-8")
+    (baseline_dir / "my_report.json").write_text(json.dumps({}), encoding="utf-8")
+
+    findings, had_error = build_cross_check_findings(
+        str(baseline_dir),
+        str(subject),
+        cfg_metric_kind=None,
+        strict=False,
+        profile=None,
+    )
+
+    assert had_error is True
+    assert any(finding.code == "D014" for finding in findings)
 
 
 def test_doctor_json_mode_emits_findings(monkeypatch, capsys):

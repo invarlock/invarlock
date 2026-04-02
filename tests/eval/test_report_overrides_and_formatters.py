@@ -4,7 +4,7 @@ from invarlock.reporting.policy_utils import (
     _format_family_caps,
     _resolve_policy_tier,
 )
-from invarlock.reporting.report_builder import _prepare_guard_overhead_section
+from invarlock.reporting.report_overhead import prepare_guard_overhead_section
 
 
 def test_extract_policy_overrides_dedup_and_sources():
@@ -37,7 +37,7 @@ def test_resolve_policy_tier_from_context_auto_and_guard_overhead_ratio_compute(
 
     # Guard overhead: compute from bare/guarded
     raw = {"bare_ppl": 10.0, "guarded_ppl": 10.5, "overhead_threshold": 0.01}
-    payload, passed = _prepare_guard_overhead_section(raw)
+    payload, passed = prepare_guard_overhead_section(raw)
     assert (
         payload["evaluated"] is True
         and payload["overhead_ratio"] == 1.05

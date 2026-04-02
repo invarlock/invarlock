@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import json
-
-from invarlock.reporting.report import to_evaluation_report
+from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import RunReport, create_empty_report
 
 
@@ -23,19 +21,16 @@ def _mk_report() -> RunReport:
     return r
 
 
-def test_to_evaluation_report_accepts_baseline_v1() -> None:
+def test_make_report_accepts_baseline_v1() -> None:
     rp = _mk_report()
-    # Baseline v1
     base_v1 = {
         "schema_version": "baseline-v1",
         "meta": {"model_id": "m"},
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
     }
-    js1 = to_evaluation_report(rp, base_v1, format="json")
-    obj1 = json.loads(js1)
-    assert obj1.get("schema_version") == "v1"
+    cert = make_report(rp, base_v1)
+    assert cert.get("schema_version") == "v1"
 
-    # Unsupported baseline version; ensure rejection
     import pytest
 
     base_v2 = {
@@ -44,10 +39,10 @@ def test_to_evaluation_report_accepts_baseline_v1() -> None:
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
     }
     with pytest.raises(ValueError):
-        to_evaluation_report(rp, base_v2, format="json")
+        make_report(rp, base_v2)
 
 
-def test_to_evaluation_report_rejects_invalid_baseline() -> None:
+def test_make_report_rejects_invalid_baseline() -> None:
     rp = _mk_report()
     bad_base = {
         "schema_version": "baseline-v1",
@@ -58,4 +53,4 @@ def test_to_evaluation_report_rejects_invalid_baseline() -> None:
     import pytest
 
     with pytest.raises(ValueError):
-        to_evaluation_report(rp, bad_base, format="json")
+        make_report(rp, bad_base)

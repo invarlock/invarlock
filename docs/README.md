@@ -40,6 +40,17 @@ Security-default note: `evaluate` uses the runtime container by default. Use
 `--mode local` only for trusted local workflows that intentionally bypass that
 boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.
 
+Smoke asset note: `configs/presets/causal_lm/gpt2_smoke_128.yaml` ships the
+small GPT-2 canary preset used by `scripts/run_gpt2_smoke_campaign.sh` and the
+scheduled/workflow-dispatch GPT-2 smoke workflow. Push gating uses
+`scripts/run_tiny_attested_smoke.sh` and the `Tiny Attested Smoke` workflow
+with `sshleifer/tiny-gpt2` plus a local JSONL fixture. Both smoke paths run
+under the shipped `dev` profile so they can complete the full `evaluate` →
+`verify` → `report` → `proof-pack` path without depending on release-profile
+floors. The tiny push smoke also uses an explicit unattested-artifact override
+for proof-pack verification when CI produces an unsigned pack; the default
+package-native verifier behavior remains fail-closed for unsigned packs.
+
 ---
 
 ## Documentation Map
@@ -77,9 +88,9 @@ boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.
 - [Programmatic Quickstart](reference/programmatic-quickstart.md)
 - [Environment Variables](reference/env-vars.md)
 
-<!-- Runbooks removed in minimal public footprint -->
+<!-- Runbooks intentionally omitted from this public docs index. -->
 
-<!-- Design docs removed in minimal public footprint -->
+<!-- Design docs intentionally omitted from this public docs index. -->
 
 ### Assurance
 
@@ -107,7 +118,7 @@ local or CI runs (typically under `runs/null_sweeps/**` and
 `reports/calibration/**`) and are not committed to the repository. Attach them
 to change proposals or releases when you update calibration.
 
-<!-- Developer docs removed in minimal public footprint. See project root CHANGELOG.md. -->
+<!-- Developer docs intentionally omitted from this public docs index. See project root CHANGELOG.md. -->
 
 ### Security
 
@@ -132,6 +143,8 @@ to change proposals or releases when you update calibration.
 3. **Validate** – run `invarlock verify` and render HTML via `invarlock report html`;
    attested outputs include `runtime.manifest.json` next to
    `evaluation.report.json`.
+   Directory inputs to `invarlock report` are only accepted when they contain
+   canonical `report.json` or `evaluation.report.json`.
 4. **Iterate** – compare runs, adjust edit plans, and reissue reports until gates pass.
 
 The guard suite (invariants, spectral, variance, and RMT) keeps edits inside
@@ -149,7 +162,7 @@ configured acceptance envelopes even when aggressive compression is attempted.
   results, notebook stdout/stderr logs, and a machine-readable `summary.json`.
 - Placeholder/template snippets still need to stay parseable, but only concrete
   runnable examples should be treated as copy-paste-ready.
-- This verifier is currently local-only and is not enforced in GitHub Actions.
+- This verifier is local-only and is not enforced in GitHub Actions.
 
 ---
 
@@ -190,7 +203,7 @@ Notes
 | Qwen3.5 causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
 | Seq2Seq / local pairs | Yes | Yes | No | No |
 
-Published assurance basis currently covers GPT-2 and BERT profiles. Repo-shipped
+Published assurance basis covers GPT-2 and BERT profiles. Repo-shipped
 presets and pilot calibration configs for additional experimental families,
 including Mistral 7B, Qwen2 7B, Qwen2.5 14B, Qwen3, DeepSeek-R1-Distill-Qwen,
 Phi-4 text-only, TinyLlama 1.1B, OLMo 2, and Qwen3.5, do not become part of the published
@@ -288,7 +301,7 @@ output:
 
 ---
 
-<!-- Quick CPU Demos section removed in minimal public footprint -->
+<!-- Quick CPU demos are intentionally omitted from this public docs index. -->
 
 ```bash
 NET=1 INCLUDE_MEASURED_CLS=1 RUN=0 bash scripts/run_tiny_all_matrix.sh

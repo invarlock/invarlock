@@ -16,12 +16,14 @@ from .report_types import (
     RunReport,
 )
 
+_COERCE_EXCEPTIONS = (TypeError, ValueError)
+
 
 def _str(x: Any, default: str = "") -> str:
     try:
         s = str(x)
         return s if s is not None else default
-    except Exception:
+    except _COERCE_EXCEPTIONS:
         return default
 
 
@@ -42,7 +44,7 @@ def normalize_run_report(report: Mapping[str, Any] | RunReport) -> RunReport:
     ts = _str(meta_in.get("ts") or datetime.now().isoformat())
     try:
         seed_value = int(meta_in.get("seed", 42))
-    except Exception:
+    except _COERCE_EXCEPTIONS:
         seed_value = 42
     meta_dict: dict[str, Any] = {
         "model_id": _str(meta_in.get("model_id")),

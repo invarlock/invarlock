@@ -11,8 +11,6 @@ spec at runtime (dense FFN vs MoE vs GPT-2-like blocks) and exposes a stable
 
 from __future__ import annotations
 
-import os
-from types import SimpleNamespace
 from typing import Any
 
 import torch
@@ -28,11 +26,6 @@ from .hf_mixin import HFAdapterMixin
 TensorType = torch.Tensor
 ModuleType = nn.Module
 
-LIGHT_IMPORT = os.getenv("INVARLOCK_LIGHT_IMPORT", "").strip().lower() in {
-    "1",
-    "true",
-    "yes",
-}
 _ALLOW_DIRECT_SUBMODULE = False
 
 
@@ -40,11 +33,11 @@ def _first_item(seq: Any) -> Any | None:
     try:
         if hasattr(seq, "__len__") and len(seq) > 0:  # type: ignore[arg-type]
             return seq[0]  # type: ignore[index]
-    except Exception:
+    except (TypeError, IndexError, KeyError):
         pass
     try:
         return next(iter(seq))
-    except Exception:
+    except (TypeError, StopIteration):
         return None
 
 
@@ -324,10 +317,6 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
 
             return self._safe_to_device(model, device)
         except DependencyError:
-            if LIGHT_IMPORT:
-                stub = SimpleNamespace(name="hf_causal_stub")
-                stub.to = lambda *_a, **_k: stub  # type: ignore[attr-defined]
-                return stub
             raise
 
     def _unwrap(self, model: Any) -> tuple[Any, Any, Any]:
@@ -351,16 +340,26 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
             try:
                 if spec.matches(model, base, layers):
                     return spec
-            except Exception:
+            except (AttributeError, IndexError, KeyError, TypeError):
                 continue
-        return _DenseDecoderSpec()
+        raise AdapterError(
+            code="E202",
+            message="ADAPTER-STRUCTURE-INVALID: no matching HF causal adapter spec",
+            details={"model_class": model.__class__.__name__},
+        )
 
     def can_handle(self, model: ModuleType | Any) -> bool:
         try:
             base, layers, _cfg = self._unwrap(model)
-        except Exception:
+        except AdapterError:
             return False
-        return any(spec.matches(model, base, layers) for spec in _SPECS)
+        for spec in _SPECS:
+            try:
+                if spec.matches(model, base, layers):
+                    return True
+            except (AttributeError, IndexError, KeyError, TypeError):
+                continue
+        return False
 
     def describe(self, model: ModuleType | Any) -> dict[str, Any]:
         base, layers, config = self._unwrap(model)

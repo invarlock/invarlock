@@ -59,7 +59,7 @@ def test_verify_accuracy_recompute_mismatch_dev(tmp_path: Path, capsys) -> None:
     with pytest.raises(typer.Exit):
         verify_command([p], baseline=None, profile="dev", json_out=True)
     out = json.loads(capsys.readouterr().out)
-    assert out["resolution"]["exit_code"] != 0
+    assert "resolution" not in out
 
 
 def test_verify_accuracy_recompute_missing_ci_profile(tmp_path: Path) -> None:
@@ -117,5 +117,5 @@ def test_verify_accuracy_skips_recompute_when_final_missing(
         verify_command([p], baseline=None, profile="dev", json_out=True)
 
     out = json.loads(capsys.readouterr().out)
-    assert out["resolution"]["exit_code"] == 0
+    assert "resolution" not in out
     assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 0

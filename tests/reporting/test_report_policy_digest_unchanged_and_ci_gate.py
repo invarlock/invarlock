@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_builder import _compute_validation_flags, make_report
+from invarlock.reporting.report_make import make_report
+from invarlock.reporting.report_validation import compute_validation_flags
 
 
 def _mk_pm_report(*, ratio: float, pm_final: float = 10.0) -> dict:
@@ -66,7 +67,7 @@ def test_ci_upper_bound_gating_from_ratio_ci() -> None:
     }
     # Minimal tokens to satisfy sample-size floors
     ppl_metrics = {"preview_total_tokens": 1000, "final_total_tokens": 1000}
-    flags = _compute_validation_flags(
+    flags = compute_validation_flags(
         ppl=ppl,
         spectral={},
         rmt={},

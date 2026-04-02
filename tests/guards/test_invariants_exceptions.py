@@ -46,8 +46,12 @@ def test_param_count_exception_path_sets_sentinel():
     m = ModelBadParams()
     prep = guard.prepare(m, adapter=None, calib=None, policy={})
     assert prep["ready"] is True
-    # Parameter count should be sentinel -1 when exception encountered
-    assert guard.baseline_checks.get("parameter_count") == -1
+    # Parameter count now records an explicit evidence gap instead of a sentinel.
+    assert guard.baseline_checks.get("parameter_count") is None
+    assert {
+        "check": "parameter_count",
+        "reason": "RuntimeError",
+    } in guard.baseline_checks.get("evidence_gaps", ())
 
 
 def test_named_modules_exception_yields_empty_layer_norm_paths():

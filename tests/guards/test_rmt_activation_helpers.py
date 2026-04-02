@@ -39,6 +39,18 @@ class DenseOnlyModel(nn.Module):
         self.dense = nn.Linear(2, 2, bias=False)
 
 
+class ParameterlessActivationModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.norm = nn.LayerNorm(4, elementwise_affine=False)
+
+    def forward(self, input_ids):
+        x = input_ids.float()
+        if x.dim() == 1:
+            x = x.unsqueeze(0)
+        return self.norm(x)
+
+
 def test_rmt_context_and_family_counts():
     guard = RMTGuard()
     report = SimpleNamespace(context={"profile": "ci", "auto": {"tier": "balanced"}})
@@ -168,6 +180,21 @@ def test_rmt_compute_activation_outliers_branches():
     guard.margin = 1e6
     out = guard._compute_activation_outliers(model, batches)
     assert out and out["outlier_count"] >= 0
+
+
+def test_rmt_activation_helpers_restore_state_for_parameterless_models():
+    guard = RMTGuard()
+    model = ParameterlessActivationModel()
+    model.train()
+    batches = [{"input_ids": [1, 2, 3, 4]}]
+
+    assert guard._compute_activation_edge_risk(model, batches) is None
+    assert model.training is True
+    assert len(model.norm._forward_hooks) == 0
+
+    assert guard._compute_activation_outliers(model, batches) is None
+    assert model.training is True
+    assert len(model.norm._forward_hooks) == 0
 
 
 def test_rmt_after_edit_activation_required_missing():

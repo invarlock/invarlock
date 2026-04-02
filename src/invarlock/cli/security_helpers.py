@@ -1,25 +1,65 @@
 from __future__ import annotations
 
-import json
-import shutil
-import subprocess
+import os
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from functools import wraps
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import typer
 
+from invarlock.runtime_attestation import (
+    configure_runtime_security as _configure_runtime_security_core,
+)
+from invarlock.runtime_attestation import (
+    verify_runtime_attestation as _verify_runtime_attestation_core,
+)
 from invarlock.runtime_security import (
-    apply_runtime_allowances,
-    delegate_current_process_to_container,
-    host_execution_allowed,
-    load_runtime_manifest,
+    ALLOW_HOST_EXECUTION_ENV,
+    ALLOW_NETWORK_ENV,
+    ALLOW_REMOTE_CODE_ENV,
+    ALLOW_THIRD_PARTY_PLUGINS_ENV,
+    ALLOW_UNATTESTED_ARTIFACTS_ENV,
+    RuntimeManifestExecution,
+    RuntimeSecurityPolicy,
+    build_runtime_security_policy,
+    current_runtime_security_policy,
+    delegate_container_command,
     running_inside_container,
-    runtime_verifier_binary,
-    unattested_artifacts_allowed,
     write_runtime_manifest,
 )
 
 
+def _env_truthy(name: str) -> bool:
+    value = os.environ.get(name, "")
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def resolve_shell_runtime_security_policy(
+    *,
+    allow_network: bool = False,
+    allow_host_execution: bool = False,
+    allow_third_party_plugins: bool = False,
+    allow_remote_code: bool = False,
+    allow_unattested_artifacts: bool = False,
+) -> RuntimeSecurityPolicy:
+    policy = current_runtime_security_policy()
+    if policy is not None:
+        return policy
+    return build_runtime_security_policy(
+        allow_network=allow_network or _env_truthy(ALLOW_NETWORK_ENV),
+        allow_host_execution=allow_host_execution
+        or _env_truthy(ALLOW_HOST_EXECUTION_ENV),
+        allow_third_party_plugins=allow_third_party_plugins
+        or _env_truthy(ALLOW_THIRD_PARTY_PLUGINS_ENV),
+        allow_remote_code=allow_remote_code or _env_truthy(ALLOW_REMOTE_CODE_ENV),
+        allow_unattested_artifacts=allow_unattested_artifacts
+        or _env_truthy(ALLOW_UNATTESTED_ARTIFACTS_ENV),
+    )
+
+
+@contextmanager
 def configure_runtime_security(
     *,
     allow_network: bool = False,
@@ -27,21 +67,59 @@ def configure_runtime_security(
     allow_third_party_plugins: bool = False,
     allow_remote_code: bool = False,
     allow_unattested_artifacts: bool = False,
-) -> None:
-    apply_runtime_allowances(
+) -> Iterator[None]:
+    policy = resolve_shell_runtime_security_policy(
         allow_network=allow_network,
         allow_host_execution=allow_host_execution,
         allow_third_party_plugins=allow_third_party_plugins,
         allow_remote_code=allow_remote_code,
         allow_unattested_artifacts=allow_unattested_artifacts,
     )
+    with _configure_runtime_security_core(
+        allow_network=policy.allow_network,
+        allow_host_execution=policy.allow_host_execution,
+        allow_third_party_plugins=policy.allow_third_party_plugins,
+        allow_remote_code=policy.allow_remote_code,
+        allow_unattested_artifacts=policy.allow_unattested_artifacts,
+    ):
+        yield
+
+
+def runtime_security_scoped[F: Callable[..., Any]](func: F) -> F:
+    @wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        mode = str(kwargs.get("mode", "") or "").strip().lower()
+        with configure_runtime_security(
+            allow_network=bool(kwargs.get("allow_network", False)),
+            allow_host_execution=bool(kwargs.get("allow_host_execution", False))
+            or mode == "local",
+            allow_third_party_plugins=bool(
+                kwargs.get("allow_third_party_plugins", False)
+            ),
+            allow_remote_code=bool(kwargs.get("allow_remote_code", False)),
+            allow_unattested_artifacts=bool(
+                kwargs.get("allow_unattested_artifacts", False)
+            ),
+        ):
+            return func(*args, **kwargs)
+
+    return cast("F", wrapper)
+
+
+def build_current_process_container_launch_plan(argv: list[str] | None = None):
+    from invarlock.cli.runtime_launch_plan import (
+        build_current_process_container_launch_plan as _impl,
+    )
+
+    return _impl(argv)
 
 
 def maybe_delegate_model_command() -> None:
-    if running_inside_container() or host_execution_allowed():
+    policy = resolve_shell_runtime_security_policy()
+    if running_inside_container() or policy.allow_host_execution:
         return
     try:
-        code = delegate_current_process_to_container()
+        code = delegate_container_command(build_current_process_container_launch_plan())
     except RuntimeError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(1) from exc
@@ -54,6 +132,7 @@ def emit_runtime_manifest(
     config_path: str | Path | None = None,
     config_payload: Any | None = None,
     extra: dict[str, Any] | None = None,
+    execution: RuntimeManifestExecution | None = None,
 ) -> Path | None:
     if not report_path:
         return None
@@ -65,6 +144,7 @@ def emit_runtime_manifest(
         config_path=config_path,
         config_payload=config_payload,
         extra=extra,
+        execution=execution,
     )
 
 
@@ -73,54 +153,7 @@ def verify_runtime_attestation(
     *,
     allow_unattested: bool = False,
 ) -> list[str]:
-    if allow_unattested or unattested_artifacts_allowed():
-        return []
-
-    report = Path(report_path)
-    manifest_path, manifest = load_runtime_manifest(report)
-    if manifest is None:
-        return [
-            f"{manifest_path.name} missing or unreadable for {report.name}; "
-            "pass --allow-unattested-artifacts to override."
-        ]
-
-    if manifest.get("execution_mode") != "container":
-        return [
-            f"{manifest_path.name} marks {report.name} as "
-            f"{manifest.get('execution_mode')!r}; pass "
-            "--allow-unattested-artifacts to override."
-        ]
-
-    binary = runtime_verifier_binary()
-    if shutil.which(binary) is None:
-        return [
-            f"Runtime verifier '{binary}' is not installed; cannot verify {report.name}."
-        ]
-
-    completed = subprocess.run(
-        [
-            binary,
-            "--report",
-            str(report),
-            "--manifest",
-            str(manifest_path),
-            "--json",
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
+    return _verify_runtime_attestation_core(
+        report_path,
+        allow_unattested=allow_unattested,
     )
-    if completed.returncode == 0:
-        return []
-
-    message = (completed.stdout or completed.stderr or "").strip()
-    if message:
-        try:
-            payload = json.loads(message)
-        except Exception:
-            pass
-        else:
-            errors = payload.get("errors")
-            if isinstance(errors, list) and errors:
-                return [str(item) for item in errors]
-    return [message or f"Runtime verifier failed for {report.name}."]

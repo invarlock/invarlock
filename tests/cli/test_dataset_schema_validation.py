@@ -52,7 +52,7 @@ output:
         ),
         patch("invarlock.eval.data.get_provider", return_value=_Provider()),
         patch(
-            "invarlock.cli.commands.run._resolve_metric_and_provider",
+            "invarlock.cli.run_pairing.resolve_metric_and_provider",
             return_value=("ppl_causal", "local_jsonl", {}),
         ),
     ):

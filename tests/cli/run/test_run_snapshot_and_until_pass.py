@@ -54,13 +54,13 @@ def _common_ce():
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report.save_report",
+            "invarlock.reporting.report_files.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
             },
         ),
         patch(
-            "invarlock.cli.commands.run.resolve_tokenizer",
+            "invarlock.cli.run_runtime.resolve_tokenizer",
             lambda profile: (
                 SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
                 "tokhash123",
@@ -164,13 +164,13 @@ def test_snapshot_auto_chunked_selected_when_large_and_disk_ok(
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.psutil.virtual_memory",
+                "invarlock.cli.run_runtime.psutil.virtual_memory",
                 lambda: _psutil_vm(available_mb=512),
             )
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.shutil.disk_usage",
+                "invarlock.cli.run_runtime_exec.shutil.disk_usage",
                 lambda path: _disk_usage(free_mb=2048),
             )
         )
@@ -236,7 +236,9 @@ def test_snapshot_cfg_mode_overrides_env(tmp_path: Path, monkeypatch):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         monkeypatch.setenv("INVARLOCK_SNAPSHOT_MODE", "chunked")  # env says chunked
-        stack.enter_context(patch("invarlock.cli.config.load_config", load_cfg))
+        stack.enter_context(
+            patch("invarlock.core.config_runtime.load_config", load_cfg)
+        )
         stack.enter_context(
             patch(
                 "invarlock.core.registry.get_registry",
@@ -359,16 +361,16 @@ def test_until_pass_materialize_sets_flags_and_retries_once(
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.commands.run.detect_model_profile", detect_profile)
+            patch("invarlock.cli.run_runtime.detect_model_profile", detect_profile)
         )
         stack.enter_context(patch("invarlock.core.retry.RetryController", RC))
         stack.enter_context(
-            patch("invarlock.reporting.report_builder.make_report", make_cert)
+            patch("invarlock.reporting.report_make.make_report", make_cert)
         )
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.commands.run.validate_guard_overhead",
-            "invarlock.cli.commands.run.validate_guard_overhead",
+            "invarlock.cli.run_runtime.validate_guard_overhead",
+            "invarlock.cli.run_runtime.validate_guard_overhead",
         ):
             stack.enter_context(
                 patch(
@@ -532,13 +534,13 @@ def test_snapshot_auto_bytes_when_small_model(tmp_path: Path, monkeypatch):
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.psutil.virtual_memory",
+                "invarlock.cli.run_runtime.psutil.virtual_memory",
                 lambda: _psutil_vm(available_mb=8192),
             )
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.shutil.disk_usage",
+                "invarlock.cli.run_runtime_exec.shutil.disk_usage",
                 lambda path: _disk_usage(free_mb=0),
             )
         )
@@ -599,13 +601,13 @@ def test_snapshot_no_support_uses_reload(tmp_path: Path, monkeypatch):
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.psutil.virtual_memory",
+                "invarlock.cli.run_runtime.psutil.virtual_memory",
                 lambda: _psutil_vm(available_mb=0),
             )
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.shutil.disk_usage",
+                "invarlock.cli.run_runtime_exec.shutil.disk_usage",
                 lambda path: _disk_usage(free_mb=0),
             )
         )

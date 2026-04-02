@@ -58,7 +58,13 @@ def test_resource_manager_mps_path(monkeypatch):
             return False
 
     with monkeypatch.context() as m:
-        m.setattr("invarlock.eval.metrics.torch.backends.mps", FakeMPS(), raising=False)
-        m.setattr("invarlock.eval.metrics.torch.cuda", FakeCUDA(), raising=False)
+        m.setattr(
+            "invarlock.eval.metrics_support.torch.backends.mps",
+            FakeMPS(),
+            raising=False,
+        )
+        m.setattr(
+            "invarlock.eval.metrics_support.torch.cuda", FakeCUDA(), raising=False
+        )
         rm = ResourceManager(MetricsConfig())
         assert str(rm.device) == "mps"

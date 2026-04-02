@@ -19,8 +19,7 @@ def test_run_command_reports_migration(monkeypatch):
     res = runner.invoke(app, ["run"])
     assert res.exit_code == 2, res.output
     out = strip_ansi(res.output)
-    assert "no longer a top-level command" in out
-    assert "invarlock evaluate" in out
+    assert "No such command 'run'" in out
 
 
 def test_evaluate_help_exposes_baseline_and_subject(monkeypatch):
@@ -29,8 +28,8 @@ def test_evaluate_help_exposes_baseline_and_subject(monkeypatch):
     res = runner.invoke(app, ["evaluate", "--help"])
     assert res.exit_code == 0, res.output
     out = strip_ansi(res.stdout)
-    assert "--baseline" in out or "--source" in out
-    assert "--subject" in out or "--edited" in out
+    assert "--baseline" in out or "--baseline" in out
+    assert "--subject" in out or "--subject" in out
     assert "--preset" in out
 
 
@@ -43,6 +42,8 @@ def test_doctor_help_is_typed(monkeypatch):
     assert "ARGS KWARGS" not in out
     # Provide a config option
     assert "--config" in out
+    assert "report.json" in out
+    assert "evaluation.report.json" in out
 
 
 def test_groups_help_list_subcommands(monkeypatch):
@@ -58,6 +59,16 @@ def test_groups_help_list_subcommands(monkeypatch):
         out = strip_ansi(res.stdout)
         for token in expected:
             assert token in out
+
+
+def test_proof_pack_build_help_mentions_explicit_report_files(monkeypatch):
+    app = _load_app(monkeypatch)
+    runner = CliRunner()
+    res = runner.invoke(app, ["advanced", "proof-pack", "build", "--help"])
+    assert res.exit_code == 0, res.output
+    out = strip_ansi(res.stdout)
+    assert "evaluation.report.json" in out
+    assert "runtime.manifest.json" in out
 
 
 def test_plugin_management_subcommands_are_removed(monkeypatch):

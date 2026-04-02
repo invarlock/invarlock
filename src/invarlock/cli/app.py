@@ -37,7 +37,7 @@ LIGHT_IMPORT = os.getenv("INVARLOCK_LIGHT_IMPORT", "").strip().lower() in {
 
 # Deterministic help ordering
 class OrderedGroup(TyperGroup):
-    def list_commands(self, ctx):  # type: ignore[override]
+    def list_commands(self, ctx: click.Context) -> list[str]:
         return [
             "evaluate",
             "report",
@@ -47,13 +47,10 @@ class OrderedGroup(TyperGroup):
             "version",
         ]
 
-    def get_command(self, ctx, cmd_name):  # type: ignore[override]
+    def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
         command = super().get_command(ctx, cmd_name)
         if command is not None:
             return command
-        removed = _removed_top_level_command(cmd_name)
-        if removed is not None:
-            return removed
         if _load_lazy_subapp(self, cmd_name):
             return super().get_command(ctx, cmd_name)
         return None
@@ -94,7 +91,7 @@ def _emit_version() -> None:
 
         schema = None
         try:
-            from invarlock.reporting.report_builder import (
+            from invarlock.reporting.report_schema import (
                 REPORT_SCHEMA_VERSION as _SCHEMA,
             )
 
@@ -141,37 +138,6 @@ def version():
     _emit_version()
 
 
-_REMOVED_TOP_LEVEL_COMMAND_HINTS = {
-    "run": "Use `invarlock evaluate --baseline <MODEL> --subject <MODEL>` for the core workflow.",
-    "proof-pack": "Use `invarlock advanced proof-pack ...` for proof-pack tooling.",
-    "policy": "Use `invarlock advanced policy ...` for policy-pack tooling.",
-    "plugins": "Use `invarlock advanced plugins ...` for plugin inspection.",
-    "calibrate": "Use `invarlock advanced calibrate ...` for calibration workflows.",
-}
-
-
-def _removed_top_level_command(name: str) -> click.Command | None:
-    hint = _REMOVED_TOP_LEVEL_COMMAND_HINTS.get(name)
-    if hint is None:
-        return None
-
-    def _removed_command(args: tuple[str, ...]) -> None:
-        click.echo(
-            f"`{name}` is no longer a top-level command. {hint}",
-            err=True,
-        )
-        raise click.exceptions.Exit(2)
-
-    return click.Command(
-        name=name,
-        callback=_removed_command,
-        hidden=True,
-        add_help_option=False,
-        params=[click.Argument(["args"], nargs=-1, type=click.UNPROCESSED)],
-        context_settings={"ignore_unknown_options": True, "allow_extra_args": True},
-    )
-
-
 """Register command modules and groups in the desired help order.
 
 Order: evaluate → report → verify → doctor → advanced → version
@@ -186,17 +152,15 @@ Order: evaluate → report → verify → doctor → advanced → version
     ),
 )
 def _evaluate_lazy(
-    source: str = typer.Option(
-        ..., "--source", "--baseline", help="Baseline model dir or Hub ID"
+    baseline: str = typer.Option(
+        ..., "--baseline", help="Baseline model dir or Hub ID"
     ),
-    edited: str = typer.Option(
-        ..., "--edited", "--subject", help="Subject model dir or Hub ID"
-    ),
+    subject: str = typer.Option(..., "--subject", help="Subject model dir or Hub ID"),
     baseline_report: str | None = typer.Option(
         None,
         "--baseline-report",
         help=(
-            "Reuse an existing baseline run report.json (skips baseline evaluation). "
+            "Reuse an existing baseline run report.json file (explicit path; skips baseline evaluation). "
             "Must include stored evaluation windows (e.g., set INVARLOCK_STORE_EVAL_WINDOWS=1)."
         ),
     ),
@@ -263,8 +227,8 @@ def _evaluate_lazy(
     from .commands.evaluate import evaluate_command as _eval
 
     return _eval(
-        source=source,
-        edited=edited,
+        baseline=baseline,
+        subject=subject,
         baseline_report=baseline_report,
         adapter=adapter,
         device=device,
@@ -290,9 +254,7 @@ def _evaluate_lazy(
 def _register_subapps() -> None:
     # Keep single-command registration light; group-style subapps are loaded on
     # demand by OrderedGroup.get_command().
-    from .commands.doctor import doctor_command as _doctor_cmd
-
-    app.command(name="doctor")(_doctor_cmd)
+    pass
 
 
 def _load_lazy_subapp(group: TyperGroup, name: str) -> bool:
@@ -311,6 +273,57 @@ def _load_lazy_subapp(group: TyperGroup, name: str) -> bool:
 
         return _register_lazy(name, _advanced_app)
     return False
+
+
+@app.command(
+    name="doctor",
+    help=(
+        "Inspect runtime health, optional dependencies, datasets, and explicit report inputs. "
+        "Optional report paths must be explicit report.json or evaluation.report.json files."
+    ),
+)
+def _doctor_typed(
+    config: str | None = typer.Option(
+        None, "--config", help="Optional config file to validate and inspect."
+    ),
+    profile: str | None = typer.Option(
+        None, "--profile", help="Optional execution profile to validate."
+    ),
+    baseline: str | None = typer.Option(
+        None, "--baseline", help="Optional baseline model path or id for quick checks."
+    ),
+    json_out: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+    tier: str | None = typer.Option(
+        None, "--tier", help="Optional tier context for config validation."
+    ),
+    baseline_report: str | None = typer.Option(
+        None,
+        "--baseline-report",
+        help="Explicit baseline report.json or evaluation.report.json path for cross-checks.",
+    ),
+    subject_report: str | None = typer.Option(
+        None,
+        "--subject-report",
+        help="Explicit subject report.json or evaluation.report.json path for cross-checks.",
+    ),
+    strict: bool = typer.Option(
+        False,
+        "--strict",
+        help="Return a non-zero exit code on warnings as well as errors.",
+    ),
+):
+    from .commands.doctor import doctor_command as _doctor
+
+    return _doctor(
+        config=config,
+        profile=profile,
+        baseline=baseline,
+        json_out=json_out,
+        tier=tier,
+        baseline_report=baseline_report,
+        subject_report=subject_report,
+        strict=strict,
+    )
 
 
 @app.command(

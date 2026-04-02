@@ -6,6 +6,15 @@ from typing import Any
 
 from .utils import _coerce_interval, _weighted_mean
 
+_NON_FATAL_EXCEPTIONS = (
+    AttributeError,
+    KeyError,
+    OverflowError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 def attach_primary_metric(
     evaluation_report: dict[str, Any],
@@ -16,7 +25,7 @@ def attach_primary_metric(
 ) -> None:
     """Attach/normalize the primary_metric block on the evaluation report.
 
-    Behavior mirrors historical logic in report_builder.py and preserves structure:
+    Behavior matches the canonical evaluation-report assembly contract and preserves structure:
     - Prefer explicit metrics.primary_metric if present
     - Compute missing ratio_vs_baseline, degenerate display_ci
     - ppl window-based analysis info (mean logloss) added when available
@@ -70,12 +79,12 @@ def attach_primary_metric(
                     ppl_analysis.get("unstable")
                 ):
                     pm_copy.setdefault("unstable", True)
-            except Exception:
+            except _NON_FATAL_EXCEPTIONS:
                 pass
             # Attach analysis-basis numbers for ppl from evaluation windows
             try:
                 kind = str(pm_copy.get("kind", "")).lower()
-            except Exception:
+            except _NON_FATAL_EXCEPTIONS:
                 kind = ""
             if kind.startswith("ppl"):
                 try:
@@ -136,9 +145,9 @@ def attach_primary_metric(
                                 lo, hi = float(lo_raw), float(hi_raw)
                                 if math.isfinite(lo) and math.isfinite(hi):
                                     pm_copy.setdefault("ci", (lo, hi))
-                    except Exception:
+                    except _NON_FATAL_EXCEPTIONS:
                         pass
-                except Exception:
+                except _NON_FATAL_EXCEPTIONS:
                     pass
             # Ensure ratio_vs_baseline present and consistent
             try:
@@ -158,7 +167,7 @@ def attach_primary_metric(
                 # Ensure display_ci aligns with log-space CI for ppl-like metrics
                 try:
                     kind = str(pm_copy.get("kind", "")).lower()
-                except Exception:
+                except _NON_FATAL_EXCEPTIONS:
                     kind = ""
                 ci = pm_copy.get("ci")
                 if (
@@ -170,7 +179,7 @@ def attach_primary_metric(
                         lo, hi = float(ci[0]), float(ci[1])
                         if math.isfinite(lo) and math.isfinite(hi):
                             pm_copy["display_ci"] = [math.exp(lo), math.exp(hi)]
-                    except Exception:
+                    except _NON_FATAL_EXCEPTIONS:
                         pass
                 # Provide a degenerate display CI if missing
                 if not isinstance(
@@ -180,43 +189,39 @@ def attach_primary_metric(
                         float(pm_copy["final"]),
                         float(pm_copy["final"]),
                     ]
-            except Exception:
+            except _NON_FATAL_EXCEPTIONS:
                 pass
             evaluation_report["primary_metric"] = pm_copy
-    except Exception:
+    except _NON_FATAL_EXCEPTIONS:
         pass
 
     def _attach_from_windows() -> None:
         if isinstance(evaluation_report.get("primary_metric"), dict):
             return
-        try:
-            m = (
-                report.get("metrics", {})
-                if isinstance(report.get("metrics"), dict)
-                else {}
-            )
-            loss_type = (
-                (m.get("loss_type") or "").lower() if isinstance(m, dict) else ""
-            )
-            if loss_type == "mlm":
-                kind_hint = "ppl_mlm"
-            elif loss_type in {"seq2seq", "s2s", "t5"}:
-                kind_hint = "ppl_seq2seq"
-            else:
-                kind_hint = "ppl_causal"
-            from invarlock.eval.primary_metric import (
-                compute_primary_metric_from_report as _pm,
-            )
+        m = report.get("metrics", {}) if isinstance(report.get("metrics"), dict) else {}
+        loss_type = (m.get("loss_type") or "").lower() if isinstance(m, dict) else ""
+        if loss_type == "mlm":
+            kind_hint = "ppl_mlm"
+        elif loss_type in {"seq2seq", "s2s", "t5"}:
+            kind_hint = "ppl_seq2seq"
+        else:
+            kind_hint = "ppl_causal"
+        from invarlock.eval.primary_metric import (
+            compute_primary_metric_from_report as _pm,
+        )
 
-            pm_block = _pm(
-                report,
-                kind=kind_hint,
-                baseline=baseline_raw if isinstance(baseline_raw, dict) else None,
-            )
+        for _attempt in range(2):
+            try:
+                pm_block = _pm(
+                    report,
+                    kind=kind_hint,
+                    baseline=baseline_raw if isinstance(baseline_raw, dict) else None,
+                )
+            except _NON_FATAL_EXCEPTIONS:
+                continue
             if isinstance(pm_block, dict) and pm_block:
                 evaluation_report["primary_metric"] = pm_block
-        except Exception:
-            pass
+                return
 
     # First attempt to synthesize PM from evaluation windows before falling back
     _attach_from_windows()
@@ -249,7 +254,7 @@ def attach_primary_metric(
                             and float(den) > 0
                         ):
                             pm_point = float(num) / float(den)
-                except Exception:
+                except _NON_FATAL_EXCEPTIONS:
                     pm_point = None
                 acc_pm: dict[str, Any] = {
                     "kind": pm_kind,
@@ -298,10 +303,10 @@ def attach_primary_metric(
                     if isinstance(acc_run, float) and isinstance(acc_base, float):
                         delta_pp = (acc_run - acc_base) * 100.0
                         acc_pm["ratio_vs_baseline"] = delta_pp
-                except Exception:
+                except _NON_FATAL_EXCEPTIONS:
                     pass
                 evaluation_report["primary_metric"] = acc_pm
-        except Exception:
+        except _NON_FATAL_EXCEPTIONS:
             pass
 
     # Retry attaching from windows if classification fallback did not populate PM
@@ -334,5 +339,5 @@ def attach_primary_metric(
                     pm["display_ci"] = [1.0, 1.0]
                     pm.setdefault("estimated", True)
 
-    except Exception:
+    except _NON_FATAL_EXCEPTIONS:
         pass

@@ -3,14 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from invarlock.reporting.report import (
-    save_report,
-    to_evaluation_report,
-    to_html,
-    to_json,
-    to_markdown,
-)
+from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.report_bundle import save_evaluation_bundle
+from invarlock.reporting.report_files import save_report
+from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import RunReport
+from invarlock.reporting.run_report_formatters import to_html, to_json, to_markdown
 
 
 def make_min_report() -> RunReport:
@@ -81,28 +79,31 @@ def test_to_json_markdown_html_variants(tmp_path: Path) -> None:
     assert "<style" not in html2
 
 
-def test_to_evaluation_report_and_save_report(tmp_path: Path, monkeypatch) -> None:
+def test_make_report_and_save_report(tmp_path: Path, monkeypatch) -> None:
     report = make_min_report()
     base = make_baseline()
 
-    # to_evaluation_report supports json and markdown
-    report_json = to_evaluation_report(report, base, format="json")
+    cert = make_report(report, base)
+    report_json = json.dumps(cert, indent=2, ensure_ascii=False)
     assert json.loads(report_json)["schema_version"]
-    report_md = to_evaluation_report(report, base, format="markdown")
+    report_md = render_report_markdown(cert)
     assert "Evaluation Report" in report_md
 
     # save_report without baseline for report should error
     out = tmp_path / "out"
     import pytest
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="save_evaluation_bundle"):
         save_report(report, out, formats=["report"])  # type: ignore[arg-type]
 
     # Enable evidence emission
     monkeypatch.setenv("INVARLOCK_EVIDENCE_DEBUG", "1")
-    save_report(
-        report, out, formats=["json", "markdown", "html", "report"], baseline=base
-    )  # type: ignore[arg-type]
+    save_report(report, out, formats=["json", "markdown", "html"])  # type: ignore[arg-type]
+    save_evaluation_bundle(
+        run_report=report,
+        output_dir=out,
+        evaluation_report=make_report(report, base),
+    )
     # Basic outputs exist
     assert (out / "report.json").exists()
     assert (out / "report.md").exists()

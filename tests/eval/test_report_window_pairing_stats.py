@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 
 
 def test_ppl_stats_window_pairing_fields_passthrough():
@@ -40,7 +40,7 @@ def test_ppl_stats_window_pairing_fields_passthrough():
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
     with patch(
-        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+        "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):
         cert = make_report(report, baseline)
     stats = cert.get("dataset", {}).get("windows", {}).get("stats", {})

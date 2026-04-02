@@ -3,10 +3,11 @@ from __future__ import annotations
 import pytest
 
 import invarlock.eval.data as data_mod
+import invarlock.eval.data_support as data_support_mod
 
 
 def test_hf_text_provider_windows_raises_when_empty(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
 
     class _DS:
         def __iter__(self):
@@ -14,7 +15,7 @@ def test_hf_text_provider_windows_raises_when_empty(monkeypatch):
             for _ in range(3):
                 yield {"not_text": ""}
 
-    monkeypatch.setattr(data_mod, "load_dataset", lambda *a, **k: _DS())  # type: ignore[no-untyped-def]
+    monkeypatch.setattr(data_support_mod, "load_dataset", lambda *a, **k: _DS())  # type: ignore[no-untyped-def]
     p = data_mod.HFTextProvider(
         dataset_name="stub", config_name=None, text_field="text", max_samples=10
     )

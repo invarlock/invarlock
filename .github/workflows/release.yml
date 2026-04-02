@@ -38,7 +38,9 @@ jobs:
       - name: Install build tooling
         run: python -m pip install --require-hashes -r requirements/workflows/release-security-py313.txt
       - name: Build wheel/sdist
-        run: python -m build
+        run: |
+          rm -rf build dist
+          python -m build
       - name: Twine check
         run: python -m twine check dist/*
       - name: Install smoke from wheel
@@ -105,7 +107,14 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: dist
-          path: dist
+          path: _release_dist
+      - name: Stage publish distributions
+        run: |
+          set -euo pipefail
+          rm -rf publish-dist
+          mkdir -p publish-dist
+          cp _release_dist/*.whl publish-dist/
+          cp _release_dist/*.tar.gz publish-dist/
       - name: Resolve publish target
         id: vars
         run: |
@@ -123,7 +132,7 @@ jobs:
         id: attest_release
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a
         with:
-          subject-path: dist/*
+          subject-path: publish-dist/*
       - name: Upload provenance bundle
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
@@ -134,7 +143,7 @@ jobs:
       - name: Publish to TestPyPI/PyPI
         uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e
         with:
-          packages-dir: dist
+          packages-dir: publish-dist
           repository-url: ${{ steps.vars.outputs.publish_repository_url }}
           skip-existing: true
 
@@ -224,7 +233,7 @@ jobs:
           name: release-provenance
           path: provenance
       - name: Sign release artifacts
-        uses: sigstore/gh-action-sigstore-python@a5caf349bc536fbef3668a10ed7f5cd309a4b53d
+        uses: sigstore/gh-action-sigstore-python@04cffa1d795717b140764e8b640de88853c92acc
         with:
           inputs: dist/*
           upload-signing-artifacts: true
@@ -245,7 +254,7 @@ jobs:
             --provenance-dir provenance \
             --output-dir release-assets
       - name: Sign offline verification bundle
-        uses: sigstore/gh-action-sigstore-python@a5caf349bc536fbef3668a10ed7f5cd309a4b53d
+        uses: sigstore/gh-action-sigstore-python@04cffa1d795717b140764e8b640de88853c92acc
         with:
           inputs: release-assets/*-offline-bundle.tar.gz
           upload-signing-artifacts: false

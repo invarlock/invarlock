@@ -3,8 +3,17 @@ from pathlib import Path
 
 import pytest
 
-from invarlock.cli import config as cfg_mod
-from invarlock.cli.config import (
+from invarlock.cli.run_config import (
+    _apply_requested_edit_override,
+    _resolve_requested_edit_name,
+)
+from invarlock.core import config_runtime as cfg_mod
+from invarlock.core.config_dependencies import (
+    absolute_path_no_resolve,
+    inspect_config_dependencies,
+    iter_absolute_path_strings,
+)
+from invarlock.core.config_runtime import (
     AutoConfig,
     DatasetConfig,
     EvalBootstrapConfig,
@@ -14,26 +23,27 @@ from invarlock.cli.config import (
     SpectralGuardConfig,
     VarianceGuardConfig,
     _deep_merge,
-    apply_edit_override,
     apply_profile,
-    inspect_config_dependencies,
     load_config,
-    resolve_edit_kind,
 )
 
 
-def test_resolve_edit_kind_and_apply_override_roundtrip():
-    cfg = InvarLockConfig(
+def test_resolve_requested_edit_name_and_apply_override_roundtrip():
+    cfg = InvarLockConfig.from_sections(
         model={"id": "gpt2", "adapter": "hf_causal"},
         edit={"name": "quant_rtn", "plan": {}},
     )
-    name = resolve_edit_kind("quant_rtn")
+    name = _resolve_requested_edit_name("quant_rtn")
     assert name == "quant_rtn"
-    updated = apply_edit_override(cfg, "quant_rtn")
-    assert updated.edit.name == "quant_rtn"
+    updated = _apply_requested_edit_override(
+        cfg,
+        "quant_rtn",
+        config_cls=InvarLockConfig,
+    )
+    assert updated.require_section("edit")["name"] == "quant_rtn"
     assert "kind" not in updated.data["edit"]
     with pytest.raises(ValueError):
-        resolve_edit_kind("unknown")
+        _resolve_requested_edit_name("unknown")
 
 
 def test_dataset_and_variance_validators_raise():
@@ -87,8 +97,8 @@ def test_load_config_with_include_and_defaults_merge(tmp_path: Path):
     cfg = load_config(cfg_path)
     assert (
         isinstance(cfg, InvarLockConfig)
-        and cfg.dataset.preview_n == 10
-        and cfg.model.id == "gpt2"
+        and cfg.require_section("dataset")["preview_n"] == 10
+        and cfg.require_section("model")["id"] == "gpt2"
     )
 
 
@@ -157,28 +167,33 @@ def test_load_config_raises_on_bad_defaults_type(tmp_path: Path):
 
 
 def test_apply_profile_ci_cpu_and_unknown_profile():
-    cfg = InvarLockConfig(
+    cfg = InvarLockConfig.from_sections(
         model={"id": "gpt2", "adapter": "hf_causal"},
         edit={"name": "quant_rtn", "plan": {}},
     )
     ci_cpu = apply_profile(cfg, "ci_cpu")
     # Expect device forced to CPU and stride set
-    assert ci_cpu.model.device == "cpu" and ci_cpu.dataset.stride > 0
+    assert ci_cpu.require_section("model")["device"] == "cpu"
+    assert ci_cpu.require_section("dataset")["stride"] > 0
     with pytest.raises(ValueError):
         apply_profile(cfg, "unknown")
 
 
 def test_apply_profile_ci_and_release():
-    cfg = InvarLockConfig(
+    cfg = InvarLockConfig.from_sections(
         model={"id": "gpt2", "adapter": "hf_causal"},
         edit={"name": "quant_rtn", "plan": {}},
     )
     ci = apply_profile(cfg, "ci")
-    assert ci.dataset.preview_n == 240 and ci.dataset.final_n == 240
-    assert ci.eval.bootstrap.replicates >= 1200
-    assert ci.primary_metric.overhead_threshold == pytest.approx(0.01)
+    assert ci.require_section("dataset")["preview_n"] == 240
+    assert ci.require_section("dataset")["final_n"] == 240
+    assert ci.require_section("eval")["bootstrap"]["replicates"] >= 1200
+    assert ci.require_section("primary_metric")["overhead_threshold"] == pytest.approx(
+        0.01
+    )
     rel = apply_profile(cfg, "release")
-    assert rel.dataset.preview_n >= 240 and rel.eval.bootstrap.replicates >= 3200
+    assert rel.require_section("dataset")["preview_n"] >= 240
+    assert rel.require_section("eval")["bootstrap"]["replicates"] >= 3200
 
 
 def test_load_config_include_missing_file(tmp_path: Path):
@@ -226,13 +241,14 @@ def test_load_config_include_depth_guard(tmp_path: Path) -> None:
         load_config(main)
 
 
-def test_obj_mapping_scalar_and_non_mapping_paths() -> None:
-    obj = cfg_mod._Obj({"nested": {"value": 1}, "scalar": 7})
+def test_invarlock_config_mapping_helpers_cover_scalar_and_missing_paths() -> None:
+    cfg = cfg_mod.InvarLockConfig({"nested": {"value": 1}, "scalar": 7})
 
-    assert obj["scalar"] == 7
-    assert obj.scalar == 7
-    assert obj.nested.value == 1
-    assert cfg_mod._Obj("plain").get("missing", "fallback") == "fallback"
+    assert cfg["scalar"] == 7
+    assert cfg.require_section("nested")["value"] == 1
+    assert cfg.get("missing", "fallback") == "fallback"
+    with pytest.raises(TypeError, match="must be a mapping"):
+        cfg.section("scalar")
 
 
 def test_dataset_and_path_iteration_helper_edges(tmp_path: Path) -> None:
@@ -240,16 +256,14 @@ def test_dataset_and_path_iteration_helper_edges(tmp_path: Path) -> None:
     absolute_a = tmp_path / "a.jsonl"
     absolute_b = tmp_path / "b.jsonl"
 
-    found = cfg_mod._iter_absolute_path_strings(
-        [str(absolute_a), ("   ", {str(absolute_b)})]
-    )
+    found = iter_absolute_path_strings([str(absolute_a), ("   ", {str(absolute_b)})])
 
     assert dataset.seq_len == 8
     assert found == {
-        cfg_mod._absolute_path_no_resolve(absolute_a),
-        cfg_mod._absolute_path_no_resolve(absolute_b),
+        absolute_path_no_resolve(absolute_a),
+        absolute_path_no_resolve(absolute_b),
     }
-    assert cfg_mod._absolute_path_no_resolve("relative/config.yaml").is_absolute()
+    assert absolute_path_no_resolve("relative/config.yaml").is_absolute()
 
 
 def test_load_runtime_yaml_env_root_missing_file_falls_back_to_package(

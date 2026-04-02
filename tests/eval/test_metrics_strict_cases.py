@@ -93,7 +93,7 @@ def test_compute_ppl_partial_attention_mask():
         def parameters(self):  # pragma: no cover
             yield from self.out.parameters()
 
-    ppl = M.compute_ppl(DummyLM(), None, window)
+    ppl = M.compute_ppl(DummyLM(), window)
     assert isinstance(ppl, float) and ppl >= 1.0
 
 

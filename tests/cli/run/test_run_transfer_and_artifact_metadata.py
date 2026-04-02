@@ -59,13 +59,13 @@ def _common_patches_detect_ce():
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report.save_report",
+            "invarlock.reporting.report_files.save_report",
             lambda report, run_dir, formats, filename_prefix=None: {
                 "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
             },
         ),
         patch(
-            "invarlock.cli.commands.run.detect_model_profile",
+            "invarlock.cli.run_runtime.detect_model_profile",
             lambda model_id=None, adapter=None: SimpleNamespace(
                 default_loss="ce",
                 model_id=model_id,
@@ -77,7 +77,7 @@ def _common_patches_detect_ce():
             ),
         ),
         patch(
-            "invarlock.cli.commands.run.resolve_tokenizer",
+            "invarlock.cli.run_runtime.resolve_tokenizer",
             lambda prof: (
                 SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
                 "tokhash123",
@@ -102,7 +102,7 @@ def test_edit_cli_override_invalid_exits(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.cli.config.resolve_edit_kind",
+                "invarlock.cli.run_config._resolve_requested_edit_name",
                 side_effect=ValueError("bad edit"),
             )
         )
@@ -135,7 +135,7 @@ def test_transfer_guard_extras_and_guard_recovered_flag(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.validate_guard_overhead",
+                "invarlock.cli.run_runtime.validate_guard_overhead",
                 lambda *a, **k: SimpleNamespace(
                     passed=True,
                     messages=[],
@@ -244,7 +244,7 @@ def test_invariants_profile_checks_merged(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.detect_model_profile",
+                "invarlock.cli.run_runtime.detect_model_profile",
                 lambda *a, **k: SimpleNamespace(
                     default_loss="ce",
                     model_id=None,
@@ -303,7 +303,7 @@ def test_edit_name_invalid_exits(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.cli.config.resolve_edit_kind",
+                "invarlock.cli.run_config._resolve_requested_edit_name",
                 side_effect=ValueError("bad edit"),
             )
         )
@@ -387,7 +387,7 @@ def _common_device_and_save():
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report.save_report",
+            "invarlock.reporting.report_files.save_report",
             lambda report, run_dir, formats, filename_prefix=None: {
                 "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
             },
@@ -440,7 +440,7 @@ def _runner_min():
 
 def _detect_loss(loss_type: str = "ce"):
     return patch(
-        "invarlock.cli.commands.run.detect_model_profile",
+        "invarlock.cli.run_runtime.detect_model_profile",
         lambda model_id, adapter: SimpleNamespace(
             default_loss=loss_type,
             model_id=model_id,
@@ -546,7 +546,7 @@ def test_bare_overhead_measurement_pass(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.commands.run.detect_model_profile",
+        "invarlock.cli.run_runtime.detect_model_profile",
         lambda *a, **k: SimpleNamespace(
             default_loss="ce",
             module_selectors={},
@@ -560,7 +560,7 @@ def test_bare_overhead_measurement_pass(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.commands.run.resolve_tokenizer",
+        "invarlock.cli.run_runtime.resolve_tokenizer",
         lambda *_: (
             SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
             "tokhash123",
@@ -626,7 +626,7 @@ def test_dataset_meta_tokenizer_hash_passthrough(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.commands.run.detect_model_profile",
+        "invarlock.cli.run_runtime.detect_model_profile",
         lambda *a, **k: SimpleNamespace(
             default_loss="ce",
             module_selectors={},
@@ -640,7 +640,7 @@ def test_dataset_meta_tokenizer_hash_passthrough(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.commands.run.resolve_tokenizer",
+        "invarlock.cli.run_runtime.resolve_tokenizer",
         lambda *_: (
             SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
             "tokhash123",
@@ -649,7 +649,7 @@ def test_dataset_meta_tokenizer_hash_passthrough(monkeypatch, tmp_path):
     run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"), profile=None)
 
 
-def test_auto_adapter_apply_ignored_on_error(monkeypatch, tmp_path):
+def test_auto_adapter_apply_fails_closed_on_error(monkeypatch, tmp_path):
     cfg = _cfg(tmp_path)
 
     class DummyRegistry:
@@ -676,10 +676,18 @@ def test_auto_adapter_apply_ignored_on_error(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.adapter_auto.apply_auto_adapter_if_needed",
+        "invarlock.core.adapter_auto.apply_auto_adapter_if_needed",
         lambda cfg: (_ for _ in ()).throw(RuntimeError("auto-err")),
     )
-    run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"), profile=None)
+    with pytest.raises(click.exceptions.Exit) as excinfo:
+        run_command(
+            config=str(cfg),
+            device="cpu",
+            out=str(tmp_path / "runs"),
+            profile=None,
+        )
+
+    assert excinfo.value.exit_code == 1
 
 
 def test_guard_overhead_ratio_display_path(monkeypatch, tmp_path):
@@ -733,7 +741,7 @@ def test_guard_overhead_ratio_display_path(monkeypatch, tmp_path):
     monkeypatch.setattr("invarlock.core.registry.get_registry", lambda: DummyRegistry())
     monkeypatch.setattr("invarlock.core.runner.CoreRunner", lambda: DummyRunner())
     monkeypatch.setattr(
-        "invarlock.cli.commands.run.validate_guard_overhead",
+        "invarlock.cli.run_runtime.validate_guard_overhead",
         lambda *a, **k: _OverheadRatio(),
     )
     monkeypatch.setattr(
@@ -881,7 +889,7 @@ def test_baseline_missing_eval_windows_fallback(monkeypatch, tmp_path):
 
 
 def test_release_capacity_planner_path():
-    from invarlock.cli.commands.run import _plan_release_windows
+    from invarlock.cli.run_overhead import plan_release_windows
 
     capacity = {
         "available_unique": 1000,
@@ -891,7 +899,7 @@ def test_release_capacity_planner_path():
         "candidate_unique": 800,
         "candidate_limit": 1600,
     }
-    plan = _plan_release_windows(
+    plan = plan_release_windows(
         capacity,
         requested_preview=400,
         requested_final=400,
@@ -916,7 +924,7 @@ def test_persist_ref_masks_positive(tmp_path: Path):
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner_min))
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.resolve_tokenizer",
+                "invarlock.cli.run_runtime.resolve_tokenizer",
                 lambda *_: (
                     SimpleNamespace(
                         eos_token="</s>", pad_token="</s>", vocab_size=50000

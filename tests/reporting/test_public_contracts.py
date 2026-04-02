@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
+
+import pytest
 
 import invarlock.public_contracts as contracts
 
@@ -91,6 +94,164 @@ def test_public_contract_loader_falls_back_to_packaged_contracts(
     assert payload["lanes"]
 
 
+def test_public_contract_loader_falls_back_to_workspace_contracts(
+    monkeypatch, tmp_path: Path
+) -> None:
+    workspace = tmp_path / "workspace"
+    contracts_dir = workspace / "contracts"
+    contracts_dir.mkdir(parents=True)
+    source = contracts.CONTRACTS_ROOT / "policy_pack.schema.json"
+    (contracts_dir / source.name).write_text(source.read_text(encoding="utf-8"))
+
+    monkeypatch.setattr(contracts, "CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(contracts, "PACKAGE_CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.chdir(workspace)
+
+    payload = contracts.load_policy_pack_schema()
+    assert payload["title"] == "InvarLock Policy Pack"
+
+
+def test_public_contract_loader_tries_env_then_workspace_and_deduplicates(
+    monkeypatch, tmp_path: Path
+) -> None:
+    workspace = tmp_path / "workspace"
+    contracts_dir = workspace / "contracts"
+    contracts_dir.mkdir(parents=True)
+    source = contracts.CONTRACTS_ROOT / "policy_pack.schema.json"
+    (contracts_dir / source.name).write_text(source.read_text(encoding="utf-8"))
+
+    monkeypatch.setattr(contracts, "CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(contracts, "PACKAGE_CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setenv("INVARLOCK_CONTRACTS_ROOT", str(tmp_path / "env-contracts"))
+    monkeypatch.setenv("GITHUB_WORKSPACE", str(workspace))
+    monkeypatch.chdir(workspace)
+
+    payload = contracts.load_policy_pack_schema()
+    assert payload["title"] == "InvarLock Policy Pack"
+
+    roots = contracts._fallback_contract_roots()
+    assert roots == [tmp_path / "env-contracts", contracts_dir]
+
+
+def test_public_contract_loader_discovers_ancestor_contracts_for_build_out(
+    monkeypatch, tmp_path: Path
+) -> None:
+    workspace = tmp_path / "workspace"
+    build_out = workspace / "build-out" / "python" / "invarlock"
+    build_out.mkdir(parents=True)
+    contracts_dir = workspace / "contracts"
+    contracts_dir.mkdir(parents=True)
+    source = contracts.CONTRACTS_ROOT / "policy_pack.schema.json"
+    (contracts_dir / source.name).write_text(source.read_text(encoding="utf-8"))
+
+    monkeypatch.setattr(contracts, "CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(contracts, "PACKAGE_CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(contracts, "__file__", str(build_out / "public_contracts.py"))
+    monkeypatch.chdir(build_out)
+
+    payload = contracts.load_policy_pack_schema()
+    assert payload["title"] == "InvarLock Policy Pack"
+    assert contracts._ancestor_contract_roots(filename="policy_pack.schema.json") == [
+        contracts_dir
+    ]
+
+
+def test_public_contract_loader_discovers_contracts_from_executable_ancestor(
+    monkeypatch, tmp_path: Path
+) -> None:
+    workspace = tmp_path / "workspace"
+    build_out = workspace / "build-out"
+    build_out.mkdir(parents=True)
+    contracts_dir = workspace / "contracts"
+    contracts_dir.mkdir(parents=True)
+    source = contracts.CONTRACTS_ROOT / "policy_pack.schema.json"
+    (contracts_dir / source.name).write_text(source.read_text(encoding="utf-8"))
+
+    monkeypatch.setattr(contracts, "CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(contracts, "PACKAGE_CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(
+        contracts,
+        "__file__",
+        str(tmp_path / "bundle" / "public_contracts.py"),
+    )
+    monkeypatch.setattr(sys, "argv", [str(build_out / "policy_pack_fuzzer")])
+    monkeypatch.setattr(sys, "executable", str(build_out / "policy_pack_fuzzer.pkg"))
+    sandbox = tmp_path / "sandbox"
+    sandbox.mkdir()
+    monkeypatch.chdir(sandbox)
+
+    payload = contracts.load_policy_pack_schema()
+    assert payload["title"] == "InvarLock Policy Pack"
+    assert contracts._ancestor_contract_roots(filename="policy_pack.schema.json") == [
+        contracts_dir
+    ]
+
+
+def test_public_contract_loader_handles_missing_process_paths(
+    monkeypatch, tmp_path: Path
+) -> None:
+    workspace = tmp_path / "workspace"
+    build_out = workspace / "build-out" / "python" / "invarlock"
+    build_out.mkdir(parents=True)
+    contracts_dir = workspace / "contracts"
+    contracts_dir.mkdir(parents=True)
+    source = contracts.CONTRACTS_ROOT / "policy_pack.schema.json"
+    (contracts_dir / source.name).write_text(source.read_text(encoding="utf-8"))
+
+    monkeypatch.setattr(contracts, "CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(contracts, "PACKAGE_CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(contracts, "__file__", str(build_out / "public_contracts.py"))
+    monkeypatch.setattr(sys, "argv", [])
+    monkeypatch.setattr(sys, "executable", "")
+    monkeypatch.chdir(build_out)
+
+    payload = contracts.load_policy_pack_schema()
+    assert payload["title"] == "InvarLock Policy Pack"
+    assert contracts._ancestor_contract_roots(filename="policy_pack.schema.json") == [
+        contracts_dir
+    ]
+
+
+def test_public_contract_loader_skips_missing_ancestor_candidates(
+    monkeypatch, tmp_path: Path
+) -> None:
+    contracts_dir = tmp_path / "workspace" / "contracts"
+    contracts_dir.mkdir(parents=True)
+    source = contracts.CONTRACTS_ROOT / "policy_pack.schema.json"
+    (contracts_dir / source.name).write_text(source.read_text(encoding="utf-8"))
+
+    monkeypatch.setattr(contracts, "CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(contracts, "PACKAGE_CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(contracts, "_fallback_contract_roots", lambda: [])
+    monkeypatch.setattr(
+        contracts,
+        "_ancestor_contract_roots",
+        lambda *, filename: [tmp_path / "missing-ancestor", contracts_dir],
+    )
+
+    payload = contracts.load_policy_pack_schema()
+    assert payload["title"] == "InvarLock Policy Pack"
+
+
+def test_public_contract_loader_raises_when_all_roots_are_missing(
+    monkeypatch, tmp_path: Path
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    monkeypatch.setattr(contracts, "CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(contracts, "PACKAGE_CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(
+        contracts, "__file__", str(tmp_path / "sandbox" / "public_contracts.py")
+    )
+    monkeypatch.setenv("INVARLOCK_CONTRACTS_ROOT", str(tmp_path / "env-contracts"))
+    monkeypatch.setenv("GITHUB_WORKSPACE", str(workspace))
+    monkeypatch.chdir(workspace)
+
+    with pytest.raises(FileNotFoundError, match="policy_pack.schema.json"):
+        contracts.load_json_contract("policy_pack.schema.json")
+
+
 def test_packaged_contract_copies_match_repo_contracts() -> None:
     repo_contracts = sorted(contracts.CONTRACTS_ROOT.glob("*.json"))
     assert repo_contracts
@@ -103,7 +264,7 @@ def test_packaged_contract_copies_match_repo_contracts() -> None:
         )
 
 
-def test_public_contract_helpers_fall_back_when_contracts_are_unavailable(
+def test_public_contract_helpers_raise_when_contracts_are_unavailable(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
@@ -112,32 +273,41 @@ def test_public_contract_helpers_fall_back_when_contracts_are_unavailable(
         lambda _filename: (_ for _ in ()).throw(OSError("missing")),
     )
 
-    assert contracts.load_support_matrix() == {
-        "format_version": "support-matrix-v1",
-        "lanes": [],
-    }
-    assert contracts.load_adapter_capabilities() == {
-        "format_version": "adapter-capabilities-v1",
-        "adapters": [],
-    }
-    assert contracts.load_model_family_catalog() == {
-        "format_version": "model-family-catalog-v1",
-        "declared_support": [],
-        "implemented_coverage": [],
-        "usage_only": [],
-        "recommended_additions": [],
-    }
-    assert contracts.load_plugin_compatibility() == {
-        "format_version": "plugin-compatibility-v1"
-    }
-    assert contracts.load_policy_pack_schema() == {}
-    assert contracts.load_proof_pack_manifest_schema() == {}
-    assert contracts.load_runtime_manifest_schema() == {}
-    assert contracts.support_lane_by_id("missing") is None
-    assert contracts.adapter_capability("missing") is None
+    with pytest.raises(contracts.ContractLoadError, match="support_matrix.json"):
+        contracts.load_support_matrix()
+    with pytest.raises(contracts.ContractLoadError, match="adapter_capabilities.json"):
+        contracts.load_adapter_capabilities()
+    with pytest.raises(contracts.ContractLoadError, match="model_family_catalog.json"):
+        contracts.load_model_family_catalog()
+    with pytest.raises(contracts.ContractLoadError, match="plugin_compatibility.json"):
+        contracts.load_plugin_compatibility()
+    with pytest.raises(contracts.ContractLoadError, match="policy_pack.schema.json"):
+        contracts.load_policy_pack_schema()
+    with pytest.raises(
+        contracts.ContractLoadError, match="proof_pack_manifest.schema.json"
+    ):
+        contracts.load_proof_pack_manifest_schema()
+    with pytest.raises(
+        contracts.ContractLoadError, match="runtime_manifest.schema.json"
+    ):
+        contracts.load_runtime_manifest_schema()
     assert contracts.contract_reference("support_matrix.json") == {
-        "path": "contracts/support_matrix.json"
+        "path": "contracts/support_matrix.json",
+        "load_error": "missing",
     }
+
+
+def test_public_contract_helpers_wrap_unicode_decode_errors(monkeypatch) -> None:
+    monkeypatch.setattr(
+        contracts,
+        "load_json_contract",
+        lambda _filename: (_ for _ in ()).throw(
+            UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+        ),
+    )
+
+    with pytest.raises(contracts.ContractLoadError, match="support_matrix.json"):
+        contracts.load_support_matrix()
 
 
 def test_public_contract_helpers_reject_non_mapping_payloads(monkeypatch) -> None:
@@ -152,31 +322,28 @@ def test_public_contract_helpers_reject_non_mapping_payloads(monkeypatch) -> Non
     }
     monkeypatch.setattr(
         contracts,
-        "_safe_load",
-        lambda filename, default: payloads.get(filename, default),
+        "_load_contract_or_raise",
+        lambda filename: payloads[filename],
     )
 
-    assert contracts.load_support_matrix() == {
-        "format_version": "support-matrix-v1",
-        "lanes": [],
-    }
-    assert contracts.load_adapter_capabilities() == {
-        "format_version": "adapter-capabilities-v1",
-        "adapters": [],
-    }
-    assert contracts.load_model_family_catalog() == {
-        "format_version": "model-family-catalog-v1",
-        "declared_support": [],
-        "implemented_coverage": [],
-        "usage_only": [],
-        "recommended_additions": [],
-    }
-    assert contracts.load_plugin_compatibility() == {
-        "format_version": "plugin-compatibility-v1"
-    }
-    assert contracts.load_policy_pack_schema() == {}
-    assert contracts.load_proof_pack_manifest_schema() == {}
-    assert contracts.load_runtime_manifest_schema() == {}
+    with pytest.raises(contracts.ContractLoadError, match="support_matrix.json"):
+        contracts.load_support_matrix()
+    with pytest.raises(contracts.ContractLoadError, match="adapter_capabilities.json"):
+        contracts.load_adapter_capabilities()
+    with pytest.raises(contracts.ContractLoadError, match="model_family_catalog.json"):
+        contracts.load_model_family_catalog()
+    with pytest.raises(contracts.ContractLoadError, match="plugin_compatibility.json"):
+        contracts.load_plugin_compatibility()
+    with pytest.raises(contracts.ContractLoadError, match="policy_pack.schema.json"):
+        contracts.load_policy_pack_schema()
+    with pytest.raises(
+        contracts.ContractLoadError, match="proof_pack_manifest.schema.json"
+    ):
+        contracts.load_proof_pack_manifest_schema()
+    with pytest.raises(
+        contracts.ContractLoadError, match="runtime_manifest.schema.json"
+    ):
+        contracts.load_runtime_manifest_schema()
 
 
 def test_public_contract_lane_and_adapter_helpers_cover_non_matching_entries(
@@ -184,8 +351,8 @@ def test_public_contract_lane_and_adapter_helpers_cover_non_matching_entries(
 ) -> None:
     monkeypatch.setattr(
         contracts,
-        "_safe_load",
-        lambda filename, default: {
+        "_load_contract_or_raise",
+        lambda filename: {
             "support_matrix.json": {
                 "format_version": "support-matrix-v1",
                 "lanes": [
@@ -218,7 +385,7 @@ def test_public_contract_lane_and_adapter_helpers_cover_non_matching_entries(
                 "core_abi": "0.1",
                 "match_policy": "exact_match",
             },
-        }.get(filename, default),
+        }[filename],
     )
 
     assert contracts.support_lane_by_id("missing") is None

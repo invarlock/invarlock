@@ -4,7 +4,8 @@ from copy import deepcopy
 
 import pytest
 
-from invarlock.reporting import report_builder as cert
+from invarlock.reporting import report_normalization as report_normalization_mod
+from invarlock.reporting.report_make import make_report
 
 
 def _optional_sections_report() -> tuple[dict, dict]:
@@ -107,11 +108,19 @@ def test_make_evaluation_report_populates_optional_sections(monkeypatch):
 
     # ensure normalization helpers do not short-circuit rich payload
     monkeypatch.setattr(
-        cert, "_normalize_and_validate_report", lambda value: value, raising=False
+        report_normalization_mod,
+        "normalize_and_validate_run_report",
+        lambda value: value,
+        raising=False,
     )
-    monkeypatch.setattr(cert, "_normalize_baseline", lambda value: value, raising=False)
+    monkeypatch.setattr(
+        report_normalization_mod,
+        "normalize_baseline",
+        lambda value: value,
+        raising=False,
+    )
 
-    evaluation_report = cert.make_report(report, baseline)
+    evaluation_report = make_report(report, baseline)
 
     sec = evaluation_report.get("secondary_metrics")
     assert isinstance(sec, list) and len(sec) == 1
@@ -134,11 +143,19 @@ def test_make_evaluation_report_policy_digest_marks_changed(monkeypatch):
     baseline["meta"]["auto"]["tier"] = "conservative"
 
     monkeypatch.setattr(
-        cert, "_normalize_and_validate_report", lambda value: value, raising=False
+        report_normalization_mod,
+        "normalize_and_validate_run_report",
+        lambda value: value,
+        raising=False,
     )
-    monkeypatch.setattr(cert, "_normalize_baseline", lambda value: value, raising=False)
+    monkeypatch.setattr(
+        report_normalization_mod,
+        "normalize_baseline",
+        lambda value: value,
+        raising=False,
+    )
 
-    evaluation_report = cert.make_report(report, baseline)
+    evaluation_report = make_report(report, baseline)
     digest = evaluation_report["policy_digest"]
     assert digest["tier_policy_name"] == "balanced"
     assert digest["changed"] is True

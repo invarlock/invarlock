@@ -13,6 +13,15 @@ import warnings
 from pathlib import Path
 from typing import Any
 
+_VALIDATION_EXCEPTIONS = (
+    AttributeError,
+    KeyError,
+    OverflowError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 __all__ = [
     "validate_against_baseline",
     "validate_drift_gate",
@@ -42,6 +51,39 @@ class ValidationResult:
         self.messages = messages
         self.warnings = warnings or []
         self.errors = errors or []
+
+    @property
+    def diagnostics(self) -> list[dict[str, Any]]:
+        """Typed diagnostic view over legacy validation text buckets."""
+        diagnostics: list[dict[str, Any]] = []
+        for message in self.messages:
+            diagnostics.append(
+                {
+                    "kind": "validation_info",
+                    "severity": "info",
+                    "message": str(message),
+                    "details": {},
+                }
+            )
+        for warning in self.warnings:
+            diagnostics.append(
+                {
+                    "kind": "validation_warning",
+                    "severity": "warning",
+                    "message": str(warning),
+                    "details": {},
+                }
+            )
+        for error in self.errors:
+            diagnostics.append(
+                {
+                    "kind": "validation_error",
+                    "severity": "error",
+                    "message": str(error),
+                    "details": {},
+                }
+            )
+        return diagnostics
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -135,7 +177,7 @@ def validate_against_baseline(
                 current_ratio = float(val)
             try:
                 pm_kind = str(pm.get("kind") or "").lower()
-            except Exception:
+            except _VALIDATION_EXCEPTIONS:
                 pm_kind = None
         if current_ratio is None:
             errors.append("Cannot extract ratio_vs_baseline from run report")
@@ -263,7 +305,7 @@ def validate_against_baseline(
             errors=errors,
         )
 
-    except Exception as e:
+    except _VALIDATION_EXCEPTIONS as e:
         return ValidationResult(
             passed=False,
             checks={"validation_error": False},
@@ -344,7 +386,7 @@ def validate_drift_gate(
             errors=errors,
         )
 
-    except Exception as e:
+    except _VALIDATION_EXCEPTIONS as e:
         return ValidationResult(
             passed=False,
             checks={"drift_gate_error": False},
@@ -440,7 +482,7 @@ def validate_guard_overhead(
             errors=errors,
         )
 
-    except Exception as e:
+    except _VALIDATION_EXCEPTIONS as e:
         return ValidationResult(
             passed=False,
             checks={"guard_overhead_error": False},
@@ -538,7 +580,7 @@ def create_baseline_from_report(run_report: dict[str, Any]) -> dict[str, Any]:
         )
         if isinstance(pm, dict) and pm.get("ratio_vs_baseline") is not None:
             baseline["ratio_vs_baseline"] = float(pm["ratio_vs_baseline"])
-    except Exception:
+    except _VALIDATION_EXCEPTIONS:
         pass
 
     if "param_reduction_ratio" in run_report:

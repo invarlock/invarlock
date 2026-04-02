@@ -7,13 +7,19 @@ import pytest
 import torch
 import torch.nn as nn
 
+from invarlock.core.exceptions import MetricsError
 from invarlock.eval import metrics as metrics_mod
+from invarlock.eval import metrics_activation as activation_mod
+from invarlock.eval import metrics_environment as metrics_environment_mod
+from invarlock.eval import metrics_lens as lens_mod
+from invarlock.eval import metrics_model_io as model_io_mod
+from invarlock.eval import metrics_support as support_mod
 
 
 def test_resource_manager_falls_back_to_cpu_when_no_cuda_or_mps(monkeypatch) -> None:
-    monkeypatch.setattr(metrics_mod.torch.cuda, "is_available", lambda: False)
+    monkeypatch.setattr(support_mod.torch.cuda, "is_available", lambda: False)
     monkeypatch.setattr(
-        metrics_mod.torch.backends,
+        support_mod.torch.backends,
         "mps",
         SimpleNamespace(is_available=lambda: False),
         raising=False,
@@ -28,7 +34,7 @@ def test_mi_gini_optimized_cpu_path_subsamples_when_n_gt_max(monkeypatch) -> Non
     max_per_layer = 5
     L, N, D = 2, 10, 4
 
-    monkeypatch.setattr(metrics_mod.torch, "randperm", lambda n: torch.arange(n))
+    monkeypatch.setattr(activation_mod.torch, "randperm", lambda n: torch.arange(n))
 
     class _DepMgr:
         def is_available(self, _name: str) -> bool:  # noqa: ANN001
@@ -42,15 +48,13 @@ def test_mi_gini_optimized_cpu_path_subsamples_when_n_gt_max(monkeypatch) -> Non
 
             return _mi_scores_fn
 
-    monkeypatch.setattr(metrics_mod, "DependencyManager", lambda: _DepMgr())
+    monkeypatch.setattr(activation_mod, "DependencyManager", lambda: _DepMgr())
 
     feats = torch.ones(L, N, D)
     targ = torch.arange(N)
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, progress_bars=False, strict_validation=False
-    )
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
 
-    out = metrics_mod._mi_gini_optimized_cpu_path(
+    out = activation_mod._mi_gini_optimized_cpu_path(
         feats, targ, max_per_layer=max_per_layer, config=cfg
     )
     assert math.isnan(out)
@@ -76,7 +80,7 @@ def test_locate_transformer_blocks_enhanced_catches_len_typeerror_and_uses_fallb
             self.transformer.h = _BadLen()
             self.block0 = _Block()
 
-    blocks = metrics_mod._locate_transformer_blocks_enhanced(_Model())
+    blocks = activation_mod._locate_transformer_blocks_enhanced(_Model())
     assert isinstance(blocks, list) and blocks
 
 
@@ -88,13 +92,11 @@ def test_extract_fc1_activations_returns_none_on_block_attr_error(monkeypatch) -
             return super().__getattribute__(name)
 
     monkeypatch.setattr(
-        metrics_mod, "_locate_transformer_blocks_enhanced", lambda _m: [_BadBlock()]
+        activation_mod, "_locate_transformer_blocks_enhanced", lambda _m: [_BadBlock()]
     )
 
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, progress_bars=False, strict_validation=False
-    )
-    out = metrics_mod._extract_fc1_activations(
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
+    out = activation_mod._extract_fc1_activations(
         nn.Linear(2, 2),
         output=SimpleNamespace(hidden_states=[]),
         config=cfg,
@@ -107,10 +109,8 @@ def test_calculate_sigma_max_skips_when_dependency_missing() -> None:
         def is_available(self, _name: str) -> bool:  # noqa: ANN001
             return False
 
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, progress_bars=False, strict_validation=False
-    )
-    out = metrics_mod._calculate_sigma_max(
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
+    out = activation_mod._calculate_sigma_max(
         nn.Linear(2, 2),
         first_batch={"input_ids": [1]},
         dep_manager=_DepMgr(),
@@ -125,10 +125,8 @@ def test_calculate_sigma_max_skips_when_first_batch_missing() -> None:
         def is_available(self, _name: str) -> bool:  # noqa: ANN001
             return True
 
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, progress_bars=False, strict_validation=False
-    )
-    out = metrics_mod._calculate_sigma_max(
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
+    out = activation_mod._calculate_sigma_max(
         nn.Linear(2, 2),
         first_batch=None,
         dep_manager=_DepMgr(),
@@ -141,13 +139,12 @@ def test_calculate_sigma_max_skips_when_first_batch_missing() -> None:
 def test_calculate_head_energy_returns_nan_when_all_values_non_finite() -> None:
     cfg = metrics_mod.MetricsConfig(
         use_cache=False,
-        progress_bars=False,
         strict_validation=False,
         nan_replacement=float("nan"),
         inf_replacement=float("nan"),
     )
     hidden_states_list = [torch.full((1, 1, 2, 1), float("nan"))]
-    out = metrics_mod._calculate_head_energy(hidden_states_list, cfg)
+    out = activation_mod._calculate_head_energy(hidden_states_list, cfg)
     assert math.isnan(out)
 
 
@@ -162,15 +159,13 @@ def test_calculate_mi_gini_returns_nan_for_missing_dependency_and_missing_activa
         def is_available(self, _name: str) -> bool:  # noqa: ANN001
             return True
 
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, progress_bars=False, strict_validation=False
-    )
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
     activation_data = {
         "fc1_activations": [torch.zeros(1, 1, 1, 1)],
         "targets": [torch.zeros(1, 1)],
     }
 
-    out_missing = metrics_mod._calculate_mi_gini(
+    out_missing = activation_mod._calculate_mi_gini(
         nn.Linear(2, 2),
         activation_data=activation_data,
         dep_manager=_DepMgrMissing(),
@@ -179,7 +174,7 @@ def test_calculate_mi_gini_returns_nan_for_missing_dependency_and_missing_activa
     )
     assert math.isnan(out_missing)
 
-    out_empty = metrics_mod._calculate_mi_gini(
+    out_empty = activation_mod._calculate_mi_gini(
         nn.Linear(2, 2),
         activation_data={"fc1_activations": [], "targets": []},
         dep_manager=_DepMgrOk(),
@@ -210,7 +205,7 @@ def test_calculate_lens_metrics_unwraps_base_model_and_returns_on_no_hidden_stat
             return self.base_model(**_kwargs)
 
     monkeypatch.setattr(
-        metrics_mod,
+        lens_mod,
         "_collect_activations",
         lambda *_a, **_k: {
             "hidden_states": [],
@@ -220,9 +215,7 @@ def test_calculate_lens_metrics_unwraps_base_model_and_returns_on_no_hidden_stat
         },
     )
 
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, progress_bars=False, strict_validation=False
-    )
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
     dataloader = [{"input_ids": torch.zeros(1, 2, dtype=torch.long)}]
     out = metrics_mod.calculate_lens_metrics_for_model(
         _Wrapped(), dataloader, config=cfg
@@ -234,17 +227,15 @@ def test_calculate_lens_metrics_strict_validation_raises_on_activation_failure(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
-        metrics_mod,
+        lens_mod,
         "_collect_activations",
         lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("boom")),
     )
 
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, progress_bars=False, strict_validation=True
-    )
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=True)
     dataloader = [{"input_ids": torch.zeros(1, 2, dtype=torch.long)}]
-    with pytest.raises(metrics_mod.MetricsError):
-        metrics_mod.calculate_lens_metrics_for_model(
+    with pytest.raises(MetricsError):
+        lens_mod.calculate_lens_metrics_for_model(
             nn.Linear(2, 2), dataloader, config=cfg
         )
 
@@ -253,16 +244,14 @@ def test_calculate_lens_metrics_non_strict_continues_on_activation_failure(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
-        metrics_mod,
+        lens_mod,
         "_collect_activations",
         lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("boom")),
     )
 
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, progress_bars=False, strict_validation=False
-    )
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
     dataloader = [{"input_ids": torch.zeros(1, 2, dtype=torch.long)}]
-    out = metrics_mod.calculate_lens_metrics_for_model(
+    out = lens_mod.calculate_lens_metrics_for_model(
         nn.Linear(2, 2), dataloader, config=cfg
     )
     assert (
@@ -288,11 +277,11 @@ def test_perform_pre_eval_checks_handles_missing_context_attr_and_no_warning_pat
         def forward(self, **_kwargs):  # noqa: ANN001
             return SimpleNamespace(logits=torch.zeros(1, 1, 1))
 
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, progress_bars=False, strict_validation=False
-    )
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
     dataloader = [{"input_ids": torch.zeros(1, 2, dtype=torch.long)}]
-    metrics_mod._perform_pre_eval_checks(_Model(), dataloader, torch.device("cpu"), cfg)
+    activation_mod._perform_pre_eval_checks(
+        _Model(), dataloader, torch.device("cpu"), cfg
+    )
 
 
 def test_perform_pre_eval_checks_skips_warning_when_seq_len_within_model_limit() -> (
@@ -311,11 +300,11 @@ def test_perform_pre_eval_checks_skips_warning_when_seq_len_within_model_limit()
         def forward(self, **_kwargs):  # noqa: ANN001
             return SimpleNamespace(logits=torch.zeros(1, 1, 1))
 
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, progress_bars=False, strict_validation=False
-    )
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
     dataloader = [{"input_ids": torch.zeros(1, 5, dtype=torch.long)}]
-    metrics_mod._perform_pre_eval_checks(_Model(), dataloader, torch.device("cpu"), cfg)
+    activation_mod._perform_pre_eval_checks(
+        _Model(), dataloader, torch.device("cpu"), cfg
+    )
 
 
 def test_extract_fc1_activations_skips_blocks_without_mlp(monkeypatch) -> None:
@@ -323,12 +312,10 @@ def test_extract_fc1_activations_skips_blocks_without_mlp(monkeypatch) -> None:
         pass
 
     monkeypatch.setattr(
-        metrics_mod, "_locate_transformer_blocks_enhanced", lambda _m: [_Block()]
+        activation_mod, "_locate_transformer_blocks_enhanced", lambda _m: [_Block()]
     )
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, progress_bars=False, strict_validation=False
-    )
-    out = metrics_mod._extract_fc1_activations(
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
+    out = activation_mod._extract_fc1_activations(
         nn.Linear(2, 2),
         output=SimpleNamespace(hidden_states=[]),
         config=cfg,
@@ -355,11 +342,10 @@ def test_calculate_sigma_max_all_non_finite_triggers_nan_path() -> None:
 
     cfg = metrics_mod.MetricsConfig(
         use_cache=False,
-        progress_bars=False,
         strict_validation=False,
         nan_replacement=float("nan"),
     )
-    out = metrics_mod._calculate_sigma_max(
+    out = activation_mod._calculate_sigma_max(
         nn.Linear(2, 2),
         first_batch={"input_ids": torch.zeros(1, 2, dtype=torch.long)},
         dep_manager=_DepMgr(),
@@ -373,14 +359,14 @@ def test_calculate_mi_gini_oom_calls_empty_cache_when_cuda_available(
     monkeypatch,
 ) -> None:
     called = {"empty_cache": 0}
-    monkeypatch.setattr(metrics_mod.torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(activation_mod.torch.cuda, "is_available", lambda: True)
     monkeypatch.setattr(
-        metrics_mod.torch.cuda,
+        activation_mod.torch.cuda,
         "empty_cache",
         lambda: called.__setitem__("empty_cache", called["empty_cache"] + 1),
     )
     monkeypatch.setattr(
-        metrics_mod, "_mi_gini_optimized_cpu_path", lambda *_a, **_k: float("nan")
+        activation_mod, "_mi_gini_optimized_cpu_path", lambda *_a, **_k: float("nan")
     )
 
     class _DepMgr:
@@ -393,15 +379,13 @@ def test_calculate_mi_gini_oom_calls_empty_cache_when_cuda_available(
 
             return _oom
 
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, progress_bars=False, strict_validation=False
-    )
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
     activation_data = {
         "fc1_activations": [torch.zeros(1, 1, 2, 1)],
         "targets": [torch.zeros(1, 2, dtype=torch.long)],
     }
     assert math.isnan(
-        metrics_mod._calculate_mi_gini(
+        activation_mod._calculate_mi_gini(
             nn.Linear(2, 2),
             activation_data=activation_data,
             dep_manager=_DepMgr(),
@@ -423,15 +407,13 @@ def test_calculate_mi_gini_runtime_error_non_oom_takes_raise_path(monkeypatch) -
 
             return _boom
 
-    cfg = metrics_mod.MetricsConfig(
-        use_cache=False, progress_bars=False, strict_validation=False
-    )
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
     activation_data = {
         "fc1_activations": [torch.zeros(1, 1, 2, 1)],
         "targets": [torch.zeros(1, 2, dtype=torch.long)],
     }
     assert math.isnan(
-        metrics_mod._calculate_mi_gini(
+        activation_mod._calculate_mi_gini(
             nn.Linear(2, 2),
             activation_data=activation_data,
             dep_manager=_DepMgr(),
@@ -450,8 +432,10 @@ def test_validate_metrics_environment_reports_missing_modules(monkeypatch) -> No
         def get_missing_dependencies(self):  # noqa: ANN001
             return self.missing_modules
 
-    monkeypatch.setattr(metrics_mod, "DependencyManager", _DepMgr)
-    assert metrics_mod.validate_metrics_environment() is True
+    monkeypatch.setattr(metrics_environment_mod, "DependencyManager", _DepMgr)
+    report = metrics_environment_mod.validate_metrics_environment()
+    assert report.ok is True
+    assert report.missing_dependencies == (("missing", "boom"),)
 
 
 def test_validate_perplexity_hits_poor_status_path() -> None:
@@ -473,7 +457,7 @@ def test_forward_loss_causal_handles_models_without_return_dict() -> None:
         def forward(self, input_ids, attention_mask=None, labels=None):  # noqa: ANN001
             return _Out()
 
-    loss, logits = metrics_mod._forward_loss_causal(
+    loss, logits = model_io_mod.forward_loss_causal(
         _Model(),
         input_ids=torch.zeros(1, 2, dtype=torch.long),
         labels=torch.zeros(1, 2, dtype=torch.long),

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_builder import REPORT_SCHEMA_VERSION
+from invarlock.reporting.report_make import REPORT_SCHEMA_VERSION
 
 
 def _cert_with_pm(kind: str, basis: str) -> dict:

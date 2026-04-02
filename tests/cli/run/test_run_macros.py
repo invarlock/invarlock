@@ -128,16 +128,31 @@ class _CoreRunnerExit:
 def _patch_common(monkeypatch, run_mod, provider):
     # Registry and provider (patch source modules to affect inside-function imports)
     import invarlock.cli.device as dev_mod
+    import invarlock.cli.run_runtime as runtime_mod
     import invarlock.core.registry as reg_mod
     import invarlock.core.runner as runner_mod
     import invarlock.eval.data as data_mod
-    import invarlock.reporting.report as report_mod
+    import invarlock.reporting.report_files as report_files_mod
 
     monkeypatch.setattr(reg_mod, "get_registry", lambda: _Registry())
     monkeypatch.setattr(data_mod, "get_provider", lambda *a, **k: provider)
     monkeypatch.setattr(data_mod, "EvaluationWindow", _EvalWin)
     # Tokenizer resolve
-    monkeypatch.setattr(run_mod, "resolve_tokenizer", lambda *a, **k: (object(), "tok"))
+    monkeypatch.setattr(
+        runtime_mod,
+        "resolve_tokenizer",
+        lambda *a, **k: (
+            types.SimpleNamespace(
+                eos_token="</s>",
+                pad_token="</s>",
+                eos_token_id=1,
+                pad_token_id=0,
+                vocab_size=32,
+                get_vocab=lambda: {"<pad>": 0, "</s>": 1},
+            ),
+            "tok",
+        ),
+    )
     # Device is valid CPU
     monkeypatch.setattr(dev_mod, "resolve_device", lambda *a, **k: "cpu")
     monkeypatch.setattr(
@@ -146,11 +161,15 @@ def _patch_common(monkeypatch, run_mod, provider):
     # Provide lightweight CoreRunner implementation
     monkeypatch.setattr(runner_mod, "CoreRunner", _CoreRunnerExit)
 
-    # Save report stub that exits cleanly
-    def _save_report_stub(*a, **k):
-        raise typer.Exit(0)
+    # Save report stub that keeps the macro path lightweight but successful.
+    def _save_report_stub(report, out_dir, formats=None, filename_prefix="report"):
+        out_dir = Path(out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        report_path = out_dir / f"{filename_prefix}.json"
+        report_path.write_text(json.dumps(report, default=str), encoding="utf-8")
+        return {"json": report_path}
 
-    monkeypatch.setattr(report_mod, "save_report", _save_report_stub)
+    monkeypatch.setattr(report_files_mod, "save_report", _save_report_stub)
 
 
 def _write_cfg(path: Path, content: dict) -> Path:
@@ -197,9 +216,11 @@ def test_run_macro_dev_flow_quick_exit(
         },
     )
     _patch_common(monkeypatch, run_mod, _ProviderDev())
-    with pytest.raises(typer.Exit) as ei:
-        run_mod.run_command(config=str(cfg), device="cpu", profile="dev", baseline=None)
-    assert ei.value.exit_code == 0
+    report_path = run_mod.run_command(
+        config=str(cfg), device="cpu", profile="dev", baseline=None
+    )
+    assert isinstance(report_path, Path)
+    assert report_path.suffix == ".json"
 
 
 def test_run_macro_release_flow_with_capacity(
@@ -224,12 +245,15 @@ def test_run_macro_release_flow_with_capacity(
         },
     )
     _patch_common(monkeypatch, run_mod, _ProviderRelease())
-    with pytest.raises(typer.Exit) as ei:
-        run_mod.run_command(
+    try:
+        report_path = run_mod.run_command(
             config=str(cfg), device="cpu", profile="release", baseline=None
         )
-    # Release flow may fail due to window non-overlap in this stub; acceptance of capacity path is sufficient
-    assert ei.value.exit_code in (0, 1)
+    except typer.Exit as exc:
+        assert exc.exit_code == 1
+    else:
+        assert isinstance(report_path, Path)
+        assert report_path.suffix == ".json"
 
 
 def test_run_macro_with_baseline_schedule(
@@ -249,8 +273,8 @@ def test_run_macro_with_baseline_schedule(
     )
     baseline = _write_baseline(tmp_path / "baseline.json", preview=1, final=1)
     _patch_common(monkeypatch, run_mod, _ProviderDev())
-    with pytest.raises(typer.Exit) as ei:
-        run_mod.run_command(
-            config=str(cfg), device="cpu", profile="dev", baseline=str(baseline)
-        )
-    assert ei.value.exit_code == 0
+    report_path = run_mod.run_command(
+        config=str(cfg), device="cpu", profile="dev", baseline=str(baseline)
+    )
+    assert isinstance(report_path, Path)
+    assert report_path.suffix == ".json"

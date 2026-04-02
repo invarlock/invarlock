@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 import typer
 
-from invarlock.cli.commands import verify as verify_mod
 from invarlock.cli.commands.verify import verify_command
+from invarlock.reporting import verify_contract as verify_mod
 
 
 def _w(p: Path, payload: dict) -> Path:
@@ -73,7 +73,7 @@ def test_verify_counts_and_drift_errors(tmp_path: Path, capsys) -> None:
     with pytest.raises(typer.Exit) as ei:
         verify_command([p], baseline=None, profile="dev", json_out=True)
     out = json.loads(capsys.readouterr().out)
-    assert out["resolution"]["exit_code"] == 1
+    assert "resolution" not in out
     assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 1
 
 
@@ -87,7 +87,7 @@ def test_verify_drift_band_override_allows_wider_drift(tmp_path: Path, capsys) -
     with pytest.raises(typer.Exit) as ei:
         verify_command([p], baseline=None, profile="dev", json_out=True)
     out = json.loads(capsys.readouterr().out)
-    assert out["resolution"]["exit_code"] == 0
+    assert "resolution" not in out
     assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 0
 
 
@@ -116,7 +116,7 @@ def test_verify_json_results_handle_load_error_in_summary(
         verify_command([cert_path], baseline=None, profile="dev", json_out=True)
 
     out = json.loads(capsys.readouterr().out)
-    assert out["resolution"]["exit_code"] == 1
+    assert "resolution" not in out
     # Even with load error in summary, we should still emit a result record
     assert isinstance(out.get("results"), list) and out["results"]
     assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 1

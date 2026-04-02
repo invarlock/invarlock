@@ -4,9 +4,9 @@ import math
 
 import pytest
 
-from invarlock.reporting.report_builder import (
+from invarlock.reporting.report_make import make_report
+from invarlock.reporting.report_schema import (
     REPORT_JSON_SCHEMA,
-    make_report,
     validate_report,
 )
 

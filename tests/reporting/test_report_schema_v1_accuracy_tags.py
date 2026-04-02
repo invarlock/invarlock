@@ -1,4 +1,4 @@
-from invarlock.reporting.report_builder import REPORT_JSON_SCHEMA
+from invarlock.reporting.report_make import REPORT_JSON_SCHEMA
 
 
 def test_schema_accepts_counts_source_and_estimated():

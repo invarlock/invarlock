@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 
 
 def test_drift_ci_computed_from_preview_and_final_ci():
@@ -38,10 +38,17 @@ def test_drift_ci_computed_from_preview_and_final_ci():
     baseline = {
         "run_id": "b",
         "model_id": "m",
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+            }
+        },
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
     with patch(
-        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+        "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):
         cert = make_report(report, baseline)
     pm = cert.get("primary_metric", {})

@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from invarlock.reporting.report_builder import (
+from invarlock.reporting import render_markdown as render_markdown_mod
+from invarlock.reporting import report_summary as report_summary_mod
+from invarlock.reporting.render import (
     render_report_markdown,
-    validate_report,
 )
+from invarlock.reporting.report_schema import validate_report
 
 
 def _mk_cert() -> dict:
@@ -37,17 +39,12 @@ def _mk_cert() -> dict:
     }
 
 
-def test_render_report_markdown_invalid_raises() -> None:
+def test_render_report_markdown_is_presentation_only() -> None:
     cert = _mk_cert()
-    # Break schema version to make it invalid; validate_report should be False
     cert["schema_version"] = "invalid"
     assert validate_report(cert) is False
-    try:
-        render_report_markdown(cert)
-    except ValueError:
-        pass
-    else:
-        raise AssertionError("Expected ValueError for invalid cert")
+    md = render_report_markdown(cert)
+    assert "# InvarLock Evaluation Report" in md
 
 
 def test_validate_evaluation_report_rejects_unknown_validation_keys() -> None:
@@ -69,6 +66,49 @@ def test_render_report_markdown_tolerates_missing_generated_at() -> None:
     assert "## Contents" not in md
     assert "## Evaluation Dashboard" not in md
     assert "## Executive Summary" in md
+
+
+def test_render_report_markdown_uses_precomputed_quality_gates_view_model(
+    monkeypatch,
+) -> None:
+    cert = _mk_cert()
+    summary = report_summary_mod.QualityGatesSummary(
+        overall_pass=True,
+        overall_status="✅ PASS",
+        rows=(
+            report_summary_mod.QualityGateRow(
+                label="Primary Metric Acceptable",
+                status="✅ PASS",
+                measured="1.000x",
+                threshold="≤ 1.10x",
+                basis="point",
+                description="Ratio vs baseline",
+            ),
+        ),
+        hysteresis_applied=True,
+    )
+    seen: dict[str, object] = {}
+
+    def fake_build_quality_gates_summary(
+        evaluation_report: dict[str, object],
+    ) -> report_summary_mod.QualityGatesSummary:
+        seen["evaluation_report"] = evaluation_report
+        return summary
+
+    monkeypatch.setattr(
+        render_markdown_mod,
+        "build_quality_gates_summary",
+        fake_build_quality_gates_summary,
+    )
+
+    md = render_report_markdown(cert)
+
+    assert seen["evaluation_report"] == cert
+    assert (
+        "| Primary Metric Acceptable | ✅ PASS | 1.000x | ≤ 1.10x | point | Ratio vs baseline |"
+        in md
+    )
+    assert "- Note: hysteresis applied to gate boundary" in md
 
 
 def test_render_report_markdown_hides_empty_window_plan_summary() -> None:

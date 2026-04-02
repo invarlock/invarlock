@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_builder import (
-    _compute_quality_overhead_from_guard,
-    make_report,
-)
+from invarlock.reporting.report_make import make_report
+from invarlock.reporting.report_overhead import compute_quality_overhead_from_guard
 
 
 def _acc_report(correct: int, total: int) -> dict:
@@ -19,7 +17,7 @@ def test_quality_overhead_accuracy_delta_pp_basis() -> None:
     # Bare = 70%, Guarded = 68% → -2.0 pp delta
     bare = _acc_report(70, 100)
     guarded = _acc_report(68, 100)
-    out = _compute_quality_overhead_from_guard(
+    out = compute_quality_overhead_from_guard(
         {"bare_report": bare, "guarded_report": guarded}, pm_kind_hint="accuracy"
     )
     assert isinstance(out, dict) and out.get("basis") == "delta_pp"

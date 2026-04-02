@@ -34,7 +34,7 @@ The CLI example above uses the secure-default runtime container. Add
 intentionally bypass that boundary.
 
 ```python
-from invarlock.adapters import HF_Auto_Adapter
+from invarlock.adapters.auto import HF_Auto_Adapter
 
 adapter = HF_Auto_Adapter()
 model = adapter.load_model("gpt2", device="auto")
@@ -42,7 +42,7 @@ print(adapter.describe(model)["model_type"])
 ```
 
 > Adapter availability is broader than the published assurance basis. GPT-2 and
-> BERT currently back the published calibrated basis; repo-shipped pilot configs
+> BERT back the published calibrated basis; repo-shipped pilot configs
 > for Mistral 7B, Qwen2 7B, Qwen2.5 14B, and additional experimental families are for
 > experimentation until supporting artifacts are attached. See the Model Family
 > Catalog for the authoritative family-by-family inventory.

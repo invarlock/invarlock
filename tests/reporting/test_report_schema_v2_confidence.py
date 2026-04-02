@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from invarlock.reporting.report_builder import (
+from invarlock.reporting.report_make import (
     REPORT_JSON_SCHEMA,
     make_report,
 )

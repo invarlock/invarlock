@@ -1,12 +1,16 @@
 import os
+import shutil
 import subprocess
 import sys
 import zipfile
+from pathlib import Path
 
 import pytest
 
 
 def _build_wheel(tmp_path):
+    repo_root = Path(__file__).resolve().parents[3]
+    shutil.rmtree(repo_root / "build", ignore_errors=True)
     subprocess.run(
         [
             sys.executable,

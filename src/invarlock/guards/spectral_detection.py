@@ -10,6 +10,15 @@ from ._estimators import frobenius_norm_sq, row_col_norm_extrema
 from .spectral_measurement import compute_sigma_max
 from .spectral_policy import default_family_caps
 
+_SPECTRAL_CHECK_ERRORS = (
+    ArithmeticError,
+    AttributeError,
+    OverflowError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 def should_process_module(name: str, module: Any, scope: str) -> bool:
     """Determine if a module should be processed based on scope."""
@@ -339,7 +348,7 @@ def detect_spectral_violations(
                         sr_fatal = float(sr_cfg.get("fatal_ratio", 0.25))
                         nc_warn = float(nc_cfg.get("warn_ratio", 0.25))
                         nc_fatal = float(nc_cfg.get("fatal_ratio", 0.10))
-                    except Exception:
+                    except _SPECTRAL_CHECK_ERRORS:
                         sr_warn, sr_fatal, nc_warn, nc_fatal = 0.5, 0.25, 0.25, 0.10
 
                     if (
@@ -372,7 +381,7 @@ def detect_spectral_violations(
                                         ),
                                     }
                                 )
-                        except Exception:
+                        except _SPECTRAL_CHECK_ERRORS:
                             pass
 
                     if (
@@ -409,9 +418,9 @@ def detect_spectral_violations(
                                         ),
                                     }
                                 )
-                        except Exception:
+                        except _SPECTRAL_CHECK_ERRORS:
                             pass
-        except Exception as error:
+        except _SPECTRAL_CHECK_ERRORS as error:
             guard._log_event(
                 "violation_check_error",
                 level="WARN",

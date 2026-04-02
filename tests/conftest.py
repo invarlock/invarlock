@@ -19,7 +19,6 @@ def _restore_invarlock_env():
         "INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS",
         "INVARLOCK_RUNTIME_IMAGE",
         "INVARLOCK_RUNTIME_IMAGE_DIGEST",
-        "INVARLOCK_RUNTIME_VERIFIER",
     ]
     saved = {k: os.environ.get(k) for k in keys}
     try:

@@ -119,6 +119,22 @@ def test_invariants_non_finite_buffer_detected():
     assert any(v.get("type") == "non_finite_tensor" for v in out.violations)
 
 
+def test_invariants_surface_evidence_gaps_instead_of_sentinel_clean_values():
+    class BrokenModel(TinyModel):
+        def parameters(self, recurse: bool = True):  # type: ignore[override]
+            raise RuntimeError("parameter enumeration failed")
+
+    model = BrokenModel()
+    guard = InvariantsGuard(strict_mode=True, on_fail="abort")
+    guard.prepare(model, adapter=None, calib=None, policy={})
+
+    outcome = guard.finalize(model)
+
+    assert outcome.passed is False
+    assert any(v.get("type") == "evidence_gap" for v in outcome.violations)
+    assert outcome.metrics["evidence_gaps"] >= 1
+
+
 def test_invariants_tokenizer_mismatch_detected():
     model = TinyModel(vocab_size=32, hidden=8)
     guard = InvariantsGuard()

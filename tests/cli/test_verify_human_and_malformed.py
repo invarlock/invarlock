@@ -78,7 +78,7 @@ def test_verify_json_out_malformed_json_triggers_malformed_reason(tmp_path: Path
     assert len(lines) == 1
     obj = json.loads(lines[0])
     assert obj.get("summary", {}).get("reason") == "malformed"
-    assert obj.get("resolution", {}).get("exit_code") in (1, 2)
+    assert "resolution" not in obj
 
 
 def test_verify_human_mode_failure_prints_fail_lines(tmp_path: Path):

@@ -43,7 +43,7 @@ Fail conditions (gate evaluated):
 
 - `guard_overhead.overhead_ratio > 1 + guard_overhead.overhead_threshold`.
 - If the ratio cannot be computed, the check is marked `evaluated=false` and
-  soft-passes (reported in `guard_overhead.errors`) to avoid spurious failures
+  soft-passes (reported in `guard_overhead.diagnostics`) to avoid spurious failures
   in tiny runs.
 
 ## Observability & Provenance

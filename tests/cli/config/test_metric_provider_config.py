@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from invarlock.cli.commands.run import _resolve_metric_and_provider
-from invarlock.cli.config import InvarLockConfig
+from invarlock.cli.run_pairing import resolve_metric_and_provider
+from invarlock.core.config_runtime import InvarLockConfig
 from invarlock.model_profile import detect_model_profile
 
 
@@ -14,7 +14,7 @@ def test_config_provider_kind_mapping_from_dict():
         }
     )
     profile = detect_model_profile(cfg.model.id, adapter=cfg.model.adapter)
-    mk, pk, _ = _resolve_metric_and_provider(cfg, profile, resolved_loss_type="seq2seq")
+    mk, pk, _ = resolve_metric_and_provider(cfg, profile, resolved_loss_type="seq2seq")
     assert pk == "seq2seq"
     assert mk == "ppl_seq2seq"
 
@@ -28,7 +28,7 @@ def test_metric_resolution_defaults_to_profile_when_auto():
         }
     )
     profile = detect_model_profile(cfg.model.id, adapter=cfg.model.adapter)
-    mk, pk, _ = _resolve_metric_and_provider(cfg, profile, resolved_loss_type="mlm")
+    mk, pk, _ = resolve_metric_and_provider(cfg, profile, resolved_loss_type="mlm")
     assert mk == "ppl_mlm"  # profile default
     assert pk == "text_lm"
 
@@ -43,7 +43,7 @@ def test_config_overrides_env_flag_for_metric_kind(monkeypatch):
         }
     )
     profile = detect_model_profile(cfg.model.id, adapter=cfg.model.adapter)
-    mk, pk, opts = _resolve_metric_and_provider(
+    mk, pk, opts = resolve_metric_and_provider(
         cfg, profile, resolved_loss_type="causal"
     )
     assert mk == "accuracy"  # config wins

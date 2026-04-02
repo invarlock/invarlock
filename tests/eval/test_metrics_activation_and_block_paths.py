@@ -3,8 +3,8 @@ from types import SimpleNamespace
 import torch
 import torch.nn as nn
 
-from invarlock.eval.metrics import (
-    MetricsConfig,
+from invarlock.eval.metrics import MetricsConfig
+from invarlock.eval.metrics_activation import (
     _collect_activations,
     _locate_transformer_blocks_enhanced,
     _perform_pre_eval_checks,
@@ -19,7 +19,7 @@ def test_collect_activations_hidden_states_short():
             hs = [torch.randn(B, T, 4) for _ in range(2)]
             return SimpleNamespace(hidden_states=hs)
 
-    cfg = MetricsConfig(oracle_windows=1, progress_bars=False)
+    cfg = MetricsConfig(oracle_windows=1)
     dl = [{"input_ids": torch.ones(1, 4, dtype=torch.long)}]
     out = _collect_activations(M(), dl, cfg, torch.device("cpu"))
     assert isinstance(out, dict)
