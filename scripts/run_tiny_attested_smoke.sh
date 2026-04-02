@@ -87,6 +87,21 @@ resolve_container_engine() {
   return 1
 }
 
+ensure_current_runtime_image() {
+  if [[ "$MODE" != "attested" ]]; then
+    return 0
+  fi
+  if [[ -n "${INVARLOCK_RUNTIME_IMAGE:-}" && "${INVARLOCK_RUNTIME_IMAGE}" != "invarlock-runtime:local" ]]; then
+    return 0
+  fi
+  if ! command -v docker >/dev/null 2>&1 || ! command -v make >/dev/null 2>&1; then
+    return 0
+  fi
+  echo "[smoke] refreshing local attested runtime image"
+  make runtime-image
+  export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:local"
+}
+
 seed_runtime_image_digest() {
   if [[ "$MODE" != "attested" ]]; then
     return 0
@@ -153,6 +168,7 @@ ensure_writable_hf_cache() {
 }
 
 ensure_writable_hf_cache
+ensure_current_runtime_image
 seed_runtime_image_digest
 
 if [[ "${INVARLOCK_SMOKE_CACHE_COMPLETE:-0}" == "1" ]]; then

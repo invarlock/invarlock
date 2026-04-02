@@ -6,13 +6,16 @@ set -uo pipefail
 
 ts() { date +"%Y-%m-%dT%H:%M:%S%z"; }
 
-# Resolve CLI runner: prefer installed `invarlock`, else use `python -m invarlock` with local src path.
-if command -v invarlock >/dev/null 2>&1; then
-  CLI="invarlock"
-else
-  export PYTHONPATH="$(pwd)/src:${PYTHONPATH:-}"
-  CLI="python -m invarlock"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+PYTHON_BIN="${INVARLOCK_PYTHON:-}"
+if [[ -z "${PYTHON_BIN}" ]]; then
+  PYTHON_BIN="$(bash "$ROOT/scripts/select_python.sh")"
 fi
+export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
+printf -v CLI '%q ' "$PYTHON_BIN" -m invarlock
+CLI="${CLI% }"
 
 LOG_FILE="$(mktemp -t invarlock_cli_smoke.XXXXXX.log)"
 
@@ -84,7 +87,7 @@ run_to() {
     echo "[ts] $(ts)"
   } >>"$LOG_FILE"
   set +e
-  SMOKE_CMD="$cmd" SMOKE_TIMEOUT="$seconds" python - <<'PY' >>"$LOG_FILE" 2>&1
+  SMOKE_CMD="$cmd" SMOKE_TIMEOUT="$seconds" "$PYTHON_BIN" - <<'PY' >>"$LOG_FILE" 2>&1
 import os, subprocess, sys
 cmd = os.environ.get("SMOKE_CMD", "")
 if not cmd:
@@ -127,7 +130,7 @@ PY
 have_adapters_stack() {
   bash -lc "$CLI advanced plugins adapters --json >/dev/null 2>&1" || return 1
   # Try importing torch+transformers for a hard check (quick)
-  python - <<'PY'
+  "$PYTHON_BIN" - <<'PY'
 import sys
 try:
     import torch  # noqa: F401
@@ -195,7 +198,7 @@ printf '%s\n' '[{"path":"metrics.pm_ratio.ratio_limit_base","value":1.1}]' >"$TM
 printf '%s\n' '{"support_tiers":["published_basis"]}' >"$TMP_DIR/policy_compatibility.json"
 PROOF_PACK_REPORT_DIR="$TMP_DIR/proof_pack_report"
 mkdir -p "$PROOF_PACK_REPORT_DIR"
-PROOF_PACK_REPORT_DIR="$PROOF_PACK_REPORT_DIR" python - <<'PY'
+PROOF_PACK_REPORT_DIR="$PROOF_PACK_REPORT_DIR" "$PYTHON_BIN" - <<'PY'
 import hashlib
 import json
 import math

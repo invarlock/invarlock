@@ -89,6 +89,21 @@ load_dataset("wikitext", "wikitext-2-raw-v1", split="validation")
 PY
 }
 
+ensure_current_runtime_image() {
+  if [[ "$MODE" != "attested" ]]; then
+    return 0
+  fi
+  if [[ -n "${INVARLOCK_RUNTIME_IMAGE:-}" && "${INVARLOCK_RUNTIME_IMAGE}" != "invarlock-runtime:local" ]]; then
+    return 0
+  fi
+  if ! command -v docker >/dev/null 2>&1 || ! command -v make >/dev/null 2>&1; then
+    return 0
+  fi
+  echo "[smoke] refreshing local attested runtime image"
+  make runtime-image
+  export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:local"
+}
+
 if seed_hf_cache_from_host; then
   export INVARLOCK_SMOKE_CACHE_SEEDED=1
 elif prefetch_hf_assets_on_host && seed_hf_cache_from_host; then
@@ -119,6 +134,7 @@ ensure_writable_hf_cache() {
 }
 
 ensure_writable_hf_cache
+ensure_current_runtime_image
 
 if [[ "${INVARLOCK_SMOKE_CACHE_COMPLETE:-0}" == "1" ]]; then
   export HF_HUB_OFFLINE=1

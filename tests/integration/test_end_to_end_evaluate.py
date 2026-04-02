@@ -56,6 +56,9 @@ def test_gpt2_smoke_campaign_script_is_executable() -> None:
     assert "command -v invarlock" not in contents
     assert "INVARLOCK_SMOKE_CACHE_COMPLETE" in contents
     assert "prefetch_hf_assets_on_host" in contents
+    assert "ensure_current_runtime_image" in contents
+    assert 'echo "[smoke] refreshing local attested runtime image"' in contents
+    assert "make runtime-image" in contents
     assert "prefetching GPT-2 + WikiText-2 into host HF cache" in contents
     assert "evaluation report verification failed" in contents
     assert "proof-pack verification failed" in contents
@@ -73,6 +76,9 @@ def test_tiny_attested_smoke_campaign_script_is_executable() -> None:
     assert "sshleifer/tiny-gpt2" in contents
     assert "tiny_relax: true" in contents
     assert "prefetch_tiny_model_on_host" in contents
+    assert "ensure_current_runtime_image" in contents
+    assert 'echo "[smoke] refreshing local attested runtime image"' in contents
+    assert "make runtime-image" in contents
     assert "INVARLOCK_RUNTIME_IMAGE_DIGEST" in contents
     assert "runtime_verify_diagnostics" in contents
     assert '--profile "$PROFILE" --json' in contents
@@ -85,3 +91,36 @@ def test_tiny_attested_smoke_campaign_script_is_executable() -> None:
     assert '--signing-key "$PROOF_PACK_SIGNING_KEY"' in contents
     assert "evaluation report verification failed" in contents
     assert "proof-pack verification failed" in contents
+
+
+def test_cli_exhaustive_smoke_uses_repo_selected_python() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script_path = repo_root / "scripts" / "cli_exhaustive_smoke.sh"
+    assert script_path.exists(), "Expected scripts/cli_exhaustive_smoke.sh to exist"
+    assert os.access(script_path, os.X_OK), (
+        "cli_exhaustive_smoke.sh should be executable"
+    )
+
+    contents = script_path.read_text(encoding="utf-8")
+    assert 'PYTHON_BIN="${INVARLOCK_PYTHON:-}"' in contents
+    assert 'PYTHON_BIN="$(bash "$ROOT/scripts/select_python.sh")"' in contents
+    assert 'export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"' in contents
+    assert "printf -v CLI '%q ' \"$PYTHON_BIN\" -m invarlock" in contents
+    assert "\"$PYTHON_BIN\" - <<'PY'" in contents
+    assert "command -v invarlock" not in contents
+
+
+def test_run_cpu_telemetry_uses_repo_selected_python() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script_path = repo_root / "scripts" / "run_cpu_telemetry.sh"
+    assert script_path.exists(), "Expected scripts/run_cpu_telemetry.sh to exist"
+    assert os.access(script_path, os.X_OK), "run_cpu_telemetry.sh should be executable"
+
+    contents = script_path.read_text(encoding="utf-8")
+    assert 'PYTHON_BIN="${INVARLOCK_PYTHON:-}"' in contents
+    assert 'PYTHON_BIN="$(bash "$ROOT/scripts/select_python.sh")"' in contents
+    assert 'export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"' in contents
+    assert 'CLI=("$PYTHON_BIN" -m invarlock)' in contents
+    assert 'INVARLOCK_ALLOW_NETWORK=1 "${CLI[@]}" evaluate' in contents
+    assert '"${CLI[@]}" verify' in contents
+    assert "command -v invarlock" not in contents
