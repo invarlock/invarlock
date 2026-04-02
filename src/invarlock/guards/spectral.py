@@ -14,6 +14,7 @@ from typing import Any
 import numpy as np
 
 from invarlock.core.api import Guard
+from invarlock.core.types import GuardValidationResult
 
 from . import spectral_control as _spectral_control
 from . import spectral_detection as _spectral_detection
@@ -38,7 +39,7 @@ class SpectralGuard(Guard):
         self.config = dict(kwargs)
         self.prepared = False
         self.baseline_metrics: dict[str, Any] = {}
-        self.events: list[dict[str, Any]] = []
+        self._event_records: list[dict[str, Any]] = []
         self.current_metrics: dict[str, float] = {}
         self.pre_edit_metrics: dict[str, float] = {}
         self.violations: list[dict[str, Any]] = []
@@ -60,56 +61,18 @@ class SpectralGuard(Guard):
         )
         self.ignore_preview_inflation = kwargs.get("ignore_preview_inflation", True)
         self.max_caps = kwargs.get("max_caps", 5)
-        self.multiple_testing = kwargs.get(
-            "multiple_testing", {"method": "bh", "alpha": 0.05, "m": 4}
+        self.multiple_testing = _spectral_policy.normalize_multiple_testing_config(
+            kwargs.get("multiple_testing")
         )
-
-        estimator_cfg = (
-            kwargs.get("estimator") if isinstance(kwargs.get("estimator"), dict) else {}
+        self.estimator = _spectral_policy.normalize_estimator_config(
+            kwargs.get("estimator")
         )
-        try:
-            est_iters = int(estimator_cfg.get("iters", 4) or 4)
-        except Exception:
-            est_iters = 4
-        if est_iters < 1:
-            est_iters = 1
-        est_init = str(estimator_cfg.get("init", "ones") or "ones").strip().lower()
-        if est_init not in {"ones", "e0"}:
-            est_init = "ones"
-        self.estimator: dict[str, Any] = {
-            "type": "power_iter",
-            "iters": est_iters,
-            "init": est_init,
-        }
-
-        degeneracy_cfg = (
+        self.degeneracy = _spectral_policy.normalize_degeneracy_config(
             kwargs.get("degeneracy")
-            if isinstance(kwargs.get("degeneracy"), dict)
-            else {}
         )
-        stable_rank_cfg = (
-            degeneracy_cfg.get("stable_rank")
-            if isinstance(degeneracy_cfg, dict)
-            else {}
-        )
-        norm_collapse_cfg = (
-            degeneracy_cfg.get("norm_collapse")
-            if isinstance(degeneracy_cfg, dict)
-            else {}
-        )
-        self.degeneracy: dict[str, Any] = {
-            "enabled": bool(degeneracy_cfg.get("enabled", True)),
-            "stable_rank": {
-                "warn_ratio": float((stable_rank_cfg or {}).get("warn_ratio", 0.5)),
-                "fatal_ratio": float((stable_rank_cfg or {}).get("fatal_ratio", 0.25)),
-            },
-            "norm_collapse": {
-                "warn_ratio": float((norm_collapse_cfg or {}).get("warn_ratio", 0.25)),
-                "fatal_ratio": float(
-                    (norm_collapse_cfg or {}).get("fatal_ratio", 0.10)
-                ),
-            },
-        }
+        self.config["multiple_testing"] = self.multiple_testing
+        self.config["estimator"] = self.estimator
+        self.config["degeneracy"] = self.degeneracy
 
         self.baseline_sigmas: dict[str, float] = {}
         self.baseline_family_stats: dict[str, dict[str, float]] = {}
@@ -126,15 +89,54 @@ class SpectralGuard(Guard):
     def _log_event(
         self, operation: str, level: str = "INFO", message: str = "", **data: Any
     ) -> None:
-        event = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "component": "spectral_guard",
-            "operation": operation,
-            "level": level,
-            "message": message,
-            "data": data,
-        }
-        self.events.append(event)
+        level_code = str(level or "INFO").upper()
+        severity = {
+            "DEBUG": "debug",
+            "INFO": "info",
+            "WARN": "warning",
+            "WARNING": "warning",
+            "ERROR": "error",
+            "CRITICAL": "critical",
+        }.get(level_code, level_code.lower())
+        self._event_records.append(
+            {
+                "timestamp": datetime.utcnow().isoformat(),
+                "component": "spectral_guard",
+                "kind": operation,
+                "severity": severity,
+                "summary": message,
+                "details": dict(data),
+                "level_code": level_code,
+            }
+        )
+
+    @property
+    def diagnostic_records(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "timestamp": event["timestamp"],
+                "component": event["component"],
+                "kind": event["kind"],
+                "severity": event["severity"],
+                "summary": event["summary"],
+                "details": dict(event["details"]),
+            }
+            for event in self._event_records
+        ]
+
+    @property
+    def events(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "timestamp": event["timestamp"],
+                "component": event["component"],
+                "operation": event["kind"],
+                "level": event["level_code"],
+                "message": event["summary"],
+                "data": dict(event["details"]),
+            }
+            for event in self._event_records
+        ]
 
     def set_run_context(self, report: Any) -> None:
         ctx = getattr(report, "context", {}) or {}
@@ -231,13 +233,13 @@ class SpectralGuard(Guard):
 
     def validate(
         self, model: Any, adapter: Any, context: dict[str, Any]
-    ) -> dict[str, Any]:
+    ) -> GuardValidationResult:
         return _spectral_runtime.validate_guard(self, model, adapter, context)
 
     def finalize(self, model: Any) -> dict[str, Any]:
         result = _spectral_runtime.finalize_guard(self, model)
         try:
-            from invarlock.cli._evidence import maybe_dump_guard_evidence
+            from invarlock.reporting.evidence import maybe_dump_guard_evidence
 
             maybe_dump_guard_evidence(
                 ".",

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from invarlock.cli.commands.run import _compute_mask_positions_digest
+import pytest
+
+from invarlock.cli.run_pairing_helpers import _compute_mask_positions_digest
 from invarlock.eval.providers.seq2seq import Seq2SeqProvider
 from invarlock.eval.providers.text_lm import TextLMProvider
 
@@ -85,3 +87,59 @@ def test_seq2seq_provider_weights_match_target_tokens():
         tgt_mask = it["tgt_mask"]
         expected = sum(1 for t, m in zip(tgt_ids, tgt_mask, strict=False) if m)
         assert it["weights"] == expected
+
+
+def test_seq2seq_provider_default_schedule_and_digest():
+    provider = Seq2SeqProvider(
+        n=3,
+        src_len=5,
+        tgt_len=7,
+        pad_id=9,
+        bos_id=11,
+        eos_id=13,
+    )
+    assert provider.pairing_schedule() == ["ex0000", "ex0001", "ex0002"]
+    assert provider.digest() == {
+        "provider": "seq2seq",
+        "version": 1,
+        "pad_id": 9,
+        "eos_id": 13,
+        "bos_id": 11,
+    }
+
+
+def test_seq2seq_windows_resizes_and_falls_back_when_mask_lengths_mismatch():
+    class _Tok:
+        pad_token_id = 0
+
+    provider = Seq2SeqProvider(n=1, src_len=4, tgt_len=4, pad_id=0)
+
+    def fake_batches(*, seed, batch_size):  # noqa: ARG001
+        return [
+            {
+                "ids": ["ex0000", "ex0001"],
+                "src_ids": [[9, 8, 7, 6], [4, 3, 2, 1]],
+                "src_mask": [[1, 1], [1, 1, 1, 1]],
+                "tgt_ids": [[4, 5, 6, 2], [7, 8, 9, 2]],
+                "tgt_mask": [[1, 1, 1, 1], [1, 1, 1, 1]],
+                "weights": [4, 4],
+            }
+        ]
+
+    provider.batches = fake_batches  # type: ignore[method-assign]
+    prev, fin = provider.windows(_Tok(), seq_len=3, preview_n=1, final_n=1)
+    assert provider._n == 2
+    assert len(prev.input_ids[0]) == 3
+    assert prev.input_ids[0] == [9, 8, 7]
+    assert prev.attention_masks[0] == [1, 1, 1]
+    assert len(fin.input_ids) == 1
+
+
+def test_seq2seq_windows_rejects_empty_batches(monkeypatch):
+    class _Tok:
+        pad_token_id = 0
+
+    provider = Seq2SeqProvider(n=1)
+    monkeypatch.setattr(provider, "batches", lambda **kwargs: [])
+    with pytest.raises(ValueError, match="seq2seq provider produced no examples"):
+        provider.windows(_Tok(), seq_len=4, preview_n=1, final_n=1)

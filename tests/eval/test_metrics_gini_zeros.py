@@ -1,6 +1,6 @@
 import torch
 
-from invarlock.eval.metrics import _gini_vectorized
+from invarlock.eval.metrics_activation import _gini_vectorized
 
 
 def test_gini_vectorized_all_zeros_returns_nan():

@@ -2,15 +2,12 @@ from __future__ import annotations
 
 import torch.nn as nn
 
-from invarlock.guards.rmt_legacy import (
+import invarlock.guards.rmt as runtime_rmt
+from invarlock.guards.rmt_analysis import (
     analyze_weight_distribution,
     capture_baseline_mp_stats,
-    mp_bulk_edges,
-    rmt_detect_report,
-    rmt_detect_with_names,
-    rmt_growth_ratio,
-    within_deadband,
 )
+from invarlock.guards.rmt_math import mp_bulk_edges, rmt_growth_ratio, within_deadband
 
 
 def test_mp_bulk_edges_whitened_and_unwhitened() -> None:
@@ -45,10 +42,15 @@ def test_analyze_weight_distribution_paths() -> None:
         assert {"mean", "std", "min", "max", "sparsity"}.issubset(out.keys())
 
 
-def test_rmt_detect_wrappers_smoke() -> None:
+def test_runtime_detection_smoke() -> None:
     model = nn.Sequential(nn.Linear(6, 3), nn.ReLU(), nn.Linear(3, 2))
-    summary, per_layer = rmt_detect_report(model, threshold=10.0)
+    guard = runtime_rmt.RMTGuard(margin=10.0, correct=False)
+    guard.baseline_mp_stats = capture_baseline_mp_stats(model)
+    guard.baseline_sigmas = {
+        name: float(stats.get("sigma_base", 0.0) or 0.0)
+        for name, stats in guard.baseline_mp_stats.items()
+        if isinstance(stats, dict)
+    }
+    summary = guard._apply_rmt_detection_and_correction(model)
     assert isinstance(summary, dict)
-    assert isinstance(per_layer, list)
-    named = rmt_detect_with_names(model, threshold=10.0)
-    assert isinstance(named, dict)
+    assert isinstance(summary.get("per_layer"), list)

@@ -14,34 +14,50 @@ Steps:
 
 from __future__ import annotations
 
-import inspect
 import io
 import json
 import math
 import os
-import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, NoReturn
 
 import typer
+import yaml
 from rich.console import Console
 
 from invarlock import __version__ as INVARLOCK_VERSION
-
-from ...core.exceptions import MetricsError
-from ..adapter_auto import resolve_auto_adapter
-from ..config import _deep_merge as _merge  # reuse helper
-from ..security_helpers import (
-    configure_runtime_security,
-    emit_runtime_manifest,
-    maybe_delegate_model_command,
+from invarlock.exit_codes import resolve_command_exit_code
+from invarlock.runtime_security import (
+    RuntimeManifestExecution,
+    resolve_runtime_image,
+    resolve_runtime_image_digest,
 )
 
+from ...core.adapter_auto import resolve_auto_adapter
+from ...core.evaluate_contract import (
+    apply_edited_primary_metric_policy,
+    load_validated_baseline_report,
+    require_run_report_artifact,
+)
+from ...core.evaluate_plan import (
+    build_evaluate_command_plan,
+    build_subject_edit_run_config,
+    build_subject_noop_run_config,
+    normalize_model_id,
+    resolve_evaluate_execution_policy,
+    resolve_evaluate_tmp_dir,
+)
+from ...core.exceptions import ConfigError, ValidationError
+
 # Use the report group's programmatic entry for report generation
-from .report import report_command as _report
-from .run import _resolve_exit_code as _resolve_exit_code
+from ...reporting.report_contract import generate_reports
+from ..security_helpers import (
+    emit_runtime_manifest,
+    maybe_delegate_model_command,
+    runtime_security_scoped,
+)
 
 _LAZY_RUN_IMPORT = True
 
@@ -49,8 +65,34 @@ PHASE_BAR_WIDTH = 67
 VERBOSITY_QUIET = 0
 VERBOSITY_DEFAULT = 1
 VERBOSITY_VERBOSE = 2
+_QUIET_REPORT_LOAD_ERRORS = (json.JSONDecodeError, OSError, TypeError, ValueError)
+_CONSOLE_SUMMARY_ERRORS = (
+    AttributeError,
+    KeyError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+_CHILD_RUN_REPLAY_ERRORS = (
+    ConfigError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValidationError,
+    ValueError,
+)
+_EDIT_CONFIG_LOAD_ERRORS = (OSError, TypeError, ValueError, yaml.YAMLError)
+_TEXT_NORMALIZATION_ERRORS = (RuntimeError, TypeError, ValueError)
 
 console = Console()
+
+
+def _normalize_model_id(model_id: str, adapter: str) -> str:
+    return normalize_model_id(model_id, adapter)
+
+
+def _resolve_evaluate_tmp_dir() -> Path:
+    return resolve_evaluate_tmp_dir(os.environ.get("INVARLOCK_EVALUATE_TMP_DIR"))
 
 
 def _render_banner_lines(title: str, context: str) -> list[str]:
@@ -89,6 +131,27 @@ def _format_ratio(value: Any) -> str:
     return f"{val:.3f}"
 
 
+def _evaluation_report_manifest_execution(
+    *,
+    mode: str,
+    allow_network: bool,
+    allow_remote_code: bool,
+    allow_third_party_plugins: bool,
+) -> RuntimeManifestExecution | None:
+    normalized_mode = str(mode or "").strip().lower()
+    if normalized_mode != "attested":
+        return None
+    return RuntimeManifestExecution(
+        execution_mode="container",
+        container_execution=True,
+        image_ref=resolve_runtime_image(),
+        image_digest=resolve_runtime_image_digest(),
+        allow_network=allow_network,
+        allow_remote_code=allow_remote_code,
+        allow_third_party_plugins=allow_third_party_plugins,
+    )
+
+
 def _resolve_verbosity(quiet: bool, verbose: bool) -> int:
     if quiet and verbose:
         console.print("--quiet and --verbose are mutually exclusive")
@@ -115,6 +178,7 @@ def _suppress_child_output(enabled: bool) -> Iterator[io.StringIO | None]:
     if not enabled:
         yield None
         return
+    from .. import run_execution as run_exec_mod
     from . import report as report_mod
     from . import run as run_mod
 
@@ -122,6 +186,7 @@ def _suppress_child_output(enabled: bool) -> Iterator[io.StringIO | None]:
     quiet_console = Console(file=buffer, force_terminal=False, color_system=None)
     with (
         _override_console(run_mod, quiet_console),
+        _override_console(run_exec_mod, quiet_console),
         _override_console(report_mod, quiet_console),
     ):
         yield buffer
@@ -130,27 +195,27 @@ def _suppress_child_output(enabled: bool) -> Iterator[io.StringIO | None]:
 def _print_quiet_summary(
     *,
     report_out: Path,
-    source: str,
-    edited: str,
+    baseline: str,
+    subject: str,
     profile: str,
 ) -> None:
     report_path = report_out / "evaluation.report.json"
     console.print(f"INVARLOCK v{INVARLOCK_VERSION} · EVALUATE")
-    console.print(f"Baseline: {source} -> Subject: {edited} · Profile: {profile}")
+    console.print(f"Baseline: {baseline} -> Subject: {subject} · Profile: {profile}")
     if not report_path.exists():
         console.print(f"Output: {report_out}")
         return
     try:
         with report_path.open("r", encoding="utf-8") as fh:
             evaluation_report = json.load(fh)
-    except Exception:
+    except _QUIET_REPORT_LOAD_ERRORS:
         console.print(f"Output: {report_path}")
         return
     if not isinstance(evaluation_report, dict):
         console.print(f"Output: {report_path}")
         return
     try:
-        from invarlock.reporting.render import (
+        from invarlock.reporting.report_console import (
             compute_console_validation_block as _console_block,
         )
 
@@ -161,7 +226,7 @@ def _print_quiet_summary(
             sum(1 for row in rows if row.get("ok")) if isinstance(rows, list) else 0
         )
         status = "PASS" if block.get("overall_pass") else "FAIL"
-    except Exception:
+    except _CONSOLE_SUMMARY_ERRORS:
         total = 0
         passed = 0
         status = "UNKNOWN"
@@ -175,24 +240,7 @@ def _print_quiet_summary(
     console.print(f"Output: {report_path}")
 
 
-def _latest_run_report(run_root: Path) -> Path | None:
-    if not run_root.exists():
-        return None
-    candidates = sorted([p for p in run_root.iterdir() if p.is_dir()])
-    if not candidates:
-        return None
-    latest = candidates[-1]
-    for f in [latest / "report.json", latest / f"{latest.name}.json"]:
-        if f.exists():
-            return f
-    # Fallback: first JSON in the directory
-    jsons = list(latest.glob("*.json"))
-    return jsons[0] if jsons else None
-
-
 def _load_yaml(path: Path) -> dict[str, Any]:
-    import yaml
-
     with path.open("r", encoding="utf-8") as fh:
         data = yaml.safe_load(fh) or {}
     if not isinstance(data, dict):
@@ -201,192 +249,50 @@ def _load_yaml(path: Path) -> dict[str, Any]:
 
 
 def _dump_yaml(path: Path, data: dict[str, Any]) -> None:
-    import yaml
-
     with path.open("w", encoding="utf-8") as fh:
         yaml.safe_dump(data, fh, sort_keys=False)
 
 
-def _resolve_evaluate_tmp_dir() -> Path:
-    """Return the on-disk scratch directory for `invarlock evaluate`.
-
-    Evaluate generates merged YAML configs for baseline/subject runs so
-    downstream `invarlock run` flows remain traceable. We keep these files
-    under `./tmp/.evaluate` by default to avoid cluttering the working tree.
-    Each invocation gets an isolated subdirectory so concurrent evaluate
-    commands cannot overwrite each other's generated YAMLs.
-    """
-
-    candidate = os.environ.get("INVARLOCK_EVALUATE_TMP_DIR")
-    if candidate:
-        tmp_dir = Path(candidate).expanduser()
-    else:
-        scratch_root = Path("tmp") / ".evaluate"
-        scratch_root.mkdir(parents=True, exist_ok=True)
-        tmp_dir = Path(tempfile.mkdtemp(prefix="run-", dir=str(scratch_root))).resolve()
-    tmp_dir.mkdir(parents=True, exist_ok=True)
-    return tmp_dir
-
-
-def _normalize_model_id(model_id: str, adapter_name: str) -> str:
-    """Normalize model identifiers for adapters.
-
-    - Accepts optional "hf:" prefix for Hugging Face repo IDs and strips it
-      before passing to transformers APIs.
-    """
-    mid = str(model_id or "").strip()
-    try:
-        if str(adapter_name).startswith("hf_") and mid.startswith("hf:"):
-            return mid.split(":", 1)[1]
-    except Exception:
-        pass
-    return mid
-
-
+@runtime_security_scoped
 def evaluate_command(
-    # Primary names for programmatic/test compatibility
-    source: str = typer.Option(
-        ..., "--source", "--baseline", help="Baseline model dir or Hub ID"
-    ),
-    edited: str = typer.Option(
-        ..., "--edited", "--subject", help="Subject model dir or Hub ID"
-    ),
-    baseline_report: str | None = typer.Option(
-        None,
-        "--baseline-report",
-        help=(
-            "Reuse an existing baseline run report.json (skips baseline evaluation). "
-            "Must include stored evaluation windows (e.g., set INVARLOCK_STORE_EVAL_WINDOWS=1)."
-        ),
-    ),
-    adapter: str = typer.Option(
-        "auto", "--adapter", help="Adapter name or 'auto' to resolve"
-    ),
-    device: str | None = typer.Option(
-        None,
-        "--device",
-        help="Device override for runs (auto|cuda|mps|cpu)",
-    ),
-    profile: str = typer.Option(
-        "ci", "--profile", help="Profile (ci|release|ci_cpu|dev)"
-    ),
-    tier: str = typer.Option("balanced", "--tier", help="Tier label for context"),
-    preset: str | None = typer.Option(
-        None,
-        "--preset",
-        help=(
-            "Universal preset path to use (defaults to causal or masked preset"
-            " based on adapter)"
-        ),
-    ),
-    out: str = typer.Option("runs", "--out", help="Base output directory"),
-    report_out: str = typer.Option(
-        "reports/eval", "--report-out", help="Evaluation report output directory"
-    ),
-    edit_config: str | None = typer.Option(
-        None, "--edit-config", help="Edit preset to apply a demo edit"
-    ),
-    edit_label: str | None = typer.Option(
-        None,
-        "--edit-label",
-        help=(
-            "Edit algorithm label for BYOE models. Use 'noop' for baseline, "
-            "'quant_rtn' etc. for built-in edits, 'custom' for pre-edited models."
-        ),
-    ),
-    quiet: bool = typer.Option(
-        False, "--quiet", "-q", help="Minimal output (suppress run/report detail)"
-    ),
-    verbose: bool = typer.Option(
-        False, "--verbose", "-v", help="Verbose output (include debug details)"
-    ),
-    banner: bool = typer.Option(
-        True, "--banner/--no-banner", help="Show header banner"
-    ),
-    style: str = typer.Option("audit", "--style", help="Output style (audit|friendly)"),
-    timing: bool = typer.Option(False, "--timing", help="Show timing summary"),
-    progress: bool = typer.Option(
-        True, "--progress/--no-progress", help="Show progress done messages"
-    ),
-    mode: str = typer.Option(
-        "attested",
-        "--mode",
-        help="Execution mode for model-loading steps (attested|local).",
-    ),
-    allow_network: bool = typer.Option(
-        False,
-        "--allow-network",
-        help="Explicitly allow outbound network access for this command.",
-    ),
-    allow_host_execution: bool = typer.Option(
-        False,
-        "--allow-host-execution",
-        help="Run on the host instead of auto-delegating to the runtime container.",
-    ),
-    allow_third_party_plugins: bool = typer.Option(
-        False,
-        "--allow-third-party-plugins",
-        help="Enable third-party entry-point plugin discovery for this command.",
-    ),
-    allow_remote_code: bool = typer.Option(
-        False,
-        "--allow-remote-code",
-        help="Allow trust_remote_code-style model loading for this command.",
-    ),
-    no_color: bool = typer.Option(
-        False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
-    ),
+    baseline: str,
+    subject: str,
+    baseline_report: str | None = None,
+    adapter: str = "auto",
+    device: str | None = None,
+    profile: str = "ci",
+    tier: str = "balanced",
+    preset: str | None = None,
+    out: str = "runs",
+    report_out: str = "reports/eval",
+    edit_config: str | None = None,
+    edit_label: str | None = None,
+    quiet: bool = False,
+    verbose: bool = False,
+    banner: bool = True,
+    style: str = "audit",
+    timing: bool = False,
+    progress: bool = True,
+    mode: str = "attested",
+    allow_network: bool = False,
+    allow_host_execution: bool = False,
+    allow_third_party_plugins: bool = False,
+    allow_remote_code: bool = False,
+    no_color: bool = False,
 ):
     """Evaluate two checkpoints (baseline vs subject) with pinned windows."""
-    # Support programmatic calls and Typer-invoked calls uniformly
     try:
-        from typer.models import OptionInfo as _TyperOptionInfo
-    except Exception:  # pragma: no cover - typer internals may change
-        _TyperOptionInfo = ()  # type: ignore[assignment]
-
-    def _coerce_option(value, fallback=None):
-        if isinstance(value, _TyperOptionInfo):
-            return getattr(value, "default", fallback)
-        return value if value is not None else fallback
-
-    source = _coerce_option(source)
-    edited = _coerce_option(edited)
-    baseline_report = _coerce_option(baseline_report)
-    adapter = _coerce_option(adapter, "auto")
-    device = _coerce_option(device)
-    profile = _coerce_option(profile, "ci")
-    tier = _coerce_option(tier, "balanced")
-    preset = _coerce_option(preset)
-    out = _coerce_option(out, "runs")
-    report_out = _coerce_option(report_out, "reports/eval")
-    edit_config = _coerce_option(edit_config)
-    edit_label = _coerce_option(edit_label)
-    quiet = _coerce_option(quiet, False)
-    verbose = _coerce_option(verbose, False)
-    banner = _coerce_option(banner, True)
-    style = _coerce_option(style, "audit")
-    timing = bool(_coerce_option(timing, False))
-    progress = bool(_coerce_option(progress, True))
-    mode = str(_coerce_option(mode, "attested")).strip().lower()
-    allow_network = bool(_coerce_option(allow_network, False))
-    allow_host_execution = bool(_coerce_option(allow_host_execution, False))
-    allow_third_party_plugins = bool(_coerce_option(allow_third_party_plugins, False))
-    allow_remote_code = bool(_coerce_option(allow_remote_code, False))
-    no_color = bool(_coerce_option(no_color, False))
-
-    if mode not in {"attested", "local"}:
+        execution_policy = resolve_evaluate_execution_policy(
+            mode=mode,
+            allow_host_execution=allow_host_execution,
+        )
+    except ValueError as exc:
         raise typer.BadParameter(
             "Execution mode must be one of: attested, local.",
             param_hint="--mode",
-        )
-    allow_host_execution = allow_host_execution or mode == "local"
-
-    configure_runtime_security(
-        allow_network=allow_network,
-        allow_host_execution=allow_host_execution,
-        allow_third_party_plugins=allow_third_party_plugins,
-        allow_remote_code=allow_remote_code,
-    )
+        ) from exc
+    allow_host_execution = execution_policy.allow_host_execution
+    prefer_local_files_only = execution_policy.prefer_local_files_only
     maybe_delegate_model_command()
 
     verbosity = _resolve_verbosity(bool(quiet), bool(verbose))
@@ -432,23 +338,37 @@ def evaluate_command(
             console.print("")
             _print_phase_header(console, _phase_title(index, total, title))
 
-    src_id = str(source)
-    edt_id = str(edited)
-
-    # Resolve adapter when requested
-    eff_adapter = adapter
-    adapter_auto = False
-    if str(adapter).strip().lower() in {"auto", "auto_hf"}:
-        eff_adapter = resolve_auto_adapter(src_id)
-        adapter_auto = True
+    src_id = str(baseline)
+    edt_id = str(subject)
+    try:
+        plan = build_evaluate_command_plan(
+            baseline_model_id=src_id,
+            subject_model_id=edt_id,
+            adapter=adapter,
+            profile=profile,
+            tier=tier,
+            preset=preset,
+            out=out,
+            edit_config=edit_config,
+            edit_label=edit_label,
+            resolve_auto_adapter_fn=resolve_auto_adapter,
+            load_yaml_fn=_load_yaml,
+            tmp_dir_candidate=os.environ.get("INVARLOCK_EVALUATE_TMP_DIR"),
+        )
+    except FileNotFoundError as exc:
+        _fail(f"Preset not found: {exc}", exit_code=2)
+    profile_name = plan.profile_name
+    tier_name = plan.tier_name
+    eff_adapter = plan.adapter_name
+    adapter_auto = plan.adapter_auto
 
     show_banner = bool(banner) and verbosity >= VERBOSITY_DEFAULT
     if show_banner:
         _print_header_banner(
             console,
             version=INVARLOCK_VERSION,
-            profile=profile,
-            tier=tier,
+            profile=profile_name,
+            tier=tier_name,
             adapter=str(eff_adapter),
         )
         console.print("")
@@ -459,190 +379,13 @@ def evaluate_command(
     # Choose preset. If none provided and repo preset is missing (pip install
     # scenario), fall back to a minimal built-in universal preset so the
     # flag-only quick start works without cloning the repo.
-    default_universal = (
-        Path("configs/presets/masked_lm/wikitext2_128.yaml")
-        if eff_adapter == "hf_mlm"
-        else Path("configs/presets/causal_lm/wikitext2_512.yaml")
-    )
-    preset_path = Path(preset) if preset is not None else default_universal
-
-    preset_data: dict[str, Any]
-    if preset is None and not preset_path.exists():
-        # Inline minimal preset (wikitext2 universal) for pip installs
-        preset_data = {
-            "dataset": {
-                "provider": "wikitext2",
-                "split": "validation",
-                "seq_len": 512,
-                "stride": 512,
-                "preview_n": 64,
-                "final_n": 64,
-                "seed": 43,
-            }
-        }
-    else:
-        if not preset_path.exists():
-            print_event(
-                console,
-                "FAIL",
-                f"Preset not found: {preset_path}",
-                style=output_style,
-                emoji="❌",
-            )
-            raise typer.Exit(1)
-        preset_data = _load_yaml(preset_path)
-        # Do not hard-code device from presets in auto-generated evaluate configs;
-        # allow device resolution to pick CUDA/MPS/CPU via 'auto' or CLI overrides.
-        model_block = preset_data.get("model")
-        if isinstance(model_block, dict) and "device" in model_block:
-            model_block = dict(model_block)
-            model_block.pop("device", None)
-            preset_data["model"] = model_block
-
-    default_guards_order = ["invariants", "spectral", "rmt", "variance", "invariants"]
-    guards_order = None
-    preset_guards = preset_data.get("guards")
-    if isinstance(preset_guards, dict):
-        preset_order = preset_guards.get("order")
-        if (
-            isinstance(preset_order, list)
-            and preset_order
-            and all(isinstance(item, str) for item in preset_order)
-        ):
-            guards_order = list(preset_order)
-    if guards_order is None:
-        guards_order = list(default_guards_order)
-
-    def _load_and_validate_baseline_report(
-        report_path: Path,
-        *,
-        expected_profile: str,
-        expected_tier: str,
-        expected_adapter: str,
-    ) -> Path:
-        candidate = Path(report_path).expanduser()
-        if not candidate.exists():
-            _fail(f"Baseline report not found: {candidate}")
-        resolved_report: Path | None = None
-        if candidate.is_dir():
-            direct = candidate / "report.json"
-            if direct.is_file():
-                resolved_report = direct
-            else:
-                resolved_report = _latest_run_report(candidate)
-        elif candidate.is_file():
-            resolved_report = candidate
-        if resolved_report is None or not resolved_report.is_file():
-            _fail(f"Baseline report not found: {candidate}")
-        resolved_report = resolved_report.resolve()
-        try:
-            with resolved_report.open("r", encoding="utf-8") as fh:
-                payload = json.load(fh)
-        except Exception as exc:  # noqa: BLE001
-            _fail(f"Baseline report is not valid JSON: {resolved_report} ({exc})")
-        if not isinstance(payload, dict):
-            _fail(f"Baseline report must be a JSON object: {resolved_report}")
-
-        edit_block = payload.get("edit")
-        edit_name = edit_block.get("name") if isinstance(edit_block, dict) else None
-        if edit_name != "noop":
-            _fail(
-                "Baseline report must be a no-op run (edit.name == 'noop'). "
-                f"Got edit.name={edit_name!r} in {resolved_report}"
-            )
-
-        meta = payload.get("meta")
-        if isinstance(meta, dict):
-            baseline_adapter = meta.get("adapter")
-            if (
-                isinstance(baseline_adapter, str)
-                and baseline_adapter != expected_adapter
-            ):
-                _fail(
-                    "Baseline report adapter mismatch. "
-                    f"Expected {expected_adapter!r}, got {baseline_adapter!r} in {resolved_report}"
-                )
-
-        context = payload.get("context")
-        if isinstance(context, dict):
-            baseline_profile = context.get("profile")
-            if (
-                isinstance(baseline_profile, str)
-                and baseline_profile.strip().lower() != expected_profile.strip().lower()
-            ):
-                _fail(
-                    "Baseline report profile mismatch. "
-                    f"Expected {expected_profile!r}, got {baseline_profile!r} in {resolved_report}"
-                )
-            auto_ctx = context.get("auto")
-            if isinstance(auto_ctx, dict):
-                baseline_tier = auto_ctx.get("tier")
-                if isinstance(baseline_tier, str) and baseline_tier != expected_tier:
-                    _fail(
-                        "Baseline report tier mismatch. "
-                        f"Expected {expected_tier!r}, got {baseline_tier!r} in {resolved_report}"
-                    )
-
-        eval_windows = payload.get("evaluation_windows")
-        if not isinstance(eval_windows, dict):
-            _fail(
-                "Baseline report missing evaluation window payloads. "
-                "Re-run baseline with INVARLOCK_STORE_EVAL_WINDOWS=1."
-            )
-
-        for phase_name in ("preview", "final"):
-            phase = eval_windows.get(phase_name)
-            if not isinstance(phase, dict):
-                _fail(
-                    f"Baseline report missing evaluation_windows.{phase_name} payloads. "
-                    "Re-run baseline with INVARLOCK_STORE_EVAL_WINDOWS=1."
-                )
-            window_ids = phase.get("window_ids")
-            input_ids = phase.get("input_ids")
-            if not isinstance(window_ids, list) or not window_ids:
-                _fail(
-                    f"Baseline report missing evaluation_windows.{phase_name}.window_ids."
-                )
-            if not isinstance(input_ids, list) or not input_ids:
-                _fail(
-                    f"Baseline report missing evaluation_windows.{phase_name}.input_ids."
-                )
-            if len(input_ids) != len(window_ids):
-                _fail(
-                    "Baseline report has inconsistent evaluation window payloads "
-                    f"for {phase_name}: input_ids={len(input_ids)} window_ids={len(window_ids)}."
-                )
-
-        return resolved_report
-
-    # Create temp baseline config (no-op edit)
-    # Normalize possible "hf:" prefixes for HF adapters
-    norm_src_id = _normalize_model_id(src_id, eff_adapter)
-    norm_edt_id = _normalize_model_id(edt_id, eff_adapter)
-
-    baseline_cfg = _merge(
-        preset_data,
-        {
-            "model": {
-                "id": norm_src_id,
-                "adapter": eff_adapter,
-            },
-            "edit": {"name": "noop", "plan": {}},
-            "eval": {},
-            "guards": {"order": guards_order},
-            "output": {"dir": str(Path(out) / "source")},
-            "context": {"profile": profile, "tier": tier},
-        },
-    )
-
-    baseline_label = "noop"
-    subject_label: str | None = None
-    if edit_label:
-        subject_label = edit_label
-    elif not edit_config:
-        subject_label = "custom" if norm_src_id != norm_edt_id else "noop"
-
-    tmp_dir = _resolve_evaluate_tmp_dir()
+    preset_data = plan.preset_data
+    guards_order = plan.guards_order
+    norm_edt_id = plan.subject_model_id
+    baseline_cfg = plan.baseline_config
+    baseline_label = plan.baseline_label
+    subject_label = plan.subject_label
+    tmp_dir = plan.tmp_dir
 
     baseline_report_path: Path
     if baseline_report:
@@ -651,12 +394,15 @@ def evaluate_command(
             tag="EXEC",
             emoji="♻️",
         )
-        baseline_report_path = _load_and_validate_baseline_report(
-            Path(baseline_report),
-            expected_profile=profile,
-            expected_tier=tier,
-            expected_adapter=str(eff_adapter),
-        )
+        try:
+            baseline_report_path, _ = load_validated_baseline_report(
+                Path(baseline_report),
+                expected_profile=profile_name,
+                expected_tier=tier_name,
+                expected_adapter=str(eff_adapter),
+            )
+        except ValidationError as exc:
+            _fail(str(getattr(exc, "message", exc)), exit_code=2)
         _debug(f"Baseline report: {baseline_report_path}")
     else:
         baseline_yaml = tmp_dir / "baseline_noop.yaml"
@@ -678,11 +424,11 @@ def evaluate_command(
                     message="Baseline",
                     emoji="🏁",
                 ):
-                    _run(
+                    baseline_run_result = _run(
                         config=str(baseline_yaml),
-                        profile=profile,
+                        profile=profile_name,
                         out=str(Path(out) / "source"),
-                        tier=tier,
+                        tier=tier_name,
                         device=device,
                         until_pass=False,
                         max_attempts=1,
@@ -695,17 +441,25 @@ def evaluate_command(
                         allow_host_execution=allow_host_execution,
                         allow_third_party_plugins=allow_third_party_plugins,
                         allow_remote_code=allow_remote_code,
+                        prefer_local_files_only=prefer_local_files_only,
                         no_color=no_color,
                     )
-            except Exception:
+            except typer.Exit:
+                if quiet_buffer is not None:
+                    console.print(quiet_buffer.getvalue(), markup=False)
+                raise
+            except _CHILD_RUN_REPLAY_ERRORS:
                 if quiet_buffer is not None:
                     console.print(quiet_buffer.getvalue(), markup=False)
                 raise
 
-        baseline_report_path_candidate = _latest_run_report(Path(out) / "source")
-        if not baseline_report_path_candidate:
-            _fail("Could not locate baseline report after run", exit_code=1)
-        baseline_report_path = baseline_report_path_candidate
+        try:
+            baseline_report_path = require_run_report_artifact(
+                baseline_run_result,
+                stage="Baseline",
+            )
+        except ConfigError as exc:
+            _fail(str(getattr(exc, "message", exc)), exit_code=1)
         _debug(f"Baseline report: {baseline_report_path}")
 
     # Edited run: either no-op (Compare & Evaluate) or provided edit_config (demo edit)
@@ -725,7 +479,7 @@ def evaluate_command(
         # Overlay subject model id/adapter and output/context onto the provided edit config
         try:
             cfg_loaded: dict[str, Any] = _load_yaml(edited_yaml)
-        except Exception as exc:  # noqa: BLE001
+        except _EDIT_CONFIG_LOAD_ERRORS as exc:
             print_event(
                 console,
                 "FAIL",
@@ -735,46 +489,16 @@ def evaluate_command(
             )
             raise typer.Exit(1) from exc
 
-        # Ensure model.id/adapter point to the requested subject
-        model_block = dict(cfg_loaded.get("model") or {})
-        # Replace placeholder IDs like "<MODEL_ID>" or "<set-your-model-id>"
-        if not isinstance(model_block.get("id"), str) or model_block.get(
-            "id", ""
-        ).startswith("<"):
-            model_block["id"] = norm_edt_id
-        else:
-            # Always normalize when adapter is HF family
-            model_block["id"] = _normalize_model_id(str(model_block["id"]), eff_adapter)
-        # Respect explicit device from edit config; only set adapter if missing
-        if not isinstance(model_block.get("adapter"), str) or not model_block.get(
-            "adapter"
-        ):
-            model_block["adapter"] = eff_adapter
-        cfg_loaded["model"] = model_block
-
-        # Apply the same preset to the edited run to avoid duplicating dataset/task
-        # settings in edit configs; then overlay the edit, output, and context.
-        merged_edited_cfg = _merge(
-            _merge(preset_data, cfg_loaded),
-            {
-                "output": {"dir": str(Path(out) / "edited")},
-                "context": {"profile": profile, "tier": tier},
-            },
+        merged_edited_cfg = build_subject_edit_run_config(
+            preset_data,
+            cfg_loaded,
+            subject_model_id=norm_edt_id,
+            adapter_name=str(eff_adapter),
+            output_dir=str(Path(out) / "edited"),
+            profile=profile_name,
+            tier=tier_name,
+            guards_order=guards_order,
         )
-        # Ensure the edited run always has a guard chain. Presets/edit configs
-        # often omit it, but `invarlock run` expects guards.order.
-        guards_block = merged_edited_cfg.get("guards")
-        guards_order_cfg = (
-            guards_block.get("order") if isinstance(guards_block, dict) else None
-        )
-        if not (
-            isinstance(guards_order_cfg, list)
-            and guards_order_cfg
-            and all(isinstance(item, str) for item in guards_order_cfg)
-        ):
-            merged_edited_cfg = _merge(
-                merged_edited_cfg, {"guards": {"order": guards_order}}
-            )
 
         # Persist a temporary merged config for traceability
         edited_merged_yaml = tmp_dir / "edited_merged.yaml"
@@ -794,11 +518,11 @@ def evaluate_command(
                     message="Subject",
                     emoji="✂️",
                 ):
-                    _run(
+                    edited_run_result = _run(
                         config=str(edited_merged_yaml),
-                        profile=profile,
+                        profile=profile_name,
                         out=str(Path(out) / "edited"),
-                        tier=tier,
+                        tier=tier_name,
                         baseline=str(baseline_report_path),
                         device=device,
                         until_pass=False,
@@ -812,23 +536,26 @@ def evaluate_command(
                         allow_host_execution=allow_host_execution,
                         allow_third_party_plugins=allow_third_party_plugins,
                         allow_remote_code=allow_remote_code,
+                        prefer_local_files_only=prefer_local_files_only,
                         no_color=no_color,
                     )
-            except Exception:
+            except typer.Exit:
+                if quiet_buffer is not None:
+                    console.print(quiet_buffer.getvalue(), markup=False)
+                raise
+            except _CHILD_RUN_REPLAY_ERRORS:
                 if quiet_buffer is not None:
                     console.print(quiet_buffer.getvalue(), markup=False)
                 raise
     else:
-        edited_cfg = _merge(
+        edited_cfg = build_subject_noop_run_config(
             preset_data,
-            {
-                "model": {"id": norm_edt_id, "adapter": eff_adapter},
-                "edit": {"name": "noop", "plan": {}},
-                "eval": {},
-                "guards": {"order": guards_order},
-                "output": {"dir": str(Path(out) / "edited")},
-                "context": {"profile": profile, "tier": tier},
-            },
+            model_id=norm_edt_id,
+            adapter_name=str(eff_adapter),
+            output_dir=str(Path(out) / "edited"),
+            profile=profile_name,
+            tier=tier_name,
+            guards_order=guards_order,
         )
         edited_yaml = tmp_dir / "edited_noop.yaml"
         _dump_yaml(edited_yaml, edited_cfg)
@@ -847,11 +574,11 @@ def evaluate_command(
                     message="Subject",
                     emoji="🧪",
                 ):
-                    _run(
+                    edited_run_result = _run(
                         config=str(edited_yaml),
-                        profile=profile,
+                        profile=profile_name,
                         out=str(Path(out) / "edited"),
-                        tier=tier,
+                        tier=tier_name,
                         baseline=str(baseline_report_path),
                         device=device,
                         until_pass=False,
@@ -865,87 +592,55 @@ def evaluate_command(
                         allow_host_execution=allow_host_execution,
                         allow_third_party_plugins=allow_third_party_plugins,
                         allow_remote_code=allow_remote_code,
+                        prefer_local_files_only=prefer_local_files_only,
                         no_color=no_color,
                     )
-            except Exception:
+            except typer.Exit:
+                if quiet_buffer is not None:
+                    console.print(quiet_buffer.getvalue(), markup=False)
+                raise
+            except _CHILD_RUN_REPLAY_ERRORS:
                 if quiet_buffer is not None:
                     console.print(quiet_buffer.getvalue(), markup=False)
                 raise
 
-    edited_report = _latest_run_report(Path(out) / "edited")
-    if not edited_report:
-        print_event(
-            console,
-            "FAIL",
-            "Could not locate edited report after run",
-            style=output_style,
-            emoji="❌",
+    try:
+        edited_report = require_run_report_artifact(
+            edited_run_result,
+            stage="Edited",
         )
-        raise typer.Exit(1)
+    except ConfigError as exc:
+        _fail(str(getattr(exc, "message", exc)), exit_code=1)
     _debug(f"Edited report: {edited_report}")
 
     _phase(3, 3, "EVALUATION REPORT GENERATION")
 
     def _emit_evaluation_report() -> None:
         _info("Emitting evaluation report", tag="EXEC", emoji="📜")
-        with _suppress_child_output(verbosity == VERBOSITY_QUIET) as quiet_buffer:
-            try:
-                with timed_step(
-                    console=console,
-                    style=output_style,
-                    timings=timings,
-                    key="evaluation_report",
-                    tag="EXEC",
-                    message="Evaluation Report",
-                    emoji="📜",
-                ):
-                    # Use a wall-clock perf counter here (not the output module's
-                    # test-patched counter) so timing tests remain deterministic.
-                    from time import perf_counter as _wall_perf_counter
-
-                    report_start = _wall_perf_counter()
-                    report_kwargs = {
-                        "run": str(edited_report),
-                        "format": "report",
-                        "baseline": str(baseline_report_path),
-                        "output": report_out,
-                        "style": output_style.name,
-                        "no_color": no_color,
-                        "summary_baseline_seconds": float(timings.get("baseline", 0.0)),
-                        "summary_subject_seconds": float(timings.get("subject", 0.0)),
-                        "summary_report_start": float(report_start),
-                    }
-                    try:
-                        sig = inspect.signature(_report)
-                    except (TypeError, ValueError):
-                        _report(**report_kwargs)
-                    else:
-                        if any(
-                            param.kind == inspect.Parameter.VAR_KEYWORD
-                            for param in sig.parameters.values()
-                        ):
-                            _report(**report_kwargs)
-                        else:
-                            _report(
-                                **{
-                                    key: value
-                                    for key, value in report_kwargs.items()
-                                    if key in sig.parameters
-                                }
-                            )
-            except Exception:
-                if quiet_buffer is not None:
-                    console.print(quiet_buffer.getvalue(), markup=False)
-                raise
+        with timed_step(
+            console=console,
+            style=output_style,
+            timings=timings,
+            key="evaluation_report",
+            tag="EXEC",
+            message="Evaluation Report",
+            emoji="📜",
+        ):
+            generate_reports(
+                run=str(edited_report),
+                format="report",
+                baseline=str(baseline_report_path),
+                output=str(report_out),
+            )
         emit_runtime_manifest(
             Path(report_out) / "evaluation.report.json",
             config_payload={
                 "command": "evaluate",
-                "source": source,
-                "edited": edited,
+                "baseline": baseline,
+                "subject": subject,
                 "adapter": adapter,
-                "profile": profile,
-                "tier": tier,
+                "profile": profile_name,
+                "tier": tier_name,
                 "preset": preset,
                 "out": out,
                 "report_out": report_out,
@@ -957,21 +652,27 @@ def evaluate_command(
             },
             extra={
                 "command": "evaluate",
-                "profile": profile,
-                "tier": tier,
+                "profile": profile_name,
+                "tier": tier_name,
             },
+            execution=_evaluation_report_manifest_execution(
+                mode=mode,
+                allow_network=allow_network,
+                allow_remote_code=allow_remote_code,
+                allow_third_party_plugins=allow_third_party_plugins,
+            ),
         )
 
     # CI/Release hard‑abort: fail fast when primary metric is not computable.
     try:
         prof = str(profile or "").strip().lower()
-    except Exception:
+    except _TEXT_NORMALIZATION_ERRORS:
         prof = ""
     if prof in {"ci", "ci_cpu", "release"}:
         try:
             with Path(edited_report).open("r", encoding="utf-8") as fh:
                 edited_payload = json.load(fh)
-        except Exception as exc:  # noqa: BLE001
+        except _QUIET_REPORT_LOAD_ERRORS as exc:
             print_event(
                 console,
                 "FAIL",
@@ -981,74 +682,20 @@ def evaluate_command(
             )
             raise typer.Exit(1) from exc
 
-        def _finite(x: Any) -> bool:
-            try:
-                return isinstance(x, (int | float)) and math.isfinite(float(x))
-            except Exception:
-                return False
-
-        meta = (
-            edited_payload.get("meta", {}) if isinstance(edited_payload, dict) else {}
+        outcome = apply_edited_primary_metric_policy(
+            edited_payload,
+            profile=profile,
         )
-        metrics = (
-            edited_payload.get("metrics", {})
-            if isinstance(edited_payload, dict)
-            else {}
-        )
-        pm = metrics.get("primary_metric", {}) if isinstance(metrics, dict) else {}
-        pm_prev = pm.get("preview") if isinstance(pm, dict) else None
-        pm_final = pm.get("final") if isinstance(pm, dict) else None
-        pm_ratio = pm.get("ratio_vs_baseline")
-        device = meta.get("device") or "unknown"
-        adapter_name = meta.get("adapter") or "unknown"
-        edit_name = (
-            (edited_payload.get("edit", {}) or {}).get("name")
-            if isinstance(edited_payload, dict)
-            else None
-        ) or "unknown"
-
-        # Enforce only when a primary_metric block is present; allow degraded-but-flagged metrics to emit evaluation reports, but fail the task.
-        has_metric_block = isinstance(pm, dict) and bool(pm)
-        if has_metric_block:
-            degraded = bool(pm.get("invalid") or pm.get("degraded"))
-            if degraded or not _finite(pm_final):
-                fallback = pm_prev if _finite(pm_prev) else pm_final
-                if not _finite(fallback) or fallback <= 0:
-                    fallback = 1.0
-                degraded_reason = pm.get("degraded_reason") or (
-                    "non_finite_pm"
-                    if (not _finite(pm_prev) or not _finite(pm_final))
-                    else "primary_metric_degraded"
-                )
-                print_event(
-                    console,
-                    "WARN",
-                    "Primary metric degraded or non-finite; emitting evaluation report and marking task degraded. Primary metric computation failed.",
-                    style=output_style,
-                    emoji="⚠️",
-                )
-                pm["degraded"] = True
-                pm["invalid"] = pm.get("invalid") or True
-                pm["preview"] = pm_prev if _finite(pm_prev) else fallback
-                pm["final"] = pm_final if _finite(pm_final) else fallback
-                pm["ratio_vs_baseline"] = pm_ratio if _finite(pm_ratio) else 1.0
-                pm["degraded_reason"] = degraded_reason
-                metrics["primary_metric"] = pm
-                edited_payload.setdefault("metrics", {}).update(metrics)
-
-                # Emit the evaluation report for inspection, then exit with a CI-visible error.
-                _emit_evaluation_report()
-                err = MetricsError(
-                    code="E111",
-                    message=f"Primary metric degraded or non-finite ({degraded_reason}).",
-                    details={
-                        "reason": degraded_reason,
-                        "adapter": adapter_name,
-                        "device": device,
-                        "edit": edit_name,
-                    },
-                )
-                raise typer.Exit(_resolve_exit_code(err, profile=profile))
+        if outcome.diagnostic is not None and outcome.error is not None:
+            print_event(
+                console,
+                "WARN",
+                outcome.diagnostic.message,
+                style=output_style,
+                emoji="⚠️",
+            )
+            _emit_evaluation_report()
+            raise typer.Exit(resolve_command_exit_code(outcome.error, profile=profile))
 
     _emit_evaluation_report()
     if timing:
@@ -1074,7 +721,7 @@ def evaluate_command(
     if verbosity == VERBOSITY_QUIET:
         _print_quiet_summary(
             report_out=Path(report_out),
-            source=src_id,
-            edited=edt_id,
-            profile=profile,
+            baseline=src_id,
+            subject=edt_id,
+            profile=profile_name,
         )

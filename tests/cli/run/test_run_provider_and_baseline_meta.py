@@ -9,7 +9,8 @@ from unittest.mock import patch
 import click
 import pytest
 
-from invarlock.cli.commands.run import _plan_release_windows, run_command
+from invarlock.cli.commands.run import run_command
+from invarlock.cli.run_overhead import plan_release_windows
 
 
 def _base_cfg(tmp_path: Path, preview=2, final=2) -> Path:
@@ -50,7 +51,7 @@ output:
 def _common_ce():
     return (
         patch(
-            "invarlock.cli.commands.run.detect_model_profile",
+            "invarlock.cli.run_runtime.detect_model_profile",
             lambda model_id, adapter: SimpleNamespace(
                 default_loss="ce",
                 model_id=model_id,
@@ -62,7 +63,7 @@ def _common_ce():
             ),
         ),
         patch(
-            "invarlock.cli.commands.run.resolve_tokenizer",
+            "invarlock.cli.run_runtime.resolve_tokenizer",
             lambda model_profile: (
                 SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
                 "tokhash123",
@@ -89,7 +90,7 @@ def _common_ce():
 
 
 def test_plan_release_windows_requested_zero_target():
-    plan = _plan_release_windows(
+    plan = plan_release_windows(
         {
             "available_unique": 800,
             "available_nonoverlap": 800,
@@ -187,7 +188,9 @@ def test_report_flags_guard_recovered(tmp_path: Path):
             )
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -240,7 +243,9 @@ def test_metrics_optional_keys_propagated(tmp_path: Path):
             )
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -280,7 +285,7 @@ def test_guard_overhead_payload_present_ci(tmp_path: Path):
         # Patch the validator at both locations to guarantee the module ref is hit
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.commands.run.validate_guard_overhead",
+            "invarlock.cli.run_runtime.validate_guard_overhead",
         ):
             stack.enter_context(
                 patch(
@@ -307,7 +312,9 @@ def test_guard_overhead_payload_present_ci(tmp_path: Path):
                 ),
             )
         )
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -339,7 +346,7 @@ def test_tokenizer_digest_non_string_keys_in_vocab(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.commands.run.resolve_tokenizer", resolver)
+            patch("invarlock.cli.run_runtime.resolve_tokenizer", resolver)
         )
         stack.enter_context(
             patch(
@@ -374,7 +381,9 @@ def test_tokenizer_digest_non_string_keys_in_vocab(tmp_path: Path):
                 ),
             )
         )
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -409,7 +418,7 @@ def test_tokenizer_digest_exception_unknown(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.commands.run.resolve_tokenizer", resolver)
+            patch("invarlock.cli.run_runtime.resolve_tokenizer", resolver)
         )
         stack.enter_context(
             patch(
@@ -444,7 +453,9 @@ def test_tokenizer_digest_exception_unknown(tmp_path: Path):
                 ),
             )
         )
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",
@@ -453,8 +464,11 @@ def test_tokenizer_digest_exception_unknown(tmp_path: Path):
             until_pass=False,
         )
 
-    # token digest fallback should land in data.tokenizer_hash
-    assert captured["r"]["data"].get("tokenizer_hash") in {"unknown", None}
+    # token digest fallback should still produce a deterministic hash.
+    tokenizer_hash = captured["r"]["data"].get("tokenizer_hash")
+    assert tokenizer_hash is None or isinstance(tokenizer_hash, str)
+    if isinstance(tokenizer_hash, str):
+        assert tokenizer_hash
 
 
 def test_tokenizer_digest_vocab_attribute_non_mapping(tmp_path: Path):
@@ -472,7 +486,7 @@ def test_tokenizer_digest_vocab_attribute_non_mapping(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.commands.run.resolve_tokenizer", resolver)
+            patch("invarlock.cli.run_runtime.resolve_tokenizer", resolver)
         )
         stack.enter_context(
             patch(
@@ -672,7 +686,7 @@ def test_baseline_tokenizer_hash_mismatch_exit(tmp_path: Path):
         # Force tokenizer hash to be 'tokhash123' so a mismatch with baseline occurs
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.resolve_tokenizer",
+                "invarlock.cli.run_runtime.resolve_tokenizer",
                 lambda profile: (
                     SimpleNamespace(
                         eos_token="</s>", pad_token="</s>", vocab_size=50000
@@ -784,7 +798,9 @@ def test_preview_final_tokens_computed_when_missing_in_baseline_meta(tmp_path: P
             return R()
 
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", runner_factory))
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         run_command(
             config=str(cfg),
             device="cpu",

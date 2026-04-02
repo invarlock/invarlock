@@ -27,7 +27,7 @@ calibration data that accompany the InvarLock assurance notes.
 | **Spectral** | 2‑D layer weights (FFN, attention proj, embeddings) | Compute $z = \frac{\hat{s} - \mu_f}{\sigma_f}$ where $\hat{s}$ is an **iterative estimate** of $\sigma_{\max}$ under a fixed measurement contract; require `abs(z) ≤ κ_f` calibrated for ≤5% WARN FPR. Optional degeneracy proxies (stable-rank drift, norm collapse) may add WARN/ABORT depending on policy. | WARN when cap applied; abort if cap would exceed `max_caps` (and for configured fatal degeneracy thresholds). | `invarlock.guards.spectral` |
 | **RMT** | Token‑weighted activations (sampled) | Compute a per‑module **edge risk score** $r = \hat{\sigma}_{\max}(A') / \sigma_{\mathrm{MP}}(m,n)$ on whitened activations $A'$ under a fixed measurement contract; accept when baseline‑relative growth stays within the calibrated ε-band per family. | report fails on ε‑band violations; catastrophic spikes in the primary metric are gated separately (`spike_threshold` = 2.0× for ppl‑like metrics). | `invarlock.guards.rmt` |
 | **Variance (VE)** | Paired ΔlogNLL with calibration windows | Enable VE only if the predictive CI upper bound ≤ −`min_effect_lognll` **and** mean Δ ≤ −`min_effect_lognll` (Balanced uses one‑sided CI; Conservative uses two‑sided CI). A CI entirely above +`min_effect_lognll` is treated as regression and VE stays off. | VE disabled, guard records reason; edit continues | `invarlock.guards.variance` |
-| **Bootstrap sanity** | Evaluation windows, token counts | Matching window IDs, zero overlap; BCa replicates ≥ requested | Abort evaluation and surface reason | `invarlock.reporting.report_builder` |
+| **Bootstrap sanity** | Evaluation windows, token counts | Matching window IDs, zero overlap; BCa replicates ≥ requested | Abort evaluation and surface reason | `invarlock.reporting.report_make` |
 
 Each guard logs its policy digest, metrics, and **measurement contract**; reports
 mirror those fields under `resolved_policy.*` and `spectral`/`rmt`/`variance` blocks.
@@ -106,7 +106,7 @@ in `mode: warn` (staged rollout) where it emits a warning but keeps
 `validation.primary_metric_tail_acceptable = true`. Catastrophic spikes are
 handled during the run: the `spike_threshold` (default 2.0× PPL) triggers
 immediate rollback regardless of other gates. See also
-`src/invarlock/core/runner.py:1816`.
+`src/invarlock/core/runner_finalize.py`.
 
 **Sigma quantile (qσ)** controls the target sigma used for spectral monitoring.
 Balanced uses `sigma_quantile = 0.95`, Conservative `0.90` (see
@@ -158,7 +158,9 @@ An evaluation schedule is accepted when:
 - Masked-token counts are non-zero for masked-LM baselines (see
   `tests/eval/test_metrics_masked_lm.py`).
 - Window overlap = 0 and coverage ≥ requested counts; CI/Release profiles treat
-  violations as hard errors during the run (see `src/invarlock/core/runner.py`).
+  violations as hard errors during report assembly and verification (see
+  `src/invarlock/reporting/report_make.py` and
+  `src/invarlock/reporting/report_validation.py`).
 - Predictive VE calibration windows are drawn from the same schedule; provenance
   appears under `variance.ab_test.provenance.window_ids`.
 
@@ -169,9 +171,9 @@ Baseline pairing schedules record the exact windows to preserve determinism.
 To reproduce a report:
 
 1. Persist the run config (`config.yaml`), `window_plan`, and `evaluation_windows`.
-2. Record dataset/hash/tokenizer metadata (`invarlock report --run <run_dir> --format json` already saves this).
+2. Record dataset/hash/tokenizer metadata (`invarlock report --run <run_report.json> --format json` already saves this).
 3. Capture the seed bundle (`meta.seeds`) and policy digests.
-4. Use `invarlock report --format report` with the saved baseline/report combination
+4. Use `invarlock report --run <subject_report.json> --baseline <baseline_report.json> --format report`
    to regenerate the report; when seeds, config, and backend match, the
    resulting report is bit-for-bit identical.
 
@@ -233,7 +235,7 @@ Detailed derivations are in the calibration appendix (`09-tier-v1-calibration.md
 - No adversarial robustness or gradient masking guarantees.
 - CUDA kernels outside deterministic mode may exceed drift tolerances.
 - Reference mask-based flows are conservative; stronger compression requires plugins.
-- Published assurance basis currently covers GPT-2 and BERT profiles.
+- Published assurance basis covers GPT-2 and BERT profiles.
 - The repo also ships pilot calibration configs for additional families such as
   Mistral 7B, Qwen2 7B, and Qwen2.5 14B; those configs are not part of the published
   assurance basis until supporting artifacts are attached.

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
+
 import torch
 import torch.nn as nn
 
 import invarlock.guards.rmt as runtime_rmt
-import invarlock.guards.rmt_legacy as legacy_rmt
+import invarlock.guards.rmt_analysis as rmt_analysis
+import invarlock.guards.rmt_detection as rmt_detection
 
 
 class _TinyBlock(nn.Module):
@@ -21,7 +24,7 @@ class _TinyModel(nn.Module):
         self.transformer.h = nn.ModuleList([_TinyBlock() for _ in range(n_layers)])
 
 
-def test_rmt_detect_prints_improving_when_outliers_drop(monkeypatch, capsys) -> None:
+def test_rmt_detect_logs_improving_when_outliers_drop(monkeypatch, caplog) -> None:
     model = _TinyModel(n_layers=2)
     state = {"corrected": False}
 
@@ -44,23 +47,23 @@ def test_rmt_detect_prints_improving_when_outliers_drop(monkeypatch, capsys) -> 
     def fake_apply(*_a, **_k):  # noqa: ANN001
         state["corrected"] = True
 
-    monkeypatch.setattr(legacy_rmt, "layer_svd_stats", fake_layer_svd_stats)
-    monkeypatch.setattr(legacy_rmt, "_apply_rmt_correction", fake_apply)
+    monkeypatch.setattr(rmt_analysis, "layer_svd_stats", fake_layer_svd_stats)
+    monkeypatch.setattr(rmt_detection, "_apply_rmt_correction", fake_apply)
 
-    legacy_rmt.rmt_detect(
-        model,
-        threshold=1.5,
-        detect_only=False,
-        correction_factor=0.9,
-        verbose=True,
-        max_iterations=2,
-    )
-    out = capsys.readouterr().out
-    assert "RMT correction improving" in out
+    with caplog.at_level(logging.INFO, logger=rmt_detection.__name__):
+        rmt_detection.rmt_detect(
+            model,
+            threshold=1.5,
+            detect_only=False,
+            correction_factor=0.9,
+            verbose=True,
+            max_iterations=2,
+        )
+    assert "RMT correction improving" in caplog.text
 
 
-def test_rmt_detect_with_names_verbose_prints_more_layers_flagged(
-    monkeypatch, capsys
+def test_rmt_detect_with_names_verbose_logs_more_layers_flagged(
+    monkeypatch, caplog
 ) -> None:
     model = _TinyModel(n_layers=5)
 
@@ -72,14 +75,14 @@ def test_rmt_detect_with_names_verbose_prints_more_layers_flagged(
             "worst_details": {"name": "attn.c_proj", "s_max": 2.0},
         }
 
-    monkeypatch.setattr(legacy_rmt, "layer_svd_stats", fake_layer_svd_stats)
-    legacy_rmt.rmt_detect_with_names(model, threshold=1.5, verbose=True)
-    out = capsys.readouterr().out
-    assert "... and 2 more layers flagged" in out
+    monkeypatch.setattr(rmt_analysis, "layer_svd_stats", fake_layer_svd_stats)
+    with caplog.at_level(logging.INFO, logger=rmt_detection.__name__):
+        rmt_detection.rmt_detect_with_names(model, threshold=1.5, verbose=True)
+    assert "... and 2 more layers flagged" in caplog.text
 
 
 def test_apply_rmt_correction_fallback_scaling_on_svd_failure(
-    monkeypatch, capsys
+    monkeypatch, caplog
 ) -> None:
     layer = nn.Linear(4, 4, bias=False)
     before = layer.weight.detach().clone()
@@ -88,11 +91,11 @@ def test_apply_rmt_correction_fallback_scaling_on_svd_failure(
         raise torch.linalg.LinAlgError("svd fail")
 
     monkeypatch.setattr(torch.linalg, "svdvals", boom)
-    legacy_rmt._apply_rmt_correction(
-        layer, factor=0.9, layer_name="layer", verbose=True
-    )
-    out = capsys.readouterr().out
-    assert "fallback scaling" in out
+    with caplog.at_level(logging.INFO, logger=rmt_detection.__name__):
+        rmt_detection._apply_rmt_correction(
+            layer, factor=0.9, layer_name="layer", verbose=True
+        )
+    assert "fallback scaling" in caplog.text
 
     after = layer.weight.detach()
     assert torch.allclose(after, before * 0.9)
@@ -126,7 +129,7 @@ def test_iter_transformer_layers_skips_non_iterable_decoder_layers() -> None:
             self.model = nn.Module()
             self.model.layers = object()
 
-    assert list(legacy_rmt._iter_transformer_layers(Model())) == []
+    assert list(rmt_analysis._iter_transformer_layers(Model())) == []
 
 
 def test_iter_transformer_layers_skips_non_iterable_bert_layers() -> None:
@@ -136,7 +139,7 @@ def test_iter_transformer_layers_skips_non_iterable_bert_layers() -> None:
             self.encoder = nn.Module()
             self.encoder.layer = object()
 
-    assert list(legacy_rmt._iter_transformer_layers(Model())) == []
+    assert list(rmt_analysis._iter_transformer_layers(Model())) == []
 
 
 def test_rmt_detect_with_names_skips_non_iterable_gpt2_layers() -> None:
@@ -146,7 +149,7 @@ def test_rmt_detect_with_names_skips_non_iterable_gpt2_layers() -> None:
             self.transformer = nn.Module()
             self.transformer.h = object()
 
-    out = legacy_rmt.rmt_detect_with_names(Model(), threshold=1.5, verbose=False)
+    out = rmt_detection.rmt_detect_with_names(Model(), threshold=1.5, verbose=False)
     assert out["n_layers_flagged"] == 0
 
 
@@ -157,7 +160,7 @@ def test_rmt_detect_with_names_skips_non_iterable_decoder_layers() -> None:
             self.model = nn.Module()
             self.model.layers = object()
 
-    out = legacy_rmt.rmt_detect_with_names(Model(), threshold=1.5, verbose=False)
+    out = rmt_detection.rmt_detect_with_names(Model(), threshold=1.5, verbose=False)
     assert out["n_layers_flagged"] == 0
 
 
@@ -168,7 +171,7 @@ def test_rmt_detect_with_names_skips_non_iterable_bert_layers() -> None:
             self.encoder = nn.Module()
             self.encoder.layer = object()
 
-    out = legacy_rmt.rmt_detect_with_names(Model(), threshold=1.5, verbose=False)
+    out = rmt_detection.rmt_detect_with_names(Model(), threshold=1.5, verbose=False)
     assert out["n_layers_flagged"] == 0
 
 
@@ -190,7 +193,7 @@ def test_rmt_detect_skips_modules_without_2d_weights_when_suffix_matches() -> No
             self.transformer = nn.Module()
             self.transformer.h = nn.ModuleList([_WeirdBlock()])
 
-    out = legacy_rmt.rmt_detect(_Model(), detect_only=True)
+    out = rmt_detection.rmt_detect(_Model(), detect_only=True)
     assert out["n_layers_flagged"] == 0
 
 
@@ -205,8 +208,8 @@ def test_rmt_detect_partial_baseline_deadband_branch_sets_outlier(monkeypatch) -
             "worst_details": {"name": "attn.c_proj", "s_max": 10.0},
         }
 
-    monkeypatch.setattr(legacy_rmt, "layer_svd_stats", fake_layer_svd_stats)
-    out = legacy_rmt.rmt_detect(
+    monkeypatch.setattr(rmt_analysis, "layer_svd_stats", fake_layer_svd_stats)
+    out = rmt_detection.rmt_detect(
         model,
         threshold=1.5,
         detect_only=True,
@@ -227,13 +230,13 @@ def test_rmt_detect_omits_details_when_worst_details_missing(monkeypatch) -> Non
             "worst_ratio": 2.0,
         }
 
-    monkeypatch.setattr(legacy_rmt, "layer_svd_stats", fake_layer_svd_stats)
-    out = legacy_rmt.rmt_detect(model, threshold=1.5, detect_only=True)
+    monkeypatch.setattr(rmt_analysis, "layer_svd_stats", fake_layer_svd_stats)
+    out = rmt_detection.rmt_detect(model, threshold=1.5, detect_only=True)
     assert out["per_layer"] and "details" not in out["per_layer"][0]
 
 
-def test_rmt_detect_prints_stalled_when_outliers_do_not_improve(
-    monkeypatch, capsys
+def test_rmt_detect_logs_stalled_when_outliers_do_not_improve(
+    monkeypatch, caplog
 ) -> None:
     model = _TinyModel(n_layers=2)
 
@@ -245,23 +248,23 @@ def test_rmt_detect_prints_stalled_when_outliers_do_not_improve(
             "worst_details": {"name": "attn.c_proj", "s_max": 2.0},
         }
 
-    monkeypatch.setattr(legacy_rmt, "layer_svd_stats", fake_layer_svd_stats)
-    monkeypatch.setattr(legacy_rmt, "_apply_rmt_correction", lambda *_a, **_k: None)
+    monkeypatch.setattr(rmt_analysis, "layer_svd_stats", fake_layer_svd_stats)
+    monkeypatch.setattr(rmt_detection, "_apply_rmt_correction", lambda *_a, **_k: None)
 
-    legacy_rmt.rmt_detect(
-        model,
-        threshold=1.5,
-        detect_only=False,
-        correction_factor=0.9,
-        verbose=True,
-        max_iterations=2,
-    )
-    out = capsys.readouterr().out
-    assert "RMT correction stalled" in out
+    with caplog.at_level(logging.INFO, logger=rmt_detection.__name__):
+        rmt_detection.rmt_detect(
+            model,
+            threshold=1.5,
+            detect_only=False,
+            correction_factor=0.9,
+            verbose=True,
+            max_iterations=2,
+        )
+    assert "RMT correction stalled" in caplog.text
 
 
 def test_rmt_detect_improving_path_with_verbose_false_emits_no_message(
-    monkeypatch, capsys
+    monkeypatch, caplog
 ) -> None:
     model = _TinyModel(n_layers=2)
     state = {"corrected": False}
@@ -280,23 +283,23 @@ def test_rmt_detect_improving_path_with_verbose_false_emits_no_message(
     def fake_apply(*_a, **_k):  # noqa: ANN001
         state["corrected"] = True
 
-    monkeypatch.setattr(legacy_rmt, "layer_svd_stats", fake_layer_svd_stats)
-    monkeypatch.setattr(legacy_rmt, "_apply_rmt_correction", fake_apply)
+    monkeypatch.setattr(rmt_analysis, "layer_svd_stats", fake_layer_svd_stats)
+    monkeypatch.setattr(rmt_detection, "_apply_rmt_correction", fake_apply)
 
-    legacy_rmt.rmt_detect(
-        model,
-        threshold=1.5,
-        detect_only=False,
-        correction_factor=0.9,
-        verbose=False,
-        max_iterations=2,
-    )
-    out = capsys.readouterr().out
-    assert "RMT correction improving" not in out
+    with caplog.at_level(logging.INFO, logger=rmt_detection.__name__):
+        rmt_detection.rmt_detect(
+            model,
+            threshold=1.5,
+            detect_only=False,
+            correction_factor=0.9,
+            verbose=False,
+            max_iterations=2,
+        )
+    assert "RMT correction improving" not in caplog.text
 
 
 def test_rmt_detect_logs_more_layers_when_over_three_outliers(
-    monkeypatch, capsys
+    monkeypatch, caplog
 ) -> None:
     model = _TinyModel(n_layers=5)
 
@@ -308,10 +311,10 @@ def test_rmt_detect_logs_more_layers_when_over_three_outliers(
             "worst_details": {"name": "attn.c_proj", "s_max": 2.0},
         }
 
-    monkeypatch.setattr(legacy_rmt, "layer_svd_stats", fake_layer_svd_stats)
-    legacy_rmt.rmt_detect(model, threshold=1.5, detect_only=True, verbose=True)
-    out = capsys.readouterr().out
-    assert "more layers flagged" in out
+    monkeypatch.setattr(rmt_analysis, "layer_svd_stats", fake_layer_svd_stats)
+    with caplog.at_level(logging.INFO, logger=rmt_detection.__name__):
+        rmt_detection.rmt_detect(model, threshold=1.5, detect_only=True, verbose=True)
+    assert "more layers flagged" in caplog.text
 
 
 def test_rmt_detect_target_layers_handles_missing_named_modules(monkeypatch) -> None:
@@ -321,12 +324,12 @@ def test_rmt_detect_target_layers_handles_missing_named_modules(monkeypatch) -> 
 
     model = Model(n_layers=1)
     monkeypatch.setattr(
-        legacy_rmt,
+        rmt_analysis,
         "layer_svd_stats",
         lambda *_a, **_k: {"sigma_min": 1.0, "sigma_max": 1.0, "worst_ratio": 1.0},
     )
 
-    out = legacy_rmt.rmt_detect(
+    out = rmt_detection.rmt_detect(
         model, target_layers=["transformer_layer_0"], detect_only=True
     )
     assert out["n_layers_flagged"] == 0
@@ -347,7 +350,7 @@ def test_apply_rmt_correction_scales_tied_parameters() -> None:
             return tied if name == "tied.weight" else None
 
     before = tied.detach().clone()
-    legacy_rmt._apply_rmt_correction(
+    rmt_detection._apply_rmt_correction(
         layer, factor=0.9, layer_name="layer", adapter=Adapter()
     )
     assert torch.allclose(tied.detach(), before) is False

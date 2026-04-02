@@ -122,6 +122,7 @@ def test_registry_fallback_on_entry_points_error(monkeypatch, tmp_path):
     # Unknown plugin info and metadata behavior
     info = r.get_plugin_info("nope", "guards")
     assert info["available"] is False and info["module"] == "unknown"
+    assert "Plugin discovery failed" in info["status"]
     with pytest.raises(KeyError):
         r.get_plugin_metadata("nope", "guards")
 
@@ -130,6 +131,7 @@ def test_registry_fallback_on_entry_points_error(monkeypatch, tmp_path):
     )
     assert (
         not ok
+        and "Plugin discovery failed" in msg
         and "Unknown adapter" in msg
         and "Unknown edit" in msg
         and "Unknown guard" in msg
@@ -190,6 +192,17 @@ def test_registry_entry_points_select_and_get_paths(monkeypatch):
 
     r2 = reg.CoreRegistry()
     assert "ep_hello_guard" in r2.list_guards()
+
+
+def test_get_plugin_metadata_adds_name_and_type_for_known_plugin() -> None:
+    registry = reg.CoreRegistry()
+
+    metadata = registry.get_plugin_metadata("hello_guard", "guards")
+
+    assert metadata["name"] == "hello_guard"
+    assert metadata["type"] == "guards"
+    assert metadata["available"] is True
+    assert metadata["module"] != "unknown"
 
 
 def test_registry_entry_point_collision_and_typed_getters(monkeypatch):

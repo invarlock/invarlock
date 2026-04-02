@@ -7,6 +7,8 @@ import torch
 
 from ._estimators import power_iter_sigma_max
 
+_SPECTRAL_MEASUREMENT_ERRORS = (RuntimeError, TypeError, ValueError)
+
 
 def compute_sigma_max(
     weight_matrix: Any,
@@ -20,7 +22,7 @@ def compute_sigma_max(
         power_iter_sigma_max_fn = power_iter_sigma_max
     try:
         iters_i = int(iters)
-    except Exception:
+    except (TypeError, ValueError):
         iters_i = 4
     if iters_i < 1:
         iters_i = 1
@@ -37,7 +39,7 @@ def compute_sigma_max(
 
     try:
         return float(power_iter_sigma_max_fn(weight_matrix, iters=iters_i, init=init_s))
-    except Exception:
+    except (ArithmeticError, AttributeError, RuntimeError, TypeError, ValueError):
         return 1.0
 
 
@@ -56,9 +58,18 @@ def auto_sigma_target(
                 if sigma > 0:
                     spectral_norms.append(sigma)
         if spectral_norms:
-            return float(np.percentile(spectral_norms, percentile * 100))
+            try:
+                return float(np.percentile(spectral_norms, percentile * 100))
+            except _SPECTRAL_MEASUREMENT_ERRORS:
+                return percentile
         return percentile
-    except Exception:
+    except (
+        ArithmeticError,
+        AttributeError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ):
         return percentile
 
 
@@ -87,7 +98,13 @@ def capture_baseline_sigmas(
             if hasattr(module, "weight") and module.weight.ndim == 2:
                 baseline_sigmas[name] = compute_sigma_max_fn(module.weight)
         return baseline_sigmas
-    except Exception:
+    except (
+        ArithmeticError,
+        AttributeError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ):
         return {}
 
 
@@ -130,7 +147,7 @@ def scan_model_gains(
                             "min": module.weight.min().item(),
                             "max": module.weight.max().item(),
                         }
-                    except Exception:
+                    except (AttributeError, RuntimeError, TypeError, ValueError):
                         pass
 
         if results["spectral_norms"]:
@@ -142,7 +159,13 @@ def scan_model_gains(
             f"Scanned {results['scanned_modules']} modules out of {results['total_layers']} total layers"
         )
         return results
-    except Exception as error:
+    except (
+        ArithmeticError,
+        AttributeError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ) as error:
         return {
             "total_layers": int(results.get("total_layers", 0)),
             "scanned_modules": 0,
@@ -165,7 +188,13 @@ def capture_sigmas(
     sigmas: dict[str, float] = {}
     try:
         iters = int((guard.estimator or {}).get("iters", 4) or 4)
-    except Exception:
+    except (
+        ArithmeticError,
+        AttributeError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ):
         iters = 4
     if iters < 1:
         iters = 1
@@ -193,7 +222,13 @@ def capture_sigmas(
             sigmas[name] = float(
                 power_iter_sigma_max_fn(weight, iters=iters, init=init)
             )
-        except Exception:
+        except (
+            ArithmeticError,
+            AttributeError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ):
             sigmas[name] = 1.0
     return sigmas
 

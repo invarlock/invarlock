@@ -36,7 +36,9 @@ def test_spectral_guard_before_edit_skips_when_not_prepared():
 
     guard.before_edit(model)
 
-    assert any(event["operation"] == "before_edit_skipped" for event in guard.events)
+    assert any(
+        event["kind"] == "before_edit_skipped" for event in guard.diagnostic_records
+    )
 
 
 def test_spectral_guard_detects_multiple_violation_types():
@@ -99,7 +101,8 @@ def test_spectral_guard_validate_auto_prepare(monkeypatch):
     def fake_capture(model: Any, scope: str):
         return {"layer.mlp.c_fc": 1.2}
 
-    def fake_classify(model: Any, scope: str, existing=None):
+    def fake_classify(model: Any, scope: str, existing=None, modules=None):
+        _ = modules
         return {"layer.mlp.c_fc": "ffn"}
 
     def fake_family_stats(sigmas, family_map):
@@ -145,8 +148,26 @@ def test_spectral_guard_validate_auto_prepare(monkeypatch):
 
     result = guard.validate(model, adapter=None, context={})
 
-    assert result["action"] in {"warn", "abort"}
+    assert result["decision"] in {"monitor", "block"}
     assert isinstance(result["violations"], list)
+
+
+def test_spectral_prepare_failures_raise_and_log_event(monkeypatch):
+    guard = SpectralGuard(scope="all", correction_enabled=False)
+
+    class DummyPreparedModel:
+        def named_modules(self):
+            return iter([])
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("prepare boom")
+
+    monkeypatch.setattr(guard, "_get_scoped_modules", boom)
+
+    with pytest.raises(RuntimeError, match="Failed to prepare spectral guard"):
+        guard.prepare(DummyPreparedModel(), adapter=None, calib=None, policy={})
+
+    assert any(event["kind"] == "prepare_failed" for event in guard.diagnostic_records)
 
 
 def test_apply_relative_spectral_cap_scales_module():

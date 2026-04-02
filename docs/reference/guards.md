@@ -35,7 +35,7 @@ guards:
 > Most thresholds come from the tier defaults (see `tiers.yaml`). Use overrides
 > sparingly and keep evidence in the report.
 >
-> Assurance scope note: the published assurance basis currently covers GPT-2
+> Assurance scope note: the published assurance basis covers GPT-2
 > and BERT profiles. Repo-shipped presets and pilot configs for families such
 > as Mistral 7B, Qwen2 7B, and Qwen2.5 14B expand runnable coverage, not the published
 > assurance basis.

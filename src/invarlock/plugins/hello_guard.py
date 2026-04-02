@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from invarlock.core.api import Guard, ModelAdapter
+from invarlock.core.types import GuardValidationResult
 
 
 class HelloGuard(Guard):
@@ -20,14 +21,16 @@ class HelloGuard(Guard):
         model: Any,
         adapter: ModelAdapter,
         context: dict[str, Any],
-    ) -> dict[str, Any]:
+    ) -> GuardValidationResult:
         score = float(context.get("hello_score", 0.0))
         passed = score <= self.threshold
-        return {
-            "passed": passed,
-            "action": "warn" if passed else "abort",
-            "message": f"Hello guard score {score:.3f} (threshold {self.threshold:.3f})",
-            "metrics": {
-                "score": score,
+        return GuardValidationResult(
+            passed=passed,
+            decision="monitor" if passed else "block",
+            metrics={"score": score},
+            extras={
+                "message": (
+                    f"Hello guard score {score:.3f} (threshold {self.threshold:.3f})"
+                )
             },
-        }
+        )

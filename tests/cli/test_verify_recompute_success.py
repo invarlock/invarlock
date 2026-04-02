@@ -69,7 +69,7 @@ def test_verify_accuracy_recompute_success_json(tmp_path: Path, capsys) -> None:
     with pytest.raises(typer.Exit) as ei:
         verify_command([p], baseline=None, profile="dev", json_out=True)
     out = json.loads(capsys.readouterr().out)
-    assert out["resolution"]["exit_code"] == 0
+    assert "resolution" not in out
     assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 0
 
 
@@ -92,7 +92,7 @@ def test_verify_ppl_recompute_success_json(tmp_path: Path, capsys) -> None:
     with pytest.raises(typer.Exit) as ei:
         verify_command([p], baseline=None, profile="dev", json_out=True, tolerance=1e-9)
     out = json.loads(capsys.readouterr().out)
-    assert out["resolution"]["exit_code"] == 0
+    assert "resolution" not in out
     assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 0
 
 
@@ -116,7 +116,7 @@ def test_verify_ppl_recompute_analysis_point_success(tmp_path: Path, capsys) -> 
     with pytest.raises(typer.Exit) as ei:
         verify_command([p], baseline=None, profile="dev", json_out=True, tolerance=1e-9)
     out = json.loads(capsys.readouterr().out)
-    assert out["resolution"]["exit_code"] == 0
+    assert "resolution" not in out
     assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 0
 
 

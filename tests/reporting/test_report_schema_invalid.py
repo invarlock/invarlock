@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_builder import validate_report
+from invarlock.reporting.report_schema import validate_report
 
 
 def test_validate_evaluation_report_returns_false_for_invalid_payload():

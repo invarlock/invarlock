@@ -5,8 +5,8 @@ from typing import Any
 
 import pytest
 
-from invarlock.reporting.render import compute_console_validation_block
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_console import compute_console_validation_block
+from invarlock.reporting.report_make import make_report
 
 
 def _mock_report_with_windows() -> dict[str, Any]:

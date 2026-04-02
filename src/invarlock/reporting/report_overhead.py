@@ -1,15 +1,100 @@
-"""Guard-overhead helpers extracted from report_builder."""
+"""Guard-overhead normalization helpers for evaluation report assembly."""
 
 from __future__ import annotations
 
 import copy
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any
 
 ValidateGuardOverheadFn = Callable[..., Any]
 ComputePrimaryMetricFn = Callable[..., dict[str, Any]]
 GetMetricFn = Callable[[str], Any]
+
+_NON_FATAL_EXCEPTIONS = (
+    AttributeError,
+    KeyError,
+    OverflowError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
+
+def _append_diagnostic(
+    diagnostics: list[dict[str, Any]],
+    *,
+    kind: str,
+    severity: str,
+    message: Any,
+    details: Mapping[str, Any] | None = None,
+) -> None:
+    diagnostics.append(
+        {
+            "kind": kind,
+            "severity": severity,
+            "message": str(message),
+            "details": dict(details or {}),
+        }
+    )
+
+
+def _coerce_diagnostics(raw: Any) -> list[dict[str, Any]]:
+    diagnostics: list[dict[str, Any]] = []
+    for item in raw if isinstance(raw, (list, tuple)) else ():
+        if isinstance(item, Mapping):
+            diagnostics.append(
+                {
+                    "kind": str(item.get("kind", "guard_overhead_diagnostic")),
+                    "severity": str(item.get("severity", "info")),
+                    "message": str(item.get("message", "")),
+                    "details": {
+                        str(key): value
+                        for key, value in item.items()
+                        if key not in {"kind", "severity", "message"}
+                    },
+                }
+            )
+        elif all(hasattr(item, attr) for attr in ("kind", "severity", "message")):
+            details = getattr(item, "details", {})
+            diagnostics.append(
+                {
+                    "kind": str(getattr(item, "kind", "guard_overhead_diagnostic")),
+                    "severity": str(getattr(item, "severity", "info")),
+                    "message": str(getattr(item, "message", "")),
+                    "details": dict(details) if isinstance(details, Mapping) else {},
+                }
+            )
+        else:
+            diagnostics.append(
+                {
+                    "kind": "guard_overhead_diagnostic",
+                    "severity": "info",
+                    "message": str(item),
+                    "details": {},
+                }
+            )
+    return diagnostics
+
+
+def _extend_legacy_diagnostics(
+    diagnostics: list[dict[str, Any]],
+    *,
+    raw: Any,
+    severity: str,
+    kind: str,
+) -> None:
+    if not isinstance(raw, list | tuple):
+        return
+    for item in raw:
+        diagnostics.append(
+            {
+                "kind": kind,
+                "severity": severity,
+                "message": str(item),
+                "details": {},
+            }
+        )
 
 
 def prepare_guard_overhead_section(
@@ -54,7 +139,7 @@ def prepare_guard_overhead_section(
             mode = payload.get("guard_overhead_mode")
         if isinstance(mode, str) and mode.strip():
             sanitized["mode"] = mode.strip()
-    except Exception:
+    except _NON_FATAL_EXCEPTIONS:
         pass
     try:
         skipped = bool(payload.get("skipped", False))
@@ -63,7 +148,7 @@ def prepare_guard_overhead_section(
             reason = payload.get("skip_reason")
             if isinstance(reason, str) and reason.strip():
                 sanitized["skip_reason"] = reason.strip()
-    except Exception:
+    except _NON_FATAL_EXCEPTIONS:
         pass
 
     # Prefer structured reports and reuse the validator when available
@@ -74,15 +159,14 @@ def prepare_guard_overhead_section(
             bare_report, guarded_report, overhead_threshold=threshold
         )
         metrics = result.metrics or {}
+        diagnostics = _coerce_diagnostics(getattr(result, "diagnostics", ()))
         sanitized.update(
             {
                 "overhead_ratio": metrics.get("overhead_ratio"),
                 "overhead_percent": metrics.get("overhead_percent"),
                 "bare_ppl": metrics.get("bare_ppl"),
                 "guarded_ppl": metrics.get("guarded_ppl"),
-                "messages": list(result.messages),
-                "warnings": list(result.warnings),
-                "errors": list(result.errors),
+                "diagnostics": diagnostics,
                 "checks": dict(result.checks),
                 "evaluated": True,
                 "passed": bool(result.passed),
@@ -106,21 +190,26 @@ def prepare_guard_overhead_section(
     if guarded_ppl is not None:
         sanitized["guarded_ppl"] = guarded_ppl
 
-    sanitized["messages"] = (
-        [str(m) for m in payload.get("messages", [])]
-        if isinstance(payload.get("messages"), list)
-        else []
+    diagnostics = _coerce_diagnostics(payload.get("diagnostics"))
+    _extend_legacy_diagnostics(
+        diagnostics,
+        raw=payload.get("messages"),
+        severity="info",
+        kind="guard_overhead_message",
     )
-    sanitized["warnings"] = (
-        [str(w) for w in payload.get("warnings", [])]
-        if isinstance(payload.get("warnings"), list)
-        else []
+    _extend_legacy_diagnostics(
+        diagnostics,
+        raw=payload.get("warnings"),
+        severity="warning",
+        kind="guard_overhead_warning",
     )
-    sanitized["errors"] = (
-        [str(e) for e in payload.get("errors", [])]
-        if isinstance(payload.get("errors"), list)
-        else []
+    _extend_legacy_diagnostics(
+        diagnostics,
+        raw=payload.get("errors"),
+        severity="error",
+        kind="guard_overhead_error",
     )
+    sanitized["diagnostics"] = diagnostics
     checks = payload.get("checks")
     sanitized["checks"] = dict(checks) if isinstance(checks, dict) else {}
 
@@ -134,8 +223,15 @@ def prepare_guard_overhead_section(
 
     # Unable to compute ratio – treat as not evaluated and soft-pass
     # to align with CLI/run behavior and avoid spurious failures in tiny runs.
-    if not sanitized["errors"]:
-        sanitized["errors"] = ["Guard overhead ratio unavailable"]
+    if not diagnostics:
+        sanitized["diagnostics"] = [
+            {
+                "kind": "guard_overhead_unavailable",
+                "severity": "warning",
+                "message": "Guard overhead ratio unavailable",
+                "details": {},
+            }
+        ]
     sanitized["evaluated"] = False
     sanitized["passed"] = True
     return sanitized, True
@@ -192,7 +288,7 @@ def compute_quality_overhead_from_guard(
         # Resolve direction from registry when possible
         try:
             direction = get_metric_impl(kind).direction
-        except Exception:  # pragma: no cover
+        except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
             direction = str(pm_g.get("direction", "")).lower()
         if direction == "lower":
             if float(b_point) <= 0:
@@ -203,5 +299,5 @@ def compute_quality_overhead_from_guard(
             value = 100.0 * (float(g_point) - float(b_point))
             basis = "delta_pp"
         return {"basis": basis, "value": value, "kind": kind}
-    except Exception:  # pragma: no cover
+    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
         return None

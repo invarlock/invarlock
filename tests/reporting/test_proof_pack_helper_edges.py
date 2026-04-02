@@ -5,8 +5,12 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 import invarlock.proof_pack as proof_pack_mod
+import invarlock.proof_pack_integrity as proof_pack_integrity_mod
+from invarlock.reporting.verify_contract import VerifyExecutionResult, VerifyOutcome
 from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
 
 
@@ -79,6 +83,91 @@ def _write_manifest_and_checksums(
     if manifest_overrides:
         manifest.update(manifest_overrides)
     _write_json(pack_dir / "manifest.json", manifest)
+
+
+def _sign_pack(
+    pack_dir: Path,
+    tmp_path: Path,
+    *,
+    record_manifest_fingerprint: bool = True,
+    manifest_fingerprint_override: str | None = None,
+) -> str:
+    key_root = (
+        tmp_path
+        / f"proof-pack-signing-key-{len(list(tmp_path.glob('proof-pack-signing-key-*.pem'))):02d}.pem"
+    )
+    private_key = key_root
+    public_key = key_root.with_name(f"{key_root.stem}.pub.pem")
+    fingerprint = proof_pack_mod._generate_signing_keypair(
+        private_key,
+        public_key_path=public_key,
+    )
+    if record_manifest_fingerprint or manifest_fingerprint_override is not None:
+        manifest = json.loads((pack_dir / "manifest.json").read_text(encoding="utf-8"))
+        manifest["signing_key_fingerprint"] = (
+            fingerprint
+            if manifest_fingerprint_override is None
+            else manifest_fingerprint_override
+        )
+        _write_json(pack_dir / "manifest.json", manifest)
+    proof_pack_mod._sign_manifest(
+        pack_dir / "manifest.json", signing_key_path=private_key
+    )
+    return fingerprint
+
+
+def test_signature_warnings_to_errors_converts_signature_paths() -> None:
+    assert proof_pack_mod._signature_warnings_to_errors(
+        [
+            "manifest.signature.json missing; pack is unsigned.",
+            "other warning",
+        ]
+    ) == [
+        "manifest.signature.json missing; signed manifest required by default.",
+        "other warning",
+    ]
+
+
+def test_signing_key_validation_and_generation_error_paths(tmp_path: Path) -> None:
+    missing = tmp_path / "missing-key.pem"
+    assert proof_pack_integrity_mod.validate_signing_key(missing) == [
+        f"signing key file not found: {missing}"
+    ]
+
+    invalid_key = tmp_path / "invalid-key.pem"
+    invalid_key.write_text("not-a-pem", encoding="utf-8")
+    assert (
+        "signing key is invalid:"
+        in proof_pack_integrity_mod.validate_signing_key(invalid_key)[0]
+    )
+
+    rsa_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    rsa_key_path = tmp_path / "rsa-key.pem"
+    rsa_key_path.write_bytes(
+        rsa_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+    )
+    assert "Ed25519" in proof_pack_integrity_mod.validate_signing_key(rsa_key_path)[0]
+
+    private_key = tmp_path / "existing-private.pem"
+    public_key = tmp_path / "existing-public.pem"
+    private_key.write_text("exists", encoding="utf-8")
+    with pytest.raises(FileExistsError):
+        proof_pack_integrity_mod.generate_signing_keypair(
+            private_key,
+            public_key_path=public_key,
+        )
+
+    private_key.unlink()
+    public_key.write_text("exists", encoding="utf-8")
+    with pytest.raises(FileExistsError):
+        proof_pack_integrity_mod.generate_signing_keypair(
+            private_key,
+            public_key_path=public_key,
+        )
 
 
 def test_manual_validate_manifest_reports_structural_errors() -> None:
@@ -163,6 +252,10 @@ def test_validate_manifest_and_load_json_object_cover_error_paths(
     errors = proof_pack_mod.validate_manifest(manifest_path)
     assert "manifest is not valid JSON" in errors[0]
 
+    manifest_path.write_bytes(b"\xff")
+    errors = proof_pack_mod.validate_manifest(manifest_path)
+    assert "manifest is not valid JSON" in errors[0]
+
     _write_json(
         manifest_path,
         {
@@ -180,7 +273,9 @@ def test_validate_manifest_and_load_json_object_cover_error_paths(
     monkeypatch.setattr(
         proof_pack_mod.jsonschema,
         "validate",
-        lambda instance, schema: (_ for _ in ()).throw(ValueError("schema boom")),
+        lambda instance, schema: (_ for _ in ()).throw(
+            proof_pack_mod.jsonschema.exceptions.ValidationError("schema boom")
+        ),
         raising=True,
     )
     errors = proof_pack_mod.validate_manifest(manifest_path)
@@ -198,11 +293,75 @@ def test_validate_manifest_and_load_json_object_cover_error_paths(
     assert payload is None
     assert "demo is not valid JSON" in errors[0]
 
+    bad_utf8 = tmp_path / "bad-utf8.json"
+    bad_utf8.write_bytes(b"\xff")
+    payload, errors = proof_pack_mod._load_json_object(bad_utf8, label="demo")
+    assert payload is None
+    assert "demo is not valid JSON" in errors[0]
+
     array_json = tmp_path / "array.json"
     array_json.write_text("[1, 2]", encoding="utf-8")
     payload, errors = proof_pack_mod._load_json_object(array_json, label="demo")
     assert payload is None
     assert errors == [f"demo must decode to a JSON object: {array_json}"]
+
+
+def test_jsonschema_helper_and_direct_validate_fallback_paths(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    class _ValidationError(Exception):
+        pass
+
+    monkeypatch.setattr(proof_pack_mod, "jsonschema", None, raising=False)
+    assert proof_pack_mod._jsonschema_validation_error_types() == ()
+
+    jsonschema_stub = SimpleNamespace(
+        ValidationError=_ValidationError,
+        validate=lambda instance, schema: None,
+    )
+    monkeypatch.setattr(proof_pack_mod, "jsonschema", jsonschema_stub, raising=False)
+    assert proof_pack_mod._jsonschema_validation_error_types() == (_ValidationError,)
+
+    manifest_path = tmp_path / "manifest.json"
+    _write_json(
+        manifest_path,
+        {
+            "format": proof_pack_mod.PROOF_PACK_FORMAT,
+            "checksums_sha256": "checksums.sha256",
+            "checksums_sha256_digest": "a" * 64,
+            "subject": {
+                "name": "final_verdict",
+                "path": "results/final_verdict.json",
+                "digest": "sha256:" + ("b" * 64),
+            },
+            "environment": {
+                "path": "metadata/environment.json",
+                "digest": "sha256:" + ("c" * 64),
+            },
+        },
+    )
+    calls: list[tuple[object, object]] = []
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "load_proof_pack_manifest_schema",
+        lambda: {"type": "object"},
+        raising=True,
+    )
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "jsonschema",
+        SimpleNamespace(
+            validate=lambda instance, schema: calls.append((instance, schema))
+        ),
+        raising=False,
+    )
+    assert proof_pack_mod.validate_manifest(manifest_path) == []
+    assert calls == [
+        (
+            json.loads(manifest_path.read_text(encoding="utf-8")),
+            {"type": "object"},
+        )
+    ]
 
 
 def test_material_and_reference_helpers_cover_invalid_paths(tmp_path: Path) -> None:
@@ -336,8 +495,8 @@ def test_checksum_and_extra_file_helpers_cover_error_paths(tmp_path: Path) -> No
     assert extra_warnings == []
 
 
-def test_verify_gpg_covers_missing_binary_signature_failure_and_fingerprint_mismatch(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+def test_verify_signature_covers_missing_signature_failure_and_fingerprint_mismatch(
+    tmp_path: Path,
 ) -> None:
     pack_dir = tmp_path / "pack"
     report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
@@ -348,70 +507,198 @@ def test_verify_gpg_covers_missing_binary_signature_failure_and_fingerprint_mism
         environment=environment,
     )
 
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
+    errors, warnings, fingerprint = proof_pack_mod._verify_signature(
+        pack_dir, strict=False
+    )
     assert errors == []
-    assert warnings == ["manifest.json.asc missing; pack is unsigned."]
+    assert warnings == ["manifest.signature.json missing; pack is unsigned."]
     assert fingerprint is None
 
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=True)
+    errors, warnings, fingerprint = proof_pack_mod._verify_signature(
+        pack_dir, strict=True
+    )
     assert errors == [
-        "manifest.json.asc missing (strict mode requires a signed manifest)."
+        "manifest.signature.json missing (strict mode requires a signed manifest)."
     ]
     assert warnings == []
     assert fingerprint is None
 
-    (pack_dir / "manifest.json.asc").write_text("sig", encoding="utf-8")
-    monkeypatch.setattr(
-        proof_pack_mod.subprocess,
-        "run",
-        lambda *args, **kwargs: (_ for _ in ()).throw(FileNotFoundError()),
-        raising=True,
+    (pack_dir / "manifest.signature.json").write_text("{invalid", encoding="utf-8")
+    errors, warnings, fingerprint = proof_pack_mod._verify_signature(
+        pack_dir, strict=False
     )
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
-    assert errors == []
-    assert "gpg not found" in warnings[0]
-    assert fingerprint is None
-
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=True)
-    assert errors == ["gpg not found (strict mode requires signature verification)."]
+    assert "manifest.signature.json is not valid JSON" in errors[0]
     assert warnings == []
     assert fingerprint is None
 
-    monkeypatch.setattr(
-        proof_pack_mod.subprocess,
-        "run",
-        lambda *args, **kwargs: SimpleNamespace(
-            returncode=1, stdout="", stderr="bad signature"
-        ),
-        raising=True,
+    fingerprint = _sign_pack(pack_dir, tmp_path)
+    manifest = json.loads((pack_dir / "manifest.json").read_text(encoding="utf-8"))
+    manifest["format"] = "tampered"
+    _write_json(pack_dir / "manifest.json", manifest)
+    errors, warnings, fingerprint_out = proof_pack_mod._verify_signature(
+        pack_dir, strict=False
     )
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
+    assert "manifest signature verification failed." in errors[0]
+    assert warnings == []
+    assert fingerprint_out is None
+
+    _write_manifest_and_checksums(
+        pack_dir,
+        report_path=report_path,
+        final_verdict=final_verdict,
+        environment=environment,
+    )
+    mismatch_fingerprint = _sign_pack(
+        pack_dir,
+        tmp_path,
+        manifest_fingerprint_override="EXPECTED",
+    )
+    errors, warnings, fingerprint_out = proof_pack_mod._verify_signature(
+        pack_dir, strict=False
+    )
+    assert "signing_key_fingerprint (EXPECTED) does not match" in errors[0]
+    assert warnings == []
+    assert fingerprint_out == mismatch_fingerprint
+
+
+def test_verify_signature_uses_default_failure_text_and_rejects_malformed_bundle(
+    tmp_path: Path,
+) -> None:
+    pack_dir = tmp_path / "pack"
+    report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
+    _write_manifest_and_checksums(
+        pack_dir,
+        report_path=report_path,
+        final_verdict=final_verdict,
+        environment=environment,
+    )
+    _write_json(
+        pack_dir / "manifest.signature.json",
+        {
+            "format": "proof-pack-signature-v1",
+            "algorithm": "ed25519",
+            "signing_key_fingerprint": "sha256:" + ("a" * 64),
+            "public_key": {"encoding": "pem", "value": "bad-key"},
+            "signature": {"encoding": "base64", "value": ""},
+        },
+    )
+    errors, warnings, fingerprint = proof_pack_mod._verify_signature(
+        pack_dir, strict=False
+    )
+    assert (
+        "manifest.signature.json signature.value must be a non-empty base64 string."
+        in errors[0]
+    )
+    assert warnings == []
+    assert fingerprint is None
+
+    _write_json(
+        pack_dir / "manifest.signature.json",
+        {
+            "format": "wrong",
+            "algorithm": "ed25519",
+            "signing_key_fingerprint": "sha256:" + ("a" * 64),
+            "public_key": {"encoding": "pem", "value": "bad-key"},
+            "signature": {"encoding": "base64", "value": "abc"},
+        },
+    )
+    errors, warnings, fingerprint = proof_pack_mod._verify_signature(
+        pack_dir, strict=False
+    )
+    assert "manifest.signature.json format must be" in errors[0]
+    assert warnings == []
+    assert fingerprint is None
+
+
+def test_signature_bundle_structure_and_decode_error_paths(tmp_path: Path) -> None:
+    signature_path = tmp_path / "manifest.signature.json"
+
+    _write_json(signature_path, ["not", "an", "object"])
+    bundle, errors = proof_pack_integrity_mod._load_signature_bundle(signature_path)
+    assert bundle is None
+    assert errors == ["manifest.signature.json must decode to a JSON object."]
+
+    _write_json(
+        signature_path,
+        {
+            "format": "wrong",
+            "algorithm": "rsa",
+            "public_key": "bad",
+            "signature": "bad",
+            "signing_key_fingerprint": "bad",
+        },
+    )
+    bundle, errors = proof_pack_integrity_mod._load_signature_bundle(signature_path)
+    assert bundle is None
+    assert "manifest.signature.json algorithm must be 'ed25519'." in errors
+    assert "manifest.signature.json public_key must be an object." in errors
+    assert "manifest.signature.json signature must be an object." in errors
+    assert (
+        "manifest.signature.json signing_key_fingerprint must be a sha256:... string."
+        in errors
+    )
+
+    _write_json(
+        signature_path,
+        {
+            "format": "proof-pack-signature-v1",
+            "algorithm": "ed25519",
+            "public_key": {"encoding": "der", "value": ""},
+            "signature": {"encoding": "hex", "value": ""},
+            "signing_key_fingerprint": "sha256:" + ("a" * 64),
+        },
+    )
+    bundle, errors = proof_pack_integrity_mod._load_signature_bundle(signature_path)
+    assert bundle is None
+    assert "manifest.signature.json public_key.encoding must be 'pem'." in errors
+    assert (
+        "manifest.signature.json public_key.value must be a non-empty PEM string."
+        in errors
+    )
+    assert "manifest.signature.json signature.encoding must be 'base64'." in errors
+    assert (
+        "manifest.signature.json signature.value must be a non-empty base64 string."
+        in errors
+    )
+
+
+def test_verify_signature_bundle_fingerprint_and_decode_error_paths(
+    tmp_path: Path,
+) -> None:
+    pack_dir = tmp_path / "pack"
+    report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
+    _write_manifest_and_checksums(
+        pack_dir,
+        report_path=report_path,
+        final_verdict=final_verdict,
+        environment=environment,
+    )
+    expected_fingerprint = _sign_pack(pack_dir, tmp_path)
+    signature_path = pack_dir / "manifest.signature.json"
+
+    bundle = json.loads(signature_path.read_text(encoding="utf-8"))
+    bundle["signing_key_fingerprint"] = "sha256:" + ("0" * 64)
+    _write_json(signature_path, bundle)
+    errors, warnings, fingerprint = proof_pack_integrity_mod.verify_signature(
+        pack_dir, strict=False
+    )
+    assert "does not match bundled public key" in errors[0]
+    assert warnings == []
+    assert fingerprint == expected_fingerprint
+
+    bundle = json.loads(signature_path.read_text(encoding="utf-8"))
+    bundle["signing_key_fingerprint"] = expected_fingerprint
+    bundle["signature"]["value"] = "%%%not-base64%%%"
+    _write_json(signature_path, bundle)
+    errors, warnings, fingerprint = proof_pack_integrity_mod.verify_signature(
+        pack_dir, strict=False
+    )
     assert "manifest signature verification failed." in errors[0]
     assert warnings == []
     assert fingerprint is None
 
-    manifest = json.loads((pack_dir / "manifest.json").read_text(encoding="utf-8"))
-    manifest["signing_key_fingerprint"] = "EXPECTED"
-    _write_json(pack_dir / "manifest.json", manifest)
-    monkeypatch.setattr(
-        proof_pack_mod.subprocess,
-        "run",
-        lambda *args, **kwargs: SimpleNamespace(
-            returncode=0,
-            stdout="[GNUPG:] VALIDSIG ACTUAL 20260101 0 4 0 1 10 00 00\n",
-            stderr="",
-        ),
-        raising=True,
-    )
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
-    assert "signing_key_fingerprint (EXPECTED) does not match" in errors[0]
-    assert warnings == []
-    assert fingerprint == "ACTUAL"
 
-
-def test_verify_gpg_uses_default_failure_text_and_ignores_short_validsig_lines(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_verify_signature_rejects_non_ed25519_public_key(tmp_path: Path) -> None:
     pack_dir = tmp_path / "pack"
     report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
     _write_manifest_and_checksums(
@@ -420,69 +707,35 @@ def test_verify_gpg_uses_default_failure_text_and_ignores_short_validsig_lines(
         final_verdict=final_verdict,
         environment=environment,
     )
-    (pack_dir / "manifest.json.asc").write_text("sig", encoding="utf-8")
 
-    monkeypatch.setattr(
-        proof_pack_mod.subprocess,
-        "run",
-        lambda *args, **kwargs: SimpleNamespace(returncode=1, stdout="", stderr=""),
-        raising=True,
+    rsa_private = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    public_pem = (
+        rsa_private.public_key()
+        .public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        .decode("ascii")
     )
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
-    assert errors == ["manifest signature verification failed."]
+    _write_json(
+        pack_dir / "manifest.signature.json",
+        {
+            "format": "proof-pack-signature-v1",
+            "algorithm": "ed25519",
+            "signing_key_fingerprint": "sha256:" + ("a" * 64),
+            "public_key": {"encoding": "pem", "value": public_pem},
+            "signature": {"encoding": "base64", "value": "YWJj"},
+        },
+    )
+
+    errors, warnings, fingerprint = proof_pack_integrity_mod.verify_signature(
+        pack_dir, strict=False
+    )
+    assert errors == [
+        "manifest signature verification failed. public key must be Ed25519."
+    ]
     assert warnings == []
     assert fingerprint is None
-
-    monkeypatch.setattr(
-        proof_pack_mod.subprocess,
-        "run",
-        lambda *args, **kwargs: SimpleNamespace(
-            returncode=0,
-            stdout="[GNUPG:] VALIDSIG\n",
-            stderr="",
-        ),
-        raising=True,
-    )
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
-    assert errors == []
-    assert warnings == []
-    assert fingerprint is None
-
-
-def test_verify_gpg_skips_short_validsig_before_later_fingerprint(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    pack_dir = tmp_path / "pack"
-    report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
-    _write_manifest_and_checksums(
-        pack_dir,
-        report_path=report_path,
-        final_verdict=final_verdict,
-        environment=environment,
-    )
-    manifest = json.loads((pack_dir / "manifest.json").read_text(encoding="utf-8"))
-    manifest["signing_key_fingerprint"] = "ACTUAL"
-    (pack_dir / "manifest.json").write_text(
-        json.dumps(manifest, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    (pack_dir / "manifest.json.asc").write_text("sig", encoding="utf-8")
-
-    monkeypatch.setattr(
-        proof_pack_mod.subprocess,
-        "run",
-        lambda *args, **kwargs: SimpleNamespace(
-            returncode=0,
-            stdout="[GNUPG:] VALIDSIG \n[GNUPG:] VALIDSIG ACTUAL EXTRA\n",
-            stderr="",
-        ),
-        raising=True,
-    )
-
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
-    assert errors == []
-    assert warnings == []
-    assert fingerprint == "ACTUAL"
 
 
 def test_verify_reports_and_inspect_cover_error_paths(
@@ -538,7 +791,11 @@ def test_verify_reports_and_inspect_cover_error_paths(
     def _fake_run_verify(reports: list[Path], *, profile: str):
         verify_calls.append([str(path) for path in reports])
         if len(verify_calls) == 1:
-            return 1, {"ok": False}
+            return VerifyExecutionResult(
+                outcome=VerifyOutcome.OK,
+                payload={"ok": False},
+                diagnostics=(),
+            )
         raise RuntimeError("ignore nested error reports")
 
     monkeypatch.setattr(
@@ -550,22 +807,139 @@ def test_verify_reports_and_inspect_cover_error_paths(
     errors, payload = proof_pack_mod._verify_reports(
         pack_dir, json_out_path=json_out, profile="release"
     )
-    assert errors == ["invarlock verify reported report verification failures."]
+    assert errors == [
+        "error-injection report verification failed: ignore nested error reports"
+    ]
     assert payload == {"ok": False}
-    assert json.loads(json_out.read_text(encoding="utf-8")) == {"ok": False}
     assert len(verify_calls) == 2
 
-    missing_payload, exit_code = proof_pack_mod.inspect_proof_pack(tmp_path / "missing")
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_MISSING
+    missing_result = proof_pack_mod.inspect_proof_pack(tmp_path / "missing")
+    missing_payload = missing_result.payload
+    exit_code = missing_result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.MISSING
     assert missing_payload["ok"] is False
 
     invalid_pack = tmp_path / "invalid"
     invalid_pack.mkdir()
     (invalid_pack / "manifest.json").write_text("{invalid", encoding="utf-8")
     (invalid_pack / "checksums.sha256").write_text("", encoding="utf-8")
-    invalid_payload, exit_code = proof_pack_mod.inspect_proof_pack(invalid_pack)
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_FORMAT
+    invalid_result = proof_pack_mod.inspect_proof_pack(invalid_pack)
+    invalid_payload = invalid_result.payload
+    exit_code = invalid_result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.FORMAT
     assert invalid_payload["ok"] is False
+
+
+def test_verify_reports_covers_remaining_payload_contract_branches(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    def _build_pack(name: str, *, with_errors: bool) -> Path:
+        pack_dir = tmp_path / name
+        report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
+        _write_manifest_and_checksums(
+            pack_dir,
+            report_path=report_path,
+            final_verdict=final_verdict,
+            environment=environment,
+        )
+        if with_errors:
+            error_dir = pack_dir / "reports" / "model" / "errors" / "noop"
+            error_dir.mkdir(parents=True, exist_ok=True)
+            (error_dir / "evaluation.report.json").write_text("{}", encoding="utf-8")
+        return pack_dir
+
+    pack_with_errors = _build_pack("with-errors", with_errors=True)
+
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "_run_verify_command",
+        lambda reports, *, profile: (
+            VerifyExecutionResult(
+                outcome=VerifyOutcome.OK,
+                payload={"ok": True},
+                diagnostics=(),
+            )
+            if "clean" in str(reports[0])
+            else VerifyExecutionResult(
+                outcome=VerifyOutcome.OK,
+                payload=["bad-payload"],
+                diagnostics=(),
+            )
+        ),
+        raising=True,
+    )
+    errors, payload = proof_pack_mod._verify_reports(
+        pack_with_errors, json_out_path=None, profile="dev"
+    )
+    assert errors == [
+        "error-injection report verification did not return a JSON object."
+    ]
+    assert payload == {"ok": True}
+
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "_run_verify_command",
+        lambda reports, *, profile: (
+            VerifyExecutionResult(
+                outcome=VerifyOutcome.OK,
+                payload=None,
+                diagnostics=(),
+            )
+            if "clean" in str(reports[0])
+            else VerifyExecutionResult(
+                outcome=VerifyOutcome.OK,
+                payload={"ok": True},
+                diagnostics=(),
+            )
+        ),
+        raising=True,
+    )
+    errors, payload = proof_pack_mod._verify_reports(
+        pack_with_errors, json_out_path=None, profile="dev"
+    )
+    assert errors == ["clean report verification did not return a JSON object."]
+    assert payload is None
+
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "_run_verify_command",
+        lambda reports, *, profile: (
+            VerifyExecutionResult(
+                outcome=VerifyOutcome.OK,
+                payload=["clean-bad"],
+                diagnostics=(),
+            )
+            if "clean" in str(reports[0])
+            else VerifyExecutionResult(
+                outcome=VerifyOutcome.OK,
+                payload={"ok": True},
+                diagnostics=(),
+            )
+        ),
+        raising=True,
+    )
+    errors, payload = proof_pack_mod._verify_reports(
+        pack_with_errors, json_out_path=None, profile="dev"
+    )
+    assert errors == ["clean report verification did not return a JSON object."]
+    assert payload is None
+
+    pack_clean_only = _build_pack("clean-only", with_errors=False)
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "_run_verify_command",
+        lambda reports, *, profile: VerifyExecutionResult(
+            outcome=VerifyOutcome.POLICY_FAIL,
+            payload={"ok": False},
+            diagnostics=(),
+        ),
+        raising=True,
+    )
+    errors, payload = proof_pack_mod._verify_reports(
+        pack_clean_only, json_out_path=None, profile="release"
+    )
+    assert errors == ["invarlock verify reported report verification failures."]
+    assert payload == {"ok": False}
 
 
 def test_build_and_verify_proof_pack_cover_usage_and_failure_paths(
@@ -584,65 +958,83 @@ def test_build_and_verify_proof_pack_cover_usage_and_failure_paths(
     material = tmp_path / "material.json"
     _write_json(material, {"name": "demo"})
 
-    payload, exit_code = proof_pack_mod.build_proof_pack(
+    result = proof_pack_mod.build_proof_pack(
         tmp_path / "out-none",
         final_verdict_path=final_verdict,
         report_paths=[],
     )
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_USAGE
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.USAGE
     assert "at least one --report input" in payload["errors"][0]
 
     existing_out = tmp_path / "existing"
     existing_out.mkdir()
-    payload, exit_code = proof_pack_mod.build_proof_pack(
+    result = proof_pack_mod.build_proof_pack(
         existing_out,
         final_verdict_path=final_verdict,
         report_paths=[report_path],
     )
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_USAGE
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.USAGE
     assert "already exists" in payload["errors"][0]
 
-    payload, exit_code = proof_pack_mod.build_proof_pack(
+    result = proof_pack_mod.build_proof_pack(
         tmp_path / "out-invalid-material",
         final_verdict_path=final_verdict,
         report_paths=[report_path],
         material_specs=[("../bad", material), ("../bad", material)],
     )
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_FORMAT
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.FORMAT
     assert any("Invalid material name" in error for error in payload["errors"])
     assert any("Duplicate material name" in error for error in payload["errors"])
 
     runtime_manifest.unlink()
-    payload, exit_code = proof_pack_mod.build_proof_pack(
+    result = proof_pack_mod.build_proof_pack(
         tmp_path / "out-missing-sidecar",
         final_verdict_path=final_verdict,
         report_paths=[report_path],
     )
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_FORMAT
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.FORMAT
     assert any("report sidecar file not found" in error for error in payload["errors"])
     _write_json(runtime_manifest, {"ok": True})
 
     monkeypatch.setattr(
         proof_pack_mod,
         "_run_verify_command",
-        lambda reports, profile: (2, {"ok": False}),
+        lambda reports, profile: VerifyExecutionResult(
+            outcome=VerifyOutcome.POLICY_FAIL,
+            payload={"ok": False},
+            diagnostics=(),
+        ),
         raising=True,
     )
-    payload, exit_code = proof_pack_mod.build_proof_pack(
+    result = proof_pack_mod.build_proof_pack(
         tmp_path / "out-verify-fail",
         final_verdict_path=final_verdict,
         report_paths=[report_path],
     )
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_REPORTS
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.REPORTS
     assert payload["verify"] == {"ok": False}
 
     monkeypatch.setattr(
         proof_pack_mod,
         "_run_verify_command",
-        lambda reports, profile: (0, {"ok": True}),
+        lambda reports, profile: VerifyExecutionResult(
+            outcome=VerifyOutcome.OK,
+            payload={"ok": True},
+            diagnostics=(),
+        ),
         raising=True,
     )
-    payload, exit_code = proof_pack_mod.build_proof_pack(
+    result = proof_pack_mod.build_proof_pack(
         tmp_path / "out-ok",
         final_verdict_path=final_verdict,
         report_paths=[report_path],
@@ -651,23 +1043,70 @@ def test_build_and_verify_proof_pack_cover_usage_and_failure_paths(
         material_specs=[("demo", material)],
         readme_path=tmp_path / "missing-readme.md",
     )
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_OK
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.OK
     assert payload["ok"] is True
     assert any("README file not found" in warning for warning in payload["warnings"])
 
-    payload, exit_code = proof_pack_mod.verify_proof_pack(
+    result = proof_pack_mod.verify_proof_pack(
         tmp_path / "missing-pack", skip_verify=True
     )
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_MISSING
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.MISSING
     assert payload["ok"] is False
 
-    payload, exit_code = proof_pack_mod.verify_proof_pack(
+    result = proof_pack_mod.verify_proof_pack(
         tmp_path / "out-ok",
         json_out_path=(tmp_path / "out-ok" / "verify.json"),
         skip_verify=True,
     )
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_USAGE
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.USAGE
     assert "--json-out must point outside the pack directory." in payload["errors"]
+
+
+def test_run_verify_command_delegates_to_verify_reports_contract(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    report = tmp_path / "evaluation.report.json"
+    report.write_text("{}", encoding="utf-8")
+    captured: dict[str, object] = {}
+
+    def _fake_verify_contract(
+        reports: list[Path],
+        *,
+        baseline=None,
+        tolerance=1e-9,
+        profile=None,
+        allow_unattested_artifacts=False,
+        json_mode=False,
+    ):
+        captured["reports"] = reports
+        captured["profile"] = profile
+        captured["json_mode"] = json_mode
+        return VerifyExecutionResult(
+            outcome=VerifyOutcome.OK,
+            payload={"ok": True},
+            diagnostics=(),
+        )
+
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "run_verify_reports",
+        _fake_verify_contract,
+        raising=False,
+    )
+
+    result = proof_pack_mod._run_verify_command([report], profile="release")
+
+    assert result.outcome == VerifyOutcome.OK
+    assert result.payload == {"ok": True}
+    assert captured["reports"] == [report]
+    assert captured["profile"] == "release"
+    assert captured["json_mode"] is True
 
 
 def test_manual_validate_manifest_accepts_valid_optional_sections() -> None:
@@ -787,8 +1226,8 @@ def test_parse_checksums_ignores_blank_lines(tmp_path: Path) -> None:
     assert entries == [("a" * 64, "results/final_verdict.json")]
 
 
-def test_verify_gpg_success_without_validsig_returns_no_fingerprint(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+def test_verify_signature_success_without_manifest_fingerprint_returns_signer(
+    tmp_path: Path,
 ) -> None:
     pack_dir = tmp_path / "pack"
     report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
@@ -798,27 +1237,21 @@ def test_verify_gpg_success_without_validsig_returns_no_fingerprint(
         final_verdict=final_verdict,
         environment=environment,
     )
-    (pack_dir / "manifest.json.asc").write_text("sig", encoding="utf-8")
-
-    monkeypatch.setattr(
-        proof_pack_mod.subprocess,
-        "run",
-        lambda *args, **kwargs: SimpleNamespace(
-            returncode=0,
-            stdout="[GNUPG:] GOODSIG TEST KEY\n",
-            stderr="",
-        ),
-        raising=True,
+    expected_fingerprint = _sign_pack(
+        pack_dir,
+        tmp_path,
+        record_manifest_fingerprint=False,
     )
-
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
+    errors, warnings, fingerprint = proof_pack_mod._verify_signature(
+        pack_dir, strict=False
+    )
     assert errors == []
     assert warnings == []
-    assert fingerprint is None
+    assert fingerprint == expected_fingerprint
 
 
-def test_verify_gpg_success_with_matching_fingerprint_returns_signer(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+def test_verify_signature_success_with_matching_fingerprint_returns_signer(
+    tmp_path: Path,
 ) -> None:
     pack_dir = tmp_path / "pack"
     report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
@@ -828,26 +1261,13 @@ def test_verify_gpg_success_with_matching_fingerprint_returns_signer(
         final_verdict=final_verdict,
         environment=environment,
     )
-    manifest = json.loads((pack_dir / "manifest.json").read_text(encoding="utf-8"))
-    manifest["signing_key_fingerprint"] = "MATCHED"
-    _write_json(pack_dir / "manifest.json", manifest)
-    (pack_dir / "manifest.json.asc").write_text("sig", encoding="utf-8")
-
-    monkeypatch.setattr(
-        proof_pack_mod.subprocess,
-        "run",
-        lambda *args, **kwargs: SimpleNamespace(
-            returncode=0,
-            stdout="[GNUPG:] VALIDSIG MATCHED 20260101 0 4 0 1 10 00 00\n",
-            stderr="",
-        ),
-        raising=True,
+    expected_fingerprint = _sign_pack(pack_dir, tmp_path)
+    errors, warnings, fingerprint = proof_pack_mod._verify_signature(
+        pack_dir, strict=False
     )
-
-    errors, warnings, fingerprint = proof_pack_mod._verify_gpg(pack_dir, strict=False)
     assert errors == []
     assert warnings == []
-    assert fingerprint == "MATCHED"
+    assert fingerprint == expected_fingerprint
 
 
 def test_inspect_proof_pack_reports_missing_manifest_and_checksums(
@@ -857,8 +1277,10 @@ def test_inspect_proof_pack_reports_missing_manifest_and_checksums(
     missing_manifest.mkdir()
     _write_json(missing_manifest / "checksums.sha256", {})
 
-    payload, exit_code = proof_pack_mod.inspect_proof_pack(missing_manifest)
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_MISSING
+    result = proof_pack_mod.inspect_proof_pack(missing_manifest)
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.MISSING
     assert payload["issues"] == ["manifest.json missing in pack."]
 
     missing_checksums = tmp_path / "missing-checksums"
@@ -872,8 +1294,10 @@ def test_inspect_proof_pack_reports_missing_manifest_and_checksums(
         },
     )
 
-    payload, exit_code = proof_pack_mod.inspect_proof_pack(missing_checksums)
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_MISSING
+    result = proof_pack_mod.inspect_proof_pack(missing_checksums)
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.MISSING
     assert payload["issues"] == ["checksums.sha256 missing in pack."]
 
 
@@ -888,13 +1312,40 @@ def test_inspect_proof_pack_signed_pack_omits_unsigned_warning_and_reports_extra
         final_verdict=final_verdict,
         environment=environment,
     )
-    (pack_dir / "manifest.json.asc").write_text("sig", encoding="utf-8")
+    _sign_pack(pack_dir, tmp_path)
     (pack_dir / "extra.bin").write_text("extra", encoding="utf-8")
 
-    payload, exit_code = proof_pack_mod.inspect_proof_pack(pack_dir)
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_OK
+    result = proof_pack_mod.inspect_proof_pack(pack_dir)
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.INTEGRITY
+    assert payload["ok"] is False
     assert not any("pack is unsigned" in issue for issue in payload["issues"])
     assert any("extra files not covered" in issue for issue in payload["issues"])
+
+
+def test_inspect_proof_pack_unsigned_clean_pack_reports_warning_without_extras(
+    tmp_path: Path,
+) -> None:
+    pack_dir = tmp_path / "unsigned-pack"
+    report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
+    _write_manifest_and_checksums(
+        pack_dir,
+        report_path=report_path,
+        final_verdict=final_verdict,
+        environment=environment,
+    )
+
+    result = proof_pack_mod.inspect_proof_pack(pack_dir)
+    payload = result.payload
+
+    assert result.status == proof_pack_mod.ProofPackStatus.OK
+    assert payload["ok"] is True
+    assert payload["integrity"]["extra_files"] == []
+    assert (
+        "manifest.signature.json missing; strict verification would fail."
+        in payload["issues"]
+    )
 
 
 def test_build_proof_pack_copies_readme_and_environment_without_optional_refs(
@@ -914,18 +1365,24 @@ def test_build_proof_pack_copies_readme_and_environment_without_optional_refs(
     monkeypatch.setattr(
         proof_pack_mod,
         "_run_verify_command",
-        lambda reports, profile: (0, {"ok": True}),
+        lambda reports, profile: VerifyExecutionResult(
+            outcome=VerifyOutcome.OK,
+            payload={"ok": True},
+            diagnostics=(),
+        ),
         raising=True,
     )
 
-    payload, exit_code = proof_pack_mod.build_proof_pack(
+    result = proof_pack_mod.build_proof_pack(
         tmp_path / "out-readme",
         final_verdict_path=final_verdict,
         report_paths=[report_path],
         environment_path=environment,
         readme_path=readme,
     )
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_OK
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.OK
     assert payload["ok"] is True
     manifest = json.loads(
         (tmp_path / "out-readme" / "manifest.json").read_text(encoding="utf-8")
@@ -951,17 +1408,23 @@ def test_build_proof_pack_copies_source_repo_without_environment_or_materials(
     monkeypatch.setattr(
         proof_pack_mod,
         "_run_verify_command",
-        lambda reports, profile: (0, {"ok": True}),
+        lambda reports, profile: VerifyExecutionResult(
+            outcome=VerifyOutcome.OK,
+            payload={"ok": True},
+            diagnostics=(),
+        ),
         raising=True,
     )
 
-    payload, exit_code = proof_pack_mod.build_proof_pack(
+    result = proof_pack_mod.build_proof_pack(
         tmp_path / "out-source-only",
         final_verdict_path=final_verdict,
         report_paths=[report_path],
         source_repo_path=source_repo,
     )
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_OK
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.OK
     assert payload["ok"] is True
     manifest = json.loads(
         (tmp_path / "out-source-only" / "manifest.json").read_text(encoding="utf-8")
@@ -980,10 +1443,10 @@ def test_verify_proof_pack_reports_missing_manifest_and_checksums(
     missing_manifest.mkdir()
     (missing_manifest / "checksums.sha256").write_text("", encoding="utf-8")
 
-    payload, exit_code = proof_pack_mod.verify_proof_pack(
-        missing_manifest, skip_verify=True
-    )
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_MISSING
+    result = proof_pack_mod.verify_proof_pack(missing_manifest, skip_verify=True)
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.MISSING
     assert payload["errors"] == ["manifest.json missing in pack."]
 
     missing_checksums = tmp_path / "missing-checksums"
@@ -997,10 +1460,10 @@ def test_verify_proof_pack_reports_missing_manifest_and_checksums(
         },
     )
 
-    payload, exit_code = proof_pack_mod.verify_proof_pack(
-        missing_checksums, skip_verify=True
-    )
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_MISSING
+    result = proof_pack_mod.verify_proof_pack(missing_checksums, skip_verify=True)
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.MISSING
     assert payload["errors"] == ["checksums.sha256 missing in pack."]
 
 
@@ -1019,8 +1482,10 @@ def test_verify_proof_pack_returns_format_for_invalid_manifest(
     )
     (pack_dir / "checksums.sha256").write_text("", encoding="utf-8")
 
-    payload, exit_code = proof_pack_mod.verify_proof_pack(pack_dir, skip_verify=True)
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_FORMAT
+    result = proof_pack_mod.verify_proof_pack(pack_dir, skip_verify=True)
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.FORMAT
     assert payload["errors"]
     assert any(
         "schema validation failed" in error or "manifest format must be" in error
@@ -1042,15 +1507,92 @@ def test_verify_proof_pack_returns_signature_failure_payload(
 
     monkeypatch.setattr(
         proof_pack_mod,
-        "_verify_gpg",
+        "_verify_signature",
         lambda pack_dir, strict: (["bad signature"], [], "FPR123"),
         raising=True,
     )
 
-    payload, exit_code = proof_pack_mod.verify_proof_pack(pack_dir, skip_verify=True)
-    assert exit_code == proof_pack_mod.PROOF_PACK_VERIFY_SIGNATURE
+    result = proof_pack_mod.verify_proof_pack(pack_dir, skip_verify=True)
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == proof_pack_mod.ProofPackStatus.SIGNATURE
     assert payload["errors"] == ["bad signature"]
     assert payload["signer_fingerprint"] == "FPR123"
+
+
+def test_verify_proof_pack_skip_verify_fails_closed_without_signature_override(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    pack_dir = tmp_path / "pack"
+    report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
+    _write_manifest_and_checksums(
+        pack_dir,
+        report_path=report_path,
+        final_verdict=final_verdict,
+        environment=environment,
+    )
+
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "_verify_reports",
+        lambda *args, **kwargs: pytest.fail(
+            "_verify_reports should not run when skip_verify=True"
+        ),
+        raising=True,
+    )
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "unattested_artifacts_allowed",
+        lambda: False,
+        raising=True,
+    )
+
+    result = proof_pack_mod.verify_proof_pack(pack_dir, skip_verify=True)
+
+    assert result.status == proof_pack_mod.ProofPackStatus.SIGNATURE
+    assert result.payload["ok"] is False
+    assert "verify" not in result.payload
+    assert result.payload["warnings"] == []
+    assert result.payload["errors"] == [
+        "manifest.signature.json missing; signed manifest required by default."
+    ]
+
+
+def test_verify_proof_pack_skip_verify_allows_explicit_unattested_override(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    pack_dir = tmp_path / "pack"
+    report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
+    _write_manifest_and_checksums(
+        pack_dir,
+        report_path=report_path,
+        final_verdict=final_verdict,
+        environment=environment,
+    )
+
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "_verify_reports",
+        lambda *args, **kwargs: pytest.fail(
+            "_verify_reports should not run when skip_verify=True"
+        ),
+        raising=True,
+    )
+    monkeypatch.setattr(
+        proof_pack_mod,
+        "unattested_artifacts_allowed",
+        lambda: True,
+        raising=True,
+    )
+
+    result = proof_pack_mod.verify_proof_pack(pack_dir, skip_verify=True)
+
+    assert result.status == proof_pack_mod.ProofPackStatus.OK
+    assert result.payload["ok"] is True
+    assert "verify" not in result.payload
+    assert result.payload["warnings"] == [
+        "manifest.signature.json missing; pack is unsigned."
+    ]
 
 
 def test_build_verify_result_includes_signer_and_verify_payload(tmp_path: Path) -> None:
@@ -1063,8 +1605,8 @@ def test_build_verify_result_includes_signer_and_verify_payload(tmp_path: Path) 
         errors=["err"],
         signer_fingerprint="ABC123",
         verify_payload={"ok": False},
-        exit_code=proof_pack_mod.PROOF_PACK_VERIFY_SIGNATURE,
+        status=proof_pack_mod.ProofPackStatus.OK,
     )
 
-    assert payload["signer_fingerprint"] == "ABC123"
-    assert payload["verify"] == {"ok": False}
+    assert payload.payload["signer_fingerprint"] == "ABC123"
+    assert payload.payload["verify"] == {"ok": False}

@@ -42,5 +42,5 @@ def test_compute_ppl_window_simple():
         input_ids=[[1, 2, 3, 4]],
         attention_masks=[[1, 1, 1, 1]],
     )
-    ppl = compute_ppl(model, None, window)
+    ppl = compute_ppl(model, window)
     assert isinstance(ppl, float) and ppl >= 1.0

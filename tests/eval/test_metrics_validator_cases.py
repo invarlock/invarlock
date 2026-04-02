@@ -3,6 +3,7 @@ from __future__ import annotations
 import torch
 
 from invarlock.core.exceptions import ValidationError
+from invarlock.eval import metrics_support as support_mod
 from invarlock.eval.metrics import InputValidator, MetricsConfig
 
 
@@ -65,7 +66,7 @@ def test_validate_tensor_inf_non_strict_replaces() -> None:
 def test_validate_dataloader_empty_paths_raise_or_warn(monkeypatch) -> None:
     seen: list[str] = []
     monkeypatch.setattr(
-        "invarlock.eval.metrics.logger.warning", lambda msg: seen.append(str(msg))
+        support_mod.logger, "warning", lambda msg: seen.append(str(msg))
     )
 
     cfg_strict = MetricsConfig(allow_empty_data=False, use_cache=False)

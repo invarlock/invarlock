@@ -1471,3 +1471,15 @@ test_generate_model_tasks_falls_back_to_plain_error_json_when_jq_binary_missing(
 
     unset -f type
 }
+
+test_queue_manager_terminal_state_covers_completed_variants() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/queue_manager.sh"
+
+    get_queue_stats() { echo "0:0:0:2:0:2"; }
+    assert_eq "completed" "$(queue_terminal_state)" "no failures yields completed terminal state"
+
+    get_queue_stats() { echo "0:0:0:1:1:2"; }
+    assert_eq "completed_with_failures" "$(queue_terminal_state)" "failures yield completed_with_failures terminal state"
+}

@@ -13,7 +13,6 @@ from .api import Guard, ModelAdapter, ModelEdit, RunConfig, RunReport
 from .checkpoint import CheckpointManager
 from .events import EventLogger
 from .exceptions import InvarlockError
-from .registry import PluginInfo, get_registry
 from .types import (
     EditInfo,
     EditType,
@@ -43,20 +42,7 @@ __all__ = [
     "ModelInfo",
     "EditInfo",
     "GuardResult",
-    # Registry and discovery
-    "get_registry",
-    "PluginInfo",
     # Supporting services
     "EventLogger",
     "CheckpointManager",
 ]
-
-
-# Lazy import CoreRunner to avoid importing heavy dependencies (e.g., NumPy)
-# during lightweight operations such as registry inspection or CLI startup.
-def __getattr__(name: str):  # pragma: no cover - simple lazy import shim
-    if name == "CoreRunner":
-        from .runner import CoreRunner as _CoreRunner
-
-        return _CoreRunner
-    raise AttributeError(name)

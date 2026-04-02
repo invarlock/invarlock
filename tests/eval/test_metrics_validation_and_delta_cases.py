@@ -6,6 +6,11 @@ import pytest
 import torch
 
 from invarlock.eval import metrics as M
+from invarlock.eval.metrics_activation import (
+    ResultCache,
+    _gini_vectorized,
+    _locate_transformer_blocks_enhanced,
+)
 
 
 def test_bootstrap_ci_errors_and_success():
@@ -47,12 +52,12 @@ def test_input_validator_paths():
 def test_gini_and_cache_and_blocks():
     # Gini on zero vector returns NaN
     v = torch.zeros(3, 4)
-    val = M._gini_vectorized(v)
+    val = _gini_vectorized(v)
     assert math.isnan(val)
 
     # ResultCache get/set/clear
     cfg = M.MetricsConfig(use_cache=True)
-    cache = M.ResultCache(cfg)
+    cache = ResultCache(cfg)
     dummy_model = torch.nn.Linear(2, 2)
     key = cache._get_cache_key(dummy_model, [1, 2], cfg)
     assert cache.get(key) is None
@@ -66,7 +71,7 @@ def test_gini_and_cache_and_blocks():
         def __init__(self):
             self.transformer = SimpleNamespace(h=[object()])
 
-    blocks = M._locate_transformer_blocks_enhanced(Dummy())
+    blocks = _locate_transformer_blocks_enhanced(Dummy())
     assert isinstance(blocks, list)
 
 
@@ -98,7 +103,7 @@ def test_unified_compute_ppl_with_window_object():
             logits = self.out(torch.zeros(B, T, 4))
             return SimpleNamespace(logits=logits)
 
-    ppl = M.compute_ppl(DummyLM(), None, window)
+    ppl = M.compute_ppl(DummyLM(), window)
     assert isinstance(ppl, float) and ppl >= 1.0
 
 
@@ -115,8 +120,8 @@ def test_locate_transformer_blocks_patterns():
         def __init__(self):
             self.transformer = ModelH()
 
-    assert isinstance(M._locate_transformer_blocks_enhanced(Wrapped()), list)
-    assert isinstance(M._locate_transformer_blocks_enhanced(BaseModel()), list)
+    assert isinstance(_locate_transformer_blocks_enhanced(Wrapped()), list)
+    assert isinstance(_locate_transformer_blocks_enhanced(BaseModel()), list)
 
 
 def test_unified_compute_ppl_window_no_valid_tokens_raises():
@@ -138,4 +143,4 @@ def test_unified_compute_ppl_window_no_valid_tokens_raises():
             return SimpleNamespace(logits=logits)
 
     with pytest.raises(M.ValidationError):
-        _ = M.compute_ppl(DummyLM(), None, window)
+        _ = M.compute_ppl(DummyLM(), window)

@@ -211,8 +211,16 @@ def test_release_workflow_uses_trusted_publishing():
         == "${{ github.event_name == 'push' && github.ref || inputs.release_tag }}"
     )
 
+    dist_download_step = _find_step_by_name(steps, "Download dist artifacts")
+    assert dist_download_step["with"]["path"] == "_release_dist"
+
+    stage_step = _find_step_by_name(steps, "Stage publish distributions")
+    assert "rm -rf publish-dist" in stage_step["run"]
+    assert "cp _release_dist/*.whl publish-dist/" in stage_step["run"]
+    assert "cp _release_dist/*.tar.gz publish-dist/" in stage_step["run"]
+
     attest_step = _find_step_by_uses_prefix(steps, "actions/attest-build-provenance@")
-    assert attest_step["with"]["subject-path"] == "dist/*"
+    assert attest_step["with"]["subject-path"] == "publish-dist/*"
     assert attest_step["id"] == "attest_release"
 
     provenance_step = _find_step_by_name(steps, "Upload provenance bundle")
@@ -227,7 +235,7 @@ def test_release_workflow_uses_trusted_publishing():
     step_with = publish_step.get("with", {})
     assert "user" not in step_with
     assert "password" not in step_with
-    assert step_with["packages-dir"] == "dist"
+    assert step_with["packages-dir"] == "publish-dist"
     assert "steps.vars.outputs.publish_repository_url" in step_with["repository-url"]
     assert step_with["skip-existing"] is True
 
@@ -488,3 +496,62 @@ def test_model_evidence_workflow_is_configured() -> None:
     upload = _find_step_by_uses_prefix(steps, "actions/upload-artifact@")
     assert upload["with"]["name"] == "model-evidence-${{ github.run_id }}"
     assert upload["with"]["path"] == "reports/model_evidence/${{ github.run_id }}/"
+
+
+def test_gpt2_smoke_workflow_is_configured() -> None:
+    workflow = _load_workflow(Path(".github/workflows/gpt2-smoke.yml"))
+    triggers = workflow["on"]
+
+    assert "workflow_dispatch" in triggers
+    assert triggers["schedule"] == [{"cron": "0 4 * * 1"}]
+    assert "push" not in triggers
+    assert workflow["permissions"] == {"contents": "read"}
+
+    job = workflow["jobs"]["smoke"]
+    assert job["runs-on"] == "ubuntu-latest"
+    assert job["timeout-minutes"] == 60
+
+    env = job["env"]
+    assert env["INVARLOCK_ALLOW_NETWORK"] == "1"
+    assert env["INVARLOCK_SMOKE_MODE"] == "attested"
+    assert env["INVARLOCK_SMOKE_PROFILE"] == "dev"
+    assert env["INVARLOCK_RUNTIME_IMAGE"] == "invarlock-runtime:local"
+
+    steps = job["steps"]
+    install = _find_step_by_name(steps, "Install dependencies")
+    assert "pip install --require-hashes" in install["run"]
+
+    runtime_image = _find_step_by_name(steps, "Build runtime image")
+    assert "make runtime-image" in runtime_image["run"]
+
+    smoke = _find_step_by_name(steps, "Run GPT-2 smoke campaign")
+    assert "scripts/run_gpt2_smoke_campaign.sh" in smoke["run"]
+
+
+def test_tiny_attested_smoke_workflow_is_configured() -> None:
+    workflow = _load_workflow(Path(".github/workflows/tiny-attested-smoke.yml"))
+    triggers = workflow["on"]
+
+    assert triggers["push"]["branches"] == ["staging/next"]
+    assert "workflow_dispatch" in triggers
+    assert workflow["permissions"] == {"contents": "read"}
+
+    job = workflow["jobs"]["smoke"]
+    assert job["runs-on"] == "ubuntu-latest"
+    assert job["timeout-minutes"] == 45
+
+    env = job["env"]
+    assert env["INVARLOCK_ALLOW_NETWORK"] == "1"
+    assert env["INVARLOCK_SMOKE_MODE"] == "attested"
+    assert env["INVARLOCK_SMOKE_PROFILE"] == "dev"
+    assert env["INVARLOCK_RUNTIME_IMAGE"] == "invarlock-runtime:local"
+
+    steps = job["steps"]
+    install = _find_step_by_name(steps, "Install dependencies")
+    assert "pip install --require-hashes" in install["run"]
+
+    runtime_image = _find_step_by_name(steps, "Build runtime image")
+    assert "make runtime-image" in runtime_image["run"]
+
+    smoke = _find_step_by_name(steps, "Run tiny attested smoke campaign")
+    assert "scripts/run_tiny_attested_smoke.sh" in smoke["run"]

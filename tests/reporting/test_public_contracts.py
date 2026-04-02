@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 import invarlock.public_contracts as contracts
 
 
@@ -103,7 +105,7 @@ def test_packaged_contract_copies_match_repo_contracts() -> None:
         )
 
 
-def test_public_contract_helpers_fall_back_when_contracts_are_unavailable(
+def test_public_contract_helpers_raise_when_contracts_are_unavailable(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
@@ -112,32 +114,41 @@ def test_public_contract_helpers_fall_back_when_contracts_are_unavailable(
         lambda _filename: (_ for _ in ()).throw(OSError("missing")),
     )
 
-    assert contracts.load_support_matrix() == {
-        "format_version": "support-matrix-v1",
-        "lanes": [],
-    }
-    assert contracts.load_adapter_capabilities() == {
-        "format_version": "adapter-capabilities-v1",
-        "adapters": [],
-    }
-    assert contracts.load_model_family_catalog() == {
-        "format_version": "model-family-catalog-v1",
-        "declared_support": [],
-        "implemented_coverage": [],
-        "usage_only": [],
-        "recommended_additions": [],
-    }
-    assert contracts.load_plugin_compatibility() == {
-        "format_version": "plugin-compatibility-v1"
-    }
-    assert contracts.load_policy_pack_schema() == {}
-    assert contracts.load_proof_pack_manifest_schema() == {}
-    assert contracts.load_runtime_manifest_schema() == {}
-    assert contracts.support_lane_by_id("missing") is None
-    assert contracts.adapter_capability("missing") is None
+    with pytest.raises(contracts.ContractLoadError, match="support_matrix.json"):
+        contracts.load_support_matrix()
+    with pytest.raises(contracts.ContractLoadError, match="adapter_capabilities.json"):
+        contracts.load_adapter_capabilities()
+    with pytest.raises(contracts.ContractLoadError, match="model_family_catalog.json"):
+        contracts.load_model_family_catalog()
+    with pytest.raises(contracts.ContractLoadError, match="plugin_compatibility.json"):
+        contracts.load_plugin_compatibility()
+    with pytest.raises(contracts.ContractLoadError, match="policy_pack.schema.json"):
+        contracts.load_policy_pack_schema()
+    with pytest.raises(
+        contracts.ContractLoadError, match="proof_pack_manifest.schema.json"
+    ):
+        contracts.load_proof_pack_manifest_schema()
+    with pytest.raises(
+        contracts.ContractLoadError, match="runtime_manifest.schema.json"
+    ):
+        contracts.load_runtime_manifest_schema()
     assert contracts.contract_reference("support_matrix.json") == {
-        "path": "contracts/support_matrix.json"
+        "path": "contracts/support_matrix.json",
+        "load_error": "missing",
     }
+
+
+def test_public_contract_helpers_wrap_unicode_decode_errors(monkeypatch) -> None:
+    monkeypatch.setattr(
+        contracts,
+        "load_json_contract",
+        lambda _filename: (_ for _ in ()).throw(
+            UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+        ),
+    )
+
+    with pytest.raises(contracts.ContractLoadError, match="support_matrix.json"):
+        contracts.load_support_matrix()
 
 
 def test_public_contract_helpers_reject_non_mapping_payloads(monkeypatch) -> None:
@@ -152,31 +163,28 @@ def test_public_contract_helpers_reject_non_mapping_payloads(monkeypatch) -> Non
     }
     monkeypatch.setattr(
         contracts,
-        "_safe_load",
-        lambda filename, default: payloads.get(filename, default),
+        "_load_contract_or_raise",
+        lambda filename: payloads[filename],
     )
 
-    assert contracts.load_support_matrix() == {
-        "format_version": "support-matrix-v1",
-        "lanes": [],
-    }
-    assert contracts.load_adapter_capabilities() == {
-        "format_version": "adapter-capabilities-v1",
-        "adapters": [],
-    }
-    assert contracts.load_model_family_catalog() == {
-        "format_version": "model-family-catalog-v1",
-        "declared_support": [],
-        "implemented_coverage": [],
-        "usage_only": [],
-        "recommended_additions": [],
-    }
-    assert contracts.load_plugin_compatibility() == {
-        "format_version": "plugin-compatibility-v1"
-    }
-    assert contracts.load_policy_pack_schema() == {}
-    assert contracts.load_proof_pack_manifest_schema() == {}
-    assert contracts.load_runtime_manifest_schema() == {}
+    with pytest.raises(contracts.ContractLoadError, match="support_matrix.json"):
+        contracts.load_support_matrix()
+    with pytest.raises(contracts.ContractLoadError, match="adapter_capabilities.json"):
+        contracts.load_adapter_capabilities()
+    with pytest.raises(contracts.ContractLoadError, match="model_family_catalog.json"):
+        contracts.load_model_family_catalog()
+    with pytest.raises(contracts.ContractLoadError, match="plugin_compatibility.json"):
+        contracts.load_plugin_compatibility()
+    with pytest.raises(contracts.ContractLoadError, match="policy_pack.schema.json"):
+        contracts.load_policy_pack_schema()
+    with pytest.raises(
+        contracts.ContractLoadError, match="proof_pack_manifest.schema.json"
+    ):
+        contracts.load_proof_pack_manifest_schema()
+    with pytest.raises(
+        contracts.ContractLoadError, match="runtime_manifest.schema.json"
+    ):
+        contracts.load_runtime_manifest_schema()
 
 
 def test_public_contract_lane_and_adapter_helpers_cover_non_matching_entries(
@@ -184,8 +192,8 @@ def test_public_contract_lane_and_adapter_helpers_cover_non_matching_entries(
 ) -> None:
     monkeypatch.setattr(
         contracts,
-        "_safe_load",
-        lambda filename, default: {
+        "_load_contract_or_raise",
+        lambda filename: {
             "support_matrix.json": {
                 "format_version": "support-matrix-v1",
                 "lanes": [
@@ -218,7 +226,7 @@ def test_public_contract_lane_and_adapter_helpers_cover_non_matching_entries(
                 "core_abi": "0.1",
                 "match_policy": "exact_match",
             },
-        }.get(filename, default),
+        }[filename],
     )
 
     assert contracts.support_lane_by_id("missing") is None

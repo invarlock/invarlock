@@ -74,7 +74,8 @@ def test_edit_phase_sets_defaults_when_deltas_not_dict() -> None:
         def can_edit(self, _desc):  # noqa: ANN001
             return True
 
-        def apply(self, _model, _adapter, **_kwargs):  # noqa: ANN001
+        def apply(self, _model, _adapter, plan=None, runtime=None):  # noqa: ANN001
+            _ = plan, runtime
             return {"name": self.name, "deltas": ["bad"]}
 
     report = RunReport()
@@ -85,6 +86,7 @@ def test_edit_phase_sets_defaults_when_deltas_not_dict() -> None:
         model_desc={},
         report=report,
         edit_config=None,
+        edit_runtime=None,
     )
     assert report.context.get("edit", {}).get("params_changed") == 0
 

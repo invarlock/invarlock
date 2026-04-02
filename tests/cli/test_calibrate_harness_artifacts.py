@@ -170,7 +170,7 @@ def test_calibrate_commands_exit_on_missing_optional_deps(
         )
 
 
-def test_null_sweep_optioninfo_runtime_flags_do_not_block_missing_dep_error(
+def test_null_sweep_runtime_flags_do_not_block_missing_dep_error(
     tmp_path: Path,
 ) -> None:
     cfg = _write_base_config(tmp_path)
@@ -204,10 +204,10 @@ def test_null_sweep_optioninfo_runtime_flags_do_not_block_missing_dep_error(
             seed_start=42,
             profile="ci",
             device=None,
-            allow_network=typer.Option(True),
-            allow_host_execution=typer.Option(True),
-            allow_third_party_plugins=typer.Option(True),
-            allow_remote_code=typer.Option(True),
+            allow_network=True,
+            allow_host_execution=True,
+            allow_third_party_plugins=True,
+            allow_remote_code=True,
             safety_margin=0.05,
             target_any_warning_rate=0.01,
         )
@@ -215,7 +215,7 @@ def test_null_sweep_optioninfo_runtime_flags_do_not_block_missing_dep_error(
     run_calibration.assert_not_called()
 
 
-def test_ve_sweep_optioninfo_runtime_flags_do_not_block_missing_dep_error(
+def test_ve_sweep_runtime_flags_do_not_block_missing_dep_error(
     tmp_path: Path,
 ) -> None:
     cfg = _write_base_config(tmp_path)
@@ -251,10 +251,10 @@ def test_ve_sweep_optioninfo_runtime_flags_do_not_block_missing_dep_error(
             target_enable_rate=0.05,
             profile="ci",
             device=None,
-            allow_network=typer.Option(True),
-            allow_host_execution=typer.Option(True),
-            allow_third_party_plugins=typer.Option(True),
-            allow_remote_code=typer.Option(True),
+            allow_network=True,
+            allow_host_execution=True,
+            allow_third_party_plugins=True,
+            allow_remote_code=True,
             safety_margin=0.0,
         )
 
@@ -265,15 +265,9 @@ def test_null_sweep_emits_json_csv_md_and_tier_patch(tmp_path: Path) -> None:
     cfg = _write_base_config(tmp_path)
     out = tmp_path / "out"
 
-    def _fake_run_command(
-        *, out: Path, tier: str, config: Path, **_kwargs
-    ) -> str | None:  # noqa: ARG001
+    def _fake_run_command(*, out: Path, tier: str, config: Path, **_kwargs) -> str:  # noqa: ARG001
         loaded = yaml.safe_load(Path(config).read_text(encoding="utf-8"))
         assert loaded["context"]["run"]["skip_overhead_check"] is True
-        out_str = str(out)
-        # Exercise both branches: one run produces a report; one is skipped.
-        if "seed_43" in out_str:
-            return None
         report_path = Path(out) / "report.json"
         report_path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
@@ -543,11 +537,7 @@ def test_ve_sweep_covers_guard_search_and_ci_width_exceptions(tmp_path: Path) ->
     )
     out = tmp_path / "out"
 
-    def _fake_run_command(
-        *, out: Path, tier: str, config: Path, **_kwargs
-    ) -> str | None:  # noqa: ARG001
-        if "seed_43" in str(out):
-            return None
+    def _fake_run_command(*, out: Path, tier: str, config: Path, **_kwargs) -> str:  # noqa: ARG001
         report_path = Path(out) / "report.json"
         report_path.parent.mkdir(parents=True, exist_ok=True)
         payload = {

@@ -150,7 +150,7 @@ run_evaluate_sentinel() {
     normalize_staged_preset_for_baseline_report "${staged_preset}" "${staged_baseline_report}"
 
     local rc=0
-    if ! invarlock evaluate \
+    if invarlock evaluate \
         --baseline "${baseline_path}" \
         --subject "${subject_path}" \
         --adapter "${adapter}" \
@@ -160,6 +160,8 @@ run_evaluate_sentinel() {
         --device "${device}" \
         --out "${out_dir}/report.json" \
         --report-out "${out_dir}"; then
+        :
+    else
         rc=$?
     fi
 
@@ -178,7 +180,9 @@ run_public_quant_verify() {
     local profile="$3"
 
     local rc=0
-    if ! invarlock verify --json --profile "${profile}" "${report_path}" > "${out_dir}/verify.json"; then
+    if invarlock verify --json --profile "${profile}" "${report_path}" > "${out_dir}/verify.json"; then
+        :
+    else
         rc=$?
     fi
     require_file "${out_dir}/verify.json" "verify summary"
@@ -317,4 +321,6 @@ main() {
     find "${out_dir}" -maxdepth 2 -type f \( -name 'evaluation.report.json' -o -name 'verify.json' -o -name 'report.json' \) | sort
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi

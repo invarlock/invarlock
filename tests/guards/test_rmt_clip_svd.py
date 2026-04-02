@@ -1,6 +1,6 @@
 import torch
 
-import invarlock.guards.rmt_legacy as R
+import invarlock.guards.rmt_math as R
 
 
 def test_clip_full_svd_components_and_nonfinite():

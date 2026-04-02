@@ -30,7 +30,8 @@ class _BadEdit(ModelEdit):
     def can_edit(self, model_desc):
         return True
 
-    def apply(self, model, adapter, **kwargs):
+    def apply(self, model, adapter, plan=None, runtime=None):
+        _ = model, adapter, plan, runtime
         return {}
 
 

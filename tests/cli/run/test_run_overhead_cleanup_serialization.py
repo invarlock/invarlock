@@ -55,13 +55,13 @@ def _common_ce():
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report.save_report",
+            "invarlock.reporting.report_files.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
             },
         ),
         patch(
-            "invarlock.cli.commands.run.resolve_tokenizer",
+            "invarlock.cli.run_runtime.resolve_tokenizer",
             lambda profile: (
                 SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
                 "tokhash123",
@@ -131,7 +131,9 @@ def test_cleanup_rmtree_exception_is_swallowed(tmp_path: Path, monkeypatch):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.cli.config.load_config", load_cfg))
+        stack.enter_context(
+            patch("invarlock.core.config_runtime.load_config", load_cfg)
+        )
         stack.enter_context(
             patch(
                 "invarlock.core.registry.get_registry",
@@ -154,7 +156,7 @@ def test_cleanup_rmtree_exception_is_swallowed(tmp_path: Path, monkeypatch):
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.shutil.rmtree",
+                "invarlock.core.checkpoint.shutil.rmtree",
                 side_effect=RuntimeError("boom"),
             )
         )
@@ -205,8 +207,8 @@ def test_overhead_display_fallbacks(tmp_path: Path, percent, ratio, expect_na):
             stack.enter_context(ctx)
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.commands.run.validate_guard_overhead",
-            "invarlock.cli.commands.run.validate_guard_overhead",
+            "invarlock.cli.run_runtime.validate_guard_overhead",
+            "invarlock.cli.run_runtime.validate_guard_overhead",
         ):
             stack.enter_context(patch(target, vg))
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
@@ -336,12 +338,12 @@ def test_until_pass_baseline_disappears_between_attempts(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(patch("invarlock.core.retry.RetryController", RC))
         stack.enter_context(
-            patch("invarlock.reporting.report_builder.make_report", make_cert)
+            patch("invarlock.reporting.report_make.make_report", make_cert)
         )
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.commands.run.validate_guard_overhead",
-            "invarlock.cli.commands.run.validate_guard_overhead",
+            "invarlock.cli.run_runtime.validate_guard_overhead",
+            "invarlock.cli.run_runtime.validate_guard_overhead",
         ):
             stack.enter_context(
                 patch(
@@ -445,7 +447,9 @@ def test_restore_chunked_missing_dir_causes_exit(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.cli.config.load_config", load_cfg))
+        stack.enter_context(
+            patch("invarlock.core.config_runtime.load_config", load_cfg)
+        )
         stack.enter_context(
             patch(
                 "invarlock.core.registry.get_registry",
@@ -547,8 +551,8 @@ def test_guard_overhead_failure_exits(tmp_path: Path):
             stack.enter_context(ctx)
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.commands.run.validate_guard_overhead",
-            "invarlock.cli.commands.run.validate_guard_overhead",
+            "invarlock.cli.run_runtime.validate_guard_overhead",
+            "invarlock.cli.run_runtime.validate_guard_overhead",
         ):
             stack.enter_context(patch(target, vg))
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
@@ -600,7 +604,7 @@ def test_overhead_threshold_bad_type_uses_default(tmp_path: Path):
             stack.enter_context(ctx)
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.commands.run.validate_guard_overhead",
+            "invarlock.cli.run_runtime.validate_guard_overhead",
         ):
             stack.enter_context(patch(target, vg))
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
@@ -754,7 +758,7 @@ def test_psutil_virtual_memory_failure(tmp_path: Path):
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.psutil.virtual_memory",
+                "invarlock.cli.run_runtime.psutil.virtual_memory",
                 lambda: (_ for _ in ()).throw(RuntimeError("fail")),
             )
         )
@@ -775,7 +779,9 @@ def test_save_report_failure_bubbles_to_exit(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.reporting.report.save_report", bad_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", bad_save)
+        )
         stack.enter_context(
             patch(
                 "invarlock.eval.data.get_provider", lambda *a, **k: _provider_simple()

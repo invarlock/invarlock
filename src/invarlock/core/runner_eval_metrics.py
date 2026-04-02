@@ -11,6 +11,7 @@ from .bootstrap import (
     compute_paired_delta_log_ci,
     logspace_to_ratio_ci,
 )
+from .exceptions import InvarlockError
 from .runner_eval_windows import compute_slice_summary, resolve_limit, slice_calibration
 from .runner_latency import measure_latency
 from .runner_pairing import (
@@ -41,20 +42,44 @@ def compute_real_metrics(
     _ = adapter
     model.eval()
 
-    if os.environ.get("INVARLOCK_DEBUG_TRACE"):
-        print(
-            f"[debug] compute_real_metrics preview_n={preview_n} final_n={final_n} calibration_len={len(calibration_data) if hasattr(calibration_data, '__len__') else 'n/a'}"
+    debug_trace_enabled = bool(os.environ.get("INVARLOCK_DEBUG_TRACE"))
+    if (
+        not debug_trace_enabled
+        and config
+        and isinstance(getattr(config, "context", None), dict)
+    ):
+        debug_trace_enabled = bool(config.context.get("debug_trace", False))
+    if debug_trace_enabled:
+        runner._log_event(
+            "eval",
+            "real_metrics_snapshot",
+            LogLevel.DEBUG,
+            {
+                "preview_n": preview_n,
+                "final_n": final_n,
+                "calibration_len": (
+                    len(calibration_data)
+                    if hasattr(calibration_data, "__len__")
+                    else "n/a"
+                ),
+            },
         )
     device = next(model.parameters()).device
 
-    eval_device_override = os.environ.get("INVARLOCK_EVAL_DEVICE")
+    eval_device_override = None
+    if config and isinstance(getattr(config, "context", None), dict):
+        eval_section = config.context.get("eval")
+        if isinstance(eval_section, dict):
+            override = eval_section.get("device_override")
+            if isinstance(override, str) and override.strip():
+                eval_device_override = override.strip()
     if eval_device_override:
         override_device = torch.device(eval_device_override)
         if override_device != device:
             model.to(override_device)
             device = override_device
 
-    process = psutil.Process(os.getpid())
+    process = psutil.Process()
     initial_memory = process.memory_info().rss / 1024 / 1024
 
     policy_flags = runner._resolve_policy_flags(config)
@@ -132,8 +157,9 @@ def compute_real_metrics(
         )
         final_n = remaining
 
+    calibration_source = calibration_data
     preview_data, calibration_data = slice_calibration(
-        calibration_data,
+        calibration_source,
         start=0,
         count=preview_n,
         allow_materialize=allow_materialize,
@@ -144,6 +170,14 @@ def compute_real_metrics(
         count=final_n,
         allow_materialize=allow_materialize,
     )
+    if not final_data and requested_final > 0 and total_available > 0:
+        fallback_final_n = min(requested_final, total_available)
+        final_data, calibration_data = slice_calibration(
+            calibration_source,
+            start=0,
+            count=fallback_final_n,
+            allow_materialize=allow_materialize,
+        )
 
     eval_context: dict[str, Any] = {}
     if config and isinstance(config.context, dict):
@@ -195,8 +229,8 @@ def compute_real_metrics(
     if not (0.0 < bootstrap_alpha < 1.0):
         bootstrap_alpha = 0.05
 
-    pm_preview = 50.0
-    pm_final = 50.0
+    pm_preview = float("nan")
+    pm_final = float("nan")
     ratio_ci: tuple[float, float] = (1.0, 1.0)
     preview_log_ci: tuple[float, float] = (math.log(pm_preview), math.log(pm_preview))
     final_log_ci: tuple[float, float] = (math.log(pm_final), math.log(pm_final))
@@ -277,12 +311,7 @@ def compute_real_metrics(
 
         preview_raw_losses = preview_summary["log_losses"]
         final_raw_losses = final_summary["log_losses"]
-        try:
-            paired_windows_attempted = min(
-                len(preview_raw_losses), len(final_raw_losses)
-            )
-        except Exception:
-            paired_windows_attempted = 0
+        paired_windows_attempted = min(len(preview_raw_losses), len(final_raw_losses))
 
         preview_log_losses = [
             float(loss) for loss in preview_raw_losses if math.isfinite(loss)
@@ -355,7 +384,7 @@ def compute_real_metrics(
         else:
             pm_preview = preview_summary["ppl"]
             if not math.isfinite(pm_preview) or pm_preview <= 0:
-                pm_preview = 50.0
+                pm_preview = float("nan")
             preview_mean_log = math.log(pm_preview)
 
         if final_tokens_ct > 0:
@@ -367,7 +396,7 @@ def compute_real_metrics(
         else:
             pm_final = final_summary["ppl"]
             if not math.isfinite(pm_final) or pm_final <= 0:
-                pm_final = 50.0
+                pm_final = float("nan")
             final_mean_log = math.log(pm_final)
 
         delta_mean_log = final_mean_log - preview_mean_log
@@ -379,7 +408,7 @@ def compute_real_metrics(
             expected_ratio = math.exp(delta_mean_log)
             if abs(ppl_ratio - expected_ratio) > 1e-6:
                 raise RuntimeError("primary_metric_ratio_mismatch")
-        except Exception as exc:
+        except (ArithmeticError, TypeError, ValueError, RuntimeError) as exc:
             pm_invalid = True
             runner._log_event(
                 "eval",
@@ -507,27 +536,6 @@ def compute_real_metrics(
 
         if needs_pm_fallback or needs_delta_fallback:
             pm_invalid = True
-            pm_fallback = (
-                pm_preview if math.isfinite(pm_preview) and pm_preview > 0 else pm_final
-            )
-            if not (math.isfinite(pm_fallback) and pm_fallback > 0):
-                pm_fallback = 1.0
-            if needs_pm_fallback:
-                pm_preview = (
-                    pm_preview
-                    if math.isfinite(pm_preview) and pm_preview > 0
-                    else pm_fallback
-                )
-                pm_final = (
-                    pm_final
-                    if math.isfinite(pm_final) and pm_final > 0
-                    else pm_fallback
-                )
-            if needs_delta_fallback:
-                if not math.isfinite(delta_mean_log):
-                    delta_mean_log = 0.0
-                if not math.isfinite(ppl_ratio):
-                    ppl_ratio = 1.0
 
         pairing_metrics = compute_window_pairing_metrics(
             preview_window_ids=preview_window_ids,
@@ -629,8 +637,6 @@ def compute_real_metrics(
                 },
             )
             if pairing_context and profile_label in {"ci", "release"}:
-                from invarlock.core.exceptions import InvarlockError
-
                 raise InvarlockError(
                     code="E005",
                     message=(
@@ -651,14 +657,20 @@ def compute_real_metrics(
                 "coverage": coverage_summary["coverage"],
             }
         )
-    except Exception as exc:  # pragma: no cover - defensive fallback
-        runner._log_event(
-            "eval",
-            "error",
-            LogLevel.ERROR,
-            {"message": f"Primary-metric computation failed: {exc}"},
-        )
+    except InvarlockError as exc:
         eval_error = {"type": type(exc).__name__, "message": str(exc)}
+    except RuntimeError as exc:
+        message = str(exc)
+        if message.startswith(
+            (
+                "Window pairing mismatch detected",
+                "Window overlap detected",
+                "Window count mismatch detected",
+            )
+        ):
+            eval_error = {"type": type(exc).__name__, "message": message}
+        else:
+            raise
 
     latency_ms_per_tok = measure_latency(
         model, preview_data[:1] if preview_data else final_data[:1], device
@@ -669,12 +681,9 @@ def compute_real_metrics(
     eval_samples = 0
     total_tokens = 0
     masked_total_tokens = 0
-    try:
-        eval_samples = int(preview_batches_ct) + int(final_batches_ct)
-        total_tokens = int(preview_actual_tokens_ct) + int(final_actual_tokens_ct)
-        masked_total_tokens = int(preview_masked_total) + int(final_masked_total)
-    except Exception:
-        pass
+    eval_samples = int(preview_batches_ct) + int(final_batches_ct)
+    total_tokens = int(preview_actual_tokens_ct) + int(final_actual_tokens_ct)
+    masked_total_tokens = int(preview_masked_total) + int(final_masked_total)
 
     paired_windows_count = (
         paired_windows_attempted if paired_windows_attempted else len(delta_samples)

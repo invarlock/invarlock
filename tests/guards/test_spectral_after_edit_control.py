@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+import pytest
 import torch
 
 from invarlock.guards.spectral import SpectralGuard
@@ -58,6 +59,28 @@ def test_spectral_after_edit_applies_control_and_logs_event():
             guard.before_edit(baseline)
             guard.after_edit(edited)
 
-    # Ensure after_edit path executed (either applied control or failed gracefully)
-    messages = [e.get("operation") for e in guard.events]
-    assert "after_edit" in messages or "after_edit_failed" in messages
+    # Ensure after_edit path executed.
+    messages = [e.get("kind") for e in guard.diagnostic_records]
+    assert "after_edit" in messages
+
+
+def test_spectral_after_edit_failures_raise_and_log_event(monkeypatch):
+    guard = SpectralGuard(scope="all", correction_enabled=False)
+    guard.prepared = True
+
+    class DummyModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.fc = torch.nn.Linear(2, 2)
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("after edit boom")
+
+    monkeypatch.setattr(guard, "_capture_sigmas", boom)
+
+    with pytest.raises(RuntimeError, match="Post-edit spectral analysis failed"):
+        guard.after_edit(DummyModel())
+
+    assert any(
+        event["kind"] == "after_edit_failed" for event in guard.diagnostic_records
+    )

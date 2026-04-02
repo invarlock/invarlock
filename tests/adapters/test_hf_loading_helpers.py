@@ -6,6 +6,8 @@ from pathlib import Path
 import pytest
 import torch
 
+from invarlock.runtime_security import runtime_allowances_scope
+
 
 @pytest.mark.unit
 def test_resolve_trust_remote_code_defaults_false(monkeypatch):
@@ -20,21 +22,21 @@ def test_resolve_trust_remote_code_defaults_false(monkeypatch):
 
 
 @pytest.mark.unit
-def test_resolve_trust_remote_code_env_opt_in(monkeypatch):
+def test_resolve_trust_remote_code_ignores_env_opt_in(monkeypatch):
     from invarlock.adapters.hf_loading import resolve_trust_remote_code
 
     monkeypatch.setenv("INVARLOCK_ALLOW_REMOTE_CODE", "1")
     monkeypatch.setenv("INVARLOCK_TRUST_REMOTE_CODE", "1")
-    assert resolve_trust_remote_code({}) is True
+    assert resolve_trust_remote_code({}) is False
 
 
 @pytest.mark.unit
 def test_resolve_trust_remote_code_kwargs_override(monkeypatch):
     from invarlock.adapters.hf_loading import resolve_trust_remote_code
 
-    monkeypatch.setenv("INVARLOCK_ALLOW_REMOTE_CODE", "1")
     monkeypatch.setenv("INVARLOCK_TRUST_REMOTE_CODE", "0")
-    assert resolve_trust_remote_code({"trust_remote_code": True}) is True
+    with runtime_allowances_scope(allow_remote_code=True):
+        assert resolve_trust_remote_code({"trust_remote_code": True}) is True
 
 
 @pytest.mark.unit
@@ -230,14 +232,13 @@ def test_resolve_core_loader_strategy_trust_remote_code_forces_auto(
         "_import_symbol",
         lambda module_path, symbol_name: f"{module_path}.{symbol_name}",
     )
-    monkeypatch.setenv("INVARLOCK_ALLOW_REMOTE_CODE", "1")
-
-    strategy = hf_loading.resolve_core_loader_strategy(
-        task="causal",
-        model_id=str(model_dir),
-        kwargs={"trust_remote_code": True},
-        allow_direct_submodule=True,
-    )
+    with runtime_allowances_scope(allow_remote_code=True):
+        strategy = hf_loading.resolve_core_loader_strategy(
+            task="causal",
+            model_id=str(model_dir),
+            kwargs={"trust_remote_code": True},
+            allow_direct_submodule=True,
+        )
 
     assert strategy.strategy == "auto"
     assert strategy.loader_label == "transformers.AutoModelForCausalLM"

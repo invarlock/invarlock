@@ -13,10 +13,11 @@ from __future__ import annotations
 import logging
 from unittest.mock import MagicMock, patch
 
+import pytest
 import torch.nn as nn
 
 from invarlock.adapters.capabilities import ModelCapabilities
-from invarlock.adapters.hf_mixin import HFAdapterMixin
+from invarlock.adapters.hf_mixin import HFAdapterMixin, HFPretrainedLoadDiagnostic
 
 
 class SimpleMixin(HFAdapterMixin):
@@ -274,8 +275,9 @@ class TestFilteredLoadingInfo:
 
         assert isinstance(model, DummyModel)
         assert caplog.text == ""
+        assert mixin.pretrained_load_diagnostics == ()
 
-    def test_logs_actionable_loading_mismatches(self, caplog):
+    def test_captures_actionable_loading_mismatches(self, caplog):
         mixin = SimpleMixin()
 
         class DummyModel:
@@ -295,11 +297,25 @@ class TestFilteredLoadingInfo:
         with caplog.at_level(logging.WARNING):
             mixin._load_pretrained_model(DummyLoader, "demo/model")
 
-        assert "Transformers load info" in caplog.text
-        assert "decoder.foo.weight" in caplog.text
-        assert "decoder.bar.weight" in caplog.text
-        assert "decoder.baz.weight" in caplog.text
-        assert "errors=1" in caplog.text
+        assert caplog.text == ""
+        assert mixin.pretrained_load_diagnostics == (
+            HFPretrainedLoadDiagnostic(
+                kind="unexpected_keys",
+                entries=("decoder.foo.weight",),
+            ),
+            HFPretrainedLoadDiagnostic(
+                kind="missing_keys",
+                entries=("decoder.bar.weight",),
+            ),
+            HFPretrainedLoadDiagnostic(
+                kind="mismatched_keys",
+                entries=("decoder.baz.weight",),
+            ),
+            HFPretrainedLoadDiagnostic(
+                kind="error_messages",
+                entries=("shape mismatch",),
+            ),
+        )
 
     def test_retries_when_loader_rejects_output_loading_info(self):
         mixin = SimpleMixin()
@@ -325,3 +341,78 @@ class TestFilteredLoadingInfo:
         assert len(DummyLoader.calls) == 2
         assert DummyLoader.calls[0]["output_loading_info"] is True
         assert "output_loading_info" not in DummyLoader.calls[1]
+        assert mixin.pretrained_load_diagnostics == ()
+
+    def test_prefers_local_files_only_before_online_retry(self):
+        mixin = SimpleMixin()
+
+        class DummyModel:
+            pass
+
+        class DummyLoader:
+            calls: list[dict[str, object]] = []
+
+            @classmethod
+            def from_pretrained(cls, model_id: str, **kwargs: object):
+                cls.calls.append({"model_id": model_id, **kwargs})
+                if kwargs.get("local_files_only") is True:
+                    return DummyModel(), {"unexpected_keys": []}
+                return DummyModel()
+
+        model = mixin._load_pretrained_model(
+            DummyLoader,
+            "gpt2",
+            prefer_local_files_only=True,
+        )
+
+        assert isinstance(model, DummyModel)
+        assert len(DummyLoader.calls) == 1
+        assert DummyLoader.calls[0]["local_files_only"] is True
+
+    def test_falls_back_online_when_local_cache_missing(self):
+        mixin = SimpleMixin()
+
+        class DummyModel:
+            pass
+
+        class DummyLoader:
+            calls: list[dict[str, object]] = []
+
+            @classmethod
+            def from_pretrained(cls, model_id: str, **kwargs: object):
+                cls.calls.append({"model_id": model_id, **kwargs})
+                if kwargs.get("local_files_only") is True:
+                    raise OSError("missing cached files")
+                return DummyModel()
+
+        model = mixin._load_pretrained_model(
+            DummyLoader,
+            "gpt2",
+            prefer_local_files_only=True,
+        )
+
+        assert isinstance(model, DummyModel)
+        assert len(DummyLoader.calls) == 2
+        assert DummyLoader.calls[0]["local_files_only"] is True
+        assert "local_files_only" not in DummyLoader.calls[1]
+
+    def test_does_not_fall_back_online_on_arbitrary_loader_errors(self):
+        mixin = SimpleMixin()
+
+        class DummyLoader:
+            calls: list[dict[str, object]] = []
+
+            @classmethod
+            def from_pretrained(cls, model_id: str, **kwargs: object):
+                cls.calls.append({"model_id": model_id, **kwargs})
+                raise RuntimeError("loader boom")
+
+        with pytest.raises(RuntimeError, match="loader boom"):
+            mixin._load_pretrained_model(
+                DummyLoader,
+                "gpt2",
+                prefer_local_files_only=True,
+            )
+
+        assert len(DummyLoader.calls) == 1
+        assert DummyLoader.calls[0]["local_files_only"] is True

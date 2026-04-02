@@ -19,8 +19,8 @@ def test_explain_gates_missing_files_exits_with_message(tmp_path):
             str(tmp_path / "missing2.json"),
         ],
     )
-    assert r.exit_code == 1
-    assert "Missing --report or --baseline file" in r.stdout
+    assert r.exit_code == 2
+    assert "Path not found" in r.stdout
 
 
 def test_explain_gates_invalid_json(tmp_path):
@@ -31,8 +31,8 @@ def test_explain_gates_invalid_json(tmp_path):
     r = CliRunner().invoke(
         app, ["report", "explain", "--report", str(rep), "--baseline", str(base)]
     )
-    assert r.exit_code == 1
-    assert "Failed to load inputs" in r.stdout
+    assert r.exit_code == 2
+    assert "not valid JSON" in r.stdout
 
 
 def test_explain_gates_hysteresis_and_overhead_rendering(monkeypatch, tmp_path):

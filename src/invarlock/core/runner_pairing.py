@@ -11,6 +11,7 @@ BOOTSTRAP_COVERAGE_REQUIREMENTS = {
     "balanced": {"preview": 180, "final": 180, "replicates": 1200},
     "aggressive": {"preview": 140, "final": 140, "replicates": 800},
 }
+_PAIRING_COERCION_ERRORS = (OverflowError, TypeError, ValueError)
 
 
 def _hash_tokens(tokens: Sequence[int]) -> bytes:
@@ -83,13 +84,20 @@ def compare_with_baseline(
         return stats
 
     base_map: dict[int, bytes] = {}
+    invalid_baseline_reference = False
     for base_id, seq in zip(base_ids, base_tokens, strict=False):
         try:
             base_id_int = int(base_id)
-        except Exception:
-            continue
-        seq_list = list(seq) if not isinstance(seq, list) else seq
-        base_map[base_id_int] = _hash_tokens(seq_list)
+            seq_list = list(seq) if not isinstance(seq, list) else seq
+            base_map[base_id_int] = _hash_tokens(seq_list)
+        except _PAIRING_COERCION_ERRORS:
+            invalid_baseline_reference = True
+            break
+
+    if invalid_baseline_reference or len(base_map) != len(base_ids):
+        stats["expected"] = max(len(base_ids), len(base_tokens))
+        stats["reason"] = "invalid_baseline_reference"
+        return stats
 
     stats["expected"] = len(base_map)
     matched = 0
@@ -100,7 +108,7 @@ def compare_with_baseline(
     for run_id, seq in zip(run_ids, run_tokens, strict=False):
         try:
             run_id_int = int(run_id)
-        except Exception:
+        except _PAIRING_COERCION_ERRORS:
             unexpected.append(run_id)
             continue
 

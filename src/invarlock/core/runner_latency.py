@@ -4,6 +4,12 @@ import time
 from typing import Any
 
 
+def _raise_latency_error(summary: str, *, error: Exception | None = None) -> None:
+    if error is None:
+        raise RuntimeError(summary)
+    raise RuntimeError(summary) from error
+
+
 def measure_latency(model: Any, sample_data: Any, device: Any) -> float:
     """Simple latency measurement for a sample."""
     import torch
@@ -24,22 +30,37 @@ def measure_latency(model: Any, sample_data: Any, device: Any) -> float:
         return 0.0
 
     if not isinstance(input_ids, torch.Tensor):
-        input_ids = torch.tensor(input_ids)
+        try:
+            input_ids = torch.tensor(input_ids)
+        except Exception as error:
+            _raise_latency_error(
+                "Latency measurement input tensor conversion failed.",
+                error=error,
+            )
 
     try:
         dim_val = input_ids.dim()
-    except Exception:
-        dim_val = 2
+    except Exception as error:
+        _raise_latency_error(
+            "Latency measurement input shape inspection failed.",
+            error=error,
+        )
     if dim_val == 1:
         try:
             input_ids = input_ids.unsqueeze(0)
-        except Exception:
-            pass
+        except Exception as error:
+            _raise_latency_error(
+                "Latency measurement batch shaping failed.",
+                error=error,
+            )
 
     try:
         input_ids = input_ids.to(device)
-    except Exception:
-        pass
+    except Exception as error:
+        _raise_latency_error(
+            "Latency measurement device transfer failed.",
+            error=error,
+        )
 
     def maybe_sync() -> None:
         try:
@@ -50,8 +71,11 @@ def measure_latency(model: Any, sample_data: Any, device: Any) -> float:
                 is_cuda = device.startswith("cuda")
             if is_cuda and torch.cuda.is_available():
                 torch.cuda.synchronize()
-        except Exception:
-            pass
+        except Exception as error:
+            _raise_latency_error(
+                "Latency measurement device synchronization failed.",
+                error=error,
+            )
 
     with torch.no_grad():
         try:
@@ -65,35 +89,40 @@ def measure_latency(model: Any, sample_data: Any, device: Any) -> float:
                         if attn_t.dim() == 1:
                             attn_t = attn_t.unsqueeze(0)
                     except Exception:
-                        pass
+                        _raise_latency_error(
+                            "Latency measurement attention-mask shaping failed."
+                        )
                     try:
                         attn_t = attn_t.to(device)
-                    except Exception:
-                        pass
-                except Exception:
-                    attn_t = None
+                    except Exception as error:
+                        _raise_latency_error(
+                            "Latency measurement attention-mask device transfer failed.",
+                            error=error,
+                        )
+                except Exception as error:
+                    _raise_latency_error(
+                        "Latency measurement attention-mask preparation failed.",
+                        error=error,
+                    )
             if isinstance(sample, dict) and "token_type_ids" in sample:
                 try:
                     token_type_t = torch.tensor(sample["token_type_ids"])
                     if token_type_t.dim() == 1:
                         token_type_t = token_type_t.unsqueeze(0)
                     token_type_t = token_type_t.to(device)
-                except Exception:
-                    token_type_t = None
+                except Exception as error:
+                    _raise_latency_error(
+                        "Latency measurement token-type preparation failed.",
+                        error=error,
+                    )
 
             def call_model() -> Any:
+                kwargs: dict[str, Any] = {"labels": labels_t}
                 if attn_t is not None:
-                    return model(
-                        input_ids,
-                        attention_mask=attn_t,
-                        labels=labels_t,
-                        token_type_ids=token_type_t,
-                    )
-                return model(
-                    input_ids,
-                    labels=labels_t,
-                    token_type_ids=token_type_t,
-                )
+                    kwargs["attention_mask"] = attn_t
+                if token_type_t is not None:
+                    kwargs["token_type_ids"] = token_type_t
+                return model(input_ids, **kwargs)
 
             for _ in range(3):
                 _ = call_model()
@@ -108,11 +137,14 @@ def measure_latency(model: Any, sample_data: Any, device: Any) -> float:
             total_time = (end_time - start_time) * 1000
             try:
                 total_tokens = input_ids.numel() * 10
-            except Exception:
-                total_tokens = 0
+            except Exception as error:
+                _raise_latency_error(
+                    "Latency measurement token counting failed.",
+                    error=error,
+                )
             return total_time / total_tokens if total_tokens > 0 else 0.0
         except Exception:
-            return 0.0
+            raise
 
 
 def samples_to_dataloader(samples: list[Any]) -> Any:

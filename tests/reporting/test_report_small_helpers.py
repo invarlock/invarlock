@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_builder import (
+from invarlock.reporting.report_make import (
     _compute_confidence_label,
     _compute_edit_digest,
-    _is_ppl_kind,
 )
+from invarlock.reporting.report_primary_metric_policy import is_ppl_kind as _is_ppl_kind
 
 
 def test_is_ppl_kind_variants() -> None:

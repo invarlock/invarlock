@@ -391,11 +391,9 @@ class InvarLockHealthChecker(HealthChecker):
         def check_adapters():
             """Check adapter availability."""
             try:
-                from invarlock.adapters import (
-                    HF_Causal_Adapter,
-                    HF_MLM_Adapter,
-                    HF_Seq2Seq_Adapter,
-                )
+                from invarlock.adapters.hf_causal import HF_Causal_Adapter
+                from invarlock.adapters.hf_mlm import HF_MLM_Adapter
+                from invarlock.adapters.hf_seq2seq import HF_Seq2Seq_Adapter
 
                 adapters = {
                     "hf_causal": HF_Causal_Adapter,
@@ -448,12 +446,10 @@ class InvarLockHealthChecker(HealthChecker):
         def check_guards():
             """Check guard system availability."""
             try:
-                from invarlock.guards import (
-                    InvariantsGuard,
-                    RMTGuard,
-                    SpectralGuard,
-                    VarianceGuard,
-                )
+                from invarlock.guards.invariants import InvariantsGuard
+                from invarlock.guards.rmt import RMTGuard
+                from invarlock.guards.spectral import SpectralGuard
+                from invarlock.guards.variance import VarianceGuard
 
                 guards = {
                     "spectral": SpectralGuard,

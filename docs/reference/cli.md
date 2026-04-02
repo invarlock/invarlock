@@ -38,6 +38,7 @@ invarlock verify reports/eval/evaluation.report.json
 
 # Render shareable HTML
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
+invarlock report explain --report runs/subject/report.json --baseline runs/source/report.json
 ```
 
 ## Security Defaults
@@ -57,7 +58,7 @@ invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/eva
 | Compare baseline vs subject | `invarlock evaluate` | `reports/eval/evaluation.report.json` plus `runtime.manifest.json` for attested runs |
 | Validate an evaluation report | `invarlock verify` | Exit code plus human or JSON verification output |
 | Render HTML from an evaluation report | `invarlock report html` | HTML file |
-| Explain gate decisions | `invarlock report explain` | Human-readable explanation |
+| Explain gate decisions from run reports | `invarlock report explain` | Human-readable explanation |
 | Inspect environment health | `invarlock doctor` | Human or JSON diagnostics |
 | Proof-pack, policy, plugin, or calibration workflows | `invarlock advanced ...` | Advanced artifacts and diagnostics |
 
@@ -68,7 +69,7 @@ invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/eva
 | `invarlock evaluate` | Yes (`--out`, default `runs/`) | Yes (`--report-out`, default `reports/eval`) | Produces the paired evaluation report bundle |
 | `invarlock verify` | No | No | Reads existing evaluation report JSON |
 | `invarlock report html` | No | Yes (`--output`) | Renders HTML from an existing report |
-| `invarlock report explain` | No | No | Reads existing baseline and subject report artifacts |
+| `invarlock report explain` | No | No | Reads existing baseline and subject run report JSON files (not evaluation.report.json) |
 | `invarlock doctor` | No | No | Diagnostics only |
 | `invarlock advanced proof-pack` | Depends on subcommand | Depends on subcommand | Advanced evidence packaging |
 | `invarlock advanced policy` | Depends on subcommand | No | Advanced policy-pack tooling |
@@ -95,10 +96,10 @@ Purpose: compare a baseline against a subject and emit an evaluation report.
 
 Common options:
 
-- `--baseline` / `--source`: baseline checkpoint path or model ID
-- `--subject` / `--edited`: subject checkpoint path or model ID
-- `--baseline-report`: reuse a stored baseline report when you already captured
-  the baseline windows
+- `--baseline`: baseline checkpoint path or model ID
+- `--subject`: subject checkpoint path or model ID
+- `--baseline-report`: reuse a stored baseline report by passing the explicit
+  `report.json` file path that captured the baseline windows
 - `--adapter`: adapter name or `auto`
 - `--profile`: `ci`, `release`, or another shipped profile
 - `--tier`: tier label for policy context
@@ -151,17 +152,22 @@ Core subcommands:
   - Render an evaluation report to HTML
   - Options: `-i/--input`, `-o/--output`, `--embed-css`, `--force`
 - `invarlock report explain`
+  - Explain gate decisions from run reports, not the generated evaluation bundle
   - Explain gates and primary-metric behavior for a subject report versus a
     baseline report
 - `invarlock report validate`
   - Validate a report JSON against the current schema
 - `invarlock report verify`
   - Re-run verification through the report namespace when needed
+- Directory inputs to `report` commands are only accepted when they contain a
+  canonical `report.json` or `evaluation.report.json`; otherwise pass an
+  explicit file path.
 
 Example:
 
 ```bash
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
+invarlock report explain --report runs/subject/report.json --baseline runs/source/report.json
 ```
 
 ## `invarlock doctor`
@@ -176,6 +182,8 @@ Common options:
 - `--baseline-report`
 - `--subject-report`
 - `--strict`
+- Report inputs accept an explicit JSON file path or a directory containing
+  canonical `report.json` or `evaluation.report.json`.
 
 Example:
 
@@ -228,7 +236,7 @@ pip install "invarlock[hf]"
 pip install "invarlock[awq,gptq]"
 ```
 
-The CLI no longer provides plugin install or uninstall commands.
+Plugin install and uninstall commands are not part of the CLI surface.
 
 ## JSON Output
 
@@ -242,15 +250,13 @@ plugin surfaces.
 
 These commands emit a single JSON object suitable for CI parsing.
 
-## Migration Notes
+## Command Layout
 
-The CLI surface was simplified to reduce operator overhead.
-
-- The public top level is now `evaluate`, `verify`, `report`, `doctor`,
+- The public top level is `evaluate`, `verify`, `report`, `doctor`,
   `advanced`, and `version`.
-- Proof-pack, policy, plugin, and calibration workflows moved under
+- Proof-pack, policy, plugin, and calibration workflows live under
   `invarlock advanced ...`.
-- Trusted host execution for the core evaluation path is now expressed as
+- Trusted host execution for the core evaluation path is expressed as
   `--mode local`.
 - Optional runtime backends are installed with Python extras instead of CLI
   install and uninstall commands.

@@ -16,6 +16,13 @@ from invarlock.utils.bootstrap import (
 
 from .variance_types import CalibrationBatchContext
 
+_VARIANCE_BATCHING_ERRORS = (
+    AttributeError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 def safe_mean(
     samples: list[float] | np.ndarray, default: float | None = None
@@ -39,7 +46,7 @@ def materialize_batch(guard: Any, batch: Any) -> Any:
         return batch.detach().cpu()
     try:
         return copy.deepcopy(batch)
-    except Exception:
+    except (AttributeError, RuntimeError, TypeError, ValueError):
         return batch
 
 
@@ -52,7 +59,7 @@ def ensure_tensor_value(value: Any) -> Any:
     if isinstance(value, list | tuple):
         try:
             return torch.as_tensor(value)
-        except Exception:
+        except (RuntimeError, TypeError, ValueError):
             return value
     if isinstance(value, int | float):
         return torch.tensor(value)
@@ -192,7 +199,7 @@ def prepare_batch_tensors(
         input_ids = input_ids.unsqueeze(0)
     try:
         input_ids = input_ids.to(device)
-    except Exception:
+    except (AttributeError, RuntimeError, TypeError, ValueError):
         input_ids = input_ids.clone()
 
     labels = input_ids.clone()
@@ -203,7 +210,7 @@ def prepare_batch_tensors(
             attention_mask = attention_mask.unsqueeze(0)
         try:
             attention_mask = attention_mask.to(device)
-        except Exception:
+        except (AttributeError, RuntimeError, TypeError, ValueError):
             attention_mask = attention_mask.clone()
         labels = labels.masked_fill(attention_mask == 0, -100)
 
@@ -253,7 +260,7 @@ def compute_ppl_for_batches(
                             ).item()
                         else:
                             loss_val = outputs.float().pow(2).mean().item()
-                    except Exception:
+                    except _VARIANCE_BATCHING_ERRORS:
                         loss_val = None
 
                 if loss_val is None or not math.isfinite(loss_val):
@@ -271,15 +278,15 @@ def compute_ppl_for_batches(
                     try:
                         if labels is not None and isinstance(labels, torch.Tensor):
                             count = int((labels != -100).sum().item())
-                    except Exception:
+                    except (AttributeError, RuntimeError, TypeError, ValueError):
                         count = None
                     if count is None:
                         try:
                             count = int(inputs.numel())
-                        except Exception:
+                        except (AttributeError, RuntimeError, TypeError, ValueError):
                             count = 0
                     token_counts.append(int(max(count, 0)))
-            except Exception:
+            except (AttributeError, RuntimeError, TypeError, ValueError):
                 continue
 
     if model_was_training:

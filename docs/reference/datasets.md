@@ -11,7 +11,7 @@
 | **Network** | Offline by default; HF-backed providers need `INVARLOCK_ALLOW_NETWORK=1` for first download. |
 | **Inputs** | Dataset provider name plus provider-specific fields. |
 | **Outputs / Artifacts** | Evaluation windows stored in `report.evaluation_windows` and dataset metadata in `report.data.*`. |
-| **Source of truth** | `src/invarlock/eval/data.py` and `src/invarlock/eval/providers/*`. |
+| **Source of truth** | `src/invarlock/eval/data.py`, `src/invarlock/eval/data_support.py`, `src/invarlock/eval/data_tokenization.py`, `src/invarlock/eval/data_windows.py`, and `src/invarlock/eval/data_providers.py`. |
 
 ## Quick Start
 
@@ -36,6 +36,10 @@ For Compare & evaluate, reuse the same `dataset` block in baseline and subject r
   windows. Missing/invalid evidence fails closed in CI/Release profiles.
 - **Offline-first**: downloads are opt-in via `INVARLOCK_ALLOW_NETWORK=1`. Cached
   datasets can be enforced via `HF_DATASETS_OFFLINE=1`.
+- **Tokenizer contract**: dataset providers expect either a callable tokenizer
+  that returns `input_ids` plus optional `attention_mask`, or an `encode(...)`
+  method that accepts `truncation=True`, `max_length=...`, and
+  `padding="max_length"`.
 - **Secure-default execution**: dataset-backed model-loading commands run in the
   runtime container by default; trusted public local execution uses
   `invarlock evaluate --mode local`.

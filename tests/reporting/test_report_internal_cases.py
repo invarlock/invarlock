@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import math
 
-from invarlock.reporting import report_builder as C
+from invarlock.reporting import report_make as C
+from invarlock.reporting import report_normalization as report_normalization_mod
+from invarlock.reporting import report_overhead as report_overhead_mod
 from invarlock.reporting.policy_utils import _build_resolved_policies
 from invarlock.reporting.utils import _coerce_int, _sanitize_seed_bundle
 
@@ -17,7 +19,7 @@ def test_normalize_baseline_variants():
         "rmt_base": {"outliers": 0},
         "invariants": {"status": "pass"},
     }
-    out = C._normalize_baseline(b1)
+    out = report_normalization_mod.normalize_baseline(b1)
     assert out.get("model_id") == "m"
     assert "ppl_final" in out
 
@@ -27,7 +29,7 @@ def test_normalize_baseline_variants():
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 49.0}},
         "edit": {"plan": {}, "plan_digest": "noop"},
     }
-    out2 = C._normalize_baseline(base_rr)
+    out2 = report_normalization_mod.normalize_baseline(base_rr)
     assert math.isfinite(out2.get("ppl_final", float("nan")))
 
 
@@ -72,7 +74,7 @@ def test_compute_report_and_quality_overhead():
             "final": {"logloss": [4.0, 4.1], "token_counts": [100, 100]}
         }
     }
-    out = C._compute_quality_overhead_from_guard(
+    out = report_overhead_mod.compute_quality_overhead_from_guard(
         {"bare_report": bare, "guarded_report": guarded}, pm_kind_hint="ppl_causal"
     )
     assert out and out["basis"] == "ratio" and out["value"] > 1.0

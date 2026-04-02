@@ -1,6 +1,8 @@
 import pytest
 import torch.nn as nn
 
+import invarlock.guards.spectral_policy as spectral_policy
+from invarlock.core.exceptions import ValidationError
 from invarlock.guards.spectral import SpectralGuard
 
 
@@ -14,3 +16,72 @@ def test_prepare_rejects_contraction_alias():
             calib=None,
             policy={"contraction": 0.9, "family_caps": {"ffn": 2.0}},
         )
+
+
+def test_normalize_family_caps_filters_invalid_entries_and_defaults_when_empty():
+    mixed = spectral_policy.normalize_family_caps(
+        {
+            "ffn": {"kappa": 2.2, "bad": "ignore"},
+            "attn": 3.4,
+            "other": {"bad": object()},
+        }
+    )
+
+    assert mixed["ffn"] == {"kappa": 2.2}
+    assert mixed["attn"] == {"kappa": 3.4}
+    assert "other" not in mixed
+
+    defaulted = spectral_policy.normalize_family_caps(
+        {"ffn": {"kappa": float("inf")}, "attn": object()}
+    )
+    assert defaulted == spectral_policy.default_family_caps()
+
+
+def test_policy_helpers_reject_non_mapping_and_can_omit_value_details():
+    err = spectral_policy._policy_invalid("sigma_quantile", "bad")
+    assert err.details == {"param": "sigma_quantile", "reason": "bad"}
+
+    with pytest.raises(ValidationError, match="POLICY-PARAM-INVALID"):
+        spectral_policy._require_policy_mapping("family_caps", [])
+
+
+@pytest.mark.parametrize(
+    ("value", "kwargs"),
+    [
+        ("oops", {}),
+        (float("inf"), {}),
+        (-1, {"minimum": 0.0}),
+        (2.0, {"maximum": 1.0}),
+    ],
+)
+def test_require_policy_float_rejects_invalid_values(value, kwargs):
+    with pytest.raises(ValidationError, match="POLICY-PARAM-INVALID"):
+        spectral_policy._require_policy_float("sigma_quantile", value, **kwargs)
+
+
+def test_normalize_multiple_testing_config_rejects_bad_method_and_zero_alpha():
+    with pytest.raises(ValidationError, match="POLICY-PARAM-INVALID"):
+        spectral_policy.normalize_multiple_testing_config({"method": "holm"})
+
+    with pytest.raises(ValidationError, match="POLICY-PARAM-INVALID"):
+        spectral_policy.normalize_multiple_testing_config({"alpha": 0.0})
+
+
+def test_normalize_estimator_config_rejects_unknown_init():
+    with pytest.raises(ValidationError, match="POLICY-PARAM-INVALID"):
+        spectral_policy.normalize_estimator_config({"iters": 2, "init": "random"})
+
+
+def test_apply_policy_overrides_rejects_multipletesting_alias():
+    guard = SpectralGuard()
+
+    with pytest.raises(ValidationError) as excinfo:
+        spectral_policy.apply_policy_overrides(
+            guard,
+            {"multipletesting": {"method": "bh", "alpha": 0.05, "m": 4}},
+        )
+
+    assert excinfo.value.details == {
+        "param": "multipletesting",
+        "hint": "Use spectral.multiple_testing instead.",
+    }

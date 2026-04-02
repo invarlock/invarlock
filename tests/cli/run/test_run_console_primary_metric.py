@@ -98,7 +98,7 @@ output:
             "invarlock.eval.primary_metric.compute_primary_metric_from_report", fake_pm
         ),
         patch(
-            "invarlock.reporting.report.save_report",
+            "invarlock.reporting.report_files.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / (filename_prefix + ".json"))
             },

@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from invarlock.reporting.report_builder import REPORT_SCHEMA_VERSION, make_report
+from invarlock.reporting.report_make import REPORT_SCHEMA_VERSION, make_report
 
 
 def _mock_report_with_windows() -> dict[str, Any]:

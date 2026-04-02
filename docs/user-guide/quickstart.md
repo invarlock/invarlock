@@ -61,11 +61,19 @@ runtime manifest before you promote results.
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
 
-Optional: explain gate decisions directly from the evaluation artifacts.
+Directory inputs to `invarlock report` are only accepted when they contain
+canonical `report.json` or `evaluation.report.json`; otherwise pass the exact
+file path.
+
+Optional: explain gate decisions directly from the run reports.
 
 ```bash
 invarlock report explain --report runs/subject/report.json --baseline runs/source/report.json
 ```
+
+`invarlock report explain` expects run reports (`report.json`), not the
+generated `evaluation.report.json` bundle. Use `invarlock verify` for the
+paired evaluation report.
 
 ## Execution Notes
 
@@ -76,8 +84,8 @@ invarlock report explain --report runs/subject/report.json --baseline runs/sourc
 
 ## Advanced And Demo Flows
 
-The built-in `quant_rtn` edit still ships for demos and smoke tests, but it is
-no longer the primary onboarding path.
+The built-in `quant_rtn` edit ships for demos and smoke tests, but the primary
+onboarding path is the secure-default evaluate flow shown above.
 
 ```bash
 INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \

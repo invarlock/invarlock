@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from invarlock.cli.commands.run import _persist_ref_masks
+from invarlock.cli.run_artifacts import persist_ref_masks
 
 
 class _Obj:
@@ -10,7 +10,7 @@ class _Obj:
         self.edit = data
 
 
-def test_persist_ref_masks_from_object(tmp_path: Path) -> None:
+def testpersist_ref_masks_from_object(tmp_path: Path) -> None:
     run_dir = tmp_path / "run"
     payload = {
         "artifacts": {
@@ -21,5 +21,5 @@ def test_persist_ref_masks_from_object(tmp_path: Path) -> None:
         }
     }
     obj = _Obj(payload)
-    p = _persist_ref_masks(obj, run_dir)
+    p = persist_ref_masks(obj, run_dir)
     assert p is not None and p.exists()

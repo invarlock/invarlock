@@ -5,6 +5,15 @@ from typing import Any
 import torch
 import torch.nn as nn
 
+_VARIANCE_OPERATION_ERRORS = (
+    ArithmeticError,
+    AttributeError,
+    OverflowError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 def push_checkpoint(guard: Any, model: nn.Module) -> None:
     """Push current target-module weights to the checkpoint stack."""
@@ -154,7 +163,7 @@ def enable_guard(guard: Any, model: nn.Module, adapter=None) -> bool:
                     )
                 else:
                     failed_modules.append(scale_name)
-            except Exception as error:
+            except _VARIANCE_OPERATION_ERRORS as error:
                 failed_modules.append(scale_name)
                 guard._log_event(
                     "scale_apply_error",
@@ -195,7 +204,7 @@ def enable_guard(guard: Any, model: nn.Module, adapter=None) -> bool:
             attempt_count=guard._enable_attempt_count,
         )
         return True
-    except Exception as error:
+    except _VARIANCE_OPERATION_ERRORS as error:
         pop_checkpoint(guard, model)
         guard._log_event(
             "enable_catastrophic_failure",
@@ -294,7 +303,7 @@ def disable_guard(guard: Any, model: nn.Module, adapter=None) -> bool:
                     )
                 else:
                     failed_modules.append(scale_name)
-            except Exception as error:
+            except _VARIANCE_OPERATION_ERRORS as error:
                 failed_modules.append(scale_name)
                 guard._log_event(
                     "scale_revert_error",
@@ -332,7 +341,7 @@ def disable_guard(guard: Any, model: nn.Module, adapter=None) -> bool:
             attempt_count=guard._disable_attempt_count,
         )
         return True
-    except Exception as error:
+    except _VARIANCE_OPERATION_ERRORS as error:
         guard._log_event(
             "disable_catastrophic_failure",
             level="ERROR",

@@ -1,5 +1,5 @@
 from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_builder import REPORT_SCHEMA_VERSION
+from invarlock.reporting.report_make import REPORT_SCHEMA_VERSION
 
 
 def test_markdown_includes_estimated_suffix_and_note_for_accuracy():

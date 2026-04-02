@@ -6,8 +6,10 @@ import torch.nn as nn
 
 from invarlock.eval.metrics import (
     MetricsConfig,
-    _mi_gini_optimized_cpu_path,
     compute_ppl,
+)
+from invarlock.eval.metrics_activation import _mi_gini_optimized_cpu_path
+from invarlock.eval.metrics_environment import (
     get_metrics_info,
     validate_metrics_environment,
 )
@@ -40,14 +42,15 @@ def test_compute_ppl_with_partial_attention_mask():
         [1, 1, 1, 1, 0, 0],
     ]
     window = SimpleNamespace(input_ids=input_ids, attention_masks=attention_masks)
-    ppl = compute_ppl(model, adapter=None, window=window, device="cpu")
+    ppl = compute_ppl(model, window=window, device="cpu")
     assert isinstance(ppl, float) and math.isfinite(ppl) and ppl >= 1.0
 
 
 def test_metrics_env_info_and_validation():
     info = get_metrics_info()
     assert isinstance(info, dict) and "available_metrics" in info
-    assert isinstance(validate_metrics_environment(), bool)
+    report = validate_metrics_environment()
+    assert report.ok is True
 
 
 def test_mi_gini_cpu_chunk_warnings(monkeypatch):
@@ -73,7 +76,7 @@ def test_mi_gini_cpu_chunk_warnings(monkeypatch):
     L, N, D = 3, 5, 4
     feats_cpu = torch.randn(L, N, D)
     targ_cpu = torch.randint(0, 10, (N,))
-    cfg = MetricsConfig(progress_bars=False)
+    cfg = MetricsConfig()
     val = _mi_gini_optimized_cpu_path(feats_cpu, targ_cpu, max_per_layer=10, config=cfg)
     # Function should not crash and should produce a float (likely NaN)
     assert isinstance(val, float) and (math.isnan(val) or math.isfinite(val))

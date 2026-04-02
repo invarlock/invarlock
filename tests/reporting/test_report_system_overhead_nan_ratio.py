@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 
 
 def _reports_with_sys_overhead_zero_base() -> tuple[dict, dict]:

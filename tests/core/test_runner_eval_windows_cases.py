@@ -98,6 +98,25 @@ def test_slice_calibration_raises_without_supported_access() -> None:
         )
 
 
+def test_slice_calibration_reraises_unexpected_access_errors() -> None:
+    class _ExplodingSlice:
+        def __getitem__(self, index):
+            if isinstance(index, slice):
+                raise AssertionError("explode")
+            return 0
+
+        def __len__(self) -> int:
+            return 1
+
+    with pytest.raises(AssertionError, match="explode"):
+        slice_calibration(
+            _ExplodingSlice(),
+            start=0,
+            count=1,
+            allow_materialize=False,
+        )
+
+
 def test_resolve_limit_uses_all_batches_for_non_positive_request() -> None:
     assert resolve_limit([], requested=5) == 0
     assert resolve_limit([1, 2, 3], requested=0) == 3

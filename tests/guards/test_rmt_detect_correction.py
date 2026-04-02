@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from invarlock.guards.rmt_legacy import rmt_detect
+from invarlock.guards.rmt_detection import rmt_detect
 
 
 class TinyTransformers(nn.Module):

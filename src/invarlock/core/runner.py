@@ -20,6 +20,7 @@ from invarlock.observability.metrics import (
 
 from .api import (
     EditLike,
+    EditRuntime,
     Guard,
     ModelAdapter,
     ModelEdit,
@@ -89,6 +90,7 @@ class CoreRunner:
         calibration_data: Any = None,
         auto_config: dict[str, Any] | None = None,
         edit_config: dict[str, Any] | None = None,
+        edit_runtime: EditRuntime | None = None,
         preview_n: int | None = None,
         final_n: int | None = None,
     ) -> RunReport:
@@ -156,7 +158,15 @@ class CoreRunner:
             reset_peak_memory_stats()
             phase_start = time.perf_counter()
             try:
-                self._edit_phase(model, adapter, edit, model_desc, report, edit_config)
+                self._edit_phase(
+                    model,
+                    adapter,
+                    edit,
+                    model_desc,
+                    report,
+                    edit_config,
+                    edit_runtime,
+                )
             finally:
                 record_timing(timings, "edit", phase_start)
                 capture_memory(
@@ -273,6 +283,7 @@ class CoreRunner:
         model_desc: dict[str, Any],
         report: RunReport,
         edit_config: dict[str, Any] | None,
+        edit_runtime: EditRuntime | None,
     ) -> dict[str, Any]:
         """Phase 2: Apply edit operation."""
         edit_label = "baseline" if edit.name == "baseline" else edit.name
@@ -282,10 +293,11 @@ class CoreRunner:
         if not edit.can_edit(model_desc):
             raise ValueError(f"Edit '{edit.name}' cannot be applied to this model")
 
-        edit_result = (
-            edit.apply(model, adapter, **edit_config)
-            if edit_config
-            else edit.apply(model, adapter)
+        edit_result = edit.apply(
+            model,
+            adapter,
+            plan=dict(edit_config or {}) or None,
+            runtime=edit_runtime,
         )
         report.edit = edit_result
         if not isinstance(report.context, dict):

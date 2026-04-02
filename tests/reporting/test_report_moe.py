@@ -4,8 +4,9 @@ from copy import deepcopy
 
 import pytest
 
-import invarlock.reporting.report_builder as cert
-from invarlock.reporting.report_builder import make_report
+import invarlock.reporting.report_normalization as report_normalization_mod
+import invarlock.reporting.report_validation as report_validation_mod
+from invarlock.reporting.report_make import make_report
 
 
 def _mk_base_report() -> dict:
@@ -98,12 +99,14 @@ def test_evaluation_report_includes_moe_families_when_present():
         }
     )
 
-    cert = make_report(report, baseline)
+    evaluation_report = make_report(report, baseline)
     # Spectral families include MoE
-    spectral_families = set(cert.get("spectral", {}).get("families", {}).keys())
+    spectral_families = set(
+        evaluation_report.get("spectral", {}).get("families", {}).keys()
+    )
     assert {"router", "expert_ffn"}.issubset(spectral_families)
     # RMT families include MoE
-    rmt_families = set(cert.get("rmt", {}).get("families", {}).keys())
+    rmt_families = set(evaluation_report.get("rmt", {}).get("families", {}).keys())
     assert {"router", "expert_ffn"}.issubset(rmt_families)
 
 
@@ -126,10 +129,16 @@ def test_evaluation_report_moe_section_uses_normalized_baseline(monkeypatch):
     }
 
     monkeypatch.setattr(
-        cert, "_normalize_and_validate_report", lambda value: value, raising=False
+        report_normalization_mod,
+        "normalize_and_validate_run_report",
+        lambda value: value,
+        raising=False,
     )
     monkeypatch.setattr(
-        cert, "_normalize_baseline", lambda value: normalized_baseline, raising=False
+        report_normalization_mod,
+        "normalize_baseline",
+        lambda value: normalized_baseline,
+        raising=False,
     )
 
     captured: dict[str, dict] = {}
@@ -146,15 +155,20 @@ def test_evaluation_report_moe_section_uses_normalized_baseline(monkeypatch):
         primary_metric=None,
         moe=None,
         dataset_capacity=None,
+        pm_acceptance_range=None,
+        pm_drift_band=None,
+        pm_tail=None,
+        tiny_relax=False,
+        **_kwargs,
     ):
         captured["moe"] = moe or {}
         return {"primary_metric_acceptable": True}
 
     monkeypatch.setattr(
-        cert, "_compute_validation_flags", _capture_flags, raising=False
+        report_validation_mod, "compute_validation_flags", _capture_flags, raising=False
     )
 
-    cert.make_report(report, baseline)
+    make_report(report, baseline)
     moe_section = captured["moe"]
     assert moe_section["delta_load_balance_loss"] == pytest.approx(0.02)
     assert moe_section["delta_router_entropy"] == pytest.approx(0.3)

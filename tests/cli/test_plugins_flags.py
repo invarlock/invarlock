@@ -9,14 +9,9 @@ from invarlock.cli.app import app
 runner = CliRunner()
 
 
-def test_plugins_alias_adapter_singular():
-    # Should accept 'adapter' as alias for 'adapters'
+def test_plugins_singular_adapter_is_rejected():
     res = runner.invoke(app, ["advanced", "plugins", "adapter", "--json"])
-    assert res.exit_code == 0, res.output
-    payload = json.loads(res.output)
-    assert payload.get("category") == "adapters"
-    assert "kind" not in payload
-    assert isinstance(payload.get("items"), list)
+    assert res.exit_code != 0, res.output
 
 
 def test_plugins_hide_unsupported_filter():

@@ -193,13 +193,13 @@ def test_until_pass_restore_failure_discards_model_and_reloads_next_attempt(
         )
         stack.enter_context(
             patch(
-                "invarlock.reporting.report_builder.make_report",
+                "invarlock.reporting.report_make.make_report",
                 make_report,
             )
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.detect_model_profile",
+                "invarlock.cli.run_runtime.detect_model_profile",
                 lambda *a, **k: SimpleNamespace(
                     default_loss="ce",
                     default_provider=None,
@@ -213,7 +213,7 @@ def test_until_pass_restore_failure_discards_model_and_reloads_next_attempt(
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.resolve_tokenizer",
+                "invarlock.cli.run_runtime.resolve_tokenizer",
                 lambda *a, **k: (
                     SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=10),
                     "tokhash123",
@@ -221,7 +221,7 @@ def test_until_pass_restore_failure_discards_model_and_reloads_next_attempt(
             )
         )
         stack.enter_context(
-            patch("invarlock.reporting.report.save_report", save_report)
+            patch("invarlock.reporting.report_files.save_report", save_report)
         )
 
         run_command(

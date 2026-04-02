@@ -8,6 +8,15 @@ import torch.nn as nn
 
 from .variance_results import build_prepare_result
 
+_VARIANCE_PREPARE_ERRORS = (
+    ArithmeticError,
+    AttributeError,
+    OverflowError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 def prepare_guard(
     guard: Any,
@@ -221,7 +230,7 @@ def prepare_guard(
             preparation_time=preparation_time,
             ready=True,
         )
-    except Exception as error:
+    except _VARIANCE_PREPARE_ERRORS as error:
         guard._prepared = False
         guard._adapter_ref = adapter
         guard._log_event(

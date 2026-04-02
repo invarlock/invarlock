@@ -18,10 +18,10 @@ import pytest
 import torch
 import torch.nn as nn
 
-import invarlock
+import invarlock.adapters as invarlock_adapters
+from invarlock.adapters.auto import HF_Auto_Adapter
 
 # Import invarlock adapters namespace
-import invarlock.adapters as invarlock_adapters
 from invarlock.adapters.base import (
     AdapterCache,
     AdapterConfig,
@@ -1117,72 +1117,70 @@ class TestHFCausalAdapterRopeDecoder:
 class TestInitModule:
     """Test __init__.py module functionality."""
 
-    def test_quality_label_function(self):
-        """Test quality label function."""
-        # Test different quality tiers
-        assert invarlock.adapters.quality_label(1.05) == "Excellent"
-        assert invarlock.adapters.quality_label(1.15) == "Good"
-        assert invarlock.adapters.quality_label(1.30) == "Fair"
-        assert invarlock.adapters.quality_label(1.50) == "Degraded"
-
-        # Test boundary conditions
-        assert invarlock.adapters.quality_label(1.10) == "Excellent"
-        assert invarlock.adapters.quality_label(1.25) == "Good"
-        assert invarlock.adapters.quality_label(1.40) == "Fair"
+    def test_test_only_quality_helper_is_not_exported(self):
+        """Test-only helpers should not leak into the adapter namespace."""
+        assert not hasattr(invarlock_adapters, "quality_label")
 
     def test_placeholder_adapters(self):
-        """Test placeholder adapter classes."""
-        # Test that placeholders raise NotImplementedError
-        with pytest.raises(NotImplementedError):
-            invarlock.adapters.HF_Pythia_Adapter()
+        """Removed compatibility placeholders are absent from the namespace."""
+        assert not hasattr(invarlock_adapters, "HF_Pythia_Adapter")
+        assert not hasattr(invarlock_adapters, "auto_tune_pruning_budget")
+        assert not hasattr(invarlock_adapters, "run_auto_invarlock")
+        assert not hasattr(invarlock_adapters, "InvarLockPipeline")
+        assert not hasattr(invarlock_adapters, "InvarLockConfig")
+        assert not hasattr(invarlock_adapters, "run_invarlock_pipeline")
+        assert not hasattr(invarlock_adapters, "run_invarlock")
+        assert not hasattr(invarlock_adapters, "quick_prune_gpt2")
 
-        # Note: HF_Causal_Adapter is now implemented, not a placeholder
-        # Test that it can be instantiated without error
-        adapter = invarlock.adapters.HF_Causal_Adapter()
+        assert not hasattr(invarlock_adapters, "HF_Causal_Adapter")
+        assert not hasattr(invarlock_adapters, "HF_Auto_Adapter")
+
+        adapter = HF_Auto_Adapter()
         assert adapter is not None
 
-        # Test auto-tuning placeholders
-        with pytest.raises(NotImplementedError):
-            invarlock.adapters.auto_tune_pruning_budget()
-
-        with pytest.raises(NotImplementedError):
-            invarlock.adapters.run_auto_invarlock()
-
-        # Baseline-specific placeholders are not present
-
-        # Placeholder previously referenced here is no longer present
-
     def test_removed_component_stubs(self):
-        """Test removed component stubs."""
-        # Test removed components
-        with pytest.raises(NotImplementedError, match="InvarLock 1.0"):
-            invarlock.adapters.InvarLockPipeline()
+        """Removed compatibility components stay absent."""
+        for name in (
+            "InvarLockPipeline",
+            "InvarLockConfig",
+            "run_invarlock_pipeline",
+            "run_invarlock",
+            "quick_prune_gpt2",
+        ):
+            assert not hasattr(invarlock_adapters, name)
 
-        with pytest.raises(NotImplementedError):
-            invarlock.adapters.InvarLockConfig()
+    def test_hf_auto_adapter_exposes_only_explicit_adapter_surface(self):
+        class _Delegate:
+            def load_model(self, model_id: str, **kwargs):
+                return {"model_id": model_id, "kwargs": kwargs}
 
-        with pytest.raises(NotImplementedError):
-            invarlock.adapters.run_invarlock_pipeline()
+            def describe(self, _model):
+                return {"model_type": "delegate"}
 
-        with pytest.raises(NotImplementedError):
-            invarlock.adapters.run_invarlock()
+            def snapshot(self, _model):
+                return b"snapshot"
 
-        with pytest.raises(NotImplementedError):
-            invarlock.adapters.quick_prune_gpt2()
+            def restore(self, _model, _blob):
+                return None
+
+            def tokenize(self, _text):
+                return ["should-not-be-exposed"]
+
+        adapter = HF_Auto_Adapter()
+        adapter._delegate = _Delegate()
+
+        assert adapter.load_model("demo/model", device="cpu") == {
+            "model_id": "demo/model",
+            "kwargs": {"device": "cpu"},
+        }
+        assert adapter.describe(object()) == {"model_type": "delegate"}
+        assert adapter.snapshot(object()) == b"snapshot"
+        adapter.restore(object(), b"snapshot")
+        assert not hasattr(adapter, "tokenize")
 
     def test_removed_component_behavior(self):
-        """Test _RemovedComponent behavior."""
-        stub = invarlock.adapters._RemovedComponent("TestComponent", "new.component")
-
-        # Test calling the stub
-        with pytest.raises(
-            NotImplementedError, match="is not available in InvarLock 1.0"
-        ):
-            stub()
-
-        # Test attribute access
-        attr = stub.some_attribute
-        assert isinstance(attr, invarlock.adapters._RemovedComponent)
+        """Removed-component shim type is gone."""
+        assert not hasattr(invarlock_adapters, "_RemovedComponent")
 
 
 class TestIntegration:
@@ -1190,14 +1188,10 @@ class TestIntegration:
 
     def test_module_imports(self):
         """Test that main module imports work."""
-        # Test adapter classes
-        assert hasattr(invarlock_adapters, "HF_Causal_Adapter")
+        assert not hasattr(invarlock_adapters, "HF_Causal_Adapter")
         assert hasattr(invarlock_adapters, "BaseAdapter")
         assert hasattr(invarlock_adapters, "AdapterConfig")
-
-        # Test utility functions
-        assert hasattr(invarlock_adapters, "quality_label")
-        assert callable(invarlock.adapters.quality_label)
+        assert not hasattr(invarlock_adapters, "quality_label")
 
     def test_end_to_end_adapter_workflow(self):
         """Test end-to-end adapter workflow."""

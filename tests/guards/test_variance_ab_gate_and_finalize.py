@@ -54,7 +54,11 @@ def test_finalize_deadband_and_absolute_floor_errors(monkeypatch):
 
     out = g.validate(model, adapter=None, context={})
     assert out["passed"] is False
-    errs = "\n".join(out.get("errors", []))
+    errs = "\n".join(
+        diagnostic["message"]
+        for diagnostic in out.get("diagnostics", [])
+        if diagnostic.get("severity") == "error"
+    )
     assert "tie-breaker deadband" in errs
     assert "absolute floor" in errs
 
@@ -77,12 +81,12 @@ def test_ab_gate_missing_and_invalid_ratio_ci_paths():
     g._ppl_with_ve = 90.0
     g._ratio_ci = None
     res1 = g.validate(model, adapter=None, context={})
-    assert isinstance(res1, dict)
+    assert "passed" in res1
 
     # Invalid ratio_ci
     g._ratio_ci = (0.0, -1.0)
     res2 = g.validate(model, adapter=None, context={})
-    assert isinstance(res2, dict)
+    assert "passed" in res2
 
 
 def test_monitor_only_sets_action_warn():
@@ -102,7 +106,7 @@ def test_monitor_only_sets_action_warn():
     g._ppl_with_ve = 80.0
     g._ratio_ci = (0.7, 0.9)
     out = g.validate(model, adapter=None, context={})
-    assert out.get("action") == "warn"
+    assert out.get("decision") == "monitor"
 
 
 def test_partial_enable_disable_paths():

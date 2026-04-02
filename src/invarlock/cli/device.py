@@ -28,15 +28,17 @@ def is_device_available(device: str) -> bool:
     if d == "cpu":
         return True
     try:
-        import torch  # noqa: F401
+        import torch as _torch
 
-        if d == "cuda" and hasattr(torch, "cuda") and torch.cuda.is_available():  # type: ignore[attr-defined]
+        torch_mod: Any = _torch
+
+        if d == "cuda" and hasattr(torch_mod, "cuda") and torch_mod.cuda.is_available():
             return True
         if (
             d == "mps"
-            and hasattr(torch.backends, "mps")
-            and torch.backends.mps.is_available()
-        ):  # type: ignore[attr-defined]
+            and hasattr(torch_mod.backends, "mps")
+            and torch_mod.backends.mps.is_available()
+        ):
             return True
     except Exception:
         return False
@@ -72,18 +74,20 @@ def get_device_info() -> dict[str, dict]:
     }
     auto = resolve_device("auto")
     try:
-        import torch  # noqa: F401
+        import torch as _torch
 
-        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():  # type: ignore[attr-defined]
+        torch_mod: Any = _torch
+
+        if hasattr(torch_mod.backends, "mps") and torch_mod.backends.mps.is_available():
             info["mps"]["available"] = True
             info["mps"]["info"] = "Available"
-        if hasattr(torch, "cuda") and torch.cuda.is_available():  # type: ignore[attr-defined]
-            props = torch.cuda.get_device_properties(0)
+        if hasattr(torch_mod, "cuda") and torch_mod.cuda.is_available():
+            props = torch_mod.cuda.get_device_properties(0)
             name = getattr(props, "name", "CUDA")
             mem = getattr(props, "total_memory", 0)
             info["cuda"]["available"] = True
             info["cuda"]["info"] = "Available"
-            info["cuda"]["device_count"] = torch.cuda.device_count()
+            info["cuda"]["device_count"] = torch_mod.cuda.device_count()
             info["cuda"]["device_name"] = name
             info["cuda"]["memory_total"] = f"{mem / 1e9:.1f} GB"
     except Exception:

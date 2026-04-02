@@ -83,117 +83,100 @@ def eval_phase(
             "eval",
             "warning",
             LogLevel.WARNING,
-            {"message": "No calibration data provided, using mock metrics"},
+            {
+                "message": "No calibration data provided; evaluation skipped.",
+                "state": "not_evaluated",
+            },
         )
         metrics = {
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "preview": 25.0,
-                "final": 26.0,
+            "eval_state": {
+                "evaluated": False,
+                "reason": "missing_calibration_data",
             },
-            "latency_ms_per_tok": 15.0,
-            "memory_mb_peak": 1024.0,
         }
         eval_windows = {"preview": {}, "final": {}}
 
-    try:
-        pm = metrics.get("primary_metric", {}) if isinstance(metrics, dict) else {}
-        pm_kind = str(pm.get("kind", "")).lower() if isinstance(pm, dict) else ""
-        is_ppl_metric = pm_kind.startswith("ppl")
+    pm = metrics.get("primary_metric", {}) if isinstance(metrics, dict) else {}
+    pm_kind = str(pm.get("kind", "")).lower() if isinstance(pm, dict) else ""
+    is_ppl_metric = pm_kind.startswith("ppl")
 
-        baseline_eval: dict[str, Any] = {}
+    baseline_eval: dict[str, Any] = {}
+    if (
+        is_ppl_metric
+        and config
+        and isinstance(config.context, dict)
+        and isinstance(config.context.get("baseline_eval_windows"), dict)
+    ):
+        baseline_eval = config.context.get("baseline_eval_windows") or {}
+
+    if is_ppl_metric and baseline_eval:
+        tier_policies = (
+            report.meta.get("tier_policies", {})
+            if isinstance(getattr(report, "meta", None), dict)
+            else {}
+        )
+        metrics_policy = (
+            tier_policies.get("metrics", {}) if isinstance(tier_policies, dict) else {}
+        )
+        pm_tail_policy = (
+            metrics_policy.get("pm_tail", {})
+            if isinstance(metrics_policy, dict)
+            else {}
+        )
+
+        run_final = (
+            eval_windows.get("final", {}) if isinstance(eval_windows, dict) else {}
+        )
+        base_final = (
+            baseline_eval.get("final", {}) if isinstance(baseline_eval, dict) else {}
+        )
+
+        deltas: list[float] = []
+        weights: list[float] = []
+        run_ids = run_final.get("window_ids") if isinstance(run_final, dict) else None
+        run_ll = run_final.get("logloss") if isinstance(run_final, dict) else None
+        run_tc = run_final.get("token_counts") if isinstance(run_final, dict) else None
+        base_ids = (
+            base_final.get("window_ids") if isinstance(base_final, dict) else None
+        )
+        base_ll = base_final.get("logloss") if isinstance(base_final, dict) else None
+
         if (
-            is_ppl_metric
-            and config
-            and isinstance(config.context, dict)
-            and isinstance(config.context.get("baseline_eval_windows"), dict)
+            isinstance(run_ids, list)
+            and isinstance(run_ll, list)
+            and isinstance(base_ids, list)
+            and isinstance(base_ll, list)
         ):
-            baseline_eval = config.context.get("baseline_eval_windows") or {}
-
-        if is_ppl_metric and baseline_eval:
-            tier_policies = (
-                report.meta.get("tier_policies", {})
-                if isinstance(getattr(report, "meta", None), dict)
-                else {}
-            )
-            metrics_policy = (
-                tier_policies.get("metrics", {})
-                if isinstance(tier_policies, dict)
-                else {}
-            )
-            pm_tail_policy = (
-                metrics_policy.get("pm_tail", {})
-                if isinstance(metrics_policy, dict)
-                else {}
-            )
-
-            run_final = (
-                eval_windows.get("final", {}) if isinstance(eval_windows, dict) else {}
-            )
-            base_final = (
-                baseline_eval.get("final", {})
-                if isinstance(baseline_eval, dict)
-                else {}
-            )
-
-            deltas: list[float] = []
-            weights: list[float] = []
-            run_ids = (
-                run_final.get("window_ids") if isinstance(run_final, dict) else None
-            )
-            run_ll = run_final.get("logloss") if isinstance(run_final, dict) else None
-            run_tc = (
-                run_final.get("token_counts") if isinstance(run_final, dict) else None
-            )
-            base_ids = (
-                base_final.get("window_ids") if isinstance(base_final, dict) else None
-            )
-            base_ll = (
-                base_final.get("logloss") if isinstance(base_final, dict) else None
-            )
-
-            if (
-                isinstance(run_ids, list)
-                and isinstance(run_ll, list)
-                and isinstance(base_ids, list)
-                and isinstance(base_ll, list)
-            ):
-                base_map: dict[int, float] = {}
-                for baseline_id, baseline_val in zip(base_ids, base_ll, strict=False):
-                    if isinstance(baseline_id, int | float) and isinstance(
-                        baseline_val, int | float
-                    ):
-                        base_map[int(baseline_id)] = float(baseline_val)
-                for index, (run_id, run_val) in enumerate(
-                    zip(run_ids, run_ll, strict=False)
+            base_map: dict[int, float] = {}
+            for baseline_id, baseline_val in zip(base_ids, base_ll, strict=False):
+                if isinstance(baseline_id, int | float) and isinstance(
+                    baseline_val, int | float
                 ):
-                    if not (
-                        isinstance(run_id, int | float)
-                        and isinstance(run_val, int | float)
-                    ):
-                        continue
-                    key = int(run_id)
-                    if key not in base_map:
-                        continue
-                    delta_value = float(run_val) - base_map[key]
-                    if math.isfinite(delta_value):
-                        deltas.append(float(delta_value))
-                        if isinstance(run_tc, list) and index < len(run_tc):
-                            try:
-                                weight_value = float(run_tc[index])
-                            except Exception:
-                                weight_value = 0.0
-                            weights.append(float(max(weight_value, 0.0)))
+                    base_map[int(baseline_id)] = float(baseline_val)
+            for index, (run_id, run_val) in enumerate(
+                zip(run_ids, run_ll, strict=False)
+            ):
+                if not (
+                    isinstance(run_id, int | float) and isinstance(run_val, int | float)
+                ):
+                    continue
+                key = int(run_id)
+                if key not in base_map:
+                    continue
+                delta_value = float(run_val) - base_map[key]
+                if math.isfinite(delta_value):
+                    deltas.append(float(delta_value))
+                    if isinstance(run_tc, list) and index < len(run_tc):
+                        weight_value = float(run_tc[index])
+                        weights.append(float(max(weight_value, 0.0)))
 
-            tail_result = evaluate_metric_tail_fn(
-                deltas=deltas,
-                weights=weights if (weights and len(weights) == len(deltas)) else None,
-                policy=pm_tail_policy if isinstance(pm_tail_policy, dict) else None,
-            )
-            tail_result["source"] = "paired_baseline.final"
-            metrics["primary_metric_tail"] = tail_result
-    except Exception:  # pragma: no cover - best effort
-        pass
+        tail_result = evaluate_metric_tail_fn(
+            deltas=deltas,
+            weights=weights if (weights and len(weights) == len(deltas)) else None,
+            policy=pm_tail_policy if isinstance(pm_tail_policy, dict) else None,
+        )
+        tail_result["source"] = "paired_baseline.final"
+        metrics["primary_metric_tail"] = tail_result
 
     policy_flags = runner._resolve_policy_flags(config)
     eval_error = metrics.get("eval_error") if isinstance(metrics, dict) else None

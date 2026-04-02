@@ -1,9 +1,9 @@
 import pytest
 
-from invarlock.reporting.guards_analysis import _extract_invariants
+from invarlock.reporting.guards_invariants import _extract_invariants
 from invarlock.reporting.policy_utils import _build_resolved_policies
 from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 from invarlock.reporting.utils import _infer_scope_from_modules, _pair_logloss_windows
 
 
@@ -22,7 +22,9 @@ def test_pair_logloss_windows_non_numeric_filtered():
 def test_build_resolved_policies_with_empty_tier_defaults(monkeypatch):
     # Simulate missing tier presets; function should fall back to internal defaults
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.TIER_POLICIES", {}, raising=False
+        "invarlock.reporting.policy_utils.get_tier_policies",
+        lambda *_a, **_k: {},
+        raising=False,
     )
     resolved = _build_resolved_policies(
         "balanced",
@@ -110,7 +112,7 @@ def test_render_report_markdown_guard_overhead_na(monkeypatch):
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.validate_run_report", lambda _: True
+        "invarlock.reporting.report_normalization.validate_report", lambda _: True
     )
     cert = make_report(report, baseline)
     # Inject a guard_overhead section with None/NaN values; renderer should not crash

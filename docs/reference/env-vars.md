@@ -8,7 +8,7 @@
 | **Audience** | CLI users and operators tuning runtime behavior. |
 | **Scope** | CLI commands and programmatic runs; config values override env when both are set. |
 | **Network** | Offline by default; network must be explicitly enabled. |
-| **Source of truth** | `docs/reference/env-vars.md`, `src/invarlock/cli/commands/*`, `src/invarlock/core/runner.py`. |
+| **Source of truth** | `docs/reference/env-vars.md`, `src/invarlock/cli/commands/*`, `src/invarlock/cli/backend_runtime.py`, `src/invarlock/runtime_security.py`, `src/invarlock/core/runner.py`. |
 
 ## Quick Start
 
@@ -67,7 +67,7 @@ INVARLOCK_EVAL_DEVICE=cpu INVARLOCK_ALLOW_NETWORK=1 \
 | `INVARLOCK_ALLOW_REMOTE_CODE` | unset | Explicitly allow remote model code execution. |
 
 `INVARLOCK_TRUST_REMOTE_CODE`, `TRUST_REMOTE_CODE_BOOL`, and `ALLOW_REMOTE_CODE`
-only request remote code. The request still fails unless
+only request remote code. The request fails unless
 `INVARLOCK_ALLOW_REMOTE_CODE=1` is also present or `--allow-remote-code` is used.
 
 ### Evaluation & pairing
@@ -151,7 +151,6 @@ Strictness/tiny-relax/overhead-skip are also config/profile policy:
 | `INVARLOCK_CONTAINER_EXECUTION` | unset | Internal recursion guard marking runtime-container execution. |
 | `INVARLOCK_RUNTIME_IMAGE` | unset | Override the OCI image used for containerized model execution. |
 | `INVARLOCK_RUNTIME_IMAGE_DIGEST` | unset | Supply the immutable digest recorded into `runtime.manifest.json`. |
-| `INVARLOCK_RUNTIME_VERIFIER` | unset | Override the `invarlock-runtime-verify` binary path. |
 
 ### Docs build
 

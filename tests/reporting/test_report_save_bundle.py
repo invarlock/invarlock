@@ -4,7 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from invarlock.reporting.report import save_report
+from invarlock.reporting.report_bundle import save_evaluation_bundle
+from invarlock.reporting.report_files import save_report
+from invarlock.reporting.report_make import make_report
 
 
 def _minimal_run_report() -> dict:
@@ -98,8 +100,10 @@ def test_save_report_bundle_writes_manifest_and_evidence(tmp_path: Path, monkeyp
     # Gate small debug evidence emission via env
     monkeypatch.setenv("INVARLOCK_EVIDENCE_DEBUG", "1")
 
-    out = save_report(
-        rep, tmp_path, formats=["report"], baseline=base, filename_prefix="r"
+    out = save_evaluation_bundle(
+        run_report=rep,
+        output_dir=tmp_path,
+        evaluation_report=make_report(rep, base),
     )
     assert out["report"].exists()
     assert out["report_md"].exists()
@@ -111,5 +115,5 @@ def test_save_report_bundle_writes_manifest_and_evidence(tmp_path: Path, monkeyp
 
 def test_save_report_requires_baseline(tmp_path: Path):
     rep = _minimal_run_report()
-    with pytest.raises(ValueError):
-        save_report(rep, tmp_path, formats=["report"], baseline=None)
+    with pytest.raises(ValueError, match="save_evaluation_bundle"):
+        save_report(rep, tmp_path, formats=["report"])

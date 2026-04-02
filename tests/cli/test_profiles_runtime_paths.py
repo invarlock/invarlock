@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from invarlock.cli.config import apply_profile
+from invarlock.core.config_runtime import InvarLockConfig, apply_profile
 
 
 def _patch_exists_block_configs(
@@ -38,20 +38,22 @@ def test_apply_profile_uses_packaged_runtime_when_configs_absent(
     # Should still load release profile from package data
     rel = apply_profile(
         # minimal base cfg
-        cfg=__import__("invarlock.cli.config").cli.config.InvarLockConfig(
+        cfg=InvarLockConfig.from_sections(
             model={"id": "gpt2", "adapter": "hf_causal"},
             edit={"name": "noop", "plan": {}},
         ),
         profile="release",
     )
-    assert rel.dataset.preview_n >= 400 and rel.eval.bootstrap.replicates >= 3200
+    assert rel.require_section("dataset")["preview_n"] >= 400
+    assert rel.require_section("eval")["bootstrap"]["replicates"] >= 3200
 
     # And CI CPU profile forces CPU device and stride
     ci_cpu = apply_profile(
-        cfg=__import__("invarlock.cli.config").cli.config.InvarLockConfig(
+        cfg=InvarLockConfig.from_sections(
             model={"id": "gpt2", "adapter": "hf_causal"},
             edit={"name": "noop", "plan": {}},
         ),
         profile="ci_cpu",
     )
-    assert ci_cpu.model.device == "cpu" and ci_cpu.dataset.stride > 0
+    assert ci_cpu.require_section("model")["device"] == "cpu"
+    assert ci_cpu.require_section("dataset")["stride"] > 0

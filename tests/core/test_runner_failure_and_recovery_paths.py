@@ -34,7 +34,14 @@ class EditStub:
     def can_edit(self, model_desc: dict[str, Any]) -> bool:
         return True
 
-    def apply(self, model: Any, adapter: ModelAdapter, **kwargs) -> dict[str, Any]:
+    def apply(
+        self,
+        model: Any,
+        adapter: ModelAdapter,
+        plan=None,
+        runtime=None,
+    ) -> dict[str, Any]:
+        _ = model, adapter, plan, runtime
         return dict(self._result)
 
 
@@ -258,14 +265,15 @@ def test_edit_phase_with_baseline_label(tmp_path):
         def can_edit(self, model_desc):
             return True
 
-        def apply(self, model, adapter, **kwargs):
+        def apply(self, model, adapter, plan=None, runtime=None):
+            _ = model, adapter, plan, runtime
             return {"name": self.name, "deltas": {}}
 
     from invarlock.core.api import RunReport
 
     report = RunReport()
     result = runner._edit_phase(
-        object(), DummyAdapter(), Edit(), {"n_layer": 0}, report, None
+        object(), DummyAdapter(), Edit(), {"n_layer": 0}, report, None, None
     )
     assert isinstance(result, dict) and report.meta.get("edit_name") == "baseline"
 
@@ -360,9 +368,7 @@ def test_bootstrap_coverage_ignores_non_dict_auto_context() -> None:
     assert cov.get("tier") == "balanced"
 
 
-def test_eval_device_override_env(monkeypatch, tmp_path):
-    # Ensure INVARLOCK_EVAL_DEVICE env path is exercised (no-op on CPU-only)
-    monkeypatch.setenv("INVARLOCK_EVAL_DEVICE", "cpu")
+def test_eval_device_override_from_config_context(monkeypatch, tmp_path):
     runner = CoreRunner()
     model = _toy_model_with_losses([1.0, 1.0])
     adapter = DummyAdapter()
@@ -372,7 +378,7 @@ def test_eval_device_override_env(monkeypatch, tmp_path):
         adapter,
         preview_n=1,
         final_n=1,
-        config=RunConfig(),
+        config=RunConfig(context={"eval": {"device_override": "cpu"}}),
     )
     assert isinstance(metrics.get("primary_metric"), dict)
 
@@ -409,12 +415,12 @@ def test_missing_loss_fallback_debug(monkeypatch):
             final_n=1,
             config=RunConfig(),
         )
-        # Fallback assigns finite primary metric preview/final
+        # Missing loss evidence now fails closed instead of fabricating finite values.
         pm = metrics.get("primary_metric", {})
-        preview_val = pm.get("preview")
-        final_val = pm.get("final")
-        assert preview_val is not None and final_val is not None
-        assert float(preview_val) > 0 and float(final_val) > 0
+        assert pm.get("invalid") is True
+        assert pm.get("degraded_reason") == "non_finite_pm"
+        assert pm.get("preview") is None
+        assert pm.get("final") is None
     finally:
         del os.environ["INVARLOCK_DEBUG_TRACE"]
 
@@ -575,10 +581,10 @@ def test_count_zero_returns_non_mlm(tmp_path):
         Toy(), cal, adapter, preview_n=1, final_n=1, config=RunConfig()
     )
     pm = metrics.get("primary_metric", {})
-    preview_val = pm.get("preview")
-    final_val = pm.get("final")
-    assert preview_val is not None and final_val is not None
-    assert float(preview_val) > 0 and float(final_val) > 0
+    assert pm.get("invalid") is True
+    assert pm.get("degraded_reason") == "non_finite_pm"
+    assert pm.get("preview") is None
+    assert pm.get("final") is None
 
 
 def test_pairing_mismatch_warning_non_ci(tmp_path):
@@ -759,8 +765,10 @@ def test_measure_latency_to_device_exceptions(monkeypatch):
             "attention_mask": [1, 1, 1],
             "token_type_ids": [0, 0, 0],
         }
-        ms = runner._measure_latency(M(), [sample], "cpu")
-        assert ms == 0.0 or ms > 0.0
+        with pytest.raises(
+            RuntimeError, match="Latency measurement device transfer failed"
+        ):
+            runner._measure_latency(M(), [sample], "cpu")
     finally:
         monkeypatch.setattr(torch.Tensor, "to", original_to)
 
@@ -838,7 +846,10 @@ def test_zero_mask_total_debug(monkeypatch):
             model, cal, adapter, preview_n=1, final_n=1, config=RunConfig()
         )
         pm = metrics.get("primary_metric", {})
-        assert pm.get("final") and pm.get("preview")
+        assert pm.get("invalid") is True
+        assert pm.get("degraded_reason") == "non_finite_pm"
+        assert pm.get("preview") is None
+        assert pm.get("final") is None
     finally:
         del os.environ["INVARLOCK_DEBUG_TRACE"]
 
@@ -886,91 +897,77 @@ def test_resolve_policies_edit_name_from_meta(monkeypatch):
 
 
 def test_eval_device_override_moves_model(monkeypatch):
-    import os
+    class MovableModel:
+        def __init__(self):
+            self.moved = False
 
-    os.environ["INVARLOCK_EVAL_DEVICE"] = "cpu"
-    try:
+        def eval(self):
+            return None
 
-        class MovableModel:
-            def __init__(self):
-                self.moved = False
+        def parameters(self):
+            class P:
+                device = "meta"
 
-            def eval(self):
-                return None
+            yield P()
 
-            def parameters(self):
-                class P:
-                    device = "meta"
+        def to(self, device):
+            self.moved = True
+            return self
 
-                yield P()
+        def __call__(self, *a, **k):
+            class Obj:
+                def __init__(self):
+                    self.loss = type("L", (), {"item": lambda self: 1.0})()
 
-            def to(self, device):
-                self.moved = True
-                return self
+            return Obj()
 
-            def __call__(self, *a, **k):
-                class Obj:
-                    def __init__(self):
-                        self.loss = type("L", (), {"item": lambda self: 1.0})()
-
-                return Obj()
-
-        runner = CoreRunner()
-        adapter = DummyAdapter()
-        metrics, _ = runner._compute_real_metrics(
-            MovableModel(),
-            _minimal_calibration(2),
-            adapter,
-            preview_n=1,
-            final_n=1,
-            config=RunConfig(),
-        )
-        pm = metrics.get("primary_metric", {})
-        assert pm.get("final") and pm.get("preview")  # branch executed
-    finally:
-        del os.environ["INVARLOCK_EVAL_DEVICE"]
+    runner = CoreRunner()
+    adapter = DummyAdapter()
+    metrics, _ = runner._compute_real_metrics(
+        MovableModel(),
+        _minimal_calibration(2),
+        adapter,
+        preview_n=1,
+        final_n=1,
+        config=RunConfig(context={"eval": {"device_override": "cpu"}}),
+    )
+    pm = metrics.get("primary_metric", {})
+    assert pm.get("final") and pm.get("preview")  # branch executed
 
 
 def test_eval_device_override_no_move_when_equal(monkeypatch):
-    import os
-
     import torch
 
-    os.environ["INVARLOCK_EVAL_DEVICE"] = "cpu"
-    try:
+    class CpuModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lin = torch.nn.Linear(3, 3, bias=False)
+            self.moved = False
 
-        class CpuModel(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
-                self.lin = torch.nn.Linear(3, 3, bias=False)
-                self.moved = False
+        def to(self, *args, **kwargs):
+            self.moved = True
+            return super().to(*args, **kwargs)
 
-            def to(self, *args, **kwargs):
-                self.moved = True
-                return super().to(*args, **kwargs)
+        def forward(self, *a, **k):
+            class Obj:
+                def __init__(self):
+                    self.loss = type("L", (), {"item": lambda self: 1.0})()
 
-            def forward(self, *a, **k):
-                class Obj:
-                    def __init__(self):
-                        self.loss = type("L", (), {"item": lambda self: 1.0})()
+            return Obj()
 
-                return Obj()
-
-        runner = CoreRunner()
-        adapter = DummyAdapter()
-        # Parameters are on CPU; override also CPU → no-op move path
-        metrics, _ = runner._compute_real_metrics(
-            CpuModel(),
-            _minimal_calibration(2),
-            adapter,
-            preview_n=1,
-            final_n=1,
-            config=RunConfig(),
-        )
-        pm = metrics.get("primary_metric", {})
-        assert pm.get("final") and pm.get("preview")
-    finally:
-        del os.environ["INVARLOCK_EVAL_DEVICE"]
+    runner = CoreRunner()
+    adapter = DummyAdapter()
+    # Parameters are on CPU; override also CPU → no-op move path
+    metrics, _ = runner._compute_real_metrics(
+        CpuModel(),
+        _minimal_calibration(2),
+        adapter,
+        preview_n=1,
+        final_n=1,
+        config=RunConfig(context={"eval": {"device_override": "cpu"}}),
+    )
+    pm = metrics.get("primary_metric", {})
+    assert pm.get("final") and pm.get("preview")
 
 
 def test_eval_debug_snapshot_with_labels(monkeypatch, tmp_path):
@@ -1118,8 +1115,10 @@ def test_measure_latency_dim_exception(monkeypatch):
     monkeypatch.setattr(torch.Tensor, "dim", raising_dim)
     try:
         sample = {"input_ids": [1, 2, 3], "attention_mask": [1, 1, 1]}
-        ms = runner._measure_latency(M(), [sample], "cpu")
-        assert ms == 0.0 or ms > 0.0
+        with pytest.raises(
+            RuntimeError, match="Latency measurement input shape inspection failed"
+        ):
+            runner._measure_latency(M(), [sample], "cpu")
     finally:
         monkeypatch.setattr(torch.Tensor, "dim", orig_dim)
 
@@ -1197,7 +1196,10 @@ def test_final_zero_uses_remaining_batches():
         model, cal, adapter, preview_n=2, final_n=0, config=RunConfig()
     )
     pm = metrics.get("primary_metric", {})
-    assert pm.get("final") and pm.get("preview")
+    assert pm.get("invalid") is True
+    assert pm.get("degraded_reason") == "non_finite_pm"
+    assert pm.get("preview") is not None
+    assert pm.get("final") is None
 
 
 def test_labels_present_without_attention_mask():
@@ -1274,7 +1276,7 @@ def test_delta_ci_normal_no_mismatch():
     assert math.isfinite(lo) and math.isfinite(hi) and (hi - lo) >= 0.0
 
 
-def test_resolve_guard_policies_exception_returns_empty(monkeypatch):
+def test_resolve_guard_policies_exception_surfaces(monkeypatch):
     from invarlock.core.api import RunReport
 
     runner = CoreRunner()
@@ -1287,23 +1289,31 @@ def test_resolve_guard_policies_exception_returns_empty(monkeypatch):
     monkeypatch.setattr(runner_mod, "resolve_tier_policies", boom)
     report = RunReport()
     report.meta["config"] = {"guards": {}}
-    policies = runner._resolve_guard_policies(report, auto_config=None)
-    assert policies == {}
+    with pytest.raises(RuntimeError, match="boom"):
+        runner._resolve_guard_policies(report, auto_config=None)
 
 
 ## Removed flaky negative request coverage assertion; coverage for _resolve_limit
 ## with non-positive requests is exercised by other tests (preview/final zero cases).
 
 
-def test_eval_phase_no_calibration_fallback(tmp_path):
+def test_eval_phase_no_calibration_returns_non_evaluated_state(tmp_path):
     runner = CoreRunner()
     model = _toy_model_with_losses([1.0])
     adapter = DummyAdapter()
     edit = EditStub("e")
-    cfg = RunConfig(context={"run_id": "r"}, checkpoint_interval=0, event_path=None)
+    cfg = RunConfig(
+        context={"run_id": "r", "run": {"strict_eval": False}},
+        checkpoint_interval=0,
+        event_path=None,
+    )
     report = runner.execute(model, adapter, edit, [], cfg, calibration_data=None)
-    pm = report.metrics.get("primary_metric", {})
-    assert pm.get("preview") == 25.0 and pm.get("final") == 26.0
+    assert report.status == "success"
+    assert report.metrics["eval_state"] == {
+        "evaluated": False,
+        "reason": "missing_calibration_data",
+    }
+    assert "eval_error" not in report.metrics
 
 
 def test_zero_mask_batch_warning_debug(monkeypatch):
@@ -1737,18 +1747,16 @@ def test_tail_token_count_conversion_error(monkeypatch):
         }
     )
 
-    metrics = runner._eval_phase(
-        model=object(),
-        adapter=adapter,
-        calibration_data=[{"input_ids": [1, 2, 3]}],
-        report=report,
-        preview_n=1,
-        final_n=1,
-        config=cfg,
-    )
-
-    assert metrics["primary_metric_tail"]["source"] == "paired_baseline.final"
-    assert tail_calls.get("weights") == [0.0]
+    with pytest.raises(ValueError, match="could not convert string to float"):
+        runner._eval_phase(
+            model=object(),
+            adapter=adapter,
+            calibration_data=[{"input_ids": [1, 2, 3]}],
+            report=report,
+            preview_n=1,
+            final_n=1,
+            config=cfg,
+        )
 
 
 def test_soft_eval_error_warns_not_raises():
@@ -1780,7 +1788,7 @@ def test_soft_eval_error_warns_not_raises():
     assert eval_error.get("error") == "mlm_missing_masks"
 
 
-def test_eval_phase_without_calibration_uses_mock_metrics():
+def test_eval_phase_without_calibration_returns_non_evaluated_state():
     runner = CoreRunner()
     model = _toy_model_with_losses([0.3])
     adapter = DummyAdapter()
@@ -1796,8 +1804,11 @@ def test_eval_phase_without_calibration_uses_mock_metrics():
         config=RunConfig(),
     )
 
-    pm = metrics.get("primary_metric", {})
-    assert pm.get("preview") == 25.0 and pm.get("final") == 26.0
+    assert metrics["eval_state"] == {
+        "evaluated": False,
+        "reason": "missing_calibration_data",
+    }
+    assert "primary_metric" not in metrics
     assert report.evaluation_windows == {"preview": {}, "final": {}}
 
 
@@ -1851,6 +1862,7 @@ def test_measure_latency_cuda_sync(monkeypatch):
         sync_called["called"] = True
 
     monkeypatch.setattr(torch.cuda, "synchronize", fake_sync)
+    monkeypatch.setattr(torch.Tensor, "to", lambda self, *_args, **_kwargs: self)
 
     latency = runner._measure_latency(
         M(), [{"input_ids": [1, 2, 3]}], torch.device("cuda")
@@ -1970,8 +1982,8 @@ def test_measure_latency_model_exception_returns_zero():
         def __call__(self, *a, **k):
             raise RuntimeError("boom")
 
-    latency = runner._measure_latency(BadModel(), [{"input_ids": [1, 2, 3]}], "cpu")
-    assert latency == 0.0
+    with pytest.raises(RuntimeError, match="boom"):
+        runner._measure_latency(BadModel(), [{"input_ids": [1, 2, 3]}], "cpu")
 
 
 # Note: Avoid exercising the MLM zero-usable-batches raise path due to a known

@@ -1,6 +1,19 @@
 from types import SimpleNamespace
 
-from invarlock.cli.commands import run
+from invarlock.cli import run_runtime
+
+
+def test_optional_module_helpers_preserve_explicit_bindings(monkeypatch):
+    fake_psutil = SimpleNamespace(virtual_memory=lambda: "vm")
+    fake_torch = SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: False))
+
+    monkeypatch.setattr(run_runtime, "psutil", fake_psutil)
+    monkeypatch.setattr(run_runtime, "torch", fake_torch)
+
+    run_runtime.reset_optional_runtime_caches()
+
+    assert run_runtime.get_psutil() is fake_psutil
+    assert run_runtime.get_torch() is fake_torch
 
 
 def test_free_model_memory_invokes_cuda(monkeypatch):
@@ -17,18 +30,18 @@ def test_free_model_memory_invokes_cuda(monkeypatch):
             calls["synchronize"] += 1
 
     fake_torch = SimpleNamespace(cuda=FakeCuda())
-    monkeypatch.setattr(run, "torch", fake_torch)
+    monkeypatch.setattr(run_runtime, "torch", fake_torch)
 
-    run._free_model_memory(object())
+    run_runtime.free_model_memory(object())
 
     assert calls["empty_cache"] == 1
     assert calls["synchronize"] == 1
 
 
 def test_free_model_memory_tolerates_missing_torch(monkeypatch):
-    monkeypatch.setattr(run, "torch", None)
+    monkeypatch.setattr(run_runtime, "torch", None)
     # Should not raise when torch is unavailable
-    run._free_model_memory(object())
+    run_runtime.free_model_memory(object())
 
 
 def test_free_model_memory_swallows_cuda_exceptions(monkeypatch):
@@ -36,5 +49,5 @@ def test_free_model_memory_swallows_cuda_exceptions(monkeypatch):
         def is_available(self) -> bool:
             raise RuntimeError("boom")
 
-    monkeypatch.setattr(run, "torch", SimpleNamespace(cuda=FakeCuda()))
-    run._free_model_memory(object())
+    monkeypatch.setattr(run_runtime, "torch", SimpleNamespace(cuda=FakeCuda()))
+    run_runtime.free_model_memory(object())

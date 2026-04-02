@@ -4,7 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from invarlock.core.config_execution import RuntimeDelegationError, run_from_config
+from invarlock.cli.config_execution import RuntimeDelegationError, run_from_config
 from invarlock.runtime_security import (
     apply_runtime_allowances,
     delegate_python_script_to_container,

@@ -3,7 +3,8 @@ from types import SimpleNamespace
 import torch
 import torch.nn as nn
 
-from invarlock.eval.metrics import MetricsConfig, _collect_activations
+from invarlock.eval.metrics import MetricsConfig
+from invarlock.eval.metrics_activation import _collect_activations
 
 
 def test_collect_activations_indexable_and_hidden_states_le_two():
@@ -40,7 +41,7 @@ def test_collect_activations_indexable_and_hidden_states_le_two():
     out = _collect_activations(
         Model().eval(),
         dl,
-        MetricsConfig(progress_bars=False, oracle_windows=2),
+        MetricsConfig(oracle_windows=2),
         torch.device("cpu"),
     )
     assert out["first_batch"] is not None

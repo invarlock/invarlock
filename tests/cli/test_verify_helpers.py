@@ -6,6 +6,8 @@ import sys
 import types
 from pathlib import Path
 
+from invarlock.reporting.report_schema import REPORT_SCHEMA_VERSION
+
 
 def _import_verify_module():
     # transformers stub so importing verify (which imports run) is safe
@@ -33,7 +35,7 @@ def _import_verify_module():
         sub = types.ModuleType("transformers.tokenization_utils_base")
         sub.PreTrainedTokenizerBase = object  # type: ignore[attr-defined]
         sys.modules["transformers.tokenization_utils_base"] = sub
-    return importlib.import_module("invarlock.cli.commands.verify")
+    return importlib.import_module("invarlock.reporting.verify_contract")
 
 
 def test_primary_metric_validation_ppl_and_non_ppl() -> None:
@@ -256,7 +258,7 @@ def test_validate_drift_band_skips_tiny_relax_reports() -> None:
     verify_mod = _import_verify_module()
 
     cert_tiny_relax = {
-        "auto": {"tiny_relax": True},
+        "context": {"run": {"tiny_relax": True}},
         "primary_metric": {"preview": 10.0, "final": 20.0},
     }
 
@@ -500,9 +502,9 @@ def test_validate_report_schema_strict_paths(monkeypatch) -> None:
         verify_mod._validate_report_schema_strict({"schema_version": "nope"}) is False
     )
 
-    report = {"schema_version": verify_mod.REPORT_SCHEMA_VERSION}
+    report = {"schema_version": REPORT_SCHEMA_VERSION}
 
-    monkeypatch.setattr(verify_mod._report_builder, "jsonschema", None, raising=False)
+    monkeypatch.setattr(verify_mod._report_schema, "jsonschema", None, raising=False)
     assert verify_mod._validate_report_schema_strict(report) is False
 
     class _SchemaFail:
@@ -511,7 +513,7 @@ def test_validate_report_schema_strict_paths(monkeypatch) -> None:
             raise RuntimeError("boom")
 
     monkeypatch.setattr(
-        verify_mod._report_builder, "jsonschema", _SchemaFail(), raising=False
+        verify_mod._report_schema, "jsonschema", _SchemaFail(), raising=False
     )
     assert verify_mod._validate_report_schema_strict(report) is False
 
@@ -521,7 +523,7 @@ def test_validate_report_schema_strict_paths(monkeypatch) -> None:
             return None
 
     monkeypatch.setattr(
-        verify_mod._report_builder, "jsonschema", _SchemaOk(), raising=False
+        verify_mod._report_schema, "jsonschema", _SchemaOk(), raising=False
     )
     assert verify_mod._validate_report_schema_strict(report) is True
 
@@ -683,11 +685,13 @@ def test_recompute_validation_flags_and_policy_gate_paths(monkeypatch) -> None:
             }
         },
         "auto": {"tier": "Conservative", "target_pm_ratio": "1.1"},
-        "resolved_policy": {"metrics": {"pm_ratio": {"min_tokens": 1}}},
-        "meta": {
-            "pm_acceptance_range": {"min": 0.95, "max": 1.15},
-            "pm_drift_band": {"min": 0.9, "max": 1.3},
+        "context": {
+            "primary_metric": {
+                "acceptance_range": {"min": 0.95, "max": 1.15},
+                "drift_band": {"min": 0.9, "max": 1.3},
+            }
         },
+        "resolved_policy": {"metrics": {"pm_ratio": {"min_tokens": 1}}},
         "spectral": {},
         "rmt": {},
         "invariants": {},
@@ -744,7 +748,7 @@ def test_primary_metric_policy_uses_serialized_acceptance_range() -> None:
             "ratio_vs_baseline": 1.12,
         },
         "baseline_ref": {"primary_metric": {"final": 10.0}},
-        "meta": {"pm_acceptance_range": {"min": 0.95, "max": 1.15}},
+        "context": {"primary_metric": {"acceptance_range": {"min": 0.95, "max": 1.15}}},
     }
     assert verify_mod._validate_primary_metric_policy(relaxed, profile="release") == []
 
@@ -756,7 +760,7 @@ def test_primary_metric_policy_uses_serialized_acceptance_range() -> None:
             "ratio_vs_baseline": 1.08,
         },
         "baseline_ref": {"primary_metric": {"final": 10.0}},
-        "meta": {"pm_acceptance_range": {"min": 0.95, "max": 1.05}},
+        "context": {"primary_metric": {"acceptance_range": {"min": 0.95, "max": 1.05}}},
     }
     errs = verify_mod._validate_primary_metric_policy(strict, profile="release")
     assert errs == ["Primary metric policy gate failed (tier=balanced)."]
@@ -789,4 +793,8 @@ def test_warn_adapter_family_mismatch(tmp_path: Path) -> None:
         "provenance": {"baseline": {"report_path": str(baseline)}},
     }
     # Should not raise; may emit a soft warning to console
-    verify_mod._warn_adapter_family_mismatch(baseline, cert)
+    verify_mod._warn_adapter_family_mismatch(
+        baseline,
+        cert,
+        trusted_baseline_path=baseline,
+    )

@@ -6,6 +6,8 @@ from pathlib import Path
 import pytest
 import typer
 
+from invarlock.cli.commands.verify import verify_command
+
 
 def _touch_min_cert(tmp_path: Path) -> Path:
     p = tmp_path / "c.json"
@@ -59,7 +61,7 @@ def test_verify_json_structured_error_envelope(
     expected_exit,
 ) -> None:
     # Force verify_command to raise our exception before processing
-    from invarlock.cli.commands import verify as v
+    from invarlock.reporting import verify_contract as v
 
     def _boom(*a, **k):
         raise exc_factory()
@@ -68,7 +70,7 @@ def test_verify_json_structured_error_envelope(
 
     cert_path = _touch_min_cert(tmp_path)
     with pytest.raises(typer.Exit) as ei:
-        v.verify_command([cert_path], baseline=None, profile=profile, json_out=True)
+        verify_command([cert_path], baseline=None, profile=profile, json_out=True)
     # exit codes mapped as expected
     assert (
         getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == expected_exit

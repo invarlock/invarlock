@@ -1,7 +1,7 @@
 from typing import Any
 
 from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 
 
 def _minimal_run_report_with_windows(kind: str = "ppl_causal") -> dict[str, Any]:

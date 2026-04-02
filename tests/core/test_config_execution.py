@@ -1,20 +1,59 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
 
-import invarlock.core.config_execution as config_execution
+import invarlock.cli.config_execution as config_execution
+import invarlock.runtime_security as runtime_security
 
 
-def test_default_run_impl_and_deps_imports_run_symbols() -> None:
-    from invarlock.cli.commands.run import _build_run_command_deps
-    from invarlock.cli.run_command_impl import run_command_impl
+def test_run_from_config_executes_concrete_run_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: dict[str, object] = {}
+    report_path = Path("reports/demo.report.json")
+    monkeypatch.setattr(
+        config_execution,
+        "resolve_shell_runtime_security_policy",
+        lambda **kwargs: runtime_security.build_runtime_security_policy(
+            **kwargs,
+        ),
+        raising=True,
+    )
 
-    run_impl, deps_builder = config_execution._default_run_impl_and_deps()
+    @contextmanager
+    def _scope(*, policy):
+        seen["policy"] = policy
+        yield
 
-    assert run_impl is run_command_impl
-    assert deps_builder is _build_run_command_deps
+    monkeypatch.setattr(
+        config_execution,
+        "runtime_allowances_scope",
+        _scope,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        config_execution,
+        "execute_config_run_request",
+        lambda request: (seen.__setitem__("request", request), str(report_path))[1],
+        raising=True,
+    )
+    monkeypatch.setattr(
+        config_execution,
+        "write_runtime_manifest",
+        lambda *args, **kwargs: None,
+        raising=True,
+    )
+
+    out = config_execution.run_from_config(config="configs/demo.yaml", delegate=False)
+
+    assert out == report_path.resolve()
+    assert seen["request"] == config_execution.ConfigExecutionRequest(
+        config="configs/demo.yaml"
+    )
+    assert seen["policy"] == runtime_security.build_runtime_security_policy()
 
 
 def test_run_from_config_executes_without_delegation_and_writes_manifest(
@@ -27,8 +66,22 @@ def test_run_from_config_executes_without_delegation_and_writes_manifest(
 
     monkeypatch.setattr(
         config_execution,
-        "apply_runtime_allowances",
-        lambda **kwargs: seen.setdefault("allowances", kwargs),
+        "resolve_shell_runtime_security_policy",
+        lambda **kwargs: runtime_security.build_runtime_security_policy(
+            **kwargs,
+        ),
+        raising=True,
+    )
+
+    @contextmanager
+    def _scope(*, policy):
+        seen["policy"] = policy
+        yield
+
+    monkeypatch.setattr(
+        config_execution,
+        "runtime_allowances_scope",
+        _scope,
         raising=True,
     )
     monkeypatch.setattr(
@@ -41,9 +94,12 @@ def test_run_from_config_executes_without_delegation_and_writes_manifest(
         raising=True,
     )
 
-    def _run_impl(**kwargs):
-        seen["run_kwargs"] = kwargs
-        return str(report_path)
+    monkeypatch.setattr(
+        config_execution,
+        "execute_config_run_request",
+        lambda request: (seen.__setitem__("request", request), str(report_path))[1],
+        raising=True,
+    )
 
     out = config_execution.run_from_config(
         config="configs/demo.yaml",
@@ -55,39 +111,20 @@ def test_run_from_config_executes_without_delegation_and_writes_manifest(
         allow_third_party_plugins=True,
         command_name="proof-pack-run",
         delegate=False,
-        run_impl=_run_impl,
-        deps_builder=lambda: {"deps": "ok"},
     )
 
-    assert out == str(report_path)
-    assert seen["allowances"] == {
-        "allow_network": True,
-        "allow_host_execution": False,
-        "allow_third_party_plugins": True,
-        "allow_remote_code": True,
-    }
-    assert seen["run_kwargs"] == {
-        "config": "configs/demo.yaml",
-        "device": None,
-        "profile": "ci",
-        "out": "runs/demo",
-        "edit": None,
-        "edit_label": None,
-        "tier": "balanced",
-        "metric_kind": None,
-        "probes": None,
-        "until_pass": False,
-        "max_attempts": 3,
-        "timeout": None,
-        "baseline": None,
-        "no_cleanup": False,
-        "style": None,
-        "progress": False,
-        "timing": False,
-        "telemetry": False,
-        "no_color": False,
-        "deps": {"deps": "ok"},
-    }
+    assert out == report_path.resolve()
+    assert seen["policy"] == runtime_security.build_runtime_security_policy(
+        allow_network=True,
+        allow_third_party_plugins=True,
+        allow_remote_code=True,
+    )
+    assert seen["request"] == config_execution.ConfigExecutionRequest(
+        config="configs/demo.yaml",
+        profile="ci",
+        out="runs/demo",
+        tier="balanced",
+    )
     manifest_report, manifest_config, manifest_extra = seen["manifest"]
     assert manifest_report == report_path
     assert manifest_config == "configs/demo.yaml"
@@ -103,10 +140,23 @@ def test_run_from_config_executes_without_delegation_and_writes_manifest(
 def test_run_from_config_delegates_when_secure_default_requires_container(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    seen: dict[str, object] = {}
     monkeypatch.setattr(
         config_execution,
-        "apply_runtime_allowances",
-        lambda **kwargs: None,
+        "resolve_shell_runtime_security_policy",
+        lambda **kwargs: runtime_security.build_runtime_security_policy(),
+        raising=True,
+    )
+
+    @contextmanager
+    def _scope(*, policy):
+        seen["policy"] = policy
+        yield
+
+    monkeypatch.setattr(
+        config_execution,
+        "runtime_allowances_scope",
+        _scope,
         raising=True,
     )
     monkeypatch.setattr(
@@ -123,8 +173,17 @@ def test_run_from_config_delegates_when_secure_default_requires_container(
     )
     monkeypatch.setattr(
         config_execution,
-        "delegate_current_process_to_container",
-        lambda: 7,
+        "build_request_container_launch_plan",
+        lambda command_name, request: (
+            seen.__setitem__("plan", (command_name, request)),
+            "plan",
+        )[1],
+        raising=True,
+    )
+    monkeypatch.setattr(
+        config_execution,
+        "delegate_container_command",
+        lambda plan: 7 if plan == "plan" else 99,
         raising=True,
     )
 
@@ -132,6 +191,11 @@ def test_run_from_config_delegates_when_secure_default_requires_container(
         config_execution.run_from_config(config="configs/demo.yaml")
 
     assert excinfo.value.code == 7
+    assert seen["policy"] == runtime_security.build_runtime_security_policy()
+    assert seen["plan"] == (
+        "run",
+        config_execution.ConfigExecutionRequest(config="configs/demo.yaml"),
+    )
 
 
 def test_run_from_config_wraps_runtime_delegation_failures(
@@ -139,8 +203,19 @@ def test_run_from_config_wraps_runtime_delegation_failures(
 ) -> None:
     monkeypatch.setattr(
         config_execution,
-        "apply_runtime_allowances",
-        lambda **kwargs: None,
+        "resolve_shell_runtime_security_policy",
+        lambda **kwargs: runtime_security.build_runtime_security_policy(),
+        raising=True,
+    )
+
+    @contextmanager
+    def _scope(*, policy):
+        yield
+
+    monkeypatch.setattr(
+        config_execution,
+        "runtime_allowances_scope",
+        _scope,
         raising=True,
     )
     monkeypatch.setattr(
@@ -157,8 +232,14 @@ def test_run_from_config_wraps_runtime_delegation_failures(
     )
     monkeypatch.setattr(
         config_execution,
-        "delegate_current_process_to_container",
-        lambda: (_ for _ in ()).throw(RuntimeError("no runtime image")),
+        "build_request_container_launch_plan",
+        lambda command_name, request: "plan",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        config_execution,
+        "delegate_container_command",
+        lambda plan: (_ for _ in ()).throw(RuntimeError("no runtime image")),
         raising=True,
     )
 
@@ -168,7 +249,7 @@ def test_run_from_config_wraps_runtime_delegation_failures(
         config_execution.run_from_config(config="configs/demo.yaml")
 
 
-def test_run_from_config_uses_default_impls_and_skips_manifest_for_missing_report(
+def test_run_from_config_skips_manifest_for_missing_report(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -177,28 +258,32 @@ def test_run_from_config_uses_default_impls_and_skips_manifest_for_missing_repor
 
     monkeypatch.setattr(
         config_execution,
-        "apply_runtime_allowances",
-        lambda **kwargs: seen.setdefault("allowances", kwargs),
+        "resolve_shell_runtime_security_policy",
+        lambda **kwargs: runtime_security.build_runtime_security_policy(
+            **kwargs,
+        ),
         raising=True,
     )
 
-    def _default_impls() -> tuple[object, object]:
-        def _deps_builder() -> dict[str, str]:
-            seen["deps_called"] = True
-            return {"deps": "default"}
-
-        def _run_impl(**kwargs) -> str:
-            seen["run_kwargs"] = kwargs
-            return str(missing_report)
-
-        return _run_impl, _deps_builder
+    @contextmanager
+    def _scope(*, policy):
+        seen["policy"] = policy
+        yield
 
     monkeypatch.setattr(
         config_execution,
-        "_default_run_impl_and_deps",
-        _default_impls,
+        "runtime_allowances_scope",
+        _scope,
         raising=True,
     )
+
+    monkeypatch.setattr(
+        config_execution,
+        "execute_config_run_request",
+        lambda request: (seen.__setitem__("request", request), str(missing_report))[1],
+        raising=True,
+    )
+
     monkeypatch.setattr(
         config_execution,
         "write_runtime_manifest",
@@ -212,45 +297,84 @@ def test_run_from_config_uses_default_impls_and_skips_manifest_for_missing_repor
         delegate=False,
     )
 
-    assert out == str(missing_report)
-    assert seen["allowances"] == {
-        "allow_network": False,
-        "allow_host_execution": False,
-        "allow_third_party_plugins": False,
-        "allow_remote_code": False,
-    }
-    assert seen["deps_called"] is True
-    assert seen["run_kwargs"] == {
-        "config": "configs/demo.yaml",
-        "device": None,
-        "profile": "ci",
-        "out": None,
-        "edit": None,
-        "edit_label": None,
-        "tier": None,
-        "metric_kind": None,
-        "probes": None,
-        "until_pass": False,
-        "max_attempts": 3,
-        "timeout": None,
-        "baseline": None,
-        "no_cleanup": False,
-        "style": None,
-        "progress": False,
-        "timing": False,
-        "telemetry": False,
-        "no_color": False,
-        "deps": {"deps": "default"},
-    }
+    assert out == missing_report.resolve()
+
+    assert seen["policy"] == runtime_security.build_runtime_security_policy()
+    assert seen["request"] == config_execution.ConfigExecutionRequest(
+        config="configs/demo.yaml",
+        profile="ci",
+    )
 
 
-def test_run_from_config_returns_none_when_run_impl_returns_none(
+def test_run_from_config_wraps_explicit_cuda_visibility_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
         config_execution,
-        "apply_runtime_allowances",
-        lambda **kwargs: None,
+        "resolve_shell_runtime_security_policy",
+        lambda **kwargs: runtime_security.build_runtime_security_policy(**kwargs),
+        raising=True,
+    )
+
+    @contextmanager
+    def _scope(*, policy):
+        yield
+
+    monkeypatch.setattr(
+        config_execution,
+        "runtime_allowances_scope",
+        _scope,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        config_execution,
+        "running_inside_container",
+        lambda: False,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        config_execution,
+        "host_execution_allowed",
+        lambda: False,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        config_execution,
+        "build_request_container_launch_plan",
+        lambda command_name, request: (_ for _ in ()).throw(
+            RuntimeError("Requested --device cuda, but no NVIDIA runtime is visible")
+        ),
+        raising=True,
+    )
+
+    with pytest.raises(
+        config_execution.RuntimeDelegationError,
+        match="Requested --device cuda",
+    ):
+        config_execution.run_from_config(
+            config="configs/demo.yaml",
+            device="cuda",
+        )
+
+
+def test_run_from_config_raises_when_run_execution_returns_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        config_execution,
+        "resolve_shell_runtime_security_policy",
+        lambda **kwargs: runtime_security.build_runtime_security_policy(),
+        raising=True,
+    )
+
+    @contextmanager
+    def _scope(*, policy):
+        yield
+
+    monkeypatch.setattr(
+        config_execution,
+        "runtime_allowances_scope",
+        _scope,
         raising=True,
     )
     monkeypatch.setattr(
@@ -260,11 +384,17 @@ def test_run_from_config_returns_none_when_run_impl_returns_none(
         raising=True,
     )
 
-    out = config_execution.run_from_config(
-        config="configs/demo.yaml",
-        delegate=False,
-        run_impl=lambda **kwargs: None,
-        deps_builder=lambda: {"deps": "ok"},
+    monkeypatch.setattr(
+        config_execution,
+        "execute_config_run_request",
+        lambda request: None,
+        raising=True,
     )
 
-    assert out is None
+    with pytest.raises(
+        RuntimeError, match="run execution did not return a report path"
+    ):
+        config_execution.run_from_config(
+            config="configs/demo.yaml",
+            delegate=False,
+        )

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "invarlock"
-version = "0.5.0"
+version = "0.5.1"
 description = "Edit‑agnostic robustness evaluation reports for weight edits (InvarLock framework)"
 authors = [{ name = "InvarLock Team", email = "oss@invarlock.dev" }]
 maintainers = [{ name = "InvarLock Maintainers", email = "support@invarlock.dev" }]
@@ -31,6 +31,7 @@ dependencies = [
     "typer>=0.15",
     "click>=8.1",
     "shellingham>=1.5.0",
+    "cryptography>=46.0.0",
     "pandas>=2.2",
     "scikit-learn>=1.4",
     "pydantic>=2.0",
@@ -55,6 +56,9 @@ adapters = [
   "torch>=2.1.0",
   "transformers>=5.0.0",
   "safetensors>=0.4.0",
+  "protobuf>=4.25",
+  "sentencepiece>=0.2.1",
+  "tiktoken>=0.9.0",
 ]
 
 # Hugging Face workflow (adapters + evaluation stack)
@@ -63,7 +67,11 @@ hf = [
   "accelerate>=0.26.0",
   "transformers>=5.0.0",
   "safetensors>=0.4.0",
+  "protobuf>=4.25",
+  "sentencepiece>=0.2.1",
+  "tiktoken>=0.9.0",
   "datasets>=3.0",
+  "requests>=2.33.0",
   "numpy>=1.24",
   "huggingface_hub>=1.0.0",
   "aiohttp>=3.12.14",
@@ -86,6 +94,7 @@ edits = [
 eval = [
   "torch>=2.1.0",
   "datasets>=3.0",
+  "requests>=2.33.0",
 ]
 
 # External edit integrations
@@ -118,7 +127,11 @@ gpu = [
 advanced = [
   "torch>=2.1.0",
   "transformers>=5.0.0",
+  "protobuf>=4.25",
+  "sentencepiece>=0.2.1",
+  "tiktoken>=0.9.0",
   "datasets>=3.0",
+  "requests>=2.33.0",
   "numpy>=1.24",
   "huggingface_hub>=1.0.0",
   "accelerate>=0.27",
@@ -136,7 +149,11 @@ advanced = [
 all = [
   "torch>=2.1.0",
   "transformers>=5.0.0",
+  "protobuf>=4.25",
+  "sentencepiece>=0.2.1",
+  "tiktoken>=0.9.0",
   "datasets>=3.0",
+  "requests>=2.33.0",
   "numpy>=1.24",
   "huggingface_hub>=1.0.0",
   "accelerate>=0.27",
@@ -153,7 +170,7 @@ all = [
 dev = [
   "pytest>=7.0",
   "pytest-cov>=4.0",
-  "ruff==0.15.7",
+  "ruff==0.15.8",
   "black>=23.0",
   "mypy>=1.0",
   "hypothesis>=6.98",
@@ -165,20 +182,23 @@ dev = [
   "matplotlib>=3.7",
   "bitsandbytes>=0.41",
   "build>=0.10.0",
+  "requests>=2.33.0",
   "twine>=4.0.0",
 ]
 
 ci = [
   "pytest>=7.0",
-  "ruff==0.15.7",
+  "ruff==0.15.8",
   "mkdocs>=1.5",
   "mkdocs-material>=9.5",
   "mkdocs-mermaid2-plugin>=1.1",
   "build>=0.10.0",
+  "requests>=2.33.0",
 ]
 
 docs-ci = [
   "linkchecker>=10.5",
+  "requests>=2.33.0",
   "mypy>=1.0",
   "hypothesis>=6.98",
 ]
@@ -189,12 +209,14 @@ precommit-ci = [
 
 release-ci = [
   "build>=0.10.0",
+  "requests>=2.33.0",
   "twine>=4.0.0",
   "cyclonedx-bom>=4.1",
 ]
 
 security-ci = [
   "pip-audit>=2.8",
+  "requests>=2.33.0",
   "cyclonedx-bom>=4.1",
 ]
 
@@ -221,7 +243,7 @@ hf_bnb = "invarlock.plugins.hf_bnb_adapter:HF_BNB_Adapter"
 # Console scripts
 [project.scripts]
 invarlock = "invarlock.cli.app:app"
-invarlock-runtime-verify = "invarlock.runtime_verify:main"
+invarlock-runtime-verify = "invarlock.cli.runtime_verify:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

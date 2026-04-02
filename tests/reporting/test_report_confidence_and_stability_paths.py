@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_builder import (
-    _is_ppl_kind,
-    make_report,
-    validate_report,
-)
+from invarlock.reporting.report_make import make_report
+from invarlock.reporting.report_primary_metric_policy import is_ppl_kind as _is_ppl_kind
+from invarlock.reporting.report_schema import validate_report
 from invarlock.reporting.report_types import RunReport, create_empty_report
 
 
@@ -109,7 +107,7 @@ def test_make_evaluation_report_replicates_zero_keeps_run_metrics_pairing_and_fi
     report["metrics"]["stats"] = {"requested_preview": 1.2, "requested_final": -1}
 
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci",
         lambda *_a, **_k: (_a, _k),  # should not be called when replicates=0
     )
     cert = make_report(report, baseline)
@@ -131,19 +129,18 @@ def test_make_evaluation_report_uses_bca_when_method_explicit(monkeypatch) -> No
         return (-0.01, 0.01)
 
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci", _fake_ci
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci", _fake_ci
     )
     cert = make_report(report, baseline)
     assert validate_report(cert)
     assert seen.get("method") == "bca"
 
 
-def test_make_evaluation_report_env_bca_flag_ignored_when_windows_small(
+def test_make_evaluation_report_percentile_method_used_when_windows_small(
     monkeypatch,
 ) -> None:
     report = _mk_report(replicates=10, bootstrap_method="percentile")
     baseline = _mk_baseline()
-    monkeypatch.setenv("INVARLOCK_BOOTSTRAP_BCA", "1")
 
     seen: dict[str, object] = {}
 
@@ -152,7 +149,7 @@ def test_make_evaluation_report_env_bca_flag_ignored_when_windows_small(
         return (-0.01, 0.01)
 
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci", _fake_ci
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci", _fake_ci
     )
     cert = make_report(report, baseline)
     assert validate_report(cert)
@@ -168,11 +165,11 @@ def test_make_evaluation_report_marks_unstable_when_token_floor_violated(
     report["metrics"]["final_total_tokens"] = 10
 
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.get_tier_policies",
+        "invarlock.reporting.report_make.get_tier_policies",
         lambda: {"balanced": {"metrics": {"pm_ratio": {"min_tokens": 100}}}},
     )
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder.compute_paired_delta_log_ci",
+        "invarlock.core.bootstrap.compute_paired_delta_log_ci",
         lambda *_a, **_k: (-0.01, 0.01),
     )
     cert = make_report(report, baseline)

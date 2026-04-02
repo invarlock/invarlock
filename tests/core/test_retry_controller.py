@@ -4,7 +4,7 @@ Tests for RetryController and retry parameter adjustments.
 
 import time
 
-from invarlock.core.retry import RetryController, adjust_edit_params
+from invarlock.core.retry import RetryController, RetryDiagnostic, adjust_edit_params
 
 
 class TestRetryController:
@@ -18,6 +18,7 @@ class TestRetryController:
         controller = RetryController(max_attempts=3)
         assert controller.should_retry(report_passed=True) is False
         assert controller.attempt_history == []
+        assert controller.drain_diagnostics() == ()
 
     def test_attempt_budget_enforced(self) -> None:
         controller = RetryController(max_attempts=3)
@@ -69,27 +70,37 @@ class TestRetryController:
         controller.record_attempt(1, {"passed": False}, {})
         assert controller.should_retry(False) is False
 
-    def test_verbose_timeout_budget_prints_stop_message(self, capsys) -> None:
+    def test_verbose_timeout_budget_collects_stop_notice(self) -> None:
         controller = RetryController(max_attempts=3, timeout=0, verbose=True)
         controller.start_time = time.time() - 1
 
         assert controller.should_retry(False) is False
-        assert "Timeout 0s exceeded" in capsys.readouterr().out
+        diagnostic = controller.drain_diagnostics()[0]
+        assert diagnostic.code == "retry.timeout_exhausted"
+        assert "Timeout 0s exceeded" in diagnostic.message
 
 
 class TestAdjustEditParams:
     def test_adjust_quant_adds_clamp_ratio(self) -> None:
-        params = {"bits": 8}
+        params = {"bitwidth": 8}
         adjusted = adjust_edit_params("quant_rtn", params, attempt=1)
-        assert adjusted["clamp_ratio"] == 0.01
+        assert adjusted.params["clamp_ratio"] == 0.01
+        assert adjusted.diagnostics == (
+            RetryDiagnostic(
+                code="retry.quant_clamp_ratio_added",
+                message="Quant retry adjustment: added clamp_ratio=0.01",
+                details={"clamp_ratio": 0.01},
+            ),
+        )
 
     def test_adjust_unknown_edit_noop(self) -> None:
         params = {"some_param": "value"}
         adjusted = adjust_edit_params("unknown_edit", params, attempt=1)
-        assert adjusted == params
+        assert adjusted.params == params
+        assert adjusted.diagnostics == ()
 
     def test_adjust_preserves_other_fields(self) -> None:
-        params = {"bits": 8, "scope": "ffn", "seed": 42}
+        params = {"bitwidth": 8, "scope": "ffn", "seed": 42}
         adjusted = adjust_edit_params("quant_rtn", params, attempt=1)
-        assert adjusted["scope"] == "ffn"
-        assert adjusted["seed"] == 42
+        assert adjusted.params["scope"] == "ffn"
+        assert adjusted.params["seed"] == 42

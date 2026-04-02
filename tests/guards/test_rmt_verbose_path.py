@@ -1,6 +1,7 @@
 import torch
 
-import invarlock.guards.rmt_legacy as R
+import invarlock.guards.rmt_detection as R
+import invarlock.guards.rmt_math as rmt_math
 
 
 class TinyOutlier(torch.nn.Module):
@@ -21,7 +22,7 @@ def test_rmt_detect_verbose_outlier_prints():
     baseline_sigmas = {"block.attn.c_proj": 1.0}
     baseline_mp_stats = {
         "block.attn.c_proj": {
-            "mp_bulk_edge_base": float(R.mp_bulk_edge(m, n, whitened=False))
+            "mp_bulk_edge_base": float(rmt_math.mp_bulk_edge(m, n, whitened=False))
         }
     }
     out = R.rmt_detect(

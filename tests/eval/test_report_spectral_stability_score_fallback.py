@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 
 
 def test_spectral_stability_score_from_generic_key():
@@ -43,7 +43,7 @@ def test_spectral_stability_score_from_generic_key():
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
     with patch(
-        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+        "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):
         cert = make_report(report, baseline)
     summary = cert.get("spectral", {}).get("summary", {})

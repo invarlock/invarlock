@@ -23,6 +23,7 @@ class Model(nn.Module):
     def __init__(self, vocab=5):
         super().__init__()
         self.vocab = vocab
+        self.proj = nn.Linear(4, 4, bias=False)
         self.transformer = types.SimpleNamespace(h=[Block(), Block()])
 
     def forward(self, input_ids=None, output_hidden_states=False, **kwargs):
@@ -76,7 +77,7 @@ def test_calculate_lens_metrics_integration_and_cache(monkeypatch):
 
     model = Model().eval()
     dl = [{"input_ids": torch.ones(1, 12, dtype=torch.long)}]
-    cfg = MetricsConfig(oracle_windows=1, progress_bars=False, use_cache=True)
+    cfg = MetricsConfig(oracle_windows=1, use_cache=True)
 
     # Compute (cache is per-instance; we just validate the path executes)
     res1 = calculate_lens_metrics_for_model(model, dl, config=cfg)

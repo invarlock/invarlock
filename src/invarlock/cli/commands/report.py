@@ -7,18 +7,28 @@ Provides the `invarlock report` group with:
   - subcommands: verify, explain, html, validate
 """
 
-import json
 import math
-from pathlib import Path
 from time import perf_counter
-from typing import Any
+from typing import Any, NoReturn
 
 import typer
 from rich.console import Console
 
 from invarlock.cli.output import print_event, resolve_output_style
-from invarlock.reporting import report as report_lib
-from invarlock.reporting import report_builder as report_builder
+from invarlock.core.report_inputs import (
+    ReportInputError,
+    load_report_input_json,
+    resolve_report_input_path,
+)
+from invarlock.reporting.report_contract import (
+    ReportGenerationResult,
+    generate_reports,
+    load_report_payload,
+)
+from invarlock.reporting.report_telemetry import (
+    telemetry_output_enabled,
+    telemetry_summary_line,
+)
 
 console = Console()
 
@@ -26,6 +36,33 @@ SECTION_WIDTH = 67
 KV_LABEL_WIDTH = 16
 GATE_LABEL_WIDTH = 32
 ARTIFACT_LABEL_WIDTH = 18
+_SUMMARY_FORMAT_ERRORS = (TypeError, ValueError)
+_REPORT_RENDER_ERRORS = (
+    AttributeError,
+    KeyError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+_REPORT_COMMAND_ERRORS = (OSError, RuntimeError, TypeError)
+
+
+def _raise_report_input_failure(message: str, *, no_color: bool = False) -> NoReturn:
+    print_event(
+        console,
+        "FAIL",
+        message,
+        style=resolve_output_style(
+            style="audit",
+            profile="ci",
+            progress=False,
+            timing=False,
+            no_color=no_color,
+        ),
+        emoji="❌",
+    )
+    raise typer.Exit(2)
 
 
 def _format_section_title(title: str, *, suffix: str | None = None) -> str:
@@ -107,46 +144,16 @@ report_app = typer.Typer(
 )
 
 
-def _generate_reports(
+def _render_generation_result(
     *,
-    run: str,
-    format: str = "json",
-    compare: str | None = None,
-    baseline: str | None = None,
-    output: str | None = None,
+    result: ReportGenerationResult,
     style: str = "audit",
     no_color: bool = False,
     summary_baseline_seconds: float | None = None,
     summary_subject_seconds: float | None = None,
     summary_report_start: float | None = None,
 ) -> None:
-    # This callback runs only when invoked without subcommand (default Click behavior)
     try:
-        # When invoked programmatically (not via Typer CLI), the default values for
-        # parameters defined with `typer.Option(...)` can be instances of
-        # `typer.models.OptionInfo`. Coerce them to real Python values to avoid
-        # accidentally treating an OptionInfo object as a path.
-        try:  # Typer internal type may change between versions
-            from typer.models import OptionInfo as _TyperOptionInfo
-        except Exception:  # pragma: no cover - defensive fallback
-            _TyperOptionInfo = ()  # type: ignore[assignment]
-
-        def _coerce_option(value, fallback=None):
-            if isinstance(value, _TyperOptionInfo):
-                return getattr(value, "default", fallback)
-            return value if value is not None else fallback
-
-        run = _coerce_option(run)
-        format = _coerce_option(format, "json")
-        compare = _coerce_option(compare)
-        baseline = _coerce_option(baseline)
-        output = _coerce_option(output)
-        style = _coerce_option(style, "audit")
-        no_color = bool(_coerce_option(no_color, False))
-        summary_baseline_seconds = _coerce_option(summary_baseline_seconds)
-        summary_subject_seconds = _coerce_option(summary_subject_seconds)
-        summary_report_start = _coerce_option(summary_report_start)
-
         output_style = resolve_output_style(
             style=str(style),
             profile="ci",
@@ -158,86 +165,20 @@ def _generate_reports(
         def _event(tag: str, message: str, *, emoji: str | None = None) -> None:
             print_event(console, tag, message, style=output_style, emoji=emoji)
 
-        # Load primary report
-        _event("DATA", f"Loading run report: {run}", emoji="📊")
-        primary_report = _load_run_report(run)
-
-        # Load comparison report if specified
-        compare_report = None
-        if compare:
-            _event("DATA", f"Loading comparison report: {compare}", emoji="📊")
-            compare_report = _load_run_report(compare)
-
-        # Load baseline report if specified
-        baseline_report = None
-        if baseline:
-            _event("DATA", f"Loading baseline report: {baseline}", emoji="📊")
-            baseline_report = _load_run_report(baseline)
-
-        # Determine output directory
-        if output is None:
-            run_name = Path(run).stem if Path(run).is_file() else Path(run).name
-            output_dir = f"reports_{run_name}"
-        else:
-            output_dir = output
-
-        # Determine formats
-        allowed_formats = {"json", "md", "markdown", "html", "report", "all"}
-        if format not in allowed_formats:
-            _event("FAIL", f"Unknown --format '{format}'", emoji="❌")
-            raise typer.Exit(2)
-
-        if format == "md":
-            format = "markdown"
-        if format == "all":
-            formats = ["json", "markdown", "html"]
-        else:
-            formats = [format]
-
-        # Validate evaluation report requirements
-        if "report" in formats:
-            if baseline_report is None:
-                _event(
-                    "FAIL",
-                    "Evaluation report format requires --baseline",
-                    emoji="❌",
-                )
-                _event(
-                    "INFO",
-                    "Use: invarlock report --run <run_dir> --format report --baseline <baseline_run_dir>",
-                )
-                raise typer.Exit(1)
-            _event(
-                "EXEC",
-                "Generating evaluation report with baseline comparison",
-                emoji="📜",
-            )
-
-        # Generate reports
-        _event("EXEC", f"Generating reports in formats: {formats}", emoji="📝")
-        saved_files = report_lib.save_report(
-            primary_report,
-            output_dir,
-            formats=formats,
-            compare=compare_report,
-            baseline=baseline_report,
-            filename_prefix="evaluation",
-        )
+        output_dir = result.output_dir
+        saved_files = result.saved_files
 
         # Show results
         _event("PASS", "Reports generated successfully.", emoji="✅")
 
-        if "report" in formats and baseline_report:
+        if "report" in result.formats and result.evaluation_report:
             try:
-                evaluation_report = report_builder.make_report(
-                    primary_report, baseline_report
-                )
-                report_builder.validate_report(evaluation_report)
-                from invarlock.reporting.render import (
-                    compute_console_validation_block as _console_block,
-                )
-
-                block = _console_block(evaluation_report)
+                evaluation_report = result.evaluation_report
+                if telemetry_output_enabled():
+                    summary_line = telemetry_summary_line(evaluation_report)
+                    if summary_line:
+                        console.print(summary_line, markup=False)
+                block = result.validation_block or {"overall_pass": False, "rows": []}
                 overall_pass = bool(block.get("overall_pass"))
                 status_text = _format_status(overall_pass)
 
@@ -259,7 +200,7 @@ def _generate_reports(
                             0.0, float(perf_counter() - float(summary_report_start))
                         )
                         summary_suffix = f"[{(base + subject + report_elapsed):.2f}s]"
-                    except Exception:
+                    except _SUMMARY_FORMAT_ERRORS:
                         summary_suffix = None
                 _print_section_header(
                     console,
@@ -275,13 +216,13 @@ def _generate_reports(
                     )
 
                 run_id = evaluation_report.get("run_id") or (
-                    (primary_report.get("meta", {}) or {}).get("run_id")
+                    (result.primary_report.get("meta", {}) or {}).get("run_id")
                 )
                 if run_id:
                     console.print(_format_kv_line("Run ID", str(run_id)))
 
-                model_id = (primary_report.get("meta", {}) or {}).get("model_id")
-                edit_name = (primary_report.get("edit", {}) or {}).get("name")
+                model_id = (result.primary_report.get("meta", {}) or {}).get("model_id")
+                edit_name = (result.primary_report.get("edit", {}) or {}).get("name")
                 if model_id:
                     console.print(_format_kv_line("Model", str(model_id)))
                 if edit_name:
@@ -293,7 +234,7 @@ def _generate_reports(
                     else {}
                 )
                 if not pm:
-                    pm = (primary_report.get("metrics", {}) or {}).get(
+                    pm = (result.primary_report.get("metrics", {}) or {}).get(
                         "primary_metric", {}
                     )
                 console.print("  PRIMARY METRIC")
@@ -349,7 +290,7 @@ def _generate_reports(
                 # In CLI report flow, do not hard-exit on validation failure; just display status.
                 # CI gating should be handled by dedicated verify commands.
 
-            except Exception as e:
+            except _REPORT_RENDER_ERRORS as e:
                 _event("WARN", f"Evaluation report validation error: {e}", emoji="⚠️")
                 # Exit non-zero on evaluation report generation error
                 raise typer.Exit(1) from e
@@ -360,7 +301,13 @@ def _generate_reports(
                     _format_kv_line(label, str(value), width=ARTIFACT_LABEL_WIDTH)
                 )
 
-    except Exception as e:
+    except ReportInputError as e:
+        _raise_report_input_failure(str(e), no_color=no_color)
+    except ValueError as e:
+        _raise_report_input_failure(str(e), no_color=no_color)
+    except typer.Exit:
+        raise
+    except _REPORT_RENDER_ERRORS as e:
         print_event(
             console,
             "FAIL",
@@ -381,18 +328,32 @@ def _generate_reports(
 def report_callback(
     ctx: typer.Context,
     run: str | None = typer.Option(
-        None, "--run", help="Path to run directory or RunReport JSON"
+        None,
+        "--run",
+        help=(
+            "Path to run report JSON file or directory containing canonical "
+            "report.json or evaluation.report.json"
+        ),
     ),
     format: str = typer.Option(
         "json", "--format", help="Output format (json|md|html|report|all)"
     ),
     compare: str | None = typer.Option(
-        None, "--compare", help="Path to second run for comparison"
+        None,
+        "--compare",
+        help=(
+            "Path to comparison report JSON file or directory containing "
+            "canonical report.json or evaluation.report.json"
+        ),
     ),
     baseline: str | None = typer.Option(
         None,
         "--baseline",
-        help="Path to baseline run for evaluation report generation (required for report format)",
+        help=(
+            "Path to baseline report JSON file or directory containing "
+            "canonical report.json or evaluation.report.json "
+            "(required for report format)"
+        ),
     ),
     output: str | None = typer.Option(None, "--output", "-o", help="Output directory"),
     style: str = typer.Option("audit", "--style", help="Output style (audit|friendly)"),
@@ -418,64 +379,72 @@ def report_callback(
             emoji="❌",
         )
         raise typer.Exit(2)
-    _generate_reports(
-        run=run,
-        format=format,
-        compare=compare,
-        baseline=baseline,
-        output=output,
+    try:
+        result = generate_reports(
+            run=run,
+            format=format,
+            compare=compare,
+            baseline=baseline,
+            output=output,
+        )
+    except ReportInputError as exc:
+        _raise_report_input_failure(str(exc), no_color=no_color)
+    except ValueError as exc:
+        message = str(exc)
+        if message == "Evaluation report format requires --baseline":
+            print_event(
+                console,
+                "FAIL",
+                message,
+                style=resolve_output_style(
+                    style=str(style),
+                    profile="ci",
+                    progress=False,
+                    timing=False,
+                    no_color=no_color,
+                ),
+                emoji="❌",
+            )
+            print_event(
+                console,
+                "INFO",
+                "Use: invarlock report --run <subject_report.json> --format report --baseline <baseline_report.json>",
+                style=resolve_output_style(
+                    style=str(style),
+                    profile="ci",
+                    progress=False,
+                    timing=False,
+                    no_color=no_color,
+                ),
+            )
+            raise typer.Exit(1) from exc
+        _raise_report_input_failure(message, no_color=no_color)
+    except _REPORT_COMMAND_ERRORS as exc:
+        print_event(
+            console,
+            "FAIL",
+            f"Report generation failed: {exc}",
+            style=resolve_output_style(
+                style=str(style),
+                profile="ci",
+                progress=False,
+                timing=False,
+                no_color=no_color,
+            ),
+            emoji="❌",
+        )
+        raise typer.Exit(1) from exc
+    _render_generation_result(
+        result=result,
         style=style,
         no_color=no_color,
     )
     return
 
 
-# Backward-compatible function name expected by tests
-def report_command(
-    run: str,
-    format: str = "json",
-    compare: str | None = None,
-    baseline: str | None = None,
-    output: str | None = None,
-    style: str = "audit",
-    no_color: bool = False,
-    summary_baseline_seconds: float | None = None,
-    summary_subject_seconds: float | None = None,
-    summary_report_start: float | None = None,
-):
-    return _generate_reports(
-        run=run,
-        format=format,
-        compare=compare,
-        baseline=baseline,
-        output=output,
-        style=style,
-        no_color=no_color,
-        summary_baseline_seconds=summary_baseline_seconds,
-        summary_subject_seconds=summary_subject_seconds,
-        summary_report_start=summary_report_start,
-    )
-
-
 def _load_run_report(path: str) -> dict:
-    """Load a RunReport from file or directory."""
-    path_obj = Path(path)
-
-    if path_obj.is_file():
-        with open(path_obj) as f:
-            return json.load(f)
-    elif path_obj.is_dir():
-        # Look for report JSON files
-        json_files = list(path_obj.glob("*.json"))
-        report_files = [f for f in json_files if "report" in f.name.lower()]
-
-        if not report_files:
-            raise FileNotFoundError(f"No report JSON files found in {path}")
-
-        with open(report_files[0]) as f:
-            return json.load(f)
-    else:
-        raise FileNotFoundError(f"Path not found: {path}")
+    """Load a report from file or from a canonical report directory."""
+    return load_report_payload(path)
 
 
 # Subcommands wired from existing modules
@@ -484,12 +453,21 @@ def _load_run_report(path: str) -> dict:
 )
 def report_verify_command(
     reports: list[str] = typer.Argument(
-        ..., help="One or more evaluation report JSON files to verify."
+        ...,
+        help=(
+            "One or more evaluation report JSON files or directories "
+            "containing canonical report.json or evaluation.report.json to "
+            "verify."
+        ),
     ),
     baseline: str | None = typer.Option(
         None,
         "--baseline",
-        help="Optional baseline evaluation report JSON to enforce provider parity.",
+        help=(
+            "Optional baseline evaluation report JSON file or directory "
+            "containing canonical report.json or evaluation.report.json to "
+            "enforce provider parity."
+        ),
     ),
     tolerance: float = typer.Option(
         1e-9, "--tolerance", help="Tolerance for analysis-basis comparisons."
@@ -509,8 +487,15 @@ def report_verify_command(
 
     from .verify import verify_command as _verify_command
 
-    report_paths = [_Path(p) for p in reports]
-    baseline_path = _Path(baseline) if isinstance(baseline, str) else None
+    try:
+        report_paths = [resolve_report_input_path(_Path(p)) for p in reports]
+        baseline_path = (
+            resolve_report_input_path(_Path(baseline))
+            if isinstance(baseline, str)
+            else None
+        )
+    except ReportInputError as exc:
+        _raise_report_input_failure(str(exc))
     return _verify_command(
         reports=report_paths,
         baseline=baseline_path,
@@ -521,24 +506,58 @@ def report_verify_command(
 
 
 @report_app.command(
-    name="explain", help="Explain evaluation report gates for report vs baseline."
+    name="explain",
+    help="Explain gate decisions for subject and baseline run reports.",
 )
 def report_explain(
-    report: str = typer.Option(..., "--report", help="Path to primary report.json"),
+    report: str = typer.Option(
+        ...,
+        "--report",
+        help=(
+            "Path to primary run report JSON file or directory containing "
+            "canonical report.json"
+        ),
+    ),
     baseline: str = typer.Option(
-        ..., "--baseline", help="Path to baseline report.json"
+        ...,
+        "--baseline",
+        help=(
+            "Path to baseline run report JSON file or directory containing "
+            "canonical report.json"
+        ),
     ),
 ):  # pragma: no cover - thin wrapper
-    """Explain evaluation report gates for a report vs baseline."""
+    """Explain gate decisions for a subject run report vs baseline run report."""
     from .explain_gates import explain_gates_command as _explain
 
-    return _explain(report=report, baseline=baseline)
+    try:
+        report_path, report_payload = load_report_input_json(report)
+        baseline_path, baseline_payload = load_report_input_json(baseline)
+    except ReportInputError as exc:
+        _raise_report_input_failure(str(exc))
+    if isinstance(report_payload.get("validation"), dict):
+        _raise_report_input_failure(
+            "report explain expects a subject run report.json; pass the run "
+            "report emitted by invarlock evaluate/run, not an evaluation.report.json bundle."
+        )
+    if isinstance(baseline_payload.get("validation"), dict):
+        _raise_report_input_failure(
+            "report explain expects a baseline run report.json; pass the baseline "
+            "run report emitted by invarlock evaluate/run, not an evaluation.report.json bundle."
+        )
+    return _explain(report=str(report_path), baseline=str(baseline_path))
 
 
 @report_app.command(name="html", help="Render an evaluation report JSON to HTML.")
 def report_html(
     input: str = typer.Option(
-        ..., "--input", "-i", help="Path to evaluation report JSON"
+        ...,
+        "--input",
+        "-i",
+        help=(
+            "Path to evaluation report JSON file or directory containing "
+            "canonical report.json or evaluation.report.json"
+        ),
     ),
     output: str = typer.Option(..., "--output", "-o", help="Path to output HTML file"),
     embed_css: bool = typer.Option(
@@ -550,13 +569,27 @@ def report_html(
 ):  # pragma: no cover - thin wrapper
     from .export_html import export_html_command as _export
 
-    return _export(input=input, output=output, embed_css=embed_css, force=force)
+    try:
+        input_path, _ = load_report_input_json(input)
+    except ReportInputError as exc:
+        _raise_report_input_failure(str(exc))
+    return _export(
+        input=str(input_path),
+        output=output,
+        embed_css=embed_css,
+        force=force,
+    )
 
 
 @report_app.command("validate")
 def report_validate(
     report: str = typer.Argument(
-        ..., help="Path to evaluation report JSON to validate against schema v1"
+        ...,
+        help=(
+            "Path to report JSON file or directory containing canonical "
+            "report.json or evaluation.report.json to validate against "
+            "schema v1"
+        ),
     ),
 ):
     """Validate an evaluation report JSON against the current schema (v1)."""
@@ -571,15 +604,14 @@ def report_validate(
     def _event(tag: str, message: str, *, emoji: str | None = None) -> None:
         print_event(console, tag, message, style=output_style, emoji=emoji)
 
-    p = Path(report)
     try:
-        payload = json.loads(p.read_text(encoding="utf-8"))
-    except Exception as exc:  # noqa: BLE001
-        _event("FAIL", f"Failed to read input JSON: {exc}", emoji="❌")
-        raise typer.Exit(1) from exc
+        _, payload = load_report_input_json(report)
+    except ReportInputError as exc:
+        _event("FAIL", str(exc), emoji="❌")
+        raise typer.Exit(2) from exc
 
     try:
-        from invarlock.reporting.report_builder import validate_report
+        from invarlock.reporting.report_schema import validate_report
 
         ok = validate_report(payload)
         if not ok:
@@ -591,9 +623,9 @@ def report_validate(
         raise typer.Exit(2) from exc
     except typer.Exit:
         raise
-    except Exception as exc:  # noqa: BLE001
+    except _REPORT_RENDER_ERRORS as exc:
         _event("FAIL", f"Validation failed: {exc}", emoji="❌")
         raise typer.Exit(1) from exc
 
 
-__all__ = ["report_app", "report_callback", "report_command"]
+__all__ = ["report_app"]

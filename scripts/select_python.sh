@@ -56,6 +56,13 @@ fi
 
 print_if_version_matches "python3.12" || true
 
+if [[ -n "${HOME:-}" ]]; then
+  print_if_version_matches "$HOME/anaconda3/envs/invarlock-py312/bin/python" || true
+  print_if_version_matches "$HOME/miniconda3/envs/invarlock-py312/bin/python" || true
+  print_if_version_matches "$HOME/miniforge3/envs/invarlock-py312/bin/python" || true
+  print_if_version_matches "$HOME/mambaforge/envs/invarlock-py312/bin/python" || true
+fi
+
 if command -v conda >/dev/null 2>&1; then
   conda_base="$(conda info --base 2>/dev/null || true)"
   if [[ -n "$conda_base" ]]; then

@@ -5,11 +5,46 @@ from typing import Any
 
 import torch.nn as nn
 
+from invarlock.core.types import GuardDiagnostic, GuardValidationResult
+
 from .variance_results import (
     build_finalize_metrics,
     build_finalize_result,
     evaluate_finalize_state,
 )
+
+
+def _decision_from_action(action: str) -> str:
+    normalized = str(action or "continue").lower()
+    if normalized == "warn":
+        return "monitor"
+    if normalized == "rollback":
+        return "rollback"
+    if normalized in {"abort", "reject"}:
+        return "block"
+    return "allow"
+
+
+def _build_diagnostics(
+    *, warnings: list[str], errors: list[str]
+) -> tuple[GuardDiagnostic, ...]:
+    diagnostics = [
+        GuardDiagnostic(
+            kind="variance_warning",
+            severity="warning",
+            message=message,
+        )
+        for message in warnings
+    ]
+    diagnostics.extend(
+        GuardDiagnostic(
+            kind="variance_error",
+            severity="error",
+            message=message,
+        )
+        for message in errors
+    )
+    return tuple(diagnostics)
 
 
 def before_edit_guard(guard: Any, model: nn.Module) -> None:
@@ -40,7 +75,7 @@ def after_edit_guard(guard: Any, model: nn.Module) -> None:
 
 def validate_guard(
     guard: Any, model: Any, adapter: Any, context: dict[str, Any]
-) -> dict[str, Any]:
+) -> GuardValidationResult:
     """Validate model state through the finalized variance result."""
     _ = adapter
     _ = context
@@ -54,18 +89,25 @@ def validate_guard(
         action = "warn" if warnings else "continue"
     else:
         action = "warn" if guard._monitor_only else "abort"
+    decision = _decision_from_action(action)
 
-    return {
-        "passed": passed,
-        "action": action,
-        "metrics": result.get("metrics", {}),
-        "violations": errors,
-        "message": "Variance guard validation completed",
-        "details": details,
-        "policy": details.get("policy", guard._policy.copy()),
-        "warnings": warnings,
-        "errors": errors,
-    }
+    violations = tuple(
+        {
+            "type": "variance_error",
+            "severity": "error",
+            "message": str(message),
+        }
+        for message in errors
+    )
+    return GuardValidationResult(
+        passed=bool(passed),
+        decision=decision,
+        metrics=dict(result.get("metrics", {})),
+        diagnostics=_build_diagnostics(warnings=warnings, errors=errors),
+        policy=dict(details.get("policy", guard._policy.copy()) or {}),
+        details=dict(details),
+        violations=violations,
+    )
 
 
 def finalize_guard(guard: Any, model: nn.Module) -> dict[str, Any]:
@@ -84,7 +126,12 @@ def finalize_guard(guard: Any, model: nn.Module) -> dict[str, Any]:
             "warnings": ["Variance guard not properly prepared"],
             "errors": ["Preparation failed or no target modules found"],
             "finalize_time": time.time() - start_time,
-            "events": guard.events,
+            "diagnostics": list(
+                _build_diagnostics(
+                    warnings=["Variance guard not properly prepared"],
+                    errors=["Preparation failed or no target modules found"],
+                )
+            ),
         }
 
     if guard._monitor_only:
@@ -174,13 +221,26 @@ def finalize_guard(guard: Any, model: nn.Module) -> dict[str, Any]:
         warnings=warnings,
         errors=errors,
         finalize_time=finalize_time,
-        events=guard.events,
         enabled_after_ab=enabled_after_ab,
         ppl_no_ve=guard._ppl_no_ve,
         scales=guard._scales,
         stats=guard._stats,
         policy=guard._policy,
     )
+    result["decision"] = _decision_from_action(
+        "continue"
+        if passed and not warnings
+        else ("warn" if passed or guard._monitor_only else "abort")
+    )
+    result["diagnostics"] = [
+        {
+            "kind": diagnostic.kind,
+            "severity": diagnostic.severity,
+            "message": diagnostic.message,
+            "details": dict(diagnostic.details),
+        }
+        for diagnostic in _build_diagnostics(warnings=warnings, errors=errors)
+    ]
 
     return result
 

@@ -10,17 +10,18 @@
 | **Requires** | `invarlock[adapters]` for HF adapters, `invarlock[edits]` for built-in edits, `invarlock[guards]` for guard math, `invarlock[eval]` for dataset providers. |
 | **Network** | Offline by default; set `INVARLOCK_ALLOW_NETWORK=1` to download models or datasets. |
 | **Inputs** | Model instance, adapter, edit, guard list, `RunConfig`, optional calibration data. |
-| **Outputs / Artifacts** | `RunReport` object; optional event logs/checkpoints; reports via `make_report`. |
-| **Source of truth** | `src/invarlock/core/runner.py`, `src/invarlock/core/api.py`, `src/invarlock/reporting/report_builder.py`, `src/invarlock/reporting/render.py`, `src/invarlock/reporting/report_schema.py`. |
+| **Outputs / Artifacts** | `RunReport` object; optional event logs/checkpoints; evaluation bundles via `report_make.make_report(...)` and `report_bundle.save_evaluation_bundle(...)`. |
+| **Source of truth** | `src/invarlock/core/runner.py`, `src/invarlock/core/api.py`, `src/invarlock/cli/config_execution.py`, `src/invarlock/reporting/report_make.py`, `src/invarlock/reporting/report_bundle.py`, `src/invarlock/reporting/report_console.py`, `src/invarlock/reporting/report_files.py`, `src/invarlock/reporting/report_schema.py`. |
 
 ## Quick Start
 
 ```python
-from invarlock.adapters import HF_Auto_Adapter
+from invarlock.adapters.auto import HF_Auto_Adapter
 from invarlock.core.api import RunConfig
 from invarlock.core.runner import CoreRunner
 from invarlock.edits import RTNQuantEdit
-from invarlock.guards import InvariantsGuard, SpectralGuard
+from invarlock.guards.invariants import InvariantsGuard
+from invarlock.guards.spectral import SpectralGuard
 
 adapter = HF_Auto_Adapter()
 model = adapter.load_model("gpt2", device="auto")
@@ -36,7 +37,7 @@ print("primary metric:", report.metrics.get("primary_metric"))
 ```
 
 > For real primary-metric values, pass `calibration_data` (see Concepts). Without it,
-> the runner falls back to lightweight mock metrics so the pipeline can still finish.
+> the runner uses lightweight mock metrics so the pipeline can finish.
 
 ## Concepts
 
@@ -48,8 +49,9 @@ print("primary metric:", report.metrics.get("primary_metric"))
 - **Snapshots**: retries use snapshot/restore; configure via
   `context.snapshot.*` when using YAML configs.
 - **reports**: generated from `RunReport` + baseline report via
-  `invarlock.reporting.report_builder.make_report`.
-- **Verification**: CLI-side `invarlock verify` now enforces
+  `invarlock.reporting.report_make.make_report`, then persisted as an
+  evaluation bundle with `invarlock.reporting.report_bundle.save_evaluation_bundle`.
+- **Verification**: CLI-side `invarlock verify` enforces
   `runtime.manifest.json` attestation for attested outputs in addition to schema
   and pairing checks.
 
@@ -62,7 +64,7 @@ print("primary metric:", report.metrics.get("primary_metric"))
 | Adapter | Load/describe model, snapshot/restore. |
 | Guards | `prepare`/`validate`, return action (warn/rollback/abort). |
 | Eval | Build windows, compute primary metric + tail metrics. |
-| report | `make_report(report, baseline)` for verification. |
+| report | `make_report(report, baseline)` + `save_evaluation_bundle(...)` for evaluation-bundle generation. |
 
 Note: CoreRunner coordinates each lane.
 
@@ -110,7 +112,7 @@ report = CoreRunner().execute(
 | `spike_threshold` | `2.0` | Catastrophic spike ratio for immediate rollback. |
 | `event_path` | `None` | Path to JSONL event log (optional). |
 | `checkpoint_interval` | `0` | 0 disables checkpoints. |
-| `dry_run` | `False` | Skip mutations, still produce report. |
+| `dry_run` | `False` | Skip mutations and still produce a report. |
 | `verbose` | `False` | Enables extra logging. |
 | `context` | `{}` | Free-form context passed to guards/eval. |
 
@@ -230,7 +232,7 @@ calibration = [
 
 ```python
 from invarlock.reporting.render import render_report_markdown
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_schema import validate_report
 
 report = make_report(report, baseline_report)

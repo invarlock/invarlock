@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting import report_builder as cert
+from invarlock.reporting.report_make import make_report
 
 
 def _base_report() -> dict:
@@ -117,7 +117,7 @@ def test_make_evaluation_report_compares_invariants_against_baseline_report() ->
         }
     ]
 
-    evaluation_report = cert.make_report(report, baseline)
+    evaluation_report = make_report(report, baseline)
     assert evaluation_report["invariants"]["status"] == "fail"
     assert evaluation_report["validation"]["invariants_pass"] is False
     assert any(

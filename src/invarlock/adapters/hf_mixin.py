@@ -16,11 +16,10 @@ from __future__ import annotations
 
 import base64
 import json
-import logging
-import os
 import re
 import tempfile
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -35,6 +34,12 @@ SCALAR_TYPES = (int, float, str, bool)
 _BENIGN_HF_UNEXPECTED_KEY_RE = re.compile(r"(?:^|.*\.)attn\.(?:masked_)?bias$")
 
 
+@dataclass(frozen=True)
+class HFPretrainedLoadDiagnostic:
+    kind: str
+    entries: tuple[str, ...]
+
+
 def _sanitize_param_name(name: str) -> str:
     """Return a filesystem-safe parameter name."""
     return name.replace(".", "__").replace("/", "_")
@@ -43,7 +48,7 @@ def _sanitize_param_name(name: str) -> str:
 def _ensure_secure_dir(path: Path) -> None:
     """Ensure snapshot directory uses 0o700 permissions."""
     path.mkdir(parents=True, exist_ok=True)
-    os.chmod(path, 0o700)
+    path.chmod(0o700)
     if not is_secure_path(path):
         raise RuntimeError(
             f"Snapshot directory {path} must have permissions 0o700 for security."
@@ -128,6 +133,26 @@ def _load_chunked_tensor(path: Path) -> torch.Tensor:
     return tensor
 
 
+def _is_local_loader_cache_miss(error: Exception) -> bool:
+    if isinstance(error, FileNotFoundError):
+        return True
+    if not isinstance(error, OSError):
+        return False
+    message = str(error).strip().lower()
+    return any(
+        snippet in message
+        for snippet in (
+            "no such file",
+            "not found",
+            "could not locate",
+            "missing cached",
+            "local files only",
+            "cannot find",
+            "can't load the model",
+        )
+    )
+
+
 class HFAdapterMixin:
     """Reusable utilities for HuggingFace-backed adapters."""
 
@@ -141,16 +166,18 @@ class HFAdapterMixin:
 
         return isinstance(key, str) and bool(_BENIGN_HF_UNEXPECTED_KEY_RE.search(key))
 
-    def _log_filtered_loading_info(
-        self,
-        model: object,
-        model_id: str,
-        loading_info: Mapping[str, Any] | None,
-    ) -> None:
-        """Log only actionable HF loading info after filtering benign keys."""
+    @property
+    def pretrained_load_diagnostics(self) -> tuple[HFPretrainedLoadDiagnostic, ...]:
+        diagnostics = getattr(self, "_pretrained_load_diagnostics", ())
+        return diagnostics if isinstance(diagnostics, tuple) else ()
 
+    def _capture_filtered_loading_info(
+        self,
+        loading_info: Mapping[str, Any] | None,
+    ) -> tuple[HFPretrainedLoadDiagnostic, ...]:
+        """Capture actionable HF loading info as typed diagnostics."""
         if not isinstance(loading_info, Mapping):
-            return
+            return ()
 
         unexpected_keys = [
             key
@@ -161,9 +188,6 @@ class HFAdapterMixin:
         mismatched_keys = list(loading_info.get("mismatched_keys") or [])
         error_msgs = [msg for msg in list(loading_info.get("error_msgs") or []) if msg]
 
-        if not any((unexpected_keys, missing_keys, mismatched_keys, error_msgs)):
-            return
-
         mismatch_names: list[str] = []
         for item in mismatched_keys:
             if isinstance(item, Mapping):
@@ -173,50 +197,86 @@ class HFAdapterMixin:
                     continue
             mismatch_names.append(str(item))
 
-        parts: list[str] = []
+        diagnostics: list[HFPretrainedLoadDiagnostic] = []
         if unexpected_keys:
-            parts.append(f"unexpected={unexpected_keys}")
+            diagnostics.append(
+                HFPretrainedLoadDiagnostic(
+                    kind="unexpected_keys",
+                    entries=tuple(str(key) for key in unexpected_keys),
+                )
+            )
         if missing_keys:
-            parts.append(f"missing={missing_keys}")
+            diagnostics.append(
+                HFPretrainedLoadDiagnostic(
+                    kind="missing_keys",
+                    entries=tuple(str(key) for key in missing_keys),
+                )
+            )
         if mismatch_names:
-            parts.append(f"mismatched={mismatch_names}")
+            diagnostics.append(
+                HFPretrainedLoadDiagnostic(
+                    kind="mismatched_keys",
+                    entries=tuple(mismatch_names),
+                )
+            )
         if error_msgs:
-            parts.append(f"errors={len(error_msgs)}")
-
-        model_name = getattr(model.__class__, "__name__", "model")
-        logging.getLogger(__name__).warning(
-            "Transformers load info for %s from %s: %s",
-            model_name,
-            model_id,
-            "; ".join(parts),
-        )
+            diagnostics.append(
+                HFPretrainedLoadDiagnostic(
+                    kind="error_messages",
+                    entries=tuple(str(msg) for msg in error_msgs),
+                )
+            )
+        return tuple(diagnostics)
 
     def _load_pretrained_model(self, loader: Any, model_id: str, **kwargs: Any) -> Any:
         """Load a HF model while filtering known benign loading-info noise."""
 
-        tf_logger = logging.getLogger("transformers")
-        prev_tf_verbosity = os.environ.get("TRANSFORMERS_VERBOSITY")
-        prev_tf_level = tf_logger.level
-        os.environ["TRANSFORMERS_VERBOSITY"] = "error"
-        tf_logger.setLevel(logging.ERROR)
+        self._pretrained_load_diagnostics = ()
+        prefer_local_files_only = bool(kwargs.pop("prefer_local_files_only", False))
         try:
+            if prefer_local_files_only:
+                loaded = loader.from_pretrained(
+                    model_id,
+                    output_loading_info=True,
+                    local_files_only=True,
+                    **kwargs,
+                )
+            else:
+                loaded = loader.from_pretrained(
+                    model_id, output_loading_info=True, **kwargs
+                )
+        except TypeError as exc:
+            if "output_loading_info" not in str(exc):
+                raise
+            if prefer_local_files_only:
+                try:
+                    loaded = loader.from_pretrained(
+                        model_id, local_files_only=True, **kwargs
+                    )
+                except Exception as local_error:
+                    if not _is_local_loader_cache_miss(local_error):
+                        raise
+                    try:
+                        loaded = loader.from_pretrained(
+                            model_id, output_loading_info=True, **kwargs
+                        )
+                    except TypeError as retry_exc:
+                        if "output_loading_info" not in str(retry_exc):
+                            raise
+                        loaded = loader.from_pretrained(model_id, **kwargs)
+            else:
+                loaded = loader.from_pretrained(model_id, **kwargs)
+        except Exception as exc:
+            if not prefer_local_files_only or not _is_local_loader_cache_miss(exc):
+                raise
             try:
                 loaded = loader.from_pretrained(
                     model_id, output_loading_info=True, **kwargs
                 )
-            except TypeError as exc:
-                if "output_loading_info" not in str(exc):
+            except TypeError as retry_exc:
+                if "output_loading_info" not in str(retry_exc):
                     raise
                 loaded = loader.from_pretrained(model_id, **kwargs)
-        finally:
-            try:
-                tf_logger.setLevel(prev_tf_level)
-            except (TypeError, ValueError):
-                pass
-            if prev_tf_verbosity is None:
-                os.environ.pop("TRANSFORMERS_VERBOSITY", None)
-            else:
-                os.environ["TRANSFORMERS_VERBOSITY"] = prev_tf_verbosity
 
         if (
             isinstance(loaded, tuple)
@@ -224,7 +284,9 @@ class HFAdapterMixin:
             and isinstance(loaded[1], Mapping)
         ):
             model, loading_info = loaded
-            self._log_filtered_loading_info(model, model_id, loading_info)
+            self._pretrained_load_diagnostics = self._capture_filtered_loading_info(
+                loading_info
+            )
             return model
         return loaded
 

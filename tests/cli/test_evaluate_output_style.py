@@ -6,7 +6,7 @@ from pathlib import Path
 from invarlock.cli.commands.evaluate import evaluate_command
 
 
-def _stub_run(out_dir: Path) -> None:
+def _stub_run(out_dir: Path) -> Path:
     ts_dir = out_dir / "20250101_000000"
     ts_dir.mkdir(parents=True, exist_ok=True)
     report = {
@@ -17,7 +17,9 @@ def _stub_run(out_dir: Path) -> None:
         },
         "data": {"preview_n": 1, "final_n": 1},
     }
-    (ts_dir / "report.json").write_text(json.dumps(report), encoding="utf-8")
+    report_path = ts_dir / "report.json"
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+    return report_path
 
 
 def test_evaluate_timing_block_printed(monkeypatch, tmp_path, capsys) -> None:
@@ -40,10 +42,12 @@ def test_evaluate_timing_block_printed(monkeypatch, tmp_path, capsys) -> None:
     monkeypatch.setattr(
         run_mod,
         "run_command",
-        lambda **kwargs: _stub_run(Path(kwargs["out"])),
+        lambda **kwargs: str(_stub_run(Path(kwargs["out"]))),
         raising=False,
     )
-    monkeypatch.setattr(cert_mod, "_report", lambda **_kwargs: None, raising=False)
+    monkeypatch.setattr(
+        cert_mod, "generate_reports", lambda **_kwargs: None, raising=False
+    )
 
     # Deterministic time progression for: total, baseline, subject, evaluation report.
     from invarlock.cli import output as out_mod
@@ -52,8 +56,8 @@ def test_evaluate_timing_block_printed(monkeypatch, tmp_path, capsys) -> None:
     monkeypatch.setattr(out_mod, "perf_counter", lambda: next(ticks))
 
     evaluate_command(
-        source=str(src),
-        edited=str(edt),
+        baseline=str(src),
+        subject=str(edt),
         adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),

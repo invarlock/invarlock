@@ -35,7 +35,7 @@ def test_verify_json_malformed_missing_ratio(tmp_path: Path):
     res, obj = _invoke_verify_json(bad, tmp_path)
     assert obj.get("format_version") == "verify-v1"
     assert obj.get("summary", {}).get("reason") == "malformed"
-    assert obj.get("resolution", {}).get("exit_code") in (1, 2)
+    assert "resolution" not in obj
     assert isinstance(obj.get("results"), list)
     assert obj["results"][0].get("reason") in {"malformed", "policy_fail"}
 
@@ -68,4 +68,4 @@ def test_verify_json_policy_fail_reason(tmp_path: Path):
     res, obj = _invoke_verify_json(cert, tmp_path)
     assert obj.get("format_version") == "verify-v1"
     assert obj.get("summary", {}).get("reason") in {"policy_fail", "malformed"}
-    assert obj.get("resolution", {}).get("exit_code") in (1, 2)
+    assert "resolution" not in obj

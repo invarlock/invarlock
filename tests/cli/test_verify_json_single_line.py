@@ -36,4 +36,4 @@ def test_verify_json_single_line(tmp_path: Path):
     assert len(lines) == 1, f"Expected one JSON line, got {len(lines)}"
     obj = json.loads(lines[0])
     assert obj.get("format_version") == "verify-v1"
-    assert obj.get("resolution", {}).get("exit_code") in (0, 1, 2)
+    assert "resolution" not in obj

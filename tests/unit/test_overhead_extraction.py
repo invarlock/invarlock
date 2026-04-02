@@ -3,6 +3,7 @@ from collections.abc import Iterable
 
 import pytest
 
+import invarlock.eval.primary_metric as primary_metric_mod
 from invarlock.cli.overhead_utils import _extract_pm_snapshot_for_overhead as extract
 from invarlock.reporting.validate import validate_guard_overhead
 
@@ -82,7 +83,8 @@ def test_extract_pm_snapshot_returns_none_when_unusable(
         raise RuntimeError("cannot compute")
 
     monkeypatch.setattr(
-        "invarlock.eval.primary_metric.compute_primary_metric_from_report",
+        primary_metric_mod,
+        "compute_primary_metric_from_report",
         _boom,
         raising=False,
     )

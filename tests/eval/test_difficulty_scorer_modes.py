@@ -1,11 +1,11 @@
 import pytest
 
-import invarlock.eval.data as data_mod
+import invarlock.eval.data_support as data_support_mod
 from invarlock.eval.data import WikiText2Provider
 
 
 def test_byte_ngram_scoring_is_deterministic(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
     provider = WikiText2Provider()
     candidates = [
         {"text": "alpha"},
@@ -24,7 +24,7 @@ def test_byte_ngram_scoring_is_deterministic(monkeypatch):
 
 
 def test_byte_ngram_unicode_and_missing_text(monkeypatch):
-    monkeypatch.setattr(data_mod, "HAS_DATASETS", True)
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
     provider = WikiText2Provider()
     candidates = [{"text": "café"}, {"text": None}]
     assert provider._score_candidates_byte_ngram(candidates) is True

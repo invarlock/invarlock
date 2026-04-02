@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import copy
 
-from invarlock.cli.commands.run import (
-    _compute_mask_positions_digest,
-    _compute_provider_digest,
-)
+from invarlock.cli.run_pairing import compute_provider_digest
+from invarlock.cli.run_pairing_helpers import _compute_mask_positions_digest
 
 
 def _mk_windows(
@@ -53,7 +51,7 @@ def test_provider_digest_includes_ids_and_tokenizer_and_masking():
             window_ids_final=[20],
         ),
     }
-    digest = _compute_provider_digest(report)
+    digest = compute_provider_digest(report)
     assert isinstance(digest, dict)
     assert digest.get("tokenizer_sha256") == "abc123"
     assert isinstance(digest.get("ids_sha256"), str) and len(digest["ids_sha256"]) >= 16

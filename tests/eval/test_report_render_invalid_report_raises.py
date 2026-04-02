@@ -1,10 +1,9 @@
 import pytest
 
-from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.html import render_report_html
 
 
-def test_render_report_markdown_rejects_invalid_schema():
-    # Minimal malformed evaluation_report to exercise validate_report(False) path
+def test_render_report_html_rejects_invalid_schema():
     cert = {
         "schema_version": "bad-version",
         "run_id": "r1",
@@ -30,4 +29,4 @@ def test_render_report_markdown_rejects_invalid_schema():
         "validation": {"primary_metric_acceptable": True},
     }
     with pytest.raises(ValueError):
-        render_report_markdown(cert)
+        render_report_html(cert)

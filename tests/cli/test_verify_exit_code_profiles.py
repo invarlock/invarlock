@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 import typer
 
-from invarlock.cli.commands import verify as verify_mod
 from invarlock.cli.commands.verify import verify_command
+from invarlock.reporting import verify_contract as verify_mod
 
 
 def _write_cert(tmp_path: Path, payload: dict, name: str) -> Path:
@@ -145,7 +145,7 @@ def test_verify_drift_band_exit_code_varies_by_profile(
 
     payload = json.loads(capsys.readouterr().out)
     assert payload["summary"]["ok"] is expected_ok
-    assert payload["resolution"]["exit_code"] == expected_exit_code
+    assert "resolution" not in payload
     assert (
         getattr(ei.value, "exit_code", getattr(ei.value, "code", None))
         == expected_exit_code
@@ -183,7 +183,7 @@ def test_verify_guard_overhead_exit_code_varies_by_profile(
 
     payload = json.loads(capsys.readouterr().out)
     assert payload["summary"]["ok"] is expected_ok
-    assert payload["resolution"]["exit_code"] == expected_exit_code
+    assert "resolution" not in payload
     assert (
         getattr(ei.value, "exit_code", getattr(ei.value, "code", None))
         == expected_exit_code
@@ -218,7 +218,7 @@ def test_verify_provider_digest_exit_code_varies_by_profile(
         verify_command([path], baseline=None, profile=profile, json_out=True)
 
     payload = json.loads(capsys.readouterr().out)
-    assert payload["resolution"]["exit_code"] == expected_exit_code
+    assert "resolution" not in payload
     assert (
         getattr(ei.value, "exit_code", getattr(ei.value, "code", None))
         == expected_exit_code
@@ -255,5 +255,5 @@ def test_verify_exit_code_2_when_any_evaluation_report_is_malformed(
 
     payload = json.loads(capsys.readouterr().out)
     assert payload["summary"]["ok"] is False
-    assert payload["resolution"]["exit_code"] == 2
+    assert "resolution" not in payload
     assert getattr(ei.value, "exit_code", getattr(ei.value, "code", None)) == 2

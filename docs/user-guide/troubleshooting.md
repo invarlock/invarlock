@@ -7,7 +7,7 @@
 | **Purpose** | Consolidated error code reference and troubleshooting guide. |
 | **Audience** | Users encountering errors during `evaluate`, `verify`, or advanced workflows. |
 | **Exit codes** | `0=success`, `1=generic failure`, `2=schema/config invalid`, `3=hard abort (CI/Release)`. |
-| **Source of truth** | `src/invarlock/cli/commands/run.py`, `src/invarlock/cli/commands/verify.py`. |
+| **Source of truth** | `src/invarlock/cli/commands/run.py`, `src/invarlock/reporting/verify_contract.py`, `src/invarlock/core/doctor_findings.py`. |
 
 ## Quick Start
 
@@ -84,7 +84,7 @@ These errors relate to window pairing, tokenizer consistency, and evidence integ
 **Common causes:**
 
 - Different tokenizer versions or configurations
-- Model updated with new vocabulary
+- Model checkpoint with a different vocabulary
 - Trust-remote-code flag inconsistency
 
 **Fixes:**
@@ -149,7 +149,7 @@ These errors relate to window pairing, tokenizer consistency, and evidence integ
 
 **Common causes:**
 
-- Old baseline report generated before digest tracking was added
+- Baseline report missing digest-tracking metadata
 - Report truncated or missing `provenance` section
 - Windows not materialized due to `INVARLOCK_STORE_EVAL_WINDOWS=0`
 
@@ -240,7 +240,7 @@ These errors relate to window pairing, tokenizer consistency, and evidence integ
 **Notes:**
 
 - `invarlock evaluate` always emits a report before exiting on E111
-- legacy/internal `run` flows log a warning for non-finite PM but do not raise E111
+- internal `run` flows log a warning for non-finite PM but do not raise E111
 
 ---
 
@@ -346,6 +346,22 @@ context:
 1. Use an accelerator when available: `--device cuda` or `--device mps`
 2. Force higher precision: `dtype: float32` in config
 3. Reduce edit scope or batch size
+
+### Explicit CUDA Request Rejected Before Container Launch
+
+**Symptom:** Secure-default `evaluate`, `run`, or `calibrate` exits early with a
+message that `--device cuda` was requested but no NVIDIA runtime is visible on
+the host.
+
+**Cause:** Explicit CUDA requests are fail-closed for delegated container runs.
+InvarLock requires either `/dev/nvidiactl` or `nvidia-smi` to be visible before
+it adds `--gpus all` to the container launch.
+
+**Fixes:**
+
+1. Install or expose NVIDIA container support so `nvidia-smi` works on the host
+2. Use `--device auto` if CPU fallback is acceptable
+3. Use `--device cpu` when you want a deterministic CPU-only run
 
 ## Debug Tools
 

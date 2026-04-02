@@ -57,7 +57,7 @@ def main() -> int:
         "docs/README.md": [
             "Assurance Case",
             "Evaluation Math Derivation",
-            "Published assurance basis currently covers GPT-2 and BERT profiles.",
+            "Published assurance basis covers GPT-2 and BERT profiles.",
             "Mistral 7B",
             "Qwen2 7B",
             "Qwen2.5 14B",
@@ -85,14 +85,14 @@ def main() -> int:
             "published assurance tiers",
         ],
         "docs/assurance/04-guard-contracts.md": [
-            "Published assurance basis currently covers GPT-2 and BERT profiles.",
+            "Published assurance basis covers GPT-2 and BERT profiles.",
             "Mistral 7B",
             "Qwen2 7B",
             "Qwen2.5 14B",
             "not part of the published",
         ],
         "docs/reference/calibration.md": [
-            "Published assurance basis currently covers GPT-2 and BERT profiles.",
+            "Published assurance basis covers GPT-2 and BERT profiles.",
             "Mistral 7B",
             "Qwen2 7B",
             "Qwen2.5 14B",

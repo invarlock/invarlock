@@ -12,8 +12,8 @@ import pytest
 # otherwise, drive it via evaluation_report inputs in an integration test.
 from invarlock.core.runner_pairing import BOOTSTRAP_COVERAGE_REQUIREMENTS
 from invarlock.guards.variance import VarianceGuard
-from invarlock.reporting.guards_analysis import _extract_rmt_analysis
-from invarlock.reporting.report_builder import make_report
+from invarlock.reporting.guards_rmt import _extract_rmt_analysis
+from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import create_empty_report
 
 
@@ -104,10 +104,24 @@ def _build_paired_run_and_baseline(
     baseline = {
         "run_id": "baseline-seed",
         "model_id": "gpt2-small",
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "final": math.exp(
+                    float(
+                        np.average(
+                            [math.log(x) for x in baseline_final],
+                            weights=weights,
+                        )
+                    )
+                ),
+            }
+        },
         "evaluation_windows": {
             "final": {
                 "window_ids": [0, 1],
                 "logloss": [math.log(x) for x in baseline_final],
+                "token_counts": list(token_counts),
             }
         },
         "rmt": {"outliers": 2},
@@ -126,7 +140,7 @@ def test_bootstrap_coverage_floors_match_assurance_docs():
 def test_evaluation_report_enforces_paired_ratio_identity():
     report, baseline = _build_paired_run_and_baseline()
     with patch(
-        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+        "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):
         evaluation_report = make_report(deepcopy(report), deepcopy(baseline))
     delta_mean = report["metrics"]["paired_delta_summary"]["mean"]
@@ -144,7 +158,7 @@ def test_evaluation_report_rejects_inconsistent_ratio():
     report, baseline = _build_paired_run_and_baseline()
     report["metrics"]["paired_delta_summary"]["mean"] += 0.1  # Break consistency
     with patch(
-        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+        "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):
         # Use dev profile to avoid strict pairing enforcement; inconsistency should not raise
         report.setdefault("metrics", {}).setdefault("window_plan", {})["profile"] = (
@@ -203,7 +217,7 @@ def test_ppl_ratio_gate_enforced():
     )  # 1.15
 
     with patch(
-        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+        "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):
         passing_cert = make_report(deepcopy(passing_report), deepcopy(baseline))
         failing_cert = make_report(deepcopy(failing_report), deepcopy(baseline))
@@ -215,7 +229,7 @@ def test_ppl_ratio_gate_enforced():
 def test_seed_bundle_contract():
     report, baseline = _build_paired_run_and_baseline()
     with patch(
-        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+        "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):
         evaluation_report = make_report(report, baseline)
     # Evaluation Report preserves the full seed bundle for auditability.
@@ -251,7 +265,7 @@ def test_evaluation_report_rejects_ci_runs_below_bootstrap_floor():
     }
     report["metrics"]["bootstrap"]["replicates"] = 100
     with patch(
-        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+        "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):
         with pytest.raises(ValueError):
             make_report(deepcopy(report), deepcopy(baseline))
@@ -286,7 +300,7 @@ def test_evaluation_report_rejects_ci_overlap():
     _apply_ci_pairing_requirements(report)
     report["metrics"]["window_overlap_fraction"] = 0.25
     with patch(
-        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+        "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):
         with pytest.raises(ValueError):
             make_report(deepcopy(report), deepcopy(baseline))
@@ -297,7 +311,7 @@ def test_evaluation_report_rejects_ci_pairing_mismatch():
     _apply_ci_pairing_requirements(report)
     report["metrics"]["window_match_fraction"] = 0.98
     with patch(
-        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+        "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):
         with pytest.raises(ValueError):
             make_report(deepcopy(report), deepcopy(baseline))

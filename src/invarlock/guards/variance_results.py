@@ -188,7 +188,6 @@ def build_finalize_result(
     warnings: list[str],
     errors: list[str],
     finalize_time: float,
-    events: list[dict[str, Any]],
     enabled_after_ab: bool,
     ppl_no_ve: float | None,
     scales: dict[str, float],
@@ -201,7 +200,6 @@ def build_finalize_result(
         "warnings": warnings,
         "errors": errors,
         "finalize_time": float(finalize_time),
-        "events": events,
         "details": {
             "guard_type": "variance",
             "ve_applied": enabled_after_ab,

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_builder import _compute_validation_flags
+from invarlock.reporting.report_validation import compute_validation_flags
 
 
 def test_accuracy_hysteresis_applied_and_accepts_conservative() -> None:
     # Conservative tier: delta_min_pp = -0.5, hysteresis_delta_pp = 0.1
     # Set delta = -0.55 → meets_delta via hysteresis; expect hysteresis_applied True
-    flags = _compute_validation_flags(
+    flags = compute_validation_flags(
         ppl={"ratio_vs_baseline": 1.0, "preview_final_ratio": 1.0},
         spectral={},
         rmt={},
@@ -47,14 +47,14 @@ def test_accuracy_min_examples_fraction_precedence_balanced() -> None:
     }
 
     # Below floor
-    flags_fail = _compute_validation_flags(
+    flags_fail = compute_validation_flags(
         **common_kwargs,
         primary_metric={"kind": "accuracy", "ratio_vs_baseline": 0.0, "n_final": 400},
     )
     assert flags_fail["primary_metric_acceptable"] is False
 
     # Above floor
-    flags_pass = _compute_validation_flags(
+    flags_pass = compute_validation_flags(
         **common_kwargs,
         primary_metric={"kind": "accuracy", "ratio_vs_baseline": 0.0, "n_final": 600},
     )

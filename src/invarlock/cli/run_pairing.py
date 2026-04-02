@@ -9,13 +9,63 @@ from typing import Any
 import typer
 from rich.console import Console
 
+from invarlock.core.metric_provider_resolution import (
+    resolve_metric_and_provider as _resolve_metric_and_provider_core,
+)
+from invarlock.core.provider_parity import (
+    enforce_provider_parity as _enforce_provider_parity_core,
+)
+
+_PAIRING_INT_ERRORS = (OverflowError, TypeError, ValueError)
+_PAIRING_ASSIGNMENT_ERRORS = (KeyError, TypeError, ValueError)
+
+
+def _canonical_dataset_id(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        normalized = value.strip()
+        return normalized or None
+    if isinstance(value, dict):
+        candidate = (
+            value.get("kind")
+            or value.get("dataset")
+            or value.get("name")
+            or value.get("id")
+            or value.get("provider")
+        )
+        return _canonical_dataset_id(candidate)
+    if hasattr(value, "items"):
+        try:
+            return _canonical_dataset_id(dict(value.items()))
+        except (AttributeError, KeyError, RuntimeError, TypeError, ValueError):
+            pass
+    for attr in ("kind", "dataset", "name", "id", "provider"):
+        try:
+            candidate = getattr(value, attr)
+        except AttributeError:
+            continue
+        normalized = _canonical_dataset_id(candidate)
+        if normalized is not None:
+            return normalized
+    try:
+        normalized = str(value).strip()
+    except (RuntimeError, TypeError, ValueError):
+        return None
+    return normalized or None
+
 
 def extract_pairing_schedule(
     report: dict[str, Any] | None,
     *,
-    tensor_or_list_to_ints_fn: Any,
+    tensor_or_list_to_ints_fn: Any | None = None,
 ) -> dict[str, Any] | None:
     """Extract sanitized pairing schedule from baseline-like report data."""
+    if tensor_or_list_to_ints_fn is None:
+        from invarlock.cli.run_pairing_helpers import _tensor_or_list_to_ints
+
+        tensor_or_list_to_ints_fn = _tensor_or_list_to_ints
+
     if not isinstance(report, dict):
         return None
     windows = report.get("evaluation_windows")
@@ -48,7 +98,7 @@ def extract_pairing_schedule(
             for wid in window_ids_raw:
                 try:
                     window_ids.append(int(wid))
-                except Exception:
+                except _PAIRING_INT_ERRORS:
                     return None
         else:
             window_ids = list(range(int(start_id), int(start_id) + len(input_ids)))
@@ -139,10 +189,15 @@ def extract_pairing_schedule(
 def compute_provider_digest(
     report: dict[str, Any],
     *,
-    compute_mask_positions_digest_fn: Any,
+    compute_mask_positions_digest_fn: Any | None = None,
 ) -> dict[str, str] | None:
     """Compute provider digest (ids/tokenizer/masking) from report context."""
     from invarlock.utils.digest import hash_json
+
+    if compute_mask_positions_digest_fn is None:
+        from invarlock.cli.run_pairing_helpers import _compute_mask_positions_digest
+
+        compute_mask_positions_digest_fn = _compute_mask_positions_digest
 
     windows = report.get("evaluation_windows") if isinstance(report, dict) else None
     if not isinstance(windows, dict) or not windows:
@@ -164,7 +219,7 @@ def compute_provider_digest(
         for raw in all_ids:
             try:
                 ids_int.append(int(raw))
-            except Exception:
+            except _PAIRING_INT_ERRORS:
                 use_ints = False
                 break
         if use_ints:
@@ -202,12 +257,27 @@ def validate_and_harvest_baseline_schedule(
     baseline_path_str: str | None = None,
     console: Console | None = None,
     event_fn: Any | None = None,
-    canonical_dataset_id_fn: Any,
-    tensor_or_list_to_ints_fn: Any,
-    hash_sequences_fn: Any,
-    invarlock_error_cls: type[BaseException],
+    typed_failures: bool = False,
+    canonical_dataset_id_fn: Any | None = None,
+    tensor_or_list_to_ints_fn: Any | None = None,
+    hash_sequences_fn: Any | None = None,
+    invarlock_error_cls: type[BaseException] | None = None,
 ) -> dict[str, Any]:
     """Validate baseline pairing compatibility and harvest dataset metadata."""
+    if canonical_dataset_id_fn is None:
+        canonical_dataset_id_fn = _canonical_dataset_id
+    if tensor_or_list_to_ints_fn is None:
+        from invarlock.cli.run_pairing_helpers import _tensor_or_list_to_ints
+
+        tensor_or_list_to_ints_fn = _tensor_or_list_to_ints
+    if hash_sequences_fn is None:
+        from invarlock.cli.run_pairing_helpers import _hash_sequences
+
+        hash_sequences_fn = _hash_sequences
+    if invarlock_error_cls is None:
+        from invarlock.core.exceptions import InvarlockError
+
+        invarlock_error_cls = InvarlockError
 
     def _emit(tag: str, message: str, emoji: str) -> None:
         if console is not None and event_fn is not None:
@@ -217,8 +287,11 @@ def validate_and_harvest_baseline_schedule(
         path = baseline_path_str or "baseline"
         prof = (profile or "dev").strip().lower()
         message = f"PAIRING-EVIDENCE-MISSING: {path}: {reason}"
-        if prof in {"ci", "release"}:
+        shell_mode = console is not None and event_fn is not None
+        if prof in {"ci", "release"} or typed_failures:
             raise invarlock_error_cls(code="E001", message=message)
+        if not shell_mode:
+            raise typer.Exit(1)
         _emit(
             "FAIL",
             f"Baseline pairing schedule '{path}' is incompatible: {reason}",
@@ -271,7 +344,7 @@ def validate_and_harvest_baseline_schedule(
             for idx, (wid, seq) in enumerate(zip(window_ids, input_ids, strict=False)):
                 try:
                     wid_int = int(wid)
-                except Exception:
+                except _PAIRING_INT_ERRORS:
                     _fail_schedule(
                         f"{label} window_ids contains non-int at index {idx}"
                     )
@@ -314,7 +387,7 @@ def validate_and_harvest_baseline_schedule(
             if masks_missing:
                 try:
                     section["attention_masks"] = masks_rows
-                except Exception:
+                except _PAIRING_ASSIGNMENT_ERRORS:
                     pass
 
             labels = section.get("labels")
@@ -424,7 +497,7 @@ def validate_and_harvest_baseline_schedule(
         raise
     except typer.Exit:
         raise
-    except Exception as exc:
+    except (AttributeError, KeyError, TypeError, ValueError) as exc:
         _fail_schedule(f"failed to validate baseline schedule integrity ({exc})")
 
     baseline_preview = len(pairing_schedule["preview"].get("input_ids") or [])
@@ -549,60 +622,19 @@ def enforce_provider_parity(
     baseline_digest: dict | None,
     *,
     profile: str | None,
-    invarlock_error_cls: type[BaseException],
+    invarlock_error_cls: type[BaseException] | None = None,
 ) -> None:
+    if invarlock_error_cls is None:
+        from invarlock.core.exceptions import InvarlockError
+
+        invarlock_error_cls = InvarlockError
     """Enforce tokenizer/masking parity rules for CI and release profiles."""
-    prof = (profile or "").strip().lower()
-    if prof not in {"ci", "release"}:
-        return
-
-    subject = subject_digest or {}
-    baseline = baseline_digest or {}
-    subj_ids = subject.get("ids_sha256")
-    base_ids = baseline.get("ids_sha256")
-    subj_tok = subject.get("tokenizer_sha256")
-    base_tok = baseline.get("tokenizer_sha256")
-    subj_mask = subject.get("masking_sha256")
-    base_mask = baseline.get("masking_sha256")
-
-    if not (
-        isinstance(subj_ids, str)
-        and isinstance(base_ids, str)
-        and subj_ids
-        and base_ids
-        and isinstance(subj_tok, str)
-        and isinstance(base_tok, str)
-        and subj_tok
-        and base_tok
-    ):
-        raise invarlock_error_cls(
-            code="E004",
-            message="PROVIDER-DIGEST-MISSING: subject or baseline missing ids/tokenizer digest",
-        )
-
-    if subj_ids != base_ids:
-        raise invarlock_error_cls(
-            code="E006",
-            message="IDS-DIGEST-MISMATCH: subject and baseline window IDs differ",
-        )
-
-    if subj_tok != base_tok:
-        raise invarlock_error_cls(
-            code="E002",
-            message="TOKENIZER-DIGEST-MISMATCH: subject and baseline tokenizers differ",
-        )
-
-    if (
-        isinstance(subj_mask, str)
-        and isinstance(base_mask, str)
-        and subj_mask
-        and base_mask
-        and subj_mask != base_mask
-    ):
-        raise invarlock_error_cls(
-            code="E003",
-            message="MASK-PARITY-MISMATCH: mask positions differ under matched tokenizers",
-        )
+    _enforce_provider_parity_core(
+        subject_digest,
+        baseline_digest,
+        profile=profile,
+        invarlock_error_cls=invarlock_error_cls,
+    )
 
 
 def resolve_metric_and_provider(
@@ -612,98 +644,10 @@ def resolve_metric_and_provider(
     resolved_loss_type: str | None = None,
     metric_kind_override: str | None = None,
 ) -> tuple[str, str, dict[str, float]]:
-    """Resolve metric kind, provider kind, and metric options from config."""
-    provider_val = None
-    try:
-        provider_val = cfg.dataset.provider
-    except Exception:
-        provider_val = None
-
-    provider_kind = None
-    if isinstance(provider_val, str) and provider_val:
-        provider_kind = provider_val
-    else:
-        try:
-            provider_kind = provider_val.kind
-        except Exception:
-            try:
-                provider_kind = provider_val.get("kind")  # type: ignore[attr-defined]
-            except Exception:
-                provider_kind = None
-
-    if not provider_kind and hasattr(model_profile, "default_provider"):
-        provider_kind = model_profile.default_provider
-    if not provider_kind:
-        provider_kind = "wikitext2"
-
-    metric_cfg = None
-    try:
-        eval_section = cfg.eval
-        metric_cfg = getattr(eval_section, "metric", None)
-    except Exception:
-        metric_cfg = None
-
-    metric_kind = None
-    if isinstance(metric_kind_override, str) and metric_kind_override.strip():
-        metric_override = metric_kind_override.strip().lower()
-        if metric_override != "auto":
-            metric_kind = metric_override
-
-    reps = None
-    ci_level = None
-    if metric_kind is None and metric_cfg is not None:
-        try:
-            metric_kind = (
-                metric_cfg.get("kind")
-                if isinstance(metric_cfg, dict)
-                else metric_cfg.kind
-            )
-        except Exception:
-            metric_kind = None
-        try:
-            reps = (
-                metric_cfg.get("reps")
-                if isinstance(metric_cfg, dict)
-                else metric_cfg.reps
-            )
-        except Exception:
-            reps = None
-        try:
-            ci_level = (
-                metric_cfg.get("ci_level")
-                if isinstance(metric_cfg, dict)
-                else metric_cfg.ci_level
-            )
-        except Exception:
-            ci_level = None
-
-    if isinstance(metric_kind, str) and metric_kind:
-        normalized_kind = metric_kind.strip().lower()
-        metric_kind = None if normalized_kind == "auto" else normalized_kind
-    else:
-        metric_kind = None
-
-    if not metric_kind and hasattr(model_profile, "default_metric"):
-        metric_kind = model_profile.default_metric
-    if not metric_kind:
-        loss_kind = (resolved_loss_type or "causal").lower()
-        if loss_kind == "mlm":
-            metric_kind = "ppl_mlm"
-        elif loss_kind in {"seq2seq", "s2s", "t5"}:
-            metric_kind = "ppl_seq2seq"
-        else:
-            metric_kind = "ppl_causal"
-
-    opts: dict[str, float] = {}
-    if reps is not None:
-        try:
-            opts["reps"] = float(int(reps))
-        except Exception:
-            pass
-    if ci_level is not None:
-        try:
-            opts["ci_level"] = float(ci_level)
-        except Exception:
-            pass
-
-    return str(metric_kind), str(provider_kind), opts
+    """Resolve metric/provider policy via the core owner."""
+    return _resolve_metric_and_provider_core(
+        cfg,
+        model_profile,
+        resolved_loss_type=resolved_loss_type,
+        metric_kind_override=metric_kind_override,
+    )

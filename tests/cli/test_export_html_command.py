@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
 
 from invarlock.cli.commands.export_html import export_html_command
-from invarlock.reporting.report import to_evaluation_report
+from invarlock.reporting.report_make import make_report
 
 
 def _make_min_report():
@@ -59,7 +60,7 @@ def _make_baseline():
 def test_export_html_happy_and_no_overwrite(tmp_path: Path):
     report = _make_min_report()
     base = _make_baseline()
-    report_json = to_evaluation_report(report, base, format="json")
+    report_json = json.dumps(make_report(report, base), indent=2, ensure_ascii=False)
     inp = tmp_path / "cert.json"
     out = tmp_path / "out.html"
     inp.write_text(report_json, encoding="utf-8")

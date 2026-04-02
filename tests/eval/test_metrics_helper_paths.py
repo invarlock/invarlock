@@ -13,24 +13,33 @@ from invarlock.eval.metrics import (
     DependencyError,
     InputValidator,
     MetricsConfig,
-    ResultCache,
     ValidationError,
-    _calculate_mi_gini,
-    _finalize_results,
-    _forward_loss_causal,
-    _gini_vectorized,
-    _locate_transformer_blocks_enhanced,
     analyze_spectral_changes,
     compute_parameter_deltas,
     compute_perplexity,
     compute_perplexity_strict,
     compute_ppl,
-    get_metrics_info,
     measure_latency,
     measure_memory,
-    validate_metrics_environment,
     validate_perplexity,
 )
+from invarlock.eval.metrics_activation import (
+    ResultCache,
+    _calculate_head_energy,
+    _calculate_mi_gini,
+    _calculate_sigma_max,
+    _collect_activations,
+    _extract_fc1_activations,
+    _gini_vectorized,
+    _locate_transformer_blocks_enhanced,
+    _perform_pre_eval_checks,
+)
+from invarlock.eval.metrics_environment import (
+    get_metrics_info,
+    validate_metrics_environment,
+)
+from invarlock.eval.metrics_lens import _finalize_results
+from invarlock.eval.metrics_model_io import forward_loss_causal
 
 
 class DummyCausalLM(nn.Module):
@@ -91,10 +100,9 @@ def test_validator_model_and_dataloader_paths():
         def __init__(self):
             super().__init__()
 
-    # Strict mode: NoParamModel is acceptable in current implementation
-    # (parameter counting may be guarded). Ensure call does not error.
-    with torch.no_grad():
-        InputValidator.validate_model(NoParamModel(), cfg_strict)
+    with pytest.raises(ValidationError):
+        with torch.no_grad():
+            InputValidator.validate_model(NoParamModel(), cfg_strict)
 
     # Non-strict mode -> no raise
     InputValidator.validate_model(NoParamModel(), cfg_nonstrict)
@@ -196,7 +204,7 @@ def test_compute_parameter_deltas_and_structural_counts():
 
     before.tag = "before"
     after.tag = "after"
-    deltas = compute_parameter_deltas(before, after, adapter=Adapter())
+    deltas = compute_parameter_deltas(before, after)
     assert deltas["params_changed"] == before.transformer.h[0].weight.numel()
     assert deltas["layers_modified"] == 1
     # Structural head/neuron counts are not tracked; ensure layers reflect change
@@ -236,6 +244,30 @@ def test_analyze_spectral_and_rmt_changes_happy_and_error_paths():
         s_err = analyze_spectral_changes(m1, m2)
         assert s_err.get("error")
 
+    fake_spec_missing = types.ModuleType("invarlock.guards.spectral_measurement")
+    with patch.dict(
+        sys.modules, {"invarlock.guards.spectral_measurement": fake_spec_missing}
+    ):
+        s_missing = analyze_spectral_changes(m1, m2)
+        assert s_missing == {"error": "spectral_analysis_unavailable"}
+
+
+def test_compute_parameter_deltas_handles_sparsity_and_failures() -> None:
+    before = nn.Sequential(nn.Linear(4, 4), nn.Linear(4, 4))
+    after = nn.Sequential(nn.Linear(4, 2))
+
+    deltas = compute_parameter_deltas(before, after)
+    assert deltas["params_changed"] >= 0
+    assert deltas["sparsity"] is not None
+    assert deltas["sparsity"] > 0
+
+    class BrokenParams(nn.Module):
+        def named_parameters(self, *args, **kwargs):  # noqa: ANN002, ANN003
+            raise RuntimeError("boom")
+
+    broken = compute_parameter_deltas(BrokenParams(), BrokenParams())
+    assert broken == {"params_changed": 0, "layers_modified": 0, "sparsity": None}
+
 
 def test_compute_and_measure_helpers():
     model = DummyCausalLM()
@@ -244,7 +276,7 @@ def test_compute_and_measure_helpers():
     attn = [1] * len(seq)
     win = EvaluationWindow([seq, seq], [attn, attn], [0, 1])
 
-    ppl = compute_ppl(model, adapter=None, window=win, device="cpu")
+    ppl = compute_ppl(model, window=win, device="cpu")
     assert isinstance(ppl, float) and ppl >= 1.0
 
     lat = measure_latency(model, win, device="cpu", warmup_steps=1, measurement_steps=2)
@@ -304,7 +336,7 @@ def test_info_and_environment_helpers():
     info = get_metrics_info()
     assert "available_metrics" in info and isinstance(info.get("default_config"), dict)
     # Environment validation returns boolean and logs missing optional deps
-    assert isinstance(validate_metrics_environment(), bool)
+    assert validate_metrics_environment().ok is True
 
 
 def test_validate_perplexity_paths():
@@ -403,8 +435,6 @@ def test_resource_manager_and_pre_eval_checks_and_gini_zero():
             return SimpleNamespace(ok=True)
 
     dl = [{"input_ids": torch.ones(1, 8, dtype=torch.long)}]
-    from invarlock.eval.metrics import _perform_pre_eval_checks
-
     _perform_pre_eval_checks(ModelPre(), dl, torch.device("cpu"), cfg)
 
     # Pre-eval dry run failure path
@@ -440,11 +470,6 @@ def test_collect_activations_and_fc1_extraction_shape_mismatch_and_head_energy()
     batch = {"input_ids": torch.ones(1, 16, dtype=torch.long)}
     dl = [batch, batch]
     cfg = MetricsConfig(oracle_windows=2, max_tokens=8)
-    from invarlock.eval.metrics import (
-        _calculate_head_energy,
-        _collect_activations,
-        _extract_fc1_activations,
-    )
 
     data = _collect_activations(model, dl, cfg, torch.device("cpu"))
     assert data["first_batch"] is not None
@@ -486,8 +511,6 @@ def test_calculate_sigma_max_variants_and_head_energy_empty():
             return GainsDF([self._names[i] for i in idx], [self.gain[i] for i in idx])
 
     dm = DM(GainsDF(["mlp.c_fc", "embed"], [0.5, 0.1]))
-    from invarlock.eval.metrics import _calculate_head_energy, _calculate_sigma_max
-
     val = _calculate_sigma_max(
         DummyCausalLM(),
         {"input_ids": torch.ones(1, 8, dtype=torch.long)},
@@ -567,24 +590,27 @@ def test_calculate_sigma_max_variants_and_head_energy_empty():
 
 
 def test_measure_latency_early_and_error_paths_and_compute_perplexity_tuple_fallback():
-    # measure_latency early return when no suitable sample
+    # measure_latency now rejects windows without any usable long sample
     model = DummyCausalLM()
     short = EvaluationWindow([[1, 2, 3]], [[1, 1, 1]], [0])
-    assert measure_latency(model, short, device="cpu") == 0.0
+    with pytest.raises(ValidationError) as exc_info:
+        measure_latency(model, short, device="cpu")
+    assert (
+        exc_info.value.details["reason"]
+        == "latency measurement requires at least one sequence longer than 10 tokens"
+    )
 
-    # model raising during warmup -> returns 0.0
+    # model raising during warmup now surfaces the failure
     class FailModel(DummyCausalLM):
         def forward(self, *a, **k):
             raise RuntimeError("boom")
 
-    assert (
+    with pytest.raises(RuntimeError, match="Latency warmup failed"):
         measure_latency(
             FailModel(),
             EvaluationWindow([list(range(12))], [[1] * 12], [0]),
             device="cpu",
         )
-        == 0.0
-    )
 
     # compute_perplexity fallback path with tuple output
     class TupleModel(nn.Module):
@@ -613,8 +639,39 @@ def test_measure_latency_early_and_error_paths_and_compute_perplexity_tuple_fall
         bad_batch = {"input_ids": torch.tensor([[1]])}
         from invarlock.eval.metrics import ValidationError as MValidationError
 
-        with pytest.raises(MValidationError):
-            compute_perplexity(MinModel(), [bad_batch], max_samples=1, device="cpu")
+    with pytest.raises(MValidationError):
+        compute_perplexity(MinModel(), [bad_batch], max_samples=1, device="cpu")
+
+
+def test_measure_latency_raises_on_measurement_execution_failure():
+    class GoodModel(DummyCausalLM):
+        def forward(self, *a, **k):
+            return super().forward(*a, **k)
+
+    calls = {"count": 0}
+
+    def _call_model(_model, **_kwargs):
+        calls["count"] += 1
+        if calls["count"] > 1:
+            raise RuntimeError("measurement boom")
+        return SimpleNamespace(logits=torch.randn(1, 12, 16))
+
+    window = EvaluationWindow([list(range(12))], [[1] * 12], [0])
+    from invarlock.eval import metrics_runtime as metrics_runtime_mod
+
+    original = metrics_runtime_mod.call_model
+    metrics_runtime_mod.call_model = _call_model
+    try:
+        with pytest.raises(RuntimeError, match="Latency measurement failed"):
+            measure_latency(
+                GoodModel(),
+                window,
+                device="cpu",
+                warmup_steps=1,
+                measurement_steps=2,
+            )
+    finally:
+        metrics_runtime_mod.call_model = original
 
 
 def test_compute_perplexity_else_tensor_and_invalid_type():
@@ -647,7 +704,7 @@ def test_compute_ppl_empty_sample_and_fallback_tuple():
     # Window with an empty sample should be skipped
     model = DummyCausalLM()
     win = EvaluationWindow([[], list(range(12))], [[0] * 0, [1] * 12], [0, 1])
-    _ = compute_ppl(model, adapter=None, window=win, device="cpu")
+    _ = compute_ppl(model, window=win, device="cpu")
 
     # Model raising in try path triggers fallback to tuple
     class TupleOut(nn.Module):
@@ -660,7 +717,7 @@ def test_compute_ppl_empty_sample_and_fallback_tuple():
     seq = list(range(1, 6))
     attn = [1] * len(seq)
     win2 = EvaluationWindow([seq], [attn], [0])
-    _ = compute_ppl(TupleOut(), adapter=None, window=win2, device="cpu")
+    _ = compute_ppl(TupleOut(), window=win2, device="cpu")
 
 
 def test_measure_memory_break_and_continue_and_latency_total_tokens_zero():
@@ -677,38 +734,47 @@ def test_measure_memory_break_and_continue_and_latency_total_tokens_zero():
     # measure_latency total_tokens == 0 path
     zero = [0] * 12
     win2 = EvaluationWindow([list(range(12))], [zero], [0])
-    assert (
+    with pytest.raises(ValidationError) as exc_info:
         measure_latency(
             DummyCausalLM(), win2, device="cpu", warmup_steps=0, measurement_steps=1
         )
-        == 0.0
+    assert (
+        exc_info.value.details["reason"]
+        == "latency measurement requires at least one attended token"
     )
 
-    # No suitable sample (all sequences <=10) -> returns 0.0
+    # No suitable sample (all sequences <=10) -> invalid measurement input
     small = list(range(5))
     win3 = EvaluationWindow([small, small], [[1] * 5, [1] * 5], [0, 1])
-    assert (
+    with pytest.raises(ValidationError) as exc_info:
         measure_latency(
             DummyCausalLM(), win3, device="cpu", warmup_steps=0, measurement_steps=1
         )
-        == 0.0
+    assert (
+        exc_info.value.details["reason"]
+        == "latency measurement requires at least one sequence longer than 10 tokens"
     )
 
     # Empty window path
     empty = EvaluationWindow([], [], [])
-    assert measure_latency(DummyCausalLM(), empty, device="cpu") == 0.0
+    with pytest.raises(ValidationError) as exc_info:
+        measure_latency(DummyCausalLM(), empty, device="cpu")
+    assert (
+        exc_info.value.details["reason"]
+        == "latency measurement requires a non-empty evaluation window"
+    )
 
 
 def test_validate_env_failure_path():
     # Patch DependencyManager on the real module to raise in constructor
-    from invarlock.eval import metrics as real_metrics
+    from invarlock.eval import metrics_environment as metrics_environment_mod
 
     class DMErr:
         def __init__(self):
             raise RuntimeError("boom")
 
-    with patch.object(real_metrics, "DependencyManager", DMErr):
-        assert real_metrics.validate_metrics_environment() is False
+    with patch.object(metrics_environment_mod, "DependencyManager", DMErr):
+        assert metrics_environment_mod.validate_metrics_environment().ok is False
 
 
 def test_dependency_manager_missing_get_module_and_collect_activations_exception_path():
@@ -730,8 +796,6 @@ def test_dependency_manager_missing_get_module_and_collect_activations_exception
 
     cfg = MetricsConfig(oracle_windows=2)
     dl = [{"input_ids": torch.ones(1, 4, dtype=torch.long)} for _ in range(2)]
-    from invarlock.eval.metrics import _collect_activations
-
     data = _collect_activations(ModelRaises(), dl, cfg, torch.device("cpu"))
     assert isinstance(data, dict)
 
@@ -747,7 +811,7 @@ def test_forward_loss_causal_paths():
             return SimpleNamespace(loss=loss, logits=logits)
 
     ids = torch.randint(0, 8, (1, 4))
-    loss, logits = _forward_loss_causal(MO(), ids, labels=ids)
+    loss, logits = forward_loss_causal(MO(), ids, labels=ids)
     assert isinstance(loss, float) and logits is not None
 
     # Tuple(loss, logits) fallback
@@ -758,7 +822,7 @@ def test_forward_loss_causal_paths():
             logits = torch.randn(input_ids.size(0), input_ids.size(1), 8)
             return (torch.tensor(0.4), logits)
 
-    loss2, logits2 = _forward_loss_causal(Tup(), ids, labels=ids)
+    loss2, logits2 = forward_loss_causal(Tup(), ids, labels=ids)
     assert isinstance(loss2, float) and logits2 is not None
 
     # Object with attributes but no loss -> compute manually
@@ -769,7 +833,7 @@ def test_forward_loss_causal_paths():
             logits = torch.randn(input_ids.size(0), input_ids.size(1), 8)
             return SimpleNamespace(logits=logits)
 
-    loss3, logits3 = _forward_loss_causal(Obj(), ids, labels=ids)
+    loss3, logits3 = forward_loss_causal(Obj(), ids, labels=ids)
     assert isinstance(loss3, float) and logits3 is not None
 
     # Missing logits and labels -> raises
@@ -780,14 +844,14 @@ def test_forward_loss_causal_paths():
     from invarlock.eval.metrics import MetricsError as MMetricsError
 
     with pytest.raises(MMetricsError):
-        _forward_loss_causal(Bad(), ids)
+        forward_loss_causal(Bad(), ids)
 
     # Object with maybe_loss attribute only
     class OnlyLoss(nn.Module):
         def forward(self, *a, **k):
             return SimpleNamespace(loss=torch.tensor(0.1))
 
-    l4, lg4 = _forward_loss_causal(OnlyLoss(), ids, labels=ids)
+    l4, lg4 = forward_loss_causal(OnlyLoss(), ids, labels=ids)
     assert isinstance(l4, float) and lg4 is None
 
     # Tuple path with no labels -> should raise for missing labels
@@ -801,7 +865,7 @@ def test_forward_loss_causal_paths():
     from invarlock.eval.metrics import ValidationError as MValidationError
 
     with pytest.raises(MValidationError):
-        _forward_loss_causal(TupNoLabels(), ids)
+        forward_loss_causal(TupNoLabels(), ids)
 
 
 def test_compute_perplexity_strict_tuple_and_no_valid_tokens():

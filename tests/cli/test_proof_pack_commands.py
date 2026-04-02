@@ -4,17 +4,20 @@ import hashlib
 import json
 import math
 from pathlib import Path
+from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
+import invarlock.proof_pack as proof_pack_mod
 from invarlock.cli.app import app
-from invarlock.cli.commands import verify as verify_mod
+from invarlock.reporting import verify_contract as verify_mod
 from invarlock.runtime_security import (
     RUNTIME_MANIFEST_FILENAME,
     RUNTIME_VERIFIER_CONTRACT_VERSION,
 )
 
 _VALID_TEST_IMAGE_DIGEST = "sha256:" + ("a" * 64)
+_ALLOW_UNATTESTED_ENV = {"INVARLOCK_ALLOW_UNATTESTED_ARTIFACTS": "1"}
 
 
 def _write_json(path: Path, payload: object) -> None:
@@ -66,8 +69,17 @@ def _successful_verify_payload(reports: list[Path]) -> dict[str, object]:
         "format_version": "verify-v1",
         "ok": True,
         "reports": [str(path) for path in reports],
-        "resolution": {"exit_code": 0},
     }
+
+
+def _successful_verify_result(
+    reports: list[Path],
+) -> verify_mod.VerifyExecutionResult:
+    return verify_mod.VerifyExecutionResult(
+        outcome=verify_mod.VerifyOutcome.OK,
+        payload=_successful_verify_payload(reports),
+        diagnostics=(),
+    )
 
 
 def _write_checksums(pack_dir: Path, rel_paths: list[str]) -> None:
@@ -212,6 +224,7 @@ def test_proof_pack_help_lists_verify() -> None:
     assert "verify" in result.output
     assert "inspect" in result.output
     assert "build" in result.output
+    assert "keygen" in result.output
 
 
 def test_proof_pack_verify_json_round_trip(monkeypatch, tmp_path: Path) -> None:
@@ -223,7 +236,7 @@ def test_proof_pack_verify_json_round_trip(monkeypatch, tmp_path: Path) -> None:
 
     monkeypatch.setattr(
         "invarlock.proof_pack._run_verify_command",
-        lambda reports, profile: (0, _successful_verify_payload(reports)),
+        lambda reports, profile: _successful_verify_result(reports),
         raising=False,
     )
 
@@ -238,6 +251,7 @@ def test_proof_pack_verify_json_round_trip(monkeypatch, tmp_path: Path) -> None:
             "--json-out",
             str(json_out),
         ],
+        env=_ALLOW_UNATTESTED_ENV,
     )
 
     assert result.exit_code == 0, result.output
@@ -255,12 +269,14 @@ def test_proof_pack_verify_human_success(monkeypatch, tmp_path: Path) -> None:
     )
     monkeypatch.setattr(
         "invarlock.proof_pack._run_verify_command",
-        lambda reports, profile: (0, _successful_verify_payload(reports)),
+        lambda reports, profile: _successful_verify_result(reports),
         raising=False,
     )
 
     result = CliRunner().invoke(
-        app, ["advanced", "proof-pack", "verify", str(pack_dir)]
+        app,
+        ["advanced", "proof-pack", "verify", str(pack_dir)],
+        env=_ALLOW_UNATTESTED_ENV,
     )
 
     assert result.exit_code == 0, result.output
@@ -277,14 +293,14 @@ def test_proof_pack_verify_human_failure_renders_errors(
     )
     monkeypatch.setattr(
         "invarlock.cli.commands.proof_pack.verify_proof_pack",
-        lambda *args, **kwargs: (
-            {
+        lambda *args, **kwargs: SimpleNamespace(
+            payload={
                 "pack": str(pack_dir),
                 "ok": False,
                 "warnings": [],
                 "errors": ["bad pack"],
             },
-            6,
+            status=proof_pack_mod.ProofPackStatus.INTEGRITY,
         ),
         raising=False,
     )
@@ -307,12 +323,14 @@ def test_proof_pack_verify_json_round_trip_with_verify_payload(
     )
     monkeypatch.setattr(
         "invarlock.proof_pack._run_verify_command",
-        lambda reports, profile: (0, _successful_verify_payload(reports)),
+        lambda reports, profile: _successful_verify_result(reports),
         raising=False,
     )
 
     result = CliRunner().invoke(
-        app, ["advanced", "proof-pack", "verify", str(pack_dir), "--json"]
+        app,
+        ["advanced", "proof-pack", "verify", str(pack_dir), "--json"],
+        env=_ALLOW_UNATTESTED_ENV,
     )
 
     assert result.exit_code == 0, result.output
@@ -320,7 +338,7 @@ def test_proof_pack_verify_json_round_trip_with_verify_payload(
     assert payload["format_version"] == "proof-pack-verify-v1"
     assert payload["ok"] is True
     assert payload["verify"]["format_version"] == "verify-v1"
-    assert payload["verify"]["resolution"]["exit_code"] == 0
+    assert payload["verify"]["ok"] is True
 
 
 def test_proof_pack_verify_json_round_trip_with_real_nested_verify(
@@ -332,7 +350,9 @@ def test_proof_pack_verify_json_round_trip_with_real_nested_verify(
     )
 
     result = CliRunner().invoke(
-        app, ["advanced", "proof-pack", "verify", str(pack_dir), "--json"]
+        app,
+        ["advanced", "proof-pack", "verify", str(pack_dir), "--json"],
+        env=_ALLOW_UNATTESTED_ENV,
     )
 
     assert result.exit_code == 0, result.output
@@ -341,7 +361,7 @@ def test_proof_pack_verify_json_round_trip_with_real_nested_verify(
     assert payload["ok"] is True
     assert payload["verify"]["format_version"] == "verify-v1"
     assert payload["verify"]["summary"]["reason"] == "ok"
-    assert payload["verify"]["resolution"]["exit_code"] == 0
+    assert payload["verify"]["summary"]["ok"] is True
 
 
 def test_proof_pack_verify_rejects_missing_pack(tmp_path: Path) -> None:
@@ -353,7 +373,7 @@ def test_proof_pack_verify_rejects_missing_pack(tmp_path: Path) -> None:
     assert result.exit_code == 3
     payload = json.loads(result.stdout.strip())
     assert payload["ok"] is False
-    assert payload["resolution"]["exit_code"] == 3
+    assert "resolution" not in payload
 
 
 def test_proof_pack_verify_human_failure(tmp_path: Path) -> None:
@@ -387,7 +407,9 @@ def test_proof_pack_inspect_json_summary(tmp_path: Path) -> None:
     assert payload["integrity"]["checksums_bound"] is True
     assert payload["integrity"]["manifest_attestation_ok"] is True
     assert payload["strict_ready"] is False
-    assert any("manifest.json.asc missing" in issue for issue in payload["issues"])
+    assert any(
+        "manifest.signature.json missing" in issue for issue in payload["issues"]
+    )
 
 
 def test_proof_pack_inspect_human_success_and_failure(
@@ -398,13 +420,13 @@ def test_proof_pack_inspect_human_success_and_failure(
 
     monkeypatch.setattr(
         "invarlock.cli.commands.proof_pack.inspect_proof_pack",
-        lambda path: (
-            {
+        lambda path: SimpleNamespace(
+            payload={
                 "pack": str(path),
                 "ok": True,
                 "issues": ["unsigned"],
             },
-            0,
+            status=proof_pack_mod.ProofPackStatus.OK,
         ),
         raising=False,
     )
@@ -417,13 +439,13 @@ def test_proof_pack_inspect_human_success_and_failure(
 
     monkeypatch.setattr(
         "invarlock.cli.commands.proof_pack.inspect_proof_pack",
-        lambda path: (
-            {
+        lambda path: SimpleNamespace(
+            payload={
                 "pack": str(path),
                 "ok": False,
                 "issues": ["missing manifest"],
             },
-            4,
+            status=proof_pack_mod.ProofPackStatus.FORMAT,
         ),
         raising=False,
     )
@@ -451,7 +473,7 @@ def test_proof_pack_build_json_round_trip(monkeypatch, tmp_path: Path) -> None:
     _write_runtime_manifest(report)
     monkeypatch.setattr(
         "invarlock.proof_pack._run_verify_command",
-        lambda reports, profile: (0, _successful_verify_payload(reports)),
+        lambda reports, profile: _successful_verify_result(reports),
         raising=False,
     )
 
@@ -491,12 +513,110 @@ def test_proof_pack_build_json_round_trip(monkeypatch, tmp_path: Path) -> None:
     assert len(list(out_dir.glob("reports/**/evaluation.report.json"))) == 1
 
     verify = CliRunner().invoke(
-        app, ["advanced", "proof-pack", "verify", str(out_dir), "--json"]
+        app,
+        ["advanced", "proof-pack", "verify", str(out_dir), "--json"],
+        env=_ALLOW_UNATTESTED_ENV,
     )
     assert verify.exit_code == 0, verify.output
     verify_payload = json.loads(verify.stdout.strip())
     assert verify_payload["ok"] is True
-    assert verify_payload["verify"]["resolution"]["exit_code"] == 0
+    assert verify_payload["verify"]["ok"] is True
+
+
+def test_proof_pack_keygen_and_signed_build_round_trip(
+    monkeypatch, tmp_path: Path
+) -> None:
+    final_verdict = tmp_path / "final_verdict.json"
+    report = tmp_path / "evaluation.report.json"
+    out_dir = tmp_path / "proof_pack_signed"
+    private_key = tmp_path / "proof-pack-signing-key.pem"
+    public_key = tmp_path / "proof-pack-signing-key.pub.pem"
+
+    _write_json(final_verdict, {"verdict": "PASS"})
+    _write_json(report, _build_report_payload())
+    _write_runtime_manifest(report)
+    monkeypatch.setattr(
+        "invarlock.proof_pack._run_verify_command",
+        lambda reports, profile: _successful_verify_result(reports),
+        raising=False,
+    )
+
+    keygen = CliRunner().invoke(
+        app,
+        [
+            "advanced",
+            "proof-pack",
+            "keygen",
+            str(private_key),
+            "--public-key-out",
+            str(public_key),
+            "--json",
+        ],
+    )
+    assert keygen.exit_code == 0, keygen.output
+    keygen_payload = json.loads(keygen.stdout.strip())
+    assert keygen_payload["ok"] is True
+    assert private_key.is_file()
+    assert public_key.is_file()
+
+    build = CliRunner().invoke(
+        app,
+        [
+            "advanced",
+            "proof-pack",
+            "build",
+            str(out_dir),
+            "--final-verdict",
+            str(final_verdict),
+            "--report",
+            str(report),
+            "--signing-key",
+            str(private_key),
+            "--json",
+        ],
+    )
+    assert build.exit_code == 0, build.output
+    build_payload = json.loads(build.stdout.strip())
+    assert build_payload["ok"] is True
+    assert build_payload["signature"]["present"] is True
+    assert (out_dir / "manifest.signature.json").is_file()
+
+    verify = CliRunner().invoke(
+        app,
+        ["advanced", "proof-pack", "verify", str(out_dir), "--json"],
+    )
+    assert verify.exit_code == 0, verify.output
+    verify_payload = json.loads(verify.stdout.strip())
+    assert verify_payload["ok"] is True
+    assert (
+        verify_payload["signer_fingerprint"]
+        == keygen_payload["signing_key_fingerprint"]
+    )
+
+
+def test_proof_pack_keygen_console_paths_cover_success_and_existing_key(
+    tmp_path: Path,
+) -> None:
+    private_key = tmp_path / "console-signing-key.pem"
+
+    result = CliRunner().invoke(
+        app,
+        ["advanced", "proof-pack", "keygen", str(private_key)],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Proof-pack signing keypair created" in result.output
+    assert private_key.name in result.output
+    assert f"{private_key.stem}.pub.pem" in result.output
+    assert "Private key:" in result.output
+    assert "Public key:" in result.output
+    assert "Fingerprint:" in result.output
+
+    existing = CliRunner().invoke(
+        app,
+        ["advanced", "proof-pack", "keygen", str(private_key)],
+    )
+    assert existing.exit_code == 2, existing.output
+    assert "private key output already exists" in existing.output
 
 
 def test_proof_pack_build_requires_reports(tmp_path: Path) -> None:
@@ -573,8 +693,8 @@ def test_proof_pack_build_human_success_and_failure(
 
     monkeypatch.setattr(
         "invarlock.cli.commands.proof_pack.build_proof_pack",
-        lambda *args, **kwargs: (
-            {
+        lambda *args, **kwargs: SimpleNamespace(
+            payload={
                 "pack": str(tmp_path / "pack"),
                 "ok": True,
                 "warnings": ["unsigned"],
@@ -583,7 +703,7 @@ def test_proof_pack_build_human_success_and_failure(
                 "verify": {"ok": True},
                 "files": {"hashed": 2},
             },
-            0,
+            status=proof_pack_mod.ProofPackStatus.OK,
         ),
         raising=False,
     )
@@ -606,8 +726,8 @@ def test_proof_pack_build_human_success_and_failure(
 
     monkeypatch.setattr(
         "invarlock.cli.commands.proof_pack.build_proof_pack",
-        lambda *args, **kwargs: (
-            {
+        lambda *args, **kwargs: SimpleNamespace(
+            payload={
                 "pack": str(tmp_path / "pack"),
                 "ok": False,
                 "warnings": [],
@@ -616,7 +736,7 @@ def test_proof_pack_build_human_success_and_failure(
                 "verify": None,
                 "files": None,
             },
-            7,
+            status=proof_pack_mod.ProofPackStatus.REPORTS,
         ),
         raising=False,
     )

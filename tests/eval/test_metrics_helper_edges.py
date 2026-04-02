@@ -7,11 +7,11 @@ from invarlock.eval.metrics import (
     InputValidator,
     MetricsConfig,
     ResourceManager,
-    _finalize_results,
-    _locate_transformer_blocks_enhanced,
     bootstrap_confidence_interval,
-    get_metrics_info,
 )
+from invarlock.eval.metrics_activation import _locate_transformer_blocks_enhanced
+from invarlock.eval.metrics_environment import get_metrics_info
+from invarlock.eval.metrics_lens import _finalize_results
 
 
 def test_bootstrap_confidence_interval_errors_and_success():

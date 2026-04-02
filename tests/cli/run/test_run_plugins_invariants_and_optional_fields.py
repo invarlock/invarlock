@@ -51,7 +51,7 @@ output:
 def _common_ce():
     return (
         patch(
-            "invarlock.reporting.report.save_report",
+            "invarlock.reporting.report_files.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
             },
@@ -74,7 +74,7 @@ def _common_ce():
             ),
         ),
         patch(
-            "invarlock.cli.commands.run.detect_model_profile",
+            "invarlock.cli.run_runtime.detect_model_profile",
             lambda model_id=None, adapter=None: SimpleNamespace(
                 default_loss="ce",
                 model_id=model_id,
@@ -86,7 +86,7 @@ def _common_ce():
             ),
         ),
         patch(
-            "invarlock.cli.commands.run.resolve_tokenizer",
+            "invarlock.cli.run_runtime.resolve_tokenizer",
             lambda profile: (
                 SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
                 "tokhash123",
@@ -131,7 +131,7 @@ def test_profile_apply_failure_exit(tmp_path: Path):
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.config.apply_profile",
+                "invarlock.core.config_runtime.apply_profile",
                 side_effect=RuntimeError("bad profile"),
             )
         )
@@ -151,10 +151,16 @@ def test_edit_override_ok(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.config.resolve_edit_kind", lambda name: name)
+            patch(
+                "invarlock.cli.run_config._resolve_requested_edit_name",
+                lambda name: name,
+            )
         )
         stack.enter_context(
-            patch("invarlock.cli.config.apply_edit_override", lambda c, e: c)
+            patch(
+                "invarlock.cli.run_config._apply_requested_edit_override",
+                lambda c, e, *, config_cls: c,
+            )
         )
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider_min())
@@ -325,7 +331,7 @@ def test_invariants_injected_into_policy(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.detect_model_profile",
+                "invarlock.cli.run_runtime.detect_model_profile",
                 detect_with_invariants,
             )
         )
@@ -358,7 +364,7 @@ def test_tokenizer_digest_unknown_path(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.resolve_tokenizer",
+                "invarlock.cli.run_runtime.resolve_tokenizer",
                 lambda profile: (Tok(), None),
             )
         )
@@ -394,7 +400,7 @@ def test_mlm_mask_prob_zero_sets_labels_and_zero_counts(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.resolve_tokenizer",
+                "invarlock.cli.run_runtime.resolve_tokenizer",
                 lambda profile: (
                     SimpleNamespace(
                         mask_token_id=103,
@@ -434,7 +440,9 @@ def test_mlm_mask_prob_zero_sets_labels_and_zero_counts(tmp_path: Path):
             def model_dump(self):
                 return {}
 
-        stack.enter_context(patch("invarlock.cli.config.load_config", lambda p: Cfg()))
+        stack.enter_context(
+            patch("invarlock.core.config_runtime.load_config", lambda p: Cfg())
+        )
 
         def runner_exec6(**kwargs):
             cfg_ctx = getattr(kwargs.get("config"), "context", {})
@@ -468,7 +476,7 @@ def test_mlm_missing_mask_token_exits(tmp_path: Path):
         # No mask_token_id
         stack.enter_context(
             patch(
-                "invarlock.cli.commands.run.resolve_tokenizer",
+                "invarlock.cli.run_runtime.resolve_tokenizer",
                 lambda profile: (
                     SimpleNamespace(
                         eos_token="</s>", pad_token="</s>", vocab_size=50000
@@ -762,7 +770,9 @@ def test_metrics_merges_masked_totals_from_context(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider_min())
@@ -806,7 +816,9 @@ def test_metrics_optional_logloss_keys_persisted(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider_min())
@@ -837,8 +849,8 @@ def test_guard_overhead_fail_exits(tmp_path: Path):
         # Patch validator to fail
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.commands.run.validate_guard_overhead",
-            "invarlock.cli.commands.run.validate_guard_overhead",
+            "invarlock.cli.run_runtime.validate_guard_overhead",
+            "invarlock.cli.run_runtime.validate_guard_overhead",
         ):
             stack.enter_context(
                 patch(
@@ -961,7 +973,7 @@ def test_retry_controller_until_pass_two_attempts(tmp_path: Path):
 
         stack.enter_context(patch("invarlock.core.retry.RetryController", RC))
         stack.enter_context(
-            patch("invarlock.reporting.report_builder.make_report", make_cert)
+            patch("invarlock.reporting.report_make.make_report", make_cert)
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
@@ -1041,7 +1053,9 @@ def test_release_no_estimate_capacity_uses_default_window_plan(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: Provider())
         )
@@ -1119,7 +1133,9 @@ def test_dataset_hash_constructed_when_missing(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider_min())
@@ -1157,7 +1173,9 @@ def test_loss_type_from_dataset_meta_when_missing_in_metrics(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(patch("invarlock.reporting.report.save_report", cap_save))
+        stack.enter_context(
+            patch("invarlock.reporting.report_files.save_report", cap_save)
+        )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider_min())

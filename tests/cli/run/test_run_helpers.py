@@ -9,11 +9,9 @@ from unittest.mock import patch
 
 import pytest
 
-from invarlock.cli.commands.run import (
-    _persist_ref_masks,
-    _plan_release_windows,
-    run_command,
-)
+from invarlock.cli.commands.run import run_command
+from invarlock.cli.run_artifacts import persist_ref_masks
+from invarlock.cli.run_overhead import plan_release_windows
 from rich.console import Console
 
 
@@ -30,7 +28,7 @@ def test_plan_release_windows_insufficient_capacity():
         "dedupe_rate": 0.1,
     }
     with pytest.raises(RuntimeError):
-        _plan_release_windows(
+        plan_release_windows(
             capacity, requested_preview=100, requested_final=100, max_calibration=0
         )
 
@@ -42,7 +40,7 @@ def test_plan_release_windows_success_path():
         "total_tokens": 10_000_000,
         "dedupe_rate": 0.1,
     }
-    plan = _plan_release_windows(
+    plan = plan_release_windows(
         capacity, requested_preview=500, requested_final=500, max_calibration=100
     )
     assert plan["coverage_ok"] is True
@@ -52,7 +50,7 @@ def test_plan_release_windows_success_path():
 
 def test_plan_release_windows_success_and_insufficient(tmp_path: Path):
     # Sufficient capacity
-    plan = _plan_release_windows(
+    plan = plan_release_windows(
         {
             "available_unique": 1000,
             "available_nonoverlap": 1000,
@@ -72,7 +70,7 @@ def test_plan_release_windows_success_and_insufficient(tmp_path: Path):
 
     # Insufficient capacity triggers RuntimeError
     with pytest.raises(RuntimeError):
-        _ = _plan_release_windows(
+        _ = plan_release_windows(
             {
                 "available_unique": 10,
                 "available_nonoverlap": 10,
@@ -86,7 +84,7 @@ def test_plan_release_windows_success_and_insufficient(tmp_path: Path):
         )
 
     # Candidate unique path
-    plan2 = _plan_release_windows(
+    plan2 = plan_release_windows(
         {
             "available_unique": 1000,
             "available_nonoverlap": 1000,
@@ -108,13 +106,13 @@ def test_plan_release_windows_success_and_insufficient(tmp_path: Path):
 # --------------------
 
 
-def test_persist_ref_masks(tmp_path: Path):
+def testpersist_ref_masks(tmp_path: Path):
     core_report = SimpleNamespace(
         edit={"artifacts": {"mask_payload": {"indices": [1, 2, 3], "meta": {}}}}
     )
     out_dir = tmp_path / "run"
     out_dir.mkdir()
-    mask_path = _persist_ref_masks(core_report, out_dir)
+    mask_path = persist_ref_masks(core_report, out_dir)
     assert mask_path and mask_path.exists()
 
 
@@ -260,7 +258,7 @@ output:
             ),
         ),
         patch(
-            "invarlock.cli.commands.run.detect_model_profile",
+            "invarlock.cli.run_runtime.detect_model_profile",
             lambda model_id, adapter: SimpleNamespace(
                 default_loss="mlm",
                 model_id=model_id,
@@ -282,7 +280,7 @@ output:
             ),
         ),
         patch(
-            "invarlock.cli.commands.run.resolve_tokenizer",
+            "invarlock.cli.run_runtime.resolve_tokenizer",
             lambda model_profile: (
                 SimpleNamespace(
                     mask_token_id=103,
@@ -297,13 +295,13 @@ output:
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.reporting.report.save_report",
+            "invarlock.reporting.report_files.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / (filename_prefix + ".json"))
             },
         ),
         patch(
-            "invarlock.cli.commands.run.validate_guard_overhead",
+            "invarlock.cli.run_runtime.validate_guard_overhead",
             lambda *args, **kwargs: SimpleNamespace(
                 passed=True,
                 overhead_ratio=0.0,
@@ -402,7 +400,9 @@ def test_to_serialisable_dict_uses_dict_method(tmp_path: Path):
             return {}
 
     with ExitStack() as stack:
-        stack.enter_context(patch("invarlock.cli.config.load_config", lambda p: Cfg()))
+        stack.enter_context(
+            patch("invarlock.core.config_runtime.load_config", lambda p: Cfg())
+        )
         stack.enter_context(
             patch(
                 "invarlock.eval.data.get_provider",
@@ -452,17 +452,17 @@ def test_to_serialisable_dict_uses_dict_method(tmp_path: Path):
 
 def test_persist_masks_returns_none_when_no_edit_dict(tmp_path: Path):
     core_report = SimpleNamespace(edit=None)
-    assert _persist_ref_masks(core_report, tmp_path) is None
+    assert persist_ref_masks(core_report, tmp_path) is None
 
 
 def test_persist_masks_returns_none_when_no_artifacts_dict(tmp_path: Path):
     core_report = SimpleNamespace(edit={"artifacts": None})
-    assert _persist_ref_masks(core_report, tmp_path) is None
+    assert persist_ref_masks(core_report, tmp_path) is None
 
 
 def test_persist_masks_returns_none_when_mask_payload_invalid(tmp_path: Path):
     core_report = SimpleNamespace(edit={"artifacts": {"mask_payload": []}})
-    assert _persist_ref_masks(core_report, tmp_path) is None
+    assert persist_ref_masks(core_report, tmp_path) is None
 
 
 def test_plan_release_windows_console_adjustment_path():
@@ -474,7 +474,7 @@ def test_plan_release_windows_console_adjustment_path():
         "candidate_unique": 800,
         "candidate_limit": 1200,
     }
-    plan = _plan_release_windows(
+    plan = plan_release_windows(
         capacity,
         requested_preview=500,
         requested_final=500,
@@ -485,3 +485,28 @@ def test_plan_release_windows_console_adjustment_path():
     assert plan["actual_preview"] < plan["target_per_arm"]
     assert plan["capacity"].get("candidate_unique") == 800
     assert plan["capacity"].get("candidate_limit") == 1200
+
+
+def test_plan_release_windows_candidate_unique_zero_falls_back_to_available_unique():
+    events: list[tuple[str, str]] = []
+
+    plan = plan_release_windows(
+        {
+            "available_unique": 2000,
+            "available_nonoverlap": 2000,
+            "total_tokens": 1_000_000,
+            "dedupe_rate": 0.1,
+            "candidate_unique": 0,
+        },
+        requested_preview=500,
+        requested_final=500,
+        max_calibration=100,
+        console=Console(record=True),
+        event_fn=lambda console, tag, message, **kwargs: events.append((tag, message)),
+    )
+
+    assert plan["capacity"]["effective_unique"] == 2000
+    assert plan["capacity"]["candidate_unique"] == 0
+    assert any(
+        tag == "METRIC" and "candidate_unique=0" in message for tag, message in events
+    )

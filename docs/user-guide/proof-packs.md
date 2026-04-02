@@ -7,8 +7,8 @@
 | **Purpose** | Hardware-agnostic validation runs that bundle reports into portable evidence artifacts. |
 | **Audience** | CI operators producing validation evidence across GPU topologies. |
 | **Requires** | Active repo environment, GPU capable of fitting selected models, and HF cache or network for model download. Secure-default runs also require an OCI container engine. |
-| **Outputs** | Proof pack directory with reports, checksums, and optional GPG signature. |
-| **Source of truth** | `scripts/proof_packs/run_suite.sh`, `scripts/proof_packs/run_pack.sh`. |
+| **Outputs** | Proof pack directory with reports, checksums, and an optional package-native signature bundle. |
+| **Source of truth** | `scripts/proof_packs/run_suite.sh`, `scripts/proof_packs/run_pack.sh`, `src/invarlock/proof_pack.py`, `src/invarlock/cli/commands/proof_pack.py`, `src/invarlock/reporting/verify_contract.py`. |
 
 Proof packs are hardware-agnostic validation runs that bundle InvarLock reports,
 summary reports, and verification metadata into a portable evidence artifact. They replace the
@@ -29,7 +29,7 @@ verify reported outcomes, and provide structured outputs for downstream analysis
 > `calibrated_preset_<model>.yaml/json` for that suite run. It does not directly
 > modify global `runtime/tiers.yaml`. For global tier policy tuning, use
 > `invarlock advanced calibrate ...` (see [Tier Policy Tuning CLI](../reference/calibration.md)).
-> Calibration entrypoints still use the secure-default runtime container unless
+> Calibration entrypoints use the secure-default runtime container unless
 > a trusted repo-only workflow opts into local host execution.
 
 ## Entrypoint Guide
@@ -74,16 +74,23 @@ INVARLOCK_ALLOW_REMOTE_CODE=1 \
 invarlock advanced proof-pack inspect ./proof_pack_runs/subset_20250101_000000/proof_pack --json
 
 # Build a proof pack from existing artifacts
+invarlock advanced proof-pack keygen ./tmp/proof_pack_signing_key.pem
+
 invarlock advanced proof-pack build ./tmp/proof_pack \
   --final-verdict ./reports/final_verdict.json \
   --source-repo ./metadata/source_repo.json \
   --environment ./metadata/environment.json \
   --material model_revisions=./metadata/model_revisions.json \
-  --report ./runs/model/evaluation.report.json
+  --report ./runs/model/evaluation.report.json \
+  --signing-key ./tmp/proof_pack_signing_key.pem
 
 # Verify an existing proof pack
 invarlock advanced proof-pack verify ./proof_pack_runs/subset_20250101_000000/proof_pack --strict
 ```
+
+Each `--report` must be an explicit `evaluation.report.json` file path. The
+builder also requires `runtime.manifest.json` next to each supplied report so
+packaged evidence preserves attestation provenance.
 
 Note: clean edits require tuned preset parameters. Either set
 `PACK_TUNED_EDIT_PARAMS_FILE` or place the file at
@@ -101,7 +108,7 @@ model-loading commands use the secure-default runtime container path and expect
 Validated secure-default parity contract for proof-pack wrappers:
 
 - Wrapper-provided `INVARLOCK_CONFIG_ROOT` and `INVARLOCK_STORE_EVAL_WINDOWS`
-  now survive delegated repo-only config-runner / `evaluate` calls.
+  survive delegated repo-only config-runner / `evaluate` calls.
 - External cache and temp overrides such as `HF_HOME`, `HF_HUB_CACHE`,
   `HF_DATASETS_CACHE`, `TRANSFORMERS_CACHE`, `TMPDIR`, and `TMP` remain visible
   inside the runtime container.
@@ -109,9 +116,9 @@ Validated secure-default parity contract for proof-pack wrappers:
   inputs are mounted automatically before delegation.
 - Configs that rely on `!include` outside the config directory must set
   `INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1`; otherwise the proof-pack wrapper
-  now fails before launch instead of starting an unusable container job.
+  fails before launch instead of starting an unusable container job.
 
-Bulk proof-pack entrypoints now default to `SKIP_FLASH_ATTN=true` and
+Bulk proof-pack entrypoints default to `SKIP_FLASH_ATTN=true` and
 `PACK_BASELINE_STORAGE_MODE=snapshot_copy`. That is the safe default for remote
 secure-default runs. Only opt back into flash-attn builds or
 `snapshot_symlink` baselines when you intentionally want the extra complexity.
@@ -144,9 +151,9 @@ Scenario selection is driven by `scripts/proof_packs/scenarios.json`. Scenarios 
 optionally declare `suites: ["subset", "showcase", "full", ...]`; during execution the
 suite writes the effective (filtered) manifest to `OUTPUT_DIR/state/scenarios.json`,
 and both task generation and final verdict compilation use that state manifest.
-`--scenario-ids` filters that manifest before queue generation, and the runtime now
+`--scenario-ids` filters that manifest before queue generation, and the runtime
 honors one-sided selections exactly: clean-only, stress-only, or single-scenario
-smokes no longer expand back to the default 8 edit scenarios. Disk estimation uses
+smokes do not expand back to the default 8 edit scenarios. Disk estimation uses
 the same filtered state manifest, so storage preflight reflects the selected
 scenario set rather than the suite defaults.
 
@@ -159,7 +166,7 @@ Proof packs require pinned model revisions for reproducibility:
 - Offline runs use `--net 0` (default) and error if the cache is missing.
 - The `PACK_NET` environment variable is exported as `1` or `0` to gate `HF_*_OFFLINE` settings.
 - Bulk proof-pack runs also require `INVARLOCK_ALLOW_REMOTE_CODE=1`; the
-  entrypoint now fails fast before queue creation when that opt-in is missing.
+  entrypoint fails fast before queue creation when that opt-in is missing.
 
 ## Promotion Sentinels
 
@@ -213,7 +220,7 @@ A suite run writes artifacts under `OUTPUT_DIR` (default: `./proof_pack_runs/<su
 - `reports/**/ve_probe.json` (optional sidecar; emitted by VE demo scenarios, e.g. `ve_mlp_scale_skew`)
 - `reports/**/evaluation.html` + `reports/**/verify.json`
 - `README.md`, `manifest.json`, `checksums.sha256`
-- `manifest.json.asc` if GPG signing is available
+- `manifest.signature.json` when the pack is signed
 - `metadata/source_repo.json`, `metadata/environment.json`, and other input metadata sidecars when present
 
 Pack assembly is atomic at the directory level. `run_pack.sh` stages the pack in
@@ -246,32 +253,39 @@ a drift summary in `results/determinism_repeats.json`.
 signed manifest cryptographically binds the checksums file (and thus all hashed artifacts).
 Newer packs also carry a repo-native attestation block in the same signed manifest:
 `builder`, `subject`, `invocation`, `environment`, and digest-backed `materials`.
-Signed packs also record `signing_key_fingerprint` for audit trails.
+Package-native signed packs store the detached Ed25519 signature bundle in
+`manifest.signature.json` and record `signing_key_fingerprint` in the manifest
+for audit trails.
 
 The manifest contract is published at `contracts/proof_pack_manifest.schema.json`.
 `invarlock advanced proof-pack verify` validates this schema before checksum and signature verification so
 malformed proof packs fail deterministically.
 
-Installed wheels now ship the public contracts and support package-native
-inspection, assembly, and verification via `invarlock advanced proof-pack inspect`,
-`invarlock advanced proof-pack build`, and `invarlock advanced proof-pack verify`. The repo shell verifier remains
-available for maintainers using the proof-pack harness directly.
+Installed wheels ship the public contracts and support package-native
+inspection, key generation, assembly, and verification via `invarlock advanced proof-pack inspect`,
+`invarlock advanced proof-pack keygen`, `invarlock advanced proof-pack build`,
+and `invarlock advanced proof-pack verify`. The package-native CLI does not
+depend on external signature binaries for proof-pack verification.
 
 Use the package-native subcommands:
 
 - `invarlock advanced proof-pack inspect <dir>`
   - Summarizes manifest validity, checksum coverage, attestation references, report inventory, and strict-readiness.
   - Does not run nested `invarlock verify`; use this for quick received-artifact triage.
+- `invarlock advanced proof-pack keygen <private-key.pem>`
+  - Generates an Ed25519 signing key pair for package-native proof-pack signatures.
 - `invarlock advanced proof-pack build <out> --final-verdict <json> --report <report> [...more --report]`
   - Packages existing JSON artifacts into a proof pack and pre-verifies the supplied clean reports with `invarlock verify`.
+  - Add `--signing-key <private-key.pem>` to produce `manifest.signature.json`.
   - Intended for wheel users packaging already-produced evidence, not for running the full suite.
+  - The repo maintainer harness signs by default as well; set `PACK_SIGN_MANIFEST=0` only when you intentionally need an unsigned pack.
 - `invarlock advanced proof-pack verify <dir>`
 
 - Default: `invarlock advanced proof-pack verify <dir>`
-  - Verifies `checksums_sha256_digest`, validates digest-backed manifest references, validates `checksums.sha256`, and runs `invarlock verify`.
-  - Warns (but does not fail) if the pack is unsigned; this is evidence-grade verification.
+  - Verifies `checksums_sha256_digest`, validates digest-backed manifest references, validates `checksums.sha256`, requires a signed `manifest.signature.json`, and runs `invarlock verify`.
+  - Fails closed if the pack is unsigned or if signature verification cannot run.
 - Strict (recommended for distributable evidence): `invarlock advanced proof-pack verify <dir> --strict`
-  - Fails if `manifest.json.asc` is missing, `gpg` verification fails, or extra files exist outside `checksums.sha256`.
+  - Adds fail-closed checks for extra files outside `checksums.sha256` on top of the default signed-manifest requirement.
   - Repo-harness alternative: `PACK_STRICT_MODE=1 scripts/proof_packs/verify_pack.sh --pack <dir>`.
 
 `invarlock advanced proof-pack verify` returns structured exit codes:
@@ -290,11 +304,8 @@ Reviewer checklist:
 - `invarlock advanced proof-pack verify <dir> --strict` returns `0`
 - `jq -e . <dir>/manifest.json` succeeds
 - `sha256sum -c <dir>/checksums.sha256` succeeds
-- `gpg --verify <dir>/manifest.json.asc <dir>/manifest.json` succeeds when the
-  pack is published as signed evidence
+- `jq -e . <dir>/manifest.signature.json` succeeds when the pack is published as signed evidence
 - `manifest.json` includes builder, subject, invocation, environment, and
   material digests for the distributed pack
 
 For proof-grade attestation, require all three: signed manifest, strict verification, and PASS final verdict.
-
-To skip signing during pack creation, set `PACK_GPG_SIGN=0`. To require signing, set `PACK_STRICT_MODE=1`.

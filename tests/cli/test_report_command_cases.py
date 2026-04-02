@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import sys
 import types
 from pathlib import Path
 from unittest.mock import patch
@@ -11,6 +10,8 @@ from typer.testing import CliRunner
 
 from invarlock.cli.app import app
 from invarlock.cli.commands import report as report_mod
+from invarlock.reporting import report_console as console_mod
+from invarlock.reporting.report_contract import ReportGenerationResult, generate_reports
 
 
 def test_report_requires_run_flag_when_no_subcommand():
@@ -47,14 +48,16 @@ def test_report_helpers_cover_invalid_and_long_formatting_cases():
     assert report_mod._fmt_ci_95((1.0, float("nan"))) is None
 
 
-def test_generate_reports_rejects_unknown_format():
-    with patch.object(report_mod, "_load_run_report", return_value={"meta": {}}):
-        with pytest.raises(report_mod.typer.Exit) as excinfo:
-            report_mod._generate_reports(run="ignored.json", format="bogus")
-    assert excinfo.value.exit_code == 1
+def test_report_command_rejects_unknown_format():
+    with patch(
+        "invarlock.reporting.report_contract.load_report_payload",
+        return_value={"meta": {}},
+    ):
+        with pytest.raises(ValueError, match="Unknown --format"):
+            generate_reports(run="ignored.json", format="bogus")
 
 
-def test_generate_reports_normalizes_md_and_handles_sparse_primary_metric(
+def test_report_command_normalizes_md_and_handles_sparse_primary_metric(
     tmp_path: Path,
 ) -> None:
     render_mod = types.SimpleNamespace(
@@ -67,9 +70,8 @@ def test_generate_reports_normalizes_md_and_handles_sparse_primary_metric(
     run_path.write_text("{}", encoding="utf-8")
 
     with (
-        patch.object(
-            report_mod,
-            "_load_run_report",
+        patch(
+            "invarlock.reporting.report_contract.load_report_payload",
             side_effect=[
                 {
                     "meta": {},
@@ -80,14 +82,16 @@ def test_generate_reports_normalizes_md_and_handles_sparse_primary_metric(
                 {"meta": {}, "metrics": {}},
             ],
         ),
-        patch.object(
-            report_mod.report_lib,
-            "save_report",
-            return_value={"report": str(tmp_path / "report.json")},
+        patch(
+            "invarlock.reporting.report_contract.save_report",
+            return_value={"markdown": str(tmp_path / "report.md")},
         ) as save_report,
-        patch.object(
-            report_mod.report_builder,
-            "make_report",
+        patch(
+            "invarlock.reporting.report_contract.save_evaluation_bundle",
+            return_value={"report": tmp_path / "report.json"},
+        ) as save_bundle,
+        patch(
+            "invarlock.reporting.report_contract.make_report",
             return_value={
                 "schema_version": "1",
                 "primary_metric": {
@@ -99,23 +103,101 @@ def test_generate_reports_normalizes_md_and_handles_sparse_primary_metric(
                 },
             },
         ),
-        patch.object(report_mod.report_builder, "validate_report"),
-        patch.dict(sys.modules, {"invarlock.reporting.render": render_mod}),
-        patch.object(report_mod.console, "print"),
+        patch("invarlock.reporting.report_contract.validate_report"),
+        patch(
+            "invarlock.reporting.report_contract.compute_console_validation_block",
+            render_mod.compute_console_validation_block,
+        ),
     ):
-        report_mod._generate_reports(
+        generate_reports(
             run=str(run_path),
             format="report",
             baseline=str(run_path),
             output=str(tmp_path / "out"),
         )
-        report_mod._generate_reports(
+        generate_reports(
             run=str(run_path),
             format="md",
             output=str(tmp_path / "out-md"),
         )
 
-    first_formats = save_report.call_args_list[0].kwargs["formats"]
-    second_formats = save_report.call_args_list[1].kwargs["formats"]
-    assert first_formats == ["report"]
-    assert second_formats == ["markdown"]
+    assert save_bundle.call_count == 1
+    assert save_report.call_args_list[0].kwargs["formats"] == ["markdown"]
+
+
+def test_report_command_generic_failure_maps_to_exit_one(monkeypatch) -> None:
+    monkeypatch.setattr(
+        report_mod,
+        "generate_reports",
+        lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+    monkeypatch.setattr(report_mod, "print_event", lambda *_args, **_kwargs: None)
+
+    with pytest.raises(report_mod.typer.Exit) as excinfo:
+        report_mod.report_callback(
+            type("Ctx", (), {"resilient_parsing": False, "invoked_subcommand": None})(),
+            run="ignored.json",
+            format="json",
+            compare=None,
+            baseline=None,
+            output=None,
+            style="audit",
+            no_color=False,
+        )
+
+    assert excinfo.value.exit_code == 1
+
+
+def test_report_command_summary_prints_metadata_and_primary_metric_fields(
+    tmp_path: Path,
+) -> None:
+    run_path = tmp_path / "run.json"
+    run_path.write_text("{}", encoding="utf-8")
+    primary_report = {
+        "meta": {"model_id": "subject-model", "run_id": "subject-run"},
+        "edit": {"name": "quant_rtn"},
+        "metrics": {},
+    }
+    baseline_report = {"meta": {}, "metrics": {}}
+    captured: list[str] = []
+
+    class _CaptureConsole:
+        def print(self, *args: object, **kwargs: object) -> None:
+            captured.append(" ".join(str(arg) for arg in args))
+
+    result = ReportGenerationResult(
+        output_dir=str(tmp_path / "out"),
+        formats=["report"],
+        saved_files={"report": str(tmp_path / "evaluation.report.json")},
+        primary_report=primary_report,
+        compare_report=None,
+        baseline_report=baseline_report,
+        evaluation_report={
+            "schema_version": "1",
+            "run_id": "evaluation-run",
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 1.0,
+                "final": 2.0,
+                "ratio_vs_baseline": 1.5,
+                "display_ci": [1.25, 1.75],
+            },
+        },
+        validation_block=console_mod.compute_console_validation_block({}),
+    )
+    with patch.object(report_mod, "console", _CaptureConsole()):
+        report_mod._render_generation_result(
+            result=result,
+            style="audit",
+            no_color=False,
+        )
+
+    rendered = "\n".join(captured)
+    assert "Schema Version" in rendered
+    assert "Run ID" in rendered
+    assert "Model" in rendered
+    assert "Edit" in rendered
+    assert "Preview" in rendered
+    assert "Final" in rendered
+    assert "Ratio" in rendered
+    assert "CI (95%)" in rendered

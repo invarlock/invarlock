@@ -9,6 +9,7 @@ Provides structured logging for analysis and debugging.
 from __future__ import annotations
 
 import json
+import logging
 import time
 from collections.abc import Mapping, Sequence
 from datetime import datetime
@@ -137,9 +138,7 @@ class EventLogger:
                 self._file.flush()
 
         except Exception as e:  # pragma: no cover - fallback to stderr
-            import sys
-
-            print(f"Event logging failed: {e}", file=sys.stderr)
+            logging.getLogger(__name__).warning("Event logging failed: %s", e)
 
     def _sanitize_data(self, data: dict[str, Any]) -> dict[str, Any]:
         """

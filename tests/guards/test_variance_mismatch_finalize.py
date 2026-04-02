@@ -39,8 +39,12 @@ def test_finalize_mismatch_warning(monkeypatch):
 
     result = g.validate(TinyModel(), adapter=None, context={})
     assert result["passed"] is True
-    # Should include a warning about disabled despite approval
-    assert any("A/B gate approval" in w for w in result.get("warnings", []))
+    messages = [
+        diagnostic["message"]
+        for diagnostic in result.get("diagnostics", [])
+        if diagnostic.get("severity") == "warning"
+    ]
+    assert any("A/B gate approval" in message for message in messages)
 
 
 def test_finalize_mismatch_error(monkeypatch):

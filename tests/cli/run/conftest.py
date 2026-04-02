@@ -4,6 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from invarlock.runtime_security import RuntimeSecurityPolicy
+
 
 class _DummyRunModel:
     def named_parameters(self):
@@ -43,5 +45,22 @@ def _default_run_registry(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         "invarlock.core.registry.get_registry",
         lambda: _DummyRunRegistry(),
+    )
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _default_run_host_execution(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        "invarlock.cli.config_execution.host_execution_allowed",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        "invarlock.cli.config_execution.resolve_shell_runtime_security_policy",
+        lambda **_: RuntimeSecurityPolicy(allow_host_execution=True),
+    )
+    monkeypatch.setattr(
+        "invarlock.cli.security_helpers.resolve_shell_runtime_security_policy",
+        lambda **_: RuntimeSecurityPolicy(allow_host_execution=True),
     )
     yield

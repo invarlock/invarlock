@@ -1741,10 +1741,6 @@ main_dynamic() {
     if ! [[ "${stress_scenarios}" =~ ^[0-9]+$ ]]; then
         stress_scenarios=0
     fi
-    if ! [[ "${error_scenarios}" =~ ^[0-9]+$ ]]; then
-        error_scenarios=0
-    fi
-
     if command -v jq >/dev/null 2>&1 && [[ -f "${scenarios_file}" ]]; then
         error_scenarios="$(jq -r '[.scenarios[] | select(.generation.kind=="error")] | length' "${scenarios_file}" 2>/dev/null || echo 0)"
         error_scenarios_source="state/scenarios.json"
@@ -1752,7 +1748,6 @@ main_dynamic() {
     if ! [[ "${error_scenarios}" =~ ^[0-9]+$ ]]; then
         error_scenarios=0
     fi
-
     local clean_runs="${CLEAN_EDIT_RUNS:-0}"
     if ! [[ "${clean_runs}" =~ ^-?[0-9]+$ ]]; then
         clean_runs=0

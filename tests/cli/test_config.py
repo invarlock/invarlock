@@ -4,42 +4,72 @@ from pathlib import Path
 
 import pytest
 
-import invarlock.cli.config as config_mod
-from invarlock.cli.config import (
+import invarlock.core.config_runtime as config_mod
+from invarlock.cli.run_config import _resolve_requested_edit_name
+from invarlock.core.config_runtime import (
     AutoConfig,
     InvarLockConfig,
     OutputConfig,
     SpectralGuardConfig,
     VarianceGuardConfig,
-    _Obj,
     apply_profile,
-    resolve_edit_kind,
 )
 
 
-def test__obj_attribute_access_and_get():
-    o = _Obj({"a": {"b": 1}, "c": 2})
-    assert o.c == 2
-    assert isinstance(o.a, _Obj)
-    with pytest.raises(AttributeError):
-        _ = o.missing  # noqa: F841
-    assert o.get("missing", 7) == 7
-
-
-def test__obj_non_mapping_paths() -> None:
-    o = _Obj(123)
-    with pytest.raises(TypeError):
-        _ = o["x"]  # noqa: F841
-    assert o.get("anything", 9) == 9
-
-
-def test_invarlock_config_merges_data_and_sections() -> None:
+def test_invarlock_config_is_explicit_mutable_mapping() -> None:
     base = {"model": {"id": "gpt2"}, "extra": 1}
-    cfg = InvarLockConfig(data=base, edit={"name": "noop"})
-    assert cfg.model.id == "gpt2"
-    assert cfg.edit.name == "noop"
-    with pytest.raises(AttributeError):
-        _ = cfg.missing  # noqa: F841
+    cfg = InvarLockConfig.from_sections(**base, edit={"name": "noop"})
+    assert cfg["model"]["id"] == "gpt2"
+    assert cfg.require_section("edit")["name"] == "noop"
+    assert cfg.get("missing") is None
+    cfg.setdefault("context", {})
+    cfg["context"]["mode"] = "local"
+    assert cfg.section("context") == {"mode": "local"}
+
+
+def test_invarlock_config_section_accessors_fail_closed() -> None:
+    cfg = InvarLockConfig.from_sections(model={"id": "gpt2"}, extra=7)
+    assert cfg.section("missing") is None
+    assert cfg.section("model") == {"id": "gpt2"}
+    with pytest.raises(KeyError, match="required"):
+        cfg.require_section("dataset")
+    with pytest.raises(TypeError, match="must be a mapping"):
+        cfg.section("extra")
+
+
+def test_eval_section_preserves_loss_and_runtime_fields() -> None:
+    cfg = InvarLockConfig.from_sections(
+        eval={
+            "loss": {
+                "type": "mlm",
+                "mask_prob": 0.2,
+                "random_token_prob": 0.1,
+                "original_token_prob": 0.05,
+            },
+            "capacity_fast": True,
+            "max_pm_ratio": 1.25,
+            "spike_threshold": 2.5,
+        }
+    )
+
+    assert cfg.eval.loss is not None
+    assert cfg.eval.loss.type == "mlm"
+    assert cfg.eval.loss.mask_prob == pytest.approx(0.2)
+    assert cfg.eval.capacity_fast is True
+    assert cfg.eval.max_pm_ratio == pytest.approx(1.25)
+    assert cfg.eval.spike_threshold == pytest.approx(2.5)
+    assert cfg.section("eval") == {
+        "bootstrap": {"replicates": 1000, "alpha": 0.05, "ci_band": 0.1},
+        "loss": {
+            "type": "mlm",
+            "mask_prob": 0.2,
+            "random_token_prob": 0.1,
+            "original_token_prob": 0.05,
+        },
+        "spike_threshold": 2.5,
+        "max_pm_ratio": 1.25,
+        "capacity_fast": True,
+    }
 
 
 def test_guard_configs_family_caps_and_sigma_quantile():
@@ -78,14 +108,14 @@ def test_auto_config_valid_values_pass() -> None:
     assert cfg.probes == 3 and cfg.target_pm_ratio == 1.1
 
 
-def test_resolve_edit_kind_unknown_raises():
+def test_resolve_requested_edit_name_unknown_raises():
     with pytest.raises(ValueError):
-        resolve_edit_kind("not-a-kind")
+        _resolve_requested_edit_name("not-a-kind")
 
 
 def test_apply_profile_ci_raises_when_runtime_profile_missing(monkeypatch):
     monkeypatch.setattr(config_mod, "_load_runtime_yaml", lambda *_a, **_k: None)
-    cfg = InvarLockConfig(dataset={"provider": "wikitext2"})
+    cfg = InvarLockConfig.from_sections(dataset={"provider": "wikitext2"})
     with pytest.raises(ValueError, match="Unknown profile"):
         apply_profile(cfg, "ci")
 
@@ -94,6 +124,6 @@ def test_apply_profile_ci_missing_runtime_profile_ignores_env(monkeypatch):
     monkeypatch.setattr(config_mod, "_load_runtime_yaml", lambda *_a, **_k: None)
     monkeypatch.setenv("INVARLOCK_CI_PREVIEW", "not-an-int")
     monkeypatch.setenv("INVARLOCK_CI_FINAL", "also-bad")
-    cfg = InvarLockConfig(dataset={"provider": "wikitext2"})
+    cfg = InvarLockConfig.from_sections(dataset={"provider": "wikitext2"})
     with pytest.raises(ValueError, match="Unknown profile"):
         apply_profile(cfg, "ci")

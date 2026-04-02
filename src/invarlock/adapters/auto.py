@@ -7,7 +7,7 @@ from typing import Any
 
 from invarlock.core.api import ModelAdapter
 
-from ..cli.adapter_auto import resolve_auto_adapter
+from ..core.adapter_auto import resolve_auto_adapter
 
 
 def _detect_quantization_from_path(model_id: str) -> str | None:
@@ -26,23 +26,27 @@ def _detect_quantization_from_path(model_id: str) -> str | None:
         return None
 
     try:
-        config_data = json.loads(config_path.read_text())
-        quant_cfg = config_data.get("quantization_config", {})
+        config_data = json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return None
+    if not isinstance(config_data, dict):
+        return None
 
-        if not quant_cfg:
-            return None
+    quant_cfg = config_data.get("quantization_config", {})
+    if not isinstance(quant_cfg, dict) or not quant_cfg:
+        return None
 
-        quant_method = quant_cfg.get("quant_method", "").lower()
+    quant_method = quant_cfg.get("quant_method", "")
+    if not isinstance(quant_method, str):
+        return None
+    quant_method = quant_method.lower()
 
-        if quant_method == "awq":
-            return "hf_awq"
-        elif quant_method == "gptq":
-            return "hf_gptq"
-        elif "bitsandbytes" in quant_method or "bnb" in quant_method:
-            return "hf_bnb"
-
-    except Exception:
-        pass
+    if quant_method == "awq":
+        return "hf_awq"
+    if quant_method == "gptq":
+        return "hf_gptq"
+    if "bitsandbytes" in quant_method or "bnb" in quant_method:
+        return "hf_bnb"
 
     return None
 
@@ -69,7 +73,10 @@ def _detect_quantization_from_model(model: Any) -> str | None:
 
     # Handle dict-style config
     if isinstance(quant_cfg, dict):
-        quant_method = quant_cfg.get("quant_method", "").lower()
+        quant_method = quant_cfg.get("quant_method", "")
+        if not isinstance(quant_method, str):
+            return None
+        quant_method = quant_method.lower()
         if quant_method == "awq":
             return "hf_awq"
         elif quant_method == "gptq":
@@ -84,11 +91,6 @@ def _detect_quantization_from_model(model: Any) -> str | None:
         elif cfg_class in ("GPTQConfig",):
             return "hf_gptq"
         elif cfg_class in ("BitsAndBytesConfig", "BnbConfig"):
-            return "hf_bnb"
-        # Check attributes
-        if getattr(quant_cfg, "load_in_8bit", False) or getattr(
-            quant_cfg, "load_in_4bit", False
-        ):
             return "hf_bnb"
 
     return None
@@ -190,14 +192,6 @@ class _DelegatingAdapter(ModelAdapter):
     def restore(self, model: Any, blob: bytes) -> None:
         delegate = self._delegate or self._ensure_delegate_from_model(model)
         return delegate.restore(model, blob)
-
-    def __getattr__(self, item: str):  # pragma: no cover - passthrough
-        if item == "_delegate":
-            raise AttributeError(item)
-        delegate = self._delegate
-        if delegate is not None and hasattr(delegate, item):
-            return getattr(delegate, item)
-        raise AttributeError(item)
 
 
 class HF_Auto_Adapter(_DelegatingAdapter):

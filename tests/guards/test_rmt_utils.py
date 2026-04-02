@@ -2,9 +2,8 @@ import pytest
 import torch.nn as nn
 
 from invarlock.guards.rmt import create_custom_rmt_policy, get_rmt_policy
-from invarlock.guards.rmt_legacy import (
-    _iter_transformer_layers,
-    layer_svd_stats,
+from invarlock.guards.rmt_analysis import _iter_transformer_layers, layer_svd_stats
+from invarlock.guards.rmt_math import (
     mp_bulk_edge,
     mp_bulk_edges,
     rmt_growth_ratio,

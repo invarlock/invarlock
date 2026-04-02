@@ -1,9 +1,9 @@
 from unittest.mock import patch
 
-from invarlock.reporting.report_builder import (
-    make_report,
+from invarlock.reporting.render import (
     render_report_markdown,
 )
+from invarlock.reporting.report_make import make_report
 
 
 def test_render_spectral_multiple_testing_yaml_block():
@@ -37,7 +37,7 @@ def test_render_spectral_multiple_testing_yaml_block():
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
     with patch(
-        "invarlock.reporting.report_builder.validate_run_report", return_value=True
+        "invarlock.reporting.report_normalization.validate_report", return_value=True
     ):
         cert = make_report(report, baseline)
 

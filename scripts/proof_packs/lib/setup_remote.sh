@@ -43,6 +43,22 @@ pack_activate_venv() {
     . "${VENV_DIR}/bin/activate"
 }
 
+pack_proof_pack_requirement_path() {
+    local requirement_name="$1"
+    echo "${REPO_DIR}/requirements/proof-packs/${requirement_name}.txt"
+}
+
+pack_install_pinned_requirement() {
+    local requirement_name="$1"
+    local requirement_path
+    requirement_path="$(pack_proof_pack_requirement_path "${requirement_name}")"
+    if [[ ! -f "${requirement_path}" ]]; then
+        echo "ERROR: Missing pinned proof-pack requirement file: ${requirement_path}" >&2
+        return 1
+    fi
+    pack_run_cmd python -m pip install --require-hashes -r "${requirement_path}"
+}
+
 install_system_deps() {
     log "Installing system dependencies (apt)..."
     pack_run_cmd apt-get update
@@ -105,7 +121,17 @@ install_invarlock_stack() {
     cd "${REPO_DIR}"
 
     pack_run_cmd python -m pip install -e ".[hf]"
-    pack_run_cmd python -m pip install accelerate sentencepiece protobuf safetensors
+    pack_install_pinned_requirement "huggingface_hub"
+    pack_install_pinned_requirement "accelerate"
+    pack_install_pinned_requirement "pyyaml"
+    pack_install_pinned_requirement "protobuf"
+    pack_install_pinned_requirement "sentencepiece"
+}
+
+verify_remote_stack() {
+    log "Running proof-pack remote smoke check"
+    pack_activate_venv
+    pack_run_cmd python "${REPO_DIR}/scripts/proof_packs/python/remote_setup_smoke.py"
 }
 
 post_setup() {
@@ -123,6 +149,7 @@ main() {
     install_torch
     install_invarlock_stack
     post_setup
+    verify_remote_stack
 
     log "Setup complete. Run INVARLOCK_ALLOW_REMOTE_CODE=1 ./scripts/proof_packs/run_pack.sh --suite subset --net 1"
 }

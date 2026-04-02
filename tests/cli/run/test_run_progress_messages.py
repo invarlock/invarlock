@@ -92,7 +92,7 @@ def _common_stubs(monkeypatch) -> None:
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.commands.run.detect_model_profile",
+        "invarlock.cli.run_runtime.detect_model_profile",
         lambda *a, **k: SimpleNamespace(
             default_loss="ce",
             invariants=[],
@@ -102,7 +102,7 @@ def _common_stubs(monkeypatch) -> None:
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.commands.run.resolve_tokenizer",
+        "invarlock.cli.run_runtime.resolve_tokenizer",
         lambda *a, **k: (
             SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=10),
             "tokhash123",
@@ -126,5 +126,6 @@ def test_run_progress_done_messages(tmp_path: Path, monkeypatch) -> None:
     )
     assert r.exit_code == 0
     s = r.stdout
-    assert "done (1.00s)" in s
-    assert "done (2.00s)" in s
+    assert "Loading model done (" in s
+    assert "Execute pipeline done (" in s
+    assert s.count(" done (") >= 2

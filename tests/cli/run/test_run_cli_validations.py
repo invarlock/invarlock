@@ -5,15 +5,14 @@ import pytest
 import typer
 
 from invarlock.cli.commands.run import (
-    GUARD_OVERHEAD_THRESHOLD,
     run_command,
 )
+from invarlock.core.run_policy import GUARD_OVERHEAD_THRESHOLD
 
 
 def test_run_command_file_not_found():
     with (
-        patch("invarlock.cli.commands.run.HAS_CORE_COMPONENTS", True),
-        patch("invarlock.cli.commands.run.console"),
+        patch("invarlock.cli.run_execution.console"),
     ):
         with pytest.raises((SystemExit, typer.Exit)) as exc_info:
             run_command(
@@ -32,9 +31,8 @@ def test_run_command_file_not_found():
             assert exc_info.value.exit_code == 1
 
 
-@patch("invarlock.cli.commands.run.HAS_CORE_COMPONENTS", True)
-@patch("invarlock.cli.config.load_config")
-@patch("invarlock.cli.config.resolve_edit_kind")
+@patch("invarlock.core.config_runtime.load_config")
+@patch("invarlock.cli.run_config._resolve_requested_edit_name")
 def test_run_command_invalid_edit_kind(mock_resolve_edit, mock_load):
     mock_config = Mock()
     mock_config.model.device = "auto"
@@ -43,7 +41,7 @@ def test_run_command_invalid_edit_kind(mock_resolve_edit, mock_load):
     mock_load.return_value = mock_config
     mock_resolve_edit.side_effect = ValueError("Invalid edit kind")
 
-    with patch("invarlock.cli.commands.run.console"):
+    with patch("invarlock.cli.run_execution.console"):
         with pytest.raises((SystemExit, typer.Exit)) as exc_info:
             run_command(
                 config="test.yaml",
@@ -60,14 +58,13 @@ def test_run_command_invalid_edit_kind(mock_resolve_edit, mock_load):
             assert exc_info.value.exit_code == 2
 
 
-@patch("invarlock.cli.commands.run.HAS_CORE_COMPONENTS", True)
-@patch("invarlock.cli.config.load_config")
+@patch("invarlock.core.config_runtime.load_config")
 def test_run_command_invalid_config_key_exits_2(mock_load):
     mock_load.side_effect = ValueError(
         "edit.parameters is not supported; use edit.plan."
     )
 
-    with patch("invarlock.cli.commands.run.console"):
+    with patch("invarlock.cli.run_execution.console"):
         with pytest.raises((SystemExit, typer.Exit)) as exc_info:
             run_command(
                 config="test.yaml",
@@ -84,8 +81,7 @@ def test_run_command_invalid_config_key_exits_2(mock_load):
             assert exc_info.value.exit_code == 2
 
 
-@patch("invarlock.cli.commands.run.HAS_CORE_COMPONENTS", True)
-@patch("invarlock.cli.config.load_config")
+@patch("invarlock.core.config_runtime.load_config")
 def test_run_command_invalid_tier(mock_load):
     mock_config = Mock()
     mock_config.model.device = "auto"
@@ -93,7 +89,7 @@ def test_run_command_invalid_tier(mock_load):
     mock_config.eval.spike_threshold = 2.0
     mock_load.return_value = mock_config
 
-    with patch("invarlock.cli.commands.run.console"):
+    with patch("invarlock.cli.run_execution.console"):
         with pytest.raises((SystemExit, typer.Exit)) as exc_info:
             run_command(
                 config="test.yaml",
@@ -110,8 +106,7 @@ def test_run_command_invalid_tier(mock_load):
             assert exc_info.value.exit_code == 1
 
 
-@patch("invarlock.cli.commands.run.HAS_CORE_COMPONENTS", True)
-@patch("invarlock.cli.config.load_config")
+@patch("invarlock.core.config_runtime.load_config")
 def test_run_command_invalid_probes(mock_load):
     mock_config = Mock()
     mock_config.model.device = "auto"
@@ -119,7 +114,7 @@ def test_run_command_invalid_probes(mock_load):
     mock_config.eval.spike_threshold = 2.0
     mock_load.return_value = mock_config
 
-    with patch("invarlock.cli.commands.run.console"):
+    with patch("invarlock.cli.run_execution.console"):
         with pytest.raises((SystemExit, typer.Exit)) as exc_info:
             run_command(
                 config="test.yaml",
@@ -136,15 +131,14 @@ def test_run_command_invalid_probes(mock_load):
             assert exc_info.value.exit_code == 1
 
 
-@patch("invarlock.cli.commands.run.HAS_CORE_COMPONENTS", True)
-@patch("invarlock.cli.commands.run.validate_guard_overhead")
-@patch("invarlock.cli.config.load_config")
-@patch("invarlock.cli.config.apply_profile")
+@patch("invarlock.cli.run_runtime.validate_guard_overhead")
+@patch("invarlock.core.config_runtime.load_config")
+@patch("invarlock.core.config_runtime.apply_profile")
 @patch("invarlock.cli.device.resolve_device", return_value="cpu")
 @patch("invarlock.cli.device.validate_device_for_config", return_value=(True, ""))
 @patch("invarlock.core.registry.get_registry")
 @patch("invarlock.core.runner.CoreRunner")
-@patch("invarlock.reporting.report.save_report")
+@patch("invarlock.reporting.report_files.save_report")
 @patch("invarlock.eval.data.get_provider")
 @patch("pathlib.Path.mkdir")
 def test_run_command_fails_when_guard_overhead_exceeds_budget(
@@ -245,7 +239,7 @@ def test_run_command_fails_when_guard_overhead_exceeds_budget(
         errors=["too slow"],
     )
 
-    with patch("invarlock.cli.commands.run.console"):
+    with patch("invarlock.cli.run_execution.console"):
         with pytest.raises((SystemExit, typer.Exit)) as exc_info:
             run_command(
                 config="test.yaml",
