@@ -867,3 +867,106 @@ test_run_pack_entrypoint_propagates_layout_normalization_failures() {
     run pack_run_pack --out "${TEST_TMPDIR}/out"
     assert_rc "7" "${RUN_RC}" "layout normalization failure propagates"
 }
+
+test_run_pack_atomic_helpers_cover_error_paths() {
+    mock_reset
+
+    source ./scripts/proof_packs/run_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    local staging_dir
+
+    mkdir() { return 1; }
+    run pack_prepare_staging_dir "${pack_dir}"
+    assert_rc "1" "${RUN_RC}" "prepare staging dir fails when parent mkdir fails"
+    unset -f mkdir
+
+    staging_dir="$(pack_prepare_staging_dir "${pack_dir}")"
+    mkdir -p "${pack_dir}"
+    echo "payload" > "${pack_dir}/existing"
+    run pack_finalize_staging_dir "${staging_dir}" "${pack_dir}"
+    assert_rc "1" "${RUN_RC}" "finalize rejects non-empty target directories"
+    pack_cleanup_staging_dir "${staging_dir}"
+
+    staging_dir="$(pack_prepare_staging_dir "${pack_dir}")"
+    rm -f "${pack_dir}/existing"
+    rmdir() { return 1; }
+    run pack_finalize_staging_dir "${staging_dir}" "${pack_dir}"
+    assert_rc "1" "${RUN_RC}" "finalize fails when empty target cannot be removed atomically"
+    unset -f rmdir
+    pack_cleanup_staging_dir "${staging_dir}"
+
+    staging_dir="$(pack_prepare_staging_dir "${pack_dir}")"
+    mv() { return 1; }
+    run pack_finalize_staging_dir "${staging_dir}" "${pack_dir}"
+    assert_rc "1" "${RUN_RC}" "finalize fails when staged directory cannot be moved into place"
+    unset -f mv
+    pack_cleanup_staging_dir "${staging_dir}"
+}
+
+test_run_pack_build_pack_propagates_staging_and_finalize_failures() {
+    mock_reset
+
+    source ./scripts/proof_packs/run_pack.sh
+
+    local run_dir="${TEST_TMPDIR}/run"
+    mkdir -p "${run_dir}"
+
+    pack_require_passing_run_verdict() { return 0; }
+    pack_require_cmd() { return 0; }
+    pack_prepare_staging_dir() { return 1; }
+
+    run pack_build_pack "${run_dir}" "${TEST_TMPDIR}/pack"
+    assert_rc "1" "${RUN_RC}" "pack build fails when staging dir cannot be prepared"
+
+    pack_prepare_staging_dir() {
+        mkdir -p "${TEST_TMPDIR}/staging"
+        printf '%s\n' "${TEST_TMPDIR}/staging"
+    }
+    pack_populate_pack_dir() { return 0; }
+    pack_finalize_staging_dir() { return 1; }
+
+    run pack_build_pack "${run_dir}" "${TEST_TMPDIR}/pack"
+    assert_rc "1" "${RUN_RC}" "pack build fails when atomic finalize fails"
+    [[ ! -d "${TEST_TMPDIR}/staging" ]] || t_fail "staging directory should be cleaned on finalize failure"
+}
+
+test_run_pack_populate_pack_dir_propagates_environment_and_manifest_write_failures() {
+    mock_reset
+
+    source ./scripts/proof_packs/run_pack.sh
+
+    local run_dir="${TEST_TMPDIR}/run"
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${run_dir}/reports" "${pack_dir}"
+    echo "verdict" > "${run_dir}/reports/final_verdict.txt"
+    echo '{"verdict":"PASS"}' > "${run_dir}/reports/final_verdict.json"
+
+    pack_normalize_layout() { echo "v2"; }
+    pack_copy_file() { return 0; }
+    pack_copy_optional() { return 0; }
+    pack_write_source_repo_metadata() { return 0; }
+    pack_collect_reports() { :; }
+    pack_verify_reports() { return 0; }
+    pack_generate_html() { return 0; }
+    pack_sign_manifest() { return 0; }
+
+    pack_write_environment_metadata() { return 1; }
+    run pack_populate_pack_dir "${run_dir}" "${pack_dir}"
+    assert_rc "1" "${RUN_RC}" "populate pack dir fails when environment metadata write fails"
+
+    pack_write_environment_metadata() { return 0; }
+    pack_write_readme() { return 1; }
+    run pack_populate_pack_dir "${run_dir}" "${pack_dir}"
+    assert_rc "1" "${RUN_RC}" "populate pack dir fails when README write fails"
+
+    pack_write_readme() { return 0; }
+    pack_write_checksums() { return 1; }
+    run pack_populate_pack_dir "${run_dir}" "${pack_dir}"
+    assert_rc "1" "${RUN_RC}" "populate pack dir fails when checksum write fails"
+
+    pack_write_checksums() { return 0; }
+    pack_write_manifest() { return 1; }
+    run pack_populate_pack_dir "${run_dir}" "${pack_dir}"
+    assert_rc "1" "${RUN_RC}" "populate pack dir fails when manifest write fails"
+}

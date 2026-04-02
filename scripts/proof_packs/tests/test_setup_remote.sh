@@ -69,6 +69,21 @@ test_setup_remote_verify_remote_stack_runs_package_native_smoke() {
     assert_match "python /opt/invarlock/scripts/proof_packs/python/remote_setup_smoke.py" "${cmd}" "remote smoke helper invoked"
 }
 
+test_setup_remote_pack_install_pinned_requirement_requires_file() {
+    mock_reset
+
+    source ./scripts/proof_packs/lib/setup_remote.sh
+
+    REPO_DIR="${TEST_TMPDIR}/repo"
+    mkdir -p "${REPO_DIR}/requirements/proof-packs"
+    pack_run_cmd() { echo "unexpected" > "${TEST_TMPDIR}/unexpected.cmd"; }
+
+    run pack_install_pinned_requirement "missing"
+    assert_rc "1" "${RUN_RC}" "missing pinned requirement file fails"
+    assert_match "Missing pinned proof-pack requirement file" "${RUN_ERR}" "error names missing requirement file"
+    [[ ! -f "${TEST_TMPDIR}/unexpected.cmd" ]] || t_fail "pack_run_cmd should not run when pinned requirement file is absent"
+}
+
 test_setup_remote_post_setup_marks_entrypoints_executable() {
     mock_reset
 

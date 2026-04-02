@@ -1911,3 +1911,368 @@ EOF
     task_calibration_run "${model_name}" 0 "2" "43" "${out}" "${log_file}"
     assert_match "spectral" "$(cat "${model_output_dir}/reports/calibration/run_2/calibration_config.yaml")" "default guard order used"
 }
+
+test_task_helper_effective_ci_and_runtime_stage_error_branches() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    local plan_json
+    plan_json="$(_plan_effective_ci_schedule "${TEST_TMPDIR}/missing-model" "13" "balanced" "wikitext2" "validation" "42")"
+    assert_eq "missing_model_ref" "$(printf '%s' "${plan_json}" | jq -r '.reason')" "effective ci planner skips when model ref is missing"
+
+    local log_file="${TEST_TMPDIR}/helper.log"
+    : > "${log_file}"
+
+    run _stage_runtime_input_for_eval "${TEST_TMPDIR}/missing" "${TEST_TMPDIR}/cert" "${log_file}" "preset"
+    assert_rc "1" "${RUN_RC}" "staging helper fails when source file is missing"
+
+    local source_file="${TEST_TMPDIR}/preset.yaml"
+    printf 'dataset:\n  seq_len: 64\n' > "${source_file}"
+
+    mkdir() { return 1; }
+    run _stage_runtime_input_for_eval "${source_file}" "${TEST_TMPDIR}/cert_mkdir_fail" "${log_file}" "preset"
+    assert_rc "1" "${RUN_RC}" "staging helper fails when runtime_inputs directory cannot be created"
+    unset -f mkdir
+
+    cp() { return 1; }
+    run _stage_runtime_input_for_eval "${source_file}" "${TEST_TMPDIR}/cert_cp_fail" "${log_file}" "preset"
+    assert_rc "1" "${RUN_RC}" "staging helper fails when the staged file cannot be copied"
+    unset -f cp
+
+    run _normalize_staged_preset_for_eval "${TEST_TMPDIR}/missing.yaml" 128 128 16 16 0 "${log_file}"
+    assert_rc "1" "${RUN_RC}" "normalize helper fails when the staged preset is missing"
+
+    local staged_preset="${TEST_TMPDIR}/staged.yaml"
+    printf 'dataset:\n  seq_len: 64\n' > "${staged_preset}"
+    export PYTHON_BIN="$(command -v python || command -v python3)"
+    local explicit_python="${PYTHON_BIN}"
+    _runtime_python() { return 1; }
+    run _normalize_staged_preset_for_eval "${staged_preset}" 128 128 16 16 0 "${log_file}"
+    assert_rc "1" "${RUN_RC}" "normalize helper propagates runtime python failures with explicit PYTHON_BIN"
+    assert_eq "${explicit_python}" "${PYTHON_BIN}" "explicit PYTHON_BIN is restored after normalize failure"
+
+    unset PYTHON_BIN
+    run _normalize_staged_preset_for_eval "${staged_preset}" 128 128 16 16 0 "${log_file}"
+    assert_rc "1" "${RUN_RC}" "normalize helper propagates runtime python failures without PYTHON_BIN"
+    [[ ! -v PYTHON_BIN ]] || t_fail "PYTHON_BIN should be unset after normalize failure without an explicit override"
+}
+
+test_task_calibration_and_preset_cover_effective_ci_failure_and_remote_code_branches() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local baseline_dir="${model_output_dir}/models/baseline"
+    local log_file="${TEST_TMPDIR}/log.txt"
+    mkdir -p "${baseline_dir}" "$(dirname "${log_file}")" "${model_output_dir}/reports/calibration"
+    echo "{}" > "${baseline_dir}/config.json"
+    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
+    echo "Qwen/Qwen2.5-14B" > "${model_output_dir}/.model_id"
+    : > "${log_file}"
+
+    _estimate_model_size() { echo "7"; }
+    _get_model_size_from_name() { echo "14"; }
+    _get_invarlock_config() { echo "128:128:1:1:1"; }
+    pack_remote_code_allowed() { return 0; }
+    _pack_run_from_config() {
+        local out_dir=""
+        while [[ $# -gt 0 ]]; do
+            case "${1}" in
+                --out)
+                    out_dir="${2:-}"
+                    shift 2
+                    ;;
+                *)
+                    shift
+                    ;;
+            esac
+        done
+        mkdir -p "${out_dir}"
+        printf '{"report":"ok"}\n' > "${out_dir}/report.json"
+        return 0
+    }
+    _cmd_python() { return 0; }
+    _plan_effective_ci_schedule() { echo '{"status":"selected"}'; }
+    _apply_effective_ci_schedule() { echo '256:256:9:10'; }
+
+    run task_calibration_run "${model_name}" 0 "1" "42" "${out}" "${log_file}"
+    assert_rc "0" "${RUN_RC}" "calibration run succeeds with a selected effective ci schedule"
+
+    _plan_effective_ci_schedule() { return 1; }
+    run task_calibration_run "${model_name}" 0 "2" "43" "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "calibration run fails when effective ci planning errors"
+
+    _plan_effective_ci_schedule() { echo '{"status":"selected"}'; }
+    _apply_effective_ci_schedule() { return 1; }
+    run task_calibration_run "${model_name}" 0 "3" "44" "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "calibration run fails when effective ci schedule application errors"
+
+    local preset_env="${TEST_TMPDIR}/preset.env"
+    _cmd_python() {
+        printf '%s\n' "${PRESET_SEQ_LEN}:${PRESET_STRIDE}:${PRESET_PREVIEW_N}:${PRESET_FINAL_N}" > "${preset_env}"
+        return 0
+    }
+    _plan_effective_ci_schedule() { echo '{"status":"selected"}'; }
+    _apply_effective_ci_schedule() { echo '300:300:11:12'; }
+
+    run task_generate_preset "${model_name}" "${out}" "${log_file}"
+    assert_rc "0" "${RUN_RC}" "preset generation succeeds with a selected effective ci schedule"
+    assert_eq "300:300:11:12" "$(cat "${preset_env}")" "preset generation exports the selected effective ci schedule"
+
+    _plan_effective_ci_schedule() { return 1; }
+    run task_generate_preset "m_fail_plan" "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "preset generation fails when effective ci planning errors"
+
+    mkdir -p "${out}/m_fail_apply/reports/calibration"
+    mkdir -p "${out}/m_fail_apply/models/baseline"
+    echo "${out}/m_fail_apply/models/baseline" > "${out}/m_fail_apply/.baseline_path"
+    echo "Qwen/Qwen2.5-14B" > "${out}/m_fail_apply/.model_id"
+    echo "{}" > "${out}/m_fail_apply/models/baseline/config.json"
+    _plan_effective_ci_schedule() { echo '{"status":"selected"}'; }
+    _apply_effective_ci_schedule() { return 1; }
+    run task_generate_preset "m_fail_apply" "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "preset generation fails when effective ci schedule application errors"
+}
+
+test_task_baseline_report_helper_exports_remote_code_allowance() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    local baseline_root="${TEST_TMPDIR}/baseline_root"
+    local baseline_path="${TEST_TMPDIR}/baseline_model"
+    local log_file="${TEST_TMPDIR}/baseline_helper.log"
+    local env_log="${TEST_TMPDIR}/baseline_helper.env"
+    mkdir -p "${baseline_root}" "${baseline_path}"
+    : > "${log_file}"
+
+    _resolve_invarlock_adapter() { echo "hf_test"; }
+    _validate_evaluate_baseline_report() { return 0; }
+    _is_large_model() { return 0; }
+    pack_remote_code_allowed() { return 0; }
+    _pack_run_from_config() {
+        printf '%s\n' "${INVARLOCK_ALLOW_REMOTE_CODE-}" > "${env_log}"
+        local out_dir=""
+        while [[ $# -gt 0 ]]; do
+            case "${1}" in
+                --out)
+                    out_dir="${2:-}"
+                    shift 2
+                    ;;
+                *)
+                    shift
+                    ;;
+            esac
+        done
+        mkdir -p "${out_dir}/noop"
+        printf '{"report":"ok"}\n' > "${out_dir}/noop/report.json"
+        return 0
+    }
+
+    local baseline_report
+    baseline_report="$(_ensure_evaluate_baseline_report "${baseline_root}" "${baseline_path}" "ci" "balanced" 128 128 4 4 1 100 "7" "${log_file}")"
+    assert_match "baseline_report\\.json$" "${baseline_report}" "baseline helper returns the generated baseline report path"
+    assert_eq "1" "$(cat "${env_log}")" "baseline helper exports remote code allowance when enabled"
+}
+
+test_task_evaluate_edit_covers_effective_ci_and_staging_failure_branches() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+cert_out=""
+while [[ $# -gt 0 ]]; do
+    case "${1}" in
+        --report-out|--out)
+            cert_out="${2:-}"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+printf '%s\n' "INVARLOCK_ALLOW_REMOTE_CODE=${INVARLOCK_ALLOW_REMOTE_CODE:-}" >> "${TEST_TMPDIR}/evaluate_edit.env"
+mkdir -p "${cert_out}"
+printf '{"ok":true}\n' > "${cert_out}/evaluation.report.json"
+exit 0
+EOF
+    chmod +x "${bin_dir}/invarlock"
+    local original_path="${PATH}"
+    PATH="${bin_dir}:${PATH}"
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local baseline_dir="${model_output_dir}/models/baseline"
+    local edit_dir="${model_output_dir}/models/_clean"
+    local log_file="${TEST_TMPDIR}/log.txt"
+    mkdir -p "${baseline_dir}" "${edit_dir}" "${out}/presets" "$(dirname "${log_file}")"
+    echo "{}" > "${baseline_dir}/config.json"
+    echo "{}" > "${edit_dir}/config.json"
+    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
+    echo "Qwen/Qwen2.5-32B" > "${model_output_dir}/.model_id"
+    printf 'dataset:\n  seq_len: 128\n' > "${out}/presets/calibrated_preset_${model_name}.yaml"
+    : > "${log_file}"
+
+    resolve_edit_params() {
+        jq -n '{status:"selected", edit_type:"quant_rtn", param1:"4", param2:"32", scope:"ffn", edit_dir_name:"_clean"}'
+    }
+    _estimate_model_size() { echo "7"; }
+    _get_model_size_from_name() { echo "32"; }
+    _get_invarlock_config() { echo "128:128:1:1:1"; }
+    pack_remote_code_allowed() { return 0; }
+
+    _plan_effective_ci_schedule() { return 1; }
+    run task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:ffn" clean 1 "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "evaluate_edit fails when effective ci planning errors"
+
+    _plan_effective_ci_schedule() { echo '{"status":"selected"}'; }
+    _apply_effective_ci_schedule() { return 1; }
+    run task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:ffn" clean 2 "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "evaluate_edit fails when effective ci schedule application errors"
+
+    local baseline_report="${TEST_TMPDIR}/baseline_report.json"
+    echo '{"evaluation_windows":{"preview":{"window_ids":[1],"input_ids":[[1]]},"final":{"window_ids":[1],"input_ids":[[1]]}},"edit":{"name":"noop"}}' > "${baseline_report}"
+    _apply_effective_ci_schedule() { echo '256:256:9:10'; }
+    _ensure_evaluate_baseline_report() { echo "${baseline_report}"; }
+    _stage_baseline_report_for_eval() { return 1; }
+    run task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:ffn" clean 3 "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "evaluate_edit fails when staging the baseline report fails"
+
+    _ensure_evaluate_baseline_report() { echo ""; }
+    _stage_preset_for_eval() { return 1; }
+    run task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:ffn" clean 4 "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "evaluate_edit fails when staging the preset fails"
+
+    _stage_preset_for_eval() { printf '%s\n' "${out}/presets/calibrated_preset_${model_name}.yaml"; }
+    _normalize_staged_preset_for_eval() { return 1; }
+    run task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:ffn" clean 5 "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "evaluate_edit fails when preset normalization fails"
+
+    _normalize_staged_preset_for_eval() { return 0; }
+    run task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:ffn" clean 6 "${out}" "${log_file}"
+    assert_rc "0" "${RUN_RC}" "evaluate_edit succeeds after stage and normalize helpers succeed"
+    assert_match "INVARLOCK_ALLOW_REMOTE_CODE=1" "$(cat "${TEST_TMPDIR}/evaluate_edit.env")" "evaluate_edit forwards remote code allowance into the runtime env"
+
+    PATH="${original_path}"
+}
+
+test_task_evaluate_error_covers_effective_ci_staging_and_probe_remote_code_branches() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/task_functions.sh"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+cert_out=""
+while [[ $# -gt 0 ]]; do
+    case "${1}" in
+        --report-out|--out)
+            cert_out="${2:-}"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+printf '%s\n' "INVARLOCK_ALLOW_REMOTE_CODE=${INVARLOCK_ALLOW_REMOTE_CODE:-}" >> "${TEST_TMPDIR}/evaluate_error.env"
+mkdir -p "${cert_out}"
+printf '{"ok":true}\n' > "${cert_out}/evaluation.report.json"
+exit 0
+EOF
+    chmod +x "${bin_dir}/invarlock"
+    local original_path="${PATH}"
+    PATH="${bin_dir}:${PATH}"
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local baseline_dir="${model_output_dir}/models/baseline"
+    local log_file="${TEST_TMPDIR}/log.txt"
+    mkdir -p "${baseline_dir}" "${out}/presets" "$(dirname "${log_file}")"
+    echo "{}" > "${baseline_dir}/config.json"
+    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
+    echo "Qwen/Qwen2.5-32B" > "${model_output_dir}/.model_id"
+    printf 'dataset:\n  seq_len: 128\n' > "${out}/presets/calibrated_preset_${model_name}.yaml"
+    : > "${log_file}"
+
+    mkdir -p "${model_output_dir}/models/error_plan_fail" "${model_output_dir}/models/error_apply_fail" \
+        "${model_output_dir}/models/error_baseline_stage_fail" "${model_output_dir}/models/error_stage_preset_fail" \
+        "${model_output_dir}/models/error_normalize_fail" "${model_output_dir}/models/error_rmt_norm_noise" \
+        "${model_output_dir}/models/error_ve_mlp_scale_skew"
+    for dir in \
+        "${model_output_dir}/models/error_plan_fail" \
+        "${model_output_dir}/models/error_apply_fail" \
+        "${model_output_dir}/models/error_baseline_stage_fail" \
+        "${model_output_dir}/models/error_stage_preset_fail" \
+        "${model_output_dir}/models/error_normalize_fail" \
+        "${model_output_dir}/models/error_rmt_norm_noise" \
+        "${model_output_dir}/models/error_ve_mlp_scale_skew"; do
+        echo "{}" > "${dir}/config.json"
+    done
+
+    _estimate_model_size() { echo "7"; }
+    _get_model_size_from_name() { echo "32"; }
+    _get_invarlock_config() { echo "128:128:1:1:1"; }
+    pack_remote_code_allowed() { return 0; }
+
+    _plan_effective_ci_schedule() { return 1; }
+    run task_evaluate_error "${model_name}" 0 plan_fail "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "evaluate_error fails when effective ci planning errors"
+
+    _plan_effective_ci_schedule() { echo '{"status":"selected"}'; }
+    _apply_effective_ci_schedule() { return 1; }
+    run task_evaluate_error "${model_name}" 0 apply_fail "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "evaluate_error fails when effective ci schedule application errors"
+
+    local baseline_report="${TEST_TMPDIR}/baseline_report.json"
+    echo '{"evaluation_windows":{"preview":{"window_ids":[1],"input_ids":[[1]]},"final":{"window_ids":[1],"input_ids":[[1]]}},"edit":{"name":"noop"}}' > "${baseline_report}"
+    _apply_effective_ci_schedule() { echo '256:256:9:10'; }
+    _ensure_evaluate_baseline_report() { echo "${baseline_report}"; }
+    _stage_baseline_report_for_eval() { return 1; }
+    run task_evaluate_error "${model_name}" 0 baseline_stage_fail "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "evaluate_error fails when staging the baseline report fails"
+
+    _ensure_evaluate_baseline_report() { echo ""; }
+    _stage_preset_for_eval() { return 1; }
+    run task_evaluate_error "${model_name}" 0 stage_preset_fail "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "evaluate_error fails when staging the preset fails"
+
+    _stage_preset_for_eval() { printf '%s\n' "${out}/presets/calibrated_preset_${model_name}.yaml"; }
+    _normalize_staged_preset_for_eval() { return 1; }
+    run task_evaluate_error "${model_name}" 0 normalize_fail "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "evaluate_error fails when preset normalization fails"
+
+    local py_calls="${TEST_TMPDIR}/probe_python.calls"
+    _ensure_evaluate_baseline_report() { echo "${baseline_report}"; }
+    _stage_baseline_report_for_eval() { printf '%s\n' "${TEST_TMPDIR}/staged_baseline_report.json"; }
+    _normalize_staged_preset_for_eval() { return 0; }
+    _cmd_python() {
+        printf '%s\n' "$*" >> "${py_calls}"
+        return 0
+    }
+
+    run task_evaluate_error "${model_name}" 0 rmt_norm_noise "${out}" "${log_file}"
+    assert_rc "0" "${RUN_RC}" "evaluate_error succeeds for rmt probe path"
+    run task_evaluate_error "${model_name}" 0 ve_mlp_scale_skew "${out}" "${log_file}"
+    assert_rc "0" "${RUN_RC}" "evaluate_error succeeds for ve probe path"
+    assert_match "INVARLOCK_ALLOW_REMOTE_CODE=1" "$(cat "${TEST_TMPDIR}/evaluate_error.env")" "evaluate_error forwards remote code allowance into the runtime env"
+    assert_match "rmt_cross_model_probe\\.py.*--trust-remote-code" "$(cat "${py_calls}")" "rmt probe inherits remote code allowance"
+    assert_match "ve_cross_model_probe\\.py.*--trust-remote-code" "$(cat "${py_calls}")" "ve probe inherits remote code allowance"
+
+    PATH="${original_path}"
+}

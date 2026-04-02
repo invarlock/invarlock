@@ -491,7 +491,9 @@ pack_build_pack() {
         pack_cleanup_staging_dir "${staging_dir}"
         return "${rc}"
     fi
-    if ! pack_finalize_staging_dir "${staging_dir}" "${pack_dir}"; then
+    if pack_finalize_staging_dir "${staging_dir}" "${pack_dir}"; then
+        :
+    else
         rc=$?
         pack_cleanup_staging_dir "${staging_dir}"
         return "${rc}"

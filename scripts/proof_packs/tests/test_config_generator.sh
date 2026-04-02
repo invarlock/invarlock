@@ -235,3 +235,51 @@ test_config_generator_generate_invarlock_config_writes_to_stdout_when_requested(
     out="$(generate_invarlock_config "demo/model" "/dev/stdout" "edit")"
     assert_match 'trust_remote_code: true' "${out}" "remote code emitted only with explicit allow"
 }
+
+test_config_generator_run_single_calibration_exports_remote_code_allowance() {
+    mock_reset
+
+    # shellcheck source=../config_generator.sh
+    source "${TEST_ROOT}/scripts/proof_packs/lib/config_generator.sh"
+
+    INVARLOCK_DATASET="wikitext2"
+    INVARLOCK_TIER="balanced"
+    FLASH_ATTENTION_AVAILABLE="false"
+    PACK_DETERMINISM="throughput"
+    export INVARLOCK_DATASET INVARLOCK_TIER FLASH_ATTENTION_AVAILABLE PACK_DETERMINISM
+
+    local env_log="${TEST_TMPDIR}/run.env"
+    _pack_run_from_config() {
+        printf '%s\n' "${INVARLOCK_ALLOW_REMOTE_CODE-}" > "${env_log}"
+        local out=""
+        while [[ $# -gt 0 ]]; do
+            case "${1}" in
+                --out)
+                    out="${2:-}"
+                    shift 2
+                    ;;
+                *)
+                    shift
+                    ;;
+            esac
+        done
+        mkdir -p "${out}"
+        echo '{}' > "${out}/report.json"
+        return 0
+    }
+    _cmd_python() { return 0; }
+    estimate_model_params() { echo "7"; }
+    pack_remote_code_allowed() { return 0; }
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    export OUTPUT_DIR
+    mkdir -p "${OUTPUT_DIR}/logs"
+
+    local run_dir="${TEST_TMPDIR}/calibration/run_1"
+    local log_file="${TEST_TMPDIR}/calibration.log"
+    mkdir -p "$(dirname "${run_dir}")"
+    : > "${log_file}"
+
+    run_single_calibration "${TEST_TMPDIR}/model" "${run_dir}" 42 2 2 10 "${log_file}" 0 128 128 1
+    assert_eq "1" "$(cat "${env_log}")" "remote code allowance exported into calibration runner env"
+}

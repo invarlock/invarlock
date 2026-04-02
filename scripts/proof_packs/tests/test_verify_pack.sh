@@ -733,3 +733,25 @@ test_verify_pack_rejects_tampered_payload_when_checksums_bound() {
     run pack_verify_pack --pack "${pack_dir}" --skip-verify
     assert_rc "6" "${RUN_RC}" "tampered payload must fail checksum verification"
 }
+
+test_verify_pack_returns_integrity_error_when_manifest_attestation_fails() {
+    mock_reset
+
+    source ./scripts/proof_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}"
+    printf '%s\n' '{}' > "${pack_dir}/manifest.json"
+    printf '%s\n' 'hash  payload' > "${pack_dir}/checksums.sha256"
+
+    pack_validate_manifest_schema() { return 0; }
+    pack_verify_signature() { return 0; }
+    pack_verify_manifest_binds_checksums() { return 0; }
+    pack_verify_checksums() { return 0; }
+    pack_verify_manifest_attestation() { return 1; }
+    pack_verify_no_extra_files() { return 0; }
+    pack_verify_reports() { return 0; }
+
+    run pack_verify_pack --pack "${pack_dir}" --skip-verify
+    assert_rc "${PACK_VERIFY_INTEGRITY}" "${RUN_RC}" "manifest attestation failure maps to integrity exit code"
+}
