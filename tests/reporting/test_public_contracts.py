@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -146,6 +147,62 @@ def test_public_contract_loader_discovers_ancestor_contracts_for_build_out(
     monkeypatch.setattr(contracts, "CONTRACTS_ROOT", tmp_path / "missing")
     monkeypatch.setattr(contracts, "PACKAGE_CONTRACTS_ROOT", tmp_path / "missing")
     monkeypatch.setattr(contracts, "__file__", str(build_out / "public_contracts.py"))
+    monkeypatch.chdir(build_out)
+
+    payload = contracts.load_policy_pack_schema()
+    assert payload["title"] == "InvarLock Policy Pack"
+    assert contracts._ancestor_contract_roots(filename="policy_pack.schema.json") == [
+        contracts_dir
+    ]
+
+
+def test_public_contract_loader_discovers_contracts_from_executable_ancestor(
+    monkeypatch, tmp_path: Path
+) -> None:
+    workspace = tmp_path / "workspace"
+    build_out = workspace / "build-out"
+    build_out.mkdir(parents=True)
+    contracts_dir = workspace / "contracts"
+    contracts_dir.mkdir(parents=True)
+    source = contracts.CONTRACTS_ROOT / "policy_pack.schema.json"
+    (contracts_dir / source.name).write_text(source.read_text(encoding="utf-8"))
+
+    monkeypatch.setattr(contracts, "CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(contracts, "PACKAGE_CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(
+        contracts,
+        "__file__",
+        str(tmp_path / "bundle" / "public_contracts.py"),
+    )
+    monkeypatch.setattr(sys, "argv", [str(build_out / "policy_pack_fuzzer")])
+    monkeypatch.setattr(sys, "executable", str(build_out / "policy_pack_fuzzer.pkg"))
+    sandbox = tmp_path / "sandbox"
+    sandbox.mkdir()
+    monkeypatch.chdir(sandbox)
+
+    payload = contracts.load_policy_pack_schema()
+    assert payload["title"] == "InvarLock Policy Pack"
+    assert contracts._ancestor_contract_roots(filename="policy_pack.schema.json") == [
+        contracts_dir
+    ]
+
+
+def test_public_contract_loader_handles_missing_process_paths(
+    monkeypatch, tmp_path: Path
+) -> None:
+    workspace = tmp_path / "workspace"
+    build_out = workspace / "build-out" / "python" / "invarlock"
+    build_out.mkdir(parents=True)
+    contracts_dir = workspace / "contracts"
+    contracts_dir.mkdir(parents=True)
+    source = contracts.CONTRACTS_ROOT / "policy_pack.schema.json"
+    (contracts_dir / source.name).write_text(source.read_text(encoding="utf-8"))
+
+    monkeypatch.setattr(contracts, "CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(contracts, "PACKAGE_CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(contracts, "__file__", str(build_out / "public_contracts.py"))
+    monkeypatch.setattr(sys, "argv", [])
+    monkeypatch.setattr(sys, "executable", "")
     monkeypatch.chdir(build_out)
 
     payload = contracts.load_policy_pack_schema()

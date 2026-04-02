@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.resources
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -52,6 +53,12 @@ def _fallback_contract_roots() -> list[Path]:
 def _ancestor_contract_roots(*, filename: str) -> list[Path]:
     roots: list[Path] = []
     anchors = [Path(__file__).resolve().parent, Path.cwd().resolve()]
+    argv0 = Path(sys.argv[0]).resolve().parent if sys.argv else None
+    executable = Path(sys.executable).resolve().parent if sys.executable else None
+    if argv0 is not None:
+        anchors.append(argv0)
+    if executable is not None:
+        anchors.append(executable)
     seen: set[Path] = set()
     for anchor in anchors:
         for parent in (anchor, *anchor.parents):
