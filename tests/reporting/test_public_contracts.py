@@ -93,6 +93,61 @@ def test_public_contract_loader_falls_back_to_packaged_contracts(
     assert payload["lanes"]
 
 
+def test_public_contract_loader_falls_back_to_workspace_contracts(
+    monkeypatch, tmp_path: Path
+) -> None:
+    workspace = tmp_path / "workspace"
+    contracts_dir = workspace / "contracts"
+    contracts_dir.mkdir(parents=True)
+    source = contracts.CONTRACTS_ROOT / "policy_pack.schema.json"
+    (contracts_dir / source.name).write_text(source.read_text(encoding="utf-8"))
+
+    monkeypatch.setattr(contracts, "CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(contracts, "PACKAGE_CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.chdir(workspace)
+
+    payload = contracts.load_policy_pack_schema()
+    assert payload["title"] == "InvarLock Policy Pack"
+
+
+def test_public_contract_loader_tries_env_then_workspace_and_deduplicates(
+    monkeypatch, tmp_path: Path
+) -> None:
+    workspace = tmp_path / "workspace"
+    contracts_dir = workspace / "contracts"
+    contracts_dir.mkdir(parents=True)
+    source = contracts.CONTRACTS_ROOT / "policy_pack.schema.json"
+    (contracts_dir / source.name).write_text(source.read_text(encoding="utf-8"))
+
+    monkeypatch.setattr(contracts, "CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(contracts, "PACKAGE_CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setenv("INVARLOCK_CONTRACTS_ROOT", str(tmp_path / "env-contracts"))
+    monkeypatch.setenv("GITHUB_WORKSPACE", str(workspace))
+    monkeypatch.chdir(workspace)
+
+    payload = contracts.load_policy_pack_schema()
+    assert payload["title"] == "InvarLock Policy Pack"
+
+    roots = contracts._fallback_contract_roots()
+    assert roots == [tmp_path / "env-contracts", contracts_dir]
+
+
+def test_public_contract_loader_raises_when_all_roots_are_missing(
+    monkeypatch, tmp_path: Path
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    monkeypatch.setattr(contracts, "CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(contracts, "PACKAGE_CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setenv("INVARLOCK_CONTRACTS_ROOT", str(tmp_path / "env-contracts"))
+    monkeypatch.setenv("GITHUB_WORKSPACE", str(workspace))
+    monkeypatch.chdir(workspace)
+
+    with pytest.raises(FileNotFoundError, match="policy_pack.schema.json"):
+        contracts.load_json_contract("policy_pack.schema.json")
+
+
 def test_packaged_contract_copies_match_repo_contracts() -> None:
     repo_contracts = sorted(contracts.CONTRACTS_ROOT.glob("*.json"))
     assert repo_contracts

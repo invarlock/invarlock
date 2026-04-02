@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.resources
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -28,13 +29,43 @@ def contract_relpath(filename: str) -> str:
     return f"contracts/{filename}"
 
 
+def _fallback_contract_roots() -> list[Path]:
+    roots: list[Path] = []
+    env_root = os.environ.get("INVARLOCK_CONTRACTS_ROOT")
+    if env_root:
+        roots.append(Path(env_root))
+    github_workspace = os.environ.get("GITHUB_WORKSPACE")
+    if github_workspace:
+        roots.append(Path(github_workspace) / "contracts")
+    roots.append(Path.cwd() / "contracts")
+
+    unique: list[Path] = []
+    seen: set[Path] = set()
+    for root in roots:
+        if root in seen or root == CONTRACTS_ROOT:
+            continue
+        seen.add(root)
+        unique.append(root)
+    return unique
+
+
 def load_json_contract(filename: str) -> Any:
     path = contract_path(filename)
     if path.is_file():
         return json.loads(path.read_text(encoding="utf-8"))
-    return json.loads(
-        PACKAGE_CONTRACTS_ROOT.joinpath(filename).read_text(encoding="utf-8")
-    )
+    try:
+        return json.loads(
+            PACKAGE_CONTRACTS_ROOT.joinpath(filename).read_text(encoding="utf-8")
+        )
+    except (FileNotFoundError, NotADirectoryError, OSError):
+        pass
+
+    for root in _fallback_contract_roots():
+        fallback_path = root / filename
+        if fallback_path.is_file():
+            return json.loads(fallback_path.read_text(encoding="utf-8"))
+
+    raise FileNotFoundError(filename)
 
 
 def _load_contract_or_raise(filename: str) -> Any:

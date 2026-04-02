@@ -53,6 +53,7 @@ EXCLUDE_TOP_LEVEL_DIRS = {
 def _is_excluded_top_level(name: str) -> bool:
     return name.startswith(".") or name in EXCLUDE_TOP_LEVEL_DIRS
 
+
 REF_PATTERN = re.compile(r"\b(invarlock(?:\.[A-Za-z_][A-Za-z0-9_]*)+)\b")
 IGNORE_LAST_SEGMENT = {
     # Common file extensions and non-API suffixes
