@@ -109,20 +109,57 @@ def test_checklist_no_longer_advertises_distilbert_classification(tmp_path: Path
 def test_net_bootstrap_prefers_cpu_torch_before_hf_extra() -> None:
     text = Path("scripts/run_tiny_all_matrix.sh").read_text(encoding="utf-8")
     cpu_torch_install = 'os.environ["TORCH_CPU_INDEX_URL"]'
-    hf_install = '"invarlock[hf]"'
+    hf_install = '".[hf]"'
 
+    assert "google.protobuf" in text
+    assert "import sentencepiece" in text
+    assert "import tiktoken" in text
     assert "TORCH_CPU_INDEX_URL" in text
     assert "export TORCH_CPU_INDEX_URL" in text
     assert cpu_torch_install in text
     assert hf_install in text
     assert text.index(cpu_torch_install) < text.index(hf_install)
+    assert 'HF_HOME="${HF_HOME:-$TMP_DIR/.hf}"' in text
+    assert 'mkdir -p "$HF_HOME" "$HF_HUB_CACHE" "$HF_DATASETS_CACHE"' in text
+
+
+def test_hf_extras_include_sentencepiece_for_runtime_tokenizer_support() -> None:
+    text = Path("pyproject.toml").read_text(encoding="utf-8")
+
+    assert '"sentencepiece>=0.2.1"' in text
+    assert '"tiktoken>=0.9.0"' in text
+
+
+def test_matrix_uses_repo_python_selector_and_py312_floor() -> None:
+    text = Path("scripts/run_tiny_all_matrix.sh").read_text(encoding="utf-8")
+
+    assert 'PYTHON_BIN="${PYTHON_BIN:-$(bash scripts/select_python.sh)}"' in text
+    assert "requires Python 3.12+" in text
+    assert 'CLI=("$PYTHON_BIN" -m invarlock.cli)' in text
+
+
+def test_quant_demo_uses_dev_profile_by_default() -> None:
+    text = Path("scripts/run_tiny_all_matrix.sh").read_text(encoding="utf-8")
+
+    assert 'QUANT_PROFILE="${QUANT_PROFILE:-dev}"' in text
+    assert '--profile "$QUANT_PROFILE"' in text
+    assert 'append "gpt2_eval_quant8_${QUANT_PROFILE}"' in text
+
+
+def test_encoder_mlm_smoke_uses_stable_tiny_model() -> None:
+    text = Path("scripts/run_tiny_all_matrix.sh").read_text(encoding="utf-8")
+
+    assert 'BERT_ID=${BERT_ID:-"sshleifer/tiny-distilroberta-base"}' in text
+    assert 'echo "## Encoder MLM" >> "$TMP_DIR/checklist.md"' in text
 
 
 def test_matrix_prefers_local_runtime_image_when_available() -> None:
     text = Path("scripts/run_tiny_all_matrix.sh").read_text(encoding="utf-8")
 
-    assert 'docker image inspect invarlock-runtime:local' in text
+    assert "docker image inspect invarlock-runtime:local" in text
     assert 'export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:local"' in text
+    assert 'echo "[smoke] refreshing local attested runtime image"' in text
+    assert "make runtime-image" in text
 
 
 def test_run_mode_falls_back_to_python_module_when_console_script_missing(
