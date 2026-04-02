@@ -121,6 +121,24 @@ def test_run_cpu_telemetry_uses_repo_selected_python() -> None:
     assert 'PYTHON_BIN="$(bash "$ROOT/scripts/select_python.sh")"' in contents
     assert 'export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"' in contents
     assert 'CLI=("$PYTHON_BIN" -m invarlock)' in contents
+    assert (
+        'PRESET="${PRESET:-configs/presets/causal_lm/wikitext2_512.yaml}"' in contents
+    )
     assert 'INVARLOCK_ALLOW_NETWORK=1 "${CLI[@]}" evaluate' in contents
-    assert '"${CLI[@]}" verify' in contents
+    assert "EVAL_RC=$?" in contents
+    assert (
+        'if [[ "${EVAL_RC}" != "3" || ! -f "${REPORT_ROOT}/evaluation.report.json" ]]; then'
+        in contents
+    )
+    assert '"${CLI[@]}" report validate' in contents
+    assert '"${CLI[@]}" verify' not in contents
     assert "command -v invarlock" not in contents
+
+
+def test_cli_exhaustive_smoke_uses_reporting_verify_contract_helpers() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script_path = repo_root / "scripts" / "cli_exhaustive_smoke.sh"
+    contents = script_path.read_text(encoding="utf-8")
+
+    assert "from invarlock.reporting import verify_contract as verify_mod" in contents
+    assert "from invarlock.cli.commands import verify as verify_mod" not in contents

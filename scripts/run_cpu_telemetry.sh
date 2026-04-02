@@ -30,6 +30,7 @@ EDIT_CFG="${EDIT_CFG:-configs/overlays/edits/quant_rtn/8bit_attn.yaml}"
 RUN_ROOT="${ROOT}/runs/telemetry_cpu/quant8"
 REPORT_ROOT="${OUT_ROOT}/quant8"
 
+set +e
 INVARLOCK_ALLOW_NETWORK=1 "${CLI[@]}" evaluate \
   --baseline "${MODEL_ID}" \
   --subject "${MODEL_ID}" \
@@ -40,7 +41,16 @@ INVARLOCK_ALLOW_NETWORK=1 "${CLI[@]}" evaluate \
   --edit-config "${EDIT_CFG}" \
   --out "${RUN_ROOT}" \
   --report-out "${REPORT_ROOT}" >/dev/null
+EVAL_RC=$?
+set -e
 
-"${CLI[@]}" verify "${REPORT_ROOT}/evaluation.report.json" >/dev/null
+if [[ "${EVAL_RC}" != "0" ]]; then
+  if [[ "${EVAL_RC}" != "3" || ! -f "${REPORT_ROOT}/evaluation.report.json" ]]; then
+    exit "${EVAL_RC}"
+  fi
+  echo "Telemetry evaluate completed with profile gate exit ${EVAL_RC}; using emitted report artifacts."
+fi
+
+"${CLI[@]}" report validate "${REPORT_ROOT}/evaluation.report.json" >/dev/null
 
 echo "Telemetry reports written to ${REPORT_ROOT}"
