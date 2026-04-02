@@ -29,6 +29,16 @@ compile_req_in() {
     "$@"
 }
 
+compile_req_platform() {
+  local input="$1"
+  local output="$2"
+  shift 2
+  uv pip compile "${input}" \
+    --generate-hashes \
+    --output-file "${output}" \
+    "$@"
+}
+
 compile_pyproject "${WORKFLOW_DIR}/ci-hf-py312.txt" \
   --python-version 3.12 \
   --extra hf \
@@ -47,6 +57,26 @@ compile_pyproject "${WORKFLOW_DIR}/docs-ci-py313.txt" \
 compile_pyproject "${WORKFLOW_DIR}/hf-py313.txt" \
   --python-version 3.13 \
   --extra hf
+
+compile_req_platform \
+  "${WORKFLOW_DIR}/runtime-image.in" \
+  "${WORKFLOW_DIR}/runtime-image-py312.txt" \
+  --python-version 3.12 \
+  --python-platform x86_64-unknown-linux-gnu \
+  --torch-backend cpu
+
+compile_req_platform \
+  "${WORKFLOW_DIR}/runtime-image.in" \
+  "${WORKFLOW_DIR}/runtime-image-py312-aarch64.txt" \
+  --python-version 3.12 \
+  --python-platform aarch64-unknown-linux-gnu \
+  --torch-backend cpu
+
+compile_req_platform \
+  "${WORKFLOW_DIR}/clusterfuzzlite.in" \
+  "${WORKFLOW_DIR}/clusterfuzzlite-py311.txt" \
+  --python-version 3.11 \
+  --python-platform x86_64-unknown-linux-gnu
 
 compile_pyproject "${WORKFLOW_DIR}/precommit-ci-py313.txt" \
   --python-version 3.13 \
