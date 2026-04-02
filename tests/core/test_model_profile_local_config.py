@@ -219,6 +219,74 @@ def test_resolve_tokenizer_uses_remote_fallback_only_after_cache_miss(
     ]
 
 
+def test_resolve_tokenizer_retries_remote_on_hf_local_entry_cache_miss(
+    monkeypatch,
+) -> None:
+    calls: list[tuple[str, bool | None]] = []
+
+    class _Factory:
+        @classmethod
+        def from_pretrained(cls, model_id: str, **kwargs: object) -> _DummyTokenizer:
+            calls.append((model_id, kwargs.get("local_files_only")))
+            if kwargs.get("local_files_only"):
+                raise OSError(
+                    "We couldn't connect to 'https://huggingface.co' to load the files, "
+                    "and couldn't find them in the cached files. Outgoing traffic has "
+                    "been disabled."
+                )
+            return _DummyTokenizer(name_or_path=model_id)
+
+    monkeypatch.setattr(mp, "AutoTokenizer", _Factory, raising=False)
+    monkeypatch.setattr(mp, "network_allowed", lambda: True)
+
+    profile = mp.detect_model_profile("sshleifer/tiny-gpt2", adapter="hf_causal")
+    tokenizer, _ = mp.resolve_tokenizer(profile)
+
+    assert tokenizer.name_or_path == "sshleifer/tiny-gpt2"
+    assert calls == [
+        ("sshleifer/tiny-gpt2", True),
+        ("sshleifer/tiny-gpt2", None),
+    ]
+
+
+def test_resolve_tokenizer_falls_back_to_slow_tokenizer_when_fast_backend_missing(
+    monkeypatch,
+) -> None:
+    calls: list[tuple[str, bool | None, bool | None]] = []
+
+    class _Factory:
+        @classmethod
+        def from_pretrained(cls, model_id: str, **kwargs: object) -> _DummyTokenizer:
+            calls.append(
+                (
+                    model_id,
+                    kwargs.get("local_files_only"),
+                    kwargs.get("use_fast"),
+                )
+            )
+            if kwargs.get("use_fast") is False:
+                return _DummyTokenizer(name_or_path=model_id, mask_token="[MASK]")
+            raise ValueError(
+                "Couldn't instantiate the backend tokenizer from one of: "
+                "(1) a `tokenizers` library serialization file, "
+                "(2) a slow tokenizer instance to convert or "
+                "(3) an equivalent slow tokenizer class to instantiate and convert. "
+                "You need to have sentencepiece or tiktoken installed to convert "
+                "a slow tokenizer to a fast one."
+            )
+
+    monkeypatch.setattr(mp, "AutoTokenizer", _Factory, raising=False)
+
+    profile = mp.detect_model_profile("prajjwal1/bert-tiny", adapter="hf_mlm")
+    tokenizer, _ = mp.resolve_tokenizer(profile)
+
+    assert tokenizer.name_or_path == "prajjwal1/bert-tiny"
+    assert calls == [
+        ("prajjwal1/bert-tiny", True, None),
+        ("prajjwal1/bert-tiny", True, False),
+    ]
+
+
 def test_resolve_tokenizer_does_not_retry_remote_on_non_cache_loader_error(
     monkeypatch,
 ) -> None:

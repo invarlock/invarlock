@@ -386,6 +386,8 @@ def _load_local_fast_tokenizer(candidate: str) -> PreTrainedTokenizerBase | None
 def _is_tokenizer_cache_miss(error: Exception) -> bool:
     if isinstance(error, FileNotFoundError):
         return True
+    if error.__class__.__name__ in {"LocalEntryNotFoundError", "EntryNotFoundError"}:
+        return True
     if not isinstance(error, (OSError, ValueError)):
         return False
     message = str(error).strip().lower()
@@ -399,6 +401,10 @@ def _is_tokenizer_cache_miss(error: Exception) -> bool:
             "files missing",
             "local files only",
             "cannot find",
+            "couldn't find them in the cached files",
+            "requested files in the disk cache",
+            "outgoing traffic has been disabled",
+            "couldn't connect to",
             "can't load the model",
             "can't load tokenizer",
             "is not a local folder",
@@ -406,6 +412,44 @@ def _is_tokenizer_cache_miss(error: Exception) -> bool:
             "does not appear to have a file named",
         )
     )
+
+
+def _is_slow_tokenizer_fallback_candidate(error: Exception) -> bool:
+    if not isinstance(error, (OSError, RuntimeError, TypeError, ValueError)):
+        return False
+    message = str(error).strip().lower()
+    return any(
+        snippet in message
+        for snippet in (
+            "couldn't instantiate the backend tokenizer",
+            "you need to have sentencepiece",
+            "you need to have sentencepiece or tiktoken installed",
+            "convert a slow tokenizer",
+        )
+    )
+
+
+def _load_tokenizer_with_factory_retry(
+    tokenizer_factory: Any,
+    candidate: str,
+    *,
+    local_files_only: bool,
+) -> PreTrainedTokenizerBase:
+    kwargs: dict[str, Any] = {}
+    if local_files_only:
+        kwargs["local_files_only"] = True
+    try:
+        tokenizer = tokenizer_factory.from_pretrained(candidate, **kwargs)
+        return cast("PreTrainedTokenizerBase", tokenizer)
+    except Exception as exc:
+        if not _is_slow_tokenizer_fallback_candidate(exc):
+            raise
+        tokenizer = tokenizer_factory.from_pretrained(
+            candidate,
+            use_fast=False,
+            **kwargs,
+        )
+        return cast("PreTrainedTokenizerBase", tokenizer)
 
 
 def _tokenizer_candidates(model_id: str) -> list[str]:
@@ -454,10 +498,11 @@ def _load_tokenizer_for_model(
 
     for candidate in candidates:
         try:
-            tokenizer = tokenizer_factory.from_pretrained(
-                candidate, local_files_only=True
+            return _load_tokenizer_with_factory_retry(
+                tokenizer_factory,
+                candidate,
+                local_files_only=True,
             )
-            return cast("PreTrainedTokenizerBase", tokenizer)
         except Exception as exc:
             if not _is_tokenizer_cache_miss(exc):
                 raise
@@ -477,8 +522,11 @@ def _load_tokenizer_for_model(
         if candidate_path is not None and candidate_path.exists():
             continue
         try:
-            tokenizer = tokenizer_factory.from_pretrained(candidate)
-            return cast("PreTrainedTokenizerBase", tokenizer)
+            return _load_tokenizer_with_factory_retry(
+                tokenizer_factory,
+                candidate,
+                local_files_only=False,
+            )
         except Exception as exc:
             if not _is_tokenizer_cache_miss(exc):
                 raise
