@@ -15,6 +15,7 @@ set -euo pipefail
 RUN="${RUN:-0}"
 NET="${NET:-0}"
 TORCH_CPU_INDEX_URL="${TORCH_CPU_INDEX_URL:-https://download.pytorch.org/whl/cpu}"
+export TORCH_CPU_INDEX_URL
 
 if command -v invarlock >/dev/null 2>&1; then
   CLI=(invarlock)
@@ -29,6 +30,16 @@ render_cmd() {
 
 run_cmd() {
   "$@" || true
+}
+
+seed_local_runtime_image() {
+  if [[ -n "${INVARLOCK_RUNTIME_IMAGE:-}" ]]; then
+    return 0
+  fi
+  if command -v docker >/dev/null 2>&1 \
+    && docker image inspect invarlock-runtime:local >/dev/null 2>&1; then
+    export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:local"
+  fi
 }
 
 # Profile selection
@@ -72,6 +83,8 @@ else
   export HF_HUB_ENABLE_HF_TRANSFER=0
   export HF_DATASETS_OFFLINE=1
 fi
+
+seed_local_runtime_image
 
 # Ensure required Python deps are present when NET=1
 if [ "$NET" = "1" ]; then

@@ -112,9 +112,17 @@ def test_net_bootstrap_prefers_cpu_torch_before_hf_extra() -> None:
     hf_install = '"invarlock[hf]"'
 
     assert "TORCH_CPU_INDEX_URL" in text
+    assert "export TORCH_CPU_INDEX_URL" in text
     assert cpu_torch_install in text
     assert hf_install in text
     assert text.index(cpu_torch_install) < text.index(hf_install)
+
+
+def test_matrix_prefers_local_runtime_image_when_available() -> None:
+    text = Path("scripts/run_tiny_all_matrix.sh").read_text(encoding="utf-8")
+
+    assert 'docker image inspect invarlock-runtime:local' in text
+    assert 'export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:local"' in text
 
 
 def test_run_mode_falls_back_to_python_module_when_console_script_missing(
