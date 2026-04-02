@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+### Removed
+
+### Dependencies
+
+### Documentation
+
+## [0.5.1] - 2026-04-02
+
+### Added
 - Added a lightweight attested push smoke lane built around
   `sshleifer/tiny-gpt2`, a local JSONL fixture, and the new `Tiny Attested
   Smoke` workflow.
