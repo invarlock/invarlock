@@ -14,6 +14,7 @@ set -euo pipefail
 
 RUN="${RUN:-0}"
 NET="${NET:-0}"
+TORCH_CPU_INDEX_URL="${TORCH_CPU_INDEX_URL:-https://download.pytorch.org/whl/cpu}"
 
 if command -v invarlock >/dev/null 2>&1; then
   CLI=(invarlock)
@@ -80,9 +81,20 @@ try:
     print("deps: torch/transformers/datasets present")
 except Exception as e:
     print("deps: missing core HF stack; attempting install via pip...", e)
-    import sys, subprocess
-    cmd = [sys.executable, "-m", "pip", "install", "-q", "invarlock[hf]"]
-    subprocess.check_call(cmd)
+    import os, sys, subprocess
+    cpu_torch_cmd = [
+        sys.executable,
+        "-m",
+        "pip",
+        "install",
+        "-q",
+        "--index-url",
+        os.environ["TORCH_CPU_INDEX_URL"],
+        "torch",
+    ]
+    hf_cmd = [sys.executable, "-m", "pip", "install", "-q", "invarlock[hf]"]
+    subprocess.check_call(cpu_torch_cmd)
+    subprocess.check_call(hf_cmd)
     print("deps: installed invarlock[hf]")
 PY
 fi

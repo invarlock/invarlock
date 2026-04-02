@@ -106,6 +106,17 @@ def test_checklist_no_longer_advertises_distilbert_classification(tmp_path: Path
     assert "classification" not in text.lower()
 
 
+def test_net_bootstrap_prefers_cpu_torch_before_hf_extra() -> None:
+    text = Path("scripts/run_tiny_all_matrix.sh").read_text(encoding="utf-8")
+    cpu_torch_install = 'os.environ["TORCH_CPU_INDEX_URL"]'
+    hf_install = '"invarlock[hf]"'
+
+    assert "TORCH_CPU_INDEX_URL" in text
+    assert cpu_torch_install in text
+    assert hf_install in text
+    assert text.index(cpu_torch_install) < text.index(hf_install)
+
+
 def test_run_mode_falls_back_to_python_module_when_console_script_missing(
     tmp_path: Path,
 ) -> None:
