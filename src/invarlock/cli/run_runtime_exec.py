@@ -9,7 +9,6 @@ import os
 import shutil
 from typing import Any
 
-from invarlock.cli.run_config import extract_model_load_kwargs
 from invarlock.cli.run_runtime import free_model_memory, get_psutil
 from invarlock.cli.run_warning_filters import suppress_noisy_warnings
 from invarlock.core.exceptions import InvarlockError
@@ -80,6 +79,8 @@ def load_model_with_cfg(
     prefer_local_files_only: bool = False,
 ) -> Any:
     """Load a model with config-provided kwargs, filtering for strict adapters."""
+    from invarlock.cli.run_config import extract_model_load_kwargs
+
     try:
         model_id = cfg.model.id
     except (AttributeError, KeyError, TypeError):

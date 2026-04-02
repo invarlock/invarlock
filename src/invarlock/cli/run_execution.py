@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from functools import partial
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import typer
 
@@ -90,13 +90,10 @@ from invarlock.reporting.run_retry_validation import (
     validate_retry_evaluation_report as _validate_retry_evaluation_report,
 )
 
-if TYPE_CHECKING:
-    from .config_execution import ConfigExecutionRequest
-
 console = make_console()
 
 
-def execute_config_run_request(request: ConfigExecutionRequest) -> str | None:
+def execute_config_run_request(request: SupportsRunExecutionRequest) -> str | None:
     run_runtime_mod.reset_optional_runtime_caches()
     return execute_run_request(request)
 

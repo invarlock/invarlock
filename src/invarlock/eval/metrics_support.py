@@ -26,7 +26,7 @@ class ResourceError(MetricsError):
     """Raised when insufficient resources are available."""
 
 
-type MetricsProgressPhase = Literal["activation_collection", "mi_gini_cpu"]
+MetricsProgressPhase = Literal["activation_collection", "mi_gini_cpu"]
 
 
 @dataclass(frozen=True)
@@ -38,7 +38,7 @@ class MetricsProgressUpdate:
     total: int | None
 
 
-type MetricsProgressObserver = Callable[[MetricsProgressUpdate], None]
+MetricsProgressObserver = Callable[[MetricsProgressUpdate], None]
 
 
 @dataclass

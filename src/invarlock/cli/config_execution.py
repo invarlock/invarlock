@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from invarlock.cli.runtime_launch_plan import build_request_container_launch_plan
 from invarlock.runtime_security import (
     delegate_container_command,
     host_execution_allowed,
@@ -12,12 +11,29 @@ from invarlock.runtime_security import (
     write_runtime_manifest,
 )
 
-from .run_execution import execute_config_run_request
-from .security_helpers import resolve_shell_runtime_security_policy
-
 
 class RuntimeDelegationError(RuntimeError):
     """Raised when secure-default container delegation cannot start."""
+
+
+def resolve_shell_runtime_security_policy(**kwargs: object):
+    from .security_helpers import resolve_shell_runtime_security_policy as _impl
+
+    return _impl(**kwargs)
+
+
+def build_request_container_launch_plan(command_name: str, request: object):
+    from invarlock.cli.runtime_launch_plan import (
+        build_request_container_launch_plan as _impl,
+    )
+
+    return _impl(command_name, request)
+
+
+def execute_config_run_request(request: object):
+    from .run_execution import execute_config_run_request as _impl
+
+    return _impl(request)
 
 
 @dataclass(frozen=True)

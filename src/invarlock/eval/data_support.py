@@ -26,8 +26,8 @@ _load_dataset_cached: Any = _DATASETS_UNSET
 load_dataset: Any = None
 
 
-type DatasetDiagnosticSeverity = Literal["info", "warning", "error"]
-type DatasetDiagnosticCategory = Literal["dataset", "provider", "window"]
+DatasetDiagnosticSeverity = Literal["info", "warning", "error"]
+DatasetDiagnosticCategory = Literal["dataset", "provider", "window"]
 
 
 @dataclass(frozen=True)

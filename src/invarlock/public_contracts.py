@@ -49,6 +49,21 @@ def _fallback_contract_roots() -> list[Path]:
     return unique
 
 
+def _ancestor_contract_roots(*, filename: str) -> list[Path]:
+    roots: list[Path] = []
+    anchors = [Path(__file__).resolve().parent, Path.cwd().resolve()]
+    seen: set[Path] = set()
+    for anchor in anchors:
+        for parent in (anchor, *anchor.parents):
+            candidate = parent / "contracts"
+            if candidate in seen or candidate == CONTRACTS_ROOT:
+                continue
+            seen.add(candidate)
+            if (candidate / filename).is_file():
+                roots.append(candidate)
+    return roots
+
+
 def load_json_contract(filename: str) -> Any:
     path = contract_path(filename)
     if path.is_file():
@@ -61,6 +76,11 @@ def load_json_contract(filename: str) -> Any:
         pass
 
     for root in _fallback_contract_roots():
+        fallback_path = root / filename
+        if fallback_path.is_file():
+            return json.loads(fallback_path.read_text(encoding="utf-8"))
+
+    for root in _ancestor_contract_roots(filename=filename):
         fallback_path = root / filename
         if fallback_path.is_file():
             return json.loads(fallback_path.read_text(encoding="utf-8"))

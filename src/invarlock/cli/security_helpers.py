@@ -5,13 +5,10 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from functools import wraps
 from pathlib import Path
-from typing import Any, TypeVar, cast
+from typing import Any, cast
 
 import typer
 
-from invarlock.cli.runtime_launch_plan import (
-    build_current_process_container_launch_plan,
-)
 from invarlock.runtime_attestation import (
     configure_runtime_security as _configure_runtime_security_core,
 )
@@ -32,8 +29,6 @@ from invarlock.runtime_security import (
     running_inside_container,
     write_runtime_manifest,
 )
-
-F = TypeVar("F", bound=Callable[..., Any])
 
 
 def _env_truthy(name: str) -> bool:
@@ -108,7 +103,15 @@ def runtime_security_scoped[F: Callable[..., Any]](func: F) -> F:
         ):
             return func(*args, **kwargs)
 
-    return cast(F, wrapper)
+    return cast("F", wrapper)
+
+
+def build_current_process_container_launch_plan(argv: list[str] | None = None):
+    from invarlock.cli.runtime_launch_plan import (
+        build_current_process_container_launch_plan as _impl,
+    )
+
+    return _impl(argv)
 
 
 def maybe_delegate_model_command() -> None:

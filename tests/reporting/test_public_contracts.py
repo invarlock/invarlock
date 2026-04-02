@@ -132,6 +132,50 @@ def test_public_contract_loader_tries_env_then_workspace_and_deduplicates(
     assert roots == [tmp_path / "env-contracts", contracts_dir]
 
 
+def test_public_contract_loader_discovers_ancestor_contracts_for_build_out(
+    monkeypatch, tmp_path: Path
+) -> None:
+    workspace = tmp_path / "workspace"
+    build_out = workspace / "build-out" / "python" / "invarlock"
+    build_out.mkdir(parents=True)
+    contracts_dir = workspace / "contracts"
+    contracts_dir.mkdir(parents=True)
+    source = contracts.CONTRACTS_ROOT / "policy_pack.schema.json"
+    (contracts_dir / source.name).write_text(source.read_text(encoding="utf-8"))
+
+    monkeypatch.setattr(contracts, "CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(contracts, "PACKAGE_CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(contracts, "__file__", str(build_out / "public_contracts.py"))
+    monkeypatch.chdir(build_out)
+
+    payload = contracts.load_policy_pack_schema()
+    assert payload["title"] == "InvarLock Policy Pack"
+    assert contracts._ancestor_contract_roots(filename="policy_pack.schema.json") == [
+        contracts_dir
+    ]
+
+
+def test_public_contract_loader_skips_missing_ancestor_candidates(
+    monkeypatch, tmp_path: Path
+) -> None:
+    contracts_dir = tmp_path / "workspace" / "contracts"
+    contracts_dir.mkdir(parents=True)
+    source = contracts.CONTRACTS_ROOT / "policy_pack.schema.json"
+    (contracts_dir / source.name).write_text(source.read_text(encoding="utf-8"))
+
+    monkeypatch.setattr(contracts, "CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(contracts, "PACKAGE_CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(contracts, "_fallback_contract_roots", lambda: [])
+    monkeypatch.setattr(
+        contracts,
+        "_ancestor_contract_roots",
+        lambda *, filename: [tmp_path / "missing-ancestor", contracts_dir],
+    )
+
+    payload = contracts.load_policy_pack_schema()
+    assert payload["title"] == "InvarLock Policy Pack"
+
+
 def test_public_contract_loader_raises_when_all_roots_are_missing(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -140,6 +184,9 @@ def test_public_contract_loader_raises_when_all_roots_are_missing(
 
     monkeypatch.setattr(contracts, "CONTRACTS_ROOT", tmp_path / "missing")
     monkeypatch.setattr(contracts, "PACKAGE_CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(
+        contracts, "__file__", str(tmp_path / "sandbox" / "public_contracts.py")
+    )
     monkeypatch.setenv("INVARLOCK_CONTRACTS_ROOT", str(tmp_path / "env-contracts"))
     monkeypatch.setenv("GITHUB_WORKSPACE", str(workspace))
     monkeypatch.chdir(workspace)
