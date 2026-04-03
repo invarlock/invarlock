@@ -122,6 +122,48 @@ def test_validate_evaluation_report_rejects_blank_run_id_without_jsonschema(
     assert schema_mod.validate_report(evaluation_report) is False
 
 
+def test_validate_evaluation_report_rejects_blank_metric_kind_without_jsonschema(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(schema_mod, "jsonschema", None, raising=False)
+    evaluation_report = {
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
+        "run_id": "run-4",
+        "primary_metric": {"kind": "   "},
+        "validation": {"primary_metric_acceptable": True},
+    }
+
+    assert schema_mod.validate_report(evaluation_report) is False
+
+
+def test_validate_evaluation_report_rejects_boolean_metric_final_without_jsonschema(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(schema_mod, "jsonschema", None, raising=False)
+    evaluation_report = {
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
+        "run_id": "run-5",
+        "primary_metric": {"final": True},
+        "validation": {"primary_metric_acceptable": True},
+    }
+
+    assert schema_mod.validate_report(evaluation_report) is False
+
+
+def test_validate_evaluation_report_rejects_non_mapping_validation_without_jsonschema(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(schema_mod, "jsonschema", None, raising=False)
+    evaluation_report = {
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
+        "run_id": "run-6",
+        "primary_metric": {"final": 1.0},
+        "validation": [],
+    }
+
+    assert schema_mod.validate_report(evaluation_report) is False
+
+
 def test_load_validation_allowlist_prefers_contracts_file(monkeypatch):
     keys = ["primary_metric_acceptable", "guard_overhead_acceptable", "custom_flag"]
     monkeypatch.setattr(allowlist_mod, "load_json_contract", lambda _filename: keys)

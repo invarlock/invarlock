@@ -16,6 +16,10 @@ from invarlock.core.api import (
     DeviceType,
     Guard,
     GuardChain,
+    GuardWithAfterEdit,
+    GuardWithBeforeEdit,
+    GuardWithFinalize,
+    GuardWithPrepare,
     MetricsDict,
     ModelAdapter,
     ModelEdit,
@@ -179,6 +183,14 @@ class TestGuardChainComprehensive:
         result = chain.get_worst_action([])
         assert isinstance(result, str)
 
+    def test_get_worst_action_prefers_typed_decisions_when_present(self):
+        """Typed decisions should override legacy action labels when both are present."""
+        chain = GuardChain([])
+
+        outcomes = [Mock(decision="monitor", action="abort")]
+
+        assert chain.get_worst_action(outcomes) == "warn"
+
     def test_guard_chain_initialization(self):
         """Test GuardChain initialization with different parameters."""
         # Test with guards and policy
@@ -248,6 +260,7 @@ class TestDataClassesCoverage:
         assert report1.edit == {}
         assert report1.guards == {}
         assert report1.metrics == {}
+        assert report1.evaluation_windows == {}
         assert report1.status == "pending"
         assert report1.error is None
         assert report1.context == {}
@@ -264,6 +277,7 @@ class TestDataClassesCoverage:
             edit=edit_data,
             guards=guards_data,
             metrics=metrics_data,
+            evaluation_windows={"preview": {"window_ids": [1]}},
             status="success",
             error="test error",
             context=context_data,
@@ -273,13 +287,16 @@ class TestDataClassesCoverage:
         assert report2.edit == edit_data
         assert report2.guards == guards_data
         assert report2.metrics == metrics_data
+        assert report2.evaluation_windows == {"preview": {"window_ids": [1]}}
         assert report2.status == "success"
         assert report2.error == "test error"
         assert report2.context == context_data
 
         # Test that default factory creates isolated instances
         report1.meta["new"] = "value"
+        report1.evaluation_windows["final"] = {"window_ids": [2]}
         assert "new" not in report2.meta
+        assert "final" not in report2.evaluation_windows
 
         # Test different status values
         for status in ["pending", "success", "failed", "rollback"]:
@@ -464,6 +481,29 @@ class TestEdgeCases:
         # finalize_all should not call missing method
         final_results = chain.finalize_all(Mock())
         assert final_results == []
+
+    def test_runtime_checkable_guard_protocols(self):
+        """Runtime guard protocol checks should accept matching hook shapes."""
+
+        class _Hooks:
+            def prepare(self, model, adapter, calib, policy_config):
+                return {"ready": True}
+
+            def before_edit(self, model):
+                return "before"
+
+            def after_edit(self, model):
+                return "after"
+
+            def finalize(self, model):
+                return "final"
+
+        hooks = _Hooks()
+
+        assert isinstance(hooks, GuardWithPrepare)
+        assert isinstance(hooks, GuardWithBeforeEdit)
+        assert isinstance(hooks, GuardWithAfterEdit)
+        assert isinstance(hooks, GuardWithFinalize)
 
 
 if __name__ == "__main__":

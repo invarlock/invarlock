@@ -247,14 +247,18 @@ def validate_report(report: dict[str, Any]) -> bool:
             run_id = report.get("run_id")
             run_id_ok = isinstance(run_id, str) and bool(run_id.strip())
             pm = report.get("primary_metric")
+            pm_final = pm.get("final") if isinstance(pm, dict) else None
+            pm_kind = pm.get("kind") if isinstance(pm, dict) else None
             pm_ok = isinstance(pm, dict) and (
-                isinstance(pm.get("final"), int | float)
-                or (isinstance(pm.get("kind"), str) and bool(pm.get("kind")))
+                (isinstance(pm_final, int | float) and not isinstance(pm_final, bool))
+                or (isinstance(pm_kind, str) and bool(pm_kind.strip()))
             )
             if not (run_id_ok and pm_ok):
                 return False
 
         validation = report.get("validation", {})
+        if validation is None or not isinstance(validation, dict):
+            return False
         for flag in [
             "preview_final_drift_acceptable",
             "primary_metric_acceptable",

@@ -46,6 +46,19 @@ def test_env_text_returns_none_for_whitespace_only_value() -> None:
     assert env_text("INVARLOCK_TEXT", environ={"INVARLOCK_TEXT": "   "}) is None
 
 
+def test_env_flag_returns_false_for_falsey_values_and_missing() -> None:
+    environ = {
+        "INVARLOCK_FLAG_FALSE": "off",
+        "INVARLOCK_FLAG_ZERO": " 0 ",
+        "INVARLOCK_FLAG_OTHER": "maybe",
+    }
+
+    assert env_flag("INVARLOCK_FLAG_FALSE", environ=environ) is False
+    assert env_flag("INVARLOCK_FLAG_ZERO", environ=environ) is False
+    assert env_flag("INVARLOCK_FLAG_OTHER", environ=environ) is False
+    assert env_flag("INVARLOCK_FLAG_MISSING", environ=environ) is False
+
+
 def test_build_run_execution_request_reads_policy_from_environ() -> None:
     request = _Request()
     core_request = build_run_execution_request(
@@ -81,3 +94,23 @@ def test_build_run_execution_request_prefers_pack_determinism_over_legacy_env() 
     )
 
     assert core_request.determinism_mode == "strict"
+
+
+def test_build_run_execution_request_uses_legacy_determinism_and_can_disable_timings() -> (
+    None
+):
+    request = _Request(progress=False, timing=False)
+
+    core_request = build_run_execution_request(
+        request,
+        environ={
+            "INVARLOCK_EVAL_DEVICE": "   ",
+            "INVARLOCK_DETERMINISM": "legacy",
+            "INVARLOCK_EXPORT_DIR": "   ",
+        },
+    )
+
+    assert core_request.capture_timings is False
+    assert core_request.eval_device_override is None
+    assert core_request.determinism_mode == "legacy"
+    assert core_request.export_dir is None

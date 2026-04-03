@@ -363,6 +363,20 @@ def test_create_plugin_info_parse_and_metadata_paths(monkeypatch):
     assert info_ok.package == "invarlock"
 
 
+def test_create_plugin_info_uses_dist_name_when_metadata_name_is_missing() -> None:
+    r = reg.CoreRegistry()
+    ep = _EP(
+        name="ok",
+        value="invarlock.plugins.hello_guard:HelloGuard",
+        dist=types.SimpleNamespace(name="fallback-dist", version="1.2.3", metadata={}),
+    )
+
+    info = r._create_plugin_info(ep, "guards")
+
+    assert info.package == "fallback-dist"
+    assert info.version == "1.2.3"
+
+
 def test_check_runtime_dependencies_find_spec_exception_counts_missing(monkeypatch):
     r = reg.CoreRegistry()
 
