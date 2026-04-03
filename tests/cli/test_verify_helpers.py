@@ -270,12 +270,14 @@ def test_coercion_helpers_and_measurement_contract_digest() -> None:
 
     assert verify_mod._coerce_float("1.5") == 1.5
     assert verify_mod._coerce_float(2) == 2.0
+    assert verify_mod._coerce_float(True) is None
     assert verify_mod._coerce_float(None) is None
     assert verify_mod._coerce_float("nope") is None
     assert verify_mod._coerce_float(float("nan")) is None
 
     assert verify_mod._coerce_int("3") == 3
     assert verify_mod._coerce_int(0) == 0
+    assert verify_mod._coerce_int(False) is None
     assert verify_mod._coerce_int(-1) is None
     assert verify_mod._coerce_int("nope") is None
 
@@ -413,6 +415,28 @@ def test_pairing_rejects_pairing_reason_and_zero_pairs() -> None:
     }
     errs2 = verify_mod._validate_pairing(cert_zero)
     assert errs2 and any("paired_windows" in e for e in errs2)
+
+
+def test_pairing_rejects_bool_fraction_fields() -> None:
+    verify_mod = _import_verify_module()
+
+    cert = {
+        "dataset": {
+            "windows": {
+                "stats": {
+                    "window_match_fraction": True,
+                    "window_overlap_fraction": False,
+                    "window_pairing_reason": None,
+                    "paired_windows": 2,
+                }
+            }
+        }
+    }
+
+    errs = verify_mod._validate_pairing(cert)
+
+    assert any("window_match_fraction" in e for e in errs)
+    assert any("window_overlap_fraction" in e for e in errs)
 
 
 def test_tokenizer_hash_and_profile_lints() -> None:

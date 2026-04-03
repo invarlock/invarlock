@@ -467,8 +467,8 @@ def _validate_pairing(report: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     stats = report.get("dataset", {}).get("windows", {}).get("stats", {})
 
-    match_fraction = stats.get("window_match_fraction")
-    overlap_fraction = stats.get("window_overlap_fraction")
+    match_fraction = _coerce_float(stats.get("window_match_fraction"))
+    overlap_fraction = _coerce_float(stats.get("window_overlap_fraction"))
     pairing_reason = stats.get("window_pairing_reason")
     paired_windows = _coerce_int(stats.get("paired_windows"))
 

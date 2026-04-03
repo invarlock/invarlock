@@ -114,7 +114,7 @@ def compute_validation_flags(
 
     # Canonical Gates
     # 1. Drift gate: by default 0.95 ≤ final/preview ≤ 1.05 (configurable)
-    drift_ratio = ppl.get("preview_final_ratio", 1.0)
+    drift_ratio = _coerce_finite_float(ppl.get("preview_final_ratio", 1.0))
     drift_min, drift_max = pm_drift_band_default
     if isinstance(pm_drift_band, dict):
         try:
@@ -131,7 +131,9 @@ def compute_validation_flags(
                 drift_max = cand_max_f
         except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
             pass
-    preview_final_drift_acceptable = drift_min <= drift_ratio <= drift_max
+    preview_final_drift_acceptable = (
+        drift_ratio is not None and drift_min <= drift_ratio <= drift_max
+    )
     if tiny_relax:
         # Treat drift identity as informational in tiny dev demos
         preview_final_drift_acceptable = True
