@@ -231,6 +231,12 @@ def _validate_with_jsonschema(
 
 def validate_report(report: dict[str, Any]) -> bool:
     """Validate evaluation report structure and essential flags."""
+    original_validation_spec: dict[str, Any] | None = None
+    schema_properties = REPORT_JSON_SCHEMA.get("properties")
+    if isinstance(schema_properties, dict):
+        validation_spec = schema_properties.get("validation")
+        if isinstance(validation_spec, dict):
+            original_validation_spec = copy.deepcopy(validation_spec)
     try:
         if report.get("schema_version") != REPORT_SCHEMA_VERSION:
             return False
@@ -287,6 +293,11 @@ def validate_report(report: dict[str, Any]) -> bool:
         return True
     except (KeyError, TypeError, ValueError):
         return False
+    finally:
+        if original_validation_spec is not None:
+            schema_properties = REPORT_JSON_SCHEMA.get("properties")
+            if isinstance(schema_properties, dict):
+                schema_properties["validation"] = original_validation_spec
 
 
 __all__ = [

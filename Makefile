@@ -124,16 +124,19 @@ test:  ## Run tests
 coverage:  ## Run tests with coverage and generate XML
 	$(MAKE) ensure-python
 	$(COVERAGE) erase
+	rm -f .coverage.*
 	PYTHONPATH=src $(PYTEST) -q $(COVERAGE_TESTS) \
 		$(COVERAGE_MODULES) \
 		--cov-branch \
 		--cov-report=term --cov-report=xml:reports/cov.xml --cov-fail-under=90
-	PYTHONPATH=src $(COVERAGE) run --append -m pytest -q -p no:cov \
+	mv .coverage .coverage.main
+	PYTHONPATH=src $(COVERAGE) run --parallel-mode -m pytest -q -p no:cov \
 		$(COVERAGE_TESTS_EVAL_PROBES)
-	PYTHONPATH=src $(COVERAGE) run --append -m pytest -q -p no:cov \
+	PYTHONPATH=src $(COVERAGE) run --parallel-mode -m pytest -q -p no:cov \
 		$(COVERAGE_TESTS_RUNTIME)
-	PYTHONPATH=src $(COVERAGE) run --append -m pytest -q -p no:cov \
+	PYTHONPATH=src $(COVERAGE) run --parallel-mode -m pytest -q -p no:cov \
 		$(COVERAGE_TESTS_ADAPTERS)
+	$(COVERAGE) combine
 	$(COVERAGE) report --include="$(COVERAGE_INCLUDE)" --fail-under=90
 	$(COVERAGE) xml --include="$(COVERAGE_INCLUDE)" -o reports/cov.xml
 

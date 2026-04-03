@@ -194,6 +194,32 @@ def test_validate_evaluation_report_handles_mapping_errors() -> None:
     assert schema_mod.validate_report(evaluation_report) is False
 
 
+def test_validate_evaluation_report_normalizes_missing_validation_from_mapping(
+    monkeypatch,
+) -> None:
+    class NonDictValidationMapping(dict):
+        def get(self, key, default=None):
+            if key == "validation":
+                return []
+            return super().get(key, default)
+
+        def __contains__(self, key):
+            if key == "validation":
+                return False
+            return super().__contains__(key)
+
+    monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda *_args: True)
+    evaluation_report = NonDictValidationMapping(
+        {
+            "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
+            "run_id": "run-7",
+            "primary_metric": {"final": 1.0},
+        }
+    )
+
+    assert schema_mod.validate_report(evaluation_report) is True
+
+
 def test_propagate_pairing_stats_adds_missing_fields():
     evaluation_report = {"dataset": {"windows": {}}}
     ppl_analysis = {
