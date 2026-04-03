@@ -413,6 +413,12 @@ def test_scorecard_workflow_is_configured():
         "results_format": "sarif",
     }
 
+    filter_step = _find_step_by_name(
+        steps, "Filter informational Scorecard SARIF rules"
+    )
+    assert "python scripts/filter_scorecard_sarif.py" in filter_step["run"]
+    assert "--exclude-rule CIIBestPracticesID" in filter_step["run"]
+
     upload_sarif_step = _find_step_by_uses_prefix(
         steps, "github/codeql-action/upload-sarif@"
     )
