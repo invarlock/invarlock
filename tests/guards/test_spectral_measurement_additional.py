@@ -39,6 +39,14 @@ def test_auto_sigma_target_ignores_non_positive_sigmas() -> None:
     assert target == 0.9
 
 
+def test_auto_sigma_target_returns_percentile_when_model_iteration_fails() -> None:
+    class _BrokenModel:
+        def named_modules(self):
+            raise RuntimeError("broken model")
+
+    assert auto_sigma_target(_BrokenModel(), percentile=0.8) == 0.8
+
+
 def test_auto_sigma_target_returns_percentile_when_numpy_percentile_fails(
     monkeypatch,
 ) -> None:
@@ -228,3 +236,23 @@ def test_capture_sigmas_prefers_scoped_modules_and_handles_quantized_weights() -
 
     assert sigmas["quantized"] == 1.0
     assert sigmas["floaty"] > 0.0
+
+
+def test_auto_sigma_target_falls_back_when_percentile_computation_fails(
+    monkeypatch,
+) -> None:
+    model = _Model({"layer": _Module(torch.eye(2))})
+
+    monkeypatch.setattr(
+        spectral_measurement.np,
+        "percentile",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("boom")),
+    )
+
+    target = auto_sigma_target(
+        model,
+        percentile=0.8,
+        compute_sigma_max_fn=lambda _weight: 2.0,
+    )
+
+    assert target == 0.8

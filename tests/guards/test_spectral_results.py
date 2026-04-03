@@ -105,6 +105,20 @@ def test_build_spectral_diagnostics_marks_fatal_and_budgeted_entries() -> None:
     assert diagnostics[1]["message"] == ""
 
 
+def test_build_spectral_diagnostics_defaults_missing_type() -> None:
+    diagnostics = build_spectral_diagnostics([{"message": "fallback"}])
+
+    assert diagnostics == [
+        {
+            "kind": "spectral_violation",
+            "severity": "warning",
+            "message": "fallback",
+            "family": None,
+            "module": None,
+        }
+    ]
+
+
 def test_build_spectral_validation_metrics_and_message() -> None:
     metrics = build_spectral_validation_metrics(
         current_metrics={"m": 2.0},

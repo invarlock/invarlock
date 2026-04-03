@@ -627,6 +627,23 @@ def test_runner_eval_metrics_hook_and_metric_resolution_helpers() -> None:
     )
 
 
+def test_runner_eval_metrics_small_helpers_filter_and_normalize_inputs() -> None:
+    prepared = {
+        "input_ids": [1, 2, 3],
+        "labels": [1, 2, 3],
+        "_private": "drop",
+        7: "drop",
+    }
+
+    assert rem._model_kwargs(prepared) == {
+        "input_ids": [1, 2, 3],
+        "labels": [1, 2, 3],
+    }
+    assert rem._normalize_answer_text("  Cat   Dog\n") == "cat dog"
+    assert rem._is_multimodal_batch({"example_id": "ex-1"}) is True
+    assert rem._is_multimodal_batch({"input_ids": [1, 2, 3]}) is False
+
+
 def test_evaluate_vision_text_arm_requires_real_hook_surface() -> None:
     with pytest.raises(RuntimeError, match="prepare_model_inputs"):
         rem._evaluate_vision_text_arm(
@@ -653,6 +670,76 @@ def test_evaluate_vision_text_arm_requires_real_hook_surface() -> None:
             adapter=_MissingDecode(),
             device="cpu",
         )
+
+    class _MissingGeneration:
+        def prepare_model_inputs(self, batch, device, include_labels):  # noqa: ANN001
+            return {
+                "input_ids": torch.tensor([[1]], device=device),
+                "labels": torch.tensor([[1]], device=device),
+            }
+
+        def decode_generated(self, generated_ids, generation_inputs):  # noqa: ANN001
+            return ["cat"]
+
+    with pytest.raises(RuntimeError, match="prepare_generation_inputs"):
+        rem._evaluate_vision_text_arm(
+            _FakeModel(),
+            [{"id": "ex-1", "image_path": "/tmp/a.png", "answers": ["cat"]}],
+            adapter=_MissingGeneration(),
+            device="cpu",
+        )
+
+
+def test_evaluate_vision_text_arm_skips_zero_answer_tokens_and_blank_processor_sha() -> None:
+    class _VisionModel:
+        def __call__(self, **_kwargs):
+            return SimpleNamespace(loss=torch.tensor(0.5))
+
+        def generate(self, **_kwargs):
+            return torch.tensor([[1, 2]])
+
+    class _Adapter:
+        def prepare_model_inputs(self, batch, device, include_labels):  # noqa: ANN001
+            return {
+                "input_ids": torch.tensor([[1]], device=device),
+                "labels": torch.tensor([[1]], device=device),
+                "_answer_token_count": 0,
+            }
+
+        def prepare_generation_inputs(self, batch, device):  # noqa: ANN001
+            return {
+                "input_ids": torch.tensor([[1]], device=device),
+                "_reference_answers": ["   "],
+                "_processor_sha256": 123,
+            }
+
+        def decode_generated(self, generated_ids, generation_inputs):  # noqa: ANN001
+            return ["cat"]
+
+    payload, latency_ms = rem._evaluate_vision_text_arm(
+        _VisionModel(),
+        [
+            {
+                "id": "batch-id",
+                "image_path": "/tmp/demo.png",
+                "answers": ["cat"],
+                "image_sha256": "img",
+                "prompt_sha256": "prompt",
+                "answer_sha256": "answer",
+            }
+        ],
+        adapter=_Adapter(),
+        device="cpu",
+    )
+
+    assert latency_ms >= 0.0
+    assert payload["total_tokens"] == 0
+    assert payload["logloss"] == []
+    assert payload["token_counts"] == []
+    assert payload["records"][0]["id"] == "batch-id"
+    assert payload["records"][0]["references"] == []
+    assert payload["records"][0]["correct"] is False
+    assert "processor_sha256" not in payload
 
 
 def test_compute_real_metrics_propagates_pairing_metric_failures(monkeypatch) -> None:
