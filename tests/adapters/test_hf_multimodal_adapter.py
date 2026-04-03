@@ -65,6 +65,28 @@ class _FakeProcessor:
         return [" ".join(str(token) for token in row) for row in rows]
 
 
+class _RetryingProcessor(_FakeProcessor):
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls: list[tuple[str, bool, int | None]] = []
+
+    def __call__(self, *, text, images, return_tensors, truncation, max_length):  # noqa: ANN001
+        del images, return_tensors
+        self.calls.append((text, bool(truncation), max_length))
+        if truncation:
+            raise ValueError(
+                "Mismatch in `image` token count between text and `input_ids`. "
+                "Likely due to `truncation='max_length'`."
+            )
+        return super().__call__(
+            text=text,
+            images=None,
+            return_tensors="pt",
+            truncation=False,
+            max_length=max_length,
+        )
+
+
 class _TokenizerOnlyDecoder:
     def __init__(self) -> None:
         self.decoded_inputs: list[object] = []
@@ -151,6 +173,40 @@ def test_hf_multimodal_prepare_generation_inputs_and_decode(tmp_path: Path) -> N
 
     assert processor.decoded_inputs == [[21, 22]]
     assert decoded == ["21 22"]
+
+
+def test_hf_multimodal_prepare_model_inputs_retries_without_truncation(
+    tmp_path: Path,
+) -> None:
+    adapter = HF_Multimodal_Adapter()
+    processor = _RetryingProcessor()
+    adapter._processor = processor
+    adapter._processor_digest = adapter._compute_processor_digest(processor)
+    adapter._last_model_id = "fake/model"
+    image_path = tmp_path / "demo.ppm"
+    _write_ppm(image_path)
+
+    prepared = adapter.prepare_model_inputs(
+        {
+            "id": "ex-retry",
+            "image_path": str(image_path),
+            "prompt": "what is shown?",
+            "answers": ["cat"],
+            "seq_len": 8,
+        },
+        device="cpu",
+        include_labels=True,
+    )
+
+    assert prepared["_decode_prompt_length"] == 3
+    assert prepared["_answer_token_count"] == 2
+    assert prepared["labels"].tolist() == [[-100, -100, -100, 14, 15]]
+    assert processor.calls == [
+        ("USER:what is shown?\nASSISTANT:", True, 8),
+        ("USER:what is shown?\nASSISTANT:", False, None),
+        ("USER:what is shown?\nASSISTANT:cat", True, 8),
+        ("USER:what is shown?\nASSISTANT:cat", False, None),
+    ]
 
 
 def test_hf_multimodal_load_model_uses_resolved_strategy(

@@ -210,6 +210,42 @@ class HF_Multimodal_Adapter(HF_Causal_Adapter):
             return prompt
         return f"{prompt}\n{answer}"
 
+    def _should_retry_without_truncation(self, exc: ValueError) -> bool:
+        message = str(exc).strip().lower()
+        return "mismatch in `image` token count" in message and (
+            "truncation='max_length'" in message or "max_length" in message
+        )
+
+    def _processor_call(
+        self,
+        processor: Any,
+        *,
+        text: str,
+        image: Any,
+        seq_len: int | None,
+    ) -> tuple[dict[str, Any], bool]:
+        kwargs = {
+            "text": text,
+            "images": image,
+            "return_tensors": "pt",
+            "truncation": bool(seq_len),
+            "max_length": seq_len,
+        }
+        try:
+            payload = processor(**kwargs)
+            return dict(payload), bool(seq_len)
+        except ValueError as exc:
+            if not seq_len or not self._should_retry_without_truncation(exc):
+                raise
+        retry_payload = processor(
+            text=text,
+            images=image,
+            return_tensors="pt",
+            truncation=False,
+            max_length=None,
+        )
+        return dict(retry_payload), False
+
     def _move_to_device(self, payload: dict[str, Any], device: Any) -> dict[str, Any]:
         prepared: dict[str, Any] = {}
         for key, value in payload.items():
@@ -230,12 +266,11 @@ class HF_Multimodal_Adapter(HF_Causal_Adapter):
         seq_len = int(batch.get("seq_len", 0) or 0) or None
 
         prompt_text = self._processor_text(processor, prompt=prompt)
-        prompt_payload = processor(
+        prompt_payload, prompt_used_truncation = self._processor_call(
+            processor,
             text=prompt_text,
-            images=image,
-            return_tensors="pt",
-            truncation=bool(seq_len),
-            max_length=seq_len,
+            image=image,
+            seq_len=seq_len,
         )
         prompt_ids = prompt_payload.get("input_ids")
         prompt_length = (
@@ -244,13 +279,25 @@ class HF_Multimodal_Adapter(HF_Causal_Adapter):
 
         if include_labels:
             full_text = self._processor_text(processor, prompt=prompt, answer=answer)
-            payload = processor(
+            payload, labels_used_truncation = self._processor_call(
+                processor,
                 text=full_text,
-                images=image,
-                return_tensors="pt",
-                truncation=bool(seq_len),
-                max_length=seq_len,
+                image=image,
+                seq_len=seq_len,
             )
+            if prompt_used_truncation and not labels_used_truncation:
+                prompt_payload, _ = self._processor_call(
+                    processor,
+                    text=prompt_text,
+                    image=image,
+                    seq_len=None,
+                )
+                prompt_ids = prompt_payload.get("input_ids")
+                prompt_length = (
+                    int(prompt_ids.shape[-1])
+                    if isinstance(prompt_ids, torch.Tensor)
+                    else 0
+                )
             labels = payload.get("input_ids")
             if isinstance(labels, torch.Tensor):
                 labels = labels.clone()

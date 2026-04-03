@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import Mock
@@ -9,6 +10,7 @@ import pytest
 import torch
 
 import invarlock.core.runner_eval_metrics as rem
+from invarlock.adapters.hf_multimodal import HF_Multimodal_Adapter
 
 
 class _FakeRunner:
@@ -43,6 +45,10 @@ class _FakeModel:
         self._device = str(device)
         self._param = SimpleNamespace(device=device)
         return self
+
+
+def _write_ppm(path: Path) -> None:
+    path.write_text("P3\n1 1\n255\n255 0 0\n", encoding="utf-8")
 
 
 def _summary(
@@ -460,6 +466,137 @@ def test_compute_real_metrics_supports_vision_text_classification() -> None:
     assert eval_windows["final"]["records"][0]["correct"] is False
     assert metrics["primary_metric"]["preview"] == 1.0
     assert metrics["primary_metric"]["final"] == 0.0
+
+
+def test_compute_real_metrics_retries_multimodal_processor_without_truncation(
+    tmp_path: Path,
+) -> None:
+    class _RetryingProcessor:
+        def __init__(self) -> None:
+            self.name_or_path = "retrying-processor"
+            self.tokenizer = SimpleNamespace(
+                name_or_path="retrying-tokenizer",
+                vocab_size=32,
+                eos_token="</s>",
+                pad_token="<pad>",
+            )
+            self.image_processor = SimpleNamespace(
+                size={"height": 1, "width": 1},
+                image_mean=[0.5, 0.5, 0.5],
+                image_std=[0.25, 0.25, 0.25],
+            )
+            self.calls: list[tuple[str, bool, int | None]] = []
+
+        def apply_chat_template(
+            self, messages, tokenize=False, add_generation_prompt=False
+        ):  # noqa: ANN001
+            del tokenize
+            prompt = messages[0]["content"][1]["text"]
+            if len(messages) > 1:
+                answer = messages[1]["content"][0]["text"]
+                return f"USER:{prompt}\nASSISTANT:{answer}"
+            suffix = "\nASSISTANT:" if add_generation_prompt else ""
+            return f"USER:{prompt}{suffix}"
+
+        def __call__(
+            self, *, text, images, return_tensors, truncation, max_length
+        ):  # noqa: ANN001
+            del images, return_tensors
+            self.calls.append((text, bool(truncation), max_length))
+            if truncation:
+                raise ValueError(
+                    "Mismatch in `image` token count between text and `input_ids`. "
+                    "Likely due to `truncation='max_length'`."
+                )
+            if "ASSISTANT:cat" in text:
+                input_ids = torch.tensor([[11, 12, 13, 14]], dtype=torch.long)
+            else:
+                input_ids = torch.tensor([[11, 12]], dtype=torch.long)
+            return {
+                "input_ids": input_ids,
+                "attention_mask": torch.ones_like(input_ids),
+            }
+
+        def batch_decode(self, ids, skip_special_tokens=True):  # noqa: ANN001
+            del skip_special_tokens
+            rows = ids.tolist()
+            if rows == [[101]]:
+                return ["cat"]
+            if rows == [[102]]:
+                return ["not-cat"]
+            return [" ".join(str(token) for token in row) for row in rows]
+
+    class _VisionModel(_FakeModel):
+        def __init__(self) -> None:
+            super().__init__()
+            self.generate_calls = 0
+
+        def __call__(self, **kwargs):
+            del kwargs
+            return SimpleNamespace(loss=torch.tensor(0.25))
+
+        def generate(self, **kwargs):
+            del kwargs
+            self.generate_calls += 1
+            token = 101 if self.generate_calls == 1 else 102
+            return torch.tensor([[1, 2, token]], dtype=torch.long)
+
+    image_path = tmp_path / "demo.ppm"
+    _write_ppm(image_path)
+
+    adapter = HF_Multimodal_Adapter()
+    processor = _RetryingProcessor()
+    adapter._processor = processor
+    adapter._processor_digest = adapter._compute_processor_digest(processor)
+    adapter._last_model_id = "fake/model"
+
+    metrics, eval_windows = rem.compute_real_metrics(
+        _FakeRunner(),
+        _VisionModel(),
+        calibration_data=[
+            {
+                "id": "ex-1",
+                "example_id": "ex-1",
+                "image_path": str(image_path),
+                "prompt": "what is shown?",
+                "answers": ["cat"],
+                "seq_len": 8,
+            },
+            {
+                "id": "ex-2",
+                "example_id": "ex-2",
+                "image_path": str(image_path),
+                "prompt": "what is shown?",
+                "answers": ["cat"],
+                "seq_len": 8,
+            },
+        ],
+        adapter=adapter,
+        preview_n=1,
+        final_n=1,
+        config=SimpleNamespace(
+            context={
+                "eval": {
+                    "loss": {
+                        "type": "classification",
+                        "resolved_type": "classification",
+                    },
+                    "metric": {"kind": "vqa_accuracy"},
+                }
+            }
+        ),
+    )
+
+    assert metrics["classification"]["counts_source"] == "measured"
+    assert metrics["classification"]["n_correct"] == 0
+    assert metrics["classification"]["n_total"] == 1
+    assert metrics["classification"]["estimated"] is False
+    assert eval_windows["preview"]["records"][0]["correct"] is True
+    assert eval_windows["final"]["records"][0]["correct"] is False
+    assert any(
+        truncation is False and max_length is None
+        for _text, truncation, max_length in processor.calls
+    )
 
 
 def test_runner_eval_metrics_hook_and_metric_resolution_helpers() -> None:
