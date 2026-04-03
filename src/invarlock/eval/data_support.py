@@ -9,7 +9,7 @@ import os
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, TypeAlias
 
 from invarlock.core.exceptions import DependencyError as _DepErr
 
@@ -26,8 +26,8 @@ _load_dataset_cached: Any = _DATASETS_UNSET
 load_dataset: Any = None
 
 
-type DatasetDiagnosticSeverity = Literal["info", "warning", "error"]
-type DatasetDiagnosticCategory = Literal["dataset", "provider", "window"]
+DatasetDiagnosticSeverity: TypeAlias = Literal["info", "warning", "error"]  # noqa: UP040
+DatasetDiagnosticCategory: TypeAlias = Literal["dataset", "provider", "window"]  # noqa: UP040
 
 
 @dataclass(frozen=True)

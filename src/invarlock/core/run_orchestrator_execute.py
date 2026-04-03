@@ -406,6 +406,7 @@ def execute_run_request_impl(
         if loaded is not None:
             return loaded
         _halt("torch_missing")
+        raise AssertionError("unreachable after torch_missing halt")  # pragma: no cover
 
     # use module-level _derive_mlm_seed
 

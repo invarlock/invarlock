@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Any
 
 from invarlock.runtime_security import ContainerLaunchPlan
 from invarlock.runtime_security_helpers import (
@@ -12,9 +12,6 @@ from invarlock.runtime_security_helpers import (
     _normalize_local_model_path_for_container,
     _normalize_output_path_for_container,
 )
-
-if TYPE_CHECKING:
-    from invarlock.cli.config_execution import ConfigExecutionRequest
 
 _CONFIG_SCAN_ARG_FLAGS = {"--config", "-c", "--preset", "--edit-config"}
 _CONFIG_PATH_ARG_FLAGS = _CONFIG_SCAN_ARG_FLAGS | {"--baseline-report"}
@@ -187,7 +184,7 @@ def _append_bool_flag(argv: list[str], flag: str, enabled: bool) -> None:
 
 def build_request_container_launch_plan(
     command_name: str,
-    request: ConfigExecutionRequest,
+    request: Any,
 ) -> ContainerLaunchPlan:
     delegated_argv: list[str] = [str(command_name)]
     _append_option(delegated_argv, "--config", request.config)

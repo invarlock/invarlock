@@ -9,7 +9,6 @@ import os
 import shutil
 from typing import Any
 
-from invarlock.cli.run_config import extract_model_load_kwargs
 from invarlock.cli.run_runtime import free_model_memory, get_psutil
 from invarlock.cli.run_warning_filters import suppress_noisy_warnings
 from invarlock.core.exceptions import InvarlockError
@@ -89,6 +88,8 @@ def load_model_with_cfg(
             model_id = None
     if not isinstance(model_id, str) or not model_id:
         raise ValueError("Missing model.id in config")
+
+    from invarlock.cli.run_config import extract_model_load_kwargs
 
     extra = extract_model_load_kwargs(cfg, invarlock_error_cls=InvarlockError)
     with suppress_noisy_warnings(

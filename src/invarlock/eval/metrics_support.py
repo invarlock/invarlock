@@ -7,7 +7,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, TypeAlias
 
 import psutil
 import torch
@@ -26,7 +26,7 @@ class ResourceError(MetricsError):
     """Raised when insufficient resources are available."""
 
 
-type MetricsProgressPhase = Literal["activation_collection", "mi_gini_cpu"]
+MetricsProgressPhase: TypeAlias = Literal["activation_collection", "mi_gini_cpu"]  # noqa: UP040
 
 
 @dataclass(frozen=True)
@@ -38,7 +38,7 @@ class MetricsProgressUpdate:
     total: int | None
 
 
-type MetricsProgressObserver = Callable[[MetricsProgressUpdate], None]
+MetricsProgressObserver: TypeAlias = Callable[[MetricsProgressUpdate], None]  # noqa: UP040
 
 
 @dataclass

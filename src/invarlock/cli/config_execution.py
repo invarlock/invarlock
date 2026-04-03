@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from invarlock.cli.runtime_launch_plan import build_request_container_launch_plan
 from invarlock.runtime_security import (
     delegate_container_command,
     host_execution_allowed,
@@ -12,7 +11,6 @@ from invarlock.runtime_security import (
     write_runtime_manifest,
 )
 
-from .run_execution import execute_config_run_request
 from .security_helpers import resolve_shell_runtime_security_policy
 
 
@@ -46,6 +44,25 @@ class ConfigExecutionRequest:
     allow_third_party_plugins: bool = False
     allow_remote_code: bool = False
     prefer_local_files_only: bool = False
+
+
+def build_request_container_launch_plan(
+    command_name: str,
+    request: ConfigExecutionRequest,
+):
+    from invarlock.cli.runtime_launch_plan import (
+        build_request_container_launch_plan as _build_request_container_launch_plan,
+    )
+
+    return _build_request_container_launch_plan(command_name, request)
+
+
+def execute_config_run_request(request: ConfigExecutionRequest) -> str | None:
+    from .run_execution import (
+        execute_config_run_request as _execute_config_run_request,
+    )
+
+    return _execute_config_run_request(request)
 
 
 def run_from_config(
