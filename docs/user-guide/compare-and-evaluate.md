@@ -28,7 +28,8 @@ existing tooling intact.
 
 By default, `evaluate` runs inside the runtime container. Use `--mode local`
 only for trusted local workflows that intentionally run model loading on the
-host.
+host. If that trusted local path intentionally bypasses runtime attestation,
+add `--allow-unattested-artifacts`.
 
 Example (GPT‑2, CPU/MPS friendly; requires `invarlock[hf]` or equivalent HF extra):
 

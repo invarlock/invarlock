@@ -73,6 +73,7 @@ def run_from_config(
     allow_host_execution: bool = False,
     allow_third_party_plugins: bool = False,
     allow_remote_code: bool = False,
+    allow_unattested_artifacts: bool = False,
     prefer_local_files_only: bool = False,
     command_name: str = "run",
     delegate: bool = True,
@@ -83,6 +84,7 @@ def run_from_config(
         allow_host_execution=allow_host_execution,
         allow_third_party_plugins=allow_third_party_plugins,
         allow_remote_code=allow_remote_code,
+        allow_unattested_artifacts=allow_unattested_artifacts,
     )
     with runtime_allowances_scope(policy=policy):
         if delegate and not running_inside_container() and not host_execution_allowed():

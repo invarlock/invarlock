@@ -223,6 +223,11 @@ def _evaluate_lazy(
         "--allow-network",
         help="Allow network access, including runtime-image pulls and model fetches.",
     ),
+    allow_unattested_artifacts: bool = typer.Option(
+        False,
+        "--allow-unattested-artifacts",
+        help="Allow local evaluate/report artifacts without runtime attestation metadata.",
+    ),
 ):
     from .commands.evaluate import evaluate_command as _eval
 
@@ -248,6 +253,7 @@ def _evaluate_lazy(
         mode=mode.value,
         no_color=no_color,
         allow_network=allow_network,
+        allow_unattested_artifacts=allow_unattested_artifacts,
     )
 
 

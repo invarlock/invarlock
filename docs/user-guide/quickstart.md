@@ -44,7 +44,9 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
 
 `evaluate` uses the secure-default runtime container unless you explicitly pass
 `--mode local` for a trusted host-side workflow. Attested runs emit
-`reports/eval/runtime.manifest.json` next to `evaluation.report.json`.
+`reports/eval/runtime.manifest.json` next to `evaluation.report.json`. For a
+trusted host-side bypass that intentionally skips runtime attestation, add
+`--allow-unattested-artifacts`.
 
 ### 3. Verify the evaluation report
 

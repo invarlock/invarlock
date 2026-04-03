@@ -16,3 +16,4 @@ def test_cli_evaluate_help():
     assert "--baseline" in stdout and "--subject" in stdout
     assert "--baseline-report" in stdout
     assert "--edit-label" in stdout
+    assert "--allow-unattested-artifacts" in stdout

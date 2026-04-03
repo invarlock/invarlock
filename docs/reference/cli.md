@@ -107,6 +107,8 @@ Common options:
 - `--out`: run-artifact directory
 - `--report-out`: evaluation report directory
 - `--mode attested|local`: execution mode for model-loading steps
+- `--allow-unattested-artifacts`: allow trusted local evaluate flows to emit
+  host-bypass artifacts without runtime attestation
 - `--edit-config`: optional demo/smoke edit overlay such as `quant_rtn`
 
 Example:

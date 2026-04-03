@@ -187,6 +187,55 @@ def test_evaluate_command_local_mode_prefers_local_files_only(monkeypatch, tmp_p
         assert call["prefer_local_files_only"] is True
 
 
+def test_evaluate_command_passes_allow_unattested_artifacts_to_runs(
+    monkeypatch, tmp_path
+) -> None:
+    src = tmp_path / "src_model"
+    edt = tmp_path / "edt_model"
+    src.mkdir()
+    edt.mkdir()
+    (src / "config.json").write_text(
+        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
+        encoding="utf-8",
+    )
+    (edt / "config.json").write_text(
+        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
+        encoding="utf-8",
+    )
+
+    captured_runs: list[dict[str, object]] = []
+
+    def fake_run(**kwargs):  # noqa: ANN001
+        captured_runs.append(kwargs)
+        return str(_stub_run(Path(kwargs["out"])))
+
+    def fake_report(**_kwargs):  # noqa: ANN001
+        return None
+
+    import invarlock.cli.commands.run as run_mod
+    from invarlock.cli.commands import evaluate as eval_mod
+
+    monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
+    monkeypatch.setattr(eval_mod, "generate_reports", fake_report, raising=False)
+
+    evaluate_command(
+        baseline=str(src),
+        subject=str(edt),
+        adapter="auto",
+        profile="dev",
+        mode="local",
+        allow_unattested_artifacts=True,
+        out=str(tmp_path / "runs"),
+        report_out=str(tmp_path / "reports"),
+        timing=False,
+        progress=False,
+    )
+
+    assert len(captured_runs) == 2
+    for call in captured_runs:
+        assert call["allow_unattested_artifacts"] is True
+
+
 def test_evaluate_command_resets_runtime_security_on_success(
     monkeypatch, tmp_path
 ) -> None:

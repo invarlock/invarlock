@@ -278,6 +278,7 @@ def evaluate_command(
     allow_host_execution: bool = False,
     allow_third_party_plugins: bool = False,
     allow_remote_code: bool = False,
+    allow_unattested_artifacts: bool = False,
     no_color: bool = False,
 ):
     """Evaluate two checkpoints (baseline vs subject) with pinned windows."""
@@ -441,6 +442,7 @@ def evaluate_command(
                         allow_host_execution=allow_host_execution,
                         allow_third_party_plugins=allow_third_party_plugins,
                         allow_remote_code=allow_remote_code,
+                        allow_unattested_artifacts=allow_unattested_artifacts,
                         prefer_local_files_only=prefer_local_files_only,
                         no_color=no_color,
                     )
@@ -536,6 +538,7 @@ def evaluate_command(
                         allow_host_execution=allow_host_execution,
                         allow_third_party_plugins=allow_third_party_plugins,
                         allow_remote_code=allow_remote_code,
+                        allow_unattested_artifacts=allow_unattested_artifacts,
                         prefer_local_files_only=prefer_local_files_only,
                         no_color=no_color,
                     )
@@ -592,6 +595,7 @@ def evaluate_command(
                         allow_host_execution=allow_host_execution,
                         allow_third_party_plugins=allow_third_party_plugins,
                         allow_remote_code=allow_remote_code,
+                        allow_unattested_artifacts=allow_unattested_artifacts,
                         prefer_local_files_only=prefer_local_files_only,
                         no_color=no_color,
                     )
