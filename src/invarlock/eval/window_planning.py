@@ -96,7 +96,15 @@ def _tensor_or_list_to_ints(value: Any) -> list[int]:
         candidate = list(candidate)
     if not isinstance(candidate, list):
         return []
-    return [int(item) for item in candidate]
+    result: list[int] = []
+    for item in candidate:
+        if isinstance(item, bool):
+            return []
+        try:
+            result.append(int(item))
+        except Exception:
+            return []
+    return result
 
 
 def _coerce_indices(indices: Any) -> list[Any]:

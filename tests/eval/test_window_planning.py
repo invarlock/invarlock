@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from invarlock.eval.window_planning import (
+    _tensor_or_list_to_ints,
     choose_first_token_sufficient_candidate,
     resolve_effective_windows,
 )
@@ -141,3 +142,7 @@ def test_choose_first_token_sufficient_candidate_reports_no_candidate_on_dedupe_
         "Unable to construct non-overlapping windows"
         in result["candidates"][0]["reason"]
     )
+
+
+def test_tensor_or_list_to_ints_rejects_bool_elements() -> None:
+    assert _tensor_or_list_to_ints([True, 2]) == []
