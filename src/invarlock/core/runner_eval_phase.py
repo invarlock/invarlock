@@ -97,7 +97,7 @@ def eval_phase(
         eval_windows = {"preview": {}, "final": {}}
 
     pm = metrics.get("primary_metric", {}) if isinstance(metrics, dict) else {}
-    pm_kind = str(pm.get("kind", "")).lower() if isinstance(pm, dict) else ""
+    pm_kind = str(pm.get("kind", "")).strip().lower() if isinstance(pm, dict) else ""
     is_ppl_metric = pm_kind.startswith("ppl")
 
     baseline_eval: dict[str, Any] = {}

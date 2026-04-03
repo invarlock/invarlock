@@ -62,3 +62,15 @@ def test_disable_guard_falls_back_when_checkpoint_restore_fails(monkeypatch) -> 
     assert disable_guard(guard, model=None) is True
     assert guard._enabled is False
     assert any(event[0] == "disable_checkpoint_failed" for event in guard._events)
+
+
+def test_disable_guard_returns_false_when_zero_scale_cannot_be_reverted() -> None:
+    guard = _guard()
+    module = _Module(torch.ones((2, 2)))
+    guard._target_modules = {"layer": module}
+    guard._scales = {"layer": 0.0}
+
+    assert disable_guard(guard, model=None) is False
+    assert guard._enabled is True
+    assert any(event[0] == "scale_revert_error" for event in guard._events)
+    assert any(event[0] == "disable_failed" for event in guard._events)

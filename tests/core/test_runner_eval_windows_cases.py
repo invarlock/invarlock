@@ -162,6 +162,33 @@ def test_compute_slice_summary_handles_tensor_masks_and_labels_without_storage(
     assert any(operation == "label_alignment" for _, operation, _, _ in runner.events)
 
 
+def test_compute_slice_summary_strips_whitespace_when_storage_is_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("INVARLOCK_STORE_EVAL_WINDOWS", " false ")
+    runner = _RunnerRecorder()
+    model = _LossModel(0.2)
+    batch = {
+        "input_ids": torch.tensor([[5, 6, 7]], dtype=torch.long),
+        "attention_mask": torch.tensor([[1, 1, 1]], dtype=torch.long),
+    }
+
+    summary, error = compute_slice_summary(
+        runner,
+        model,
+        [batch],
+        max_batches=1,
+        start_idx=1,
+        device=next(model.parameters()).device,
+        resolved_loss_mode="causal",
+    )
+
+    assert error is None
+    assert summary["tokens"] == []
+    assert summary["attention_masks"] == []
+    assert summary["labels"] == []
+
+
 def test_compute_slice_summary_reports_mlm_missing_masks_for_unusable_batches(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

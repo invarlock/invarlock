@@ -29,6 +29,13 @@ def compute_family_observability(
     *,
     top_k: int = 3,
 ) -> tuple[dict[str, dict[str, float]], dict[str, list[dict[str, Any]]]]:
+    try:
+        top_k_i = int(top_k)
+    except (TypeError, ValueError):
+        top_k_i = 3
+    if top_k_i < 0:
+        top_k_i = 0
+
     family_scores: dict[str, list[float]] = defaultdict(list)
     family_modules: dict[str, list[tuple[float, str]]] = defaultdict(list)
 
@@ -58,7 +65,7 @@ def compute_family_observability(
         module_entries.sort(key=lambda item: item[0], reverse=True)
         top_z_scores[family] = [
             {"module": module_name, "z": float(z_abs), "family": family}
-            for z_abs, module_name in module_entries[:top_k]
+            for z_abs, module_name in module_entries[:top_k_i]
         ]
 
     return family_quantiles, top_z_scores

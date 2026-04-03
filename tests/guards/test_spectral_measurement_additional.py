@@ -39,6 +39,25 @@ def test_auto_sigma_target_ignores_non_positive_sigmas() -> None:
     assert target == 0.9
 
 
+def test_auto_sigma_target_returns_percentile_when_numpy_percentile_fails(
+    monkeypatch,
+) -> None:
+    model = _Model({"kept": _Module(torch.eye(2))})
+    monkeypatch.setattr(
+        spectral_measurement.np,
+        "percentile",
+        lambda *_a, **_k: (_ for _ in ()).throw(ValueError("boom")),
+    )
+
+    target = auto_sigma_target(
+        model,
+        percentile=0.8,
+        compute_sigma_max_fn=lambda _weight: 2.0,
+    )
+
+    assert target == 0.8
+
+
 def test_capture_baseline_sigmas_skips_out_of_scope_modules() -> None:
     model = _Model({"kept": _Module(torch.eye(2)), "skipped": _Module(torch.eye(2))})
 
@@ -187,3 +206,25 @@ def test_capture_sigmas_falls_back_for_invalid_estimator_and_power_iter_failure(
     sigmas = capture_sigmas(guard, _ModelWithWeight(), phase="after_edit")
 
     assert sigmas == {"fragile": 1.0}
+
+
+def test_capture_sigmas_prefers_scoped_modules_and_handles_quantized_weights() -> None:
+    guard = SimpleNamespace(
+        estimator={"iters": 2, "init": "ones"},
+        _get_scoped_modules=lambda _model: (
+            ("quantized", _Module(torch.ones((2, 2), dtype=torch.int8))),
+            ("floaty", _Module(torch.eye(2))),
+        ),
+    )
+
+    sigmas = capture_sigmas(
+        guard,
+        object(),
+        phase="after_edit",
+        power_iter_sigma_max_fn=lambda weight, *, iters, init: float(
+            weight.sum().item() + iters + len(init)
+        ),
+    )
+
+    assert sigmas["quantized"] == 1.0
+    assert sigmas["floaty"] > 0.0

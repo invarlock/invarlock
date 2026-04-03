@@ -94,7 +94,9 @@ def compute_slice_summary(
     zero_mask_batches = 0
     any_labels_seen = False
     eval_error: dict[str, Any] | None = None
-    store_windows = os.environ.get("INVARLOCK_STORE_EVAL_WINDOWS", "1").lower() not in {
+    store_windows = os.environ.get(
+        "INVARLOCK_STORE_EVAL_WINDOWS", "1"
+    ).strip().lower() not in {
         "0",
         "false",
         "no",
