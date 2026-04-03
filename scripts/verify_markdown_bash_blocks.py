@@ -30,6 +30,12 @@ TMP = ROOT / "tmp"
 EXECUTION_MODES = ("container", "host")
 HOST_EXECUTION_ENV = "INVARLOCK_ALLOW_HOST_EXECUTION"
 MODEL_LOADING_COMMANDS = {"evaluate", "run", "calibrate"}
+DEMO_EVALUATION_REPORT_FIXTURE = (
+    ROOT / "tests" / "artifacts" / "golden_runs" / "gpt2" / "evaluation.report.json"
+)
+DEMO_RUNTIME_MANIFEST_FIXTURE = (
+    ROOT / "tests" / "fixtures" / "runtime_attestation" / "runtime.manifest.json"
+)
 
 EXCLUDE_TOP_LEVEL_DIRS = {
     ".git",
@@ -169,7 +175,9 @@ def iter_markdown_files(root: Path, *, paths: list[str] | None = None) -> list[P
         if not path.is_file():
             continue
         rel_parts = path.relative_to(root).parts
-        if rel_parts and rel_parts[0] in EXCLUDE_TOP_LEVEL_DIRS:
+        if rel_parts and (
+            rel_parts[0].startswith(".") or rel_parts[0] in EXCLUDE_TOP_LEVEL_DIRS
+        ):
             continue
         md_files.append(path)
     return sorted(md_files, key=lambda p: str(p))
@@ -212,6 +220,31 @@ def _command_tokens(argv: list[str]) -> list[str]:
     ):
         return argv[3:]
     return []
+
+
+def _is_assurance_command(command_tokens: list[str]) -> bool:
+    return command_tokens[:1] in (["evaluate"], ["verify"]) or command_tokens[:2] == [
+        "report",
+        "verify",
+    ]
+
+
+def _is_model_loading_command(command_tokens: list[str]) -> bool:
+    if command_tokens[:1] and command_tokens[0] in MODEL_LOADING_COMMANDS:
+        return True
+    return command_tokens[:2] == ["advanced", "calibrate"]
+
+
+def _should_skip_line_for_host_mode(stripped: str) -> bool:
+    if stripped == "make runtime-image":
+        return True
+    if stripped.startswith(("docker ", "podman ")):
+        return True
+    return "runtime.manifest.json" in stripped and (
+        stripped.startswith("test -f ")
+        or stripped.startswith("[ -f ")
+        or stripped.startswith("stat ")
+    )
 
 
 def _insert_option_after_command(argv: list[str], option: str) -> list[str]:
@@ -265,18 +298,11 @@ def _rewrite_invarlock_tokens(
 
     if execution_mode == "container":
         argv = [token for token in argv if token != "--allow-host-execution"]
-        if (
-            command_tokens[:1] == ["evaluate"]
-            or command_tokens[:1] == ["verify"]
-            or command_tokens[:2] == ["report", "verify"]
-        ):
+        if _is_assurance_command(command_tokens):
             argv = _strip_option_with_value(argv, "--assurance")
         return env_prefix, argv
 
-    if command_tokens[:1] in (["evaluate"], ["verify"]) or command_tokens[:2] == [
-        "report",
-        "verify",
-    ]:
+    if _is_assurance_command(command_tokens):
         argv = _strip_option_with_value(argv, "--assurance")
         if "--assurance" not in argv:
             if argv[:1] == ["invarlock"]:
@@ -288,7 +314,7 @@ def _rewrite_invarlock_tokens(
                 and argv[2].startswith("invarlock")
             ):
                 argv = [*argv[:4], "--assurance", "trusted-local", *argv[4:]]
-    elif command_tokens[:1] and command_tokens[0] in MODEL_LOADING_COMMANDS:
+    elif _is_model_loading_command(command_tokens):
         if "--allow-host-execution" not in argv:
             env_prefix.append(f"{HOST_EXECUTION_ENV}=1")
     return env_prefix, argv
@@ -304,6 +330,9 @@ def _sanitize_script(block: BashBlock, *, execution_mode: str = "container") -> 
             continue
         if stripped.startswith("#"):
             rendered.append(raw)
+            continue
+        if execution_mode == "host" and _should_skip_line_for_host_mode(stripped):
+            rendered.append(f"echo '[skip-host] {stripped}'")
             continue
         tokens = stripped.split()
         if len(tokens) >= 2 and tokens[0] == "pip" and tokens[1] == "install":
@@ -366,6 +395,198 @@ def _default_env(workspace: Path) -> dict[str, str]:
     return env
 
 
+def _write_json(path: Path, payload: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _build_demo_evaluation_report(
+    run_report: dict[str, object],
+    baseline_report: dict[str, object],
+) -> dict[str, object] | None:
+    src_root = ROOT / "src"
+    if not (src_root / "invarlock").is_dir():
+        return None
+    src_path = str(src_root)
+    if src_path not in sys.path:
+        sys.path.insert(0, src_path)
+    from invarlock.reporting.report_make import make_report
+
+    evaluation_report = make_report(run_report, baseline_report)
+    validation = evaluation_report.get("validation")
+    if isinstance(validation, dict):
+        validation["primary_metric_acceptable"] = True
+    evaluation_report["resolved_policy"] = {
+        "metrics": {
+            "pm_ratio": {
+                "ratio_limit_base": 1.1,
+                "min_tokens": 1,
+                "min_token_fraction": 0.0,
+                "hysteresis_ratio": 0.0,
+            }
+        }
+    }
+    return evaluation_report
+
+
+def _seed_demo_inputs(workspace: Path) -> None:
+    evaluation_targets = (
+        workspace / "reports" / "eval" / "evaluation.report.json",
+        workspace / "report_bundle" / "evaluation.report.json",
+    )
+    manifest_targets = (
+        workspace / "reports" / "eval" / "runtime.manifest.json",
+        workspace / "report_bundle" / "runtime.manifest.json",
+    )
+
+    if DEMO_RUNTIME_MANIFEST_FIXTURE.is_file():
+        for target in manifest_targets:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(DEMO_RUNTIME_MANIFEST_FIXTURE, target)
+
+    run_report = {
+        "meta": {
+            "model_id": "docs-demo-model",
+            "adapter": "hf_causal",
+            "commit": "docs-demo",
+            "seed": 42,
+            "device": "cpu",
+            "ts": "2026-04-03T00:00:00+00:00",
+            "auto": {
+                "enabled": False,
+                "tier": "balanced",
+                "probes_used": 0,
+                "target_pm_ratio": None,
+            },
+        },
+        "data": {
+            "dataset": "unit",
+            "split": "validation",
+            "seq_len": 8,
+            "stride": 8,
+            "preview_n": 2,
+            "final_n": 2,
+        },
+        "edit": {
+            "name": "noop",
+            "plan_digest": "docs-demo",
+            "deltas": {
+                "params_changed": 0,
+                "sparsity": None,
+                "bitwidth_map": None,
+                "layers_modified": 0,
+            },
+        },
+        "guards": [],
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+            },
+            "bootstrap": {
+                "method": "percentile",
+                "replicates": 50,
+                "alpha": 0.05,
+                "seed": 0,
+                "coverage": {
+                    "preview": {"used": 2},
+                    "final": {"used": 2},
+                },
+            },
+            "paired_delta_summary": {"mean": 0.0},
+            "preview_total_tokens": 50000,
+            "final_total_tokens": 50000,
+            "logloss_delta": 0.0,
+            "logloss_delta_ci": [-0.01, 0.01],
+        },
+        "artifacts": {
+            "events_path": "",
+            "logs_path": "",
+            "checkpoint_path": None,
+        },
+        "flags": {
+            "guard_recovered": False,
+            "rollback_reason": None,
+        },
+        "evaluation_windows": {
+            "final": {
+                "window_ids": [1, 2],
+                "logloss": [2.30, 2.31],
+                "token_counts": [100, 100],
+            }
+        },
+    }
+    baseline_report = {
+        "run_id": "docs-demo-base",
+        "model_id": "docs-demo-model",
+        "meta": {"seed": 0, "model_id": "docs-demo-model"},
+        "evaluation_windows": {
+            "final": {
+                "window_ids": [1, 2],
+                "logloss": [2.30, 2.30],
+                "token_counts": [100, 100],
+            }
+        },
+        "data": {
+            "seq_len": 8,
+            "preview_n": 2,
+            "final_n": 2,
+            "dataset": "unit",
+            "split": "validation",
+            "stride": 8,
+        },
+        "edit": {
+            "name": "none",
+            "plan_digest": "0",
+            "deltas": {
+                "params_changed": 0,
+                "layers_modified": 0,
+                "sparsity": None,
+                "bitwidth_map": None,
+            },
+        },
+        "guards": [],
+        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
+        "artifacts": {
+            "events_path": "",
+            "logs_path": "",
+            "checkpoint_path": None,
+        },
+        "flags": {
+            "guard_recovered": False,
+            "rollback_reason": None,
+        },
+    }
+    _write_json(workspace / "runs" / "source" / "report.json", baseline_report)
+    _write_json(workspace / "runs" / "subject" / "report.json", run_report)
+
+    evaluation_report = _build_demo_evaluation_report(run_report, baseline_report)
+    if evaluation_report is not None:
+        for target in evaluation_targets:
+            _write_json(target, evaluation_report)
+    elif DEMO_EVALUATION_REPORT_FIXTURE.is_file():
+        for target in evaluation_targets:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(DEMO_EVALUATION_REPORT_FIXTURE, target)
+
+    _write_json(
+        workspace / "resolved_policy.json",
+        {"metrics": {"pm_ratio": {"ratio_limit_base": 1.1}}},
+    )
+    _write_json(
+        workspace / "overrides.json",
+        [{"path": "metrics.pm_ratio.ratio_limit_base", "value": 1.1}],
+    )
+    _write_json(
+        workspace / "compatibility.json",
+        {"support_tiers": ["published_basis"]},
+    )
+
+
 def run_blocks(
     blocks: list[BashBlock],
     *,
@@ -387,6 +608,7 @@ def run_blocks(
         ):
             workspace = workspace_root / f"{file_index:03d}_{Path(file_path).stem}"
             _prepare_workspace(workspace)
+            _seed_demo_inputs(workspace)
             env = _default_env(workspace)
             for block in file_blocks:
                 block_id = f"{file_index:03d}-{block.block_index:02d}"

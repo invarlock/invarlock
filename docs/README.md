@@ -260,7 +260,7 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
 ```bash
 invarlock advanced plugins adapters
 invarlock advanced calibrate --help
-python scripts/verify_ci_matrix.sh
+bash scripts/verify_ci_matrix.sh
 ```
 
 ### Production Evaluation

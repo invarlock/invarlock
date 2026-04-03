@@ -31,9 +31,9 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --assurance
 
 # Compare & Evaluate (preferred), using an edit overlay
 INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --assurance trusted-local \
-  --baseline sshleifer/tiny-gpt2 --subject sshleifer/tiny-gpt2 --adapter auto \
-  --profile ci --tier balanced \
-  --preset configs/presets/causal_lm/wikitext2_512.yaml \
+  --baseline gpt2 --subject gpt2 --adapter auto \
+  --profile dev --tier balanced \
+  --preset configs/presets/causal_lm/gpt2_smoke_128.yaml \
   --edit-config configs/overlays/edits/quant_rtn/8bit_attn.yaml
 
 # First-class GPT-2 smoke preset used by the smoke campaign script/CI workflow
