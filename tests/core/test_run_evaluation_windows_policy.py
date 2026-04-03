@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from invarlock.core.run_evaluation_windows_policy import (
+    _nested_list_payload,
     _token_count,
     build_fallback_evaluation_windows,
     serialize_evaluation_windows,
@@ -249,3 +250,47 @@ def test_serialize_evaluation_windows_ignores_non_sequence_scalar_fields() -> No
             "records": [],
         },
     }
+
+
+def test_serialize_evaluation_windows_filters_non_sequence_nested_items() -> None:
+    payload = serialize_evaluation_windows(
+        {
+            "preview": {
+                "input_ids": [(1, 2), "skip-me", [3, 4]],
+                "attention_masks": [[1, 1], None],
+                "labels": [(-100, 2), 7],
+            },
+            "final": {},
+        }
+    )
+
+    assert payload == {
+        "preview": {
+            "window_ids": [],
+            "example_ids": [],
+            "logloss": [],
+            "input_ids": [[1, 2], [3, 4]],
+            "attention_masks": [[1, 1]],
+            "token_counts": [],
+            "masked_token_counts": [],
+            "actual_token_counts": [],
+            "labels": [[-100, 2]],
+            "records": [],
+        },
+        "final": {
+            "window_ids": [],
+            "example_ids": [],
+            "logloss": [],
+            "input_ids": [],
+            "attention_masks": [],
+            "token_counts": [],
+            "masked_token_counts": [],
+            "actual_token_counts": [],
+            "labels": [],
+            "records": [],
+        },
+    }
+
+
+def test_nested_list_payload_skips_non_sequence_item_and_continues_iteration() -> None:
+    assert _nested_list_payload([[1], None, [2, 3]]) == [[1], [2, 3]]

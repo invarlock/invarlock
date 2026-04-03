@@ -552,15 +552,25 @@ def get_variance_policy(
             if tier_config:
                 # Update with calibrated values
                 if "deadband" in tier_config:
-                    policy["deadband"] = tier_config["deadband"]
+                    deadband = tier_config["deadband"]
+                    if _is_non_bool_number(deadband):
+                        policy["deadband"] = float(deadband)
                 if "min_effect_lognll" in tier_config:
-                    policy["min_effect_lognll"] = tier_config["min_effect_lognll"]
+                    min_effect_lognll = tier_config["min_effect_lognll"]
+                    if _is_non_bool_number(min_effect_lognll):
+                        policy["min_effect_lognll"] = float(min_effect_lognll)
                 if "min_abs_adjust" in tier_config:
-                    policy["min_abs_adjust"] = tier_config["min_abs_adjust"]
+                    min_abs_adjust = tier_config["min_abs_adjust"]
+                    if _is_non_bool_number(min_abs_adjust):
+                        policy["min_abs_adjust"] = float(min_abs_adjust)
                 if "max_scale_step" in tier_config:
-                    policy["max_scale_step"] = tier_config["max_scale_step"]
+                    max_scale_step = tier_config["max_scale_step"]
+                    if _is_non_bool_number(max_scale_step):
+                        policy["max_scale_step"] = float(max_scale_step)
                 if "topk_backstop" in tier_config:
-                    policy["topk_backstop"] = tier_config["topk_backstop"]
+                    topk_backstop = tier_config["topk_backstop"]
+                    if _is_non_bool_number(topk_backstop):
+                        policy["topk_backstop"] = int(topk_backstop)
                 if "predictive_one_sided" in tier_config:
                     # Map predictive_one_sided to predictive_gate behavior
                     pass  # This is handled elsewhere in variance guard

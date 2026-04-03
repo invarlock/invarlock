@@ -124,6 +124,49 @@ def test_apply_policy_overrides_rejects_bool_numeric_values(policy, param):
         spectral_policy.apply_policy_overrides(guard, policy)
 
 
+def test_apply_policy_overrides_updates_optional_numeric_fields() -> None:
+    guard = SpectralGuard()
+
+    spectral_policy.apply_policy_overrides(
+        guard,
+        {
+            "deadband": 0.12,
+            "max_spectral_norm": None,
+            "max_caps": 4,
+            "correction_enabled": False,
+        },
+    )
+
+    assert guard.deadband == pytest.approx(0.12)
+    assert guard.config["deadband"] == pytest.approx(0.12)
+    assert guard.max_spectral_norm is None
+    assert guard.config["max_spectral_norm"] is None
+    assert guard.max_caps == 4
+    assert guard.config["max_caps"] == 4
+    assert guard.correction_enabled is False
+    assert guard.config["correction_enabled"] is False
+
+
+def test_apply_policy_overrides_updates_individual_numeric_fields() -> None:
+    guard = SpectralGuard()
+
+    spectral_policy.apply_policy_overrides(
+        guard,
+        {
+            "deadband": 0.08,
+            "max_spectral_norm": None,
+            "max_caps": 0,
+        },
+    )
+
+    assert guard.deadband == pytest.approx(0.08)
+    assert guard.config["deadband"] == pytest.approx(0.08)
+    assert guard.max_spectral_norm is None
+    assert guard.config["max_spectral_norm"] is None
+    assert guard.max_caps == 0
+    assert guard.config["max_caps"] == 0
+
+
 def test_apply_policy_overrides_rejects_multipletesting_alias():
     guard = SpectralGuard()
 
