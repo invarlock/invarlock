@@ -22,6 +22,7 @@ _AUTO_LOADER_SPECS: dict[str, tuple[str, str]] = {
     "causal": ("transformers", "AutoModelForCausalLM"),
     "mlm": ("transformers", "AutoModelForMaskedLM"),
     "mlm_base": ("transformers", "AutoModel"),
+    "multimodal": ("transformers", "AutoModelForImageTextToText"),
     "seq2seq": ("transformers", "AutoModelForSeq2SeqLM"),
 }
 
@@ -47,6 +48,10 @@ _DIRECT_SUBMODULE_SPECS: dict[str, dict[str, tuple[str, str]]] = {
         "gemma3": (
             "transformers.models.gemma3.modeling_gemma3",
             "Gemma3ForConditionalGeneration",
+        ),
+        "gemma4": (
+            "transformers.models.gemma4.modeling_gemma4",
+            "Gemma4ForCausalLM",
         ),
         "gpt_neox": (
             "transformers.models.gpt_neox.modeling_gpt_neox",
@@ -97,6 +102,12 @@ _DIRECT_SUBMODULE_SPECS: dict[str, dict[str, tuple[str, str]]] = {
         "marian": (
             "transformers.models.marian.modeling_marian",
             "MarianMTModel",
+        ),
+    },
+    "multimodal": {
+        "gemma4": (
+            "transformers.models.gemma4.modeling_gemma4",
+            "Gemma4ForConditionalGeneration",
         ),
     },
 }

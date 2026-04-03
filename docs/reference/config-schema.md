@@ -113,7 +113,7 @@ dataset:
 ```
 
 Supported providers: `wikitext2`, `synthetic`, `hf_text`, `local_jsonl`,
-`hf_seq2seq`, `local_jsonl_pairs`, `seq2seq`.
+`vision_text`, `hf_seq2seq`, `local_jsonl_pairs`, `seq2seq`.
 
 ### Edit (built-in quant_rtn)
 

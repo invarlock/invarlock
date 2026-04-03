@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from unittest.mock import Mock
 
+import pytest
 import torch
 import torch.nn as nn
 
 from invarlock.guards.variance_batching import (
+    _resolve_adapter_hook,
     compute_ppl_for_batches,
     prepare_batch_tensors,
 )
@@ -96,3 +99,91 @@ def test_compute_ppl_for_batches_uses_count_fallbacks_when_labels_or_numel_fail(
         return_counts=True,
     )
     assert bad_counts == [0]
+
+
+def test_variance_batching_resolves_adapter_hooks_safely() -> None:
+    class _Adapter:
+        def prepare_model_inputs(self, batch, device, include_labels):  # noqa: ANN001
+            return {"batch": batch, "device": device, "include_labels": include_labels}
+
+    assert _resolve_adapter_hook(None, "prepare_model_inputs") is None
+    assert _resolve_adapter_hook(Mock(), "prepare_model_inputs") is None
+    assert callable(_resolve_adapter_hook(_Adapter(), "prepare_model_inputs"))
+
+
+def test_compute_ppl_for_batches_uses_adapter_prepare_model_inputs_path() -> None:
+    class _Adapter:
+        def prepare_model_inputs(self, batch, device, include_labels):  # noqa: ANN001
+            _ = batch, include_labels
+            return {
+                "input_ids": torch.tensor([[1, 2]], device=device),
+                "labels": "not-a-tensor",
+                "_answer_token_count": 7,
+            }
+
+    class _GuardWithAdapter(_Guard):
+        def __init__(self) -> None:
+            self._adapter_ref = _Adapter()
+
+    class _KwModel(nn.Module):
+        def forward(self, **kwargs):  # noqa: ANN003
+            _ = kwargs
+            return SimpleNamespace(loss=torch.tensor(0.0))
+
+    guard = _GuardWithAdapter()
+    model = _KwModel()
+    device = torch.device("cpu")
+
+    ppl, losses, counts = compute_ppl_for_batches(
+        guard,
+        model,
+        [{"input_ids": [1, 2]}],
+        device,
+        return_counts=True,
+    )
+
+    assert ppl == [1.0]
+    assert losses == [0.0]
+    assert counts == [7]
+
+
+def test_compute_ppl_for_batches_falls_back_to_zero_count_when_numel_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _Adapter:
+        def prepare_model_inputs(self, batch, device, include_labels):  # noqa: ANN001
+            _ = batch, include_labels
+            return {
+                "input_ids": torch.tensor([[1, 2]], device=device),
+                "labels": "not-a-tensor",
+                "_answer_token_count": "bad",
+            }
+
+    class _GuardWithAdapter(_Guard):
+        def __init__(self) -> None:
+            self._adapter_ref = _Adapter()
+
+    class _KwModel(nn.Module):
+        def forward(self, **kwargs):  # noqa: ANN003
+            _ = kwargs
+            return SimpleNamespace(loss=torch.tensor(0.0))
+
+    original_numel = torch.Tensor.numel
+
+    def _bad_numel(self):  # noqa: ANN001
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(torch.Tensor, "numel", _bad_numel)
+
+    try:
+        _, _, counts = compute_ppl_for_batches(
+            _GuardWithAdapter(),
+            _KwModel(),
+            [{"input_ids": [1, 2]}],
+            torch.device("cpu"),
+            return_counts=True,
+        )
+    finally:
+        monkeypatch.setattr(torch.Tensor, "numel", original_numel)
+
+    assert counts == [0]

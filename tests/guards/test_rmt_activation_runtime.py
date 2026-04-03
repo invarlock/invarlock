@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest.mock import Mock
+
 import pytest
 import torch
 import torch.nn as nn
@@ -292,6 +294,95 @@ def test_compute_activation_edge_risk_handles_attention_mask_typeerror_and_bad_h
     assert result["batches_used"] == 1
     assert result["token_weight_total"] == 2
     assert result["edge_risk_by_family"]["attn"] >= 0.0
+
+
+def test_rmt_runtime_adapter_hook_resolution_and_adapter_paths() -> None:
+    class _Adapter:
+        def prepare_generation_inputs(self, batch, device):  # noqa: ANN001
+            return {
+                "input_ids": torch.ones((1, 2), device=device),
+                "attention_mask": torch.ones((1, 2), device=device),
+            }
+
+    class _HookModel(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.attn = nn.Linear(2, 2, bias=False)
+
+        def forward(self, input_ids, attention_mask=None):  # noqa: ANN001
+            _ = attention_mask
+            return self.attn(input_ids.float())
+
+    assert runtime._resolve_adapter_hook(None, "prepare_generation_inputs") is None
+    assert runtime._resolve_adapter_hook(Mock(), "prepare_generation_inputs") is None
+    assert callable(
+        runtime._resolve_adapter_hook(_Adapter(), "prepare_generation_inputs")
+    )
+
+    kwargs = {
+        "allowed_suffixes": ("attn",),
+        "activation_sampling": None,
+        "estimator": {"iters": 1, "init": "e0"},
+        "deadband": 0.0,
+        "margin": 0.0,
+        "classify_family_fn": lambda name: "attn",
+    }
+    batch = {"id": "ex-1", "image_path": "/tmp/a.png", "answers": ["cat"]}
+
+    risk = runtime.compute_activation_edge_risk(
+        _HookModel(),
+        [batch],
+        adapter=_Adapter(),
+        **kwargs,
+    )
+    assert risk is not None
+    assert risk["batches_used"] == 1
+
+
+def test_rmt_compute_activation_outliers_uses_adapter_generation_inputs() -> None:
+    class _Adapter:
+        def prepare_generation_inputs(self, batch, device):  # noqa: ANN001
+            return {
+                "input_ids": torch.ones((1, 2), device=device),
+                "attention_mask": torch.ones((1, 2), device=device),
+            }
+
+    class _Model(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.attn = nn.Linear(2, 2, bias=False)
+
+        def forward(self, input_ids, attention_mask=None):  # noqa: ANN001
+            _ = attention_mask
+            return self.attn(input_ids.float())
+
+    class _Guard:
+        adapter = _Adapter()
+        margin = 1.0
+        deadband = 0.0
+
+        def _get_activation_modules(self, model):  # noqa: ANN001
+            return runtime.get_activation_modules(model, allowed_suffixes=("attn",))
+
+        def _activation_svd_outliers(self, output, *, margin, deadband):  # noqa: ANN001
+            _ = output, margin, deadband
+            return 1, 2.0, 3.0
+
+        def _prepare_activation_inputs(self, batch, device):  # noqa: ANN001
+            return runtime.prepare_activation_inputs(batch, device)
+
+        def _batch_token_weight(self, input_ids, attention_mask):  # noqa: ANN001
+            return runtime.batch_token_weight(input_ids, attention_mask)
+
+    out = runtime.compute_activation_outliers(
+        _Guard(),
+        _Model(),
+        [{"id": "ex-1", "image_path": "/tmp/a.png", "answers": ["cat"]}],
+    )
+
+    assert out is not None
+    assert out["outlier_count"] > 0
+    assert out["token_weight_total"] == 2
 
 
 def test_prepare_and_after_edit_result_contract_helpers() -> None:

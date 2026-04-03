@@ -74,6 +74,24 @@ def enrich_run_report_metrics(
     )
     if loss_type == "classification":
         try:
+            existing_classification = (
+                report.get("metrics", {}).get("classification")
+                if isinstance(report.get("metrics"), dict)
+                else None
+            )
+            if isinstance(existing_classification, dict) and existing_classification:
+                counts_source = str(
+                    existing_classification.get("counts_source", "")
+                ).lower()
+                final_existing = existing_classification.get("final", {})
+                if (
+                    counts_source == "measured"
+                    and isinstance(final_existing, Mapping)
+                    and isinstance(final_existing.get("total"), (int, float))
+                    and int(final_existing.get("total", 0)) > 0
+                ):
+                    raise StopIteration
+
             from invarlock.eval.primary_metric import compute_accuracy_counts
 
             evaluation_windows = {}
@@ -137,6 +155,8 @@ def enrich_run_report_metrics(
             report.setdefault("metrics", {})["classification"] = classification_metrics
             if n_fin > 0:
                 report["metrics"]["accuracy"] = float(c_fin / n_fin)
+        except StopIteration:
+            pass
         except (
             AttributeError,
             ImportError,

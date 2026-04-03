@@ -206,6 +206,35 @@ def test_extract_pairing_schedule_rejects_malformed_sections() -> None:
         )
         is None
     )
+
+
+def test_extract_pairing_schedule_supports_multimodal_records() -> None:
+    report = {
+        "evaluation_windows": {
+            "preview": {
+                "example_ids": ["ex-1"],
+                "records": [{"id": "ex-1", "prompt": "what?"}],
+                "processor_sha256": "proc-123",
+            },
+            "final": {
+                "records": [{"id": "ex-2", "prompt": "where?"}],
+            },
+        }
+    }
+
+    sched = extract_pairing_schedule(report)
+
+    assert sched == {
+        "preview": {
+            "example_ids": ["ex-1"],
+            "records": [{"id": "ex-1", "prompt": "what?"}],
+            "processor_sha256": "proc-123",
+        },
+        "final": {
+            "example_ids": ["ex-2"],
+            "records": [{"id": "ex-2", "prompt": "where?"}],
+        },
+    }
     assert (
         extract_pairing_schedule(
             {
@@ -308,6 +337,59 @@ def test_extract_pairing_schedule_falls_back_for_malformed_attention_rows() -> N
         )
         is None
     )
+
+
+def test_extract_pairing_schedule_rejects_multimodal_length_mismatch() -> None:
+    report = {
+        "evaluation_windows": {
+            "preview": {
+                "example_ids": ["ex-1", "ex-2"],
+                "records": [{"id": "ex-1"}],
+            },
+            "final": {
+                "example_ids": ["ex-3"],
+                "records": [{"id": "ex-3"}],
+            },
+        }
+    }
+
+    assert extract_pairing_schedule(report) is None
+
+
+def test_extract_pairing_schedule_skips_non_dict_multimodal_records() -> None:
+    report = {
+        "evaluation_windows": {
+            "preview": {
+                "example_ids": ["ex-1"],
+                "records": ["skip-me"],
+            },
+            "final": {
+                "records": [{"id": "ex-2"}],
+            },
+        }
+    }
+
+    assert extract_pairing_schedule(report) == {
+        "preview": {"example_ids": ["ex-1"]},
+        "final": {
+            "example_ids": ["ex-2"],
+            "records": [{"id": "ex-2"}],
+        },
+    }
+
+
+def test_extract_pairing_schedule_rejects_attention_mask_row_count_mismatch() -> None:
+    report = {
+        "evaluation_windows": {
+            "preview": {
+                "input_ids": [[1, 2], [3, 4]],
+                "attention_masks": [[1, 1]],
+            },
+            "final": {"input_ids": [[5, 6]], "attention_masks": [[1, 1]]},
+        }
+    }
+
+    assert extract_pairing_schedule(report) is None
 
 
 def test_apply_mlm_masks_handles_mask_random_and_original_modes(monkeypatch) -> None:

@@ -23,6 +23,7 @@ PROVIDER_NOTES: dict[str, str] = {
     # Local providers (offline)
     "local_jsonl": "local files; offline",
     "local_jsonl_pairs": "paired prompts/responses (JSONL); offline",
+    "vision_text": "local image+prompt manifests; offline",
     # Seq2Seq providers
     "seq2seq": "toy seq2seq dataset; offline",
     "hf_seq2seq": "requires network",
@@ -36,6 +37,7 @@ PROVIDER_PARAMS: dict[str, str] = {
     "hf_seq2seq": "dataset_name[, split, input_field, target_field]",
     "local_jsonl": "path[, text_field]",
     "local_jsonl_pairs": "path[, input_field, target_field]",
+    "vision_text": "path[, image_path, prompt, answer|answers]",
     "seq2seq": "-",
 }
 
@@ -47,6 +49,7 @@ PROVIDER_NETWORK: dict[str, str] = {
     "hf_text": "yes",
     "local_jsonl": "no",
     "local_jsonl_pairs": "no",
+    "vision_text": "no",
     "seq2seq": "no",
     "hf_seq2seq": "yes",
 }
@@ -58,6 +61,7 @@ PROVIDER_KIND: dict[str, str] = {
     "hf_text": "text",
     "local_jsonl": "text",
     "local_jsonl_pairs": "pairs",
+    "vision_text": "multimodal",
     "seq2seq": "seq2seq",
     "hf_seq2seq": "seq2seq",
 }

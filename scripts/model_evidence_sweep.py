@@ -143,6 +143,14 @@ CURRENT_SUPPORTED_EXPERIMENTAL_LANES: tuple[EvidenceLane, ...] = (
         model_id="Qwen/Qwen3.5-9B",
         preset_relpath="configs/presets/causal_lm/qwen3_5_9b_512.yaml",
     ),
+    EvidenceLane(
+        slug="gemma4_e2b",
+        lane_id="gemma4-e2b-text-causal-hf",
+        family="Gemma 4 E2B causal LM (text-only eval)",
+        model_id="google/gemma-4-E2B-it",
+        preset_relpath="configs/presets/causal_lm/gemma4_e2b_512.yaml",
+        adapter="hf_causal",
+    ),
 )
 
 SUITES: dict[str, tuple[EvidenceLane, ...]] = {

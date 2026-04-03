@@ -6,7 +6,7 @@
 | --- | --- |
 | **Purpose** | Load models, describe structure, and snapshot/restore state for edits and guards. |
 | **Audience** | CLI users choosing `model.adapter` and Python callers instantiating adapters. |
-| **Supported surface** | Core HF adapters, auto-match adapters, platform-dependent BNB, and Linux-only AWQ/GPTQ quantized adapters. |
+| **Supported surface** | Core HF text and image-text adapters, auto-match adapters, platform-dependent BNB, and Linux-only AWQ/GPTQ quantized adapters. |
 | **Requires** | `invarlock[adapters]` or `invarlock[hf]` for core HF adapters; `invarlock[gpu]`, `invarlock[awq]`, `invarlock[gptq]` for quantized adapters. |
 | **Network** | Offline by default; set `INVARLOCK_ALLOW_NETWORK=1` for model downloads. |
 | **Inputs** | `model.id` (HF repo or local path), adapter name, device. |
@@ -55,7 +55,8 @@ print(adapter.describe(model)["model_type"])
   (adapter plugin) to choose a concrete role adapter (`hf_causal`, `hf_mlm`,
   `hf_seq2seq`) plus quant adapters when detected. Local paths can use
   `config.json`; remote IDs fall back to name heuristics and default to
-  `hf_causal` when unsure.
+  `hf_causal` when unsure. Phase 1 image-text models use the explicit
+  `hf_multimodal` adapter rather than adapter auto.
 - **Quantized adapters** (`hf_bnb`, `hf_awq`, `hf_gptq`) handle their own device
   placement; avoid calling `.to(...)` on the loaded model.
 - **Snapshot strategy**: HF adapters expose `snapshot`/`restore` and
@@ -77,7 +78,8 @@ Capability matrix (at a glance)
 
 | Adapter family | Snapshot/restore | Guard compatibility | Platform |
 | --- | --- | --- | --- |
-| HF PyTorch (`hf_causal`, `hf_mlm`, `hf_seq2seq`) | Yes | Full | All |
+| HF text (`hf_causal`, `hf_mlm`, `hf_seq2seq`) | Yes | Full | All |
+| HF image-text (`hf_multimodal`) | Yes | Full when decoder layers are exposed | All |
 | Quantized (`hf_bnb`) | Best-effort | Full when modules exposed | Platform-dependent |
 | Quantized (`hf_awq`, `hf_gptq`) | Best-effort | Full when modules exposed | Linux |
 
@@ -93,6 +95,7 @@ Machine-readable adapter capability metadata is published at
 | --- | --- | --- | --- | --- |
 | `hf_causal` | Decoder-only causal LMs (dense + MoE + GPT2-like) | `invarlock[adapters]` | All platforms with torch | Default causal LM adapter. |
 | `hf_mlm` | BERT/RoBERTa/DeBERTa MLMs | `invarlock[adapters]` | All platforms with torch | Loads `AutoModelForMaskedLM` when possible. |
+| `hf_multimodal` | Image-text generation models exposed through HF `AutoModelForImageTextToText` | `invarlock[adapters]` | All platforms with torch | Phase 1 is single-image `vision_text` evaluation with explicit adapter selection. |
 | `hf_seq2seq` | T5/encoder‑decoder models | `invarlock[adapters]` | All platforms with torch | For seq2seq evaluation. |
 | `hf_auto` | Auto-select HF adapter | `invarlock[adapters]` | All platforms with torch | Delegates to a role adapter; prefers quant adapters when detected. |
 | `hf_bnb` | Bitsandbytes quantized LMs | `invarlock[gpu]` | Platform-dependent | Uses `device_map="auto"`; no `.to()`. Latest bitsandbytes wheels can work outside Linux/CUDA when the runtime imports cleanly. |
@@ -103,7 +106,7 @@ Machine-readable adapter capability metadata is published at
 
 | Adapter class | Snapshot/restore | Guard compatibility | Notes |
 | --- | --- | --- | --- |
-| PyTorch HF adapters (`hf_causal`, `hf_causal`, `hf_mlm`, `hf_seq2seq`) | Yes | Full (module access) | Uses `HFAdapterMixin` snapshots. |
+| PyTorch HF adapters (`hf_causal`, `hf_mlm`, `hf_multimodal`, `hf_seq2seq`) | Yes | Full (module access) / multimodal full when decoder layers are exposed | Uses `HFAdapterMixin` snapshots. |
 | Quantized HF adapters (`hf_bnb`, `hf_awq`, `hf_gptq`) | Yes (best-effort) | Full when modules are exposed | Avoid explicit `.to()` calls. |
 
 ### Adapter selection (`adapter: auto`)

@@ -220,6 +220,78 @@ def test_compute_provider_digest_reraises_unexpected_window_id_errors() -> None:
         compute_provider_digest(report)
 
 
+def test_compute_provider_digest_supports_multimodal_example_ids() -> None:
+    digest = compute_provider_digest(
+        {
+            "evaluation_windows": {
+                "preview": {
+                    "example_ids": ["ex-2", "ex-1"],
+                    "processor_sha256": "proc-123",
+                },
+                "final": {
+                    "records": [{"id": "ex-3"}],
+                },
+            }
+        },
+        compute_mask_positions_digest_fn=lambda _windows: "",
+    )
+
+    assert digest == {
+        "ids_sha256": digest["ids_sha256"],
+        "processor_sha256": "proc-123",
+    }
+
+
+def test_compute_provider_digest_skips_non_dict_sections_and_uses_meta_fallbacks() -> (
+    None
+):
+    digest = compute_provider_digest(
+        {
+            "evaluation_windows": {
+                "preview": "ignore-me",
+                "final": {"window_ids": [7]},
+            },
+            "meta": {
+                "tokenizer_hash": "",
+                "processor_sha256": "proc-meta",
+            },
+            "data": {
+                "tokenizer_hash": "tok-data",
+                "processor_sha256": "proc-data",
+            },
+        },
+        compute_mask_positions_digest_fn=lambda _windows: "masksha",
+    )
+
+    assert digest == {
+        "ids_sha256": digest["ids_sha256"],
+        "tokenizer_sha256": "tok-data",
+        "processor_sha256": "proc-meta",
+        "masking_sha256": "masksha",
+    }
+
+
+def test_compute_provider_digest_uses_data_processor_sha_fallback() -> None:
+    digest = compute_provider_digest(
+        {
+            "evaluation_windows": {
+                "preview": {"window_ids": [1]},
+                "final": {"window_ids": [2]},
+            },
+            "data": {
+                "tokenizer_hash": "",
+                "processor_sha256": "proc-data",
+            },
+        },
+        compute_mask_positions_digest_fn=lambda _windows: "",
+    )
+
+    assert digest == {
+        "ids_sha256": digest["ids_sha256"],
+        "processor_sha256": "proc-data",
+    }
+
+
 def test_plan_release_windows_console_adjustment_message(capsys) -> None:
     class _Console:
         def print(self, *args, **kwargs):

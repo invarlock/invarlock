@@ -349,6 +349,7 @@ class RMTGuard(Guard):
             deadband=self.deadband,
             margin=self.margin,
             classify_family_fn=self._classify_family,
+            adapter=self.adapter,
         )
 
     def _activation_svd_outliers(

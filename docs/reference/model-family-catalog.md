@@ -36,6 +36,7 @@ out of declared support lanes and shipped preset inventory.
 | Qwen3 causal LM | `supported_experimental` | `Qwen/Qwen3-8B` | Pilot preset and calibration config are shipped. |
 | DeepSeek-R1-Distill-Qwen causal LM | `supported_experimental` | `deepseek-ai/DeepSeek-R1-Distill-Qwen-7B` | Pilot preset and calibration config are shipped. |
 | Phi-4 causal LM (text-only eval) | `supported_experimental` | `microsoft/Phi-4-reasoning-plus` | Text-only pilot preset and calibration config are shipped, and the current remote evaluate/verify lane closes cleanly. |
+| Gemma 4 E2B causal LM (text-only eval) | `supported_experimental` | `google/gemma-4-E2B-it` | Text-only pilot preset and calibration config are shipped. Image-text evaluation is available separately via `hf_multimodal` + `vision_text`. |
 | TinyLlama 1.1B causal LM | `supported_experimental` | `TinyLlama/TinyLlama-1.1B-Chat-v1.0` | Ungated Llama-family pilot lane with shipped preset and calibration config. |
 | OLMo 2 causal LM | `supported_experimental` | `allenai/OLMo-2-1124-7B`, `allenai/OLMo-2-1124-13B-Instruct` | Pilot presets and calibration configs are shipped for both 7B and 13B scale points. |
 | Qwen3.5 causal LM | `supported_experimental` | `Qwen/Qwen3.5-9B` | Pilot preset and calibration config are shipped. |
@@ -50,6 +51,7 @@ out of declared support lanes and shipped preset inventory.
 | Qwen family aliases (Qwen1.5/Qwen2.5/Qwen3 naming) | `profile_first_class` | `Qwen/Qwen2.5-14B`, `Qwen/Qwen3.5-9B` | Shared qwen-family heuristics cover aliases beyond the declared Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 lanes, including larger usage-only Qwen2.5 checkpoints. |
 | Yi | `profile_first_class` | `01-ai/Yi-34B` | Treated as a RoPE decoder family in profile logic. |
 | Phi family | `profile_first_class` | `microsoft/Phi-3-mini-4k-instruct`, `microsoft/Phi-4-reasoning-plus` | Dedicated phi-family selectors exist. Phi-4 has a declared text-only lane, while multimodal Phi-4 remains backlog-only. |
+| Gemma family | `profile_first_class` | `google/gemma-3-4b-it`, `google/gemma-4-E2B-it` | Gemma 3/4 selectors and loaders are first-class. Gemma 4 E2B has a declared text-only lane, image-text evaluation is shipped via `hf_multimodal` + `vision_text`, and audio remains deferred. |
 | OPT / GPT-NeoX / GPT-J | `profile_shared_alias` | `facebook/opt-1.3b`, `EleutherAI/gpt-neox-20b` | Available through shared GPT-style paths. |
 | Falcon | `auto_or_loader_only` | `tiiuae/falcon-7b` | Visible through adapter-auto heuristics only. |
 | GLM | `auto_or_loader_only` | `THUDM/glm-4-9b-chat` | Visible through adapter-auto heuristics only. |
@@ -70,7 +72,7 @@ out of declared support lanes and shipped preset inventory.
 
 | Priority | Family | Planned support mode | Representative models | Notes |
 | --- | --- | --- | --- | --- |
-| `P2` | Full multimodal evaluation pipeline | `full_multimodal_eval` | `microsoft/Phi-4-vision-reasoning-15B` | Deferred capability backlog item beyond text-only evaluation for ungated multimodal checkpoints. |
+| `P2` | Audio-text evaluation pipeline | `phase2_audio_eval` | `google/gemma-4-E2B-it`, `google/gemma-4-E4B-it` | Image-text evaluation is now shipped. Audio-capable evaluation for the smaller Gemma 4 checkpoints remains deferred. |
 
 ## Promotion Criteria
 

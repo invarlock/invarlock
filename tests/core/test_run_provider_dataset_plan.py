@@ -344,3 +344,74 @@ def test_build_provider_dataset_plan_mlm_populates_mask_counts_and_metadata() ->
     assert result.dataset_meta["masked_tokens_total"] == 2
     assert result.window_plan is not None
     assert result.window_plan["dedupe_adjustments"] == ["kept"]
+
+
+def test_build_provider_dataset_plan_supports_vision_text_examples() -> None:
+    provider = SimpleNamespace(
+        name="vision_text",
+        examples=lambda split="validation": [
+            {
+                "id": "ex-1",
+                "image_path": "/tmp/a.png",
+                "prompt": "what is shown?",
+                "answer": "cat",
+                "answers": ["cat"],
+                "image_sha256": "img-a",
+                "prompt_sha256": "prompt-a",
+                "answer_sha256": "answer-a",
+            },
+            {
+                "id": "ex-2",
+                "image_path": "/tmp/b.png",
+                "prompt": "what is shown?",
+                "answer": "dog",
+                "answers": ["dog"],
+                "image_sha256": "img-b",
+                "prompt_sha256": "prompt-b",
+                "answer_sha256": "answer-b",
+            },
+        ],
+        digest=lambda: {"provider": "vision_text", "ids_sha256": "ids"},
+    )
+
+    result = build_provider_dataset_plan(
+        cfg=_cfg(provider=_ProviderConfig("vision_text", path="demo.jsonl")),
+        model_profile=SimpleNamespace(),
+        resolved_device="cpu",
+        profile="dev",
+        profile_normalized="dev",
+        requested_preview=1,
+        requested_final=1,
+        effective_preview=1,
+        effective_final=1,
+        pairing_schedule_present=False,
+        use_mlm=False,
+        mask_prob=0.15,
+        mask_seed=43,
+        random_token_prob=0.1,
+        original_token_prob=0.1,
+        resolved_loss_type="classification",
+        tier="balanced",
+        get_provider_fn=object(),
+        resolve_provider_and_split_fn=lambda *args, **kwargs: (
+            provider,
+            "validation",
+            False,
+        ),
+        resolve_tokenizer_fn=lambda profile: (_DummyTokenizer(), "tokhash"),
+        maybe_plan_release_windows_fn=lambda **kwargs: {"actual_preview": 1},
+        resolve_effective_windows_fn=lambda **kwargs: {},
+        apply_mlm_masks_fn=lambda *args, **kwargs: (0, []),
+        resolve_pm_min_tokens_target_fn=lambda **kwargs: 4,
+        hash_sequences_fn=lambda seqs: f"hash-{len(list(seqs))}",
+        tokenizer_digest_fn=lambda tokenizer: "digest",
+        safe_int_fn=lambda value, default=0: int(value or default),
+        tensor_or_list_to_ints_fn=lambda values: list(values),
+    )
+
+    assert result.tokenizer is None
+    assert result.calibration_data[0]["example_id"] == "ex-1"
+    assert result.preview_records[0]["seq_len"] == 8
+    assert result.final_records[0]["example_id"] == "ex-2"
+    assert result.dataset_meta["provider_kind"] == "vision_text"
+    assert result.dataset_meta["provider_digest"]["provider"] == "vision_text"

@@ -2083,7 +2083,7 @@ tqdm==4.67.3 \
     #   datasets
     #   huggingface-hub
     #   transformers
-transformers==5.4.0 \
+transformers==5.5.0 \
     --hash=sha256:9fbe50602d2a4e6d0aa8a35a605433dfac72d595ee2192eae192590a6cc2df86 \
     --hash=sha256:cb34ca89dce345ae3224b290346b9c0fa9694b951d54f3ed16334a4b1bfe3d04
     # via -r requirements/workflows/runtime-image.in

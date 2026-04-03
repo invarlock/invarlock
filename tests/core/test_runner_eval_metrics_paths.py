@@ -3,8 +3,10 @@ from __future__ import annotations
 import math
 from types import SimpleNamespace
 from typing import Any
+from unittest.mock import Mock
 
 import pytest
+import torch
 
 import invarlock.core.runner_eval_metrics as rem
 
@@ -378,8 +380,144 @@ def test_compute_real_metrics_marks_empty_slice_metrics_invalid(monkeypatch) -> 
 
     assert metrics["primary_metric"]["invalid"] is True
     assert metrics["primary_metric"]["degraded_reason"] == "non_finite_pm"
-    assert metrics["primary_metric"]["preview"] is None
-    assert metrics["primary_metric"]["final"] is None
+
+
+def test_compute_real_metrics_supports_vision_text_classification() -> None:
+    class _VisionModel(_FakeModel):
+        def __call__(self, **kwargs):
+            labels = kwargs["labels"]
+            loss = torch.tensor(0.25 if int((labels != -100).sum().item()) > 0 else 0.0)
+            return SimpleNamespace(loss=loss)
+
+        def generate(self, **kwargs):
+            return torch.tensor([[1, 2, 3]], dtype=torch.long)
+
+    class _VisionAdapter:
+        def prepare_model_inputs(self, batch, device, include_labels):  # noqa: ANN001
+            payload = {
+                "input_ids": torch.tensor([[1, 2]], device=device, dtype=torch.long),
+                "attention_mask": torch.tensor(
+                    [[1, 1]], device=device, dtype=torch.long
+                ),
+                "_example_id": batch["id"],
+                "_reference_answers": list(batch["answers"]),
+                "_processor_sha256": "proc-123",
+                "_prediction": batch["prediction"],
+                "_answer_token_count": 1,
+            }
+            if include_labels:
+                payload["labels"] = torch.tensor(
+                    [[-100, 7]], device=device, dtype=torch.long
+                )
+            return payload
+
+        def prepare_generation_inputs(self, batch, device):  # noqa: ANN001
+            payload = self.prepare_model_inputs(batch, device, include_labels=False)
+            payload["_max_new_tokens"] = 8
+            return payload
+
+        def decode_generated(self, generated_ids, prepared_batch):  # noqa: ANN001
+            return [prepared_batch["_prediction"]]
+
+    runner = _FakeRunner()
+    config = SimpleNamespace(
+        context={
+            "eval": {
+                "loss": {"type": "classification", "resolved_type": "classification"},
+                "metric": {"kind": "vqa_accuracy"},
+            }
+        }
+    )
+
+    metrics, eval_windows = rem.compute_real_metrics(
+        runner,
+        _VisionModel(),
+        calibration_data=[
+            {
+                "id": "ex-1",
+                "image_path": "/tmp/a.png",
+                "answers": ["cat"],
+                "prediction": "cat",
+            },
+            {
+                "id": "ex-2",
+                "image_path": "/tmp/b.png",
+                "answers": ["dog"],
+                "prediction": "cat",
+            },
+        ],
+        adapter=_VisionAdapter(),
+        preview_n=1,
+        final_n=1,
+        config=config,
+    )
+
+    assert metrics["primary_metric"]["kind"] == "vqa_accuracy"
+    assert metrics["classification"]["preview"]["correct_total"] == 1
+    assert metrics["classification"]["final"]["correct_total"] == 0
+    assert metrics["classification"]["counts_source"] == "measured"
+    assert eval_windows["preview"]["example_ids"] == ["ex-1"]
+    assert eval_windows["final"]["records"][0]["correct"] is False
+    assert metrics["primary_metric"]["preview"] == 1.0
+    assert metrics["primary_metric"]["final"] == 0.0
+
+
+def test_runner_eval_metrics_hook_and_metric_resolution_helpers() -> None:
+    class _Adapter:
+        def prepare_model_inputs(self):  # noqa: ANN201
+            return None
+
+    assert rem._resolve_adapter_hook(None, "prepare_model_inputs") is None
+    assert rem._resolve_adapter_hook(Mock(), "prepare_model_inputs") is None
+    assert callable(rem._resolve_adapter_hook(_Adapter(), "prepare_model_inputs"))
+
+    fallback = "fallback_metric"
+    assert rem._resolve_metric_kind(None, fallback=fallback) == fallback
+    assert rem._resolve_metric_kind(SimpleNamespace(context=[]), fallback=fallback) == (
+        fallback
+    )
+    assert (
+        rem._resolve_metric_kind(
+            SimpleNamespace(context={"eval": []}),
+            fallback=fallback,
+        )
+        == fallback
+    )
+    assert (
+        rem._resolve_metric_kind(
+            SimpleNamespace(context={"eval": {"metric": {"kind": "auto"}}}),
+            fallback=fallback,
+        )
+        == fallback
+    )
+
+
+def test_evaluate_vision_text_arm_requires_real_hook_surface() -> None:
+    with pytest.raises(RuntimeError, match="prepare_model_inputs"):
+        rem._evaluate_vision_text_arm(
+            _FakeModel(),
+            [{"id": "ex-1", "image_path": "/tmp/a.png", "answers": ["cat"]}],
+            adapter=object(),
+            device="cpu",
+        )
+
+    class _MissingDecode:
+        def prepare_model_inputs(self, batch, device, include_labels):  # noqa: ANN001
+            return {
+                "input_ids": torch.tensor([[1]], device=device),
+                "labels": torch.tensor([[1]], device=device),
+            }
+
+        def prepare_generation_inputs(self, batch, device):  # noqa: ANN001
+            return {"input_ids": torch.tensor([[1]], device=device)}
+
+    with pytest.raises(RuntimeError, match="decode_generated"):
+        rem._evaluate_vision_text_arm(
+            _FakeModel(),
+            [{"id": "ex-1", "image_path": "/tmp/a.png", "answers": ["cat"]}],
+            adapter=_MissingDecode(),
+            device="cpu",
+        )
 
 
 def test_compute_real_metrics_propagates_pairing_metric_failures(monkeypatch) -> None:

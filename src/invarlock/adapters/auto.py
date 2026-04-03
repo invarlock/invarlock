@@ -114,6 +114,11 @@ class _DelegatingAdapter(ModelAdapter):
                 ".hf_mlm", __package__
             ).HF_MLM_Adapter
             return HF_MLM_Adapter()
+        if adapter_name == "hf_multimodal":
+            HF_Multimodal_Adapter = _importlib.import_module(
+                ".hf_multimodal", __package__
+            ).HF_Multimodal_Adapter
+            return HF_Multimodal_Adapter()
         if adapter_name == "hf_seq2seq":
             HF_Seq2Seq_Adapter = _importlib.import_module(
                 ".hf_seq2seq", __package__

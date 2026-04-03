@@ -43,6 +43,11 @@ def test_resolve_auto_adapter_gemma3(tmp_path):
     assert resolve_auto_adapter(str(model_dir)) == "hf_causal"
 
 
+def test_resolve_auto_adapter_gemma4(tmp_path):
+    model_dir = _write_cfg(tmp_path, "gemma4", "Gemma4ForConditionalGeneration")
+    assert resolve_auto_adapter(str(model_dir)) == "hf_causal"
+
+
 def test_resolve_auto_adapter_bert(tmp_path):
     model_dir = _write_cfg(tmp_path, "bert", "BertForMaskedLM")
     assert resolve_auto_adapter(str(model_dir)) == "hf_mlm"

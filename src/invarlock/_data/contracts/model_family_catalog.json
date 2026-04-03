@@ -1,6 +1,6 @@
 {
   "format_version": "model-family-catalog-v1",
-  "as_of": "2026-03-25",
+  "as_of": "2026-04-03",
   "declared_support": [
     {
       "family_id": "gpt2-causal-lm",
@@ -113,6 +113,20 @@
         "configs/calibration/null_sweep_phi4_reasoning_plus.yaml"
       ],
       "notes": "Derived from support_matrix lane phi-4-text-causal-hf after the shipped text-only pilot closed with passing evaluate and verify evidence."
+    },
+    {
+      "family_id": "gemma-4-e2b-text-causal-lm",
+      "display_name": "Gemma 4 E2B causal LM (text-only eval)",
+      "modalities": ["text"],
+      "task_role": "causal_lm",
+      "state": "supported_experimental",
+      "representative_models": ["google/gemma-4-E2B-it"],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/causal_lm/gemma4_e2b_512.yaml",
+        "configs/calibration/null_sweep_gemma4_e2b.yaml"
+      ],
+      "notes": "Derived from support_matrix lane gemma4-e2b-text-causal-hf. Public support is text-only in phase 1; image-text evaluation is shipped separately via hf_multimodal + vision_text."
     },
     {
       "family_id": "tinyllama-1-1b-causal-lm",
@@ -255,6 +269,24 @@
         "src/invarlock/cli/adapter_auto.py"
       ],
       "notes": "Phi-family selectors are first-class. Phi-4 now has a declared text-only lane via the reasoning-plus pilot, while multimodal Phi-4 remains backlog-only."
+    },
+    {
+      "family_id": "gemma-family",
+      "display_name": "Gemma family",
+      "modalities": ["text", "image", "audio"],
+      "task_role": "causal_lm",
+      "state": "profile_first_class",
+      "representative_models": [
+        "google/gemma-3-4b-it",
+        "google/gemma-4-E2B-it"
+      ],
+      "repo_evidence": [
+        "src/invarlock/model_profile.py",
+        "src/invarlock/adapters/hf_loading.py",
+        "src/invarlock/adapters/hf_multimodal.py",
+        "src/invarlock/eval/providers/vision_text.py"
+      ],
+      "notes": "Gemma 3/4 selectors and loaders are first-class. Gemma 4 E2B now has a declared text-only lane, image-text evaluation is shipped through hf_multimodal + vision_text, and audio remains deferred."
     },
     {
       "family_id": "opt-neox-gptj",
@@ -403,30 +435,32 @@
   ],
   "recommended_additions": [
     {
-      "family_id": "full-multimodal-evaluation",
-      "display_name": "Full multimodal evaluation pipeline",
+      "family_id": "audio-text-evaluation",
+      "display_name": "Audio-text evaluation pipeline",
       "modalities": ["text", "image", "audio"],
-      "task_role": "multimodal_eval",
+      "task_role": "audio_multimodal_eval",
       "state": "recommended_p2_deferred",
       "priority": "P2",
-      "planned_support_mode": "full_multimodal_eval",
+      "planned_support_mode": "phase2_audio_eval",
       "representative_models": [
-        "microsoft/Phi-4-vision-reasoning-15B"
+        "google/gemma-4-E2B-it",
+        "google/gemma-4-E4B-it"
       ],
       "repo_evidence": [
         "docs/reference/model-adapters.md",
-        "src/invarlock/cli/adapter_auto.py"
+        "src/invarlock/adapters/hf_multimodal.py",
+        "src/invarlock/eval/providers/vision_text.py"
       ],
       "repo_gaps": [
-        "No processor-aware multimodal dataset/evaluation pipeline exists today"
+        "No processor-aware audio dataset provider or audio report surface exists today"
       ],
       "blockers": [
-        "Requires new processor, dataset, and report plumbing beyond text-only evaluation"
+        "Requires audio manifest support, processor hooks, and evaluation/report plumbing beyond the shipped image-text path"
       ],
       "source_refs": [
-        "https://huggingface.co/microsoft/Phi-4-vision-reasoning-15B"
+        "https://ai.google.dev/gemma/docs/core/model_card_4"
       ],
-      "notes": "The remaining backlog item is a broader multimodal pipeline capability anchored on currently ungated multimodal checkpoints."
+      "notes": "Image-text evaluation is now shipped. The remaining multimodal backlog item is audio-capable evaluation for the smaller Gemma 4 checkpoints."
     }
   ]
 }

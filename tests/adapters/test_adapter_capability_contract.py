@@ -27,6 +27,7 @@ def test_adapter_capabilities_contract_is_exposed_through_plugins_json() -> None
     for adapter_name in (
         "hf_causal",
         "hf_mlm",
+        "hf_multimodal",
         "hf_seq2seq",
         "hf_bnb",
         "hf_awq",

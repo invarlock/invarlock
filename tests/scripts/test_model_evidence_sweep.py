@@ -78,6 +78,7 @@ def test_select_specs_sharding_is_stable() -> None:
         "qwen2_7b",
         "deepseek_r1_distill_qwen_7b",
         "olmo2_7b",
+        "gemma4_e2b",
     ]
 
 

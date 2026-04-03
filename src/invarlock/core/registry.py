@@ -160,6 +160,12 @@ class CoreRegistry:
         )
         _fallback(
             self._adapters,
+            "hf_multimodal",
+            "invarlock.adapters.hf_multimodal",
+            "HF_Multimodal_Adapter",
+        )
+        _fallback(
+            self._adapters,
             "hf_seq2seq",
             "invarlock.adapters.hf_seq2seq",
             "HF_Seq2Seq_Adapter",

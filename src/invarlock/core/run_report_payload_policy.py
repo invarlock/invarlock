@@ -232,6 +232,7 @@ def build_metrics_payload(
                 }
             )
     optional_keys = [
+        "classification",
         "logloss_preview",
         "logloss_final",
         "logloss_delta",

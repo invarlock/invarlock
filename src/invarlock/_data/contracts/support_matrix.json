@@ -95,6 +95,16 @@
       "provenance_source": "docs/README.md#support-matrix"
     },
     {
+      "lane_id": "gemma4-e2b-text-causal-hf",
+      "family": "Gemma 4 E2B causal LM (text-only eval)",
+      "runtime": "huggingface-pytorch",
+      "adapter": "hf_causal",
+      "support_tier": "supported_experimental",
+      "evidence_status": "repo_shipped_pilot_config",
+      "docs_label": "No, repo-shipped pilot config only",
+      "provenance_source": "docs/README.md#support-matrix"
+    },
+    {
       "lane_id": "tinyllama-1-1b-causal-hf",
       "family": "TinyLlama 1.1B causal LM",
       "runtime": "huggingface-pytorch",

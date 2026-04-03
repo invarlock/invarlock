@@ -22,6 +22,7 @@ def test_causal_lm_family_presets_load() -> None:
         "qwen3_8b_512.yaml": "Qwen/Qwen3-8B",
         "deepseek_r1_distill_qwen_7b_512.yaml": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
         "phi4_reasoning_plus_512.yaml": "microsoft/Phi-4-reasoning-plus",
+        "gemma4_e2b_512.yaml": "google/gemma-4-E2B-it",
         "tinyllama_1_1b_512.yaml": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
         "olmo2_7b_512.yaml": "allenai/OLMo-2-1124-7B",
         "olmo2_13b_512.yaml": "allenai/OLMo-2-1124-13B-Instruct",
@@ -29,6 +30,7 @@ def test_causal_lm_family_presets_load() -> None:
     }
     expected_provider_kinds = {
         "deepseek_r1_distill_qwen_7b_512.yaml": "hf_text",
+        "gemma4_e2b_512.yaml": "hf_text",
         "olmo2_13b_512.yaml": "hf_text",
         "olmo2_7b_512.yaml": "hf_text",
         "phi4_reasoning_plus_512.yaml": "hf_text",
@@ -38,12 +40,15 @@ def test_causal_lm_family_presets_load() -> None:
         "qwen3_8b_512.yaml": "hf_text",
     }
     expected_skip_overhead = {
+        "gemma4_e2b_512.yaml",
         "phi4_reasoning_plus_512.yaml",
     }
     for name, model_id in presets.items():
         cfg = load_config(root / "configs/presets/causal_lm" / name)
         assert cfg.require_section("model")["id"] == model_id
         assert cfg.require_section("model")["adapter"] == "hf_causal"
+        if name == "gemma4_e2b_512.yaml":
+            assert cfg.require_section("model")["attn_implementation"] == "sdpa"
         provider = cfg.data["dataset"]["provider"]
         if name in expected_provider_kinds:
             assert provider["kind"] == expected_provider_kinds[name]
@@ -65,6 +70,7 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
         "null_sweep_qwen3_8b.yaml": "Qwen/Qwen3-8B",
         "null_sweep_deepseek_r1_distill_qwen_7b.yaml": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
         "null_sweep_phi4_reasoning_plus.yaml": "microsoft/Phi-4-reasoning-plus",
+        "null_sweep_gemma4_e2b.yaml": "google/gemma-4-E2B-it",
         "null_sweep_tinyllama_1_1b.yaml": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
         "null_sweep_olmo2_7b.yaml": "allenai/OLMo-2-1124-7B",
         "null_sweep_olmo2_13b.yaml": "allenai/OLMo-2-1124-13B-Instruct",
@@ -77,6 +83,7 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
         assert data["model"]["id"] == model_id
         if name in {
             "null_sweep_deepseek_r1_distill_qwen_7b.yaml",
+            "null_sweep_gemma4_e2b.yaml",
             "null_sweep_olmo2_13b.yaml",
             "null_sweep_olmo2_7b.yaml",
             "null_sweep_phi4_reasoning_plus.yaml",
@@ -86,4 +93,6 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
             "null_sweep_qwen3_8b.yaml",
         }:
             assert data["dataset"]["provider"]["kind"] == "hf_text"
+        if name == "null_sweep_gemma4_e2b.yaml":
+            assert data["model"]["attn_implementation"] == "sdpa"
         assert data["primary_metric"]["drift_band"] == expected_drift_band
