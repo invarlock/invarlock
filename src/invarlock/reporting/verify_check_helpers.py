@@ -32,6 +32,8 @@ _VERIFY_PARSE_EXCEPTIONS = (
 
 
 def _coerce_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
         out = float(value)
     except (TypeError, ValueError):
@@ -40,6 +42,8 @@ def _coerce_float(value: Any) -> float | None:
 
 
 def _coerce_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
     try:
         out = int(value)
     except (TypeError, ValueError):
@@ -132,8 +136,7 @@ def _validate_logspace_ci_identity(
     )
     baseline_final = baseline_pm.get("final") if isinstance(baseline_pm, dict) else None
     if not (
-        isinstance(baseline_final, (int, float))
-        and math.isfinite(float(baseline_final))
+        _coerce_float(baseline_final) is not None
     ):
         return errors
 
@@ -141,9 +144,7 @@ def _validate_logspace_ci_identity(
         return (
             isinstance(bounds, (tuple, list))
             and len(bounds) == 2
-            and all(
-                isinstance(v, (int, float)) and math.isfinite(float(v)) for v in bounds
-            )
+            and all(_coerce_float(v) is not None for v in bounds)
         )
 
     def _coerce_bounds(bounds: Any) -> tuple[float, float] | None:
@@ -190,7 +191,7 @@ def _validate_primary_metric(report: dict[str, Any]) -> list[str]:
         return errors
 
     def _is_finite_number(value: Any) -> bool:
-        return isinstance(value, (int, float)) and math.isfinite(float(value))
+        return _coerce_float(value) is not None
 
     def _declares_invalid_primary_metric(metric: dict[str, Any]) -> bool:
         if bool(metric.get("invalid")):
@@ -219,7 +220,7 @@ def _validate_primary_metric(report: dict[str, Any]) -> list[str]:
         baseline_final = None
         if isinstance(baseline_pm, dict):
             bv = baseline_pm.get("final")
-            if isinstance(bv, (int, float)):
+            if _coerce_float(bv) is not None:
                 baseline_final = float(bv)
         final_value = _coerce_float(final)
         baseline_final_value = _coerce_float(baseline_final)
@@ -513,25 +514,44 @@ def _validate_counts(report: dict[str, Any]) -> list[str]:
     paired_windows = stats.get("paired_windows")
 
     if expected_preview is not None:
-        if preview_used is None:
+        expected_preview_count = _coerce_int(expected_preview)
+        if expected_preview_count is None:
+            errors.append("report has invalid dataset.windows.preview count.")
+        elif preview_used is None:
             errors.append("report missing coverage.preview.used for preview windows.")
-        elif int(preview_used) != int(expected_preview):
-            errors.append(
-                f"Preview window count mismatch: expected {expected_preview}, observed {preview_used}."
-            )
+        else:
+            preview_used_count = _coerce_int(preview_used)
+            if preview_used_count is None:
+                errors.append("report has invalid coverage.preview.used value.")
+            elif preview_used_count != expected_preview_count:
+                errors.append(
+                    f"Preview window count mismatch: expected {expected_preview}, observed {preview_used}."
+                )
 
     if expected_final is not None:
-        if final_used is None:
+        expected_final_count = _coerce_int(expected_final)
+        if expected_final_count is None:
+            errors.append("report has invalid dataset.windows.final count.")
+        elif final_used is None:
             errors.append("report missing coverage.final.used for final windows.")
-        elif int(final_used) != int(expected_final):
-            errors.append(
-                f"Final window count mismatch: expected {expected_final}, observed {final_used}."
-            )
+        else:
+            final_used_count = _coerce_int(final_used)
+            if final_used_count is None:
+                errors.append("report has invalid coverage.final.used value.")
+            elif final_used_count != expected_final_count:
+                errors.append(
+                    f"Final window count mismatch: expected {expected_final}, observed {final_used}."
+                )
 
-    if (
-        paired_windows is not None
+    expected_preview_count = _coerce_int(expected_preview)
+    paired_windows_count = _coerce_int(paired_windows)
+    if paired_windows is not None and paired_windows_count is None:
+        errors.append("report has invalid paired_windows metric.")
+    elif (
+        paired_windows_count is not None
         and expected_preview is not None
-        and int(paired_windows) != int(expected_preview)
+        and expected_preview_count is not None
+        and paired_windows_count != expected_preview_count
     ):
         errors.append(
             f"Paired window count mismatch: expected {expected_preview}, observed {paired_windows}."
@@ -552,20 +572,14 @@ def _validate_drift_band(report: dict[str, Any]) -> list[str]:
         return errors
     drift_ratio = None
     try:
-        prev = pm.get("preview")
-        fin = pm.get("final")
-        if (
-            isinstance(prev, (int, float))
-            and isinstance(fin, (int, float))
-            and math.isfinite(float(prev))
-            and math.isfinite(float(fin))
-            and prev > 0
-        ):
-            drift_ratio = float(fin) / float(prev)
+        prev = _coerce_float(pm.get("preview"))
+        fin = _coerce_float(pm.get("final"))
+        if prev is not None and fin is not None and prev > 0:
+            drift_ratio = fin / prev
     except _VERIFY_PARSE_EXCEPTIONS:
         drift_ratio = None
 
-    if not isinstance(drift_ratio, (int, float)):
+    if drift_ratio is None:
         errors.append("report missing preview/final to compute drift ratio.")
         return errors
 
@@ -574,26 +588,21 @@ def _validate_drift_band(report: dict[str, Any]) -> list[str]:
     band = pm.get("drift_band")
     try:
         if isinstance(band, dict):
-            lo = band.get("min")
-            hi = band.get("max")
-            if isinstance(lo, (int, float)) and isinstance(hi, (int, float)):
-                lo_f = float(lo)
-                hi_f = float(hi)
-                if math.isfinite(lo_f) and math.isfinite(hi_f) and 0 < lo_f < hi_f:
-                    drift_min = lo_f
-                    drift_max = hi_f
+            lo = _coerce_float(band.get("min"))
+            hi = _coerce_float(band.get("max"))
+            if lo is not None and hi is not None and 0 < lo < hi:
+                drift_min = lo
+                drift_max = hi
         elif isinstance(band, (list, tuple)) and len(band) == 2:
-            lo_raw, hi_raw = band[0], band[1]
-            if isinstance(lo_raw, (int, float)) and isinstance(hi_raw, (int, float)):
-                lo_f = float(lo_raw)
-                hi_f = float(hi_raw)
-                if math.isfinite(lo_f) and math.isfinite(hi_f) and 0 < lo_f < hi_f:
-                    drift_min = lo_f
-                    drift_max = hi_f
+            lo_f = _coerce_float(band[0])
+            hi_f = _coerce_float(band[1])
+            if lo_f is not None and hi_f is not None and 0 < lo_f < hi_f:
+                drift_min = lo_f
+                drift_max = hi_f
     except _VERIFY_PARSE_EXCEPTIONS:
         pass
 
-    if not drift_min <= float(drift_ratio) <= drift_max:
+    if not drift_min <= drift_ratio <= drift_max:
         errors.append(
             f"Preview→final drift ratio out of band ({drift_min:.2f}–{drift_max:.2f}): observed {drift_ratio:.6f}."
         )

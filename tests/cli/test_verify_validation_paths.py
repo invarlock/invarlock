@@ -72,6 +72,17 @@ def test_validate_counts_paths_none_expected_and_missing_coverage():
     assert any("coverage.final.used" in e for e in errs)
 
 
+def test_validate_ratio_and_drift_reject_bool_numeric_fields():
+    cert = _base_cert()
+    cert["primary_metric"]["kind"] = "accuracy"
+    cert["primary_metric"]["ratio_vs_baseline"] = True
+    cert["primary_metric"]["preview"] = True
+    errs = V._validate_primary_metric(cert)
+    assert any("primary_metric.ratio_vs_baseline" in e for e in errs)
+    drift_errs = V._validate_drift_band(cert)
+    assert any("missing preview/final" in e.lower() for e in drift_errs)
+
+
 def test_apply_profile_lints_equals_mismatch_and_numeric_conversion_errors():
     cert = _base_cert()
     cert["meta"]["model_profile"] = {

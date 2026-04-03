@@ -18,11 +18,17 @@ _NON_FATAL_EXCEPTIONS = (
 
 
 def _coerce_finite_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
         coerced = float(value)
     except (TypeError, ValueError):
         return None
     return coerced if math.isfinite(coerced) else None
+
+
+def _is_non_bool_finite_number(value: Any) -> bool:
+    return _coerce_finite_float(value) is not None
 
 
 def _guard_overhead_has_error_diagnostic(payload: Any) -> bool:
@@ -102,8 +108,9 @@ def compute_validation_flags(
     ratio_limit = (
         ratio_max_bound if ratio_max_bound is not None else float(ratio_limit_base)
     )
-    if isinstance(target_ratio, int | float) and target_ratio > 0:
-        ratio_limit = min(ratio_limit, float(target_ratio))
+    target_ratio_value = _coerce_finite_float(target_ratio)
+    if target_ratio_value is not None and target_ratio_value > 0:
+        ratio_limit = min(ratio_limit, target_ratio_value)
 
     # Canonical Gates
     # 1. Drift gate: by default 0.95 ≤ final/preview ≤ 1.05 (configurable)
@@ -113,16 +120,15 @@ def compute_validation_flags(
         try:
             cand_min = pm_drift_band.get("min")
             cand_max = pm_drift_band.get("max")
-            if isinstance(cand_min, int | float) and isinstance(cand_max, int | float):
-                cand_min_f = float(cand_min)
-                cand_max_f = float(cand_max)
-                if (
-                    math.isfinite(cand_min_f)
-                    and math.isfinite(cand_max_f)
-                    and 0 < cand_min_f < cand_max_f
-                ):
-                    drift_min = cand_min_f
-                    drift_max = cand_max_f
+            cand_min_f = _coerce_finite_float(cand_min)
+            cand_max_f = _coerce_finite_float(cand_max)
+            if (
+                cand_min_f is not None
+                and cand_max_f is not None
+                and 0 < cand_min_f < cand_max_f
+            ):
+                drift_min = cand_min_f
+                drift_max = cand_max_f
         except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
             pass
     preview_final_drift_acceptable = drift_min <= drift_ratio <= drift_max
@@ -133,16 +139,15 @@ def compute_validation_flags(
     # 2. Primary metric vs baseline: edited/baseline ≤ tier threshold (ratio for ppl-like)
     ratio_vs_baseline = ppl.get("ratio_vs_baseline", 1.0)
     # Prefer primary_metric ratio when present
-    if not (
-        isinstance(ratio_vs_baseline, int | float) and math.isfinite(ratio_vs_baseline)
-    ):
+    if not _is_non_bool_finite_number(ratio_vs_baseline):
         try:
             pm_try = primary_metric if isinstance(primary_metric, dict) else {}
             pm_ratio = (
                 pm_try.get("ratio_vs_baseline") if isinstance(pm_try, dict) else None
             )
-            if isinstance(pm_ratio, int | float) and math.isfinite(pm_ratio):
-                ratio_vs_baseline = float(pm_ratio)
+            pm_ratio_value = _coerce_finite_float(pm_ratio)
+            if pm_ratio_value is not None:
+                ratio_vs_baseline = pm_ratio_value
         except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
             pass
     # Hysteresis and sample-size floors from tier policies
@@ -164,10 +169,11 @@ def compute_validation_flags(
                     if isinstance(dataset_capacity, dict):
                         frac = float(pm_policy.get("min_token_fraction", 0.0) or 0.0)
                         avail_tokens = dataset_capacity.get("tokens_available")
-                        if isinstance(avail_tokens, int | float) and frac > 0.0:
+                        avail_tokens_value = _coerce_finite_float(avail_tokens)
+                        if avail_tokens_value is not None and frac > 0.0:
                             eff_min_tokens = max(
                                 eff_min_tokens,
-                                int(math.ceil(float(avail_tokens) * frac)),
+                                int(math.ceil(avail_tokens_value * frac)),
                             )
                 except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
                     pass
@@ -185,13 +191,13 @@ def compute_validation_flags(
                                 fin_used = fin_cov.get("used")
                                 fin_req = fin_cov.get("required")
                                 prev_ok = bool(prev_cov.get("ok")) or (
-                                    isinstance(prev_used, int | float)
-                                    and isinstance(prev_req, int | float)
+                                    _is_non_bool_finite_number(prev_used)
+                                    and _is_non_bool_finite_number(prev_req)
                                     and float(prev_used) >= float(prev_req)
                                 )
                                 fin_ok = bool(fin_cov.get("ok")) or (
-                                    isinstance(fin_used, int | float)
-                                    and isinstance(fin_req, int | float)
+                                    _is_non_bool_finite_number(fin_used)
+                                    and _is_non_bool_finite_number(fin_req)
                                     and float(fin_used) >= float(fin_req)
                                 )
                                 coverage_ok = prev_ok and fin_ok
@@ -218,31 +224,26 @@ def compute_validation_flags(
     # Apply hysteresis to ratio limit if needed
     ratio_limit_with_hyst = ratio_limit + max(0.0, hysteresis_ratio)
     lower_bound_ok = True
-    if ratio_min_bound is not None and isinstance(ratio_vs_baseline, (int | float)):
+    if ratio_min_bound is not None and _is_non_bool_finite_number(ratio_vs_baseline):
         try:
-            lower_bound_ok = math.isfinite(float(ratio_vs_baseline)) and (
-                float(ratio_vs_baseline) >= float(ratio_min_bound)
-            )
+            lower_bound_ok = float(ratio_vs_baseline) >= float(ratio_min_bound)
         except _NON_FATAL_EXCEPTIONS:
             lower_bound_ok = True
     compression_acceptable = (
-        isinstance(ratio_vs_baseline, int | float)
-        and math.isfinite(ratio_vs_baseline)
+        _is_non_bool_finite_number(ratio_vs_baseline)
         and lower_bound_ok
         and ratio_vs_baseline <= ratio_limit_with_hyst
         and tokens_ok_eff
     )
     if tiny_relax:
         # In tiny demos, allow undefined ratio and relax floors
-        if not isinstance(ratio_vs_baseline, int | float) or not math.isfinite(
-            ratio_vs_baseline
-        ):
+        if not _is_non_bool_finite_number(ratio_vs_baseline):
             compression_acceptable = True
     ratio_ci = ppl.get("ratio_ci")
     if (
         isinstance(ratio_ci, tuple | list)
         and len(ratio_ci) == 2
-        and all(isinstance(x, int | float) and math.isfinite(x) for x in ratio_ci)
+        and all(_is_non_bool_finite_number(x) for x in ratio_ci)
     ):
         compression_acceptable = (
             compression_acceptable
@@ -299,8 +300,7 @@ def compute_validation_flags(
     # Mark hysteresis application when ratio exceeds base limit but passes with hysteresis
     try:
         base_ok = (
-            isinstance(ratio_vs_baseline, int | float)
-            and math.isfinite(ratio_vs_baseline)
+            _is_non_bool_finite_number(ratio_vs_baseline)
             and ratio_vs_baseline <= ratio_limit
         )
         if not base_ok and compression_acceptable:
@@ -315,8 +315,11 @@ def compute_validation_flags(
             if kind in {"ppl_causal", "ppl_mlm", "ppl_seq2seq"}:
                 # Apply the same hysteresis and sample-size floors as primary_metric_acceptable
                 pm_ratio = primary_metric.get("ratio_vs_baseline")
-                if isinstance(pm_ratio, int | float) and math.isfinite(pm_ratio):
-                    ok = (pm_ratio <= ratio_limit_with_hyst) and bool(tokens_ok_eff)
+                pm_ratio_value = _coerce_finite_float(pm_ratio)
+                if pm_ratio_value is not None:
+                    ok = (pm_ratio_value <= ratio_limit_with_hyst) and bool(
+                        tokens_ok_eff
+                    )
                 else:
                     # Fall back to compression_acceptable when PM ratio is unavailable
                     ok = bool(compression_acceptable)
@@ -332,18 +335,16 @@ def compute_validation_flags(
                 min_examples = int(acc_policy.get("min_examples", 200))
                 hysteresis_pp = float(acc_policy.get("hysteresis_delta_pp", 0.0))
                 delta = primary_metric.get("ratio_vs_baseline")
-                meets_delta = (
-                    isinstance(delta, int | float)
-                    and math.isfinite(delta)
-                    and (delta >= (delta_min_pp - max(0.0, hysteresis_pp)))
+                delta_value = _coerce_finite_float(delta)
+                meets_delta = delta_value is not None and (
+                    delta_value >= (delta_min_pp - max(0.0, hysteresis_pp))
                 )
-                if tiny_relax and not (
-                    isinstance(delta, int | float) and math.isfinite(delta)
-                ):
+                if tiny_relax and delta_value is None:
                     meets_delta = True
                 n_fin = primary_metric.get("n_final")
                 meets_n = True
-                if isinstance(n_fin, int | float):
+                n_fin_value = _coerce_finite_float(n_fin)
+                if n_fin_value is not None:
                     # Dataset-scale aware min_examples when available
                     eff_min_examples = int(min_examples)
                     try:
@@ -352,24 +353,23 @@ def compute_validation_flags(
                                 acc_policy.get("min_examples_fraction", 0.0) or 0.0
                             )
                             avail_ex = dataset_capacity.get("examples_available")
-                            if isinstance(avail_ex, int | float) and frac > 0.0:
+                            avail_ex_value = _coerce_finite_float(avail_ex)
+                            if avail_ex_value is not None and frac > 0.0:
                                 eff_min_examples = max(
                                     eff_min_examples,
-                                    int(math.ceil(float(avail_ex) * frac)),
+                                    int(math.ceil(avail_ex_value * frac)),
                                 )
                     except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
                         pass
-                    meets_n = int(n_fin) >= eff_min_examples
+                    meets_n = int(n_fin_value) >= eff_min_examples
                     if tiny_relax:
                         # In tiny demos accept smaller sample sizes
                         meets_n = True
+                elif "n_final" in primary_metric:
+                    meets_n = False
                 flags["primary_metric_acceptable"] = bool(meets_delta and meets_n)
                 try:
-                    if (
-                        isinstance(delta, int | float)
-                        and delta < delta_min_pp
-                        and meets_delta
-                    ):
+                    if delta_value is not None and delta_value < delta_min_pp and meets_delta:
                         flags["hysteresis_applied"] = True
                 except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
                     pass
@@ -384,10 +384,10 @@ def compute_validation_flags(
             kind2 = str(primary_metric.get("kind", "")).lower()
             if kind2 in {"ppl_causal", "ppl_mlm", "ppl_seq2seq"}:
                 pmr = primary_metric.get("ratio_vs_baseline")
+                pmr_value = _coerce_finite_float(pmr)
                 if (
-                    isinstance(pmr, int | float)
-                    and math.isfinite(float(pmr))
-                    and float(pmr) <= (ratio_limit + max(0.0, hysteresis_ratio))
+                    pmr_value is not None
+                    and pmr_value <= (ratio_limit + max(0.0, hysteresis_ratio))
                     and bool(tokens_ok_eff)
                 ):
                     flags["primary_metric_acceptable"] = True
