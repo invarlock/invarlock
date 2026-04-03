@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import warnings
 from functools import lru_cache
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Literal
 
@@ -241,19 +242,19 @@ def get_tier_guard_config(
     """
     config = load_tier_config()
     tier_config = config.get(tier, config.get("balanced", {}))
-    return tier_config.get(guard, {}).copy()
+    return deepcopy(tier_config.get(guard, {}))
 
 
 def get_spectral_caps(tier: TierName = "balanced") -> dict[str, float]:
     """Get spectral κ caps for a tier (family -> kappa value)."""
     config = get_tier_guard_config(tier, "spectral_guard")
-    return config.get("family_caps", {}).copy()
+    return deepcopy(config.get("family_caps", {}))
 
 
 def get_rmt_epsilon(tier: TierName = "balanced") -> dict[str, float]:
     """Get RMT ε values for a tier (family -> epsilon value)."""
     config = get_tier_guard_config(tier, "rmt_guard")
-    return config.get("epsilon_by_family", {}).copy()
+    return deepcopy(config.get("epsilon_by_family", {}))
 
 
 def get_variance_min_effect(tier: TierName = "balanced") -> float:
