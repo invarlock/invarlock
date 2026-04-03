@@ -6,6 +6,10 @@ from typing import Any
 from invarlock.core.exceptions import ValidationError
 
 
+def _is_non_bool_number(value: Any) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool)
+
+
 def default_family_caps() -> dict[str, dict[str, float]]:
     """Default per-family spectral z-score caps."""
     return {
@@ -28,9 +32,9 @@ def normalize_family_caps(
         entry: dict[str, float] = {}
         if isinstance(values, dict):
             for key, val in values.items():
-                if isinstance(val, int | float) and math.isfinite(float(val)):
+                if _is_non_bool_number(val) and math.isfinite(float(val)):
                     entry[str(key)] = float(val)
-        elif isinstance(values, int | float) and math.isfinite(float(values)):
+        elif _is_non_bool_number(values) and math.isfinite(float(values)):
             entry["kappa"] = float(values)
         if entry:
             normalized[str(family)] = entry
@@ -68,6 +72,8 @@ def _require_policy_float(
     minimum: float | None = None,
     maximum: float | None = None,
 ) -> float:
+    if isinstance(value, bool):
+        raise _policy_invalid(param, "must be a finite float", value=value)
     try:
         numeric = float(value)
     except (TypeError, ValueError) as exc:
@@ -82,6 +88,8 @@ def _require_policy_float(
 
 
 def _require_policy_int(param: str, value: Any, *, minimum: int | None = None) -> int:
+    if isinstance(value, bool):
+        raise _policy_invalid(param, "must be an integer", value=value)
     try:
         integer = int(value)
     except (TypeError, ValueError) as exc:
@@ -191,25 +199,37 @@ def apply_policy_overrides(guard: Any, policy: dict[str, Any]) -> None:
             "use 'sigma_quantile'."
         )
     if sigma_value is not None:
-        guard.sigma_quantile = float(sigma_value)
+        guard.sigma_quantile = _require_policy_float(
+            "sigma_quantile", sigma_value, minimum=0.0, maximum=1.0
+        )
         policy["sigma_quantile"] = guard.sigma_quantile
     guard.config["sigma_quantile"] = guard.sigma_quantile
 
-    for key in [
-        "sigma_quantile",
-        "deadband",
-        "scope",
-        "max_spectral_norm",
-        "correction_enabled",
-        "max_caps",
-    ]:
-        if key in policy:
-            setattr(guard, key, policy[key])
-            guard.config[key] = policy[key]
+    if "deadband" in policy:
+        guard.deadband = _require_policy_float("deadband", policy["deadband"], minimum=0.0)
+        guard.config["deadband"] = guard.deadband
 
-    if guard.max_spectral_norm is not None:
-        guard.max_spectral_norm = float(guard.max_spectral_norm)
-    guard.config["max_spectral_norm"] = guard.max_spectral_norm
+    if "scope" in policy:
+        guard.scope = policy["scope"]
+        guard.config["scope"] = guard.scope
+
+    if "max_spectral_norm" in policy:
+        max_spectral_norm = policy["max_spectral_norm"]
+        if max_spectral_norm is None:
+            guard.max_spectral_norm = None
+        else:
+            guard.max_spectral_norm = _require_policy_float(
+                "max_spectral_norm", max_spectral_norm
+            )
+        guard.config["max_spectral_norm"] = guard.max_spectral_norm
+
+    if "correction_enabled" in policy:
+        guard.correction_enabled = bool(policy["correction_enabled"])
+        guard.config["correction_enabled"] = guard.correction_enabled
+
+    if "max_caps" in policy:
+        guard.max_caps = _require_policy_int("max_caps", policy["max_caps"], minimum=0)
+        guard.config["max_caps"] = guard.max_caps
 
     if "family_caps" in policy:
         guard.family_caps = normalize_family_caps(policy["family_caps"], default=True)

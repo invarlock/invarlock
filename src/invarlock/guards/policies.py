@@ -28,8 +28,14 @@ from invarlock.core.exceptions import (
 
 from .rmt import RMTPolicyDict
 from .spectral_types import SpectralPolicy
+from .spectral_policy import normalize_family_caps
+from .spectral_policy import normalize_multiple_testing_config
 from .tier_config import GuardType, TierName, get_tier_guard_config
 from .tier_config import check_drift as check_tier_drift
+
+
+def _is_non_bool_number(value: Any) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool)
 
 # === Spectral Guard Policies ===
 
@@ -278,19 +284,31 @@ def get_spectral_policy(
             if tier_config:
                 # Update with calibrated values
                 if "sigma_quantile" in tier_config:
-                    policy["sigma_quantile"] = tier_config["sigma_quantile"]
+                    sigma_quantile = tier_config["sigma_quantile"]
+                    if _is_non_bool_number(sigma_quantile):
+                        policy["sigma_quantile"] = float(sigma_quantile)
                 if "deadband" in tier_config:
-                    policy["deadband"] = tier_config["deadband"]
+                    deadband = tier_config["deadband"]
+                    if _is_non_bool_number(deadband):
+                        policy["deadband"] = float(deadband)
                 if "scope" in tier_config:
                     policy["scope"] = tier_config["scope"]
                 if "max_caps" in tier_config:
-                    policy["max_caps"] = tier_config["max_caps"]
+                    max_caps = tier_config["max_caps"]
+                    if _is_non_bool_number(max_caps):
+                        policy["max_caps"] = int(max_caps)
                 if "max_spectral_norm" in tier_config:
-                    policy["max_spectral_norm"] = tier_config["max_spectral_norm"]
+                    max_spectral_norm = tier_config["max_spectral_norm"]
+                    if _is_non_bool_number(max_spectral_norm):
+                        policy["max_spectral_norm"] = float(max_spectral_norm)
                 if "family_caps" in tier_config:
-                    policy["family_caps"] = tier_config["family_caps"]
+                    policy["family_caps"] = normalize_family_caps(
+                        tier_config["family_caps"], default=True
+                    )
                 if "multiple_testing" in tier_config:
-                    policy["multiple_testing"] = tier_config["multiple_testing"]
+                    policy["multiple_testing"] = normalize_multiple_testing_config(
+                        tier_config["multiple_testing"]
+                    )
         except (AttributeError, RuntimeError, TypeError, ValueError):
             # Fallback to hardcoded values on any error
             pass
@@ -317,14 +335,16 @@ def create_custom_spectral_policy(
     Raises:
         ValidationError(E501): If parameters are out of valid ranges
     """
-    if not 0.0 <= sigma_quantile <= 1.0:
+    if not _is_non_bool_number(sigma_quantile) or not 0.0 <= float(
+        sigma_quantile
+    ) <= 1.0:
         raise ValidationError(
             code="E501",
             message="POLICY-PARAM-INVALID",
             details={"param": "sigma_quantile", "value": sigma_quantile},
         )
 
-    if not 0.0 <= deadband <= 0.5:
+    if not _is_non_bool_number(deadband) or not 0.0 <= float(deadband) <= 0.5:
         raise ValidationError(
             code="E501",
             message="POLICY-PARAM-INVALID",
@@ -400,13 +420,27 @@ def get_rmt_policy(name: str = "balanced", *, use_yaml: bool = True) -> RMTPolic
             if tier_config:
                 # Update with calibrated values
                 if "deadband" in tier_config:
-                    policy["deadband"] = tier_config["deadband"]
+                    deadband = tier_config["deadband"]
+                    if _is_non_bool_number(deadband):
+                        policy["deadband"] = float(deadband)
                 if "margin" in tier_config:
-                    policy["margin"] = tier_config["margin"]
+                    margin = tier_config["margin"]
+                    if _is_non_bool_number(margin):
+                        policy["margin"] = float(margin)
                 if "epsilon_default" in tier_config:
-                    policy["epsilon_default"] = tier_config["epsilon_default"]
+                    epsilon_default = tier_config["epsilon_default"]
+                    if _is_non_bool_number(epsilon_default):
+                        policy["epsilon_default"] = float(epsilon_default)
                 if "epsilon_by_family" in tier_config:
-                    policy["epsilon_by_family"] = tier_config["epsilon_by_family"]
+                    epsilon_by_family = tier_config["epsilon_by_family"]
+                    if isinstance(epsilon_by_family, dict):
+                        normalized_epsilon_by_family = {
+                            str(family): float(value)
+                            for family, value in epsilon_by_family.items()
+                            if _is_non_bool_number(value)
+                        }
+                        if normalized_epsilon_by_family:
+                            policy["epsilon_by_family"] = normalized_epsilon_by_family
         except (AttributeError, RuntimeError, TypeError, ValueError):
             # Fallback to hardcoded values on any error
             pass
@@ -435,21 +469,23 @@ def create_custom_rmt_policy(
     Raises:
         ValidationError(E501): If parameters are out of valid ranges
     """
-    if isinstance(q, float) and not 0.1 <= q <= 10.0:
+    if q != "auto" and (
+        not _is_non_bool_number(q) or not 0.1 <= float(q) <= 10.0
+    ):
         raise ValidationError(
             code="E501",
             message="POLICY-PARAM-INVALID",
             details={"param": "q", "value": q},
         )
 
-    if not 0.0 <= deadband <= 0.5:
+    if not _is_non_bool_number(deadband) or not 0.0 <= float(deadband) <= 0.5:
         raise ValidationError(
             code="E501",
             message="POLICY-PARAM-INVALID",
             details={"param": "deadband", "value": deadband},
         )
 
-    if not margin >= 1.0:
+    if not _is_non_bool_number(margin) or not float(margin) >= 1.0:
         raise ValidationError(
             code="E501",
             message="POLICY-PARAM-INVALID",
@@ -711,8 +747,14 @@ def enforce_validation_gate(metrics: dict[str, Any], gate: dict[str, Any]) -> No
     violations: list[dict[str, Any]] = []
 
     try:
-        caps = float(metrics.get("caps_applied", 0))
-        total = float(metrics.get("total_layers", 0))
+        caps_value = metrics.get("caps_applied", 0)
+        total_value = metrics.get("total_layers", 0)
+        if not (
+            _is_non_bool_number(caps_value) and _is_non_bool_number(total_value)
+        ):
+            raise TypeError("caps_applied and total_layers must be numeric")
+        caps = float(caps_value)
+        total = float(total_value)
         if total > 0:
             rate = caps / total
             limit = float(gate.get("max_capping_rate", 1.0))
@@ -730,7 +772,7 @@ def enforce_validation_gate(metrics: dict[str, Any], gate: dict[str, Any]) -> No
 
     try:
         ratio = metrics.get("primary_metric_ratio")
-        if isinstance(ratio, int | float) and math.isfinite(float(ratio)):
+        if _is_non_bool_number(ratio) and math.isfinite(float(ratio)):
             limit = float(gate.get("max_ppl_degradation", 1.0))
             # ppl-like ratio: degradation ~ ratio-1; gate on allowed extra
             if ratio - 1.0 > limit:
