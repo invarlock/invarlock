@@ -86,7 +86,7 @@
       "path": "src/invarlock/core/runner_eval_phase.py",
       "subsystem": "core",
       "bucket": "acceptable",
-      "lines": [35, 45, 57],
+      "lines": [39, 49, 61],
       "rationale": "These broad catches only protect debug-trace logging and do not change evaluation verdicts."
     },
     {
