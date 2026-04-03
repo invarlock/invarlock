@@ -48,6 +48,10 @@ EXCLUDE_TOP_LEVEL_DIRS = {
 }
 
 
+def _is_excluded_top_level(name: str) -> bool:
+    return name.startswith(".") or name in EXCLUDE_TOP_LEVEL_DIRS
+
+
 CMD_PATTERN = re.compile(
     r"^(?P<prefix>(?:[A-Z_][A-Z0-9_]*=[^\s]+\s+)*)\s*(?P<cmd>(?:invarlock\s+|python\s+-m\s+invarlock(?:\\.[^\\s]+)?\s+).*)$"
 )
@@ -262,7 +266,7 @@ def _iter_markdown_files(repo_root: Path, *, paths: list[str] | None) -> list[Pa
             # Explicit external file/dir paths are allowed (used by tests and
             # local validation). Excludes apply only within the repo.
             return True
-        return not rel_parts or rel_parts[0] not in EXCLUDE_TOP_LEVEL_DIRS
+        return not rel_parts or not _is_excluded_top_level(rel_parts[0])
 
     return sorted((p for p in candidates if _allowed(p)), key=lambda p: str(p))
 

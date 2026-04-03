@@ -113,6 +113,114 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ownership now explicitly points at the package-native verifier instead of an
   external-binary model.
 
+## [0.5.1] - 2026-04-02
+
+### Added
+- Added a lightweight attested push smoke lane built around
+  `sshleifer/tiny-gpt2`, a local JSONL fixture, and the new `Tiny Attested
+  Smoke` workflow.
+- Added a heavier GPT-2 canary preset and workflow for scheduled and manually
+  dispatched end-to-end attestation checks.
+- Added a tracked broad-exception review-bucket contract so remaining blanket
+  catches are explicitly classified and linted instead of drifting silently.
+- Expanded the coverage-enforcement inventory to include newly split
+  implementation owners and helper surfaces as first-class critical files.
+- Added package-native Ed25519 proof-pack manifest signing, verification, and
+  key-generation flows so signed proof-pack verification no longer depends on
+  host `gpg` tooling.
+- Added stricter proof-pack remote-setup smoke coverage and higher-level
+  harness checks around package installation, source provenance, and remote
+  validation preflights.
+
+### Changed
+- Drove a repo-wide hardening and architecture cleanup pass across trust-
+  critical evaluation, runtime attestation, proof-pack verification,
+  determinism, registry, invariants, run orchestration, and reporting flows.
+- Continued the shell/core split so CLI shells hand policy and owner logic to
+  typed core and reporting helpers instead of owning fallback decisions.
+- Decomposed the largest owner modules across runtime security, run
+  orchestration, run execution, report building, verification checks, and
+  proof-pack handling into smaller implementation files with stronger guardrail
+  coverage.
+- Converged runtime-manifest verification onto a single package-native Python
+  path so product attestation, `invarlock-runtime-verify`, and
+  `make runtime-verify` all exercise the same verifier implementation.
+- Reworked proof-pack signing and verification around the same package-native
+  Ed25519 manifest-signature contract used by the installed CLI and shell
+  harnesses.
+- Hardened attested smoke and tiny-matrix flows so they rebuild the local
+  runtime image when needed, prefer the repo-selected interpreter, bootstrap
+  the CPU-only Hugging Face stack deterministically, and keep local and CI
+  runtime behavior aligned.
+- Ratcheted refactored split owners to stricter 95% and 100% per-file coverage
+  thresholds where the current suite supports it.
+
+### Fixed
+- Delegated and containerized evaluation reports now emit attested execution
+  provenance into their runtime manifests.
+- Runtime attestation and proof-pack verification now fail closed by default on
+  unattested artifacts, mutable runtime-image refs without digests, and
+  unsigned or unverifiable proof-pack manifests unless the explicit unattested
+  override is set.
+- Runtime attestation now uses the packaged Python runtime-manifest verifier
+  directly, removing path-dependent behavior from product verification.
+- Tiny attested smoke exports now write to host-writable paths, and unsigned
+  proof-pack smoke runs use an explicit unattested-artifact override instead of
+  implicitly depending on legacy behavior.
+- Narrowed active-path broad exception fallbacks across core, guards, and CLI
+  flows, and removed the remaining trust-critical broad catches.
+- Restored calibration and evaluate/report edge behavior after the refactors,
+  and resolved the post-split typing and coverage regressions surfaced by the
+  tighter repo gates.
+- Fixed release publishing and recovery paths around existing tags and
+  dist-only uploads.
+- Proof-pack maintainer packaging now fails closed when Git-backed source
+  provenance cannot be collected, and explicit `--device cuda` delegation now
+  rejects hosts without visible NVIDIA runtime support instead of silently
+  dropping GPU passthrough.
+- Fixed the runtime image and smoke bootstrap paths so attested Linux smoke
+  runs install the CPU-only torch stack deterministically, reuse writable HF
+  caches, and no longer depend on stale local runtime images or host `PATH`
+  quirks.
+- Restored 100% proof-pack shell-harness coverage and fixed warning-path shell
+  helpers that had been swallowing finalize, evaluate, or verify failures.
+
+### Removed
+- Removed remaining compatibility surfaces that no longer fit the stabilized
+  architecture, including legacy command shims, reporting facades, owner-layer
+  patch-sync wrappers, the retired legacy RMT module, stale lazy export
+  placeholders, and other shell-leaking or test-only indirections that had
+  survived earlier migrations.
+- Removed the repo-local Rust runtime verifier crate and the
+  `INVARLOCK_RUNTIME_VERIFIER` product override so runtime attestation now has
+  a single package-native verifier path.
+- Removed the proof-pack `gpg` signing and verification path in favor of the
+  package-native Ed25519 manifest-signature flow.
+
+### Dependencies
+- Patched vulnerable workflow locks and tightened smoke-workflow dependency and
+  asset caching behavior for more deterministic CI execution.
+- Updated verification and coverage gates so the packaged verifier and the
+  newly split owner modules are exercised directly in local and CI runs.
+- Bumped workflow and release security pins including `cryptography` to
+  `46.0.6`, `pygments` to `2.20.0`, and the Sigstore GitHub Action used by the
+  release workflow.
+- Bumped `aiohttp` from `3.13.3` to `3.13.4` in workflow requirement locks and
+  landed the corresponding Dependabot-equivalent fix on `staging/next`.
+
+### Documentation
+- Refreshed docs to match the post-`v0.5.0` architecture and operations model,
+  including the shell/core redesign, current evaluate contract, and updated
+  report-artifact guidance.
+- Added remediation closeout records from the refactor program and updated the
+  maintainer smoke notes to distinguish the push-gated tiny attested smoke from
+  the heavier GPT-2 canary workflow.
+- Documented the Python-only runtime-verifier contract and removed the obsolete
+  external-verifier environment-variable guidance.
+- Updated the architecture/security references so runtime attestation
+  ownership now explicitly points at the package-native verifier instead of an
+  external-binary model.
+
 ## [0.5.0] - 2026-03-25
 ### Added
 - Added an offline release-verification bundle generator and reference docs for
