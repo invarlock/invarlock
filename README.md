@@ -51,7 +51,7 @@ in CI.
 
 ## Who is this for?
 
-- ML engineers shipping edited model checkpoints, including quantized, pruned, finetuned, or otherwise weight-modified variants.
+- ML engineers shipping edited model checkpoints, including quantized, pruned, fine-tuned, or otherwise weight-modified variants.
 - MLOps and platform teams building CI gates, attested verification, and reviewable evaluation artifacts.
 - Researchers validating weight-edit, compression, and model-comparison methods with reproducible paired evaluation across text and image-text workflows supported here.
 
