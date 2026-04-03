@@ -371,7 +371,11 @@ def compute_validation_flags(
                     meets_n = False
                 flags["primary_metric_acceptable"] = bool(meets_delta and meets_n)
                 try:
-                    if delta_value is not None and delta_value < delta_min_pp and meets_delta:
+                    if (
+                        delta_value is not None
+                        and delta_value < delta_min_pp
+                        and meets_delta
+                    ):
                         flags["hysteresis_applied"] = True
                 except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
                     pass

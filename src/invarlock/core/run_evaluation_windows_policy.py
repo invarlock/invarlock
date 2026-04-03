@@ -28,7 +28,9 @@ def _window_payload(window: Mapping[str, Any] | None) -> dict[str, Any]:
     window_map = dict(window or {})
     payload = {
         "window_ids": _list_payload(window_map.get("window_ids", [])),
-        "example_ids": [str(value) for value in _list_payload(window_map.get("example_ids", []))],
+        "example_ids": [
+            str(value) for value in _list_payload(window_map.get("example_ids", []))
+        ],
         "logloss": _list_payload(window_map.get("logloss", [])),
         "input_ids": _nested_list_payload(window_map.get("input_ids", [])),
         "attention_masks": _nested_list_payload(window_map.get("attention_masks", [])),

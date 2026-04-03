@@ -202,11 +202,7 @@ def evaluate_metric_tail(
             )
 
         tail_mass = _as_finite_float(stats.get("tail_mass"))
-        if (
-            mmax is not None
-            and tail_mass is not None
-            and tail_mass > float(mmax)
-        ):
+        if mmax is not None and tail_mass is not None and tail_mass > float(mmax):
             passed = False
             violations.append(
                 {

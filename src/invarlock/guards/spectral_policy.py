@@ -206,7 +206,9 @@ def apply_policy_overrides(guard: Any, policy: dict[str, Any]) -> None:
     guard.config["sigma_quantile"] = guard.sigma_quantile
 
     if "deadband" in policy:
-        guard.deadband = _require_policy_float("deadband", policy["deadband"], minimum=0.0)
+        guard.deadband = _require_policy_float(
+            "deadband", policy["deadband"], minimum=0.0
+        )
         guard.config["deadband"] = guard.deadband
 
     if "scope" in policy:

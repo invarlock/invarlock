@@ -135,9 +135,7 @@ def _validate_logspace_ci_identity(
         baseline_ref.get("primary_metric") if isinstance(baseline_ref, dict) else None
     )
     baseline_final = baseline_pm.get("final") if isinstance(baseline_pm, dict) else None
-    if not (
-        _coerce_float(baseline_final) is not None
-    ):
+    if not (_coerce_float(baseline_final) is not None):
         return errors
 
     def _finite_bounds(bounds: Any) -> bool:

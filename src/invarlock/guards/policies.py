@@ -27,15 +27,21 @@ from invarlock.core.exceptions import (
 )
 
 from .rmt import RMTPolicyDict
+from .spectral_policy import normalize_family_caps, normalize_multiple_testing_config
 from .spectral_types import SpectralPolicy
-from .spectral_policy import normalize_family_caps
-from .spectral_policy import normalize_multiple_testing_config
-from .tier_config import GuardType, TierName, get_tier_guard_config
-from .tier_config import check_drift as check_tier_drift
+from .tier_config import (
+    GuardType,
+    TierName,
+    get_tier_guard_config,
+)
+from .tier_config import (
+    check_drift as check_tier_drift,
+)
 
 
 def _is_non_bool_number(value: Any) -> bool:
     return isinstance(value, int | float) and not isinstance(value, bool)
+
 
 # === Spectral Guard Policies ===
 
@@ -335,9 +341,10 @@ def create_custom_spectral_policy(
     Raises:
         ValidationError(E501): If parameters are out of valid ranges
     """
-    if not _is_non_bool_number(sigma_quantile) or not 0.0 <= float(
-        sigma_quantile
-    ) <= 1.0:
+    if (
+        not _is_non_bool_number(sigma_quantile)
+        or not 0.0 <= float(sigma_quantile) <= 1.0
+    ):
         raise ValidationError(
             code="E501",
             message="POLICY-PARAM-INVALID",
@@ -469,9 +476,7 @@ def create_custom_rmt_policy(
     Raises:
         ValidationError(E501): If parameters are out of valid ranges
     """
-    if q != "auto" and (
-        not _is_non_bool_number(q) or not 0.1 <= float(q) <= 10.0
-    ):
+    if q != "auto" and (not _is_non_bool_number(q) or not 0.1 <= float(q) <= 10.0):
         raise ValidationError(
             code="E501",
             message="POLICY-PARAM-INVALID",
@@ -759,9 +764,7 @@ def enforce_validation_gate(metrics: dict[str, Any], gate: dict[str, Any]) -> No
     try:
         caps_value = metrics.get("caps_applied", 0)
         total_value = metrics.get("total_layers", 0)
-        if not (
-            _is_non_bool_number(caps_value) and _is_non_bool_number(total_value)
-        ):
+        if not (_is_non_bool_number(caps_value) and _is_non_bool_number(total_value)):
             raise TypeError("caps_applied and total_layers must be numeric")
         caps = float(caps_value)
         total = float(total_value)

@@ -160,9 +160,7 @@ def attach_primary_metric(
             try:
                 fin = pm_copy.get("final")
                 baseline_final_val = (
-                    float(baseline_final)
-                    if _is_finite(baseline_final)
-                    else None
+                    float(baseline_final) if _is_finite(baseline_final) else None
                 )
                 if (
                     _is_finite(fin)

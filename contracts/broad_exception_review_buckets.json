@@ -114,7 +114,7 @@
       "path": "src/invarlock/guards/tier_config.py",
       "subsystem": "guards",
       "bucket": "acceptable",
-      "lines": [169],
+      "lines": [170],
       "rationale": "Tier-config loading is a compatibility helper that already emits explicit parse errors when strict config content is required."
     },
     {
