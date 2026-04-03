@@ -124,6 +124,10 @@ def test_resolve_limit_uses_all_batches_for_non_positive_request() -> None:
     assert resolve_limit([1, 2, 3], requested=2) == 2
 
 
+def test_resolve_limit_caps_large_request_to_batch_count() -> None:
+    assert resolve_limit([1, 2, 3], requested=99) == 3
+
+
 def test_compute_slice_summary_handles_tensor_masks_and_labels_without_storage(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

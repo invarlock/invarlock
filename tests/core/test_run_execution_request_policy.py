@@ -42,6 +42,10 @@ def test_env_text_and_flag_normalize_environ_values() -> None:
     assert env_text("MISSING", environ=environ) is None
 
 
+def test_env_text_returns_none_for_whitespace_only_value() -> None:
+    assert env_text("INVARLOCK_TEXT", environ={"INVARLOCK_TEXT": "   "}) is None
+
+
 def test_build_run_execution_request_reads_policy_from_environ() -> None:
     request = _Request()
     core_request = build_run_execution_request(
@@ -63,3 +67,17 @@ def test_build_run_execution_request_reads_policy_from_environ() -> None:
     assert core_request.tiny_relax_enabled is True
     assert core_request.export_model_requested is True
     assert core_request.export_dir == "exports"
+
+
+def test_build_run_execution_request_prefers_pack_determinism_over_legacy_env() -> None:
+    request = _Request()
+
+    core_request = build_run_execution_request(
+        request,
+        environ={
+            "PACK_DETERMINISM": "strict",
+            "INVARLOCK_DETERMINISM": "legacy",
+        },
+    )
+
+    assert core_request.determinism_mode == "strict"

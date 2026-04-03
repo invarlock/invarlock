@@ -21,8 +21,14 @@ _VERIFY_OUTPUT_EXCEPTIONS = (
 FORMAT_VERIFY = "verify-v1"
 
 
+def _is_non_bool_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
 def _coerce_ci_output(ci: Any) -> list[float] | None:
     if not (isinstance(ci, (tuple, list)) and len(ci) == 2):
+        return None
+    if isinstance(ci[0], bool) or isinstance(ci[1], bool):
         return None
     try:
         return [float(ci[0]), float(ci[1])]
@@ -54,8 +60,8 @@ def _build_recompute_summary(
             n_correct = cls.get("n_correct") if isinstance(cls, dict) else None
             n_total = cls.get("n_total") if isinstance(cls, dict) else None
             if (
-                isinstance(n_correct, (int, float))
-                and isinstance(n_total, (int, float))
+                _is_non_bool_number(n_correct)
+                and _is_non_bool_number(n_total)
                 and n_total > 0
             ):
                 acc = float(n_correct) / float(n_total)
@@ -65,7 +71,7 @@ def _build_recompute_summary(
                     else None
                 )
                 ok = bool(
-                    isinstance(display_final, (int, float))
+                    _is_non_bool_number(display_final)
                     and abs(float(display_final) - acc) <= max(1e-12, tolerance)
                 )
                 recompute = {
@@ -168,7 +174,7 @@ def build_verify_json_result_item(
         "ok": ok,
         "reason": reason,
         "ratio_vs_baseline": float(ratio)
-        if isinstance(ratio, (int, float)) and math.isfinite(float(ratio))
+        if _is_non_bool_number(ratio) and math.isfinite(float(ratio))
         else None,
         "ci": ci_out,
         "recompute": recompute,
@@ -253,24 +259,19 @@ def build_verify_success_line(report: dict[str, Any]) -> str:
         else None
     )
     ci = primary_metric.get("display_ci") if isinstance(primary_metric, dict) else None
+    ci_out = _coerce_ci_output(ci)
     ci_text = None
     width = None
-    if isinstance(ci, (tuple, list)) and len(ci) == 2:
-        try:
-            ci_lo = float(ci[0])
-            ci_hi = float(ci[1])
-        except _VERIFY_OUTPUT_EXCEPTIONS:
-            ci_text = None
-            width = None
-        else:
-            ci_text = f"ci=[{ci_lo:.6f},{ci_hi:.6f}]"
-            width = ci_hi - ci_lo
+    if ci_out is not None:
+        ci_lo, ci_hi = ci_out
+        ci_text = f"ci=[{ci_lo:.6f},{ci_hi:.6f}]"
+        width = ci_hi - ci_lo
     parts = ["VERIFY OK"]
     if kind:
         parts.append(f"metric={kind}")
-    if n_prev is not None and n_fin is not None:
+    if _is_non_bool_number(n_prev) and _is_non_bool_number(n_fin):
         parts.append(f"n={n_prev}/{n_fin}")
-    if isinstance(ratio, (int, float)):
+    if _is_non_bool_number(ratio):
         parts.append(f"point={float(ratio):.6f}")
     if ci_text is not None:
         parts.append(ci_text)
