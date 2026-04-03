@@ -369,6 +369,8 @@ def test_materialize_baseline_pairing_schedule_supports_multimodal_records() -> 
     assert result.final_count == 1
     assert result.calibration_data[0]["example_id"] == "ex-1"
     assert result.calibration_data[1]["window_id"] == "final::0"
+    assert result.preview_records[0]["window_id"] == "preview::0"
+    assert result.final_records[0]["example_id"] == "ex-2"
     assert result.dataset_meta["provider_kind"] == "vision_text"
     assert result.dataset_meta["processor_sha256"] == "proc-123"
     assert result.preview_mask_total == 0

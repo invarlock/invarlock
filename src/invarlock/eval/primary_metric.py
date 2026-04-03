@@ -788,14 +788,20 @@ def infer_binary_label_from_ids(input_ids: list[int]) -> int:
 
 
 def compute_accuracy_counts(records: list[dict[str, Any]]) -> tuple[int, int]:
-    """Compute accuracy counts from records with input_ids.
+    """Compute accuracy counts from records with measured correctness or input_ids.
 
-    Predicts the same as the inferred label for a perfect-accuracy smoke path.
+    Prefer explicit per-example correctness when present. Otherwise predict the
+    same as the inferred label for a perfect-accuracy smoke path.
     Returns (correct_total, total).
     """
     correct = 0
     total = 0
     for rec in records:
+        explicit_correct = rec.get("correct") if isinstance(rec, dict) else None
+        if isinstance(explicit_correct, bool):
+            correct += int(explicit_correct)
+            total += 1
+            continue
         seq = rec.get("input_ids") if isinstance(rec, dict) else None
         if not isinstance(seq, list) or not seq:
             continue

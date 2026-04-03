@@ -202,41 +202,73 @@ def _validate_evaluation_window_phase(
 
     window_ids = phase.get("window_ids")
     input_ids = phase.get("input_ids")
-    if not isinstance(window_ids, list) or not window_ids:
-        raise ValidationError(
-            code="E222",
-            message=(
-                f"Baseline report missing evaluation_windows.{phase_name}.window_ids."
-            ),
-            details={
-                "path": str(resolved_report),
-                "field": f"evaluation_windows.{phase_name}.window_ids",
-            },
-        )
-    if not isinstance(input_ids, list) or not input_ids:
-        raise ValidationError(
-            code="E222",
-            message=(
-                f"Baseline report missing evaluation_windows.{phase_name}.input_ids."
-            ),
-            details={
-                "path": str(resolved_report),
-                "field": f"evaluation_windows.{phase_name}.input_ids",
-            },
-        )
-    if len(input_ids) != len(window_ids):
-        raise ValidationError(
-            code="E222",
-            message=(
-                "Baseline report has inconsistent evaluation window payloads for "
-                f"{phase_name}: input_ids={len(input_ids)} "
-                f"window_ids={len(window_ids)}."
-            ),
-            details={
-                "path": str(resolved_report),
-                "field": f"evaluation_windows.{phase_name}",
-            },
-        )
+    if isinstance(window_ids, list) and window_ids:
+        if not isinstance(input_ids, list) or not input_ids:
+            raise ValidationError(
+                code="E222",
+                message=(
+                    f"Baseline report missing evaluation_windows.{phase_name}.input_ids."
+                ),
+                details={
+                    "path": str(resolved_report),
+                    "field": f"evaluation_windows.{phase_name}.input_ids",
+                },
+            )
+        if len(input_ids) != len(window_ids):
+            raise ValidationError(
+                code="E222",
+                message=(
+                    "Baseline report has inconsistent evaluation window payloads for "
+                    f"{phase_name}: input_ids={len(input_ids)} "
+                    f"window_ids={len(window_ids)}."
+                ),
+                details={
+                    "path": str(resolved_report),
+                    "field": f"evaluation_windows.{phase_name}",
+                },
+            )
+        return
+
+    example_ids = phase.get("example_ids")
+    records = phase.get("records")
+    if isinstance(example_ids, list) and example_ids:
+        if not isinstance(records, list) or not records:
+            raise ValidationError(
+                code="E222",
+                message=(
+                    f"Baseline report missing evaluation_windows.{phase_name}.records."
+                ),
+                details={
+                    "path": str(resolved_report),
+                    "field": f"evaluation_windows.{phase_name}.records",
+                },
+            )
+        if len(records) != len(example_ids):
+            raise ValidationError(
+                code="E222",
+                message=(
+                    "Baseline report has inconsistent multimodal evaluation payloads for "
+                    f"{phase_name}: records={len(records)} "
+                    f"example_ids={len(example_ids)}."
+                ),
+                details={
+                    "path": str(resolved_report),
+                    "field": f"evaluation_windows.{phase_name}",
+                },
+            )
+        return
+
+    raise ValidationError(
+        code="E222",
+        message=(
+            "Baseline report missing evaluation evidence for "
+            f"evaluation_windows.{phase_name}."
+        ),
+        details={
+            "path": str(resolved_report),
+            "field": f"evaluation_windows.{phase_name}",
+        },
+    )
 
 
 @dataclass(frozen=True)

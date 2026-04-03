@@ -125,7 +125,11 @@ class _DenseDecoderSpec(_CausalSpec):
         try:
             if hasattr(model, "lm_head") and hasattr(base, "embed_tokens"):
                 if model.lm_head.weight is base.embed_tokens.weight:
-                    tying["lm_head.weight"] = "model.embed_tokens.weight"
+                    embed_path = "model.embed_tokens.weight"
+                    outer_model = getattr(model, "model", None)
+                    if getattr(outer_model, "language_model", None) is base:
+                        embed_path = "model.language_model.embed_tokens.weight"
+                    tying["lm_head.weight"] = embed_path
         except Exception:
             pass
         return tying
@@ -321,6 +325,10 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
 
     def _unwrap(self, model: Any) -> tuple[Any, Any, Any]:
         config = getattr(model, "config", None)
+        if hasattr(model, "model") and hasattr(model.model, "language_model"):
+            language_model = getattr(model.model, "language_model", None)
+            if language_model is not None and hasattr(language_model, "layers"):
+                return language_model, language_model.layers, config
         if hasattr(model, "model") and hasattr(model.model, "layers"):
             return model.model, model.model.layers, config
         if hasattr(model, "transformer") and hasattr(model.transformer, "h"):
@@ -391,15 +399,21 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
                 return None
             return None
 
-        n_heads = _coerce_int(getattr(config, "num_attention_heads", None))
-        if n_heads is None:
-            n_heads = _coerce_int(getattr(config, "n_head", None))
+        text_config = getattr(config, "text_config", None)
 
-        hidden_size = _coerce_int(getattr(config, "hidden_size", None))
-        if hidden_size is None:
-            hidden_size = _coerce_int(getattr(config, "n_embd", None))
+        def _cfg_int(*names: str) -> int | None:
+            for container in (config, text_config):
+                if container is None:
+                    continue
+                for name in names:
+                    value = _coerce_int(getattr(container, name, None))
+                    if value is not None:
+                        return value
+            return None
 
-        vocab_size = _coerce_int(getattr(config, "vocab_size", None))
+        n_heads = _cfg_int("num_attention_heads", "n_head")
+        hidden_size = _cfg_int("hidden_size", "n_embd")
+        vocab_size = _cfg_int("vocab_size")
 
         if n_heads is None or hidden_size is None:
             raise AdapterError(

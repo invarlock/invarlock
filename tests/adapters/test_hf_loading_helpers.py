@@ -192,7 +192,7 @@ def test_resolve_core_loader_strategy_uses_direct_submodule_when_allowed(
         ),
         (
             "gemma4",
-            "transformers.models.gemma4.modeling_gemma4.Gemma4ForCausalLM",
+            "transformers.models.gemma4.modeling_gemma4.Gemma4ForConditionalGeneration",
         ),
         ("olmo2", "transformers.models.olmo2.modeling_olmo2.Olmo2ForCausalLM"),
     ],

@@ -36,6 +36,8 @@ class BaselinePairingMaterializationResult:
     final_mask_counts: list[int]
     preview_mask_total: int
     final_mask_total: int
+    preview_records: list[dict[str, Any]]
+    final_records: list[dict[str, Any]]
 
 
 def _merge_pairing_schedule(
@@ -184,6 +186,8 @@ def materialize_baseline_pairing_schedule(
         if isinstance(section, dict)
     )
     if multimodal_schedule:
+        materialized_preview_records: list[dict[str, Any]] = []
+        materialized_final_records: list[dict[str, Any]] = []
         preview_records_raw = (
             preview_section.get("records")
             if isinstance(preview_section, dict)
@@ -222,12 +226,16 @@ def materialize_baseline_pairing_schedule(
                 str(record.get("id") or record.get("example_id") or "")
                 for record in final_records
             ]
-        for arm, records in (("preview", preview_records), ("final", final_records)):
+        for arm, records, target_records in (
+            ("preview", preview_records, materialized_preview_records),
+            ("final", final_records, materialized_final_records),
+        ):
             for index, record in enumerate(records):
                 entry = dict(record)
                 example_id = str(record.get("id") or record.get("example_id") or "")
                 entry["example_id"] = example_id
                 entry["window_id"] = f"{arm}::{index}"
+                target_records.append(dict(entry))
                 materialized.append(entry)
 
         preview_count = len(preview_ids)
@@ -289,8 +297,11 @@ def materialize_baseline_pairing_schedule(
             final_mask_counts=[0] * final_count,
             preview_mask_total=0,
             final_mask_total=0,
+            preview_records=materialized_preview_records,
+            final_records=materialized_final_records,
         )
 
+    preview_records_out: list[dict[str, Any]] = []
     preview_window_ids = pairing_schedule["preview"].get("window_ids")
     preview_labels = pairing_schedule["preview"].get("labels")
     preview_masked_token_counts = pairing_schedule["preview"].get("masked_token_counts")
@@ -333,7 +344,9 @@ def materialize_baseline_pairing_schedule(
                 except (TypeError, ValueError, OverflowError):
                     pass
         materialized.append(entry)
+        preview_records_out.append(dict(entry))
 
+    final_records_out: list[dict[str, Any]] = []
     final_window_ids = pairing_schedule["final"].get("window_ids")
     final_labels = pairing_schedule["final"].get("labels")
     final_masked_token_counts = pairing_schedule["final"].get("masked_token_counts")
@@ -374,6 +387,7 @@ def materialize_baseline_pairing_schedule(
                 except (TypeError, ValueError, OverflowError):
                     pass
         materialized.append(entry)
+        final_records_out.append(dict(entry))
 
     preview_count = len(pairing_schedule["preview"]["input_ids"])
     final_count = len(pairing_schedule["final"]["input_ids"])
@@ -520,4 +534,6 @@ def materialize_baseline_pairing_schedule(
         final_mask_counts=final_mask_counts,
         preview_mask_total=preview_mask_total,
         final_mask_total=final_mask_total,
+        preview_records=preview_records_out,
+        final_records=final_records_out,
     )

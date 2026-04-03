@@ -120,6 +120,58 @@ def test_materialize_run_dataset_harvests_pairing_schedule() -> None:
     assert result.final_records == []
 
 
+def test_materialize_run_dataset_preserves_materialized_pairing_records() -> None:
+    harvested = {
+        "dataset_meta": {"provider": "baseline"},
+        "window_plan": {"preview": 1, "final": 1},
+        "calibration_data": [{"example_id": "ex-1"}],
+    }
+    materialized = SimpleNamespace(
+        calibration_data=[{"example_id": "ex-1"}],
+        dataset_meta={"provider": "baseline"},
+        window_plan={"preview": 1, "final": 1},
+        preview_count=1,
+        final_count=1,
+        effective_preview=1,
+        effective_final=1,
+        preview_mask_counts=[0],
+        final_mask_counts=[0],
+        preview_records=[{"example_id": "ex-1", "window_id": "preview::0"}],
+        final_records=[{"example_id": "ex-2", "window_id": "final::0"}],
+    )
+
+    result = materialize_run_dataset(
+        pairing_schedule={"preview": {}, "final": {}},
+        cfg=SimpleNamespace(dataset=SimpleNamespace(provider=None)),
+        baseline_report_data={"evaluation_windows": {}},
+        tokenizer_hash="tok",
+        resolved_loss_type="classification",
+        profile="dev",
+        model_profile=SimpleNamespace(),
+        tokenizer=None,
+        use_mlm=False,
+        mask_prob=0.0,
+        mask_seed=1,
+        random_token_prob=0.0,
+        original_token_prob=0.0,
+        tier="balanced",
+        requested_preview=1,
+        requested_final=1,
+        effective_preview=1,
+        effective_final=1,
+        resolved_device="cpu",
+        profile_normalized="dev",
+        resolved_split=None,
+        validate_and_harvest_baseline_schedule_fn=lambda *args, **kwargs: harvested,
+        materialize_baseline_pairing_schedule_fn=lambda **kwargs: materialized,
+        resolve_tokenizer_fn=lambda *args, **kwargs: (None, "tok"),
+        build_provider_dataset_plan_fn=lambda **kwargs: None,
+    )
+
+    assert result.preview_records == [{"example_id": "ex-1", "window_id": "preview::0"}]
+    assert result.final_records == [{"example_id": "ex-2", "window_id": "final::0"}]
+
+
 def test_materialize_run_dataset_returns_passthrough_defaults_without_provider() -> (
     None
 ):

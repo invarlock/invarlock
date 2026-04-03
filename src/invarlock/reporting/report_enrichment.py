@@ -164,6 +164,33 @@ def attach_classification(
             else None
         )
         if isinstance(cls, dict):
+            metrics_payload: dict[str, Any] = {}
+            for key in ("preview", "final", "counts_source", "estimated", "subgroups"):
+                value = cls.get(key)
+                if isinstance(value, dict):
+                    metrics_payload[key] = dict(value)
+                elif value is not None:
+                    metrics_payload[key] = value
+
+            final = cls.get("final") if isinstance(cls.get("final"), dict) else None
+            if isinstance(final, dict):
+                correct_total = final.get("correct_total")
+                total = final.get("total")
+                if isinstance(correct_total, int | float) and isinstance(
+                    total, int | float
+                ):
+                    metrics_payload.setdefault("n_correct", int(correct_total))
+                    metrics_payload.setdefault("n_total", int(total))
+            counts_source = metrics_payload.get("counts_source")
+            if isinstance(counts_source, str):
+                metrics_payload.setdefault(
+                    "estimated", counts_source.strip().lower() != "measured"
+                )
+            if metrics_payload:
+                evaluation_report.setdefault("metrics", {})["classification"] = (
+                    metrics_payload
+                )
+
             sub = cls.get("subgroups")
             if isinstance(sub, dict) and all(
                 key in sub for key in ("preview", "final")

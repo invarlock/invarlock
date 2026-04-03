@@ -28,6 +28,20 @@ class RunReportMetricsEnrichmentResult:
 def _classification_records(arm_payload: Any) -> list[dict[str, Any]]:
     if not isinstance(arm_payload, Mapping):
         return []
+    records = arm_payload.get("records", []) or []
+    if isinstance(records, list):
+        measured = [dict(record) for record in records if isinstance(record, Mapping)]
+        if measured:
+            return measured
+    example_correct = arm_payload.get("example_correct", []) or []
+    if isinstance(example_correct, list):
+        measured = [
+            {"correct": bool(value)}
+            for value in example_correct
+            if isinstance(value, bool | int | float)
+        ]
+        if measured:
+            return measured
     sequences = arm_payload.get("input_ids", []) or []
     if not isinstance(sequences, list):
         return []
@@ -79,6 +93,17 @@ def enrich_run_report_metrics(
                 if isinstance(report.get("metrics"), dict)
                 else None
             )
+            if not isinstance(existing_classification, dict) and hasattr(
+                core_report, "metrics"
+            ):
+                core_metrics = (
+                    core_report.metrics if isinstance(core_report.metrics, dict) else {}
+                )
+                existing_classification = (
+                    core_metrics.get("classification")
+                    if isinstance(core_metrics.get("classification"), dict)
+                    else None
+                )
             if isinstance(existing_classification, dict) and existing_classification:
                 counts_source = str(
                     existing_classification.get("counts_source", "")
@@ -90,6 +115,9 @@ def enrich_run_report_metrics(
                     and isinstance(final_existing.get("total"), (int, float))
                     and int(final_existing.get("total", 0)) > 0
                 ):
+                    report.setdefault("metrics", {})["classification"] = dict(
+                        existing_classification
+                    )
                     raise StopIteration
 
             from invarlock.eval.primary_metric import compute_accuracy_counts
@@ -141,7 +169,10 @@ def enrich_run_report_metrics(
             classification_metrics = {
                 "preview": {"correct_total": int(c_prev), "total": int(n_prev)},
                 "final": {"correct_total": int(c_fin), "total": int(n_fin)},
+                "n_correct": int(c_fin),
+                "n_total": int(n_fin),
                 "counts_source": "pseudo_config" if used_pseudo_counts else "measured",
+                "estimated": bool(used_pseudo_counts),
             }
             if used_pseudo_counts:
                 try:

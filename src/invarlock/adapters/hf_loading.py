@@ -51,7 +51,7 @@ _DIRECT_SUBMODULE_SPECS: dict[str, dict[str, tuple[str, str]]] = {
         ),
         "gemma4": (
             "transformers.models.gemma4.modeling_gemma4",
-            "Gemma4ForCausalLM",
+            "Gemma4ForConditionalGeneration",
         ),
         "gpt_neox": (
             "transformers.models.gpt_neox.modeling_gpt_neox",

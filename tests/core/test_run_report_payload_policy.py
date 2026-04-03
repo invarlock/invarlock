@@ -72,6 +72,29 @@ def test_build_run_report_meta_collects_profile_and_optional_fields() -> None:
     assert payload["pm_drift_band"] == (0.95, 1.05)
 
 
+def test_build_run_report_meta_suppresses_profile_lints_for_multimodal_adapter() -> None:
+    model_profile = SimpleNamespace(
+        family="gemma",
+        default_loss="causal",
+        module_selectors={"decoder": ["x"]},
+        invariants=("rope_rotary_embedding",),
+        cert_lints=({"code": "L001"},),
+    )
+
+    payload = build_run_report_meta(
+        model_id="google/gemma-4-E2B-it",
+        adapter="hf_multimodal",
+        resolved_device="cpu",
+        commit_value="abc123",
+        seed_bundle={"python": 43, "numpy": 43},
+        auto_config={"tier": "balanced"},
+        guard_overhead_threshold=0.01,
+        model_profile=model_profile,
+    )
+
+    assert payload["model_profile"]["cert_lints"] == []
+
+
 def test_build_run_report_data_merges_dataset_meta_and_tokenizer_fallback() -> None:
     payload, tokenizer_hash = build_run_report_data(
         canonical_dataset_id="wikitext2",
