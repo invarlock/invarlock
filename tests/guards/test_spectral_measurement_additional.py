@@ -39,6 +39,19 @@ def test_auto_sigma_target_ignores_non_positive_sigmas() -> None:
     assert target == 0.9
 
 
+def test_auto_sigma_target_ignores_boolean_sigmas() -> None:
+    model = _Model({"booly": _Module(torch.eye(2)), "real": _Module(torch.eye(2))})
+    seen = iter([True, 2.5])
+
+    target = auto_sigma_target(
+        model,
+        percentile=0.95,
+        compute_sigma_max_fn=lambda _weight: next(seen),
+    )
+
+    assert target == 2.5
+
+
 def test_auto_sigma_target_returns_percentile_when_model_iteration_fails() -> None:
     class _BrokenModel:
         def named_modules(self):

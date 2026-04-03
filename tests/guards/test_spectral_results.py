@@ -36,6 +36,17 @@ def test_compute_family_observability_branches() -> None:
     assert top["ffn"][0]["module"] == "m2"
 
 
+def test_compute_family_observability_ignores_boolean_scores() -> None:
+    quantiles, top = compute_family_observability(
+        {"m1": True, "m2": 2.5},
+        {"m1": "ffn", "m2": "ffn"},
+    )
+
+    assert quantiles["ffn"]["count"] == 1
+    assert quantiles["ffn"]["max"] == 2.5
+    assert top["ffn"] == [{"module": "m2", "z": 2.5, "family": "ffn"}]
+
+
 def test_compute_family_observability_clamps_invalid_top_k() -> None:
     quantiles, top = compute_family_observability(
         {"m1": 1.0, "m2": 2.0},

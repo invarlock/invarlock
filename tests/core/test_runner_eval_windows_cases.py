@@ -162,6 +162,30 @@ def test_compute_slice_summary_handles_tensor_masks_and_labels_without_storage(
     assert any(operation == "label_alignment" for _, operation, _, _ in runner.events)
 
 
+def test_compute_slice_summary_treats_whitespace_false_store_flag_as_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("INVARLOCK_STORE_EVAL_WINDOWS", " false ")
+    runner = _RunnerRecorder()
+    model = _LossModel(0.1)
+    batch = {"input_ids": torch.tensor([[1, 2, 3]], dtype=torch.long)}
+
+    summary, error = compute_slice_summary(
+        runner,
+        model,
+        [batch],
+        max_batches=1,
+        start_idx=0,
+        device=next(model.parameters()).device,
+        resolved_loss_mode="causal",
+    )
+
+    assert error is None
+    assert summary["tokens"] == []
+    assert summary["attention_masks"] == []
+    assert summary["labels"] == []
+
+
 def test_compute_slice_summary_strips_whitespace_when_storage_is_disabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -219,3 +243,44 @@ def test_compute_slice_summary_reports_mlm_missing_masks_for_unusable_batches(
     operations = [operation for _, operation, _, _ in runner.events]
     assert "missing_loss" in operations
     assert "mlm_missing_masks" in operations
+
+
+def test_compute_slice_summary_logs_zero_mask_batches_and_uses_token_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("INVARLOCK_DEBUG_TRACE", "1")
+    runner = _RunnerRecorder()
+    model = _LossModel(0.3)
+    batch = {
+        "input_ids": torch.tensor([[4, 5, 6]], dtype=torch.long),
+        "attention_mask": torch.tensor([[1, 1, 1]], dtype=torch.long),
+        "labels": torch.tensor([[-100, -100, -100]], dtype=torch.long),
+    }
+
+    summary, error = compute_slice_summary(
+        runner,
+        model,
+        [batch],
+        max_batches=1,
+        start_idx=7,
+        device=next(model.parameters()).device,
+        resolved_loss_mode="mlm",
+    )
+
+    assert error is None
+    assert summary["num_batches"] == 1
+    assert summary["total_tokens"] == 3
+    assert summary["actual_total_tokens"] == 3
+    assert summary["masked_token_counts"] == [3]
+    zero_mask_events = [
+        data for _, operation, _, data in runner.events if operation == "zero_mask_batch"
+    ]
+    assert zero_mask_events == [
+        {
+            "window_index": 7,
+            "tokens_in_batch": 3,
+            "masked_tokens": 0,
+            "labels_sample": [-100, -100, -100],
+            "fallback_weight": 3,
+        }
+    ]

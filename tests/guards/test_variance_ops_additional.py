@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import torch
 
 from invarlock.guards.variance_ops import (
+    commit_checkpoint,
     disable_guard,
     enable_guard,
     pop_checkpoint,
@@ -64,6 +65,20 @@ def test_pop_checkpoint_ignores_missing_targets_and_missing_weight() -> None:
 
     assert pop_checkpoint(guard, model=None) is True
     assert guard._checkpoint_stack == []
+
+
+def test_commit_checkpoint_pops_latest_snapshot_and_logs() -> None:
+    guard = _guard()
+    guard._checkpoint_stack = [
+        {"first": torch.ones((1, 1))},
+        {"second": torch.zeros((1, 1))},
+    ]
+
+    commit_checkpoint(guard)
+
+    assert len(guard._checkpoint_stack) == 1
+    assert "first" in guard._checkpoint_stack[0]
+    assert any(event[0] == "checkpoint_committed" for event in guard._events)
 
 
 def test_disable_guard_falls_back_when_checkpoint_restore_fails(monkeypatch) -> None:

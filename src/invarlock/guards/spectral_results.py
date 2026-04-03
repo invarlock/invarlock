@@ -7,6 +7,10 @@ from typing import Any
 import numpy as np
 
 
+def _is_real_number(value: Any) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool)
+
+
 def _quantile(sorted_values: list[float], quantile: float) -> float:
     if not sorted_values:
         return 0.0
@@ -42,6 +46,8 @@ def compute_family_observability(
     for module_name, z_value in latest_z_scores.items():
         family = module_family_map.get(module_name)
         if family is None:
+            continue
+        if not _is_real_number(z_value):
             continue
         try:
             z_abs = abs(float(z_value))
