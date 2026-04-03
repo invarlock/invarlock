@@ -50,7 +50,7 @@ def test_groups_help_list_subcommands(monkeypatch):
     app = _load_app(monkeypatch)
     runner = CliRunner()
     for cmd, expected in (
-        ("report", ["verify", "explain", "html", "validate"]),
+        ("report", ["generate", "explain", "html", "validate"]),
         ("advanced", ["proof-pack", "policy", "plugins", "calibrate"]),
         ("advanced plugins", ["list", "guards", "edits", "adapters"]),
     ):

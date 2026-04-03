@@ -14,16 +14,16 @@ LIGHT_IMPORT = os.getenv("INVARLOCK_LIGHT_IMPORT", "").strip().lower() in {
 }
 
 
-def test_report_verify_help_does_not_require_run(tmp_path: Path) -> None:
+def test_report_generate_help_does_not_require_run(tmp_path: Path) -> None:
     if LIGHT_IMPORT:
         # In light-import mode, help layout may differ across Typer/Rich
         # versions; exercise this more fully in the default import path.
         return
-    r = CliRunner().invoke(cli, ["report", "verify", "--help"])
+    r = CliRunner().invoke(cli, ["report", "generate", "--help"])
     assert r.exit_code == 0, r.stdout
-    # Should show verify help, not the group callback error about --run
-    assert "Recompute and verify" in r.stdout
-    assert "--tolerance" in r.stdout
+    # Should show generate help, not the group root help or a missing --run error
+    assert "Generate reports from existing run report artifacts" in r.stdout
+    assert "--run" in r.stdout
 
 
 def test_report_html_help_shows_short_flags(tmp_path: Path) -> None:

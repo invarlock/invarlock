@@ -217,7 +217,7 @@ _VALIDATION_ALLOWLIST_DEFAULT = allowlist_mod.DEFAULT_VALIDATION_ALLOWLIST
 def _validate_with_jsonschema(report: dict[str, Any]) -> bool:
     """Validate evaluation report with JSON Schema when available."""
     if jsonschema is None:
-        return True  # Schema library unavailable; fall back to minimal checks
+        return False
     try:
         jsonschema.validate(instance=report, schema=REPORT_JSON_SCHEMA)
         return True
@@ -244,9 +244,8 @@ def validate_report(report: dict[str, Any]) -> bool:
 
         if not _validate_with_jsonschema(report):
             # Minimal fallback: require schema version + run_id + primary_metric
-            run_id_ok = isinstance(report.get("run_id"), str) and bool(
-                report.get("run_id")
-            )
+            run_id = report.get("run_id")
+            run_id_ok = isinstance(run_id, str) and bool(run_id.strip())
             pm = report.get("primary_metric")
             pm_ok = isinstance(pm, dict) and (
                 isinstance(pm.get("final"), int | float)

@@ -33,7 +33,7 @@ boundary.
 provide good coverage while keeping runtime reasonable.
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --baseline gpt2 --subject /path/to/edited \
+invarlock evaluate --allow-network --baseline gpt2 --subject /path/to/edited \
   --preset configs/presets/causal_lm/wikitext2_512.yaml --profile ci
 ```
 
@@ -48,7 +48,7 @@ INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --baseline gpt2 --subject /path/to/
 network access is unavailable or for CI smoke tests.
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --baseline bert-base-uncased --subject /path/to/edited \
+invarlock evaluate --allow-network --baseline bert-base-uncased --subject /path/to/edited \
   --preset configs/presets/masked_lm/wikitext2_128.yaml --profile ci
 ```
 
@@ -76,7 +76,7 @@ own pre-edited checkpoint instead.
 **Example (demo edit):**
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --baseline gpt2 --subject gpt2 \
+invarlock evaluate --allow-network --baseline gpt2 --subject gpt2 \
   --preset configs/presets/causal_lm/wikitext2_512.yaml \
   --edit-config configs/overlays/edits/quant_rtn/8bit_attn.yaml \
   --profile ci

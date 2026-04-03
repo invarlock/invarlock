@@ -82,9 +82,15 @@ def test_explain_gates_happy_and_missing(tmp_path: Path):
     rp.write_text(json.dumps(rpt), encoding="utf-8")
     bp.write_text(json.dumps(base), encoding="utf-8")
     # Happy path prints content
-    explain_gates_command(report=str(rp), baseline=str(bp))
+    explain_gates_command(
+        subject_report=str(rp),
+        baseline_report=str(bp),
+    )
     # Missing file triggers exit(1)
     import click
 
     with pytest.raises(click.exceptions.Exit):
-        explain_gates_command(report=str(rp), baseline=str(tmp_path / "missing.json"))
+        explain_gates_command(
+            subject_report=str(rp),
+            baseline_report=str(tmp_path / "missing.json"),
+        )

@@ -35,7 +35,7 @@ def test_load_validation_allowlist_non_list_payload(monkeypatch):
 
 def test_validate_with_jsonschema_handles_missing_library(monkeypatch):
     monkeypatch.setattr(schema_mod, "jsonschema", None, raising=False)
-    assert schema_mod._validate_with_jsonschema({"schema_version": "v1"})
+    assert schema_mod._validate_with_jsonschema({"schema_version": "v1"}) is False
 
 
 def test_validate_with_jsonschema_failure(monkeypatch):

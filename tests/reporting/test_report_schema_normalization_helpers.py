@@ -108,6 +108,20 @@ def test_validate_evaluation_report_rejects_invalid_flags(monkeypatch):
     assert schema_mod.validate_report(evaluation_report) is False
 
 
+def test_validate_evaluation_report_rejects_blank_run_id_without_jsonschema(
+    monkeypatch,
+):
+    monkeypatch.setattr(schema_mod, "jsonschema", None, raising=False)
+    evaluation_report = {
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
+        "run_id": "   ",
+        "primary_metric": {"final": 1.0},
+        "validation": {"primary_metric_acceptable": True},
+    }
+
+    assert schema_mod.validate_report(evaluation_report) is False
+
+
 def test_load_validation_allowlist_prefers_contracts_file(monkeypatch):
     keys = ["primary_metric_acceptable", "guard_overhead_acceptable", "custom_flag"]
     monkeypatch.setattr(allowlist_mod, "load_json_contract", lambda _filename: keys)

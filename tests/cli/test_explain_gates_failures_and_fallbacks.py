@@ -38,7 +38,15 @@ def test_explain_gates_tokens_below_floor_and_drift_fail(monkeypatch, tmp_path):
 
     monkeypatch.setattr(mod, "make_report", _fake_cert)
     r = CliRunner().invoke(
-        app, ["report", "explain", "--report", str(rep), "--baseline", str(base)]
+        app,
+        [
+            "report",
+            "explain",
+            "--subject-report",
+            str(rep),
+            "--baseline-report",
+            str(base),
+        ],
     )
     assert r.exit_code == 0
     # tokens below floor
@@ -95,7 +103,15 @@ def test_explain_gates_handles_failures_and_threshold_edges(monkeypatch, tmp_pat
 
     monkeypatch.setattr(mod, "make_report", fake_cert)
     result = CliRunner().invoke(
-        app, ["report", "explain", "--report", str(rep), "--baseline", str(base)]
+        app,
+        [
+            "report",
+            "explain",
+            "--subject-report",
+            str(rep),
+            "--baseline-report",
+            str(base),
+        ],
     )
     assert "Dataset split: validation (fallback)" in result.stdout
     assert "observed: 1.200x" in result.stdout
@@ -141,7 +157,10 @@ def test_explain_gates_dataset_split_handles_exception(monkeypatch, tmp_path):
         },
     )
 
-    mod.explain_gates_command(report=str(rep), baseline=str(base))
+    mod.explain_gates_command(
+        subject_report=str(rep),
+        baseline_report=str(base),
+    )
 
 
 def test_explain_gates_missing_and_load_failures(tmp_path, monkeypatch) -> None:
@@ -155,15 +174,24 @@ def test_explain_gates_missing_and_load_failures(tmp_path, monkeypatch) -> None:
     present.write_text("{}", encoding="utf-8")
 
     with pytest.raises(typer.Exit) as missing_exc:
-        mod.explain_gates_command(report=str(missing), baseline=str(present))
+        mod.explain_gates_command(
+            subject_report=str(missing),
+            baseline_report=str(present),
+        )
     assert missing_exc.value.exit_code == 1
-    assert any("Missing --report or --baseline file" in line for line in console.lines)
+    assert any(
+        "Missing --subject-report or --baseline-report file" in line
+        for line in console.lines
+    )
 
     bad = tmp_path / "bad.json"
     bad.write_text("{not-json", encoding="utf-8")
     console.calls.clear()
     with pytest.raises(typer.Exit) as load_exc:
-        mod.explain_gates_command(report=str(bad), baseline=str(present))
+        mod.explain_gates_command(
+            subject_report=str(bad),
+            baseline_report=str(present),
+        )
     assert load_exc.value.exit_code == 1
     assert any("Failed to load inputs" in line for line in console.lines)
 
@@ -210,7 +238,10 @@ def test_explain_gates_info_tail_and_ratio_only_overhead(tmp_path, monkeypatch) 
         },
     )
 
-    mod.explain_gates_command(report=str(report), baseline=str(baseline))
+    mod.explain_gates_command(
+        subject_report=str(report),
+        baseline_report=str(baseline),
+    )
 
     joined = console.joined()
     assert "threshold: unavailable" in joined
@@ -284,7 +315,10 @@ def test_explain_gates_hysteresis_warn_tail_and_drift_defaults(
         },
     )
 
-    mod.explain_gates_command(report=str(report), baseline=str(baseline))
+    mod.explain_gates_command(
+        subject_report=str(report),
+        baseline_report=str(baseline),
+    )
 
     joined = console.joined()
     assert "status: PASS" in joined

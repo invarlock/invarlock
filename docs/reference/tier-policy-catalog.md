@@ -13,7 +13,9 @@
 
 ```bash
 # Inspect resolved tier policies in a report
-invarlock report explain --report runs/subject/report.json --baseline runs/baseline/report.json
+invarlock report explain \
+  --subject-report runs/subject/report.json \
+  --baseline-report runs/baseline/report.json
 ```
 
 ## Quick Comparison

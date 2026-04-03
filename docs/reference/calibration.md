@@ -13,7 +13,7 @@
 | **Audience** | Operators recalibrating tier policies for additional model families or revised guard contracts. |
 | **Primary commands** | `invarlock advanced calibrate null-sweep`, `invarlock advanced calibrate ve-sweep`. |
 | **Requires** | `invarlock[hf]` for HF workflows; base config YAML for each sweep type. |
-| **Network** | Offline by default; enable per command with `INVARLOCK_ALLOW_NETWORK=1`. |
+| **Network** | Offline by default; use `--allow-network` on calibration commands when a sweep needs model or dataset downloads. |
 | **Source of truth** | `src/invarlock/cli/commands/calibrate.py`, `src/invarlock/calibration/`. |
 
 ## Quick Start
@@ -25,6 +25,7 @@ intentionally bypass that boundary.
 ```bash
 # Run spectral null-sweep (noop edit) to calibrate κ/alpha
 invarlock advanced calibrate null-sweep \
+  --allow-network \
   --config configs/calibration/null_sweep_ci.yaml \
   --out reports/calibration/null_sweep \
   --tier balanced --tier conservative \
@@ -32,6 +33,7 @@ invarlock advanced calibrate null-sweep \
 
 # Run VE sweep (quant_rtn edit) to calibrate min_effect_lognll
 invarlock advanced calibrate ve-sweep \
+  --allow-network \
   --config configs/calibration/rmt_ve_sweep_ci.yaml \
   --out reports/calibration/ve_sweep \
   --tier balanced --tier conservative \

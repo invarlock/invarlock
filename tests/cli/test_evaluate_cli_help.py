@@ -19,8 +19,8 @@ def test_cli_evaluate_help():
     assert "--assurance" in stdout
 
 
-def test_cli_report_verify_help_shows_assurance_choices():
-    result = runner.invoke(app, ["report", "verify", "--help"], env={"COLUMNS": "240"})
+def test_cli_verify_help_shows_assurance_choices():
+    result = runner.invoke(app, ["verify", "--help"], env={"COLUMNS": "240"})
     assert result.exit_code == 0
     stdout = strip_ansi(result.stdout)
     compact = "".join(stdout.split())

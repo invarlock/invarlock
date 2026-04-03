@@ -107,6 +107,11 @@ def test_cli_exhaustive_smoke_uses_repo_selected_python() -> None:
     assert 'export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"' in contents
     assert "printf -v CLI '%q ' \"$PYTHON_BIN\" -m invarlock" in contents
     assert "\"$PYTHON_BIN\" - <<'PY'" in contents
+    assert (
+        'run "invarlock report generate --help" "$CLI report generate --help"'
+        in contents
+    )
+    assert "report verify --help" not in contents
     assert "command -v invarlock" not in contents
 
 

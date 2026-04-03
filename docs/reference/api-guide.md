@@ -8,7 +8,7 @@
 | **Audience** | Python callers building scripted workflows or integrations. |
 | **Supported surface** | `CoreRunner.execute`, `RunConfig`, `ModelAdapter`, `ModelEdit`, `Guard`, and direct reporting helpers. |
 | **Requires** | `invarlock[adapters]` for HF adapters, `invarlock[edits]` for built-in edits, `invarlock[guards]` for guard math, `invarlock[eval]` for dataset providers. |
-| **Network** | Offline by default; set `INVARLOCK_ALLOW_NETWORK=1` to download models or datasets. |
+| **Network** | Offline by default; CLI runs use `evaluate --allow-network`, while Python callers set `INVARLOCK_ALLOW_NETWORK=1` to download models or datasets. |
 | **Inputs** | Model instance, adapter, edit, guard list, `RunConfig`, optional calibration data. |
 | **Outputs / Artifacts** | `RunReport` object; optional event logs/checkpoints; evaluation bundles via `report_make.make_report(...)` and `report_bundle.save_evaluation_bundle(...)`. |
 | **Source of truth** | `src/invarlock/core/runner.py`, `src/invarlock/core/api.py`, `src/invarlock/cli/config_execution.py`, `src/invarlock/reporting/report_make.py`, `src/invarlock/reporting/report_bundle.py`, `src/invarlock/reporting/report_console.py`, `src/invarlock/reporting/report_files.py`, `src/invarlock/reporting/report_schema.py`. |

@@ -49,6 +49,10 @@ def _make_generation_result(
     )
 
 
+def _minimal_evaluation_report_payload() -> dict[str, object]:
+    return {"schema_version": "v1", "validation": {}}
+
+
 def test_generate_reports_normalizes_all_formats(monkeypatch):
     saved = {}
 
@@ -202,6 +206,11 @@ def test_report_command_skips_empty_telemetry_summary_line(monkeypatch):
 def test_report_command_evaluation_report_validation_error(monkeypatch):
     monkeypatch.setattr(
         report_mod,
+        "load_run_report_input_json",
+        lambda path: (Path(path), {"meta": {}}),
+    )
+    monkeypatch.setattr(
+        report_mod,
         "generate_reports",
         lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("bad report")),
     )
@@ -274,6 +283,11 @@ def test_report_command_rejects_noncanonical_run_directory(monkeypatch, tmp_path
 
 def test_report_command_maps_nonbaseline_value_error_to_exit_two(monkeypatch) -> None:
     captured: dict[str, object] = {}
+    monkeypatch.setattr(
+        report_mod,
+        "load_run_report_input_json",
+        lambda path: (Path(path), {"meta": {}}),
+    )
 
     monkeypatch.setattr(
         report_mod,
@@ -306,6 +320,11 @@ def test_report_command_maps_nonbaseline_value_error_to_exit_two(monkeypatch) ->
 
 
 def test_report_callback_maps_generic_error_to_exit_one(monkeypatch) -> None:
+    monkeypatch.setattr(
+        report_mod,
+        "load_run_report_input_json",
+        lambda path: (Path(path), {"meta": {}}),
+    )
     monkeypatch.setattr(
         report_mod,
         "generate_reports",
@@ -538,6 +557,11 @@ def test_report_callback_skips_subcommand_and_delegates_success(monkeypatch) -> 
         return _make_generation_result(formats=["json"], saved_files={"json": "a.json"})
 
     monkeypatch.setattr(report_mod, "generate_reports", fake_generate)
+    monkeypatch.setattr(
+        report_mod,
+        "load_run_report_input_json",
+        lambda path: (Path(path), {"meta": {}}),
+    )
 
     ctx_skip = type(
         "Ctx", (), {"resilient_parsing": False, "invoked_subcommand": "verify"}
@@ -581,6 +605,11 @@ def test_report_callback_skips_subcommand_and_delegates_success(monkeypatch) -> 
 def test_report_command_maps_report_input_error_to_exit_two(monkeypatch) -> None:
     monkeypatch.setattr(
         report_mod,
+        "load_run_report_input_json",
+        lambda path: (Path(path), {"meta": {}}),
+    )
+    monkeypatch.setattr(
+        report_mod,
         "generate_reports",
         lambda **_kwargs: (_ for _ in ()).throw(
             report_mod.ReportInputError("not_found", Path("run.json"))
@@ -606,8 +635,10 @@ def test_report_command_maps_report_input_error_to_exit_two(monkeypatch) -> None
 
 
 def test_report_validate_success(monkeypatch, tmp_path):
-    report = tmp_path / "report.json"
-    report.write_text(json.dumps({"ok": True}), encoding="utf-8")
+    report = tmp_path / "evaluation.report.json"
+    report.write_text(
+        json.dumps(_minimal_evaluation_report_payload()), encoding="utf-8"
+    )
     monkeypatch.setattr(
         report_mod, "console", type("C", (), {"print": lambda *_: None})()
     )
@@ -624,7 +655,7 @@ def test_report_validate_accepts_canonical_directory(monkeypatch, tmp_path):
     report_dir = tmp_path / "report-dir"
     report_dir.mkdir()
     (report_dir / "evaluation.report.json").write_text(
-        json.dumps({"ok": True}),
+        json.dumps(_minimal_evaluation_report_payload()),
         encoding="utf-8",
     )
     monkeypatch.setattr(
@@ -658,8 +689,10 @@ def test_report_validate_rejects_noncanonical_directory(monkeypatch, tmp_path):
 
 
 def test_report_validate_schema_failure(monkeypatch, tmp_path):
-    report = tmp_path / "report.json"
-    report.write_text("{}", encoding="utf-8")
+    report = tmp_path / "evaluation.report.json"
+    report.write_text(
+        json.dumps(_minimal_evaluation_report_payload()), encoding="utf-8"
+    )
     monkeypatch.setattr(
         report_mod, "console", type("C", (), {"print": lambda *_: None})()
     )
@@ -675,8 +708,10 @@ def test_report_validate_schema_failure(monkeypatch, tmp_path):
 
 
 def test_report_validate_value_error(monkeypatch, tmp_path):
-    report = tmp_path / "report.json"
-    report.write_text("{}", encoding="utf-8")
+    report = tmp_path / "evaluation.report.json"
+    report.write_text(
+        json.dumps(_minimal_evaluation_report_payload()), encoding="utf-8"
+    )
     monkeypatch.setattr(
         report_mod, "console", type("C", (), {"print": lambda *_: None})()
     )
@@ -691,8 +726,10 @@ def test_report_validate_value_error(monkeypatch, tmp_path):
 
 
 def test_report_validate_generic_error(monkeypatch, tmp_path):
-    report = tmp_path / "report.json"
-    report.write_text("{}", encoding="utf-8")
+    report = tmp_path / "evaluation.report.json"
+    report.write_text(
+        json.dumps(_minimal_evaluation_report_payload()), encoding="utf-8"
+    )
     monkeypatch.setattr(
         report_mod, "console", type("C", (), {"print": lambda *_: None})()
     )
@@ -707,8 +744,10 @@ def test_report_validate_generic_error(monkeypatch, tmp_path):
 
 
 def test_report_validate_read_failure(monkeypatch, tmp_path):
-    report = tmp_path / "report.json"
-    report.write_text("{}", encoding="utf-8")
+    report = tmp_path / "evaluation.report.json"
+    report.write_text(
+        json.dumps(_minimal_evaluation_report_payload()), encoding="utf-8"
+    )
     monkeypatch.setattr(
         report_mod, "console", type("C", (), {"print": lambda *_: None})()
     )
@@ -728,70 +767,6 @@ def test_report_validate_read_failure(monkeypatch, tmp_path):
     )
     with pytest.raises(typer.Exit) as exc:
         report_mod.report_validate(report=str(report))
-    assert exc.value.exit_code == 2
-
-
-def test_report_verify_command_resolves_canonical_directories(monkeypatch, tmp_path):
-    report_dir = tmp_path / "report-dir"
-    report_dir.mkdir()
-    report_json = report_dir / "evaluation.report.json"
-    report_json.write_text("{}", encoding="utf-8")
-    baseline_dir = tmp_path / "baseline-dir"
-    baseline_dir.mkdir()
-    baseline_json = baseline_dir / "report.json"
-    baseline_json.write_text("{}", encoding="utf-8")
-    captured: dict[str, object] = {}
-
-    monkeypatch.setattr(
-        "invarlock.cli.commands.verify.verify_command",
-        lambda **kwargs: captured.update(kwargs),
-        raising=False,
-    )
-
-    report_mod.report_verify_command(
-        reports=[str(report_dir)],
-        baseline=str(baseline_dir),
-    )
-
-    assert captured["reports"] == [report_json.resolve()]
-    assert captured["baseline"] == baseline_json.resolve()
-
-
-def test_report_verify_command_rejects_noncanonical_report_directory(
-    monkeypatch, tmp_path
-):
-    report_dir = tmp_path / "report-dir"
-    report_dir.mkdir()
-    (report_dir / "my_report.json").write_text("{}", encoding="utf-8")
-    monkeypatch.setattr(
-        report_mod, "console", type("C", (), {"print": lambda *_: None})()
-    )
-
-    with pytest.raises(typer.Exit) as exc:
-        report_mod.report_verify_command(reports=[str(report_dir)])
-
-    assert exc.value.exit_code == 2
-
-
-def test_report_verify_command_rejects_noncanonical_baseline_directory(
-    monkeypatch, tmp_path
-):
-    report_dir = tmp_path / "report-dir"
-    report_dir.mkdir()
-    (report_dir / "evaluation.report.json").write_text("{}", encoding="utf-8")
-    baseline_dir = tmp_path / "baseline-dir"
-    baseline_dir.mkdir()
-    (baseline_dir / "subject_report.json").write_text("{}", encoding="utf-8")
-    monkeypatch.setattr(
-        report_mod, "console", type("C", (), {"print": lambda *_: None})()
-    )
-
-    with pytest.raises(typer.Exit) as exc:
-        report_mod.report_verify_command(
-            reports=[str(report_dir)],
-            baseline=str(baseline_dir),
-        )
-
     assert exc.value.exit_code == 2
 
 
@@ -821,10 +796,13 @@ def test_report_explain_resolves_canonical_directories(monkeypatch, tmp_path):
         raising=False,
     )
 
-    report_mod.report_explain(report=str(report_dir), baseline=str(baseline_dir))
+    report_mod.report_explain(
+        subject_report=str(report_dir),
+        baseline_report=str(baseline_dir),
+    )
 
-    assert captured["report"] == str(report_json.resolve())
-    assert captured["baseline"] == str(baseline_json.resolve())
+    assert captured["subject_report"] == str(report_json.resolve())
+    assert captured["baseline_report"] == str(baseline_json.resolve())
 
 
 @pytest.mark.parametrize("invalid_slot", ["report", "baseline"])
@@ -863,7 +841,10 @@ def test_report_explain_rejects_evaluation_report_bundle(
     )
 
     with pytest.raises(typer.Exit) as exc:
-        report_mod.report_explain(report=str(report_json), baseline=str(baseline_json))
+        report_mod.report_explain(
+            subject_report=str(report_json),
+            baseline_report=str(baseline_json),
+        )
 
     assert exc.value.exit_code == 2
     assert captured == {}
@@ -891,7 +872,10 @@ def test_report_explain_rejects_noncanonical_directory_inputs(
     )
 
     with pytest.raises(typer.Exit) as exc:
-        report_mod.report_explain(report=str(report_dir), baseline=str(baseline_dir))
+        report_mod.report_explain(
+            subject_report=str(report_dir),
+            baseline_report=str(baseline_dir),
+        )
 
     assert exc.value.exit_code == 2
 
@@ -900,7 +884,9 @@ def test_report_html_resolves_canonical_directory_input(monkeypatch, tmp_path):
     report_dir = tmp_path / "report-dir"
     report_dir.mkdir()
     report_json = report_dir / "evaluation.report.json"
-    report_json.write_text("{}", encoding="utf-8")
+    report_json.write_text(
+        json.dumps(_minimal_evaluation_report_payload()), encoding="utf-8"
+    )
     captured: dict[str, object] = {}
 
     monkeypatch.setattr(

@@ -33,7 +33,10 @@ telemetry fields, and HTML export.
 
 ```bash
 # Generate a report from a run report
-invarlock report --run runs/subject/report.json --baseline runs/baseline/report.json --format report
+invarlock report generate \
+  --run runs/subject/report.json \
+  --baseline-run-report runs/baseline/report.json \
+  --format report
 
 # Validate an attested report bundle
 invarlock verify reports/eval/evaluation.report.json
@@ -46,8 +49,9 @@ jq '.telemetry' reports/eval/evaluation.report.json
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
 
-When you pass a directory to `invarlock report`, it must contain a canonical
-`report.json` or `evaluation.report.json`. Other report-like filenames are not
+When you pass a directory to `invarlock report generate`, it must contain a
+canonical `report.json`. `invarlock report html` and `invarlock verify`
+expect canonical `evaluation.report.json`. Other report-like filenames are not
 auto-selected; pass the explicit file path instead.
 
 ## report Layout

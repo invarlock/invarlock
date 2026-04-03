@@ -80,7 +80,7 @@ printf '{"text":"hello world"}\n{"text":"custom data"}\n' > /tmp/byod.jsonl
 
 # 2) Write config (start from configs/presets/causal_lm/wikitext2_512.yaml and adjust dataset to your BYOD)
 # 3) Compare baseline and subject directly
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
+invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject gpt2 \
   --preset byod.yaml \

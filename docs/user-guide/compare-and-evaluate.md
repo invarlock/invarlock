@@ -11,7 +11,7 @@ title: Compare & evaluate (BYOE)
 | **Purpose** | evaluate two checkpoints (baseline vs subject) with deterministic pairing. |
 | **Audience** | Teams and researchers with existing model-edit workflows who want paired evaluation without coupling to a specific edit stack. |
 | **Workflow** | Baseline run → Subject run → report with paired windows. |
-| **Network** | Offline by default; `INVARLOCK_ALLOW_NETWORK=1` for model downloads. |
+| **Network** | Offline by default; use `evaluate --allow-network` when a run needs model downloads. |
 | **Output** | `evaluation.report.json` + `evaluation_report.md` (+ `runtime.manifest.json` for attested outputs). |
 
 InvarLock's primary, most stable path is Compare & evaluate (BYOE): you provide the
@@ -35,7 +35,7 @@ host. If you choose that trusted local path, verify the resulting report with
 Example (GPT‑2, CPU/MPS friendly; requires `invarlock[hf]` or equivalent HF extra):
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
+INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline sshleifer/tiny-gpt2 \
   --subject /path/to/your/edited-model \
   --adapter auto \
@@ -67,7 +67,7 @@ Example:
 
 ```bash
 # 1) Produce a reusable baseline report once (writes runs/baseline_once/source/<timestamp>/report.json)
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_STORE_EVAL_WINDOWS=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
+INVARLOCK_STORE_EVAL_WINDOWS=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline sshleifer/tiny-gpt2 \
   --subject sshleifer/tiny-gpt2 \
   --adapter auto \
@@ -79,7 +79,7 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_STORE_EVAL_WINDOWS=1 INVARLOCK_DEDUP_TEXTS=1
 
 # 2) Reuse it for many subjects (skips baseline evaluation)
 #    Use the exact report path from step 1, e.g. runs/baseline_once/source/<timestamp>/report.json
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
+INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline-report runs/baseline_once/source/<timestamp>/report.json \
   --baseline sshleifer/tiny-gpt2 \
   --subject /path/to/your/edited-model \

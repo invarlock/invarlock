@@ -52,10 +52,10 @@ invarlock doctor
 ## Network Access
 
 InvarLock blocks outbound network by default. When you need to download models
-or datasets, opt in per command with `INVARLOCK_ALLOW_NETWORK=1`:
+or datasets, opt in per command with `--allow-network`:
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
+invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject distilgpt2 \
   --adapter auto \
@@ -73,7 +73,7 @@ runtime container and emit `runtime.manifest.json` beside the evaluation
 report.
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
+INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject /path/to/edited \
   --adapter auto \

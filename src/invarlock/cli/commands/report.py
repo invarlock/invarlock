@@ -2,9 +2,8 @@
 Report operations group
 =======================
 
-Provides the `invarlock report` group with:
-  - default callback to generate reports from runs
-  - subcommands: verify, explain, html, validate
+Provides the `invarlock report` group with explicit subcommands for
+generating, explaining, validating, and rendering report artifacts.
 """
 
 import math
@@ -14,17 +13,15 @@ from typing import Any, NoReturn
 import typer
 from rich.console import Console
 
-from invarlock.cli.assurance import AssuranceMode
 from invarlock.cli.output import print_event, resolve_output_style
 from invarlock.core.report_inputs import (
     ReportInputError,
-    load_report_input_json,
-    resolve_report_input_path,
+    load_evaluation_report_input_json,
+    load_run_report_input_json,
 )
 from invarlock.reporting.report_contract import (
     ReportGenerationResult,
     generate_reports,
-    load_report_payload,
 )
 from invarlock.reporting.report_telemetry import (
     telemetry_output_enabled,
@@ -64,13 +61,6 @@ def _raise_report_input_failure(message: str, *, no_color: bool = False) -> NoRe
         emoji="❌",
     )
     raise typer.Exit(2)
-
-
-def _resolve_assurance_mode_value(value: object) -> str:
-    candidate = getattr(value, "default", value)
-    if isinstance(candidate, AssuranceMode):
-        return candidate.value
-    return str(candidate)
 
 
 def _format_section_title(title: str, *, suffix: str | None = None) -> str:
@@ -147,8 +137,9 @@ def _artifact_entries(
 
 # Group with callback so `invarlock report` still generates reports
 report_app = typer.Typer(
-    help="Operations on run reports and evaluation reports (verify, explain, html, validate).",
-    invoke_without_command=True,
+    help="Operations on run reports and evaluation reports (generate, explain, html, validate).",
+    invoke_without_command=False,
+    no_args_is_help=False,
 )
 
 
@@ -332,67 +323,42 @@ def _render_generation_result(
         raise typer.Exit(1) from e
 
 
-@report_app.callback(invoke_without_command=True)
 def report_callback(
-    ctx: typer.Context,
-    run: str | None = typer.Option(
-        None,
-        "--run",
-        help=(
-            "Path to run report JSON file or directory containing canonical "
-            "report.json or evaluation.report.json"
-        ),
-    ),
-    format: str = typer.Option(
-        "json", "--format", help="Output format (json|md|html|report|all)"
-    ),
-    compare: str | None = typer.Option(
-        None,
-        "--compare",
-        help=(
-            "Path to comparison report JSON file or directory containing "
-            "canonical report.json or evaluation.report.json"
-        ),
-    ),
-    baseline: str | None = typer.Option(
-        None,
-        "--baseline",
-        help=(
-            "Path to baseline report JSON file or directory containing "
-            "canonical report.json or evaluation.report.json "
-            "(required for report format)"
-        ),
-    ),
-    output: str | None = typer.Option(None, "--output", "-o", help="Output directory"),
-    style: str = typer.Option("audit", "--style", help="Output style (audit|friendly)"),
-    no_color: bool = typer.Option(
-        False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
-    ),
+    ctx: typer.Context | None = None,
+    *,
+    run: str | None = None,
+    format: str = "json",
+    compare: str | None = None,
+    baseline: str | None = None,
+    output: str | None = None,
+    style: str = "audit",
+    no_color: bool = False,
 ):
-    """Generate a report from a run (default callback)."""
-    if getattr(ctx, "resilient_parsing", False) or ctx.invoked_subcommand is not None:
+    """Generate reports from explicit run report artifacts."""
+    if ctx is not None and (
+        getattr(ctx, "resilient_parsing", False) or ctx.invoked_subcommand is not None
+    ):
         return
     if not run:
-        print_event(
-            console,
-            "FAIL",
-            "--run is required when no subcommand is provided",
-            style=resolve_output_style(
-                style=str(style),
-                profile="ci",
-                progress=False,
-                timing=False,
-                no_color=no_color,
-            ),
-            emoji="❌",
+        raise typer.BadParameter("--run is required", param_hint="--run")
+    try:
+        run_path, _ = load_run_report_input_json(run)
+        compare_path = (
+            load_run_report_input_json(compare)[0] if isinstance(compare, str) else None
         )
-        raise typer.Exit(2)
+        baseline_path = (
+            load_run_report_input_json(baseline)[0]
+            if isinstance(baseline, str)
+            else None
+        )
+    except ReportInputError as exc:
+        _raise_report_input_failure(str(exc), no_color=no_color)
     try:
         result = generate_reports(
-            run=run,
+            run=str(run_path),
             format=format,
-            compare=compare,
-            baseline=baseline,
+            compare=str(compare_path) if compare_path is not None else None,
+            baseline=str(baseline_path) if baseline_path is not None else None,
             output=output,
         )
     except ReportInputError as exc:
@@ -416,7 +382,7 @@ def report_callback(
             print_event(
                 console,
                 "INFO",
-                "Use: invarlock report --run <subject_report.json> --format report --baseline <baseline_report.json>",
+                "Use: invarlock report generate --run <subject_report.json> --format report --baseline-run-report <baseline_report.json>",
                 style=resolve_output_style(
                     style=str(style),
                     profile="ci",
@@ -450,71 +416,67 @@ def report_callback(
     return
 
 
-def _load_run_report(path: str) -> dict:
-    """Load a report from file or from a canonical report directory."""
-    return load_report_payload(path)
+@report_app.callback(invoke_without_command=True)
+def report_root(ctx: typer.Context) -> None:
+    """Report command namespace."""
+    if getattr(ctx, "resilient_parsing", False) or ctx.invoked_subcommand is not None:
+        return
+    typer.echo(ctx.get_help())
+    raise typer.Exit(0)
 
 
-# Subcommands wired from existing modules
 @report_app.command(
-    name="verify", help="Recompute and verify metrics for evaluation reports."
+    name="generate",
+    help="Generate reports from existing run report artifacts.",
 )
-def report_verify_command(
-    reports: list[str] = typer.Argument(
+def report_generate_command(
+    run: str = typer.Option(
         ...,
+        "--run",
         help=(
-            "One or more evaluation report JSON files or directories "
-            "containing canonical report.json or evaluation.report.json to "
-            "verify."
+            "Path to subject run report JSON file or directory containing canonical "
+            "report.json"
+        ),
+    ),
+    format: str = typer.Option(
+        "json", "--format", help="Output format (json|md|html|report|all)"
+    ),
+    compare: str | None = typer.Option(
+        None,
+        "--compare-run-report",
+        help=(
+            "Optional comparison run report JSON file or directory containing canonical "
+            "report.json"
         ),
     ),
     baseline: str | None = typer.Option(
         None,
-        "--baseline",
+        "--baseline-run-report",
         help=(
-            "Optional baseline evaluation report JSON file or directory "
-            "containing canonical report.json or evaluation.report.json to "
-            "enforce provider parity."
+            "Optional baseline run report JSON file or directory containing canonical "
+            "report.json (required for report format)"
         ),
     ),
-    tolerance: float = typer.Option(
-        1e-9, "--tolerance", help="Tolerance for analysis-basis comparisons."
+    output: str | None = typer.Option(None, "--output", "-o", help="Output directory"),
+    style: str = typer.Option("audit", "--style", help="Output style (audit|friendly)"),
+    no_color: bool = typer.Option(
+        False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
     ),
-    profile: str | None = typer.Option(
-        "dev",
-        "--profile",
-        help="Execution profile affecting parity enforcement and exit codes (dev|ci|release).",
-    ),
-    assurance: AssuranceMode = typer.Option(
-        AssuranceMode.ATTESTED,
-        "--assurance",
-        help="Assurance level for verification (attested|trusted-local).",
-        case_sensitive=False,
-    ),
-):  # pragma: no cover - thin wrapper around verify_command
-    from pathlib import Path as _Path
+) -> None:
+    report_callback(
+        run=run,
+        format=format,
+        compare=compare,
+        baseline=baseline,
+        output=output,
+        style=style,
+        no_color=no_color,
+    )
 
-    from .verify import verify_command as _verify_command
 
-    try:
-        report_paths = [resolve_report_input_path(_Path(p)) for p in reports]
-        baseline_path = (
-            resolve_report_input_path(_Path(baseline))
-            if isinstance(baseline, str)
-            else None
-        )
-    except ReportInputError as exc:
-        _raise_report_input_failure(str(exc))
-    try:
-        return _verify_command(
-            reports=report_paths,
-            baseline=baseline_path,
-            tolerance=tolerance,
-            profile=profile,
-            assurance=_resolve_assurance_mode_value(assurance),
-        )
-    except ValueError as exc:
-        raise typer.BadParameter(str(exc), param_hint="--assurance") from exc
+def _load_run_report(path: str) -> dict:
+    """Load a report from file or from a canonical report directory."""
+    return load_run_report_input_json(path)[1]
 
 
 @report_app.command(
@@ -522,17 +484,17 @@ def report_verify_command(
     help="Explain gate decisions for subject and baseline run reports.",
 )
 def report_explain(
-    report: str = typer.Option(
+    subject_report: str = typer.Option(
         ...,
-        "--report",
+        "--subject-report",
         help=(
-            "Path to primary run report JSON file or directory containing "
+            "Path to subject run report JSON file or directory containing "
             "canonical report.json"
         ),
     ),
-    baseline: str = typer.Option(
+    baseline_report: str = typer.Option(
         ...,
-        "--baseline",
+        "--baseline-report",
         help=(
             "Path to baseline run report JSON file or directory containing "
             "canonical report.json"
@@ -543,21 +505,14 @@ def report_explain(
     from .explain_gates import explain_gates_command as _explain
 
     try:
-        report_path, report_payload = load_report_input_json(report)
-        baseline_path, baseline_payload = load_report_input_json(baseline)
+        report_path, _report_payload = load_run_report_input_json(subject_report)
+        baseline_path, _baseline_payload = load_run_report_input_json(baseline_report)
     except ReportInputError as exc:
         _raise_report_input_failure(str(exc))
-    if isinstance(report_payload.get("validation"), dict):
-        _raise_report_input_failure(
-            "report explain expects a subject run report.json; pass the run "
-            "report emitted by invarlock evaluate/run, not an evaluation.report.json bundle."
-        )
-    if isinstance(baseline_payload.get("validation"), dict):
-        _raise_report_input_failure(
-            "report explain expects a baseline run report.json; pass the baseline "
-            "run report emitted by invarlock evaluate/run, not an evaluation.report.json bundle."
-        )
-    return _explain(report=str(report_path), baseline=str(baseline_path))
+    return _explain(
+        subject_report=str(report_path),
+        baseline_report=str(baseline_path),
+    )
 
 
 @report_app.command(name="html", help="Render an evaluation report JSON to HTML.")
@@ -568,7 +523,7 @@ def report_html(
         "-i",
         help=(
             "Path to evaluation report JSON file or directory containing "
-            "canonical report.json or evaluation.report.json"
+            "canonical evaluation.report.json"
         ),
     ),
     output: str = typer.Option(..., "--output", "-o", help="Path to output HTML file"),
@@ -582,7 +537,7 @@ def report_html(
     from .export_html import export_html_command as _export
 
     try:
-        input_path, _ = load_report_input_json(input)
+        input_path, _ = load_evaluation_report_input_json(input)
     except ReportInputError as exc:
         _raise_report_input_failure(str(exc))
     return _export(
@@ -599,7 +554,7 @@ def report_validate(
         ...,
         help=(
             "Path to report JSON file or directory containing canonical "
-            "report.json or evaluation.report.json to validate against "
+            "evaluation.report.json to validate against "
             "schema v1"
         ),
     ),
@@ -617,7 +572,7 @@ def report_validate(
         print_event(console, tag, message, style=output_style, emoji=emoji)
 
     try:
-        _, payload = load_report_input_json(report)
+        _, payload = load_evaluation_report_input_json(report)
     except ReportInputError as exc:
         _event("FAIL", str(exc), emoji="❌")
         raise typer.Exit(2) from exc

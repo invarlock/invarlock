@@ -141,8 +141,7 @@ def test_load_run_report_directory_ambiguous(tmp_path: Path):
     (tmp_path / "report.json").write_text(json.dumps({"x": 1}))
     (tmp_path / "evaluation.report.json").write_text(json.dumps({"x": 2}))
 
-    with pytest.raises(ValueError, match="Ambiguous report directory"):
-        _load_run_report(str(tmp_path))
+    assert _load_run_report(str(tmp_path)) == {"x": 1}
 
 
 def test_load_run_report_directory_requires_canonical_filename(tmp_path: Path):
@@ -150,7 +149,7 @@ def test_load_run_report_directory_requires_canonical_filename(tmp_path: Path):
 
     (tmp_path / "subject_report.json").write_text(json.dumps({"x": 1}))
 
-    with pytest.raises(ValueError, match="does not contain a canonical report file"):
+    with pytest.raises(ValueError, match="canonical run report file"):
         _load_run_report(str(tmp_path))
 
 

@@ -74,7 +74,10 @@ def test_explain_gates_hysteresis(tmp_path: Path, capsys):
     subj_path.write_text(json.dumps(subject))
     base_path.write_text(json.dumps(baseline))
 
-    explain_gates_command(report=str(subj_path), baseline=str(base_path))
+    explain_gates_command(
+        subject_report=str(subj_path),
+        baseline_report=str(base_path),
+    )
     out = capsys.readouterr().out.lower()
     assert "hysteresis applied" in out
     assert "effective" in out and ("threshold" in out or "limit" in out)
@@ -92,7 +95,10 @@ def test_explain_gates_honors_tiny_relax_context(tmp_path: Path, capsys):
     subj_path.write_text(json.dumps(subject))
     base_path.write_text(json.dumps(baseline))
 
-    explain_gates_command(report=str(subj_path), baseline=str(base_path))
+    explain_gates_command(
+        subject_report=str(subj_path),
+        baseline_report=str(base_path),
+    )
     out = capsys.readouterr().out.lower()
     assert "status: pass" in out
     assert "tiny relax enabled" in out

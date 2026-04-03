@@ -29,14 +29,15 @@ pip install invarlock
 pip install "invarlock[hf]"
 
 # Compare & evaluate (BYOE checkpoints)
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
+INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline <BASELINE_MODEL> \
   --subject  <SUBJECT_MODEL> \
-  --adapter  auto
+  --adapter  auto \
+  --profile  ci
 ```
 
 Tip: enable Hub downloads per command when fetching models/datasets:
-`INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate ...`
+`invarlock evaluate --allow-network ...`
 
 Security-default note: `evaluate` uses the runtime container by default. Use
 `--assurance trusted-local` only for trusted local workflows that intentionally bypass that
@@ -48,7 +49,7 @@ scheduled/workflow-dispatch GPT-2 smoke workflow. Push gating uses
 `scripts/run_tiny_attested_smoke.sh` and the `Tiny Attested Smoke` workflow
 with `sshleifer/tiny-gpt2` plus a local JSONL fixture. Both smoke paths run
 under the included `dev` profile so they can complete the full `evaluate` →
-`verify` → `report` → `proof-pack` path without depending on release-profile
+`verify` → `report` commands → `proof-pack` path without depending on release-profile
 floors. The tiny push smoke also uses an explicit trusted-local assurance override
 for proof-pack verification when CI produces an unsigned pack; the default
 package-native verifier behavior remains fail-closed for unsigned packs.
@@ -249,7 +250,7 @@ coverage, usage-only checkpoint families, and recommended additions, see
 ```bash
 pip install "invarlock[adapters,guards,eval]"
 invarlock doctor
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
+INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject /path/to/edited \
   --adapter auto \

@@ -8,7 +8,7 @@
 | **Audience** | CLI users choosing `model.adapter` and Python callers instantiating adapters. |
 | **Supported surface** | Core HF text and image-text adapters, auto-match adapters, platform-dependent BNB, and Linux-only AWQ/GPTQ quantized adapters. |
 | **Requires** | `invarlock[adapters]` or `invarlock[hf]` for core HF adapters; `invarlock[gpu]`, `invarlock[awq]`, `invarlock[gptq]` for quantized adapters. |
-| **Network** | Offline by default; set `INVARLOCK_ALLOW_NETWORK=1` for model downloads. |
+| **Network** | Offline by default; use `evaluate --allow-network` when a run needs model downloads. |
 | **Inputs** | `model.id` (HF repo or local path), adapter name, device. |
 | **Outputs / Artifacts** | Loaded model object; optional snapshots; exported model directories when enabled. |
 | **Source of truth** | `src/invarlock/adapters/*`, `src/invarlock/plugins/hf_*_adapter.py`. |
@@ -23,7 +23,7 @@ pip install "invarlock[hf]"
 invarlock advanced plugins adapters
 
 # Compare & evaluate with adapter auto-selection
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
+invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject gpt2 \
   --adapter auto

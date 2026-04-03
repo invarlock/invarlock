@@ -104,11 +104,11 @@ invarlock --version
 # Compare baseline vs subject (downloads require explicit network enable)
 # Secure-default execution uses the runtime container and writes
 # reports/eval/runtime.manifest.json next to evaluation.report.json.
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
+invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject  distilgpt2 \
   --adapter auto \
-  --profile dev \
+  --profile ci \
   --report-out reports/eval \
   --quiet
 
@@ -120,9 +120,9 @@ invarlock verify --json reports/eval/evaluation.report.json
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
 
-If you pass a directory to `invarlock report`, it must contain canonical
-`report.json` or `evaluation.report.json`; other report-like filenames are not
-auto-selected.
+If you pass a directory to `invarlock report generate` or
+`invarlock report explain`, it must contain canonical `report.json`.
+`invarlock report html` expects canonical `evaluation.report.json`.
 
 Example output (abridged; counts vary by profile/config):
 

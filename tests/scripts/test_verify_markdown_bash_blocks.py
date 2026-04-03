@@ -74,7 +74,7 @@ def test_sanitize_script_skips_pip_installs() -> None:
         block_index=1,
         text=(
             'pip install "invarlock[hf]"\n'
-            "INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \\\n"
+            "invarlock evaluate --allow-network \\\n"
             "  --baseline gpt2 \\\n"
             "python -m pip install foo\n"
         ),
@@ -83,7 +83,7 @@ def test_sanitize_script_skips_pip_installs() -> None:
     rendered = module._sanitize_script(block)
 
     assert "[skip] pip install" in rendered
-    assert " -m invarlock evaluate \\" in rendered
+    assert " -m invarlock evaluate --allow-network \\" in rendered
     assert "--baseline gpt2 \\" in rendered
     assert "\\ \\" not in rendered
     assert "[skip] python -m pip install foo" in rendered

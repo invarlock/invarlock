@@ -174,11 +174,12 @@ def test_evaluate_byod_local_quick(tmp_path: Path, monkeypatch) -> None:
         public_cli,
         [
             "report",
+            "generate",
             "--run",
             str(rep_subj),
             "--format",
             "report",
-            "--baseline",
+            "--baseline-run-report",
             str(rep_base),
             "--output",
             str(tmp_path / "reports"),

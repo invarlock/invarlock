@@ -128,7 +128,7 @@
       "path": "src/invarlock/cli/app.py",
       "subsystem": "cli",
       "bucket": "acceptable",
-      "lines": [94, 101, 107],
+      "lines": [98, 105, 111],
       "rationale": "CLI bootstrap and top-level dispatch are shell surfaces with explicit fallback behavior."
     },
     {

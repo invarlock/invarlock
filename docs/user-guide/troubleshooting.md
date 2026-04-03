@@ -19,8 +19,8 @@ invarlock doctor --config <config.yaml> --profile ci
 invarlock verify reports/eval/evaluation.report.json --profile ci
 
 # Enable debug output for detailed traces
-INVARLOCK_DEBUG_TRACE=1 INVARLOCK_ALLOW_NETWORK=1 \
-  invarlock evaluate --assurance trusted-local --baseline gpt2 --subject gpt2 --preset <config.yaml>
+INVARLOCK_DEBUG_TRACE=1 \
+  invarlock evaluate --allow-network --assurance trusted-local --baseline gpt2 --subject gpt2 --preset <config.yaml>
 ```
 
 `verify` expects `runtime.manifest.json` next to evaluation outputs.
@@ -299,7 +299,7 @@ These errors relate to window pairing, tokenizer consistency, and evidence integ
 **Fix:**
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --baseline gpt2 --subject gpt2
+invarlock evaluate --allow-network --baseline gpt2 --subject gpt2
 ```
 
 ### Dependency Missing
@@ -321,8 +321,8 @@ pip install "invarlock[adapters]" # All adapters
 **Fix:**
 
 ```bash
-INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE=1 INVARLOCK_ALLOW_NETWORK=1 \
-  invarlock evaluate --baseline gpt2 --subject gpt2 --preset <config.yaml>
+INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE=1 \
+  invarlock evaluate --allow-network --baseline gpt2 --subject gpt2 --preset <config.yaml>
 ```
 
 ### Guard Prepare Failures
@@ -378,8 +378,8 @@ invarlock doctor --config <config.yaml> --profile ci --strict
 Enable detailed logging:
 
 ```bash
-INVARLOCK_DEBUG_TRACE=1 INVARLOCK_ALLOW_NETWORK=1 \
-  invarlock evaluate --baseline gpt2 --subject gpt2 --preset <config.yaml>
+INVARLOCK_DEBUG_TRACE=1 \
+  invarlock evaluate --allow-network --baseline gpt2 --subject gpt2 --preset <config.yaml>
 ```
 
 ### Plugins Inspection

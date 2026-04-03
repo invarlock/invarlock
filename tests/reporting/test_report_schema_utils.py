@@ -51,4 +51,4 @@ def test_validate_report_rejects_bad_validation_values():
 
 def test_validate_with_jsonschema_handles_missing_library(monkeypatch):
     monkeypatch.setattr(schema_mod, "jsonschema", None, raising=False)
-    assert schema_mod._validate_with_jsonschema(_base_evaluation_report()) is True
+    assert schema_mod._validate_with_jsonschema(_base_evaluation_report()) is False

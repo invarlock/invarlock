@@ -7,7 +7,7 @@
 | **Purpose** | Complete the core evaluation workflow in a few commands. |
 | **Audience** | New users running their first evaluation. |
 | **Requires** | `invarlock[hf]` for Hugging Face-backed evaluation. |
-| **Network** | `INVARLOCK_ALLOW_NETWORK=1` for model and dataset downloads. |
+| **Network** | Use `--allow-network` on `evaluate` when a run needs model or dataset downloads. |
 | **Next step** | [Compare & evaluate](compare-and-evaluate.md) for production use. |
 
 This guide focuses on the public core CLI: `evaluate`, `verify`, and
@@ -33,7 +33,7 @@ invarlock doctor
 ### 2. Evaluate a baseline against a subject
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
+INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject /path/to/edited \
   --adapter auto \
@@ -68,14 +68,16 @@ when the evaluation itself ran with `--assurance trusted-local`.
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
 
-Directory inputs to `invarlock report` are only accepted when they contain
-canonical `report.json` or `evaluation.report.json`; otherwise pass the exact
-file path.
+Directory inputs are command-specific: `invarlock report explain` expects a
+directory containing canonical `report.json`, while `invarlock report html`
+expects a directory containing canonical `evaluation.report.json`.
 
 Optional: explain gate decisions directly from the run reports.
 
 ```bash
-invarlock report explain --report runs/subject/report.json --baseline runs/source/report.json
+invarlock report explain \
+  --subject-report runs/subject/report.json \
+  --baseline-report runs/source/report.json
 ```
 
 `invarlock report explain` expects run reports (`report.json`), not the
@@ -84,7 +86,7 @@ paired evaluation report.
 
 ## Execution Notes
 
-- Enable downloads per command with `INVARLOCK_ALLOW_NETWORK=1`.
+- Enable downloads per command with `--allow-network`.
 - For offline reads after warming caches, use `HF_DATASETS_OFFLINE=1`.
 - `--assurance trusted-local` is the explicit trusted-host bypass for `evaluate`.
 - `verify` expects `runtime.manifest.json` for attested evaluation outputs.
@@ -95,7 +97,7 @@ The built-in `quant_rtn` edit ships for demos and smoke tests, but the primary
 onboarding path is the secure-default evaluate flow shown above.
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
+INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject gpt2 \
   --adapter auto \

@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-CANONICAL_REPORT_FILENAMES: tuple[str, str] = ("report.json", "evaluation.report.json")
+RUN_REPORT_FILENAME = "report.json"
+EVALUATION_REPORT_FILENAME = "evaluation.report.json"
+CANONICAL_REPORT_FILENAMES: tuple[str, str] = (
+    RUN_REPORT_FILENAME,
+    EVALUATION_REPORT_FILENAME,
+)
 
 
 class ReportInputError(ValueError):
@@ -27,6 +32,16 @@ class ReportInputError(ValueError):
                 f"{self.path}: contains both report.json and evaluation.report.json; "
                 "pass an explicit file path."
             )
+        if self.reason == "missing_run_canonical":
+            return (
+                f"Directory {self.path} does not contain a canonical run report file "
+                f"({RUN_REPORT_FILENAME}); pass an explicit run report path."
+            )
+        if self.reason == "missing_evaluation_canonical":
+            return (
+                f"Directory {self.path} does not contain a canonical evaluation report file "
+                f"({EVALUATION_REPORT_FILENAME}); pass an explicit evaluation report path."
+            )
         if self.reason == "missing_canonical":
             return (
                 f"Directory {self.path} does not contain a canonical report file "
@@ -40,6 +55,16 @@ class ReportInputError(ValueError):
             return f"Report is not valid JSON: {self.path} ({self.detail})"
         if self.reason == "non_object":
             return f"Report must decode to a JSON object: {self.path}"
+        if self.reason == "expected_run_payload":
+            return (
+                f"Expected a run report payload, not an evaluation bundle: {self.path} "
+                f"({self.detail})"
+            )
+        if self.reason == "expected_evaluation_payload":
+            return (
+                f"Expected an evaluation report payload, not a run report artifact: "
+                f"{self.path} ({self.detail})"
+            )
         return f"Invalid report input: {self.path}"
 
 
@@ -47,6 +72,7 @@ def resolve_report_input_path(
     path_value: str | Path,
     *,
     allow_canonical_directory: bool = True,
+    expected_kind: Literal["any", "run", "evaluation"] = "any",
 ) -> Path:
     """Resolve a report-like input to a concrete JSON file path.
 
@@ -63,6 +89,16 @@ def resolve_report_input_path(
     if candidate.is_dir():
         if not allow_canonical_directory:
             raise ReportInputError("directory_forbidden", candidate)
+        if expected_kind == "run":
+            run_candidate = candidate / RUN_REPORT_FILENAME
+            if run_candidate.is_file():
+                return run_candidate.resolve()
+            raise ReportInputError("missing_run_canonical", candidate)
+        if expected_kind == "evaluation":
+            evaluation_candidate = candidate / EVALUATION_REPORT_FILENAME
+            if evaluation_candidate.is_file():
+                return evaluation_candidate.resolve()
+            raise ReportInputError("missing_evaluation_canonical", candidate)
         canonical_matches = [
             candidate / name
             for name in CANONICAL_REPORT_FILENAMES
@@ -80,12 +116,14 @@ def load_report_input_json(
     path_value: str | Path,
     *,
     allow_canonical_directory: bool = True,
+    expected_kind: Literal["any", "run", "evaluation"] = "any",
 ) -> tuple[Path, dict[str, Any]]:
     """Resolve and load a report-like JSON object."""
 
     resolved = resolve_report_input_path(
         path_value,
         allow_canonical_directory=allow_canonical_directory,
+        expected_kind=expected_kind,
     )
     try:
         with resolved.open("r", encoding="utf-8") as handle:
@@ -99,9 +137,51 @@ def load_report_input_json(
     return resolved, payload
 
 
+def load_run_report_input_json(
+    path_value: str | Path,
+    *,
+    allow_canonical_directory: bool = True,
+) -> tuple[Path, dict[str, Any]]:
+    resolved, payload = load_report_input_json(
+        path_value,
+        allow_canonical_directory=allow_canonical_directory,
+        expected_kind="run",
+    )
+    if isinstance(payload.get("validation"), dict):
+        raise ReportInputError(
+            "expected_run_payload",
+            resolved,
+            detail="pass the report.json artifact emitted by evaluate/run",
+        )
+    return resolved, payload
+
+
+def load_evaluation_report_input_json(
+    path_value: str | Path,
+    *,
+    allow_canonical_directory: bool = True,
+) -> tuple[Path, dict[str, Any]]:
+    resolved, payload = load_report_input_json(
+        path_value,
+        allow_canonical_directory=allow_canonical_directory,
+        expected_kind="evaluation",
+    )
+    if not isinstance(payload.get("validation"), dict):
+        raise ReportInputError(
+            "expected_evaluation_payload",
+            resolved,
+            detail="pass the evaluation.report.json artifact emitted by verify/reporting",
+        )
+    return resolved, payload
+
+
 __all__ = [
     "CANONICAL_REPORT_FILENAMES",
+    "EVALUATION_REPORT_FILENAME",
     "ReportInputError",
+    "RUN_REPORT_FILENAME",
+    "load_evaluation_report_input_json",
     "load_report_input_json",
+    "load_run_report_input_json",
     "resolve_report_input_path",
 ]

@@ -19,6 +19,10 @@ from rich.console import Console
 from typer.core import TyperGroup
 
 from invarlock.cli.assurance import AssuranceMode
+from invarlock.core.report_inputs import (
+    ReportInputError,
+    resolve_report_input_path,
+)
 from invarlock.security import (
     enforce_default_security,
     enforce_network_policy,
@@ -64,7 +68,7 @@ app = typer.Typer(
         "Core path: invarlock evaluate --baseline <MODEL> --subject <MODEL>\n"
         "Then: invarlock verify <REPORT> and invarlock report html -i <REPORT> -o <HTML>\n"
         "Advanced workflows live under: invarlock advanced\n"
-        "Tip: enable downloads with INVARLOCK_ALLOW_NETWORK=1 when fetching.\n"
+        "Tip: enable downloads with --allow-network when fetching.\n"
         "Exit codes:\n"
         "  0=success\n"
         "  1=generic failure\n"
@@ -330,12 +334,19 @@ def _doctor_typed(
 )
 def _verify_typed(
     reports: list[str] = typer.Argument(
-        ..., help="One or more evaluation report JSON files to verify."
+        ...,
+        help=(
+            "One or more evaluation report JSON files or directories containing "
+            "canonical evaluation.report.json to verify."
+        ),
     ),
     baseline: str | None = typer.Option(
         None,
         "--baseline",
-        help="Optional baseline evaluation report JSON to enforce provider parity.",
+        help=(
+            "Optional baseline report JSON file or directory containing canonical "
+            "report.json or evaluation.report.json to enforce provider parity."
+        ),
     ),
     tolerance: float = typer.Option(
         1e-9, "--tolerance", help="Tolerance for analysis-basis comparisons."
@@ -360,8 +371,19 @@ def _verify_typed(
 
     from .commands.verify import verify_command as _verify
 
-    report_paths = [_Path(p) for p in reports]
-    baseline_path = _Path(baseline) if isinstance(baseline, str) else None
+    try:
+        report_paths = [
+            resolve_report_input_path(_Path(p), expected_kind="evaluation")
+            for p in reports
+        ]
+        baseline_path = (
+            resolve_report_input_path(_Path(baseline), expected_kind="any")
+            if isinstance(baseline, str)
+            else None
+        )
+    except ReportInputError as exc:
+        console.print(f"FAIL {exc}")
+        raise typer.Exit(2) from exc
     return _verify(
         reports=report_paths,
         baseline=baseline_path,

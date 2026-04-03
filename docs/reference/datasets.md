@@ -8,7 +8,7 @@
 | **Audience** | CLI users configuring `dataset` blocks and Python callers building evaluation windows. |
 | **Supported providers** | `wikitext2`, `synthetic`, `hf_text`, `local_jsonl`, `vision_text`, `hf_seq2seq`, `local_jsonl_pairs`, `seq2seq`. |
 | **Requires** | `invarlock[eval]` or `invarlock[hf]` for Hugging Face datasets providers. |
-| **Network** | Offline by default; HF-backed providers need `INVARLOCK_ALLOW_NETWORK=1` for first download. |
+| **Network** | Offline by default; CLI runs use `evaluate --allow-network` for first download, while programmatic callers can set `INVARLOCK_ALLOW_NETWORK=1`. |
 | **Inputs** | Dataset provider name plus provider-specific fields. |
 | **Outputs / Artifacts** | Evaluation windows stored in `report.evaluation_windows` and dataset metadata in `report.data.*`. `vision_text` persists example records instead of token windows. |
 | **Source of truth** | `src/invarlock/eval/data.py`, `src/invarlock/eval/data_support.py`, `src/invarlock/eval/data_tokenization.py`, `src/invarlock/eval/data_windows.py`, and `src/invarlock/eval/data_providers.py`. |
@@ -34,8 +34,9 @@ For Compare & evaluate, reuse the same `dataset` block in baseline and subject r
   deterministic splits; counts are recorded in run reports and evaluation reports.
 - **Pairing**: `invarlock evaluate` requires baseline window evidence to pair
   windows. Missing/invalid evidence fails closed in CI/Release profiles.
-- **Offline-first**: downloads are opt-in via `INVARLOCK_ALLOW_NETWORK=1`. Cached
-  datasets can be enforced via `HF_DATASETS_OFFLINE=1`.
+- **Offline-first**: downloads are opt-in. CLI runs use `evaluate --allow-network`;
+  programmatic callers can set `INVARLOCK_ALLOW_NETWORK=1`. Cached datasets can
+  be enforced via `HF_DATASETS_OFFLINE=1`.
 - **Vision-text manifests**: `vision_text` is local-files-only and
   expects JSONL records with `id`, `image_path`, `prompt`, and either `answer`
   or `answers`. It is fixed to single-image examples and `batch_size=1`.

@@ -256,7 +256,7 @@ fi
 "${CLI[@]}" report validate "$EVAL_REPORT"
 mkdir -p "$SMOKE_EXPORT_DIR"
 "${CLI[@]}" report html -i "$EVAL_REPORT" -o "$SMOKE_EXPORT_DIR/evaluation.html"
-"${CLI[@]}" report explain --report "$EDITED_REPORT" --baseline "$BASELINE_REPORT"
+"${CLI[@]}" report explain --subject-report "$EDITED_REPORT" --baseline-report "$BASELINE_REPORT"
 
 printf '%s\n' '{"verdict":"PASS","note":"tiny attested smoke campaign"}' > "$WORK_ROOT/final_verdict.json"
 PROOF_PACK_SIGNING_KEY="$WORK_ROOT/proof_pack_signing_key.pem"

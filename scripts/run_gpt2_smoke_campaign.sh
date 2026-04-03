@@ -188,7 +188,7 @@ if [[ "$VERIFY_RC" != "0" ]]; then
 fi
 "${CLI[@]}" report validate "$EVAL_REPORT"
 "${CLI[@]}" report html -i "$EVAL_REPORT" -o "$SMOKE_REPORT_DIR/evaluation.html"
-"${CLI[@]}" report explain --report "$EDITED_REPORT" --baseline "$BASELINE_REPORT"
+"${CLI[@]}" report explain --subject-report "$EDITED_REPORT" --baseline-report "$BASELINE_REPORT"
 
 printf '%s\n' '{"verdict":"PASS","note":"gpt2 smoke campaign"}' > "$WORK_ROOT/final_verdict.json"
 PROOF_PACK_SIGNING_KEY="$WORK_ROOT/proof_pack_signing_key.pem"

@@ -8,10 +8,10 @@
 | **Audience** | Operators running InvarLock from a terminal or CI. |
 | **Primary commands** | `evaluate`, `verify`, `report`, `doctor`, `advanced`, `version`. |
 | **Requires** | `invarlock[hf]` for model-loading workflows; extra backends are installed via Python extras. |
-| **Network** | Offline by default; enable downloads per command with `INVARLOCK_ALLOW_NETWORK=1`. |
+| **Network** | Offline by default; use `evaluate --allow-network` when a run needs model or dataset downloads. |
 | **Source of truth** | `src/invarlock/cli/app.py`, `src/invarlock/cli/commands/*.py`. |
 
-The public product surface is intentionally narrow:
+Most users only need a narrow top-level surface:
 
 1. `invarlock evaluate`
 2. `invarlock verify`
@@ -27,7 +27,7 @@ Everything else is either diagnostics (`doctor`) or explicitly advanced
 pip install "invarlock[hf]"
 
 # Compare a baseline against a subject
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
+invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject distilgpt2 \
   --adapter auto \
@@ -38,7 +38,9 @@ invarlock verify reports/eval/evaluation.report.json
 
 # Render shareable HTML
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
-invarlock report explain --report runs/subject/report.json --baseline runs/source/report.json
+invarlock report explain \
+  --subject-report runs/subject/report.json \
+  --baseline-report runs/source/report.json
 ```
 
 ## Security Defaults
@@ -49,7 +51,7 @@ invarlock report explain --report runs/subject/report.json --baseline runs/sourc
   bypass the container boundary.
 - `verify` expects `runtime.manifest.json` beside attested evaluation outputs
   and fails closed when required attestation is missing.
-- Network access remains opt-in through `INVARLOCK_ALLOW_NETWORK=1`.
+- Network access remains opt-in through `evaluate --allow-network`.
 
 ## Task To Command Map
 
@@ -115,7 +117,7 @@ Common options:
 Example:
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
+INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject /path/to/edited \
   --adapter auto \
@@ -130,7 +132,8 @@ Purpose: verify existing evaluation report JSON files.
 
 Arguments:
 
-- `REPORTS...`: one or more report JSON paths
+- `REPORTS...`: one or more evaluation report JSON paths or directories containing
+  canonical `evaluation.report.json`
 
 Common options:
 
@@ -149,10 +152,14 @@ invarlock verify --json reports/eval/evaluation.report.json
 
 ## `invarlock report`
 
-Purpose: operate on existing report artifacts.
+Purpose: operate on existing report artifacts through explicit subcommands.
 
 Core subcommands:
 
+- `invarlock report generate`
+  - Generate human-readable report output from existing run reports
+  - Options: `--run`, `--compare-run-report`, `--baseline-run-report`,
+    `--format`, `--output`
 - `invarlock report html`
   - Render an evaluation report to HTML
   - Options: `-i/--input`, `-o/--output`, `--embed-css`, `--force`
@@ -160,19 +167,25 @@ Core subcommands:
   - Explain gate decisions from run reports, not the generated evaluation bundle
   - Explain gates and primary-metric behavior for a subject report versus a
     baseline report
+  - Options: `--subject-report`, `--baseline-report`
 - `invarlock report validate`
   - Validate a report JSON against the v1 schema
-- `invarlock report verify`
-  - Re-run verification through the report namespace when needed
-- Directory inputs to `report` commands are only accepted when they contain a
-  canonical `report.json` or `evaluation.report.json`; otherwise pass an
-  explicit file path.
+- Directory inputs are command-specific:
+  - `report generate` and `report explain` accept directories containing
+    canonical `report.json`
+  - `report html` and `report validate` accept directories containing
+    canonical `evaluation.report.json`
+  - `verify` accepts directories containing canonical `evaluation.report.json`
+    and optional baselines containing canonical `report.json` or
+    `evaluation.report.json`
 
 Example:
 
 ```bash
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
-invarlock report explain --report runs/subject/report.json --baseline runs/source/report.json
+invarlock report explain \
+  --subject-report runs/subject/report.json \
+  --baseline-report runs/source/report.json
 ```
 
 ## `invarlock doctor`
