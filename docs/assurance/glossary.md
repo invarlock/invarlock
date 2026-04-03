@@ -114,7 +114,7 @@ Workflow that compares a subject model to a baseline, optionally with an externa
 | **report fields** | `provenance.baseline.*`, `provenance.edited.*` |
 | **See also** | [Compare & evaluate Guide](../user-guide/compare-and-evaluate.md) |
 
-**Example:** BYOE workflow evaluates an externally quantized checkpoint against its
+**Example:** BYOE workflow evaluates an externally edited checkpoint against its
 unmodified baseline.
 
 ---

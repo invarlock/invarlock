@@ -10,7 +10,7 @@
 | **Requires** | `invarlock[hf]` for HF adapter workflows. |
 
 InvarLock emits both machine-readable reports and human-friendly summaries.
-Use the steps below to reproduce representative artifacts from the current release.
+Use the steps below to reproduce representative artifacts from this repository version.
 
 ## 1. Generate a report Bundle
 

@@ -101,7 +101,7 @@ Common options:
 - `--baseline-report`: reuse a stored baseline report by passing the explicit
   `report.json` file path that captured the baseline windows
 - `--adapter`: adapter name or `auto`
-- `--profile`: `ci`, `release`, or another shipped profile
+- `--profile`: `ci`, `release`, or another included profile
 - `--tier`: tier label for policy context
 - `--preset`: optional repo preset path
 - `--out`: run-artifact directory
@@ -161,7 +161,7 @@ Core subcommands:
   - Explain gates and primary-metric behavior for a subject report versus a
     baseline report
 - `invarlock report validate`
-  - Validate a report JSON against the current schema
+  - Validate a report JSON against the v1 schema
 - `invarlock report verify`
   - Re-run verification through the report namespace when needed
 - Directory inputs to `report` commands are only accepted when they contain a
@@ -224,7 +224,7 @@ invarlock advanced calibrate --help
 ## Plugins & Entry Points
 
 `invarlock advanced plugins` lists built-in and optional adapters, guards,
-edits, datasets, and related entry points without mutating the current Python
+edits, datasets, and related entry points without mutating the active Python
 environment.
 
 Available read-only flows include:

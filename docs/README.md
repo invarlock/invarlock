@@ -7,6 +7,8 @@ InvarLock is edit-agnostic (BYOE). A small built-in quantization demo
 Welcome to the documentation hub for InvarLock (Edit‑agnostic robustness reports for weight edits).
 The material below is organized so new users can ramp quickly while practitioners
 find detailed reference, design rationales, and assurance notes.
+It is aimed at checkpoint editors, CI and assurance owners, and researchers
+running paired evaluation on text workflows plus the included image-text path.
 
 ---
 
@@ -14,7 +16,7 @@ find detailed reference, design rationales, and assurance notes.
 
 1. **[Getting Started](user-guide/getting-started.md)** – environment setup and the first `evaluate` → `verify` → `report html` loop.
 2. **[Quickstart](user-guide/quickstart.md)** – CLI highlights for common workflows.
-3. **[Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)** – baseline ↔ subject with guardchain.
+3. **[Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)** – baseline ↔ subject paired evaluation with guardchain.
 4. **[Primary Metric Smoke](user-guide/primary-metric-smoke.md)** – tiny examples for ppl/accuracy kinds.
 
 ### Quick Examples
@@ -40,12 +42,12 @@ Security-default note: `evaluate` uses the runtime container by default. Use
 `--assurance trusted-local` only for trusted local workflows that intentionally bypass that
 boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.
 
-Smoke asset note: `configs/presets/causal_lm/gpt2_smoke_128.yaml` ships the
+Smoke asset note: `configs/presets/causal_lm/gpt2_smoke_128.yaml` provides the
 small GPT-2 canary preset used by `scripts/run_gpt2_smoke_campaign.sh` and the
 scheduled/workflow-dispatch GPT-2 smoke workflow. Push gating uses
 `scripts/run_tiny_attested_smoke.sh` and the `Tiny Attested Smoke` workflow
 with `sshleifer/tiny-gpt2` plus a local JSONL fixture. Both smoke paths run
-under the shipped `dev` profile so they can complete the full `evaluate` →
+under the included `dev` profile so they can complete the full `evaluate` →
 `verify` → `report` → `proof-pack` path without depending on release-profile
 floors. The tiny push smoke also uses an explicit trusted-local assurance override
 for proof-pack verification when CI produces an unsigned pack; the default
@@ -156,11 +158,11 @@ configured acceptance envelopes even when aggressive compression is attempted.
 
 - Runnable documentation surfaces can be verified locally with
   `python scripts/verify_live_examples.py` or `make docs-live`.
-- This live check executes concrete Markdown CLI snippets through the current
+- This live check executes concrete Markdown CLI snippets through the active
   checkout and smoke-runs notebooks under `notebooks/`.
 - Artifacts land under `tmp/live_examples/`, including per-command JSONL
   results, notebook stdout/stderr logs, and a machine-readable `summary.json`.
-- Placeholder/template snippets still need to stay parseable, but only concrete
+- Placeholder/template snippets must remain parseable, but only concrete
   runnable examples should be treated as copy-paste-ready.
 - This verifier is local-only and is not enforced in GitHub Actions.
 
@@ -188,50 +190,50 @@ Notes
 
 ## Support Matrix
 
-| Surface | Preset shipped | Adapter available | Pilot calibration config present | Published assurance basis |
+| Surface | Preset included | Adapter available | Pilot calibration config present | Published assurance basis |
 | ------- | -------------- | ----------------- | -------------------------------- | ------------------------- |
 | GPT-2 causal LM | Yes | Yes | Yes | Yes |
 | BERT / RoBERTa MLM | Yes | Yes | Yes | Yes |
-| Mistral 7B causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
-| Qwen2 7B causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
-| Qwen2.5 14B causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
-| Qwen3 causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
-| DeepSeek-R1-Distill-Qwen causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
-| Phi-4 causal LM (text-only eval) | Yes | Yes | Yes | No, repo-shipped pilot config only |
-| Gemma 4 E2B causal LM (text-only eval) | Yes | Yes | Yes | No, repo-shipped pilot config only |
-| TinyLlama 1.1B causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
-| OLMo 2 causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
-| Qwen3.5 causal LM | Yes | Yes | Yes | No, repo-shipped pilot config only |
+| Mistral 7B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
+| Qwen2 7B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
+| Qwen2.5 14B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
+| Qwen3 causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
+| DeepSeek-R1-Distill-Qwen causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
+| Phi-4 causal LM (text-only eval) | Yes | Yes | Yes | No, repo-included pilot config only |
+| Gemma 4 E2B causal LM (text-only eval) | Yes | Yes | Yes | No, repo-included pilot config only |
+| TinyLlama 1.1B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
+| OLMo 2 causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
+| Qwen3.5 causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
 | Seq2Seq / local pairs | Yes | Yes | No | No |
 
-Published assurance basis covers GPT-2 and BERT profiles. Repo-shipped
+Published assurance basis covers GPT-2 and BERT profiles. Repo-included
 presets and pilot calibration configs for additional experimental families,
 including Mistral 7B, Qwen2 7B, Qwen2.5 14B, Qwen3, DeepSeek-R1-Distill-Qwen,
 Phi-4 text-only, Gemma 4 E2B text-only, TinyLlama 1.1B, OLMo 2, and Qwen3.5, do not become part of the published
 assurance basis until supporting artifacts are attached. Access-gated vendor
-checkpoints are intentionally excluded from the shipped support matrix and
-preset inventory, and ungated families that have not yet closed into clean
-pilot lanes remain in the model family backlog rather than the support matrix.
+checkpoints are intentionally excluded from the included support matrix and
+preset inventory, and ungated families without clean pilot lanes remain in the
+model family backlog rather than the support matrix.
 
-Phase 1 image-text evaluation now ships separately through the built-in
+Image-text evaluation uses the built-in
 `hf_multimodal` adapter and the `vision_text` provider. Public support remains
-text-only for the Gemma 4 lane, and audio evaluation is still deferred.
+text-only for the Gemma 4 lane, and audio evaluation is deferred.
 
 Machine-readable support metadata lives in `contracts/support_matrix.json`. It is
 the canonical source of truth for normalized support tiers
 (`published_basis`, `supported_experimental`, `community_experimental`) and for
 published-basis evidence references.
 
-Maintained shipped-model evidence automation lives in
+Model evidence automation lives in
 `scripts/model_evidence_sweep.py`, with tmux-based remote launch support in
 `scripts/run_model_evidence_remote.py` and a nightly/manual runner workflow in
 `.github/workflows/model-evidence-sweep.yml`.
-For the new Gemma 4 text lane, the repo-maintained local smoke is the shipped
+For the new Gemma 4 text lane, the repo-maintained local smoke is the included
 manifest dry-run (`scripts/model_evidence_sweep.py --slug gemma4_e2b --dry-run`).
-The phase-1 image-text path also ships an offline demo preset at
+The image-text path also includes an offline demo preset at
 `configs/presets/multimodal/gemma4_e2b_vision_text_256.yaml` plus
 `tests/fixtures/vision_text/demo_manifest.jsonl` for provider/config validation;
-live multimodal model execution still requires an installed HF stack and model
+live multimodal model execution requires an installed HF stack and model
 weights.
 
 For the broader inventory of declared support, implemented-but-not-public

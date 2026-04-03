@@ -52,10 +52,10 @@ invarlock advanced calibrate ve-sweep \
   outputs and may be consumed directly by verification, review, and policy-pack
   workflows.
 
-## Published Basis vs Shipped Configs
+## Published Basis vs Included Configs
 
 Published assurance basis covers GPT-2 and BERT profiles. The repo
-also ships pilot calibration configs for additional families such as Mistral 7B,
+also includes pilot calibration configs for additional families such as Mistral 7B,
 Qwen2 7B, and Qwen2.5 14B under `configs/calibration/`, but those configs are
 not part of the published assurance basis until supporting artifacts are
 attached.

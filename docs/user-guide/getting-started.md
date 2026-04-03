@@ -12,7 +12,9 @@
 
 This guide covers installation, environment setup, and the smallest useful
 InvarLock workflow: compare a baseline against a subject, verify the attested
-report, and render HTML for review.
+report, and render HTML for review. The same top-level loop also underpins the
+included image-text path when you use the explicit multimodal preset and
+provider configuration.
 
 ## Install InvarLock
 
@@ -137,7 +139,7 @@ for local smoke and portability runs.
 
 | I want to... | Start here |
 | --- | --- |
-| evaluate my own edited model (BYOE) | [Compare & evaluate (BYOE)](compare-and-evaluate.md) |
+| evaluate my own edited checkpoint workflow | [Compare & evaluate (BYOE)](compare-and-evaluate.md) |
 | understand the CLI commands | [Quickstart](quickstart.md) |
 | bring my own evaluation dataset | [Bring Your Own Data](bring-your-own-data.md) |
 | see example outputs | [Example Reports](example-reports.md) |

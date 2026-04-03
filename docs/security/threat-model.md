@@ -77,7 +77,7 @@ security or alignment.
 - Malicious or malformed model artifacts (e.g., unsafe pickle payloads) used as
   baselines or subjects.
 - Misconfigured edits or guard policies that silently degrade quality or break
-  structural invariants while still “appearing to run”.
+  structural invariants while “appearing to run”.
 - Dependency vulnerabilities in the Python stack and transitive extras that
   could affect evaluation or guard logic.
 

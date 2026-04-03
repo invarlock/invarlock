@@ -6,11 +6,11 @@
 | --- | --- |
 | **Purpose** | Quick pointers to common presets and overlays. |
 | **Audience** | Users looking for ready-to-use configurations. |
-| **Note** | Presets are repo assets, not shipped in wheels. |
+| **Note** | Presets are repo assets, not included in wheels. |
 | **Source** | `configs/presets/` and `configs/overlays/`. |
 
 Pointers to common presets in this repository you can start from. Presets are
-repo assets (not shipped in wheels). Use flag‑only `invarlock evaluate` when
+repo assets (not included in wheels). Use flag‑only `invarlock evaluate` when
 installing from PyPI, or clone this repo to reference these files.
 
 Note: Adapter‑based flows such as `invarlock evaluate` with HF models require

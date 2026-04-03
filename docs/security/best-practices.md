@@ -62,7 +62,7 @@ Copy-paste checklist for production or CI deployments:
 - Prefer `pipx` or conda-managed environments for clean installs.
 - Keep Python at 3.12+ and update dependencies regularly.
 - Use the supply-chain workflow (SBOM + pip-audit + secret scan) as a
-  reference; see the allowlist page for current exceptions.
+  reference; see the allowlist page for documented exceptions.
 
 ## Release verification
 

@@ -42,7 +42,7 @@ print(adapter.describe(model)["model_type"])
 ```
 
 > Adapter availability is broader than the published assurance basis. GPT-2 and
-> BERT back the published calibrated basis; repo-shipped pilot configs
+> BERT back the published calibrated basis; repo-included pilot configs
 > for Mistral 7B, Qwen2 7B, Qwen2.5 14B, and additional experimental families are for
 > experimentation until supporting artifacts are attached. See the Model Family
 > Catalog for the authoritative family-by-family inventory.
@@ -55,7 +55,7 @@ print(adapter.describe(model)["model_type"])
   (adapter plugin) to choose a concrete role adapter (`hf_causal`, `hf_mlm`,
   `hf_seq2seq`) plus quant adapters when detected. Local paths can use
   `config.json`; remote IDs fall back to name heuristics and default to
-  `hf_causal` when unsure. Phase 1 image-text models use the explicit
+  `hf_causal` when unsure. Image-text models use the explicit
   `hf_multimodal` adapter rather than adapter auto.
 - **Quantized adapters** (`hf_bnb`, `hf_awq`, `hf_gptq`) handle their own device
   placement; avoid calling `.to(...)` on the loaded model.
@@ -95,12 +95,12 @@ Machine-readable adapter capability metadata is published at
 | --- | --- | --- | --- | --- |
 | `hf_causal` | Decoder-only causal LMs (dense + MoE + GPT2-like) | `invarlock[adapters]` | All platforms with torch | Default causal LM adapter. |
 | `hf_mlm` | BERT/RoBERTa/DeBERTa MLMs | `invarlock[adapters]` | All platforms with torch | Loads `AutoModelForMaskedLM` when possible. |
-| `hf_multimodal` | Image-text generation models exposed through HF `AutoModelForImageTextToText` | `invarlock[adapters]` | All platforms with torch | Phase 1 is single-image `vision_text` evaluation with explicit adapter selection. |
+| `hf_multimodal` | Image-text generation models exposed through HF `AutoModelForImageTextToText` | `invarlock[adapters]` | All platforms with torch | Single-image `vision_text` evaluation with explicit adapter selection. |
 | `hf_seq2seq` | T5/encoder‑decoder models | `invarlock[adapters]` | All platforms with torch | For seq2seq evaluation. |
 | `hf_auto` | Auto-select HF adapter | `invarlock[adapters]` | All platforms with torch | Delegates to a role adapter; prefers quant adapters when detected. |
 | `hf_bnb` | Bitsandbytes quantized LMs | `invarlock[gpu]` | Platform-dependent | Uses `device_map="auto"`; no `.to()`. Latest bitsandbytes wheels can work outside Linux/CUDA when the runtime imports cleanly. |
 | `hf_awq` | AWQ quantized LMs | `invarlock[awq]` | Linux only | Requires `autoawq`/`triton`. |
-| `hf_gptq` | GPTQ quantized LMs | `invarlock[gptq]` | Linux only | Requires `auto-gptq`/`triton`; current upstream wheels may require a pinned or vendor build on newer Python/CUDA stacks. |
+| `hf_gptq` | GPTQ quantized LMs | `invarlock[gptq]` | Linux only | Requires `auto-gptq`/`triton`; some upstream wheel combinations may require a pinned or vendor build on newer Python/CUDA stacks. |
 
 ### Adapter capabilities
 
@@ -194,7 +194,7 @@ finally:
 - **Linux-only adapters not available**: `hf_awq` and `hf_gptq` depend on
   `triton` and remain Linux-only in `pyproject.toml`.
 - **GPTQ install fails even on Linux/CUDA**: `auto-gptq` packaging is
-  upstream-dependent; current Python/CUDA combinations may require a pinned or
+  upstream-dependent; some Python/CUDA combinations may require a pinned or
   vendor wheel beyond `pip install "invarlock[gptq]"`.
 - **Bitsandbytes not detected**: `hf_bnb` is platform-dependent. If the backend
   imports cleanly, `invarlock advanced plugins adapters` will report it as ready even on

@@ -91,7 +91,7 @@ These errors relate to window pairing, tokenizer consistency, and evidence integ
 
 1. Ensure both runs use the same model checkpoint
 2. Pin tokenizer version via `revision` in config
-3. Regenerate baseline with current tokenizer
+3. Regenerate the baseline with the tokenizer used for the subject run
 
 **Example error:**
 
@@ -155,7 +155,7 @@ These errors relate to window pairing, tokenizer consistency, and evidence integ
 
 **Fixes:**
 
-1. Regenerate baseline with current InvarLock version
+1. Regenerate the baseline with the InvarLock version used for verification
 2. Ensure `INVARLOCK_STORE_EVAL_WINDOWS=1` (default)
 3. Check `report.provenance.provider_digest` exists
 

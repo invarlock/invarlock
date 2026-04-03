@@ -150,7 +150,7 @@ Attested evaluations also emit `runtime.manifest.json` next to
 ### Minimal v1 report Example
 
 The example below shows a realistic, PM‑only report envelope. It follows
-the current validator in `invarlock.reporting.report_schema` and the
+the validator in `invarlock.reporting.report_schema` and the
 fields produced by `invarlock.reporting.report_make.make_report`.
 
 ```json
@@ -248,7 +248,7 @@ fields produced by `invarlock.reporting.report_make.make_report`.
 
 **Notes:**
 
-- `schema_version` is a string and must be `"v1"` for the current format.
+- `schema_version` is a string and must be `"v1"` for the v1 format.
 - `run_id` is a short, opaque identifier; reports treat it as a stable
   string key.
 - `primary_metric` is the **canonical** place for PM values.

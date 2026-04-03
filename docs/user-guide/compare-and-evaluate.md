@@ -9,7 +9,7 @@ title: Compare & evaluate (BYOE)
 | Aspect | Details |
 | --- | --- |
 | **Purpose** | evaluate two checkpoints (baseline vs subject) with deterministic pairing. |
-| **Audience** | Users with existing edit pipelines who want paired evaluation without coupling. |
+| **Audience** | Teams and researchers with existing model-edit workflows who want paired evaluation without coupling to a specific edit stack. |
 | **Workflow** | Baseline run → Subject run → report with paired windows. |
 | **Network** | Offline by default; `INVARLOCK_ALLOW_NETWORK=1` for model downloads. |
 | **Output** | `evaluation.report.json` + `evaluation_report.md` (+ `runtime.manifest.json` for attested outputs). |
@@ -17,7 +17,8 @@ title: Compare & evaluate (BYOE)
 InvarLock's primary, most stable path is Compare & evaluate (BYOE): you provide the
 baseline and the subject checkpoints, and InvarLock produces a deterministic
 report. This avoids coupling to any particular edit stack and keeps your
-existing tooling intact.
+existing tooling intact whether you are validating quantization, pruning,
+fine-tuning, or other checkpoint-edit workflows.
 
 ## TL;DR
 
@@ -53,7 +54,7 @@ Outputs:
 ## Reuse a baseline report (skip baseline evaluation)
 
 When evaluating many subjects against the same baseline, you can reuse a single
-baseline `report.json` file and skip Phase 1/3 (baseline evaluation) by passing
+baseline `report.json` file and skip the baseline evaluation portion by passing
 `--baseline-report` the exact emitted report path.
 
 Requirements:

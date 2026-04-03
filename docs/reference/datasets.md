@@ -36,7 +36,7 @@ For Compare & evaluate, reuse the same `dataset` block in baseline and subject r
   windows. Missing/invalid evidence fails closed in CI/Release profiles.
 - **Offline-first**: downloads are opt-in via `INVARLOCK_ALLOW_NETWORK=1`. Cached
   datasets can be enforced via `HF_DATASETS_OFFLINE=1`.
-- **Vision-text manifests**: `vision_text` is local-files-only in phase 1 and
+- **Vision-text manifests**: `vision_text` is local-files-only and
   expects JSONL records with `id`, `image_path`, `prompt`, and either `answer`
   or `answers`. It is fixed to single-image examples and `batch_size=1`.
 - **Tokenizer contract**: dataset providers expect either a callable tokenizer
@@ -75,7 +75,7 @@ Counts mismatches are enforced via `coverage.preview.used`,
 | `synthetic` | text | Offline | `provider`, `seq_len`, `preview_n`, `final_n` | Generated text; good for smoke tests. |
 | `hf_text` | text | Cache/Net | `dataset_name`, `text_field` | Generic HF dataset loader; uses first N rows. |
 | `local_jsonl` | text | Offline | `file`/`path`/`data_files`, `text_field` | Reads JSONL from disk; default `text_field: text`. |
-| `vision_text` | image-text | Offline | `file`/`path`/`data_files` | Local JSONL manifest of single-image VQA-style examples; `stride` is ignored in phase 1. |
+| `vision_text` | image-text | Offline | `file`/`path`/`data_files` | Local JSONL manifest of single-image VQA-style examples; `stride` is ignored. |
 | `hf_seq2seq` | seq2seq | Cache/Net | `dataset_name`, `src_field`, `tgt_field` | Provides encoder ids + decoder labels. |
 | `local_jsonl_pairs` | seq2seq | Offline | `file`/`path`/`data_files`, `src_field`, `tgt_field` | Paired JSONL for seq2seq. |
 | `seq2seq` | seq2seq | Offline | optional `n`, `src_len`, `tgt_len` | Synthetic seq2seq generator. |

@@ -30,7 +30,7 @@ Thank you for using InvarLock! This document explains where to ask questions, ho
 - This project is maintained on a **best‑effort** basis.
 - There is **no guaranteed SLA** for responses or fixes.
 - We periodically review new issues and discussions and try to prioritise:
-  - Clearly‑reproducible bugs, especially recent regressions,
+  - Clearly‑reproducible bugs and regressions,
   - Security reports (via `SECURITY.md`),
   - Documentation gaps that affect many users.
 - Response times can vary significantly, especially around holidays, conferences, and major releases.

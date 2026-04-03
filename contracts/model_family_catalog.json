@@ -455,12 +455,12 @@
         "No processor-aware audio dataset provider or audio report surface exists today"
       ],
       "blockers": [
-        "Requires audio manifest support, processor hooks, and evaluation/report plumbing beyond the shipped image-text path"
+        "Requires audio manifest support, processor hooks, and evaluation/report plumbing beyond the included image-text path"
       ],
       "source_refs": [
         "https://ai.google.dev/gemma/docs/core/model_card_4"
       ],
-      "notes": "Image-text evaluation is now shipped. The remaining multimodal backlog item is audio-capable evaluation for the smaller Gemma 4 checkpoints."
+      "notes": "Image-text evaluation is included. The remaining multimodal backlog item is audio-capable evaluation for the smaller Gemma 4 checkpoints."
     }
   ]
 }

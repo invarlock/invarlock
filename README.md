@@ -43,7 +43,7 @@ in CI.
 
 ## Why InvarLock?
 
-- **Quality gates for weight edits**: catch regressions before deployment.
+- **Quality gates for edited checkpoints**: catch regressions before deployment.
 - **Statistical guarantees**: paired primary metrics with confidence intervals.
 - **Auditable evidence**: deterministic pairing metadata + policy digests in `evaluation.report.json`.
 - **CI/CD-friendly**: stable exit codes, `--json` outputs, and portable “proof packs”.
@@ -51,9 +51,9 @@ in CI.
 
 ## Who is this for?
 
-- ML engineers shipping quantized/pruned checkpoints.
-- MLOps teams building CI quality gates and reviewable artifacts.
-- Researchers validating compression/edit methods with reproducible, paired eval.
+- ML engineers shipping edited model checkpoints, including quantized, pruned, finetuned, or otherwise weight-modified variants.
+- MLOps and platform teams building CI gates, attested verification, and reviewable evaluation artifacts.
+- Researchers validating weight-edit, compression, and model-comparison methods with reproducible paired evaluation across text and image-text workflows supported here.
 
 ## How it works
 
@@ -153,7 +153,7 @@ Proof packs bundle reports + verification metadata into a distributable artifact
   `invarlock advanced proof-pack verify <dir> --strict`
 - Repo harness alternative: `scripts/proof_packs/verify_pack.sh --pack <dir> --strict`
 
-Note: `configs/` and most `scripts/` remain repo resources and are not shipped in
+Note: `configs/` and most `scripts/` remain repo resources and are not included in
 wheels. Installed wheels include the public contracts and the
 `invarlock advanced proof-pack verify` verifier.
 

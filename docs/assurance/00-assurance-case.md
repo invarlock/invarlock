@@ -5,7 +5,7 @@
 > **Plain language:** This overview lists every assurance claim, the evidence we ship with the repo, and the runtime contracts that enforce each claim in production.
 
 This note enumerates the explicit **assurance claims** the toolkit makes, the
-**evidence** shipped in-tree, and the **runtime contracts** that enforce each
+**evidence** included in-tree, and the **runtime contracts** that enforce each
 claim. Each claim must have:
 
 If you need definitions for guard terms (kappa threshold, epsilon band, window

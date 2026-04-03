@@ -112,7 +112,7 @@ report = CoreRunner().execute(
 | `spike_threshold` | `2.0` | Catastrophic spike ratio for immediate rollback. |
 | `event_path` | `None` | Path to JSONL event log (optional). |
 | `checkpoint_interval` | `0` | 0 disables checkpoints. |
-| `dry_run` | `False` | Skip mutations and still produce a report. |
+| `dry_run` | `False` | Skip mutations and produce a report. |
 | `verbose` | `False` | Enables extra logging. |
 | `context` | `{}` | Free-form context passed to guards/eval. |
 

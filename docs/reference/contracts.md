@@ -33,7 +33,7 @@ The public contract surface covers:
 | Console labels | `contracts/console_labels.json` | Stable report console labels |
 | Metric kinds | `contracts/metric_kinds.json` | Stable metric kind catalog for report surfaces |
 
-These JSON files are shipped in installed wheels under
+These JSON files are included in installed wheels under
 `invarlock/_data/contracts/*.json`. The logical public contract names remain
 `contracts/<name>.json`, and `invarlock.public_contracts` resolves them from the
 repo checkout when present or from packaged wheel data otherwise.
