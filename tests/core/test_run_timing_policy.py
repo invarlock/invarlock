@@ -65,6 +65,20 @@ def test_build_timing_summary_payload_returns_none_without_printable_timings() -
     )
 
 
+def test_build_timing_summary_payload_ignores_bool_numeric_fields() -> None:
+    payload = build_timing_summary_payload(
+        timings={"load_dataset": True, "execute": 4.0},
+        total_duration=False,
+        report={"metrics": {"memory_mb_peak": True, "gpu_memory_mb_peak": False}},
+    )
+
+    assert payload is not None
+    assert payload.timings == {"execute": 4.0}
+    assert payload.ordered_keys == ("execute",)
+    assert payload.memory_mb_peak is None
+    assert payload.gpu_memory_mb_peak is None
+
+
 def test_build_timing_summary_payload_rejects_bool_timings_and_peaks() -> None:
     payload = build_timing_summary_payload(
         timings={"load_model": True, "execute": 4.0},

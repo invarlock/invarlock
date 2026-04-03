@@ -16,6 +16,14 @@ _NON_FATAL_EXCEPTIONS = (
 )
 
 
+def _is_non_bool_finite_number(value: Any) -> bool:
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(float(value))
+    )
+
+
 def attach_primary_metric(
     evaluation_report: dict[str, Any],
     report: dict[str, Any],
@@ -51,7 +59,7 @@ def attach_primary_metric(
             )
 
             def _is_finite(value: Any) -> bool:
-                return isinstance(value, (int, float)) and math.isfinite(float(value))
+                return _is_non_bool_finite_number(value)
 
             baseline_has_reference = _is_finite(baseline_final)
             needs_pm_fallback = False
@@ -139,12 +147,11 @@ def attach_primary_metric(
                             and len(dlci_source) == 2
                         ):
                             lo_raw, hi_raw = dlci_source[0], dlci_source[1]
-                            if isinstance(lo_raw, (int, float)) and isinstance(
-                                hi_raw, (int, float)
-                            ):
+                            if _is_non_bool_finite_number(
+                                lo_raw
+                            ) and _is_non_bool_finite_number(hi_raw):
                                 lo, hi = float(lo_raw), float(hi_raw)
-                                if math.isfinite(lo) and math.isfinite(hi):
-                                    pm_copy.setdefault("ci", (lo, hi))
+                                pm_copy.setdefault("ci", (lo, hi))
                     except _NON_FATAL_EXCEPTIONS:
                         pass
                 except _NON_FATAL_EXCEPTIONS:
@@ -154,12 +161,11 @@ def attach_primary_metric(
                 fin = pm_copy.get("final")
                 baseline_final_val = (
                     float(baseline_final)
-                    if isinstance(baseline_final, (int, float))
-                    and _is_finite(baseline_final)
+                    if _is_finite(baseline_final)
                     else None
                 )
                 if (
-                    isinstance(fin, (int, float))
+                    _is_finite(fin)
                     and baseline_final_val is not None
                     and baseline_final_val > 0
                 ):
@@ -184,7 +190,7 @@ def attach_primary_metric(
                 # Provide a degenerate display CI if missing
                 if not isinstance(
                     pm_copy.get("display_ci"), list | tuple
-                ) and isinstance(pm_copy.get("final"), int | float):
+                ) and _is_finite(pm_copy.get("final")):
                     pm_copy["display_ci"] = [
                         float(pm_copy["final"]),
                         float(pm_copy["final"]),
@@ -243,14 +249,14 @@ def attach_primary_metric(
                 pm_point = None
                 try:
                     val = clf.get("final")
-                    if isinstance(val, int | float):
+                    if _is_non_bool_finite_number(val):
                         pm_point = float(val)
                     elif isinstance(val, dict):
                         num = val.get("correct_total")
                         den = val.get("total")
                         if (
-                            isinstance(num, int | float)
-                            and isinstance(den, int | float)
+                            _is_non_bool_finite_number(num)
+                            and _is_non_bool_finite_number(den)
                             and float(den) > 0
                         ):
                             pm_point = float(num) / float(den)
@@ -289,14 +295,14 @@ def attach_primary_metric(
                     acc_base = None
                     if isinstance(base_cls, dict):
                         valb = base_cls.get("final")
-                        if isinstance(valb, int | float):
+                        if _is_non_bool_finite_number(valb):
                             acc_base = float(valb)
                         elif isinstance(valb, dict):
                             nb = valb.get("correct_total")
                             db = valb.get("total")
                             if (
-                                isinstance(nb, int | float)
-                                and isinstance(db, int | float)
+                                _is_non_bool_finite_number(nb)
+                                and _is_non_bool_finite_number(db)
                                 and float(db) > 0
                             ):
                                 acc_base = float(nb) / float(db)
@@ -324,12 +330,12 @@ def attach_primary_metric(
             if not (
                 isinstance(disp, list | tuple)
                 and len(disp) == 2
-                and all(isinstance(x, int | float) for x in disp)
+                and all(_is_non_bool_finite_number(x) for x in disp)
             ):
                 point = None
                 for key in ("ratio_vs_baseline", "final", "preview"):
                     val = pm.get(key)
-                    if isinstance(val, int | float) and math.isfinite(float(val)):
+                    if _is_non_bool_finite_number(val):
                         point = float(val)
                         break
                 if isinstance(point, float):
