@@ -208,7 +208,9 @@ def test_enrich_run_report_metrics_derives_measured_counts_from_accuracy_metric(
             "final": {"records": [{"id": "ex-2"}], "example_ids": ["ex-2"]},
         },
     }
-    core_report = SimpleNamespace(evaluation_windows=report["evaluation_windows"], metrics={})
+    core_report = SimpleNamespace(
+        evaluation_windows=report["evaluation_windows"], metrics={}
+    )
     run_config = SimpleNamespace(
         context={"eval": {"loss": {"resolved_type": "classification"}}}
     )

@@ -4,6 +4,7 @@ import builtins
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 import torch
@@ -105,6 +106,51 @@ class _ProcessorWithoutTemplate:
     def __call__(self, *, text, images, return_tensors, truncation, max_length):  # noqa: ANN001
         del text, images, return_tensors, truncation, max_length
         return {"input_ids": ["not-a-tensor"], "attention_mask": None}
+
+
+class _ProcessorPromptRetry(_FakeProcessor):
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls: list[tuple[str, bool, int | None]] = []
+
+    def __call__(self, *, text, images, return_tensors, truncation, max_length):  # noqa: ANN001
+        del images, return_tensors
+        self.calls.append((text, bool(truncation), max_length))
+        if "ASSISTANT:cat" in text and truncation:
+            raise ValueError(
+                "Mismatch in `image` token count between text and `input_ids`. "
+                "Likely due to `truncation='max_length'`."
+            )
+        return super().__call__(
+            text=text,
+            images=None,
+            return_tensors="pt",
+            truncation=truncation,
+            max_length=max_length,
+        )
+
+
+class _ProcessorZeroPromptLength:
+    def __init__(self) -> None:
+        self.name_or_path = "zero-prompt"
+        self.tokenizer = _FakeTokenizer()
+        self.image_processor = _FakeImageProcessor()
+
+    def apply_chat_template(
+        self, messages, tokenize=False, add_generation_prompt=False
+    ):  # noqa: ANN001
+        del tokenize, add_generation_prompt
+        prompt = messages[0]["content"][1]["text"]
+        if len(messages) > 1:
+            answer = messages[1]["content"][0]["text"]
+            return f"{prompt}\n{answer}"
+        return prompt
+
+    def __call__(self, *, text, images, return_tensors, truncation, max_length):  # noqa: ANN001
+        del images, return_tensors, truncation, max_length
+        if "\n" in text:
+            return {"input_ids": torch.tensor([[21, 22]], dtype=torch.long)}
+        return {"input_ids": torch.zeros((1, 0), dtype=torch.long)}
 
 
 class _ProcessorWithoutDecoder:
@@ -435,6 +481,9 @@ def test_hf_multimodal_compute_digest_and_helpers_cover_fallback_paths(
     digest = adapter._compute_processor_digest(SimpleNamespace(name_or_path="minimal"))
     assert isinstance(digest, str)
     assert adapter._reference_answers({"answer": "  cat  "}) == ["cat"]
+    assert adapter._reference_answers({"answers": [" ", ""], "answer": "dog"}) == [
+        "dog"
+    ]
     assert adapter._reference_answers({}) == []
     assert (
         adapter._processor_text(object(), prompt="describe", answer=None) == "describe"
@@ -484,6 +533,78 @@ def test_hf_multimodal_prepare_model_inputs_handles_non_tensor_labels(
     assert "labels" not in prepared
 
 
+def test_hf_multimodal_processor_call_raises_when_retry_not_allowed() -> None:
+    adapter = HF_Multimodal_Adapter()
+    processor = Mock(side_effect=ValueError("plain processor failure"))
+
+    with pytest.raises(ValueError, match="plain processor failure"):
+        adapter._processor_call(
+            processor,
+            text="USER:describe\nASSISTANT:",
+            image=None,
+            seq_len=8,
+        )
+
+
+def test_hf_multimodal_prepare_model_inputs_recomputes_prompt_after_answer_retry(
+    tmp_path: Path,
+) -> None:
+    adapter = HF_Multimodal_Adapter()
+    processor = _ProcessorPromptRetry()
+    adapter._processor = processor
+    adapter._processor_digest = adapter._compute_processor_digest(processor)
+    adapter._last_model_id = "fake/model"
+    image_path = tmp_path / "demo.ppm"
+    _write_ppm(image_path)
+
+    prepared = adapter.prepare_model_inputs(
+        {
+            "id": "ex-prompt-retry",
+            "image_path": str(image_path),
+            "prompt": "what is shown?",
+            "answers": ["cat"],
+            "seq_len": 8,
+        },
+        device="cpu",
+        include_labels=True,
+    )
+
+    assert prepared["_decode_prompt_length"] == 3
+    assert prepared["labels"].tolist() == [[-100, -100, -100, 14, 15]]
+    assert processor.calls == [
+        ("USER:what is shown?\nASSISTANT:", True, 8),
+        ("USER:what is shown?\nASSISTANT:cat", True, 8),
+        ("USER:what is shown?\nASSISTANT:cat", False, None),
+        ("USER:what is shown?\nASSISTANT:", False, None),
+    ]
+
+
+def test_hf_multimodal_prepare_model_inputs_skips_prompt_mask_when_prompt_is_empty(
+    tmp_path: Path,
+) -> None:
+    adapter = HF_Multimodal_Adapter()
+    processor = _ProcessorZeroPromptLength()
+    adapter._processor = processor
+    adapter._processor_digest = adapter._compute_processor_digest(processor)
+    adapter._last_model_id = "fake/model"
+    image_path = tmp_path / "demo.ppm"
+    _write_ppm(image_path)
+
+    prepared = adapter.prepare_model_inputs(
+        {
+            "image_path": str(image_path),
+            "prompt": "describe",
+            "answer": "cat",
+        },
+        device="cpu",
+        include_labels=True,
+    )
+
+    assert prepared["_decode_prompt_length"] == 0
+    assert prepared["labels"].tolist() == [[21, 22]]
+    assert prepared["_answer_token_count"] == 2
+
+
 def test_hf_multimodal_decode_generated_uses_tokenizer_fallback_and_tensor_unsqueeze() -> (
     None
 ):
@@ -501,6 +622,19 @@ def test_hf_multimodal_decode_generated_uses_tokenizer_fallback_and_tensor_unsqu
     assert isinstance(tokenizer.decoded_inputs[0], torch.Tensor)
     assert tokenizer.decoded_inputs[0].shape == (1, 3)
     assert decoded == ["decoded:7 8 9"]
+
+
+def test_hf_multimodal_decode_generated_accepts_non_tensor_ids() -> None:
+    adapter = HF_Multimodal_Adapter()
+    tokenizer = _TokenizerOnlyDecoder()
+    adapter._processor = SimpleNamespace(tokenizer=tokenizer)
+    adapter._processor_digest = "digest"
+    adapter._last_model_id = "fake/model"
+
+    decoded = adapter.decode_generated([[3, 4]], {"_decode_prompt_length": 0})
+
+    assert tokenizer.decoded_inputs == [[[3, 4]]]
+    assert decoded == ["decoded:3 4"]
 
 
 def test_hf_multimodal_decode_generated_raises_without_batch_decoder() -> None:

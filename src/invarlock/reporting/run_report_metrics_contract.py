@@ -58,9 +58,9 @@ def _loss_type_from_context(run_config: Any) -> str | None:
     return str(loss_type_ctx).lower()
 
 
-def _classification_counts_from_primary_metric(primary_metric: Any) -> (
-    tuple[int, int, int, int] | None
-):
+def _classification_counts_from_primary_metric(
+    primary_metric: Any,
+) -> tuple[int, int, int, int] | None:
     if not isinstance(primary_metric, Mapping):
         return None
     try:
@@ -190,7 +190,9 @@ def enrich_run_report_metrics(
                     core_report, "metrics"
                 ):
                     core_metrics = (
-                        core_report.metrics if isinstance(core_report.metrics, dict) else {}
+                        core_report.metrics
+                        if isinstance(core_report.metrics, dict)
+                        else {}
                     )
                     primary_metric_seed = (
                         core_metrics.get("primary_metric")

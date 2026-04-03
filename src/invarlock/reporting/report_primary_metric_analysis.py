@@ -384,8 +384,10 @@ def build_primary_metric_analysis(
     except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
         paired_windows_signal = None
     paired_windows_signal_int = _coerce_int(paired_windows_signal)
+    paired_windows_explicit = False
     if paired_windows_signal_int is not None and paired_windows_signal_int >= 0:
         paired_windows = paired_windows_signal_int
+        paired_windows_explicit = True
 
     try:
         pm_blk = (
@@ -505,7 +507,9 @@ def build_primary_metric_analysis(
                     return None
                 records = section.get("records")
                 if isinstance(records, list):
-                    measured = len([record for record in records if isinstance(record, dict)])
+                    measured = len(
+                        [record for record in records if isinstance(record, dict)]
+                    )
                     if measured > 0:
                         return measured
                 example_ids = section.get("example_ids")
@@ -522,7 +526,9 @@ def build_primary_metric_analysis(
                 else None
             )
             classification_metrics = (
-                classification_metrics if isinstance(classification_metrics, dict) else {}
+                classification_metrics
+                if isinstance(classification_metrics, dict)
+                else {}
             )
 
             def _classification_total(arm: str) -> int | None:
@@ -631,7 +637,7 @@ def build_primary_metric_analysis(
                     final_cov.setdefault("ok", act_fin >= req_fin)
                 coverage_summary["final"] = final_cov
 
-            if paired_windows <= 0:
+            if paired_windows <= 0 and not paired_windows_explicit:
                 if isinstance(act_prev, int) and act_prev > 0:
                     if isinstance(act_fin, int) and act_fin > 0:
                         paired_windows = min(act_prev, act_fin)
@@ -641,17 +647,23 @@ def build_primary_metric_analysis(
                 stats_obj["paired_windows"] = paired_windows
 
             match_fraction = stats_obj.get("window_match_fraction")
-            if not (
-                isinstance(match_fraction, int | float)
-                and math.isfinite(float(match_fraction))
-            ) and paired_windows > 0:
+            if (
+                not (
+                    isinstance(match_fraction, int | float)
+                    and math.isfinite(float(match_fraction))
+                )
+                and paired_windows > 0
+            ):
                 stats_obj["window_match_fraction"] = 1.0
 
             overlap_fraction = stats_obj.get("window_overlap_fraction")
-            if not (
-                isinstance(overlap_fraction, int | float)
-                and math.isfinite(float(overlap_fraction))
-            ) and paired_windows > 0:
+            if (
+                not (
+                    isinstance(overlap_fraction, int | float)
+                    and math.isfinite(float(overlap_fraction))
+                )
+                and paired_windows > 0
+            ):
                 stats_obj["window_overlap_fraction"] = 0.0
 
             if "coverage_ok" not in stats_obj:

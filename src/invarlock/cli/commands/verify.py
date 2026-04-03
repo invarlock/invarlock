@@ -90,9 +90,7 @@ def verify_command(
         baseline=baseline,
         tolerance=tolerance,
         profile=profile,
-        allow_unattested_artifacts=_allow_unattested_artifacts_for_assurance(
-            assurance
-        ),
+        allow_unattested_artifacts=_allow_unattested_artifacts_for_assurance(assurance),
         json_mode=bool(json_out),
     )
     exit_code = _verify_exit_code(result, profile=profile)

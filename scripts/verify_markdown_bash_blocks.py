@@ -265,9 +265,11 @@ def _rewrite_invarlock_tokens(
 
     if execution_mode == "container":
         argv = [token for token in argv if token != "--allow-host-execution"]
-        if command_tokens[:1] == ["evaluate"] or command_tokens[:1] == [
-            "verify"
-        ] or command_tokens[:2] == ["report", "verify"]:
+        if (
+            command_tokens[:1] == ["evaluate"]
+            or command_tokens[:1] == ["verify"]
+            or command_tokens[:2] == ["report", "verify"]
+        ):
             argv = _strip_option_with_value(argv, "--assurance")
         return env_prefix, argv
 

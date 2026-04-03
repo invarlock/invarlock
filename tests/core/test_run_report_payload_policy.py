@@ -72,7 +72,9 @@ def test_build_run_report_meta_collects_profile_and_optional_fields() -> None:
     assert payload["pm_drift_band"] == (0.95, 1.05)
 
 
-def test_build_run_report_meta_suppresses_profile_lints_for_multimodal_adapter() -> None:
+def test_build_run_report_meta_suppresses_profile_lints_for_multimodal_adapter() -> (
+    None
+):
     model_profile = SimpleNamespace(
         family="gemma",
         default_loss="causal",

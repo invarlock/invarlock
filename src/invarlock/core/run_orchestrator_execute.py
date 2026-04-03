@@ -1204,11 +1204,13 @@ def execute_run_request_impl(
                 _fail_run(str(exc), error=exc)
 
             # Optional: export HF-loadable model snapshot when requested
+            output_cfg = _cfg_section_value(cfg, "output") or {}
             save_model_cfg = False
             try:
-                save_model_cfg = bool(
-                    getattr(getattr(cfg, "output", {}), "save_model", False)
-                )
+                if isinstance(output_cfg, dict):
+                    save_model_cfg = bool(output_cfg.get("save_model", False))
+                else:
+                    save_model_cfg = bool(getattr(output_cfg, "save_model", False))
             except (AttributeError, TypeError):
                 save_model_cfg = False
             if bool(export_model_requested) or save_model_cfg:
@@ -1221,9 +1223,13 @@ def execute_run_request_impl(
                     export_dir: Path | None = None
                     # (1) explicit model_dir in config
                     try:
-                        out_cfg = getattr(cfg, "output", None)
+                        out_cfg = output_cfg
                         model_dir_cfg = None
-                        if out_cfg is not None:
+                        if isinstance(out_cfg, dict):
+                            model_dir_cfg = out_cfg.get("model_dir") or out_cfg.get(
+                                "model_path"
+                            )
+                        elif out_cfg is not None:
                             model_dir_cfg = getattr(
                                 out_cfg, "model_dir", None
                             ) or getattr(out_cfg, "model_path", None)
@@ -1240,11 +1246,14 @@ def execute_run_request_impl(
                     # (3) config subdir
                     if export_dir is None:
                         try:
-                            resolved_export_subdir = str(
-                                getattr(
-                                    getattr(cfg, "output", {}), "model_subdir", "model"
+                            if isinstance(output_cfg, dict):
+                                resolved_export_subdir = str(
+                                    output_cfg.get("model_subdir", "model")
                                 )
-                            )
+                            else:
+                                resolved_export_subdir = str(
+                                    getattr(output_cfg, "model_subdir", "model")
+                                )
                         except OPTIONAL_RUNTIME_EXCEPTIONS:
                             resolved_export_subdir = "model"
                         export_dir = run_dir / resolved_export_subdir

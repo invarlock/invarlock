@@ -498,9 +498,7 @@ def test_compute_real_metrics_retries_multimodal_processor_without_truncation(
             suffix = "\nASSISTANT:" if add_generation_prompt else ""
             return f"USER:{prompt}{suffix}"
 
-        def __call__(
-            self, *, text, images, return_tensors, truncation, max_length
-        ):  # noqa: ANN001
+        def __call__(self, *, text, images, return_tensors, truncation, max_length):  # noqa: ANN001
             del images, return_tensors
             self.calls.append((text, bool(truncation), max_length))
             if truncation:
