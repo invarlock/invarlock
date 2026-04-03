@@ -1,13 +1,24 @@
 from __future__ import annotations
 
 import copy
+import math
 from typing import Any
 
 
+def _finite_non_bool_values(values: dict[str, float]) -> list[float]:
+    return [
+        float(value)
+        for value in values.values()
+        if isinstance(value, int | float)
+        and not isinstance(value, bool)
+        and math.isfinite(float(value))
+    ]
+
+
 def build_scale_statistics(scales: dict[str, float]) -> dict[str, float]:
-    if not scales:
+    values = _finite_non_bool_values(scales)
+    if not values:
         return {"mean_scale": 1.0, "min_scale": 1.0, "max_scale": 1.0}
-    values = list(scales.values())
     return {
         "mean_scale": float(sum(values) / len(values)),
         "min_scale": float(min(values)),

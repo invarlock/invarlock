@@ -158,3 +158,28 @@ def test_set_ab_results_marks_numeric_error_for_non_finite_gain() -> None:
     assert guard._ab_gain == 0.0
     assert guard._post_edit_evaluated is True
     assert events[0][1]["gain_status"] == "numeric_error"
+
+
+def test_set_ab_results_rejects_bool_upper_ratio_for_manual_override() -> None:
+    guard = SimpleNamespace(
+        _ppl_no_ve=None,
+        _ppl_with_ve=None,
+        _ab_windows_used=None,
+        _ab_seed_used=None,
+        _ratio_ci=None,
+        _ab_gain=None,
+        _post_edit_evaluated=False,
+        _predictive_gate_state={},
+        _log_event=lambda *_args, **_kwargs: None,
+    )
+
+    set_ab_results(
+        guard,
+        ppl_no_ve=1.0,
+        ppl_with_ve=0.8,
+        windows_used=2,
+        seed_used=7,
+        ratio_ci=(0.8, True),
+    )
+
+    assert guard._predictive_gate_state == {}
