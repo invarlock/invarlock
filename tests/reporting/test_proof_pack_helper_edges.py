@@ -1387,6 +1387,7 @@ def test_build_proof_pack_copies_readme_and_environment_without_optional_refs(
     manifest = json.loads(
         (tmp_path / "out-readme" / "manifest.json").read_text(encoding="utf-8")
     )
+    assert manifest["evidence_level"] == "medium"
     assert "invocation" not in manifest
     assert "materials" not in manifest
     assert manifest["environment"]["path"] == "metadata/environment.json"
@@ -1429,11 +1430,17 @@ def test_build_proof_pack_copies_source_repo_without_environment_or_materials(
     manifest = json.loads(
         (tmp_path / "out-source-only" / "manifest.json").read_text(encoding="utf-8")
     )
+    assert manifest["evidence_level"] == "medium"
+    assert manifest["verification"]["clean_reports"] == 1
     assert (
         manifest["invocation"]["config_source"]["path"] == "metadata/source_repo.json"
     )
     assert "environment" not in manifest
     assert "materials" not in manifest
+    readme_text = (tmp_path / "out-source-only" / "README.md").read_text(
+        encoding="utf-8"
+    )
+    assert "Evidence level: medium" in readme_text
 
 
 def test_verify_proof_pack_reports_missing_manifest_and_checksums(

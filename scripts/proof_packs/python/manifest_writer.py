@@ -21,6 +21,41 @@ def _load_json(path: Path) -> Any:
         return None
 
 
+def _proof_pack_counts_from_verification(
+    verification: dict[str, Any] | None,
+) -> tuple[int | None, int | None]:
+    if not isinstance(verification, dict):
+        return None, None
+    clean_reports = verification.get("clean_reports")
+    failed_reports = verification.get("failed_reports")
+    return (
+        int(clean_reports) if isinstance(clean_reports, int) else None,
+        int(failed_reports) if isinstance(failed_reports, int) else None,
+    )
+
+
+def _derive_evidence_level(
+    *,
+    subject_present: bool,
+    clean_reports: int | None,
+    failed_reports: int | None,
+    has_source_repo_ref: bool,
+    has_environment_ref: bool,
+) -> str:
+    if (
+        subject_present
+        and isinstance(clean_reports, int)
+        and clean_reports > 0
+        and failed_reports == 0
+        and has_source_repo_ref
+        and has_environment_ref
+    ):
+        return "high"
+    if subject_present and isinstance(clean_reports, int) and clean_reports > 0:
+        return "medium"
+    return "low"
+
+
 def _collect_model_revisions(pack_dir: Path) -> tuple[list[str], list[dict[str, str]]]:
     revisions_path = pack_dir / "state" / "model_revisions.json"
     if not revisions_path.is_file():
@@ -335,6 +370,26 @@ def write_manifest(
     environment = _environment(pack_dir)
     if environment is not None:
         payload["environment"] = environment
+
+    clean_reports, failed_reports = _proof_pack_counts_from_verification(
+        verification_summary if isinstance(verification_summary, dict) else None
+    )
+    payload["evidence_level"] = _derive_evidence_level(
+        subject_present=subject is not None,
+        clean_reports=clean_reports,
+        failed_reports=failed_reports,
+        has_source_repo_ref=bool(
+            isinstance(payload.get("invocation"), dict)
+            and isinstance(payload["invocation"].get("config_source"), dict)
+            and payload["invocation"]["config_source"].get("path")
+            and payload["invocation"]["config_source"].get("digest")
+        ),
+        has_environment_ref=bool(
+            isinstance(environment, dict)
+            and environment.get("path")
+            and environment.get("digest")
+        ),
+    )
 
     if model_licenses:
         payload["model_licenses"] = model_licenses

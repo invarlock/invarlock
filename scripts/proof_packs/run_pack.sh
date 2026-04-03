@@ -10,6 +10,13 @@ pack_usage() {
     cat <<'EOF'
 Usage: scripts/proof_packs/run_pack.sh [options]
 
+Builds an evidence-grade proof pack from a completed suite run.
+For proof-grade attestation, require a signed manifest, strict verification,
+and a PASS final verdict.
+
+Verify a completed pack with:
+  invarlock advanced proof-pack verify <pack-dir> --strict
+
 Options:
   --suite NAME         Suite name (subset|showcase|workshop3|full)
   --models CSV         Comma-separated model IDs to run (overrides suite defaults)
@@ -309,32 +316,7 @@ pack_write_checksums() {
 pack_write_readme() {
     local pack_dir="$1"
     echo "[run_pack.sh] Writing README.md to ${pack_dir}" >&2
-    cat > "${pack_dir}/README.md" <<'EOF'
-# InvarLock Proof Pack
-
-This proof pack bundles reports, summary reports, and metadata for offline
-verification. No model weights are included.
-
-By default this is evidence-grade packaging. For proof-grade attestation,
-require a signed manifest, strict verification, and a PASS final verdict.
-
-## Verify
-
-1) Verify the manifest signature (if present):
-   invarlock advanced proof-pack verify <pack-dir> --strict
-
-2) Verify file checksums:
-   sha256sum -c checksums.sha256
-   # macOS: shasum -a 256 -c checksums.sha256
-
-3) Verify report integrity:
-   invarlock verify --json reports/**/evaluation.report.json
-
-Or use:
-  invarlock advanced proof-pack verify <pack-dir> [--strict]
-Repo workflow alternative:
-  scripts/proof_packs/verify_pack.sh --pack <pack-dir> [--strict]
-EOF
+    python3 "${RUN_PACK_SCRIPT_DIR}/python/write_pack_readme.py" "${pack_dir}"
 }
 
 pack_prepare_staging_dir() {

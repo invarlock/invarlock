@@ -86,6 +86,9 @@ def _manual_validate_manifest(payload: Any) -> list[str]:
     network_mode = payload.get("network_mode")
     if network_mode is not None and network_mode not in {"offline", "online"}:
         errors.append("manifest network_mode must be 'offline' or 'online'")
+    evidence_level = payload.get("evidence_level")
+    if evidence_level is not None and evidence_level not in {"low", "medium", "high"}:
+        errors.append("manifest evidence_level must be 'low', 'medium', or 'high'")
     artifacts = payload.get("artifacts")
     if artifacts is not None and not isinstance(artifacts, list):
         errors.append("manifest artifacts must be a list")

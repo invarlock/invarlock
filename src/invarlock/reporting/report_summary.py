@@ -62,6 +62,19 @@ class ReportManifestSummary:
     gates_total: int
 
 
+def derive_report_manifest_evidence_level(
+    summary: ReportManifestSummary,
+    *,
+    has_guard_evidence: bool,
+) -> str:
+    """Classify evaluation-bundle audit strength from shipped sidecars."""
+    if has_guard_evidence and summary.gates_total > 0:
+        return "high"
+    if summary.gates_total > 0:
+        return "medium"
+    return "low"
+
+
 def _format_gate_status(
     validation: dict[str, Any] | None,
     key: str,
@@ -473,6 +486,7 @@ __all__ = [
     "SafetyDashboardRow",
     "SafetyDashboardSummary",
     "ReportManifestSummary",
+    "derive_report_manifest_evidence_level",
     "build_quality_gates_summary",
     "build_safety_dashboard_summary",
     "build_report_manifest_summary",

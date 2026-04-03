@@ -9,8 +9,12 @@ from typing import Any, cast
 
 from .evidence import maybe_dump_guard_evidence
 from .report_evidence import build_guard_evidence_payload
-from .report_summary import build_report_manifest_summary
+from .report_summary import (
+    build_report_manifest_summary,
+    derive_report_manifest_evidence_level,
+)
 from .report_types import RunReport
+from .reviewer_summary import render_evaluation_bundle_reviewer_summary
 
 _NON_FATAL_EXCEPTIONS = (AttributeError, OSError, TypeError, ValueError)
 
@@ -50,8 +54,25 @@ def write_report_manifest(
         maybe_dump_guard_evidence(output_path, guard_payload)
 
         ev_file = output_path / "guards_evidence.json"
+        has_guard_evidence = ev_file.exists()
+        evidence_level = derive_report_manifest_evidence_level(
+            summary, has_guard_evidence=has_guard_evidence
+        )
+        manifest["evidence_level"] = evidence_level
         if ev_file.exists():
             manifest["evidence"] = {"guards_evidence": str(ev_file)}
+
+        reviewer_summary_path = output_path / "reviewer_summary.txt"
+        reviewer_summary_path.write_text(
+            render_evaluation_bundle_reviewer_summary(
+                summary,
+                evidence_level=evidence_level,
+                has_guard_evidence=has_guard_evidence,
+            ),
+            encoding="utf-8",
+        )
+        manifest["files"]["reviewer_summary_txt"] = str(reviewer_summary_path)
+        saved_files["reviewer_summary"] = reviewer_summary_path
 
         manifest_path = output_path / "manifest.json"
         manifest_path.write_text(

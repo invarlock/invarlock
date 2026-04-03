@@ -219,7 +219,7 @@ A suite run writes artifacts under `OUTPUT_DIR` (default: `./proof_pack_runs/<su
 - `reports/**/rmt_probe.json` (optional sidecar; emitted by some scenarios, e.g. `rmt_norm_noise`)
 - `reports/**/ve_probe.json` (optional sidecar; emitted by VE demo scenarios, e.g. `ve_mlp_scale_skew`)
 - `reports/**/evaluation.html` + `reports/**/verify.json`
-- `README.md`, `manifest.json`, `checksums.sha256`
+- `README.md` (reviewer summary), `manifest.json`, `checksums.sha256`
 - `manifest.signature.json` when the pack is signed
 - `metadata/source_repo.json`, `metadata/environment.json`, and other input metadata sidecars when present
 
@@ -253,6 +253,8 @@ a drift summary in `results/determinism_repeats.json`.
 signed manifest cryptographically binds the checksums file (and thus all hashed artifacts).
 Newer packs also carry a repo-native attestation block in the same signed manifest:
 `builder`, `subject`, `invocation`, `environment`, and digest-backed `materials`.
+The manifest also records a derived `evidence_level` (`low`/`medium`/`high`) so
+reviewers can triage bundles quickly without replacing the underlying proof-grade checks.
 Package-native signed packs store the detached Ed25519 signature bundle in
 `manifest.signature.json` and record `signing_key_fingerprint` in the manifest
 for audit trails.

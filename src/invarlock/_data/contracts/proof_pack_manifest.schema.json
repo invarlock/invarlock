@@ -25,6 +25,13 @@
         "online"
       ]
     },
+    "evidence_level": {
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
     "determinism": {
       "type": "string",
       "minLength": 1

@@ -176,7 +176,10 @@ def test_save_evaluation_bundle_uses_manifest_summary_view_model(
     manifest = (tmp_path / "manifest.json").read_text(encoding="utf-8")
     assert '"overall_status": "PASS"' in manifest
     assert '"gates_passed": 3' in manifest
+    assert '"evidence_level": "medium"' in manifest
+    assert '"reviewer_summary_txt"' in manifest
     assert "manifest" in saved
+    assert "reviewer_summary" in saved
 
 
 def test_build_guard_evidence_payload_handles_guard_access_errors() -> None:
