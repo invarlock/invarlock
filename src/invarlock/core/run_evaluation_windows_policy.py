@@ -4,20 +4,38 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 
+def _is_sequence_payload(value: Any) -> bool:
+    return isinstance(value, Sequence) and not isinstance(
+        value, (str, bytes, bytearray)
+    )
+
+
+def _list_payload(value: Any) -> list[Any]:
+    return list(value) if _is_sequence_payload(value) else []
+
+
+def _nested_list_payload(value: Any) -> list[list[Any]]:
+    if not _is_sequence_payload(value):
+        return []
+    payload: list[list[Any]] = []
+    for item in value:
+        if _is_sequence_payload(item):
+            payload.append(list(item))
+    return payload
+
+
 def _window_payload(window: Mapping[str, Any] | None) -> dict[str, Any]:
     window_map = dict(window or {})
     payload = {
-        "window_ids": list(window_map.get("window_ids", [])),
-        "example_ids": [str(value) for value in window_map.get("example_ids", [])],
-        "logloss": list(window_map.get("logloss", [])),
-        "input_ids": [list(seq) for seq in window_map.get("input_ids", [])],
-        "attention_masks": [
-            list(mask) for mask in window_map.get("attention_masks", [])
-        ],
-        "token_counts": list(window_map.get("token_counts", [])),
-        "masked_token_counts": list(window_map.get("masked_token_counts", [])),
-        "actual_token_counts": list(window_map.get("actual_token_counts", [])),
-        "labels": [list(seq) for seq in window_map.get("labels", [])],
+        "window_ids": _list_payload(window_map.get("window_ids", [])),
+        "example_ids": [str(value) for value in _list_payload(window_map.get("example_ids", []))],
+        "logloss": _list_payload(window_map.get("logloss", [])),
+        "input_ids": _nested_list_payload(window_map.get("input_ids", [])),
+        "attention_masks": _nested_list_payload(window_map.get("attention_masks", [])),
+        "token_counts": _list_payload(window_map.get("token_counts", [])),
+        "masked_token_counts": _list_payload(window_map.get("masked_token_counts", [])),
+        "actual_token_counts": _list_payload(window_map.get("actual_token_counts", [])),
+        "labels": _nested_list_payload(window_map.get("labels", [])),
     }
     records = window_map.get("records", [])
     if isinstance(records, list):

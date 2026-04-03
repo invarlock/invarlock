@@ -119,6 +119,22 @@ def test_build_guard_overhead_summary_marks_not_evaluated() -> None:
     assert summary.overhead_ratio is None
 
 
+def test_build_guard_overhead_summary_rejects_bool_numeric_fields() -> None:
+    summary = build_guard_overhead_summary(
+        {
+            "evaluated": True,
+            "passed": False,
+            "overhead_percent": True,
+            "overhead_ratio": True,
+            "overhead_threshold": True,
+        },
+        default_threshold=0.02,
+    )
+    assert summary.overhead_percent is None
+    assert summary.overhead_ratio is None
+    assert summary.threshold_fraction == 0.02
+
+
 def test_normalize_guard_overhead_result_marks_missing_ratio_as_not_evaluated() -> None:
     out = normalize_guard_overhead_result(None)
     assert out["evaluated"] is False
@@ -142,6 +158,18 @@ def test_normalize_guard_overhead_result_propagates_unexpected_ratio_errors() ->
 
     with pytest.raises(RuntimeError, match="boom"):
         normalize_guard_overhead_result({"overhead_ratio": BadInt(1)})
+
+
+def test_finalize_guard_overhead_payload_drops_bool_metric_values() -> None:
+    result = SimpleNamespace(
+        metrics={"overhead_ratio": True, "overhead_percent": False},
+        passed=False,
+    )
+    payload = finalize_guard_overhead_payload({}, result)
+    assert payload["overhead_ratio"] is None
+    assert payload["overhead_percent"] is None
+    assert payload["evaluated"] is False
+    assert payload["passed"] is True
 
 
 def test_prepare_guard_overhead_report_returns_skipped_payload() -> None:

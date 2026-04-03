@@ -203,3 +203,49 @@ def test_token_count_returns_zero_when_len_fails() -> None:
             return super().get(key, default)
 
     assert _token_count(_BadRecord()) == 0
+
+
+def test_serialize_evaluation_windows_ignores_non_sequence_scalar_fields() -> None:
+    payload = serialize_evaluation_windows(
+        {
+            "preview": {
+                "window_ids": True,
+                "example_ids": True,
+                "logloss": True,
+                "input_ids": True,
+                "attention_masks": {"bad": "mask"},
+                "token_counts": True,
+                "masked_token_counts": True,
+                "actual_token_counts": True,
+                "labels": True,
+            },
+            "final": {"window_ids": [1]},
+        }
+    )
+
+    assert payload == {
+        "preview": {
+            "window_ids": [],
+            "example_ids": [],
+            "logloss": [],
+            "input_ids": [],
+            "attention_masks": [],
+            "token_counts": [],
+            "masked_token_counts": [],
+            "actual_token_counts": [],
+            "labels": [],
+            "records": [],
+        },
+        "final": {
+            "window_ids": [1],
+            "example_ids": [],
+            "logloss": [],
+            "input_ids": [],
+            "attention_masks": [],
+            "token_counts": [],
+            "masked_token_counts": [],
+            "actual_token_counts": [],
+            "labels": [],
+            "records": [],
+        },
+    }
