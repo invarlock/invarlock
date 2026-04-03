@@ -96,11 +96,11 @@ Note: clean edits require tuned preset parameters. Either set
 `PACK_TUNED_EDIT_PARAMS_FILE` or place the file at
 `scripts/proof_packs/tuned_edit_params.json`.
 
-The proof-pack shell wrappers do not expose the public core `--mode` flag
+The proof-pack shell wrappers do not expose the public core `--assurance` flag
 directly. For trusted local host execution in these repo-only wrappers, set
 `INVARLOCK_ALLOW_HOST_EXECUTION=1` in the environment before calling
 `run_pack.sh` or `run_suite.sh`. Installed-wheel/public workflows should use
-`invarlock evaluate --mode local` instead. Otherwise, the underlying
+`invarlock evaluate --assurance trusted-local` instead. Otherwise, the underlying
 model-loading commands use the secure-default runtime container path and expect
 `docker` or `podman`, plus a locally built `invarlock-runtime:local` image from
 `make runtime-image`.

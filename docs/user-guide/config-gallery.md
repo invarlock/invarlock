@@ -18,7 +18,7 @@ extras like `invarlock[hf]` or `invarlock[adapters]`. The core install
 (`pip install invarlock`) remains torch‑free.
 
 The `evaluate` examples below use the secure-default runtime container. Add
-`--mode local` only for trusted local workflows that intentionally bypass that
+`--assurance trusted-local` only for trusted local workflows that intentionally bypass that
 boundary.
 
 ## Presets (Runnable)

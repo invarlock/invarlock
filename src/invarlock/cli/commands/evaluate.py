@@ -46,7 +46,7 @@ from ...core.evaluate_plan import (
     build_subject_edit_run_config,
     build_subject_noop_run_config,
     normalize_model_id,
-    resolve_evaluate_execution_policy,
+    resolve_evaluate_assurance_policy,
     resolve_evaluate_tmp_dir,
 )
 from ...core.exceptions import ConfigError, ValidationError
@@ -133,13 +133,13 @@ def _format_ratio(value: Any) -> str:
 
 def _evaluation_report_manifest_execution(
     *,
-    mode: str,
+    assurance: str,
     allow_network: bool,
     allow_remote_code: bool,
     allow_third_party_plugins: bool,
 ) -> RuntimeManifestExecution | None:
-    normalized_mode = str(mode or "").strip().lower()
-    if normalized_mode != "attested":
+    normalized_assurance = str(assurance or "").strip().lower()
+    if normalized_assurance != "attested":
         return None
     return RuntimeManifestExecution(
         execution_mode="container",
@@ -273,27 +273,27 @@ def evaluate_command(
     style: str = "audit",
     timing: bool = False,
     progress: bool = True,
-    mode: str = "attested",
+    assurance: str = "attested",
     allow_network: bool = False,
     allow_host_execution: bool = False,
     allow_third_party_plugins: bool = False,
     allow_remote_code: bool = False,
-    allow_unattested_artifacts: bool = False,
     no_color: bool = False,
 ):
     """Evaluate two checkpoints (baseline vs subject) with pinned windows."""
     try:
-        execution_policy = resolve_evaluate_execution_policy(
-            mode=mode,
+        execution_policy = resolve_evaluate_assurance_policy(
+            assurance=assurance,
             allow_host_execution=allow_host_execution,
         )
     except ValueError as exc:
         raise typer.BadParameter(
-            "Execution mode must be one of: attested, local.",
-            param_hint="--mode",
+            "Assurance level must be one of: attested, trusted-local.",
+            param_hint="--assurance",
         ) from exc
     allow_host_execution = execution_policy.allow_host_execution
     prefer_local_files_only = execution_policy.prefer_local_files_only
+    allow_unattested_artifacts = execution_policy.allow_unattested_artifacts
     maybe_delegate_model_command()
 
     verbosity = _resolve_verbosity(bool(quiet), bool(verbose))
@@ -653,14 +653,16 @@ def evaluate_command(
                 "allow_network": allow_network,
                 "allow_remote_code": allow_remote_code,
                 "allow_third_party_plugins": allow_third_party_plugins,
+                "assurance": assurance,
             },
             extra={
                 "command": "evaluate",
                 "profile": profile_name,
                 "tier": tier_name,
+                "assurance": assurance,
             },
             execution=_evaluation_report_manifest_execution(
-                mode=mode,
+                assurance=assurance,
                 allow_network=allow_network,
                 allow_remote_code=allow_remote_code,
                 allow_third_party_plugins=allow_third_party_plugins,

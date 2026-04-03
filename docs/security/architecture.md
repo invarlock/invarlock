@@ -15,7 +15,7 @@ Overview of the core security-related components and defaults.
 
 - `invarlock evaluate`, `invarlock advanced calibrate`, and internal `run`
   flows delegate to the runtime container by default.
-- Use `--mode local` on `invarlock evaluate` for trusted public local runs, or
+- Use `--assurance trusted-local` on `invarlock evaluate` for trusted public local runs, or
   `INVARLOCK_ALLOW_HOST_EXECUTION=1` / `--allow-host-execution` for advanced
   and internal workflows that intentionally bypass that boundary.
 - Third-party plugin discovery and remote model code execution are separate

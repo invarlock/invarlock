@@ -43,9 +43,9 @@ invarlock report explain --report runs/subject/report.json --baseline runs/sourc
 
 ## Security Defaults
 
-- `evaluate` defaults to `--mode attested`, which delegates model-loading work
+- `evaluate` defaults to `--assurance attested`, which delegates model-loading work
   into the runtime container.
-- Use `--mode local` only for trusted host-side workflows that intentionally
+- Use `--assurance trusted-local` only for trusted host-side workflows that intentionally
   bypass the container boundary.
 - `verify` expects `runtime.manifest.json` beside attested evaluation outputs
   and fails closed when required attestation is missing.
@@ -106,9 +106,10 @@ Common options:
 - `--preset`: optional repo preset path
 - `--out`: run-artifact directory
 - `--report-out`: evaluation report directory
-- `--mode attested|local`: execution mode for model-loading steps
-- `--allow-unattested-artifacts`: allow trusted local evaluate flows to emit
-  host-bypass artifacts without runtime attestation
+- `--assurance attested|trusted-local`: execution policy for `evaluate`.
+  `attested` keeps model loading inside the runtime container; `trusted-local`
+  allows trusted host execution and produces host-bypass artifacts that should
+  be verified with `verify --assurance trusted-local`.
 - `--edit-config`: optional demo/smoke edit overlay such as `quant_rtn`
 
 Example:
@@ -136,6 +137,8 @@ Common options:
 - `--baseline`: optional baseline report for comparison flows
 - `--tolerance`: float tolerance for recompute checks
 - `--profile`: profile-aware validation mode
+- `--assurance attested|trusted-local`: attestation expectation for the
+  supplied report artifacts
 - `--json`: emit a single JSON envelope
 
 Example:
@@ -259,7 +262,7 @@ These commands emit a single JSON object suitable for CI parsing.
 - Proof-pack, policy, plugin, and calibration workflows live under
   `invarlock advanced ...`.
 - Trusted host execution for the core evaluation path is expressed as
-  `--mode local`.
+  `--assurance trusted-local`.
 - Optional runtime backends are installed with Python extras instead of CLI
   install and uninstall commands.
 

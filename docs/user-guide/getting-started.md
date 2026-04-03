@@ -92,8 +92,8 @@ render a shareable HTML artifact from the same report.
 
 ## Execution Modes
 
-- `evaluate` defaults to the runtime container (`--mode attested`).
-- Use `--mode local` only for trusted host-side workflows that intentionally
+- `evaluate` defaults to the runtime container (`--assurance attested`).
+- Use `--assurance trusted-local` only for trusted host-side workflows that intentionally
   bypass container execution.
 - `verify` expects `runtime.manifest.json` next to attested evaluation reports.
 

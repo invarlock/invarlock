@@ -358,7 +358,7 @@ def build_evaluate_command(
         _command_path(lane_root / "report", execution_mode=execution_mode),
     ]
     if execution_mode == "host":
-        command.extend(["--mode", "local"])
+        command.extend(["--assurance", "trusted-local"])
     return command
 
 
@@ -380,7 +380,7 @@ def build_verify_command(
         str(report_path),
     ]
     if execution_mode == "host":
-        command.insert(-1, "--allow-unattested-artifacts")
+        command[4:4] = ["--assurance", "trusted-local"]
     return command
 
 

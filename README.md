@@ -85,7 +85,7 @@ container and expects an OCI container engine such as `docker` or `podman`.
 In a repo checkout, build the local runtime image once with
 `make runtime-image`; InvarLock automatically prefers
 `invarlock-runtime:local` when it is present. Trusted local workflows can opt
-into host execution explicitly with `--mode local` on `invarlock evaluate`, but
+into host execution explicitly with `--assurance trusted-local` on `invarlock evaluate`, but
 the attested verification step below expects container execution. The
 quickstart block below assumes a repo checkout; do not skip
 `make runtime-image` if you want the attested container path.
@@ -140,7 +140,7 @@ Attestation: reports/eval/runtime.manifest.json
 - Core workflow: `invarlock evaluate` → `invarlock verify` →
   `invarlock report html`.
 - Advanced workflows live under `invarlock advanced ...`.
-- Trusted host execution for the core evaluate path uses `--mode local`.
+- Trusted host execution for the core evaluate path uses `--assurance trusted-local`.
 - Optional adapter/backend installs use normal Python extras such as
   `pip install "invarlock[hf]"` rather than CLI install commands.
 

@@ -95,7 +95,7 @@ def test_verify_allows_unattested_override(
 
     result = CliRunner().invoke(
         app,
-        ["verify", "--allow-unattested-artifacts", str(cert_path)],
+        ["verify", "--assurance", "trusted-local", str(cert_path)],
         env={"INVARLOCK_ALLOW_UNATTESTED_ARTIFACTS": "0"},
     )
 

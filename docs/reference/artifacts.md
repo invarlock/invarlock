@@ -24,7 +24,7 @@ invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/eva
 ```
 
 Model-loading commands use the secure-default runtime container unless a trusted
-`invarlock evaluate --mode local` workflow explicitly bypasses it.
+`invarlock evaluate --assurance trusted-local` workflow explicitly bypasses it.
 
 ## Concepts
 

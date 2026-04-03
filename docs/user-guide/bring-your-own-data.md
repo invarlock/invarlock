@@ -92,7 +92,7 @@ invarlock report html -i report_bundle/evaluation.report.json -o report_bundle/e
 ```
 
 The `invarlock evaluate` step follows the secure-default runtime container path
-unless a trusted local workflow explicitly sets `--mode local`.
+unless a trusted local workflow explicitly sets `--assurance trusted-local`.
 
 Common pitfalls:
 

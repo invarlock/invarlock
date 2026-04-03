@@ -148,13 +148,18 @@ echo "[smoke] mode=$MODE profile=$PROFILE"
 echo "[smoke] hf_home=$HF_HOME"
 echo "[smoke] hf_datasets_cache=$HF_DATASETS_CACHE"
 
+ASSURANCE="attested"
+if [[ "$MODE" == "local" ]]; then
+  ASSURANCE="trusted-local"
+fi
+
 "${CLI[@]}" evaluate \
   --baseline gpt2 \
   --subject gpt2 \
   --adapter auto \
   --profile "$PROFILE" \
   --preset "$PRESET" \
-  --mode "$MODE" \
+  --assurance "$ASSURANCE" \
   --out "$SMOKE_RUN_DIR" \
   --report-out "$SMOKE_REPORT_DIR" \
   --timing
@@ -172,10 +177,7 @@ echo "[smoke] baseline_report=$BASELINE_REPORT"
 echo "[smoke] edited_report=$EDITED_REPORT"
 echo "[smoke] evaluation_report=$EVAL_REPORT"
 
-VERIFY_ARGS=()
-if [[ "$MODE" == "local" ]]; then
-  VERIFY_ARGS+=(--allow-unattested-artifacts)
-fi
+VERIFY_ARGS=(--assurance "$ASSURANCE")
 
 "${CLI[@]}" verify "$EVAL_REPORT" "${VERIFY_ARGS[@]}" --json || VERIFY_RC=$?
 VERIFY_RC="${VERIFY_RC:-0}"

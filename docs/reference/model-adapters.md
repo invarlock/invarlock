@@ -30,7 +30,7 @@ INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
 ```
 
 The CLI example above uses the secure-default runtime container. Add
-`--mode local` only for trusted local compare/evaluate workflows that
+`--assurance trusted-local` only for trusted local compare/evaluate workflows that
 intentionally bypass that boundary.
 
 ```python

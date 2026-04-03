@@ -68,7 +68,7 @@ def test_cli_version_flag_exits_through_root_callback():
     emit_version.assert_called_once_with()
 
 
-def test_evaluate_cli_forwards_allow_unattested_artifacts(monkeypatch):
+def test_evaluate_cli_forwards_assurance(monkeypatch):
     seen: dict[str, object] = {}
 
     def fake_evaluate_command(**kwargs):
@@ -88,12 +88,13 @@ def test_evaluate_cli_forwards_allow_unattested_artifacts(monkeypatch):
             "baseline",
             "--subject",
             "subject",
-            "--allow-unattested-artifacts",
+            "--assurance",
+            "trusted-local",
         ],
     )
 
     assert result.exit_code == 0, result.output
-    assert seen["allow_unattested_artifacts"] is True
+    assert seen["assurance"] == "trusted-local"
 
 
 def test_ordered_group_handles_advanced_and_unknown_lazy_subapps():

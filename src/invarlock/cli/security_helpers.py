@@ -93,18 +93,20 @@ def configure_runtime_security(
 def runtime_security_scoped[F: Callable[..., Any]](func: F) -> F:
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
-        mode = str(kwargs.get("mode", "") or "").strip().lower()
+        assurance = str(kwargs.get("assurance", "") or "").strip().lower()
+        trusted_local = assurance == "trusted-local"
         with configure_runtime_security(
             allow_network=bool(kwargs.get("allow_network", False)),
             allow_host_execution=bool(kwargs.get("allow_host_execution", False))
-            or mode == "local",
+            or trusted_local,
             allow_third_party_plugins=bool(
                 kwargs.get("allow_third_party_plugins", False)
             ),
             allow_remote_code=bool(kwargs.get("allow_remote_code", False)),
             allow_unattested_artifacts=bool(
                 kwargs.get("allow_unattested_artifacts", False)
-            ),
+            )
+            or trusted_local,
         ):
             return func(*args, **kwargs)
 

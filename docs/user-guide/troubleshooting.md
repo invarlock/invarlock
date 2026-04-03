@@ -20,7 +20,7 @@ invarlock verify reports/eval/evaluation.report.json --profile ci
 
 # Enable debug output for detailed traces
 INVARLOCK_DEBUG_TRACE=1 INVARLOCK_ALLOW_NETWORK=1 \
-  invarlock evaluate --mode local --baseline gpt2 --subject gpt2 --preset <config.yaml>
+  invarlock evaluate --assurance trusted-local --baseline gpt2 --subject gpt2 --preset <config.yaml>
 ```
 
 `verify` expects `runtime.manifest.json` next to evaluation outputs.

@@ -395,7 +395,7 @@ def test_evaluate_attested_bundle_manifest_inherits_container_execution(
         subject=str(edt),
         adapter="auto",
         profile="dev",
-        mode="attested",
+        assurance="attested",
         out=str(tmp_path / "runs"),
         report_out=str(tmp_path / "reports"),
     )

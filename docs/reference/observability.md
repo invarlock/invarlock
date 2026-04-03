@@ -268,7 +268,7 @@ INVARLOCK_TELEMETRY=1 invarlock evaluate --baseline gpt2 --subject gpt2
 ```
 
 This uses the secure-default runtime container unless a trusted local workflow
-adds `--mode local`.
+adds `--assurance trusted-local`.
 
 Reports include telemetry under `report.metrics`:
 

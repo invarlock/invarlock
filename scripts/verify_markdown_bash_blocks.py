@@ -247,45 +247,48 @@ def _rewrite_invarlock_tokens(
         token for token in env_prefix if not token.startswith(f"{HOST_EXECUTION_ENV}=")
     ]
 
+    def _strip_option_with_value(
+        tokens: list[str],
+        option: str,
+    ) -> list[str]:
+        rewritten: list[str] = []
+        skip_next = False
+        for idx, token in enumerate(tokens):
+            if skip_next:
+                skip_next = False
+                continue
+            if token == option and idx + 1 < len(tokens):
+                skip_next = True
+                continue
+            rewritten.append(token)
+        return rewritten
+
     if execution_mode == "container":
         argv = [token for token in argv if token != "--allow-host-execution"]
-        if command_tokens[:1] == ["evaluate"]:
-            rewritten: list[str] = []
-            skip_next = False
-            for idx, token in enumerate(argv):
-                if skip_next:
-                    skip_next = False
-                    continue
-                if token == "--mode" and idx + 1 < len(argv):
-                    skip_next = True
-                    continue
-                rewritten.append(token)
-            argv = rewritten
-        if command_tokens[:1] == ["verify"] or command_tokens[:2] == [
-            "report",
-            "verify",
-        ]:
-            argv = [token for token in argv if token != "--allow-unattested-artifacts"]
+        if command_tokens[:1] == ["evaluate"] or command_tokens[:1] == [
+            "verify"
+        ] or command_tokens[:2] == ["report", "verify"]:
+            argv = _strip_option_with_value(argv, "--assurance")
         return env_prefix, argv
 
-    if command_tokens[:1] == ["evaluate"]:
-        if "--mode" not in argv:
+    if command_tokens[:1] in (["evaluate"], ["verify"]) or command_tokens[:2] == [
+        "report",
+        "verify",
+    ]:
+        argv = _strip_option_with_value(argv, "--assurance")
+        if "--assurance" not in argv:
             if argv[:1] == ["invarlock"]:
-                argv = [*argv[:2], "--mode", "local", *argv[2:]]
+                argv = [*argv[:2], "--assurance", "trusted-local", *argv[2:]]
             elif (
                 len(argv) >= 3
                 and argv[0] in {"python", "python3"}
                 and argv[1] == "-m"
                 and argv[2].startswith("invarlock")
             ):
-                argv = [*argv[:4], "--mode", "local", *argv[4:]]
+                argv = [*argv[:4], "--assurance", "trusted-local", *argv[4:]]
     elif command_tokens[:1] and command_tokens[0] in MODEL_LOADING_COMMANDS:
         if "--allow-host-execution" not in argv:
             env_prefix.append(f"{HOST_EXECUTION_ENV}=1")
-    if (
-        command_tokens[:1] == ["verify"] or command_tokens[:2] == ["report", "verify"]
-    ) and "--allow-unattested-artifacts" not in argv:
-        argv = _insert_option_after_command(argv, "--allow-unattested-artifacts")
     return env_prefix, argv
 
 

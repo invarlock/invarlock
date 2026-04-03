@@ -26,10 +26,10 @@ existing tooling intact.
   present).
 - Run `invarlock evaluate --baseline <baseline> --subject <subject> --adapter auto`.
 
-By default, `evaluate` runs inside the runtime container. Use `--mode local`
+By default, `evaluate` runs inside the runtime container. Use `--assurance trusted-local`
 only for trusted local workflows that intentionally run model loading on the
-host. If that trusted local path intentionally bypasses runtime attestation,
-add `--allow-unattested-artifacts`.
+host. If you choose that trusted local path, verify the resulting report with
+`invarlock verify --assurance trusted-local ...`.
 
 Example (GPT‑2, CPU/MPS friendly; requires `invarlock[hf]` or equivalent HF extra):
 

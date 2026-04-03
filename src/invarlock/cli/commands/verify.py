@@ -27,6 +27,15 @@ from .._json import emit as _emit_json
 console = Console()
 
 
+def _allow_unattested_artifacts_for_assurance(assurance: str) -> bool:
+    normalized_assurance = str(assurance or "").strip().lower()
+    if normalized_assurance == "attested":
+        return False
+    if normalized_assurance == "trusted-local":
+        return True
+    raise ValueError("Assurance level must be one of: attested, trusted-local.")
+
+
 def _render_verify_diagnostic(diagnostic: VerifyDiagnostic) -> None:
     level = str(diagnostic.level or "").lower()
     message = diagnostic.message
@@ -68,7 +77,7 @@ def verify_command(
     tolerance: float = 1e-9,
     profile: str | None = "dev",
     json_out: bool = False,
-    allow_unattested_artifacts: bool = False,
+    assurance: str = "attested",
 ) -> None:
     """
     Verify evaluation report integrity.
@@ -81,7 +90,9 @@ def verify_command(
         baseline=baseline,
         tolerance=tolerance,
         profile=profile,
-        allow_unattested_artifacts=bool(allow_unattested_artifacts),
+        allow_unattested_artifacts=_allow_unattested_artifacts_for_assurance(
+            assurance
+        ),
         json_mode=bool(json_out),
     )
     exit_code = _verify_exit_code(result, profile=profile)

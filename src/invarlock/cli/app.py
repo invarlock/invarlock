@@ -12,13 +12,13 @@ minimal environments.
 from __future__ import annotations
 
 import os
-from enum import Enum
 
 import click
 import typer
 from rich.console import Console
 from typer.core import TyperGroup
 
+from invarlock.cli.assurance import AssuranceMode
 from invarlock.security import (
     enforce_default_security,
     enforce_network_policy,
@@ -54,11 +54,6 @@ class OrderedGroup(TyperGroup):
         if _load_lazy_subapp(self, cmd_name):
             return super().get_command(ctx, cmd_name)
         return None
-
-
-class ExecutionMode(str, Enum):
-    ATTESTED = "attested"
-    LOCAL = "local"
 
 
 # Initialize CLI app
@@ -209,10 +204,10 @@ def _evaluate_lazy(
     progress: bool = typer.Option(
         True, "--progress/--no-progress", help="Show progress done messages"
     ),
-    mode: ExecutionMode = typer.Option(
-        ExecutionMode.ATTESTED,
-        "--mode",
-        help="Execution mode for model-loading steps.",
+    assurance: AssuranceMode = typer.Option(
+        AssuranceMode.ATTESTED,
+        "--assurance",
+        help="Assurance level for evaluation (attested|trusted-local).",
         case_sensitive=False,
     ),
     no_color: bool = typer.Option(
@@ -222,11 +217,6 @@ def _evaluate_lazy(
         False,
         "--allow-network",
         help="Allow network access, including runtime-image pulls and model fetches.",
-    ),
-    allow_unattested_artifacts: bool = typer.Option(
-        False,
-        "--allow-unattested-artifacts",
-        help="Allow local evaluate/report artifacts without runtime attestation metadata.",
     ),
 ):
     from .commands.evaluate import evaluate_command as _eval
@@ -250,10 +240,9 @@ def _evaluate_lazy(
         style=style,
         timing=timing,
         progress=progress,
-        mode=mode.value,
+        assurance=assurance.value,
         no_color=no_color,
         allow_network=allow_network,
-        allow_unattested_artifacts=allow_unattested_artifacts,
     )
 
 
@@ -361,10 +350,10 @@ def _verify_typed(
         "--json",
         help="Emit machine-readable JSON (suppresses human-readable output)",
     ),
-    allow_unattested_artifacts: bool = typer.Option(
-        False,
-        "--allow-unattested-artifacts",
-        help="Allow verification of reports without runtime attestation metadata.",
+    assurance: AssuranceMode = typer.Option(
+        AssuranceMode.ATTESTED,
+        "--assurance",
+        help="Assurance level for verification (attested|trusted-local).",
     ),
 ):
     from pathlib import Path as _Path
@@ -379,7 +368,7 @@ def _verify_typed(
         tolerance=tolerance,
         profile=profile,
         json_out=json_out,
-        allow_unattested_artifacts=allow_unattested_artifacts,
+        assurance=assurance.value,
     )
 
 

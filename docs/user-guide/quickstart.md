@@ -43,19 +43,24 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
 ```
 
 `evaluate` uses the secure-default runtime container unless you explicitly pass
-`--mode local` for a trusted host-side workflow. Attested runs emit
+`--assurance trusted-local` for a trusted host-side workflow. Attested runs emit
 `reports/eval/runtime.manifest.json` next to `evaluation.report.json`. For a
-trusted host-side bypass that intentionally skips runtime attestation, add
-`--allow-unattested-artifacts`.
+trusted host-side bypass, verify the resulting report with
+`invarlock verify --assurance trusted-local ...`.
 
 ### 3. Verify the evaluation report
 
 ```bash
+# Attested/default evaluate output
 invarlock verify reports/eval/evaluation.report.json
+
+# Trusted-local evaluate output
+invarlock verify --assurance trusted-local reports/eval/evaluation.report.json
 ```
 
 The verifier re-checks schema, paired math, gate results, and the adjacent
-runtime manifest before you promote results.
+runtime manifest before you promote results. Use the trusted-local form only
+when the evaluation itself ran with `--assurance trusted-local`.
 
 ### 4. Render shareable HTML
 
@@ -81,7 +86,7 @@ paired evaluation report.
 
 - Enable downloads per command with `INVARLOCK_ALLOW_NETWORK=1`.
 - For offline reads after warming caches, use `HF_DATASETS_OFFLINE=1`.
-- `--mode local` is the explicit trusted-host bypass for `evaluate`.
+- `--assurance trusted-local` is the explicit trusted-host bypass for `evaluate`.
 - `verify` expects `runtime.manifest.json` for attested evaluation outputs.
 
 ## Advanced And Demo Flows

@@ -37,7 +37,7 @@ Tip: enable Hub downloads per command when fetching models/datasets:
 `INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate ...`
 
 Security-default note: `evaluate` uses the runtime container by default. Use
-`--mode local` only for trusted local workflows that intentionally bypass that
+`--assurance trusted-local` only for trusted local workflows that intentionally bypass that
 boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.
 
 Smoke asset note: `configs/presets/causal_lm/gpt2_smoke_128.yaml` ships the
@@ -47,7 +47,7 @@ scheduled/workflow-dispatch GPT-2 smoke workflow. Push gating uses
 with `sshleifer/tiny-gpt2` plus a local JSONL fixture. Both smoke paths run
 under the shipped `dev` profile so they can complete the full `evaluate` →
 `verify` → `report` → `proof-pack` path without depending on release-profile
-floors. The tiny push smoke also uses an explicit unattested-artifact override
+floors. The tiny push smoke also uses an explicit trusted-local assurance override
 for proof-pack verification when CI produces an unsigned pack; the default
 package-native verifier behavior remains fail-closed for unsigned packs.
 
@@ -139,7 +139,7 @@ to change proposals or releases when you update calibration.
 1. **Configure** – describe model, dataset, edit, and guard policies in YAML.
 2. **Execute** – run `invarlock evaluate` under a CI or release profile;
    model-loading commands use the runtime container by default unless you pass
-   `--mode local`.
+   `--assurance trusted-local`.
 3. **Validate** – run `invarlock verify` and render HTML via `invarlock report html`;
    attested outputs include `runtime.manifest.json` next to
    `evaluation.report.json`.

@@ -71,7 +71,7 @@ def test_sanitize_script_skips_pip_installs() -> None:
     assert "[skip] python -m pip install foo" in rendered
 
 
-def test_sanitize_script_host_mode_injects_host_bypass_and_verify_override() -> None:
+def test_sanitize_script_host_mode_injects_trusted_local_assurance() -> None:
     module = _load_script_module()
     block = module.BashBlock(
         file="README.md",
@@ -85,9 +85,9 @@ def test_sanitize_script_host_mode_injects_host_bypass_and_verify_override() -> 
 
     rendered = module._sanitize_script(block, execution_mode="host")
 
-    assert "--mode local" in rendered
+    assert "--assurance trusted-local" in rendered
     assert "INVARLOCK_ALLOW_HOST_EXECUTION=1" not in rendered
-    assert "--allow-unattested-artifacts" in rendered
+    assert rendered.count("--assurance trusted-local") == 2
 
 
 def test_sanitize_script_container_mode_strips_host_bypass_flags() -> None:
@@ -98,14 +98,14 @@ def test_sanitize_script_container_mode_strips_host_bypass_flags() -> None:
         block_index=1,
         text=(
             "INVARLOCK_ALLOW_HOST_EXECUTION=1 invarlock run -c config.yaml\n"
-            "invarlock verify --allow-unattested-artifacts reports/eval/evaluation.report.json\n"
+            "invarlock verify --assurance trusted-local reports/eval/evaluation.report.json\n"
         ),
     )
 
     rendered = module._sanitize_script(block, execution_mode="container")
 
     assert "INVARLOCK_ALLOW_HOST_EXECUTION=1" not in rendered
-    assert "--allow-unattested-artifacts" not in rendered
+    assert "--assurance trusted-local" not in rendered
 
 
 def test_run_blocks_writes_results(tmp_path: Path, monkeypatch) -> None:

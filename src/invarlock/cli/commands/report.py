@@ -14,6 +14,7 @@ from typing import Any, NoReturn
 import typer
 from rich.console import Console
 
+from invarlock.cli.assurance import AssuranceMode
 from invarlock.cli.output import print_event, resolve_output_style
 from invarlock.core.report_inputs import (
     ReportInputError,
@@ -63,6 +64,13 @@ def _raise_report_input_failure(message: str, *, no_color: bool = False) -> NoRe
         emoji="❌",
     )
     raise typer.Exit(2)
+
+
+def _resolve_assurance_mode_value(value: object) -> str:
+    candidate = getattr(value, "default", value)
+    if isinstance(candidate, AssuranceMode):
+        return candidate.value
+    return str(candidate)
 
 
 def _format_section_title(title: str, *, suffix: str | None = None) -> str:
@@ -477,10 +485,11 @@ def report_verify_command(
         "--profile",
         help="Execution profile affecting parity enforcement and exit codes (dev|ci|release).",
     ),
-    allow_unattested_artifacts: bool = typer.Option(
-        False,
-        "--allow-unattested-artifacts",
-        help="Allow verification of reports without runtime attestation metadata.",
+    assurance: AssuranceMode = typer.Option(
+        AssuranceMode.ATTESTED,
+        "--assurance",
+        help="Assurance level for verification (attested|trusted-local).",
+        case_sensitive=False,
     ),
 ):  # pragma: no cover - thin wrapper around verify_command
     from pathlib import Path as _Path
@@ -496,13 +505,16 @@ def report_verify_command(
         )
     except ReportInputError as exc:
         _raise_report_input_failure(str(exc))
-    return _verify_command(
-        reports=report_paths,
-        baseline=baseline_path,
-        tolerance=tolerance,
-        profile=profile,
-        allow_unattested_artifacts=allow_unattested_artifacts,
-    )
+    try:
+        return _verify_command(
+            reports=report_paths,
+            baseline=baseline_path,
+            tolerance=tolerance,
+            profile=profile,
+            assurance=_resolve_assurance_mode_value(assurance),
+        )
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc), param_hint="--assurance") from exc
 
 
 @report_app.command(

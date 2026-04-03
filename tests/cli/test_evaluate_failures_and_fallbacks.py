@@ -780,9 +780,13 @@ def test_evaluate_yaml_tmp_dir_and_successful_quiet_summary(
     assert "Primary metric ratio: 0.990" in joined
 
 
-def test_evaluate_rejects_invalid_execution_mode() -> None:
-    with pytest.raises(click.BadParameter, match="Execution mode must be one of"):
-        mod.evaluate_command(baseline="baseline", subject="subject", mode="invalid")
+def test_evaluate_rejects_invalid_assurance() -> None:
+    with pytest.raises(click.BadParameter, match="Assurance level must be one of"):
+        mod.evaluate_command(
+            baseline="baseline",
+            subject="subject",
+            assurance="invalid",
+        )
 
 
 def test_evaluate_quiet_mode_disables_progress_and_timing(

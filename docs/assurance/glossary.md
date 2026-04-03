@@ -65,7 +65,7 @@ The unedited reference model run used for comparison and gating.
 
 **Example:** `invarlock evaluate --baseline gpt2 --subject gpt2-quant`
 This follows the secure-default runtime-container path unless a trusted local
-workflow uses `--mode local`.
+workflow uses `--assurance trusted-local`.
 
 ---
 
