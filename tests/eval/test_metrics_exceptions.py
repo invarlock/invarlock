@@ -46,3 +46,13 @@ def test_validate_primary_metric_non_finite_raises_validation_error() -> None:
     with pytest.raises(ValidationError) as ei:
         validate_primary_metric_block(block)
     assert getattr(ei.value, "code", None) == "E402"
+
+
+def test_validate_primary_metric_rejects_bool_preview_and_final() -> None:
+    with pytest.raises(ValidationError) as preview_err:
+        validate_primary_metric_block({"preview": True, "final": 1.0})
+    assert getattr(preview_err.value, "code", None) == "E402"
+
+    with pytest.raises(ValidationError) as final_err:
+        validate_primary_metric_block({"preview": 1.0, "final": False})
+    assert getattr(final_err.value, "code", None) == "E402"
