@@ -615,3 +615,144 @@ def test_execute_run_request_covers_export_fallback_branches(
     assert outcome.ok is True
     assert outcome.failure is None
     assert "export_adapter_directory_missing" in diagnostic_codes
+
+
+def test_execute_run_request_fails_fast_when_torch_is_unavailable(
+    monkeypatch, tmp_path: Path
+) -> None:
+    config = _Config()
+    _install_common_monkeypatches(monkeypatch)
+    base_services = _make_services(tmp_path, config)
+    services = RunExecutionServices(
+        **{
+            **base_services.__dict__,
+            "get_torch": lambda: None,
+        }
+    )
+
+    outcome = execute_run_request(
+        RunExecutionRequest(
+            config=str(tmp_path / "config.yaml"),
+            device="cpu",
+            profile="dev",
+        ),
+        services=services,
+    )
+
+    assert outcome.ok is False
+    assert outcome.failure is not None
+    assert outcome.failure.code == "torch_missing"
+
+
+def test_execute_run_request_maps_torch_import_errors_to_typed_failure(
+    monkeypatch, tmp_path: Path
+) -> None:
+    config = _Config()
+    _install_common_monkeypatches(monkeypatch)
+    base_services = _make_services(tmp_path, config)
+    services = RunExecutionServices(
+        **{
+            **base_services.__dict__,
+            "load_model_with_cfg": lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                ImportError("torch backend unavailable")
+            ),
+        }
+    )
+
+    outcome = execute_run_request(
+        RunExecutionRequest(
+            config=str(tmp_path / "config.yaml"),
+            device="cpu",
+            profile="dev",
+        ),
+        services=services,
+    )
+
+    failure_codes = [
+        event.failure.code
+        for event in outcome.events
+        if isinstance(event, RunFailureEvent)
+    ]
+    assert outcome.ok is False
+    assert outcome.failure is not None
+    assert outcome.failure.code == "torch_missing"
+    assert failure_codes == ["torch_missing"]
+
+
+def test_execute_run_request_applies_preset_seed_overrides_and_model_path_attr(
+    monkeypatch, tmp_path: Path
+) -> None:
+    class _Adapter:
+        name = "stub"
+
+        def __init__(self) -> None:
+            self.saved: list[Path] = []
+
+        def save_pretrained(self, _model, export_dir: Path) -> bool:
+            self.saved.append(export_dir)
+            export_dir.mkdir(parents=True, exist_ok=True)
+            return True
+
+    class _OutputConfig:
+        dir = "runs"
+        save_model = True
+        model_dir = None
+        model_path = "hf-export"
+        model_subdir = "ignored"
+
+    config = _Config()
+    config.output = _OutputConfig()
+    adapter = _Adapter()
+    captured_seed_bundles: list[dict[str, object]] = []
+    _install_common_monkeypatches(monkeypatch, adapter=adapter)
+    monkeypatch.setattr(
+        "invarlock.core.determinism_policy.apply_determinism_preset",
+        lambda **_kwargs: {
+            "mode": "strict",
+            "seeds": {"python": 101, "numpy": 202, "torch": 303},
+        },
+    )
+    base_services = _make_services(tmp_path, config)
+    services = RunExecutionServices(
+        **{
+            **base_services.__dict__,
+            "assemble_run_report": lambda **kwargs: (
+                captured_seed_bundles.append(dict(kwargs["seed_bundle"])),
+                SimpleNamespace(
+                    report={
+                        "metrics": {
+                            "primary_metric": {
+                                "kind": "ppl_causal",
+                                "preview": 1.0,
+                                "final": 1.0,
+                            }
+                        },
+                        "artifacts": {},
+                    },
+                    timings={},
+                    provenance_result=SimpleNamespace(
+                        missing_evaluation_windows_for_baseline=False
+                    ),
+                    metrics_enrichment=SimpleNamespace(
+                        pairing_violations=(),
+                        debug_diffs_line=None,
+                    ),
+                ),
+            )[1],
+        }
+    )
+
+    outcome = execute_run_request(
+        RunExecutionRequest(
+            config=str(tmp_path / "config.yaml"),
+            device="cpu",
+            profile="ci",
+            export_model_requested=True,
+        ),
+        services=services,
+    )
+
+    assert outcome.ok is True
+    assert outcome.failure is None
+    assert captured_seed_bundles == [{"python": 101, "numpy": 202, "torch": 303}]
+    assert adapter.saved and adapter.saved[0].name == "hf-export"

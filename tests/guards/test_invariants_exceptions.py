@@ -5,6 +5,7 @@ import torch.nn as nn
 from invarlock.guards.invariants import (
     InvariantsGuard,
     _check_standard_invariants,
+    _decision_from_action,
     check_all_invariants,
 )
 
@@ -83,3 +84,8 @@ def test_check_all_invariants_rejects_missing_named_parameters() -> None:
     assert outcome.passed is False
     assert outcome.action == "reject"
     assert outcome.violations[0]["type"] == "structure_violation"
+
+
+def test_decision_from_action_strips_whitespace_and_maps_aliases() -> None:
+    assert _decision_from_action(" warn ") == "monitor"
+    assert _decision_from_action(" reject ") == "block"

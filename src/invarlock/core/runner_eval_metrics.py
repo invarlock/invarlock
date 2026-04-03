@@ -44,7 +44,9 @@ def _resolve_adapter_hook(adapter: Any, name: str) -> Any | None:
 
 
 def _normalize_answer_text(value: Any) -> str:
-    return " ".join(str(value or "").strip().lower().split())
+    if value is None:
+        return ""
+    return " ".join(str(value).strip().lower().split())
 
 
 def _is_multimodal_batch(batch: Any) -> bool:

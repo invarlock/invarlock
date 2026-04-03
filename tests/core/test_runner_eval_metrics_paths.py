@@ -640,6 +640,7 @@ def test_runner_eval_metrics_small_helpers_filter_and_normalize_inputs() -> None
         "labels": [1, 2, 3],
     }
     assert rem._normalize_answer_text("  Cat   Dog\n") == "cat dog"
+    assert rem._normalize_answer_text(0) == "0"
     assert rem._is_multimodal_batch({"example_id": "ex-1"}) is True
     assert rem._is_multimodal_batch({"input_ids": [1, 2, 3]}) is False
 
@@ -690,7 +691,9 @@ def test_evaluate_vision_text_arm_requires_real_hook_surface() -> None:
         )
 
 
-def test_evaluate_vision_text_arm_skips_zero_answer_tokens_and_blank_processor_sha() -> None:
+def test_evaluate_vision_text_arm_skips_zero_answer_tokens_and_blank_processor_sha() -> (
+    None
+):
     class _VisionModel:
         def __call__(self, **_kwargs):
             return SimpleNamespace(loss=torch.tensor(0.5))

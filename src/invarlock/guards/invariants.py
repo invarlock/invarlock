@@ -561,7 +561,7 @@ class InvariantsGuard(Guard):
 
 
 def _decision_from_action(action: str) -> str:
-    normalized = str(action or "none").lower()
+    normalized = str(action or "none").strip().lower()
     if normalized == "warn":
         return "monitor"
     if normalized == "rollback":

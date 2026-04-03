@@ -78,7 +78,10 @@ def test_eval_phase_passes_empty_pairs_when_final_windows_are_not_lists() -> Non
             return {"strict_eval": False}
 
     def _fake_tail(
-        *, deltas: list[float], weights: list[float] | None, policy: dict[str, object] | None
+        *,
+        deltas: list[float],
+        weights: list[float] | None,
+        policy: dict[str, object] | None,
     ) -> dict[str, object]:
         captured["deltas"] = list(deltas)
         captured["weights"] = weights

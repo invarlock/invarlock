@@ -114,7 +114,7 @@ def _coerce_float(value: Any, default: float) -> float:
 def _coerce_int(value: Any, default: int) -> int:
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except (OverflowError, TypeError, ValueError):
         return int(default)
 
 

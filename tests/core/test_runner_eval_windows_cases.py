@@ -273,7 +273,9 @@ def test_compute_slice_summary_logs_zero_mask_batches_and_uses_token_fallback(
     assert summary["actual_total_tokens"] == 3
     assert summary["masked_token_counts"] == [3]
     zero_mask_events = [
-        data for _, operation, _, data in runner.events if operation == "zero_mask_batch"
+        data
+        for _, operation, _, data in runner.events
+        if operation == "zero_mask_batch"
     ]
     assert zero_mask_events == [
         {
