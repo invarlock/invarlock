@@ -29,6 +29,19 @@ def test_maybe_dump_guard_evidence_writes_json_when_debug_is_enabled(
     assert payload == {"guard": "spectral", "ok": True}
 
 
+def test_maybe_dump_guard_evidence_accepts_string_target_dir(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("INVARLOCK_EVIDENCE_DEBUG", "1")
+
+    maybe_dump_guard_evidence(str(tmp_path), {"guard": "variance", "ok": False})
+
+    payload = json.loads(
+        (tmp_path / "guards_evidence.json").read_text(encoding="utf-8")
+    )
+    assert payload == {"guard": "variance", "ok": False}
+
+
 def test_maybe_dump_guard_evidence_swallows_filesystem_errors(
     monkeypatch, tmp_path: Path
 ) -> None:

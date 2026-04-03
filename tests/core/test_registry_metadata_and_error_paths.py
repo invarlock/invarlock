@@ -205,6 +205,35 @@ def test_get_plugin_metadata_adds_name_and_type_for_known_plugin() -> None:
     assert metadata["module"] != "unknown"
 
 
+def test_get_plugin_info_reports_entry_point_group_for_entry_point_plugins(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "1")
+
+    from invarlock.plugins.hello_guard import HelloGuard
+
+    ep = _EP(
+        name="ep_hello_guard",
+        value="invarlock.plugins.hello_guard:HelloGuard",
+        dist=_Dist("invarlock-plugins", "0.0"),
+        loader=HelloGuard,
+    )
+
+    class _EPContainerSelect:
+        def select(self, *, group: str):
+            if group == "invarlock.guards":
+                return [ep]
+            return []
+
+    monkeypatch.setattr(reg, "entry_points", lambda: _EPContainerSelect())
+    registry = reg.CoreRegistry()
+
+    info = registry.get_plugin_info("ep_hello_guard", "guards")
+
+    assert info["entry_point"] == "ep_hello_guard"
+    assert info["entry_point_group"] == "invarlock.guards"
+
+
 def test_registry_entry_point_collision_and_typed_getters(monkeypatch):
     monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "1")
     adapter_cls, edit_cls, guard_cls = _install_plugin_module(

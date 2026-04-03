@@ -245,7 +245,7 @@ def validate_report(report: dict[str, Any]) -> bool:
         if not _validate_with_jsonschema(report):
             # Minimal fallback: require schema version + run_id + primary_metric
             run_id = report.get("run_id")
-            run_id_ok = isinstance(run_id, str) and bool(run_id.strip())
+            run_id_ok = isinstance(run_id, str) and len(run_id.strip()) >= 4
             pm = report.get("primary_metric")
             pm_final = pm.get("final") if isinstance(pm, dict) else None
             pm_kind = pm.get("kind") if isinstance(pm, dict) else None

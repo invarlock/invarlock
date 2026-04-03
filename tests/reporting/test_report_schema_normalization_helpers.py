@@ -122,6 +122,20 @@ def test_validate_evaluation_report_rejects_blank_run_id_without_jsonschema(
     assert schema_mod.validate_report(evaluation_report) is False
 
 
+def test_validate_evaluation_report_rejects_short_run_id_without_jsonschema(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(schema_mod, "jsonschema", None, raising=False)
+    evaluation_report = {
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
+        "run_id": "r1 ",
+        "primary_metric": {"final": 1.0},
+        "validation": {"primary_metric_acceptable": True},
+    }
+
+    assert schema_mod.validate_report(evaluation_report) is False
+
+
 def test_validate_evaluation_report_rejects_blank_metric_kind_without_jsonschema(
     monkeypatch,
 ) -> None:

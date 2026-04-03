@@ -191,6 +191,15 @@ class TestGuardChainComprehensive:
 
         assert chain.get_worst_action(outcomes) == "warn"
 
+    def test_get_worst_action_returns_worst_legacy_action_when_decisions_absent(self):
+        chain = GuardChain([])
+
+        outcomes = [Mock(spec=["action"]), Mock(spec=["action"])]
+        outcomes[0].action = "warn"
+        outcomes[1].action = "rollback"
+
+        assert chain.get_worst_action(outcomes) == "rollback"
+
     def test_guard_chain_initialization(self):
         """Test GuardChain initialization with different parameters."""
         # Test with guards and policy

@@ -114,3 +114,18 @@ def test_build_run_execution_request_uses_legacy_determinism_and_can_disable_tim
     assert core_request.eval_device_override is None
     assert core_request.determinism_mode == "legacy"
     assert core_request.export_dir is None
+
+
+def test_build_run_execution_request_falls_back_to_legacy_when_pack_is_blank() -> None:
+    request = _Request(progress=False, timing=False)
+
+    core_request = build_run_execution_request(
+        request,
+        environ={
+            "PACK_DETERMINISM": "   ",
+            "INVARLOCK_DETERMINISM": "warn",
+        },
+    )
+
+    assert core_request.capture_timings is False
+    assert core_request.determinism_mode == "warn"
