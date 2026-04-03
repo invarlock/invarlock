@@ -58,6 +58,37 @@ def _loss_type_from_context(run_config: Any) -> str | None:
     return str(loss_type_ctx).lower()
 
 
+def _classification_counts_from_primary_metric(primary_metric: Any) -> (
+    tuple[int, int, int, int] | None
+):
+    if not isinstance(primary_metric, Mapping):
+        return None
+    try:
+        kind = str(primary_metric.get("kind", "")).lower()
+    except (AttributeError, TypeError, ValueError):
+        return None
+    if kind not in {"accuracy", "vqa_accuracy"}:
+        return None
+    try:
+        preview = float(primary_metric.get("preview"))
+        final = float(primary_metric.get("final"))
+        n_preview = int(primary_metric.get("n_preview", 0))
+        n_final = int(primary_metric.get("n_final", 0))
+    except (AttributeError, TypeError, ValueError, OverflowError):
+        return None
+    if not (
+        0.0 <= preview <= 1.0 and 0.0 <= final <= 1.0 and n_preview > 0 and n_final > 0
+    ):
+        return None
+    correct_preview = int(round(preview * n_preview))
+    correct_final = int(round(final * n_final))
+    if abs(preview - (correct_preview / n_preview)) > 1e-9:
+        return None
+    if abs(final - (correct_final / n_final)) > 1e-9:
+        return None
+    return correct_preview, n_preview, correct_final, n_final
+
+
 def enrich_run_report_metrics(
     *,
     report: dict[str, Any],
@@ -150,21 +181,43 @@ def enrich_run_report_metrics(
 
             used_pseudo_counts = False
             if n_prev == 0 and n_fin == 0:
-                try:
-                    prev_n_cfg = getattr(cfg.dataset, "preview_n", None)
-                    fin_n_cfg = getattr(cfg.dataset, "final_n", None)
-                except (AttributeError, TypeError):
-                    prev_n_cfg = None
-                    fin_n_cfg = None
-                try:
-                    prev_n = int(preview_count_report or prev_n_cfg or 0)
-                    fin_n = int(final_count_report or fin_n_cfg or 0)
-                except (TypeError, ValueError, OverflowError):
-                    prev_n = 0
-                    fin_n = 0
-                c_prev, n_prev = (prev_n, prev_n) if prev_n > 0 else (0, 0)
-                c_fin, n_fin = (fin_n, fin_n) if fin_n > 0 else (0, 0)
-                used_pseudo_counts = prev_n > 0 or fin_n > 0
+                primary_metric_seed = (
+                    report.get("metrics", {}).get("primary_metric")
+                    if isinstance(report.get("metrics"), dict)
+                    else None
+                )
+                if not isinstance(primary_metric_seed, Mapping) and hasattr(
+                    core_report, "metrics"
+                ):
+                    core_metrics = (
+                        core_report.metrics if isinstance(core_report.metrics, dict) else {}
+                    )
+                    primary_metric_seed = (
+                        core_metrics.get("primary_metric")
+                        if isinstance(core_metrics.get("primary_metric"), Mapping)
+                        else None
+                    )
+                derived_counts = _classification_counts_from_primary_metric(
+                    primary_metric_seed
+                )
+                if derived_counts is not None:
+                    c_prev, n_prev, c_fin, n_fin = derived_counts
+                else:
+                    try:
+                        prev_n_cfg = getattr(cfg.dataset, "preview_n", None)
+                        fin_n_cfg = getattr(cfg.dataset, "final_n", None)
+                    except (AttributeError, TypeError):
+                        prev_n_cfg = None
+                        fin_n_cfg = None
+                    try:
+                        prev_n = int(preview_count_report or prev_n_cfg or 0)
+                        fin_n = int(final_count_report or fin_n_cfg or 0)
+                    except (TypeError, ValueError, OverflowError):
+                        prev_n = 0
+                        fin_n = 0
+                    c_prev, n_prev = (prev_n, prev_n) if prev_n > 0 else (0, 0)
+                    c_fin, n_fin = (fin_n, fin_n) if fin_n > 0 else (0, 0)
+                    used_pseudo_counts = prev_n > 0 or fin_n > 0
 
             classification_metrics = {
                 "preview": {"correct_total": int(c_prev), "total": int(n_prev)},
