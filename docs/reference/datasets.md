@@ -48,6 +48,10 @@ For Compare & evaluate, reuse the same `dataset` block in baseline and subject r
   `invarlock evaluate --assurance trusted-local`.
 - **Dedupe & capacity**: `INVARLOCK_DEDUP_TEXTS=1` removes exact duplicates;
   `INVARLOCK_CAPACITY_FAST=1` speeds up capacity checks for quick runs.
+- **HF cache fallback**: if a local rerun hits a Hugging Face datasets
+  shared-cache lock/permission error, InvarLock retries with its own writable
+  datasets cache. Set `INVARLOCK_HF_DATASETS_CACHE` to choose that fallback
+  location explicitly.
 
 ### Pairing invariants (E001)
 
@@ -156,11 +160,16 @@ dataset:
 - `HF_DATASETS_OFFLINE=1` — force cached-only datasets.
 - `INVARLOCK_DEDUP_TEXTS=1` — exact-text dedupe before tokenization.
 - `INVARLOCK_CAPACITY_FAST=1` — approximate capacity estimation for quick runs.
+- `INVARLOCK_HF_DATASETS_CACHE=/path/to/cache` — override the writable fallback
+  cache used after shared-cache lock/permission failures.
 
 ## Troubleshooting
 
 - **`DEPENDENCY-MISSING: datasets`**: install `invarlock[eval]` or `invarlock[hf]`.
 - **`NO-SAMPLES` / `NO-PAIRS` errors**: verify dataset fields and split names.
+- **HF cache `.lock` / permission errors on local reruns**: rerun as-is to use
+  the automatic writable-cache fallback, or set
+  `INVARLOCK_HF_DATASETS_CACHE` to a writable directory you control.
 - **`vision_text image file is missing`**: ensure manifest `image_path` values
   resolve relative to the JSONL file and point to readable local files.
 - **Pairing failures (`E001`)**: ensure baseline `report.json` contains

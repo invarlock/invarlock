@@ -86,6 +86,7 @@ only request remote code. The request fails unless
 | --- | --- | --- |
 | `INVARLOCK_CAPACITY_FAST` | unset | Approximate capacity estimation for quick runs. |
 | `INVARLOCK_DEDUP_TEXTS` | unset | Exact-text dedupe before tokenization. |
+| `INVARLOCK_HF_DATASETS_CACHE` | unset | Override the writable fallback cache used when HF dataset loads hit a shared-cache lock/permission error. |
 
 ### Determinism & performance
 
@@ -162,6 +163,7 @@ Strictness/tiny-relax/overhead-skip are also config/profile policy:
 ## Troubleshooting
 
 - **Downloads blocked**: set `INVARLOCK_ALLOW_NETWORK=1` and retry.
+- **HF dataset cache lock/permission errors on local reruns**: set `INVARLOCK_HF_DATASETS_CACHE=/path/to/writable/cache` or let InvarLock retry under its own writable cache.
 - **Calibration iterables fail**: use `INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE=1`.
 - **Third-party plugins missing**: set `INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=1` or use `--allow-third-party-plugins`.
 

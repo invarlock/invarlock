@@ -20,7 +20,7 @@ from .data_difficulty import (
 from .data_stratification import (
     stratify_wikitext_candidates as _stratify_wikitext_candidates,
 )
-from .data_support import _require_load_dataset
+from .data_support import _require_load_dataset, load_dataset_with_cache_fallback
 from .data_tokenization import tokenize_combined_pairs, tokenize_texts_padded
 from .data_windows import EvaluationWindow, split_labels_by_index, split_window_by_index
 from .providers.local_jsonl import LocalJSONLProvider
@@ -119,10 +119,7 @@ class WikiText2Provider:
             return cached[:max_samples]
 
         dataset_slice = f"{split}[:{max_samples}]" if max_samples > 0 else split
-        load_dataset = _require_load_dataset(
-            "DEPENDENCY-MISSING: datasets library required for WikiText-2 loading"
-        )
-        dataset = load_dataset(
+        dataset = load_dataset_with_cache_fallback(
             "wikitext",
             "wikitext-2-raw-v1",
             split=dataset_slice,
@@ -507,10 +504,7 @@ class HFTextProvider:
         cached = self._texts_cache.get(split)
         if cached is not None:
             return cached
-        load_dataset = _require_load_dataset(
-            "DEPENDENCY-MISSING: datasets library required for hf_text provider"
-        )
-        ds = load_dataset(
+        ds = load_dataset_with_cache_fallback(
             path=self.dataset_name,
             name=self.config_name,
             split=split,
@@ -711,10 +705,7 @@ class HFSeq2SeqProvider:
         cached = self._pairs_cache.get(split)
         if cached is not None:
             return cached
-        load_dataset = _require_load_dataset(
-            "DEPENDENCY-MISSING: datasets library required for hf_seq2seq provider"
-        )
-        ds = load_dataset(
+        ds = load_dataset_with_cache_fallback(
             path=self.dataset_name,
             name=self.config_name,
             split=split,
