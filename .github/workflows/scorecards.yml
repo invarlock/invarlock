@@ -24,6 +24,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           persist-credentials: false
+      # scorecard-action publish mode rejects extra steps in this job.
       - name: Run OpenSSF Scorecard analysis
         uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a
         with:
@@ -33,20 +34,3 @@ jobs:
           publish_results: true
           results_file: results.sarif
           results_format: sarif
-      - name: Filter informational Scorecard SARIF rules
-        uses: ./.github/actions/filter-scorecard-sarif
-        with:
-          input: results.sarif
-          output: results.sarif
-          exclude_rule: CIIBestPracticesID
-      - name: Upload Scorecard artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
-        with:
-          name: scorecard-results
-          path: results.sarif
-          if-no-files-found: error
-          retention-days: 5
-      - name: Upload Scorecard SARIF
-        uses: github/codeql-action/upload-sarif@b20883b0cd1f46c72ae0ba6d1090936928f9fa30
-        with:
-          sarif_file: results.sarif
