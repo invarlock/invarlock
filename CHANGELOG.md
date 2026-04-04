@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `hf_multimodal` adapter, the `vision_text` dataset provider, multimodal
   pairing/provenance wiring, and a Gemma 4 image-text preset plus local demo
   fixtures.
+- Added proof-pack evidence levels and reviewer summaries to generated
+  manifests and report outputs so artifact bundles surface review context more
+  directly.
 - Added targeted regression coverage for Gemma 4 loading/profile resolution,
   multimodal batching, baseline pairing, measured classification reporting, and
   the new public CLI assurance surface.
@@ -24,20 +27,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--assurance attested|trusted-local` across `evaluate`, `verify`, and
   `report verify`, replacing the earlier split between `--mode local` and the
   explicit unattested-artifact verify bypass.
+- Refined `report` and `verify` CLI input handling, help text, and artifact
+  loading so local verification and report review flows behave more
+  consistently.
 - Hardened shipped smoke and evidence-sweep helpers around tiny/GPT-2 bootstrap,
   tokenizer loading, smoke follow-ups, markdown example rewriting, and trusted-
   local verification so local and CI command surfaces stay aligned.
 - Tightened proof-pack remote-setup and shell-harness checks and kept the
   support/evidence docs in sync with the post-`v0.5.1` assurance model.
+- Hardened reporting, evaluation, orchestration, and guard helper contracts
+  around numeric coercion, fallback validation, retry signaling, iterator
+  handling, and config isolation, with expanded targeted regression coverage.
 
 ### Fixed
 - Fixed Gemma 4 causal and multimodal loading paths so text and image-text
   runs resolve through the intended adapters, stay on the supported
   Transformers surface, and no longer fail on the Gemma 4 image-token
   truncation mismatch path.
+- Fixed dataset loading on read-only or unwritable cache paths by retrying with
+  a writable fallback cache.
 - Fixed multimodal reused-baseline reporting so raw run artifacts now preserve
   measured `metrics.classification` counts instead of falling back to
   `pseudo_config` on successful image-text runs.
+- Fixed report schema fallback validation so allowlist state stays isolated
+  across runs and blank identifiers are rejected consistently when
+  `jsonschema` is unavailable.
+- Fixed snapshot-restore retry/fallback signaling, multimodal metric scalar
+  handling, boolean-as-number validation gaps, and invariant iteration failure
+  handling in core evaluation and reporting paths.
 - Fixed trusted-local evaluation and verification ergonomics so local host runs,
   report verification, and docs/notebook examples all use the same explicit
   assurance vocabulary.
@@ -53,6 +70,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refreshed CLI/reference/user-guide pages, shipped preset comments, and
   notebooks to teach the new assurance UX and the current trusted-local verify
   pattern consistently.
+- Documented the proof-pack reviewer-summary surface and the writable dataset
+  cache fallback path in the relevant reference and user-guide pages.
 - Updated support and dataset docs to document the Gemma 4 E2B pilot lane and
   the new `vision_text` image-text evaluation flow.
 
