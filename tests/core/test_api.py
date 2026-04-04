@@ -14,10 +14,12 @@ import pytest
 from invarlock.core.api import (
     CalibrationData,
     DeviceType,
+    EditLike,
     Guard,
     GuardChain,
     GuardWithAfterEdit,
     GuardWithBeforeEdit,
+    GuardWithContext,
     GuardWithFinalize,
     GuardWithPrepare,
     MetricsDict,
@@ -197,6 +199,15 @@ class TestGuardChainComprehensive:
         outcomes = [Mock(spec=["action"]), Mock(spec=["action"])]
         outcomes[0].action = "warn"
         outcomes[1].action = "rollback"
+
+        assert chain.get_worst_action(outcomes) == "rollback"
+
+    def test_get_worst_action_ignores_blank_decision_when_legacy_action_is_present(
+        self,
+    ):
+        chain = GuardChain([])
+
+        outcomes = [Mock(decision="   ", action="rollback")]
 
         assert chain.get_worst_action(outcomes) == "rollback"
 
@@ -513,6 +524,61 @@ class TestEdgeCases:
         assert isinstance(hooks, GuardWithBeforeEdit)
         assert isinstance(hooks, GuardWithAfterEdit)
         assert isinstance(hooks, GuardWithFinalize)
+
+    def test_runtime_checkable_edit_and_context_protocols(self):
+        class _EditHooks:
+            name = "hooked_edit"
+
+            def can_edit(self, model_desc):
+                return bool(model_desc)
+
+            def apply(self, model, adapter, plan=None, runtime=None):
+                _ = model, adapter, runtime
+                return {"applied": True, "plan": plan or {}}
+
+        class _GuardContext:
+            def set_run_context(self, report):
+                self.report = report
+
+        edit = _EditHooks()
+        context = _GuardContext()
+
+        assert isinstance(edit, EditLike)
+        assert isinstance(context, GuardWithContext)
+
+    def test_guard_chain_hook_errors_propagate(self):
+        class _PrepareGuard:
+            name = "prepare_guard"
+
+            def prepare(self, model, adapter, calib, policy_config):
+                raise RuntimeError("prepare boom")
+
+        class _BeforeGuard:
+            name = "before_guard"
+
+            def before_edit(self, model):
+                raise RuntimeError("before boom")
+
+        class _AfterGuard:
+            name = "after_guard"
+
+            def after_edit(self, model):
+                raise RuntimeError("after boom")
+
+        class _FinalizeGuard:
+            name = "finalize_guard"
+
+            def finalize(self, model):
+                raise RuntimeError("finalize boom")
+
+        with pytest.raises(RuntimeError, match="prepare boom"):
+            GuardChain([_PrepareGuard()]).prepare_all(Mock(), Mock(), Mock(), {})
+        with pytest.raises(RuntimeError, match="before boom"):
+            GuardChain([_BeforeGuard()]).before_edit_all(Mock())
+        with pytest.raises(RuntimeError, match="after boom"):
+            GuardChain([_AfterGuard()]).after_edit_all(Mock())
+        with pytest.raises(RuntimeError, match="finalize boom"):
+            GuardChain([_FinalizeGuard()]).finalize_all(Mock())
 
 
 if __name__ == "__main__":

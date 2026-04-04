@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -743,6 +744,70 @@ def test_evaluate_vision_text_arm_skips_zero_answer_tokens_and_blank_processor_s
     assert payload["records"][0]["references"] == []
     assert payload["records"][0]["correct"] is False
     assert "processor_sha256" not in payload
+
+
+def test_evaluate_vision_text_arm_treats_string_outputs_and_references_as_single_values() -> (
+    None
+):
+    class _VisionModel:
+        def __call__(self, **_kwargs):
+            return SimpleNamespace(loss=torch.tensor(0.5))
+
+        def generate(self, **_kwargs):
+            return torch.tensor([[1, 2]])
+
+    class _Adapter:
+        def prepare_model_inputs(self, batch, device, include_labels):  # noqa: ANN001
+            return {
+                "input_ids": torch.tensor([[1]], device=device),
+                "labels": torch.tensor([[1]], device=device),
+                "_answer_token_count": 1,
+            }
+
+        def prepare_generation_inputs(self, batch, device):  # noqa: ANN001
+            return {
+                "input_ids": torch.tensor([[1]], device=device),
+                "_reference_answers": " Cat ",
+            }
+
+        def decode_generated(self, generated_ids, generation_inputs):  # noqa: ANN001
+            return "Cat"
+
+    payload, _latency_ms = rem._evaluate_vision_text_arm(
+        _VisionModel(),
+        [{"id": "example-1", "image_path": "/tmp/demo.png", "answers": ["cat"]}],
+        adapter=_Adapter(),
+        device="cpu",
+    )
+
+    assert payload["records"][0]["prediction"] == "Cat"
+    assert payload["records"][0]["references"] == ["Cat"]
+    assert payload["records"][0]["correct"] is True
+
+
+def test_compute_real_metrics_rejects_invalid_device_override(monkeypatch) -> None:
+    monkeypatch.setitem(
+        sys.modules,
+        "psutil",
+        SimpleNamespace(
+            Process=lambda: SimpleNamespace(
+                memory_info=lambda: SimpleNamespace(rss=0),
+            )
+        ),
+    )
+
+    with pytest.raises((RuntimeError, ValueError)):
+        rem.compute_real_metrics(
+            _FakeRunner(),
+            _FakeModel(),
+            calibration_data=[{"input_ids": [1]}],
+            adapter=object(),
+            preview_n=1,
+            final_n=1,
+            config=SimpleNamespace(
+                context={"eval": {"device_override": "not-a-real-device"}}
+            ),
+        )
 
 
 def test_compute_real_metrics_propagates_pairing_metric_failures(monkeypatch) -> None:

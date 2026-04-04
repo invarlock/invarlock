@@ -42,6 +42,14 @@ class ModelBadTie(nn.Module):
         self.lm_head = types.SimpleNamespace(weight=WeightLikeNoPtr())
 
 
+class ModelBadNamedParameters(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def named_parameters(self, prefix="", recurse=True):  # type: ignore[override]
+        raise RuntimeError("named_parameters failed")
+
+
 def test_param_count_exception_path_sets_sentinel():
     guard = InvariantsGuard()
     m = ModelBadParams()
@@ -84,6 +92,17 @@ def test_check_all_invariants_rejects_missing_named_parameters() -> None:
     assert outcome.passed is False
     assert outcome.action == "reject"
     assert outcome.violations[0]["type"] == "structure_violation"
+
+
+def test_check_all_invariants_fail_closed_when_named_parameters_iteration_errors() -> (
+    None
+):
+    outcome = check_all_invariants(ModelBadNamedParameters())
+
+    assert outcome.passed is False
+    assert outcome.action == "reject"
+    assert outcome.violations[0]["type"] == "structure_violation"
+    assert outcome.metrics["parameters_checked"] == 0
 
 
 def test_decision_from_action_strips_whitespace_and_maps_aliases() -> None:

@@ -756,3 +756,71 @@ def test_execute_run_request_applies_preset_seed_overrides_and_model_path_attr(
     assert outcome.failure is None
     assert captured_seed_bundles == [{"python": 101, "numpy": 202, "torch": 303}]
     assert adapter.saved and adapter.saved[0].name == "hf-export"
+
+
+def test_execute_run_request_marks_export_failure_when_adapter_save_raises(
+    monkeypatch, tmp_path: Path
+) -> None:
+    class _Adapter:
+        name = "stub"
+
+        def save_pretrained(self, _model, _export_dir: Path) -> bool:
+            raise RuntimeError("export boom")
+
+    config = _Config()
+    config.output.save_model = True
+
+    _install_common_monkeypatches(monkeypatch, adapter=_Adapter())
+    services = _make_services(tmp_path, config)
+
+    outcome = execute_run_request(
+        RunExecutionRequest(
+            config=str(tmp_path / "config.yaml"),
+            device="cpu",
+            profile="dev",
+            export_model_requested=True,
+        ),
+        services=services,
+    )
+
+    diagnostic_codes = {
+        event.code for event in outcome.events if isinstance(event, RunDiagnosticEvent)
+    }
+    assert outcome.ok is True
+    assert "export_failed" in diagnostic_codes
+
+
+def test_execute_run_request_surfaces_persistence_failures(
+    monkeypatch, tmp_path: Path
+) -> None:
+    config = _Config()
+
+    _install_common_monkeypatches(monkeypatch)
+    base_services = _make_services(tmp_path, config)
+    services = RunExecutionServices(
+        **{
+            **base_services.__dict__,
+            "persist_run_report_outputs": lambda **_kwargs: (_ for _ in ()).throw(
+                RuntimeError("persist boom")
+            ),
+        }
+    )
+
+    outcome = execute_run_request(
+        RunExecutionRequest(
+            config=str(tmp_path / "config.yaml"),
+            device="cpu",
+            profile="dev",
+        ),
+        services=services,
+    )
+
+    failure_codes = [
+        event.failure.code
+        for event in outcome.events
+        if isinstance(event, RunFailureEvent)
+    ]
+    assert outcome.ok is False
+    assert outcome.failure is not None
+    assert outcome.failure.code == "pipeline_failed"
+    assert failure_codes == ["pipeline_failed"]

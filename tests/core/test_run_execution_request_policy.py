@@ -46,6 +46,16 @@ def test_env_text_returns_none_for_whitespace_only_value() -> None:
     assert env_text("INVARLOCK_TEXT", environ={"INVARLOCK_TEXT": "   "}) is None
 
 
+def test_env_text_ignores_non_string_values_and_env_flag_treats_none_as_false() -> None:
+    environ = {
+        "INVARLOCK_EVAL_DEVICE": 7,
+        "INVARLOCK_TINY_RELAX": None,
+    }
+
+    assert env_text("INVARLOCK_EVAL_DEVICE", environ=environ) is None
+    assert env_flag("INVARLOCK_TINY_RELAX", environ=environ) is False
+
+
 def test_env_flag_returns_false_for_falsey_values_and_missing() -> None:
     environ = {
         "INVARLOCK_FLAG_FALSE": "off",
@@ -129,3 +139,46 @@ def test_build_run_execution_request_falls_back_to_legacy_when_pack_is_blank() -
 
     assert core_request.capture_timings is False
     assert core_request.determinism_mode == "warn"
+
+
+def test_build_run_execution_request_propagates_request_fields_and_timing_flag() -> (
+    None
+):
+    request = _Request(
+        device="cuda:1",
+        profile="prod",
+        out="custom-runs",
+        edit="quant_rtn",
+        edit_label="wave2",
+        tier="strict",
+        metric_kind="ppl_causal",
+        probes=7,
+        until_pass=True,
+        max_attempts=4,
+        timeout=90,
+        baseline="baseline.json",
+        no_cleanup=True,
+        timing=True,
+        progress=False,
+        telemetry=False,
+        prefer_local_files_only=True,
+    )
+
+    core_request = build_run_execution_request(request, environ={})
+
+    assert core_request.device == "cuda:1"
+    assert core_request.profile == "prod"
+    assert core_request.out == "custom-runs"
+    assert core_request.edit == "quant_rtn"
+    assert core_request.edit_label == "wave2"
+    assert core_request.tier == "strict"
+    assert core_request.metric_kind == "ppl_causal"
+    assert core_request.probes == 7
+    assert core_request.until_pass is True
+    assert core_request.max_attempts == 4
+    assert core_request.timeout == 90
+    assert core_request.baseline == "baseline.json"
+    assert core_request.no_cleanup is True
+    assert core_request.capture_timings is True
+    assert core_request.telemetry is False
+    assert core_request.prefer_local_files_only is True

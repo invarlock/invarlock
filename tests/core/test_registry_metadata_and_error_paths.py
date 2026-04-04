@@ -138,6 +138,23 @@ def test_registry_fallback_on_entry_points_error(monkeypatch, tmp_path):
     )
 
 
+def test_registry_skips_entry_point_lookup_when_third_party_plugins_are_disabled(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", raising=False)
+    monkeypatch.setattr(reg, "third_party_plugins_allowed", lambda: False)
+    monkeypatch.setattr(
+        reg, "entry_points", lambda: (_ for _ in ()).throw(AssertionError("unused"))
+    )
+
+    registry = reg.CoreRegistry()
+
+    assert "hf_causal" in registry.list_adapters()
+    assert registry.get_plugin_info("hf_causal", "adapters")["status"] == (
+        "Available (fallback)"
+    )
+
+
 def test_registry_entry_points_select_and_get_paths(monkeypatch):
     monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "1")
     # Build stubs that exercise both eps.select(...) and eps.get(...)
@@ -292,6 +309,33 @@ def test_registry_entry_point_collision_and_typed_getters(monkeypatch):
     assert isinstance(guard, guard_cls)
 
 
+def test_registry_optional_plugin_metadata_tracks_missing_dependencies(
+    monkeypatch,
+) -> None:
+    def _fake_missing(self, deps: list[str]) -> list[str]:
+        if deps == ["auto_gptq"]:
+            return ["auto_gptq"]
+        if deps == ["awq"]:
+            return []
+        if deps == ["bitsandbytes"]:
+            return ["bitsandbytes"]
+        return []
+
+    monkeypatch.setattr(reg.CoreRegistry, "_check_runtime_dependencies", _fake_missing)
+    registry = reg.CoreRegistry()
+
+    gptq_info = registry.get_plugin_info("hf_gptq", "adapters")
+    awq_info = registry.get_plugin_info("hf_awq", "adapters")
+    bnb_info = registry.get_plugin_info("hf_bnb", "adapters")
+
+    assert gptq_info["available"] is False
+    assert gptq_info["status"] == "Needs extra: auto_gptq"
+    assert awq_info["available"] is True
+    assert awq_info["status"] == "Available (plugin)"
+    assert bnb_info["available"] is False
+    assert bnb_info["status"] == "Needs extra: bitsandbytes"
+
+
 def test_registry_additional_paths(monkeypatch):
     r = reg.CoreRegistry()
 
@@ -368,6 +412,51 @@ def test_registry_additional_paths(monkeypatch):
         and "Edit unavailable" in msg
         and "Guard unavailable" in msg
     )
+
+
+def test_registry_typed_wrappers_raise_dependency_error_for_adapter_and_edit_import_failures() -> (
+    None
+):
+    registry = reg.CoreRegistry()
+    registry._initialized = True
+    registry._adapters["missing_adapter"] = reg.PluginInfo(
+        name="missing_adapter",
+        module="invarlock_test_registry_missing_adapter_module",
+        class_name="MissingAdapter",
+        available=True,
+        status="Available",
+        entry_point=None,
+    )
+    registry._edits["missing_edit"] = reg.PluginInfo(
+        name="missing_edit",
+        module="invarlock_test_registry_missing_edit_module",
+        class_name="MissingEdit",
+        available=True,
+        status="Available",
+        entry_point=None,
+    )
+
+    with pytest.raises(reg.DependencyError) as adapter_exc:
+        registry.get_adapter_typed("missing_adapter")
+    with pytest.raises(reg.DependencyError) as edit_exc:
+        registry.get_edit_typed("missing_edit")
+
+    assert adapter_exc.value.code == "E702"
+    assert adapter_exc.value.details == {
+        "name": "missing_adapter",
+        "kind": "adapter",
+        "reason": "ImportError",
+    }
+    assert edit_exc.value.code == "E702"
+    assert edit_exc.value.details == {
+        "name": "missing_edit",
+        "kind": "edit",
+        "reason": "ImportError",
+    }
+
+
+def test_get_registry_returns_global_singleton() -> None:
+    assert reg.get_registry() is reg.get_registry()
 
 
 def test_create_plugin_info_parse_and_metadata_paths(monkeypatch):

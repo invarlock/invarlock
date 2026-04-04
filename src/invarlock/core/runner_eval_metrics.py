@@ -49,6 +49,24 @@ def _normalize_answer_text(value: Any) -> str:
     return " ".join(str(value).strip().lower().split())
 
 
+def _decode_prediction_text(decoded: Any) -> str:
+    if isinstance(decoded, str):
+        return decoded.strip()
+    if isinstance(decoded, (list, tuple)):
+        return str(decoded[0] if decoded else "").strip()
+    return str(decoded).strip() if decoded is not None else ""
+
+
+def _normalize_reference_answers(value: Any) -> list[str]:
+    if isinstance(value, str):
+        candidates = [value]
+    elif isinstance(value, (list, tuple, set)):
+        candidates = list(value)
+    else:
+        candidates = []
+    return [str(item).strip() for item in candidates if str(item).strip()]
+
+
 def _is_multimodal_batch(batch: Any) -> bool:
     return isinstance(batch, dict) and (
         "image_path" in batch or "example_id" in batch or "answers" in batch
@@ -129,12 +147,10 @@ def _evaluate_vision_text_arm(
         latency_ms += (time.perf_counter() - start) * 1000.0
 
         decoded = decode_generated(generated_ids, generation_inputs)
-        prediction = str(decoded[0] if decoded else "").strip()
-        references = [
-            str(value).strip()
-            for value in generation_inputs.get("_reference_answers", [])
-            if str(value).strip()
-        ]
+        prediction = _decode_prediction_text(decoded)
+        references = _normalize_reference_answers(
+            generation_inputs.get("_reference_answers", [])
+        )
         normalized_prediction = _normalize_answer_text(prediction)
         correct = int(
             any(
