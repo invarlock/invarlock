@@ -34,11 +34,11 @@ jobs:
           results_file: results.sarif
           results_format: sarif
       - name: Filter informational Scorecard SARIF rules
-        run: >-
-          python scripts/filter_scorecard_sarif.py
-          --input results.sarif
-          --output results.sarif
-          --exclude-rule CIIBestPracticesID
+        uses: ./.github/actions/filter-scorecard-sarif
+        with:
+          input: results.sarif
+          output: results.sarif
+          exclude_rule: CIIBestPracticesID
       - name: Upload Scorecard artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
