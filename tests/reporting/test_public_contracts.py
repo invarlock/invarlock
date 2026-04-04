@@ -134,6 +134,30 @@ def test_public_contract_loader_tries_env_then_workspace_and_deduplicates(
     assert roots == [tmp_path / "env-contracts", contracts_dir]
 
 
+def test_public_contract_loader_tries_pyinstaller_bundle_contracts(
+    monkeypatch, tmp_path: Path
+) -> None:
+    bundle_root = tmp_path / "_MEI12345"
+    bundle_contracts = bundle_root / "contracts"
+    bundle_contracts.mkdir(parents=True)
+    source = contracts.CONTRACTS_ROOT / "policy_pack.schema.json"
+    (bundle_contracts / source.name).write_text(source.read_text(encoding="utf-8"))
+
+    monkeypatch.setattr(contracts, "CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(contracts, "PACKAGE_CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(sys, "_MEIPASS", str(bundle_root), raising=False)
+    monkeypatch.delenv("INVARLOCK_CONTRACTS_ROOT", raising=False)
+    monkeypatch.delenv("GITHUB_WORKSPACE", raising=False)
+    monkeypatch.chdir(tmp_path)
+
+    payload = contracts.load_policy_pack_schema()
+    assert payload["title"] == "InvarLock Policy Pack"
+    assert contracts._fallback_contract_roots()[:2] == [
+        bundle_contracts,
+        bundle_root / "invarlock" / "_data" / "contracts",
+    ]
+
+
 def test_public_contract_loader_discovers_ancestor_contracts_for_build_out(
     monkeypatch, tmp_path: Path
 ) -> None:

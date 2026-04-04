@@ -38,6 +38,12 @@ def test_clusterfuzz_wrapper_sets_contract_root_for_fuzzers() -> None:
     assert 'export INVARLOCK_CONTRACTS_ROOT="\\$workspace_root/contracts"' in text
 
 
+def test_clusterfuzz_pyinstaller_bundles_contracts_for_fuzzers() -> None:
+    text = (Path.cwd() / ".clusterfuzzlite" / "build.sh").read_text(encoding="utf-8")
+
+    assert '--add-data "$SRC/invarlock/contracts:contracts"' in text
+
+
 def test_clusterfuzz_requirements_are_hash_locked() -> None:
     text = (
         Path.cwd() / "requirements" / "workflows" / "clusterfuzzlite-py311.txt"

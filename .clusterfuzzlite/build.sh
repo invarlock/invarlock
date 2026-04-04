@@ -35,7 +35,12 @@ for fuzzer in $(find "$SRC/invarlock/fuzzers" -name '*_fuzzer.py' | sort); do
   fuzzer_basename=$(basename -s .py "$fuzzer")
   fuzzer_package="${fuzzer_basename}.pkg"
 
-  pyinstaller --distpath "$OUT" --onefile --name "$fuzzer_package" "$fuzzer"
+  pyinstaller \
+    --distpath "$OUT" \
+    --onefile \
+    --add-data "$SRC/invarlock/contracts:contracts" \
+    --name "$fuzzer_package" \
+    "$fuzzer"
 
   cat > "$OUT/$fuzzer_basename" <<EOF
 #!/bin/sh

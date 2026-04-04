@@ -35,6 +35,10 @@ def _fallback_contract_roots() -> list[Path]:
     env_root = os.environ.get("INVARLOCK_CONTRACTS_ROOT")
     if env_root:
         roots.append(Path(env_root))
+    bundle_root = getattr(sys, "_MEIPASS", "")
+    if bundle_root:
+        roots.append(Path(bundle_root) / "contracts")
+        roots.append(Path(bundle_root) / "invarlock" / "_data" / "contracts")
     github_workspace = os.environ.get("GITHUB_WORKSPACE")
     if github_workspace:
         roots.append(Path(github_workspace) / "contracts")
