@@ -27,6 +27,17 @@ def test_clusterfuzz_build_uses_hash_locked_installs() -> None:
     assert "python3 -m build --wheel --no-isolation" in text
 
 
+def test_clusterfuzz_wrapper_sets_contract_root_for_fuzzers() -> None:
+    text = (Path.cwd() / ".clusterfuzzlite" / "build.sh").read_text(encoding="utf-8")
+
+    assert "INVARLOCK_CONTRACTS_ROOT" in text
+    assert (
+        'workspace_root=\\${GITHUB_WORKSPACE:-\\$(CDPATH= cd -- "\\$this_dir/.." && pwd)}'
+        in text
+    )
+    assert 'export INVARLOCK_CONTRACTS_ROOT="\\$workspace_root/contracts"' in text
+
+
 def test_clusterfuzz_requirements_are_hash_locked() -> None:
     text = (
         Path.cwd() / "requirements" / "workflows" / "clusterfuzzlite-py311.txt"

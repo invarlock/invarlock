@@ -40,7 +40,11 @@ for fuzzer in $(find "$SRC/invarlock/fuzzers" -name '*_fuzzer.py' | sort); do
   cat > "$OUT/$fuzzer_basename" <<EOF
 #!/bin/sh
 # LLVMFuzzerTestOneInput for fuzzer detection.
-this_dir=\$(dirname "\$0")
+this_dir=\$(CDPATH= cd -- "\$(dirname "\$0")" && pwd)
+workspace_root=\${GITHUB_WORKSPACE:-\$(CDPATH= cd -- "\$this_dir/.." && pwd)}
+if [ -z "\${INVARLOCK_CONTRACTS_ROOT:-}" ] && [ -d "\$workspace_root/contracts" ]; then
+  export INVARLOCK_CONTRACTS_ROOT="\$workspace_root/contracts"
+fi
 "\$this_dir/$fuzzer_package" "\$@"
 EOF
   chmod +x "$OUT/$fuzzer_basename"
