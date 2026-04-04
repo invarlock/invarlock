@@ -27,7 +27,13 @@ def get_adapter_rows() -> list[dict[str, Any]]:
         )
         backend, status, enable = None, "ready", ""
 
-        if name in {"hf_causal", "hf_mlm", "hf_seq2seq", "hf_auto"}:
+        if name in {
+            "hf_causal",
+            "hf_mlm",
+            "hf_multimodal",
+            "hf_seq2seq",
+            "hf_auto",
+        }:
             backend = "transformers"
         elif name == "hf_gptq":
             backend = "auto-gptq"

@@ -23,12 +23,14 @@ def test_normalize_family_caps_filters_invalid_entries_and_defaults_when_empty()
         {
             "ffn": {"kappa": 2.2, "bad": "ignore"},
             "attn": 3.4,
+            "embed": True,
             "other": {"bad": object()},
         }
     )
 
     assert mixed["ffn"] == {"kappa": 2.2}
     assert mixed["attn"] == {"kappa": 3.4}
+    assert "embed" not in mixed
     assert "other" not in mixed
 
     defaulted = spectral_policy.normalize_family_caps(
@@ -59,6 +61,20 @@ def test_require_policy_float_rejects_invalid_values(value, kwargs):
         spectral_policy._require_policy_float("sigma_quantile", value, **kwargs)
 
 
+@pytest.mark.parametrize(
+    ("value", "checker", "param_name"),
+    [
+        (True, spectral_policy._require_policy_float, "sigma_quantile"),
+        (False, spectral_policy._require_policy_float, "sigma_quantile"),
+        (True, spectral_policy._require_policy_int, "max_caps"),
+        (False, spectral_policy._require_policy_int, "max_caps"),
+    ],
+)
+def test_require_policy_numeric_helpers_reject_bools(value, checker, param_name):
+    with pytest.raises(ValidationError, match="POLICY-PARAM-INVALID"):
+        checker(param_name, value)
+
+
 def test_normalize_multiple_testing_config_rejects_bad_method_and_zero_alpha():
     with pytest.raises(ValidationError, match="POLICY-PARAM-INVALID"):
         spectral_policy.normalize_multiple_testing_config({"method": "holm"})
@@ -66,10 +82,89 @@ def test_normalize_multiple_testing_config_rejects_bad_method_and_zero_alpha():
     with pytest.raises(ValidationError, match="POLICY-PARAM-INVALID"):
         spectral_policy.normalize_multiple_testing_config({"alpha": 0.0})
 
+    with pytest.raises(ValidationError, match="POLICY-PARAM-INVALID"):
+        spectral_policy.normalize_multiple_testing_config({"alpha": True})
+
+    with pytest.raises(ValidationError, match="POLICY-PARAM-INVALID"):
+        spectral_policy.normalize_multiple_testing_config({"m": False})
+
 
 def test_normalize_estimator_config_rejects_unknown_init():
     with pytest.raises(ValidationError, match="POLICY-PARAM-INVALID"):
         spectral_policy.normalize_estimator_config({"iters": 2, "init": "random"})
+
+    with pytest.raises(ValidationError, match="POLICY-PARAM-INVALID"):
+        spectral_policy.normalize_estimator_config({"iters": True})
+
+
+def test_normalize_degeneracy_config_rejects_bool_ratios():
+    with pytest.raises(ValidationError, match="POLICY-PARAM-INVALID"):
+        spectral_policy.normalize_degeneracy_config(
+            {"stable_rank": {"warn_ratio": True}}
+        )
+
+    with pytest.raises(ValidationError, match="POLICY-PARAM-INVALID"):
+        spectral_policy.normalize_degeneracy_config(
+            {"norm_collapse": {"fatal_ratio": False}}
+        )
+
+
+@pytest.mark.parametrize(
+    ("policy", "param"),
+    [
+        ({"sigma_quantile": True}, "sigma_quantile"),
+        ({"deadband": False}, "deadband"),
+        ({"max_spectral_norm": True}, "max_spectral_norm"),
+        ({"max_caps": True}, "max_caps"),
+    ],
+)
+def test_apply_policy_overrides_rejects_bool_numeric_values(policy, param):
+    guard = SpectralGuard()
+    with pytest.raises(ValidationError, match="POLICY-PARAM-INVALID"):
+        spectral_policy.apply_policy_overrides(guard, policy)
+
+
+def test_apply_policy_overrides_updates_optional_numeric_fields() -> None:
+    guard = SpectralGuard()
+
+    spectral_policy.apply_policy_overrides(
+        guard,
+        {
+            "deadband": 0.12,
+            "max_spectral_norm": None,
+            "max_caps": 4,
+            "correction_enabled": False,
+        },
+    )
+
+    assert guard.deadband == pytest.approx(0.12)
+    assert guard.config["deadband"] == pytest.approx(0.12)
+    assert guard.max_spectral_norm is None
+    assert guard.config["max_spectral_norm"] is None
+    assert guard.max_caps == 4
+    assert guard.config["max_caps"] == 4
+    assert guard.correction_enabled is False
+    assert guard.config["correction_enabled"] is False
+
+
+def test_apply_policy_overrides_updates_individual_numeric_fields() -> None:
+    guard = SpectralGuard()
+
+    spectral_policy.apply_policy_overrides(
+        guard,
+        {
+            "deadband": 0.08,
+            "max_spectral_norm": None,
+            "max_caps": 0,
+        },
+    )
+
+    assert guard.deadband == pytest.approx(0.08)
+    assert guard.config["deadband"] == pytest.approx(0.08)
+    assert guard.max_spectral_norm is None
+    assert guard.config["max_spectral_norm"] is None
+    assert guard.max_caps == 0
+    assert guard.config["max_caps"] == 0
 
 
 def test_apply_policy_overrides_rejects_multipletesting_alias():

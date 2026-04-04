@@ -13,7 +13,9 @@
 
 ```bash
 # Inspect resolved tier policies in a report
-invarlock report explain --report runs/subject/report.json --baseline runs/baseline/report.json
+invarlock report explain \
+  --subject-report runs/subject/report.json \
+  --baseline-report runs/baseline/report.json
 ```
 
 ## Quick Comparison
@@ -115,7 +117,7 @@ a report (see “Quality Gates” in `docs/assurance/04-guard-contracts.md`).
   in `docs/assurance/04-guard-contracts.md` (“Primary metric … ppl-like kinds”).
 - `min_tokens` *(policy)* — minimum total tokens (preview + final) required
   before enforcing the ppl ratio gate. Rationale: prevents noisy PASS/FAIL on
-  tiny samples; keeps CI smokes meaningful while still allowing small local
+  tiny samples; keeps CI smokes meaningful while allowing small local
   demos.
 - `min_token_fraction` *(policy)* — dataset-scale-aware floor: when the runner
   knows available tokens, the effective floor becomes

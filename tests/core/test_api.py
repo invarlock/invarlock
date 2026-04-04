@@ -14,8 +14,14 @@ import pytest
 from invarlock.core.api import (
     CalibrationData,
     DeviceType,
+    EditLike,
     Guard,
     GuardChain,
+    GuardWithAfterEdit,
+    GuardWithBeforeEdit,
+    GuardWithContext,
+    GuardWithFinalize,
+    GuardWithPrepare,
     MetricsDict,
     ModelAdapter,
     ModelEdit,
@@ -179,6 +185,46 @@ class TestGuardChainComprehensive:
         result = chain.get_worst_action([])
         assert isinstance(result, str)
 
+    def test_get_worst_action_prefers_typed_decisions_when_present(self):
+        """Typed decisions should override legacy action labels when both are present."""
+        chain = GuardChain([])
+
+        outcomes = [Mock(decision="monitor", action="abort")]
+
+        assert chain.get_worst_action(outcomes) == "warn"
+
+    def test_get_worst_action_returns_worst_legacy_action_when_decisions_absent(self):
+        chain = GuardChain([])
+
+        outcomes = [Mock(spec=["action"]), Mock(spec=["action"])]
+        outcomes[0].action = "warn"
+        outcomes[1].action = "rollback"
+
+        assert chain.get_worst_action(outcomes) == "rollback"
+
+    def test_get_worst_action_ignores_blank_decision_when_legacy_action_is_present(
+        self,
+    ):
+        chain = GuardChain([])
+
+        outcomes = [Mock(decision="   ", action="rollback")]
+
+        assert chain.get_worst_action(outcomes) == "rollback"
+
+    def test_get_worst_action_ignores_unrecognized_decision_without_action(self):
+        chain = GuardChain([])
+
+        outcomes = [Mock(decision="mystery")]
+
+        assert chain.get_worst_action(outcomes) == "none"
+
+    def test_get_worst_action_accumulates_multiple_typed_decisions(self):
+        chain = GuardChain([])
+
+        outcomes = [Mock(decision="monitor"), Mock(decision="block")]
+
+        assert chain.get_worst_action(outcomes) == "abort"
+
     def test_guard_chain_initialization(self):
         """Test GuardChain initialization with different parameters."""
         # Test with guards and policy
@@ -248,6 +294,7 @@ class TestDataClassesCoverage:
         assert report1.edit == {}
         assert report1.guards == {}
         assert report1.metrics == {}
+        assert report1.evaluation_windows == {}
         assert report1.status == "pending"
         assert report1.error is None
         assert report1.context == {}
@@ -264,6 +311,7 @@ class TestDataClassesCoverage:
             edit=edit_data,
             guards=guards_data,
             metrics=metrics_data,
+            evaluation_windows={"preview": {"window_ids": [1]}},
             status="success",
             error="test error",
             context=context_data,
@@ -273,13 +321,16 @@ class TestDataClassesCoverage:
         assert report2.edit == edit_data
         assert report2.guards == guards_data
         assert report2.metrics == metrics_data
+        assert report2.evaluation_windows == {"preview": {"window_ids": [1]}}
         assert report2.status == "success"
         assert report2.error == "test error"
         assert report2.context == context_data
 
         # Test that default factory creates isolated instances
         report1.meta["new"] = "value"
+        report1.evaluation_windows["final"] = {"window_ids": [2]}
         assert "new" not in report2.meta
+        assert "final" not in report2.evaluation_windows
 
         # Test different status values
         for status in ["pending", "success", "failed", "rollback"]:
@@ -464,6 +515,84 @@ class TestEdgeCases:
         # finalize_all should not call missing method
         final_results = chain.finalize_all(Mock())
         assert final_results == []
+
+    def test_runtime_checkable_guard_protocols(self):
+        """Runtime guard protocol checks should accept matching hook shapes."""
+
+        class _Hooks:
+            def prepare(self, model, adapter, calib, policy_config):
+                return {"ready": True}
+
+            def before_edit(self, model):
+                return "before"
+
+            def after_edit(self, model):
+                return "after"
+
+            def finalize(self, model):
+                return "final"
+
+        hooks = _Hooks()
+
+        assert isinstance(hooks, GuardWithPrepare)
+        assert isinstance(hooks, GuardWithBeforeEdit)
+        assert isinstance(hooks, GuardWithAfterEdit)
+        assert isinstance(hooks, GuardWithFinalize)
+
+    def test_runtime_checkable_edit_and_context_protocols(self):
+        class _EditHooks:
+            name = "hooked_edit"
+
+            def can_edit(self, model_desc):
+                return bool(model_desc)
+
+            def apply(self, model, adapter, plan=None, runtime=None):
+                _ = model, adapter, runtime
+                return {"applied": True, "plan": plan or {}}
+
+        class _GuardContext:
+            def set_run_context(self, report):
+                self.report = report
+
+        edit = _EditHooks()
+        context = _GuardContext()
+
+        assert isinstance(edit, EditLike)
+        assert isinstance(context, GuardWithContext)
+
+    def test_guard_chain_hook_errors_propagate(self):
+        class _PrepareGuard:
+            name = "prepare_guard"
+
+            def prepare(self, model, adapter, calib, policy_config):
+                raise RuntimeError("prepare boom")
+
+        class _BeforeGuard:
+            name = "before_guard"
+
+            def before_edit(self, model):
+                raise RuntimeError("before boom")
+
+        class _AfterGuard:
+            name = "after_guard"
+
+            def after_edit(self, model):
+                raise RuntimeError("after boom")
+
+        class _FinalizeGuard:
+            name = "finalize_guard"
+
+            def finalize(self, model):
+                raise RuntimeError("finalize boom")
+
+        with pytest.raises(RuntimeError, match="prepare boom"):
+            GuardChain([_PrepareGuard()]).prepare_all(Mock(), Mock(), Mock(), {})
+        with pytest.raises(RuntimeError, match="before boom"):
+            GuardChain([_BeforeGuard()]).before_edit_all(Mock())
+        with pytest.raises(RuntimeError, match="after boom"):
+            GuardChain([_AfterGuard()]).after_edit_all(Mock())
+        with pytest.raises(RuntimeError, match="finalize boom"):
+            GuardChain([_FinalizeGuard()]).finalize_all(Mock())
 
 
 if __name__ == "__main__":

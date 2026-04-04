@@ -12,7 +12,9 @@
 
 This guide covers installation, environment setup, and the smallest useful
 InvarLock workflow: compare a baseline against a subject, verify the attested
-report, and render HTML for review.
+report, and render HTML for review. The same top-level loop also underpins the
+included image-text path when you use the explicit multimodal preset and
+provider configuration.
 
 ## Install InvarLock
 
@@ -50,10 +52,10 @@ invarlock doctor
 ## Network Access
 
 InvarLock blocks outbound network by default. When you need to download models
-or datasets, opt in per command with `INVARLOCK_ALLOW_NETWORK=1`:
+or datasets, opt in per command with `--allow-network`:
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
+invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject distilgpt2 \
   --adapter auto \
@@ -71,7 +73,7 @@ runtime container and emit `runtime.manifest.json` beside the evaluation
 report.
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
+INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject /path/to/edited \
   --adapter auto \
@@ -92,8 +94,8 @@ render a shareable HTML artifact from the same report.
 
 ## Execution Modes
 
-- `evaluate` defaults to the runtime container (`--mode attested`).
-- Use `--mode local` only for trusted host-side workflows that intentionally
+- `evaluate` defaults to the runtime container (`--assurance attested`).
+- Use `--assurance trusted-local` only for trusted host-side workflows that intentionally
   bypass container execution.
 - `verify` expects `runtime.manifest.json` next to attested evaluation reports.
 
@@ -137,7 +139,7 @@ for local smoke and portability runs.
 
 | I want to... | Start here |
 | --- | --- |
-| evaluate my own edited model (BYOE) | [Compare & evaluate (BYOE)](compare-and-evaluate.md) |
+| evaluate my own edited checkpoint workflow | [Compare & evaluate (BYOE)](compare-and-evaluate.md) |
 | understand the CLI commands | [Quickstart](quickstart.md) |
 | bring my own evaluation dataset | [Bring Your Own Data](bring-your-own-data.md) |
 | see example outputs | [Example Reports](example-reports.md) |

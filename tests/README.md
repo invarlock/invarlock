@@ -39,5 +39,5 @@ pytest -q \
 ## Runtime artifacts
 
 - CLI commands and scripts write run artifacts under `runs/` and evaluation reports under `reports/eval/` at the repository (or working directory) root.
-- Attested evaluation outputs now include `runtime.manifest.json` adjacent to `evaluation.report.json`; archive both when they are emitted.
+- Attested evaluation outputs include `runtime.manifest.json` adjacent to `evaluation.report.json`; archive both when they are emitted.
 - Test fixtures should live under `tests/fixtures` (or per-area test dirs), not under `tests/runs` or `tests/reports`.

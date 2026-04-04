@@ -561,7 +561,7 @@ class InvariantsGuard(Guard):
 
 
 def _decision_from_action(action: str) -> str:
-    normalized = str(action or "none").lower()
+    normalized = str(action or "none").strip().lower()
     if normalized == "warn":
         return "monitor"
     if normalized == "rollback":
@@ -675,8 +675,25 @@ def check_all_invariants(model: Any, threshold: float = 1e-6) -> GuardOutcome:
             metrics={},
         )
 
+    try:
+        named_parameters = list(model.named_parameters())
+    except _INVARIANT_CAPTURE_ERRORS as exc:
+        violations.append(
+            {
+                "type": "structure_violation",
+                "message": f"Could not iterate named_parameters: {exc}",
+            }
+        )
+        return GuardOutcome(
+            name="check_all_invariants",
+            passed=False,
+            action="reject",
+            violations=violations,
+            metrics={"parameters_checked": 0, "violations_found": len(violations)},
+        )
+
     # Check for NaN/Inf in parameters
-    for name, param in model.named_parameters():
+    for name, param in named_parameters:
         if hasattr(param.data, "isnan") and param.data.isnan().any():
             violations.append(
                 {
@@ -695,7 +712,7 @@ def check_all_invariants(model: Any, threshold: float = 1e-6) -> GuardOutcome:
             )
 
     # Check parameter ranges are reasonable
-    for name, param in model.named_parameters():
+    for name, param in named_parameters:
         if hasattr(param.data, "abs") and hasattr(param.data, "max"):
             max_val = param.data.abs().max()
             if hasattr(max_val, "item"):
@@ -729,7 +746,7 @@ def check_all_invariants(model: Any, threshold: float = 1e-6) -> GuardOutcome:
         action=action,
         violations=violations,
         metrics={
-            "parameters_checked": sum(1 for _ in model.named_parameters()),
+            "parameters_checked": len(named_parameters),
             "violations_found": len(violations),
         },
     )

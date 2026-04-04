@@ -19,6 +19,10 @@ except ImportError:  # Legacy fallback
     from typing_extensions import TypedDict
 
 
+def _is_non_bool_number(value: object) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool)
+
+
 class AutoConfig(TypedDict):
     """Auto-tuning configuration metadata."""
 
@@ -256,15 +260,15 @@ def validate_report(report: object) -> bool:
 
     pm_kind = pm.get("kind")
     pm_final = pm.get("final")
-    if not (isinstance(pm_kind, str) and pm_kind):
+    if not (isinstance(pm_kind, str) and pm_kind.strip()):
         return False
-    if pm_final is not None and not isinstance(pm_final, int | float):
+    if pm_final is not None and not _is_non_bool_number(pm_final):
         return False
 
     meta = report.get("meta")
     if not isinstance(meta, dict):
         return False
-    return isinstance(meta.get("seed"), int)
+    return _is_non_bool_number(meta.get("seed"))
 
 
 # Export all types for type hints

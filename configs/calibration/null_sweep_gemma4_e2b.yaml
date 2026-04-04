@@ -1,0 +1,49 @@
+# Calibration config: Null sweep for Gemma 4 E2B text-only spectral/RMT calibration on WikiText-103 via hf_text.
+
+model:
+  id: "google/gemma-4-E2B-it"
+  adapter: "hf_causal"
+  device: "auto"
+  attn_implementation: "sdpa"
+
+dataset:
+  provider:
+    kind: "hf_text"
+    dataset_name: "wikitext"
+    config_name: "wikitext-103-v1"
+    text_field: "text"
+    max_samples: 10000
+  split: "train"
+  seq_len: 512
+  stride: 512
+  preview_n: 64
+  final_n: 64
+  seed: 42
+
+edit:
+  name: noop
+  plan: {}
+
+eval:
+  metric:
+    kind: ppl_causal
+  loss:
+    type: causal
+
+primary_metric:
+  drift_band:
+    min: 0.90
+    max: 1.20
+
+auto:
+  enabled: true
+  tier: balanced
+  probes: 0
+
+guards:
+  order: ["invariants", "spectral", "rmt", "variance", "invariants"]
+
+output:
+  dir: runs/null_sweeps/gemma4_e2b
+  save_model: false
+  save_report: true

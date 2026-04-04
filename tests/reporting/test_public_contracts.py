@@ -19,7 +19,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
 
     family_catalog = contracts.load_model_family_catalog()
     assert family_catalog["format_version"] == "model-family-catalog-v1"
-    assert family_catalog["as_of"] == "2026-03-25"
+    assert family_catalog["as_of"] == "2026-04-03"
     assert family_catalog["declared_support"][0]["display_name"] == "GPT-2 causal LM"
     declared = {item["display_name"] for item in family_catalog["declared_support"]}
     assert declared == {
@@ -31,6 +31,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "Qwen3 causal LM",
         "DeepSeek-R1-Distill-Qwen causal LM",
         "Phi-4 causal LM (text-only eval)",
+        "Gemma 4 E2B causal LM (text-only eval)",
         "TinyLlama 1.1B causal LM",
         "OLMo 2 causal LM",
         "Qwen3.5 causal LM",
@@ -41,7 +42,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     recommended = {
         item["display_name"] for item in family_catalog["recommended_additions"]
     }
-    assert recommended == {"Full multimodal evaluation pipeline"}
+    assert recommended == {"Audio-text evaluation pipeline"}
 
     gpt2_lane = contracts.support_lane_by_id("gpt2-causal-hf")
     assert gpt2_lane is not None
@@ -131,6 +132,30 @@ def test_public_contract_loader_tries_env_then_workspace_and_deduplicates(
 
     roots = contracts._fallback_contract_roots()
     assert roots == [tmp_path / "env-contracts", contracts_dir]
+
+
+def test_public_contract_loader_tries_pyinstaller_bundle_contracts(
+    monkeypatch, tmp_path: Path
+) -> None:
+    bundle_root = tmp_path / "_MEI12345"
+    bundle_contracts = bundle_root / "contracts"
+    bundle_contracts.mkdir(parents=True)
+    source = contracts.CONTRACTS_ROOT / "policy_pack.schema.json"
+    (bundle_contracts / source.name).write_text(source.read_text(encoding="utf-8"))
+
+    monkeypatch.setattr(contracts, "CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(contracts, "PACKAGE_CONTRACTS_ROOT", tmp_path / "missing")
+    monkeypatch.setattr(sys, "_MEIPASS", str(bundle_root), raising=False)
+    monkeypatch.delenv("INVARLOCK_CONTRACTS_ROOT", raising=False)
+    monkeypatch.delenv("GITHUB_WORKSPACE", raising=False)
+    monkeypatch.chdir(tmp_path)
+
+    payload = contracts.load_policy_pack_schema()
+    assert payload["title"] == "InvarLock Policy Pack"
+    assert contracts._fallback_contract_roots()[:2] == [
+        bundle_contracts,
+        bundle_root / "invarlock" / "_data" / "contracts",
+    ]
 
 
 def test_public_contract_loader_discovers_ancestor_contracts_for_build_out(

@@ -17,6 +17,10 @@ def test_normalize_run_report_accuracy_fallback_and_retention():
     pm = rep["metrics"]["primary_metric"]
     assert pm["kind"] == "accuracy"
     assert 0.79 < pm["final"] < 0.81
+    assert rep["metrics"]["classification"]["final"] == {
+        "correct_total": 8,
+        "total": 10,
+    }
     assert (
         "evaluation_windows" in rep and "guard_overhead" in rep and "provenance" in rep
     )

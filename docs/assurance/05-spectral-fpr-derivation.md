@@ -49,7 +49,7 @@ alongside $\kappa_f$ so auditors can recover the expected per-run WARN rate.
 - Conservative tier applies **Bonferroni** (`method = "bonferroni"`, α = 0.000625,
   m = 4) with caps `{ffn: 3.849, attn: 2.6, embed: 2.8, other: 2.8}`,
   `sigma_quantile = 0.90`, and `max_caps = 3`, keeping WARNs within the
-  calibrated budget. Scope is `ffn` in the shipped tier policies, so only FFN
+  calibrated budget. Scope is `ffn` in the included tier policies, so only FFN
   blocks are actively budgeted under the Conservative spectral guard.
 - Deadband δ suppresses flicker around the cap: Balanced records δ = 0.10,
   Conservative δ = 0.05, surfaced in reports via

@@ -73,6 +73,7 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
         "Qwen3 causal LM",
         "DeepSeek-R1-Distill-Qwen causal LM",
         "Phi-4 causal LM (text-only eval)",
+        "Gemma 4 E2B causal LM (text-only eval)",
         "TinyLlama 1.1B causal LM",
         "OLMo 2 causal LM",
         "Qwen3.5 causal LM",
@@ -90,6 +91,10 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
     )
     assert (
         families["Phi-4 causal LM (text-only eval)"]["support_tier"]
+        == "supported_experimental"
+    )
+    assert (
+        families["Gemma 4 E2B causal LM (text-only eval)"]["support_tier"]
         == "supported_experimental"
     )
     assert (

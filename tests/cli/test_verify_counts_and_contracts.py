@@ -34,6 +34,25 @@ def test_validate_counts_emits_paired_windows_mismatch() -> None:
     assert any("Paired window count mismatch" in e for e in errs)
 
 
+def test_validate_counts_rejects_bool_counts_even_when_they_match_ints() -> None:
+    cert = {
+        "dataset": {
+            "windows": {
+                "preview": 1,
+                "final": True,
+                "stats": {
+                    "paired_windows": True,
+                    "coverage": {"preview": {"used": True}, "final": {"used": True}},
+                },
+            }
+        }
+    }
+    errs = v._validate_counts(cert)
+    assert any("invalid coverage.preview.used" in e for e in errs)
+    assert any("invalid dataset.windows.final count" in e for e in errs)
+    assert any("invalid paired_windows" in e for e in errs)
+
+
 def test_validate_tokenizer_hash_falls_back_to_dataset_tokenizer_hash() -> None:
     cert = {
         "meta": {},

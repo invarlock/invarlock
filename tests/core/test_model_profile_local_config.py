@@ -87,6 +87,13 @@ def test_local_profile_config_helpers_tolerate_invalid_utf8(tmp_path: Path) -> N
         ),
         (
             {
+                "model_type": "gemma4",
+                "architectures": ["Gemma4ForConditionalGeneration"],
+            },
+            "gemma",
+        ),
+        (
+            {
                 "model_type": "olmo2",
                 "architectures": ["Olmo2ForCausalLM"],
             },

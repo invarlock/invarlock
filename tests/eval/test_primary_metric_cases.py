@@ -35,6 +35,27 @@ def test_compute_primary_metric_accuracy_counts_source_and_ratio():
     )
 
 
+def test_compute_primary_metric_accuracy_ignores_bool_counts_and_baseline_final():
+    report = {
+        "metrics": {
+            "classification": {
+                "preview": {"correct_total": True, "total": 10},
+                "final": {"correct_total": 18, "total": 20},
+                "counts_source": "measured",
+            }
+        }
+    }
+    baseline = {
+        "metrics": {"primary_metric": {"kind": "accuracy", "final": True}},
+    }
+    payload = compute_primary_metric_from_report(
+        report, kind="accuracy", baseline=baseline
+    )
+    assert math.isnan(payload["preview"])
+    assert payload["final"] == pytest.approx(0.9)
+    assert math.isnan(payload["ratio_vs_baseline"])
+
+
 def test_compute_primary_metric_accuracy_derives_counts_from_ids():
     report = {
         "evaluation_windows": {
@@ -63,6 +84,21 @@ def test_compute_primary_metric_ppl_ratio_vs_baseline():
     assert payload["ratio_vs_baseline"] == pytest.approx(
         payload["final"] / baseline["metrics"]["primary_metric"]["final"]
     )
+
+
+def test_compute_primary_metric_ppl_ignores_bool_baseline_final():
+    report = {
+        "evaluation_windows": {
+            "preview": {"logloss": [1.0], "token_counts": [4]},
+            "final": {"logloss": [1.5], "token_counts": [5]},
+        }
+    }
+    baseline = {"metrics": {"primary_metric": {"kind": "ppl_causal", "final": True}}}
+    payload = compute_primary_metric_from_report(
+        report, kind="ppl_causal", baseline=baseline
+    )
+    assert payload["final"] == pytest.approx(math.exp(1.5))
+    assert math.isnan(payload["ratio_vs_baseline"])
 
 
 def test_infer_binary_label_handles_bad_tokens():

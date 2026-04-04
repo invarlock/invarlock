@@ -11,11 +11,22 @@ __all__ = [
 
 
 def _as_finite_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
         out = float(value)
     except Exception:
         return None
     return out if math.isfinite(out) else None
+
+
+def _coerce_non_bool_int(value: Any, default: int) -> int:
+    if isinstance(value, bool):
+        return int(default)
+    try:
+        return int(value)
+    except Exception:
+        return int(default)
 
 
 def _linear_quantile(sorted_values: Sequence[float], q: float) -> float:
@@ -145,10 +156,7 @@ def evaluate_metric_tail(
         mode = "warn"
 
     min_windows = pol.get("min_windows", 1)
-    try:
-        min_windows_i = int(min_windows)
-    except Exception:
-        min_windows_i = 1
+    min_windows_i = _coerce_non_bool_int(min_windows, 1)
     min_windows_i = max(1, min_windows_i)
 
     q = _as_finite_float(pol.get("quantile", 0.95))
@@ -179,8 +187,8 @@ def evaluate_metric_tail(
     if evaluated:
         passed = True
         q_label = f"q{int(round(100.0 * q))}"
-        q_obs = stats.get(q_label)
-        if not (isinstance(q_obs, int | float) and math.isfinite(float(q_obs))):
+        q_obs = _as_finite_float(stats.get(q_label))
+        if q_obs is None:
             q_obs = float("nan")
         if qmax is not None and math.isfinite(q_obs) and q_obs > float(qmax):
             passed = False
@@ -193,19 +201,14 @@ def evaluate_metric_tail(
                 }
             )
 
-        tail_mass = stats.get("tail_mass")
-        if (
-            mmax is not None
-            and isinstance(tail_mass, int | float)
-            and math.isfinite(float(tail_mass))
-            and float(tail_mass) > float(mmax)
-        ):
+        tail_mass = _as_finite_float(stats.get("tail_mass"))
+        if mmax is not None and tail_mass is not None and tail_mass > float(mmax):
             passed = False
             violations.append(
                 {
                     "type": "tail_mass_exceeded",
                     "epsilon": float(eps),
-                    "observed": float(tail_mass),
+                    "observed": tail_mass,
                     "threshold": float(mmax),
                 }
             )

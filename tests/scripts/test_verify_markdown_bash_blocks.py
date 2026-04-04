@@ -48,6 +48,24 @@ def test_extract_bash_blocks_only_keeps_invarlock_blocks(tmp_path: Path) -> None
     assert "invarlock version" in blocks[0].text
 
 
+def test_iter_markdown_files_excludes_top_level_hidden_docs(tmp_path: Path) -> None:
+    module = _load_script_module()
+    (tmp_path / ".private" / "plans").mkdir(parents=True)
+    (tmp_path / ".private" / "plans" / "internal.md").write_text(
+        "```bash\ninvarlock version\n```\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "public.md").write_text(
+        "```bash\ninvarlock version\n```\n",
+        encoding="utf-8",
+    )
+
+    files = module.iter_markdown_files(tmp_path)
+
+    assert files == [tmp_path / "docs" / "public.md"]
+
+
 def test_sanitize_script_skips_pip_installs() -> None:
     module = _load_script_module()
     block = module.BashBlock(
@@ -56,7 +74,7 @@ def test_sanitize_script_skips_pip_installs() -> None:
         block_index=1,
         text=(
             'pip install "invarlock[hf]"\n'
-            "INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \\\n"
+            "invarlock evaluate --allow-network \\\n"
             "  --baseline gpt2 \\\n"
             "python -m pip install foo\n"
         ),
@@ -65,13 +83,13 @@ def test_sanitize_script_skips_pip_installs() -> None:
     rendered = module._sanitize_script(block)
 
     assert "[skip] pip install" in rendered
-    assert " -m invarlock evaluate \\" in rendered
+    assert " -m invarlock evaluate --allow-network \\" in rendered
     assert "--baseline gpt2 \\" in rendered
     assert "\\ \\" not in rendered
     assert "[skip] python -m pip install foo" in rendered
 
 
-def test_sanitize_script_host_mode_injects_host_bypass_and_verify_override() -> None:
+def test_sanitize_script_host_mode_injects_trusted_local_assurance() -> None:
     module = _load_script_module()
     block = module.BashBlock(
         file="README.md",
@@ -85,9 +103,49 @@ def test_sanitize_script_host_mode_injects_host_bypass_and_verify_override() -> 
 
     rendered = module._sanitize_script(block, execution_mode="host")
 
-    assert "--mode local" in rendered
+    assert "--assurance trusted-local" in rendered
     assert "INVARLOCK_ALLOW_HOST_EXECUTION=1" not in rendered
-    assert "--allow-unattested-artifacts" in rendered
+    assert rendered.count("--assurance trusted-local") == 2
+
+
+def test_sanitize_script_host_mode_marks_advanced_calibrate_for_host_execution() -> (
+    None
+):
+    module = _load_script_module()
+    block = module.BashBlock(
+        file="docs/reference/calibration.md",
+        line=1,
+        block_index=1,
+        text=(
+            "invarlock advanced calibrate null-sweep \\\n"
+            "  --config configs/calibration/null_sweep_ci.yaml\n"
+        ),
+    )
+
+    rendered = module._sanitize_script(block, execution_mode="host")
+
+    assert "INVARLOCK_ALLOW_HOST_EXECUTION=1" in rendered
+    assert "-m invarlock advanced calibrate null-sweep" in rendered
+
+
+def test_sanitize_script_host_mode_skips_container_only_lines() -> None:
+    module = _load_script_module()
+    block = module.BashBlock(
+        file="README.md",
+        line=1,
+        block_index=1,
+        text=(
+            "make runtime-image\n"
+            "test -f reports/eval/runtime.manifest.json\n"
+            "docker ps\n"
+        ),
+    )
+
+    rendered = module._sanitize_script(block, execution_mode="host")
+
+    assert "[skip-host] make runtime-image" in rendered
+    assert "[skip-host] test -f reports/eval/runtime.manifest.json" in rendered
+    assert "[skip-host] docker ps" in rendered
 
 
 def test_sanitize_script_container_mode_strips_host_bypass_flags() -> None:
@@ -98,14 +156,69 @@ def test_sanitize_script_container_mode_strips_host_bypass_flags() -> None:
         block_index=1,
         text=(
             "INVARLOCK_ALLOW_HOST_EXECUTION=1 invarlock run -c config.yaml\n"
-            "invarlock verify --allow-unattested-artifacts reports/eval/evaluation.report.json\n"
+            "invarlock verify --assurance trusted-local reports/eval/evaluation.report.json\n"
         ),
     )
 
     rendered = module._sanitize_script(block, execution_mode="container")
 
     assert "INVARLOCK_ALLOW_HOST_EXECUTION=1" not in rendered
-    assert "--allow-unattested-artifacts" not in rendered
+    assert "--assurance trusted-local" not in rendered
+
+
+def test_seed_demo_inputs_writes_expected_fixture_files(tmp_path: Path) -> None:
+    module = _load_script_module()
+    fixture_root = tmp_path / "repo"
+    (fixture_root / "tests" / "artifacts" / "golden_runs" / "gpt2").mkdir(parents=True)
+    (fixture_root / "tests" / "fixtures" / "runtime_attestation").mkdir(parents=True)
+    (
+        fixture_root
+        / "tests"
+        / "artifacts"
+        / "golden_runs"
+        / "gpt2"
+        / "evaluation.report.json"
+    ).write_text(
+        '{"schema_version":"v1"}\n',
+        encoding="utf-8",
+    )
+    (
+        fixture_root
+        / "tests"
+        / "fixtures"
+        / "runtime_attestation"
+        / "runtime.manifest.json"
+    ).write_text(
+        '{"format_version":"runtime-manifest-v1"}\n',
+        encoding="utf-8",
+    )
+    module.ROOT = fixture_root
+    module.DEMO_EVALUATION_REPORT_FIXTURE = (
+        fixture_root
+        / "tests"
+        / "artifacts"
+        / "golden_runs"
+        / "gpt2"
+        / "evaluation.report.json"
+    )
+    module.DEMO_RUNTIME_MANIFEST_FIXTURE = (
+        fixture_root
+        / "tests"
+        / "fixtures"
+        / "runtime_attestation"
+        / "runtime.manifest.json"
+    )
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    module._seed_demo_inputs(workspace)
+
+    assert (workspace / "reports" / "eval" / "evaluation.report.json").is_file()
+    assert (workspace / "report_bundle" / "evaluation.report.json").is_file()
+    assert (workspace / "reports" / "eval" / "runtime.manifest.json").is_file()
+    assert (workspace / "runs" / "subject" / "report.json").is_file()
+    assert (workspace / "resolved_policy.json").is_file()
+    assert (workspace / "compatibility.json").is_file()
 
 
 def test_run_blocks_writes_results(tmp_path: Path, monkeypatch) -> None:

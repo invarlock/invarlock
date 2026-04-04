@@ -384,8 +384,10 @@ def build_primary_metric_analysis(
     except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
         paired_windows_signal = None
     paired_windows_signal_int = _coerce_int(paired_windows_signal)
+    paired_windows_explicit = False
     if paired_windows_signal_int is not None and paired_windows_signal_int >= 0:
         paired_windows = paired_windows_signal_int
+        paired_windows_explicit = True
 
     try:
         pm_blk = (
@@ -500,6 +502,47 @@ def build_primary_metric_analysis(
                     return int(round(value))
                 return None
 
+            def _count_examples(section: Any) -> int | None:
+                if not isinstance(section, dict):
+                    return None
+                records = section.get("records")
+                if isinstance(records, list):
+                    measured = len(
+                        [record for record in records if isinstance(record, dict)]
+                    )
+                    if measured > 0:
+                        return measured
+                example_ids = section.get("example_ids")
+                if isinstance(example_ids, list) and example_ids:
+                    return int(len(example_ids))
+                ids = section.get("window_ids")
+                if isinstance(ids, list) and ids:
+                    return int(len(ids))
+                return None
+
+            classification_metrics = (
+                report.get("metrics", {}).get("classification")
+                if isinstance(report.get("metrics"), dict)
+                else None
+            )
+            classification_metrics = (
+                classification_metrics
+                if isinstance(classification_metrics, dict)
+                else {}
+            )
+
+            def _classification_total(arm: str) -> int | None:
+                section = (
+                    classification_metrics.get(arm)
+                    if isinstance(classification_metrics, dict)
+                    else None
+                )
+                if isinstance(section, dict):
+                    total = _as_count(section.get("total"))
+                    if total is not None:
+                        return total
+                return None
+
             data_cfg = report.get("data", {}) if isinstance(report, dict) else {}
             data_cfg = data_cfg if isinstance(data_cfg, dict) else {}
             windows_cfg = (
@@ -526,17 +569,11 @@ def build_primary_metric_analysis(
             )
             eval_windows = eval_windows if isinstance(eval_windows, dict) else {}
 
-            def _len_ids(section: Any) -> int | None:
-                if not isinstance(section, dict):
-                    return None
-                ids = section.get("window_ids")
-                if isinstance(ids, list):
-                    return int(len(ids))
-                return None
-
             act_prev = _as_count(stats_obj.get("actual_preview"))
             if act_prev is None:
-                act_prev = _len_ids(eval_windows.get("preview"))
+                act_prev = _count_examples(eval_windows.get("preview"))
+            if act_prev is None:
+                act_prev = _classification_total("preview")
             if act_prev is None:
                 cov_prev = (
                     coverage_summary.get("preview")
@@ -550,7 +587,9 @@ def build_primary_metric_analysis(
 
             act_fin = _as_count(stats_obj.get("actual_final"))
             if act_fin is None:
-                act_fin = _len_ids(eval_windows.get("final"))
+                act_fin = _count_examples(eval_windows.get("final"))
+            if act_fin is None:
+                act_fin = _classification_total("final")
             if act_fin is None:
                 cov_fin = (
                     coverage_summary.get("final")
@@ -572,6 +611,60 @@ def build_primary_metric_analysis(
                 stats_obj["actual_preview"] = act_prev
             if act_fin is not None:
                 stats_obj["actual_final"] = act_fin
+
+            if not isinstance(coverage_summary, dict):
+                coverage_summary = {}
+            if isinstance(act_prev, int):
+                preview_cov = (
+                    coverage_summary.get("preview")
+                    if isinstance(coverage_summary.get("preview"), dict)
+                    else {}
+                )
+                preview_cov.setdefault("used", act_prev)
+                if isinstance(req_prev, int):
+                    preview_cov.setdefault("required", req_prev)
+                    preview_cov.setdefault("ok", act_prev >= req_prev)
+                coverage_summary["preview"] = preview_cov
+            if isinstance(act_fin, int):
+                final_cov = (
+                    coverage_summary.get("final")
+                    if isinstance(coverage_summary.get("final"), dict)
+                    else {}
+                )
+                final_cov.setdefault("used", act_fin)
+                if isinstance(req_fin, int):
+                    final_cov.setdefault("required", req_fin)
+                    final_cov.setdefault("ok", act_fin >= req_fin)
+                coverage_summary["final"] = final_cov
+
+            if paired_windows <= 0 and not paired_windows_explicit:
+                if isinstance(act_prev, int) and act_prev > 0:
+                    if isinstance(act_fin, int) and act_fin > 0:
+                        paired_windows = min(act_prev, act_fin)
+                    else:
+                        paired_windows = act_prev
+            if paired_windows > 0:
+                stats_obj["paired_windows"] = paired_windows
+
+            match_fraction = stats_obj.get("window_match_fraction")
+            if (
+                not (
+                    isinstance(match_fraction, int | float)
+                    and math.isfinite(float(match_fraction))
+                )
+                and paired_windows > 0
+            ):
+                stats_obj["window_match_fraction"] = 1.0
+
+            overlap_fraction = stats_obj.get("window_overlap_fraction")
+            if (
+                not (
+                    isinstance(overlap_fraction, int | float)
+                    and math.isfinite(float(overlap_fraction))
+                )
+                and paired_windows > 0
+            ):
+                stats_obj["window_overlap_fraction"] = 0.0
 
             if "coverage_ok" not in stats_obj:
                 if (

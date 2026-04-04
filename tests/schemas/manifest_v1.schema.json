@@ -5,12 +5,16 @@
   "required": ["generated_at", "files", "summary"],
   "properties": {
     "generated_at": {"type": "string"},
+    "evidence_level": {
+      "enum": ["low", "medium", "high"]
+    },
     "files": {
       "type": "object",
       "required": ["evaluation_report_json", "evaluation_report_markdown"],
       "properties": {
         "evaluation_report_json": {"type": "string", "minLength": 1},
-        "evaluation_report_markdown": {"type": "string", "minLength": 1}
+        "evaluation_report_markdown": {"type": "string", "minLength": 1},
+        "reviewer_summary_txt": {"type": "string", "minLength": 1}
       },
       "additionalProperties": false
     },

@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to InvarLock.
 This guide summarizes how to set up a dev environment, run checks, and open
-high-quality PRs that match the current repo layout and tooling.
+high-quality PRs that match the repo layout and tooling.
 
 ---
 
@@ -18,12 +18,12 @@ high-quality PRs that match the current repo layout and tooling.
 InvarLock runs offline by default. For commands that need downloads
 (models/datasets), enable network explicitly per run. Model-loading commands use
 the runtime container by default; trusted local development outside that
-container should use `--mode local` on the public `evaluate` path:
+container should use `--assurance trusted-local` on the public `evaluate` path:
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --mode local --baseline gpt2 --subject distilgpt2 --adapter auto
+INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --assurance trusted-local --baseline gpt2 --subject distilgpt2 --adapter auto
 # repo preset example:
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --mode local --baseline gpt2 --subject gpt2 --adapter auto --preset configs/presets/causal_lm/wikitext2_512.yaml --profile ci
+INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --assurance trusted-local --baseline gpt2 --subject gpt2 --adapter auto --preset configs/presets/causal_lm/wikitext2_512.yaml --profile ci
 ```
 
 ### 1.2 Quick setup (recommended)
@@ -89,7 +89,7 @@ invarlock/
 │   ├── edits/           # Edit abstractions and demos
 │   ├── observability/   # Logging, telemetry, diagnostics
 │   ├── plugins/         # Pluggable edits/adapters/guards
-│   └── _data/runtime/   # Profiles/tiers shipped with the package
+│   └── _data/runtime/   # Profiles/tiers included with the package
 ├── tests/               # Test suite (pytest)
 │   ├── unit/            # Focused unit tests
 │   ├── integration/     # End-to-end and pipeline tests
@@ -191,7 +191,7 @@ Key points:
   # internally: python scripts/check_coverage_thresholds.py --coverage reports/cov.xml --json reports/thresholds.json
   ```
 
-- **Critical surface** currently includes (see `THRESHOLDS`, `CORE_PREFIXES`, and
+- **Critical surface** includes (see `THRESHOLDS`, `CORE_PREFIXES`, and
   `CORE_FILES` in `scripts/check_coverage_thresholds.py`):
   - Core runtime: everything under `src/invarlock/core/`
     (runner, registry, contracts, auto_tuning, events, types, checkpoint, api, retry)
@@ -213,7 +213,7 @@ Key points:
     `src/invarlock/cli/verify_checks.py`,
     `src/invarlock/cli/verify_output.py`
 
-- Split-aware enforcement now uses four levels:
+- Split-aware enforcement uses four levels:
   - **100% branch** for lifecycle shells:
     `src/invarlock/core/runner.py`,
     `src/invarlock/guards/variance.py`,
@@ -246,7 +246,7 @@ Key points:
     `src/invarlock/guards/variance_scaling.py`,
     `src/invarlock/guards/spectral_control.py`,
     `src/invarlock/guards/spectral_measurement.py`
-  - **≥90% branch** for the rest of the current critical surface until it is split further,
+  - **≥90% branch** for the rest of the critical surface until it is split further,
     including orchestration helpers such as
     `src/invarlock/core/runner_eval_metrics.py`,
     `src/invarlock/core/runner_finalize.py`, and

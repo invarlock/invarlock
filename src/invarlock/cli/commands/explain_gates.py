@@ -66,9 +66,15 @@ def _drift_ratio(preview: object, final: object) -> float | None:
 
 
 def explain_gates_command(
-    report: str = typer.Option(..., "--report", help="Path to primary report.json"),
-    baseline: str = typer.Option(
-        ..., "--baseline", help="Path to baseline report.json"
+    subject_report: str = typer.Option(
+        ...,
+        "--subject-report",
+        help="Path to the subject run report.json",
+    ),
+    baseline_report: str = typer.Option(
+        ...,
+        "--baseline-report",
+        help="Path to the baseline run report.json",
     ),
 ) -> None:
     """Explain evaluation report gates for a report vs baseline.
@@ -76,10 +82,10 @@ def explain_gates_command(
     Loads the reports, builds an evaluation report, and prints gate thresholds,
     observed statistics, and pass/fail reasons in a compact, readable form.
     """
-    report_path = Path(report)
-    baseline_path = Path(baseline)
+    report_path = Path(subject_report)
+    baseline_path = Path(baseline_report)
     if not report_path.exists() or not baseline_path.exists():
-        console.print("[red]Missing --report or --baseline file[/red]")
+        console.print("[red]Missing --subject-report or --baseline-report file[/red]")
         raise typer.Exit(1)
 
     try:

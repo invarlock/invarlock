@@ -233,3 +233,92 @@ def test_adapter_aware_standard_invariants_violation():
     passed, results = check_adapter_aware_invariants(model)
     assert results.get("adapter_type") == "none"
     assert passed is False or results.get("violations")
+
+
+def test_capture_invariants_uses_embedding_weight_shape_fallback() -> None:
+    class _FragileEmbedding(nn.Embedding):
+        def __getattribute__(self, name: str):
+            if name == "num_embeddings":
+                raise RuntimeError("num_embeddings unavailable")
+            return super().__getattribute__(name)
+
+    class _Model(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.embed = _FragileEmbedding(11, 4)
+
+    guard = InvariantsGuard()
+    checks = guard._capture_invariants(_Model(), adapter=None)
+
+    assert checks["embedding_vocab_sizes"]["embed"] == 11
+
+
+def test_capture_invariants_records_multiple_evidence_gaps(
+    monkeypatch,
+) -> None:
+    class _BadConfig:
+        model_type = ""
+        is_decoder = False
+        vocab_size = object()
+
+    class _ExplodingModel(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.ln = nn.LayerNorm(4)
+            self.embed = nn.Embedding(8, 4)
+            self.config = _BadConfig()
+
+        @property
+        def transformer(self):
+            raise RuntimeError("gpt2 tie unavailable")
+
+        @property
+        def bert(self):
+            raise RuntimeError("bert tie unavailable")
+
+        @property
+        def model(self):
+            raise RuntimeError("decoder tie unavailable")
+
+    monkeypatch.setattr(
+        "invarlock.guards.invariants.hashlib.sha256",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("hash boom")),
+    )
+
+    guard = InvariantsGuard()
+    checks = guard._capture_invariants(_ExplodingModel(), adapter=None)
+    gap_names = {gap["check"] for gap in checks["evidence_gaps"]}
+
+    assert {
+        "config_vocab_size",
+        "weight_tying_gpt2",
+        "weight_tying_bert",
+        "weight_tying_embed_tokens",
+        "structure_hash",
+    } <= gap_names
+    assert checks["structure_hash"] is None
+
+
+def test_invariants_profile_checks_cover_empty_rotary_layers_and_causal_type() -> None:
+    guard = InvariantsGuard()
+    model = SimpleNamespace(
+        model=SimpleNamespace(layers=[]),
+        config=SimpleNamespace(model_type="qwen2", is_decoder=False),
+    )
+
+    assert guard._evaluate_profile_check(model, "rotary_embedding") is False
+    assert guard._evaluate_profile_check(model, "causal_masking") is True
+
+
+def test_detect_non_finite_ignores_bad_tensor_checks_and_iteration_failures() -> None:
+    class _BrokenModel:
+        def named_parameters(self):
+            yield "bad_param", object()
+
+        def named_buffers(self):
+            yield "bad_buffer", object()
+            raise RuntimeError("buffers boom")
+
+    guard = InvariantsGuard()
+
+    assert guard._detect_non_finite(_BrokenModel()) == []

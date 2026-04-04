@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "invarlock"
-version = "0.5.1"
+version = "0.6.0"
 description = "Edit‑agnostic robustness evaluation reports for weight edits (InvarLock framework)"
 authors = [{ name = "InvarLock Team", email = "oss@invarlock.dev" }]
 maintainers = [{ name = "InvarLock Maintainers", email = "support@invarlock.dev" }]
@@ -54,18 +54,19 @@ Changelog = "https://github.com/invarlock/invarlock/blob/main/CHANGELOG.md"
 # Core torch dependencies for adapters
 adapters = [
   "torch>=2.1.0",
-  "transformers>=5.0.0",
+  "transformers>=5.5.0",
   "safetensors>=0.4.0",
   "protobuf>=4.25",
   "sentencepiece>=0.2.1",
   "tiktoken>=0.9.0",
+  "pillow>=11.3.0",
 ]
 
 # Hugging Face workflow (adapters + evaluation stack)
 hf = [
   "torch>=2.1.0",
   "accelerate>=0.26.0",
-  "transformers>=5.0.0",
+  "transformers>=5.5.0",
   "safetensors>=0.4.0",
   "protobuf>=4.25",
   "sentencepiece>=0.2.1",
@@ -102,7 +103,7 @@ gptq = [
   "torch>=2.1.0",
   "auto-gptq>=0.7.0; platform_system == \"Linux\"",
   "triton>=2.3.0; platform_system == \"Linux\"",
-  "transformers>=5.0.0",
+  "transformers>=5.5.0",
   "safetensors>=0.4.0",
 ]
 
@@ -110,7 +111,7 @@ gptq = [
 awq = [
   "torch>=2.1.0",
   "autoawq>=0.2.0; platform_system == \"Linux\"",
-  "transformers>=5.0.0",
+  "transformers>=5.5.0",
   "safetensors>=0.4.0",
   "triton>=2.3.0; platform_system == \"Linux\"",
 ]
@@ -126,7 +127,7 @@ gpu = [
 # Convenience install for advanced proof-pack/policy/plugins/calibration workflows.
 advanced = [
   "torch>=2.1.0",
-  "transformers>=5.0.0",
+  "transformers>=5.5.0",
   "protobuf>=4.25",
   "sentencepiece>=0.2.1",
   "tiktoken>=0.9.0",
@@ -148,7 +149,7 @@ advanced = [
 # Complete installation with all features
 all = [
   "torch>=2.1.0",
-  "transformers>=5.0.0",
+  "transformers>=5.5.0",
   "protobuf>=4.25",
   "sentencepiece>=0.2.1",
   "tiktoken>=0.9.0",
@@ -236,6 +237,7 @@ hf_causal = "invarlock.adapters:HF_Causal_Adapter"
 hf_mlm = "invarlock.adapters:HF_MLM_Adapter"
 hf_seq2seq = "invarlock.adapters:HF_Seq2Seq_Adapter"
 hf_auto = "invarlock.adapters:HF_Auto_Adapter"
+hf_multimodal = "invarlock.adapters.hf_multimodal:HF_Multimodal_Adapter"
 hf_gptq = "invarlock.plugins.hf_gptq_adapter:HF_GPTQ_Adapter"
 hf_awq = "invarlock.plugins.hf_awq_adapter:HF_AWQ_Adapter"
 hf_bnb = "invarlock.plugins.hf_bnb_adapter:HF_BNB_Adapter"
@@ -393,6 +395,7 @@ include = [
     "src/invarlock/cli/*",
     "src/invarlock/reporting/*",
     "src/invarlock/core/*",
+    "src/invarlock/adapters/hf_multimodal.py",
     "src/invarlock/public_contracts.py",
     "src/invarlock/policy_pack.py",
 ]

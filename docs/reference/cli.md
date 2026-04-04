@@ -8,10 +8,10 @@
 | **Audience** | Operators running InvarLock from a terminal or CI. |
 | **Primary commands** | `evaluate`, `verify`, `report`, `doctor`, `advanced`, `version`. |
 | **Requires** | `invarlock[hf]` for model-loading workflows; extra backends are installed via Python extras. |
-| **Network** | Offline by default; enable downloads per command with `INVARLOCK_ALLOW_NETWORK=1`. |
+| **Network** | Offline by default; use `evaluate --allow-network` when a run needs model or dataset downloads. |
 | **Source of truth** | `src/invarlock/cli/app.py`, `src/invarlock/cli/commands/*.py`. |
 
-The public product surface is intentionally narrow:
+Most users only need a narrow top-level surface:
 
 1. `invarlock evaluate`
 2. `invarlock verify`
@@ -27,7 +27,7 @@ Everything else is either diagnostics (`doctor`) or explicitly advanced
 pip install "invarlock[hf]"
 
 # Compare a baseline against a subject
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
+invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject distilgpt2 \
   --adapter auto \
@@ -38,18 +38,20 @@ invarlock verify reports/eval/evaluation.report.json
 
 # Render shareable HTML
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
-invarlock report explain --report runs/subject/report.json --baseline runs/source/report.json
+invarlock report explain \
+  --subject-report runs/subject/report.json \
+  --baseline-report runs/source/report.json
 ```
 
 ## Security Defaults
 
-- `evaluate` defaults to `--mode attested`, which delegates model-loading work
+- `evaluate` defaults to `--assurance attested`, which delegates model-loading work
   into the runtime container.
-- Use `--mode local` only for trusted host-side workflows that intentionally
+- Use `--assurance trusted-local` only for trusted host-side workflows that intentionally
   bypass the container boundary.
 - `verify` expects `runtime.manifest.json` beside attested evaluation outputs
   and fails closed when required attestation is missing.
-- Network access remains opt-in through `INVARLOCK_ALLOW_NETWORK=1`.
+- Network access remains opt-in through `evaluate --allow-network`.
 
 ## Task To Command Map
 
@@ -101,18 +103,21 @@ Common options:
 - `--baseline-report`: reuse a stored baseline report by passing the explicit
   `report.json` file path that captured the baseline windows
 - `--adapter`: adapter name or `auto`
-- `--profile`: `ci`, `release`, or another shipped profile
+- `--profile`: `ci`, `release`, or another included profile
 - `--tier`: tier label for policy context
 - `--preset`: optional repo preset path
 - `--out`: run-artifact directory
 - `--report-out`: evaluation report directory
-- `--mode attested|local`: execution mode for model-loading steps
+- `--assurance attested|trusted-local`: execution policy for `evaluate`.
+  `attested` keeps model loading inside the runtime container; `trusted-local`
+  allows trusted host execution and produces host-bypass artifacts that should
+  be verified with `verify --assurance trusted-local`.
 - `--edit-config`: optional demo/smoke edit overlay such as `quant_rtn`
 
 Example:
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
+INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject /path/to/edited \
   --adapter auto \
@@ -127,13 +132,16 @@ Purpose: verify existing evaluation report JSON files.
 
 Arguments:
 
-- `REPORTS...`: one or more report JSON paths
+- `REPORTS...`: one or more evaluation report JSON paths or directories containing
+  canonical `evaluation.report.json`
 
 Common options:
 
 - `--baseline`: optional baseline report for comparison flows
 - `--tolerance`: float tolerance for recompute checks
 - `--profile`: profile-aware validation mode
+- `--assurance attested|trusted-local`: attestation expectation for the
+  supplied report artifacts
 - `--json`: emit a single JSON envelope
 
 Example:
@@ -144,10 +152,14 @@ invarlock verify --json reports/eval/evaluation.report.json
 
 ## `invarlock report`
 
-Purpose: operate on existing report artifacts.
+Purpose: operate on existing report artifacts through explicit subcommands.
 
 Core subcommands:
 
+- `invarlock report generate`
+  - Generate human-readable report output from existing run reports
+  - Options: `--run`, `--compare-run-report`, `--baseline-run-report`,
+    `--format`, `--output`
 - `invarlock report html`
   - Render an evaluation report to HTML
   - Options: `-i/--input`, `-o/--output`, `--embed-css`, `--force`
@@ -155,19 +167,25 @@ Core subcommands:
   - Explain gate decisions from run reports, not the generated evaluation bundle
   - Explain gates and primary-metric behavior for a subject report versus a
     baseline report
+  - Options: `--subject-report`, `--baseline-report`
 - `invarlock report validate`
-  - Validate a report JSON against the current schema
-- `invarlock report verify`
-  - Re-run verification through the report namespace when needed
-- Directory inputs to `report` commands are only accepted when they contain a
-  canonical `report.json` or `evaluation.report.json`; otherwise pass an
-  explicit file path.
+  - Validate a report JSON against the v1 schema
+- Directory inputs are command-specific:
+  - `report generate` and `report explain` accept directories containing
+    canonical `report.json`
+  - `report html` and `report validate` accept directories containing
+    canonical `evaluation.report.json`
+  - `verify` accepts directories containing canonical `evaluation.report.json`
+    and optional baselines containing canonical `report.json` or
+    `evaluation.report.json`
 
 Example:
 
 ```bash
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
-invarlock report explain --report runs/subject/report.json --baseline runs/source/report.json
+invarlock report explain \
+  --subject-report runs/subject/report.json \
+  --baseline-report runs/source/report.json
 ```
 
 ## `invarlock doctor`
@@ -219,7 +237,7 @@ invarlock advanced calibrate --help
 ## Plugins & Entry Points
 
 `invarlock advanced plugins` lists built-in and optional adapters, guards,
-edits, datasets, and related entry points without mutating the current Python
+edits, datasets, and related entry points without mutating the active Python
 environment.
 
 Available read-only flows include:
@@ -257,7 +275,7 @@ These commands emit a single JSON object suitable for CI parsing.
 - Proof-pack, policy, plugin, and calibration workflows live under
   `invarlock advanced ...`.
 - Trusted host execution for the core evaluation path is expressed as
-  `--mode local`.
+  `--assurance trusted-local`.
 - Optional runtime backends are installed with Python extras instead of CLI
   install and uninstall commands.
 

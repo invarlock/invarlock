@@ -6,9 +6,9 @@
 | --- | --- |
 | **Purpose** | Load models, describe structure, and snapshot/restore state for edits and guards. |
 | **Audience** | CLI users choosing `model.adapter` and Python callers instantiating adapters. |
-| **Supported surface** | Core HF adapters, auto-match adapters, platform-dependent BNB, and Linux-only AWQ/GPTQ quantized adapters. |
+| **Supported surface** | Core HF text and image-text adapters, auto-match adapters, platform-dependent BNB, and Linux-only AWQ/GPTQ quantized adapters. |
 | **Requires** | `invarlock[adapters]` or `invarlock[hf]` for core HF adapters; `invarlock[gpu]`, `invarlock[awq]`, `invarlock[gptq]` for quantized adapters. |
-| **Network** | Offline by default; set `INVARLOCK_ALLOW_NETWORK=1` for model downloads. |
+| **Network** | Offline by default; use `evaluate --allow-network` when a run needs model downloads. |
 | **Inputs** | `model.id` (HF repo or local path), adapter name, device. |
 | **Outputs / Artifacts** | Loaded model object; optional snapshots; exported model directories when enabled. |
 | **Source of truth** | `src/invarlock/adapters/*`, `src/invarlock/plugins/hf_*_adapter.py`. |
@@ -23,14 +23,14 @@ pip install "invarlock[hf]"
 invarlock advanced plugins adapters
 
 # Compare & evaluate with adapter auto-selection
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
+invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject gpt2 \
   --adapter auto
 ```
 
 The CLI example above uses the secure-default runtime container. Add
-`--mode local` only for trusted local compare/evaluate workflows that
+`--assurance trusted-local` only for trusted local compare/evaluate workflows that
 intentionally bypass that boundary.
 
 ```python
@@ -42,7 +42,7 @@ print(adapter.describe(model)["model_type"])
 ```
 
 > Adapter availability is broader than the published assurance basis. GPT-2 and
-> BERT back the published calibrated basis; repo-shipped pilot configs
+> BERT back the published calibrated basis; repo-included pilot configs
 > for Mistral 7B, Qwen2 7B, Qwen2.5 14B, and additional experimental families are for
 > experimentation until supporting artifacts are attached. See the Model Family
 > Catalog for the authoritative family-by-family inventory.
@@ -55,7 +55,8 @@ print(adapter.describe(model)["model_type"])
   (adapter plugin) to choose a concrete role adapter (`hf_causal`, `hf_mlm`,
   `hf_seq2seq`) plus quant adapters when detected. Local paths can use
   `config.json`; remote IDs fall back to name heuristics and default to
-  `hf_causal` when unsure.
+  `hf_causal` when unsure. Image-text models use the explicit
+  `hf_multimodal` adapter rather than adapter auto.
 - **Quantized adapters** (`hf_bnb`, `hf_awq`, `hf_gptq`) handle their own device
   placement; avoid calling `.to(...)` on the loaded model.
 - **Snapshot strategy**: HF adapters expose `snapshot`/`restore` and
@@ -77,7 +78,8 @@ Capability matrix (at a glance)
 
 | Adapter family | Snapshot/restore | Guard compatibility | Platform |
 | --- | --- | --- | --- |
-| HF PyTorch (`hf_causal`, `hf_mlm`, `hf_seq2seq`) | Yes | Full | All |
+| HF text (`hf_causal`, `hf_mlm`, `hf_seq2seq`) | Yes | Full | All |
+| HF image-text (`hf_multimodal`) | Yes | Full when decoder layers are exposed | All |
 | Quantized (`hf_bnb`) | Best-effort | Full when modules exposed | Platform-dependent |
 | Quantized (`hf_awq`, `hf_gptq`) | Best-effort | Full when modules exposed | Linux |
 
@@ -93,17 +95,18 @@ Machine-readable adapter capability metadata is published at
 | --- | --- | --- | --- | --- |
 | `hf_causal` | Decoder-only causal LMs (dense + MoE + GPT2-like) | `invarlock[adapters]` | All platforms with torch | Default causal LM adapter. |
 | `hf_mlm` | BERT/RoBERTa/DeBERTa MLMs | `invarlock[adapters]` | All platforms with torch | Loads `AutoModelForMaskedLM` when possible. |
+| `hf_multimodal` | Image-text generation models exposed through HF `AutoModelForImageTextToText` | `invarlock[adapters]` | All platforms with torch | Single-image `vision_text` evaluation with explicit adapter selection. |
 | `hf_seq2seq` | T5/encoder‑decoder models | `invarlock[adapters]` | All platforms with torch | For seq2seq evaluation. |
 | `hf_auto` | Auto-select HF adapter | `invarlock[adapters]` | All platforms with torch | Delegates to a role adapter; prefers quant adapters when detected. |
 | `hf_bnb` | Bitsandbytes quantized LMs | `invarlock[gpu]` | Platform-dependent | Uses `device_map="auto"`; no `.to()`. Latest bitsandbytes wheels can work outside Linux/CUDA when the runtime imports cleanly. |
 | `hf_awq` | AWQ quantized LMs | `invarlock[awq]` | Linux only | Requires `autoawq`/`triton`. |
-| `hf_gptq` | GPTQ quantized LMs | `invarlock[gptq]` | Linux only | Requires `auto-gptq`/`triton`; current upstream wheels may require a pinned or vendor build on newer Python/CUDA stacks. |
+| `hf_gptq` | GPTQ quantized LMs | `invarlock[gptq]` | Linux only | Requires `auto-gptq`/`triton`; some upstream wheel combinations may require a pinned or vendor build on newer Python/CUDA stacks. |
 
 ### Adapter capabilities
 
 | Adapter class | Snapshot/restore | Guard compatibility | Notes |
 | --- | --- | --- | --- |
-| PyTorch HF adapters (`hf_causal`, `hf_causal`, `hf_mlm`, `hf_seq2seq`) | Yes | Full (module access) | Uses `HFAdapterMixin` snapshots. |
+| PyTorch HF adapters (`hf_causal`, `hf_mlm`, `hf_multimodal`, `hf_seq2seq`) | Yes | Full (module access) / multimodal full when decoder layers are exposed | Uses `HFAdapterMixin` snapshots. |
 | Quantized HF adapters (`hf_bnb`, `hf_awq`, `hf_gptq`) | Yes (best-effort) | Full when modules are exposed | Avoid explicit `.to()` calls. |
 
 ### Adapter selection (`adapter: auto`)
@@ -191,7 +194,7 @@ finally:
 - **Linux-only adapters not available**: `hf_awq` and `hf_gptq` depend on
   `triton` and remain Linux-only in `pyproject.toml`.
 - **GPTQ install fails even on Linux/CUDA**: `auto-gptq` packaging is
-  upstream-dependent; current Python/CUDA combinations may require a pinned or
+  upstream-dependent; some Python/CUDA combinations may require a pinned or
   vendor wheel beyond `pip install "invarlock[gptq]"`.
 - **Bitsandbytes not detected**: `hf_bnb` is platform-dependent. If the backend
   imports cleanly, `invarlock advanced plugins adapters` will report it as ready even on

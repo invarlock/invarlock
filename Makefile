@@ -66,6 +66,11 @@ COVERAGE_TESTS_CLI_HELPERS := \
 	tests/cli/test_json_helpers.py tests/cli/test_runtime_launch_plan_contract.py \
 	tests/unit/test_overhead_extraction.py
 
+COVERAGE_TESTS_ADAPTERS := \
+	tests/adapters/test_adapter_contracts.py \
+	tests/adapters/test_hf_loading_helpers.py \
+	tests/adapters/test_hf_multimodal_adapter.py
+
 COVERAGE_TESTS_RUNTIME := \
 	tests/cli/test_security_default_contract.py \
 	tests/cli/test_container_delegation.py \
@@ -94,7 +99,7 @@ COVERAGE_MODULES := \
 	--cov=invarlock.runtime_verify \
 	--cov=invarlock.proof_pack
 
-COVERAGE_INCLUDE := src/invarlock/eval/*,src/invarlock/guards/*,src/invarlock/calibration/*,src/invarlock/cli/*,src/invarlock/cli/commands/*,src/invarlock/core/*,src/invarlock/reporting/*,src/invarlock/public_contracts.py,src/invarlock/policy_pack.py,src/invarlock/proof_pack.py,src/invarlock/proof_pack_integrity.py,src/invarlock/proof_pack_manifest.py,src/invarlock/runtime_security.py,src/invarlock/runtime_security_helpers.py,src/invarlock/runtime_verify.py,invarlock/eval/*,invarlock/guards/*,invarlock/calibration/*,invarlock/cli/*,invarlock/cli/commands/*,invarlock/core/*,invarlock/reporting/*,invarlock/public_contracts.py,invarlock/policy_pack.py,invarlock/proof_pack.py,invarlock/proof_pack_integrity.py,invarlock/proof_pack_manifest.py,invarlock/runtime_security.py,invarlock/runtime_security_helpers.py,invarlock/runtime_verify.py
+COVERAGE_INCLUDE := src/invarlock/eval/*,src/invarlock/guards/*,src/invarlock/calibration/*,src/invarlock/cli/*,src/invarlock/cli/commands/*,src/invarlock/core/*,src/invarlock/reporting/*,src/invarlock/adapters/hf_multimodal.py,src/invarlock/public_contracts.py,src/invarlock/policy_pack.py,src/invarlock/proof_pack.py,src/invarlock/proof_pack_integrity.py,src/invarlock/proof_pack_manifest.py,src/invarlock/runtime_security.py,src/invarlock/runtime_security_helpers.py,src/invarlock/runtime_verify.py,invarlock/eval/*,invarlock/guards/*,invarlock/calibration/*,invarlock/cli/*,invarlock/cli/commands/*,invarlock/core/*,invarlock/reporting/*,invarlock/adapters/hf_multimodal.py,invarlock/public_contracts.py,invarlock/policy_pack.py,invarlock/proof_pack.py,invarlock/proof_pack_integrity.py,invarlock/proof_pack_manifest.py,invarlock/runtime_security.py,invarlock/runtime_security_helpers.py,invarlock/runtime_verify.py
 
 TEST_DIR_TARGETS := core cli eval guards edits adapters plugins scripts ci
 
@@ -119,14 +124,19 @@ test:  ## Run tests
 coverage:  ## Run tests with coverage and generate XML
 	$(MAKE) ensure-python
 	$(COVERAGE) erase
+	rm -f .coverage.*
 	PYTHONPATH=src $(PYTEST) -q $(COVERAGE_TESTS) \
 		$(COVERAGE_MODULES) \
 		--cov-branch \
 		--cov-report=term --cov-report=xml:reports/cov.xml --cov-fail-under=90
-	PYTHONPATH=src $(COVERAGE) run --append -m pytest -q -p no:cov \
+	mv .coverage .coverage.main
+	PYTHONPATH=src $(COVERAGE) run --parallel-mode -m pytest -q -p no:cov \
 		$(COVERAGE_TESTS_EVAL_PROBES)
-	PYTHONPATH=src $(COVERAGE) run --append -m pytest -q -p no:cov \
+	PYTHONPATH=src $(COVERAGE) run --parallel-mode -m pytest -q -p no:cov \
 		$(COVERAGE_TESTS_RUNTIME)
+	PYTHONPATH=src $(COVERAGE) run --parallel-mode -m pytest -q -p no:cov \
+		$(COVERAGE_TESTS_ADAPTERS)
+	$(COVERAGE) combine
 	$(COVERAGE) report --include="$(COVERAGE_INCLUDE)" --fail-under=90
 	$(COVERAGE) xml --include="$(COVERAGE_INCLUDE)" -o reports/cov.xml
 

@@ -16,8 +16,8 @@ from invarlock.reporting.report_contract import ReportGenerationResult, generate
 
 def test_report_requires_run_flag_when_no_subcommand():
     r = CliRunner().invoke(app, ["report"])  # missing --run
-    assert r.exit_code == 2
-    assert "--run is required" in r.stdout
+    assert r.exit_code == 0
+    assert "generate" in r.stdout
 
 
 def test_report_cert_requires_baseline(tmp_path: Path):
@@ -29,7 +29,7 @@ def test_report_cert_requires_baseline(tmp_path: Path):
         )
     )
     r = CliRunner().invoke(
-        app, ["report", "--run", str(run), "--format", "report"]
+        app, ["report", "generate", "--run", str(run), "--format", "report"]
     )  # no --baseline
     assert r.exit_code == 1
     assert "Evaluation report format requires --baseline" in r.stdout
@@ -126,6 +126,11 @@ def test_report_command_normalizes_md_and_handles_sparse_primary_metric(
 
 
 def test_report_command_generic_failure_maps_to_exit_one(monkeypatch) -> None:
+    monkeypatch.setattr(
+        report_mod,
+        "load_run_report_input_json",
+        lambda path: (Path(path), {"meta": {}}),
+    )
     monkeypatch.setattr(
         report_mod,
         "generate_reports",

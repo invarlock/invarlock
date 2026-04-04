@@ -21,6 +21,7 @@ from .data_providers import (
 )
 from .data_windows import EvaluationWindow, compute_window_hash
 from .providers.seq2seq import Seq2SeqProvider
+from .providers.vision_text import VisionTextProvider
 
 _PROVIDERS: dict[str, type[object]] = {
     "wikitext2": WikiText2Provider,
@@ -30,6 +31,7 @@ _PROVIDERS: dict[str, type[object]] = {
     "seq2seq": Seq2SeqProvider,
     "hf_seq2seq": HFSeq2SeqProvider,
     "local_jsonl_pairs": LocalJSONLPairsProvider,
+    "vision_text": VisionTextProvider,
 }
 
 
@@ -59,6 +61,7 @@ __all__ = [
     "LocalJSONLProvider",
     "LocalJSONLPairsProvider",
     "SyntheticProvider",
+    "VisionTextProvider",
     "WikiText2Provider",
     "compute_window_hash",
     "get_provider",

@@ -179,6 +179,7 @@ def normalize_run_report(report: Mapping[str, Any] | RunReport) -> RunReport:
 
     # carry through selected non-PM fields when present
     for k in (
+        "classification",
         "latency_ms_per_tok",
         "latency_ms_p50",
         "latency_ms_p95",

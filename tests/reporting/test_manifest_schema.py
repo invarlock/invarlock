@@ -77,6 +77,9 @@ def test_manifest_matches_schema(tmp_path: Path):
     assert isinstance(ev, dict) and ev.get("guards_evidence"), (
         "evidence.guards_evidence missing"
     )
+    assert manifest["evidence_level"] == "high"
+    assert manifest["files"]["reviewer_summary_txt"]
     assert (out_dir / Path(ev["guards_evidence"]).name).exists(), (
         "guards_evidence.json file missing"
     )
+    assert (out_dir / "reviewer_summary.txt").exists(), "reviewer_summary.txt missing"

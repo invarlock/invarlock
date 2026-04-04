@@ -15,6 +15,16 @@ class GuardOverheadSummary:
     threshold_fraction: float
 
 
+def _coerce_non_bool_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        resolved = float(value)
+    except (TypeError, ValueError):
+        return None
+    return resolved if math.isfinite(resolved) else None
+
+
 def _append_guard_overhead_diagnostic(
     diagnostics: list[dict[str, Any]],
     *,
@@ -62,7 +72,8 @@ def normalize_guard_overhead_result(
     payload = dict(payload or {})
     try:
         ratio = payload.get("overhead_ratio")
-        value = float(ratio) if isinstance(ratio, int | float) else float("nan")
+        resolved = _coerce_non_bool_float(ratio)
+        value = resolved if resolved is not None else float("nan")
     except (TypeError, ValueError):
         value = float("nan")
     if not (isinstance(value, float) and math.isfinite(value)):
@@ -104,8 +115,8 @@ def finalize_guard_overhead_payload(
         {
             "diagnostics": diagnostics,
             "checks": checks,
-            "overhead_ratio": overhead_ratio,
-            "overhead_percent": overhead_percent,
+            "overhead_ratio": _coerce_non_bool_float(overhead_ratio),
+            "overhead_percent": _coerce_non_bool_float(overhead_percent),
             "passed": bool(getattr(result, "passed", False)),
             "evaluated": True,
         }
@@ -182,21 +193,18 @@ def build_guard_overhead_summary(
     passed = bool(info.get("passed", True))
 
     resolved_overhead_percent: float | None = None
-    overhead_percent = info.get("overhead_percent")
-    if isinstance(overhead_percent, (int, float)) and math.isfinite(
-        float(overhead_percent)
-    ):
-        resolved_overhead_percent = float(overhead_percent)
+    overhead_percent = _coerce_non_bool_float(info.get("overhead_percent"))
+    if overhead_percent is not None:
+        resolved_overhead_percent = overhead_percent
 
     resolved_overhead_ratio: float | None = None
-    ratio_value = info.get("overhead_ratio")
-    if isinstance(ratio_value, (int, float)) and math.isfinite(float(ratio_value)):
-        resolved_overhead_ratio = float(ratio_value)
+    ratio_value = _coerce_non_bool_float(info.get("overhead_ratio"))
+    if ratio_value is not None:
+        resolved_overhead_ratio = ratio_value
 
     threshold_value = info.get("overhead_threshold", fallback_threshold)
-    try:
-        threshold_fraction = float(threshold_value)
-    except (TypeError, ValueError):
+    threshold_fraction = _coerce_non_bool_float(threshold_value)
+    if threshold_fraction is None:
         threshold_fraction = fallback_threshold
     return GuardOverheadSummary(
         evaluated=evaluated,

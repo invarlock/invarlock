@@ -117,6 +117,10 @@ class MetricInfo:
     supports_bootstrap: bool
 
 
+def _is_non_bool_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
 class _PPLCausal(PrimaryMetric):
     """Token-aggregated perplexity for causal LMs.
 
@@ -368,7 +372,7 @@ class _Accuracy:
         ):
             c = windows.get(c_key)
             t = windows.get(t_key)
-            if isinstance(c, int | float) and isinstance(t, int | float) and t > 0:
+            if _is_non_bool_number(c) and _is_non_bool_number(t) and t > 0:
                 total = float(t)
                 # Optional abstain/tie handling with documented policy
                 try:
@@ -387,14 +391,10 @@ class _Accuracy:
                         policy.get("ties_count_as_incorrect", False)
                     )
                     # Apply abstain exclusion from denominator if requested
-                    if (
-                        exclude_abstain
-                        and isinstance(abstain, int | float)
-                        and abstain > 0
-                    ):
+                    if exclude_abstain and _is_non_bool_number(abstain) and abstain > 0:
                         total = max(1.0, total - float(abstain))
                     # Apply tie policy
-                    if isinstance(ties, int | float) and ties > 0:
+                    if _is_non_bool_number(ties) and ties > 0:
                         if count_ties_as_correct:
                             c = float(c) + float(ties)
                         elif count_ties_as_incorrect:
@@ -691,7 +691,7 @@ def compute_primary_metric_from_report(
             )
             if isinstance(pm_base, dict) and (base_kind == kind_l or same_family):
                 base_ref = pm_base.get("final")
-                if isinstance(base_ref, (int | float)):
+                if _is_non_bool_number(base_ref):
                     is_ppl_like = str(kind).lower().startswith("ppl")
                     if is_ppl_like and base_ref > 0:
                         ratio_vs_baseline = float(final_point) / float(base_ref)
@@ -751,9 +751,17 @@ def validate_primary_metric_block(block: dict[str, Any]) -> dict[str, Any]:
 
     Returns the input block on success to enable fluent usage.
     """
+    prev_raw = block.get("preview")
+    fin_raw = block.get("final")
+    if isinstance(prev_raw, bool) or isinstance(fin_raw, bool):
+        raise ValidationError(
+            code="E402",
+            message="METRICS-VALIDATION-FAILED",
+            details={"reason": "preview/final must be numeric, not bool"},
+        )
     try:
-        prev = float(block.get("preview"))
-        fin = float(block.get("final"))
+        prev = float(prev_raw)
+        fin = float(fin_raw)
     except Exception as err:
         raise ValidationError(
             code="E402",
@@ -788,14 +796,20 @@ def infer_binary_label_from_ids(input_ids: list[int]) -> int:
 
 
 def compute_accuracy_counts(records: list[dict[str, Any]]) -> tuple[int, int]:
-    """Compute accuracy counts from records with input_ids.
+    """Compute accuracy counts from records with measured correctness or input_ids.
 
-    Predicts the same as the inferred label for a perfect-accuracy smoke path.
+    Prefer explicit per-example correctness when present. Otherwise predict the
+    same as the inferred label for a perfect-accuracy smoke path.
     Returns (correct_total, total).
     """
     correct = 0
     total = 0
     for rec in records:
+        explicit_correct = rec.get("correct") if isinstance(rec, dict) else None
+        if isinstance(explicit_correct, bool):
+            correct += int(explicit_correct)
+            total += 1
+            continue
         seq = rec.get("input_ids") if isinstance(rec, dict) else None
         if not isinstance(seq, list) or not seq:
             continue

@@ -43,7 +43,7 @@ in CI.
 
 ## Why InvarLock?
 
-- **Quality gates for weight edits**: catch regressions before deployment.
+- **Quality gates for edited checkpoints**: catch regressions before deployment.
 - **Statistical guarantees**: paired primary metrics with confidence intervals.
 - **Auditable evidence**: deterministic pairing metadata + policy digests in `evaluation.report.json`.
 - **CI/CD-friendly**: stable exit codes, `--json` outputs, and portable “proof packs”.
@@ -51,9 +51,9 @@ in CI.
 
 ## Who is this for?
 
-- ML engineers shipping quantized/pruned checkpoints.
-- MLOps teams building CI quality gates and reviewable artifacts.
-- Researchers validating compression/edit methods with reproducible, paired eval.
+- ML engineers shipping edited model checkpoints, including quantized, pruned, fine-tuned, or otherwise weight-modified variants.
+- MLOps and platform teams building CI gates, attested verification, and reviewable evaluation artifacts.
+- Researchers validating weight-edit, compression, and model-comparison methods with reproducible paired evaluation across text and image-text workflows supported here.
 
 ## How it works
 
@@ -85,7 +85,7 @@ container and expects an OCI container engine such as `docker` or `podman`.
 In a repo checkout, build the local runtime image once with
 `make runtime-image`; InvarLock automatically prefers
 `invarlock-runtime:local` when it is present. Trusted local workflows can opt
-into host execution explicitly with `--mode local` on `invarlock evaluate`, but
+into host execution explicitly with `--assurance trusted-local` on `invarlock evaluate`, but
 the attested verification step below expects container execution. The
 quickstart block below assumes a repo checkout; do not skip
 `make runtime-image` if you want the attested container path.
@@ -104,11 +104,11 @@ invarlock --version
 # Compare baseline vs subject (downloads require explicit network enable)
 # Secure-default execution uses the runtime container and writes
 # reports/eval/runtime.manifest.json next to evaluation.report.json.
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
+invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject  distilgpt2 \
   --adapter auto \
-  --profile dev \
+  --profile ci \
   --report-out reports/eval \
   --quiet
 
@@ -120,9 +120,9 @@ invarlock verify --json reports/eval/evaluation.report.json
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
 
-If you pass a directory to `invarlock report`, it must contain canonical
-`report.json` or `evaluation.report.json`; other report-like filenames are not
-auto-selected.
+If you pass a directory to `invarlock report generate` or
+`invarlock report explain`, it must contain canonical `report.json`.
+`invarlock report html` expects canonical `evaluation.report.json`.
 
 Example output (abridged; counts vary by profile/config):
 
@@ -140,7 +140,7 @@ Attestation: reports/eval/runtime.manifest.json
 - Core workflow: `invarlock evaluate` → `invarlock verify` →
   `invarlock report html`.
 - Advanced workflows live under `invarlock advanced ...`.
-- Trusted host execution for the core evaluate path uses `--mode local`.
+- Trusted host execution for the core evaluate path uses `--assurance trusted-local`.
 - Optional adapter/backend installs use normal Python extras such as
   `pip install "invarlock[hf]"` rather than CLI install commands.
 
@@ -153,7 +153,7 @@ Proof packs bundle reports + verification metadata into a distributable artifact
   `invarlock advanced proof-pack verify <dir> --strict`
 - Repo harness alternative: `scripts/proof_packs/verify_pack.sh --pack <dir> --strict`
 
-Note: `configs/` and most `scripts/` remain repo resources and are not shipped in
+Note: `configs/` and most `scripts/` remain repo resources and are not included in
 wheels. Installed wheels include the public contracts and the
 `invarlock advanced proof-pack verify` verifier.
 

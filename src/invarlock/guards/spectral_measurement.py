@@ -10,6 +10,10 @@ from ._estimators import power_iter_sigma_max
 _SPECTRAL_MEASUREMENT_ERRORS = (RuntimeError, TypeError, ValueError)
 
 
+def _is_real_number(value: Any) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool)
+
+
 def compute_sigma_max(
     weight_matrix: Any,
     *,
@@ -55,8 +59,8 @@ def auto_sigma_target(
         for _name, module in model.named_modules():
             if hasattr(module, "weight") and module.weight.ndim == 2:
                 sigma = compute_sigma_max_fn(module.weight)
-                if sigma > 0:
-                    spectral_norms.append(sigma)
+                if _is_real_number(sigma) and sigma > 0:
+                    spectral_norms.append(float(sigma))
         if spectral_norms:
             try:
                 return float(np.percentile(spectral_norms, percentile * 100))

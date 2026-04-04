@@ -19,6 +19,7 @@ _CAUSAL_MODEL_TYPES = {
     "gemma",
     "gemma2",
     "gemma3",
+    "gemma4",
     "glm",
     "gpt2",
     "gpt_neox",

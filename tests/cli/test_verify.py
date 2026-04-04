@@ -273,7 +273,7 @@ def test_verify_uses_dataset_windows_stats(tmp_path: Path):
     assert isinstance(cert.get("dataset", {}).get("windows", {}).get("stats", {}), dict)
     cert_path = tmp_path / "cert_stats.json"
     cert_path.write_text(json.dumps(cert))
-    result = runner.invoke(app, ["report", "verify", str(cert_path)])
+    result = runner.invoke(app, ["verify", str(cert_path)])
     assert result.exit_code == 0
 
 
@@ -291,7 +291,7 @@ def test_verify_delta_basis_matches_pm_direction(tmp_path: Path):
     # Verify should still process without error (basis rendered in markdown; functional check is ratio presence for non-ppl kinds)
     cert_path = tmp_path / "cert_accuracy.json"
     cert_path.write_text(json.dumps(cert))
-    result = runner.invoke(app, ["report", "verify", str(cert_path)])
+    result = runner.invoke(app, ["verify", str(cert_path)])
     assert result.exit_code == 0
 
 
@@ -424,6 +424,65 @@ def test_verify_family_mismatch_warning_includes_backends(tmp_path: Path):
     assert "Adapter family differs" in out
     assert "baseline: family=gptq, backend=auto-gptq ==0.7.0" in out
     assert "edited  : family=awq, backend=autoawq ==0.2.0" in out
+
+
+def test_verify_resolves_canonical_directories(monkeypatch, tmp_path: Path):
+    report_dir = tmp_path / "report-dir"
+    report_dir.mkdir()
+    report_json = report_dir / "evaluation.report.json"
+    report_json.write_text(
+        json.dumps(_build_sample_evaluation_report()),
+        encoding="utf-8",
+    )
+    baseline_dir = tmp_path / "baseline-dir"
+    baseline_dir.mkdir()
+    baseline_json = baseline_dir / "report.json"
+    baseline_json.write_text("{}", encoding="utf-8")
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        "invarlock.cli.commands.verify.verify_command",
+        lambda **kwargs: captured.update(kwargs),
+        raising=False,
+    )
+
+    result = runner.invoke(
+        app,
+        ["verify", str(report_dir), "--baseline", str(baseline_dir)],
+    )
+
+    assert result.exit_code == 0
+    assert captured["reports"] == [report_json.resolve()]
+    assert captured["baseline"] == baseline_json.resolve()
+
+
+def test_verify_rejects_noncanonical_report_directory(tmp_path: Path):
+    report_dir = tmp_path / "report-dir"
+    report_dir.mkdir()
+    (report_dir / "my_report.json").write_text("{}", encoding="utf-8")
+
+    result = runner.invoke(app, ["verify", str(report_dir)])
+
+    assert result.exit_code == 2
+
+
+def test_verify_rejects_noncanonical_baseline_directory(tmp_path: Path):
+    report_dir = tmp_path / "report-dir"
+    report_dir.mkdir()
+    (report_dir / "evaluation.report.json").write_text(
+        json.dumps(_build_sample_evaluation_report()),
+        encoding="utf-8",
+    )
+    baseline_dir = tmp_path / "baseline-dir"
+    baseline_dir.mkdir()
+    (baseline_dir / "subject_report.json").write_text("{}", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        ["verify", str(report_dir), "--baseline", str(baseline_dir)],
+    )
+
+    assert result.exit_code == 2
 
 
 def test_validate_pairing_overlap_violation_direct() -> None:

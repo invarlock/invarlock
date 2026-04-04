@@ -11,7 +11,7 @@ _NON_FATAL_EXCEPTIONS = (AttributeError, OSError, TypeError, ValueError)
 def maybe_dump_guard_evidence(target_dir: str | Path, payload: dict[str, Any]) -> None:
     """Dump a small JSON blob of guard decision inputs when enabled."""
 
-    if os.getenv("INVARLOCK_EVIDENCE_DEBUG", "0") != "1":
+    if os.getenv("INVARLOCK_EVIDENCE_DEBUG", "0").strip() != "1":
         return
     try:
         path = Path(target_dir)

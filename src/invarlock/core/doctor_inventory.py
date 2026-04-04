@@ -63,7 +63,13 @@ def build_adapter_inventory_rows(
         required_extra: str | None = None
         detail: str | None = None
 
-        if name in {"hf_causal", "hf_mlm", "hf_seq2seq", "hf_auto"}:
+        if name in {
+            "hf_causal",
+            "hf_mlm",
+            "hf_multimodal",
+            "hf_seq2seq",
+            "hf_auto",
+        }:
             backend = "transformers"
             version = transformers_version
         elif name == "hf_gptq":

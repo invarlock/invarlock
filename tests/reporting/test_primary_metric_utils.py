@@ -258,7 +258,91 @@ def test_attach_primary_metric_classification_numeric_baseline_ref(monkeypatch):
     assert pm["kind"] == "accuracy"
     assert pm["final"] == pytest.approx(0.65)
     assert pm["ratio_vs_baseline"] == pytest.approx(10.0)
-    assert pm["display_ci"] == [pytest.approx(0.65), pytest.approx(0.65)]
+
+
+def test_attach_primary_metric_ignores_bool_baseline_reference() -> None:
+    evaluation_report: dict[str, object] = {}
+    report = {
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 3.0,
+                "final": 4.0,
+            }
+        }
+    }
+    baseline_ref = {"primary_metric": {"final": True}}
+
+    attach_primary_metric(
+        evaluation_report,
+        report,
+        baseline_raw=None,
+        baseline_ref=baseline_ref,
+        ppl_analysis=None,
+    )
+
+    pm = evaluation_report["primary_metric"]
+    assert "ratio_vs_baseline" not in pm
+
+
+def test_attach_primary_metric_replaces_bool_display_ci_with_numeric_fallback() -> None:
+    evaluation_report: dict[str, object] = {}
+    report = {
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 1.5,
+                "final": 2.0,
+                "display_ci": [True, False],
+            }
+        }
+    }
+
+    attach_primary_metric(
+        evaluation_report,
+        report,
+        baseline_raw=None,
+        baseline_ref=None,
+        ppl_analysis=None,
+    )
+
+    pm = evaluation_report["primary_metric"]
+    assert pm["display_ci"] == [2.0, 2.0]
+
+
+def test_attach_primary_metric_classification_fallback_ignores_bool_baseline(
+    monkeypatch,
+) -> None:
+    evaluation_report: dict[str, object] = {}
+    report = {
+        "metrics": {
+            "classification": {"final": {"correct_total": 8, "total": 10}},
+        },
+        "meta": {"model_id": "awesome-vqa"},
+    }
+    baseline_raw = {"metrics": {"classification": {"final": True}}}
+
+    import invarlock.eval.primary_metric as pm_mod
+
+    monkeypatch.setattr(
+        pm_mod,
+        "compute_primary_metric_from_report",
+        lambda *_, **__: None,
+        raising=False,
+    )
+
+    attach_primary_metric(
+        evaluation_report,
+        report,
+        baseline_raw=baseline_raw,
+        baseline_ref=None,
+        ppl_analysis=None,
+    )
+
+    pm = evaluation_report["primary_metric"]
+    assert pm["final"] == pytest.approx(0.8)
+    assert "ratio_vs_baseline" not in pm
+    assert pm["display_ci"] == [pytest.approx(0.8), pytest.approx(0.8)]
 
 
 def test_attach_primary_metric_display_ci_default_when_no_numeric(monkeypatch):

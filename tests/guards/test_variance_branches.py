@@ -48,3 +48,10 @@ def test_predictive_gate_outcome_two_sided_paths():
         True,
         "ci_gain_met",
     )
+
+
+def test_predictive_gate_outcome_rejects_bool_ci_values() -> None:
+    assert predictive_gate_outcome(-0.2, (True, -0.1), 0.05, True) == (
+        False,
+        "ci_unavailable",
+    )

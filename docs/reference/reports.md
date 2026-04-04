@@ -33,7 +33,10 @@ telemetry fields, and HTML export.
 
 ```bash
 # Generate a report from a run report
-invarlock report --run runs/subject/report.json --baseline runs/baseline/report.json --format report
+invarlock report generate \
+  --run runs/subject/report.json \
+  --baseline-run-report runs/baseline/report.json \
+  --format report
 
 # Validate an attested report bundle
 invarlock verify reports/eval/evaluation.report.json
@@ -46,8 +49,9 @@ jq '.telemetry' reports/eval/evaluation.report.json
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
 
-When you pass a directory to `invarlock report`, it must contain a canonical
-`report.json` or `evaluation.report.json`. Other report-like filenames are not
+When you pass a directory to `invarlock report generate`, it must contain a
+canonical `report.json`. `invarlock report html` and `invarlock verify`
+expect canonical `evaluation.report.json`. Other report-like filenames are not
 auto-selected; pass the explicit file path instead.
 
 ## report Layout
@@ -150,7 +154,7 @@ Attested evaluations also emit `runtime.manifest.json` next to
 ### Minimal v1 report Example
 
 The example below shows a realistic, PM‑only report envelope. It follows
-the current validator in `invarlock.reporting.report_schema` and the
+the validator in `invarlock.reporting.report_schema` and the
 fields produced by `invarlock.reporting.report_make.make_report`.
 
 ```json
@@ -248,7 +252,7 @@ fields produced by `invarlock.reporting.report_make.make_report`.
 
 **Notes:**
 
-- `schema_version` is a string and must be `"v1"` for the current format.
+- `schema_version` is a string and must be `"v1"` for the v1 format.
 - `run_id` is a short, opaque identifier; reports treat it as a stable
   string key.
 - `primary_metric` is the **canonical** place for PM values.

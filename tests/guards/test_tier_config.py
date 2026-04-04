@@ -107,6 +107,14 @@ class TestConvenienceAccessors:
         assert epsilon["ffn"] == 0.01
         assert epsilon["attn"] == 0.01
 
+    def test_get_tier_guard_config_returns_isolated_nested_copy(self) -> None:
+        """Mutating a returned guard config must not leak back into cache."""
+        first = get_tier_guard_config("balanced", "spectral_guard")
+        first["family_caps"]["ffn"] = 9.99
+
+        second = get_tier_guard_config("balanced", "spectral_guard")
+        assert second["family_caps"]["ffn"] == 3.849
+
     def test_get_variance_min_effect_balanced(self) -> None:
         """get_variance_min_effect returns calibrated min_effect_lognll."""
         min_effect = get_variance_min_effect("balanced")

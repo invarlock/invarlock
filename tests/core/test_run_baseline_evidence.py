@@ -333,3 +333,45 @@ def test_materialize_baseline_pairing_schedule_fails_when_final_masks_missing() 
         assert "provided no masked tokens for final windows" in str(exc)
     else:  # pragma: no cover - defensive
         raise AssertionError("expected ValueError")
+
+
+def test_materialize_baseline_pairing_schedule_supports_multimodal_records() -> None:
+    result = materialize_baseline_pairing_schedule(
+        pairing_schedule={
+            "preview": {
+                "example_ids": ["ex-1"],
+                "records": [{"id": "ex-1", "prompt": "what is shown?"}],
+                "processor_sha256": "proc-123",
+            },
+            "final": {
+                "example_ids": ["ex-2"],
+                "records": [{"id": "ex-2", "prompt": "what changed?"}],
+            },
+        },
+        calibration_data=[],
+        dataset_meta={},
+        window_plan=None,
+        tokenizer=object(),
+        use_mlm=False,
+        mask_prob=0.15,
+        mask_seed=43,
+        random_token_prob=0.1,
+        original_token_prob=0.1,
+        resolved_tier="balanced",
+        profile="dev",
+        apply_mlm_masks_fn=lambda *args, **kwargs: (0, []),
+        resolve_pm_min_tokens_target_fn=lambda **kwargs: 4,
+        hash_sequences_fn=lambda seqs: "unused",
+        tensor_or_list_to_ints_fn=lambda values: list(values),
+    )
+
+    assert result.preview_count == 1
+    assert result.final_count == 1
+    assert result.calibration_data[0]["example_id"] == "ex-1"
+    assert result.calibration_data[1]["window_id"] == "final::0"
+    assert result.preview_records[0]["window_id"] == "preview::0"
+    assert result.final_records[0]["example_id"] == "ex-2"
+    assert result.dataset_meta["provider_kind"] == "vision_text"
+    assert result.dataset_meta["processor_sha256"] == "proc-123"
+    assert result.preview_mask_total == 0
+    assert result.final_mask_total == 0

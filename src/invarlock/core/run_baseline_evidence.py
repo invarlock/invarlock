@@ -36,6 +36,8 @@ class BaselinePairingMaterializationResult:
     final_mask_counts: list[int]
     preview_mask_total: int
     final_mask_total: int
+    preview_records: list[dict[str, Any]]
+    final_records: list[dict[str, Any]]
 
 
 def _merge_pairing_schedule(
@@ -175,6 +177,131 @@ def materialize_baseline_pairing_schedule(
 ) -> BaselinePairingMaterializationResult:
     materialized = list(calibration_data or [])
 
+    preview_section = pairing_schedule.get("preview", {})
+    final_section = pairing_schedule.get("final", {})
+    multimodal_schedule = any(
+        isinstance(section.get("example_ids"), list)
+        or isinstance(section.get("records"), list)
+        for section in (preview_section, final_section)
+        if isinstance(section, dict)
+    )
+    if multimodal_schedule:
+        materialized_preview_records: list[dict[str, Any]] = []
+        materialized_final_records: list[dict[str, Any]] = []
+        preview_records_raw = (
+            preview_section.get("records")
+            if isinstance(preview_section, dict)
+            else None
+        )
+        final_records_raw = (
+            final_section.get("records") if isinstance(final_section, dict) else None
+        )
+        preview_records = (
+            [dict(record) for record in preview_records_raw if isinstance(record, dict)]
+            if isinstance(preview_records_raw, list)
+            else []
+        )
+        final_records = (
+            [dict(record) for record in final_records_raw if isinstance(record, dict)]
+            if isinstance(final_records_raw, list)
+            else []
+        )
+        preview_ids = (
+            [str(value) for value in preview_section.get("example_ids", [])]
+            if isinstance(preview_section, dict)
+            else []
+        )
+        final_ids = (
+            [str(value) for value in final_section.get("example_ids", [])]
+            if isinstance(final_section, dict)
+            else []
+        )
+        if preview_records and not preview_ids:
+            preview_ids = [
+                str(record.get("id") or record.get("example_id") or "")
+                for record in preview_records
+            ]
+        if final_records and not final_ids:
+            final_ids = [
+                str(record.get("id") or record.get("example_id") or "")
+                for record in final_records
+            ]
+        for arm, records, target_records in (
+            ("preview", preview_records, materialized_preview_records),
+            ("final", final_records, materialized_final_records),
+        ):
+            for index, record in enumerate(records):
+                entry = dict(record)
+                example_id = str(record.get("id") or record.get("example_id") or "")
+                entry["example_id"] = example_id
+                entry["window_id"] = f"{arm}::{index}"
+                target_records.append(dict(entry))
+                materialized.append(entry)
+
+        preview_count = len(preview_ids)
+        final_count = len(final_ids)
+        if not isinstance(window_plan, dict):
+            window_plan = {
+                "profile": "vision_text",
+                "requested_preview": preview_count,
+                "requested_final": final_count,
+                "actual_preview": preview_count,
+                "actual_final": final_count,
+                "coverage_ok": True,
+            }
+        dataset_meta = dict(dataset_meta)
+        dataset_meta.setdefault("provider_kind", "vision_text")
+        dataset_meta.setdefault(
+            "preview_hash",
+            hashlib.blake2s(
+                "||".join(preview_ids).encode("utf-8"), digest_size=16
+            ).hexdigest(),
+        )
+        dataset_meta.setdefault(
+            "final_hash",
+            hashlib.blake2s(
+                "||".join(final_ids).encode("utf-8"), digest_size=16
+            ).hexdigest(),
+        )
+        dataset_meta.setdefault(
+            "dataset_hash",
+            hashlib.blake2s(
+                (
+                    str(dataset_meta.get("preview_hash", ""))
+                    + str(dataset_meta.get("final_hash", ""))
+                ).encode("utf-8"),
+                digest_size=16,
+            ).hexdigest(),
+        )
+        processor_sha = (
+            preview_section.get("processor_sha256")
+            if isinstance(preview_section, dict)
+            else None
+        ) or (
+            final_section.get("processor_sha256")
+            if isinstance(final_section, dict)
+            else None
+        )
+        if isinstance(processor_sha, str) and processor_sha:
+            dataset_meta["processor_sha256"] = processor_sha
+
+        return BaselinePairingMaterializationResult(
+            calibration_data=materialized,
+            dataset_meta=dataset_meta,
+            window_plan=window_plan,
+            preview_count=preview_count,
+            final_count=final_count,
+            effective_preview=preview_count,
+            effective_final=final_count,
+            preview_mask_counts=[0] * preview_count,
+            final_mask_counts=[0] * final_count,
+            preview_mask_total=0,
+            final_mask_total=0,
+            preview_records=materialized_preview_records,
+            final_records=materialized_final_records,
+        )
+
+    preview_records_out: list[dict[str, Any]] = []
     preview_window_ids = pairing_schedule["preview"].get("window_ids")
     preview_labels = pairing_schedule["preview"].get("labels")
     preview_masked_token_counts = pairing_schedule["preview"].get("masked_token_counts")
@@ -217,7 +344,9 @@ def materialize_baseline_pairing_schedule(
                 except (TypeError, ValueError, OverflowError):
                     pass
         materialized.append(entry)
+        preview_records_out.append(dict(entry))
 
+    final_records_out: list[dict[str, Any]] = []
     final_window_ids = pairing_schedule["final"].get("window_ids")
     final_labels = pairing_schedule["final"].get("labels")
     final_masked_token_counts = pairing_schedule["final"].get("masked_token_counts")
@@ -258,6 +387,7 @@ def materialize_baseline_pairing_schedule(
                 except (TypeError, ValueError, OverflowError):
                     pass
         materialized.append(entry)
+        final_records_out.append(dict(entry))
 
     preview_count = len(pairing_schedule["preview"]["input_ids"])
     final_count = len(pairing_schedule["final"]["input_ids"])
@@ -404,4 +534,6 @@ def materialize_baseline_pairing_schedule(
         final_mask_counts=final_mask_counts,
         preview_mask_total=preview_mask_total,
         final_mask_total=final_mask_total,
+        preview_records=preview_records_out,
+        final_records=final_records_out,
     )

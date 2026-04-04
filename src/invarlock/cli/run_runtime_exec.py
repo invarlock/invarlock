@@ -79,8 +79,6 @@ def load_model_with_cfg(
     prefer_local_files_only: bool = False,
 ) -> Any:
     """Load a model with config-provided kwargs, filtering for strict adapters."""
-    from invarlock.cli.run_config import extract_model_load_kwargs
-
     try:
         model_id = cfg.model.id
     except (AttributeError, KeyError, TypeError):
@@ -90,6 +88,8 @@ def load_model_with_cfg(
             model_id = None
     if not isinstance(model_id, str) or not model_id:
         raise ValueError("Missing model.id in config")
+
+    from invarlock.cli.run_config import extract_model_load_kwargs
 
     extra = extract_model_load_kwargs(cfg, invarlock_error_cls=InvarlockError)
     with suppress_noisy_warnings(

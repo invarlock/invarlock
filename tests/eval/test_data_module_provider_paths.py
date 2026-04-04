@@ -693,6 +693,50 @@ def test_wikitext2_load_filters_and_cache_updates(monkeypatch, tmp_path):
     assert len(texts_updated) == 3
 
 
+def test_wikitext2_load_retries_with_invarlock_cache_on_lock_error(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
+    calls: list[str | None] = []
+
+    def fake_load_dataset(*args, **kwargs):  # noqa: ARG001
+        calls.append(kwargs.get("cache_dir"))
+        if len(calls) == 1:
+            raise PermissionError(
+                "Operation not permitted: '/Users/test/.cache/huggingface/datasets/sample.lock'"
+            )
+        return [{"text": "A valid sample that is long enough 12345"}]
+
+    monkeypatch.setattr(data_support_mod, "load_dataset", fake_load_dataset)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("HF_DATASETS_CACHE", raising=False)
+    monkeypatch.delenv("INVARLOCK_HF_DATASETS_CACHE", raising=False)
+
+    provider = WikiText2Provider()
+    texts = provider.load(split="validation", max_samples=5)
+
+    assert texts == ["A valid sample that is long enough 12345"]
+    assert calls[0] is None
+    assert calls[1] == str(tmp_path / ".cache" / "invarlock" / "hf_datasets")
+
+
+def test_wikitext2_load_does_not_override_explicit_cache_dir_on_lock_error(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True)
+
+    def fake_load_dataset(*args, **kwargs):  # noqa: ARG001
+        raise PermissionError(
+            "Operation not permitted: '/Users/test/.cache/huggingface/datasets/sample.lock'"
+        )
+
+    monkeypatch.setattr(data_support_mod, "load_dataset", fake_load_dataset)
+    provider = WikiText2Provider(cache_dir=tmp_path / "explicit")
+
+    with pytest.raises(PermissionError, match="Operation not permitted"):
+        provider.load(split="validation", max_samples=5)
+
+
 def test_seq2seq_provider_windows_and_masks():
     class _Tok:
         pad_token_id = 0

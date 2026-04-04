@@ -65,7 +65,7 @@ The unedited reference model run used for comparison and gating.
 
 **Example:** `invarlock evaluate --baseline gpt2 --subject gpt2-quant`
 This follows the secure-default runtime-container path unless a trusted local
-workflow uses `--mode local`.
+workflow uses `--assurance trusted-local`.
 
 ---
 
@@ -114,7 +114,7 @@ Workflow that compares a subject model to a baseline, optionally with an externa
 | **report fields** | `provenance.baseline.*`, `provenance.edited.*` |
 | **See also** | [Compare & evaluate Guide](../user-guide/compare-and-evaluate.md) |
 
-**Example:** BYOE workflow evaluates an externally quantized checkpoint against its
+**Example:** BYOE workflow evaluates an externally edited checkpoint against its
 unmodified baseline.
 
 ---

@@ -21,6 +21,15 @@ def test_build_scale_statistics_defaults_and_values() -> None:
     assert stats["max_scale"] == 1.2
 
 
+def test_build_scale_statistics_ignores_bool_and_nonfinite_values() -> None:
+    stats = build_scale_statistics({"a": True, "b": 2.0, "c": float("inf")})
+    assert stats == {
+        "mean_scale": 2.0,
+        "min_scale": 2.0,
+        "max_scale": 2.0,
+    }
+
+
 def test_build_prepare_result_ready_and_failure_paths() -> None:
     ready = build_prepare_result(
         policy={"scope": "ffn", "min_gain": 0.0},

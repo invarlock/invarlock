@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from typing import Any
 
 from . import report_validation_allowlist as allowlist_mod
@@ -214,12 +215,15 @@ REPORT_JSON_SCHEMA: dict[str, Any] = {
 _VALIDATION_ALLOWLIST_DEFAULT = allowlist_mod.DEFAULT_VALIDATION_ALLOWLIST
 
 
-def _validate_with_jsonschema(report: dict[str, Any]) -> bool:
+def _validate_with_jsonschema(
+    report: dict[str, Any], schema: dict[str, Any] | None = None
+) -> bool:
     """Validate evaluation report with JSON Schema when available."""
     if jsonschema is None:
-        return True  # Schema library unavailable; fall back to minimal checks
+        return False
+    active_schema = REPORT_JSON_SCHEMA if schema is None else schema
     try:
-        jsonschema.validate(instance=report, schema=REPORT_JSON_SCHEMA)
+        jsonschema.validate(instance=report, schema=active_schema)
         return True
     except _JSONSCHEMA_FAILURES:
         return False
@@ -227,9 +231,17 @@ def _validate_with_jsonschema(report: dict[str, Any]) -> bool:
 
 def validate_report(report: dict[str, Any]) -> bool:
     """Validate evaluation report structure and essential flags."""
+    original_validation_spec: dict[str, Any] | None = None
+    schema_properties = REPORT_JSON_SCHEMA.get("properties")
+    if isinstance(schema_properties, dict):
+        validation_spec = schema_properties.get("validation")
+        if isinstance(validation_spec, dict):
+            original_validation_spec = copy.deepcopy(validation_spec)
     try:
         if report.get("schema_version") != REPORT_SCHEMA_VERSION:
             return False
+
+        schema_for_validation = copy.deepcopy(REPORT_JSON_SCHEMA)
 
         # Prefer JSON Schema structural validation; if unavailable or too strict,
         # fall back to a lenient minimal check used by unit tests.
@@ -237,25 +249,35 @@ def validate_report(report: dict[str, Any]) -> bool:
         # disallow unknown validation keys at schema level.
         try:
             allowlist_mod.apply_validation_allowlist_schema(
-                REPORT_JSON_SCHEMA, allowlist_mod.load_validation_allowlist()
+                schema_for_validation, allowlist_mod.load_validation_allowlist()
             )
         except (KeyError, RuntimeError, TypeError, ValueError):
             pass
 
-        if not _validate_with_jsonschema(report):
+        try:
+            jsonschema_ok = _validate_with_jsonschema(report, schema_for_validation)
+        except TypeError:
+            jsonschema_ok = _validate_with_jsonschema(report)
+
+        if not jsonschema_ok:
             # Minimal fallback: require schema version + run_id + primary_metric
-            run_id_ok = isinstance(report.get("run_id"), str) and bool(
-                report.get("run_id")
-            )
+            run_id = report.get("run_id")
+            run_id_ok = isinstance(run_id, str) and bool(run_id.strip())
             pm = report.get("primary_metric")
+            pm_final = pm.get("final") if isinstance(pm, dict) else None
+            pm_kind = pm.get("kind") if isinstance(pm, dict) else None
             pm_ok = isinstance(pm, dict) and (
-                isinstance(pm.get("final"), int | float)
-                or (isinstance(pm.get("kind"), str) and bool(pm.get("kind")))
+                (isinstance(pm_final, int | float) and not isinstance(pm_final, bool))
+                or (isinstance(pm_kind, str) and bool(pm_kind.strip()))
             )
             if not (run_id_ok and pm_ok):
                 return False
 
         validation = report.get("validation", {})
+        if "validation" in report and not isinstance(validation, dict):
+            return False
+        if not isinstance(validation, dict):
+            validation = {}
         for flag in [
             "preview_final_drift_acceptable",
             "primary_metric_acceptable",
@@ -271,6 +293,11 @@ def validate_report(report: dict[str, Any]) -> bool:
         return True
     except (KeyError, TypeError, ValueError):
         return False
+    finally:
+        if original_validation_spec is not None:
+            schema_properties = REPORT_JSON_SCHEMA.get("properties")
+            if isinstance(schema_properties, dict):
+                schema_properties["validation"] = original_validation_spec
 
 
 __all__ = [

@@ -1387,6 +1387,7 @@ def test_build_proof_pack_copies_readme_and_environment_without_optional_refs(
     manifest = json.loads(
         (tmp_path / "out-readme" / "manifest.json").read_text(encoding="utf-8")
     )
+    assert manifest["evidence_level"] == "medium"
     assert "invocation" not in manifest
     assert "materials" not in manifest
     assert manifest["environment"]["path"] == "metadata/environment.json"
@@ -1429,11 +1430,17 @@ def test_build_proof_pack_copies_source_repo_without_environment_or_materials(
     manifest = json.loads(
         (tmp_path / "out-source-only" / "manifest.json").read_text(encoding="utf-8")
     )
+    assert manifest["evidence_level"] == "medium"
+    assert manifest["verification"]["clean_reports"] == 1
     assert (
         manifest["invocation"]["config_source"]["path"] == "metadata/source_repo.json"
     )
     assert "environment" not in manifest
     assert "materials" not in manifest
+    readme_text = (tmp_path / "out-source-only" / "README.md").read_text(
+        encoding="utf-8"
+    )
+    assert "Evidence level: medium" in readme_text
 
 
 def test_verify_proof_pack_reports_missing_manifest_and_checksums(
@@ -1610,3 +1617,56 @@ def test_build_verify_result_includes_signer_and_verify_payload(tmp_path: Path) 
 
     assert payload.payload["signer_fingerprint"] == "ABC123"
     assert payload.payload["verify"] == {"ok": False}
+
+
+def test_proof_pack_helper_paths_cover_counts_low_evidence_and_failed_readme() -> None:
+    assert proof_pack_mod._proof_pack_counts_from_verification(
+        {
+            "clean_reports": 2,
+            "error_injection_reports": 1,
+            "failed_reports": 0,
+        }
+    ) == (2, 1, 0)
+    assert (
+        proof_pack_mod._derive_proof_pack_evidence_level(
+            subject_present=False,
+            checksums_bound=True,
+            clean_reports=0,
+            failed_reports=1,
+            has_source_repo_ref=False,
+            has_environment_ref=False,
+        )
+        == "low"
+    )
+    readme = proof_pack_mod._render_proof_pack_readme(
+        evidence_level="low",
+        clean_reports=2,
+        error_reports=1,
+        failed_reports=1,
+        policy_profile="release",
+        strict_ready=False,
+        signer_fingerprint=None,
+    )
+    assert "Unexpected report verification failures" in readme
+
+
+def test_build_verify_result_handles_invalid_manifest_json(tmp_path: Path) -> None:
+    pack_dir = tmp_path / "pack"
+    pack_dir.mkdir()
+    (pack_dir / "manifest.json").write_text("{not-json", encoding="utf-8")
+
+    payload = proof_pack_mod._build_verify_result(
+        pack_dir=pack_dir,
+        ok=False,
+        strict=False,
+        skip_verify=True,
+        warnings=[],
+        errors=["boom"],
+        signer_fingerprint=None,
+        verify_payload=None,
+        status=proof_pack_mod.ProofPackStatus.FORMAT,
+    )
+
+    assert payload.payload["evidence_level"] is None
+    assert "signer_fingerprint" not in payload.payload
+    assert "verify" not in payload.payload

@@ -31,6 +31,24 @@ def test_invariants_guard_records_profile_checks():
     assert baseline_checks["profile::mlm_mask_alignment"] is True
 
 
+def test_invariants_guard_ignores_scalar_and_non_sequence_profile_checks() -> None:
+    model = DummyBertModel()
+
+    for profile_checks in ("mlm_mask_alignment", object()):
+        guard = InvariantsGuard()
+        guard.prepare(
+            model,
+            adapter=None,
+            calib=None,
+            policy={"profile_checks": profile_checks},
+        )
+
+        assert guard.profile_checks == ()
+        assert not any(
+            key.startswith("profile::") for key in guard.baseline_checks.keys()
+        )
+
+
 def test_invariants_guard_detects_non_finite_weights():
     guard = InvariantsGuard(on_fail="abort")
     model = DummyBertModel()

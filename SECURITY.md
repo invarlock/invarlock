@@ -84,7 +84,7 @@ InvarLock includes several security features:
 
 We thank the security researchers who have responsibly disclosed vulnerabilities:
 
-*No vulnerabilities have been reported yet.*
+Public acknowledgments will be listed here when applicable.
 
 ---
 

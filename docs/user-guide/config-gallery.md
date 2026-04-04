@@ -6,11 +6,11 @@
 | --- | --- |
 | **Purpose** | Quick pointers to common presets and overlays. |
 | **Audience** | Users looking for ready-to-use configurations. |
-| **Note** | Presets are repo assets, not shipped in wheels. |
+| **Note** | Presets are repo assets, not included in wheels. |
 | **Source** | `configs/presets/` and `configs/overlays/`. |
 
 Pointers to common presets in this repository you can start from. Presets are
-repo assets (not shipped in wheels). Use flag‑only `invarlock evaluate` when
+repo assets (not included in wheels). Use flag‑only `invarlock evaluate` when
 installing from PyPI, or clone this repo to reference these files.
 
 Note: Adapter‑based flows such as `invarlock evaluate` with HF models require
@@ -18,7 +18,7 @@ extras like `invarlock[hf]` or `invarlock[adapters]`. The core install
 (`pip install invarlock`) remains torch‑free.
 
 The `evaluate` examples below use the secure-default runtime container. Add
-`--mode local` only for trusted local workflows that intentionally bypass that
+`--assurance trusted-local` only for trusted local workflows that intentionally bypass that
 boundary.
 
 ## Presets (Runnable)
@@ -33,7 +33,7 @@ boundary.
 provide good coverage while keeping runtime reasonable.
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --baseline gpt2 --subject /path/to/edited \
+invarlock evaluate --allow-network --baseline gpt2 --subject /path/to/edited \
   --preset configs/presets/causal_lm/wikitext2_512.yaml --profile ci
 ```
 
@@ -48,7 +48,7 @@ INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --baseline gpt2 --subject /path/to/
 network access is unavailable or for CI smoke tests.
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --baseline bert-base-uncased --subject /path/to/edited \
+invarlock evaluate --allow-network --baseline bert-base-uncased --subject /path/to/edited \
   --preset configs/presets/masked_lm/wikitext2_128.yaml --profile ci
 ```
 
@@ -76,7 +76,7 @@ own pre-edited checkpoint instead.
 **Example (demo edit):**
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --baseline gpt2 --subject gpt2 \
+invarlock evaluate --allow-network --baseline gpt2 --subject gpt2 \
   --preset configs/presets/causal_lm/wikitext2_512.yaml \
   --edit-config configs/overlays/edits/quant_rtn/8bit_attn.yaml \
   --profile ci

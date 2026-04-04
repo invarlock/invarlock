@@ -40,8 +40,8 @@ interpret them.
   - `resolved_policy.spectral.measurement_contract` /
     `resolved_policy.rmt.measurement_contract` pin the estimator + sampling
     procedure used by guards.
-  - `rmt.mode` makes the active RMT measurement path reviewer-visible; current
-    public reports emit `activation_edge_risk`.
+  - `rmt.mode` makes the active RMT measurement path reviewer-visible; public
+    reports emit `activation_edge_risk`.
   - `spectral.measurement_contract_hash` / `rmt.measurement_contract_hash` are
     compact digests for audit and baseline pairing.
   - In CI/Release, `invarlock verify` enforces baseline/subject pairing (`*_measurement_contract_match = true`).

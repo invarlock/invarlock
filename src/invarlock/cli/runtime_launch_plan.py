@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Any
 
-from invarlock.core.run_execution_request_policy import SupportsRunExecutionRequest
 from invarlock.runtime_security import ContainerLaunchPlan
 from invarlock.runtime_security_helpers import (
     _host_nvidia_visible,
@@ -184,7 +184,7 @@ def _append_bool_flag(argv: list[str], flag: str, enabled: bool) -> None:
 
 def build_request_container_launch_plan(
     command_name: str,
-    request: SupportsRunExecutionRequest,
+    request: Any,
 ) -> ContainerLaunchPlan:
     delegated_argv: list[str] = [str(command_name)]
     _append_option(delegated_argv, "--config", request.config)

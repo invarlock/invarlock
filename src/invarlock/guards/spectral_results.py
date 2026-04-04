@@ -7,6 +7,10 @@ from typing import Any
 import numpy as np
 
 
+def _is_real_number(value: Any) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool)
+
+
 def _quantile(sorted_values: list[float], quantile: float) -> float:
     if not sorted_values:
         return 0.0
@@ -29,12 +33,21 @@ def compute_family_observability(
     *,
     top_k: int = 3,
 ) -> tuple[dict[str, dict[str, float]], dict[str, list[dict[str, Any]]]]:
+    try:
+        top_k_i = int(top_k)
+    except (TypeError, ValueError):
+        top_k_i = 3
+    if top_k_i < 0:
+        top_k_i = 0
+
     family_scores: dict[str, list[float]] = defaultdict(list)
     family_modules: dict[str, list[tuple[float, str]]] = defaultdict(list)
 
     for module_name, z_value in latest_z_scores.items():
         family = module_family_map.get(module_name)
         if family is None:
+            continue
+        if not _is_real_number(z_value):
             continue
         try:
             z_abs = abs(float(z_value))
@@ -58,7 +71,7 @@ def compute_family_observability(
         module_entries.sort(key=lambda item: item[0], reverse=True)
         top_z_scores[family] = [
             {"module": module_name, "z": float(z_abs), "family": family}
-            for z_abs, module_name in module_entries[:top_k]
+            for z_abs, module_name in module_entries[:top_k_i]
         ]
 
     return family_quantiles, top_z_scores

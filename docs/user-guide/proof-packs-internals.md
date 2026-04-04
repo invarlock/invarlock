@@ -523,7 +523,7 @@ Large runs can be storage-heavy (baseline + edits + error models):
   - The minimum free space guard is `MIN_FREE_DISK_GB` (default 200).
 - `PACK_BASELINE_STORAGE_MODE=snapshot_symlink` builds a local symlink tree
   that points into the Hugging Face cache snapshot. This avoids a second
-  baseline copy under `OUTPUT_DIR`, but it still requires one full model copy in
+  baseline copy under `OUTPUT_DIR`, but it requires one full model copy in
   `HF_HUB_CACHE` when that cache shares the output filesystem.
 - `PACK_BASELINE_STORAGE_MODE=snapshot_copy` materializes a full baseline copy
   under `OUTPUT_DIR/models/<model>/baseline`.
@@ -597,7 +597,7 @@ package-native Ed25519 manifest-signature format as the installed CLI.
 
 Maintainer proof-pack packaging also treats source provenance as fail-closed:
 
-- `run_pack.sh` writes `metadata/source_repo.json` from the current Git checkout.
+- `run_pack.sh` writes `metadata/source_repo.json` from the active Git checkout.
 - If `git` is unavailable or the repository metadata cannot be collected, pack
   creation stops instead of silently emitting partial provenance.
 - If you need to package from a detached artifact tree, write a complete

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any
 
@@ -12,17 +11,9 @@ from rich.console import Console
 
 from invarlock.core.exceptions import ConfigError, ValidationError
 from invarlock.core.provider_config import resolve_provider_kind_and_kwargs
-from invarlock.runtime_security import (
-    ALLOW_HOST_EXECUTION_ENV,
-    ALLOW_NETWORK_ENV,
-    ALLOW_REMOTE_CODE_ENV,
-    ALLOW_THIRD_PARTY_PLUGINS_ENV,
-    ALLOW_UNATTESTED_ARTIFACTS_ENV,
-    RuntimeSecurityPolicy,
-    build_runtime_security_policy,
-    current_runtime_security_policy,
-    remote_code_allowed,
-)
+from invarlock.runtime_security import remote_code_allowed
+
+from .security_helpers import resolve_shell_runtime_security_policy
 
 SPLIT_ALIASES: tuple[str, ...] = ("validation", "val", "dev", "eval", "test")
 
@@ -31,37 +22,8 @@ __all__ = [
     "prepare_config_for_run",
     "resolve_device_and_output",
     "resolve_provider_and_split",
-    "resolve_shell_runtime_security_policy",
     "remote_code_allowed",
 ]
-
-
-def _env_truthy(name: str) -> bool:
-    value = os.environ.get(name, "")
-    return value.strip().lower() in {"1", "true", "yes", "on"}
-
-
-def resolve_shell_runtime_security_policy(
-    *,
-    allow_network: bool = False,
-    allow_host_execution: bool = False,
-    allow_third_party_plugins: bool = False,
-    allow_remote_code: bool = False,
-    allow_unattested_artifacts: bool = False,
-) -> RuntimeSecurityPolicy:
-    policy = current_runtime_security_policy()
-    if policy is not None:
-        return policy
-    return build_runtime_security_policy(
-        allow_network=allow_network or _env_truthy(ALLOW_NETWORK_ENV),
-        allow_host_execution=allow_host_execution
-        or _env_truthy(ALLOW_HOST_EXECUTION_ENV),
-        allow_third_party_plugins=allow_third_party_plugins
-        or _env_truthy(ALLOW_THIRD_PARTY_PLUGINS_ENV),
-        allow_remote_code=allow_remote_code or _env_truthy(ALLOW_REMOTE_CODE_ENV),
-        allow_unattested_artifacts=allow_unattested_artifacts
-        or _env_truthy(ALLOW_UNATTESTED_ARTIFACTS_ENV),
-    )
 
 
 def _resolve_requested_edit_name(kind: str) -> str:

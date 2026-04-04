@@ -39,7 +39,7 @@ request higher counts):
 
 These minima are derived from half‑width targets on paired Δlog‑loss (see
 Tier v1.0 Calibration). CI/Release profiles treat shortfalls as hard errors;
-dev flows surface warnings but still record coverage in the attested report bundle.
+dev flows surface warnings but also record coverage in the attested report bundle.
 
 ## Runtime Contract (report)
 

@@ -5,11 +5,13 @@ Owns dependency detection, lazy dataset loading, and local file signatures.
 """
 
 import importlib.util
+import logging
 import os
+import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, TypeAlias
 
 from invarlock.core.exceptions import DependencyError as _DepErr
 
@@ -24,10 +26,11 @@ HAS_TORCH = importlib.util.find_spec("torch") is not None
 _DATASETS_UNSET = object()
 _load_dataset_cached: Any = _DATASETS_UNSET
 load_dataset: Any = None
+LOGGER = logging.getLogger(__name__)
 
 
-DatasetDiagnosticSeverity = Literal["info", "warning", "error"]
-DatasetDiagnosticCategory = Literal["dataset", "provider", "window"]
+DatasetDiagnosticSeverity: TypeAlias = Literal["info", "warning", "error"]  # noqa: UP040
+DatasetDiagnosticCategory: TypeAlias = Literal["dataset", "provider", "window"]  # noqa: UP040
 
 
 @dataclass(frozen=True)
@@ -80,6 +83,70 @@ def _require_load_dataset(message: str) -> Any:
     return load_dataset_fn
 
 
+def _is_hf_datasets_cache_lock_error(exc: BaseException) -> bool:
+    message = " ".join(str(part) for part in exc.args if part).lower()
+    if not message:
+        message = str(exc).lower()
+    return (
+        ".lock" in message
+        and ("operation not permitted" in message or "permission denied" in message)
+        and ("huggingface" in message or "datasets" in message)
+    )
+
+
+def _default_invarlock_datasets_cache_dir() -> Path:
+    configured = os.getenv("INVARLOCK_HF_DATASETS_CACHE", "").strip()
+    if configured:
+        return Path(configured).expanduser()
+    cache_home = os.getenv("XDG_CACHE_HOME", "").strip()
+    if cache_home:
+        return Path(cache_home).expanduser() / "invarlock" / "hf_datasets"
+    return Path.home() / ".cache" / "invarlock" / "hf_datasets"
+
+
+def _ensure_invarlock_datasets_cache_dir() -> Path:
+    preferred = _default_invarlock_datasets_cache_dir()
+    try:
+        preferred.mkdir(parents=True, exist_ok=True)
+        return preferred
+    except OSError:
+        fallback = Path(tempfile.mkdtemp(prefix="invarlock_hf_datasets_"))
+        LOGGER.warning(
+            "Falling back to temporary datasets cache at %s after failing to create %s",
+            fallback,
+            preferred,
+        )
+        return fallback
+
+
+def load_dataset_with_cache_fallback(
+    *args: Any,
+    cache_dir: str | None = None,
+    **kwargs: Any,
+) -> Any:
+    load_dataset_fn = _require_load_dataset(
+        "DEPENDENCY-MISSING: datasets library required for Hugging Face dataset loading"
+    )
+    chosen_cache_dir = cache_dir
+    try:
+        return load_dataset_fn(*args, cache_dir=chosen_cache_dir, **kwargs)
+    except (OSError, PermissionError) as exc:
+        env_cache_dir = os.getenv("HF_DATASETS_CACHE", "").strip()
+        if (
+            chosen_cache_dir
+            or env_cache_dir
+            or not _is_hf_datasets_cache_lock_error(exc)
+        ):
+            raise
+        fallback_dir = _ensure_invarlock_datasets_cache_dir()
+        LOGGER.warning(
+            "Retrying datasets load with writable InvarLock cache %s after shared cache lock error: %s",
+            fallback_dir,
+            exc,
+        )
+        return load_dataset_fn(*args, cache_dir=str(fallback_dir), **kwargs)
+
+
 def _local_files_signature(files: Sequence[Path]) -> tuple[tuple[str, int, int], ...]:
     signature: list[tuple[str, int, int]] = []
     for file_path in files:
@@ -101,6 +168,8 @@ __all__ = [
     "HAS_TORCH",
     "_get_load_dataset",
     "_require_load_dataset",
+    "_is_hf_datasets_cache_lock_error",
     "_local_files_signature",
+    "load_dataset_with_cache_fallback",
     "load_dataset",
 ]

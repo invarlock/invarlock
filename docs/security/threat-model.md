@@ -15,7 +15,7 @@ security or alignment.
 - Default runtime posture disables outbound network connections unless
   `INVARLOCK_ALLOW_NETWORK=1` is explicitly set.
 - Default runtime posture keeps model-loading commands inside the runtime
-  container unless a trusted public workflow uses `invarlock evaluate --mode local`
+  container unless a trusted public workflow uses `invarlock evaluate --assurance trusted-local`
   or an advanced/internal workflow explicitly sets `INVARLOCK_ALLOW_HOST_EXECUTION=1`.
 - Evaluation runs use the pairing, windowing, and bootstrap profiles
   described in the assurance docs and configs.
@@ -37,7 +37,7 @@ security or alignment.
 │  ┌───────────────────────────────────────────────────────────────────┐  │
 │  │ RUNTIME LAYER                                                     │  │
 │  │ container execution by default; host execution only with          │  │
-│  │ `evaluate --mode local` (public) or advanced/internal host bypass │  │
+│  │ `evaluate --assurance trusted-local` (public) or advanced/internal host bypass │  │
 │  └───────────────────────────────────────────────────────────────────┘  │
 │                               │                                         │
 │                               ▼                                         │
@@ -77,7 +77,7 @@ security or alignment.
 - Malicious or malformed model artifacts (e.g., unsafe pickle payloads) used as
   baselines or subjects.
 - Misconfigured edits or guard policies that silently degrade quality or break
-  structural invariants while still “appearing to run”.
+  structural invariants while “appearing to run”.
 - Dependency vulnerabilities in the Python stack and transitive extras that
   could affect evaluation or guard logic.
 

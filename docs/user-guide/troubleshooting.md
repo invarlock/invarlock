@@ -19,8 +19,8 @@ invarlock doctor --config <config.yaml> --profile ci
 invarlock verify reports/eval/evaluation.report.json --profile ci
 
 # Enable debug output for detailed traces
-INVARLOCK_DEBUG_TRACE=1 INVARLOCK_ALLOW_NETWORK=1 \
-  invarlock evaluate --mode local --baseline gpt2 --subject gpt2 --preset <config.yaml>
+INVARLOCK_DEBUG_TRACE=1 \
+  invarlock evaluate --allow-network --assurance trusted-local --baseline gpt2 --subject gpt2 --preset <config.yaml>
 ```
 
 `verify` expects `runtime.manifest.json` next to evaluation outputs.
@@ -91,7 +91,7 @@ These errors relate to window pairing, tokenizer consistency, and evidence integ
 
 1. Ensure both runs use the same model checkpoint
 2. Pin tokenizer version via `revision` in config
-3. Regenerate baseline with current tokenizer
+3. Regenerate the baseline with the tokenizer used for the subject run
 
 **Example error:**
 
@@ -155,7 +155,7 @@ These errors relate to window pairing, tokenizer consistency, and evidence integ
 
 **Fixes:**
 
-1. Regenerate baseline with current InvarLock version
+1. Regenerate the baseline with the InvarLock version used for verification
 2. Ensure `INVARLOCK_STORE_EVAL_WINDOWS=1` (default)
 3. Check `report.provenance.provider_digest` exists
 
@@ -299,7 +299,7 @@ These errors relate to window pairing, tokenizer consistency, and evidence integ
 **Fix:**
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --baseline gpt2 --subject gpt2
+invarlock evaluate --allow-network --baseline gpt2 --subject gpt2
 ```
 
 ### Dependency Missing
@@ -321,8 +321,8 @@ pip install "invarlock[adapters]" # All adapters
 **Fix:**
 
 ```bash
-INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE=1 INVARLOCK_ALLOW_NETWORK=1 \
-  invarlock evaluate --baseline gpt2 --subject gpt2 --preset <config.yaml>
+INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE=1 \
+  invarlock evaluate --allow-network --baseline gpt2 --subject gpt2 --preset <config.yaml>
 ```
 
 ### Guard Prepare Failures
@@ -378,8 +378,8 @@ invarlock doctor --config <config.yaml> --profile ci --strict
 Enable detailed logging:
 
 ```bash
-INVARLOCK_DEBUG_TRACE=1 INVARLOCK_ALLOW_NETWORK=1 \
-  invarlock evaluate --baseline gpt2 --subject gpt2 --preset <config.yaml>
+INVARLOCK_DEBUG_TRACE=1 \
+  invarlock evaluate --allow-network --baseline gpt2 --subject gpt2 --preset <config.yaml>
 ```
 
 ### Plugins Inspection

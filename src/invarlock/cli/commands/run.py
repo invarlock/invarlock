@@ -30,6 +30,7 @@ def run_command(
     allow_host_execution: bool = False,
     allow_third_party_plugins: bool = False,
     allow_remote_code: bool = False,
+    allow_unattested_artifacts: bool = False,
     prefer_local_files_only: bool = False,
     no_color: bool = False,
 ):
@@ -38,6 +39,7 @@ def run_command(
     allow_host_execution = bool(allow_host_execution)
     allow_third_party_plugins = bool(allow_third_party_plugins)
     allow_remote_code = bool(allow_remote_code)
+    allow_unattested_artifacts = bool(allow_unattested_artifacts)
     prefer_local_files_only = bool(prefer_local_files_only)
     try:
         return run_from_config(
@@ -64,6 +66,7 @@ def run_command(
             allow_host_execution=allow_host_execution,
             allow_third_party_plugins=allow_third_party_plugins,
             allow_remote_code=allow_remote_code,
+            allow_unattested_artifacts=allow_unattested_artifacts,
             prefer_local_files_only=prefer_local_files_only,
             command_name="run",
         )

@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import math
+from inspect import getattr_static
 from typing import Any
 
 import numpy as np
@@ -22,6 +23,25 @@ _VARIANCE_BATCHING_ERRORS = (
     TypeError,
     ValueError,
 )
+
+
+def _model_kwargs(prepared: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: value
+        for key, value in prepared.items()
+        if isinstance(key, str) and not key.startswith("_")
+    }
+
+
+def _resolve_adapter_hook(adapter: Any, name: str) -> Any | None:
+    if adapter is None:
+        return None
+    try:
+        getattr_static(adapter, name)
+    except AttributeError:
+        return None
+    hook = getattr(adapter, name, None)
+    return hook if callable(hook) else None
 
 
 def safe_mean(
@@ -241,14 +261,25 @@ def compute_ppl_for_batches(
     with torch.no_grad():
         for batch in batches:
             try:
-                inputs, labels = guard._prepare_batch_tensors(batch, device)
-                if inputs is None or labels is None:
-                    continue
+                adapter_ref = getattr(guard, "_adapter_ref", None)
+                prepare_model_inputs = _resolve_adapter_hook(
+                    adapter_ref, "prepare_model_inputs"
+                )
+                prepared = None
+                if callable(prepare_model_inputs) and isinstance(batch, dict):
+                    prepared = prepare_model_inputs(batch, device, True)
+                    outputs = model(**_model_kwargs(prepared))
+                    inputs = prepared.get("input_ids")
+                    labels = prepared.get("labels")
+                else:
+                    inputs, labels = guard._prepare_batch_tensors(batch, device)
+                    if inputs is None or labels is None:
+                        continue
 
-                try:
-                    outputs = model(inputs, labels=labels)
-                except TypeError:
-                    outputs = model(inputs)
+                    try:
+                        outputs = model(inputs, labels=labels)
+                    except TypeError:
+                        outputs = model(inputs)
                 loss_val = None
                 if hasattr(outputs, "loss") and hasattr(outputs.loss, "item"):
                     loss_val = outputs.loss.item()
@@ -282,7 +313,14 @@ def compute_ppl_for_batches(
                         count = None
                     if count is None:
                         try:
-                            count = int(inputs.numel())
+                            if prepared is not None and isinstance(
+                                prepared.get("_answer_token_count"), int
+                            ):
+                                count = int(prepared["_answer_token_count"])
+                            elif isinstance(inputs, torch.Tensor):
+                                count = int(inputs.numel())
+                            else:
+                                count = 0
                         except (AttributeError, RuntimeError, TypeError, ValueError):
                             count = 0
                     token_counts.append(int(max(count, 0)))

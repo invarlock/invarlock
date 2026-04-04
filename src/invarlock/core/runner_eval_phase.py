@@ -12,6 +12,10 @@ from .types import LogLevel
 EvaluateMetricTailFn = Callable[..., dict[str, Any]]
 
 
+def _is_real_number(value: Any) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool)
+
+
 def eval_phase(
     runner: Any,
     model: Any,
@@ -97,7 +101,7 @@ def eval_phase(
         eval_windows = {"preview": {}, "final": {}}
 
     pm = metrics.get("primary_metric", {}) if isinstance(metrics, dict) else {}
-    pm_kind = str(pm.get("kind", "")).lower() if isinstance(pm, dict) else ""
+    pm_kind = str(pm.get("kind", "")).strip().lower() if isinstance(pm, dict) else ""
     is_ppl_metric = pm_kind.startswith("ppl")
 
     baseline_eval: dict[str, Any] = {}
@@ -149,16 +153,12 @@ def eval_phase(
         ):
             base_map: dict[int, float] = {}
             for baseline_id, baseline_val in zip(base_ids, base_ll, strict=False):
-                if isinstance(baseline_id, int | float) and isinstance(
-                    baseline_val, int | float
-                ):
+                if _is_real_number(baseline_id) and _is_real_number(baseline_val):
                     base_map[int(baseline_id)] = float(baseline_val)
             for index, (run_id, run_val) in enumerate(
                 zip(run_ids, run_ll, strict=False)
             ):
-                if not (
-                    isinstance(run_id, int | float) and isinstance(run_val, int | float)
-                ):
+                if not (_is_real_number(run_id) and _is_real_number(run_val)):
                     continue
                 key = int(run_id)
                 if key not in base_map:

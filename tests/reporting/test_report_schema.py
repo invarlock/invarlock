@@ -35,7 +35,7 @@ def test_load_validation_allowlist_non_list_payload(monkeypatch):
 
 def test_validate_with_jsonschema_handles_missing_library(monkeypatch):
     monkeypatch.setattr(schema_mod, "jsonschema", None, raising=False)
-    assert schema_mod._validate_with_jsonschema({"schema_version": "v1"})
+    assert schema_mod._validate_with_jsonschema({"schema_version": "v1"}) is False
 
 
 def test_validate_with_jsonschema_failure(monkeypatch):
@@ -77,15 +77,44 @@ def test_validate_report_fallback_and_allowlist(monkeypatch):
     monkeypatch.setattr(
         allowlist_mod, "load_validation_allowlist", lambda: {"custom_flag"}
     )
-    monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda _: False)
+    monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda *_args: False)
 
     try:
         assert schema_mod.validate_report(cert) is True
         vspec = schema_mod.REPORT_JSON_SCHEMA["properties"]["validation"]
-        assert vspec["properties"] == {"custom_flag": {"type": "boolean"}}
-        assert vspec["additionalProperties"] is False
+        assert vspec == orig_schema
     finally:
         schema_mod.REPORT_JSON_SCHEMA["properties"]["validation"] = orig_schema
+
+
+def test_validate_report_does_not_leak_allowlist_mutations_between_calls(
+    monkeypatch,
+):
+    custom = {
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
+        "run_id": "run-123",
+        "primary_metric": {"final": 1.0},
+        "validation": {"custom_flag": True},
+    }
+    standard = {
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
+        "run_id": "run-456",
+        "primary_metric": {"final": 1.0},
+        "validation": {"primary_metric_acceptable": True},
+    }
+
+    monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda *_args: False)
+    monkeypatch.setattr(
+        allowlist_mod, "load_validation_allowlist", lambda: {"custom_flag"}
+    )
+    assert schema_mod.validate_report(custom) is True
+
+    monkeypatch.setattr(
+        allowlist_mod,
+        "load_validation_allowlist",
+        lambda: {"primary_metric_acceptable"},
+    )
+    assert schema_mod.validate_report(standard) is True
 
 
 def test_validate_report_rejects_non_boolean_flags(monkeypatch):

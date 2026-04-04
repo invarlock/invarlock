@@ -161,3 +161,35 @@ def test_hf_text_provider_windows_keep_sampling_until_unique(monkeypatch):
     assert len(prev) == 3
     assert len(final) == 3
     assert len({tuple(row) for row in combined}) == 6
+
+
+def test_hf_text_provider_retries_with_invarlock_cache_on_lock_error(
+    monkeypatch, tmp_path
+):
+    import invarlock.eval.data as data_mod
+    import invarlock.eval.data_support as data_support_mod
+
+    monkeypatch.setattr(data_support_mod, "HAS_DATASETS", True, raising=False)
+    calls: list[str | None] = []
+
+    def fake_load_dataset(path, name=None, split=None, cache_dir=None, **kwargs):  # noqa: ARG001
+        calls.append(cache_dir)
+        if len(calls) == 1:
+            raise PermissionError(
+                "Operation not permitted: '/Users/test/.cache/huggingface/datasets/sample.lock'"
+            )
+        return [{"text": "hello world from fallback cache"}]
+
+    monkeypatch.setattr(
+        data_support_mod, "load_dataset", fake_load_dataset, raising=False
+    )
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("HF_DATASETS_CACHE", raising=False)
+    monkeypatch.delenv("INVARLOCK_HF_DATASETS_CACHE", raising=False)
+
+    provider = data_mod.HFTextProvider(dataset_name="dummy", text_field="text")
+    texts = provider.load(split="validation")
+
+    assert texts == ["hello world from fallback cache"]
+    assert calls[0] is None
+    assert calls[1] == str(tmp_path / ".cache" / "invarlock" / "hf_datasets")

@@ -6,11 +6,11 @@
 | --- | --- |
 | **Purpose** | Deterministic dataset providers for preview/final evaluation windows. |
 | **Audience** | CLI users configuring `dataset` blocks and Python callers building evaluation windows. |
-| **Supported providers** | `wikitext2`, `synthetic`, `hf_text`, `local_jsonl`, `hf_seq2seq`, `local_jsonl_pairs`, `seq2seq`. |
+| **Supported providers** | `wikitext2`, `synthetic`, `hf_text`, `local_jsonl`, `vision_text`, `hf_seq2seq`, `local_jsonl_pairs`, `seq2seq`. |
 | **Requires** | `invarlock[eval]` or `invarlock[hf]` for Hugging Face datasets providers. |
-| **Network** | Offline by default; HF-backed providers need `INVARLOCK_ALLOW_NETWORK=1` for first download. |
+| **Network** | Offline by default; CLI runs use `evaluate --allow-network` for first download, while programmatic callers can set `INVARLOCK_ALLOW_NETWORK=1`. |
 | **Inputs** | Dataset provider name plus provider-specific fields. |
-| **Outputs / Artifacts** | Evaluation windows stored in `report.evaluation_windows` and dataset metadata in `report.data.*`. |
+| **Outputs / Artifacts** | Evaluation windows stored in `report.evaluation_windows` and dataset metadata in `report.data.*`. `vision_text` persists example records instead of token windows. |
 | **Source of truth** | `src/invarlock/eval/data.py`, `src/invarlock/eval/data_support.py`, `src/invarlock/eval/data_tokenization.py`, `src/invarlock/eval/data_windows.py`, and `src/invarlock/eval/data_providers.py`. |
 
 ## Quick Start
@@ -34,17 +34,25 @@ For Compare & evaluate, reuse the same `dataset` block in baseline and subject r
   deterministic splits; counts are recorded in run reports and evaluation reports.
 - **Pairing**: `invarlock evaluate` requires baseline window evidence to pair
   windows. Missing/invalid evidence fails closed in CI/Release profiles.
-- **Offline-first**: downloads are opt-in via `INVARLOCK_ALLOW_NETWORK=1`. Cached
-  datasets can be enforced via `HF_DATASETS_OFFLINE=1`.
+- **Offline-first**: downloads are opt-in. CLI runs use `evaluate --allow-network`;
+  programmatic callers can set `INVARLOCK_ALLOW_NETWORK=1`. Cached datasets can
+  be enforced via `HF_DATASETS_OFFLINE=1`.
+- **Vision-text manifests**: `vision_text` is local-files-only and
+  expects JSONL records with `id`, `image_path`, `prompt`, and either `answer`
+  or `answers`. It is fixed to single-image examples and `batch_size=1`.
 - **Tokenizer contract**: dataset providers expect either a callable tokenizer
   that returns `input_ids` plus optional `attention_mask`, or an `encode(...)`
   method that accepts `truncation=True`, `max_length=...`, and
   `padding="max_length"`.
 - **Secure-default execution**: dataset-backed model-loading commands run in the
   runtime container by default; trusted public local execution uses
-  `invarlock evaluate --mode local`.
+  `invarlock evaluate --assurance trusted-local`.
 - **Dedupe & capacity**: `INVARLOCK_DEDUP_TEXTS=1` removes exact duplicates;
   `INVARLOCK_CAPACITY_FAST=1` speeds up capacity checks for quick runs.
+- **HF cache fallback**: if a local rerun hits a Hugging Face datasets
+  shared-cache lock/permission error, InvarLock retries with its own writable
+  datasets cache. Set `INVARLOCK_HF_DATASETS_CACHE` to choose that fallback
+  location explicitly.
 
 ### Pairing invariants (E001)
 
@@ -68,6 +76,7 @@ Counts mismatches are enforced via `coverage.preview.used`,
 | `synthetic` | text | Offline | `provider`, `seq_len`, `preview_n`, `final_n` | Generated text; good for smoke tests. |
 | `hf_text` | text | Cache/Net | `dataset_name`, `text_field` | Generic HF dataset loader; uses first N rows. |
 | `local_jsonl` | text | Offline | `file`/`path`/`data_files`, `text_field` | Reads JSONL from disk; default `text_field: text`. |
+| `vision_text` | image-text | Offline | `file`/`path`/`data_files` | Local JSONL manifest of single-image VQA-style examples; `stride` is ignored. |
 | `hf_seq2seq` | seq2seq | Cache/Net | `dataset_name`, `src_field`, `tgt_field` | Provides encoder ids + decoder labels. |
 | `local_jsonl_pairs` | seq2seq | Offline | `file`/`path`/`data_files`, `src_field`, `tgt_field` | Paired JSONL for seq2seq. |
 | `seq2seq` | seq2seq | Offline | optional `n`, `src_len`, `tgt_len` | Synthetic seq2seq generator. |
@@ -80,6 +89,7 @@ Counts mismatches are enforced via `coverage.preview.used`,
 | `synthetic` | `provider`, `seq_len`, `preview_n`, `final_n` | `report.data.*` + `report.dataset.windows.stats` |
 | `hf_text` | `dataset_name`, `text_field` | `report.data.*` + `report.dataset.windows.stats` |
 | `local_jsonl` | `file`/`path`/`data_files`, `text_field` | `report.data.*` + `report.dataset.windows.stats` |
+| `vision_text` | `file`/`path`/`data_files` | `report.data.*` + `report.evaluation_windows.{preview,final}.records` |
 | `hf_seq2seq` | `dataset_name`, `src_field`, `tgt_field` | `report.data.*` + `report.dataset.windows.stats` |
 | `local_jsonl_pairs` | `file`/`path`/`data_files`, `src_field`, `tgt_field` | `report.data.*` + `report.dataset.windows.stats` |
 | `seq2seq` | optional `n`, `src_len`, `tgt_len` | `report.data.*` + `report.dataset.windows.stats` |
@@ -120,6 +130,19 @@ dataset:
   final_n: 64
 ```
 
+### Vision-text provider example
+
+```yaml
+dataset:
+  provider:
+    kind: vision_text
+    path: tests/fixtures/vision_text/demo_manifest.jsonl
+  split: validation
+  seq_len: 256
+  preview_n: 1
+  final_n: 1
+```
+
 ### Seq2seq provider example (HF)
 
 ```yaml
@@ -138,11 +161,18 @@ dataset:
 - `HF_DATASETS_OFFLINE=1` — force cached-only datasets.
 - `INVARLOCK_DEDUP_TEXTS=1` — exact-text dedupe before tokenization.
 - `INVARLOCK_CAPACITY_FAST=1` — approximate capacity estimation for quick runs.
+- `INVARLOCK_HF_DATASETS_CACHE=/path/to/cache` — override the writable fallback
+  cache used after shared-cache lock/permission failures.
 
 ## Troubleshooting
 
 - **`DEPENDENCY-MISSING: datasets`**: install `invarlock[eval]` or `invarlock[hf]`.
 - **`NO-SAMPLES` / `NO-PAIRS` errors**: verify dataset fields and split names.
+- **HF cache `.lock` / permission errors on local reruns**: rerun as-is to use
+  the automatic writable-cache fallback, or set
+  `INVARLOCK_HF_DATASETS_CACHE` to a writable directory you control.
+- **`vision_text image file is missing`**: ensure manifest `image_path` values
+  resolve relative to the JSONL file and point to readable local files.
 - **Pairing failures (`E001`)**: ensure baseline `report.json` contains
   `evaluation_windows` and was produced with matching dataset settings.
 

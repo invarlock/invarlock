@@ -6,6 +6,18 @@ from typing import Any
 from ._contracts import guard_assert
 
 
+def _is_non_bool_finite_number(value: Any) -> bool:
+    return (
+        isinstance(value, int | float)
+        and not isinstance(value, bool)
+        and math.isfinite(float(value))
+    )
+
+
+def _coerce_non_bool_float(value: Any) -> float | None:
+    return float(value) if _is_non_bool_finite_number(value) else None
+
+
 def predictive_gate_outcome(
     mean_delta: float,
     delta_ci: tuple[float, float] | None,
@@ -17,9 +29,7 @@ def predictive_gate_outcome(
     if (
         delta_ci is None
         or len(delta_ci) != 2
-        or not all(
-            isinstance(val, (int | float)) and math.isfinite(val) for val in delta_ci
-        )
+        or not all(_is_non_bool_finite_number(val) for val in delta_ci)
     ):
         return False, "ci_unavailable"
 
@@ -120,10 +130,7 @@ def set_ab_results(
 
     upper_ratio = None
     if isinstance(ratio_ci, tuple | list) and len(ratio_ci) == 2:
-        try:
-            upper_ratio = float(ratio_ci[1])
-        except (TypeError, ValueError):
-            upper_ratio = None
+        upper_ratio = _coerce_non_bool_float(ratio_ci[1])
 
     if upper_ratio is not None and upper_ratio < 1.0:
         guard._predictive_gate_state.update(
@@ -188,7 +195,7 @@ def evaluate_ab_gate(guard: Any) -> tuple[bool, str]:
             return False, "missing_ratio_ci"
         ratio_lo, ratio_hi = guard._ratio_ci
         if not all(
-            isinstance(value, int | float) and math.isfinite(value) and value > 0
+            _is_non_bool_finite_number(value) and value > 0
             for value in (ratio_lo, ratio_hi)
         ):
             return False, "invalid_ratio_ci"

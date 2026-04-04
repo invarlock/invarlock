@@ -27,7 +27,7 @@ monitor.start()
 # Record an operation
 monitor.record_operation("evaluate", duration=45.2, model_id="gpt2")
 
-# Get current status
+# Get status
 status = monitor.get_status()
 print(status["health_status"])
 
@@ -105,9 +105,9 @@ InvarLock registers these metrics automatically:
 | `'invarlock.operation.duration'` | Histogram | Operation duration distribution. |
 | `'invarlock.edit.duration'` | Histogram | Edit operation duration. |
 | `'invarlock.guard.duration'` | Histogram | Guard execution duration. |
-| `'invarlock.memory.usage'` | Gauge | Current memory usage. |
-| `'invarlock.gpu.memory.usage'` | Gauge | Current GPU memory usage. |
-| `'invarlock.cpu.usage'` | Gauge | Current CPU usage. |
+| `'invarlock.memory.usage'` | Gauge | Memory usage. |
+| `'invarlock.gpu.memory.usage'` | Gauge | GPU memory usage. |
+| `'invarlock.cpu.usage'` | Gauge | CPU usage. |
 | `'invarlock.model.parameters'` | Gauge | Model parameter count. |
 | `'invarlock.model.size_mb'` | Gauge | Model size in MB. |
 | `'invarlock.model.loads'` | Counter | Model loads. |
@@ -195,7 +195,7 @@ config = MonitoringConfig()
 metrics = MetricsRegistry()
 resource_monitor = ResourceMonitor(metrics, config)
 
-# Get current usage
+# Get usage
 usage = resource_monitor.get_current_usage()
 print(f"CPU: {usage['cpu_percent']:.1f}%")
 print(f"Memory: {usage['memory_percent']:.1f}%")
@@ -268,7 +268,7 @@ INVARLOCK_TELEMETRY=1 invarlock evaluate --baseline gpt2 --subject gpt2
 ```
 
 This uses the secure-default runtime container unless a trusted local workflow
-adds `--mode local`.
+adds `--assurance trusted-local`.
 
 Reports include telemetry under `report.metrics`:
 

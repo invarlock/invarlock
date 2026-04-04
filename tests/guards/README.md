@@ -5,7 +5,7 @@ that detect and validate model edits.
 
 ## Organization
 
-The current structure (many small, focused test modules) is intentional. Guards are a
+This structure (many small, focused test modules) is intentional. Guards are a
 critical surface, and the test suite is optimized for targeted coverage and fast
 local iteration rather than a minimal file count.
 

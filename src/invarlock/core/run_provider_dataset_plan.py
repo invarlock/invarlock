@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -121,6 +121,123 @@ def _optional_text(value: Any) -> str | None:
     return None
 
 
+def _hash_texts(values: Sequence[str]) -> str:
+    return hashlib.blake2s(
+        "||".join(str(value) for value in values).encode("utf-8"),
+        digest_size=16,
+    ).hexdigest()
+
+
+def _vision_text_dataset_plan(
+    *,
+    data_provider: Any,
+    resolved_split: str,
+    used_fallback_split: bool,
+    cfg_dataset: Any,
+    requested_preview: int,
+    requested_final: int,
+    effective_preview: int,
+    effective_final: int,
+    resolved_loss_type: str,
+    diagnostics: list[ProviderDatasetPlanDiagnostic],
+) -> ProviderDatasetPlanResult:
+    examples_fn = getattr(data_provider, "examples", None)
+    if not callable(examples_fn):
+        raise TypeError("vision_text provider must expose examples()")
+
+    raw_examples = list(examples_fn(split=resolved_split))
+    preview_count = min(int(effective_preview), len(raw_examples))
+    remaining = max(len(raw_examples) - preview_count, 0)
+    final_count = min(int(effective_final), remaining)
+    if final_count <= 0 and requested_final > 0:
+        final_count = min(int(requested_final), len(raw_examples))
+        preview_count = min(
+            int(requested_preview),
+            max(len(raw_examples) - final_count, 0),
+        )
+
+    preview_records = [dict(item) for item in raw_examples[:preview_count]]
+    final_records = [
+        dict(item) for item in raw_examples[preview_count : preview_count + final_count]
+    ]
+    if not final_records and final_count > 0:
+        final_records = [dict(item) for item in raw_examples[:final_count]]
+
+    seq_len = int(getattr(cfg_dataset, "seq_len", 0) or 0)
+    calibration_data: list[dict[str, Any]] = []
+    for arm, records in (("preview", preview_records), ("final", final_records)):
+        for index, record in enumerate(records):
+            record["seq_len"] = seq_len
+            record["example_id"] = str(
+                record.get("id") or record.get("example_id") or ""
+            )
+            entry = dict(record)
+            entry["window_id"] = f"{arm}::{index}"
+            calibration_data.append(entry)
+
+    preview_ids = [str(record["example_id"]) for record in preview_records]
+    final_ids = [str(record["example_id"]) for record in final_records]
+    preview_hash = _hash_texts(preview_ids)
+    final_hash = _hash_texts(final_ids)
+    provider_digest = (
+        data_provider.digest()
+        if callable(getattr(data_provider, "digest", None))
+        else {}
+    )
+    window_plan = {
+        "profile": "vision_text",
+        "requested_preview": int(requested_preview),
+        "requested_final": int(requested_final),
+        "capacity": {"available_examples": int(len(raw_examples))},
+        "actual_preview": int(len(preview_records)),
+        "actual_final": int(len(final_records)),
+        "coverage_ok": bool(final_records or requested_final == 0),
+        "preview_total_tokens": 0,
+        "final_total_tokens": 0,
+        "min_tokens_target": 0,
+        "tokens_floor_met": True,
+    }
+    dataset_meta = {
+        "provider_kind": "vision_text",
+        "provider_digest": dict(provider_digest)
+        if isinstance(provider_digest, Mapping)
+        else {},
+        "dataset_hash": hashlib.blake2s(
+            (preview_hash + final_hash).encode("utf-8"), digest_size=16
+        ).hexdigest(),
+        "preview_hash": preview_hash,
+        "final_hash": final_hash,
+        "preview_example_ids": preview_ids,
+        "final_example_ids": final_ids,
+        "preview_total_tokens": 0,
+        "final_total_tokens": 0,
+        "min_tokens_target": 0,
+        "tokens_floor_met": True,
+        "loss_type": resolved_loss_type,
+        "window_plan": window_plan,
+    }
+
+    return ProviderDatasetPlanResult(
+        data_provider=data_provider,
+        resolved_split=resolved_split,
+        used_fallback_split=used_fallback_split,
+        tokenizer=None,
+        tokenizer_hash=None,
+        calibration_data=calibration_data,
+        dataset_meta=dataset_meta,
+        window_plan=window_plan,
+        preview_count=len(preview_records),
+        final_count=len(final_records),
+        effective_preview=len(preview_records),
+        effective_final=len(final_records),
+        preview_mask_counts=[0] * len(preview_records),
+        final_mask_counts=[0] * len(final_records),
+        preview_records=preview_records,
+        final_records=final_records,
+        diagnostics=tuple(diagnostics),
+    )
+
+
 def build_provider_dataset_plan(
     *,
     cfg: Any,
@@ -189,6 +306,21 @@ def build_provider_dataset_plan(
             },
         )
     )
+
+    provider_name = str(getattr(data_provider, "name", "") or "")
+    if provider_name == "vision_text":
+        return _vision_text_dataset_plan(
+            data_provider=data_provider,
+            resolved_split=resolved_split,
+            used_fallback_split=used_fallback_split,
+            cfg_dataset=cfg.dataset,
+            requested_preview=int(requested_preview),
+            requested_final=int(requested_final),
+            effective_preview=int(effective_preview),
+            effective_final=int(effective_final),
+            resolved_loss_type=resolved_loss_type,
+            diagnostics=diagnostics,
+        )
 
     tokenizer, tokenizer_hash = resolve_tokenizer_fn(model_profile)
     dataset_stride = getattr(

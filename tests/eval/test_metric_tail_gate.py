@@ -114,6 +114,23 @@ def test_tail_summary_skips_invalid_unweighted_deltas() -> None:
     assert summary["tail_mass"] == pytest.approx(0.5)
 
 
+def test_tail_summary_rejects_bool_numeric_inputs() -> None:
+    from invarlock.eval.tail_stats import compute_tail_summary
+
+    summary = compute_tail_summary(
+        [True, 2.0],
+        quantiles=(0.5,),
+        epsilon=True,
+        weights=[True, 2.0],
+    )
+
+    assert summary["n"] == 1
+    assert summary["epsilon"] == 0.0
+    assert summary["q50"] == 2.0
+    assert summary["tail_mass"] == 1.0
+    assert summary["tail_mass_weighted"] == 1.0
+
+
 def test_metric_tail_gate_warns_and_normalizes_invalid_policy_values() -> None:
     from invarlock.eval.tail_stats import evaluate_metric_tail
 
@@ -222,3 +239,29 @@ def test_metric_tail_gate_handles_non_finite_quantile_stat(
     assert result["evaluated"] is True
     assert result["passed"] is True
     assert result["violations"] == []
+
+
+def test_metric_tail_gate_ignores_bool_policy_thresholds() -> None:
+    from invarlock.eval.tail_stats import evaluate_metric_tail
+
+    result = evaluate_metric_tail(
+        deltas=[0.0, 1.0, 3.0],
+        policy={
+            "mode": "fail",
+            "min_windows": True,
+            "quantile": True,
+            "quantile_max": True,
+            "mass_max": False,
+        },
+    )
+
+    assert result["evaluated"] is False
+    assert result["passed"] is True
+    assert result["policy"] == {
+        "mode": "fail",
+        "min_windows": 1,
+        "quantile": 0.95,
+        "quantile_max": None,
+        "epsilon": 0.0001,
+        "mass_max": None,
+    }

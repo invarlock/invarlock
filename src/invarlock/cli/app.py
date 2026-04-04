@@ -12,13 +12,17 @@ minimal environments.
 from __future__ import annotations
 
 import os
-from enum import Enum
 
 import click
 import typer
 from rich.console import Console
 from typer.core import TyperGroup
 
+from invarlock.cli.assurance import AssuranceMode
+from invarlock.core.report_inputs import (
+    ReportInputError,
+    resolve_report_input_path,
+)
 from invarlock.security import (
     enforce_default_security,
     enforce_network_policy,
@@ -56,11 +60,6 @@ class OrderedGroup(TyperGroup):
         return None
 
 
-class ExecutionMode(str, Enum):
-    ATTESTED = "attested"
-    LOCAL = "local"
-
-
 # Initialize CLI app
 app = typer.Typer(
     name="invarlock",
@@ -69,7 +68,7 @@ app = typer.Typer(
         "Core path: invarlock evaluate --baseline <MODEL> --subject <MODEL>\n"
         "Then: invarlock verify <REPORT> and invarlock report html -i <REPORT> -o <HTML>\n"
         "Advanced workflows live under: invarlock advanced\n"
-        "Tip: enable downloads with INVARLOCK_ALLOW_NETWORK=1 when fetching.\n"
+        "Tip: enable downloads with --allow-network when fetching.\n"
         "Exit codes:\n"
         "  0=success\n"
         "  1=generic failure\n"
@@ -209,10 +208,10 @@ def _evaluate_lazy(
     progress: bool = typer.Option(
         True, "--progress/--no-progress", help="Show progress done messages"
     ),
-    mode: ExecutionMode = typer.Option(
-        ExecutionMode.ATTESTED,
-        "--mode",
-        help="Execution mode for model-loading steps.",
+    assurance: AssuranceMode = typer.Option(
+        AssuranceMode.ATTESTED,
+        "--assurance",
+        help="Assurance level for evaluation (attested|trusted-local).",
         case_sensitive=False,
     ),
     no_color: bool = typer.Option(
@@ -245,7 +244,7 @@ def _evaluate_lazy(
         style=style,
         timing=timing,
         progress=progress,
-        mode=mode.value,
+        assurance=assurance.value,
         no_color=no_color,
         allow_network=allow_network,
     )
@@ -335,12 +334,19 @@ def _doctor_typed(
 )
 def _verify_typed(
     reports: list[str] = typer.Argument(
-        ..., help="One or more evaluation report JSON files to verify."
+        ...,
+        help=(
+            "One or more evaluation report JSON files or directories containing "
+            "canonical evaluation.report.json to verify."
+        ),
     ),
     baseline: str | None = typer.Option(
         None,
         "--baseline",
-        help="Optional baseline evaluation report JSON to enforce provider parity.",
+        help=(
+            "Optional baseline report JSON file or directory containing canonical "
+            "report.json or evaluation.report.json to enforce provider parity."
+        ),
     ),
     tolerance: float = typer.Option(
         1e-9, "--tolerance", help="Tolerance for analysis-basis comparisons."
@@ -355,25 +361,36 @@ def _verify_typed(
         "--json",
         help="Emit machine-readable JSON (suppresses human-readable output)",
     ),
-    allow_unattested_artifacts: bool = typer.Option(
-        False,
-        "--allow-unattested-artifacts",
-        help="Allow verification of reports without runtime attestation metadata.",
+    assurance: AssuranceMode = typer.Option(
+        AssuranceMode.ATTESTED,
+        "--assurance",
+        help="Assurance level for verification (attested|trusted-local).",
     ),
 ):
     from pathlib import Path as _Path
 
     from .commands.verify import verify_command as _verify
 
-    report_paths = [_Path(p) for p in reports]
-    baseline_path = _Path(baseline) if isinstance(baseline, str) else None
+    try:
+        report_paths = [
+            resolve_report_input_path(_Path(p), expected_kind="evaluation")
+            for p in reports
+        ]
+        baseline_path = (
+            resolve_report_input_path(_Path(baseline), expected_kind="any")
+            if isinstance(baseline, str)
+            else None
+        )
+    except ReportInputError as exc:
+        console.print(f"FAIL {exc}")
+        raise typer.Exit(2) from exc
     return _verify(
         reports=report_paths,
         baseline=baseline_path,
         tolerance=tolerance,
         profile=profile,
         json_out=json_out,
-        allow_unattested_artifacts=allow_unattested_artifacts,
+        assurance=assurance.value,
     )
 
 

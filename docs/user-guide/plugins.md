@@ -134,8 +134,8 @@ invarlock advanced plugins guards --allow-third-party-plugins
 # Should show: nan_check | Plugin | Guard | — | — | ✅ Ready
 
 # Use in a trusted local compare/evaluate run
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=1 \
-  invarlock evaluate --mode local --baseline gpt2 --subject gpt2 --preset config.yaml
+INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=1 \
+  invarlock evaluate --allow-network --assurance trusted-local --baseline gpt2 --subject gpt2 --preset config.yaml
 ```
 
 ### Step 5: Add to Config

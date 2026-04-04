@@ -42,6 +42,33 @@ def test_env_text_and_flag_normalize_environ_values() -> None:
     assert env_text("MISSING", environ=environ) is None
 
 
+def test_env_text_returns_none_for_whitespace_only_value() -> None:
+    assert env_text("INVARLOCK_TEXT", environ={"INVARLOCK_TEXT": "   "}) is None
+
+
+def test_env_text_ignores_non_string_values_and_env_flag_treats_none_as_false() -> None:
+    environ = {
+        "INVARLOCK_EVAL_DEVICE": 7,
+        "INVARLOCK_TINY_RELAX": None,
+    }
+
+    assert env_text("INVARLOCK_EVAL_DEVICE", environ=environ) is None
+    assert env_flag("INVARLOCK_TINY_RELAX", environ=environ) is False
+
+
+def test_env_flag_returns_false_for_falsey_values_and_missing() -> None:
+    environ = {
+        "INVARLOCK_FLAG_FALSE": "off",
+        "INVARLOCK_FLAG_ZERO": " 0 ",
+        "INVARLOCK_FLAG_OTHER": "maybe",
+    }
+
+    assert env_flag("INVARLOCK_FLAG_FALSE", environ=environ) is False
+    assert env_flag("INVARLOCK_FLAG_ZERO", environ=environ) is False
+    assert env_flag("INVARLOCK_FLAG_OTHER", environ=environ) is False
+    assert env_flag("INVARLOCK_FLAG_MISSING", environ=environ) is False
+
+
 def test_build_run_execution_request_reads_policy_from_environ() -> None:
     request = _Request()
     core_request = build_run_execution_request(
@@ -63,3 +90,95 @@ def test_build_run_execution_request_reads_policy_from_environ() -> None:
     assert core_request.tiny_relax_enabled is True
     assert core_request.export_model_requested is True
     assert core_request.export_dir == "exports"
+
+
+def test_build_run_execution_request_prefers_pack_determinism_over_legacy_env() -> None:
+    request = _Request()
+
+    core_request = build_run_execution_request(
+        request,
+        environ={
+            "PACK_DETERMINISM": "strict",
+            "INVARLOCK_DETERMINISM": "legacy",
+        },
+    )
+
+    assert core_request.determinism_mode == "strict"
+
+
+def test_build_run_execution_request_uses_legacy_determinism_and_can_disable_timings() -> (
+    None
+):
+    request = _Request(progress=False, timing=False)
+
+    core_request = build_run_execution_request(
+        request,
+        environ={
+            "INVARLOCK_EVAL_DEVICE": "   ",
+            "INVARLOCK_DETERMINISM": "legacy",
+            "INVARLOCK_EXPORT_DIR": "   ",
+        },
+    )
+
+    assert core_request.capture_timings is False
+    assert core_request.eval_device_override is None
+    assert core_request.determinism_mode == "legacy"
+    assert core_request.export_dir is None
+
+
+def test_build_run_execution_request_falls_back_to_legacy_when_pack_is_blank() -> None:
+    request = _Request(progress=False, timing=False)
+
+    core_request = build_run_execution_request(
+        request,
+        environ={
+            "PACK_DETERMINISM": "   ",
+            "INVARLOCK_DETERMINISM": "warn",
+        },
+    )
+
+    assert core_request.capture_timings is False
+    assert core_request.determinism_mode == "warn"
+
+
+def test_build_run_execution_request_propagates_request_fields_and_timing_flag() -> (
+    None
+):
+    request = _Request(
+        device="cuda:1",
+        profile="prod",
+        out="custom-runs",
+        edit="quant_rtn",
+        edit_label="wave2",
+        tier="strict",
+        metric_kind="ppl_causal",
+        probes=7,
+        until_pass=True,
+        max_attempts=4,
+        timeout=90,
+        baseline="baseline.json",
+        no_cleanup=True,
+        timing=True,
+        progress=False,
+        telemetry=False,
+        prefer_local_files_only=True,
+    )
+
+    core_request = build_run_execution_request(request, environ={})
+
+    assert core_request.device == "cuda:1"
+    assert core_request.profile == "prod"
+    assert core_request.out == "custom-runs"
+    assert core_request.edit == "quant_rtn"
+    assert core_request.edit_label == "wave2"
+    assert core_request.tier == "strict"
+    assert core_request.metric_kind == "ppl_causal"
+    assert core_request.probes == 7
+    assert core_request.until_pass is True
+    assert core_request.max_attempts == 4
+    assert core_request.timeout == 90
+    assert core_request.baseline == "baseline.json"
+    assert core_request.no_cleanup is True
+    assert core_request.capture_timings is True
+    assert core_request.telemetry is False
+    assert core_request.prefer_local_files_only is True

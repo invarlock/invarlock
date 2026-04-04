@@ -45,6 +45,12 @@ def build_run_report_meta(
     pm_acceptance_range: tuple[float, float] | None = None,
     pm_drift_band: tuple[float, float] | None = None,
 ) -> dict[str, Any]:
+    adapter_lower = str(adapter or "").lower()
+    cert_lints = [
+        dict(lint) for lint in (getattr(model_profile, "cert_lints", ()) or ())
+    ]
+    if "multimodal" in adapter_lower:
+        cert_lints = []
     meta_payload: dict[str, Any] = {
         "model_id": model_id,
         "adapter": adapter,
@@ -60,9 +66,7 @@ def build_run_report_meta(
             "default_loss": getattr(model_profile, "default_loss", ""),
             "module_selectors": getattr(model_profile, "module_selectors", {}),
             "invariants": list(getattr(model_profile, "invariants", ()) or ()),
-            "cert_lints": [
-                dict(lint) for lint in (getattr(model_profile, "cert_lints", ()) or ())
-            ],
+            "cert_lints": cert_lints,
         },
     }
     if invarlock_version:
@@ -232,6 +236,7 @@ def build_metrics_payload(
                 }
             )
     optional_keys = [
+        "classification",
         "logloss_preview",
         "logloss_final",
         "logloss_delta",

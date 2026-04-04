@@ -10,16 +10,17 @@
 | **Requires** | `invarlock[hf]` for HF adapter workflows. |
 
 InvarLock emits both machine-readable reports and human-friendly summaries.
-Use the steps below to reproduce representative artifacts from the current release.
+Use the steps below to reproduce representative artifacts from this repository version.
 
 ## 1. Generate a report Bundle
 
 The command below shows the secure-default runtime-container path. It writes an
 attested `runtime.manifest.json` next to `evaluation.report.json`. Trusted
-public host-side workflows use `--mode local` and are verified differently.
+public host-side workflows use `--assurance trusted-local` and should verify the
+resulting report with `invarlock verify --assurance trusted-local ...`.
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
+INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline sshleifer/tiny-gpt2 \
   --subject  sshleifer/tiny-gpt2 \
   --adapter auto \
@@ -47,7 +48,10 @@ Each report contains:
 cat reports/quant8_demo/evaluation_report.md
 
 # To regenerate markdown from run reports, pass edited + baseline:
-invarlock report --run <edited_report.json> --baseline <baseline_report.json> --format markdown
+invarlock report generate \
+  --run <edited_report.json> \
+  --baseline-run-report <baseline_report.json> \
+  --format markdown
 ```
 
 The markdown report mirrors the report content but highlights:

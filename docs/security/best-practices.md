@@ -7,7 +7,7 @@ Recommended practices for research and production deployments.
 - Keep the default network-off posture; opt in per command with
   `INVARLOCK_ALLOW_NETWORK=1` only when required.
 - Keep model-loading commands on the runtime container by default; use
-  `invarlock evaluate --mode local` for trusted public local workflows.
+  `invarlock evaluate --assurance trusted-local` for trusted public local workflows.
 - Use isolated environments (pipx/virtualenv/conda) and lock dependencies.
 - Validate configuration inputs and paths; avoid user-controlled write
   locations and implicit directory creation.
@@ -49,7 +49,7 @@ Copy-paste checklist for production or CI deployments:
 ## Environment flags to know
 
 - `INVARLOCK_ALLOW_NETWORK=1` — enable downloads for a command.
-- `--mode local` — public evaluate opt-in for trusted host-side model loading.
+- `--assurance trusted-local` — public evaluate opt-in for trusted host-side model loading.
 - `INVARLOCK_ALLOW_HOST_EXECUTION=1` — advanced/internal host-bypass opt-in.
 - `INVARLOCK_ALLOW_REMOTE_CODE=1` — permit trusted remote model code.
 - `INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=1` — permit trusted third-party plugin discovery.
@@ -62,7 +62,7 @@ Copy-paste checklist for production or CI deployments:
 - Prefer `pipx` or conda-managed environments for clean installs.
 - Keep Python at 3.12+ and update dependencies regularly.
 - Use the supply-chain workflow (SBOM + pip-audit + secret scan) as a
-  reference; see the allowlist page for current exceptions.
+  reference; see the allowlist page for documented exceptions.
 
 ## Release verification
 

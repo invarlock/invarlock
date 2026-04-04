@@ -1,10 +1,12 @@
 import types
 
+import torch
 import torch.nn as nn
 
 from invarlock.guards.invariants import (
     InvariantsGuard,
     _check_standard_invariants,
+    _decision_from_action,
     check_all_invariants,
 )
 
@@ -39,6 +41,24 @@ class ModelBadTie(nn.Module):
             wte=types.SimpleNamespace(weight=WeightLikeNoPtr())
         )
         self.lm_head = types.SimpleNamespace(weight=WeightLikeNoPtr())
+
+
+class ModelBadNamedParameters(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def named_parameters(self, prefix="", recurse=True):  # type: ignore[override]
+        raise RuntimeError("named_parameters failed")
+
+
+class ModelMidStreamNamedParametersFailure(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.good = nn.Parameter(torch.ones(1))
+
+    def named_parameters(self, prefix="", recurse=True):  # type: ignore[override]
+        yield "good", self.good
+        raise RuntimeError("named_parameters failed mid-stream")
 
 
 def test_param_count_exception_path_sets_sentinel():
@@ -83,3 +103,30 @@ def test_check_all_invariants_rejects_missing_named_parameters() -> None:
     assert outcome.passed is False
     assert outcome.action == "reject"
     assert outcome.violations[0]["type"] == "structure_violation"
+
+
+def test_check_all_invariants_fail_closed_when_named_parameters_iteration_errors() -> (
+    None
+):
+    outcome = check_all_invariants(ModelBadNamedParameters())
+
+    assert outcome.passed is False
+    assert outcome.action == "reject"
+    assert outcome.violations[0]["type"] == "structure_violation"
+    assert outcome.metrics["parameters_checked"] == 0
+
+
+def test_check_all_invariants_fail_closed_when_named_parameters_break_mid_stream() -> (
+    None
+):
+    outcome = check_all_invariants(ModelMidStreamNamedParametersFailure())
+
+    assert outcome.passed is False
+    assert outcome.action == "reject"
+    assert outcome.violations[0]["type"] == "structure_violation"
+    assert outcome.metrics["parameters_checked"] == 0
+
+
+def test_decision_from_action_strips_whitespace_and_maps_aliases() -> None:
+    assert _decision_from_action(" warn ") == "monitor"
+    assert _decision_from_action(" reject ") == "block"

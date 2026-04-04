@@ -393,11 +393,13 @@ class InvarLockHealthChecker(HealthChecker):
             try:
                 from invarlock.adapters.hf_causal import HF_Causal_Adapter
                 from invarlock.adapters.hf_mlm import HF_MLM_Adapter
+                from invarlock.adapters.hf_multimodal import HF_Multimodal_Adapter
                 from invarlock.adapters.hf_seq2seq import HF_Seq2Seq_Adapter
 
                 adapters = {
                     "hf_causal": HF_Causal_Adapter,
                     "hf_mlm": HF_MLM_Adapter,
+                    "hf_multimodal": HF_Multimodal_Adapter,
                     "hf_seq2seq": HF_Seq2Seq_Adapter,
                 }
 

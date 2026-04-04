@@ -5,14 +5,52 @@ from pathlib import Path
 
 def test_runtime_dockerfile_installs_hf_stack() -> None:
     text = (Path.cwd() / "runtime" / "Dockerfile").read_text(encoding="utf-8")
-    cpu_torch_install = (
-        "pip install --index-url https://download.pytorch.org/whl/cpu torch"
+    assert (
+        "FROM python:3.12-slim@sha256:3d5ed973e45820f5ba5e46bd065bd88b3a504ff0724d85980dcd05eab361fcf4"
+        in text
     )
-    assert "sentencepiece>=0.2.1" in text
-    assert "tiktoken>=0.9.0" in text
-    assert "datasets>=3.0" in text
-    assert "python -m pip install --no-deps -e /opt/invarlock" in text
-    assert cpu_torch_install in text
-    assert text.index(cpu_torch_install) < text.index(
-        "python -m pip install --no-deps -e /opt/invarlock"
+    assert "ARG TARGETARCH" in text
+    assert "COPY requirements/workflows/runtime-image-py312.txt" in text
+    assert "COPY requirements/workflows/runtime-image-py312-aarch64.txt" in text
+    assert "--extra-index-url https://download.pytorch.org/whl/cpu" in text
+    assert (
+        "amd64) echo /opt/invarlock/requirements/workflows/runtime-image-py312.txt"
+        in text
     )
+    assert (
+        "arm64) echo /opt/invarlock/requirements/workflows/runtime-image-py312-aarch64.txt"
+        in text
+    )
+    assert "python -m pip install" in text
+    assert "--require-hashes" in text
+    assert "python -m pip install --no-deps -e /opt/invarlock" not in text
+    assert (
+        "pip install --index-url https://download.pytorch.org/whl/cpu torch" not in text
+    )
+    assert "PYTHONPATH=/opt/invarlock/src" in text
+
+
+def test_runtime_image_x86_requirements_are_hash_locked_cpu_only() -> None:
+    text = (
+        Path.cwd() / "requirements" / "workflows" / "runtime-image-py312.txt"
+    ).read_text(encoding="utf-8")
+
+    assert "torch==" in text
+    assert "+cpu" in text
+    assert "--hash=sha256:" in text
+    assert "nvidia-cublas-cu12" not in text
+    assert "nvidia-cuda-runtime-cu12" not in text
+    assert "triton==" not in text
+
+
+def test_runtime_image_aarch64_requirements_are_hash_locked() -> None:
+    text = (
+        Path.cwd() / "requirements" / "workflows" / "runtime-image-py312-aarch64.txt"
+    ).read_text(encoding="utf-8")
+
+    assert "torch==" in text
+    assert "+cpu" in text
+    assert "--hash=sha256:" in text
+    assert "nvidia-cublas-cu12" not in text
+    assert "nvidia-cuda-runtime-cu12" not in text
+    assert "triton==" not in text

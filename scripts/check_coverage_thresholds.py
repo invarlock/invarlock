@@ -28,6 +28,7 @@ THRESHOLDS = {
     "src/invarlock/eval/probes/post_attention.py": 0.90,
     "src/invarlock/eval/providers/base.py": 1.00,
     "src/invarlock/eval/providers/seq2seq.py": 1.00,
+    "src/invarlock/eval/providers/vision_text.py": 0.95,
     "src/invarlock/eval/metrics.py": 1.00,
     "src/invarlock/eval/metrics_activation.py": 0.95,
     "src/invarlock/eval/metrics_aggregation.py": 0.90,
@@ -122,6 +123,7 @@ THRESHOLDS = {
     "src/invarlock/runtime_verify.py": 1.00,
     "src/invarlock/runtime_security.py": 1.00,
     "src/invarlock/runtime_security_helpers.py": 0.95,
+    "src/invarlock/adapters/hf_multimodal.py": 0.90,
     "src/invarlock/proof_pack_integrity.py": 0.90,
     "src/invarlock/proof_pack_manifest.py": 0.90,
     # PR-4 split modules

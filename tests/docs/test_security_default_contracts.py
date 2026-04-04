@@ -81,8 +81,8 @@ def test_markdown_surfaces_with_model_loading_examples_explain_execution_context
         if any(
             marker in text
             for marker in (
-                "--mode local",
-                "--mode attested",
+                "--assurance trusted-local",
+                "--assurance attested",
                 "--allow-host-execution",
                 "INVARLOCK_ALLOW_HOST_EXECUTION=1",
                 "runtime container",
@@ -213,8 +213,8 @@ def test_notebooks_with_model_loading_examples_explain_execution_context() -> No
         if any(
             marker in text
             for marker in (
-                "--mode local",
-                "--mode attested",
+                "--assurance trusted-local",
+                "--assurance attested",
                 "--allow-host-execution",
                 "INVARLOCK_ALLOW_HOST_EXECUTION=1",
                 "runtime container",
@@ -239,7 +239,7 @@ def test_notebooks_with_verify_examples_explain_attestation_or_bypass() -> None:
             continue
         if "runtime.manifest.json" not in text:
             missing_manifest_context.append(str(path.relative_to(REPO_ROOT)))
-        if "invarlock verify --allow-unattested-artifacts" in text:
+        if "invarlock verify --assurance trusted-local" in text:
             continue
         if "runtime container" in text or "runtime-container" in text:
             continue
@@ -250,6 +250,6 @@ def test_notebooks_with_verify_examples_explain_attestation_or_bypass() -> None:
         + ", ".join(missing_manifest_context)
     )
     assert not missing_bypass_context, (
-        "Notebook verify examples must either use the explicit unattested-artifact bypass or explain the runtime-container path: "
+        "Notebook verify examples must either use the explicit trusted-local assurance mode or explain the runtime-container path: "
         + ", ".join(missing_bypass_context)
     )

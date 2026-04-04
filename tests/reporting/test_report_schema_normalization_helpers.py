@@ -108,6 +108,76 @@ def test_validate_evaluation_report_rejects_invalid_flags(monkeypatch):
     assert schema_mod.validate_report(evaluation_report) is False
 
 
+def test_validate_evaluation_report_rejects_blank_run_id_without_jsonschema(
+    monkeypatch,
+):
+    monkeypatch.setattr(schema_mod, "jsonschema", None, raising=False)
+    evaluation_report = {
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
+        "run_id": "   ",
+        "primary_metric": {"final": 1.0},
+        "validation": {"primary_metric_acceptable": True},
+    }
+
+    assert schema_mod.validate_report(evaluation_report) is False
+
+
+def test_validate_evaluation_report_accepts_short_nonblank_run_id_without_jsonschema(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(schema_mod, "jsonschema", None, raising=False)
+    evaluation_report = {
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
+        "run_id": "r1 ",
+        "primary_metric": {"final": 1.0},
+        "validation": {"primary_metric_acceptable": True},
+    }
+
+    assert schema_mod.validate_report(evaluation_report) is True
+
+
+def test_validate_evaluation_report_rejects_blank_metric_kind_without_jsonschema(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(schema_mod, "jsonschema", None, raising=False)
+    evaluation_report = {
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
+        "run_id": "run-4",
+        "primary_metric": {"kind": "   "},
+        "validation": {"primary_metric_acceptable": True},
+    }
+
+    assert schema_mod.validate_report(evaluation_report) is False
+
+
+def test_validate_evaluation_report_rejects_boolean_metric_final_without_jsonschema(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(schema_mod, "jsonschema", None, raising=False)
+    evaluation_report = {
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
+        "run_id": "run-5",
+        "primary_metric": {"final": True},
+        "validation": {"primary_metric_acceptable": True},
+    }
+
+    assert schema_mod.validate_report(evaluation_report) is False
+
+
+def test_validate_evaluation_report_rejects_non_mapping_validation_without_jsonschema(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(schema_mod, "jsonschema", None, raising=False)
+    evaluation_report = {
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
+        "run_id": "run-6",
+        "primary_metric": {"final": 1.0},
+        "validation": [],
+    }
+
+    assert schema_mod.validate_report(evaluation_report) is False
+
+
 def test_load_validation_allowlist_prefers_contracts_file(monkeypatch):
     keys = ["primary_metric_acceptable", "guard_overhead_acceptable", "custom_flag"]
     monkeypatch.setattr(allowlist_mod, "load_json_contract", lambda _filename: keys)
@@ -122,6 +192,32 @@ def test_validate_evaluation_report_handles_mapping_errors() -> None:
 
     evaluation_report = ExplodingMapping()
     assert schema_mod.validate_report(evaluation_report) is False
+
+
+def test_validate_evaluation_report_normalizes_missing_validation_from_mapping(
+    monkeypatch,
+) -> None:
+    class NonDictValidationMapping(dict):
+        def get(self, key, default=None):
+            if key == "validation":
+                return []
+            return super().get(key, default)
+
+        def __contains__(self, key):
+            if key == "validation":
+                return False
+            return super().__contains__(key)
+
+    monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda *_args: True)
+    evaluation_report = NonDictValidationMapping(
+        {
+            "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
+            "run_id": "run-7",
+            "primary_metric": {"final": 1.0},
+        }
+    )
+
+    assert schema_mod.validate_report(evaluation_report) is True
 
 
 def test_propagate_pairing_stats_adds_missing_fields():

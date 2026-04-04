@@ -760,7 +760,10 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
 
     if any(keyword in adapter_lower for keyword in ("hf_seq2seq", "t5", "bart")) or (
         is_encoder_decoder
-        or (seq2seq_arch and "gemma3" not in model_lower)
+        or (
+            seq2seq_arch
+            and not any(keyword in model_lower for keyword in ("gemma3", "gemma4"))
+        )
         or any(keyword in model_lower for keyword in ("t5", "bart"))
     ):
         return ModelProfile(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -12,6 +13,35 @@ _NON_FATAL_EXCEPTIONS = (AttributeError, KeyError, OSError, TypeError, ValueErro
 class RunProvenanceResult:
     missing_evaluation_windows_for_baseline: bool = False
     missing_evaluation_windows_message: str | None = None
+
+
+def _window_payload_has_signal(window_payload: Any) -> bool:
+    if not isinstance(window_payload, Mapping):
+        return False
+    for key in (
+        "window_ids",
+        "example_ids",
+        "logloss",
+        "input_ids",
+        "attention_masks",
+        "token_counts",
+        "masked_token_counts",
+        "actual_token_counts",
+        "labels",
+        "records",
+    ):
+        value = window_payload.get(key)
+        if isinstance(value, list) and value:
+            return True
+    return False
+
+
+def _evaluation_windows_have_signal(serialized_windows: Any) -> bool:
+    if not isinstance(serialized_windows, Mapping):
+        return False
+    return _window_payload_has_signal(serialized_windows.get("preview")) or (
+        _window_payload_has_signal(serialized_windows.get("final"))
+    )
 
 
 def finalize_run_provenance(
@@ -38,7 +68,7 @@ def finalize_run_provenance(
     serialized_evaluation_windows = serialize_evaluation_windows_fn(
         getattr(core_report, "evaluation_windows", None)
     )
-    if serialized_evaluation_windows:
+    if _evaluation_windows_have_signal(serialized_evaluation_windows):
         report["evaluation_windows"] = serialized_evaluation_windows
     else:
         try:

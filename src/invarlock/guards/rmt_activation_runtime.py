@@ -3,6 +3,7 @@ from __future__ import annotations
 import itertools
 import math
 from collections.abc import Callable, Mapping, Sequence
+from inspect import getattr_static
 from typing import Any
 
 import torch
@@ -128,6 +129,25 @@ def prepare_activation_inputs(
                 attention_mask = None
 
     return input_ids, attention_mask
+
+
+def _model_kwargs(prepared: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: value
+        for key, value in prepared.items()
+        if isinstance(key, str) and not key.startswith("_")
+    }
+
+
+def _resolve_adapter_hook(adapter: Any, name: str) -> Callable[..., Any] | None:
+    if adapter is None:
+        return None
+    try:
+        getattr_static(adapter, name)
+    except AttributeError:
+        return None
+    hook = getattr(adapter, name, None)
+    return hook if callable(hook) else None
 
 
 def batch_token_weight(
@@ -349,6 +369,7 @@ def compute_activation_edge_risk(
     deadband: float,
     margin: float,
     classify_family_fn: Callable[[str], str],
+    adapter: Any | None = None,
 ) -> dict[str, Any] | None:
     """Compute token-weighted activation edge-risk scores per module/family."""
     if not batches:
@@ -404,13 +425,25 @@ def compute_activation_edge_risk(
             return None
         with torch.inference_mode():
             for batch in batches:
-                inputs, attention_mask = prepare_activation_inputs(batch, device)
+                prepare_generation_inputs = _resolve_adapter_hook(
+                    adapter, "prepare_generation_inputs"
+                )
+                if callable(prepare_generation_inputs) and isinstance(batch, dict):
+                    prepared = prepare_generation_inputs(batch, device)
+                    inputs = prepared.get("input_ids")
+                    attention_mask = prepared.get("attention_mask")
+                    model_inputs = _model_kwargs(prepared)
+                else:
+                    inputs, attention_mask = prepare_activation_inputs(batch, device)
+                    model_inputs = None
                 if inputs is None:
                     continue
                 batch_weight = batch_token_weight(inputs, attention_mask)
                 batch_weight_holder["weight"] = batch_weight
                 try:
-                    if attention_mask is not None:
+                    if model_inputs is not None:
+                        model(**model_inputs)
+                    elif attention_mask is not None:
                         model(inputs, attention_mask=attention_mask)
                     else:
                         model(inputs)
@@ -535,13 +568,28 @@ def compute_activation_outliers(
             return None
         with torch.inference_mode():
             for batch in batches:
-                inputs, attention_mask = guard._prepare_activation_inputs(batch, device)
+                prepare_generation_inputs = _resolve_adapter_hook(
+                    getattr(guard, "adapter", None),
+                    "prepare_generation_inputs",
+                )
+                if callable(prepare_generation_inputs) and isinstance(batch, dict):
+                    prepared = prepare_generation_inputs(batch, device)
+                    inputs = prepared.get("input_ids")
+                    attention_mask = prepared.get("attention_mask")
+                    model_inputs = _model_kwargs(prepared)
+                else:
+                    inputs, attention_mask = guard._prepare_activation_inputs(
+                        batch, device
+                    )
+                    model_inputs = None
                 if inputs is None:
                     continue
                 batch_weight = guard._batch_token_weight(inputs, attention_mask)
                 batch_weight_holder["weight"] = batch_weight
                 try:
-                    if attention_mask is not None:
+                    if model_inputs is not None:
+                        model(**model_inputs)
+                    elif attention_mask is not None:
                         model(inputs, attention_mask=attention_mask)
                     else:
                         model(inputs)

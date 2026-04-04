@@ -11,29 +11,11 @@ from invarlock.runtime_security import (
     write_runtime_manifest,
 )
 
+from .security_helpers import resolve_shell_runtime_security_policy
+
 
 class RuntimeDelegationError(RuntimeError):
     """Raised when secure-default container delegation cannot start."""
-
-
-def resolve_shell_runtime_security_policy(**kwargs: object):
-    from .security_helpers import resolve_shell_runtime_security_policy as _impl
-
-    return _impl(**kwargs)
-
-
-def build_request_container_launch_plan(command_name: str, request: object):
-    from invarlock.cli.runtime_launch_plan import (
-        build_request_container_launch_plan as _impl,
-    )
-
-    return _impl(command_name, request)
-
-
-def execute_config_run_request(request: object):
-    from .run_execution import execute_config_run_request as _impl
-
-    return _impl(request)
 
 
 @dataclass(frozen=True)
@@ -64,6 +46,25 @@ class ConfigExecutionRequest:
     prefer_local_files_only: bool = False
 
 
+def build_request_container_launch_plan(
+    command_name: str,
+    request: ConfigExecutionRequest,
+):
+    from invarlock.cli.runtime_launch_plan import (
+        build_request_container_launch_plan as _build_request_container_launch_plan,
+    )
+
+    return _build_request_container_launch_plan(command_name, request)
+
+
+def execute_config_run_request(request: ConfigExecutionRequest) -> str | None:
+    from .run_execution import (
+        execute_config_run_request as _execute_config_run_request,
+    )
+
+    return _execute_config_run_request(request)
+
+
 def run_from_config(
     *,
     config: str,
@@ -89,6 +90,7 @@ def run_from_config(
     allow_host_execution: bool = False,
     allow_third_party_plugins: bool = False,
     allow_remote_code: bool = False,
+    allow_unattested_artifacts: bool = False,
     prefer_local_files_only: bool = False,
     command_name: str = "run",
     delegate: bool = True,
@@ -99,6 +101,7 @@ def run_from_config(
         allow_host_execution=allow_host_execution,
         allow_third_party_plugins=allow_third_party_plugins,
         allow_remote_code=allow_remote_code,
+        allow_unattested_artifacts=allow_unattested_artifacts,
     )
     with runtime_allowances_scope(policy=policy):
         if delegate and not running_inside_container() and not host_execution_allowed():

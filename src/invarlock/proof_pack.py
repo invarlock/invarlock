@@ -55,6 +55,123 @@ class ProofPackResult:
     status: ProofPackStatus
 
 
+def _proof_pack_counts_from_verification(
+    verification: dict[str, Any] | None,
+) -> tuple[int | None, int | None, int | None]:
+    if not isinstance(verification, dict):
+        return None, None, None
+    clean_reports = verification.get("clean_reports")
+    error_reports = verification.get("error_injection_reports")
+    failed_reports = verification.get("failed_reports")
+    return (
+        int(clean_reports) if isinstance(clean_reports, int) else None,
+        int(error_reports) if isinstance(error_reports, int) else None,
+        int(failed_reports) if isinstance(failed_reports, int) else None,
+    )
+
+
+def _derive_proof_pack_evidence_level(
+    *,
+    subject_present: bool,
+    checksums_bound: bool,
+    clean_reports: int | None,
+    failed_reports: int | None,
+    has_source_repo_ref: bool,
+    has_environment_ref: bool,
+) -> str:
+    if (
+        subject_present
+        and checksums_bound
+        and isinstance(clean_reports, int)
+        and clean_reports > 0
+        and failed_reports == 0
+        and has_source_repo_ref
+        and has_environment_ref
+    ):
+        return "high"
+    if (
+        subject_present
+        and checksums_bound
+        and isinstance(clean_reports, int)
+        and clean_reports > 0
+    ):
+        return "medium"
+    return "low"
+
+
+def _render_proof_pack_readme(
+    *,
+    evidence_level: str,
+    clean_reports: int | None,
+    error_reports: int | None,
+    failed_reports: int | None,
+    policy_profile: str | None,
+    strict_ready: bool,
+    signer_fingerprint: str | None,
+) -> str:
+    lines = [
+        "# InvarLock Proof Pack",
+        "",
+        "This proof pack bundles reports, summary reports, and metadata for offline",
+        "verification. No model weights are included.",
+        "",
+        f"Evidence level: {evidence_level}",
+        (
+            "Review summary: "
+            f"clean_reports={clean_reports if clean_reports is not None else 'unknown'}, "
+            f"error_injection_reports={error_reports if error_reports is not None else 'unknown'}, "
+            f"failed_reports={failed_reports if failed_reports is not None else 'unknown'}, "
+            f"profile={policy_profile or 'unknown'}."
+        ),
+        "",
+        "Why it might be wrong:",
+    ]
+    if failed_reports not in (None, 0):
+        lines.append(
+            "- Unexpected report verification failures were recorded; inspect results/verification_summary.json before trusting downstream conclusions."
+        )
+    else:
+        lines.append(
+            "- Nested report verification succeeded for the bundled clean reports, but reviewers should still inspect the underlying evaluation.report.json files."
+        )
+    lines.append(
+        "- Error-injection reports are expected-failure evidence and should not be interpreted as clean PASS runs."
+    )
+    if strict_ready:
+        lines.append(
+            "- The pack is ready for strict verification; signed manifest and checksum sealing are present."
+        )
+    else:
+        lines.append(
+            "- By default this is evidence-grade packaging. For proof-grade attestation, require a signed manifest, strict verification, and a PASS final verdict."
+        )
+    if signer_fingerprint:
+        lines.append(f"- Signer fingerprint: {signer_fingerprint}")
+
+    lines.extend(
+        [
+            "",
+            "## Verify",
+            "",
+            "1. Verify the manifest signature and strict pack integrity:",
+            "   invarlock advanced proof-pack verify <pack-dir> --strict",
+            "",
+            "2. Verify file checksums:",
+            "   sha256sum -c checksums.sha256",
+            "   # macOS: shasum -a 256 -c checksums.sha256",
+            "",
+            "3. Verify report integrity:",
+            "   invarlock verify --json reports/**/evaluation.report.json",
+            "",
+            "Or use:",
+            "  invarlock advanced proof-pack verify <pack-dir> [--strict]",
+            "Repo workflow alternative:",
+            "  scripts/proof_packs/verify_pack.sh --pack <pack-dir> [--strict]",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
 def _jsonschema_validation_error_types() -> tuple[type[BaseException], ...]:
     if jsonschema is None:
         return ()
@@ -229,7 +346,7 @@ def inspect_proof_pack(pack_dir: Path) -> ProofPackResult:
     payload: dict[str, Any] = {
         "pack": str(pack_dir),
         "ok": False,
-        "manifest": {"valid": False, "format": None},
+        "manifest": {"valid": False, "format": None, "evidence_level": None},
         "signature": {"present": False, "signer_fingerprint": None},
         "reports": {"total": 0, "clean": 0, "errors": 0},
         "artifacts": {"files": 0, "hashed": 0},
@@ -241,6 +358,7 @@ def inspect_proof_pack(pack_dir: Path) -> ProofPackResult:
         },
         "issues": issues,
         "strict_ready": False,
+        "evidence_level": None,
     }
     if not pack_dir.is_dir():
         issues.append(f"Pack directory not found: {pack_dir}")
@@ -263,6 +381,9 @@ def inspect_proof_pack(pack_dir: Path) -> ProofPackResult:
     payload["manifest"] = {
         "valid": True,
         "format": manifest.get("format") if isinstance(manifest, dict) else None,
+        "evidence_level": (
+            manifest.get("evidence_level") if isinstance(manifest, dict) else None
+        ),
     }
 
     signature_present = (pack_dir / MANIFEST_SIGNATURE_FILENAME).is_file()
@@ -313,6 +434,38 @@ def inspect_proof_pack(pack_dir: Path) -> ProofPackResult:
         "manifest_attestation_ok": not attestation_errors,
         "extra_files": extra_files,
     }
+    verification = manifest.get("verification") if isinstance(manifest, dict) else None
+    clean_count, _error_count, failed_count = _proof_pack_counts_from_verification(
+        verification if isinstance(verification, dict) else None
+    )
+    payload["evidence_level"] = (
+        manifest.get("evidence_level")
+        if isinstance(manifest, dict)
+        and isinstance(manifest.get("evidence_level"), str)
+        else _derive_proof_pack_evidence_level(
+            subject_present=bool(
+                isinstance(manifest, dict) and isinstance(manifest.get("subject"), dict)
+            ),
+            checksums_bound=not bind_errors,
+            clean_reports=(
+                clean_count if clean_count is not None else payload["reports"]["clean"]
+            ),
+            failed_reports=failed_count,
+            has_source_repo_ref=bool(
+                isinstance(manifest, dict)
+                and isinstance(manifest.get("invocation"), dict)
+                and isinstance(manifest["invocation"].get("config_source"), dict)
+                and manifest["invocation"]["config_source"].get("path")
+                and manifest["invocation"]["config_source"].get("digest")
+            ),
+            has_environment_ref=bool(
+                isinstance(manifest, dict)
+                and isinstance(manifest.get("environment"), dict)
+                and manifest["environment"].get("path")
+                and manifest["environment"].get("digest")
+            ),
+        )
+    )
     integrity_errors_present = bool(
         bind_errors or checksum_errors or attestation_errors or extra_files
     )
@@ -453,6 +606,29 @@ def build_proof_pack(
         )
         rel_paths.append(runtime_manifest_rel)
 
+    signer_fingerprint: str | None = None
+    if signing_key_path is not None:
+        signer_fingerprint = proof_pack_integrity_mod.public_key_fingerprint(
+            proof_pack_integrity_mod.load_private_signing_key(
+                signing_key_path
+            ).public_key()
+        )
+
+    verification_summary = {
+        "clean_reports": len(report_paths),
+        "error_injection_reports": 0,
+        "failed_reports": 0,
+        "policy_profile": profile,
+    }
+    evidence_level = _derive_proof_pack_evidence_level(
+        subject_present=True,
+        checksums_bound=True,
+        clean_reports=len(report_paths),
+        failed_reports=0,
+        has_source_repo_ref=source_repo_path is not None,
+        has_environment_ref=environment_path is not None,
+    )
+
     if readme_path is not None:
         if not readme_path.is_file():
             warnings.append(f"README file not found; skipping copy: {readme_path}")
@@ -460,11 +636,26 @@ def build_proof_pack(
             readme_dest = out_dir / "README.md"
             _copy_file(readme_path, readme_dest)
             rel_paths.append("README.md")
+    else:
+        readme_dest = out_dir / "README.md"
+        readme_dest.write_text(
+            _render_proof_pack_readme(
+                evidence_level=evidence_level,
+                clean_reports=len(report_paths),
+                error_reports=0,
+                failed_reports=0,
+                policy_profile=profile,
+                strict_ready=signing_key_path is not None,
+                signer_fingerprint=signer_fingerprint,
+            ),
+            encoding="utf-8",
+        )
+        rel_paths.append("README.md")
 
     _write_checksums_file(out_dir, rel_paths)
-    signer_fingerprint: str | None = None
     manifest: dict[str, Any] = {
         "format": PROOF_PACK_FORMAT,
+        "evidence_level": evidence_level,
         "checksums_sha256": "checksums.sha256",
         "checksums_sha256_digest": _sha256_bytes(
             (out_dir / "checksums.sha256").read_bytes()
@@ -474,6 +665,7 @@ def build_proof_pack(
             "path": "results/final_verdict.json",
             "digest": _sha256_file(final_dest),
         },
+        "verification": verification_summary,
     }
     if source_repo_path is not None:
         manifest["invocation"] = {
@@ -490,11 +682,6 @@ def build_proof_pack(
     if material_refs:
         manifest["materials"] = material_refs
     if signing_key_path is not None:
-        signer_fingerprint = proof_pack_integrity_mod.public_key_fingerprint(
-            proof_pack_integrity_mod.load_private_signing_key(
-                signing_key_path
-            ).public_key()
-        )
         manifest["signing_key_fingerprint"] = signer_fingerprint
     (out_dir / "manifest.json").write_text(
         json.dumps(manifest, sort_keys=True) + "\n", encoding="utf-8"
@@ -509,6 +696,7 @@ def build_proof_pack(
     payload["ok"] = True
     payload["reports"] = {"total": len(report_paths)}
     payload["verify"] = verify_result.payload
+    payload["evidence_level"] = evidence_level
     payload["files"] = {
         "hashed": len(rel_paths),
         "manifest": "manifest.json",
@@ -705,6 +893,17 @@ def _build_verify_result(
     verify_payload: dict[str, Any] | None,
     status: ProofPackStatus,
 ) -> ProofPackResult:
+    evidence_level: str | None = None
+    manifest_path = pack_dir / "manifest.json"
+    if manifest_path.is_file():
+        try:
+            manifest = _load_json(manifest_path)
+        except _json_load_error_types():
+            manifest = None
+        if isinstance(manifest, dict):
+            raw_level = manifest.get("evidence_level")
+            if isinstance(raw_level, str):
+                evidence_level = raw_level
     payload: dict[str, Any] = {
         "pack": str(pack_dir),
         "ok": ok,
@@ -712,6 +911,7 @@ def _build_verify_result(
         "skip_verify": skip_verify,
         "warnings": warnings,
         "errors": errors,
+        "evidence_level": evidence_level,
     }
     if signer_fingerprint:
         payload["signer_fingerprint"] = signer_fingerprint

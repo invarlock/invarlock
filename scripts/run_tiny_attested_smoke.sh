@@ -213,13 +213,18 @@ echo "[smoke] mode=$MODE profile=$PROFILE"
 echo "[smoke] hf_home=$HF_HOME"
 echo "[smoke] hf_hub_cache=$HF_HUB_CACHE"
 
+ASSURANCE="attested"
+if [[ "$MODE" == "local" ]]; then
+  ASSURANCE="trusted-local"
+fi
+
 "${CLI[@]}" evaluate \
   --baseline "$MODEL_ID" \
   --subject "$MODEL_ID" \
   --adapter hf_causal \
   --profile "$PROFILE" \
   --preset "$PRESET_PATH" \
-  --mode "$MODE" \
+  --assurance "$ASSURANCE" \
   --device cpu \
   --out "$SMOKE_RUN_DIR" \
   --report-out "$SMOKE_REPORT_DIR" \
@@ -238,10 +243,7 @@ echo "[smoke] baseline_report=$BASELINE_REPORT"
 echo "[smoke] edited_report=$EDITED_REPORT"
 echo "[smoke] evaluation_report=$EVAL_REPORT"
 
-VERIFY_ARGS=()
-if [[ "$MODE" == "local" ]]; then
-  VERIFY_ARGS+=(--allow-unattested-artifacts)
-fi
+VERIFY_ARGS=(--assurance "$ASSURANCE")
 
 "${CLI[@]}" verify "$EVAL_REPORT" "${VERIFY_ARGS[@]}" --profile "$PROFILE" --json || VERIFY_RC=$?
 VERIFY_RC="${VERIFY_RC:-0}"
@@ -254,7 +256,7 @@ fi
 "${CLI[@]}" report validate "$EVAL_REPORT"
 mkdir -p "$SMOKE_EXPORT_DIR"
 "${CLI[@]}" report html -i "$EVAL_REPORT" -o "$SMOKE_EXPORT_DIR/evaluation.html"
-"${CLI[@]}" report explain --report "$EDITED_REPORT" --baseline "$BASELINE_REPORT"
+"${CLI[@]}" report explain --subject-report "$EDITED_REPORT" --baseline-report "$BASELINE_REPORT"
 
 printf '%s\n' '{"verdict":"PASS","note":"tiny attested smoke campaign"}' > "$WORK_ROOT/final_verdict.json"
 PROOF_PACK_SIGNING_KEY="$WORK_ROOT/proof_pack_signing_key.pem"

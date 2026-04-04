@@ -13,7 +13,7 @@
 
 ```bash
 # Compare baseline and subject on the secure-default runtime path
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate \
+invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject gpt2 \
   --preset configs/presets/causal_lm/wikitext2_512.yaml \
@@ -24,7 +24,7 @@ invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/eva
 ```
 
 Model-loading commands use the secure-default runtime container unless a trusted
-`invarlock evaluate --mode local` workflow explicitly bypasses it.
+`invarlock evaluate --assurance trusted-local` workflow explicitly bypasses it.
 
 ## Concepts
 

@@ -16,7 +16,7 @@
       "path": "src/invarlock/core/adapter_auto.py",
       "subsystem": "core",
       "bucket": "acceptable",
-      "lines": [86],
+      "lines": [87],
       "rationale": "Optional adapter-family probing may fall back to None without changing trust-critical verdicts."
     },
     {
@@ -65,7 +65,7 @@
       "path": "src/invarlock/core/registry.py",
       "subsystem": "core",
       "bucket": "acceptable",
-      "lines": [110, 240, 287, 339, 345, 374, 380, 409, 415, 467, 480, 493],
+      "lines": [110, 246, 293, 345, 351, 380, 386, 415, 421, 473, 486, 499],
       "rationale": "Plugin discovery and load wrappers are optional-extension surfaces that already reclassify failures into explicit unavailability errors."
     },
     {
@@ -86,7 +86,7 @@
       "path": "src/invarlock/core/runner_eval_phase.py",
       "subsystem": "core",
       "bucket": "acceptable",
-      "lines": [35, 45, 57],
+      "lines": [39, 49, 61],
       "rationale": "These broad catches only protect debug-trace logging and do not change evaluation verdicts."
     },
     {
@@ -114,7 +114,7 @@
       "path": "src/invarlock/guards/tier_config.py",
       "subsystem": "guards",
       "bucket": "acceptable",
-      "lines": [169],
+      "lines": [170],
       "rationale": "Tier-config loading is a compatibility helper that already emits explicit parse errors when strict config content is required."
     },
     {
@@ -128,7 +128,7 @@
       "path": "src/invarlock/cli/app.py",
       "subsystem": "cli",
       "bucket": "acceptable",
-      "lines": [99, 106, 112],
+      "lines": [98, 105, 111],
       "rationale": "CLI bootstrap and top-level dispatch are shell surfaces with explicit fallback behavior."
     },
     {

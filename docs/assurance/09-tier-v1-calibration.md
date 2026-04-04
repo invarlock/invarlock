@@ -69,9 +69,9 @@ INVARLOCK_ALLOW_HOST_EXECUTION=1 invarlock evaluate \
   --out runs/baseline_calib \
   --report-out reports/baseline_calib
 
-# 2. Extract z-scores (example using jq)
+# 2. Extract z-scores from the baseline run report (example using jq)
 jq '.guards[] | select(.name == "spectral") | .metrics.final_z_scores' \
-  reports/baseline_calib/evaluation.report.json > z_scores.json
+  runs/baseline_calib/source/*/report.json > z_scores.json
 ```
 
 With 120 total modules distributed as: FFN=40, Attn=40, Embed=8, Other=32.

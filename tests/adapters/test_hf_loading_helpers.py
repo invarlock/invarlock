@@ -190,6 +190,10 @@ def test_resolve_core_loader_strategy_uses_direct_submodule_when_allowed(
             "gemma3",
             "transformers.models.gemma3.modeling_gemma3.Gemma3ForConditionalGeneration",
         ),
+        (
+            "gemma4",
+            "transformers.models.gemma4.modeling_gemma4.Gemma4ForConditionalGeneration",
+        ),
         ("olmo2", "transformers.models.olmo2.modeling_olmo2.Olmo2ForCausalLM"),
     ],
 )
@@ -217,6 +221,34 @@ def test_resolve_core_loader_strategy_supports_new_direct_submodule_families(
     assert strategy.strategy == "direct_submodule"
     assert strategy.model_type == model_type
     assert strategy.loader_label == loader_label
+
+
+@pytest.mark.unit
+def test_resolve_core_loader_strategy_supports_multimodal_gemma4(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    import invarlock.adapters.hf_loading as hf_loading
+
+    model_dir = _write_local_config(tmp_path / "gemma4-mm", "gemma4")
+    monkeypatch.setattr(
+        hf_loading,
+        "_import_symbol",
+        lambda module_path, symbol_name: f"{module_path}.{symbol_name}",
+    )
+
+    strategy = hf_loading.resolve_core_loader_strategy(
+        task="multimodal",
+        model_id=str(model_dir),
+        allow_direct_submodule=True,
+    )
+
+    assert strategy.strategy == "direct_submodule"
+    assert strategy.model_type == "gemma4"
+    assert (
+        strategy.loader_label
+        == "transformers.models.gemma4.modeling_gemma4.Gemma4ForConditionalGeneration"
+    )
 
 
 @pytest.mark.unit

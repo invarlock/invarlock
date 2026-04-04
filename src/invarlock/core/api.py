@@ -254,10 +254,18 @@ class GuardChain:
         decisions = []
         actions = []
         for outcome in outcomes:
-            if hasattr(outcome, "decision"):
-                decisions.append(outcome.decision)
-            if hasattr(outcome, "action"):
-                actions.append(outcome.action)
+            decision = getattr(outcome, "decision", None)
+            action = getattr(outcome, "action", None)
+            if isinstance(action, str):
+                actions.append(action)
+            if isinstance(decision, str):
+                from .types import normalize_guard_decision
+
+                normalized_decision = normalize_guard_decision(
+                    decision,
+                    fallback_action=action if isinstance(action, str) else None,
+                )
+                decisions.append(normalized_decision)
 
         # Import from types to avoid circular dependency
         from .types import decision_to_action, get_worst_action, get_worst_decision

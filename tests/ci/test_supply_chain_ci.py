@@ -6,6 +6,23 @@ import yaml
 
 WORKFLOWS_DIR = Path(".github/workflows")
 PINNED_ACTION_RE = re.compile(r"^[^@\s]+@[0-9a-f]{40}$")
+TRANSFORMERS_LOCKFILES = (
+    Path("requirements/workflows/ci-hf-py312.txt"),
+    Path("requirements/workflows/ci-hf-py313.txt"),
+    Path("requirements/workflows/hf-py313.txt"),
+    Path("requirements/workflows/runtime-image-py312.txt"),
+    Path("requirements/workflows/runtime-image-py312-aarch64.txt"),
+)
+TRANSFORMERS_550_HASHES = {
+    "821a9ff0961abbb29eb1eb686d78df1c85929fdf213a3fe49dc6bd94f9efa944",
+    "c8db656cf51c600cd8c75f06b20ef85c72e8b8ff9abc880c5d3e8bc70e0ddcbd",
+}
+TRANSFORMERS_550_RE = re.compile(
+    r"transformers==5\.5\.0 \\\n"
+    r"(?P<hash1>\s+--hash=sha256:(?P<digest1>[0-9a-f]{64}) \\\n)"
+    r"(?P<hash2>\s+--hash=sha256:(?P<digest2>[0-9a-f]{64}))",
+    re.MULTILINE,
+)
 
 
 def _load_workflow(path: Path) -> dict[str, Any]:
@@ -70,6 +87,12 @@ def _iter_pip_install_commands(workflow: dict[str, Any]) -> list[str]:
             if "pip install" in stripped:
                 commands.append(stripped)
     return commands
+
+
+def _extract_transformers_550_hashes(path: Path) -> set[str]:
+    match = TRANSFORMERS_550_RE.search(path.read_text(encoding="utf-8"))
+    assert match is not None, f"transformers==5.5.0 stanza missing in {path}"
+    return {match.group("digest1"), match.group("digest2")}
 
 
 def test_supply_chain_job_configured():
@@ -165,6 +188,19 @@ def test_workflows_pin_pip_installs_by_hash() -> None:
                 offenders.append(f"{workflow_path.name}: {command}")
 
     assert not offenders, "Unhashed workflow pip installs:\n" + "\n".join(offenders)
+
+
+def test_transformers_550_hashes_match_pypi_across_requirement_locks() -> None:
+    mismatches = {
+        str(path): sorted(_extract_transformers_550_hashes(path))
+        for path in TRANSFORMERS_LOCKFILES
+        if _extract_transformers_550_hashes(path) != TRANSFORMERS_550_HASHES
+    }
+
+    assert not mismatches, (
+        "transformers==5.5.0 hashes drifted from the current PyPI wheel/sdist:\n"
+        + "\n".join(f"{path}: {hashes}" for path, hashes in mismatches.items())
+    )
 
 
 def test_scorecards_workflow_uses_least_privilege_top_level_permissions() -> None:
@@ -376,6 +412,12 @@ def test_scorecard_workflow_is_configured():
         "results_file": "results.sarif",
         "results_format": "sarif",
     }
+
+    filter_step = _find_step_by_name(
+        steps, "Filter informational Scorecard SARIF rules"
+    )
+    assert "python scripts/filter_scorecard_sarif.py" in filter_step["run"]
+    assert "--exclude-rule CIIBestPracticesID" in filter_step["run"]
 
     upload_sarif_step = _find_step_by_uses_prefix(
         steps, "github/codeql-action/upload-sarif@"

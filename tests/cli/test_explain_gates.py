@@ -13,9 +13,9 @@ def test_explain_gates_missing_files_exits_with_message(tmp_path):
         [
             "report",
             "explain",
-            "--report",
+            "--subject-report",
             str(tmp_path / "missing1.json"),
-            "--baseline",
+            "--baseline-report",
             str(tmp_path / "missing2.json"),
         ],
     )
@@ -29,7 +29,15 @@ def test_explain_gates_invalid_json(tmp_path):
     rep.write_text("{invalid", encoding="utf-8")
     base.write_text("{invalid", encoding="utf-8")
     r = CliRunner().invoke(
-        app, ["report", "explain", "--report", str(rep), "--baseline", str(base)]
+        app,
+        [
+            "report",
+            "explain",
+            "--subject-report",
+            str(rep),
+            "--baseline-report",
+            str(base),
+        ],
     )
     assert r.exit_code == 2
     assert "not valid JSON" in r.stdout
@@ -67,7 +75,15 @@ def test_explain_gates_hysteresis_and_overhead_rendering(monkeypatch, tmp_path):
 
     monkeypatch.setattr(mod, "make_report", _fake_cert)
     r = CliRunner().invoke(
-        app, ["report", "explain", "--report", str(rep), "--baseline", str(base)]
+        app,
+        [
+            "report",
+            "explain",
+            "--subject-report",
+            str(rep),
+            "--baseline-report",
+            str(base),
+        ],
     )
     assert r.exit_code == 0
     # Hysteresis note printed

@@ -78,6 +78,7 @@ def test_select_specs_sharding_is_stable() -> None:
         "qwen2_7b",
         "deepseek_r1_distill_qwen_7b",
         "olmo2_7b",
+        "gemma4_e2b",
     ]
 
 
@@ -117,7 +118,7 @@ def test_model_evidence_sweep_dry_run_emits_commands_and_manifest(
         == "configs/presets/causal_lm/qwen3_8b_512.yaml"
     )
     assert "--allow-host-execution" not in payload[0]["evaluate"]
-    assert "--allow-unattested-artifacts" not in payload[0]["verify"]
+    assert "--assurance" not in payload[0]["verify"]
 
     manifest = json.loads((output_root / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["suite"] == "current-supported-experimental"
@@ -125,7 +126,7 @@ def test_model_evidence_sweep_dry_run_emits_commands_and_manifest(
     assert manifest["lanes"][0]["slug"] == "qwen3_8b"
 
 
-def test_model_evidence_sweep_host_mode_emits_local_mode_and_verify_bypass(
+def test_model_evidence_sweep_host_mode_emits_trusted_local_assurance(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
@@ -154,10 +155,17 @@ def test_model_evidence_sweep_host_mode_emits_local_mode_and_verify_bypass(
     payload = json.loads(proc.stdout)
     assert len(payload) == 1
     assert payload[0]["execution_mode"] == "host"
-    assert "--mode" in payload[0]["evaluate"]
-    assert payload[0]["evaluate"][payload[0]["evaluate"].index("--mode") + 1] == "local"
+    assert "--assurance" in payload[0]["evaluate"]
+    assert (
+        payload[0]["evaluate"][payload[0]["evaluate"].index("--assurance") + 1]
+        == "trusted-local"
+    )
     assert "--allow-host-execution" not in payload[0]["evaluate"]
-    assert "--allow-unattested-artifacts" in payload[0]["verify"]
+    assert "--assurance" in payload[0]["verify"]
+    assert (
+        payload[0]["verify"][payload[0]["verify"].index("--assurance") + 1]
+        == "trusted-local"
+    )
     preset_idx = payload[0]["evaluate"].index("--preset") + 1
     assert payload[0]["evaluate"][preset_idx] == str(
         repo_root / "configs/presets/causal_lm/tinyllama_1_1b_512.yaml"

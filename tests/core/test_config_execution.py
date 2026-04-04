@@ -137,6 +137,66 @@ def test_run_from_config_executes_without_delegation_and_writes_manifest(
     }
 
 
+def test_run_from_config_propagates_allow_unattested_artifacts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: dict[str, object] = {}
+    report_path = Path("reports/demo.report.json")
+
+    def _resolve_policy(**kwargs):
+        seen["policy_kwargs"] = dict(kwargs)
+        return runtime_security.build_runtime_security_policy(**kwargs)
+
+    monkeypatch.setattr(
+        config_execution,
+        "resolve_shell_runtime_security_policy",
+        _resolve_policy,
+        raising=True,
+    )
+
+    @contextmanager
+    def _scope(*, policy):
+        seen["policy"] = policy
+        yield
+
+    monkeypatch.setattr(
+        config_execution,
+        "runtime_allowances_scope",
+        _scope,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        config_execution,
+        "execute_config_run_request",
+        lambda request: str(report_path),
+        raising=True,
+    )
+    monkeypatch.setattr(
+        config_execution,
+        "write_runtime_manifest",
+        lambda *args, **kwargs: None,
+        raising=True,
+    )
+
+    out = config_execution.run_from_config(
+        config="configs/demo.yaml",
+        allow_unattested_artifacts=True,
+        delegate=False,
+    )
+
+    assert out == report_path.resolve()
+    assert seen["policy_kwargs"] == {
+        "allow_network": False,
+        "allow_host_execution": False,
+        "allow_third_party_plugins": False,
+        "allow_remote_code": False,
+        "allow_unattested_artifacts": True,
+    }
+    assert seen["policy"] == runtime_security.build_runtime_security_policy(
+        allow_unattested_artifacts=True
+    )
+
+
 def test_run_from_config_delegates_when_secure_default_requires_container(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

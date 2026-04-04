@@ -1,0 +1,2 @@
+{"id":"red-square","image_path":"red.ppm","prompt":"What color is the square?","answers":["red","bright red"]}
+{"id":"green-square","image_path":"green.ppm","prompt":"What color is the square?","answer":"green"}

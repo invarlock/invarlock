@@ -8,7 +8,7 @@
 | **Audience** | Developers running small scripted experiments. |
 | **Supported surface** | `CoreRunner.execute` and adapters/guards/edits from core packages. |
 | **Requires** | `invarlock[adapters]` for HF adapters; `invarlock[edits]` for built-in edits; `invarlock[guards]` for guard math. |
-| **Network** | Offline by default; set `INVARLOCK_ALLOW_NETWORK=1` for downloads. |
+| **Network** | Offline by default; CLI runs use `evaluate --allow-network`, while programmatic callers set `INVARLOCK_ALLOW_NETWORK=1` for downloads. |
 
 ## Quick Start
 
@@ -37,8 +37,8 @@ print("status:", report.status)
 - Programmatic runs follow the same pipeline phases and produce a
   `RunReport` object.
 - Pass `calibration_data` to `CoreRunner.execute` for real primary-metric values.
-- Enable downloads per run with `INVARLOCK_ALLOW_NETWORK=1` when using remote
-  model IDs.
+- CLI workflows use `evaluate --allow-network`; programmatic runs set
+  `INVARLOCK_ALLOW_NETWORK=1` when using remote model IDs.
 
 ## Reference
 
@@ -49,7 +49,8 @@ print("status:", report.status)
 ## Troubleshooting
 
 - **Dependency missing**: install `invarlock[adapters]` or `invarlock[guards]`.
-- **Downloads blocked**: use `INVARLOCK_ALLOW_NETWORK=1` for HF downloads.
+- **Downloads blocked**: for the CLI, rerun with `evaluate --allow-network`;
+  for programmatic code, set `INVARLOCK_ALLOW_NETWORK=1`.
 
 ## Observability
 

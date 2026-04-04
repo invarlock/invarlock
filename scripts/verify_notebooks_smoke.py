@@ -22,12 +22,19 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+HOST_EXECUTION_ENV = "INVARLOCK_ALLOW_HOST_EXECUTION"
+_ENV_PREFIX_PATTERN = r"(?P<env>(?:[A-Za-z_][A-Za-z0-9_]*=[^\s]+\s+)*)"
+_INVARLOCK_PREFIX = re.compile(rf"^(?P<indent>\s*){_ENV_PREFIX_PATTERN}invarlock(?=\s)")
+_PY_INVARLOCK_PREFIX = re.compile(
+    rf"^(?P<indent>\s*){_ENV_PREFIX_PATTERN}(?:python|python3)\s+-m\s+invarlock(?=\s)"
+)
 
 
 def _iter_code_cells(nb: dict) -> list[tuple[int, str]]:
@@ -92,30 +99,92 @@ def _convert_cell(
     return out
 
 
+def _should_skip_shell_line(stripped: str) -> bool:
+    if stripped == "make runtime-image":
+        return True
+    if stripped.startswith(("docker ", "podman ")):
+        return True
+    return "runtime.manifest.json" in stripped and (
+        stripped.startswith("test -f ")
+        or stripped.startswith("[ -f ")
+        or stripped.startswith("stat ")
+    )
+
+
 def write_script(*, nb_path: Path, out_py: Path, skip_pip: bool) -> None:
     nb = json.loads(nb_path.read_text(encoding="utf-8"))
     code_cells = _iter_code_cells(nb)
 
-    header = f"""\
-#!/usr/bin/env python3
-# Generated from: {nb_path}
-# Generated at: {datetime.now(tz=UTC).isoformat()}
-
-from __future__ import annotations
-
-import os
-import subprocess
-
-
-def _run_bash(cmd: str) -> None:
-    # Use bash so notebook-style commands (pipes, heredocs, exports) behave.
-    # Avoid `bash -l` (login shell), which can reset PATH and break venv/conda
-    # command resolution for `invarlock`, `python`, etc.
-    subprocess.run(["bash", "-c", cmd], check=True, env=os.environ.copy())
-
-
-def main() -> None:
-"""
+    header = "\n".join(
+        [
+            "#!/usr/bin/env python3",
+            f"# Generated from: {nb_path}",
+            f"# Generated at: {datetime.now(tz=UTC).isoformat()}",
+            "",
+            "from __future__ import annotations",
+            "",
+            "import os",
+            "import re",
+            "import shlex",
+            "import subprocess",
+            "import sys",
+            "",
+            "",
+            f"HOST_EXECUTION_ENV = {HOST_EXECUTION_ENV!r}",
+            f"_INVARLOCK_PREFIX = re.compile({_INVARLOCK_PREFIX.pattern!r})",
+            f"_PY_INVARLOCK_PREFIX = re.compile({_PY_INVARLOCK_PREFIX.pattern!r})",
+            "",
+            "",
+            "def _normalize_shell_line(line: str) -> str:",
+            "    stripped = line.strip()",
+            '    if not stripped or stripped.startswith("#"):',
+            "        return line",
+            "    if (",
+            '        stripped == "make runtime-image"',
+            '        or stripped.startswith(("docker ", "podman "))',
+            "        or (",
+            '            "runtime.manifest.json" in stripped',
+            "            and (",
+            '                stripped.startswith("test -f ")',
+            '                or stripped.startswith("[ -f ")',
+            '                or stripped.startswith("stat ")',
+            "            )",
+            "        )",
+            "    ):",
+            "        return f\"echo '[skip-host] {stripped}'\"",
+            "",
+            "    py = shlex.quote(sys.executable)",
+            "",
+            "    def _replace(match: re.Match[str]) -> str:",
+            '        indent = match.group("indent")',
+            '        env_prefix = match.group("env") or ""',
+            '        replacement = f"{indent}{env_prefix}{py} -m invarlock"',
+            "        if (",
+            "            HOST_EXECUTION_ENV not in env_prefix",
+            '            and " advanced calibrate" in line',
+            "        ):",
+            '            replacement = f"{indent}{env_prefix}{HOST_EXECUTION_ENV}=1 {py} -m invarlock"',
+            "        return replacement",
+            "",
+            "    normalized = _PY_INVARLOCK_PREFIX.sub(_replace, line, count=1)",
+            "    normalized = _INVARLOCK_PREFIX.sub(_replace, normalized, count=1)",
+            "    return normalized",
+            "",
+            "",
+            "def _run_bash(cmd: str) -> None:",
+            "    # Use bash so notebook-style commands (pipes, heredocs, exports) behave.",
+            "    # Avoid `bash -l` (login shell), which can reset PATH and break venv/conda",
+            "    # command resolution for `invarlock`, `python`, etc.",
+            '    normalized = "\\n".join(_normalize_shell_line(line) for line in cmd.splitlines())',
+            '    if cmd.endswith("\\n"):',
+            '        normalized += "\\n"',
+            '    subprocess.run(["bash", "-c", normalized], check=True, env=os.environ.copy())',
+            "",
+            "",
+            "def main() -> None:",
+            "",
+        ]
+    )
 
     body: list[str] = []
     notebook_name = nb_path.name

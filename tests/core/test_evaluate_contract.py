@@ -75,6 +75,37 @@ def test_load_validated_baseline_report_accepts_valid_explicit_file(
     assert payload["edit"] == {"name": "noop"}
 
 
+def test_load_validated_baseline_report_accepts_multimodal_baseline_windows(
+    tmp_path: Path,
+) -> None:
+    report = _write_json(
+        tmp_path / "vision-report.json",
+        _baseline_payload(
+            adapter="hf_multimodal",
+            evaluation_windows={
+                "preview": {
+                    "example_ids": ["red-square"],
+                    "records": [{"id": "red-square", "correct": True}],
+                },
+                "final": {
+                    "example_ids": ["green-square"],
+                    "records": [{"id": "green-square", "correct": True}],
+                },
+            },
+        ),
+    )
+
+    resolved, payload = load_validated_baseline_report(
+        report,
+        expected_profile="dev",
+        expected_tier="balanced",
+        expected_adapter="hf_multimodal",
+    )
+
+    assert resolved == report.resolve()
+    assert payload["meta"] == {"adapter": "hf_multimodal"}
+
+
 def test_load_validated_baseline_report_rejects_directory_and_bad_edit(
     tmp_path: Path,
 ) -> None:

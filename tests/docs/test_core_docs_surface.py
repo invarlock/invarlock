@@ -45,7 +45,7 @@ def test_core_docs_do_not_promote_removed_top_level_commands():
             assert needle not in text, f"{needle} still promoted in {rel_path}"
 
 
-def test_support_surfaces_use_local_mode_for_public_evaluate_examples():
+def test_support_surfaces_use_trusted_local_assurance_for_public_evaluate_examples():
     surfaces = [
         "CONTRIBUTING.md",
         "configs/README.md",
@@ -58,7 +58,9 @@ def test_support_surfaces_use_local_mode_for_public_evaluate_examples():
 
     for rel_path in surfaces:
         text = _read(rel_path)
-        assert "--mode local" in text, f"--mode local missing from {rel_path}"
+        assert "--assurance trusted-local" in text, (
+            f"--assurance trusted-local missing from {rel_path}"
+        )
         assert "INVARLOCK_ALLOW_HOST_EXECUTION=1" not in text, (
             f"legacy host-execution env still promoted in {rel_path}"
         )
@@ -85,7 +87,7 @@ def test_support_surfaces_do_not_teach_removed_public_top_level_commands():
             assert needle not in text, f"{needle} still present in {rel_path}"
 
 
-def test_public_security_and_reference_docs_use_local_mode_for_public_host_runs():
+def test_public_security_and_reference_docs_use_trusted_local_assurance_for_public_host_runs():
     surfaces = [
         "docs/reference/datasets.md",
         "docs/security/best-practices.md",
@@ -96,7 +98,9 @@ def test_public_security_and_reference_docs_use_local_mode_for_public_host_runs(
 
     for rel_path in surfaces:
         text = _read(rel_path)
-        assert "--mode local" in text, f"--mode local missing from {rel_path}"
+        assert "--assurance trusted-local" in text, (
+            f"--assurance trusted-local missing from {rel_path}"
+        )
 
 
 def test_proof_pack_docs_keep_repo_wrappers_advanced_and_use_current_verify_surface():

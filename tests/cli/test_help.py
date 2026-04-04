@@ -42,7 +42,7 @@ def test_report_group_help_lists_subcommands():
     result = runner.invoke(app, ["report", "--help"])
     assert result.exit_code == 0
     out = strip_ansi(result.stdout)
-    for sub in ("verify", "explain", "html", "validate"):
+    for sub in ("generate", "explain", "html", "validate"):
         assert sub in out
 
 

@@ -6,6 +6,7 @@ import math
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -22,6 +23,9 @@ pytestmark = pytest.mark.integration
 
 
 def _select_python(repo_root: Path) -> Path:
+    current = Path(sys.executable)
+    if current.exists() and sys.version_info >= (3, 12):
+        return current
     proc = subprocess.run(
         ["/bin/bash", str(repo_root / "scripts" / "select_python.sh")],
         capture_output=True,

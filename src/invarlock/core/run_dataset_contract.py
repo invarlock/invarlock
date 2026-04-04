@@ -121,8 +121,12 @@ def materialize_run_dataset(
             effective_final=materialized_baseline.effective_final,
             preview_mask_counts=materialized_baseline.preview_mask_counts,
             final_mask_counts=materialized_baseline.final_mask_counts,
-            preview_records=[],
-            final_records=[],
+            preview_records=list(
+                getattr(materialized_baseline, "preview_records", []) or []
+            ),
+            final_records=list(
+                getattr(materialized_baseline, "final_records", []) or []
+            ),
             diagnostics=(),
         )
 

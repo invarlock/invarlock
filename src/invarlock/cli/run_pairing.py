@@ -79,10 +79,41 @@ def extract_pairing_schedule(
             return [raw]
         return raw
 
+    def _sanitize_multimodal(section: dict[str, Any]) -> dict[str, Any] | None:
+        records_raw = section.get("records")
+        example_ids_raw = section.get("example_ids")
+        records: list[dict[str, Any]] = []
+        if isinstance(records_raw, list):
+            for record in records_raw:
+                if isinstance(record, dict):
+                    records.append(dict(record))
+        example_ids: list[str] = []
+        if isinstance(example_ids_raw, list):
+            example_ids = [str(value) for value in example_ids_raw]
+        elif records:
+            example_ids = [
+                str(record.get("id") or record.get("example_id") or "")
+                for record in records
+            ]
+        if not example_ids:
+            return None
+        if records and len(records) != len(example_ids):
+            return None
+        payload: dict[str, Any] = {"example_ids": example_ids}
+        if records:
+            payload["records"] = records
+        processor_sha = section.get("processor_sha256")
+        if isinstance(processor_sha, str) and processor_sha:
+            payload["processor_sha256"] = processor_sha
+        return payload
+
     def _sanitize(section_key: str, *, start_id: int) -> dict[str, Any] | None:
         section = windows.get(section_key)
         if not isinstance(section, dict):
             return None
+        multimodal = _sanitize_multimodal(section)
+        if multimodal is not None:
+            return multimodal
         input_ids_raw = section.get("input_ids")
         if not isinstance(input_ids_raw, list):
             return None
@@ -204,13 +235,22 @@ def compute_provider_digest(
         return None
 
     all_ids: list[Any] = []
+    processor_sha = None
     for key in ("preview", "final"):
         section = windows.get(key)
         if not isinstance(section, dict):
             continue
-        window_ids = section.get("window_ids")
-        if isinstance(window_ids, list):
-            all_ids.extend(list(window_ids))
+        example_ids = section.get("example_ids")
+        if isinstance(example_ids, list) and example_ids:
+            all_ids.extend(str(value) for value in example_ids)
+        else:
+            window_ids = section.get("window_ids")
+            if isinstance(window_ids, list):
+                all_ids.extend(list(window_ids))
+        if processor_sha is None:
+            section_processor = section.get("processor_sha256")
+            if isinstance(section_processor, str) and section_processor:
+                processor_sha = section_processor
 
     ids_sha = None
     if all_ids:
@@ -231,8 +271,16 @@ def compute_provider_digest(
     meta = report.get("meta") if isinstance(report.get("meta"), dict) else None
     if isinstance(meta, dict):
         tok_hash = meta.get("tokenizer_hash")
+        if processor_sha is None:
+            candidate = meta.get("processor_sha256")
+            if isinstance(candidate, str) and candidate:
+                processor_sha = candidate
     if not tok_hash and isinstance(report.get("data"), dict):
         tok_hash = report["data"].get("tokenizer_hash")
+    if processor_sha is None and isinstance(report.get("data"), dict):
+        candidate = report["data"].get("processor_sha256")
+        if isinstance(candidate, str) and candidate:
+            processor_sha = candidate
 
     masking = compute_mask_positions_digest_fn(windows)
 
@@ -241,6 +289,8 @@ def compute_provider_digest(
         digest["ids_sha256"] = ids_sha
     if isinstance(tok_hash, str) and tok_hash:
         digest["tokenizer_sha256"] = str(tok_hash)
+    if isinstance(processor_sha, str) and processor_sha:
+        digest["processor_sha256"] = str(processor_sha)
     if isinstance(masking, str) and masking:
         digest["masking_sha256"] = masking
     return digest or None
@@ -324,6 +374,177 @@ def validate_and_harvest_baseline_schedule(
         )
         if not isinstance(preview, dict) or not isinstance(final, dict):
             _fail_schedule("missing preview/final evaluation_windows sections")
+
+        def _hash_strings(values: list[str]) -> str:
+            return hashlib.blake2s(
+                "||".join(values).encode("utf-8"),
+                digest_size=16,
+            ).hexdigest()
+
+        def _multimodal_arm_check(
+            label: str,
+            section: dict[str, Any],
+        ) -> tuple[list[str], list[dict[str, Any]]]:
+            records_raw = section.get("records")
+            records: list[dict[str, Any]] = []
+            if isinstance(records_raw, list):
+                for record in records_raw:
+                    if not isinstance(record, dict):
+                        _fail_schedule(f"{label} record is not an object")
+                    records.append(dict(record))
+            example_ids_raw = section.get("example_ids")
+            if isinstance(example_ids_raw, list) and example_ids_raw:
+                example_ids = [str(value) for value in example_ids_raw]
+            else:
+                example_ids = [
+                    str(record.get("id") or record.get("example_id") or "")
+                    for record in records
+                ]
+            if not example_ids:
+                _fail_schedule(f"{label} missing example_ids")
+            if records and len(records) != len(example_ids):
+                _fail_schedule(
+                    f"{label} coherence error: len(example_ids)={len(example_ids)} len(records)={len(records)}"
+                )
+            for idx, example_id in enumerate(example_ids):
+                if not example_id:
+                    _fail_schedule(
+                        f"{label} example_ids contains empty id at index {idx}"
+                    )
+            if records:
+                for idx, record in enumerate(records):
+                    record_id = str(record.get("id") or record.get("example_id") or "")
+                    if record_id and record_id != example_ids[idx]:
+                        _fail_schedule(f"{label} record id mismatch at index {idx}")
+            return example_ids, records
+
+        multimodal_schedule = any(
+            isinstance(section.get("example_ids"), list)
+            or isinstance(section.get("records"), list)
+            for section in (preview, final)
+        )
+        if multimodal_schedule:
+            preview_ids, preview_records = _multimodal_arm_check("preview", preview)
+            final_ids, final_records = _multimodal_arm_check("final", final)
+
+            if len(set(preview_ids)) != len(preview_ids):
+                _fail_schedule("duplicate example_ids detected in preview arm")
+            if len(set(final_ids)) != len(final_ids):
+                _fail_schedule("duplicate example_ids detected in final arm")
+            if set(preview_ids) & set(final_ids):
+                _fail_schedule("example_ids overlap between preview and final arms")
+
+            preview_hash = _hash_strings(preview_ids)
+            final_hash = _hash_strings(final_ids)
+            dataset_hash = hashlib.blake2s(
+                (preview_hash + final_hash).encode("utf-8"),
+                digest_size=16,
+            ).hexdigest()
+
+            for meta_key, expected_value in (
+                ("preview_hash", preview_hash),
+                ("final_hash", final_hash),
+                ("dataset_hash", dataset_hash),
+            ):
+                baseline_value = baseline_meta.get(meta_key)
+                if (
+                    isinstance(baseline_value, str)
+                    and baseline_value
+                    and baseline_value != expected_value
+                ):
+                    prof = (profile or "dev").strip().lower()
+                    if prof in {"ci", "release"}:
+                        _fail_schedule(f"{meta_key} mismatch vs baseline report data")
+                    if console is not None and event_fn is not None:
+                        event_fn(
+                            console,
+                            "WARN",
+                            f"Baseline {meta_key} mismatch; continuing in dev profile.",
+                            emoji="⚠️",
+                            profile=prof,
+                        )
+
+            effective_preview = len(preview_ids)
+            effective_final = len(final_ids)
+            cfg_dataset = getattr(cfg.dataset, "provider", None)
+            if cfg_dataset is None:
+                cfg_dataset = getattr(cfg.dataset, "dataset", None)
+            cfg_dataset = canonical_dataset_id_fn(cfg_dataset)
+            baseline_dataset = canonical_dataset_id_fn(_extract_meta("dataset"))
+            if (
+                baseline_dataset is not None
+                and cfg_dataset is not None
+                and baseline_dataset != cfg_dataset
+            ):
+                _fail_schedule(
+                    f"dataset mismatch (baseline {baseline_dataset} vs config {cfg_dataset})"
+                )
+
+            cfg_split = getattr(cfg.dataset, "split", "validation")
+            baseline_split = _extract_meta("split")
+            if (
+                baseline_split is not None
+                and cfg_split is not None
+                and baseline_split != cfg_split
+            ):
+                _fail_schedule(
+                    f"split mismatch (baseline {baseline_split} vs config {cfg_split})"
+                )
+
+            baseline_prov = (
+                baseline_report_data.get("provenance")
+                if isinstance(baseline_report_data, dict)
+                else {}
+            )
+            if not isinstance(baseline_prov, dict):
+                baseline_prov = {}
+            baseline_provider_digest = baseline_prov.get("provider_digest")
+            if not isinstance(baseline_provider_digest, dict):
+                baseline_provider_digest = {}
+
+            dataset_meta = {
+                key: baseline_meta.get(key)
+                for key in (
+                    "dataset_hash",
+                    "preview_hash",
+                    "final_hash",
+                    "provider_kind",
+                    "provider_digest",
+                    "processor_sha256",
+                )
+                if baseline_meta.get(key) is not None
+            }
+            dataset_meta.setdefault("provider_kind", "vision_text")
+            dataset_meta.setdefault("preview_hash", preview_hash)
+            dataset_meta.setdefault("final_hash", final_hash)
+            dataset_meta.setdefault("dataset_hash", dataset_hash)
+            processor_sha = (
+                preview.get("processor_sha256")
+                or final.get("processor_sha256")
+                or baseline_provider_digest.get("processor_sha256")
+            )
+            if isinstance(processor_sha, str) and processor_sha:
+                dataset_meta["processor_sha256"] = processor_sha
+            dataset_meta["loss_type"] = resolved_loss_type
+            window_plan = baseline_meta.get("window_plan")
+            if not isinstance(window_plan, dict):
+                window_plan = {
+                    "profile": "vision_text",
+                    "requested_preview": effective_preview,
+                    "requested_final": effective_final,
+                    "actual_preview": effective_preview,
+                    "actual_final": effective_final,
+                    "coverage_ok": True,
+                }
+            return {
+                "effective_preview": effective_preview,
+                "effective_final": effective_final,
+                "preview_count": effective_preview,
+                "final_count": effective_final,
+                "dataset_meta": dataset_meta,
+                "window_plan": window_plan,
+                "calibration_data": [],
+            }
 
         def _arm_check(
             label: str,

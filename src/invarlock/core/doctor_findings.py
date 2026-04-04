@@ -281,7 +281,13 @@ def build_tiny_relax_finding(
 def build_provider_kind_findings(
     provider_cfg: object,
 ) -> tuple[list[DoctorFinding], bool]:
-    supported_providers = {"wikitext2", "hf_text", "synthetic", "local_jsonl"}
+    supported_providers = {
+        "wikitext2",
+        "hf_text",
+        "synthetic",
+        "local_jsonl",
+        "vision_text",
+    }
     bad_kind: str | None = None
 
     if isinstance(provider_cfg, dict):
@@ -306,11 +312,11 @@ def build_provider_kind_findings(
                 severity="error",
                 message=(
                     f'dataset.provider.kind "{bad_kind}" is not supported. '
-                    "Use one of: wikitext2 | hf_text | synthetic | local_jsonl."
+                    "Use one of: wikitext2 | hf_text | synthetic | local_jsonl | vision_text."
                 ),
                 extra={
                     "field": "dataset.provider.kind",
-                    "hint": "Use one of: wikitext2 | hf_text | synthetic | local_jsonl",
+                    "hint": "Use one of: wikitext2 | hf_text | synthetic | local_jsonl | vision_text",
                 },
             )
         ],
@@ -325,7 +331,7 @@ def build_provider_schema_findings(
     had_error = False
     kind = str(_mapping_get(provider_cfg, "kind") or "").strip()
 
-    if kind == "local_jsonl":
+    if kind in {"local_jsonl", "vision_text"}:
         raw_path = (
             _mapping_get(provider_cfg, "file")
             or _mapping_get(provider_cfg, "path")
@@ -340,25 +346,26 @@ def build_provider_schema_findings(
                 DoctorFinding(
                     code="D011",
                     severity="error",
-                    message="local_jsonl: path does not exist",
+                    message=f"{kind}: path does not exist",
                     extra={"field": "dataset.provider.file"},
                 )
             )
             had_error = True
 
-        raw_text_field = _mapping_get(provider_cfg, "text_field")
-        text_field = str(raw_text_field or "").strip()
-        if raw_text_field is not None and not text_field:
-            findings.append(
-                DoctorFinding(
-                    code="D012",
-                    severity="warning",
-                    message=(
-                        "local_jsonl: set dataset.field.text or map 'text' to your column"
-                    ),
-                    extra={"field": "dataset.provider.text_field"},
+        if kind == "local_jsonl":
+            raw_text_field = _mapping_get(provider_cfg, "text_field")
+            text_field = str(raw_text_field or "").strip()
+            if raw_text_field is not None and not text_field:
+                findings.append(
+                    DoctorFinding(
+                        code="D012",
+                        severity="warning",
+                        message=(
+                            "local_jsonl: set dataset.field.text or map 'text' to your column"
+                        ),
+                        extra={"field": "dataset.provider.text_field"},
+                    )
                 )
-            )
 
     if kind == "hf_text":
         raw_text_field = _mapping_get(provider_cfg, "text_field")
