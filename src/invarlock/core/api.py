@@ -265,8 +265,7 @@ class GuardChain:
                     decision,
                     fallback_action=action if isinstance(action, str) else None,
                 )
-                if normalized_decision:
-                    decisions.append(normalized_decision)
+                decisions.append(normalized_decision)
 
         # Import from types to avoid circular dependency
         from .types import decision_to_action, get_worst_action, get_worst_decision

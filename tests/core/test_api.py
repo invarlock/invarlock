@@ -211,6 +211,20 @@ class TestGuardChainComprehensive:
 
         assert chain.get_worst_action(outcomes) == "rollback"
 
+    def test_get_worst_action_ignores_unrecognized_decision_without_action(self):
+        chain = GuardChain([])
+
+        outcomes = [Mock(decision="mystery")]
+
+        assert chain.get_worst_action(outcomes) == "none"
+
+    def test_get_worst_action_accumulates_multiple_typed_decisions(self):
+        chain = GuardChain([])
+
+        outcomes = [Mock(decision="monitor"), Mock(decision="block")]
+
+        assert chain.get_worst_action(outcomes) == "abort"
+
     def test_guard_chain_initialization(self):
         """Test GuardChain initialization with different parameters."""
         # Test with guards and policy
