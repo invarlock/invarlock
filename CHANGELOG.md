@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+### Dependencies
+
+### Documentation
+
+## [0.6.0] - 2026-04-04
+
+### Added
 - Added `google/gemma-4-E2B-it` as the shipped `supported_experimental`
   Gemma 4 text lane with a causal preset, calibration config, and support-
   matrix/catalog updates.
