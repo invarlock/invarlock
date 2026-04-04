@@ -34,3 +34,22 @@ def test_check_all_invariants_ok_and_violations():
 def test_assert_invariants_raises():
     with pytest.raises(AssertionError):
         assert_invariants(SmallModel(bad=True))
+
+
+def test_check_all_invariants_handles_single_use_named_parameters() -> None:
+    class _SingleUseModel:
+        def __init__(self) -> None:
+            self.weight = nn.Parameter(torch.ones(2, 2))
+            self._used = False
+
+        def named_parameters(self):
+            if self._used:
+                raise RuntimeError("named_parameters reused")
+            self._used = True
+            yield "weight", self.weight
+
+    outcome = check_all_invariants(_SingleUseModel())
+
+    assert outcome.passed is True
+    assert outcome.action == "continue"
+    assert outcome.metrics["parameters_checked"] == 1

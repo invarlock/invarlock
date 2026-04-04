@@ -1,5 +1,6 @@
 import types
 
+import torch
 import torch.nn as nn
 
 from invarlock.guards.invariants import (
@@ -50,6 +51,16 @@ class ModelBadNamedParameters(nn.Module):
         raise RuntimeError("named_parameters failed")
 
 
+class ModelMidStreamNamedParametersFailure(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.good = nn.Parameter(torch.ones(1))
+
+    def named_parameters(self, prefix="", recurse=True):  # type: ignore[override]
+        yield "good", self.good
+        raise RuntimeError("named_parameters failed mid-stream")
+
+
 def test_param_count_exception_path_sets_sentinel():
     guard = InvariantsGuard()
     m = ModelBadParams()
@@ -98,6 +109,17 @@ def test_check_all_invariants_fail_closed_when_named_parameters_iteration_errors
     None
 ):
     outcome = check_all_invariants(ModelBadNamedParameters())
+
+    assert outcome.passed is False
+    assert outcome.action == "reject"
+    assert outcome.violations[0]["type"] == "structure_violation"
+    assert outcome.metrics["parameters_checked"] == 0
+
+
+def test_check_all_invariants_fail_closed_when_named_parameters_break_mid_stream() -> (
+    None
+):
+    outcome = check_all_invariants(ModelMidStreamNamedParametersFailure())
 
     assert outcome.passed is False
     assert outcome.action == "reject"
