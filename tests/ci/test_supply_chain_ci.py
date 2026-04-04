@@ -405,6 +405,12 @@ def test_scorecard_workflow_is_configured():
     }
 
     steps = analysis.get("steps", [])
+    assert [step.get("name") for step in steps] == [
+        "Checkout repository",
+        "Run OpenSSF Scorecard analysis",
+    ]
+    assert all("uses" in step for step in steps)
+
     scorecard_step = _find_step_by_uses_prefix(steps, "ossf/scorecard-action@")
     assert scorecard_step["with"] == {
         "repo_token": "${{ secrets.SCORECARD_TOKEN || github.token }}",
@@ -412,41 +418,6 @@ def test_scorecard_workflow_is_configured():
         "results_file": "results.sarif",
         "results_format": "sarif",
     }
-
-    filter_step = _find_step_by_name(
-        steps, "Filter informational Scorecard SARIF rules"
-    )
-    assert filter_step["uses"] == "./.github/actions/filter-scorecard-sarif"
-    assert filter_step["with"] == {
-        "input": "results.sarif",
-        "output": "results.sarif",
-        "exclude_rule": "CIIBestPracticesID",
-    }
-    assert all("uses" in step for step in steps)
-
-    action_path = Path(".github/actions/filter-scorecard-sarif/action.yml")
-    assert action_path.exists(), "Scorecard SARIF filter action not found"
-    action = yaml.safe_load(action_path.read_text(encoding="utf-8"))
-    assert action["runs"]["using"] == "composite"
-    action_step = action["runs"]["steps"][0]
-    assert action_step["shell"] == "bash"
-    assert "python3 scripts/filter_scorecard_sarif.py" in action_step["run"]
-    assert '--exclude-rule "${{ inputs.exclude_rule }}"' in action_step["run"]
-
-    upload_sarif_step = _find_step_by_uses_prefix(
-        steps, "github/codeql-action/upload-sarif@"
-    )
-    assert (
-        upload_sarif_step["uses"]
-        == "github/codeql-action/upload-sarif@b20883b0cd1f46c72ae0ba6d1090936928f9fa30"
-    )
-    assert upload_sarif_step["with"]["sarif_file"] == "results.sarif"
-
-    upload_artifact_step = _find_step_by_uses_prefix(steps, "actions/upload-artifact@")
-    assert (
-        upload_artifact_step["uses"]
-        == "actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f"
-    )
 
 
 def test_docs_workflow_enforces_docs_lint_on_main_and_staging() -> None:
