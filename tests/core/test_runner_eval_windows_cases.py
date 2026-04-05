@@ -286,3 +286,29 @@ def test_compute_slice_summary_logs_zero_mask_batches_and_uses_token_fallback(
             "fallback_weight": 3,
         }
     ]
+
+
+def test_compute_slice_summary_skips_non_finite_losses_and_reports_error() -> None:
+    runner = _RunnerRecorder()
+    model = _LossModel(float("nan"))
+    batch = {"input_ids": torch.tensor([[1, 2, 3]], dtype=torch.long)}
+
+    summary, error = compute_slice_summary(
+        runner,
+        model,
+        [batch],
+        max_batches=1,
+        start_idx=2,
+        device=next(model.parameters()).device,
+        resolved_loss_mode="causal",
+    )
+
+    assert summary["num_batches"] == 0
+    assert summary["log_losses"] == []
+    assert error == {
+        "error": "non_finite_loss",
+        "detail": "Evaluation produced only non-finite loss values; primary metric evidence is unavailable.",
+    }
+    operations = [operation for _, operation, _, _ in runner.events]
+    assert "non_finite_loss" in operations
+    assert "non_finite_loss_total" in operations

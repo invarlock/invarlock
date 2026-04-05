@@ -49,7 +49,7 @@ from ...core.evaluate_plan import (
     resolve_evaluate_assurance_policy,
     resolve_evaluate_tmp_dir,
 )
-from ...core.exceptions import ConfigError, ValidationError
+from ...core.exceptions import ConfigError, MetricsError, ValidationError
 
 # Use the report group's programmatic entry for report generation
 from ...reporting.report_contract import generate_reports
@@ -630,12 +630,15 @@ def evaluate_command(
             message="Evaluation Report",
             emoji="📜",
         ):
-            generate_reports(
-                run=str(edited_report),
-                format="report",
-                baseline=str(baseline_report_path),
-                output=str(report_out),
-            )
+            try:
+                generate_reports(
+                    run=str(edited_report),
+                    format="report",
+                    baseline=str(baseline_report_path),
+                    output=str(report_out),
+                )
+            except (ConfigError, MetricsError, ValidationError) as exc:
+                _fail(str(getattr(exc, "message", exc)), exit_code=1)
         emit_runtime_manifest(
             Path(report_out) / "evaluation.report.json",
             config_payload={

@@ -156,7 +156,18 @@ def make_report(
     # Normalize baseline input
     baseline_raw = baseline
     baseline_raw_map = cast(dict[str, Any], baseline_raw)
-    baseline_normalized = report_normalization_mod.normalize_baseline(baseline_raw)
+    try:
+        baseline_normalized = report_normalization_mod.normalize_baseline(baseline_raw)
+    except NON_FATAL_EXCEPTIONS as exc:
+        raise ValidationError(
+            code="E231",
+            message=(
+                "Baseline normalization failed; evaluation report assembly "
+                "requires a concrete finite baseline metric or valid baseline "
+                "evaluation evidence."
+            ),
+            details={"error": str(exc)},
+        ) from exc
     baseline_report: RunReport | None = None
     try:
         if (

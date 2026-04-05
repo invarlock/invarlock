@@ -92,6 +92,7 @@ def compute_slice_summary(
     actual_token_counts: list[int] = []
     count = 0
     zero_mask_batches = 0
+    non_finite_losses = 0
     any_labels_seen = False
     eval_error: dict[str, Any] | None = None
     store_windows = os.environ.get(
@@ -196,6 +197,15 @@ def compute_slice_summary(
                     },
                 )
             continue
+        if not isinstance(loss_val, int | float) or not math.isfinite(float(loss_val)):
+            non_finite_losses += 1
+            runner._log_event(
+                "eval",
+                "non_finite_loss",
+                LogLevel.WARNING,
+                {"window_index": start_idx + count, "loss": loss_val},
+            )
+            continue
 
         if attn_snapshot is not None:
             tokens_in_batch = int(attn_snapshot.sum().item())
@@ -270,6 +280,20 @@ def compute_slice_summary(
         count += 1
 
     if count == 0:
+        if non_finite_losses:
+            runner._log_event(
+                "eval",
+                "non_finite_loss_total",
+                LogLevel.ERROR,
+                {"non_finite_losses": non_finite_losses, "requested": limit},
+            )
+            eval_error = {
+                "error": "non_finite_loss",
+                "detail": (
+                    "Evaluation produced only non-finite loss values; "
+                    "primary metric evidence is unavailable."
+                ),
+            }
         if zero_mask_batches and os.environ.get("INVARLOCK_DEBUG_TRACE"):
             runner._log_event(
                 "eval",

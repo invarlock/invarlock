@@ -69,10 +69,12 @@ class LaneResult:
     verify_exit: int | None
     report_path: str
     verify_path: str | None
+    status: str = "failed"
+    detail: str | None = None
 
     @property
     def ok(self) -> bool:
-        return self.evaluate_exit == 0 and self.verify_exit == 0
+        return self.status in {"ok", "skipped"}
 
     def to_summary_entry(self) -> dict[str, object]:
         payload = asdict(self)
@@ -624,6 +626,45 @@ def _publish_lane_artifacts(source: Path, destination: Path) -> None:
     shutil.copytree(source, destination)
 
 
+def _classify_failure(
+    *,
+    log_path: Path,
+    evaluate_exit: int,
+    verify_exit: int | None,
+    phase: str,
+) -> tuple[str, str | None]:
+    if evaluate_exit == 0 and verify_exit == 0:
+        return ("ok", None)
+    if evaluate_exit == -9:
+        return ("failed", "resource_killed")
+    try:
+        text = log_path.read_text(encoding="utf-8").lower()
+    except OSError:
+        text = ""
+    if phase == "prefetch" and (
+        "gatedrepoerror" in text
+        or "cannot access gated repo" in text
+        or "you are trying to access a gated repo" in text
+    ):
+        return ("skipped", "gated_repo")
+    if phase == "prefetch" and (
+        "trust_remote_code=true" in text
+        or "contains custom code which must be executed" in text
+        or "loading this model requires you to execute custom code" in text
+    ):
+        return ("skipped", "remote_code_required")
+    if (
+        "invalid baseline metrics.ppl_final" in text
+        or "primary metric degraded or non-finite" in text
+    ):
+        return ("failed", "invalid_primary_metric")
+    if evaluate_exit != 0:
+        return ("failed", f"{phase}_failed")
+    if verify_exit not in {None, 0}:
+        return ("failed", "verify_failed")
+    return ("failed", None)
+
+
 def run_lane(
     spec: EvidenceLane,
     *,
@@ -665,6 +706,12 @@ def run_lane(
             )
         log_mode = "a"
         if prefetch_proc.returncode != 0:
+            status, detail = _classify_failure(
+                log_path=log_path,
+                evaluate_exit=prefetch_proc.returncode,
+                verify_exit=None,
+                phase="prefetch",
+            )
             _publish_lane_artifacts(
                 lane_root, published_lane_root := output_root / "eval" / spec.slug
             )
@@ -683,6 +730,8 @@ def run_lane(
                 verify_path=str(published_verify_path)
                 if published_verify_path.is_file()
                 else None,
+                status=status,
+                detail=detail,
             )
 
     evaluate_cmd = build_evaluate_command(
@@ -749,6 +798,12 @@ def run_lane(
     _publish_lane_artifacts(lane_root, published_lane_root)
     published_report_path = published_lane_root / "report" / "evaluation.report.json"
     published_verify_path = published_lane_root / "verify.json"
+    status, detail = _classify_failure(
+        log_path=log_path,
+        evaluate_exit=eval_returncode,
+        verify_exit=verify_exit,
+        phase="evaluate",
+    )
 
     return LaneResult(
         slug=spec.slug,
@@ -761,6 +816,8 @@ def run_lane(
         verify_path=str(published_verify_path)
         if published_verify_path.is_file()
         else None,
+        status=status,
+        detail=detail,
     )
 
 
@@ -775,13 +832,16 @@ def write_summary(
 ) -> None:
     summary_tsv = output_root / "summary.tsv"
     with summary_tsv.open("w", encoding="utf-8") as handle:
-        handle.write("slug\tlane_id\tevaluate_exit\tverify_exit\treport\n")
+        handle.write(
+            "slug\tlane_id\tstatus\tdetail\tevaluate_exit\tverify_exit\treport\n"
+        )
         for result in results:
             verify_exit = (
                 "NA" if result.verify_exit is None else str(result.verify_exit)
             )
             handle.write(
-                f"{result.slug}\t{result.lane_id}\t{result.evaluate_exit}\t"
+                f"{result.slug}\t{result.lane_id}\t{result.status}\t"
+                f"{result.detail or ''}\t{result.evaluate_exit}\t"
                 f"{verify_exit}\t{result.report_path}\n"
             )
 
@@ -905,6 +965,7 @@ def run_sweep(args: argparse.Namespace) -> int:
             )
             handle.write(
                 f"[{datetime.now(UTC).isoformat()}] DONE {result.slug} "
+                f"status={result.status} detail={result.detail or '-'} "
                 f"eval={result.evaluate_exit} verify={verify_repr}\n"
             )
             handle.flush()

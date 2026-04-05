@@ -495,6 +495,101 @@ def test_model_evidence_sweep_retries_evaluate_once_after_sigterm(
     assert "evaluate exited with -15; retrying once." in lane_log
 
 
+def test_model_evidence_sweep_marks_gated_prefetch_as_skipped(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence_sweep.py"
+    fake_python = tmp_path / "gated-fake-python"
+    fake_python.write_text(
+        """#!/bin/bash
+set -euo pipefail
+if [[ "${1:-}" == "-c" ]]; then
+  echo "GatedRepoError: Cannot access gated repo" >&2
+  exit 1
+fi
+echo "unexpected invocation" >&2
+exit 99
+""",
+        encoding="utf-8",
+    )
+    fake_python.chmod(fake_python.stat().st_mode | stat.S_IXUSR)
+    output_root = tmp_path / "evidence-host-gated"
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--suite",
+            "model-catalog-gpu",
+            "--slug",
+            "google_gemma_3_4b_it",
+            "--execution-mode",
+            "host",
+            "--output-root",
+            str(output_root),
+            "--python",
+            str(fake_python),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    summary_tsv = (output_root / "summary.tsv").read_text(encoding="utf-8")
+    assert "status\tdetail" in summary_tsv
+    assert "skipped\tgated_repo" in summary_tsv
+    status_log = (output_root / "status.log").read_text(encoding="utf-8")
+    assert "status=skipped detail=gated_repo" in status_log
+
+
+def test_model_evidence_sweep_marks_remote_code_prefetch_as_skipped(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence_sweep.py"
+    fake_python = tmp_path / "remote-code-fake-python"
+    fake_python.write_text(
+        """#!/bin/bash
+set -euo pipefail
+if [[ "${1:-}" == "-c" ]]; then
+  echo "Loading this model requires you to execute custom code. Please set trust_remote_code=True." >&2
+  exit 1
+fi
+echo "unexpected invocation" >&2
+exit 99
+""",
+        encoding="utf-8",
+    )
+    fake_python.chmod(fake_python.stat().st_mode | stat.S_IXUSR)
+    output_root = tmp_path / "evidence-host-remote-code"
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--suite",
+            "model-catalog-gpu",
+            "--slug",
+            "thudm_glm_4_9b_chat",
+            "--execution-mode",
+            "host",
+            "--output-root",
+            str(output_root),
+            "--python",
+            str(fake_python),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    summary_tsv = (output_root / "summary.tsv").read_text(encoding="utf-8")
+    assert "skipped\tremote_code_required" in summary_tsv
+
+
 def test_run_lane_sets_remote_code_env_for_matching_preset(tmp_path: Path) -> None:
     mod = _load_script_module("model_evidence_sweep")
     spec = next(

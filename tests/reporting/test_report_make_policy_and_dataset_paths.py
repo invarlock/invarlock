@@ -118,6 +118,28 @@ def _patch_common(monkeypatch, report, baseline):
     )
 
 
+def test_make_report_wraps_baseline_normalization_errors(monkeypatch) -> None:
+    report = _base_report()
+
+    monkeypatch.setattr(
+        report_normalization,
+        "normalize_and_validate_run_report",
+        lambda _r: report,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        report_normalization,
+        "normalize_baseline",
+        lambda _b: (_ for _ in ()).throw(
+            ValueError("invalid baseline metrics.ppl_final")
+        ),
+        raising=False,
+    )
+
+    with pytest.raises(ValidationError, match="Baseline normalization failed"):
+        make_report(report, _base_baseline())
+
+
 def _stub_evaluation_report_extractors(
     monkeypatch,
     *,

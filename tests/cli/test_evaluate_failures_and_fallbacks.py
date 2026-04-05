@@ -2041,6 +2041,43 @@ def test_evaluate_non_quiet_report_failure_bubbles_without_child_replay(
     assert "report child output" not in console.joined()
 
 
+def test_evaluate_report_validation_failure_exits_cleanly(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    baseline_report = _write_json(tmp_path / "baseline.json", {})
+    edited_report = _write_json(tmp_path / "edited.json", {})
+
+    monkeypatch.setattr(
+        run_mod,
+        "run_command",
+        _fake_run_command_with_paths(
+            {"source": baseline_report, "edited": edited_report}
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        mod,
+        "generate_reports",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            mod.ValidationError(code="E231", message="Baseline normalization failed")
+        ),
+        raising=False,
+    )
+
+    with pytest.raises(click.exceptions.Exit) as exc:
+        mod.evaluate_command(
+            baseline=str(src),
+            subject=str(edt),
+            adapter="hf_causal",
+            out=str(Path("runs")),
+            report_out=str(Path("reports")),
+            profile="dev",
+        )
+
+    assert exc.value.exit_code == 1
+
+
 def test_evaluate_timing_summary_uses_accumulated_total_when_style_disables_timing(
     monkeypatch, tmp_path: Path
 ) -> None:
