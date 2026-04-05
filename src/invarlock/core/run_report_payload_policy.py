@@ -16,6 +16,10 @@ def build_run_report_context(
     run_policy_context = dict(run_section) if isinstance(run_section, dict) else {}
     eval_section = run_context.get("eval")
     eval_policy_context = dict(eval_section) if isinstance(eval_section, dict) else {}
+    primary_metric_section = run_context.get("primary_metric")
+    primary_metric_context = (
+        dict(primary_metric_section) if isinstance(primary_metric_section, dict) else {}
+    )
     assurance_section = run_context.get("assurance")
     return {
         "profile": profile_normalized,
@@ -25,6 +29,7 @@ def build_run_report_context(
         ),
         "run": run_policy_context,
         "eval": eval_policy_context,
+        "primary_metric": primary_metric_context,
     }
 
 

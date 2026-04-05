@@ -23,6 +23,10 @@ def test_build_run_report_context_splits_known_sections() -> None:
         run_context={
             "run": {"seed": 43},
             "eval": {"loss": {"resolved_type": "causal"}},
+            "primary_metric": {
+                "drift_band": {"min": 0.9, "max": 1.2},
+                "acceptance_range": {"min": 0.95, "max": 1.1},
+            },
             "assurance": {"policy": "strict"},
             "ignored": "x",
         },
@@ -34,6 +38,10 @@ def test_build_run_report_context_splits_known_sections() -> None:
         "assurance": {"policy": "strict"},
         "run": {"seed": 43},
         "eval": {"loss": {"resolved_type": "causal"}},
+        "primary_metric": {
+            "drift_band": {"min": 0.9, "max": 1.2},
+            "acceptance_range": {"min": 0.95, "max": 1.1},
+        },
     }
 
 

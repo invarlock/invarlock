@@ -173,6 +173,12 @@ def test_load_profile_overrides_returns_empty_for_non_mapping(monkeypatch) -> No
     assert at._load_profile_overrides("ci", config_root=None) == {}
 
 
+def test_packaged_ci_profile_exposes_drift_band_override() -> None:
+    overrides = at._load_profile_overrides("ci", config_root=None)
+
+    assert overrides["primary_metric"]["drift_band"] == {"min": 0.95, "max": 1.07}
+
+
 def test_tier_entry_to_policy_keeps_rmt_without_family_map() -> None:
     out = at._tier_entry_to_policy(
         {"rmt_guard": {"margin": 1.7, "epsilon_by_family": "bad"}}

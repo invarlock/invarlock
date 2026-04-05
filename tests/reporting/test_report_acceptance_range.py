@@ -36,3 +36,8 @@ def test_resolve_pm_acceptance_range_paths(monkeypatch):
         {"context": {"primary_metric": {"acceptance_range": {"min": 1.2, "max": 1.0}}}}
     )
     assert clamped == {"min": 1.2, "max": 1.2}
+
+    meta_fallback = policy.resolve_pm_acceptance_range_from_report(
+        {"meta": {"pm_acceptance_range": {"min": 0.96, "max": 1.08}}}
+    )
+    assert meta_fallback == {"min": 0.96, "max": 1.08}
