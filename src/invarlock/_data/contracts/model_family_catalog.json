@@ -112,7 +112,7 @@
         "configs/presets/causal_lm/phi4_reasoning_plus_512.yaml",
         "configs/calibration/null_sweep_phi4_reasoning_plus.yaml"
       ],
-      "notes": "Derived from support_matrix lane phi-4-text-causal-hf after the shipped text-only pilot closed with passing evaluate and verify evidence."
+      "notes": "Derived from support_matrix lane phi-4-text-causal-hf after the shipped text-only pilot closed with passing evaluate and verify evidence. Current HF runtime validation requires explicit trust_remote_code opt-in for this lane."
     },
     {
       "family_id": "gemma-4-e2b-text-causal-lm",

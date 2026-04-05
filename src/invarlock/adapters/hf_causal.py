@@ -55,6 +55,13 @@ def _has_set_attr(obj: Any, name: str) -> bool:
     return False
 
 
+def _resolve_norm(layer: Any, *candidates: str) -> tuple[str | None, Any | None]:
+    for name in candidates:
+        if _has_set_attr(layer, name):
+            return name, getattr(layer, name)
+    return None, None
+
+
 class _CausalSpec:
     spec_name = "base"
 
@@ -91,9 +98,18 @@ class _DenseDecoderSpec(_CausalSpec):
             and _has_set_attr(layer.mlp, "up_proj")
             and _has_set_attr(layer.mlp, "down_proj")
         )
-        has_norms = _has_set_attr(layer, "input_layernorm") and _has_set_attr(
-            layer, "post_attention_layernorm"
+        _pre_norm_name, pre_norm = _resolve_norm(
+            layer,
+            "input_layernorm",
+            "post_feedforward_layernorm",
+            "pre_feedforward_layernorm",
         )
+        _post_norm_name, post_norm = _resolve_norm(
+            layer,
+            "post_attention_layernorm",
+            "pre_attention_layernorm",
+        )
+        has_norms = pre_norm is not None and post_norm is not None
         return bool(has_attn and has_mlp and has_norms)
 
     def infer_mlp_dim(self, layer: Any, config: Any, hidden_size: int) -> int:
@@ -108,17 +124,35 @@ class _DenseDecoderSpec(_CausalSpec):
 
     def layer_modules(self, model: Any, layer: Any) -> dict[str, Any]:
         mlp = layer.mlp
-        return {
+        pre_norm_name, pre_norm = _resolve_norm(
+            layer,
+            "input_layernorm",
+            "post_feedforward_layernorm",
+            "pre_feedforward_layernorm",
+        )
+        post_norm_name, post_norm = _resolve_norm(
+            layer,
+            "post_attention_layernorm",
+            "pre_attention_layernorm",
+        )
+        modules = {
             "self_attn.q_proj": layer.self_attn.q_proj,
             "self_attn.k_proj": layer.self_attn.k_proj,
             "self_attn.v_proj": layer.self_attn.v_proj,
             "self_attn.o_proj": layer.self_attn.o_proj,
-            "input_layernorm": layer.input_layernorm,
-            "post_attention_layernorm": layer.post_attention_layernorm,
             "mlp.gate_proj": mlp.gate_proj,
             "mlp.up_proj": mlp.up_proj,
             "mlp.down_proj": mlp.down_proj,
         }
+        if pre_norm is not None:
+            modules["input_layernorm"] = pre_norm
+            if pre_norm_name and pre_norm_name != "input_layernorm":
+                modules[pre_norm_name] = pre_norm
+        if post_norm is not None:
+            modules["post_attention_layernorm"] = post_norm
+            if post_norm_name and post_norm_name != "post_attention_layernorm":
+                modules[post_norm_name] = post_norm
+        return modules
 
     def tying_map(self, model: Any, base: Any) -> dict[str, str]:
         tying: dict[str, str] = {}
@@ -133,6 +167,101 @@ class _DenseDecoderSpec(_CausalSpec):
         except Exception:
             pass
         return tying
+
+
+class _PhiDecoderSpec(_CausalSpec):
+    spec_name = "phi_decoder"
+
+    def matches(self, model: Any, base: Any, layers: Any) -> bool:
+        layer = _first_item(layers)
+        if layer is None:
+            return False
+        has_attn = (
+            hasattr(layer, "self_attn")
+            and _has_set_attr(layer.self_attn, "qkv_proj")
+            and _has_set_attr(layer.self_attn, "o_proj")
+        )
+        has_mlp = (
+            hasattr(layer, "mlp")
+            and _has_set_attr(layer.mlp, "gate_up_proj")
+            and _has_set_attr(layer.mlp, "down_proj")
+        )
+        has_norms = _has_set_attr(layer, "input_layernorm") and _has_set_attr(
+            layer, "post_attention_layernorm"
+        )
+        return bool(has_attn and has_mlp and has_norms)
+
+    def infer_mlp_dim(self, layer: Any, config: Any, hidden_size: int) -> int:
+        mlp_dim = int(getattr(config, "intermediate_size", hidden_size * 4) or 0)
+        try:
+            down_proj = getattr(getattr(layer, "mlp", None), "down_proj", None)
+            if down_proj is not None and hasattr(down_proj, "weight"):
+                mlp_dim = int(down_proj.weight.shape[1])
+            else:
+                gate_up_proj = getattr(
+                    getattr(layer, "mlp", None), "gate_up_proj", None
+                )
+                if gate_up_proj is not None and hasattr(gate_up_proj, "weight"):
+                    mlp_dim = int(gate_up_proj.weight.shape[0] // 2)
+        except Exception:
+            pass
+        return int(mlp_dim)
+
+    def layer_modules(self, model: Any, layer: Any) -> dict[str, Any]:
+        mlp = layer.mlp
+        return {
+            "self_attn.qkv_proj": layer.self_attn.qkv_proj,
+            "self_attn.o_proj": layer.self_attn.o_proj,
+            "input_layernorm": layer.input_layernorm,
+            "post_attention_layernorm": layer.post_attention_layernorm,
+            "mlp.gate_up_proj": mlp.gate_up_proj,
+            "mlp.down_proj": mlp.down_proj,
+        }
+
+    def tying_map(self, model: Any, base: Any) -> dict[str, str]:
+        return _DenseDecoderSpec().tying_map(model, base)
+
+
+class _Qwen35LinearDecoderSpec(_CausalSpec):
+    spec_name = "qwen35_linear_decoder"
+
+    def matches(self, model: Any, base: Any, layers: Any) -> bool:
+        layer = _first_item(layers)
+        if layer is None:
+            return False
+        has_attn = (
+            hasattr(layer, "linear_attn")
+            and _has_set_attr(layer.linear_attn, "in_proj_qkv")
+            and _has_set_attr(layer.linear_attn, "out_proj")
+        )
+        has_mlp = (
+            hasattr(layer, "mlp")
+            and _has_set_attr(layer.mlp, "gate_proj")
+            and _has_set_attr(layer.mlp, "up_proj")
+            and _has_set_attr(layer.mlp, "down_proj")
+        )
+        has_norms = _has_set_attr(layer, "input_layernorm") and _has_set_attr(
+            layer, "post_attention_layernorm"
+        )
+        return bool(has_attn and has_mlp and has_norms)
+
+    def infer_mlp_dim(self, layer: Any, config: Any, hidden_size: int) -> int:
+        return _DenseDecoderSpec().infer_mlp_dim(layer, config, hidden_size)
+
+    def layer_modules(self, model: Any, layer: Any) -> dict[str, Any]:
+        mlp = layer.mlp
+        return {
+            "linear_attn.in_proj_qkv": layer.linear_attn.in_proj_qkv,
+            "linear_attn.out_proj": layer.linear_attn.out_proj,
+            "input_layernorm": layer.input_layernorm,
+            "post_attention_layernorm": layer.post_attention_layernorm,
+            "mlp.gate_proj": mlp.gate_proj,
+            "mlp.up_proj": mlp.up_proj,
+            "mlp.down_proj": mlp.down_proj,
+        }
+
+    def tying_map(self, model: Any, base: Any) -> dict[str, str]:
+        return _DenseDecoderSpec().tying_map(model, base)
 
 
 class _MoEDecoderSpec(_CausalSpec):
@@ -251,6 +380,8 @@ class _GPT2LikeDecoderSpec(_CausalSpec):
 
 _SPECS: list[_CausalSpec] = [
     _MoEDecoderSpec(),
+    _PhiDecoderSpec(),
+    _Qwen35LinearDecoderSpec(),
     _DenseDecoderSpec(),
     _GPT2LikeDecoderSpec(),
 ]
