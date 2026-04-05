@@ -48,6 +48,47 @@ class RTNQuantEdit(ModelEdit):
     name = "quant_rtn"
 
     @staticmethod
+    def _normalize_per_channel_option(value: Any, *, default: bool = True) -> bool:
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"1", "true", "yes", "on"}:
+                return True
+            if normalized in {"0", "false", "no", "off"}:
+                return False
+        raise ValueError(
+            "RTNQuantEdit expects per_channel to be a boolean-compatible value."
+        )
+
+    @staticmethod
+    def _normalize_module_selectors(
+        module_selectors: Any,
+    ) -> dict[str, list[str]]:
+        if not isinstance(module_selectors, dict):
+            return {}
+
+        normalized: dict[str, list[str]] = {}
+        for key, values in module_selectors.items():
+            if not isinstance(key, str):
+                continue
+            if isinstance(values, str):
+                cleaned = [values.strip()] if values.strip() else []
+            elif isinstance(values, list | tuple | set):
+                cleaned = [
+                    str(item).strip()
+                    for item in values
+                    if isinstance(item, str) and str(item).strip()
+                ]
+            else:
+                cleaned = []
+            if cleaned:
+                normalized[key.strip().lower()] = cleaned
+        return normalized
+
+    @staticmethod
     def _validate_options(
         *,
         bitwidth: int,
@@ -75,6 +116,7 @@ class RTNQuantEdit(ModelEdit):
         seed: int = 42,
         guard_chain: GuardChain | None = None,
         max_modules: int | None = None,
+        module_selectors: dict[str, list[str]] | None = None,
     ):
         """
         Initialize RTN quantization edit.
@@ -95,13 +137,16 @@ class RTNQuantEdit(ModelEdit):
         )
 
         self.bitwidth = bitwidth
-        self.per_channel = per_channel  # Always True
+        self.per_channel = self._normalize_per_channel_option(
+            per_channel, default=True
+        )
         self.group_size = group_size
         self.clamp_ratio = clamp_ratio
         self.scope = scope
         self.seed = seed
         self.guard_chain = guard_chain
         self.max_modules = max_modules
+        self.module_selectors = self._normalize_module_selectors(module_selectors)
 
         # group_size is currently reserved for potential future variants; it is
         # ignored for the built-in INT8 demo edit.
@@ -170,6 +215,8 @@ class RTNQuantEdit(ModelEdit):
             "quantization_stats": quant_stats,
             "anti_tying_map": self._get_weight_tying_map(model),
         }
+        if self.module_selectors:
+            plan["module_selectors"] = dict(self.module_selectors)
         if (
             isinstance(self.max_modules, int)
             and self.max_modules > 0
@@ -242,6 +289,8 @@ class RTNQuantEdit(ModelEdit):
             "scope",
             "seed",
             "max_modules",
+            "module_selectors",
+            "per_channel",
         }
         unexpected = sorted(set(plan_data) - supported_keys)
         if unexpected:
@@ -253,6 +302,15 @@ class RTNQuantEdit(ModelEdit):
         clamp_ratio = float(plan_data.get("clamp_ratio", self.clamp_ratio))
         scope = str(plan_data.get("scope", self.scope))
         seed = int(plan_data.get("seed", self.seed))
+        per_channel = self._normalize_per_channel_option(
+            plan_data.get("per_channel", self.per_channel),
+            default=self.per_channel,
+        )
+        if not per_channel:
+            raise ValueError("RTNQuantEdit only supports per_channel=True.")
+        module_selectors = self._normalize_module_selectors(
+            plan_data.get("module_selectors", self.module_selectors)
+        )
         raw_max_modules = plan_data.get("max_modules", self.max_modules)
         max_modules = (
             int(raw_max_modules)
@@ -268,13 +326,14 @@ class RTNQuantEdit(ModelEdit):
 
         active_edit = RTNQuantEdit(
             bitwidth=bitwidth,
-            per_channel=self.per_channel,
+            per_channel=per_channel,
             group_size=group_size,
             clamp_ratio=clamp_ratio,
             scope=scope,
             seed=seed,
             guard_chain=self.guard_chain,
             max_modules=max_modules,
+            module_selectors=module_selectors,
         )
 
         # Set deterministic seed
@@ -385,10 +444,13 @@ class RTNQuantEdit(ModelEdit):
             "group_size": group_size,
             "clamp_ratio": clamp_ratio,
             "seed": seed,
+            "per_channel": per_channel,
             "total_modules_quantized": len(modules_quantized),
             "total_params_quantized": total_params_quantized,
             "modules_quantized": modules_quantized,
         }
+        if module_selectors:
+            edit_plan["module_selectors"] = module_selectors
 
         # Return in the standard format expected by the framework
         return {
@@ -410,6 +472,7 @@ class RTNQuantEdit(ModelEdit):
     def _identify_target_modules(self, model: nn.Module) -> list[tuple[str, nn.Module]]:
         """Identify target modules based on scope configuration."""
         target_modules = []
+        selector_patterns = self._selector_patterns_for_scope()
 
         for name, module in model.named_modules():
             # Check for both Linear and Conv1D (GPT-2 uses Conv1D)
@@ -438,7 +501,10 @@ class RTNQuantEdit(ModelEdit):
                     "intermediate.dense",
                     "output.dense",
                 ]
-                if any(pattern in name.lower() for pattern in ffn_patterns):
+                if any(
+                    pattern in name.lower()
+                    for pattern in tuple(ffn_patterns) + tuple(selector_patterns)
+                ):
                     should_include = True
             elif self.scope == "attn":
                 # Attention layers - be more permissive with pattern matching
@@ -452,7 +518,10 @@ class RTNQuantEdit(ModelEdit):
                     "o_proj",
                     "attn",
                 ]
-                if any(pattern in name.lower() for pattern in attn_patterns):
+                if any(
+                    pattern in name.lower()
+                    for pattern in tuple(attn_patterns) + tuple(selector_patterns)
+                ):
                     should_include = True
             elif self.scope == "all":
                 # All linear layers above a minimum size threshold
@@ -463,6 +532,25 @@ class RTNQuantEdit(ModelEdit):
                 target_modules.append((name, module))
 
         return target_modules
+
+    def _selector_patterns_for_scope(self) -> tuple[str, ...]:
+        if not self.module_selectors:
+            return ()
+        if self.scope == "ffn":
+            keys = ("ffn", "feed_forward")
+        elif self.scope == "attn":
+            keys = ("attn", "attention")
+        else:
+            keys = tuple(self.module_selectors.keys())
+        patterns: list[str] = []
+        seen: set[str] = set()
+        for key in keys:
+            for value in self.module_selectors.get(key, []):
+                normalized = str(value).strip().lower()
+                if normalized and normalized not in seen:
+                    patterns.append(normalized)
+                    seen.add(normalized)
+        return tuple(patterns)
 
     def _get_module_by_name(self, model: nn.Module, name: str) -> nn.Module | None:
         """Get module by dotted name."""

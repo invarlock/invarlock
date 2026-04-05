@@ -257,6 +257,66 @@ def test_execute_run_request_reports_missing_baseline_windows(
     assert failure_codes == ["baseline_windows_missing", "pipeline_failed"]
 
 
+def test_execute_run_request_halts_before_report_assembly_when_guarded_run_fails(
+    monkeypatch, tmp_path: Path
+) -> None:
+    config = _Config()
+    _install_common_monkeypatches(monkeypatch)
+    persist_calls: list[object] = []
+    assemble_calls: list[object] = []
+    base_services = _make_services(tmp_path, config)
+    services = RunExecutionServices(
+        **{
+            **base_services.__dict__,
+            "execute_guarded_run": lambda **_kwargs: (
+                SimpleNamespace(
+                    edit={},
+                    metrics={},
+                    guards={},
+                    context={},
+                    evaluation_windows={},
+                    status="failed",
+                    error="[INVARLOCK:E321] RTN quantization matched no target modules.",
+                ),
+                object(),
+            ),
+            "assemble_run_report": lambda **_kwargs: (
+                assemble_calls.append(object()),
+                base_services.assemble_run_report(**_kwargs),
+            )[1],
+            "persist_run_report_outputs": lambda **_kwargs: (
+                persist_calls.append(object()),
+                base_services.persist_run_report_outputs(**_kwargs),
+            )[1],
+        }
+    )
+
+    outcome = execute_run_request(
+        RunExecutionRequest(
+            config=str(tmp_path / "config.yaml"),
+            device="cpu",
+            profile="dev",
+        ),
+        services=services,
+    )
+
+    failure_codes = [
+        event.failure.code
+        for event in outcome.events
+        if isinstance(event, RunFailureEvent)
+    ]
+    assert outcome.ok is False
+    assert outcome.result is None
+    assert outcome.failure is not None
+    assert (
+        outcome.failure.summary
+        == "[INVARLOCK:E321] RTN quantization matched no target modules."
+    )
+    assert failure_codes == ["pipeline_failed"]
+    assert assemble_calls == []
+    assert persist_calls == []
+
+
 def test_execute_run_request_emits_export_and_guard_overhead_failure(
     monkeypatch, tmp_path: Path
 ) -> None:

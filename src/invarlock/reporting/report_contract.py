@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from pathlib import Path
 from typing import Any, cast
 
@@ -29,6 +30,113 @@ class ReportGenerationResult:
 def load_report_payload(path: str | Path) -> RunReport:
     _, payload = load_report_input_json(path)
     return cast(RunReport, payload)
+
+
+def _is_non_bool_finite_number(value: Any) -> bool:
+    try:
+        if isinstance(value, bool):
+            return False
+        return math.isfinite(float(value))
+    except (OverflowError, TypeError, ValueError):
+        return False
+
+
+def _describe_run_report_health_error(
+    report: RunReport | dict[str, Any] | None,
+    *,
+    role: str,
+) -> str | None:
+    if not isinstance(report, dict):
+        return None
+
+    status = report.get("status")
+    if isinstance(status, str):
+        normalized_status = status.strip().lower()
+        if normalized_status in {"failed", "error"}:
+            return (
+                f"Cannot generate evaluation report from {role} run report with "
+                f"status '{status}'."
+            )
+
+    metrics = report.get("metrics")
+    if not isinstance(metrics, dict):
+        return None
+    primary_metric = metrics.get("primary_metric")
+    if not isinstance(primary_metric, dict) or not primary_metric:
+        return None
+
+    degraded_reason = primary_metric.get("degraded_reason")
+    reason_suffix = (
+        f" ({degraded_reason})"
+        if isinstance(degraded_reason, str) and degraded_reason.strip()
+        else ""
+    )
+    if bool(primary_metric.get("invalid")) or bool(primary_metric.get("degraded")):
+        return (
+            f"Cannot generate evaluation report from {role} run report with "
+            f"degraded primary metric{reason_suffix}."
+        )
+
+    for field_name in ("preview", "final", "ratio_vs_baseline"):
+        if field_name not in primary_metric:
+            continue
+        field_value = primary_metric.get(field_name)
+        if field_value is None:
+            continue
+        if not _is_non_bool_finite_number(field_value):
+            return (
+                f"Cannot generate evaluation report from {role} run report with "
+                f"non-finite primary metric field '{field_name}'."
+            )
+
+    return None
+
+
+def _assert_report_can_generate_evaluation(
+    report: RunReport | dict[str, Any] | None,
+    *,
+    role: str,
+) -> None:
+    health_error = _describe_run_report_health_error(report, role=role)
+    if health_error is not None:
+        raise ValueError(health_error)
+
+
+def _assert_evaluation_report_is_finite(
+    evaluation_report: dict[str, Any] | None,
+) -> None:
+    if not isinstance(evaluation_report, dict):
+        raise ValueError("Generated evaluation report is missing or malformed.")
+
+    primary_metric = evaluation_report.get("primary_metric")
+    if not isinstance(primary_metric, dict) or not primary_metric:
+        raise ValueError(
+            "Generated evaluation report is missing a primary_metric block."
+        )
+
+    degraded_reason = primary_metric.get("degraded_reason")
+    reason_suffix = (
+        f" ({degraded_reason})"
+        if isinstance(degraded_reason, str) and degraded_reason.strip()
+        else ""
+    )
+    if bool(primary_metric.get("invalid")) or bool(primary_metric.get("degraded")):
+        raise ValueError(
+            "Generated evaluation report contains a degraded primary metric"
+            f"{reason_suffix}."
+        )
+
+    for field_name in ("preview", "final", "ratio_vs_baseline"):
+        if field_name not in primary_metric:
+            continue
+        field_value = primary_metric.get(field_name)
+        if field_value is None:
+            continue
+        if not _is_non_bool_finite_number(field_value):
+            raise ValueError(
+                "Generated evaluation report contains non-finite primary metric "
+                f"field '{field_name}'."
+            )
 
 
 def generate_reports(
@@ -70,7 +178,10 @@ def generate_reports(
     evaluation_report: dict[str, Any] | None = None
     validation_block: dict[str, Any] | None = None
     if "report" in formats and baseline_report is not None:
+        _assert_report_can_generate_evaluation(primary_report, role="subject")
+        _assert_report_can_generate_evaluation(baseline_report, role="baseline")
         evaluation_report = make_report(primary_report, baseline_report)
+        _assert_evaluation_report_is_finite(evaluation_report)
         validate_report(evaluation_report)
         validation_block = compute_console_validation_block(evaluation_report)
 

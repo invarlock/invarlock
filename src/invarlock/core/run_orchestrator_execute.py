@@ -1141,6 +1141,21 @@ def execute_run_request_impl(
                     continue
                 _halt("snapshot_restore_failed", error=exc)
 
+            core_status = str(getattr(core_report, "status", "") or "").strip().lower()
+            if core_status in {"failed", "error"}:
+                core_error = str(getattr(core_report, "error", "") or "").strip()
+                if not core_error:
+                    core_error = (
+                        "Guarded run failed before report assembly "
+                        f"(status: {core_status})."
+                    )
+                _halt(
+                    "pipeline_failed",
+                    summary=core_error,
+                    status=core_status,
+                    phase="guarded_run",
+                )
+
             debug_metric_diffs_enabled = str(
                 os.environ.get("DEBUG_METRIC_DIFFS", "")
             ).strip().lower() in {"1", "true", "yes", "on"}

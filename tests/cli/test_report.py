@@ -91,12 +91,28 @@ def test_report_command_evaluation_report_with_baseline(
     run = {
         "meta": {"model_id": "gpt2"},
         "edit": {"name": "quant_rtn"},
-        "metrics": {"ppl_ratio": 1.05},
+        "metrics": {
+            "ppl_ratio": 1.05,
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.5,
+                "ratio_vs_baseline": 1.05,
+            },
+        },
     }
     baseline = {
         "meta": {"model_id": "gpt2"},
         "edit": {"name": "baseline"},
-        "metrics": {"ppl_ratio": 1.0},
+        "metrics": {
+            "ppl_ratio": 1.0,
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+                "ratio_vs_baseline": 1.0,
+            },
+        },
     }
 
     def side(path):
@@ -104,7 +120,15 @@ def test_report_command_evaluation_report_with_baseline(
 
     mock_load.side_effect = side
     mock_save_bundle.return_value = {"report": "evaluation.report.json"}
-    mock_cert.return_value = {"validation": {"safety_check": True}}
+    mock_cert.return_value = {
+        "validation": {"safety_check": True},
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "preview": 10.0,
+            "final": 10.5,
+            "ratio_vs_baseline": 1.05,
+        },
+    }
     mock_validate.return_value = True
 
     generate_reports(
@@ -116,6 +140,158 @@ def test_report_command_evaluation_report_with_baseline(
     )
     mock_cert.assert_called_once()
     mock_validate.assert_called_once()
+
+
+@patch("invarlock.reporting.report_contract.load_report_payload")
+@patch("invarlock.reporting.report_contract.make_report")
+def test_report_command_rejects_non_finite_subject_primary_metric(
+    mock_make_report, mock_load
+):
+    run = {
+        "meta": {"model_id": "gpt2"},
+        "edit": {"name": "quant_rtn"},
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": float("nan"),
+                "final": float("nan"),
+                "ratio_vs_baseline": float("nan"),
+            }
+        },
+    }
+    baseline = {
+        "meta": {"model_id": "gpt2"},
+        "edit": {"name": "baseline"},
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+                "ratio_vs_baseline": 1.0,
+            }
+        },
+    }
+
+    mock_load.side_effect = lambda path: baseline if "baseline" in path else run
+
+    with pytest.raises(
+        ValueError,
+        match="subject run report with non-finite primary metric field 'preview'",
+    ):
+        generate_reports(
+            run="run.json",
+            format="report",
+            compare=None,
+            baseline="baseline.json",
+            output=None,
+        )
+
+    mock_make_report.assert_not_called()
+
+
+@patch("invarlock.reporting.report_contract.load_report_payload")
+@patch("invarlock.reporting.report_contract.make_report")
+def test_report_command_rejects_failed_subject_run_report(
+    mock_make_report, mock_load
+):
+    run = {
+        "meta": {"model_id": "gpt2"},
+        "status": "failed",
+        "edit": {"name": "quant_rtn"},
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.5,
+                "ratio_vs_baseline": 1.05,
+            }
+        },
+    }
+    baseline = {
+        "meta": {"model_id": "gpt2"},
+        "edit": {"name": "baseline"},
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+                "ratio_vs_baseline": 1.0,
+            }
+        },
+    }
+
+    mock_load.side_effect = lambda path: baseline if "baseline" in path else run
+
+    with pytest.raises(
+        ValueError,
+        match="subject run report with status 'failed'",
+    ):
+        generate_reports(
+            run="run.json",
+            format="report",
+            compare=None,
+            baseline="baseline.json",
+            output=None,
+        )
+
+    mock_make_report.assert_not_called()
+
+
+@patch("invarlock.reporting.report_contract.load_report_payload")
+@patch("invarlock.reporting.report_contract.save_evaluation_bundle")
+@patch("invarlock.reporting.report_contract.make_report")
+def test_report_command_rejects_non_finite_generated_evaluation_report(
+    mock_make_report, mock_save_bundle, mock_load
+):
+    run = {
+        "meta": {"model_id": "gpt2"},
+        "edit": {"name": "quant_rtn"},
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.5,
+                "ratio_vs_baseline": 1.05,
+            }
+        },
+    }
+    baseline = {
+        "meta": {"model_id": "gpt2"},
+        "edit": {"name": "baseline"},
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+                "ratio_vs_baseline": 1.0,
+            }
+        },
+    }
+
+    mock_load.side_effect = lambda path: baseline if "baseline" in path else run
+    mock_make_report.return_value = {
+        "validation": {"safety_check": True},
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "preview": 10.0,
+            "final": float("nan"),
+            "ratio_vs_baseline": float("nan"),
+        },
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="Generated evaluation report contains non-finite primary metric field",
+    ):
+        generate_reports(
+            run="run.json",
+            format="report",
+            compare=None,
+            baseline="baseline.json",
+            output=None,
+        )
+
+    mock_save_bundle.assert_not_called()
 
 
 def test_load_run_report_file(tmp_path: Path):
