@@ -477,6 +477,60 @@ def test_evaluate_ci_nonfinite_primary_metric_exits(monkeypatch, tmp_path):
     assert exc.value.exit_code == 9
 
 
+def test_evaluate_ci_nonfinite_primary_metric_skips_report_generation(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+
+    baseline_report = _write_json(tmp_path / "baseline.json", {})
+    edited_report = _write_json(
+        tmp_path / "edited.json",
+        {
+            "status": "rollback",
+            "meta": {"device": "cpu", "adapter": "hf_causal"},
+            "edit": {"name": "quant_rtn"},
+            "metrics": {
+                "primary_metric": {
+                    "preview": 1.0,
+                    "final": float("nan"),
+                    "ratio_vs_baseline": float("nan"),
+                }
+            },
+        },
+    )
+    report_calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        run_mod,
+        "run_command",
+        _fake_run_command_with_paths(
+            {"source": baseline_report, "edited": edited_report}
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        mod,
+        "generate_reports",
+        lambda **kwargs: report_calls.append(kwargs),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        mod, "resolve_command_exit_code", lambda err, profile: 9, raising=False
+    )
+
+    with pytest.raises(click.exceptions.Exit) as exc:
+        mod.evaluate_command(
+            baseline=str(src),
+            subject=str(edt),
+            adapter="hf_causal",
+            out=str(Path("runs")),
+            profile="ci",
+        )
+
+    assert exc.value.exit_code == 9
+    assert report_calls == []
+
+
 def test_evaluate_ci_nonfinite_primary_metric_handles_float_cast_failure(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -567,6 +621,49 @@ def test_evaluate_missing_edited_report_exits(monkeypatch, tmp_path: Path):
             adapter="hf_causal",
             out=str(runs),
         )
+
+
+def test_evaluate_failed_edited_run_report_exits_before_report_generation(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+
+    baseline_report = _write_json(tmp_path / "baseline.json", {})
+    edited_report = _write_json(
+        tmp_path / "edited.json",
+        {
+            "status": "failed",
+            "error": "[INVARLOCK:E321] RTN quantization matched no target modules.",
+        },
+    )
+    report_calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        run_mod,
+        "run_command",
+        _fake_run_command_with_paths(
+            {"source": baseline_report, "edited": edited_report}
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        mod,
+        "generate_reports",
+        lambda **kwargs: report_calls.append(kwargs),
+        raising=False,
+    )
+
+    with pytest.raises(click.exceptions.Exit) as exc:
+        mod.evaluate_command(
+            baseline=str(src),
+            subject=str(edt),
+            adapter="hf_causal",
+            out=str(Path("runs")),
+            profile="dev",
+        )
+
+    assert exc.value.exit_code == 1
+    assert report_calls == []
 
 
 def test_evaluate_edit_config_missing_exits(monkeypatch, tmp_path: Path):
@@ -1244,7 +1341,7 @@ def test_evaluate_prints_timing_summary_when_requested(
     assert order[-1] == ("Total", "total")
 
 
-def test_evaluate_degraded_primary_metric_emits_report_and_exits(
+def test_evaluate_degraded_primary_metric_exits_without_report_generation(
     monkeypatch, tmp_path: Path
 ) -> None:
     src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
@@ -1296,8 +1393,7 @@ def test_evaluate_degraded_primary_metric_emits_report_and_exits(
         )
 
     assert exc.value.exit_code == 7
-    assert len(report_calls) == 1
-    assert report_calls[0]["run"] == str(edited_report)
+    assert report_calls == []
 
 
 def test_evaluate_quiet_summary_skips_primary_metric_line_when_ratio_missing(

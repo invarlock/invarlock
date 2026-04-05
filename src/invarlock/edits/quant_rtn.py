@@ -31,6 +31,7 @@ from invarlock.core.api import (
     ModelAdapter,
     ModelEdit,
 )
+from invarlock.core.exceptions import EditError
 
 __all__ = ["RTNQuantEdit"]
 
@@ -286,6 +287,20 @@ class RTNQuantEdit(ModelEdit):
         if max_modules is not None:
             if max_modules < total_identified:
                 target_modules = target_modules[:max_modules]
+        if not target_modules:
+            raise EditError(
+                code="E321",
+                message=(
+                    "RTN quantization matched no target modules for the current "
+                    "model and scope."
+                ),
+                details={
+                    "scope": scope,
+                    "bitwidth": bitwidth,
+                    "max_modules": max_modules,
+                    "identified_modules": total_identified,
+                },
+            )
 
         tying_map = active_edit._get_weight_tying_map(model)
 
@@ -315,6 +330,17 @@ class RTNQuantEdit(ModelEdit):
             quant_result["module_name"] = module_name
             quantization_results.append(quant_result)
             total_params_quantized += quant_result["params_quantized"]
+        if not quantization_results or total_params_quantized <= 0:
+            raise EditError(
+                code="E322",
+                message="RTN quantization completed without changing any parameters.",
+                details={
+                    "scope": scope,
+                    "bitwidth": bitwidth,
+                    "max_modules": max_modules,
+                    "identified_modules": total_identified,
+                },
+            )
 
         # Execute GuardChain after edit (if provided)
         if active_edit.guard_chain is not None:

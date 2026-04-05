@@ -617,6 +617,35 @@ def evaluate_command(
         _fail(str(getattr(exc, "message", exc)), exit_code=1)
     _debug(f"Edited report: {edited_report}")
 
+    try:
+        with Path(edited_report).open("r", encoding="utf-8") as fh:
+            edited_payload = json.load(fh)
+    except _QUIET_REPORT_LOAD_ERRORS as exc:
+        print_event(
+            console,
+            "FAIL",
+            f"Failed to read edited report: {exc}",
+            style=output_style,
+            emoji="❌",
+        )
+        raise typer.Exit(1) from exc
+    if not isinstance(edited_payload, dict):
+        _fail("Edited run returned a non-object report payload.", exit_code=1)
+
+    edited_status = str(edited_payload.get("status") or "").strip().lower()
+    if edited_status == "failed":
+        failure_detail = edited_payload.get("error")
+        failure_suffix = (
+            f" {failure_detail}"
+            if isinstance(failure_detail, str) and failure_detail.strip()
+            else ""
+        )
+        _fail(
+            "Edited run failed before evaluation report generation."
+            f"{failure_suffix}",
+            exit_code=1,
+        )
+
     _phase(3, 3, "EVALUATION REPORT GENERATION")
 
     def _emit_evaluation_report() -> None:
@@ -678,19 +707,6 @@ def evaluate_command(
     except _TEXT_NORMALIZATION_ERRORS:
         prof = ""
     if prof in {"ci", "ci_cpu", "release"}:
-        try:
-            with Path(edited_report).open("r", encoding="utf-8") as fh:
-                edited_payload = json.load(fh)
-        except _QUIET_REPORT_LOAD_ERRORS as exc:
-            print_event(
-                console,
-                "FAIL",
-                f"Failed to read edited report: {exc}",
-                style=output_style,
-                emoji="❌",
-            )
-            raise typer.Exit(1) from exc
-
         outcome = apply_edited_primary_metric_policy(
             edited_payload,
             profile=profile,
@@ -703,7 +719,6 @@ def evaluate_command(
                 style=output_style,
                 emoji="⚠️",
             )
-            _emit_evaluation_report()
             raise typer.Exit(resolve_command_exit_code(outcome.error, profile=profile))
 
     _emit_evaluation_report()

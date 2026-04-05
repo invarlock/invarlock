@@ -3,6 +3,7 @@ import torch
 
 import invarlock.edits.quant_rtn as quant_rtn_mod
 from invarlock.core.api import EditRuntime
+from invarlock.core.exceptions import EditError
 from invarlock.edits.quant_rtn import RTNQuantEdit
 
 
@@ -59,7 +60,7 @@ def test_quant_rtn_module_has_no_functional_apply_shim() -> None:
 
 
 def test_quant_rtn_output_format(caplog: pytest.LogCaptureFixture) -> None:
-    model = torch.nn.Linear(4, 4, bias=False)
+    model = torch.nn.Linear(16, 16, bias=False)
     adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
     edit = RTNQuantEdit(scope="all", max_modules=1)
     with caplog.at_level("INFO", logger="invarlock.edits.quant_rtn"):
@@ -76,7 +77,7 @@ def test_quant_rtn_output_format(caplog: pytest.LogCaptureFixture) -> None:
 def test_quant_rtn_emit_flag_suppresses_output(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    model = torch.nn.Linear(2, 2, bias=False)
+    model = torch.nn.Linear(10, 10, bias=False)
     adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
     edit = RTNQuantEdit(scope="all", max_modules=1)
     with caplog.at_level("INFO", logger="invarlock.edits.quant_rtn"):
@@ -91,7 +92,7 @@ def test_quant_rtn_emit_flag_suppresses_output(
 
 
 def test_quant_rtn_logs_when_console_missing(caplog: pytest.LogCaptureFixture) -> None:
-    model = torch.nn.Linear(2, 2, bias=False)
+    model = torch.nn.Linear(10, 10, bias=False)
     adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
     edit = RTNQuantEdit(scope="all", max_modules=1)
 
@@ -122,6 +123,19 @@ def test_quant_rtn_apply_rejects_non_int8_bitwidth_override() -> None:
 
     with pytest.raises(ValueError, match="only supports 8-bit quantization"):
         edit.apply(model, adapter, plan={"bitwidth": 4})
+
+
+def test_quant_rtn_apply_fails_closed_when_no_target_modules(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model = torch.nn.Linear(2, 2, bias=False)
+    adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
+    edit = RTNQuantEdit(scope="attn", max_modules=1)
+
+    monkeypatch.setattr(RTNQuantEdit, "_identify_target_modules", lambda *_args: [])
+
+    with pytest.raises(EditError, match="matched no target modules"):
+        edit.apply(model, adapter, plan={"scope": "attn", "max_modules": 1})
 
 
 def test_quant_rtn_preview_propagates_unexpected_errors(
