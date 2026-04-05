@@ -485,8 +485,9 @@ def test_build_container_command_raises_when_no_engine_is_available(
         runtime_security.build_container_command(_plan(["evaluate", "--help"]))
 
 
+@pytest.mark.parametrize("engine", ["docker", "podman"])
 def test_build_container_command_uses_launch_plan_and_deduplicates_mounts(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, engine: str
 ) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
@@ -497,7 +498,7 @@ def test_build_container_command_uses_launch_plan_and_deduplicates_mounts(
     monkeypatch.setattr(
         runtime_security_helpers,
         "resolve_container_engine",
-        lambda: "docker",
+        lambda: engine,
         raising=True,
     )
     monkeypatch.setattr(
@@ -545,7 +546,7 @@ def test_build_container_command_uses_launch_plan_and_deduplicates_mounts(
         )
     )
 
-    assert command[:3] == ["docker", "run", "--rm"]
+    assert command[:3] == [engine, "run", "--rm"]
     assert "--gpus" in command
     assert "all" in command
     assert "--network" in command

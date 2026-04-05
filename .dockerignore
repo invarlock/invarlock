@@ -1,0 +1,10 @@
+**
+!.dockerignore
+!requirements/
+!requirements/workflows/
+!requirements/workflows/runtime-image-py312.txt
+!requirements/workflows/runtime-image-py312-aarch64.txt
+!runtime/
+!runtime/Dockerfile
+!src/
+!src/**

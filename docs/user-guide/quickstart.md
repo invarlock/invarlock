@@ -27,6 +27,10 @@ pip install "invarlock[hf]"
 # Repo checkout only: build the local runtime image once for attested runs
 make runtime-image
 
+# Podman users can prepare the same image explicitly with Podman
+make runtime-image-podman
+make runtime-smoke-podman
+
 invarlock doctor
 ```
 

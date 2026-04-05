@@ -30,6 +30,16 @@ def test_runtime_dockerfile_installs_hf_stack() -> None:
     assert "PYTHONPATH=/opt/invarlock/src" in text
 
 
+def test_runtime_dockerignore_limits_context_to_runtime_inputs() -> None:
+    text = (Path.cwd() / ".dockerignore").read_text(encoding="utf-8")
+
+    assert "**" in text
+    assert "!runtime/Dockerfile" in text
+    assert "!requirements/workflows/runtime-image-py312.txt" in text
+    assert "!requirements/workflows/runtime-image-py312-aarch64.txt" in text
+    assert "!src/**" in text
+
+
 def test_runtime_image_x86_requirements_are_hash_locked_cpu_only() -> None:
     text = (
         Path.cwd() / "requirements" / "workflows" / "runtime-image-py312.txt"

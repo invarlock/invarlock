@@ -232,12 +232,25 @@ def test_inspect_container_image_handles_failures_and_digestless_images(
 
 
 def test_container_engine_and_device_helpers(monkeypatch) -> None:
+    monkeypatch.setenv(runtime_security.CONTAINER_ENGINE_ENV, "podman")
+    monkeypatch.setattr(
+        runtime_security.shutil,
+        "which",
+        lambda name: f"/usr/bin/{name}" if name in {"docker", "podman"} else None,
+        raising=True,
+    )
+    assert runtime_security.resolve_container_engine() == "podman"
+
+    monkeypatch.setenv(runtime_security.CONTAINER_ENGINE_ENV, "bogus")
     monkeypatch.setattr(
         runtime_security.shutil,
         "which",
         lambda name: "/usr/bin/podman" if name == "podman" else None,
         raising=True,
     )
+    assert runtime_security.resolve_container_engine() is None
+
+    monkeypatch.delenv(runtime_security.CONTAINER_ENGINE_ENV, raising=False)
     assert runtime_security.resolve_container_engine() == "podman"
 
     assert runtime_launch_plan._requested_device(["evaluate"]) == "auto"

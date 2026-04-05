@@ -218,14 +218,15 @@ def test_container_launch_uses_runtime_image_entrypoint(
     assert "python" not in command[command.index("invarlock-runtime:local") + 1 :]
 
 
+@pytest.mark.parametrize("engine", ["docker", "podman"])
 def test_container_launch_adds_gpu_passthrough_for_cuda_model_commands(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, engine: str
 ) -> None:
     monkeypatch.setenv("INVARLOCK_ALLOW_NETWORK", "0")
     monkeypatch.setattr(
         runtime_security_helpers,
         "resolve_container_engine",
-        lambda: "docker",
+        lambda: engine,
         raising=True,
     )
     monkeypatch.setattr(
@@ -255,7 +256,26 @@ def test_container_launch_adds_gpu_passthrough_for_cuda_model_commands(
 
     command = _build_container_command(["evaluate", "--device", "cuda", "--help"])
 
-    assert command[:5] == ["docker", "run", "--rm", "--gpus", "all"]
+    assert command[:5] == [engine, "run", "--rm", "--gpus", "all"]
+
+
+def test_container_launch_forwards_gpu_pinning_env_vars(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _stub_container_launch(monkeypatch)
+    monkeypatch.setattr(
+        runtime_launch_plan,
+        "_host_nvidia_visible",
+        lambda: True,
+        raising=True,
+    )
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "1")
+    monkeypatch.setenv("NVIDIA_VISIBLE_DEVICES", "1")
+
+    command = _build_container_command(["evaluate", "--device", "cuda", "--help"])
+
+    assert _env_value(command, "CUDA_VISIBLE_DEVICES") == "1"
+    assert _env_value(command, "NVIDIA_VISIBLE_DEVICES") == "1"
 
 
 def test_container_launch_skips_gpu_passthrough_for_cpu_model_commands(

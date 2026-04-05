@@ -22,6 +22,7 @@ ALLOW_REMOTE_CODE_ENV = "INVARLOCK_ALLOW_REMOTE_CODE"
 ALLOW_THIRD_PARTY_PLUGINS_ENV = "INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS"
 ALLOW_UNATTESTED_ARTIFACTS_ENV = "INVARLOCK_ALLOW_UNATTESTED_ARTIFACTS"
 CONTAINER_EXECUTION_ENV = "INVARLOCK_CONTAINER_EXECUTION"
+CONTAINER_ENGINE_ENV = "INVARLOCK_CONTAINER_ENGINE"
 RUNTIME_IMAGE_ENV = "INVARLOCK_RUNTIME_IMAGE"
 RUNTIME_IMAGE_DIGEST_ENV = "INVARLOCK_RUNTIME_IMAGE_DIGEST"
 RUNTIME_MANIFEST_FILENAME = "runtime.manifest.json"
@@ -44,6 +45,7 @@ __all__ = [
     "RuntimeManifestExecution",
     "RuntimeSecurityPolicy",
     "CONTAINER_EXECUTION_ENV",
+    "CONTAINER_ENGINE_ENV",
     "RUNTIME_IMAGE_ENV",
     "RUNTIME_IMAGE_DIGEST_ENV",
     "RUNTIME_MANIFEST_FILENAME",
@@ -298,6 +300,11 @@ def _inspect_container_image(engine: str, image: str) -> tuple[bool, str | None]
 
 
 def resolve_container_engine() -> str | None:
+    explicit = os.environ.get(CONTAINER_ENGINE_ENV, "").strip().lower()
+    if explicit:
+        if explicit in {"docker", "podman"} and shutil.which(explicit):
+            return explicit
+        return None
     for candidate in ("docker", "podman"):
         if shutil.which(candidate):
             return candidate
@@ -326,10 +333,12 @@ _PATH_ENV_VARS = {
     "TMP",
 }
 _FORWARDED_ENV_VARS = {
+    "CUDA_VISIBLE_DEVICES",
     "HF_DATASETS_OFFLINE",
     "INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE",
     "INVARLOCK_DETERMINISM",
     "INVARLOCK_DETERMINISM_WARN_ONLY",
+    "NVIDIA_VISIBLE_DEVICES",
     "INVARLOCK_SKIP_OVERHEAD_CHECK",
     "INVARLOCK_SNAPSHOT_MODE",
     "INVARLOCK_STORE_EVAL_WINDOWS",
@@ -704,6 +713,7 @@ def build_container_command(plan: Any) -> list[str]:
         raise RuntimeError(
             "Host execution is disabled by default and no container engine "
             "(docker/podman) is available. Set "
+            f"{CONTAINER_ENGINE_ENV}=docker|podman, "
             f"{ALLOW_HOST_EXECUTION_ENV}=1 or install docker/podman."
         )
 
@@ -770,6 +780,7 @@ def build_container_python_command(
         raise RuntimeError(
             "Host execution is disabled by default and no container engine "
             "(docker/podman) is available. Set "
+            f"{CONTAINER_ENGINE_ENV}=docker|podman, "
             f"{ALLOW_HOST_EXECUTION_ENV}=1 or install docker/podman."
         )
 

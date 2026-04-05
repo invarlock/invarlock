@@ -80,8 +80,11 @@ def test_tiny_attested_smoke_campaign_script_is_executable() -> None:
     assert 'echo "[smoke] refreshing local attested runtime image"' in contents
     assert "make runtime-image" in contents
     assert "INVARLOCK_RUNTIME_IMAGE_DIGEST" in contents
+    assert 'SMOKE_DEVICE="${INVARLOCK_SMOKE_DEVICE:-auto}"' in contents
+    assert 'echo "[smoke] device=$SMOKE_DEVICE"' in contents
     assert "runtime_verify_diagnostics" in contents
     assert '--profile "$PROFILE" --json' in contents
+    assert '--device "$SMOKE_DEVICE"' in contents
     assert 'mkdir -p "$SMOKE_EXPORT_DIR"' in contents
     assert (
         '"${CLI[@]}" report html -i "$EVAL_REPORT" -o "$SMOKE_EXPORT_DIR/evaluation.html"'

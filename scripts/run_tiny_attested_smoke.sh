@@ -8,6 +8,7 @@ WORK_ROOT="${1:-$(mktemp -d -t invarlock_tiny_attested_smoke.XXXXXX)}"
 MODEL_ID="${INVARLOCK_TINY_SMOKE_MODEL_ID:-sshleifer/tiny-gpt2}"
 MODE="${INVARLOCK_SMOKE_MODE:-attested}"
 PROFILE="${INVARLOCK_SMOKE_PROFILE:-dev}"
+SMOKE_DEVICE="${INVARLOCK_SMOKE_DEVICE:-auto}"
 
 PYTHON_BIN="${INVARLOCK_PYTHON:-}"
 if [[ -z "$PYTHON_BIN" ]]; then
@@ -210,6 +211,7 @@ echo "[smoke] work_root=$WORK_ROOT"
 echo "[smoke] model_id=$MODEL_ID"
 echo "[smoke] preset=$PRESET_PATH"
 echo "[smoke] mode=$MODE profile=$PROFILE"
+echo "[smoke] device=$SMOKE_DEVICE"
 echo "[smoke] hf_home=$HF_HOME"
 echo "[smoke] hf_hub_cache=$HF_HUB_CACHE"
 
@@ -225,7 +227,7 @@ fi
   --profile "$PROFILE" \
   --preset "$PRESET_PATH" \
   --assurance "$ASSURANCE" \
-  --device cpu \
+  --device "$SMOKE_DEVICE" \
   --out "$SMOKE_RUN_DIR" \
   --report-out "$SMOKE_REPORT_DIR" \
   --timing
