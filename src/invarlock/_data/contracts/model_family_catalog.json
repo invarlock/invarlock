@@ -326,14 +326,15 @@
       "display_name": "GPT-OSS",
       "modalities": ["text"],
       "task_role": "causal_lm",
-      "state": "profile_shared_alias",
+      "state": "profile_first_class",
       "representative_models": ["openai/gpt-oss-20b"],
       "repo_evidence": [
         "src/invarlock/model_profile.py",
         "src/invarlock/adapters/hf_loading.py",
+        "src/invarlock/adapters/hf_causal.py",
         "src/invarlock/cli/adapter_auto.py"
       ],
-      "notes": "GPT-OSS rides the shared GPT-style profile path, with an explicit HF causal loader hint for the published open-weight checkpoint."
+      "notes": "GPT-OSS now has dedicated profile selectors and a first-class HF causal decoder spec for the published open-weight checkpoint."
     },
     {
       "family_id": "falcon",

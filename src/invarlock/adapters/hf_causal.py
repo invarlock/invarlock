@@ -331,6 +331,69 @@ class _MoEDecoderSpec(_CausalSpec):
         return _DenseDecoderSpec().tying_map(model, base)
 
 
+class _GptOssMoEDecoderSpec(_CausalSpec):
+    spec_name = "gpt_oss_moe_decoder"
+
+    def matches(self, model: Any, base: Any, layers: Any) -> bool:
+        layer = _first_item(layers)
+        if layer is None:
+            return False
+        has_attn = (
+            hasattr(layer, "self_attn")
+            and _has_set_attr(layer.self_attn, "q_proj")
+            and _has_set_attr(layer.self_attn, "k_proj")
+            and _has_set_attr(layer.self_attn, "v_proj")
+            and _has_set_attr(layer.self_attn, "o_proj")
+        )
+        mlp = getattr(layer, "mlp", None)
+        router = getattr(mlp, "router", None) if mlp is not None else None
+        experts = getattr(mlp, "experts", None) if mlp is not None else None
+        has_moe = bool(
+            router is not None
+            and _has_set_attr(router, "weight")
+            and experts is not None
+            and _has_set_attr(experts, "gate_up_proj")
+            and _has_set_attr(experts, "down_proj")
+        )
+        has_norms = _has_set_attr(layer, "input_layernorm") and _has_set_attr(
+            layer, "post_attention_layernorm"
+        )
+        return bool(has_attn and has_moe and has_norms)
+
+    def infer_mlp_dim(self, layer: Any, config: Any, hidden_size: int) -> int:
+        mlp_dim = int(getattr(config, "intermediate_size", hidden_size * 4) or 0)
+        try:
+            experts = getattr(getattr(layer, "mlp", None), "experts", None)
+            if experts is not None:
+                intermediate_size = getattr(experts, "intermediate_size", None)
+                if isinstance(intermediate_size, int) and intermediate_size > 0:
+                    return int(intermediate_size)
+                gate_up_proj = getattr(experts, "gate_up_proj", None)
+                if gate_up_proj is not None and hasattr(gate_up_proj, "shape"):
+                    shape = tuple(int(dim) for dim in gate_up_proj.shape)
+                    if len(shape) >= 3 and shape[-1] > 0:
+                        return int(shape[-1] // 2)
+        except Exception:
+            pass
+        return int(mlp_dim)
+
+    def layer_modules(self, model: Any, layer: Any) -> dict[str, Any]:
+        mlp = layer.mlp
+        return {
+            "self_attn.q_proj": layer.self_attn.q_proj,
+            "self_attn.k_proj": layer.self_attn.k_proj,
+            "self_attn.v_proj": layer.self_attn.v_proj,
+            "self_attn.o_proj": layer.self_attn.o_proj,
+            "input_layernorm": layer.input_layernorm,
+            "post_attention_layernorm": layer.post_attention_layernorm,
+            "mlp.router": mlp.router,
+            "mlp.experts": mlp.experts,
+        }
+
+    def tying_map(self, model: Any, base: Any) -> dict[str, str]:
+        return _DenseDecoderSpec().tying_map(model, base)
+
+
 class _GPT2LikeDecoderSpec(_CausalSpec):
     spec_name = "gpt2_like"
 
@@ -380,6 +443,7 @@ class _GPT2LikeDecoderSpec(_CausalSpec):
 
 _SPECS: list[_CausalSpec] = [
     _MoEDecoderSpec(),
+    _GptOssMoEDecoderSpec(),
     _PhiDecoderSpec(),
     _Qwen35LinearDecoderSpec(),
     _DenseDecoderSpec(),

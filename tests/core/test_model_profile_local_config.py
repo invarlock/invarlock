@@ -104,7 +104,7 @@ def test_local_profile_config_helpers_tolerate_invalid_utf8(tmp_path: Path) -> N
                 "model_type": "gpt_oss",
                 "architectures": ["GptOssForCausalLM"],
             },
-            "gpt2",
+            "gpt_oss",
         ),
         (
             {

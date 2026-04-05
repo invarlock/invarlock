@@ -655,6 +655,21 @@ def _rope_decoder_selectors() -> dict[str, list[str]]:
     }
 
 
+def _gpt_oss_selectors() -> dict[str, list[str]]:
+    return {
+        "attention": [
+            "self_attn.q_proj",
+            "self_attn.k_proj",
+            "self_attn.v_proj",
+            "self_attn.o_proj",
+        ],
+        "ffn": [
+            "mlp.router",
+            "mlp.experts",
+        ],
+    }
+
+
 def _phi_selectors() -> dict[str, list[str]]:
     return {
         "attention": [
@@ -818,6 +833,8 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
 
     causal_family_aliases = (
         ("mixtral", "mixtral"),
+        ("gpt-oss", "gpt_oss"),
+        ("gpt_oss", "gpt_oss"),
         ("ministral", "mistral"),
         ("mistral", "mistral"),
         ("qwen", "qwen"),
@@ -834,13 +851,16 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
             if keyword in adapter_lower or keyword in model_lower:
                 family = mapped_family
                 break
+        module_selectors = (
+            _gpt_oss_selectors() if family == "gpt_oss" else _rope_decoder_selectors()
+        )
         return ModelProfile(
             family=family,
             default_loss="causal",
             make_tokenizer=_make_causal_auto_tokenizer(model_id),
             default_metric="ppl_causal",
             default_provider="wikitext2",
-            module_selectors=_rope_decoder_selectors(),
+            module_selectors=module_selectors,
             invariants=("rope_rotary_embedding",),
             cert_lints=(
                 {

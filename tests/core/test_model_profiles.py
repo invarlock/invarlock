@@ -23,7 +23,7 @@ pytest.importorskip("transformers")
             "causal",
         ),
         ("mistralai/Mixtral-8x7B-v0.1", "hf_causal", "mixtral", "causal"),
-        ("openai/gpt-oss-20b", "hf_causal", "gpt2", "causal"),
+        ("openai/gpt-oss-20b", "hf_causal", "gpt_oss", "causal"),
         ("Qwen/Qwen2-7B", "hf_causal", "qwen", "causal"),
         ("Qwen/Qwen2.5-14B", "hf_causal", "qwen", "causal"),
         ("Qwen/Qwen3-8B", "hf_causal", "qwen", "causal"),
@@ -119,3 +119,15 @@ def test_qwen35_profile_exposes_linear_attention_selectors():
     assert profile.family == "qwen"
     assert "linear_attn.in_proj_qkv" in profile.module_selectors["attention"]
     assert "linear_attn.out_proj" in profile.module_selectors["attention"]
+
+
+def test_gpt_oss_profile_exposes_moe_attention_and_ffn_selectors():
+    profile = detect_model_profile(
+        model_id="openai/gpt-oss-20b",
+        adapter="hf_causal",
+    )
+
+    assert profile.family == "gpt_oss"
+    assert "self_attn.q_proj" in profile.module_selectors["attention"]
+    assert "mlp.router" in profile.module_selectors["ffn"]
+    assert "mlp.experts" in profile.module_selectors["ffn"]
