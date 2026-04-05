@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
+
+
+_CUDA_DEVICE_RE = re.compile(r"^cuda(?::\d+)?$")
 
 
 def resolve_device(requested: str | None) -> str:
@@ -49,12 +53,14 @@ def validate_device_for_config(
     device: str, config_requirements: dict[str, Any] | None = None
 ) -> tuple[bool, str]:
     # Simple validation stub; extend with model/profile specific checks as needed
-    valid = {"cpu", "cuda", "cuda:0", "mps"}
-    if device not in valid:
+    normalized = (device or "cpu").lower()
+    if normalized not in {"cpu", "mps"} and not _CUDA_DEVICE_RE.match(normalized):
         return False, f"Unsupported device '{device}'"
     if config_requirements and config_requirements.get("required_device"):
         req = str(config_requirements.get("required_device")).lower()
-        if device != req:
+        normalized_req = "cuda" if _CUDA_DEVICE_RE.match(req) else req
+        normalized_selected = "cuda" if _CUDA_DEVICE_RE.match(normalized) else normalized
+        if normalized_selected != normalized_req:
             return (
                 False,
                 f"Configuration requires device '{req}' but '{device}' was selected",

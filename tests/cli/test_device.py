@@ -70,6 +70,20 @@ def test_validate_device_for_config(monkeypatch):
     assert ok2 is True and msg2 == ""
 
 
+def test_validate_device_for_config_accepts_indexed_cuda():
+    ok, msg = device_mod.validate_device_for_config("cuda:1", None)
+    assert ok is True
+    assert msg == ""
+
+
+def test_validate_device_for_config_treats_cuda_requirement_as_family():
+    ok, msg = device_mod.validate_device_for_config(
+        "cuda:1", {"required_device": "cuda"}
+    )
+    assert ok is True
+    assert msg == ""
+
+
 def _install_torch_stub(monkeypatch, *, cuda_available=True, mps_available=True):
     torch_stub = ModuleType("torch")
     cuda_props = SimpleNamespace(name="StubGPU", total_memory=8 * 1e9)
