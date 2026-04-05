@@ -85,7 +85,7 @@ def extract_report_meta(
             "meta.device_unavailable",
             "Run metadata is missing a usable device; evaluation report metadata leaves it null.",
         )
-    return {
+    out = {
         "model_id": model_id,
         "adapter": adapter,
         "device": device,
@@ -94,6 +94,11 @@ def extract_report_meta(
         "seed": primary_seed,
         "seeds": seeds_bundle,
     }
+    for key in ("pm_acceptance_range", "pm_drift_band"):
+        value = meta_section.get(key)
+        if isinstance(value, dict) and value:
+            out[key] = copy.deepcopy(value)
+    return out
 
 
 def generate_run_id(report: RunReport) -> str:
