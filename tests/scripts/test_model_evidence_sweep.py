@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import stat
 import subprocess
 import sys
@@ -24,6 +25,14 @@ def _load_script_module(script_name: str):
 def _write_fake_python(path: Path) -> None:
     script = """#!/bin/bash
 set -euo pipefail
+
+if [[ -n "${FAKE_PYTHON_LOG:-}" ]]; then
+  printf '%s\\n' "$*" >> "$FAKE_PYTHON_LOG"
+fi
+
+if [[ "${1:-}" == "-c" ]]; then
+  exit 0
+fi
 
 if [[ "${1:-}" == "-m" && "${2:-}" == "invarlock" && "${3:-}" == "evaluate" ]]; then
   report_dir=""
@@ -52,6 +61,49 @@ exit 99
     path.chmod(path.stat().st_mode | stat.S_IXUSR)
 
 
+def _write_flaky_fake_python(path: Path) -> None:
+    script = """#!/bin/bash
+set -euo pipefail
+
+if [[ -n "${FAKE_PYTHON_LOG:-}" ]]; then
+  printf '%s\\n' "$*" >> "$FAKE_PYTHON_LOG"
+fi
+
+if [[ "${1:-}" == "-c" ]]; then
+  exit 0
+fi
+
+if [[ "${1:-}" == "-m" && "${2:-}" == "invarlock" && "${3:-}" == "evaluate" ]]; then
+  if [[ ! -f "${FAKE_PYTHON_STATE:-}" ]]; then
+    : > "${FAKE_PYTHON_STATE:-}"
+    kill -TERM $$
+  fi
+  report_dir=""
+  while [[ $# -gt 0 ]]; do
+    if [[ "$1" == "--report-out" ]]; then
+      report_dir="$2"
+      shift 2
+      continue
+    fi
+    shift
+  done
+  mkdir -p "$report_dir"
+  printf '{"ok": true}\\n' > "$report_dir/evaluation.report.json"
+  exit 0
+fi
+
+if [[ "${1:-}" == "-m" && "${2:-}" == "invarlock" && "${3:-}" == "verify" ]]; then
+  printf '{"status":"ok"}\\n'
+  exit 0
+fi
+
+printf 'unexpected invocation: %s\\n' "$*" >&2
+exit 99
+"""
+    path.write_text(script, encoding="utf-8")
+    path.chmod(path.stat().st_mode | stat.S_IXUSR)
+
+
 def test_manifest_lane_ids_match_supported_experimental_support_matrix() -> None:
     mod = _load_script_module("model_evidence_sweep")
 
@@ -61,6 +113,186 @@ def test_manifest_lane_ids_match_supported_experimental_support_matrix() -> None
     assert actual == expected
     for lane in mod.CURRENT_SUPPORTED_EXPERIMENTAL_LANES:
         assert lane.preset_path.is_file(), lane.preset_relpath
+
+
+def test_repo_mentioned_gpu_suite_includes_basis_canaries_and_experimental() -> None:
+    mod = _load_script_module("model_evidence_sweep")
+
+    specs = mod.select_specs(
+        mod.REPO_MENTIONED_GPU_SUITE,
+        slugs=[],
+        lane_ids=[],
+        shard_index=0,
+        shard_count=1,
+    )
+
+    assert len(specs) == 16
+    slugs = {lane.slug for lane in specs}
+    assert {
+        "gpt2_public",
+        "bert_base_uncased_public",
+        "roberta_base_public",
+        "tiny_gpt2_canary",
+        "bert_tiny_canary",
+        "mistral_7b",
+        "qwen2_7b",
+        "gemma4_e2b",
+    }.issubset(slugs)
+
+
+def test_repo_mentioned_gpu_basis_lanes_use_lane_specific_profiles_and_presets() -> (
+    None
+):
+    mod = _load_script_module("model_evidence_sweep")
+    basis = {
+        lane.slug: lane
+        for lane in mod.select_specs(
+            mod.REPO_MENTIONED_GPU_SUITE,
+            slugs=["gpt2_public", "bert_base_uncased_public"],
+            lane_ids=[],
+            shard_index=0,
+            shard_count=1,
+        )
+    }
+
+    assert basis["gpt2_public"].verify_profile == "dev"
+    assert (
+        basis["gpt2_public"].preset_relpath
+        == "configs/presets/causal_lm/wikitext2_512.yaml"
+    )
+    assert basis["bert_base_uncased_public"].verify_profile == "dev"
+    assert (
+        basis["bert_base_uncased_public"].preset_relpath
+        == "configs/presets/masked_lm/wikitext2_128.yaml"
+    )
+
+
+def test_model_catalog_gpu_suite_covers_public_catalog_representative_models() -> None:
+    mod = _load_script_module("model_evidence_sweep")
+
+    specs = mod.select_specs(
+        mod.MODEL_CATALOG_GPU_SUITE,
+        slugs=[],
+        lane_ids=[],
+        shard_index=0,
+        shard_count=1,
+    )
+
+    slugs = {lane.slug for lane in specs}
+    assert len(specs) == len(slugs)
+    assert {
+        "openai_community_gpt2",
+        "bert_base_uncased",
+        "roberta_base",
+        "mistralai_mistral_7b_v0_1",
+        "qwen_qwen2_7b",
+        "microsoft_phi_4_reasoning_plus",
+        "google_gemma_4_e4b_it",
+        "facebook_bart_base",
+    }.issubset(slugs)
+
+
+def test_model_catalog_gpu_suite_maps_family_specific_presets() -> None:
+    mod = _load_script_module("model_evidence_sweep")
+    specs = {
+        lane.slug: lane
+        for lane in mod.select_specs(
+            mod.MODEL_CATALOG_GPU_SUITE,
+            slugs=[
+                "microsoft_deberta_v3_base",
+                "t5_small",
+                "google_gemma_4_e4b_it",
+                "mistralai_mixtral_8x7b_v0_1",
+            ],
+            lane_ids=[],
+            shard_index=0,
+            shard_count=1,
+        )
+    }
+
+    assert specs["microsoft_deberta_v3_base"].preset_relpath == (
+        "configs/presets/masked_lm/wikitext2_128.yaml"
+    )
+    assert specs["microsoft_deberta_v3_base"].adapter == "hf_mlm"
+    assert specs["t5_small"].preset_relpath == "configs/presets/seq2seq/synth_128.yaml"
+    assert specs["t5_small"].adapter == "hf_seq2seq"
+    assert specs["google_gemma_4_e4b_it"].preset_relpath == (
+        "configs/presets/multimodal/gemma4_e2b_vision_text_256.yaml"
+    )
+    assert specs["google_gemma_4_e4b_it"].adapter == "hf_multimodal"
+    assert specs["mistralai_mixtral_8x7b_v0_1"].preset_relpath == (
+        "configs/presets/causal_lm/wikitext2_512.yaml"
+    )
+    assert specs["mistralai_mixtral_8x7b_v0_1"].adapter == "auto"
+
+
+def test_build_prefetch_command_uses_model_profile_tokenizer_resolution() -> None:
+    mod = _load_script_module("model_evidence_sweep")
+    spec = next(
+        lane
+        for lane in mod.SUITES[mod.REPO_MENTIONED_GPU_SUITE]
+        if lane.slug == "bert_tiny_canary"
+    )
+
+    command = mod.build_prefetch_command(spec, python_exe=sys.executable)
+
+    assert command[1] == "-c"
+    assert "detect_model_profile" in command[2]
+    assert "make_tokenizer()" in command[2]
+    assert "snapshot_download(model_id)" in command[2]
+    assert "AutoModel" not in command[2]
+    assert "AutoTokenizer" not in command[2]
+    assert command[3] == "prajjwal1/bert-tiny"
+
+
+def test_lane_requires_remote_code_uses_preset_model_flag() -> None:
+    mod = _load_script_module("model_evidence_sweep")
+    phi4 = next(
+        lane
+        for lane in mod.SUITES[mod.REPO_MENTIONED_GPU_SUITE]
+        if lane.slug == "phi4_reasoning_plus"
+    )
+    qwen = next(
+        lane
+        for lane in mod.SUITES[mod.REPO_MENTIONED_GPU_SUITE]
+        if lane.slug == "qwen2_7b"
+    )
+
+    assert mod.lane_requires_remote_code(phi4) is True
+    assert mod.lane_requires_remote_code(qwen) is False
+
+
+def test_model_evidence_sweep_dry_run_uses_lane_specific_verify_profile_when_omitted(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence_sweep.py"
+    output_root = tmp_path / "evidence-lane-profile"
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--suite",
+            "repo-mentioned-gpu",
+            "--slug",
+            "gpt2_public",
+            "--execution-mode",
+            "host",
+            "--output-root",
+            str(output_root),
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(proc.stdout)
+    verify = payload[0]["verify"]
+    assert verify[verify.index("--profile") + 1] == "dev"
 
 
 def test_select_specs_sharding_is_stable() -> None:
@@ -155,6 +387,8 @@ def test_model_evidence_sweep_host_mode_emits_trusted_local_assurance(
     payload = json.loads(proc.stdout)
     assert len(payload) == 1
     assert payload[0]["execution_mode"] == "host"
+    assert payload[0]["prefetch"][-1] == "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+    assert payload[0]["prefetch"][1] == "-c"
     assert "--assurance" in payload[0]["evaluate"]
     assert (
         payload[0]["evaluate"][payload[0]["evaluate"].index("--assurance") + 1]
@@ -173,6 +407,148 @@ def test_model_evidence_sweep_host_mode_emits_trusted_local_assurance(
 
     manifest = json.loads((output_root / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["execution_mode"] == "host"
+
+
+def test_model_evidence_sweep_host_mode_prefetches_before_evaluate(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence_sweep.py"
+    fake_python = tmp_path / "fake-python"
+    _write_fake_python(fake_python)
+    output_root = tmp_path / "evidence-host-prefetch"
+    log_path = tmp_path / "fake-python.log"
+
+    env = dict(os.environ)
+    env["FAKE_PYTHON_LOG"] = str(log_path)
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--slug",
+            "tinyllama_1_1b",
+            "--execution-mode",
+            "host",
+            "--output-root",
+            str(output_root),
+            "--python",
+            str(fake_python),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+        env=env,
+    )
+
+    assert proc.returncode == 1, proc.stderr
+    invocations = log_path.read_text(encoding="utf-8").splitlines()
+    assert "TinyLlama/TinyLlama-1.1B-Chat-v1.0" in invocations[0]
+    assert "-m invarlock evaluate" in invocations[1]
+
+
+def test_model_evidence_sweep_retries_evaluate_once_after_sigterm(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence_sweep.py"
+    fake_python = tmp_path / "flaky-fake-python"
+    _write_flaky_fake_python(fake_python)
+    output_root = tmp_path / "evidence-host-retry"
+    log_path = tmp_path / "fake-python-retry.log"
+    state_path = tmp_path / "retry-state"
+
+    env = dict(os.environ)
+    env["FAKE_PYTHON_LOG"] = str(log_path)
+    env["FAKE_PYTHON_STATE"] = str(state_path)
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--slug",
+            "tinyllama_1_1b",
+            "--execution-mode",
+            "host",
+            "--output-root",
+            str(output_root),
+            "--python",
+            str(fake_python),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+        env=env,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    invocations = log_path.read_text(encoding="utf-8").splitlines()
+    evaluate_invocations = [
+        line for line in invocations if "-m invarlock evaluate" in line
+    ]
+    verify_invocations = [line for line in invocations if "-m invarlock verify" in line]
+    assert len(evaluate_invocations) == 2
+    assert len(verify_invocations) == 1
+    lane_log = (output_root / "logs" / "tinyllama_1_1b.log").read_text(encoding="utf-8")
+    assert "evaluate exited with -15; retrying once." in lane_log
+
+
+def test_run_lane_sets_remote_code_env_for_matching_preset(tmp_path: Path) -> None:
+    mod = _load_script_module("model_evidence_sweep")
+    spec = next(
+        lane
+        for lane in mod.SUITES[mod.REPO_MENTIONED_GPU_SUITE]
+        if lane.slug == "phi4_reasoning_plus"
+    )
+    output_root = tmp_path / "evidence-remote-code"
+    calls: list[tuple[list[str], str | None]] = []
+    real_completed = subprocess.CompletedProcess
+
+    def fake_run(
+        cmd: list[str],
+        *,
+        cwd: Path,
+        env: dict[str, str],
+        stdout,
+        stderr,
+        text: bool,
+        check: bool,
+    ):
+        calls.append((cmd, env.get("INVARLOCK_ALLOW_REMOTE_CODE")))
+        if "-c" in cmd:
+            return real_completed(cmd, 0)
+        if cmd[:3] == [sys.executable, "-m", "invarlock"] and "evaluate" in cmd:
+            report_dir = Path(cmd[cmd.index("--report-out") + 1])
+            report_dir.mkdir(parents=True, exist_ok=True)
+            (report_dir / "evaluation.report.json").write_text("{}", encoding="utf-8")
+            return real_completed(cmd, 0)
+        if cmd[:3] == [sys.executable, "-m", "invarlock"] and "verify" in cmd:
+            return real_completed(cmd, 0)
+        raise AssertionError(f"unexpected command: {cmd}")
+
+    original_run = mod.subprocess.run
+    mod.subprocess.run = fake_run
+    try:
+        execution_root = mod._execution_root(output_root, execution_mode="host")
+        result = mod.run_lane(
+            spec,
+            python_exe=sys.executable,
+            profile=None,
+            device="cuda",
+            execution_mode="host",
+            output_root=output_root,
+            execution_root=execution_root,
+            env={"PYTHONPATH": "src"},
+        )
+    finally:
+        mod.subprocess.run = original_run
+
+    assert result.evaluate_exit == 0
+    assert result.verify_exit == 0
+    assert calls
+    assert all(flag == "1" for _cmd, flag in calls)
 
 
 def test_build_evaluate_command_uses_container_safe_repo_relative_paths(

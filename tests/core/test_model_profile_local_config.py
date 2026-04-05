@@ -294,6 +294,57 @@ def test_resolve_tokenizer_falls_back_to_slow_tokenizer_when_fast_backend_missin
     ]
 
 
+def test_resolve_tokenizer_uses_explicit_slow_tokenizer_when_auto_retry_still_fails(
+    monkeypatch,
+) -> None:
+    auto_calls: list[tuple[str, bool | None, bool | None]] = []
+    slow_calls: list[tuple[str, bool | None]] = []
+
+    class _AutoFactory:
+        @classmethod
+        def from_pretrained(cls, model_id: str, **kwargs: object) -> _DummyTokenizer:
+            auto_calls.append(
+                (
+                    model_id,
+                    kwargs.get("local_files_only"),
+                    kwargs.get("use_fast"),
+                )
+            )
+            raise ValueError(
+                "Couldn't instantiate the backend tokenizer from one of: "
+                "(1) a `tokenizers` library serialization file, "
+                "(2) a slow tokenizer instance to convert or "
+                "(3) an equivalent slow tokenizer class to instantiate and convert. "
+                "You need to have sentencepiece or tiktoken installed to convert "
+                "a slow tokenizer to a fast one."
+            )
+
+    class _BertTokenizerFactory:
+        @classmethod
+        def from_pretrained(cls, model_id: str, **kwargs: object) -> _DummyTokenizer:
+            slow_calls.append((model_id, kwargs.get("local_files_only")))
+            return _DummyTokenizer(name_or_path=model_id, mask_token="[MASK]")
+
+    monkeypatch.setattr(mp, "AutoTokenizer", _AutoFactory, raising=False)
+    monkeypatch.setattr(
+        mp,
+        "_resolve_explicit_slow_tokenizer_factory",
+        lambda candidate: _BertTokenizerFactory
+        if candidate == "prajjwal1/bert-tiny"
+        else None,
+    )
+
+    profile = mp.detect_model_profile("prajjwal1/bert-tiny", adapter="hf_mlm")
+    tokenizer, _ = mp.resolve_tokenizer(profile)
+
+    assert tokenizer.name_or_path == "prajjwal1/bert-tiny"
+    assert auto_calls == [
+        ("prajjwal1/bert-tiny", True, None),
+        ("prajjwal1/bert-tiny", True, False),
+    ]
+    assert slow_calls == [("prajjwal1/bert-tiny", True)]
+
+
 def test_resolve_tokenizer_does_not_retry_remote_on_non_cache_loader_error(
     monkeypatch,
 ) -> None:

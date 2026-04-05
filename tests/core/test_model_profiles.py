@@ -101,3 +101,14 @@ def test_unknown_profile_falls_back_to_conservative_defaults():
     assert profile.family == "unknown"
     assert profile.default_loss == "causal"
     assert "attention" in profile.module_selectors["attention"]
+
+
+def test_qwen35_profile_exposes_linear_attention_selectors():
+    profile = detect_model_profile(
+        model_id="Qwen/Qwen3.5-9B",
+        adapter="hf_causal",
+    )
+
+    assert profile.family == "qwen"
+    assert "linear_attn.in_proj_qkv" in profile.module_selectors["attention"]
+    assert "linear_attn.out_proj" in profile.module_selectors["attention"]

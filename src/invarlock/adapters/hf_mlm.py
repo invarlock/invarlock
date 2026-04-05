@@ -25,6 +25,8 @@ _MLM_FALLBACK_TOKENS = (
     "maskedlm",
     "masked language",
     "for automodel",
+    "unrecognized model",
+    "model_type",
     "unrecognized configuration class",
     "is not supported for this model",
 )
@@ -108,6 +110,35 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
         except ModelLoadError as exc:
             if not _should_retry_mlm_loader(exc):
                 raise
+            direct_strategy = resolve_core_loader_strategy(
+                task="mlm",
+                model_id=model_id,
+                kwargs=kwargs,
+                allow_direct_submodule=True,
+            )
+            if (
+                direct_strategy.strategy == "direct_submodule"
+                and direct_strategy.loader_label != strategy.loader_label
+            ):
+                try:
+                    self._last_loader_strategy = direct_strategy.strategy
+                    self._last_loader_label = direct_strategy.loader_label
+                    with wrap_errors(
+                        ModelLoadError,
+                        "E201",
+                        f"MODEL-LOAD-FAILED: {direct_strategy.loader_label}",
+                        lambda e: {"model_id": model_id},
+                    ):
+                        model = self._load_pretrained_model(
+                            direct_strategy.loader,
+                            model_id,
+                            **kwargs,
+                        )
+                except ModelLoadError as direct_exc:
+                    if not _should_retry_mlm_loader(direct_exc):
+                        raise
+                else:
+                    return self._safe_to_device(model, device)
             if strategy.strategy != "auto":
                 try:
                     self._last_loader_strategy = auto_strategy.strategy

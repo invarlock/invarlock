@@ -207,6 +207,7 @@ def test_hf_mlm_loader_falls_back_only_for_masked_lm_loader_mismatch(
             HFLoaderStrategy("mlm", "direct", "primary", "primary"),
             HFLoaderStrategy("mlm", "auto", "auto", "auto"),
             HFLoaderStrategy("mlm_base", "base", "fallback", "fallback"),
+            HFLoaderStrategy("mlm", "auto", "ignored", "ignored"),
         )
     )
 
@@ -232,3 +233,45 @@ def test_hf_mlm_loader_falls_back_only_for_masked_lm_loader_mismatch(
 
     assert loaded == {"loader": "fallback"}
     assert calls == ["primary", "auto", "fallback"]
+
+
+def test_hf_mlm_loader_retries_with_direct_submodule_hint_for_remote_model_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from invarlock.adapters import hf_mlm as hf_mlm_mod
+    from invarlock.adapters.hf_loading import HFLoaderStrategy
+    from invarlock.adapters.hf_mlm import HF_MLM_Adapter
+
+    calls: list[str] = []
+    strategies = iter(
+        (
+            HFLoaderStrategy("mlm", "auto", "primary", "primary"),
+            HFLoaderStrategy("mlm", "auto", "auto", "auto"),
+            HFLoaderStrategy("mlm_base", "base", "fallback", "fallback"),
+            HFLoaderStrategy("mlm", "direct_submodule", "bert-direct", "bert-direct"),
+        )
+    )
+
+    monkeypatch.setattr(
+        hf_mlm_mod,
+        "resolve_core_loader_strategy",
+        lambda *args, **kwargs: next(strategies),
+    )
+
+    class DummyAdapter(HF_MLM_Adapter):
+        def _load_pretrained_model(self, loader, model_id, **kwargs):  # noqa: ANN001
+            calls.append(str(loader))
+            if loader != "bert-direct":
+                raise ValueError(
+                    "Unrecognized model in prajjwal1/bert-tiny. "
+                    "Should have a `model_type` key in its config.json."
+                )
+            return {"loader": loader}
+
+        def _safe_to_device(self, model, device):  # noqa: ANN001
+            return model
+
+    loaded = DummyAdapter().load_model("prajjwal1/bert-tiny", device="cpu")
+
+    assert loaded == {"loader": "bert-direct"}
+    assert calls == ["primary", "bert-direct"]

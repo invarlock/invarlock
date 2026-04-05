@@ -12,12 +12,20 @@ import subprocess
 import sys
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
+from functools import cache
 from pathlib import Path
+from typing import Any
+
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SUPPORT_MATRIX_PATH = REPO_ROOT / "contracts" / "support_matrix.json"
+MODEL_FAMILY_CATALOG_PATH = REPO_ROOT / "contracts" / "model_family_catalog.json"
 DEFAULT_SUITE = "current-supported-experimental"
+REPO_MENTIONED_GPU_SUITE = "repo-mentioned-gpu"
+MODEL_CATALOG_GPU_SUITE = "model-catalog-gpu"
 EXECUTION_MODES = ("container", "host")
+RETRYABLE_EVALUATE_RETURNCODES = {-15}
 
 
 @dataclass(frozen=True)
@@ -153,9 +161,170 @@ CURRENT_SUPPORTED_EXPERIMENTAL_LANES: tuple[EvidenceLane, ...] = (
     ),
 )
 
+CURRENT_PUBLISHED_BASIS_LANES: tuple[EvidenceLane, ...] = (
+    EvidenceLane(
+        slug="gpt2_public",
+        lane_id="published-gpt2-causal-hf",
+        family="GPT-2 causal LM",
+        model_id="gpt2",
+        preset_relpath="configs/presets/causal_lm/wikitext2_512.yaml",
+        adapter="hf_causal",
+        verify_profile="dev",
+    ),
+    EvidenceLane(
+        slug="bert_base_uncased_public",
+        lane_id="published-bert-base-uncased-mlm-hf",
+        family="BERT / RoBERTa MLM",
+        model_id="bert-base-uncased",
+        preset_relpath="configs/presets/masked_lm/wikitext2_128.yaml",
+        adapter="hf_mlm",
+        verify_profile="dev",
+    ),
+    EvidenceLane(
+        slug="roberta_base_public",
+        lane_id="published-roberta-base-mlm-hf",
+        family="BERT / RoBERTa MLM",
+        model_id="roberta-base",
+        preset_relpath="configs/presets/masked_lm/wikitext2_128.yaml",
+        adapter="hf_mlm",
+        verify_profile="dev",
+    ),
+)
+
+DOCUMENTED_SMOKE_CANARY_LANES: tuple[EvidenceLane, ...] = (
+    EvidenceLane(
+        slug="tiny_gpt2_canary",
+        lane_id="smoke-tiny-gpt2-causal-hf",
+        family="GPT-2 causal LM smoke canary",
+        model_id="sshleifer/tiny-gpt2",
+        preset_relpath="configs/presets/causal_lm/wikitext2_512.yaml",
+        adapter="hf_causal",
+        verify_profile="dev",
+    ),
+    EvidenceLane(
+        slug="bert_tiny_canary",
+        lane_id="smoke-bert-tiny-mlm-hf",
+        family="BERT MLM smoke canary",
+        model_id="prajjwal1/bert-tiny",
+        preset_relpath="configs/presets/masked_lm/wikitext2_128.yaml",
+        adapter="hf_mlm",
+        verify_profile="dev",
+    ),
+)
+
+MODEL_FAMILY_CATALOG_SECTIONS = (
+    "declared_support",
+    "implemented_coverage",
+    "usage_only",
+    "recommended_additions",
+)
+
+
+def _load_model_family_catalog(
+    path: Path = MODEL_FAMILY_CATALOG_PATH,
+) -> dict[str, object]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("Model family catalog must be a JSON object")
+    return payload
+
+
+def _catalog_slug(model_id: str) -> str:
+    slug = model_id.lower().replace("/", "_")
+    for old, new in ((".", "_"), ("-", "_"), ("+", "_")):
+        slug = slug.replace(old, new)
+    return slug
+
+
+def _catalog_lane_defaults(model_id: str) -> tuple[str, str]:
+    model_lower = model_id.lower()
+    if any(
+        keyword in model_lower
+        for keyword in (
+            "bert",
+            "roberta",
+            "deberta",
+            "distilbert",
+            "albert",
+            "electra",
+        )
+    ):
+        return ("configs/presets/masked_lm/wikitext2_128.yaml", "hf_mlm")
+    if any(
+        keyword in model_lower
+        for keyword in ("t5", "bart", "mbart", "pegasus", "marian", "opus-mt")
+    ):
+        return ("configs/presets/seq2seq/synth_128.yaml", "hf_seq2seq")
+    if model_lower == "google/gemma-4-e4b-it":
+        return (
+            "configs/presets/multimodal/gemma4_e2b_vision_text_256.yaml",
+            "hf_multimodal",
+        )
+    return ("configs/presets/causal_lm/wikitext2_512.yaml", "auto")
+
+
+def _build_model_catalog_gpu_lanes(
+    payload: dict[str, object] | None = None,
+) -> tuple[EvidenceLane, ...]:
+    catalog = payload or _load_model_family_catalog()
+    lanes: list[EvidenceLane] = []
+    seen: set[str] = set()
+    for section in MODEL_FAMILY_CATALOG_SECTIONS:
+        families = catalog.get(section) or []
+        if not isinstance(families, list):
+            raise ValueError(f"model_family_catalog.{section} must be a list")
+        for family in families:
+            if not isinstance(family, dict):
+                continue
+            display_name = family.get("display_name")
+            family_label = display_name if isinstance(display_name, str) else section
+            models = family.get("representative_models") or []
+            if not isinstance(models, list):
+                continue
+            for model_id in models:
+                if not isinstance(model_id, str) or not model_id or model_id in seen:
+                    continue
+                preset_relpath, adapter = _catalog_lane_defaults(model_id)
+                lanes.append(
+                    EvidenceLane(
+                        slug=_catalog_slug(model_id),
+                        lane_id=f"catalog::{_catalog_slug(model_id)}",
+                        family=family_label,
+                        model_id=model_id,
+                        preset_relpath=preset_relpath,
+                        adapter=adapter,
+                        verify_profile="dev",
+                    )
+                )
+                seen.add(model_id)
+    return tuple(lanes)
+
+
+MODEL_CATALOG_GPU_LANES = _build_model_catalog_gpu_lanes()
+
 SUITES: dict[str, tuple[EvidenceLane, ...]] = {
     DEFAULT_SUITE: CURRENT_SUPPORTED_EXPERIMENTAL_LANES,
+    REPO_MENTIONED_GPU_SUITE: (
+        CURRENT_PUBLISHED_BASIS_LANES
+        + DOCUMENTED_SMOKE_CANARY_LANES
+        + CURRENT_SUPPORTED_EXPERIMENTAL_LANES
+    ),
+    MODEL_CATALOG_GPU_SUITE: MODEL_CATALOG_GPU_LANES,
 }
+
+
+@cache
+def _preset_model_config(preset_path: str) -> dict[str, Any]:
+    data = yaml.safe_load(Path(preset_path).read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        return {}
+    model_cfg = data.get("model")
+    return model_cfg if isinstance(model_cfg, dict) else {}
+
+
+def lane_requires_remote_code(spec: EvidenceLane) -> bool:
+    model_cfg = _preset_model_config(str(spec.preset_path))
+    return bool(model_cfg.get("trust_remote_code") is True)
 
 
 def _load_support_matrix(path: Path = SUPPORT_MATRIX_PATH) -> dict[str, object]:
@@ -242,8 +411,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--profile",
-        default="ci",
-        help="Profile to pass to evaluate and verify.",
+        default=None,
+        help="Optional global profile override for evaluate and verify.",
     )
     parser.add_argument(
         "--device",
@@ -362,6 +531,38 @@ def build_evaluate_command(
     return command
 
 
+def _prefetch_adapter_name(spec: EvidenceLane) -> str:
+    adapter_name = spec.adapter
+    if adapter_name in {"auto", "auto_hf"}:
+        preset = spec.preset_relpath.lower()
+        lane = spec.lane_id.lower()
+        model_id = spec.model_id.lower()
+        if "masked_lm" in preset or "masked" in lane or "bert" in model_id:
+            adapter_name = "hf_mlm"
+        elif "seq2seq" in preset or "t5" in model_id:
+            adapter_name = "hf_seq2seq"
+        else:
+            adapter_name = "hf_causal"
+    return adapter_name
+
+
+def build_prefetch_command(
+    spec: EvidenceLane,
+    *,
+    python_exe: str,
+) -> list[str]:
+    adapter_name = _prefetch_adapter_name(spec)
+    prefetch_code = (
+        "from huggingface_hub import snapshot_download; "
+        "from invarlock.model_profile import detect_model_profile; "
+        "import sys; "
+        "model_id = sys.argv[1]; "
+        f"detect_model_profile(model_id, adapter={adapter_name!r}).make_tokenizer(); "
+        "snapshot_download(model_id)"
+    )
+    return [python_exe, "-c", prefetch_code, spec.model_id]
+
+
 def build_verify_command(
     *,
     python_exe: str,
@@ -442,32 +643,90 @@ def run_lane(
     log_path = log_dir / f"{spec.slug}.log"
     report_path = lane_root / "report" / "evaluation.report.json"
     verify_path = lane_root / "verify.json"
+    lane_env = dict(env)
+    if lane_requires_remote_code(spec):
+        lane_env["INVARLOCK_ALLOW_REMOTE_CODE"] = "1"
+
+    log_mode = "w"
+    eval_returncode: int | None = None
+    lane_profile = profile or spec.verify_profile
+    if execution_mode == "host":
+        prefetch_cmd = build_prefetch_command(spec, python_exe=python_exe)
+        with log_path.open(log_mode, encoding="utf-8") as log_file:
+            log_file.write("$ " + " ".join(prefetch_cmd) + "\n")
+            prefetch_proc = subprocess.run(
+                prefetch_cmd,
+                cwd=REPO_ROOT,
+                env=lane_env,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                text=True,
+                check=False,
+            )
+        log_mode = "a"
+        if prefetch_proc.returncode != 0:
+            _publish_lane_artifacts(
+                lane_root, published_lane_root := output_root / "eval" / spec.slug
+            )
+            published_report_path = (
+                published_lane_root / "report" / "evaluation.report.json"
+            )
+            published_verify_path = published_lane_root / "verify.json"
+            return LaneResult(
+                slug=spec.slug,
+                lane_id=spec.lane_id,
+                model_id=spec.model_id,
+                preset=spec.preset_relpath,
+                evaluate_exit=prefetch_proc.returncode,
+                verify_exit=None,
+                report_path=str(published_report_path),
+                verify_path=str(published_verify_path)
+                if published_verify_path.is_file()
+                else None,
+            )
 
     evaluate_cmd = build_evaluate_command(
         spec,
         python_exe=python_exe,
-        profile=profile,
+        profile=lane_profile,
         device=device,
         execution_mode=execution_mode,
         lane_root=lane_root,
     )
-    with log_path.open("w", encoding="utf-8") as log_file:
+    with log_path.open(log_mode, encoding="utf-8") as log_file:
         log_file.write("$ " + " ".join(evaluate_cmd) + "\n")
         eval_proc = subprocess.run(
             evaluate_cmd,
             cwd=REPO_ROOT,
-            env=env,
+            env=lane_env,
             stdout=log_file,
             stderr=subprocess.STDOUT,
             text=True,
             check=False,
         )
+    eval_returncode = eval_proc.returncode
+    if eval_returncode in RETRYABLE_EVALUATE_RETURNCODES:
+        with log_path.open("a", encoding="utf-8") as log_file:
+            log_file.write(
+                f"\n[WARN] evaluate exited with {eval_returncode}; retrying once.\n"
+            )
+            log_file.write("$ " + " ".join(evaluate_cmd) + "\n")
+            eval_proc = subprocess.run(
+                evaluate_cmd,
+                cwd=REPO_ROOT,
+                env=lane_env,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                text=True,
+                check=False,
+            )
+        eval_returncode = eval_proc.returncode
 
     verify_exit: int | None = None
-    if eval_proc.returncode == 0 and report_path.is_file():
+    if eval_returncode == 0 and report_path.is_file():
         verify_cmd = build_verify_command(
             python_exe=python_exe,
-            profile=profile,
+            profile=lane_profile,
             execution_mode=execution_mode,
             report_path=report_path,
         )
@@ -479,7 +738,7 @@ def run_lane(
             verify_proc = subprocess.run(
                 verify_cmd,
                 cwd=REPO_ROOT,
-                env=env,
+                env=lane_env,
                 stdout=verify_file,
                 stderr=log_file,
                 text=True,
@@ -496,7 +755,7 @@ def run_lane(
         lane_id=spec.lane_id,
         model_id=spec.model_id,
         preset=spec.preset_relpath,
-        evaluate_exit=eval_proc.returncode,
+        evaluate_exit=eval_returncode,
         verify_exit=verify_exit,
         report_path=str(published_report_path),
         verify_path=str(published_verify_path)
@@ -595,26 +854,30 @@ def run_sweep(args: argparse.Namespace) -> int:
         payload = []
         for spec in specs:
             lane_root = execution_root / "eval" / spec.slug
-            payload.append(
-                {
-                    "slug": spec.slug,
-                    "execution_mode": args.execution_mode,
-                    "evaluate": build_evaluate_command(
-                        spec,
-                        python_exe=args.python,
-                        profile=args.profile,
-                        device=args.device,
-                        execution_mode=args.execution_mode,
-                        lane_root=lane_root,
-                    ),
-                    "verify": build_verify_command(
-                        python_exe=args.python,
-                        profile=args.profile,
-                        execution_mode=args.execution_mode,
-                        report_path=lane_root / "report" / "evaluation.report.json",
-                    ),
-                }
-            )
+            item = {
+                "slug": spec.slug,
+                "execution_mode": args.execution_mode,
+                "evaluate": build_evaluate_command(
+                    spec,
+                    python_exe=args.python,
+                    profile=args.profile or spec.verify_profile,
+                    device=args.device,
+                    execution_mode=args.execution_mode,
+                    lane_root=lane_root,
+                ),
+                "verify": build_verify_command(
+                    python_exe=args.python,
+                    profile=args.profile or spec.verify_profile,
+                    execution_mode=args.execution_mode,
+                    report_path=lane_root / "report" / "evaluation.report.json",
+                ),
+            }
+            if args.execution_mode == "host":
+                item["prefetch"] = build_prefetch_command(
+                    spec,
+                    python_exe=args.python,
+                )
+            payload.append(item)
         print(json.dumps(payload, indent=2))
         return 0
 

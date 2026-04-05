@@ -112,6 +112,37 @@ _DIRECT_SUBMODULE_SPECS: dict[str, dict[str, tuple[str, str]]] = {
     },
 }
 
+_MODEL_ID_TYPE_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("qwen3_moe", ("qwen3_moe", "qwen3-moe")),
+    ("qwen3", ("qwen3",)),
+    (
+        "qwen2",
+        ("qwen2.5", "qwen2-5", "qwen2_5", "qwen1.5", "qwen1-5", "qwen1_5", "qwen2"),
+    ),
+    ("gemma4", ("gemma-4", "gemma4")),
+    ("gemma3", ("gemma-3", "gemma3")),
+    ("deberta-v2", ("deberta-v2", "deberta_v2", "debertav2")),
+    ("deberta", ("deberta",)),
+    ("distilbert", ("distilbert",)),
+    ("roberta", ("roberta",)),
+    ("electra", ("electra",)),
+    ("albert", ("albert",)),
+    ("bert", ("bert",)),
+    ("mbart", ("mbart",)),
+    ("bart", ("bart",)),
+    ("marian", ("marian", "opus-mt")),
+    ("t5", ("t5",)),
+    ("mixtral", ("mixtral",)),
+    ("mistral", ("mistral",)),
+    ("llama", ("llama",)),
+    ("olmo2", ("olmo-2", "olmo2")),
+    ("gpt_neox", ("gpt-neox", "gpt_neox")),
+    ("opt", ("facebook/opt", "/opt-", " opt-", "opt-")),
+    ("phi3", ("phi-3", "phi3")),
+    ("phi", ("phi-",)),
+    ("gpt2", ("gpt2",)),
+)
+
 
 @dataclass(frozen=True)
 class HFLoaderStrategy:
@@ -246,6 +277,17 @@ def _read_local_config(model_id: str) -> dict[str, Any] | None:
     return raw if isinstance(raw, dict) else None
 
 
+def _infer_model_type_from_model_id(model_id: str) -> str | None:
+    model_lower = _normalize_model_type(model_id)
+    if model_lower is None:
+        return None
+    padded = f" {model_lower} "
+    for model_type, hints in _MODEL_ID_TYPE_HINTS:
+        if any(hint in model_lower or hint in padded for hint in hints):
+            return model_type
+    return None
+
+
 def _import_symbol(module_path: str, symbol_name: str) -> Any:
     module = importlib.import_module(module_path)
     return getattr(module, symbol_name)
@@ -297,6 +339,8 @@ def resolve_core_loader_strategy(
     config_data = _read_local_config(model_id)
     if isinstance(config_data, dict):
         model_type = _normalize_model_type(config_data.get("model_type"))
+    if model_type is None:
+        model_type = _infer_model_type_from_model_id(model_id)
 
     if allow_direct_submodule and not resolve_trust_remote_code(kwargs):
         direct = _resolve_direct_submodule_loader(task, model_type)

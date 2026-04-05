@@ -444,12 +444,46 @@ def _load_tokenizer_with_factory_retry(
     except Exception as exc:
         if not _is_slow_tokenizer_fallback_candidate(exc):
             raise
-        tokenizer = tokenizer_factory.from_pretrained(
-            candidate,
-            use_fast=False,
-            **kwargs,
-        )
-        return cast("PreTrainedTokenizerBase", tokenizer)
+        try:
+            tokenizer = tokenizer_factory.from_pretrained(
+                candidate,
+                use_fast=False,
+                **kwargs,
+            )
+            return cast("PreTrainedTokenizerBase", tokenizer)
+        except Exception as slow_exc:
+            if not _is_slow_tokenizer_fallback_candidate(slow_exc):
+                raise
+            explicit_factory = _resolve_explicit_slow_tokenizer_factory(candidate)
+            if explicit_factory is None:
+                raise
+            tokenizer = explicit_factory.from_pretrained(candidate, **kwargs)
+            return cast("PreTrainedTokenizerBase", tokenizer)
+
+
+def _resolve_explicit_slow_tokenizer_factory(candidate: str) -> Any | None:
+    hint_blob, arch_blob, _ = _profile_hints(candidate)
+    hint_space = f"{hint_blob} {arch_blob}".strip()
+    for key, symbol_name in (
+        ("deberta-v2", "DebertaV2Tokenizer"),
+        ("deberta_v2", "DebertaV2Tokenizer"),
+        ("debertav2", "DebertaV2Tokenizer"),
+        ("deberta", "DebertaTokenizer"),
+        ("distilbert", "DistilBertTokenizer"),
+        ("roberta", "RobertaTokenizer"),
+        ("albert", "AlbertTokenizer"),
+        ("electra", "ElectraTokenizer"),
+        ("bert", "BertTokenizer"),
+    ):
+        if key not in hint_space:
+            continue
+        try:
+            import transformers
+
+            return getattr(transformers, symbol_name)
+        except (AttributeError, ImportError, ModuleNotFoundError):
+            return None
+    return None
 
 
 def _tokenizer_candidates(model_id: str) -> list[str]:
@@ -610,6 +644,8 @@ def _rope_decoder_selectors() -> dict[str, list[str]]:
             "self_attn.k_proj",
             "self_attn.v_proj",
             "self_attn.o_proj",
+            "linear_attn.in_proj_qkv",
+            "linear_attn.out_proj",
         ],
         "ffn": [
             "mlp.up_proj",

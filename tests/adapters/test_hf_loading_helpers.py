@@ -252,6 +252,32 @@ def test_resolve_core_loader_strategy_supports_multimodal_gemma4(
 
 
 @pytest.mark.unit
+def test_resolve_core_loader_strategy_infers_remote_model_type_from_model_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import invarlock.adapters.hf_loading as hf_loading
+
+    monkeypatch.setattr(
+        hf_loading,
+        "_import_symbol",
+        lambda module_path, symbol_name: f"{module_path}.{symbol_name}",
+    )
+
+    strategy = hf_loading.resolve_core_loader_strategy(
+        task="mlm",
+        model_id="prajjwal1/bert-tiny",
+        allow_direct_submodule=True,
+    )
+
+    assert strategy.strategy == "direct_submodule"
+    assert strategy.model_type == "bert"
+    assert (
+        strategy.loader_label
+        == "transformers.models.bert.modeling_bert.BertForMaskedLM"
+    )
+
+
+@pytest.mark.unit
 def test_resolve_core_loader_strategy_trust_remote_code_forces_auto(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
