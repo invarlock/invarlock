@@ -64,6 +64,12 @@ def _describe_run_report_health_error(
     primary_metric = metrics.get("primary_metric")
     if not isinstance(primary_metric, dict) or not primary_metric:
         return None
+    pairing_reason = metrics.get("window_pairing_reason")
+    pairing_reason_normalized = (
+        pairing_reason.strip().lower()
+        if isinstance(pairing_reason, str) and pairing_reason.strip()
+        else None
+    )
 
     degraded_reason = primary_metric.get("degraded_reason")
     reason_suffix = (
@@ -82,6 +88,11 @@ def _describe_run_report_health_error(
             continue
         field_value = primary_metric.get(field_name)
         if field_value is None:
+            continue
+        if (
+            field_name == "ratio_vs_baseline"
+            and pairing_reason_normalized == "no_baseline_reference"
+        ):
             continue
         if not _is_non_bool_finite_number(field_value):
             return (

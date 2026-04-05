@@ -240,6 +240,65 @@ def test_report_command_rejects_failed_subject_run_report(
 @patch("invarlock.reporting.report_contract.load_report_payload")
 @patch("invarlock.reporting.report_contract.save_evaluation_bundle")
 @patch("invarlock.reporting.report_contract.make_report")
+@patch("invarlock.reporting.report_contract.validate_report")
+def test_report_command_accepts_baseline_without_self_baseline_ratio(
+    mock_validate, mock_make_report, mock_save_bundle, mock_load
+):
+    run = {
+        "meta": {"model_id": "gpt2"},
+        "edit": {"name": "quant_rtn"},
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.5,
+                "ratio_vs_baseline": 1.05,
+            }
+        },
+    }
+    baseline = {
+        "meta": {"model_id": "gpt2"},
+        "edit": {"name": "baseline"},
+        "metrics": {
+            "window_pairing_reason": "no_baseline_reference",
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+                "ratio_vs_baseline": float("nan"),
+            },
+        },
+    }
+
+    mock_load.side_effect = lambda path: baseline if "baseline" in path else run
+    mock_make_report.return_value = {
+        "validation": {"safety_check": True},
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "preview": 10.0,
+            "final": 10.5,
+            "ratio_vs_baseline": 1.05,
+        },
+    }
+    mock_save_bundle.return_value = {"report": "evaluation.report.json"}
+    mock_validate.return_value = True
+
+    generate_reports(
+        run="run.json",
+        format="report",
+        compare=None,
+        baseline="baseline.json",
+        output=None,
+    )
+
+    mock_make_report.assert_called_once()
+    mock_validate.assert_called_once()
+    mock_save_bundle.assert_called_once()
+
+
+@patch("invarlock.reporting.report_contract.load_report_payload")
+@patch("invarlock.reporting.report_contract.save_evaluation_bundle")
+@patch("invarlock.reporting.report_contract.make_report")
 def test_report_command_rejects_non_finite_generated_evaluation_report(
     mock_make_report, mock_save_bundle, mock_load
 ):
@@ -292,6 +351,53 @@ def test_report_command_rejects_non_finite_generated_evaluation_report(
         )
 
     mock_save_bundle.assert_not_called()
+
+
+@patch("invarlock.reporting.report_contract.load_report_payload")
+@patch("invarlock.reporting.report_contract.make_report")
+def test_report_command_still_rejects_non_finite_input_ratio_without_pairing_reason(
+    mock_make_report, mock_load
+):
+    run = {
+        "meta": {"model_id": "gpt2"},
+        "edit": {"name": "quant_rtn"},
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.5,
+                "ratio_vs_baseline": 1.05,
+            }
+        },
+    }
+    baseline = {
+        "meta": {"model_id": "gpt2"},
+        "edit": {"name": "baseline"},
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+                "ratio_vs_baseline": float("nan"),
+            },
+        },
+    }
+
+    mock_load.side_effect = lambda path: baseline if "baseline" in path else run
+
+    with pytest.raises(
+        ValueError,
+        match="baseline run report with non-finite primary metric field 'ratio_vs_baseline'",
+    ):
+        generate_reports(
+            run="run.json",
+            format="report",
+            compare=None,
+            baseline="baseline.json",
+            output=None,
+        )
+
+    mock_make_report.assert_not_called()
 
 
 def test_load_run_report_file(tmp_path: Path):
