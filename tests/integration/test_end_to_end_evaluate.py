@@ -58,7 +58,10 @@ def test_gpt2_smoke_campaign_script_is_executable() -> None:
     assert "prefetch_hf_assets_on_host" in contents
     assert "ensure_current_runtime_image" in contents
     assert 'echo "[smoke] refreshing local attested runtime image"' in contents
+    assert 'echo "[smoke] refreshing local CUDA attested runtime image"' in contents
     assert "make runtime-image" in contents
+    assert "make runtime-image-cuda" in contents
+    assert 'export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"' in contents
     assert "prefetching GPT-2 + WikiText-2 into host HF cache" in contents
     assert "evaluation report verification failed" in contents
     assert "proof-pack verification failed" in contents
@@ -78,8 +81,11 @@ def test_tiny_attested_smoke_campaign_script_is_executable() -> None:
     assert "prefetch_tiny_model_on_host" in contents
     assert "ensure_current_runtime_image" in contents
     assert 'echo "[smoke] refreshing local attested runtime image"' in contents
+    assert 'echo "[smoke] refreshing local CUDA attested runtime image"' in contents
     assert "make runtime-image" in contents
+    assert "make runtime-image-cuda" in contents
     assert "INVARLOCK_RUNTIME_IMAGE_DIGEST" in contents
+    assert 'export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"' in contents
     assert 'SMOKE_DEVICE="${INVARLOCK_SMOKE_DEVICE:-auto}"' in contents
     assert 'echo "[smoke] device=$SMOKE_DEVICE"' in contents
     assert "runtime_verify_diagnostics" in contents

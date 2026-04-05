@@ -152,12 +152,44 @@ def test_runtime_image_prefers_local_build_when_available(
     )
     monkeypatch.setattr(
         runtime_security_helpers,
+        "_host_nvidia_visible",
+        lambda: False,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image=None, *, engine=None: image == "invarlock-runtime:local",
         raising=True,
     )
 
     assert runtime_security.resolve_runtime_image() == "invarlock-runtime:local"
+
+
+def test_runtime_image_prefers_local_cuda_build_when_gpu_visible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("INVARLOCK_RUNTIME_IMAGE", raising=False)
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "resolve_container_engine",
+        lambda: "docker",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_host_nvidia_visible",
+        lambda: True,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "container_image_available_locally",
+        lambda image=None, *, engine=None: image == "invarlock-runtime:cuda-local",
+        raising=True,
+    )
+
+    assert runtime_security.resolve_runtime_image() == "invarlock-runtime:cuda-local"
 
 
 def test_runtime_image_defaults_to_registry_when_local_build_missing(

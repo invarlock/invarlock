@@ -108,9 +108,8 @@ def compute_validation_flags(
     ratio_limit = (
         ratio_max_bound if ratio_max_bound is not None else float(ratio_limit_base)
     )
-    target_ratio_value = _coerce_finite_float(target_ratio)
-    if target_ratio_value is not None and target_ratio_value > 0:
-        ratio_limit = min(ratio_limit, target_ratio_value)
+    # target_pm_ratio is an auto-tuning objective, not a report acceptance gate.
+    # Keep gate evaluation anchored to the resolved tier / explicit acceptance range.
 
     # Canonical Gates
     # 1. Drift gate: by default 0.95 ≤ final/preview ≤ 1.05 (configurable)

@@ -32,6 +32,24 @@ def load_report_payload(path: str | Path) -> RunReport:
     return cast(RunReport, payload)
 
 
+def _extract_saved_provenance_env_flags(
+    report: RunReport | dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if not isinstance(report, dict):
+        return None
+    provenance = report.get("provenance")
+    if isinstance(provenance, dict):
+        provenance_env_flags = provenance.get("env_flags")
+        if isinstance(provenance_env_flags, dict) and provenance_env_flags:
+            return dict(provenance_env_flags)
+    meta = report.get("meta")
+    if isinstance(meta, dict):
+        meta_env_flags = meta.get("env_flags")
+        if isinstance(meta_env_flags, dict) and meta_env_flags:
+            return dict(meta_env_flags)
+    return None
+
+
 def _is_non_bool_finite_number(value: Any) -> bool:
     try:
         if isinstance(value, bool):
@@ -191,7 +209,11 @@ def generate_reports(
     if "report" in formats and baseline_report is not None:
         _assert_report_can_generate_evaluation(primary_report, role="subject")
         _assert_report_can_generate_evaluation(baseline_report, role="baseline")
-        evaluation_report = make_report(primary_report, baseline_report)
+        evaluation_report = make_report(
+            primary_report,
+            baseline_report,
+            provenance_env_flags=_extract_saved_provenance_env_flags(primary_report),
+        )
         _assert_evaluation_report_is_finite(evaluation_report)
         validate_report(evaluation_report)
         validation_block = compute_console_validation_block(evaluation_report)
@@ -214,6 +236,7 @@ def generate_reports(
                 run_report=primary_report,
                 output_dir=output_dir,
                 evaluation_report=evaluation_report,
+                source_run_path=run,
             )
         )
 

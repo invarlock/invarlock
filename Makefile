@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install test test-assurance lint format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-smoke runtime-smoke-podman runtime-verify
+.PHONY: help install dev-install test test-assurance lint format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-verify
 
 PYTHON ?= $(shell bash scripts/select_python.sh)
 PIP := $(PYTHON) -m pip
@@ -14,6 +14,9 @@ PRE_COMMIT := $(PYTHON) -m pre_commit
 MODEL_EVIDENCE_ARGS ?=
 CONTAINER_ENGINE ?= $(shell if command -v docker >/dev/null 2>&1; then echo docker; elif command -v podman >/dev/null 2>&1; then echo podman; fi)
 RUNTIME_IMAGE ?= invarlock-runtime:local
+RUNTIME_IMAGE_CUDA ?= invarlock-runtime:cuda-local
+RUNTIME_IMAGE_CUDA_REQUIREMENTS ?= requirements/workflows/runtime-image-py312-cu128.txt
+RUNTIME_IMAGE_CUDA_INDEX_URL ?= https://download.pytorch.org/whl/cu128
 RUNTIME_IMAGE_DIGEST ?= sha256:local-runtime-image
 
 # Keep repo-wide coverage practical while still exercising the CLI command
@@ -245,6 +248,19 @@ runtime-image:  ## Build the local container runtime image used for secure-defau
 runtime-image-podman: CONTAINER_ENGINE=podman
 runtime-image-podman: runtime-image  ## Build the local container runtime image with Podman
 
+runtime-image-cuda:  ## Build the local CUDA container runtime image for GPU-backed secure-default execution
+	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ Docker or Podman is required."; exit 1; }
+	@if $(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE_CUDA) >/dev/null 2>&1; then $(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE_CUDA) >/dev/null 2>&1 || true; fi
+	$(CONTAINER_ENGINE) build \
+		--build-arg RUNTIME_REQUIREMENTS_AMD64=$(RUNTIME_IMAGE_CUDA_REQUIREMENTS) \
+		--build-arg RUNTIME_REQUIREMENTS_ARM64=requirements/workflows/runtime-image-py312-aarch64.txt \
+		--build-arg PYTORCH_EXTRA_INDEX_URL=$(RUNTIME_IMAGE_CUDA_INDEX_URL) \
+		-f runtime/Dockerfile \
+		-t $(RUNTIME_IMAGE_CUDA) .
+
+runtime-image-cuda-podman: CONTAINER_ENGINE=podman
+runtime-image-cuda-podman: runtime-image-cuda  ## Build the local CUDA container runtime image with Podman
+
 runtime-smoke:  ## Smoke the local container runtime image
 	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ Docker or Podman is required."; exit 1; }
 	$(CONTAINER_ENGINE) run --rm \
@@ -254,6 +270,13 @@ runtime-smoke:  ## Smoke the local container runtime image
 
 runtime-smoke-podman: CONTAINER_ENGINE=podman
 runtime-smoke-podman: runtime-smoke  ## Smoke the local container runtime image with Podman
+
+runtime-smoke-cuda: RUNTIME_IMAGE=$(RUNTIME_IMAGE_CUDA)
+runtime-smoke-cuda: runtime-smoke  ## Smoke the local CUDA container runtime image
+
+runtime-smoke-cuda-podman: CONTAINER_ENGINE=podman
+runtime-smoke-cuda-podman: RUNTIME_IMAGE=$(RUNTIME_IMAGE_CUDA)
+runtime-smoke-cuda-podman: runtime-smoke  ## Smoke the local CUDA container runtime image with Podman
 
 runtime-verify:  ## Smoke the Python runtime verifier on the fixture bundle
 	PYTHONPATH=src $(PYTHON) -m invarlock.cli.runtime_verify \

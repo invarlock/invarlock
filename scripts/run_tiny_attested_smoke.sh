@@ -21,10 +21,22 @@ export INVARLOCK_ALLOW_NETWORK="${INVARLOCK_ALLOW_NETWORK:-1}"
 export INVARLOCK_DEDUP_TEXTS="${INVARLOCK_DEDUP_TEXTS:-1}"
 export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
 
-if [[ "$MODE" == "attested" && -z "${INVARLOCK_RUNTIME_IMAGE:-}" ]]; then
+host_gpu_visible() {
+  [[ -e /dev/nvidiactl ]] || command -v nvidia-smi >/dev/null 2>&1
+}
+
+seed_local_runtime_image() {
+  if host_gpu_visible && docker image inspect invarlock-runtime:cuda-local >/dev/null 2>&1; then
+    export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"
+    return 0
+  fi
   if docker image inspect invarlock-runtime:local >/dev/null 2>&1; then
     export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:local"
   fi
+}
+
+if [[ "$MODE" == "attested" && -z "${INVARLOCK_RUNTIME_IMAGE:-}" ]]; then
+  seed_local_runtime_image
 fi
 
 mkdir -p "$WORK_ROOT"
@@ -92,10 +104,18 @@ ensure_current_runtime_image() {
   if [[ "$MODE" != "attested" ]]; then
     return 0
   fi
-  if [[ -n "${INVARLOCK_RUNTIME_IMAGE:-}" && "${INVARLOCK_RUNTIME_IMAGE}" != "invarlock-runtime:local" ]]; then
+  if [[ -n "${INVARLOCK_RUNTIME_IMAGE:-}" \
+    && "${INVARLOCK_RUNTIME_IMAGE}" != "invarlock-runtime:local" \
+    && "${INVARLOCK_RUNTIME_IMAGE}" != "invarlock-runtime:cuda-local" ]]; then
     return 0
   fi
   if ! command -v docker >/dev/null 2>&1 || ! command -v make >/dev/null 2>&1; then
+    return 0
+  fi
+  if host_gpu_visible; then
+    echo "[smoke] refreshing local CUDA attested runtime image"
+    make runtime-image-cuda
+    export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"
     return 0
   fi
   echo "[smoke] refreshing local attested runtime image"

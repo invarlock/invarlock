@@ -126,6 +126,8 @@ _apply_validation_allowlist_schema(REPORT_JSON_SCHEMA, _VALIDATION_ALLOWLIST_KEY
 def make_report(
     report: RunReport,
     baseline: RunReport | dict[str, Any],
+    *,
+    provenance_env_flags: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Generate an evaluation report from a RunReport and baseline comparison."""
     NON_FATAL_EXCEPTIONS = (
@@ -503,6 +505,7 @@ def make_report(
         compute_report_digest_fn=_compute_report_digest,
         collect_backend_versions_fn=_collect_backend_versions,
         compute_edit_digest_fn=_compute_edit_digest,
+        env_flags_payload=provenance_env_flags,
     )
 
     moe_section = report_build_context_mod.build_moe_section(

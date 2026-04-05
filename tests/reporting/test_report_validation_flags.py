@@ -100,6 +100,21 @@ def test_tiny_relax_relaxes_tokens_floor_for_ppl():
     assert flags.get("primary_metric_acceptable") is True
 
 
+def test_compute_validation_flags_does_not_treat_target_ratio_as_gate_cap() -> None:
+    flags = report_validation_mod.compute_validation_flags(
+        ppl={"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.03},
+        spectral={"caps_applied": 0},
+        rmt={"stable": True},
+        invariants={"status": "pass"},
+        tier="balanced",
+        target_ratio=1.0,
+        primary_metric={"kind": "ppl_causal", "ratio_vs_baseline": 1.03},
+    )
+
+    assert isinstance(flags, dict)
+    assert flags.get("primary_metric_acceptable") is True
+
+
 def test_compute_validation_flags_handles_policy_cast_failures(monkeypatch) -> None:
     monkeypatch.delenv("INVARLOCK_TINY_RELAX", raising=False)
     fake_policies = {

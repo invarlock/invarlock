@@ -140,6 +140,12 @@ def test_resolve_runtime_image_prefers_explicit_local_and_default(monkeypatch) -
     )
     monkeypatch.setattr(
         runtime_security_helpers,
+        "_host_nvidia_visible",
+        lambda: False,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security_helpers,
         "container_image_available_locally",
         lambda image, engine=None: image
         == runtime_security.RUNTIME_IMAGE_LOCAL_DEFAULT,
@@ -159,6 +165,34 @@ def test_resolve_runtime_image_prefers_explicit_local_and_default(monkeypatch) -
     assert (
         runtime_security.resolve_runtime_image()
         == runtime_security.RUNTIME_IMAGE_DEFAULT
+    )
+
+
+def test_resolve_runtime_image_prefers_local_cuda_when_gpu_visible(monkeypatch) -> None:
+    monkeypatch.delenv(runtime_security.RUNTIME_IMAGE_ENV, raising=False)
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "resolve_container_engine",
+        lambda: "docker",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_host_nvidia_visible",
+        lambda: True,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "container_image_available_locally",
+        lambda image, engine=None: image
+        == runtime_security.RUNTIME_IMAGE_CUDA_LOCAL_DEFAULT,
+        raising=True,
+    )
+
+    assert (
+        runtime_security.resolve_runtime_image()
+        == runtime_security.RUNTIME_IMAGE_CUDA_LOCAL_DEFAULT
     )
 
 

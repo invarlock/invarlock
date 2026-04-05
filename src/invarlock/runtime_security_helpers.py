@@ -29,6 +29,7 @@ RUNTIME_MANIFEST_FILENAME = "runtime.manifest.json"
 RUNTIME_MANIFEST_VERSION = 1
 RUNTIME_VERIFIER_CONTRACT_VERSION = "runtime-manifest-v1"
 RUNTIME_IMAGE_LOCAL_DEFAULT = "invarlock-runtime:local"
+RUNTIME_IMAGE_CUDA_LOCAL_DEFAULT = "invarlock-runtime:cuda-local"
 RUNTIME_IMAGE_DEFAULT = "ghcr.io/invarlock/invarlock-runtime:latest"
 _CONTAINER_INSPECT_TIMEOUT_SECONDS = 30
 _CONTAINER_EXECUTION_TIMEOUT_SECONDS = 24 * 60 * 60
@@ -48,6 +49,7 @@ __all__ = [
     "CONTAINER_ENGINE_ENV",
     "RUNTIME_IMAGE_ENV",
     "RUNTIME_IMAGE_DIGEST_ENV",
+    "RUNTIME_IMAGE_CUDA_LOCAL_DEFAULT",
     "RUNTIME_MANIFEST_FILENAME",
     "RUNTIME_MANIFEST_VERSION",
     "RUNTIME_VERIFIER_CONTRACT_VERSION",
@@ -225,6 +227,10 @@ def resolve_runtime_image() -> str:
     if image:
         return image
     engine = resolve_container_engine()
+    if engine is not None and _host_nvidia_visible() and container_image_available_locally(
+        RUNTIME_IMAGE_CUDA_LOCAL_DEFAULT, engine=engine
+    ):
+        return RUNTIME_IMAGE_CUDA_LOCAL_DEFAULT
     if engine is not None and container_image_available_locally(
         RUNTIME_IMAGE_LOCAL_DEFAULT, engine=engine
     ):
@@ -247,7 +253,10 @@ def resolve_runtime_image_digest() -> str | None:
 
 
 def _attested_runtime_image_ref(image_ref: str, image_digest: str | None) -> str:
-    if image_ref == RUNTIME_IMAGE_LOCAL_DEFAULT:
+    if image_ref in {
+        RUNTIME_IMAGE_LOCAL_DEFAULT,
+        RUNTIME_IMAGE_CUDA_LOCAL_DEFAULT,
+    }:
         return image_ref
     if "@sha256:" in image_ref:
         return image_ref
@@ -297,6 +306,12 @@ def _inspect_container_image(engine: str, image: str) -> tuple[bool, str | None]
     if len(lines) >= 2 and lines[1].startswith("sha256:"):
         return True, lines[1]
     return True, None
+
+
+def _runtime_image_build_command(image: str) -> str:
+    if image == RUNTIME_IMAGE_CUDA_LOCAL_DEFAULT:
+        return "make runtime-image-cuda"
+    return "make runtime-image"
 
 
 def resolve_container_engine() -> str | None:
@@ -725,7 +740,7 @@ def build_container_command(plan: Any) -> list[str]:
     ):
         raise RuntimeError(
             "Host execution is disabled by default and runtime image "
-            f"{image!r} is not available locally. Build it with `make runtime-image` "
+            f"{image!r} is not available locally. Build it with `{_runtime_image_build_command(image)}` "
             f"or set {ALLOW_NETWORK_ENV}=1 to allow pulling the image."
         )
     pythonpath_entries, pythonpath_mounts = _container_pythonpath_entries(cwd=cwd)
@@ -792,7 +807,7 @@ def build_container_python_command(
     ):
         raise RuntimeError(
             "Host execution is disabled by default and runtime image "
-            f"{image!r} is not available locally. Build it with `make runtime-image` "
+            f"{image!r} is not available locally. Build it with `{_runtime_image_build_command(image)}` "
             f"or set {ALLOW_NETWORK_ENV}=1 to allow pulling the image."
         )
     pythonpath_entries, pythonpath_mounts = _container_pythonpath_entries(cwd=cwd)
