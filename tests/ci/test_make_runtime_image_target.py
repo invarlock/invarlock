@@ -1,0 +1,31 @@
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+
+def _get_make_target_block(text: str, target: str) -> str | None:
+    pattern = re.compile(rf"^\s*{re.escape(target)}\s*:\s*(?:##.*)?$", re.MULTILINE)
+    match = pattern.search(text)
+    if not match:
+        return None
+
+    lines: list[str] = []
+    for line in text[match.end() :].splitlines():
+        if line and re.match(r"^[A-Za-z0-9_.-]+\s*:\s*", line):
+            break
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def test_runtime_image_target_replaces_existing_local_tag_before_build() -> None:
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    data = makefile.read_text(encoding="utf-8")
+    block = _get_make_target_block(data, "runtime-image")
+
+    assert block is not None, "runtime-image target not found in Makefile"
+    assert "$(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE)" in block
+    assert "$(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE)" in block
+    assert (
+        "$(CONTAINER_ENGINE) build -f runtime/Dockerfile -t $(RUNTIME_IMAGE) ." in block
+    )

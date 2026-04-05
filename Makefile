@@ -239,6 +239,7 @@ model-evidence-sweep:  ## Run the maintained shipped-model evidence sweep
 
 runtime-image:  ## Build the local container runtime image used for secure-default execution
 	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ Docker or Podman is required."; exit 1; }
+	@if $(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE) >/dev/null 2>&1; then $(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE) >/dev/null 2>&1 || true; fi
 	$(CONTAINER_ENGINE) build -f runtime/Dockerfile -t $(RUNTIME_IMAGE) .
 
 runtime-image-podman: CONTAINER_ENGINE=podman
