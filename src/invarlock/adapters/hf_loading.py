@@ -29,11 +29,19 @@ _AUTO_LOADER_SPECS: dict[str, tuple[str, str]] = {
 _DIRECT_SUBMODULE_SPECS: dict[str, dict[str, tuple[str, str]]] = {
     "causal": {
         "gpt2": ("transformers.models.gpt2.modeling_gpt2", "GPT2LMHeadModel"),
+        "gpt_oss": (
+            "transformers.models.gpt_oss.modeling_gpt_oss",
+            "GptOssForCausalLM",
+        ),
         "opt": ("transformers.models.opt.modeling_opt", "OPTForCausalLM"),
         "llama": ("transformers.models.llama.modeling_llama", "LlamaForCausalLM"),
         "mistral": (
             "transformers.models.mistral.modeling_mistral",
             "MistralForCausalLM",
+        ),
+        "mistral3": (
+            "transformers.models.mistral3.modeling_mistral3",
+            "Mistral3ForConditionalGeneration",
         ),
         "mixtral": (
             "transformers.models.mixtral.modeling_mixtral",
@@ -109,10 +117,15 @@ _DIRECT_SUBMODULE_SPECS: dict[str, dict[str, tuple[str, str]]] = {
             "transformers.models.gemma4.modeling_gemma4",
             "Gemma4ForConditionalGeneration",
         ),
+        "mistral3": (
+            "transformers.models.mistral3.modeling_mistral3",
+            "Mistral3ForConditionalGeneration",
+        ),
     },
 }
 
 _MODEL_ID_TYPE_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("mistral3", ("ministral-3", "ministral3", "mistral3")),
     ("qwen3_moe", ("qwen3_moe", "qwen3-moe")),
     ("qwen3", ("qwen3",)),
     (
@@ -147,6 +160,7 @@ _MODEL_ID_TYPE_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("llama", ("llama",)),
     ("olmo2", ("olmo-2", "olmo2")),
     ("gpt_neox", ("gpt-neox", "gpt_neox")),
+    ("gpt_oss", ("gpt-oss", "gpt_oss")),
     ("opt", ("facebook/opt", "/opt-", " opt-", "opt-")),
     ("phi3", ("phi-3", "phi3")),
     ("phi", ("phi-",)),

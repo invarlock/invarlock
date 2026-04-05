@@ -1,6 +1,6 @@
 {
   "format_version": "model-family-catalog-v1",
-  "as_of": "2026-04-03",
+  "as_of": "2026-04-05",
   "declared_support": [
     {
       "family_id": "gpt2-causal-lm",
@@ -43,6 +43,25 @@
         "configs/calibration/null_sweep_mistral_7b.yaml"
       ],
       "notes": "Derived from support_matrix lane mistral-7b-causal-hf."
+    },
+    {
+      "family_id": "ministral-3-text-causal-lm",
+      "display_name": "Ministral 3 causal LM (text-only eval)",
+      "modalities": ["text"],
+      "task_role": "causal_lm",
+      "state": "supported_experimental",
+      "representative_models": [
+        "mistralai/Ministral-3-8B-Instruct-2512-BF16",
+        "mistralai/Ministral-3-14B-Instruct-2512-BF16"
+      ],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/causal_lm/ministral3_8b_512.yaml",
+        "configs/calibration/null_sweep_ministral3_8b.yaml",
+        "configs/presets/causal_lm/ministral3_14b_512.yaml",
+        "configs/calibration/null_sweep_ministral3_14b.yaml"
+      ],
+      "notes": "Derived from support_matrix lane ministral-3-text-causal-hf. Public support is text-only in phase 1; image-text evaluation remains an explicit multimodal follow-up."
     },
     {
       "family_id": "qwen2-7b-causal-lm",
@@ -301,6 +320,20 @@
         "src/invarlock/cli/adapter_auto.py"
       ],
       "notes": "These families are available through shared GPT-style loader and profile paths rather than dedicated public support lanes."
+    },
+    {
+      "family_id": "gpt-oss",
+      "display_name": "GPT-OSS",
+      "modalities": ["text"],
+      "task_role": "causal_lm",
+      "state": "profile_shared_alias",
+      "representative_models": ["openai/gpt-oss-20b"],
+      "repo_evidence": [
+        "src/invarlock/model_profile.py",
+        "src/invarlock/adapters/hf_loading.py",
+        "src/invarlock/cli/adapter_auto.py"
+      ],
+      "notes": "GPT-OSS rides the shared GPT-style profile path, with an explicit HF causal loader hint for the published open-weight checkpoint."
     },
     {
       "family_id": "falcon",

@@ -275,3 +275,50 @@ def test_hf_mlm_loader_retries_with_direct_submodule_hint_for_remote_model_id(
 
     assert loaded == {"loader": "bert-direct"}
     assert calls == ["primary", "bert-direct"]
+
+
+def test_hf_causal_loader_retries_with_direct_submodule_hint_for_remote_model_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from invarlock.adapters import hf_causal as hf_causal_mod
+    from invarlock.adapters.hf_causal import HF_Causal_Adapter
+    from invarlock.adapters.hf_loading import HFLoaderStrategy
+
+    calls: list[str] = []
+    strategies = iter(
+        (
+            HFLoaderStrategy("causal", "auto", "primary", "primary"),
+            HFLoaderStrategy(
+                "causal",
+                "direct_submodule",
+                "mistral3-direct",
+                "mistral3-direct",
+            ),
+        )
+    )
+
+    monkeypatch.setattr(
+        hf_causal_mod,
+        "resolve_core_loader_strategy",
+        lambda *args, **kwargs: next(strategies),
+    )
+
+    class DummyAdapter(HF_Causal_Adapter):
+        def _load_pretrained_model(self, loader, model_id, **kwargs):  # noqa: ANN001
+            calls.append(str(loader))
+            if loader != "mistral3-direct":
+                raise ValueError(
+                    "Unrecognized configuration class for this kind of AutoModelForCausalLM"
+                )
+            return {"loader": loader}
+
+        def _safe_to_device(self, model, device):  # noqa: ANN001
+            return model
+
+    loaded = DummyAdapter().load_model(
+        "mistralai/Ministral-3-8B-Instruct-2512-BF16",
+        device="cpu",
+    )
+
+    assert loaded == {"loader": "mistral3-direct"}
+    assert calls == ["primary", "mistral3-direct"]

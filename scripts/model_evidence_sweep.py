@@ -161,6 +161,20 @@ CURRENT_SUPPORTED_EXPERIMENTAL_LANES: tuple[EvidenceLane, ...] = (
         preset_relpath="configs/presets/causal_lm/gemma4_e2b_512.yaml",
         adapter="hf_causal",
     ),
+    EvidenceLane(
+        slug="ministral3_8b",
+        lane_id="ministral-3-text-causal-hf",
+        family="Ministral 3 causal LM (text-only eval)",
+        model_id="mistralai/Ministral-3-8B-Instruct-2512-BF16",
+        preset_relpath="configs/presets/causal_lm/ministral3_8b_512.yaml",
+    ),
+    EvidenceLane(
+        slug="ministral3_14b",
+        lane_id="ministral-3-text-causal-hf",
+        family="Ministral 3 causal LM (text-only eval)",
+        model_id="mistralai/Ministral-3-14B-Instruct-2512-BF16",
+        preset_relpath="configs/presets/causal_lm/ministral3_14b_512.yaml",
+    ),
 )
 
 CURRENT_PUBLISHED_BASIS_LANES: tuple[EvidenceLane, ...] = (

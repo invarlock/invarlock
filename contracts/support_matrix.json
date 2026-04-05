@@ -45,6 +45,16 @@
       "provenance_source": "docs/README.md#support-matrix"
     },
     {
+      "lane_id": "ministral-3-text-causal-hf",
+      "family": "Ministral 3 causal LM (text-only eval)",
+      "runtime": "huggingface-pytorch",
+      "adapter": "hf_causal",
+      "support_tier": "supported_experimental",
+      "evidence_status": "repo_included_pilot_config",
+      "docs_label": "No, repo-included pilot config only",
+      "provenance_source": "docs/README.md#support-matrix"
+    },
+    {
       "lane_id": "qwen2-7b-causal-hf",
       "family": "Qwen2 7B causal LM",
       "runtime": "huggingface-pytorch",

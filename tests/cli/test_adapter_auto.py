@@ -23,6 +23,11 @@ def test_resolve_auto_adapter_mistral(tmp_path):
     assert resolve_auto_adapter(str(model_dir)) == "hf_causal"
 
 
+def test_resolve_auto_adapter_mistral3(tmp_path):
+    model_dir = _write_cfg(tmp_path, "mistral3", "Mistral3ForConditionalGeneration")
+    assert resolve_auto_adapter(str(model_dir)) == "hf_causal"
+
+
 def test_resolve_auto_adapter_qwen(tmp_path):
     model_dir = _write_cfg(tmp_path, "qwen2", "Qwen2ForCausalLM")
     assert resolve_auto_adapter(str(model_dir)) == "hf_causal"
@@ -55,6 +60,11 @@ def test_resolve_auto_adapter_bert(tmp_path):
 
 def test_resolve_auto_adapter_gpt_fallback(tmp_path):
     model_dir = _write_cfg(tmp_path, "gpt2", "GPT2LMHeadModel")
+    assert resolve_auto_adapter(str(model_dir)) == "hf_causal"
+
+
+def test_resolve_auto_adapter_gpt_oss(tmp_path):
+    model_dir = _write_cfg(tmp_path, "gpt_oss", "GptOssForCausalLM")
     assert resolve_auto_adapter(str(model_dir)) == "hf_causal"
 
 

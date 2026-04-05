@@ -80,6 +80,13 @@ def test_local_profile_config_helpers_tolerate_invalid_utf8(tmp_path: Path) -> N
         ),
         (
             {
+                "model_type": "mistral3",
+                "architectures": ["Mistral3ForConditionalGeneration"],
+            },
+            "mistral",
+        ),
+        (
+            {
                 "model_type": "gemma3",
                 "architectures": ["Gemma3ForConditionalGeneration"],
             },
@@ -91,6 +98,13 @@ def test_local_profile_config_helpers_tolerate_invalid_utf8(tmp_path: Path) -> N
                 "architectures": ["Gemma4ForConditionalGeneration"],
             },
             "gemma",
+        ),
+        (
+            {
+                "model_type": "gpt_oss",
+                "architectures": ["GptOssForCausalLM"],
+            },
+            "gpt2",
         ),
         (
             {

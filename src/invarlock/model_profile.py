@@ -798,7 +798,10 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
         is_encoder_decoder
         or (
             seq2seq_arch
-            and not any(keyword in model_lower for keyword in ("gemma3", "gemma4"))
+            and not any(
+                keyword in model_lower
+                for keyword in ("gemma3", "gemma4", "mistral3", "ministral")
+            )
         )
         or any(keyword in model_lower for keyword in ("t5", "bart"))
     ):
@@ -813,17 +816,23 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
             cert_lints=(),
         )
 
+    causal_family_aliases = (
+        ("mixtral", "mixtral"),
+        ("ministral", "mistral"),
+        ("mistral", "mistral"),
+        ("qwen", "qwen"),
+        ("yi", "yi"),
+        ("llama", "llama"),
+        ("gemma", "gemma"),
+        ("olmo", "olmo"),
+    )
     if any(
-        keyword in adapter_lower
-        for keyword in ("llama", "mistral", "mixtral", "qwen", "yi", "gemma", "olmo")
-    ) or any(
-        keyword in model_lower
-        for keyword in ("llama", "mistral", "mixtral", "qwen", "yi", "gemma", "olmo")
-    ):
+        keyword in adapter_lower for keyword, _family in causal_family_aliases
+    ) or any(keyword in model_lower for keyword, _family in causal_family_aliases):
         family = "causal"
-        for keyword in ("mixtral", "mistral", "qwen", "yi", "llama", "gemma", "olmo"):
+        for keyword, mapped_family in causal_family_aliases:
             if keyword in adapter_lower or keyword in model_lower:
-                family = keyword
+                family = mapped_family
                 break
         return ModelProfile(
             family=family,

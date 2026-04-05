@@ -126,7 +126,7 @@ def test_repo_mentioned_gpu_suite_includes_basis_canaries_and_experimental() -> 
         shard_count=1,
     )
 
-    assert len(specs) == 16
+    assert len(specs) == 18
     slugs = {lane.slug for lane in specs}
     assert {
         "gpt2_public",
@@ -135,6 +135,8 @@ def test_repo_mentioned_gpu_suite_includes_basis_canaries_and_experimental() -> 
         "tiny_gpt2_canary",
         "bert_tiny_canary",
         "mistral_7b",
+        "ministral3_8b",
+        "ministral3_14b",
         "qwen2_7b",
         "gemma4_e2b",
     }.issubset(slugs)
@@ -185,6 +187,7 @@ def test_model_catalog_gpu_suite_covers_public_catalog_representative_models() -
         "bert_base_uncased",
         "roberta_base",
         "mistralai_mistral_7b_v0_1",
+        "openai_gpt_oss_20b",
         "qwen_qwen2_7b",
         "microsoft_phi_4_reasoning_plus",
         "google_gemma_4_e4b_it",

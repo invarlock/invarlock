@@ -156,7 +156,16 @@ def test_resolve_auto_adapter_additional_family_paths(tmp_path: Path) -> None:
 
 
 def test_resolve_auto_adapter_causal_model_type_only_hints(tmp_path: Path) -> None:
-    for model_type in ("llama", "qwen3", "qwen3_moe", "gemma3", "gemma4", "olmo2"):
+    for model_type in (
+        "llama",
+        "mistral3",
+        "qwen3",
+        "qwen3_moe",
+        "gemma3",
+        "gemma4",
+        "gpt_oss",
+        "olmo2",
+    ):
         model_dir = tmp_path / model_type
         model_dir.mkdir()
         (model_dir / "config.json").write_text(

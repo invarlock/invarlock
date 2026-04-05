@@ -408,6 +408,16 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
                     kwargs=kwargs,
                     allow_direct_submodule=_ALLOW_DIRECT_SUBMODULE,
                 )
+                direct_strategy = (
+                    resolve_core_loader_strategy(
+                        task="causal",
+                        model_id=model_id,
+                        kwargs=kwargs,
+                        allow_direct_submodule=True,
+                    )
+                    if strategy.strategy == "auto"
+                    else strategy
+                )
                 auto_strategy = (
                     strategy
                     if strategy.strategy == "auto"
@@ -434,6 +444,24 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
                         **kwargs,
                     )
             except ModelLoadError:
+                if (
+                    strategy.strategy == "auto"
+                    and direct_strategy.strategy == "direct_submodule"
+                ):
+                    self._last_loader_strategy = direct_strategy.strategy
+                    self._last_loader_label = direct_strategy.loader_label
+                    with wrap_errors(
+                        ModelLoadError,
+                        "E201",
+                        f"MODEL-LOAD-FAILED: {direct_strategy.loader_label}",
+                        lambda e: {"model_id": model_id},
+                    ):
+                        model = self._load_pretrained_model(
+                            direct_strategy.loader,
+                            model_id,
+                            **kwargs,
+                        )
+                    return self._safe_to_device(model, device)
                 if strategy.strategy == "auto":
                     raise
                 self._last_loader_strategy = auto_strategy.strategy
