@@ -121,7 +121,17 @@ _MODEL_ID_TYPE_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ),
     ("gemma4", ("gemma-4", "gemma4")),
     ("gemma3", ("gemma-3", "gemma3")),
-    ("deberta-v2", ("deberta-v2", "deberta_v2", "debertav2")),
+    (
+        "deberta-v2",
+        (
+            "deberta-v2",
+            "deberta_v2",
+            "debertav2",
+            "deberta-v3",
+            "deberta_v3",
+            "debertav3",
+        ),
+    ),
     ("deberta", ("deberta",)),
     ("distilbert", ("distilbert",)),
     ("roberta", ("roberta",)),
