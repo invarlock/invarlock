@@ -5,7 +5,109 @@ from unittest.mock import patch
 
 import pytest
 
-from invarlock.reporting.report_contract import generate_reports
+from invarlock.reporting.report_contract import (
+    _assert_evaluation_report_is_finite,
+    _describe_run_report_health_error,
+    _extract_saved_provenance_env_flags,
+    _is_non_bool_finite_number,
+    generate_reports,
+)
+
+
+def test_extract_saved_provenance_env_flags_prefers_provenance_then_meta():
+    assert _extract_saved_provenance_env_flags(None) is None
+    assert (
+        _extract_saved_provenance_env_flags(
+            {"provenance": {"env_flags": {}}, "meta": None}
+        )
+        is None
+    )
+    assert _extract_saved_provenance_env_flags(
+        {
+            "provenance": {"env_flags": {"cuda_matmul_allow_tf32": False}},
+            "meta": {"env_flags": {"cuda_matmul_allow_tf32": True}},
+        }
+    ) == {"cuda_matmul_allow_tf32": False}
+    assert _extract_saved_provenance_env_flags(
+        {
+            "provenance": {"env_flags": {}},
+            "meta": {"env_flags": {"cuda_matmul_allow_tf32": False}},
+        }
+    ) == {"cuda_matmul_allow_tf32": False}
+
+
+def test_run_report_health_helpers_cover_edge_cases():
+    assert _is_non_bool_finite_number(True) is False
+    assert _is_non_bool_finite_number(object()) is False
+
+    assert _describe_run_report_health_error(None, role="subject") is None
+    assert (
+        _describe_run_report_health_error(
+            {"status": "completed", "metrics": []},
+            role="subject",
+        )
+        is None
+    )
+    assert (
+        _describe_run_report_health_error(
+            {"metrics": {"primary_metric": {}}},
+            role="subject",
+        )
+        is None
+    )
+    assert (
+        _describe_run_report_health_error(
+            {
+                "metrics": {
+                    "primary_metric": {
+                        "degraded": True,
+                        "degraded_reason": "malformed",
+                    }
+                }
+            },
+            role="subject",
+        )
+        == "Cannot generate evaluation report from subject run report with "
+        "degraded primary metric (malformed)."
+    )
+    assert (
+        _describe_run_report_health_error(
+            {
+                "metrics": {
+                    "primary_metric": {
+                        "preview": None,
+                        "final": 10.0,
+                        "ratio_vs_baseline": float("nan"),
+                    }
+                }
+            },
+            role="baseline",
+        )
+        is None
+    )
+
+
+def test_assert_evaluation_report_is_finite_covers_structure_and_optional_fields():
+    with pytest.raises(ValueError, match="missing or malformed"):
+        _assert_evaluation_report_is_finite(None)
+
+    with pytest.raises(ValueError, match="missing a primary_metric block"):
+        _assert_evaluation_report_is_finite({})
+
+    with pytest.raises(ValueError, match="degraded primary metric \\(unstable\\)"):
+        _assert_evaluation_report_is_finite(
+            {
+                "primary_metric": {
+                    "degraded": True,
+                    "degraded_reason": "unstable",
+                }
+            }
+        )
+
+    _assert_evaluation_report_is_finite({"primary_metric": {"final": 10.0}})
+    _assert_evaluation_report_is_finite(
+        {"primary_metric": {"preview": None, "final": 10.0}}
+    )
 
 
 @patch("invarlock.reporting.report_contract.save_report")
@@ -264,9 +366,7 @@ def test_report_command_rejects_non_finite_subject_primary_metric(
 
 @patch("invarlock.reporting.report_contract.load_report_payload")
 @patch("invarlock.reporting.report_contract.make_report")
-def test_report_command_rejects_failed_subject_run_report(
-    mock_make_report, mock_load
-):
+def test_report_command_rejects_failed_subject_run_report(mock_make_report, mock_load):
     run = {
         "meta": {"model_id": "gpt2"},
         "status": "failed",
@@ -428,8 +528,10 @@ def test_report_command_rejects_non_finite_generated_evaluation_report(
 
 @patch("invarlock.reporting.report_contract.load_report_payload")
 @patch("invarlock.reporting.report_contract.make_report")
-def test_report_command_still_rejects_non_finite_input_ratio_without_pairing_reason(
-    mock_make_report, mock_load
+@patch("invarlock.reporting.report_contract.save_evaluation_bundle")
+@patch("invarlock.reporting.report_contract.validate_report")
+def test_report_command_allows_non_finite_input_ratio_without_pairing_reason(
+    mock_validate, mock_save_bundle, mock_make_report, mock_load
 ):
     run = {
         "meta": {"model_id": "gpt2"},
@@ -457,20 +559,29 @@ def test_report_command_still_rejects_non_finite_input_ratio_without_pairing_rea
     }
 
     mock_load.side_effect = lambda path: baseline if "baseline" in path else run
+    mock_make_report.return_value = {
+        "validation": {"safety_check": True},
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "preview": 10.0,
+            "final": 10.5,
+            "ratio_vs_baseline": 1.05,
+        },
+    }
+    mock_save_bundle.return_value = {"report": "evaluation.report.json"}
+    mock_validate.return_value = True
 
-    with pytest.raises(
-        ValueError,
-        match="baseline run report with non-finite primary metric field 'ratio_vs_baseline'",
-    ):
-        generate_reports(
-            run="run.json",
-            format="report",
-            compare=None,
-            baseline="baseline.json",
-            output=None,
-        )
+    generate_reports(
+        run="run.json",
+        format="report",
+        compare=None,
+        baseline="baseline.json",
+        output=None,
+    )
 
-    mock_make_report.assert_not_called()
+    mock_make_report.assert_called_once()
+    mock_validate.assert_called_once()
+    mock_save_bundle.assert_called_once()
 
 
 def test_load_run_report_file(tmp_path: Path):

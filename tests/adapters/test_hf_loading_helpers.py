@@ -8,7 +8,7 @@ import torch
 
 from invarlock.runtime_security import runtime_allowances_scope
 
-_MISTRAL3_ARCH = "Mistral3For" "ConditionalGeneration"
+_MISTRAL3_ARCH = "Mistral3ForConditionalGeneration"
 
 
 @pytest.mark.unit

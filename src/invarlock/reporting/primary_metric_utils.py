@@ -66,11 +66,16 @@ def attach_primary_metric(
             needs_ratio_fallback = False
             needs_pm_fallback = not (_is_finite(preview_val) and _is_finite(final_val))
             needs_ratio_fallback = baseline_has_reference and not _is_finite(ratio_val)
+            can_recompute_ratio = (
+                _is_finite(final_val)
+                and baseline_has_reference
+                and float(baseline_final) > 0.0
+            )
 
             if degraded_reason is None:
                 if needs_pm_fallback:
                     degraded_reason = "non_finite_pm"
-                elif needs_ratio_fallback:
+                elif needs_ratio_fallback and not can_recompute_ratio:
                     degraded_reason = "non_finite_delta"
                 elif pm_copy.get("invalid"):
                     degraded_reason = "primary_metric_invalid"

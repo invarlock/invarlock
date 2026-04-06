@@ -6,10 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
 from invarlock.reporting.report_bundle import save_evaluation_bundle
 from invarlock.reporting.report_files import save_report
 from invarlock.reporting.report_make import make_report
+from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
 
 
 def _minimal_run_report() -> dict:
@@ -174,6 +174,9 @@ def test_save_report_bundle_copies_runtime_manifest_when_source_run_path_provide
     assert manifest_payload["report"]["path"] == str(
         tmp_path / "out" / "evaluation.report.json"
     )
-    assert manifest_payload["report"]["sha256"] == hashlib.sha256(
-        (tmp_path / "out" / "evaluation.report.json").read_bytes()
-    ).hexdigest()
+    assert (
+        manifest_payload["report"]["sha256"]
+        == hashlib.sha256(
+            (tmp_path / "out" / "evaluation.report.json").read_bytes()
+        ).hexdigest()
+    )

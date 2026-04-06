@@ -4,6 +4,7 @@ from datetime import datetime
 
 import pytest
 
+from invarlock.core.exceptions import ValidationError
 from invarlock.reporting.render import render_report_markdown
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import create_empty_report
@@ -171,5 +172,5 @@ def test_markdown_guard_reports_section():
 
 
 def test_validate_baseline_invalid_returns_false():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError, match="Baseline normalization failed"):
         make_report(_minimal_report(), {"schema_version": "x", "metrics": {}})

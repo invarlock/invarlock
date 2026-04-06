@@ -16,7 +16,7 @@
       "path": "src/invarlock/core/adapter_auto.py",
       "subsystem": "core",
       "bucket": "acceptable",
-      "lines": [87],
+      "lines": [89],
       "rationale": "Optional adapter-family probing may fall back to None without changing trust-critical verdicts."
     },
     {
@@ -163,7 +163,7 @@
       "path": "src/invarlock/cli/device.py",
       "subsystem": "cli",
       "bucket": "acceptable",
-      "lines": [43, 93],
+      "lines": [46, 100],
       "rationale": "Device listing is a probing command and these catches only protect shell diagnostics."
     },
     {

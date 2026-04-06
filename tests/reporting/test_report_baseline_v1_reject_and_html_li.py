@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from invarlock.core.exceptions import ValidationError
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import RunReport, create_empty_report
 from invarlock.reporting.run_report_formatters import to_html
@@ -30,12 +31,12 @@ def test_baseline_v1_missing_pm_final_rejects() -> None:
         "meta": {},
         "metrics": {"primary_metric": {}},
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError, match="Baseline normalization failed"):
         make_report(report, base_v1_bad)
 
 
 def test_baseline_rejects_non_dict() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError, match="Baseline normalization failed"):
         make_report(_mk_report(), None)  # type: ignore[arg-type]
 
 

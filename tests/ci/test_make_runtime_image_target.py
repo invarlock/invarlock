@@ -40,11 +40,9 @@ def test_runtime_image_cuda_target_builds_cuda_tag_with_cuda_requirements() -> N
     assert "$(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE_CUDA)" in block
     assert "$(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE_CUDA)" in block
     assert (
-        "--build-arg "
-        "RUNTIME_REQUIREMENTS_AMD64=$(RUNTIME_IMAGE_CUDA_REQUIREMENTS)"
+        "--build-arg RUNTIME_REQUIREMENTS_AMD64=$(RUNTIME_IMAGE_CUDA_REQUIREMENTS)"
     ) in block
     assert (
-        "--build-arg "
-        "PYTORCH_EXTRA_INDEX_URL=$(RUNTIME_IMAGE_CUDA_INDEX_URL)"
+        "--build-arg PYTORCH_EXTRA_INDEX_URL=$(RUNTIME_IMAGE_CUDA_INDEX_URL)"
     ) in block
     assert "-t $(RUNTIME_IMAGE_CUDA) ." in block

@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from invarlock.core.exceptions import ValidationError
 from invarlock.reporting.render import render_report_markdown
 from invarlock.reporting.report_bundle import save_evaluation_bundle
 from invarlock.reporting.report_files import save_report
@@ -145,5 +146,5 @@ def test_make_report_accepts_run_report_and_baseline_v1():
         },
     }
     assert make_report(rep, baseline)["schema_version"] == "v1"
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError, match="Baseline normalization failed"):
         make_report(rep, {"schema_version": "baseline-v1", "meta": {}})

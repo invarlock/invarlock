@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import pytest
+
+from invarlock.core.exceptions import ValidationError
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import RunReport, create_empty_report
 
@@ -31,14 +34,12 @@ def test_make_report_accepts_baseline_v1() -> None:
     cert = make_report(rp, base_v1)
     assert cert.get("schema_version") == "v1"
 
-    import pytest
-
     base_v2 = {
         "schema_version": "baseline-v2",
         "meta": {"model_id": "m"},
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError, match="Baseline normalization failed"):
         make_report(rp, base_v2)
 
 
@@ -50,7 +51,5 @@ def test_make_report_rejects_invalid_baseline() -> None:
         # Missing primary_metric.final makes it invalid
         "metrics": {"primary_metric": {"kind": "ppl_causal"}},
     }
-    import pytest
-
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError, match="Baseline normalization failed"):
         make_report(rp, bad_base)

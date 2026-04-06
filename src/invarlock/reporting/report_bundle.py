@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import Path
 import shutil
+from pathlib import Path
 from typing import Any
 
 from invarlock.core.report_inputs import ReportInputError, resolve_report_input_path
@@ -50,9 +50,7 @@ def save_evaluation_bundle(
         except ReportInputError:
             resolved_run_path = None
         if resolved_run_path is not None:
-            runtime_manifest_path = (
-                resolved_run_path.parent / RUNTIME_MANIFEST_FILENAME
-            )
+            runtime_manifest_path = resolved_run_path.parent / RUNTIME_MANIFEST_FILENAME
             if runtime_manifest_path.is_file():
                 copied_manifest_path = output_path / RUNTIME_MANIFEST_FILENAME
                 try:

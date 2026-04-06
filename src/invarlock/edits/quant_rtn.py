@@ -137,9 +137,7 @@ class RTNQuantEdit(ModelEdit):
         )
 
         self.bitwidth = bitwidth
-        self.per_channel = self._normalize_per_channel_option(
-            per_channel, default=True
-        )
+        self.per_channel = self._normalize_per_channel_option(per_channel, default=True)
         self.group_size = group_size
         self.clamp_ratio = clamp_ratio
         self.scope = scope

@@ -17,7 +17,7 @@ _TRUE = {"1", "true", "yes", "on"}
 _FALSE = {"0", "false", "no", "off"}
 _TORCH_UNSET = object()
 _torch_module: Any = _TORCH_UNSET
-_MISTRAL3_ARCH = "Mistral3For" "ConditionalGeneration"
+_MISTRAL3_ARCH = "Mistral3ForConditionalGeneration"
 
 _AUTO_LOADER_SPECS: dict[str, tuple[str, str]] = {
     "causal": ("transformers", "AutoModelForCausalLM"),

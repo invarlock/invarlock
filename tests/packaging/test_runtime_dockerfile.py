@@ -17,14 +17,8 @@ def test_runtime_dockerfile_installs_hf_stack() -> None:
     assert "ARG RUNTIME_REQUIREMENTS_ARM64" in text
     assert "ARG PYTORCH_EXTRA_INDEX_URL" in text
     assert '--extra-index-url "${PYTORCH_EXTRA_INDEX_URL}"' in text
-    assert (
-        'amd64) echo "/opt/invarlock/${RUNTIME_REQUIREMENTS_AMD64}"'
-        in text
-    )
-    assert (
-        'arm64) echo "/opt/invarlock/${RUNTIME_REQUIREMENTS_ARM64}"'
-        in text
-    )
+    assert 'amd64) echo "/opt/invarlock/${RUNTIME_REQUIREMENTS_AMD64}"' in text
+    assert 'arm64) echo "/opt/invarlock/${RUNTIME_REQUIREMENTS_ARM64}"' in text
     assert "python -m pip install" in text
     assert "--require-hashes" in text
     assert "python -m pip install --no-deps -e /opt/invarlock" not in text

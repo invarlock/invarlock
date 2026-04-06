@@ -641,8 +641,7 @@ def evaluate_command(
             else ""
         )
         _fail(
-            "Edited run failed before evaluation report generation."
-            f"{failure_suffix}",
+            f"Edited run failed before evaluation report generation.{failure_suffix}",
             exit_code=1,
         )
 

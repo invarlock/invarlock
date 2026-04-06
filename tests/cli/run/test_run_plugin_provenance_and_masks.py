@@ -104,6 +104,17 @@ def _provider_simple():
     )
 
 
+def _is_bare_control(kwargs: dict[str, object]) -> bool:
+    cfg = kwargs.get("config")
+    context = getattr(cfg, "context", None)
+    if not isinstance(context, dict):
+        return False
+    validation = context.get("validation")
+    return (
+        isinstance(validation, dict) and validation.get("guard_overhead_mode") == "bare"
+    )
+
+
 @pytest.mark.parametrize("profile", ["ci", "release"])
 def test_parity_mismatch_evalwindow_exit(tmp_path: Path, profile: str):
     from invarlock.eval.data import EvaluationWindow
@@ -509,7 +520,7 @@ def test_overhead_bare_warning_present(tmp_path: Path):
 
     class Runner:
         def execute(self, **kwargs):
-            if kwargs.get("guards") == []:
+            if _is_bare_control(kwargs):
                 return SimpleNamespace(
                     edit={},
                     metrics={"ppl_preview": 1.0},

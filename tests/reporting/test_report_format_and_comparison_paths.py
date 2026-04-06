@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from invarlock.core.exceptions import ValidationError
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import create_empty_report
 from invarlock.reporting.run_report_formatters import to_html
@@ -29,7 +30,7 @@ def test_make_report_bad_baseline_raises() -> None:
         "meta": {},
         "metrics": {"primary_metric": {}},
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError, match="Baseline normalization failed"):
         make_report(rep, base)
 
 

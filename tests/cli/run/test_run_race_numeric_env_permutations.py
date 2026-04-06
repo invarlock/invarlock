@@ -133,6 +133,18 @@ def _common_ce_detect_ce():
     )
 
 
+def _runner_success():
+    return SimpleNamespace(
+        execute=lambda **k: SimpleNamespace(
+            edit={},
+            metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},
+            guards={},
+            context={"dataset_meta": {}},
+            status="success",
+        )
+    )
+
+
 def test_output_dir_deleted_before_save_report(tmp_path: Path):
     # Simulate run_dir deleted just before saving report -> triggers final exception path
     cfg = _base_cfg(tmp_path)
@@ -420,6 +432,7 @@ def test_env_var_poisoning_for_tmpdir_and_debug(tmp_path: Path, monkeypatch):
                 lambda: SimpleNamespace(available=200 * 1024 * 1024),
             )
         )
+        stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner_success))
         stack.enter_context(
             patch(
                 "invarlock.cli.run_runtime_exec.shutil.disk_usage",

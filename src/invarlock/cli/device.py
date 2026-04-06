@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-
 _CUDA_DEVICE_RE = re.compile(r"^cuda(?::\d+)?$")
 
 
@@ -59,7 +58,9 @@ def validate_device_for_config(
     if config_requirements and config_requirements.get("required_device"):
         req = str(config_requirements.get("required_device")).lower()
         normalized_req = "cuda" if _CUDA_DEVICE_RE.match(req) else req
-        normalized_selected = "cuda" if _CUDA_DEVICE_RE.match(normalized) else normalized
+        normalized_selected = (
+            "cuda" if _CUDA_DEVICE_RE.match(normalized) else normalized
+        )
         if normalized_selected != normalized_req:
             return (
                 False,

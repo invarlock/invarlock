@@ -227,8 +227,12 @@ def resolve_runtime_image() -> str:
     if image:
         return image
     engine = resolve_container_engine()
-    if engine is not None and _host_nvidia_visible() and container_image_available_locally(
-        RUNTIME_IMAGE_CUDA_LOCAL_DEFAULT, engine=engine
+    if (
+        engine is not None
+        and _host_nvidia_visible()
+        and container_image_available_locally(
+            RUNTIME_IMAGE_CUDA_LOCAL_DEFAULT, engine=engine
+        )
     ):
         return RUNTIME_IMAGE_CUDA_LOCAL_DEFAULT
     if engine is not None and container_image_available_locally(

@@ -585,10 +585,14 @@ def apply_profile(cfg: InvarLockConfig, profile: str) -> InvarLockConfig:
     # Runtime profiles provide defaults, but model/preset-specific primary-metric
     # policy must remain authoritative when explicitly configured.
     base_primary_metric = (
-        base_cfg.get("primary_metric") if isinstance(base_cfg.get("primary_metric"), dict) else {}
+        base_cfg.get("primary_metric")
+        if isinstance(base_cfg.get("primary_metric"), dict)
+        else {}
     )
     merged_primary_metric = (
-        merged.get("primary_metric") if isinstance(merged.get("primary_metric"), dict) else {}
+        merged.get("primary_metric")
+        if isinstance(merged.get("primary_metric"), dict)
+        else {}
     )
     if base_primary_metric and merged_primary_metric is not None:
         for key, value in base_primary_metric.items():

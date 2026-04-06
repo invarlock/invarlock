@@ -87,6 +87,17 @@ def _provider_min():
     )
 
 
+def _is_bare_control(kwargs: dict[str, object]) -> bool:
+    cfg = kwargs.get("config")
+    context = getattr(cfg, "context", None)
+    if not isinstance(context, dict):
+        return False
+    validation = context.get("validation")
+    return (
+        isinstance(validation, dict) and validation.get("guard_overhead_mode") == "bare"
+    )
+
+
 def test_device_validation_failure_exits(tmp_path: Path):
     cfg = _base_cfg(tmp_path, 1, 1)
 
@@ -568,8 +579,7 @@ def test_guard_overhead_bare_missing_ppl_and_status_warn(tmp_path: Path):
 
     class Runner:
         def execute(self, **kwargs):
-            # Detect bare vs guarded by presence of guards list
-            if kwargs.get("guards") == []:
+            if _is_bare_control(kwargs):
                 # bare report missing ppl_final and with non-success status
                 return SimpleNamespace(
                     edit={},

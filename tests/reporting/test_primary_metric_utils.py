@@ -181,6 +181,33 @@ def test_attach_primary_metric_skips_ratio_nan_without_baseline():
     assert "degraded_reason" not in pm
 
 
+def test_attach_primary_metric_recomputes_ratio_without_marking_degraded():
+    evaluation_report: dict[str, object] = {}
+    report = {
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 1.2,
+                "final": 1.8,
+                "ratio_vs_baseline": float("nan"),
+            }
+        }
+    }
+
+    attach_primary_metric(
+        evaluation_report,
+        report,
+        baseline_raw=None,
+        baseline_ref={"primary_metric": {"final": 1.5}},
+        ppl_analysis=None,
+    )
+
+    pm = evaluation_report["primary_metric"]
+    assert pm["ratio_vs_baseline"] == pytest.approx(1.2)
+    assert pm["degraded"] is False
+    assert "degraded_reason" not in pm
+
+
 def test_attach_primary_metric_retries_window_computation(monkeypatch):
     evaluation_report: dict[str, object] = {}
     report = {"metrics": {"loss_type": "s2s"}}
