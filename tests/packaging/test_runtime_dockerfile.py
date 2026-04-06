@@ -28,10 +28,16 @@ def test_runtime_dockerfile_installs_hf_stack() -> None:
     assert "PYTHONPATH=/opt/invarlock/src" in text
 
 
-def test_runtime_dockerignore_limits_context_to_runtime_inputs() -> None:
+def test_runtime_dockerignore_keeps_runtime_and_fuzzing_inputs() -> None:
     text = (Path.cwd() / ".dockerignore").read_text(encoding="utf-8")
 
     assert "**" in text
+    assert "!.clusterfuzzlite/**" in text
+    assert "!README.md" in text
+    assert "!pyproject.toml" in text
+    assert "!contracts/**" in text
+    assert "!fuzzers/**" in text
+    assert "!requirements/workflows/clusterfuzzlite-py311.txt" in text
     assert "!runtime/Dockerfile" in text
     assert "!requirements/workflows/runtime-image-py312.txt" in text
     assert "!requirements/workflows/runtime-image-py312-aarch64.txt" in text
