@@ -149,6 +149,36 @@ def test_quant_rtn_apply_accepts_per_channel_and_module_selectors() -> None:
     }
 
 
+def test_quant_rtn_counts_layers_modified_for_qwen_style_module_names(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model = torch.nn.Linear(2, 2, bias=False)
+    adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 2}})()
+    edit = RTNQuantEdit(scope="attn", max_modules=2)
+
+    monkeypatch.setattr(
+        RTNQuantEdit,
+        "_identify_target_modules",
+        lambda self, _model: [
+            ("model.layers.0.self_attn.q_proj", model),
+            ("model.layers.1.self_attn.k_proj", model),
+        ],
+    )
+    monkeypatch.setattr(
+        RTNQuantEdit,
+        "_apply_rtn_quantization",
+        lambda self, *_args, **_kwargs: {
+            "params_quantized": 16,
+            "scale_stats": {},
+        },
+    )
+
+    result = edit.apply(model, adapter, plan={"scope": "attn", "max_modules": 2})
+
+    assert result["deltas"]["params_changed"] == 32
+    assert result["deltas"]["layers_modified"] == 2
+
+
 def test_quant_rtn_apply_rejects_per_channel_false_override() -> None:
     model = torch.nn.Linear(2, 2, bias=False)
     adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()

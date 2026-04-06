@@ -396,6 +396,36 @@ class TestFilteredLoadingInfo:
         assert DummyLoader.calls[0]["local_files_only"] is True
         assert "local_files_only" not in DummyLoader.calls[1]
 
+    def test_falls_back_online_when_hf_reports_missing_weights_filename(self):
+        mixin = SimpleMixin()
+
+        class DummyModel:
+            pass
+
+        class DummyLoader:
+            calls: list[dict[str, object]] = []
+
+            @classmethod
+            def from_pretrained(cls, model_id: str, **kwargs: object):
+                cls.calls.append({"model_id": model_id, **kwargs})
+                if kwargs.get("local_files_only") is True:
+                    raise OSError(
+                        f"{model_id} does not appear to have a file named "
+                        "pytorch_model.bin or model.safetensors."
+                    )
+                return DummyModel()
+
+        model = mixin._load_pretrained_model(
+            DummyLoader,
+            "Qwen/Qwen2.5-14B",
+            prefer_local_files_only=True,
+        )
+
+        assert isinstance(model, DummyModel)
+        assert len(DummyLoader.calls) == 2
+        assert DummyLoader.calls[0]["local_files_only"] is True
+        assert "local_files_only" not in DummyLoader.calls[1]
+
     def test_does_not_fall_back_online_on_arbitrary_loader_errors(self):
         mixin = SimpleMixin()
 

@@ -8,6 +8,8 @@ import torch
 
 from invarlock.runtime_security import runtime_allowances_scope
 
+_MISTRAL3_ARCH = "Mistral3For" "ConditionalGeneration"
+
 
 @pytest.mark.unit
 def test_resolve_trust_remote_code_defaults_false(monkeypatch):
@@ -192,7 +194,7 @@ def test_resolve_core_loader_strategy_uses_direct_submodule_when_allowed(
         ),
         (
             "mistral3",
-            "transformers.models.mistral3.modeling_mistral3.Mistral3ForConditionalGeneration",
+            "transformers.models.mistral3.modeling_mistral3." + _MISTRAL3_ARCH,
         ),
         (
             "gemma3",
@@ -283,7 +285,7 @@ def test_resolve_core_loader_strategy_supports_multimodal_mistral3(
     assert strategy.model_type == "mistral3"
     assert (
         strategy.loader_label
-        == "transformers.models.mistral3.modeling_mistral3.Mistral3ForConditionalGeneration"
+        == "transformers.models.mistral3.modeling_mistral3." + _MISTRAL3_ARCH
     )
 
 

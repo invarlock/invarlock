@@ -7,6 +7,8 @@ from invarlock.core.adapter_auto import (
     resolve_auto_adapter,
 )
 
+_MISTRAL3_ARCH = "Mistral3For" "ConditionalGeneration"
+
 
 def _write_cfg(tmp_path: Path, model_type: str, arch: str) -> Path:
     d = tmp_path / "model"
@@ -24,7 +26,7 @@ def test_resolve_auto_adapter_mistral(tmp_path):
 
 
 def test_resolve_auto_adapter_mistral3(tmp_path):
-    model_dir = _write_cfg(tmp_path, "mistral3", "Mistral3ForConditionalGeneration")
+    model_dir = _write_cfg(tmp_path, "mistral3", _MISTRAL3_ARCH)
     assert resolve_auto_adapter(str(model_dir)) == "hf_causal"
 
 

@@ -425,15 +425,9 @@ class RTNQuantEdit(ModelEdit):
         # Identify modified layers
         modified_layers = []
         for result in quantization_results:
-            # Extract layer name from module name (e.g., "transformer.h.0.mlp.c_fc" -> "layer_0")
-            name_parts = result["module_name"].split(".")
-            if "h" in name_parts:
-                h_idx = name_parts.index("h")
-                if h_idx + 1 < len(name_parts):
-                    layer_num = name_parts[h_idx + 1]
-                    layer_name = f"layer_{layer_num}"
-                    if layer_name not in modified_layers:
-                        modified_layers.append(layer_name)
+            layer_name = self._layer_label_from_module_name(result["module_name"])
+            if layer_name is not None and layer_name not in modified_layers:
+                modified_layers.append(layer_name)
 
         # Store edit plan for evaluation report generation
         modules_quantized = [r["module_name"] for r in quantization_results]
@@ -468,6 +462,20 @@ class RTNQuantEdit(ModelEdit):
             if hasattr(adapter, "describe")
             else {},
         }
+
+    @staticmethod
+    def _layer_label_from_module_name(module_name: str) -> str | None:
+        name_parts = module_name.split(".")
+        for layer_token in ("h", "layers"):
+            if layer_token not in name_parts:
+                continue
+            layer_idx = name_parts.index(layer_token) + 1
+            if layer_idx >= len(name_parts):
+                continue
+            layer_num = name_parts[layer_idx]
+            if layer_num.isdigit():
+                return f"layer_{layer_num}"
+        return None
 
     def _identify_target_modules(self, model: nn.Module) -> list[tuple[str, nn.Module]]:
         """Identify target modules based on scope configuration."""

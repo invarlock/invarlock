@@ -145,6 +145,7 @@ def _is_local_loader_cache_miss(error: Exception) -> bool:
             "no such file",
             "not found",
             "could not locate",
+            "does not appear to have a file named",
             "missing cached",
             "local files only",
             "cannot find",

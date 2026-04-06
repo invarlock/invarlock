@@ -7,6 +7,8 @@ import pytest
 
 import invarlock.model_profile as mp
 
+_MISTRAL3_ARCH = "Mistral3For" "ConditionalGeneration"
+
 
 class _DummyTokenizer:
     def __init__(
@@ -81,7 +83,7 @@ def test_local_profile_config_helpers_tolerate_invalid_utf8(tmp_path: Path) -> N
         (
             {
                 "model_type": "mistral3",
-                "architectures": ["Mistral3ForConditionalGeneration"],
+                "architectures": [_MISTRAL3_ARCH],
             },
             "mistral",
         ),

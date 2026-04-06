@@ -39,6 +39,10 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
 Tip: enable Hub downloads per command when fetching models/datasets:
 `invarlock evaluate --allow-network ...`
 
+Preset sizing note: most repo presets keep small `preview_n` / `final_n` values
+for portable local smokes. Use `--profile ci` or `--profile release` when you
+need balanced-tier evaluations to clear the standard token-floor gates.
+
 Security-default note: `evaluate` uses the runtime container by default. Use
 `--assurance trusted-local` only for trusted local workflows that intentionally bypass that
 boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.

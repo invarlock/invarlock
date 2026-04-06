@@ -82,6 +82,11 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --report-out reports/eval
 ```
 
+Most repo presets keep small YAML window counts for smoke portability. The
+pass-capable path is to keep those presets and run them with `--profile ci` or
+`--profile release`, which override `preview_n` / `final_n` to the packaged
+runtime defaults.
+
 ## Verify And Render
 
 ```bash

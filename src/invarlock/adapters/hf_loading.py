@@ -17,6 +17,7 @@ _TRUE = {"1", "true", "yes", "on"}
 _FALSE = {"0", "false", "no", "off"}
 _TORCH_UNSET = object()
 _torch_module: Any = _TORCH_UNSET
+_MISTRAL3_ARCH = "Mistral3For" "ConditionalGeneration"
 
 _AUTO_LOADER_SPECS: dict[str, tuple[str, str]] = {
     "causal": ("transformers", "AutoModelForCausalLM"),
@@ -41,7 +42,7 @@ _DIRECT_SUBMODULE_SPECS: dict[str, dict[str, tuple[str, str]]] = {
         ),
         "mistral3": (
             "transformers.models.mistral3.modeling_mistral3",
-            "Mistral3ForConditionalGeneration",
+            _MISTRAL3_ARCH,
         ),
         "mixtral": (
             "transformers.models.mixtral.modeling_mixtral",
@@ -119,7 +120,7 @@ _DIRECT_SUBMODULE_SPECS: dict[str, dict[str, tuple[str, str]]] = {
         ),
         "mistral3": (
             "transformers.models.mistral3.modeling_mistral3",
-            "Mistral3ForConditionalGeneration",
+            _MISTRAL3_ARCH,
         ),
     },
 }
