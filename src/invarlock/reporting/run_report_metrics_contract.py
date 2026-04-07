@@ -25,6 +25,16 @@ class RunReportMetricsEnrichmentResult:
     overlap_fraction: float | None
 
 
+def _coerce_finite_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        coerced = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return coerced if math.isfinite(coerced) else None
+
+
 def _classification_records(arm_payload: Any) -> list[dict[str, Any]]:
     if not isinstance(arm_payload, Mapping):
         return []
@@ -69,12 +79,14 @@ def _classification_counts_from_primary_metric(
         return None
     if kind not in {"accuracy", "vqa_accuracy"}:
         return None
+    preview = _coerce_finite_float(primary_metric.get("preview"))
+    final = _coerce_finite_float(primary_metric.get("final"))
     try:
-        preview = float(primary_metric.get("preview"))
-        final = float(primary_metric.get("final"))
         n_preview = int(primary_metric.get("n_preview", 0))
         n_final = int(primary_metric.get("n_final", 0))
     except (AttributeError, TypeError, ValueError, OverflowError):
+        return None
+    if preview is None or final is None:
         return None
     if not (
         0.0 <= preview <= 1.0 and 0.0 <= final <= 1.0 and n_preview > 0 and n_final > 0

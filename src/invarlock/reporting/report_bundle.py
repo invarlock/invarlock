@@ -60,9 +60,10 @@ def save_evaluation_bundle(
                 except (OSError, TypeError, ValueError, json.JSONDecodeError):
                     manifest_payload = None
                 if isinstance(manifest_payload, dict):
+                    raw_report_payload = manifest_payload.get("report")
                     report_payload = (
-                        dict(manifest_payload.get("report"))
-                        if isinstance(manifest_payload.get("report"), dict)
+                        dict(raw_report_payload)
+                        if isinstance(raw_report_payload, dict)
                         else {}
                     )
                     report_payload["filename"] = report_json_path.name

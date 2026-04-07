@@ -612,30 +612,27 @@ def build_primary_metric_analysis(
             if act_fin is not None:
                 stats_obj["actual_final"] = act_fin
 
-            if not isinstance(coverage_summary, dict):
-                coverage_summary = {}
+            coverage_summary_map: dict[str, Any] = coverage_summary
             if isinstance(act_prev, int):
-                preview_cov = (
-                    coverage_summary.get("preview")
-                    if isinstance(coverage_summary.get("preview"), dict)
-                    else {}
+                preview_cov_raw = coverage_summary_map.get("preview")
+                preview_cov: dict[str, Any] = (
+                    dict(preview_cov_raw) if isinstance(preview_cov_raw, dict) else {}
                 )
                 preview_cov.setdefault("used", act_prev)
                 if isinstance(req_prev, int):
                     preview_cov.setdefault("required", req_prev)
                     preview_cov.setdefault("ok", act_prev >= req_prev)
-                coverage_summary["preview"] = preview_cov
+                coverage_summary_map["preview"] = preview_cov
             if isinstance(act_fin, int):
-                final_cov = (
-                    coverage_summary.get("final")
-                    if isinstance(coverage_summary.get("final"), dict)
-                    else {}
+                final_cov_raw = coverage_summary_map.get("final")
+                final_cov: dict[str, Any] = (
+                    dict(final_cov_raw) if isinstance(final_cov_raw, dict) else {}
                 )
                 final_cov.setdefault("used", act_fin)
                 if isinstance(req_fin, int):
                     final_cov.setdefault("required", req_fin)
                     final_cov.setdefault("ok", act_fin >= req_fin)
-                coverage_summary["final"] = final_cov
+                coverage_summary_map["final"] = final_cov
 
             if paired_windows <= 0 and not paired_windows_explicit:
                 if isinstance(act_prev, int) and act_prev > 0:

@@ -191,15 +191,19 @@ def compute_validation_flags(
                                 prev_req = prev_cov.get("required")
                                 fin_used = fin_cov.get("used")
                                 fin_req = fin_cov.get("required")
+                                prev_used_value = _coerce_finite_float(prev_used)
+                                prev_req_value = _coerce_finite_float(prev_req)
+                                fin_used_value = _coerce_finite_float(fin_used)
+                                fin_req_value = _coerce_finite_float(fin_req)
                                 prev_ok = bool(prev_cov.get("ok")) or (
-                                    _is_non_bool_finite_number(prev_used)
-                                    and _is_non_bool_finite_number(prev_req)
-                                    and float(prev_used) >= float(prev_req)
+                                    prev_used_value is not None
+                                    and prev_req_value is not None
+                                    and prev_used_value >= prev_req_value
                                 )
                                 fin_ok = bool(fin_cov.get("ok")) or (
-                                    _is_non_bool_finite_number(fin_used)
-                                    and _is_non_bool_finite_number(fin_req)
-                                    and float(fin_used) >= float(fin_req)
+                                    fin_used_value is not None
+                                    and fin_req_value is not None
+                                    and fin_used_value >= fin_req_value
                                 )
                                 coverage_ok = prev_ok and fin_ok
                     except _NON_FATAL_EXCEPTIONS:  # pragma: no cover

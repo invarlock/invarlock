@@ -16,12 +16,18 @@ _NON_FATAL_EXCEPTIONS = (
 )
 
 
+def _coerce_finite_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        coerced = float(value)
+    except _NON_FATAL_EXCEPTIONS:
+        return None
+    return coerced if math.isfinite(coerced) else None
+
+
 def _is_non_bool_finite_number(value: Any) -> bool:
-    return (
-        isinstance(value, (int, float))
-        and not isinstance(value, bool)
-        and math.isfinite(float(value))
-    )
+    return _coerce_finite_float(value) is not None
 
 
 def attach_primary_metric(
@@ -61,15 +67,21 @@ def attach_primary_metric(
             def _is_finite(value: Any) -> bool:
                 return _is_non_bool_finite_number(value)
 
-            baseline_has_reference = _is_finite(baseline_final)
+            preview_value = _coerce_finite_float(preview_val)
+            final_value = _coerce_finite_float(final_val)
+            ratio_value = _coerce_finite_float(ratio_val)
+            baseline_final_value = _coerce_finite_float(baseline_final)
+            baseline_has_reference = baseline_final_value is not None
             needs_pm_fallback = False
             needs_ratio_fallback = False
-            needs_pm_fallback = not (_is_finite(preview_val) and _is_finite(final_val))
-            needs_ratio_fallback = baseline_has_reference and not _is_finite(ratio_val)
+            needs_pm_fallback = not (
+                preview_value is not None and final_value is not None
+            )
+            needs_ratio_fallback = baseline_has_reference and ratio_value is None
             can_recompute_ratio = (
-                _is_finite(final_val)
-                and baseline_has_reference
-                and float(baseline_final) > 0.0
+                final_value is not None
+                and baseline_final_value is not None
+                and baseline_final_value > 0.0
             )
 
             if degraded_reason is None:
@@ -163,16 +175,12 @@ def attach_primary_metric(
                     pass
             # Ensure ratio_vs_baseline present and consistent
             try:
-                fin = pm_copy.get("final")
-                baseline_final_val = (
-                    float(baseline_final) if _is_finite(baseline_final) else None
-                )
                 if (
-                    _is_finite(fin)
-                    and baseline_final_val is not None
-                    and baseline_final_val > 0
+                    final_value is not None
+                    and baseline_final_value is not None
+                    and baseline_final_value > 0
                 ):
-                    pm_copy["ratio_vs_baseline"] = float(fin) / baseline_final_val
+                    pm_copy["ratio_vs_baseline"] = final_value / baseline_final_value
                 # Ensure display_ci aligns with log-space CI for ppl-like metrics
                 try:
                     kind = str(pm_copy.get("kind", "")).lower()
@@ -191,12 +199,13 @@ def attach_primary_metric(
                     except _NON_FATAL_EXCEPTIONS:
                         pass
                 # Provide a degenerate display CI if missing
-                if not isinstance(
-                    pm_copy.get("display_ci"), list | tuple
-                ) and _is_finite(pm_copy.get("final")):
+                if (
+                    not isinstance(pm_copy.get("display_ci"), list | tuple)
+                    and final_value is not None
+                ):
                     pm_copy["display_ci"] = [
-                        float(pm_copy["final"]),
-                        float(pm_copy["final"]),
+                        final_value,
+                        final_value,
                     ]
             except _NON_FATAL_EXCEPTIONS:
                 pass
@@ -252,17 +261,20 @@ def attach_primary_metric(
                 pm_point = None
                 try:
                     val = clf.get("final")
-                    if _is_non_bool_finite_number(val):
-                        pm_point = float(val)
+                    val_value = _coerce_finite_float(val)
+                    if val_value is not None:
+                        pm_point = val_value
                     elif isinstance(val, dict):
                         num = val.get("correct_total")
                         den = val.get("total")
+                        num_value = _coerce_finite_float(num)
+                        den_value = _coerce_finite_float(den)
                         if (
-                            _is_non_bool_finite_number(num)
-                            and _is_non_bool_finite_number(den)
-                            and float(den) > 0
+                            num_value is not None
+                            and den_value is not None
+                            and den_value > 0
                         ):
-                            pm_point = float(num) / float(den)
+                            pm_point = num_value / den_value
                 except _NON_FATAL_EXCEPTIONS:
                     pm_point = None
                 acc_pm: dict[str, Any] = {
@@ -298,17 +310,20 @@ def attach_primary_metric(
                     acc_base = None
                     if isinstance(base_cls, dict):
                         valb = base_cls.get("final")
-                        if _is_non_bool_finite_number(valb):
-                            acc_base = float(valb)
+                        valb_value = _coerce_finite_float(valb)
+                        if valb_value is not None:
+                            acc_base = valb_value
                         elif isinstance(valb, dict):
                             nb = valb.get("correct_total")
                             db = valb.get("total")
+                            nb_value = _coerce_finite_float(nb)
+                            db_value = _coerce_finite_float(db)
                             if (
-                                _is_non_bool_finite_number(nb)
-                                and _is_non_bool_finite_number(db)
-                                and float(db) > 0
+                                nb_value is not None
+                                and db_value is not None
+                                and db_value > 0
                             ):
-                                acc_base = float(nb) / float(db)
+                                acc_base = nb_value / db_value
                     if isinstance(acc_run, float) and isinstance(acc_base, float):
                         delta_pp = (acc_run - acc_base) * 100.0
                         acc_pm["ratio_vs_baseline"] = delta_pp
@@ -337,9 +352,9 @@ def attach_primary_metric(
             ):
                 point = None
                 for key in ("ratio_vs_baseline", "final", "preview"):
-                    val = pm.get(key)
-                    if _is_non_bool_finite_number(val):
-                        point = float(val)
+                    point_value = _coerce_finite_float(pm.get(key))
+                    if point_value is not None:
+                        point = point_value
                         break
                 if isinstance(point, float):
                     pm["display_ci"] = [point, point]
