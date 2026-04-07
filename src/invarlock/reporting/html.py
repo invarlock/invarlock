@@ -8,6 +8,7 @@ that the numbers and core content remain identical across formats.
 from __future__ import annotations
 
 from html import escape
+from importlib import import_module
 from typing import Any
 
 from .render import render_report_markdown
@@ -15,11 +16,9 @@ from .report_schema import validate_report
 
 markdown_module: Any | None = None
 try:
-    import markdown as _markdown  # type: ignore[import-untyped]
+    markdown_module = import_module("markdown")
 except ImportError:  # pragma: no cover - optional dependency
-    _markdown = None
-else:
-    markdown_module = _markdown
+    markdown_module = None
 
 
 _STATUS_BADGES = {

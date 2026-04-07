@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -51,11 +52,11 @@ def _ensure_tokenizers_support() -> Any:
     global TokenizerImpl
     if TokenizerImpl is _TOKENIZERS_UNSET:
         try:
-            import tokenizers  # type: ignore[import-untyped]
+            tokenizers_module = importlib.import_module("tokenizers")
         except ModuleNotFoundError:
             TokenizerImpl = None
         else:  # pragma: no cover - tokenizers optional
-            TokenizerImpl = tokenizers.Tokenizer
+            TokenizerImpl = tokenizers_module.Tokenizer
     return None if TokenizerImpl is _TOKENIZERS_UNSET else TokenizerImpl
 
 

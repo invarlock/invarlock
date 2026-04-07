@@ -65,7 +65,7 @@
       "path": "src/invarlock/core/registry.py",
       "subsystem": "core",
       "bucket": "acceptable",
-      "lines": [110, 246, 293, 345, 351, 380, 386, 415, 421, 473, 486, 499],
+      "lines": [110, 341],
       "rationale": "Plugin discovery and load wrappers are optional-extension surfaces that already reclassify failures into explicit unavailability errors."
     },
     {
@@ -95,13 +95,6 @@
       "bucket": "acceptable",
       "lines": [137, 210],
       "rationale": "Emergency rollback attempts are best-effort recovery paths that already preserve failure state in the report."
-    },
-    {
-      "path": "src/invarlock/core/runner_latency.py",
-      "subsystem": "core",
-      "bucket": "acceptable",
-      "lines": [35, 43, 51, 59, 74, 91, 97, 102, 113, 140, 146],
-      "rationale": "Latency measurement wraps arbitrary tensor/model calls and immediately re-raises with explicit phase-specific errors."
     },
     {
       "path": "src/invarlock/guards/spectral.py",

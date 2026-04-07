@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import math
 import os
 import time
@@ -221,8 +222,9 @@ def compute_real_metrics(
     coverage_requirements: Any = BOOTSTRAP_COVERAGE_REQUIREMENTS,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Compute evaluation metrics from calibration data."""
-    import psutil  # type: ignore[import-untyped]
     import torch
+
+    psutil_module: Any = importlib.import_module("psutil")
 
     _ = adapter
     model.eval()
@@ -264,7 +266,7 @@ def compute_real_metrics(
             model.to(override_device)
             device = override_device
 
-    process = psutil.Process()
+    process = psutil_module.Process()
     initial_memory = process.memory_info().rss / 1024 / 1024
 
     policy_flags = runner._resolve_policy_flags(config)

@@ -62,6 +62,66 @@ def _resolve_norm(layer: Any, *candidates: str) -> tuple[str | None, Any | None]
     return None, None
 
 
+def _weight_shape_dim(module: Any, axis: int) -> int | None:
+    weight = getattr(module, "weight", None)
+    shape = getattr(weight, "shape", None)
+    if shape is None:
+        return None
+    try:
+        return int(shape[axis])
+    except (IndexError, TypeError, ValueError):
+        return None
+
+
+def _shape_ints(value: Any) -> tuple[int, ...] | None:
+    shape = getattr(value, "shape", None)
+    if shape is None:
+        return None
+    dims: list[int] = []
+    try:
+        for dim in shape:
+            dims.append(int(dim))
+    except (TypeError, ValueError):
+        return None
+    return tuple(dims)
+
+
+def _coerce_config_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return int(value)
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped and stripped.isdigit():
+            return int(stripped)
+    return None
+
+
+def _layer_list(layers: Any) -> list[Any]:
+    try:
+        return list(layers)
+    except TypeError:
+        count = len(layers)
+        return [layers[idx] for idx in range(int(count))]
+
+
+def _safe_total_params(model: Any) -> int:
+    try:
+        return sum(int(param.numel()) for param in model.parameters())
+    except (AttributeError, RuntimeError, StopIteration, TypeError, ValueError):
+        return 0
+
+
+def _safe_model_device(model: Any) -> torch.device:
+    try:
+        return next(model.parameters()).device
+    except (AttributeError, RuntimeError, StopIteration, TypeError):
+        return torch.device("cpu")
+
+
 class _CausalSpec:
     spec_name = "base"
 
@@ -114,12 +174,10 @@ class _DenseDecoderSpec(_CausalSpec):
 
     def infer_mlp_dim(self, layer: Any, config: Any, hidden_size: int) -> int:
         mlp_dim = int(getattr(config, "intermediate_size", hidden_size * 4) or 0)
-        try:
-            gate_proj = getattr(getattr(layer, "mlp", None), "gate_proj", None)
-            if gate_proj is not None and hasattr(gate_proj, "weight"):
-                mlp_dim = int(gate_proj.weight.shape[0])
-        except Exception:
-            pass
+        gate_proj = getattr(getattr(layer, "mlp", None), "gate_proj", None)
+        gate_proj_dim = _weight_shape_dim(gate_proj, 0)
+        if gate_proj_dim is not None:
+            mlp_dim = gate_proj_dim
         return int(mlp_dim)
 
     def layer_modules(self, model: Any, layer: Any) -> dict[str, Any]:
@@ -156,16 +214,14 @@ class _DenseDecoderSpec(_CausalSpec):
 
     def tying_map(self, model: Any, base: Any) -> dict[str, str]:
         tying: dict[str, str] = {}
-        try:
-            if hasattr(model, "lm_head") and hasattr(base, "embed_tokens"):
-                if model.lm_head.weight is base.embed_tokens.weight:
-                    embed_path = "model.embed_tokens.weight"
-                    outer_model = getattr(model, "model", None)
-                    if getattr(outer_model, "language_model", None) is base:
-                        embed_path = "model.language_model.embed_tokens.weight"
-                    tying["lm_head.weight"] = embed_path
-        except Exception:
-            pass
+        lm_head_weight = getattr(getattr(model, "lm_head", None), "weight", None)
+        embed_weight = getattr(getattr(base, "embed_tokens", None), "weight", None)
+        if lm_head_weight is not None and lm_head_weight is embed_weight:
+            embed_path = "model.embed_tokens.weight"
+            outer_model = getattr(model, "model", None)
+            if getattr(outer_model, "language_model", None) is base:
+                embed_path = "model.language_model.embed_tokens.weight"
+            tying["lm_head.weight"] = embed_path
         return tying
 
 
@@ -193,18 +249,15 @@ class _PhiDecoderSpec(_CausalSpec):
 
     def infer_mlp_dim(self, layer: Any, config: Any, hidden_size: int) -> int:
         mlp_dim = int(getattr(config, "intermediate_size", hidden_size * 4) or 0)
-        try:
-            down_proj = getattr(getattr(layer, "mlp", None), "down_proj", None)
-            if down_proj is not None and hasattr(down_proj, "weight"):
-                mlp_dim = int(down_proj.weight.shape[1])
-            else:
-                gate_up_proj = getattr(
-                    getattr(layer, "mlp", None), "gate_up_proj", None
-                )
-                if gate_up_proj is not None and hasattr(gate_up_proj, "weight"):
-                    mlp_dim = int(gate_up_proj.weight.shape[0] // 2)
-        except Exception:
-            pass
+        down_proj = getattr(getattr(layer, "mlp", None), "down_proj", None)
+        down_proj_dim = _weight_shape_dim(down_proj, 1)
+        if down_proj_dim is not None:
+            mlp_dim = down_proj_dim
+        else:
+            gate_up_proj = getattr(getattr(layer, "mlp", None), "gate_up_proj", None)
+            gate_up_dim = _weight_shape_dim(gate_up_proj, 0)
+            if gate_up_dim is not None:
+                mlp_dim = int(gate_up_dim // 2)
         return int(mlp_dim)
 
     def layer_modules(self, model: Any, layer: Any) -> dict[str, Any]:
@@ -293,16 +346,13 @@ class _MoEDecoderSpec(_CausalSpec):
 
     def infer_mlp_dim(self, layer: Any, config: Any, hidden_size: int) -> int:
         mlp_dim = int(getattr(config, "intermediate_size", hidden_size * 4) or 0)
-        try:
-            moe = getattr(layer, "block_sparse_moe", None)
-            experts = getattr(moe, "experts", None) if moe is not None else None
-            expert0 = _first_item(experts) if experts is not None else None
-            if expert0 is not None:
-                w1 = getattr(expert0, "w1", None)
-                if w1 is not None and hasattr(w1, "weight"):
-                    mlp_dim = int(w1.weight.shape[0])
-        except Exception:
-            pass
+        moe = getattr(layer, "block_sparse_moe", None)
+        experts = getattr(moe, "experts", None) if moe is not None else None
+        expert0 = _first_item(experts) if experts is not None else None
+        if expert0 is not None:
+            w1_dim = _weight_shape_dim(getattr(expert0, "w1", None), 0)
+            if w1_dim is not None:
+                mlp_dim = w1_dim
         return int(mlp_dim)
 
     def layer_modules(self, model: Any, layer: Any) -> dict[str, Any]:
@@ -362,19 +412,14 @@ class _GptOssMoEDecoderSpec(_CausalSpec):
 
     def infer_mlp_dim(self, layer: Any, config: Any, hidden_size: int) -> int:
         mlp_dim = int(getattr(config, "intermediate_size", hidden_size * 4) or 0)
-        try:
-            experts = getattr(getattr(layer, "mlp", None), "experts", None)
-            if experts is not None:
-                intermediate_size = getattr(experts, "intermediate_size", None)
-                if isinstance(intermediate_size, int) and intermediate_size > 0:
-                    return int(intermediate_size)
-                gate_up_proj = getattr(experts, "gate_up_proj", None)
-                if gate_up_proj is not None and hasattr(gate_up_proj, "shape"):
-                    shape = tuple(int(dim) for dim in gate_up_proj.shape)
-                    if len(shape) >= 3 and shape[-1] > 0:
-                        return int(shape[-1] // 2)
-        except Exception:
-            pass
+        experts = getattr(getattr(layer, "mlp", None), "experts", None)
+        if experts is not None:
+            intermediate_size = getattr(experts, "intermediate_size", None)
+            if isinstance(intermediate_size, int) and intermediate_size > 0:
+                return int(intermediate_size)
+            shape = _shape_ints(getattr(experts, "gate_up_proj", None))
+            if shape is not None and len(shape) >= 3 and shape[-1] > 0:
+                return int(shape[-1] // 2)
         return int(mlp_dim)
 
     def layer_modules(self, model: Any, layer: Any) -> dict[str, Any]:
@@ -409,15 +454,15 @@ class _GPT2LikeDecoderSpec(_CausalSpec):
         )
 
     def infer_mlp_dim(self, layer: Any, config: Any, hidden_size: int) -> int:
-        try:
-            c_fc = getattr(getattr(layer, "mlp", None), "c_fc", None)
-            if c_fc is not None and hasattr(c_fc, "weight"):
-                # HF GPT-style uses Conv1D where nf is out_features.
-                if hasattr(c_fc, "nf"):
-                    return int(c_fc.nf)
-                return int(c_fc.weight.shape[0])
-        except Exception:
-            pass
+        c_fc = getattr(getattr(layer, "mlp", None), "c_fc", None)
+        if c_fc is not None:
+            # HF GPT-style uses Conv1D where nf is out_features.
+            nf_value = _coerce_config_int(getattr(c_fc, "nf", None))
+            if nf_value is not None:
+                return nf_value
+            c_fc_dim = _weight_shape_dim(c_fc, 0)
+            if c_fc_dim is not None:
+                return c_fc_dim
         return int(getattr(config, "n_inner", hidden_size * 4) or 0)
 
     def layer_modules(self, model: Any, layer: Any) -> dict[str, Any]:
@@ -432,12 +477,10 @@ class _GPT2LikeDecoderSpec(_CausalSpec):
 
     def tying_map(self, model: Any, base: Any) -> dict[str, str]:
         tying: dict[str, str] = {}
-        try:
-            if hasattr(model, "lm_head") and hasattr(base, "wte"):
-                if model.lm_head.weight is base.wte.weight:
-                    tying["lm_head.weight"] = "transformer.wte.weight"
-        except Exception:
-            pass
+        lm_head_weight = getattr(getattr(model, "lm_head", None), "weight", None)
+        wte_weight = getattr(getattr(base, "wte", None), "weight", None)
+        if lm_head_weight is not None and lm_head_weight is wte_weight:
+            tying["lm_head.weight"] = "transformer.wte.weight"
         return tying
 
 
@@ -601,26 +644,8 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
                 details={"model_class": model.__class__.__name__},
             )
 
-        try:
-            n_layers = len(layers)
-        except Exception:
-            n_layers = sum(1 for _ in iter(layers))
-
-        def _coerce_int(value: Any) -> int | None:
-            try:
-                if isinstance(value, bool):
-                    return None
-                if isinstance(value, int):
-                    return int(value)
-                if isinstance(value, float):
-                    return int(value)
-                if isinstance(value, str):
-                    stripped = value.strip()
-                    if stripped and stripped.isdigit():
-                        return int(stripped)
-            except Exception:
-                return None
-            return None
+        layer_list = _layer_list(layers)
+        n_layers = len(layer_list)
 
         text_config = getattr(config, "text_config", None)
 
@@ -629,7 +654,7 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
                 if container is None:
                     continue
                 for name in names:
-                    value = _coerce_int(getattr(container, name, None))
+                    value = _coerce_config_int(getattr(container, name, None))
                     if value is not None:
                         return value
             return None
@@ -649,22 +674,13 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
 
         heads_per_layer = [int(n_heads)] * int(n_layers)
         mlp_dims: list[int] = []
-        for idx in range(int(n_layers)):
-            layer = layers[idx]
+        for layer in layer_list:
             mlp_dims.append(spec.infer_mlp_dim(layer, config, int(hidden_size)))
 
         tying = spec.tying_map(model, base)
 
-        total_params = 0
-        try:
-            total_params = sum(p.numel() for p in model.parameters())
-        except Exception:
-            total_params = 0
-
-        try:
-            device = next(model.parameters()).device
-        except Exception:
-            device = torch.device("cpu")
+        total_params = _safe_total_params(model)
+        device = _safe_model_device(model)
 
         return {
             "n_layer": int(n_layers),

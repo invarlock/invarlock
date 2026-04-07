@@ -80,7 +80,7 @@ def test_html_exporter_prefers_markdown_when_available():
 
     cert = make_report(_mk_report(), _mk_report())
     html = html_mod.render_report_html(cert)
-    if html_mod._markdown is None:
+    if html_mod.markdown_module is None:
         assert "<pre" in html
     else:
         assert "<table" in html

@@ -5,7 +5,11 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from invarlock.core.runner_latency import measure_latency, samples_to_dataloader
+from invarlock.core.runner_latency import (
+    _raise_latency_error,
+    measure_latency,
+    samples_to_dataloader,
+)
 
 
 class _FakeTensor:
@@ -72,6 +76,11 @@ def test_measure_latency_handles_sync_unsqueeze_to_and_numel_failures(
 
     with pytest.raises(RuntimeError, match="Latency measurement batch shaping failed"):
         measure_latency(model, [[1, 2, 3]], _CudaDevice())
+
+
+def test_raise_latency_error_without_wrapped_error_raises_runtime_error() -> None:
+    with pytest.raises(RuntimeError, match="plain failure"):
+        _raise_latency_error("plain failure")
 
 
 def test_measure_latency_returns_zero_for_missing_or_empty_samples() -> None:
@@ -188,7 +197,7 @@ def test_measure_latency_handles_attention_mask_shape_and_device_failures(
 
     with pytest.raises(
         RuntimeError,
-        match="Latency measurement attention-mask preparation failed",
+        match="Latency measurement attention-mask shaping failed",
     ):
         measure_latency(
             model,
@@ -203,7 +212,7 @@ def test_measure_latency_handles_attention_mask_shape_and_device_failures(
 
     with pytest.raises(
         RuntimeError,
-        match="Latency measurement attention-mask preparation failed",
+        match="Latency measurement attention-mask device transfer failed",
     ):
         measure_latency(
             model,
@@ -306,6 +315,82 @@ def test_measure_latency_syncs_cuda_string_devices(monkeypatch) -> None:
     assert calls
     assert calls[0]["attention_mask"] is not None
     assert calls[0]["token_type_ids"] is not None
+
+
+def test_measure_latency_skips_sync_for_non_cuda_device_objects(monkeypatch) -> None:
+    sync_calls: list[str] = []
+
+    class _NoCudaDevice:
+        pass
+
+    class _LocalTensor:
+        def __init__(self, values):
+            if isinstance(values, (list, tuple)):
+                self.values = list(values)
+            else:
+                self.values = [values]
+
+        def dim(self) -> int:
+            return 1
+
+        def unsqueeze(self, _axis: int):
+            return self
+
+        def to(self, _device):
+            return self
+
+        def numel(self) -> int:
+            return len(self.values)
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(
+        torch.cuda, "synchronize", lambda: sync_calls.append("unexpected")
+    )
+    monkeypatch.setattr(
+        torch, "tensor", lambda value, *args, **kwargs: _LocalTensor(value)
+    )
+
+    latency = measure_latency(_LatencyModel(), [[1, 2, 3]], _NoCudaDevice())
+
+    assert latency >= 0.0
+    assert sync_calls == []
+
+
+def test_measure_latency_accepts_prebatched_auxiliary_tensors() -> None:
+    calls: list[dict[str, torch.Tensor | None]] = []
+
+    class _CapturingModel:
+        def __call__(
+            self, input_ids, attention_mask=None, labels=None, token_type_ids=None
+        ):
+            calls.append(
+                {
+                    "input_ids": input_ids,
+                    "attention_mask": attention_mask,
+                    "labels": labels,
+                    "token_type_ids": token_type_ids,
+                }
+            )
+            return SimpleNamespace(loss=torch.tensor(0.1))
+
+    latency = measure_latency(
+        _CapturingModel(),
+        [
+            {
+                "input_ids": torch.tensor([1, 2, 3], dtype=torch.long),
+                "attention_mask": torch.tensor([[1, 1, 1]], dtype=torch.long),
+                "token_type_ids": torch.tensor([[0, 0, 1]], dtype=torch.long),
+            }
+        ],
+        "cpu",
+    )
+
+    assert latency >= 0.0
+    assert calls
+    assert calls[0]["attention_mask"] is not None
+    assert tuple(calls[0]["attention_mask"].shape) == (1, 3)
+    assert calls[0]["token_type_ids"] is not None
+    assert tuple(calls[0]["token_type_ids"].shape) == (1, 3)
 
 
 def test_samples_to_dataloader_skips_missing_inputs_and_keeps_2d_tensor_fields() -> (
