@@ -10,14 +10,46 @@ hashing and provenance utilities.
 
 from __future__ import annotations
 
-from typing import Any
+import importlib
+from typing import TYPE_CHECKING, Any
 
 import psutil
 
-try:  # Torch is optional; utils can be imported without it.
-    import torch  # type: ignore[import]
-except Exception:  # pragma: no cover - exercised when torch is missing
-    torch = None  # type: ignore[assignment]
+if TYPE_CHECKING:
+    import torch
+
+_TORCH_UNSET = object()
+_torch: Any = _TORCH_UNSET
+_TORCH_CUDA_QUERY_ERRORS = (
+    AssertionError,
+    AttributeError,
+    LookupError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
+
+def _get_torch() -> Any | None:
+    global _torch
+    if _torch is _TORCH_UNSET:
+        try:  # pragma: no cover - exercised when torch is missing
+            _torch = importlib.import_module("torch")
+        except (
+            ModuleNotFoundError
+        ):  # pragma: no cover - exercised when torch is missing
+            _torch = None
+    return None if _torch is _TORCH_UNSET else _torch
+
+
+def _require_torch() -> Any:
+    torch_mod = _get_torch()
+    if torch_mod is None:
+        raise ModuleNotFoundError(
+            "torch is required for invarlock.utils tensor helpers"
+        )
+    return torch_mod
 
 
 def extract_input_ids(
@@ -34,7 +66,9 @@ def extract_input_ids(
     Returns:
         Extracted input_ids tensor
     """
-    if isinstance(batch, torch.Tensor):
+    torch_mod = _require_torch()
+
+    if isinstance(batch, torch_mod.Tensor):
         input_ids = batch
     elif isinstance(batch, dict):
         if "input_ids" in batch:
@@ -48,7 +82,7 @@ def extract_input_ids(
                 )
             # Try first tensor value
             for value in batch.values():
-                if isinstance(value, torch.Tensor):
+                if isinstance(value, torch_mod.Tensor):
                     input_ids = value
                     break
             else:
@@ -59,7 +93,7 @@ def extract_input_ids(
         if strict:
             raise ValueError(f"Unsupported batch format: {type(batch)}")
         # Try to convert directly
-        input_ids = torch.tensor(batch)
+        input_ids = torch_mod.tensor(batch)
 
     # Move to device if specified
     if device is not None:
@@ -70,13 +104,15 @@ def extract_input_ids(
 
 def get_model_device(model: torch.nn.Module) -> torch.device:
     """Get the device of a model."""
+    _require_torch()
     return next(model.parameters()).device
 
 
 def ensure_tensor(data: Any, device: torch.device | None = None) -> torch.Tensor:
     """Ensure data is a tensor on the correct device."""
-    if not isinstance(data, torch.Tensor):
-        data = torch.tensor(data)
+    torch_mod = _require_torch()
+    if not isinstance(data, torch_mod.Tensor):
+        data = torch_mod.tensor(data)
 
     if device is not None:
         data = data.to(device)
@@ -95,8 +131,9 @@ def dict_to_device(
     data: dict[str, torch.Tensor], device: torch.device
 ) -> dict[str, torch.Tensor]:
     """Move all tensors in a dictionary to the specified device."""
+    torch_mod = _require_torch()
     return {
-        key: value.to(device) if isinstance(value, torch.Tensor) else value
+        key: value.to(device) if isinstance(value, torch_mod.Tensor) else value
         for key, value in data.items()
     }
 
@@ -128,11 +165,18 @@ def get_memory_usage() -> dict[str, float]:
     }
 
     # Add CUDA memory if available
+    torch_mod = _get_torch()
     try:
-        if torch is not None and hasattr(torch, "cuda") and torch.cuda.is_available():
-            result["cuda_allocated_mb"] = torch.cuda.memory_allocated() / 1024 / 1024
-            result["cuda_reserved_mb"] = torch.cuda.memory_reserved() / 1024 / 1024
-    except Exception:
+        if (
+            torch_mod is not None
+            and hasattr(torch_mod, "cuda")
+            and torch_mod.cuda.is_available()
+        ):
+            result["cuda_allocated_mb"] = (
+                torch_mod.cuda.memory_allocated() / 1024 / 1024
+            )
+            result["cuda_reserved_mb"] = torch_mod.cuda.memory_reserved() / 1024 / 1024
+    except _TORCH_CUDA_QUERY_ERRORS:
         # If torch is unavailable or querying CUDA fails, fall back to CPU-only stats.
         pass
 

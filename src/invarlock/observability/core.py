@@ -16,6 +16,18 @@ from .alerting import AlertManager, AlertSeverity
 from .health import HealthChecker
 from .metrics import MetricsRegistry
 
+_MONITORING_ERRORS = (
+    ArithmeticError,
+    AssertionError,
+    AttributeError,
+    LookupError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+    psutil.Error,
+)
+
 
 @dataclass
 class MonitoringConfig:
@@ -238,7 +250,7 @@ class MonitoringManager:
                 if self.config.json_export_enabled:
                     self._export_metrics()
 
-            except Exception as e:
+            except _MONITORING_ERRORS as e:
                 self.logger.error(f"Error in metrics collection: {e}")
 
             self._stop_event.wait(self.config.metrics_interval)
@@ -259,7 +271,7 @@ class MonitoringManager:
                 # Check for health-based alerts
                 self.alert_manager.check_health_alerts(health_status)
 
-            except Exception as e:
+            except _MONITORING_ERRORS as e:
                 self.logger.error(f"Error in health checking: {e}")
 
             self._stop_event.wait(self.config.health_check_interval)
@@ -274,7 +286,7 @@ class MonitoringManager:
                 # Check resource-based alerts
                 self.alert_manager.check_resource_alerts(usage)
 
-            except Exception as e:
+            except _MONITORING_ERRORS as e:
                 self.logger.error(f"Error in resource monitoring: {e}")
 
             self._stop_event.wait(self.config.resource_check_interval)
@@ -288,7 +300,7 @@ class MonitoringManager:
                 exporter = JSONExporter(self.config.json_export_path)
                 exporter.export(self.metrics.get_all_metrics())
 
-        except Exception as e:
+        except _MONITORING_ERRORS as e:
             self.logger.error(f"Error exporting metrics: {e}")
 
     def _get_uptime(self) -> float:
@@ -507,7 +519,7 @@ class ResourceMonitor:
             usage["disk_percent"] = (disk.used / disk.total) * 100
             usage["disk_free_gb"] = disk.free / (1024**3)
 
-        except Exception as e:
+        except _MONITORING_ERRORS as e:
             self.logger.error(f"Error collecting resource usage: {e}")
 
         return usage

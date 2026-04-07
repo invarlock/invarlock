@@ -14,6 +14,19 @@ from typing import Any
 import psutil
 import torch
 
+_HEALTH_CHECK_ERRORS = (
+    ArithmeticError,
+    AssertionError,
+    AttributeError,
+    ImportError,
+    LookupError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+    psutil.Error,
+)
+
 
 class HealthStatus(Enum):
     """Health status levels."""
@@ -82,7 +95,7 @@ class HealthChecker:
             result = self.health_checks[name]()
             self.last_results[name] = result
             return result
-        except Exception as e:
+        except _HEALTH_CHECK_ERRORS as e:
             error_result = ComponentHealth(
                 name=name,
                 status=HealthStatus.CRITICAL,
@@ -167,7 +180,7 @@ class HealthChecker:
                     },
                     timestamp=time.time(),
                 )
-            except Exception as e:
+            except _HEALTH_CHECK_ERRORS as e:
                 return ComponentHealth(
                     name="memory",
                     status=HealthStatus.CRITICAL,
@@ -194,7 +207,7 @@ class HealthChecker:
                 else:
                     status = HealthStatus.HEALTHY
                     message = f"CPU usage normal: {cpu_percent:.1f}%"
-            except Exception as e:
+            except _HEALTH_CHECK_ERRORS as e:
                 status = HealthStatus.CRITICAL
                 message = f"Failed to measure CPU usage: {e}"
                 cpu_details["error"] = str(e)
@@ -204,7 +217,7 @@ class HealthChecker:
                 if core_count is None:
                     core_count = os.cpu_count()
                 cpu_details["core_count"] = core_count
-            except Exception as e:
+            except _HEALTH_CHECK_ERRORS as e:
                 cpu_details["core_count"] = os.cpu_count()
                 warnings.append(f"cpu_count_unavailable: {e}")
 
@@ -212,10 +225,12 @@ class HealthChecker:
                 load_avg: Any | None = None
                 if hasattr(psutil, "getloadavg"):
                     load_avg = psutil.getloadavg()
-                elif hasattr(os, "getloadavg"):
-                    load_avg = os.getloadavg()  # type: ignore[attr-defined]
+                else:
+                    getloadavg = getattr(os, "getloadavg", None)
+                    if callable(getloadavg):
+                        load_avg = getloadavg()
                 cpu_details["load_avg"] = load_avg
-            except Exception as e:
+            except _HEALTH_CHECK_ERRORS as e:
                 cpu_details["load_avg"] = None
                 warnings.append(f"load_avg_unavailable: {e}")
 
@@ -258,7 +273,7 @@ class HealthChecker:
                     },
                     timestamp=time.time(),
                 )
-            except Exception as e:
+            except _HEALTH_CHECK_ERRORS as e:
                 return ComponentHealth(
                     name="disk",
                     status=HealthStatus.CRITICAL,
@@ -323,7 +338,7 @@ class HealthChecker:
                     },
                     timestamp=time.time(),
                 )
-            except Exception as e:
+            except _HEALTH_CHECK_ERRORS as e:
                 return ComponentHealth(
                     name="gpu",
                     status=HealthStatus.WARNING,
@@ -361,7 +376,7 @@ class HealthChecker:
                     details=details,
                     timestamp=time.time(),
                 )
-            except Exception as e:
+            except _HEALTH_CHECK_ERRORS as e:
                 return ComponentHealth(
                     name="pytorch",
                     status=HealthStatus.CRITICAL,
@@ -410,7 +425,7 @@ class InvarLockHealthChecker(HealthChecker):
                     try:
                         adapter_class()
                         available_adapters.append(name)
-                    except Exception as e:
+                    except _HEALTH_CHECK_ERRORS as e:
                         failed_adapters.append({"name": name, "error": str(e)})
 
                 if not available_adapters:
@@ -436,7 +451,7 @@ class InvarLockHealthChecker(HealthChecker):
                     },
                     timestamp=time.time(),
                 )
-            except Exception as e:
+            except _HEALTH_CHECK_ERRORS as e:
                 return ComponentHealth(
                     name="adapters",
                     status=HealthStatus.CRITICAL,
@@ -473,7 +488,7 @@ class InvarLockHealthChecker(HealthChecker):
                         else:
                             guard_class()
                         available_guards.append(name)
-                    except Exception as e:
+                    except _HEALTH_CHECK_ERRORS as e:
                         failed_guards.append({"name": name, "error": str(e)})
 
                 if not available_guards:
@@ -499,7 +514,7 @@ class InvarLockHealthChecker(HealthChecker):
                     },
                     timestamp=time.time(),
                 )
-            except Exception as e:
+            except _HEALTH_CHECK_ERRORS as e:
                 return ComponentHealth(
                     name="guards",
                     status=HealthStatus.CRITICAL,
@@ -550,7 +565,7 @@ class InvarLockHealthChecker(HealthChecker):
                     },
                     timestamp=time.time(),
                 )
-            except Exception as e:
+            except _HEALTH_CHECK_ERRORS as e:
                 return ComponentHealth(
                     name="dependencies",
                     status=HealthStatus.CRITICAL,

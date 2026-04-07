@@ -464,6 +464,21 @@ class TestDefaultHealthChecks:
         assert result.name == "pytorch"
         assert "version" in result.details
 
+    def test_memory_check_failure_returns_critical(self, monkeypatch):
+        """Memory probe failures should return a typed critical health result."""
+        from invarlock.observability.health import HealthChecker, HealthStatus
+
+        checker = HealthChecker()
+        monkeypatch.setattr(
+            "invarlock.observability.health.psutil.virtual_memory",
+            lambda: (_ for _ in ()).throw(OSError("vmem unavailable")),
+        )
+
+        result = checker.check_component("memory")
+
+        assert result.status == HealthStatus.CRITICAL
+        assert "Failed to check memory" in result.message
+
 
 # =============================================================================
 # InvarLockHealthChecker Tests

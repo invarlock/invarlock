@@ -627,6 +627,32 @@ class TestNotifications:
         assert "json" in call_kwargs
         assert call_kwargs["json"]["alert"]["name"] == "Test"
 
+    @patch("invarlock.observability.alerting.requests.post")
+    def test_notification_failure_is_logged_and_swallowed(self, mock_post, caplog):
+        """Notification transport failures should not abort alert creation."""
+        from invarlock.observability.alerting import (
+            AlertManager,
+            AlertRule,
+            NotificationChannel,
+        )
+
+        mock_post.side_effect = OSError("webhook down")
+
+        manager = AlertManager()
+        manager.add_notification_channel(
+            NotificationChannel(
+                name="webhook",
+                type="webhook",
+                config={"url": "http://test.com/webhook"},
+            )
+        )
+        manager.add_rule(AlertRule(name="test_rule", metric="test", threshold=0.0))
+
+        manager.check_metric_against_rules("test", 1.0)
+
+        assert "rule_test_rule" in manager.active_alerts
+        assert "Failed to send notification via webhook" in caplog.text
+
 
 # =============================================================================
 # Utility Function Tests

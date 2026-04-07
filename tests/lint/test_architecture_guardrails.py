@@ -1089,6 +1089,13 @@ def test_hardened_runtime_paths_keep_broad_catch_budgets() -> None:
         REPO_ROOT / "src/invarlock/eval/window_planning.py": 0,
         REPO_ROOT / "src/invarlock/eval/primary_metric.py": 0,
         REPO_ROOT / "src/invarlock/model_profile.py": 0,
+        REPO_ROOT / "src/invarlock/observability/alerting.py": 0,
+        REPO_ROOT / "src/invarlock/observability/core.py": 0,
+        REPO_ROOT / "src/invarlock/observability/exporters.py": 0,
+        REPO_ROOT / "src/invarlock/observability/health.py": 0,
+        REPO_ROOT / "src/invarlock/adapters/hf_seq2seq.py": 0,
+        REPO_ROOT / "src/invarlock/utils/__init__.py": 0,
+        REPO_ROOT / "src/invarlock/guards_ref/spectral_ref.py": 0,
     }
     offenders: list[str] = []
     for path, budget in budgets.items():
@@ -1114,6 +1121,11 @@ def test_hardened_followup_paths_have_no_local_type_ignore_escapes() -> None:
         REPO_ROOT / "src/invarlock/eval/bench_policy.py",
         REPO_ROOT / "src/invarlock/eval/data.py",
         REPO_ROOT / "src/invarlock/eval/primary_metric.py",
+        REPO_ROOT / "src/invarlock/observability/alerting.py",
+        REPO_ROOT / "src/invarlock/observability/health.py",
+        REPO_ROOT / "src/invarlock/adapters/hf_seq2seq.py",
+        REPO_ROOT / "src/invarlock/utils/__init__.py",
+        REPO_ROOT / "src/invarlock/guards_ref/spectral_ref.py",
     )
     offenders: list[str] = []
     for path in hardened_paths:
