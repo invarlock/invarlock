@@ -675,6 +675,7 @@ def test_hf_adapter_local_only_retry_uses_cache_miss_detection() -> None:
     source = ast.get_source_segment(text, target) or ""
     assert "_is_local_loader_cache_miss" in source
     assert "prefer_local_files_only" in source
+    assert "except Exception" not in source
 
 
 def test_guarded_benchmark_failures_raise_instead_of_continuing() -> None:
@@ -695,6 +696,7 @@ def test_guarded_benchmark_failures_raise_instead_of_continuing() -> None:
     assert "Core report returned invalid edit metadata payload" in source
     assert "Core report returned non-string plan_digest" in source
     assert "Core report returned invalid edit delta payload" in source
+    assert "except Exception" not in source
 
 
 def test_execute_scenario_surfaces_benchmark_assembly_failures() -> None:
@@ -713,6 +715,7 @@ def test_execute_scenario_surfaces_benchmark_assembly_failures() -> None:
     assert "_assign_dataset_provider(" in source
     assert "_extract_success_report_path(" in source
     assert "Evaluation report generation failed for" in source
+    assert "except Exception" not in source
 
 
 def test_spectral_validation_unexpected_failures_raise() -> None:
@@ -1080,9 +1083,12 @@ def test_hardened_runtime_paths_keep_broad_catch_budgets() -> None:
         REPO_ROOT / "src/invarlock/core/registry.py": 2,
         REPO_ROOT / "src/invarlock/core/runner_latency.py": 0,
         REPO_ROOT / "src/invarlock/adapters/hf_causal.py": 0,
+        REPO_ROOT / "src/invarlock/adapters/hf_mixin.py": 0,
         REPO_ROOT / "src/invarlock/eval/data_tokenization.py": 0,
+        REPO_ROOT / "src/invarlock/eval/bench_runner.py": 0,
         REPO_ROOT / "src/invarlock/eval/window_planning.py": 0,
         REPO_ROOT / "src/invarlock/eval/primary_metric.py": 0,
+        REPO_ROOT / "src/invarlock/model_profile.py": 0,
     }
     offenders: list[str] = []
     for path, budget in budgets.items():
@@ -1104,6 +1110,7 @@ def test_source_tree_has_no_import_untyped_suppressions() -> None:
 def test_hardened_followup_paths_have_no_local_type_ignore_escapes() -> None:
     hardened_paths = (
         REPO_ROOT / "src/invarlock/adapters/hf_causal.py",
+        REPO_ROOT / "src/invarlock/adapters/hf_mixin.py",
         REPO_ROOT / "src/invarlock/eval/bench_policy.py",
         REPO_ROOT / "src/invarlock/eval/data.py",
         REPO_ROOT / "src/invarlock/eval/primary_metric.py",

@@ -8,6 +8,7 @@ from typing import Any
 
 import invarlock.guards.rmt_analysis as rmt_analysis
 import invarlock.guards.rmt_detection as rmt_detection
+from invarlock.core.exceptions import InvarlockError
 from invarlock.reporting.report_types import create_empty_report
 
 from .bench_policy import (
@@ -28,6 +29,17 @@ from .bench_policy import (
 )
 
 logger = logging.getLogger(__name__)
+_BENCHMARK_RECOVERABLE_ERRORS = (
+    InvarlockError,
+    AttributeError,
+    ImportError,
+    IndexError,
+    KeyError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 
 def _assign_dataset_provider(
@@ -225,7 +237,7 @@ def execute_single_run(
             for guard_name in ("invariants", "spectral", "rmt", "variance"):
                 try:
                     guards.append(registry.get_guard(guard_name))
-                except Exception as exc:
+                except _BENCHMARK_RECOVERABLE_ERRORS as exc:
                     raise RuntimeError(
                         f"Guard construction failed for {guard_name}: {exc}"
                     ) from exc
@@ -353,7 +365,7 @@ def execute_single_run(
                 baseline_mp_stats=rmt_baseline_mp_stats,
                 deadband=rmt_deadband,
             )
-        except Exception as exc:
+        except _BENCHMARK_RECOVERABLE_ERRORS as exc:
             raise RuntimeError(
                 f"RMT detection failed for {scenario.edit} ({run_type}): {exc}"
             ) from exc
@@ -393,7 +405,7 @@ def execute_single_run(
 
         success = str(status).lower() != "failed"
         return RunResult(run_type=run_type, report=report, success=success)
-    except Exception as exc:
+    except _BENCHMARK_RECOVERABLE_ERRORS as exc:
         logger.error(f"Run failed for {scenario.edit} ({run_type}): {exc}")
         return RunResult(
             run_type=run_type,
@@ -473,7 +485,7 @@ def execute_scenario(
                 json.dumps(evaluation_report, indent=2), encoding="utf-8"
             )
             artifacts["evaluation_report"] = str(report_path)
-        except Exception as exc:
+        except _BENCHMARK_RECOVERABLE_ERRORS as exc:
             raise RuntimeError(
                 f"Evaluation report generation failed for {scenario_slug}: {exc}"
             ) from exc

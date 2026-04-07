@@ -70,6 +70,31 @@ def test_local_profile_config_helpers_tolerate_invalid_utf8(tmp_path: Path) -> N
     }
 
 
+def test_local_fast_tokenizer_token_lookup_tolerates_runtime_errors() -> None:
+    class _BrokenLookupTokenizer:
+        def get_vocab(self) -> dict[str, int]:
+            return {"[PAD]": 0}
+
+        def token_to_id(self, _token: str) -> int:
+            raise RuntimeError("lookup boom")
+
+    tokenizer = mp._LocalFastTokenizer(
+        tokenizer=_BrokenLookupTokenizer(),
+        name_or_path="broken-local",
+        special_tokens={
+            "bos_token": None,
+            "cls_token": None,
+            "eos_token": None,
+            "mask_token": None,
+            "pad_token": "[PAD]",
+            "sep_token": None,
+            "unk_token": None,
+        },
+    )
+
+    assert tokenizer.pad_token_id is None
+
+
 @pytest.mark.parametrize(
     ("payload", "expected_family"),
     [
@@ -294,6 +319,40 @@ def test_resolve_tokenizer_falls_back_to_slow_tokenizer_when_fast_backend_missin
                 "(1) a `tokenizers` library serialization file, "
                 "(2) a slow tokenizer instance to convert or "
                 "(3) an equivalent slow tokenizer class to instantiate and convert. "
+                "You need to have sentencepiece or tiktoken installed to convert "
+                "a slow tokenizer to a fast one."
+            )
+
+    monkeypatch.setattr(mp, "AutoTokenizer", _Factory, raising=False)
+
+    profile = mp.detect_model_profile("prajjwal1/bert-tiny", adapter="hf_mlm")
+    tokenizer, _ = mp.resolve_tokenizer(profile)
+
+    assert tokenizer.name_or_path == "prajjwal1/bert-tiny"
+    assert calls == [
+        ("prajjwal1/bert-tiny", True, None),
+        ("prajjwal1/bert-tiny", True, False),
+    ]
+
+
+def test_resolve_tokenizer_retries_slow_tokenizer_on_sentencepiece_import_error(
+    monkeypatch,
+) -> None:
+    calls: list[tuple[str, bool | None, bool | None]] = []
+
+    class _Factory:
+        @classmethod
+        def from_pretrained(cls, model_id: str, **kwargs: object) -> _DummyTokenizer:
+            calls.append(
+                (
+                    model_id,
+                    kwargs.get("local_files_only"),
+                    kwargs.get("use_fast"),
+                )
+            )
+            if kwargs.get("use_fast") is False:
+                return _DummyTokenizer(name_or_path=model_id, mask_token="[MASK]")
+            raise ImportError(
                 "You need to have sentencepiece or tiktoken installed to convert "
                 "a slow tokenizer to a fast one."
             )

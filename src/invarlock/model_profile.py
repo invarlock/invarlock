@@ -14,6 +14,8 @@ _TRANSFORMERS_UNSET = object()
 AutoTokenizer: Any = _TRANSFORMERS_UNSET
 _TOKENIZERS_UNSET = object()
 TokenizerImpl: Any = _TOKENIZERS_UNSET
+_TOKENIZER_LOOKUP_ERRORS = (RuntimeError, TypeError, ValueError)
+_TOKENIZER_LOAD_ERRORS = (ImportError, OSError, RuntimeError, TypeError, ValueError)
 
 
 class PreTrainedTokenizerBase:
@@ -165,7 +167,7 @@ class _LocalFastTokenizer(PreTrainedTokenizerBase):
             return None
         try:
             token_id = self._tokenizer.token_to_id(token)
-        except Exception:
+        except _TOKENIZER_LOOKUP_ERRORS:
             return None
         return None if token_id is None else int(token_id)
 
@@ -416,7 +418,7 @@ def _is_tokenizer_cache_miss(error: Exception) -> bool:
 
 
 def _is_slow_tokenizer_fallback_candidate(error: Exception) -> bool:
-    if not isinstance(error, (OSError, RuntimeError, TypeError, ValueError)):
+    if not isinstance(error, _TOKENIZER_LOAD_ERRORS):
         return False
     message = str(error).strip().lower()
     return any(
@@ -442,7 +444,7 @@ def _load_tokenizer_with_factory_retry(
     try:
         tokenizer = tokenizer_factory.from_pretrained(candidate, **kwargs)
         return cast("PreTrainedTokenizerBase", tokenizer)
-    except Exception as exc:
+    except _TOKENIZER_LOAD_ERRORS as exc:
         if not _is_slow_tokenizer_fallback_candidate(exc):
             raise
         try:
@@ -452,7 +454,7 @@ def _load_tokenizer_with_factory_retry(
                 **kwargs,
             )
             return cast("PreTrainedTokenizerBase", tokenizer)
-        except Exception as slow_exc:
+        except _TOKENIZER_LOAD_ERRORS as slow_exc:
             if not _is_slow_tokenizer_fallback_candidate(slow_exc):
                 raise
             explicit_factory = _resolve_explicit_slow_tokenizer_factory(candidate)
@@ -538,7 +540,7 @@ def _load_tokenizer_for_model(
                 candidate,
                 local_files_only=True,
             )
-        except Exception as exc:
+        except _TOKENIZER_LOAD_ERRORS as exc:
             if not _is_tokenizer_cache_miss(exc):
                 raise
             continue
@@ -562,7 +564,7 @@ def _load_tokenizer_for_model(
                 candidate,
                 local_files_only=False,
             )
-        except Exception as exc:
+        except _TOKENIZER_LOAD_ERRORS as exc:
             if not _is_tokenizer_cache_miss(exc):
                 raise
             continue
