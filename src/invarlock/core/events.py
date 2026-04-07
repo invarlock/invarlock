@@ -20,6 +20,9 @@ from .types import LogLevel
 
 __all__ = ["EventLogger"]
 
+_EVENT_FILE_ERRORS = (OSError, ValueError)
+_EVENT_SERIALIZATION_ERRORS = (OSError, RuntimeError, TypeError, ValueError)
+
 
 class EventLogger:
     """
@@ -94,7 +97,7 @@ class EventLogger:
         """Open the log file for writing."""
         try:
             self._file = open(self.log_path, "a", encoding="utf-8")
-        except Exception as e:  # pragma: no cover - defensive guard
+        except OSError as e:  # pragma: no cover - defensive guard
             raise OSError(f"Failed to open log file {self.log_path}: {e}") from e
 
     def log(
@@ -137,7 +140,9 @@ class EventLogger:
             if self.auto_flush:
                 self._file.flush()
 
-        except Exception as e:  # pragma: no cover - fallback to stderr
+        except (
+            _EVENT_SERIALIZATION_ERRORS
+        ) as e:  # pragma: no cover - fallback to stderr
             logging.getLogger(__name__).warning("Event logging failed: %s", e)
 
     def _sanitize_data(self, data: dict[str, Any]) -> dict[str, Any]:
@@ -170,13 +175,13 @@ class EventLogger:
             if hasattr(value, "tolist"):
                 try:
                     return value.tolist()
-                except Exception:
+                except _EVENT_SERIALIZATION_ERRORS:
                     pass
 
             if isinstance(value, set | frozenset):
                 try:
                     return list(value)
-                except Exception:
+                except _EVENT_SERIALIZATION_ERRORS:
                     pass
 
             if isinstance(value, Sequence) and not isinstance(
@@ -278,7 +283,7 @@ class EventLogger:
 
             try:
                 self._file.close()
-            except Exception:  # pragma: no cover - best-effort cleanup
+            except _EVENT_FILE_ERRORS:  # pragma: no cover - best-effort cleanup
                 pass
             finally:
                 self._file = None

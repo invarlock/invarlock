@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+from builtins import OSError as BuiltinOSError
 from pathlib import Path
+
+import pytest
 
 from invarlock.core.events import EventLogger
 from invarlock.core.types import LogLevel
@@ -111,3 +114,34 @@ def test_event_logger_serializer_paths() -> None:
     # set and bytes
     assert logger._json_serializer({1, 2}) in ([1, 2], [2, 1])
     assert isinstance(logger._json_serializer(b"x"), str)
+
+
+def test_event_logger_open_failure_wraps_oserror(monkeypatch, tmp_path: Path) -> None:
+    log_path = tmp_path / "events.jsonl"
+
+    def _boom_open(*args, **kwargs):  # type: ignore[no-untyped-def]
+        raise BuiltinOSError("disk offline")
+
+    monkeypatch.setattr("builtins.open", _boom_open)
+
+    with pytest.raises(OSError, match="Failed to open log file"):
+        EventLogger(log_path, auto_flush=False)
+
+
+def test_event_logger_close_ignores_oserror(tmp_path: Path) -> None:
+    logger = EventLogger(tmp_path / "events.jsonl", auto_flush=False)
+
+    class _BrokenFile:
+        def write(self, _payload: str) -> int:
+            return 0
+
+        def flush(self) -> None:
+            return None
+
+        def close(self) -> None:
+            raise OSError("close failed")
+
+    logger._file = _BrokenFile()
+    logger.close()
+
+    assert logger._file is None

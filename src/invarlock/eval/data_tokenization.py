@@ -12,6 +12,15 @@ from invarlock.core.exceptions import DataError as _DataErr
 
 from .data_windows import EvaluationWindow
 
+_TOKENIZATION_ERRORS = (
+    AttributeError,
+    KeyError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 def call_tokenizer(tokenizer: Any, /, *args: Any, **kwargs: Any) -> Any:
     return cast(Any, tokenizer)(*args, **kwargs)
@@ -22,22 +31,22 @@ def to_python_token_rows(value: Any, *, batch_size: int) -> list[list[int]]:
     if batch_size == 1 and hasattr(candidate, "squeeze"):
         try:
             candidate = candidate.squeeze(0)
-        except Exception:
+        except _TOKENIZATION_ERRORS:
             pass
     if hasattr(candidate, "detach"):
         try:
             candidate = candidate.detach()
-        except Exception:
+        except _TOKENIZATION_ERRORS:
             pass
     if hasattr(candidate, "cpu"):
         try:
             candidate = candidate.cpu()
-        except Exception:
+        except _TOKENIZATION_ERRORS:
             pass
     if hasattr(candidate, "tolist"):
         try:
             candidate = candidate.tolist()
-        except Exception:
+        except _TOKENIZATION_ERRORS:
             pass
     if batch_size == 1:
         if (
@@ -195,7 +204,7 @@ def tokenize_texts_padded(
             input_ids_list.append(input_ids)
             attention_masks_list.append(attention_mask)
             kept_positions.append(int(position))
-        except Exception as exc:
+        except _TOKENIZATION_ERRORS as exc:
             failures.append({"position": int(position), "error": str(exc)})
             if warn_on_failure:
                 warnings.warn(

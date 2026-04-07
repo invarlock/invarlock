@@ -190,11 +190,13 @@ class MetricsAggregator:
         pm_final = float("nan")
         try:
             if isinstance(pm, dict):
-                if isinstance(pm.get("preview"), int | float):
-                    pm_preview = float(pm["preview"])  # type: ignore[index]
-                if isinstance(pm.get("final"), int | float):
-                    pm_final = float(pm["final"])  # type: ignore[index]
-        except Exception:
+                preview_raw = pm.get("preview")
+                final_raw = pm.get("final")
+                if isinstance(preview_raw, int | float):
+                    pm_preview = float(preview_raw)
+                if isinstance(final_raw, int | float):
+                    pm_final = float(final_raw)
+        except (TypeError, ValueError):
             pm_preview = float("nan")
             pm_final = float("nan")
         duration_s = float("nan")
@@ -203,7 +205,7 @@ class MetricsAggregator:
                 dur = meta.get("duration_s", meta.get("duration"))
                 if isinstance(dur, int | float):
                     duration_s = float(dur)
-        except Exception:
+        except (TypeError, ValueError):
             duration_s = float("nan")
         return {
             "primary_metric_preview": pm_preview,

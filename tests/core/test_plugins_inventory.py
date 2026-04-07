@@ -59,6 +59,16 @@ def test_is_minimal_plugins_view_and_cuda_detection() -> None:
         is True
     )
     assert detect_cuda_available(object()) is False
+    assert (
+        detect_cuda_available(
+            SimpleNamespace(
+                cuda=SimpleNamespace(
+                    is_available=lambda: (_ for _ in ()).throw(RuntimeError("boom"))
+                )
+            )
+        )
+        is False
+    )
 
 
 def test_gather_adapter_inventory_rows_and_json_payloads() -> None:
@@ -112,6 +122,27 @@ def test_gather_generic_and_combined_inventory_payloads() -> None:
 
     assert any(item["kind"] == "guard" for item in combined)
     assert any(item["origin"] == "third_party" for item in combined)
+
+
+def test_gather_adapter_inventory_rows_tolerates_probe_failures() -> None:
+    registry = _Registry()
+
+    rows = gather_adapter_inventory_rows(
+        registry=registry,
+        minimal=False,
+        has_cuda=True,
+        is_linux=True,
+        extras_checker=lambda _name, _kind: (_ for _ in ()).throw(ValueError("bad")),
+        provenance_extractor=lambda _name: (_ for _ in ()).throw(
+            RuntimeError("missing provenance")
+        ),
+        bitsandbytes_runtime_available=lambda: True,
+    )
+
+    bnb_row = next(row for row in rows if row["name"] == "hf_bnb")
+    assert bnb_row["backend"] == ""
+    assert bnb_row["status"] == "needs_extra"
+    assert bnb_row["enable"] == "pip install 'invarlock[gpu]'"
 
 
 def test_dataset_inventory_json_items_preserve_provider_module() -> None:

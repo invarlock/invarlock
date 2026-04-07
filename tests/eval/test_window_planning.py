@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from invarlock.eval.window_planning import (
     _tensor_or_list_to_ints,
+    _window_records,
     choose_first_token_sufficient_candidate,
     resolve_effective_windows,
 )
@@ -146,3 +147,36 @@ def test_choose_first_token_sufficient_candidate_reports_no_candidate_on_dedupe_
 
 def test_tensor_or_list_to_ints_rejects_bool_elements() -> None:
     assert _tensor_or_list_to_ints([True, 2]) == []
+
+
+def test_tensor_or_list_to_ints_recovers_after_runtime_coercion_failures() -> None:
+    class _TensorLike:
+        def detach(self):
+            raise RuntimeError("detach unavailable")
+
+        def cpu(self):
+            raise RuntimeError("cpu unavailable")
+
+        def tolist(self):
+            return [1, 2, 3]
+
+    assert _tensor_or_list_to_ints(_TensorLike()) == [1, 2, 3]
+
+
+def test_window_records_coerces_bad_dataset_index_to_none() -> None:
+    window = SimpleNamespace(
+        input_ids=[[1, 2, 3]],
+        attention_masks=[[1, 1, 1]],
+        indices=["bad-index"],
+    )
+
+    records, total_tokens = _window_records(window)
+
+    assert total_tokens == 3
+    assert records == [
+        {
+            "input_ids": [1, 2, 3],
+            "attention_mask": [1, 1, 1],
+            "dataset_index": None,
+        }
+    ]

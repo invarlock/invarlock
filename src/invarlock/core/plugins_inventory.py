@@ -5,6 +5,14 @@ from typing import Any, Literal
 
 PluginCategory = Literal["adapters", "guards", "edits"]
 InventoryRow = dict[str, Any]
+_INVENTORY_PROBE_ERRORS = (
+    AttributeError,
+    ImportError,
+    ModuleNotFoundError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 
 def is_minimal_plugins_view(env_value: str | None) -> bool:
@@ -16,7 +24,7 @@ def detect_cuda_available(torch_module: Any) -> bool:
     try:
         cuda = getattr(torch_module, "cuda", None)
         return bool(cuda and cuda.is_available())
-    except Exception:
+    except _INVENTORY_PROBE_ERRORS:
         return False
 
 
@@ -80,7 +88,7 @@ def gather_adapter_inventory_rows(
             backend_version = provenance.version
             present = backend_version is not None
             backend_present = present
-        except Exception:
+        except _INVENTORY_PROBE_ERRORS:
             pass
 
         status = "ready"
@@ -94,7 +102,7 @@ def gather_adapter_inventory_rows(
 
         try:
             extras_status = extras_checker(name, "adapters")
-        except Exception:
+        except _INVENTORY_PROBE_ERRORS:
             extras_status = ""
         if (
             support == "optional"

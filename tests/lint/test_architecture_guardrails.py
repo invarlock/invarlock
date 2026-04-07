@@ -1075,9 +1075,13 @@ def test_core_config_helpers_do_not_swallow_unexpected_runtime_errors() -> None:
 
 def test_hardened_runtime_paths_keep_broad_catch_budgets() -> None:
     budgets = {
+        REPO_ROOT / "src/invarlock/core/events.py": 0,
+        REPO_ROOT / "src/invarlock/core/plugins_inventory.py": 0,
         REPO_ROOT / "src/invarlock/core/registry.py": 2,
         REPO_ROOT / "src/invarlock/core/runner_latency.py": 0,
         REPO_ROOT / "src/invarlock/adapters/hf_causal.py": 0,
+        REPO_ROOT / "src/invarlock/eval/data_tokenization.py": 0,
+        REPO_ROOT / "src/invarlock/eval/window_planning.py": 0,
         REPO_ROOT / "src/invarlock/eval/primary_metric.py": 0,
     }
     offenders: list[str] = []
@@ -1093,6 +1097,21 @@ def test_source_tree_has_no_import_untyped_suppressions() -> None:
     for path in (REPO_ROOT / "src").rglob("*.py"):
         text = _read_text(path)
         if "type: ignore[import-untyped]" in text:
+            offenders.append(str(path.relative_to(REPO_ROOT)))
+    assert not offenders, "\n".join(offenders)
+
+
+def test_hardened_followup_paths_have_no_local_type_ignore_escapes() -> None:
+    hardened_paths = (
+        REPO_ROOT / "src/invarlock/adapters/hf_causal.py",
+        REPO_ROOT / "src/invarlock/eval/bench_policy.py",
+        REPO_ROOT / "src/invarlock/eval/data.py",
+        REPO_ROOT / "src/invarlock/eval/primary_metric.py",
+    )
+    offenders: list[str] = []
+    for path in hardened_paths:
+        text = _read_text(path)
+        if "type: ignore" in text:
             offenders.append(str(path.relative_to(REPO_ROOT)))
     assert not offenders, "\n".join(offenders)
 

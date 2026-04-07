@@ -14,7 +14,7 @@ from __future__ import annotations
 import math
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 import numpy as np
 
@@ -505,7 +505,7 @@ class _Accuracy:
             float(ci_level) if (ci_level is not None) else self.defaults.ci_level
         )
         alpha = 1.0 - ci_level_eff
-        rng = np.random.default_rng(seed_eff)  # type: ignore[name-defined]
+        rng = cast(Any, np.random.default_rng(seed_eff))
         stats = bootstrap_mean_statistics(
             np.asarray(diffs, dtype=float),
             n_bootstrap=reps_eff,

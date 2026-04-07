@@ -31,8 +31,8 @@ _ALLOW_DIRECT_SUBMODULE = False
 
 def _first_item(seq: Any) -> Any | None:
     try:
-        if hasattr(seq, "__len__") and len(seq) > 0:  # type: ignore[arg-type]
-            return seq[0]  # type: ignore[index]
+        if hasattr(seq, "__len__") and hasattr(seq, "__getitem__") and len(seq) > 0:
+            return seq[0]
     except (TypeError, IndexError, KeyError):
         pass
     try:

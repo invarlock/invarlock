@@ -41,20 +41,6 @@
       "rationale": "Error encoding must not fail while packaging an already-raised exception."
     },
     {
-      "path": "src/invarlock/core/events.py",
-      "subsystem": "core",
-      "bucket": "acceptable",
-      "lines": [97, 140, 173, 179, 281],
-      "rationale": "Event logging and payload sanitization are best-effort observability paths with explicit fallback behavior."
-    },
-    {
-      "path": "src/invarlock/core/plugins_inventory.py",
-      "subsystem": "core",
-      "bucket": "acceptable",
-      "lines": [19, 83, 97],
-      "rationale": "Inventory hydration is an introspection surface; broad catches only guard optional metadata and plugin-probe failures."
-    },
-    {
       "path": "src/invarlock/core/provider_config.py",
       "subsystem": "core",
       "bucket": "acceptable",
