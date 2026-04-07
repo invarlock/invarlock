@@ -46,15 +46,9 @@ print_if_supported() {
   return 1
 }
 
-if command -v python >/dev/null 2>&1; then
-  print_if_version_matches "python" || true
-fi
-
 if prefer_active_python && command -v python >/dev/null 2>&1; then
   print_if_supported "python" || true
 fi
-
-print_if_version_matches "python3.12" || true
 
 if [[ -n "${HOME:-}" ]]; then
   print_if_version_matches "$HOME/anaconda3/envs/invarlock-py312/bin/python" || true
@@ -69,6 +63,12 @@ if command -v conda >/dev/null 2>&1; then
     print_if_version_matches "$conda_base/envs/invarlock-py312/bin/python" || true
   fi
 fi
+
+if command -v python >/dev/null 2>&1; then
+  print_if_version_matches "python" || true
+fi
+
+print_if_version_matches "python3.12" || true
 
 if command -v python >/dev/null 2>&1; then
   print_if_supported "python" || true
