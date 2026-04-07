@@ -474,7 +474,35 @@ def test_codeql_workflow_uses_repo_config():
     init_step = _find_step_by_uses_prefix(
         analyze["steps"], "github/codeql-action/init@"
     )
+    autobuild_step = _find_step_by_uses_prefix(
+        analyze["steps"], "github/codeql-action/autobuild@"
+    )
+    analyze_step = _find_step_by_uses_prefix(
+        analyze["steps"], "github/codeql-action/analyze@"
+    )
+    expected_pin = "c10b8064de6f491fea524254123dbe5e09572f13"
+
+    assert init_step["uses"] == f"github/codeql-action/init@{expected_pin}"
+    assert autobuild_step["uses"] == f"github/codeql-action/autobuild@{expected_pin}"
+    assert analyze_step["uses"] == f"github/codeql-action/analyze@{expected_pin}"
     assert init_step["with"]["config-file"] == ".github/codeql/codeql-config.yml"
+
+
+def test_dependabot_ignores_codeql_action_until_updater_bug_is_fixed() -> None:
+    config = yaml.safe_load(Path(".github/dependabot.yml").read_text(encoding="utf-8"))
+
+    actions_update = next(
+        update
+        for update in config["updates"]
+        if update["package-ecosystem"] == "github-actions"
+    )
+    ignored = {
+        entry["dependency-name"]
+        for entry in actions_update.get("ignore", [])
+        if isinstance(entry, dict) and "dependency-name" in entry
+    }
+
+    assert "github/codeql-action" in ignored
 
 
 def test_codeql_config_scopes_analysis_to_shipped_python():

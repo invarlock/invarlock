@@ -65,6 +65,10 @@ updates:
       - "github-actions"
     commit-message:
       prefix: "chore(ci)"
+    # Dependabot's github-actions updater currently errors on github/codeql-action
+    # in this repo; keep the pin current manually until the upstream updater is fixed.
+    ignore:
+      - dependency-name: "github/codeql-action"
     groups:
       actions:
         patterns:
