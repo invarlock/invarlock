@@ -26,7 +26,7 @@ This checklist covers every residual static-debt item called out in the April 7 
 - [x] Each large-owner file receives at least one bounded complexity reduction that extracts a coherent helper seam without regressing behavior.
 - [x] Architecture guardrails or focused regression tests are updated where needed so the same debt cannot silently reappear.
 - [x] `make lint`, `make verify`, and `make coverage-enforce` pass on the work branch.
-- [ ] The work branch is merged back into `staging/next`, `staging/next` reruns repo gates cleanly, and the result is pushed.
+- [x] The work branch is merged back into `staging/next`, `staging/next` reruns repo gates cleanly, and the result is pushed.
 
 ## Checklist
 
@@ -52,9 +52,9 @@ This checklist covers every residual static-debt item called out in the April 7 
 - [x] Run `PYTHON=/Users/ospc/anaconda3/envs/invarlock-py312/bin/python make lint`.
 - [x] Run `PYTHON=/Users/ospc/anaconda3/envs/invarlock-py312/bin/python make verify`.
 - [x] Run `PYTHON=/Users/ospc/anaconda3/envs/invarlock-py312/bin/python make coverage-enforce`.
-- [ ] Commit the completed work to `work/residual-debt-audit-20260407`.
-- [ ] Merge `work/residual-debt-audit-20260407` into `staging/next`.
-- [ ] Re-run repo gates on `staging/next` and push the result.
+- [x] Commit the completed work to `work/residual-debt-audit-20260407`.
+- [x] Merge `work/residual-debt-audit-20260407` into `staging/next`.
+- [x] Re-run repo gates on `staging/next` and push the result.
 
 ## Validation Matrix
 
