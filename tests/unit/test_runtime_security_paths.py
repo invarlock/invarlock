@@ -468,7 +468,54 @@ def test_normalize_output_and_local_model_paths_cover_inside_outside_and_missing
     )
     assert normalized_external_model == str(external_root.resolve())
     assert external_mounts == {external_root}
-    assert treated_external is True
+
+
+def test_runtime_security_helpers_cover_build_command_and_covered_mounts(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    assert (
+        runtime_security_helpers._runtime_image_build_command(
+            runtime_security.RUNTIME_IMAGE_CUDA_LOCAL_DEFAULT
+        )
+        == "make runtime-image-cuda"
+    )
+    assert (
+        runtime_security_helpers._runtime_image_build_command("invarlock-runtime:local")
+        == "make runtime-image"
+    )
+
+    cwd = tmp_path / "repo"
+    external = tmp_path / "shared"
+    cwd.mkdir()
+    external.mkdir()
+
+    monkeypatch.setenv("PYTHONPATH", str(external))
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_mount_is_already_covered",
+        lambda _mount, *, cwd: True,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_iter_external_symlink_target_mounts",
+        lambda _path, *, cwd, recursive=True: [tmp_path / "ignored-symlink"],
+        raising=True,
+    )
+
+    entries, mounts = runtime_security_helpers._container_pythonpath_entries(cwd=cwd)
+    assert entries == [str(external.resolve())]
+    assert mounts == [tmp_path / "ignored-symlink"]
+
+    recorded_mounts: set[Path] = set()
+    inside = runtime_security_helpers._record_path_dependencies(
+        external,
+        recorded_mounts,
+        cwd=cwd,
+    )
+    assert inside is False
+    assert recorded_mounts == {tmp_path / "ignored-symlink"}
 
 
 def test_normalize_config_path_for_container_scans_dependencies_and_wraps_errors(

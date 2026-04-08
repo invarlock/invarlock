@@ -229,8 +229,6 @@ def activation_edge_risk(
         return None
 
     mat = activations.detach()
-    if mat.shape[0] <= 0 or mat.shape[1] <= 0:
-        return None
     if not torch.isfinite(mat).all():
         return None
 
@@ -396,9 +394,7 @@ def compute_activation_edge_risk(
                 weight = int(batch_weight_holder.get("weight", 1) or 1)
             except (TypeError, ValueError, RuntimeError):
                 weight = 1
-            row = acc.get(name)
-            if row is None:
-                return
+            row = acc[name]
             row["weighted_sum"] = float(row.get("weighted_sum", 0.0)) + float(
                 risk
             ) * float(weight)
@@ -533,9 +529,7 @@ def compute_activation_outliers(
                 )
             except (AttributeError, RuntimeError, TypeError, ValueError):
                 return
-            stats = per_layer_map.get(name)
-            if stats is None:
-                return
+            stats = per_layer_map[name]
             weight = int(batch_weight_holder.get("weight", 1) or 1)
             if outliers > 0:
                 increment = int(outliers) * weight

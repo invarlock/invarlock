@@ -287,6 +287,113 @@ def test_prepare_config_for_run_error_paths(
     assert excinfo.value.exit_code == code
 
 
+def test_prepare_config_for_run_shell_profile_failure_emits_fail_event() -> None:
+    events: list[tuple[str, str]] = []
+
+    def _event_fn(console, tag: str, message: str, **kwargs) -> None:  # noqa: ARG001
+        events.append((tag, message))
+
+    with pytest.raises(typer.Exit) as excinfo:
+        run_config_mod.prepare_config_for_run(
+            config_path="config.yaml",
+            profile="release",
+            edit=None,
+            tier=None,
+            probes=None,
+            console=Console(file=StringIO(), force_terminal=False),
+            event_fn=_event_fn,
+            invarlock_config_cls=_CfgWrap,
+            load_config_fn=lambda path: _CfgWrap({"model": {}, "edit": {}, "auto": {}}),
+            apply_profile_fn=lambda cfg, profile: (_ for _ in ()).throw(
+                ValueError("profile boom")
+            ),
+            apply_auto_adapter_fn=lambda cfg: cfg,
+        )
+
+    assert excinfo.value.exit_code == 1
+    assert ("FAIL", "profile boom") in events
+
+
+def test_prepare_config_for_run_non_shell_profile_failure_raises_validation_error() -> (
+    None
+):
+    with pytest.raises(Exception) as excinfo:
+        run_config_mod.prepare_config_for_run(
+            config_path="config.yaml",
+            profile="release",
+            edit=None,
+            tier=None,
+            probes=None,
+            console=None,
+            event_fn=None,
+            invarlock_config_cls=_CfgWrap,
+            load_config_fn=lambda path: _CfgWrap({"model": {}, "edit": {}, "auto": {}}),
+            apply_profile_fn=lambda cfg, profile: (_ for _ in ()).throw(
+                ValueError("profile boom")
+            ),
+            apply_auto_adapter_fn=lambda cfg: cfg,
+        )
+
+    assert getattr(excinfo.value, "code", None) == "E003"
+
+
+def test_prepare_config_for_run_shell_edit_override_failure_emits_fail_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[tuple[str, str]] = []
+
+    def _event_fn(console, tag: str, message: str, **kwargs) -> None:  # noqa: ARG001
+        events.append((tag, message))
+
+    monkeypatch.setattr(
+        run_config_mod,
+        "_resolve_requested_edit_name",
+        lambda _edit: (_ for _ in ()).throw(ValueError("bad edit")),
+    )
+
+    with pytest.raises(typer.Exit) as excinfo:
+        run_config_mod.prepare_config_for_run(
+            config_path="config.yaml",
+            profile=None,
+            edit="quant_rtn",
+            tier=None,
+            probes=None,
+            console=Console(file=StringIO(), force_terminal=False),
+            event_fn=_event_fn,
+            invarlock_config_cls=_CfgWrap,
+            load_config_fn=lambda path: _CfgWrap({"model": {}, "edit": {}, "auto": {}}),
+            apply_profile_fn=lambda cfg, profile: cfg,
+            apply_auto_adapter_fn=lambda cfg: cfg,
+        )
+
+    assert excinfo.value.exit_code == 2
+    assert ("FAIL", "bad edit") in events
+
+
+def test_prepare_config_for_run_tier_probe_override_handles_model_dump_type_error() -> (
+    None
+):
+    class _Cfg:
+        def model_dump(self) -> dict:
+            raise TypeError("bad dump")
+
+    result = run_config_mod.prepare_config_for_run(
+        config_path="config.yaml",
+        profile=None,
+        edit=None,
+        tier="balanced",
+        probes=2,
+        console=Console(file=StringIO(), force_terminal=False),
+        event_fn=lambda *args, **kwargs: None,
+        invarlock_config_cls=_CfgWrap,
+        load_config_fn=lambda path: _Cfg(),
+        apply_profile_fn=lambda cfg, profile: cfg,
+        apply_auto_adapter_fn=lambda cfg: cfg,
+    )
+
+    assert result.model_dump()["auto"] == {"tier": "balanced", "probes": 2}
+
+
 def test_resolve_device_and_output_uses_cfg_defaults_and_rejects_bad_device() -> None:
     class _Cfg:
         model = SimpleNamespace()
@@ -375,6 +482,29 @@ def test_resolve_device_and_output_uses_default_shell_helpers_and_propagates_cfg
     assert printed == []
 
 
+def test_resolve_device_and_output_handles_missing_cfg_device_attribute() -> None:
+    class _Cfg:
+        @property
+        def model(self):
+            raise AttributeError("no model")
+
+        output = SimpleNamespace(dir="custom-runs")
+
+    resolved, output_dir = run_config_mod.resolve_device_and_output(
+        _Cfg(),
+        device=None,
+        out=None,
+        console=Console(file=StringIO(), force_terminal=False),
+        format_kv_line_fn=lambda label, value: f"{label}: {value}",
+        device_resolution_note_fn=lambda target, resolved: "note",
+        resolve_device_fn=lambda target: "cpu",
+        validate_device_fn=lambda device: (True, ""),
+    )
+
+    assert resolved == "cpu"
+    assert output_dir == Path("custom-runs")
+
+
 def test_resolve_provider_and_split_ignores_emit_and_available_split_fallback() -> None:
     calls: list[tuple[str, dict]] = []
     emit_sentinel = object()
@@ -422,6 +552,39 @@ def test_resolve_provider_and_split_propagates_available_splits_failures() -> No
             provider_kwargs={"existing": True},
             resolved_device="cpu",
         )
+
+
+def test_resolve_provider_and_split_handles_missing_provider_split_and_split_probe_errors() -> (
+    None
+):
+    class _Dataset:
+        @property
+        def provider(self):
+            raise AttributeError("missing provider")
+
+        @property
+        def split(self):
+            raise AttributeError("missing split")
+
+    class Provider:
+        def available_splits(self):
+            raise ValueError("bad splits")
+
+    provider, split, used = run_config_mod.resolve_provider_and_split(
+        SimpleNamespace(dataset=_Dataset()),
+        model_profile=SimpleNamespace(default_provider="wikitext2"),
+        get_provider_fn=lambda *_args, **_kwargs: Provider(),
+        choose_dataset_split_fn=lambda **kwargs: (
+            "validation",
+            kwargs["available"] is None,
+        ),
+        provider_kwargs={"existing": True},
+        resolved_device="cpu",
+    )
+
+    assert isinstance(provider, Provider)
+    assert split == "validation"
+    assert used is True
 
 
 def test_resolve_provider_and_split_uses_default_provider_import(
@@ -476,6 +639,16 @@ def test_extract_model_load_kwargs_handles_model_dump_failure_and_removed_keys()
         run_config_mod.extract_model_load_kwargs(_CfgRemoved())
 
     assert getattr(excinfo.value, "code", None) == "E007"
+
+
+def test_extract_model_load_kwargs_returns_empty_on_recoverable_model_dump_error() -> (
+    None
+):
+    class _CfgTypeError:
+        def model_dump(self):
+            raise TypeError("boom")
+
+    assert run_config_mod.extract_model_load_kwargs(_CfgTypeError()) == {}
 
 
 def test_extract_model_load_kwargs_rejects_remote_code_when_disabled(

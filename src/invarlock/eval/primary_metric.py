@@ -267,17 +267,15 @@ class _PPLCausal(PrimaryMetric):
         ) -> float:
             if not vals:
                 return float("nan")
-            if weights and len(weights) == len(vals):
-                sw = 0.0
-                swx = 0.0
-                for v, w in zip(vals, weights, strict=False):
-                    sw += w
-                    swx += w * v
-                if sw <= 0:
-                    return float("nan")
-                return self.display_transform(swx / sw)
-            else:
-                return self.display_transform(sum(vals) / float(len(vals)))
+            assert weights is not None and len(weights) == len(vals)
+            sw = 0.0
+            swx = 0.0
+            for v, w in zip(vals, weights, strict=False):
+                sw += w
+                swx += w * v
+            if sw <= 0:
+                return float("nan")
+            return self.display_transform(swx / sw)
 
         subj_point = _point([v for v, _ in subj], [w for _, w in subj])
         base_point = _point([v for v, _ in base], [w for _, w in base])
@@ -645,8 +643,6 @@ def compute_primary_metric_from_report(
     if kind in {"accuracy", "vqa_accuracy"}:
 
         def _ensure_counts(win: dict[str, Any]) -> dict[str, Any]:
-            if not isinstance(win, dict):
-                return {}
             has_counts = (
                 isinstance(win.get("correct_total"), int | float)
                 and isinstance(win.get("total"), int | float)
@@ -675,7 +671,6 @@ def compute_primary_metric_from_report(
     final_point = metric.point_from_windows(windows=final_win)
 
     ratio_vs_baseline = float("nan")
-    baseline_has_reference = False
 
     def _is_finite(value: Any) -> bool:
         return isinstance(value, (int, float)) and math.isfinite(float(value))
@@ -702,21 +697,17 @@ def compute_primary_metric_from_report(
                 is_ppl_like = str(kind).lower().startswith("ppl")
                 if is_ppl_like and base_ref > 0:
                     ratio_vs_baseline = float(final_point) / float(base_ref)
-                    baseline_has_reference = True
                 elif (
                     str(kind).lower() in {"accuracy", "vqa_accuracy"}
                     and 0 <= base_ref <= 1
                 ):
                     ratio_vs_baseline = float(final_point) - float(base_ref)
-                    baseline_has_reference = True
 
     invalid = True
     invalid = not (_is_finite(preview_point) and _is_finite(final_point))
     degraded_reason = None
     if invalid:
         degraded_reason = "non_finite_pm"
-    elif baseline_has_reference and not _is_finite(ratio_vs_baseline):
-        degraded_reason = "non_finite_delta"
 
     degraded = bool(degraded_reason or invalid)
 
@@ -820,9 +811,7 @@ def compute_accuracy_counts(records: list[dict[str, Any]]) -> tuple[int, int]:
         seq = rec.get("input_ids") if isinstance(rec, dict) else None
         if not isinstance(seq, list) or not seq:
             continue
-        y = infer_binary_label_from_ids(seq)
-        yhat = y  # perfect prediction in smoke path
-        if int(yhat) == int(y):
-            correct += 1
+        infer_binary_label_from_ids(seq)
+        correct += 1  # perfect prediction in smoke path
         total += 1
     return correct, total

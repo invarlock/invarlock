@@ -2,7 +2,7 @@ from __future__ import annotations
 
 __test__ = False
 
-from tests.cli.evaluate_failures_support import (
+from tests.cli._support_evaluate_failures import (
     RecordingConsole,
     _assert_baseline_report_validation_exit,
     _fake_run_command_with_paths,

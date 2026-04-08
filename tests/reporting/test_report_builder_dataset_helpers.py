@@ -1,7 +1,7 @@
 # ruff: noqa: F405
 from __future__ import annotations
 
-from tests.eval.report_builder_support import *  # noqa: F401,F403,F405
+from tests.reporting._support_report_builder import *  # noqa: F401,F403,F405
 
 
 class TestNormalizationAndDataset:

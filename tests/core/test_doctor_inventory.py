@@ -103,6 +103,27 @@ def test_build_adapter_inventory_rows_marks_auto_adapter_and_linux_only_quantize
     assert rows[1].detail == "Linux-only"
 
 
+def test_build_adapter_inventory_rows_keeps_missing_extra_hint_optional() -> None:
+    class PluginRegistry(_FakeRegistry):
+        def get_plugin_info(self, name: str, kind: str) -> dict[str, str]:
+            return {"module": f"thirdparty.{kind}.{name}", "entry_point": name}
+
+    registry = PluginRegistry(adapters=["custom_adapter"], edits=[], guards=[])
+
+    rows = build_adapter_inventory_rows(
+        registry,
+        has_cuda=False,
+        is_linux=True,
+        find_spec_safe=lambda _name: None,
+        bitsandbytes_runtime_ready=True,
+    )
+
+    assert len(rows) == 1
+    assert rows[0].backend is None
+    assert rows[0].status == "needs_extra"
+    assert rows[0].required_extra is None
+
+
 def test_package_version_tolerates_missing_and_generic_errors(monkeypatch) -> None:
     monkeypatch.setattr(
         mod.importlib_metadata,
@@ -152,6 +173,20 @@ def test_build_generic_inventory_rows_tolerates_extra_lookup_errors() -> None:
     assert len(rows) == 1
     assert rows[0].status == "ready"
     assert rows[0].mode == "guard"
+
+
+def test_build_generic_inventory_rows_allows_blank_missing_hint() -> None:
+    registry = _FakeRegistry(adapters=[], edits=[], guards=["spectral"])
+
+    rows = build_generic_inventory_rows(
+        registry,
+        kind="guards",
+        check_plugin_extras=lambda *_args, **_kwargs: "⚠️ missing   ",
+    )
+
+    assert len(rows) == 1
+    assert rows[0].status == "needs_extra"
+    assert rows[0].required_extra is None
 
 
 def test_dataset_inventory_and_summary_rows_are_deterministic() -> None:

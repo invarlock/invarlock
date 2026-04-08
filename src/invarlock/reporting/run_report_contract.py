@@ -333,12 +333,9 @@ def persist_run_report_outputs(
     )
     saved_files = {key: str(value) for key, value in saved_paths.items()}
 
-    report_path_out = None
-    try:
-        if isinstance(saved_files, dict) and saved_files.get("json"):
-            report_path_out = str(saved_files["json"])
-    except (TypeError, KeyError):
-        report_path_out = None
+    report_path_out = saved_files.get("json")
+    if report_path_out:
+        report_path_out = str(report_path_out)
     if not report_path_out:
         raise RuntimeError("run report persistence did not return a json artifact path")
 
@@ -350,8 +347,7 @@ def persist_run_report_outputs(
                 report, run_dir, filename=telemetry_path.name
             )
             telemetry_saved_path = str(saved_path)
-            if isinstance(saved_files, dict):
-                saved_files["telemetry"] = telemetry_saved_path
+            saved_files["telemetry"] = telemetry_saved_path
         except _NON_FATAL_EXCEPTIONS as exc:  # pragma: no cover - best-effort
             telemetry_error = str(exc)
 

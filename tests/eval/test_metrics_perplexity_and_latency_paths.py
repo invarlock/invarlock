@@ -18,6 +18,7 @@ from invarlock.eval.metrics_activation import (
     _extract_fc1_activations,
     _perform_pre_eval_checks,
 )
+from invarlock.eval.metrics_runtime import EvaluationWindow, compute_ppl
 
 
 class TinyLM(nn.Module):
@@ -44,6 +45,74 @@ def test_compute_perplexity_mps_gather_fallback():
     }
     ppl = compute_perplexity(model, [batch], max_samples=1, device="mps")
     assert isinstance(ppl, float) and ppl >= 1.0
+
+
+def test_compute_perplexity_strict_masked_lm_without_attention_mask() -> None:
+    class TinyMaskedLM(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.config = SimpleNamespace(
+                model_type="bert", vocab_size=5, pad_token_id=0
+            )
+            self.emb = nn.Embedding(5, 3)
+
+        def get_input_embeddings(self):
+            return self.emb
+
+        def forward(
+            self,
+            input_ids=None,
+            attention_mask=None,
+            token_type_ids=None,
+            labels=None,
+            return_dict=True,
+        ):
+            del input_ids, attention_mask, token_type_ids, return_dict
+            assert labels is not None
+            return SimpleNamespace(loss=torch.tensor(0.25))
+
+    batch = {
+        "input_ids": torch.tensor([[1, 2, 3]], dtype=torch.long),
+        "labels": torch.tensor([[1, 2, 3]], dtype=torch.long),
+    }
+
+    ppl = compute_perplexity_strict(TinyMaskedLM().eval(), [batch], device="cpu")
+    assert ppl > 1.0
+
+
+def test_compute_ppl_mps_branch_runs_gather_on_cpu(monkeypatch) -> None:
+    class TinyRuntimeModel(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.config = SimpleNamespace(vocab_size=5, pad_token_id=0)
+            self.emb = nn.Embedding(5, 2)
+
+        def get_input_embeddings(self):
+            return self.emb
+
+        def forward(self, input_ids=None, attention_mask=None, return_dict=True):
+            del attention_mask, return_dict
+            batch, seq_len = input_ids.shape
+            logits = torch.zeros((batch, seq_len, 5), dtype=torch.float32)
+            return SimpleNamespace(logits=logits)
+
+    original_tensor_to = torch.Tensor.to
+
+    def _identity_to(self, *args, **kwargs):
+        del args, kwargs
+        return self
+
+    monkeypatch.setattr(torch.Tensor, "to", _identity_to, raising=False)
+    try:
+        ppl = compute_ppl(
+            TinyRuntimeModel().eval(),
+            EvaluationWindow([[1, 2, 3]], [[1, 1, 1]], [0]),
+            device="mps",
+        )
+    finally:
+        monkeypatch.setattr(torch.Tensor, "to", original_tensor_to, raising=False)
+
+    assert ppl >= 1.0
 
 
 def test_extract_fc1_inconsistent_shapes_filters_to_common_shape():

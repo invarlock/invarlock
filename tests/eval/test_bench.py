@@ -12,11 +12,13 @@ import pytest
 
 from invarlock.eval.bench import (
     BenchmarkConfig,
+    BenchmarkSummary,
     ConfigurationManager,
     DependencyChecker,
     MetricsAggregator,
     RunResult,
     ScenarioConfig,
+    ScenarioResult,
     execute_scenario,
     execute_single_run,
 )
@@ -254,6 +256,26 @@ class TestMetricsAggregator:
         report = {"metrics": {}, "meta": {"duration": 2.0}}
         metrics = MetricsAggregator.extract_core_metrics(report)
         assert metrics["duration_s"] == 2.0
+
+    def test_extract_core_metrics_tolerates_primary_metric_and_meta_get_errors(self):
+        class _ExplodingGetDict(dict):
+            def get(self, *_args, **_kwargs):  # type: ignore[override]
+                raise TypeError("boom")
+
+        report = {
+            "metrics": {
+                "primary_metric": _ExplodingGetDict(),
+                "latency_ms_per_tok": 1.0,
+                "memory_mb_peak": 2.0,
+            },
+            "meta": _ExplodingGetDict(),
+        }
+
+        metrics = MetricsAggregator.extract_core_metrics(report)
+
+        assert math.isnan(metrics["primary_metric_preview"])
+        assert math.isnan(metrics["primary_metric_final"])
+        assert math.isnan(metrics["duration_s"])
 
     def test_extract_guard_metrics_empty_report(self):
         """Test extracting guard metrics from empty report."""
@@ -542,6 +564,38 @@ def test_execute_single_run_invalid_edit_payload_surfaces_failure(
     assert result.error_message is not None
     assert "invalid edit metadata payload" in result.error_message
 
+    class _CoreRunnerNonStringPlanDigest:
+        def execute(self, **_kwargs):  # noqa: ANN001
+            return types.SimpleNamespace(
+                meta={},
+                edit={"plan_digest": 123, "deltas": {}},
+                metrics={"rmt": {}},
+                guards={},
+                status="ok",
+            )
+
+    monkeypatch.setattr(core_runner, "CoreRunner", _CoreRunnerNonStringPlanDigest)
+    result = execute_single_run(run_config, scenario, "bare", tmp_path, runtime=runtime)
+    assert result.success is False
+    assert result.error_message is not None
+    assert "non-string plan_digest" in result.error_message
+
+    class _CoreRunnerNonDictDeltas:
+        def execute(self, **_kwargs):  # noqa: ANN001
+            return types.SimpleNamespace(
+                meta={},
+                edit={"plan_digest": "pd", "deltas": []},
+                metrics={"rmt": {}},
+                guards={},
+                status="ok",
+            )
+
+    monkeypatch.setattr(core_runner, "CoreRunner", _CoreRunnerNonDictDeltas)
+    result = execute_single_run(run_config, scenario, "bare", tmp_path, runtime=runtime)
+    assert result.success is False
+    assert result.error_message is not None
+    assert "invalid edit delta payload" in result.error_message
+
 
 def test_bench_runner_helper_validations() -> None:
     import invarlock.eval.bench_runner as bench_runner_mod
@@ -571,6 +625,68 @@ def test_bench_runner_helper_validations() -> None:
             RunResult("bare", {"artifacts": {}}, success=True),
             run_label="bare",
         )
+
+
+def test_execute_single_run_tolerates_missing_guards_attribute(
+    monkeypatch, tmp_path: Path
+) -> None:
+    import types
+
+    import invarlock.core.registry as core_registry
+    import invarlock.core.runner as core_runner
+    import invarlock.eval.bench_runner as bench_runner_mod
+
+    class _Adapter:
+        def restore(self, _model, _blob):  # noqa: ANN001
+            return None
+
+    class _Registry:
+        def get_edit(self, _name: str):  # noqa: ANN001
+            return object()
+
+    class _CoreRunner:
+        def execute(self, **_kwargs):  # noqa: ANN001
+            return types.SimpleNamespace(
+                meta={},
+                edit={"plan_digest": "pd", "deltas": {}},
+                metrics={},
+                evaluation_windows={},
+                status="ok",
+            )
+
+    monkeypatch.setattr(core_registry, "get_registry", lambda: _Registry())
+    monkeypatch.setattr(core_runner, "CoreRunner", _CoreRunner)
+    monkeypatch.setattr(
+        bench_runner_mod.rmt_detection,
+        "rmt_detect",
+        lambda **_k: {"n_layers_flagged": 0},
+    )
+
+    scenario = ScenarioConfig(
+        edit="quant_rtn", tier="balanced", probes=0, profile="ci", device="cpu"
+    )
+    runtime = {
+        "adapter": _Adapter(),
+        "model": object(),
+        "baseline_snapshot": b"blob",
+        "pairing_schedule": {},
+        "calibration_data": [],
+        "rmt_baseline_mp_stats": {},
+        "rmt_baseline_sigmas": {},
+        "dataset_name": "wikitext2",
+        "split": "validation",
+    }
+
+    result = execute_single_run(
+        {"dataset": {"provider": "wikitext2"}, "edit": {"plan": {}}},
+        scenario,
+        "bare",
+        tmp_path,
+        runtime=runtime,
+    )
+
+    assert result.success is True
+    assert result.report["guards"] == []
 
 
 def test_execute_single_run_plan_digest_none_and_non_dict_guards_are_tolerated(
@@ -635,6 +751,60 @@ def test_execute_single_run_plan_digest_none_and_non_dict_guards_are_tolerated(
     assert result.report["edit"]["plan_digest"] == ""
     assert result.report["guards"] == []
 
+    class _CoreRunnerNonDictMetricsAndMixedGuards:
+        def execute(self, **_kwargs):  # noqa: ANN001
+            return types.SimpleNamespace(
+                meta={},
+                edit={"plan_digest": None, "deltas": {}},
+                metrics=[],
+                evaluation_windows=[],
+                guards={
+                    "skip": "not-a-dict",
+                    "spectral": {"passed": True, "decision": "allow"},
+                },
+                status="ok",
+            )
+
+    monkeypatch.setattr(
+        core_runner, "CoreRunner", _CoreRunnerNonDictMetricsAndMixedGuards
+    )
+    result = execute_single_run(
+        {"dataset": {"provider": "wikitext2"}, "edit": {"plan": {}}},
+        scenario,
+        "bare",
+        tmp_path,
+        runtime=runtime,
+    )
+    assert result.success is True
+    assert isinstance(result.report["metrics"], dict)
+    assert "primary_metric" in result.report["metrics"]
+    assert len(result.report["guards"]) == 1
+    assert result.report["guards"][0]["name"] == "spectral"
+    assert result.report["guards"][0]["passed"] is True
+    assert result.report["guards"][0]["decision"] == "allow"
+
+    class _CoreRunnerNonDictGuards:
+        def execute(self, **_kwargs):  # noqa: ANN001
+            return types.SimpleNamespace(
+                meta={},
+                edit={"plan_digest": None, "deltas": {}},
+                metrics={},
+                evaluation_windows=[],
+                guards=[],
+                status="ok",
+            )
+
+    monkeypatch.setattr(core_runner, "CoreRunner", _CoreRunnerNonDictGuards)
+    result = execute_single_run(
+        {"dataset": {"provider": "wikitext2"}, "edit": {"plan": {}}},
+        scenario,
+        "bare",
+        tmp_path,
+        runtime=runtime,
+    )
+    assert result.success is True
+    assert result.report["guards"] == []
+
 
 def test_execute_scenario_writes_pairing_schedule_and_telemetry_summary(
     monkeypatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
@@ -689,6 +859,56 @@ def test_execute_scenario_writes_pairing_schedule_and_telemetry_summary(
     assert "telemetry summary" in caplog.text
 
 
+def test_execute_scenario_writes_report_without_telemetry_summary_line(
+    monkeypatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    import invarlock.eval.bench_runner as bench_runner_mod
+
+    bare = RunResult("bare", _report_with_artifacts("bare.json"), success=True)
+    guarded = RunResult("guarded", _report_with_artifacts("guarded.json"), success=True)
+
+    def _fake_execute_single_run(_cfg, _scenario, run_type, _dir, *, runtime):  # noqa: ANN001
+        runtime["pairing_schedule"] = {"preview": {}, "final": {}}
+        return bare if run_type == "bare" else guarded
+
+    monkeypatch.setattr(
+        bench_runner_mod, "execute_single_run", _fake_execute_single_run
+    )
+    monkeypatch.setattr(
+        bench_runner_mod,
+        "resolve_epsilon_from_runtime",
+        lambda _report: 0.2,
+    )
+    monkeypatch.setattr(
+        "invarlock.reporting.report_make.make_report",
+        lambda guarded_report, bare_report: {  # noqa: ARG005
+            "summary": {"status": "ok"}
+        },
+    )
+    monkeypatch.setattr(
+        "invarlock.reporting.report_telemetry.telemetry_output_enabled",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        "invarlock.reporting.report_telemetry.telemetry_summary_line",
+        lambda _report: "",
+    )
+
+    caplog.set_level("INFO")
+    scenario = ScenarioConfig(edit="quant_rtn", tier="balanced", probes=1)
+    config = BenchmarkConfig(
+        edits=["quant_rtn"],
+        tiers=["balanced"],
+        probes=[1],
+        dataset="wikitext2",
+        output_dir=tmp_path,
+    )
+
+    result = execute_scenario(scenario, config, tmp_path)
+    assert "evaluation_report" in result.artifacts
+    assert "telemetry summary" not in caplog.text
+
+
 def test_execute_scenario_defaults_epsilon_when_runs_fail_without_reports(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -720,6 +940,43 @@ def test_execute_scenario_defaults_epsilon_when_runs_fail_without_reports(
     assert result.epsilon_used == 0.10
     assert "bare_report" not in result.artifacts
     assert result.metrics == {"error_bare": "bare", "error_guarded": "guarded"}
+
+
+def test_execute_scenario_uses_explicit_epsilon_without_runtime_resolution(
+    monkeypatch, tmp_path: Path
+) -> None:
+    import invarlock.eval.bench_runner as bench_runner_mod
+
+    bare = RunResult("bare", create_empty_report(), success=False, error_message="bare")
+    guarded = RunResult(
+        "guarded", create_empty_report(), success=False, error_message="guarded"
+    )
+
+    monkeypatch.setattr(
+        bench_runner_mod,
+        "execute_single_run",
+        lambda _cfg, _scenario, run_type, _dir, *, runtime: (  # noqa: ARG005
+            bare if run_type == "bare" else guarded
+        ),
+    )
+    monkeypatch.setattr(
+        bench_runner_mod,
+        "resolve_epsilon_from_runtime",
+        lambda _report: (_ for _ in ()).throw(AssertionError("should not run")),
+    )
+
+    scenario = ScenarioConfig(edit="quant_rtn", tier="balanced", probes=1)
+    config = BenchmarkConfig(
+        edits=["quant_rtn"],
+        tiers=["balanced"],
+        probes=[1],
+        dataset="wikitext2",
+        output_dir=tmp_path,
+        epsilon=0.33,
+    )
+
+    result = execute_scenario(scenario, config, tmp_path)
+    assert result.epsilon_used == 0.33
 
     def test_compute_comparison_metrics_invalid_inputs(self):
         """Test comparison with invalid inputs."""
@@ -766,6 +1023,45 @@ def test_execute_scenario_defaults_epsilon_when_runs_fail_without_reports(
         assert math.isnan(comparison["primary_metric_overhead"])
         assert math.isnan(comparison["guard_overhead_time"])
         assert math.isnan(comparison["guard_overhead_mem"])
+
+
+def test_generate_step14_markdown_uses_dash_for_missing_time_overhead() -> None:
+    summary = BenchmarkSummary(
+        config=BenchmarkConfig(
+            edits=["quant_rtn"],
+            tiers=["balanced"],
+            probes=[0],
+            output_dir=Path("bench"),
+        ),
+        scenarios=[
+            ScenarioResult(
+                config=ScenarioConfig(
+                    edit="quant_rtn",
+                    tier="balanced",
+                    probes=0,
+                ),
+                metrics={
+                    "primary_metric_overhead": 0.0,
+                    "guard_overhead_time": float("nan"),
+                    "guard_overhead_mem": 0.0,
+                    "rmt_outliers_bare": 0,
+                    "rmt_outliers_guarded": 0,
+                },
+                gates={"spike": True, "rmt": True, "quality": True},
+            )
+        ],
+        overall_pass=True,
+        timestamp="2026-04-08T00:00:00",
+        execution_time_seconds=0.1,
+    )
+
+    from invarlock.eval.bench import generate_step14_markdown
+
+    markdown = generate_step14_markdown(summary)
+
+    assert (
+        "| quant_rtn | balanced | 0 | ✅ PASS | 🟢 +0.0% | - | 🟢 +0.0% |" in markdown
+    )
 
     def test_compute_comparison_metrics_zero_division_handling(self):
         """Test comparison metrics with zero base values."""

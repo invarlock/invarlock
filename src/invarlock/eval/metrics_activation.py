@@ -76,6 +76,8 @@ def _mi_gini_optimized_cpu_path(
     config: MetricsConfig,
 ) -> float:
     l_count, sample_count, _ = feats_cpu.shape
+    if l_count <= 0:
+        return float("nan")
     if sample_count > max_per_layer:
         sel = torch.randperm(sample_count)[:max_per_layer]
         feats_cpu = feats_cpu[:, sel, :]
@@ -108,9 +110,6 @@ def _mi_gini_optimized_cpu_path(
             completed=end_idx,
             total=l_count,
         )
-
-    if not mi_scores_all:
-        return float("nan")
 
     try:
         mi_mat = torch.stack(mi_scores_all)

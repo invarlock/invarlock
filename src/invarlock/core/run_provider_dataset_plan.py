@@ -85,9 +85,7 @@ def _build_provider_kwargs(cfg_dataset: Any) -> dict[str, Any]:
     _provider_kind, explicit_provider_kwargs = resolve_provider_kind_and_kwargs(
         getattr(cfg_dataset, "provider", None)
     )
-    for key, value in explicit_provider_kwargs.items():
-        if value is not None and value != "":
-            provider_kwargs[key] = value
+    provider_kwargs.update(explicit_provider_kwargs)
     return provider_kwargs
 
 
@@ -160,8 +158,6 @@ def _vision_text_dataset_plan(
     final_records = [
         dict(item) for item in raw_examples[preview_count : preview_count + final_count]
     ]
-    if not final_records and final_count > 0:
-        final_records = [dict(item) for item in raw_examples[:final_count]]
 
     seq_len = int(getattr(cfg_dataset, "seq_len", 0) or 0)
     calibration_data: list[dict[str, Any]] = []

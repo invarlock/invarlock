@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 
-from tests.eval.report_builder_support import (
+from tests.reporting._support_report_builder import (
     _load_local_evaluation_report,
     create_mock_baseline,
     create_mock_run_report,

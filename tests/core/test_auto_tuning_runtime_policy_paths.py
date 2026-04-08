@@ -64,6 +64,12 @@ def test_normalize_multiple_testing_reraises_unexpected_numeric_errors() -> None
         at._normalize_multiple_testing({"alpha": _BadFloat()})
 
 
+def test_normalize_multiple_testing_ignores_none_numeric_fields() -> None:
+    assert at._normalize_multiple_testing(
+        {"method": "BH", "alpha": None, "m": None}
+    ) == {"method": "bh"}
+
+
 def test_tier_entry_to_policy_maps_sections_and_skips_bad_sections() -> None:
     out = at._tier_entry_to_policy(
         {

@@ -6,12 +6,14 @@ from pathlib import Path
 
 import pytest
 
+import invarlock.core.evaluate_contract as evaluate_contract_mod
 from invarlock.core.evaluate_contract import (
     apply_edited_primary_metric_policy,
     load_validated_baseline_report,
     require_run_report_artifact,
 )
 from invarlock.core.exceptions import ConfigError, ValidationError
+from invarlock.core.report_inputs import ReportInputError
 
 
 def _write_json(path: Path, payload: object) -> Path:
@@ -106,6 +108,28 @@ def test_load_validated_baseline_report_accepts_multimodal_baseline_windows(
     assert payload["meta"] == {"adapter": "hf_multimodal"}
 
 
+def test_load_validated_baseline_report_accepts_context_without_auto_tier(
+    tmp_path: Path,
+) -> None:
+    report = _write_json(
+        tmp_path / "baseline.json",
+        {
+            **_baseline_payload(),
+            "context": {"profile": "dev", "auto": "skip-tier-check"},
+        },
+    )
+
+    resolved, payload = load_validated_baseline_report(
+        report,
+        expected_profile="dev",
+        expected_tier="balanced",
+        expected_adapter="hf_causal",
+    )
+
+    assert resolved == report.resolve()
+    assert payload["context"] == {"profile": "dev", "auto": "skip-tier-check"}
+
+
 def test_load_validated_baseline_report_rejects_directory_and_bad_edit(
     tmp_path: Path,
 ) -> None:
@@ -164,6 +188,55 @@ def test_load_validated_baseline_report_rejects_policy_and_window_mismatches(
             expected_profile="dev",
             expected_tier="balanced",
             expected_adapter="hf_causal",
+        )
+
+    missing_records = _write_json(
+        tmp_path / "missing-records.json",
+        _baseline_payload(
+            adapter="hf_multimodal",
+            evaluation_windows={
+                "preview": {"example_ids": ["ex-1"]},
+                "final": {
+                    "example_ids": ["ex-2"],
+                    "records": [{"id": "ex-2", "correct": True}],
+                },
+            },
+        ),
+    )
+    with pytest.raises(
+        ValidationError, match="missing evaluation_windows.preview.records"
+    ):
+        load_validated_baseline_report(
+            missing_records,
+            expected_profile="dev",
+            expected_tier="balanced",
+            expected_adapter="hf_multimodal",
+        )
+
+    inconsistent_records = _write_json(
+        tmp_path / "inconsistent-records.json",
+        _baseline_payload(
+            adapter="hf_multimodal",
+            evaluation_windows={
+                "preview": {
+                    "example_ids": ["ex-1"],
+                    "records": [{"id": "ex-1", "correct": True}],
+                },
+                "final": {
+                    "example_ids": ["ex-2", "ex-3"],
+                    "records": [{"id": "ex-2", "correct": True}],
+                },
+            },
+        ),
+    )
+    with pytest.raises(
+        ValidationError, match="inconsistent multimodal evaluation payloads"
+    ):
+        load_validated_baseline_report(
+            inconsistent_records,
+            expected_profile="dev",
+            expected_tier="balanced",
+            expected_adapter="hf_multimodal",
         )
 
 
@@ -239,3 +312,34 @@ def test_apply_edited_primary_metric_policy_reraises_unexpected_profile_errors()
             },
             profile=_BadProfile(),
         )
+
+
+def test_apply_edited_primary_metric_policy_treats_typeerror_profile_as_non_enforcing() -> (
+    None
+):
+    class _TypeErrorProfile:
+        def __str__(self) -> str:
+            raise TypeError("bad profile")
+
+    payload = {
+        "meta": {"device": "cpu", "adapter": "hf_causal"},
+        "edit": {"name": "quant_rtn"},
+        "metrics": {"primary_metric": {"final": 1.0}},
+    }
+
+    outcome = apply_edited_primary_metric_policy(payload, profile=_TypeErrorProfile())
+
+    assert outcome.error is None
+    assert outcome.diagnostic is None
+    assert outcome.payload == payload
+
+
+def test_baseline_input_error_message_formats_unreadable_reports(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "baseline.json"
+    exc = ReportInputError("unreadable", path, detail="permission denied")
+
+    assert evaluate_contract_mod._baseline_input_error_message(exc) == (
+        f"Baseline report is not readable: {path} (permission denied)"
+    )

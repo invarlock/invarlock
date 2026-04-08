@@ -8,7 +8,7 @@ import pytest
 
 from invarlock.cli import run_masking as masking_mod
 from invarlock.cli.run_artifacts import persist_ref_masks
-from invarlock.cli.run_pairing import extract_pairing_schedule
+from invarlock.cli.run_pairing import compute_provider_digest, extract_pairing_schedule
 from invarlock.exit_codes import resolve_command_exit_code
 from invarlock.core.exceptions import (
     ConfigError,
@@ -117,6 +117,26 @@ def test_extract_pairing_schedule_returns_none_on_invalid_shapes() -> None:
     )
 
 
+def test_extract_pairing_schedule_accepts_explicit_tensor_helper() -> None:
+    calls: list[object] = []
+
+    def _helper(raw):  # noqa: ANN001
+        calls.append(raw)
+        return [int(value) for value in raw]
+
+    report = {
+        "evaluation_windows": {
+            "preview": {"input_ids": [[1, 2]], "window_ids": [1]},
+            "final": {"input_ids": [[3, 4]], "window_ids": [2]},
+        }
+    }
+
+    sched = extract_pairing_schedule(report, tensor_or_list_to_ints_fn=_helper)
+
+    assert sched is not None
+    assert calls == [[1, 2], [3, 4]]
+
+
 def test_extract_pairing_schedule_rejects_non_int_window_ids() -> None:
     report = {
         "evaluation_windows": {
@@ -180,6 +200,38 @@ def test_extract_pairing_schedule_single_row_fallbacks() -> None:
     assert sched["final"]["window_ids"] == [1]
     assert sched["final"]["attention_masks"] == [[1, 1]]
     assert sched["final"]["labels"] == [[9, -100]]
+
+
+def test_extract_pairing_schedule_ignores_non_list_attention_masks_and_prefers_window_processor_sha() -> (
+    None
+):
+    report = {
+        "evaluation_windows": {
+            "preview": {
+                "input_ids": [[1, 0, 2]],
+                "window_ids": [1],
+                "attention_masks": object(),
+                "processor_sha256": "proc-window",
+            },
+            "final": {
+                "input_ids": [[3, 4]],
+                "window_ids": [2],
+                "attention_masks": [[1, 1]],
+            },
+        },
+        "meta": {"processor_sha256": "proc-meta", "tokenizer_hash": "tok-123"},
+    }
+
+    sched = extract_pairing_schedule(report)
+    assert isinstance(sched, dict)
+    assert sched["preview"]["attention_masks"] == [[1, 0, 1]]
+
+    digest = compute_provider_digest(
+        report,
+        compute_mask_positions_digest_fn=lambda _windows: None,
+    )
+    assert digest is not None
+    assert digest["processor_sha256"] == "proc-window"
 
 
 def test_extract_pairing_schedule_rejects_malformed_sections() -> None:
@@ -250,6 +302,23 @@ def test_extract_pairing_schedule_supports_multimodal_records() -> None:
         )
         is None
     )
+
+
+def test_compute_provider_digest_uses_meta_processor_fallback() -> None:
+    digest = compute_provider_digest(
+        {
+            "evaluation_windows": {
+                "preview": {"window_ids": [1]},
+                "final": {"window_ids": [2]},
+            },
+            "meta": {"processor_sha256": "proc-123", "tokenizer_hash": "tok-123"},
+        },
+        compute_mask_positions_digest_fn=lambda _windows: None,
+    )
+
+    assert digest is not None
+    assert digest["tokenizer_sha256"] == "tok-123"
+    assert digest["processor_sha256"] == "proc-123"
 
 
 def test_extract_pairing_schedule_falls_back_for_malformed_attention_rows() -> None:

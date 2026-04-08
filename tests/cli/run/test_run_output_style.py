@@ -20,8 +20,8 @@ from invarlock.core.run_orchestrator import (
     RunSnapshotModeEvent,
     RunTelemetryFailedEvent,
 )
+from tests.cli._support_console import RecordingConsole
 from tests.cli.run._internal_cli import internal_run_app as cli
-from tests.cli.support import RecordingConsole
 
 
 def _cfg(tmp_path: Path, *, provider: str = "synthetic") -> str:

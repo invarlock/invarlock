@@ -6,7 +6,7 @@ import click
 import pytest
 import typer
 
-from tests.cli.evaluate_failures_support import (
+from tests.cli._support_evaluate_failures import (
     RecordingConsole,
     _fake_run_command_with_paths,
     _prepare_evaluate_paths,
@@ -215,6 +215,37 @@ def test_evaluate_nonquiet_noop_child_runtime_error_skips_buffer_replay(
         )
 
     assert "nonquiet subject child output" not in console.joined()
+
+
+def test_evaluate_nonquiet_subject_typer_exit_reaches_no_buffer_replay_branch(
+    monkeypatch, tmp_path: Path
+) -> None:
+    src, edt = _prepare_evaluate_paths(monkeypatch, tmp_path)
+    baseline_report = _write_json(tmp_path / "baseline-nonquiet.json", {})
+    console = RecordingConsole()
+
+    def fake_run(**kwargs):
+        out_name = Path(kwargs["out"]).name
+        if out_name == "source":
+            return str(baseline_report)
+        raise typer.Exit(6)
+
+    monkeypatch.setattr(
+        "invarlock.cli.output.make_console", lambda **_: console, raising=False
+    )
+    monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
+
+    with pytest.raises(click.exceptions.Exit) as exc:
+        mod.evaluate_command(
+            baseline=str(src),
+            subject=str(edt),
+            adapter="hf_causal",
+            out=str(Path("runs")),
+            report_out=str(Path("reports")),
+            profile="dev",
+        )
+
+    assert exc.value.exit_code == 6
 
 
 def test_evaluate_quiet_mode_replays_baseline_child_output_on_failure(

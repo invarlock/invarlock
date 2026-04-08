@@ -114,6 +114,10 @@ def test_guard_validation_result_property_fallbacks_filter_invalid_records() -> 
 def test_decision_normalization_and_priority_edges() -> None:
     assert normalize_guard_decision(None, fallback_action="reject") == "block"
     assert normalize_guard_decision(None, passed=False) == "block"
+    assert (
+        normalize_guard_decision(None, fallback_action="mystery", passed=False)
+        == "block"
+    )
     assert decision_to_action("monitor") == "warn"
     assert get_worst_decision([]) == "allow"
     assert get_worst_decision(["monitor", "allow", "rollback"]) == "rollback"

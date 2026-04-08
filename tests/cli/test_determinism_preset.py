@@ -247,6 +247,86 @@ def test_determinism_preset_cuda_low_memory_selects_cublas_fallback(
     assert payload["env"]["CUBLAS_WORKSPACE_CONFIG"] == ":16:8"
 
 
+def test_determinism_preset_cuda_high_memory_keeps_preferred_cublas_workspace(
+    monkeypatch,
+) -> None:
+    class _CudaProps:
+        total_memory = 16 * 1024**3
+
+    class _Cuda:
+        def get_device_properties(self, _idx: int) -> _CudaProps:
+            return _CudaProps()
+
+    class _Backends:
+        cuda = SimpleNamespace(matmul=SimpleNamespace(allow_tf32=True))
+        cudnn = SimpleNamespace(benchmark=True, deterministic=False, allow_tf32=True)
+
+    fake_torch = SimpleNamespace(
+        cuda=_Cuda(),
+        backends=_Backends(),
+        set_num_threads=lambda *_a, **_k: None,
+        set_num_interop_threads=lambda *_a, **_k: None,
+        use_deterministic_algorithms=lambda *_a, **_k: None,
+        initial_seed=lambda: 7,
+        are_deterministic_algorithms_enabled=lambda: True,
+    )
+
+    monkeypatch.delenv("CUBLAS_WORKSPACE_CONFIG", raising=False)
+    monkeypatch.setattr("invarlock.core.determinism_policy.torch", fake_torch)
+    monkeypatch.setattr(
+        "invarlock.core.determinism_policy.set_seed", lambda *_a, **_k: None
+    )
+
+    payload = apply_determinism_preset(profile="ci", device="cuda:0", seed=7, threads=1)
+    assert payload["env"]["CUBLAS_WORKSPACE_CONFIG"] == ":4096:8"
+
+
+def test_determinism_preset_tolerates_cuda_property_and_det_enabled_probe_failures(
+    monkeypatch,
+) -> None:
+    class _Cuda:
+        def get_device_properties(self, _idx: int) -> object:
+            raise TypeError("boom")
+
+    class _Backends:
+        cuda = SimpleNamespace(matmul=SimpleNamespace(allow_tf32=True))
+        cudnn = SimpleNamespace(benchmark=True, deterministic=False, allow_tf32=True)
+
+    class _Torch:
+        cuda = _Cuda()
+        backends = _Backends()
+
+        @staticmethod
+        def set_num_threads(*_a, **_k) -> None:
+            return None
+
+        @staticmethod
+        def set_num_interop_threads(*_a, **_k) -> None:
+            return None
+
+        @staticmethod
+        def use_deterministic_algorithms(*_a, **_k) -> None:
+            return None
+
+        @staticmethod
+        def initial_seed() -> int:
+            return 7
+
+        @staticmethod
+        def are_deterministic_algorithms_enabled() -> bool:
+            raise RuntimeError("boom")
+
+    monkeypatch.delenv("CUBLAS_WORKSPACE_CONFIG", raising=False)
+    monkeypatch.setattr("invarlock.core.determinism_policy.torch", _Torch())
+    monkeypatch.setattr(
+        "invarlock.core.determinism_policy.set_seed", lambda *_a, **_k: None
+    )
+
+    payload = apply_determinism_preset(profile="ci", device="cuda:0", seed=7, threads=1)
+    assert payload["env"]["CUBLAS_WORKSPACE_CONFIG"] == ":4096:8"
+    assert payload["strict_enforcement"] == "ok"
+
+
 def test_determinism_preset_prunes_empty_torch_payload_when_random_fails(
     monkeypatch,
 ) -> None:

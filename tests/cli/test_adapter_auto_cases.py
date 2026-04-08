@@ -101,6 +101,11 @@ class _BadQuantConfig(dict):
         raise RuntimeError("broken quant config")
 
 
+class _RecoverableBadQuantConfig(dict):
+    def get(self, *_args, **_kwargs):
+        raise ValueError("broken quant config")
+
+
 def test_read_local_hf_config_and_quant_detection_paths(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -119,6 +124,12 @@ def test_read_local_hf_config_and_quant_detection_paths(
 
     assert (
         mod._detect_quant_family_from_cfg({"quantization_config": _BadQuantConfig()})
+        is None
+    )
+    assert (
+        mod._detect_quant_family_from_cfg(
+            {"quantization_config": _RecoverableBadQuantConfig()}
+        )
         is None
     )
 
@@ -184,3 +195,17 @@ def test_apply_auto_adapter_if_needed_exception_path() -> None:
     cfg = _BrokenConfig()
     with pytest.raises(RuntimeError, match="broken model"):
         mod.apply_auto_adapter_if_needed(cfg)
+
+
+def test_apply_auto_adapter_if_needed_returns_original_cfg_on_recoverable_errors() -> (
+    None
+):
+    class _RecoverableConfig:
+        def __init__(self) -> None:
+            self.model = type("M", (), {"adapter": "auto", "id": "gpt2"})()
+
+        def model_dump(self):
+            raise ValueError("broken dump")
+
+    cfg = _RecoverableConfig()
+    assert mod.apply_auto_adapter_if_needed(cfg) is cfg

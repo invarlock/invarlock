@@ -88,8 +88,7 @@ def compute_tail_summary(
             if wv is None or wv < 0.0:
                 wv = 0.0
             values.append(float(dv))
-            if paired_weights is not None:
-                paired_weights.append(float(wv))
+            paired_weights.append(float(wv))
 
     n = int(len(values))
     values_sorted = sorted(values)

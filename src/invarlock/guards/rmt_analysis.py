@@ -172,22 +172,21 @@ def capture_baseline_mp_stats(
                 except ImportError:
                     pass
 
-                if W.ndim == 2:
-                    m, n = W.shape
-                    if not torch.isfinite(W).all():
-                        continue
-                    try:
-                        s_actual = torch.linalg.svdvals(W.float().cpu())
-                        sigma_base = s_actual[0].item()
-                        mp_edge_base = mp_bulk_edge(m, n, whitened=False)
-                        r_mp_base = sigma_base / max(mp_edge_base, 1e-12)
-                        mp_stats[name] = {
-                            "mp_bulk_edge_base": mp_edge_base,
-                            "r_mp_base": r_mp_base,
-                            "sigma_base": sigma_base,
-                        }
-                    except (RuntimeError, torch.linalg.LinAlgError):
-                        continue
+                m, n = W.shape
+                if not torch.isfinite(W).all():
+                    continue
+                try:
+                    s_actual = torch.linalg.svdvals(W.float().cpu())
+                    sigma_base = s_actual[0].item()
+                    mp_edge_base = mp_bulk_edge(m, n, whitened=False)
+                    r_mp_base = sigma_base / max(mp_edge_base, 1e-12)
+                    mp_stats[name] = {
+                        "mp_bulk_edge_base": mp_edge_base,
+                        "r_mp_base": r_mp_base,
+                        "sigma_base": sigma_base,
+                    }
+                except (RuntimeError, torch.linalg.LinAlgError):
+                    continue
                 break
 
     return mp_stats

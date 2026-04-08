@@ -129,6 +129,29 @@ def test_apply_relative_spectral_cap_skips_modules_without_matrix_weight() -> No
     assert [entry["module"] for entry in result["capped_modules"]] == ["matrix"]
 
 
+def test_apply_relative_spectral_cap_uses_explicit_predicate_and_skips_non_matrix() -> (
+    None
+):
+    class NoWeightModule:
+        pass
+
+    vector = _Module(torch.tensor([1.0, 2.0], dtype=torch.float32))
+    matrix = _Module(torch.tensor([[2.0, 0.0], [0.0, 1.0]], dtype=torch.float32))
+
+    result = apply_relative_spectral_cap(
+        _Model({"no_weight": NoWeightModule(), "vector": vector, "matrix": matrix}),
+        cap_ratio=1.0,
+        scope="all",
+        baseline_sigmas={"matrix": 1.0},
+        should_process_module_fn=lambda *_args: True,
+        capture_baseline_sigmas_fn=lambda *_args, **_kwargs: {"matrix": 1.0},
+        compute_sigma_max_fn=lambda weight: 2.0 if weight is matrix.weight else 1.0,
+    )
+
+    assert result["applied"] is True
+    assert [entry["module"] for entry in result["capped_modules"]] == ["matrix"]
+
+
 def test_apply_relative_spectral_cap_returns_outer_error_when_baseline_capture_fails() -> (
     None
 ):

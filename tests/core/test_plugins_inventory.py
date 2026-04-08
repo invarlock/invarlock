@@ -145,6 +145,45 @@ def test_gather_adapter_inventory_rows_tolerates_probe_failures() -> None:
     assert bnb_row["enable"] == "pip install 'invarlock[gpu]'"
 
 
+def test_gather_adapter_inventory_rows_handles_empty_missing_hint_and_cuda_runtime_gaps() -> (
+    None
+):
+    class _RegistryWithOptional(_Registry):
+        def __init__(self) -> None:
+            super().__init__()
+            self._adapters["custom_optional"] = {
+                "module": "vendor.optional",
+                "entry_point": "custom",
+            }
+
+    registry = _RegistryWithOptional()
+
+    def _provenance(name: str) -> SimpleNamespace:
+        if name == "hf_bnb":
+            return SimpleNamespace(library="bitsandbytes", version="1.0")
+        return SimpleNamespace(library="vendor-lib", version=None)
+
+    rows = gather_adapter_inventory_rows(
+        registry=registry,
+        minimal=False,
+        has_cuda=True,
+        is_linux=True,
+        extras_checker=lambda name, _kind: "⚠️ missing"
+        if name == "custom_optional"
+        else "",
+        provenance_extractor=_provenance,
+        bitsandbytes_runtime_available=lambda: False,
+    )
+
+    custom_row = next(row for row in rows if row["name"] == "custom_optional")
+    bnb_row = next(row for row in rows if row["name"] == "hf_bnb")
+
+    assert custom_row["status"] == "needs_extra"
+    assert custom_row["enable"] == ""
+    assert bnb_row["status"] == "unsupported"
+    assert bnb_row["enable"] == "bitsandbytes unavailable on this host"
+
+
 def test_dataset_inventory_json_items_preserve_provider_module() -> None:
     items = dataset_inventory_json_items(
         ["wikitext2"],

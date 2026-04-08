@@ -170,3 +170,49 @@ def test_resolve_snapshot_retry_transition_reuses_loaded_model() -> None:
             summary="Snapshot restore unavailable; reusing initially loaded model for guarded execution.",
         ),
     )
+
+
+def test_build_snapshot_execution_plan_uses_env_tmpdir_when_config_temp_dir_missing() -> (
+    None
+):
+    seen: list[str] = []
+
+    plan = build_snapshot_execution_plan(
+        adapter=SimpleNamespace(),
+        model=object(),
+        cfg_snapshot={"temp_dir": ""},
+        direct_reuse_loaded_model=False,
+        skip_overhead_source=None,
+        choose_snapshot_mode_fn=lambda **kwargs: "disabled",
+        estimate_model_bytes_fn=lambda model: 0,
+        psutil_module=None,
+        environ={"TMPDIR": "/tmp/custom-snapshot"},
+        disk_usage_fn=lambda path: seen.append(path) or SimpleNamespace(free=0),
+        free_model_memory_fn=lambda model: None,
+    )
+
+    assert plan.snapshot_enabled is False
+    assert seen == ["/tmp/custom-snapshot"]
+
+
+def test_build_snapshot_execution_plan_uses_env_tmpdir_when_snapshot_cfg_is_not_mapping() -> (
+    None
+):
+    seen: list[str] = []
+
+    plan = build_snapshot_execution_plan(
+        adapter=SimpleNamespace(),
+        model=object(),
+        cfg_snapshot=SimpleNamespace(temp_dir="/ignored"),
+        direct_reuse_loaded_model=False,
+        skip_overhead_source=None,
+        choose_snapshot_mode_fn=lambda **kwargs: "disabled",
+        estimate_model_bytes_fn=lambda model: 0,
+        psutil_module=None,
+        environ={"TMPDIR": "/tmp/non-mapping-snapshot"},
+        disk_usage_fn=lambda path: seen.append(path) or SimpleNamespace(free=0),
+        free_model_memory_fn=lambda model: None,
+    )
+
+    assert plan.snapshot_enabled is False
+    assert seen == ["/tmp/non-mapping-snapshot"]

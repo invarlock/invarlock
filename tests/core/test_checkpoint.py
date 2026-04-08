@@ -106,6 +106,18 @@ def test_policy_checkpoint_should_rollback_logic():
     assert not should and reason == ""
 
 
+def test_policy_checkpoint_does_not_auto_rollback_when_policy_disabled() -> None:
+    adapter = DummyAdapter(Path("/tmp"))
+    model = object()
+    policy = type("P", (), {"enable_auto_rollback": False})()
+    cp = PolicyCheckpoint(model, adapter, policy)
+
+    should, reason = cp.should_rollback([GuardOutcome("a", False, action="none")])
+
+    assert should is False
+    assert reason == ""
+
+
 def test_policy_checkpoint_rollback_guard_paths(tmp_path: Path):
     class CorruptBytesAdapter(DummyAdapter):
         def restore(self, model: object, blob: bytes | None) -> None:
@@ -128,6 +140,21 @@ def test_policy_checkpoint_rollback_guard_paths(tmp_path: Path):
     assert cp.rollback("corrupt") is False
 
 
+def test_policy_checkpoint_chunked_rollback_requires_path_and_restore(
+    tmp_path: Path,
+) -> None:
+    class NoChunkRestoreAdapter(DummyAdapter):
+        restore_chunked = None
+
+    adapter = NoChunkRestoreAdapter(tmp_path)
+    cp = PolicyCheckpoint(
+        object(), adapter, type("P", (), {"enable_auto_rollback": False})()
+    )
+    cp.checkpoint_data = {"mode": "chunked", "path": ""}
+
+    assert cp.rollback("missing_chunked_restore") is False
+
+
 def test_policy_checkpoint_rollback_reraises_unexpected_errors(tmp_path: Path):
     class ExplodingAdapter(DummyAdapter):
         def restore(self, model: object, blob: bytes) -> None:
@@ -141,6 +168,20 @@ def test_policy_checkpoint_rollback_reraises_unexpected_errors(tmp_path: Path):
 
     with pytest.raises(AssertionError, match="explode"):
         cp.rollback("unexpected")
+
+
+def test_policy_checkpoint_cleanup_tolerates_missing_chunked_path(
+    tmp_path: Path,
+) -> None:
+    adapter = DummyAdapter(tmp_path)
+    cp = PolicyCheckpoint(
+        object(), adapter, type("P", (), {"enable_auto_rollback": False})()
+    )
+    cp.checkpoint_data = {"mode": "chunked", "path": ""}
+
+    cp.cleanup()
+
+    assert cp.checkpoint_data is None
 
 
 def test_create_policy_checkpoint_context_manager(
@@ -244,3 +285,14 @@ def test_checkpoint_manager_reraises_unexpected_restore_errors(
 
     with pytest.raises(AssertionError, match="explode"):
         mgr.restore_checkpoint(object(), adapter, checkpoint_id)
+
+
+def test_checkpoint_manager_cleanup_tolerates_missing_chunked_path() -> None:
+    mgr = CheckpointManager()
+    mgr.checkpoints["checkpoint_1"] = {"mode": "chunked", "path": ""}
+    mgr.next_id = 2
+
+    mgr.cleanup()
+
+    assert mgr.checkpoints == {}
+    assert mgr.next_id == 1

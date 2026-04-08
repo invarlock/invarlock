@@ -69,9 +69,7 @@ def extract_pairing_schedule(
     if not isinstance(windows, dict):
         return None
 
-    def _wrap_single_row(raw: Any, *, expected_rows: int) -> list | None:
-        if not isinstance(raw, list):
-            return None
+    def _wrap_single_row(raw: list[Any], *, expected_rows: int) -> list:
         if expected_rows == 1 and raw and not isinstance(raw[0], list):
             return [raw]
         return raw
@@ -164,14 +162,11 @@ def extract_pairing_schedule(
             labels = []
             for idx, raw_label in enumerate(maybe_labels):
                 label_list = tensor_or_list_to_ints_fn(raw_label)
-                if idx < len(input_ids):
-                    target_len = len(input_ids[idx])
-                    if len(label_list) < target_len:
-                        label_list = label_list + [-100] * (
-                            target_len - len(label_list)
-                        )
-                    elif len(label_list) > target_len:
-                        label_list = label_list[:target_len]
+                target_len = len(input_ids[idx])
+                if len(label_list) < target_len:
+                    label_list = label_list + [-100] * (target_len - len(label_list))
+                elif len(label_list) > target_len:
+                    label_list = label_list[:target_len]
                 labels.append(label_list)
 
         masked_counts: list[int] | None = None

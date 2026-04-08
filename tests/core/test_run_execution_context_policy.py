@@ -4,7 +4,9 @@ from types import SimpleNamespace
 
 from invarlock.core.run_execution_context_policy import (
     _baseline_eval_windows,
+    _normalize_edit_plan,
     _normalize_profile_checks,
+    _section_dict,
     build_run_context_payload,
     build_run_execution_config_payloads,
 )
@@ -14,6 +16,16 @@ def test_normalize_profile_checks_handles_scalar_and_falsy_values() -> None:
     assert _normalize_profile_checks("shape_ok") == ["shape_ok"]
     assert _normalize_profile_checks(None) == []
     assert _normalize_profile_checks(0) == []
+
+
+def test_section_dict_recovers_from_section_dispatch_errors() -> None:
+    class _Config:
+        guards = {"spectral": {"enabled": True}}
+
+        def section(self, _name: str) -> object:
+            raise TypeError("boom")
+
+    assert _section_dict(_Config(), "guards") == {"spectral": {"enabled": True}}
 
 
 def test_baseline_eval_windows_rejects_malformed_payloads_and_omits_bad_token_counts() -> (
@@ -170,6 +182,97 @@ def test_build_run_context_payload_skips_invalid_baseline_and_non_dict_context()
     assert payload["eval"]["loss"]["resolved_type"] == "ppl_causal"
 
 
+def test_build_run_context_payload_preserves_non_mapping_eval_payloads() -> None:
+    cfg = SimpleNamespace(
+        eval=SimpleNamespace(max_pm_ratio=1.5),
+        dataset=SimpleNamespace(provider="wikitext2"),
+        guards=SimpleNamespace(spectral={}, rmt={}, variance={}, invariants={}),
+        context={},
+    )
+    model_profile = SimpleNamespace(
+        family="test",
+        default_loss="ppl_causal",
+        module_selectors={},
+        invariants=[],
+        cert_lints=[],
+    )
+
+    def _to_serialisable(obj: object) -> object:
+        if isinstance(obj, dict) and obj.get("max_pm_ratio") == 1.5:
+            return "not-a-dict"
+        if isinstance(obj, dict):
+            return dict(obj)
+        return {
+            key: value for key, value in vars(obj).items() if not key.startswith("_")
+        }
+
+    payload = build_run_context_payload(
+        cfg=cfg,
+        profile="dev",
+        pairing_schedule=None,
+        seed_bundle={},
+        plugin_provenance={},
+        run_id="run-3",
+        baseline_report_data=None,
+        pm_acceptance_range=None,
+        pm_drift_band=None,
+        guard_overhead_threshold=0.01,
+        model_profile=model_profile,
+        resolved_loss_type="ppl_causal",
+        tiny_relax_enabled=False,
+        to_serialisable_dict_fn=_to_serialisable,
+    )
+
+    assert payload["eval"] == "not-a-dict"
+
+
+def test_build_run_context_payload_ignores_non_mapping_serialised_context() -> None:
+    cfg = SimpleNamespace(
+        eval=SimpleNamespace(max_pm_ratio=1.5),
+        dataset=SimpleNamespace(provider="wikitext2"),
+        guards=SimpleNamespace(spectral={}, rmt={}, variance={}, invariants={}),
+        context={"raw": True},
+    )
+    model_profile = SimpleNamespace(
+        family="test",
+        default_loss="ppl_causal",
+        module_selectors={},
+        invariants=[],
+        cert_lints=[],
+    )
+
+    payload = build_run_context_payload(
+        cfg=cfg,
+        profile="dev",
+        pairing_schedule=None,
+        seed_bundle={},
+        plugin_provenance={},
+        run_id="run-4",
+        baseline_report_data=None,
+        pm_acceptance_range=None,
+        pm_drift_band=None,
+        guard_overhead_threshold=0.01,
+        model_profile=model_profile,
+        resolved_loss_type="ppl_causal",
+        tiny_relax_enabled=False,
+        to_serialisable_dict_fn=lambda obj: (
+            "not-a-dict"
+            if obj == {"raw": True}
+            else dict(obj)
+            if isinstance(obj, dict)
+            else {
+                key: value
+                for key, value in vars(obj).items()
+                if not key.startswith("_")
+            }
+        ),
+    )
+
+    assert payload["profile"] == "dev"
+    assert payload["eval"]["loss"]["resolved_type"] == "ppl_causal"
+    assert "raw" not in payload
+
+
 class _PlanWrapper:
     def __init__(self, data: dict[str, object]) -> None:
         self._data = data
@@ -252,6 +355,19 @@ class _BadAuto:
         raise TypeError("bad ratio")
 
 
+class _RaisingGetDict(dict):
+    def get(self, key, default=None):  # type: ignore[override]
+        if key == "enabled":
+            raise TypeError("bad enabled")
+        if key == "tier":
+            raise ValueError("bad tier")
+        if key == "probes":
+            raise TypeError("bad probes")
+        if key == "target_pm_ratio":
+            raise ValueError("bad ratio")
+        return super().get(key, default)
+
+
 def test_build_run_execution_config_payloads_supports_items_plan() -> None:
     cfg = SimpleNamespace(
         auto=SimpleNamespace(),
@@ -290,6 +406,35 @@ def test_build_run_execution_config_payloads_handles_missing_edit_namespace() ->
     model_profile = SimpleNamespace(module_selectors={})
 
     payloads = build_run_execution_config_payloads(cfg=cfg, model_profile=model_profile)
+
+    assert payloads.auto_config == {
+        "enabled": False,
+        "tier": "balanced",
+        "probes": 0,
+        "target_pm_ratio": 2.0,
+    }
+    assert payloads.edit_config == {}
+
+
+def test_normalize_edit_plan_returns_empty_for_non_mapping_objects() -> None:
+    assert _normalize_edit_plan(object()) == {}
+
+
+def test_build_run_execution_config_payloads_recovers_from_bad_auto_mapping_getters() -> (
+    None
+):
+    class _Cfg:
+        edit = SimpleNamespace(plan=object())
+
+        def section(self, name: str) -> object:
+            if name == "auto":
+                return _RaisingGetDict()
+            raise KeyError(name)
+
+    payloads = build_run_execution_config_payloads(
+        cfg=_Cfg(),
+        model_profile=SimpleNamespace(module_selectors={}),
+    )
 
     assert payloads.auto_config == {
         "enabled": False,

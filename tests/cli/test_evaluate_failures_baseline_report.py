@@ -6,7 +6,7 @@ from pathlib import Path
 import click
 import pytest
 
-from tests.cli.evaluate_failures_support import (
+from tests.cli._support_evaluate_failures import (
     _assert_baseline_report_validation_exit,
     _fake_run_command_with_paths,
     _prepare_evaluate_paths,

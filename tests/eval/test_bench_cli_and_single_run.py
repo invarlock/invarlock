@@ -94,6 +94,8 @@ class TestExecuteSingleRun:
 
         from invarlock.eval.data import EvaluationWindow
 
+        provider_kwargs_seen: list[dict[str, object]] = []
+
         class DummyProfile:
             def make_tokenizer(self):
                 return object(), "tokhash"
@@ -173,7 +175,10 @@ class TestExecuteSingleRun:
             lambda *_a, **_k: DummyProfile(),
         )
         monkeypatch.setattr(
-            "invarlock.eval.data.get_provider", lambda *_a, **_k: DummyProvider()
+            "invarlock.eval.data.get_provider",
+            lambda *_a, **_k: (
+                provider_kwargs_seen.append(dict(_k)) or DummyProvider()
+            ),
         )
         monkeypatch.setattr(
             "invarlock.core.registry.get_registry", lambda: DummyRegistry()
@@ -188,7 +193,12 @@ class TestExecuteSingleRun:
             lambda *_a, **_k: {"n_layers_flagged": 0},
         )
 
-        scenario = ScenarioConfig(edit="quant_rtn", tier="balanced", probes=2)
+        scenario = ScenarioConfig(
+            edit="quant_rtn",
+            tier="balanced",
+            probes=2,
+            device="cpu",
+        )
         run_config = ConfigurationManager.create_bare_config(scenario)
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -198,6 +208,7 @@ class TestExecuteSingleRun:
         assert result.run_type == "bare"
         assert result.report["meta"]["model_id"] == "gpt2"
         assert result.report["edit"]["name"] == "quant_rtn"
+        assert provider_kwargs_seen == [{"device_hint": "cpu"}]
 
     def test_execute_single_run_exception_handling(self, monkeypatch):
         """Test exception handling in single run execution."""

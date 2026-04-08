@@ -99,3 +99,50 @@ def test_resolve_metric_and_provider_reraises_unexpected_metric_lookup_errors(
 
     with pytest.raises(RuntimeError, match="boom"):
         mpr.resolve_metric_and_provider(_Cfg(), profile, resolved_loss_type="mlm")
+
+
+def test_resolve_metric_and_provider_ignores_non_mapping_eval_section() -> None:
+    class _Dataset:
+        @property
+        def provider(self) -> object:
+            raise AttributeError("missing provider")
+
+    class _Cfg:
+        dataset = _Dataset()
+
+        def section(self, name: str):  # noqa: ANN001
+            if name == "eval":
+                return ["not-a-mapping"]
+            return {}
+
+    profile = SimpleNamespace(default_provider="profile-provider", default_metric=None)
+
+    kind, provider, opts = mpr.resolve_metric_and_provider(
+        _Cfg(),
+        profile,
+        resolved_loss_type="classification",
+    )
+
+    assert kind == "accuracy"
+    assert provider == "profile-provider"
+    assert opts == {}
+
+
+def test_resolve_metric_and_provider_handles_section_lookup_errors() -> None:
+    class _Cfg:
+        dataset = SimpleNamespace(provider=None)
+
+        def section(self, _name: str):  # noqa: ANN001
+            raise ValueError("bad section")
+
+    profile = SimpleNamespace(default_provider=None, default_metric=None)
+
+    kind, provider, opts = mpr.resolve_metric_and_provider(
+        _Cfg(),
+        profile,
+        resolved_loss_type="seq2seq",
+    )
+
+    assert kind == "ppl_seq2seq"
+    assert provider == "wikitext2"
+    assert opts == {}

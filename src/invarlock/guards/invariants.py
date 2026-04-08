@@ -404,8 +404,6 @@ class InvariantsGuard(Guard):
         weight_tying_flags: dict[str, bool] = {}
 
         def _is_tied(left: Any, right: Any) -> bool:
-            if left is None or right is None:
-                return False
             try:
                 return left.data_ptr() == right.data_ptr()
             except _INVARIANT_CAPTURE_ERRORS:

@@ -7,7 +7,7 @@ import typer
 from typer.testing import CliRunner
 
 from invarlock.cli.app import app
-from tests.cli.support import RecordingConsole
+from tests.cli._support_console import RecordingConsole
 
 
 def test_explain_gates_tokens_below_floor_and_drift_fail(monkeypatch, tmp_path):

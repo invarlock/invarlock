@@ -406,3 +406,42 @@ def test_evaluate_attested_bundle_manifest_inherits_container_execution(
     assert manifest["execution_mode"] == "container"
     assert manifest["runtime"]["container_execution"] is True
     assert manifest["runtime"]["image_digest"] == "sha256:" + ("a" * 64)
+
+
+def test_evaluate_fails_when_edited_report_payload_is_not_an_object(
+    monkeypatch, tmp_path
+):
+    src = tmp_path / "src_model"
+    edt = tmp_path / "edt_model"
+    src.mkdir()
+    edt.mkdir()
+    (src / "config.json").write_text("{}", encoding="utf-8")
+    (edt / "config.json").write_text("{}", encoding="utf-8")
+
+    baseline_report = _stub_run(tmp_path / "runs" / "source")
+    edited_dir = tmp_path / "runs" / "edited" / "20250101_000000"
+    edited_dir.mkdir(parents=True, exist_ok=True)
+    edited_report = edited_dir / "report.json"
+    edited_report.write_text(json.dumps(["not-an-object"]), encoding="utf-8")
+
+    import invarlock.cli.commands.run as run_mod
+
+    def fake_run(**kwargs):
+        out = Path(kwargs["out"]).name
+        if out == "source":
+            return str(baseline_report)
+        return str(edited_report)
+
+    monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
+
+    with pytest.raises(click.exceptions.Exit) as exc:
+        evaluate_command(
+            baseline=str(src),
+            subject=str(edt),
+            adapter="hf_causal",
+            out=str(tmp_path / "runs"),
+            report_out=str(tmp_path / "reports"),
+            profile="dev",
+        )
+
+    assert exc.value.exit_code == 1

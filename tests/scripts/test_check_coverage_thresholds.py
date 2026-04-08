@@ -118,7 +118,7 @@ def test_overrides_take_precedence(tmp_path: Path) -> None:
         )
         < 1e-9
     )
-    assert payload["configured_threshold_files"] == 141
+    assert payload["configured_threshold_files"] == 158
     assert payload["evaluated_files"] == 1
     assert payload["measured_threshold_files"] == 1
     assert "src/invarlock/cli/app.py" in payload["missing_threshold_files"]
@@ -183,20 +183,20 @@ def test_summary_reports_measured_vs_configured_threshold_counts(
 
     assert proc.returncode == 0, proc.stderr
     assert (
-        "Coverage OK: 1/141 threshold-listed files had coverage data and met "
+        "Coverage OK: 1/158 threshold-listed files had coverage data and met "
         "per-file thresholds." in proc.stdout
     )
     assert (
-        "140 threshold-listed files were absent from the coverage report."
+        "157 threshold-listed files were absent from the coverage report."
         in proc.stdout
     )
 
     payload = json.loads(json_out.read_text())
     assert payload["status"] == "ok"
-    assert payload["configured_threshold_files"] == 141
+    assert payload["configured_threshold_files"] == 158
     assert payload["evaluated_files"] == 1
     assert payload["measured_threshold_files"] == 1
-    assert len(payload["missing_threshold_files"]) == 140
+    assert len(payload["missing_threshold_files"]) == 157
 
 
 def test_ratchets_selected_files_to_ninety_five_percent(tmp_path: Path) -> None:
@@ -207,27 +207,38 @@ def test_ratchets_selected_files_to_ninety_five_percent(tmp_path: Path) -> None:
         [
             ("src/invarlock/cli/commands/evaluate.py", 0.949, 1.0),
             ("src/invarlock/core/determinism_policy.py", 0.949, 1.0),
-            ("src/invarlock/core/bootstrap.py", 0.949, 1.0),
             ("src/invarlock/core/auto_tuning.py", 0.949, 1.0),
-            ("src/invarlock/core/config_runtime.py", 0.949, 1.0),
             ("src/invarlock/core/adapter_auto.py", 0.949, 1.0),
             ("src/invarlock/core/runtime_manifest_verify.py", 0.949, 1.0),
             ("src/invarlock/core/metric_provider_resolution.py", 0.949, 1.0),
             ("src/invarlock/core/run_guard_overhead_policy.py", 0.949, 1.0),
             ("src/invarlock/core/run_snapshot_contract.py", 0.949, 1.0),
             ("src/invarlock/core/run_timing_policy.py", 0.949, 1.0),
-            ("src/invarlock/eval/tail_stats.py", 0.949, 1.0),
             ("src/invarlock/eval/metrics_activation.py", 0.949, 1.0),
-            ("src/invarlock/reporting/report_policy.py", 0.949, 1.0),
             ("src/invarlock/reporting/report_validation.py", 0.949, 1.0),
             ("src/invarlock/reporting/run_report_formatters.py", 0.949, 1.0),
             ("src/invarlock/reporting/validate.py", 0.949, 1.0),
-            ("src/invarlock/guards/policies.py", 0.949, 1.0),
             ("src/invarlock/guards/rmt_analysis.py", 0.949, 1.0),
             ("src/invarlock/guards/tier_config.py", 0.949, 1.0),
-            ("src/invarlock/eval/bench_policy.py", 0.949, 1.0),
             ("src/invarlock/cli/commands/calibrate.py", 0.949, 1.0),
             ("src/invarlock/cli/run_config.py", 0.949, 1.0),
+            ("src/invarlock/core/run_report_payload_policy.py", 0.949, 1.0),
+            ("src/invarlock/calibration/spectral_null.py", 0.949, 1.0),
+            ("src/invarlock/cli/run_pairing.py", 0.949, 1.0),
+            ("src/invarlock/core/doctor_preflight.py", 0.949, 1.0),
+            ("src/invarlock/core/events.py", 0.949, 1.0),
+            ("src/invarlock/core/plugins_inventory.py", 0.949, 1.0),
+            ("src/invarlock/core/runner_finalize.py", 0.949, 1.0),
+            ("src/invarlock/core/runner_guards.py", 0.949, 1.0),
+            ("src/invarlock/core/types.py", 0.949, 1.0),
+            ("src/invarlock/eval/metrics_aggregation.py", 0.949, 1.0),
+            ("src/invarlock/eval/primary_metric.py", 0.949, 1.0),
+            ("src/invarlock/eval/probes/mi.py", 0.949, 1.0),
+            ("src/invarlock/eval/probes/post_attention.py", 0.949, 1.0),
+            ("src/invarlock/guards/invariants.py", 0.949, 1.0),
+            ("src/invarlock/guards/rmt.py", 0.949, 1.0),
+            ("src/invarlock/proof_pack_integrity.py", 0.949, 1.0),
+            ("src/invarlock/proof_pack_manifest.py", 0.949, 1.0),
         ],
     )
 
@@ -237,27 +248,38 @@ def test_ratchets_selected_files_to_ninety_five_percent(tmp_path: Path) -> None:
     for path in (
         "src/invarlock/cli/commands/evaluate.py",
         "src/invarlock/core/determinism_policy.py",
-        "src/invarlock/core/bootstrap.py",
         "src/invarlock/core/auto_tuning.py",
-        "src/invarlock/core/config_runtime.py",
         "src/invarlock/core/adapter_auto.py",
         "src/invarlock/core/runtime_manifest_verify.py",
         "src/invarlock/core/metric_provider_resolution.py",
         "src/invarlock/core/run_guard_overhead_policy.py",
         "src/invarlock/core/run_snapshot_contract.py",
         "src/invarlock/core/run_timing_policy.py",
-        "src/invarlock/eval/tail_stats.py",
         "src/invarlock/eval/metrics_activation.py",
-        "src/invarlock/reporting/report_policy.py",
         "src/invarlock/reporting/report_validation.py",
         "src/invarlock/reporting/run_report_formatters.py",
         "src/invarlock/reporting/validate.py",
-        "src/invarlock/guards/policies.py",
         "src/invarlock/guards/rmt_analysis.py",
         "src/invarlock/guards/tier_config.py",
-        "src/invarlock/eval/bench_policy.py",
         "src/invarlock/cli/commands/calibrate.py",
         "src/invarlock/cli/run_config.py",
+        "src/invarlock/core/run_report_payload_policy.py",
+        "src/invarlock/calibration/spectral_null.py",
+        "src/invarlock/cli/run_pairing.py",
+        "src/invarlock/core/doctor_preflight.py",
+        "src/invarlock/core/events.py",
+        "src/invarlock/core/plugins_inventory.py",
+        "src/invarlock/core/runner_finalize.py",
+        "src/invarlock/core/runner_guards.py",
+        "src/invarlock/core/types.py",
+        "src/invarlock/eval/metrics_aggregation.py",
+        "src/invarlock/eval/primary_metric.py",
+        "src/invarlock/eval/probes/mi.py",
+        "src/invarlock/eval/probes/post_attention.py",
+        "src/invarlock/guards/invariants.py",
+        "src/invarlock/guards/rmt.py",
+        "src/invarlock/proof_pack_integrity.py",
+        "src/invarlock/proof_pack_manifest.py",
     ):
         assert path in proc.stderr
 
@@ -335,6 +357,24 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
             ("src/invarlock/cli/commands/run.py", 0.999, 1.0),
             ("src/invarlock/runtime_security.py", 0.999, 1.0),
             ("src/invarlock/runtime_verify.py", 0.999, 1.0),
+            ("src/invarlock/core/run_orchestrator_execute_helpers.py", 0.999, 1.0),
+            ("src/invarlock/proof_pack_metadata.py", 0.999, 1.0),
+            ("src/invarlock/adapters/hf_multimodal.py", 0.999, 1.0),
+            ("src/invarlock/cli/runtime_launch_plan.py", 0.999, 1.0),
+            ("src/invarlock/core/bootstrap.py", 0.999, 1.0),
+            ("src/invarlock/core/config_runtime.py", 0.999, 1.0),
+            ("src/invarlock/core/run_orchestrator_execute.py", 0.999, 1.0),
+            ("src/invarlock/core/run_snapshot_policy.py", 0.999, 1.0),
+            ("src/invarlock/core/runner_eval_metrics_multimodal.py", 0.999, 1.0),
+            ("src/invarlock/core/runner_eval_metrics_stats.py", 0.999, 1.0),
+            ("src/invarlock/core/runner_eval_phase.py", 0.999, 1.0),
+            ("src/invarlock/core/runner_latency.py", 0.999, 1.0),
+            ("src/invarlock/eval/bench_policy.py", 0.999, 1.0),
+            ("src/invarlock/eval/tail_stats.py", 0.999, 1.0),
+            ("src/invarlock/guards/policies.py", 0.999, 1.0),
+            ("src/invarlock/guards/variance_ops.py", 0.999, 1.0),
+            ("src/invarlock/reporting/report_policy.py", 0.999, 1.0),
+            ("src/invarlock/runtime_security_helpers.py", 0.999, 1.0),
         ],
     )
 
@@ -398,6 +438,24 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
         "src/invarlock/cli/commands/run.py",
         "src/invarlock/runtime_security.py",
         "src/invarlock/runtime_verify.py",
+        "src/invarlock/core/run_orchestrator_execute_helpers.py",
+        "src/invarlock/proof_pack_metadata.py",
+        "src/invarlock/adapters/hf_multimodal.py",
+        "src/invarlock/cli/runtime_launch_plan.py",
+        "src/invarlock/core/bootstrap.py",
+        "src/invarlock/core/config_runtime.py",
+        "src/invarlock/core/run_orchestrator_execute.py",
+        "src/invarlock/core/run_snapshot_policy.py",
+        "src/invarlock/core/runner_eval_metrics_multimodal.py",
+        "src/invarlock/core/runner_eval_metrics_stats.py",
+        "src/invarlock/core/runner_eval_phase.py",
+        "src/invarlock/core/runner_latency.py",
+        "src/invarlock/eval/bench_policy.py",
+        "src/invarlock/eval/tail_stats.py",
+        "src/invarlock/guards/policies.py",
+        "src/invarlock/guards/variance_ops.py",
+        "src/invarlock/reporting/report_policy.py",
+        "src/invarlock/runtime_security_helpers.py",
     ):
         assert path in proc.stderr
 
@@ -408,21 +466,21 @@ def test_calibrated_split_owner_thresholds_are_explicit(tmp_path: Path) -> None:
     _write_cov_xml(
         xml,
         [
-            ("src/invarlock/core/config_runtime.py", 0.899, 1.0),
+            ("src/invarlock/core/config_runtime.py", 0.999, 1.0),
             ("src/invarlock/core/metric_provider_resolution.py", 0.949, 1.0),
             ("src/invarlock/core/run_orchestrator.py", 0.899, 1.0),
             ("src/invarlock/core/run_provider_dataset_plan.py", 0.889, 1.0),
             ("src/invarlock/cli/run_config.py", 0.949, 1.0),
-            ("src/invarlock/cli/run_pairing.py", 0.899, 1.0),
-            ("src/invarlock/eval/metrics_aggregation.py", 0.899, 1.0),
+            ("src/invarlock/cli/run_pairing.py", 0.949, 1.0),
+            ("src/invarlock/eval/metrics_aggregation.py", 0.949, 1.0),
             ("src/invarlock/eval/metrics_runtime.py", 0.899, 1.0),
-            ("src/invarlock/core/run_orchestrator_execute.py", 0.899, 1.0),
-            ("src/invarlock/proof_pack_integrity.py", 0.899, 1.0),
-            ("src/invarlock/proof_pack_manifest.py", 0.899, 1.0),
+            ("src/invarlock/core/run_orchestrator_execute.py", 0.999, 1.0),
+            ("src/invarlock/proof_pack_integrity.py", 0.949, 1.0),
+            ("src/invarlock/proof_pack_manifest.py", 0.949, 1.0),
             ("src/invarlock/reporting/verify_check_helpers.py", 0.949, 1.0),
-            ("src/invarlock/runtime_security_helpers.py", 0.949, 1.0),
+            ("src/invarlock/runtime_security_helpers.py", 0.999, 1.0),
             ("src/invarlock/cli/run_execution_output.py", 0.949, 1.0),
-            ("src/invarlock/cli/runtime_launch_plan.py", 0.949, 1.0),
+            ("src/invarlock/cli/runtime_launch_plan.py", 0.999, 1.0),
             ("src/invarlock/reporting/run_report_contract.py", 0.949, 1.0),
             ("src/invarlock/reporting/report_builder_support.py", 0.949, 1.0),
         ],
@@ -449,5 +507,42 @@ def test_calibrated_split_owner_thresholds_are_explicit(tmp_path: Path) -> None:
         "src/invarlock/cli/runtime_launch_plan.py",
         "src/invarlock/reporting/run_report_contract.py",
         "src/invarlock/reporting/report_builder_support.py",
+    ):
+        assert path in proc.stderr
+
+
+def test_newly_promoted_core_thresholds_are_explicit(tmp_path: Path) -> None:
+    xml = tmp_path / "cov.xml"
+    json_out = tmp_path / "out.json"
+    _write_cov_xml(
+        xml,
+        [
+            ("src/invarlock/core/doctor_inventory.py", 0.899, 1.0),
+            ("src/invarlock/core/doctor_preflight.py", 0.949, 1.0),
+            ("src/invarlock/core/evaluate_contract.py", 0.899, 1.0),
+            ("src/invarlock/core/plugins_inventory.py", 0.949, 1.0),
+            ("src/invarlock/core/run_baseline_evidence.py", 0.899, 1.0),
+            ("src/invarlock/core/run_execution_context_policy.py", 0.899, 1.0),
+            ("src/invarlock/core/run_orchestrator_execute_attempts.py", 0.899, 1.0),
+            ("src/invarlock/core/run_orchestrator_execute_prepare.py", 0.899, 1.0),
+            ("src/invarlock/core/run_retry_policy.py", 0.899, 1.0),
+            ("src/invarlock/cli/run_pairing_baseline.py", 0.899, 1.0),
+        ],
+    )
+
+    proc = _run_checker(xml, json_out)
+
+    assert proc.returncode != 0
+    for path in (
+        "src/invarlock/core/doctor_inventory.py",
+        "src/invarlock/core/doctor_preflight.py",
+        "src/invarlock/core/evaluate_contract.py",
+        "src/invarlock/core/plugins_inventory.py",
+        "src/invarlock/core/run_baseline_evidence.py",
+        "src/invarlock/core/run_execution_context_policy.py",
+        "src/invarlock/core/run_orchestrator_execute_attempts.py",
+        "src/invarlock/core/run_orchestrator_execute_prepare.py",
+        "src/invarlock/core/run_retry_policy.py",
+        "src/invarlock/cli/run_pairing_baseline.py",
     ):
         assert path in proc.stderr

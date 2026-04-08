@@ -151,6 +151,27 @@ def test_finalize_rolls_back_on_invalid_primary_metric_flag_even_with_finite_val
     assert report.meta.get("rollback_reason") == "primary_metric_invalid"
 
 
+def test_finalize_rolls_back_on_non_finite_numeric_primary_metric_values() -> None:
+    runner = CoreRunner()
+    report = RunReport()
+    metrics = {
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "preview": float("nan"),
+            "final": 1.0,
+        }
+    }
+    guard_results = {"spectral": {"passed": True}}
+    cfg = RunConfig(max_pm_ratio=10.0, spike_threshold=2.0)
+
+    status = runner._finalize_phase(
+        object(), object(), guard_results, metrics, cfg, report
+    )
+
+    assert status == RunStatus.ROLLBACK.value
+    assert report.meta.get("rollback_reason") == "primary_metric_invalid"
+
+
 def test_finalize_rolls_back_on_invalid_tail_payload() -> None:
     runner = CoreRunner()
     report = RunReport()

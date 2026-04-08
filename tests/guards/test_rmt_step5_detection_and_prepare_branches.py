@@ -68,20 +68,30 @@ def test_rmt_prepare_policy_parsing_and_activation_required_paths(monkeypatch) -
     # Exercise window_count parse failure (count not int) + estimator parsing.
     guard = R.RMTGuard()
     guard.activation_sampling["windows"]["count"] = "bad"
+    deadband_before = guard.deadband
+    margin_before = guard.margin
     out = guard.prepare(
         model,
         calib=None,
         policy={
-            "q": "not-a-float",
+            "q": "auto",
+            "deadband": "not-a-float",
             "margin": "not-a-float",
-            "estimator": {"iters": -1, "init": "bogus"},
+            "estimator": {"iters": "bad", "init": "bogus"},
+            "activation": {
+                "sampling": {"windows": {"count": "bad", "indices_policy": "last"}}
+            },
             "activation_required": False,
         },
     )
     assert out["ready"] is True
     assert guard.q == "auto"
-    assert guard.estimator["iters"] == 1
+    assert guard.deadband == deadband_before
+    assert guard.margin == margin_before
+    assert guard.estimator["iters"] == 3
     assert guard.estimator["init"] == "ones"
+    assert guard.activation_sampling["windows"]["count"] == "bad"
+    assert guard.activation_sampling["windows"]["indices_policy"] == "last"
 
     # activation_required=True with no calibration batches returns a hard failure.
     guard_required = R.RMTGuard()
@@ -108,4 +118,56 @@ def test_rmt_prepare_policy_parsing_and_activation_required_paths(monkeypatch) -
     assert out_baseline["ready"] is False
     assert (
         guard_baseline._activation_required_reason == "activation_baseline_unavailable"
+    )
+
+    guard_q = R.RMTGuard()
+    guard_q.prepare(model, calib=None, policy={"q": object()})
+    assert guard_q.q == "auto"
+
+    guard_iters = R.RMTGuard()
+    guard_iters.prepare(
+        model,
+        calib=None,
+        policy={"estimator": {"iters": -2, "init": "e0"}},
+    )
+    assert guard_iters.estimator["iters"] == 1
+    assert guard_iters.estimator["init"] == "e0"
+
+    guard_sampling = R.RMTGuard()
+    baseline_sampling = dict(guard_sampling.activation_sampling["windows"])
+    guard_sampling.prepare(
+        model, calib=None, policy={"activation": {"sampling": "bad"}}
+    )
+    assert guard_sampling.activation_sampling["windows"] == baseline_sampling
+
+    guard_windows = R.RMTGuard()
+    guard_windows.prepare(
+        model,
+        calib=None,
+        policy={"activation": {"sampling": {"windows": "bad"}}},
+    )
+    assert guard_windows.activation_sampling["windows"]["count"] == 8
+    assert (
+        guard_windows.activation_sampling["windows"]["indices_policy"]
+        == "evenly_spaced"
+    )
+
+    guard_indices = R.RMTGuard()
+    guard_indices.prepare(
+        model,
+        calib=None,
+        policy={"activation": {"sampling": {"windows": {"indices_policy": "last"}}}},
+    )
+    assert guard_indices.activation_sampling["windows"]["count"] == 8
+    assert guard_indices.activation_sampling["windows"]["indices_policy"] == "last"
+
+    guard_count = R.RMTGuard()
+    guard_count.prepare(
+        model,
+        calib=None,
+        policy={"activation": {"sampling": {"windows": {"count": 2}}}},
+    )
+    assert guard_count.activation_sampling["windows"]["count"] == 2
+    assert (
+        guard_count.activation_sampling["windows"]["indices_policy"] == "evenly_spaced"
     )

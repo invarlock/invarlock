@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+import invarlock.core.run_snapshot_policy as mod
 from invarlock.core.run_snapshot_policy import (
     choose_snapshot_mode,
     estimate_model_bytes,
@@ -93,6 +94,21 @@ def test_resolve_snapshot_config_fails_closed_on_non_mapping_snapshot_output() -
     assert out == {}
 
 
+def test_resolve_snapshot_config_fails_closed_on_nested_snapshot_serialiser_error() -> (
+    None
+):
+    out = resolve_snapshot_config(
+        {"snapshot": {"mode": "bytes"}},
+        to_serialisable_dict_fn=lambda obj: (
+            (_ for _ in ()).throw(TypeError("boom"))
+            if obj == {"mode": "bytes"}
+            else obj
+        ),
+    )
+
+    assert out == {}
+
+
 def test_estimate_model_bytes_sums_parameters_and_buffers() -> None:
     assert estimate_model_bytes(_FakeModel()) == 3584
     assert estimate_model_bytes(object()) == 0
@@ -100,6 +116,14 @@ def test_estimate_model_bytes_sums_parameters_and_buffers() -> None:
 
 def test_estimate_model_bytes_ignores_bad_tensor_metadata() -> None:
     assert estimate_model_bytes(_BadModel()) == 0
+
+
+def test_estimate_model_bytes_returns_zero_on_broken_parameter_iterator() -> None:
+    class _BrokenModel:
+        def named_parameters(self):
+            raise TypeError("boom")
+
+    assert estimate_model_bytes(_BrokenModel()) == 0
 
 
 def test_choose_snapshot_mode_honors_explicit_config_then_falls_back() -> None:
@@ -174,6 +198,50 @@ def test_choose_snapshot_mode_returns_reload_when_no_snapshot_support_exists() -
     assert out == "reload"
 
 
+def test_choose_snapshot_mode_honors_explicit_chunked_request_and_reload_fallback() -> (
+    None
+):
+    assert (
+        choose_snapshot_mode(
+            snapshot_config={"mode": "chunked"},
+            env_mode=None,
+            supports_bytes=True,
+            supports_chunked=True,
+            estimated_model_mb=64.0,
+            available_ram_mb=512.0,
+            disk_free_mb=512.0,
+        )
+        == "chunked"
+    )
+    assert (
+        choose_snapshot_mode(
+            snapshot_config={"mode": "chunked"},
+            env_mode=None,
+            supports_bytes=False,
+            supports_chunked=False,
+            estimated_model_mb=64.0,
+            available_ram_mb=512.0,
+            disk_free_mb=512.0,
+        )
+        == "reload"
+    )
+
+
+def test_choose_snapshot_mode_honors_env_requested_mode_when_cfg_mode_absent() -> None:
+    assert (
+        choose_snapshot_mode(
+            snapshot_config={},
+            env_mode="chunked",
+            supports_bytes=True,
+            supports_chunked=True,
+            estimated_model_mb=64.0,
+            available_ram_mb=512.0,
+            disk_free_mb=512.0,
+        )
+        == "chunked"
+    )
+
+
 def test_choose_snapshot_mode_uses_threshold_and_margin_fallbacks_when_ram_unknown() -> (
     None
 ):
@@ -205,3 +273,82 @@ def test_choose_snapshot_mode_falls_back_on_invalid_env_threshold_values() -> No
     )
 
     assert out == "bytes"
+
+
+def test_choose_snapshot_mode_prefers_bytes_when_disk_is_tight_for_chunked() -> None:
+    out = choose_snapshot_mode(
+        snapshot_config={"disk_free_margin_ratio": 2.0},
+        env_mode="auto",
+        supports_bytes=True,
+        supports_chunked=True,
+        estimated_model_mb=600.0,
+        available_ram_mb=512.0,
+        disk_free_mb=700.0,
+        env_ram_fraction="0.4",
+    )
+
+    assert out == "bytes"
+
+
+def test_choose_snapshot_mode_uses_cfg_ram_fraction_and_bytes_fallback_chunked_path() -> (
+    None
+):
+    out = choose_snapshot_mode(
+        snapshot_config={"ram_fraction": "0.9"},
+        env_mode="auto",
+        supports_bytes=True,
+        supports_chunked=True,
+        estimated_model_mb=850.0,
+        available_ram_mb=1000.0,
+        disk_free_mb=2000.0,
+    )
+
+    assert out == "chunked"
+
+
+def test_choose_snapshot_mode_covers_requested_mode_and_auto_fallback_edges() -> None:
+    assert (
+        choose_snapshot_mode(
+            snapshot_config={"mode": "other"},
+            env_mode="auto",
+            supports_bytes=True,
+            supports_chunked=False,
+            estimated_model_mb=8.0,
+            available_ram_mb=128.0,
+            disk_free_mb=128.0,
+        )
+        == "bytes"
+    )
+    assert (
+        choose_snapshot_mode(
+            snapshot_config={},
+            env_mode="auto",
+            supports_bytes=False,
+            supports_chunked=True,
+            estimated_model_mb=8.0,
+            available_ram_mb=128.0,
+            disk_free_mb=128.0,
+        )
+        == "chunked"
+    )
+    assert (
+        choose_snapshot_mode(
+            snapshot_config={},
+            env_mode="auto",
+            supports_bytes=False,
+            supports_chunked=False,
+            estimated_model_mb=8.0,
+            available_ram_mb=128.0,
+            disk_free_mb=128.0,
+        )
+        == "reload"
+    )
+
+
+def test_choose_snapshot_mode_falls_back_to_bytes_for_unknown_requested_mode() -> None:
+    assert (
+        mod._requested_snapshot_mode(
+            "bytes-ish", supports_bytes=True, supports_chunked=False
+        )
+        == "bytes"
+    )

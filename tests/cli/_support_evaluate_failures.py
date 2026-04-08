@@ -10,7 +10,7 @@ import pytest
 import invarlock.cli.commands.run as run_mod
 import invarlock.cli.run_execution as run_exec_mod
 from invarlock.cli.commands import evaluate as mod
-from tests.cli.support import RecordingConsole
+from tests.cli._support_console import RecordingConsole
 
 
 def _stub_run_dir(out_dir: Path, name: str = "report.json") -> Path:

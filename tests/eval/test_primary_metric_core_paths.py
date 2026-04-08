@@ -240,3 +240,25 @@ def test_compute_accuracy_counts_prefers_explicit_bool_correct_flags() -> None:
     )
 
     assert (correct, total) == (2, 3)
+
+
+def test_primary_metric_helper_coercers_skip_invalid_dict_entries() -> None:
+    ppl_metric = _PPLCausal()
+    assert ppl_metric._coerce_contrib_array(  # noqa: SLF001
+        [
+            {"value": "bad", "weight": 2},
+            {"value": 1.0, "weight": "bad"},
+            {"weight": 3.0},
+            {"value": 1.5, "weight": 2.0},
+        ]
+    ) == [(1.5, 2.0)]
+
+    acc_metric = _Accuracy()
+    assert acc_metric._coerce_vals(  # noqa: SLF001
+        [
+            {"value": "bad"},
+            {"other": 1.0},
+            {"value": 0.3},
+            MetricContribution(value=0.8),
+        ]
+    ) == [0.0, 1.0]

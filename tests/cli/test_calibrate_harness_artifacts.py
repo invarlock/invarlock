@@ -13,6 +13,7 @@ import typer
 import yaml
 
 from invarlock.cli.commands import calibrate as calibrate_mod
+from invarlock.cli.config_execution import RuntimeDelegationError
 
 
 def _write_base_config(tmp_path: Path) -> Path:
@@ -102,6 +103,60 @@ def test_get_tier_guard_config_missing_optional_deps_and_reraise(
     monkeypatch.setattr(builtins, "__import__", _missing_other)
     with pytest.raises(ModuleNotFoundError):
         calibrate_mod.get_tier_guard_config("balanced", "variance_guard")
+
+
+def test_run_calibration_config_runtime_delegation_error_exits(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(
+        calibrate_mod,
+        "run_from_config",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            RuntimeDelegationError("delegation failed")
+        ),
+    )
+
+    with pytest.raises(typer.Exit) as excinfo:
+        calibrate_mod._run_calibration_config(
+            config=tmp_path / "config.yaml",
+            device="cpu",
+            profile="ci",
+            out=tmp_path / "out",
+            tier="balanced",
+            allow_network=False,
+            allow_host_execution=False,
+            allow_third_party_plugins=False,
+            allow_remote_code=False,
+        )
+
+    assert excinfo.value.exit_code == 1
+
+
+def test_get_tier_guard_config_success_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    real_import = builtins.__import__
+    fake_module = types.ModuleType("invarlock.guards.tier_config")
+    fake_module.get_tier_guard_config = lambda tier, guard_key: {
+        "tier": tier,
+        "guard": guard_key,
+    }
+
+    def _import(
+        name: str,
+        globals=None,
+        locals=None,
+        fromlist=(),
+        level: int = 0,
+    ):
+        if name == "invarlock.guards.tier_config":
+            return fake_module
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", _import)
+
+    assert calibrate_mod.get_tier_guard_config("balanced", "variance_guard") == {
+        "tier": "balanced",
+        "guard": "variance_guard",
+    }
 
 
 def test_calibrate_commands_exit_on_missing_optional_deps(
@@ -259,6 +314,65 @@ def test_ve_sweep_runtime_flags_do_not_block_missing_dep_error(
         )
 
     run_calibration.assert_not_called()
+
+
+def test_calibrate_commands_reraise_non_optional_missing_modules(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cfg = _write_base_config(tmp_path)
+    out = tmp_path / "out"
+    real_import = builtins.__import__
+
+    def _missing_numpy(
+        target_module: str,
+    ):
+        def _import(name, globals=None, locals=None, fromlist=(), level: int = 0):
+            if name == target_module:
+                exc = ModuleNotFoundError("missing numpy")
+                exc.name = "numpy"
+                raise exc
+            return real_import(name, globals, locals, fromlist, level)
+
+        return _import
+
+    monkeypatch.setattr(
+        builtins,
+        "__import__",
+        _missing_numpy("invarlock.calibration.spectral_null"),
+    )
+    with pytest.raises(ModuleNotFoundError):
+        calibrate_mod.null_sweep(
+            config=cfg,
+            out=out,
+            tiers=["balanced"],
+            seed=[42],
+            n_seeds=1,
+            seed_start=42,
+            profile="ci",
+            device=None,
+            safety_margin=0.05,
+            target_any_warning_rate=0.01,
+        )
+
+    monkeypatch.setattr(
+        builtins,
+        "__import__",
+        _missing_numpy("invarlock.calibration.variance_ve"),
+    )
+    with pytest.raises(ModuleNotFoundError):
+        calibrate_mod.ve_sweep(
+            config=cfg,
+            out=out,
+            tiers=["balanced"],
+            seed=[42],
+            n_seeds=1,
+            seed_start=42,
+            window=[6],
+            target_enable_rate=0.05,
+            profile="ci",
+            device=None,
+            safety_margin=0.0,
+        )
 
 
 def test_null_sweep_emits_json_csv_md_and_tier_patch(tmp_path: Path) -> None:

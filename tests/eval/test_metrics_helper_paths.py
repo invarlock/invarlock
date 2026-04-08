@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import math
+import sys
+import types
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -29,9 +31,11 @@ from invarlock.eval.metrics_activation import (
     _calculate_mi_gini,
     _calculate_sigma_max,
     _collect_activations,
+    _emit_progress,
     _extract_fc1_activations,
     _gini_vectorized,
     _locate_transformer_blocks_enhanced,
+    _mi_gini_optimized_cpu_path,
     _perform_pre_eval_checks,
 )
 from invarlock.eval.metrics_environment import (
@@ -211,6 +215,27 @@ def test_compute_parameter_deltas_and_structural_counts():
     assert deltas["layers_modified"] >= 1
 
 
+def test_compute_parameter_deltas_counts_changes_without_numeric_layer_match():
+    class Mismatch(nn.Module):
+        def __init__(self, value: float):
+            super().__init__()
+            self.weight = nn.Parameter(torch.full((2, 2), value))
+
+        def named_parameters(self, prefix: str = "", recurse: bool = True):
+            yield "transformer.layers.x.weight", self.weight
+
+        def parameters(self, recurse: bool = True):
+            yield self.weight
+
+    before = Mismatch(0.0)
+    after = Mismatch(1.0)
+
+    deltas = compute_parameter_deltas(before, after)
+
+    assert deltas["params_changed"] == 4
+    assert deltas["layers_modified"] == 0
+
+
 def test_analyze_spectral_and_rmt_changes_happy_and_error_paths():
     m1 = nn.Linear(2, 2)
     m2 = nn.Linear(2, 2)
@@ -250,6 +275,30 @@ def test_analyze_spectral_and_rmt_changes_happy_and_error_paths():
     ):
         s_missing = analyze_spectral_changes(m1, m2)
         assert s_missing == {"error": "spectral_analysis_unavailable"}
+
+
+def test_analyze_spectral_changes_skips_layers_missing_from_after_norms(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spectral_module = types.ModuleType("invarlock.guards.spectral_measurement")
+    sentinel_before = object()
+    sentinel_after = object()
+    spectral_module.compute_spectral_norms = (
+        lambda model, scope="ffn": {"layer_a": 2.0, "layer_b": 4.0}
+        if model is sentinel_before
+        else {"layer_a": 3.0}
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "invarlock.guards.spectral_measurement",
+        spectral_module,
+    )
+
+    changes = analyze_spectral_changes(sentinel_before, sentinel_after)
+
+    assert changes["layers_analyzed"] == 1
+    assert "layer_b" not in changes["layer_changes"]
+    assert changes["layer_changes"]["layer_a"]["ratio"] == 1.5
 
 
 def test_compute_parameter_deltas_handles_sparsity_and_failures() -> None:
@@ -503,11 +552,26 @@ def test_calculate_sigma_max_variants_and_head_energy_empty():
             self.gain = gains
             self.columns = ["name", "gain"]
 
+        class _NameSeries:
+            def __init__(self, names):
+                self._names = names
+
+            @property
+            def str(self):
+                return self
+
+            def contains(self, pattern, case=False, regex=True):  # noqa: ANN001, ARG002
+                return [
+                    ("embed" in name) or ("lm_head" in name) for name in self._names
+                ]
+
         def __len__(self):
             return len(self._names)
 
-        def __getitem__(self, mask):
-            idx = [i for i, m in enumerate(mask) if m]
+        def __getitem__(self, key):  # noqa: ANN001
+            if key == "name":
+                return self._NameSeries(self._names)
+            idx = [i for i, m in enumerate(key) if m]
             return GainsDF([self._names[i] for i in idx], [self.gain[i] for i in idx])
 
     dm = DM(GainsDF(["mlp.c_fc", "embed"], [0.5, 0.1]))
@@ -587,6 +651,23 @@ def test_calculate_sigma_max_variants_and_head_energy_empty():
         torch.device("cpu"),
     )
     assert isinstance(val3, float)
+
+
+def test_metrics_activation_progress_and_zero_layer_mi_paths() -> None:
+    updates = []
+    cfg = MetricsConfig(progress_observer=updates.append)
+    _emit_progress(cfg, phase="mi_gini_cpu", completed=1, total=2)
+    assert updates[0].completed == 1
+    assert updates[0].total == 2
+
+    assert math.isnan(
+        _mi_gini_optimized_cpu_path(
+            torch.empty((0, 2, 1), dtype=torch.float32),
+            torch.zeros(2, dtype=torch.float32),
+            max_per_layer=2,
+            config=MetricsConfig(use_cache=False),
+        )
+    )
 
 
 def test_measure_latency_early_and_error_paths_and_compute_perplexity_tuple_fallback():

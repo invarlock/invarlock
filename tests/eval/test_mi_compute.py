@@ -6,7 +6,7 @@ import pytest
 import torch
 
 from invarlock.eval.probes.mi import compute_neuron_mi_scores
-from tests.eval.mi_test_support import MockAlternativeModel, MockGPT2Model
+from tests.eval._support_mi import MockAlternativeModel, MockGPT2Model
 
 
 class TestComputeNeuronMIScores:

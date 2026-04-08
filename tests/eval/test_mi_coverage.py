@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 
 from invarlock.eval.probes.mi import compute_neuron_mi_scores, mi_neuron_scores
-from tests.eval.mi_test_support import MockGPT2Model
+from tests.eval._support_mi import MockGPT2Model
 
 
 class TestMIModuleCoverage:

@@ -225,21 +225,20 @@ def build_metrics_payload(
         if isinstance(capacity_meta, Mapping):
             metrics_payload["window_capacity"] = dict(capacity_meta)
         stats_section = metrics_payload.setdefault("stats", {})
-        if isinstance(stats_section, dict):
-            stats_section.update(
-                {
-                    "requested_preview": window_plan_ctx.get("requested_preview"),
-                    "requested_final": window_plan_ctx.get("requested_final"),
-                    "actual_preview": window_plan_ctx.get("actual_preview"),
-                    "actual_final": window_plan_ctx.get("actual_final"),
-                    "coverage_ok": window_plan_ctx.get("coverage_ok"),
-                    "preview_total_tokens": window_plan_ctx.get("preview_total_tokens"),
-                    "final_total_tokens": window_plan_ctx.get("final_total_tokens"),
-                    "min_tokens_target": window_plan_ctx.get("min_tokens_target"),
-                    "tokens_floor_met": window_plan_ctx.get("tokens_floor_met"),
-                    "dedupe_adjustments": window_plan_ctx.get("dedupe_adjustments"),
-                }
-            )
+        stats_section.update(
+            {
+                "requested_preview": window_plan_ctx.get("requested_preview"),
+                "requested_final": window_plan_ctx.get("requested_final"),
+                "actual_preview": window_plan_ctx.get("actual_preview"),
+                "actual_final": window_plan_ctx.get("actual_final"),
+                "coverage_ok": window_plan_ctx.get("coverage_ok"),
+                "preview_total_tokens": window_plan_ctx.get("preview_total_tokens"),
+                "final_total_tokens": window_plan_ctx.get("final_total_tokens"),
+                "min_tokens_target": window_plan_ctx.get("min_tokens_target"),
+                "tokens_floor_met": window_plan_ctx.get("tokens_floor_met"),
+                "dedupe_adjustments": window_plan_ctx.get("dedupe_adjustments"),
+            }
+        )
     optional_keys = [
         "classification",
         "logloss_preview",

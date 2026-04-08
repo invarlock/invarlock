@@ -9,7 +9,7 @@ import click
 import pytest
 import typer
 
-from tests.cli.evaluate_failures_support import (
+from tests.cli._support_evaluate_failures import (
     RecordingConsole,
     _fake_run_command_with_paths,
     _prepare_evaluate_paths,

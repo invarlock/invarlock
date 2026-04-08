@@ -205,6 +205,34 @@ class TestDriftDetection:
         # but we verify the function runs without error
         _ = check_drift(silent=True)
 
+    def test_check_drift_warns_when_not_silent(self) -> None:
+        with (
+            mock.patch(
+                "invarlock.guards.tier_config._load_yaml",
+                return_value={"balanced": {}, "conservative": {}, "aggressive": {}},
+            ),
+            mock.patch(
+                "invarlock.guards.tier_config._find_drifts",
+                side_effect=[
+                    ["a", "b", "c", "d"],
+                    [],
+                    [],
+                    [],
+                    [],
+                    [],
+                    [],
+                    [],
+                    [],
+                ],
+            ),
+            warnings.catch_warnings(record=True) as caught,
+        ):
+            warnings.simplefilter("always")
+            drift = check_drift(silent=False)
+
+        assert drift["balanced"] == ["a", "b", "c", "d"]
+        assert caught
+
 
 class TestCaching:
     """Tests for configuration caching behavior."""
@@ -391,3 +419,19 @@ class TestCheckDriftWarning:
             # No warnings should be emitted
             user_warnings = [x for x in w if "drift" in str(x.message).lower()]
             assert len(user_warnings) == 0
+
+    def test_check_drift_silent_true_suppresses_warning_even_when_drift_exists(
+        self,
+    ) -> None:
+        import invarlock.guards.tier_config as tc
+
+        yaml_data = deepcopy(tc._FALLBACK_CONFIG)
+        yaml_data["balanced"]["spectral_guard"]["deadband"] = 0.123
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            with mock.patch.object(tc, "_load_yaml", return_value=yaml_data):
+                drift = tc.check_drift(silent=True)
+
+        assert drift["balanced"]
+        assert not [x for x in w if issubclass(x.category, UserWarning)]

@@ -93,3 +93,69 @@ def test_blend_one_dimensional_scores_path():
     b = torch.full((4,), 2.0)
     out = pa.blend_neuron_scores([a, b])
     assert out.shape == (6,) and torch.all(out[:4] > 0)
+
+
+class ThresholdBlock(nn.Module):
+    def __init__(self, hidden_size: int, *, include_ln: bool):
+        super().__init__()
+        self.attn = nn.Linear(hidden_size, hidden_size, bias=False)
+        if include_ln:
+            self.ln_2 = nn.Identity()
+        self.mlp = types.SimpleNamespace(
+            c_fc=nn.Linear(hidden_size, hidden_size, bias=False)
+        )
+
+
+class ThresholdModel(nn.Module):
+    def __init__(self, *, n_layers: int, blocks: list[ThresholdBlock], vocab: int = 16):
+        super().__init__()
+        self.config = types.SimpleNamespace(n_layer=n_layers, n_head=2)
+        self.embedding = nn.Embedding(vocab, 8)
+        self.transformer = types.SimpleNamespace(h=nn.ModuleList(blocks))
+        self.to_logits = nn.Linear(8, vocab, bias=False)
+
+    def forward(self, input_ids):
+        x = self.embedding(input_ids)
+        for blk in self.transformer.h:
+            x = blk.mlp.c_fc(blk.attn(x))
+        return types.SimpleNamespace(logits=self.to_logits(x))
+
+
+def test_post_attention_threshold_paths_cover_missing_ln_and_none_grads(monkeypatch):
+    def fake_norm(inp, p="fro", dim=None, keepdim=False, out=None, dtype=None):  # noqa: ARG001
+        if isinstance(dim, tuple | list) and len(dim) == 3 and inp.dim() == 4:
+            return torch.ones(inp.size(2), device=inp.device)
+        return torch.linalg.vector_norm(inp)
+
+    monkeypatch.setattr(pa.torch, "norm", fake_norm)
+
+    head_model = ThresholdModel(
+        n_layers=1,
+        blocks=[
+            ThresholdBlock(8, include_ln=False),
+            ThresholdBlock(8, include_ln=False),
+        ],
+    )
+    head_scores = pa.compute_post_attention_head_scores(
+        head_model,
+        [torch.randint(0, 16, (1, 4), dtype=torch.long)],
+        calibration_windows=1,
+        device="cpu",
+    )
+    assert tuple(head_scores["scores"].shape) == (1, 2)
+
+    wanda_model = ThresholdModel(
+        n_layers=1,
+        blocks=[ThresholdBlock(8, include_ln=True)],
+    )
+    wanda_model.transformer.h[0].mlp.c_fc.weight.requires_grad_(False)
+    wanda_scores = pa.compute_wanda_neuron_scores(
+        wanda_model,
+        [torch.randint(0, 16, (1, 4), dtype=torch.long)],
+        calibration_windows=1,
+        device="cpu",
+    )
+    assert torch.equal(
+        wanda_scores["scores"],
+        torch.zeros_like(wanda_scores["scores"]),
+    )

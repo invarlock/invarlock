@@ -167,7 +167,8 @@ def compute_wanda_neuron_scores(
 
     # Initialize storage for each layer
     blocks = model.transformer.h if hasattr(model, "transformer") else model.h
-    for _layer_idx, block in enumerate(blocks):
+    active_blocks = tuple(blocks[:n_layers])
+    for _layer_idx, block in enumerate(active_blocks):
         mlp_dim = block.mlp.c_fc.weight.shape[0]
         neuron_importance.append(torch.zeros(mlp_dim, device=device))
 
@@ -183,7 +184,7 @@ def compute_wanda_neuron_scores(
 
     # Register hooks on MLP layers
     hooks = []
-    for layer_idx, block in enumerate(blocks):
+    for layer_idx, block in enumerate(active_blocks):
         hook = block.mlp.c_fc.register_forward_hook(make_activation_hook(layer_idx))
         hooks.append(hook)
 
@@ -232,21 +233,18 @@ def compute_wanda_neuron_scores(
 
                 # Compute WANDA scores (activation * gradient)
                 for layer_idx, _layer_activations in activations.items():
-                    if layer_idx < n_layers:
-                        # Get gradients from the MLP layer
-                        mlp_layer = blocks[layer_idx].mlp.c_fc
-                        if mlp_layer.weight.grad is not None:
-                            # Compute WANDA score
-                            weight_grad = (
-                                mlp_layer.weight.grad
-                            )  # [mlp_dim, hidden_size]
-                            weight_magnitude = torch.abs(mlp_layer.weight.data)
+                    # Get gradients from the MLP layer
+                    mlp_layer = active_blocks[layer_idx].mlp.c_fc
+                    if mlp_layer.weight.grad is not None:
+                        # Compute WANDA score
+                        weight_grad = mlp_layer.weight.grad  # [mlp_dim, hidden_size]
+                        weight_magnitude = torch.abs(mlp_layer.weight.data)
 
-                            # WANDA score: weight magnitude * gradient magnitude
-                            wanda_scores = torch.mean(
-                                weight_magnitude * torch.abs(weight_grad), dim=1
-                            )
-                            neuron_importance[layer_idx] += wanda_scores
+                        # WANDA score: weight magnitude * gradient magnitude
+                        wanda_scores = torch.mean(
+                            weight_magnitude * torch.abs(weight_grad), dim=1
+                        )
+                        neuron_importance[layer_idx] += wanda_scores
 
             activations.clear()
             samples_processed += 1

@@ -239,8 +239,6 @@ def compute_slice_summary(
                     },
                 )
         effective_weight = effective_masked if labels is not None else tokens_in_batch
-        if effective_weight <= 0:
-            continue
 
         if store_windows:
             for row in snapshot:
@@ -294,13 +292,6 @@ def compute_slice_summary(
                     "primary metric evidence is unavailable."
                 ),
             }
-        if zero_mask_batches and os.environ.get("INVARLOCK_DEBUG_TRACE"):
-            runner._log_event(
-                "eval",
-                "zero_mask_total",
-                LogLevel.ERROR,
-                {"zero_mask_batches": zero_mask_batches, "requested": limit},
-            )
         if resolved_loss_mode == "mlm":
             error_msg = (
                 "MLM evaluation produced zero usable batches; "
