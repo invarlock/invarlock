@@ -47,7 +47,7 @@ def test_coverage_target_includes_probe_suite_for_plain_coverage_run() -> None:
     for pattern in (
         "tests/eval/test_fft.py",
         "tests/eval/test_fft_probe_cases.py",
-        "tests/eval/test_mi.py",
+        "tests/eval/test_mi*.py",
         "tests/eval/test_post_attention_probes.py",
         "tests/eval/test_post_attention_probe_cases.py",
     ):
