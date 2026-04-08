@@ -13,7 +13,7 @@ from invarlock.core.run_orchestrator import (
     RunRetrySummaryEvent,
     execute_run_request,
 )
-from tests.core.test_run_orchestrator_paths import (
+from tests.core._support_run_orchestrator_request import (
     _Config,
     _install_common_monkeypatches,
     _make_services,

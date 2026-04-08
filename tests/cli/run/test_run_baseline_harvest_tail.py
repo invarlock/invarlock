@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from tests.cli.run.test_run_baseline_harvest import (
-    InvarlockError,
-    _Cfg,
-    pytest,
-    typer,
-    validate_and_harvest_baseline_schedule,
-)
+import pytest
+import typer
+
+from invarlock.cli.run_pairing import validate_and_harvest_baseline_schedule
+from invarlock.core.exceptions import InvarlockError
+from tests.cli.run._support_run_baseline_harvest import _Cfg
 
 
 def test_baseline_harvest_missing_preview_section_raises_in_ci() -> None:
