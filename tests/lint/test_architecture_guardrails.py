@@ -1096,6 +1096,10 @@ def test_hardened_runtime_paths_keep_broad_catch_budgets() -> None:
         REPO_ROOT / "src/invarlock/adapters/hf_seq2seq.py": 0,
         REPO_ROOT / "src/invarlock/utils/__init__.py": 0,
         REPO_ROOT / "src/invarlock/guards_ref/spectral_ref.py": 0,
+        REPO_ROOT / "src/invarlock/core/runner_eval_phase.py": 0,
+        REPO_ROOT / "src/invarlock/cli/app.py": 0,
+        REPO_ROOT / "src/invarlock/cli/commands/export_html.py": 0,
+        REPO_ROOT / "src/invarlock/cli/overhead_utils.py": 0,
     }
     offenders: list[str] = []
     for path, budget in budgets.items():

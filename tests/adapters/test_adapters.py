@@ -1062,6 +1062,27 @@ class TestHFBERTAdapter:
             is model.embeddings.word_embeddings.weight
         )
 
+    def test_bert_adapter_layer_modules_and_embeddings_info(self):
+        adapter = HF_MLM_Adapter()
+        model = MockBertModel(tie_weights=True)
+
+        modules = adapter.get_layer_modules(model, 0)
+        assert (
+            modules["attention.self.query"]
+            is model.encoder.layer[0].attention.self.query
+        )
+        assert (
+            modules["attention.output.LayerNorm"]
+            is model.encoder.layer[0].attention.output.LayerNorm
+        )
+
+        embeddings_info = adapter.get_embeddings_info(model)
+        assert embeddings_info["vocab_size"] == model.config.vocab_size
+        assert embeddings_info["hidden_size"] == model.config.hidden_size
+        assert embeddings_info["has_word_embeddings"] is True
+        assert embeddings_info["has_position_embeddings"] is False
+        assert embeddings_info["has_token_type_embeddings"] is False
+
 
 class TestHFCausalAdapterRopeDecoder:
     """Tests causal adapter behavior on RoPE decoder-only structures."""

@@ -130,6 +130,15 @@ class RuntimeManifestLoadResult:
     issue_message: str | None = None
 
 
+@dataclass(frozen=True)
+class _ContainerLaunchContext:
+    engine: str
+    cwd: Path
+    image: str
+    env_pairs: dict[str, str]
+    base_mounts: tuple[Path, ...]
+
+
 _RUNTIME_SECURITY_POLICY: ContextVar[RuntimeSecurityPolicy | None] = ContextVar(
     "invarlock_runtime_security_policy",
     default=None,
@@ -607,6 +616,80 @@ def _delegated_env_pairs(*, cwd: Path) -> tuple[dict[str, str], list[Path]]:
     return env_pairs, _minimize_mounts(mounts)
 
 
+def _merge_container_mounts(*groups: list[Path] | tuple[Path, ...]) -> tuple[Path, ...]:
+    merged: list[Path] = []
+    for group in groups:
+        for mount in group:
+            if any(existing == mount for existing in merged):
+                continue
+            merged.append(mount)
+    return tuple(_minimize_mounts(merged))
+
+
+def _resolve_container_launch_context(plan: Any) -> _ContainerLaunchContext:
+    engine = resolve_container_engine()
+    if engine is None:
+        raise RuntimeError(
+            "Host execution is disabled by default and no container engine "
+            "(docker/podman) is available. Set "
+            f"{CONTAINER_ENGINE_ENV}=docker|podman, "
+            f"{ALLOW_HOST_EXECUTION_ENV}=1 or install docker/podman."
+        )
+
+    cwd = Path.cwd().resolve()
+    image = resolve_runtime_image()
+    digest = resolve_runtime_image_digest() or ""
+    if not network_allowed() and not container_image_available_locally(
+        image, engine=engine
+    ):
+        raise RuntimeError(
+            "Host execution is disabled by default and runtime image "
+            f"{image!r} is not available locally. Build it with `{_runtime_image_build_command(image)}` "
+            f"or set {ALLOW_NETWORK_ENV}=1 to allow pulling the image."
+        )
+
+    pythonpath_entries, pythonpath_mounts = _container_pythonpath_entries(cwd=cwd)
+    env_pairs, env_mounts = _delegated_env_pairs(cwd=cwd)
+    env_pairs[RUNTIME_IMAGE_DIGEST_ENV] = digest
+    env_pairs["PYTHONPATH"] = os.pathsep.join(pythonpath_entries)
+    base_mounts = _merge_container_mounts(
+        plan.argv_mounts,
+        tuple(env_mounts),
+        tuple(pythonpath_mounts),
+    )
+    return _ContainerLaunchContext(
+        engine=engine,
+        cwd=cwd,
+        image=image,
+        env_pairs=env_pairs,
+        base_mounts=base_mounts,
+    )
+
+
+def _compose_container_run_args(
+    context: _ContainerLaunchContext,
+    plan: Any,
+    *,
+    entrypoint: tuple[str, ...] = (),
+    extra_mounts: tuple[Path, ...] = (),
+    argv: tuple[str, ...],
+) -> list[str]:
+    command = [context.engine, "run", "--rm", *entrypoint]
+    if plan.gpu_passthrough:
+        command.extend(["--gpus", "all"])
+    if not network_allowed():
+        command.extend(["--network", "none"])
+    command.extend(["-v", f"{context.cwd}:/workspace", "-w", "/workspace"])
+    if plan.needs_cwd_host_mirror:
+        command.extend(["-v", f"{context.cwd}:{context.cwd}"])
+    for mount in _merge_container_mounts(context.base_mounts, extra_mounts):
+        command.extend(["-v", f"{mount}:{mount}"])
+    for key, value in context.env_pairs.items():
+        command.extend(["-e", f"{key}={value}"])
+    command.extend([context.image, *argv])
+    return command
+
+
 def container_image_available_locally(
     image: str | None = None, *, engine: str | None = None
 ) -> bool:
@@ -659,6 +742,20 @@ def _resolve_runtime_security_policy(
     )
 
 
+def _apply_runtime_security_policy(
+    resolved_policy: RuntimeSecurityPolicy,
+) -> Token[RuntimeSecurityPolicy | None]:
+    token = _RUNTIME_SECURITY_POLICY.set(resolved_policy)
+    try:
+        from invarlock.security import enforce_network_policy
+
+        enforce_network_policy(bool(resolved_policy.allow_network))
+    except RuntimeError:
+        _RUNTIME_SECURITY_POLICY.reset(token)
+        raise
+    return token
+
+
 def apply_runtime_allowances(
     *,
     policy: RuntimeSecurityPolicy | None = None,
@@ -676,16 +773,7 @@ def apply_runtime_allowances(
         allow_remote_code=allow_remote_code,
         allow_unattested_artifacts=allow_unattested_artifacts,
     )
-
-    token = _RUNTIME_SECURITY_POLICY.set(resolved_policy)
-    try:
-        from invarlock.security import enforce_network_policy
-
-        enforce_network_policy(bool(resolved_policy.allow_network))
-    except Exception:
-        _RUNTIME_SECURITY_POLICY.reset(token)
-        raise
-    return token
+    return _apply_runtime_security_policy(resolved_policy)
 
 
 def reset_runtime_allowances(
@@ -727,51 +815,13 @@ def runtime_allowances_scope(
 
 
 def build_container_command(plan: Any) -> list[str]:
-    engine = resolve_container_engine()
-    if engine is None:
-        raise RuntimeError(
-            "Host execution is disabled by default and no container engine "
-            "(docker/podman) is available. Set "
-            f"{CONTAINER_ENGINE_ENV}=docker|podman, "
-            f"{ALLOW_HOST_EXECUTION_ENV}=1 or install docker/podman."
-        )
-
-    cwd = Path.cwd().resolve()
-    image = resolve_runtime_image()
-    digest = resolve_runtime_image_digest() or ""
-    if not network_allowed() and not container_image_available_locally(
-        image, engine=engine
-    ):
-        raise RuntimeError(
-            "Host execution is disabled by default and runtime image "
-            f"{image!r} is not available locally. Build it with `{_runtime_image_build_command(image)}` "
-            f"or set {ALLOW_NETWORK_ENV}=1 to allow pulling the image."
-        )
-    pythonpath_entries, pythonpath_mounts = _container_pythonpath_entries(cwd=cwd)
-    env_pairs, env_mounts = _delegated_env_pairs(cwd=cwd)
-    env_pairs[RUNTIME_IMAGE_DIGEST_ENV] = digest
-    env_pairs["PYTHONPATH"] = os.pathsep.join(pythonpath_entries)
-    command = [engine, "run", "--rm"]
-    if plan.gpu_passthrough:
-        command.extend(["--gpus", "all"])
-    if not network_allowed():
-        command.extend(["--network", "none"])
-    command.extend(["-v", f"{cwd}:/workspace", "-w", "/workspace"])
-    if plan.needs_cwd_host_mirror:
-        command.extend(["-v", f"{cwd}:{cwd}"])
-    extra_mounts = list(plan.argv_mounts)
-    extra_mounts.extend(env_mounts)
-    for mount in pythonpath_mounts:
-        if any(existing == mount for existing in extra_mounts):
-            continue
-        extra_mounts.append(mount)
-    for mount in _minimize_mounts(extra_mounts):
-        command.extend(["-v", f"{mount}:{mount}"])
-    for key, value in env_pairs.items():
-        command.extend(["-e", f"{key}={value}"])
+    context = _resolve_container_launch_context(plan)
     # The runtime image already sets `python -m invarlock` as its entrypoint.
-    command.extend([image, *plan.argv])
-    return command
+    return _compose_container_run_args(
+        context,
+        plan,
+        argv=tuple(plan.argv),
+    )
 
 
 def delegate_container_command(plan: Any) -> int:
@@ -794,56 +844,21 @@ def build_container_python_command(
     script_path: str | os.PathLike[str],
     plan: Any,
 ) -> list[str]:
-    engine = resolve_container_engine()
-    if engine is None:
-        raise RuntimeError(
-            "Host execution is disabled by default and no container engine "
-            "(docker/podman) is available. Set "
-            f"{CONTAINER_ENGINE_ENV}=docker|podman, "
-            f"{ALLOW_HOST_EXECUTION_ENV}=1 or install docker/podman."
-        )
-
-    cwd = Path.cwd().resolve()
-    image = resolve_runtime_image()
-    digest = resolve_runtime_image_digest() or ""
-    if not network_allowed() and not container_image_available_locally(
-        image, engine=engine
-    ):
-        raise RuntimeError(
-            "Host execution is disabled by default and runtime image "
-            f"{image!r} is not available locally. Build it with `{_runtime_image_build_command(image)}` "
-            f"or set {ALLOW_NETWORK_ENV}=1 to allow pulling the image."
-        )
-    pythonpath_entries, pythonpath_mounts = _container_pythonpath_entries(cwd=cwd)
-    env_pairs, env_mounts = _delegated_env_pairs(cwd=cwd)
-    env_pairs[RUNTIME_IMAGE_DIGEST_ENV] = digest
-    env_pairs["PYTHONPATH"] = os.pathsep.join(pythonpath_entries)
-
+    context = _resolve_container_launch_context(plan)
+    cwd = context.cwd
     script_host_path = _absolute_host_path(Path(script_path), cwd=cwd)
     script_mounts: set[Path] = set()
     if _record_path_dependencies(script_host_path, script_mounts, cwd=cwd):
         container_script = _workspace_path(script_host_path, cwd=cwd)
     else:
         container_script = str(script_host_path)
-
-    command = [engine, "run", "--rm", "--entrypoint", "python"]
-    if plan.gpu_passthrough:
-        command.extend(["--gpus", "all"])
-    if not network_allowed():
-        command.extend(["--network", "none"])
-    command.extend(["-v", f"{cwd}:/workspace", "-w", "/workspace"])
-    if plan.needs_cwd_host_mirror:
-        command.extend(["-v", f"{cwd}:{cwd}"])
-    extra_mounts = list(plan.argv_mounts)
-    extra_mounts.extend(env_mounts)
-    extra_mounts.extend(pythonpath_mounts)
-    extra_mounts.extend(script_mounts)
-    for mount in _minimize_mounts(extra_mounts):
-        command.extend(["-v", f"{mount}:{mount}"])
-    for key, value in env_pairs.items():
-        command.extend(["-e", f"{key}={value}"])
-    command.extend([image, container_script, *plan.argv])
-    return command
+    return _compose_container_run_args(
+        context,
+        plan,
+        entrypoint=("--entrypoint", "python"),
+        extra_mounts=tuple(script_mounts),
+        argv=(container_script, *plan.argv),
+    )
 
 
 def delegate_python_script_to_container(

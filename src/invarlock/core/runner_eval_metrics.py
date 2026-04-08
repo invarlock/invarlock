@@ -4,6 +4,7 @@ import importlib
 import math
 import os
 import time
+from dataclasses import dataclass
 from inspect import getattr_static
 from typing import Any
 
@@ -23,6 +24,17 @@ from .runner_pairing import (
     compute_window_pairing_metrics,
 )
 from .types import LogLevel
+
+
+@dataclass(frozen=True)
+class _EvalWindowSelection:
+    preview_data: Any
+    final_data: Any
+    preview_n: int
+    final_n: int
+    requested_preview: int
+    requested_final: int
+    total_available: int
 
 
 def _model_kwargs(prepared: dict[str, Any]) -> dict[str, Any]:
@@ -86,6 +98,137 @@ def _resolve_metric_kind(config: Any, *, fallback: str) -> str:
         if kind and kind != "auto":
             return kind
     return fallback
+
+
+def _resolve_eval_device(model: Any, config: Any, torch_mod: Any) -> Any:
+    device = next(model.parameters()).device
+    eval_device_override = None
+    if config and isinstance(getattr(config, "context", None), dict):
+        eval_section = config.context.get("eval")
+        if isinstance(eval_section, dict):
+            override = eval_section.get("device_override")
+            if isinstance(override, str) and override.strip():
+                eval_device_override = override.strip()
+    if eval_device_override:
+        override_device = torch_mod.device(eval_device_override)
+        if override_device != device:
+            model.to(override_device)
+            return override_device
+    return device
+
+
+def _select_eval_windows(
+    runner: Any,
+    calibration_data: Any,
+    *,
+    preview_n: int | None,
+    final_n: int | None,
+    allow_materialize: bool,
+) -> _EvalWindowSelection:
+    if not hasattr(calibration_data, "__len__"):
+        if allow_materialize and hasattr(calibration_data, "__iter__"):
+            calibration_data = list(calibration_data)
+        else:
+            raise ValueError(
+                "Calibration data must define __len__ (or enable materialization "
+                "via INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE or context.run.allow_calibration_materialize)."
+            )
+
+    total_available = (
+        len(calibration_data) if hasattr(calibration_data, "__len__") else 0
+    )
+    if total_available == 0:
+        raise ValueError("Calibration data is empty; cannot compute metrics.")
+
+    resolved_preview_n = max(
+        int(preview_n if preview_n is not None else max(total_available // 2, 1)),
+        0,
+    )
+    resolved_final_n = max(
+        int(final_n if final_n is not None else resolved_preview_n),
+        0,
+    )
+    max_single_arm = max(resolved_preview_n, resolved_final_n)
+    if max_single_arm <= 0:
+        raise ValueError("preview_n and final_n cannot both be zero.")
+
+    if max_single_arm > total_available:
+        runner._log_event(
+            "eval",
+            "data_scaled",
+            LogLevel.WARNING,
+            {
+                "requested_preview": resolved_preview_n,
+                "requested_final": resolved_final_n,
+                "available": total_available,
+            },
+        )
+        resolved_preview_n = min(resolved_preview_n, total_available)
+        resolved_final_n = min(resolved_final_n, total_available)
+
+    requested_preview = resolved_preview_n
+    requested_final = resolved_final_n
+    if resolved_preview_n + resolved_final_n > total_available:
+        runner._log_event(
+            "eval",
+            "window_shortage",
+            LogLevel.WARNING,
+            {
+                "requested_preview": resolved_preview_n,
+                "requested_final": resolved_final_n,
+                "available": total_available,
+            },
+        )
+
+    resolved_preview_n = min(resolved_preview_n, total_available)
+    final_start = resolved_preview_n
+    remaining = max(total_available - resolved_preview_n, 0)
+    if resolved_final_n > remaining:
+        runner._log_event(
+            "eval",
+            "final_window_shortage",
+            LogLevel.WARNING,
+            {
+                "requested_final": resolved_final_n,
+                "available_after_preview": remaining,
+                "requested_preview": requested_preview,
+                "requested_final_original": requested_final,
+            },
+        )
+        resolved_final_n = remaining
+
+    calibration_source = calibration_data
+    preview_data, calibration_data = slice_calibration(
+        calibration_source,
+        start=0,
+        count=resolved_preview_n,
+        allow_materialize=allow_materialize,
+    )
+    final_data, calibration_data = slice_calibration(
+        calibration_data,
+        start=final_start,
+        count=resolved_final_n,
+        allow_materialize=allow_materialize,
+    )
+    if not final_data and requested_final > 0 and total_available > 0:
+        fallback_final_n = min(requested_final, total_available)
+        final_data, calibration_data = slice_calibration(
+            calibration_source,
+            start=0,
+            count=fallback_final_n,
+            allow_materialize=allow_materialize,
+        )
+        resolved_final_n = fallback_final_n
+
+    return _EvalWindowSelection(
+        preview_data=preview_data,
+        final_data=final_data,
+        preview_n=resolved_preview_n,
+        final_n=resolved_final_n,
+        requested_preview=requested_preview,
+        requested_final=requested_final,
+        total_available=total_available,
+    )
 
 
 def _evaluate_vision_text_arm(
@@ -208,6 +351,110 @@ def _evaluate_vision_text_arm(
     return payload, latency_ms
 
 
+def _build_multimodal_eval_result(
+    model: Any,
+    preview_data: list[dict[str, Any]],
+    final_data: list[dict[str, Any]],
+    *,
+    adapter: Any,
+    device: Any,
+    config: Any,
+    process: Any,
+    initial_memory: float,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    preview_payload, preview_latency_ms = _evaluate_vision_text_arm(
+        model,
+        list(preview_data),
+        adapter=adapter,
+        device=device,
+    )
+    final_payload, final_latency_ms = _evaluate_vision_text_arm(
+        model,
+        list(final_data),
+        adapter=adapter,
+        device=device,
+    )
+    current_memory = process.memory_info().rss / 1024 / 1024
+    peak_memory = max(initial_memory, current_memory)
+    total_tokens = int(preview_payload["total_tokens"]) + int(
+        final_payload["total_tokens"]
+    )
+    latency_ms_per_tok = (
+        float((preview_latency_ms + final_latency_ms) / total_tokens)
+        if total_tokens > 0
+        else 0.0
+    )
+    metric_kind = _resolve_metric_kind(config, fallback="vqa_accuracy")
+    preview_accuracy = float(preview_payload.get("accuracy", float("nan")))
+    final_accuracy = float(final_payload.get("accuracy", float("nan")))
+    primary_metric = {
+        "kind": metric_kind,
+        "preview": preview_accuracy if math.isfinite(preview_accuracy) else None,
+        "final": final_accuracy if math.isfinite(final_accuracy) else None,
+        "invalid": not (
+            math.isfinite(preview_accuracy) and math.isfinite(final_accuracy)
+        ),
+        "degraded": False,
+        "counts_source": "measured",
+        "estimated": False,
+        "n_preview": int(preview_payload.get("total", 0)),
+        "n_final": int(final_payload.get("total", 0)),
+    }
+    metrics = {
+        "primary_metric": primary_metric,
+        "classification": {
+            "preview": {
+                "correct_total": int(preview_payload["correct_total"]),
+                "total": int(preview_payload["total"]),
+                "example_correct": list(preview_payload["example_correct"]),
+            },
+            "final": {
+                "correct_total": int(final_payload["correct_total"]),
+                "total": int(final_payload["total"]),
+                "example_correct": list(final_payload["example_correct"]),
+            },
+            "n_correct": int(final_payload["correct_total"]),
+            "n_total": int(final_payload["total"]),
+            "counts_source": "measured",
+            "estimated": False,
+        },
+        "accuracy": final_accuracy if math.isfinite(final_accuracy) else None,
+        "logloss_preview": float(preview_payload.get("mean_logloss", float("nan"))),
+        "logloss_final": float(final_payload.get("mean_logloss", float("nan"))),
+        "logloss_delta": (
+            float(final_payload.get("mean_logloss", float("nan")))
+            - float(preview_payload.get("mean_logloss", float("nan")))
+        ),
+        "latency_ms_per_tok": latency_ms_per_tok,
+        "memory_mb_peak": peak_memory,
+        "eval_samples": int(preview_payload.get("total", 0))
+        + int(final_payload.get("total", 0)),
+        "total_tokens": total_tokens,
+        "preview_total_tokens": int(preview_payload["total_tokens"]),
+        "final_total_tokens": int(final_payload["total_tokens"]),
+        "window_overlap_fraction": 0.0,
+        "window_match_fraction": 1.0,
+    }
+    eval_windows = {
+        "preview": {
+            "example_ids": list(preview_payload["example_ids"]),
+            "records": list(preview_payload["records"]),
+            "logloss": list(preview_payload["logloss"]),
+            "token_counts": list(preview_payload["token_counts"]),
+            "processor_sha256": preview_payload.get("processor_sha256"),
+        },
+        "final": {
+            "example_ids": list(final_payload["example_ids"]),
+            "records": list(final_payload["records"]),
+            "logloss": list(final_payload["logloss"]),
+            "token_counts": list(final_payload["token_counts"]),
+            "processor_sha256": final_payload.get("processor_sha256")
+            or preview_payload.get("processor_sha256"),
+        },
+    }
+    return metrics, eval_windows
+
+
 def compute_real_metrics(
     runner: Any,
     model: Any,
@@ -251,20 +498,7 @@ def compute_real_metrics(
                 ),
             },
         )
-    device = next(model.parameters()).device
-
-    eval_device_override = None
-    if config and isinstance(getattr(config, "context", None), dict):
-        eval_section = config.context.get("eval")
-        if isinstance(eval_section, dict):
-            override = eval_section.get("device_override")
-            if isinstance(override, str) and override.strip():
-                eval_device_override = override.strip()
-    if eval_device_override:
-        override_device = torch.device(eval_device_override)
-        if override_device != device:
-            model.to(override_device)
-            device = override_device
+    device = _resolve_eval_device(model, config, torch)
 
     process = psutil_module.Process()
     initial_memory = process.memory_info().rss / 1024 / 1024
@@ -272,99 +506,17 @@ def compute_real_metrics(
     policy_flags = runner._resolve_policy_flags(config)
     allow_materialize = policy_flags["allow_calibration_materialize"]
 
-    if not hasattr(calibration_data, "__len__"):
-        if allow_materialize and hasattr(calibration_data, "__iter__"):
-            calibration_data = list(calibration_data)
-        else:
-            raise ValueError(
-                "Calibration data must define __len__ (or enable materialization "
-                "via INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE or context.run.allow_calibration_materialize)."
-            )
-
-    total_available = (
-        len(calibration_data) if hasattr(calibration_data, "__len__") else 0
-    )
-    if total_available == 0:
-        raise ValueError("Calibration data is empty; cannot compute metrics.")
-
-    if preview_n is None:
-        preview_n = max(total_available // 2, 1)
-    if final_n is None:
-        final_n = preview_n
-
-    preview_n = max(int(preview_n), 0)
-    final_n = max(int(final_n), 0)
-    max_single_arm = max(preview_n, final_n)
-    if max_single_arm <= 0:
-        raise ValueError("preview_n and final_n cannot both be zero.")
-
-    if max_single_arm > total_available:
-        runner._log_event(
-            "eval",
-            "data_scaled",
-            LogLevel.WARNING,
-            {
-                "requested_preview": preview_n,
-                "requested_final": final_n,
-                "available": total_available,
-            },
-        )
-        preview_n = min(preview_n, total_available)
-        final_n = min(final_n, total_available)
-
-    requested_preview = preview_n
-    requested_final = final_n
-    total_needed = preview_n + final_n
-    if total_needed > total_available:
-        runner._log_event(
-            "eval",
-            "window_shortage",
-            LogLevel.WARNING,
-            {
-                "requested_preview": preview_n,
-                "requested_final": final_n,
-                "available": total_available,
-            },
-        )
-
-    preview_n = min(preview_n, total_available)
-    final_start = preview_n
-    remaining = max(total_available - preview_n, 0)
-    if final_n > remaining:
-        runner._log_event(
-            "eval",
-            "final_window_shortage",
-            LogLevel.WARNING,
-            {
-                "requested_final": final_n,
-                "available_after_preview": remaining,
-                "requested_preview": requested_preview,
-                "requested_final_original": requested_final,
-            },
-        )
-        final_n = remaining
-
-    calibration_source = calibration_data
-    preview_data, calibration_data = slice_calibration(
-        calibration_source,
-        start=0,
-        count=preview_n,
-        allow_materialize=allow_materialize,
-    )
-    final_data, calibration_data = slice_calibration(
+    window_selection = _select_eval_windows(
+        runner,
         calibration_data,
-        start=final_start,
-        count=final_n,
+        preview_n=preview_n,
+        final_n=final_n,
         allow_materialize=allow_materialize,
     )
-    if not final_data and requested_final > 0 and total_available > 0:
-        fallback_final_n = min(requested_final, total_available)
-        final_data, calibration_data = slice_calibration(
-            calibration_source,
-            start=0,
-            count=fallback_final_n,
-            allow_materialize=allow_materialize,
-        )
+    preview_data = window_selection.preview_data
+    final_data = window_selection.final_data
+    preview_n = window_selection.preview_n
+    final_n = window_selection.final_n
 
     eval_context: dict[str, Any] = {}
     if config and isinstance(config.context, dict):
@@ -376,96 +528,16 @@ def compute_real_metrics(
     ).lower()
 
     if preview_data and _is_multimodal_batch(preview_data[0]):
-        preview_payload, preview_latency_ms = _evaluate_vision_text_arm(
+        metrics, eval_windows = _build_multimodal_eval_result(
             model,
             list(preview_data),
-            adapter=adapter,
-            device=device,
-        )
-        final_payload, final_latency_ms = _evaluate_vision_text_arm(
-            model,
             list(final_data),
             adapter=adapter,
             device=device,
+            config=config,
+            process=process,
+            initial_memory=initial_memory,
         )
-        current_memory = process.memory_info().rss / 1024 / 1024
-        peak_memory = max(initial_memory, current_memory)
-        total_tokens = int(preview_payload["total_tokens"]) + int(
-            final_payload["total_tokens"]
-        )
-        latency_ms_per_tok = (
-            float((preview_latency_ms + final_latency_ms) / total_tokens)
-            if total_tokens > 0
-            else 0.0
-        )
-        metric_kind = _resolve_metric_kind(config, fallback="vqa_accuracy")
-        preview_accuracy = float(preview_payload.get("accuracy", float("nan")))
-        final_accuracy = float(final_payload.get("accuracy", float("nan")))
-        primary_metric = {
-            "kind": metric_kind,
-            "preview": preview_accuracy if math.isfinite(preview_accuracy) else None,
-            "final": final_accuracy if math.isfinite(final_accuracy) else None,
-            "invalid": not (
-                math.isfinite(preview_accuracy) and math.isfinite(final_accuracy)
-            ),
-            "degraded": False,
-            "counts_source": "measured",
-            "estimated": False,
-            "n_preview": int(preview_payload.get("total", 0)),
-            "n_final": int(final_payload.get("total", 0)),
-        }
-        metrics = {
-            "primary_metric": primary_metric,
-            "classification": {
-                "preview": {
-                    "correct_total": int(preview_payload["correct_total"]),
-                    "total": int(preview_payload["total"]),
-                    "example_correct": list(preview_payload["example_correct"]),
-                },
-                "final": {
-                    "correct_total": int(final_payload["correct_total"]),
-                    "total": int(final_payload["total"]),
-                    "example_correct": list(final_payload["example_correct"]),
-                },
-                "n_correct": int(final_payload["correct_total"]),
-                "n_total": int(final_payload["total"]),
-                "counts_source": "measured",
-                "estimated": False,
-            },
-            "accuracy": final_accuracy if math.isfinite(final_accuracy) else None,
-            "logloss_preview": float(preview_payload.get("mean_logloss", float("nan"))),
-            "logloss_final": float(final_payload.get("mean_logloss", float("nan"))),
-            "logloss_delta": (
-                float(final_payload.get("mean_logloss", float("nan")))
-                - float(preview_payload.get("mean_logloss", float("nan")))
-            ),
-            "latency_ms_per_tok": latency_ms_per_tok,
-            "memory_mb_peak": peak_memory,
-            "eval_samples": int(preview_payload.get("total", 0))
-            + int(final_payload.get("total", 0)),
-            "total_tokens": total_tokens,
-            "preview_total_tokens": int(preview_payload["total_tokens"]),
-            "final_total_tokens": int(final_payload["total_tokens"]),
-            "window_overlap_fraction": 0.0,
-            "window_match_fraction": 1.0,
-        }
-        eval_windows = {
-            "preview": {
-                "example_ids": list(preview_payload["example_ids"]),
-                "records": list(preview_payload["records"]),
-                "logloss": list(preview_payload["logloss"]),
-                "token_counts": list(preview_payload["token_counts"]),
-                "processor_sha256": preview_payload.get("processor_sha256"),
-            },
-            "final": {
-                "example_ids": list(final_payload["example_ids"]),
-                "records": list(final_payload["records"]),
-                "logloss": list(final_payload["logloss"]),
-                "token_counts": list(final_payload["token_counts"]),
-                "processor_sha256": final_payload.get("processor_sha256")
-                or preview_payload.get("processor_sha256"),
-            },
-        }
         return metrics, eval_windows
 
     bootstrap_cfg = eval_context.get("bootstrap", {}) or {}

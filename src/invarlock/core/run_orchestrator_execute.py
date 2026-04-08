@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import math
 import os
+from collections.abc import Callable
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 from time import perf_counter
 from typing import Any, NoReturn, cast
@@ -118,6 +121,326 @@ def _coerce_int(value: Any, default: int) -> int:
         return int(default)
 
 
+RunEventEmitter = Callable[[RunExecutionEvent], None]
+
+
+@dataclass(frozen=True)
+class _RunLossAndSeedState:
+    eval_section: Any
+    resolved_loss_type: str
+    use_mlm: bool
+    mask_prob: float
+    mask_seed: int
+    random_token_prob: float
+    original_token_prob: float
+    seed_value: int
+    seed_bundle: dict[str, int | None]
+
+
+def _emit_run_diagnostic(
+    emit: RunEventEmitter,
+    *,
+    origin: str | None = None,
+    code: str | None = None,
+    summary: str | None = None,
+    level: str | None = None,
+    **context: Any,
+) -> None:
+    emit(
+        RunDiagnosticEvent(
+            source=origin,
+            code=code,
+            summary=summary,
+            level=level,
+            context=dict(context),
+        )
+    )
+
+
+def _emit_run_guard_overhead_summary(
+    emit: RunEventEmitter,
+    guard_overhead_info: dict[str, Any],
+    *,
+    default_threshold: float,
+) -> None:
+    emit(
+        RunGuardOverheadSummaryEvent(
+            guard_overhead_info=guard_overhead_info,
+            default_threshold=default_threshold,
+        )
+    )
+
+
+def _emit_run_retry_summary(
+    emit: RunEventEmitter, retry_controller: Any | None
+) -> None:
+    if not retry_controller or not getattr(retry_controller, "attempt_history", None):
+        return
+    try:
+        summary = retry_controller.get_attempt_summary()
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return
+    if not isinstance(summary, dict):
+        return
+    emit(RunRetrySummaryEvent(summary=summary))
+
+
+def _raise_run_halt(
+    emit: RunEventEmitter,
+    halt_error_type: type[_RunExecutionHalt],
+    *,
+    code: str,
+    summary: str | None = None,
+    error: Exception | None = None,
+    **context: Any,
+) -> NoReturn:
+    failure = RunExecutionFailure(
+        code=code,
+        summary=summary,
+        error=error,
+        context=dict(context),
+    )
+    emit(RunFailureEvent(failure=failure))
+    raise halt_error_type(failure)
+
+
+def _emit_transition_diagnostic(
+    emit_diagnostic: Callable[..., None],
+    source: str,
+    diagnostic: Any,
+) -> None:
+    code = getattr(diagnostic, "code", None)
+    if isinstance(code, str) and code:
+        details = getattr(diagnostic, "details", None)
+        context = getattr(diagnostic, "context", None)
+        payload = {}
+        if isinstance(details, dict):
+            payload.update(details)
+        if isinstance(context, dict):
+            payload.update(context)
+        payload.setdefault("diagnostic_source", source)
+        summary = getattr(diagnostic, "summary", None)
+        if not isinstance(summary, str) or not summary:
+            message = getattr(diagnostic, "message", None)
+            summary = message if isinstance(message, str) and message else None
+        emit_diagnostic(
+            origin=source,
+            code=code,
+            summary=summary,
+            **payload,
+        )
+        return
+    kind = getattr(diagnostic, "kind", None)
+    if isinstance(kind, str) and kind:
+        payload = {}
+        metadata = getattr(diagnostic, "metadata", None)
+        if isinstance(metadata, dict):
+            payload.update(metadata)
+        context = getattr(diagnostic, "context", None)
+        if isinstance(context, dict):
+            payload.update(context)
+        payload.setdefault("diagnostic_source", source)
+        level = getattr(diagnostic, "level", None)
+        if not isinstance(level, str) or not level:
+            severity = getattr(diagnostic, "severity", None)
+            level = severity if isinstance(severity, str) and severity else None
+        summary = getattr(diagnostic, "summary", None)
+        if not isinstance(summary, str) or not summary:
+            message = getattr(diagnostic, "message", None)
+            summary = message if isinstance(message, str) and message else None
+        emit_diagnostic(
+            origin=source,
+            code=kind,
+            summary=summary,
+            level=level,
+            **payload,
+        )
+        return
+    payload = {"diagnostic_source": source}
+    metadata = getattr(diagnostic, "metadata", None)
+    if isinstance(metadata, dict):
+        payload.update(metadata)
+    details = getattr(diagnostic, "details", None)
+    if isinstance(details, dict):
+        payload.update(details)
+    context = getattr(diagnostic, "context", None)
+    if isinstance(context, dict):
+        payload.update(context)
+    level = getattr(diagnostic, "level", None)
+    if not isinstance(level, str) or not level:
+        severity = getattr(diagnostic, "severity", None)
+        level = severity if isinstance(severity, str) and severity else None
+    summary = getattr(diagnostic, "summary", None)
+    if not isinstance(summary, str) or not summary:
+        message = getattr(diagnostic, "message", None)
+        summary = message if isinstance(message, str) and message else None
+    if len(payload) > 1 or (isinstance(summary, str) and summary):
+        emit_diagnostic(
+            origin=source,
+            code="transition_diagnostic",
+            summary=summary,
+            level=level,
+            **payload,
+        )
+
+
+def _cfg_section_value(
+    cfg_obj: Any,
+    name: str,
+    config_value_exceptions: tuple[type[BaseException], ...],
+) -> Any:
+    section_fn = getattr(cfg_obj, "section", None)
+    if callable(section_fn):
+        try:
+            section = section_fn(name)
+        except config_value_exceptions:
+            section = None
+        if section is not None:
+            return section
+    try:
+        return getattr(cfg_obj, name)
+    except config_value_exceptions:
+        return None
+
+
+def _resolve_loss_seed_and_determinism_state(
+    cfg: Any,
+    *,
+    model_profile: Any,
+    profile_normalized: str,
+    determinism_mode: str | None,
+    determinism_warn_only: bool,
+    optional_torch: Callable[[], Any | None],
+    emit: RunEventEmitter,
+    cfg_value: Callable[[Any, str], Any],
+    config_value_exceptions: tuple[type[BaseException], ...],
+    numeric_exceptions: tuple[type[BaseException], ...],
+    optional_runtime_exceptions: tuple[type[BaseException], ...],
+) -> _RunLossAndSeedState:
+    eval_section = cfg_value(cfg, "eval") or {}
+    loss_cfg = eval_section.get("loss") if isinstance(eval_section, dict) else None
+    if loss_cfg is None and not isinstance(eval_section, dict):
+        loss_cfg = getattr(eval_section, "loss", None)
+
+    resolved_loss_type = (
+        str(loss_cfg.get("type", "auto")).lower()
+        if isinstance(loss_cfg, dict)
+        else str(getattr(loss_cfg, "type", "auto")).lower()
+        if loss_cfg
+        else "auto"
+    )
+    if resolved_loss_type == "auto":
+        resolved_loss_type = model_profile.default_loss
+    use_mlm = resolved_loss_type == "mlm"
+
+    mask_prob = _coerce_float(
+        loss_cfg.get("mask_prob") if isinstance(loss_cfg, dict) else None,
+        0.15,
+    )
+    if not isinstance(loss_cfg, dict):
+        mask_prob = _coerce_float(getattr(loss_cfg, "mask_prob", None), mask_prob)
+
+    mask_seed = _coerce_int(
+        loss_cfg.get("seed") if isinstance(loss_cfg, dict) else None,
+        42,
+    )
+    if not isinstance(loss_cfg, dict):
+        mask_seed = _coerce_int(getattr(loss_cfg, "seed", None), mask_seed)
+
+    random_token_prob = _coerce_float(
+        loss_cfg.get("random_token_prob") if isinstance(loss_cfg, dict) else None,
+        0.1,
+    )
+    if not isinstance(loss_cfg, dict):
+        random_token_prob = _coerce_float(
+            getattr(loss_cfg, "random_token_prob", None),
+            random_token_prob,
+        )
+
+    original_token_prob = _coerce_float(
+        loss_cfg.get("original_token_prob") if isinstance(loss_cfg, dict) else None,
+        0.1,
+    )
+    if not isinstance(loss_cfg, dict):
+        original_token_prob = _coerce_float(
+            getattr(loss_cfg, "original_token_prob", None),
+            original_token_prob,
+        )
+    if isinstance(loss_cfg, dict) and loss_cfg.get("type") == "auto":
+        loss_cfg["type"] = resolved_loss_type
+
+    raw_seed_value = 42
+    if hasattr(cfg, "dataset"):
+        try:
+            raw_seed_value = getattr(cfg.dataset, "seed", 42)
+        except config_value_exceptions:
+            raw_seed_value = 42
+    try:
+        seed_value = int(raw_seed_value)
+    except numeric_exceptions:
+        seed_value = 42
+    set_seed(seed_value)
+
+    profile_label = profile_normalized or None
+    torch_mod = optional_torch()
+    if torch_mod is not None and profile_label in {"ci", "release"}:
+        try:  # pragma: no cover - behavior depends on torch availability
+            resolved_determinism_mode = determinism_mode or "throughput"
+            warn_only = resolved_determinism_mode.lower() != "strict"
+            if bool(determinism_warn_only):
+                warn_only = True
+            if hasattr(torch_mod, "use_deterministic_algorithms"):
+                torch_mod.use_deterministic_algorithms(True, warn_only=warn_only)
+            if hasattr(torch_mod.backends, "cudnn"):
+                torch_mod.backends.cudnn.benchmark = False
+                try:
+                    torch_mod.backends.cudnn.deterministic = True
+                except (AttributeError, TypeError, RuntimeError):
+                    pass
+        except optional_runtime_exceptions:
+            pass
+
+    try:
+        numpy_state = cast(tuple[Any, ...], np.random.get_state())
+        numpy_seed_state = numpy_state[1]
+        numpy_seed = (
+            int(numpy_seed_state[0]) if len(numpy_seed_state) > 0 else int(seed_value)
+        )
+    except (AttributeError, IndexError, OverflowError, TypeError, ValueError):
+        numpy_seed = seed_value
+
+    torch_seed = None
+    if torch_mod is not None:
+        try:
+            torch_seed = int(torch_mod.initial_seed())
+        except (AttributeError, OverflowError, RuntimeError, TypeError, ValueError):
+            torch_seed = seed_value
+
+    seed_bundle = {
+        "python": int(seed_value),
+        "numpy": int(numpy_seed),
+        "torch": int(torch_seed) if torch_seed is not None else None,
+    }
+    emit(
+        RunDeterministicSeedsEvent(
+            python_seed=int(seed_bundle["python"] or seed_value),
+            numpy_seed=int(seed_bundle["numpy"] or seed_value),
+            torch_seed=seed_bundle["torch"],
+        )
+    )
+    return _RunLossAndSeedState(
+        eval_section=eval_section,
+        resolved_loss_type=resolved_loss_type,
+        use_mlm=use_mlm,
+        mask_prob=mask_prob,
+        mask_seed=mask_seed,
+        random_token_prob=random_token_prob,
+        original_token_prob=original_token_prob,
+        seed_value=seed_value,
+        seed_bundle=seed_bundle,
+    )
+
+
 def execute_run_request_impl(
     request: RunExecutionRequest,
     *,
@@ -224,48 +547,9 @@ def execute_run_request_impl(
         if observer is not None:
             observer(event)
 
-    def _emit_diagnostic(
-        *,
-        origin: str | None = None,
-        code: str | None = None,
-        summary: str | None = None,
-        level: str | None = None,
-        **context: Any,
-    ) -> None:
-        _emit(
-            RunDiagnosticEvent(
-                source=origin,
-                code=code,
-                summary=summary,
-                level=level,
-                context=dict(context),
-            )
-        )
-
-    def _emit_guard_overhead_summary(
-        guard_overhead_info: dict[str, Any],
-        *,
-        default_threshold: float,
-    ) -> None:
-        _emit(
-            RunGuardOverheadSummaryEvent(
-                guard_overhead_info=guard_overhead_info,
-                default_threshold=default_threshold,
-            )
-        )
-
-    def _emit_retry_summary(retry_controller: Any | None) -> None:
-        if not retry_controller or not getattr(
-            retry_controller, "attempt_history", None
-        ):
-            return
-        try:
-            summary = retry_controller.get_attempt_summary()
-        except (AttributeError, KeyError, TypeError, ValueError):
-            return
-        if not isinstance(summary, dict):
-            return
-        _emit(RunRetrySummaryEvent(summary=summary))
+    _emit_diagnostic = partial(_emit_run_diagnostic, _emit)
+    _emit_guard_overhead_summary = partial(_emit_run_guard_overhead_summary, _emit)
+    _emit_retry_summary = partial(_emit_run_retry_summary, _emit)
 
     def _halt(
         code: str,
@@ -274,14 +558,14 @@ def execute_run_request_impl(
         error: Exception | None = None,
         **context: Any,
     ) -> NoReturn:
-        failure = RunExecutionFailure(
+        _raise_run_halt(
+            _emit,
+            _RunExecutionHalt,
             code=code,
             summary=summary,
             error=error,
-            context=dict(context),
+            **context,
         )
-        _emit(RunFailureEvent(failure=failure))
-        raise _RunExecutionHalt(failure)
 
     @contextmanager
     def _record_timed_step(key: str):
@@ -294,94 +578,10 @@ def execute_run_request_impl(
     def _fail_run(message: str, *, error: Exception | None = None) -> None:
         _halt("pipeline_failed", summary=message, error=error)
 
-    def _emit_transition_diagnostic(source: str, diagnostic: Any) -> None:
-        code = getattr(diagnostic, "code", None)
-        if isinstance(code, str) and code:
-            details = getattr(diagnostic, "details", None)
-            context = getattr(diagnostic, "context", None)
-            payload = {}
-            if isinstance(details, dict):
-                payload.update(details)
-            if isinstance(context, dict):
-                payload.update(context)
-            payload.setdefault("diagnostic_source", source)
-            summary = getattr(diagnostic, "summary", None)
-            if not isinstance(summary, str) or not summary:
-                message = getattr(diagnostic, "message", None)
-                summary = message if isinstance(message, str) and message else None
-            _emit_diagnostic(
-                origin=source,
-                code=code,
-                summary=summary,
-                **payload,
-            )
-            return
-        kind = getattr(diagnostic, "kind", None)
-        if isinstance(kind, str) and kind:
-            payload = {}
-            metadata = getattr(diagnostic, "metadata", None)
-            if isinstance(metadata, dict):
-                payload.update(metadata)
-            context = getattr(diagnostic, "context", None)
-            if isinstance(context, dict):
-                payload.update(context)
-            payload.setdefault("diagnostic_source", source)
-            level = getattr(diagnostic, "level", None)
-            if not isinstance(level, str) or not level:
-                severity = getattr(diagnostic, "severity", None)
-                level = severity if isinstance(severity, str) and severity else None
-            summary = getattr(diagnostic, "summary", None)
-            if not isinstance(summary, str) or not summary:
-                message = getattr(diagnostic, "message", None)
-                summary = message if isinstance(message, str) and message else None
-            _emit_diagnostic(
-                origin=source,
-                code=kind,
-                summary=summary,
-                level=level,
-                **payload,
-            )
-            return
-        payload = {"diagnostic_source": source}
-        metadata = getattr(diagnostic, "metadata", None)
-        if isinstance(metadata, dict):
-            payload.update(metadata)
-        details = getattr(diagnostic, "details", None)
-        if isinstance(details, dict):
-            payload.update(details)
-        context = getattr(diagnostic, "context", None)
-        if isinstance(context, dict):
-            payload.update(context)
-        level = getattr(diagnostic, "level", None)
-        if not isinstance(level, str) or not level:
-            severity = getattr(diagnostic, "severity", None)
-            level = severity if isinstance(severity, str) and severity else None
-        summary = getattr(diagnostic, "summary", None)
-        if not isinstance(summary, str) or not summary:
-            message = getattr(diagnostic, "message", None)
-            summary = message if isinstance(message, str) and message else None
-        if len(payload) > 1 or (isinstance(summary, str) and summary):
-            _emit_diagnostic(
-                origin=source,
-                code="transition_diagnostic",
-                summary=summary,
-                level=level,
-                **payload,
-            )
-
-    def _cfg_section_value(cfg_obj: Any, name: str) -> Any:
-        section_fn = getattr(cfg_obj, "section", None)
-        if callable(section_fn):
-            try:
-                section = section_fn(name)
-            except CONFIG_VALUE_EXCEPTIONS:
-                section = None
-            if section is not None:
-                return section
-        try:
-            return getattr(cfg_obj, name)
-        except CONFIG_VALUE_EXCEPTIONS:
-            return None
+    _emit_transition = partial(_emit_transition_diagnostic, _emit_diagnostic)
+    _cfg_value = partial(
+        _cfg_section_value, config_value_exceptions=CONFIG_VALUE_EXCEPTIONS
+    )
 
     _optional_dep_unset = object()
     _optional_torch_cache = _optional_dep_unset
@@ -472,125 +672,29 @@ def execute_run_request_impl(
         )
         tokenizer_hash: str | None = None
         tokenizer: Any | None = None
-
-        eval_section = _cfg_section_value(cfg, "eval") or {}
-        loss_cfg = eval_section.get("loss") if isinstance(eval_section, dict) else None
-        if loss_cfg is None and not isinstance(eval_section, dict):
-            loss_cfg = getattr(eval_section, "loss", None)
-        resolved_loss_type = (
-            str(loss_cfg.get("type", "auto")).lower()
-            if isinstance(loss_cfg, dict)
-            else str(getattr(loss_cfg, "type", "auto")).lower()
-            if loss_cfg
-            else "auto"
+        loss_seed_state = _resolve_loss_seed_and_determinism_state(
+            cfg,
+            model_profile=model_profile,
+            profile_normalized=profile_normalized,
+            determinism_mode=determinism_mode,
+            determinism_warn_only=bool(determinism_warn_only),
+            optional_torch=_optional_torch,
+            emit=_emit,
+            cfg_value=_cfg_value,
+            config_value_exceptions=CONFIG_VALUE_EXCEPTIONS,
+            numeric_exceptions=NUMERIC_EXCEPTIONS,
+            optional_runtime_exceptions=OPTIONAL_RUNTIME_EXCEPTIONS,
         )
-        if resolved_loss_type == "auto":
-            resolved_loss_type = model_profile.default_loss
-        use_mlm = resolved_loss_type == "mlm"
-        mask_prob = _coerce_float(
-            loss_cfg.get("mask_prob") if isinstance(loss_cfg, dict) else None,
-            0.15,
-        )
-        if not isinstance(loss_cfg, dict):
-            mask_prob = _coerce_float(getattr(loss_cfg, "mask_prob", None), mask_prob)
-        mask_seed = _coerce_int(
-            loss_cfg.get("seed") if isinstance(loss_cfg, dict) else None,
-            42,
-        )
-        if not isinstance(loss_cfg, dict):
-            mask_seed = _coerce_int(getattr(loss_cfg, "seed", None), mask_seed)
-        random_token_prob = _coerce_float(
-            loss_cfg.get("random_token_prob") if isinstance(loss_cfg, dict) else None,
-            0.1,
-        )
-        if not isinstance(loss_cfg, dict):
-            random_token_prob = _coerce_float(
-                getattr(loss_cfg, "random_token_prob", None),
-                random_token_prob,
-            )
-        original_token_prob = _coerce_float(
-            loss_cfg.get("original_token_prob") if isinstance(loss_cfg, dict) else None,
-            0.1,
-        )
-        if not isinstance(loss_cfg, dict):
-            original_token_prob = _coerce_float(
-                getattr(loss_cfg, "original_token_prob", None),
-                original_token_prob,
-            )
-        if isinstance(loss_cfg, dict) and loss_cfg.get("type") == "auto":
-            loss_cfg["type"] = resolved_loss_type
-
-        # Set deterministic seeds for Python/NumPy/Torch and record provenance
-        raw_seed_value = 42
-        if hasattr(cfg, "dataset"):
-            try:
-                raw_seed_value = getattr(cfg.dataset, "seed", 42)
-            except CONFIG_VALUE_EXCEPTIONS:
-                raw_seed_value = 42
-        try:
-            seed_value = int(raw_seed_value)
-        except NUMERIC_EXCEPTIONS:
-            seed_value = 42
-        set_seed(seed_value)
-        # Enforce deterministic algorithms in CI/Release profiles when torch is available
+        eval_section = loss_seed_state.eval_section
+        resolved_loss_type = loss_seed_state.resolved_loss_type
+        use_mlm = loss_seed_state.use_mlm
+        mask_prob = loss_seed_state.mask_prob
+        mask_seed = loss_seed_state.mask_seed
+        random_token_prob = loss_seed_state.random_token_prob
+        original_token_prob = loss_seed_state.original_token_prob
+        seed_value = loss_seed_state.seed_value
+        seed_bundle = dict(loss_seed_state.seed_bundle)
         profile_label = profile_normalized or None
-        torch_mod = _optional_torch()
-        if torch_mod is not None and profile_label in {"ci", "release"}:
-            try:  # pragma: no cover - behavior depends on torch availability
-                resolved_determinism_mode = determinism_mode or "throughput"
-                warn_only = False
-                if resolved_determinism_mode.lower() != "strict":
-                    warn_only = True
-                if bool(determinism_warn_only):
-                    warn_only = True
-                if hasattr(torch_mod, "use_deterministic_algorithms"):
-                    torch_mod.use_deterministic_algorithms(True, warn_only=warn_only)
-                if hasattr(torch_mod.backends, "cudnn"):
-                    torch_mod.backends.cudnn.benchmark = False
-                    try:
-                        torch_mod.backends.cudnn.deterministic = True
-                    except (AttributeError, TypeError, RuntimeError):
-                        pass
-            except OPTIONAL_RUNTIME_EXCEPTIONS:
-                # If we cannot enforce determinism here, we will rely on core checks
-                pass
-        try:
-            numpy_state = cast(tuple[Any, ...], np.random.get_state())
-            numpy_seed_state = numpy_state[1]
-            numpy_seed = (
-                int(numpy_seed_state[0])
-                if len(numpy_seed_state) > 0
-                else int(seed_value)
-            )
-        except (
-            AttributeError,
-            IndexError,
-            TypeError,
-            ValueError,
-            OverflowError,
-        ):
-            numpy_seed = seed_value
-        torch_seed = None
-        if torch_mod is not None:
-            try:
-                torch_seed = int(torch_mod.initial_seed())
-            except (AttributeError, TypeError, ValueError, OverflowError, RuntimeError):
-                torch_seed = seed_value
-        python_seed = int(seed_value)
-        normalized_numpy_seed = int(numpy_seed)
-        normalized_torch_seed = int(torch_seed) if torch_seed is not None else None
-        seed_bundle = {
-            "python": python_seed,
-            "numpy": normalized_numpy_seed,
-            "torch": normalized_torch_seed,
-        }
-        _emit(
-            RunDeterministicSeedsEvent(
-                python_seed=python_seed,
-                numpy_seed=normalized_numpy_seed,
-                torch_seed=normalized_torch_seed,
-            )
-        )
 
         # Resolve device and output directory
         resolved_device, output_dir = _resolve_device_and_output(
@@ -738,7 +842,7 @@ def execute_run_request_impl(
 
         guards = []
         guard_metadata: list[dict[str, Any]] = []
-        guards_section = _cfg_section_value(cfg, "guards") or {}
+        guards_section = _cfg_value(cfg, "guards") or {}
         guard_order = (
             guards_section.get("order", [])
             if isinstance(guards_section, dict)
@@ -854,7 +958,7 @@ def execute_run_request_impl(
                 _fail_run(str(exc), error=exc)
 
             for diagnostic in dataset_result.diagnostics:
-                _emit_transition_diagnostic("dataset", diagnostic)
+                _emit_transition("dataset", diagnostic)
 
             resolved_split = dataset_result.resolved_split
             used_fallback_split = dataset_result.used_fallback_split
@@ -969,7 +1073,7 @@ def execute_run_request_impl(
             else:
                 try:
                     cfg_snapshot = _resolve_snapshot_config(
-                        _cfg_section_value(cfg, "context") or {}
+                        _cfg_value(cfg, "context") or {}
                     )
                 except OPTIONAL_RUNTIME_EXCEPTIONS:
                     cfg_snapshot = {}
@@ -991,7 +1095,7 @@ def execute_run_request_impl(
                     RunSnapshotModeEvent(enabled=bool(snapshot_plan.snapshot_enabled))
                 )
             for diagnostic in snapshot_plan.diagnostics:
-                _emit_transition_diagnostic("snapshot_plan", diagnostic)
+                _emit_transition("snapshot_plan", diagnostic)
         except OPTIONAL_RUNTIME_EXCEPTIONS:
             # On any failure, fall back to reload-per-attempt path
             _free_model_memory(model)
@@ -1015,11 +1119,11 @@ def execute_run_request_impl(
             snapshot_retry_transition.emitted_skip_overhead_warning
         )
         for diagnostic in snapshot_retry_transition.diagnostics:
-            _emit_transition_diagnostic("snapshot_retry", diagnostic)
+            _emit_transition("snapshot_retry", diagnostic)
 
         while True:
             # Reset RNG streams each attempt to guarantee determinism across retries
-            set_seed(python_seed)
+            set_seed(int(seed_bundle.get("python") or seed_value))
 
             if retry_controller:
                 _emit(
@@ -1046,7 +1150,7 @@ def execute_run_request_impl(
                 )
                 edit_config = adjustment.params
                 for diagnostic in adjustment.diagnostics:
-                    _emit_transition_diagnostic("retry_adjustment", diagnostic)
+                    _emit_transition("retry_adjustment", diagnostic)
 
             guard_overhead_payload: dict[str, Any] | None = None
             try:
@@ -1135,7 +1239,7 @@ def execute_run_request_impl(
                     passed=False,
                 )
                 for diagnostic in retry_transition.diagnostics:
-                    _emit_transition_diagnostic("retry_failure", diagnostic)
+                    _emit_transition("retry_failure", diagnostic)
                 if retry_transition.should_retry:
                     attempt = retry_transition.next_attempt
                     continue
@@ -1209,7 +1313,7 @@ def execute_run_request_impl(
                 if provenance_result.missing_evaluation_windows_for_baseline:
                     _halt(
                         "baseline_windows_missing",
-                        message=(
+                        summary=(
                             provenance_result.missing_evaluation_windows_message
                             or "[INVARLOCK:E001] PAIRING-SCHEDULE-MISMATCH: baseline pairing requested but evaluation windows were not produced. Check capacity/pairing config."
                         ),
@@ -1220,7 +1324,7 @@ def execute_run_request_impl(
                 _fail_run(str(exc), error=exc)
 
             # Optional: export HF-loadable model snapshot when requested
-            output_cfg = _cfg_section_value(cfg, "output") or {}
+            output_cfg = _cfg_value(cfg, "output") or {}
             save_model_cfg = False
             try:
                 if isinstance(output_cfg, dict):
@@ -1447,7 +1551,7 @@ def execute_run_request_impl(
                         )
 
                     for diagnostic in retry_decision.diagnostics:
-                        _emit_transition_diagnostic("retry_validation", diagnostic)
+                        _emit_transition("retry_validation", diagnostic)
                     if retry_disposition == "retry":
                         attempt = retry_decision.next_attempt or (attempt + 1)
                         continue

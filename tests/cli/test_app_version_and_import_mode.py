@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import os
+from importlib.metadata import PackageNotFoundError
 
 from typer.testing import CliRunner
 
@@ -47,7 +48,7 @@ def test_version_fallbacks(monkeypatch):
     importlib.reload(app_mod)
 
     monkeypatch.setattr(
-        im, "version", lambda *_: (_ for _ in ()).throw(Exception("boom"))
+        im, "version", lambda *_: (_ for _ in ()).throw(PackageNotFoundError("boom"))
     )
     runner = CliRunner()
     result = runner.invoke(app_mod.app, ["version"])  # type: ignore[attr-defined]

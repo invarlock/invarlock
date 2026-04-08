@@ -10,10 +10,54 @@ from invarlock.eval.tail_stats import evaluate_metric_tail
 from .types import LogLevel
 
 EvaluateMetricTailFn = Callable[..., dict[str, Any]]
+_DEBUG_TRACE_ERRORS = (
+    AttributeError,
+    IndexError,
+    KeyError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 
 def _is_real_number(value: Any) -> bool:
     return isinstance(value, int | float) and not isinstance(value, bool)
+
+
+def _debug_trace_length_hint(calibration_data: Any) -> int | None:
+    try:
+        length_hint = len(calibration_data)
+    except _DEBUG_TRACE_ERRORS:  # pragma: no cover - defensive
+        return None
+    return length_hint if isinstance(length_hint, int) else None
+
+
+def _debug_trace_first_batch(calibration_data: Any) -> tuple[bool, Any | None]:
+    indexable = hasattr(calibration_data, "__getitem__")
+    if isinstance(calibration_data, list | tuple):
+        return True, calibration_data[0] if calibration_data else None
+    if indexable:
+        try:
+            return True, calibration_data[0]
+        except _DEBUG_TRACE_ERRORS:  # pragma: no cover - defensive
+            return True, None
+    return False, None
+
+
+def _debug_trace_masked_preview(
+    first_batch: Any,
+) -> tuple[list[str] | None, int | None]:
+    if not isinstance(first_batch, dict):
+        return None, None
+    first_keys = list(first_batch.keys())
+    labels_preview = first_batch.get("labels")
+    if not isinstance(labels_preview, list | tuple):
+        return first_keys, None
+    try:
+        masked_preview = sum(1 for token in labels_preview if token != -100)
+    except _DEBUG_TRACE_ERRORS:  # pragma: no cover - defensive
+        masked_preview = None
+    return first_keys, masked_preview
 
 
 def eval_phase(
@@ -33,33 +77,9 @@ def eval_phase(
 
     if calibration_data is not None:
         if os.environ.get("INVARLOCK_DEBUG_TRACE"):
-            length_hint = None
-            try:
-                length_hint = len(calibration_data)
-            except Exception:  # pragma: no cover - defensive
-                length_hint = None
-            first_batch = None
-            indexable = hasattr(calibration_data, "__getitem__")
-            if isinstance(calibration_data, list | tuple):
-                if calibration_data:
-                    first_batch = calibration_data[0]
-            elif indexable:
-                try:
-                    first_batch = calibration_data[0]
-                except Exception:  # pragma: no cover - defensive
-                    first_batch = None
-            masked_preview = None
-            first_keys = None
-            if isinstance(first_batch, dict):
-                first_keys = list(first_batch.keys())
-                labels_preview = first_batch.get("labels")
-                if isinstance(labels_preview, list | tuple):
-                    try:
-                        masked_preview = sum(
-                            1 for token in labels_preview if token != -100
-                        )
-                    except Exception:  # pragma: no cover - defensive
-                        masked_preview = None
+            length_hint = _debug_trace_length_hint(calibration_data)
+            indexable, first_batch = _debug_trace_first_batch(calibration_data)
+            first_keys, masked_preview = _debug_trace_masked_preview(first_batch)
             runner._log_event(
                 "eval",
                 "calibration_snapshot",

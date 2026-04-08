@@ -12,6 +12,7 @@ minimal environments.
 from __future__ import annotations
 
 import os
+from importlib.metadata import PackageNotFoundError
 
 import click
 import typer
@@ -80,36 +81,62 @@ app = typer.Typer(
 )
 
 console = Console()
+_VERSION_IMPORT_ERRORS = (
+    AttributeError,
+    ImportError,
+    ModuleNotFoundError,
+    PackageNotFoundError,
+)
+
+
+def _resolve_schema_version() -> str | None:
+    try:
+        from invarlock.reporting.report_schema import REPORT_SCHEMA_VERSION
+    except _VERSION_IMPORT_ERRORS:
+        return None
+    return (
+        REPORT_SCHEMA_VERSION
+        if isinstance(REPORT_SCHEMA_VERSION, str) and REPORT_SCHEMA_VERSION
+        else None
+    )
+
+
+def _resolve_package_version() -> str | None:
+    try:
+        from importlib.metadata import version as _pkg_version
+    except _VERSION_IMPORT_ERRORS:
+        return None
+    try:
+        resolved = _pkg_version("invarlock")
+    except _VERSION_IMPORT_ERRORS:
+        return None
+    return resolved if isinstance(resolved, str) and resolved else None
+
+
+def _resolve_module_version() -> str | None:
+    try:
+        from invarlock import __version__
+    except _VERSION_IMPORT_ERRORS:
+        return None
+    return __version__ if isinstance(__version__, str) and __version__ else None
 
 
 def _emit_version() -> None:
     """Emit the InvarLock version string."""
     # Prefer package metadata when available so CLI reflects wheel truth
-    try:
-        from importlib.metadata import version as _pkg_version
-
-        schema = None
-        try:
-            from invarlock.reporting.report_schema import (
-                REPORT_SCHEMA_VERSION as _SCHEMA,
-            )
-
-            schema = _SCHEMA
-        except Exception:
-            schema = None
-        msg = f"InvarLock {_pkg_version('invarlock')}"
+    package_version = _resolve_package_version()
+    if package_version is not None:
+        msg = f"InvarLock {package_version}"
+        schema = _resolve_schema_version()
         if schema:
             msg += f" · schema={schema}"
         console.print(msg)
         return
-    except Exception:
-        pass
-    try:
-        from invarlock import __version__
-
-        console.print(f"InvarLock {__version__}")
-    except Exception:
-        console.print("InvarLock version unknown")
+    module_version = _resolve_module_version()
+    if module_version is not None:
+        console.print(f"InvarLock {module_version}")
+        return
+    console.print("InvarLock version unknown")
 
 
 @app.callback(invoke_without_command=True)

@@ -1,4 +1,5 @@
 import sys
+from importlib.metadata import PackageNotFoundError
 from types import ModuleType
 
 from invarlock.cli.app import version as version_fn
@@ -12,7 +13,7 @@ def test_version_prints_version(capsys, monkeypatch):
 
     # Force package metadata import path to fail so we exercise fallback
     def _raise(*_args, **_kwargs):
-        raise Exception("boom")
+        raise PackageNotFoundError("boom")
 
     monkeypatch.setattr("importlib.metadata.version", _raise)
     version_fn()
@@ -35,7 +36,7 @@ def test_version_import_error_path(capsys, monkeypatch):
 
     # Also make package metadata resolution fail
     def _raise(*_args, **_kwargs):
-        raise Exception("boom")
+        raise PackageNotFoundError("boom")
 
     monkeypatch.setattr("importlib.metadata.version", _raise)
     version_fn()
