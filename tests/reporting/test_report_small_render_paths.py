@@ -7,7 +7,7 @@ from invarlock.reporting.utils import _pair_logloss_windows
 
 def test_pair_logloss_windows_invalid_and_small_samples():
     # Invalid inputs
-    assert _pair_logloss_windows(None, None) is None  # type: ignore[arg-type]
+    assert _pair_logloss_windows(None, None) is None
     assert _pair_logloss_windows({"window_ids": [1]}, {"window_ids": [1]}) is None
     # Valid structure but <2 pairs → None
     run = {"window_ids": [1], "logloss": [1.0]}

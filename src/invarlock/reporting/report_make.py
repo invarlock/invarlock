@@ -12,6 +12,7 @@ from __future__ import annotations
 
 # Core evaluation report building and analysis orchestration lives here.
 import copy
+from collections.abc import Callable
 from typing import Any, cast
 
 from invarlock.core.auto_tuning import get_tier_policies
@@ -86,6 +87,15 @@ VARIANCE_CANONICAL_KEYS = (
     "max_adjusted_modules",
 )
 
+_MAKE_REPORT_NON_FATAL_EXCEPTIONS = (
+    AttributeError,
+    TypeError,
+    ValueError,
+    KeyError,
+    RuntimeError,
+    OSError,
+)
+
 
 ## Helpers are imported from invarlock.reporting.utils
 _collect_backend_versions = report_provenance_mod.collect_backend_versions
@@ -110,93 +120,14 @@ def _compute_thresholds_hash(payload: dict[str, Any]) -> str:
     return _impl(payload)
 
 
-# Tighten JSON Schema: populate validation.properties from allow-list and
-# disallow unknown validation keys at schema level.
-_VALIDATION_ALLOWLIST_KEYS, _VALIDATION_ALLOWLIST_SOURCE = (
-    _load_validation_allowlist_with_source()
-)
-_apply_validation_allowlist_schema(REPORT_JSON_SCHEMA, _VALIDATION_ALLOWLIST_KEYS)
-
-
-## Note: helpers like _get_section/_get_mapping/_iter_guard_entries,
-## and policy helpers are provided by invarlock.reporting.utils and policy_utils.
-## Import those directly in callers/tests instead of through this module.
-
-
-def make_report(
+def _copy_meta_provenance_fields(
     report: RunReport,
-    baseline: RunReport | dict[str, Any],
+    meta: dict[str, Any],
+    build_diagnostics: list[dict[str, Any]],
     *,
-    provenance_env_flags: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Generate an evaluation report from a RunReport and baseline comparison."""
-    NON_FATAL_EXCEPTIONS = (
-        AttributeError,
-        TypeError,
-        ValueError,
-        KeyError,
-        RuntimeError,
-        OSError,
-    )
-    evaluate_metric_tail = tail_stats_mod.evaluate_metric_tail
-    build_diagnostics: list[dict[str, Any]] = []
-    provenance_blocking_issue = False
-
-    def _record_blocking_diagnostic(code: str, message: str) -> None:
-        nonlocal provenance_blocking_issue
-        provenance_blocking_issue = True
-        _append_build_diagnostic(
-            build_diagnostics,
-            code=code,
-            message=message,
-            severity="error",
-        )
-
-    report = report_normalization_mod.normalize_and_validate_run_report(report)
-    report_map = cast(dict[str, Any], report)
-
-    # Normalize baseline input
-    baseline_raw = baseline
-    baseline_raw_map = cast(dict[str, Any], baseline_raw)
-    try:
-        baseline_normalized = report_normalization_mod.normalize_baseline(baseline_raw)
-    except NON_FATAL_EXCEPTIONS as exc:
-        raise ValidationError(
-            code="E231",
-            message=(
-                "Baseline normalization failed; evaluation report assembly "
-                "requires a concrete finite baseline metric or valid baseline "
-                "evaluation evidence."
-            ),
-            details={"error": str(exc)},
-        ) from exc
-    baseline_report: RunReport | None = None
-    try:
-        if (
-            isinstance(baseline_raw, dict)
-            and "meta" in baseline_raw
-            and "metrics" in baseline_raw
-            and "edit" in baseline_raw
-        ):
-            baseline_report = (
-                report_normalization_mod.normalize_and_validate_run_report(baseline_raw)
-            )
-    except NON_FATAL_EXCEPTIONS as exc:
-        raise ValidationError(
-            code="E232",
-            message=(
-                "Baseline report normalization failed; evaluation report assembly "
-                "requires a valid baseline report."
-            ),
-            details={"error": str(exc)},
-        ) from exc
-
-    # Extract core metadata with full seed bundle
-    meta = extract_report_meta(report, build_diagnostics)
-
-    # Propagate environment flags captured in the RunReport (e.g., deterministic algos,
-    # TF32 controls, MPS/CUDA availability). This is useful for auditability and
-    # reproducibility of evaluation runs.
+    record_blocking_diagnostic,
+    non_fatal_exceptions: tuple[type[BaseException], ...],
+) -> None:
     try:
         env_flags = (
             report.get("meta", {}).get("env_flags")
@@ -205,13 +136,12 @@ def make_report(
         )
         if isinstance(env_flags, dict) and env_flags:
             meta["env_flags"] = env_flags
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        _record_blocking_diagnostic(
+    except non_fatal_exceptions:  # pragma: no cover
+        record_blocking_diagnostic(
             code="meta.env_flags_unavailable",
             message="Environment flag provenance could not be copied into the evaluation report.",
         )
 
-    # Determinism preset (CI/Release provenance) when present.
     try:
         det = (
             report.get("meta", {}).get("determinism")
@@ -220,13 +150,12 @@ def make_report(
         )
         if isinstance(det, dict) and det:
             meta["determinism"] = det
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        _record_blocking_diagnostic(
+    except non_fatal_exceptions:  # pragma: no cover
+        record_blocking_diagnostic(
             code="meta.determinism_unavailable",
             message="Determinism provenance could not be copied into the evaluation report.",
         )
 
-    # Execution profile provenance when available via run context.
     try:
         ctx = report.get("context") if isinstance(report, dict) else None
         ctx_profile = (
@@ -236,8 +165,8 @@ def make_report(
         )
         if ctx_profile:
             meta["profile"] = ctx_profile
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        _record_blocking_diagnostic(
+    except non_fatal_exceptions:  # pragma: no cover
+        record_blocking_diagnostic(
             code="meta.profile_unavailable",
             message="Execution profile provenance could not be copied into the evaluation report.",
         )
@@ -258,7 +187,171 @@ def make_report(
     if isinstance(cuda_flags, dict) and cuda_flags:
         meta["cuda_flags"] = cuda_flags
 
-    # Extract auto-tuning configuration
+
+def _resolve_policy_inputs(
+    report: RunReport,
+    build_diagnostics: list[dict[str, Any]],
+    *,
+    non_fatal_exceptions: tuple[type[BaseException], ...],
+) -> tuple[str | None, dict[str, Any] | None]:
+    profile = None
+    explicit_overrides: dict[str, Any] | None = None
+    try:
+        ctx = report.get("context") if isinstance(report, dict) else None
+        if isinstance(ctx, dict) and ctx.get("profile"):
+            profile = str(ctx.get("profile"))
+    except non_fatal_exceptions:
+        profile = None
+        _append_build_diagnostic(
+            build_diagnostics,
+            code="policy.profile_from_context_failed",
+            message="Profile extraction from run context failed; policy resolution fell back to default profile handling.",
+            severity="error",
+        )
+    try:
+        window_plan = (
+            report.get("metrics", {}).get("window_plan")
+            if isinstance(report.get("metrics"), dict)
+            else None
+        )
+        if (
+            profile is None
+            and isinstance(window_plan, dict)
+            and window_plan.get("profile")
+        ):
+            profile = str(window_plan.get("profile"))
+    except non_fatal_exceptions:
+        profile = None
+        _append_build_diagnostic(
+            build_diagnostics,
+            code="policy.profile_from_window_plan_failed",
+            message="Window-plan profile extraction failed; policy resolution fell back to context/default profile handling.",
+            severity="error",
+        )
+    try:
+        meta_cfg = (
+            report.get("meta", {}).get("config")
+            if isinstance(report.get("meta"), dict)
+            else None
+        )
+        if isinstance(meta_cfg, dict) and isinstance(meta_cfg.get("guards"), dict):
+            explicit_overrides = meta_cfg.get("guards")
+        cfg2 = report.get("config")
+        if explicit_overrides is None and isinstance(cfg2, dict):
+            if isinstance(cfg2.get("guards"), dict):
+                explicit_overrides = cfg2.get("guards")
+    except non_fatal_exceptions:
+        explicit_overrides = None
+        _append_build_diagnostic(
+            build_diagnostics,
+            code="policy.explicit_overrides_unavailable",
+            message="Explicit guard overrides could not be extracted from the run configuration.",
+            severity="error",
+        )
+    return profile, explicit_overrides
+
+
+def _build_blocking_diagnostic_recorder(
+    build_diagnostics: list[dict[str, Any]],
+) -> tuple[dict[str, bool], Callable[[str, str], None]]:
+    state = {"blocking": False}
+
+    def _record_blocking_diagnostic(code: str, message: str) -> None:
+        state["blocking"] = True
+        _append_build_diagnostic(
+            build_diagnostics,
+            code=code,
+            message=message,
+            severity="error",
+        )
+
+    return state, _record_blocking_diagnostic
+
+
+def _normalize_make_report_inputs(
+    report: RunReport,
+    baseline: RunReport | dict[str, Any],
+    *,
+    non_fatal_exceptions: tuple[type[BaseException], ...],
+) -> tuple[
+    RunReport,
+    dict[str, Any],
+    RunReport | dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    RunReport | None,
+]:
+    normalized_report = report_normalization_mod.normalize_and_validate_run_report(
+        report
+    )
+    report_map = cast(dict[str, Any], normalized_report)
+
+    baseline_raw = baseline
+    baseline_raw_map = cast(dict[str, Any], baseline_raw)
+    try:
+        baseline_normalized = report_normalization_mod.normalize_baseline(baseline_raw)
+    except non_fatal_exceptions as exc:
+        raise ValidationError(
+            code="E231",
+            message=(
+                "Baseline normalization failed; evaluation report assembly "
+                "requires a concrete finite baseline metric or valid baseline "
+                "evaluation evidence."
+            ),
+            details={"error": str(exc)},
+        ) from exc
+
+    baseline_report: RunReport | None = None
+    try:
+        if (
+            isinstance(baseline_raw, dict)
+            and "meta" in baseline_raw
+            and "metrics" in baseline_raw
+            and "edit" in baseline_raw
+        ):
+            baseline_report = (
+                report_normalization_mod.normalize_and_validate_run_report(baseline_raw)
+            )
+    except non_fatal_exceptions as exc:
+        raise ValidationError(
+            code="E232",
+            message=(
+                "Baseline report normalization failed; evaluation report assembly "
+                "requires a valid baseline report."
+            ),
+            details={"error": str(exc)},
+        ) from exc
+
+    return (
+        normalized_report,
+        report_map,
+        baseline_raw,
+        baseline_raw_map,
+        baseline_normalized,
+        baseline_report,
+    )
+
+
+def _extract_report_build_sections(
+    report: RunReport,
+    report_map: dict[str, Any],
+    baseline_raw: RunReport | dict[str, Any],
+    baseline_normalized: dict[str, Any],
+    baseline_report: RunReport | None,
+    build_diagnostics: list[dict[str, Any]],
+    *,
+    record_blocking_diagnostic: Callable[[str, str], None],
+    non_fatal_exceptions: tuple[type[BaseException], ...],
+) -> dict[str, Any]:
+    meta = extract_report_meta(report, build_diagnostics)
+    _copy_meta_provenance_fields(
+        report,
+        meta,
+        build_diagnostics,
+        record_blocking_diagnostic=record_blocking_diagnostic,
+        non_fatal_exceptions=non_fatal_exceptions,
+    )
+
     auto_config = report["meta"].get("auto")
     if auto_config:
         auto: dict[str, Any] = {
@@ -269,14 +362,13 @@ def make_report(
     else:
         auto = {"tier": "none", "probes_used": 0, "target_pm_ratio": None}
 
-    # Extract dataset configuration and compute hashes
     dataset_info = _extract_dataset_info(report_map)
     try:
         if isinstance(dataset_info, dict):
             windows = dataset_info.get("windows")
             if isinstance(windows, dict):
                 windows.setdefault("stats", {})
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
+    except non_fatal_exceptions:  # pragma: no cover
         _append_build_diagnostic(
             build_diagnostics,
             code="dataset.windows_stats_unavailable",
@@ -289,7 +381,6 @@ def make_report(
         baseline_normalized,
         compute_primary_metric_from_report_fn=compute_primary_metric_from_report,
     )
-
     ppl_analysis, window_plan_profile = (
         report_primary_metric_analysis_mod.build_primary_metric_analysis(
             report_map,
@@ -300,30 +391,21 @@ def make_report(
     )
     ppl_metrics = report_map.get("metrics", {})
 
-    # Extract invariant status
     invariants = guards_invariants_mod._extract_invariants(
         report,
         baseline=baseline_report,
     )
-
-    # Extract spectral analysis
     spectral = guards_spectral_mod._extract_spectral_analysis(
         report,
         baseline_normalized,
     )
-
-    # Extract RMT analysis
     rmt = guards_rmt_mod._extract_rmt_analysis(report, baseline_normalized)
-
-    # Extract variance guard info
     variance = guards_variance_mod._extract_variance_analysis(report)
 
-    # Extract structural deltas
     structure = report_edit_summary_mod.extract_structural_deltas(report)
     compression_diag = structure.get("compression_diagnostics", {})
     structure["compression_diagnostics"] = compression_diag
 
-    # Extract effective policies used
     policies = report_policy_utils_mod._extract_effective_policies(report)
     variance_policy = policies.get("variance")
     guard_variance_policy = None
@@ -356,64 +438,44 @@ def make_report(
         if variance_policy_digest:
             policies["variance"]["policy_digest"] = variance_policy_digest
 
-    # Resolve tier/profile policy (canonical) and merge observed guard policies.
-    profile = None
-    explicit_overrides: dict[str, Any] | None = None
-    try:
-        ctx = report.get("context") if isinstance(report, dict) else None
-        if isinstance(ctx, dict) and ctx.get("profile"):
-            profile = str(ctx.get("profile"))
-    except NON_FATAL_EXCEPTIONS:
-        profile = None
-        provenance_blocking_issue = True
-        _append_build_diagnostic(
-            build_diagnostics,
-            code="policy.profile_from_context_failed",
-            message="Profile extraction from run context failed; policy resolution fell back to default profile handling.",
-            severity="error",
-        )
-    try:
-        window_plan = (
-            report.get("metrics", {}).get("window_plan")
-            if isinstance(report.get("metrics"), dict)
-            else None
-        )
-        if (
-            profile is None
-            and isinstance(window_plan, dict)
-            and window_plan.get("profile")
-        ):
-            profile = str(window_plan.get("profile"))
-    except NON_FATAL_EXCEPTIONS:
-        profile = None
-        provenance_blocking_issue = True
-        _append_build_diagnostic(
-            build_diagnostics,
-            code="policy.profile_from_window_plan_failed",
-            message="Window-plan profile extraction failed; policy resolution fell back to context/default profile handling.",
-            severity="error",
-        )
-    try:
-        meta_cfg = (
-            report.get("meta", {}).get("config")
-            if isinstance(report.get("meta"), dict)
-            else None
-        )
-        if isinstance(meta_cfg, dict) and isinstance(meta_cfg.get("guards"), dict):
-            explicit_overrides = meta_cfg.get("guards")
-        cfg2 = report.get("config")
-        if explicit_overrides is None and isinstance(cfg2, dict):
-            if isinstance(cfg2.get("guards"), dict):
-                explicit_overrides = cfg2.get("guards")
-    except NON_FATAL_EXCEPTIONS:
-        explicit_overrides = None
-        provenance_blocking_issue = True
-        _append_build_diagnostic(
-            build_diagnostics,
-            code="policy.explicit_overrides_unavailable",
-            message="Explicit guard overrides could not be extracted from the run configuration.",
-            severity="error",
-        )
+    return {
+        "meta": meta,
+        "auto": auto,
+        "dataset_info": dataset_info,
+        "baseline_ref": baseline_ref,
+        "ppl_analysis": ppl_analysis,
+        "window_plan_profile": window_plan_profile,
+        "ppl_metrics": ppl_metrics,
+        "invariants": invariants,
+        "spectral": spectral,
+        "rmt": rmt,
+        "variance": variance,
+        "structure": structure,
+        "policies": policies,
+        "variance_policy_digest": variance_policy_digest,
+    }
+
+
+def _resolve_policy_edit_and_telemetry_context(
+    report: RunReport,
+    report_map: dict[str, Any],
+    meta: dict[str, Any],
+    auto: dict[str, Any],
+    spectral: dict[str, Any],
+    rmt: dict[str, Any],
+    variance: dict[str, Any],
+    policies: dict[str, Any],
+    variance_policy_digest: str,
+    build_diagnostics: list[dict[str, Any]],
+    *,
+    record_blocking_diagnostic: Callable[[str, str], None],
+    non_fatal_exceptions: tuple[type[BaseException], ...],
+) -> dict[str, Any]:
+    profile, explicit_overrides = _resolve_policy_inputs(
+        report,
+        build_diagnostics,
+        non_fatal_exceptions=non_fatal_exceptions,
+    )
 
     resolved_policy = report_policy_utils_mod._build_resolved_policies(
         auto.get("tier", "balanced"),
@@ -437,9 +499,9 @@ def make_report(
         "validation_allowlist_source": _VALIDATION_ALLOWLIST_SOURCE,
     }
     if profile in {"ci", "release"} and _VALIDATION_ALLOWLIST_SOURCE != "contracts":
-        _record_blocking_diagnostic(
-            code="policy.validation_allowlist_source_invalid",
-            message=(
+        record_blocking_diagnostic(
+            "policy.validation_allowlist_source_invalid",
+            (
                 "CI/Release evaluation reports must resolve validation allowlists "
                 "from contracts-only sources."
             ),
@@ -458,6 +520,7 @@ def make_report(
         raw_plugin_provenance = meta_plugins.get("plugins")
         if isinstance(raw_plugin_provenance, dict):
             plugin_provenance = raw_plugin_provenance
+
     edit_metadata = report_edit_summary_mod.extract_edit_metadata(
         report, plugin_provenance
     )
@@ -472,7 +535,38 @@ def make_report(
 
     telemetry = report_build_context_mod.extract_telemetry(report, meta.get("device"))
 
-    # Build the evaluation report
+    return {
+        "profile": profile,
+        "resolved_policy": resolved_policy,
+        "policy_provenance": policy_provenance,
+        "plugin_provenance": plugin_provenance,
+        "edit_metadata": edit_metadata,
+        "edit_name": edit_name,
+        "telemetry": telemetry,
+    }
+
+
+def _build_report_assembly_context(
+    report: RunReport,
+    report_map: dict[str, Any],
+    baseline_raw: RunReport | dict[str, Any],
+    baseline_raw_map: dict[str, Any],
+    baseline_normalized: dict[str, Any],
+    baseline_ref: dict[str, Any],
+    dataset_info: dict[str, Any],
+    telemetry: dict[str, Any],
+    policy_provenance: dict[str, Any],
+    ppl_analysis: dict[str, Any],
+    resolved_policy: dict[str, Any],
+    auto: dict[str, Any],
+    invariants: dict[str, Any],
+    spectral: dict[str, Any],
+    rmt: dict[str, Any],
+    ppl_metrics: dict[str, Any] | Any,
+    provenance_env_flags: dict[str, Any] | None,
+    blocking_state: dict[str, bool],
+) -> dict[str, Any]:
+    evaluate_metric_tail = tail_stats_mod.evaluate_metric_tail
     window_capacity_ctx = (
         report.get("metrics", {}).get("window_capacity")
         if isinstance(report.get("metrics"), dict)
@@ -480,12 +574,10 @@ def make_report(
     )
 
     artifacts_payload = report_build_context_mod.build_artifacts_payload(report)
-
     raw_guard_ctx = report.get("guard_overhead")
     guard_overhead_section, _ = report_overhead_mod.prepare_guard_overhead_section(
         raw_guard_ctx
     )
-
     schedule_digest = report_build_context_mod.attach_schedule_digest(
         report, guard_overhead_section
     )
@@ -511,10 +603,10 @@ def make_report(
     moe_section = report_build_context_mod.build_moe_section(
         report, baseline_raw, baseline_normalized
     )
-
     capacity_tokens, capacity_examples = (
         report_build_context_mod.resolve_capacity_context(
-            window_capacity_ctx, dataset_info
+            window_capacity_ctx,
+            dataset_info,
         )
     )
 
@@ -525,7 +617,6 @@ def make_report(
         report_map, drift_band_default=PM_DRIFT_BAND_DEFAULT
     )
     tiny_relax = report_policy_mod.resolve_tiny_relax_from_report(report_map)
-
     pm_tail_result = report_build_context_mod.evaluate_primary_metric_tail(
         report,
         baseline_normalized,
@@ -537,7 +628,6 @@ def make_report(
     target_ratio = (
         float(target_ratio_raw) if isinstance(target_ratio_raw, int | float) else None
     )
-
     validation_flags = report_validation_mod.compute_validation_flags(
         ppl=ppl_analysis,
         spectral=spectral,
@@ -565,15 +655,57 @@ def make_report(
         get_tier_policies_fn=get_tier_policies,
     )
 
-    # Enforce validation key allow-list to prevent surface drift
     _allowed_validation = _load_validation_allowlist()
     validation_filtered = {
         k: bool(v) for k, v in validation_flags.items() if k in _allowed_validation
     }
-    if provenance_blocking_issue:
+    if blocking_state["blocking"]:
         validation_filtered["primary_metric_acceptable"] = False
 
-    evaluation_report: dict[str, Any] = {
+    return {
+        "artifacts_payload": artifacts_payload,
+        "raw_guard_ctx": raw_guard_ctx,
+        "guard_overhead_section": guard_overhead_section,
+        "current_run_id": current_run_id,
+        "provenance": provenance,
+        "moe_section": moe_section,
+        "capacity_tokens": capacity_tokens,
+        "capacity_examples": capacity_examples,
+        "pm_acceptance_range": pm_acceptance_range,
+        "pm_drift_band": pm_drift_band,
+        "tiny_relax": tiny_relax,
+        "pm_tail_result": pm_tail_result,
+        "validation_filtered": validation_filtered,
+    }
+
+
+def _build_evaluation_report(
+    *,
+    report_map: dict[str, Any],
+    current_run_id: str,
+    meta: dict[str, Any],
+    auto: dict[str, Any],
+    dataset_info: dict[str, Any],
+    edit_metadata: dict[str, Any] | None,
+    telemetry: dict[str, Any],
+    baseline_ref: dict[str, Any],
+    invariants: dict[str, Any],
+    spectral: dict[str, Any],
+    rmt: dict[str, Any],
+    variance: dict[str, Any],
+    structure: dict[str, Any],
+    policies: dict[str, Any],
+    resolved_policy: dict[str, Any],
+    policy_provenance: dict[str, Any],
+    provenance: dict[str, Any],
+    plugin_provenance: dict[str, Any],
+    edit_name: str | None,
+    artifacts_payload: dict[str, Any],
+    validation_filtered: dict[str, bool],
+    guard_overhead_section: dict[str, Any],
+    pm_tail_result: dict[str, Any],
+) -> dict[str, Any]:
+    return {
         "schema_version": REPORT_SCHEMA_VERSION,
         "run_id": current_run_id,
         "meta": meta,
@@ -599,7 +731,29 @@ def make_report(
         "primary_metric_tail": pm_tail_result,
     }
 
-    # Record tiny-relax provenance explicitly when active.
+
+def _finalize_evaluation_report(
+    evaluation_report: dict[str, Any],
+    *,
+    report_map: dict[str, Any],
+    report: RunReport,
+    baseline_raw_map: dict[str, Any],
+    baseline_normalized: dict[str, Any],
+    baseline_ref: dict[str, Any],
+    telemetry: dict[str, Any],
+    resolved_policy: dict[str, Any],
+    auto: dict[str, Any],
+    policy_provenance: dict[str, Any],
+    raw_guard_ctx: Any,
+    ppl_analysis: dict[str, Any],
+    window_plan_profile: Any,
+    pm_drift_band: dict[str, Any] | None,
+    tiny_relax: bool,
+    current_run_id: str,
+    build_diagnostics: list[dict[str, Any]],
+    record_blocking_diagnostic,
+    non_fatal_exceptions: tuple[type[BaseException], ...],
+) -> None:
     if tiny_relax:
         try:
             auto_section = evaluation_report.setdefault("auto", {})
@@ -610,8 +764,8 @@ def make_report(
                 flags = prov.setdefault("flags", [])
                 if isinstance(flags, list) and "tiny_relax" not in flags:
                     flags.append("tiny_relax")
-        except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-            _record_blocking_diagnostic(
+        except non_fatal_exceptions:  # pragma: no cover
+            record_blocking_diagnostic(
                 code="provenance.tiny_relax_flag_unavailable",
                 message="Tiny-relax provenance could not be attached to the evaluation report.",
             )
@@ -625,8 +779,8 @@ def make_report(
 
     try:
         _propagate_pairing_stats(evaluation_report, ppl_analysis)
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        _record_blocking_diagnostic(
+    except non_fatal_exceptions:  # pragma: no cover
+        record_blocking_diagnostic(
             code="pairing.stats_unavailable",
             message="Pairing statistics could not be propagated into the evaluation report.",
         )
@@ -650,7 +804,6 @@ def make_report(
         telemetry,
     )
 
-    # Attach/normalize primary metric block (moved to helper)
     from .primary_metric_utils import attach_primary_metric as _attach_pm
 
     _attach_pm(
@@ -665,8 +818,8 @@ def make_report(
             pm_block = evaluation_report.get("primary_metric")
             if isinstance(pm_block, dict):
                 pm_block.setdefault("drift_band", dict(pm_drift_band))
-    except NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        _record_blocking_diagnostic(
+    except non_fatal_exceptions:  # pragma: no cover
+        record_blocking_diagnostic(
             code="primary_metric.drift_band_unavailable",
             message="Primary-metric drift-band metadata could not be attached to the evaluation report.",
         )
@@ -676,7 +829,6 @@ def make_report(
         ppl_analysis.get("logloss_delta_ci"),
         window_plan_profile,
     )
-
     report_enrichment_mod.ensure_primary_metric_display_ci(evaluation_report)
     report_enrichment_mod.attach_telemetry_summary_line(
         evaluation_report, report_map, current_run_id
@@ -688,5 +840,134 @@ def make_report(
         meta_section = evaluation_report.setdefault("meta", {})
         if isinstance(meta_section, dict):
             meta_section["build_diagnostics"] = build_diagnostics
+
+
+# Tighten JSON Schema: populate validation.properties from allow-list and
+# disallow unknown validation keys at schema level.
+_VALIDATION_ALLOWLIST_KEYS, _VALIDATION_ALLOWLIST_SOURCE = (
+    _load_validation_allowlist_with_source()
+)
+_apply_validation_allowlist_schema(REPORT_JSON_SCHEMA, _VALIDATION_ALLOWLIST_KEYS)
+
+
+## Note: helpers like _get_section/_get_mapping/_iter_guard_entries,
+## and policy helpers are provided by invarlock.reporting.utils and policy_utils.
+## Import those directly in callers/tests instead of through this module.
+
+
+def make_report(
+    report: RunReport,
+    baseline: RunReport | dict[str, Any],
+    *,
+    provenance_env_flags: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Generate an evaluation report from a RunReport and baseline comparison."""
+    build_diagnostics: list[dict[str, Any]] = []
+    blocking_state, record_blocking_diagnostic = _build_blocking_diagnostic_recorder(
+        build_diagnostics
+    )
+    (
+        report,
+        report_map,
+        baseline_raw,
+        baseline_raw_map,
+        baseline_normalized,
+        baseline_report,
+    ) = _normalize_make_report_inputs(
+        report,
+        baseline,
+        non_fatal_exceptions=_MAKE_REPORT_NON_FATAL_EXCEPTIONS,
+    )
+    sections = _extract_report_build_sections(
+        report,
+        report_map,
+        baseline_raw,
+        baseline_normalized,
+        baseline_report,
+        build_diagnostics,
+        record_blocking_diagnostic=record_blocking_diagnostic,
+        non_fatal_exceptions=_MAKE_REPORT_NON_FATAL_EXCEPTIONS,
+    )
+    policy_context = _resolve_policy_edit_and_telemetry_context(
+        report,
+        report_map,
+        sections["meta"],
+        sections["auto"],
+        sections["spectral"],
+        sections["rmt"],
+        sections["variance"],
+        sections["policies"],
+        sections["variance_policy_digest"],
+        build_diagnostics,
+        record_blocking_diagnostic=record_blocking_diagnostic,
+        non_fatal_exceptions=_MAKE_REPORT_NON_FATAL_EXCEPTIONS,
+    )
+    assembly_context = _build_report_assembly_context(
+        report,
+        report_map,
+        baseline_raw,
+        baseline_raw_map,
+        baseline_normalized,
+        sections["baseline_ref"],
+        sections["dataset_info"],
+        policy_context["telemetry"],
+        policy_context["policy_provenance"],
+        sections["ppl_analysis"],
+        policy_context["resolved_policy"],
+        sections["auto"],
+        sections["invariants"],
+        sections["spectral"],
+        sections["rmt"],
+        sections["ppl_metrics"],
+        provenance_env_flags,
+        blocking_state,
+    )
+
+    evaluation_report = _build_evaluation_report(
+        report_map=report_map,
+        current_run_id=assembly_context["current_run_id"],
+        meta=sections["meta"],
+        auto=sections["auto"],
+        dataset_info=sections["dataset_info"],
+        edit_metadata=policy_context["edit_metadata"],
+        telemetry=policy_context["telemetry"],
+        baseline_ref=sections["baseline_ref"],
+        invariants=sections["invariants"],
+        spectral=sections["spectral"],
+        rmt=sections["rmt"],
+        variance=sections["variance"],
+        structure=sections["structure"],
+        policies=sections["policies"],
+        resolved_policy=policy_context["resolved_policy"],
+        policy_provenance=policy_context["policy_provenance"],
+        provenance=assembly_context["provenance"],
+        plugin_provenance=policy_context["plugin_provenance"],
+        edit_name=policy_context["edit_name"],
+        artifacts_payload=assembly_context["artifacts_payload"],
+        validation_filtered=assembly_context["validation_filtered"],
+        guard_overhead_section=assembly_context["guard_overhead_section"],
+        pm_tail_result=assembly_context["pm_tail_result"],
+    )
+    _finalize_evaluation_report(
+        evaluation_report,
+        report_map=report_map,
+        report=report,
+        baseline_raw_map=baseline_raw_map,
+        baseline_normalized=baseline_normalized,
+        baseline_ref=sections["baseline_ref"],
+        telemetry=policy_context["telemetry"],
+        resolved_policy=policy_context["resolved_policy"],
+        auto=sections["auto"],
+        policy_provenance=policy_context["policy_provenance"],
+        raw_guard_ctx=assembly_context["raw_guard_ctx"],
+        ppl_analysis=sections["ppl_analysis"],
+        window_plan_profile=sections["window_plan_profile"],
+        pm_drift_band=assembly_context["pm_drift_band"],
+        tiny_relax=assembly_context["tiny_relax"],
+        current_run_id=assembly_context["current_run_id"],
+        build_diagnostics=build_diagnostics,
+        record_blocking_diagnostic=record_blocking_diagnostic,
+        non_fatal_exceptions=_MAKE_REPORT_NON_FATAL_EXCEPTIONS,
+    )
 
     return evaluation_report

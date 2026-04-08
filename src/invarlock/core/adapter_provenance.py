@@ -8,6 +8,7 @@ environment and import metadata to annotate evaluation artifacts.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as pkg_version
 from typing import Any
 
@@ -32,6 +33,14 @@ _FAMILY_MAP: dict[str, tuple[str, str, list[str]]] = {
     "hf_bnb": ("bnb", "bitsandbytes", []),
 }
 
+_PROVENANCE_LOOKUP_ERRORS = (
+    PackageNotFoundError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 def extract_adapter_provenance(adapter_name: str) -> AdapterProvenance:
     name = (adapter_name or "").strip().lower()
@@ -46,7 +55,7 @@ def extract_adapter_provenance(adapter_name: str) -> AdapterProvenance:
             if supported
             else f"Use Compare & Evaluate (BYOE); {library} version unsupported (tested: {tested})"
         )
-    except Exception:  # Package not installed or version unknown
+    except _PROVENANCE_LOOKUP_ERRORS:  # Package not installed or metadata unavailable
         ver = None
         supported = False
         msg = f"{library} not available; prefer Compare & Evaluate (BYOE) or install extras."

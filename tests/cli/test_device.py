@@ -115,7 +115,7 @@ def test_is_device_available_cuda_and_mps_paths(monkeypatch):
     torch_stub = _install_torch_stub(monkeypatch)
     assert device_mod.is_device_available("cuda:3") is True
     assert device_mod.is_device_available("mps") is True
-    torch_stub.cuda.is_available = lambda: False  # type: ignore[attr-defined]
+    torch_stub.cuda.is_available = lambda: False
     assert device_mod.is_device_available("cuda") is False
 
 

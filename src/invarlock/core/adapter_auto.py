@@ -50,6 +50,7 @@ _MLM_MODEL_TYPES = {
     "distilbert",
     "roberta",
 }
+_MODEL_CONFIG_ERRORS = (AttributeError, TypeError, ValueError)
 
 
 def _read_local_hf_config(model_id: str | os.PathLike[str]) -> dict[str, Any] | None:
@@ -76,18 +77,18 @@ def _detect_quant_family_from_cfg(cfg: dict[str, Any]) -> str | None:
 
     Returns one of: 'hf_gptq', 'hf_awq', 'hf_bnb' or None if not detected.
     """
-    try:
-        q = cfg.get("quantization_config") or {}
-        if isinstance(q, dict):
+    q = cfg.get("quantization_config") or {}
+    if isinstance(q, dict):
+        try:
             method = str(q.get("quant_method", q.get("quant_method_full", ""))).lower()
-            if any(tok in method for tok in ("gptq",)):
-                return "hf_gptq"
-            if any(tok in method for tok in ("awq",)):
-                return "hf_awq"
-            if "bitsandbytes" in method or "bnb" in method:
-                return "hf_bnb"
-    except Exception:
-        return None
+        except _MODEL_CONFIG_ERRORS:
+            return None
+        if any(tok in method for tok in ("gptq",)):
+            return "hf_gptq"
+        if any(tok in method for tok in ("awq",)):
+            return "hf_awq"
+        if "bitsandbytes" in method or "bnb" in method:
+            return "hf_bnb"
     return None
 
 

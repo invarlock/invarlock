@@ -85,7 +85,7 @@ def test_coerce_int_nonfinite_float():
 
 def test_resolve_policy_tier_exception_path():
     class BadStr:
-        def __str__(self):  # type: ignore[override]
+        def __str__(self):
             raise RuntimeError("boom")
 
     report = {"meta": {"auto": {"tier": BadStr()}}}

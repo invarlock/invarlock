@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import os
 from importlib.metadata import PackageNotFoundError
+from typing import Any, cast
 
 from typer.testing import CliRunner
 
@@ -20,7 +21,7 @@ def test_version_outputs_schema(monkeypatch):
     monkeypatch.setattr(im, "version", lambda _: "0.0.0-test")
 
     runner = CliRunner()
-    result = runner.invoke(app_mod.app, ["version"])  # type: ignore[attr-defined]
+    result = runner.invoke(cast(Any, app_mod).app, ["version"])
     assert result.exit_code == 0
     assert "InvarLock 0.0.0-test" in result.output
     # Should include schema version when available
@@ -51,12 +52,12 @@ def test_version_fallbacks(monkeypatch):
         im, "version", lambda *_: (_ for _ in ()).throw(PackageNotFoundError("boom"))
     )
     runner = CliRunner()
-    result = runner.invoke(app_mod.app, ["version"])  # type: ignore[attr-defined]
+    result = runner.invoke(cast(Any, app_mod).app, ["version"])
     assert result.exit_code == 0
     assert "InvarLock" in result.output  # fallback ok
 
     # Remove __version__ and ensure we print unknown
     monkeypatch.delattr(invarlock, "__version__", raising=False)
-    result2 = runner.invoke(app_mod.app, ["version"])  # type: ignore[attr-defined]
+    result2 = runner.invoke(cast(Any, app_mod).app, ["version"])
     assert result2.exit_code == 0
     assert "unknown" in result2.output.lower()

@@ -9,6 +9,16 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
+_OBSERVABILITY_PROBE_ERRORS = (
+    AttributeError,
+    ImportError,
+    ModuleNotFoundError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 class MetricType(Enum):
     """Types of metrics supported."""
@@ -476,7 +486,7 @@ def reset_peak_memory_stats() -> None:
         mps = getattr(torch, "mps", None)
         if mps is not None and hasattr(mps, "reset_peak_memory_stats"):
             mps.reset_peak_memory_stats()
-    except Exception:
+    except _OBSERVABILITY_PROBE_ERRORS:
         pass
 
 
@@ -497,7 +507,7 @@ def capture_memory_snapshot(
         process = psutil.Process(os.getpid())
         rss_mb = process.memory_info().rss / 1024 / 1024
         snapshot["rss_mb"] = float(rss_mb)
-    except Exception:
+    except _OBSERVABILITY_PROBE_ERRORS:
         pass
 
     try:
@@ -531,7 +541,7 @@ def capture_memory_snapshot(
                         snapshot["gpu_reserved_mb"] = float(
                             mps.driver_allocated_memory() / 1024 / 1024
                         )
-    except Exception:
+    except _OBSERVABILITY_PROBE_ERRORS:
         pass
 
     if len(snapshot) <= 2:

@@ -35,7 +35,7 @@ def test_normalize_model_id_reraises_unexpected_adapter_text_errors() -> None:
             raise AssertionError("explode")
 
     with pytest.raises(AssertionError, match="explode"):
-        normalize_model_id("hf:org/model", _BadAdapterName())  # type: ignore[arg-type]
+        normalize_model_id("hf:org/model", _BadAdapterName())
 
 
 def test_sanitize_preset_data_for_evaluate_removes_pinned_device() -> None:

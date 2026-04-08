@@ -155,6 +155,7 @@ def _load_yaml() -> dict[str, Any] | None:
     except ImportError:
         logger.debug("PyYAML not installed; using fallback tier config")
         return None
+    tier_config_load_errors = (OSError, TypeError, ValueError, yaml.YAMLError)
 
     if not _TIERS_YAML_PATH.exists():
         logger.debug("tiers.yaml not found at %s; using fallback", _TIERS_YAML_PATH)
@@ -167,7 +168,7 @@ def _load_yaml() -> dict[str, Any] | None:
             logger.warning("tiers.yaml did not parse as dict; using fallback")
             return None
         return data
-    except Exception as exc:
+    except tier_config_load_errors as exc:
         logger.warning("Failed to load tiers.yaml: %s; using fallback", exc)
         return None
 

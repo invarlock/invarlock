@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+_ITEMS_CALL_ERRORS = (AttributeError, TypeError, ValueError)
+
 
 def _mapping_items(value: Any) -> list[tuple[Any, Any]]:
     if isinstance(value, Mapping):
@@ -14,7 +16,7 @@ def _mapping_items(value: Any) -> list[tuple[Any, Any]]:
     if callable(items):
         try:
             return list(items())
-        except Exception:
+        except _ITEMS_CALL_ERRORS:
             return []
     return []
 

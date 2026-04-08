@@ -31,6 +31,7 @@ from .auto_tuning import resolve_tier_policies
 from .bootstrap import compute_paired_delta_log_ci, logspace_to_ratio_ci
 from .checkpoint import CheckpointManager
 from .events import EventLogger
+from .exceptions import InvarlockError
 from .runner_context import (
     collect_cuda_flags as _collect_cuda_flags,
 )
@@ -63,6 +64,16 @@ from .runner_services import (
 from .types import LogLevel, RunStatus
 
 __all__ = ["CoreRunner"]
+
+_RUNNER_EXECUTION_ERRORS = (
+    AssertionError,
+    InvarlockError,
+    ImportError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 
 class CoreRunner:
@@ -223,7 +234,7 @@ class CoreRunner:
                 {"status": final_status, "duration": report.meta["duration"]},
             )
             return report
-        except Exception as error:
+        except _RUNNER_EXECUTION_ERRORS as error:
             self._handle_error(error, report, model=model, adapter=adapter)
             return report
         finally:

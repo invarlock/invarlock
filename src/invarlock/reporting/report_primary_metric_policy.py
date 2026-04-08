@@ -188,10 +188,10 @@ def enforce_display_ci_alignment(
     if not _finite_bounds(ci):
         if _finite_bounds(logloss_delta_ci):
             assert isinstance(logloss_delta_ci, tuple | list)
-            primary_metric["ci"] = (
+            primary_metric["ci"] = [
                 float(logloss_delta_ci[0]),
                 float(logloss_delta_ci[1]),
-            )
+            ]
             ci = primary_metric["ci"]
         else:
             profile = (window_plan_profile or "dev").lower()

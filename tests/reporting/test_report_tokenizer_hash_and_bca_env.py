@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.report_make import make_report
-from invarlock.reporting.report_types import create_empty_report
+from invarlock.reporting.report_types import AutoConfig, create_empty_report
 
 
 def test_evaluation_report_baseline_ref_includes_tokenizer_hash() -> None:
@@ -9,11 +9,12 @@ def test_evaluation_report_baseline_ref_includes_tokenizer_hash() -> None:
     report["meta"]["model_id"] = "m"
     report["meta"]["adapter"] = "hf"
     report["meta"]["device"] = "cpu"
-    report["meta"]["auto"] = {
-        "tier": "balanced",
-        "probes_used": 0,
-        "target_pm_ratio": None,
-    }  # type: ignore[assignment]
+    report["meta"]["auto"] = AutoConfig(
+        enabled=False,
+        tier="balanced",
+        probes_used=0,
+        target_pm_ratio=None,
+    )
     report["data"]["dataset"] = "unit"
     report["data"]["split"] = "validation"
     report["data"]["seq_len"] = 8
@@ -77,11 +78,12 @@ def test_evaluation_report_uses_explicit_bca_when_many_paired_windows(
     report["meta"]["model_id"] = "m"
     report["meta"]["adapter"] = "hf"
     report["meta"]["device"] = "cpu"
-    report["meta"]["auto"] = {
-        "tier": "balanced",
-        "probes_used": 0,
-        "target_pm_ratio": None,
-    }  # type: ignore[assignment]
+    report["meta"]["auto"] = AutoConfig(
+        enabled=False,
+        tier="balanced",
+        probes_used=0,
+        target_pm_ratio=None,
+    )
     report["data"]["dataset"] = "unit"
     report["data"]["split"] = "validation"
     report["data"]["seq_len"] = 8

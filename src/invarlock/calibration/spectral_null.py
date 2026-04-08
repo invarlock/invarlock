@@ -4,12 +4,14 @@ import math
 from collections import Counter, defaultdict
 from typing import Any
 
+_COERCE_ERRORS = (TypeError, ValueError, OverflowError)
+
 
 def _finite01(value: Any) -> bool:
     try:
         f = float(value)
         return math.isfinite(f) and 0.0 <= f <= 1.0
-    except Exception:
+    except _COERCE_ERRORS:
         return False
 
 
@@ -23,7 +25,7 @@ def _bh_reject_families(
         return set()
     try:
         alpha_f = float(alpha)
-    except Exception:
+    except _COERCE_ERRORS:
         return set()
     if not (0.0 < alpha_f <= 1.0):
         return set()
@@ -65,7 +67,7 @@ def _bonferroni_reject_families(
         return set()
     try:
         alpha_f = float(alpha)
-    except Exception:
+    except _COERCE_ERRORS:
         return set()
     if not (0.0 < alpha_f <= 1.0):
         return set()
@@ -94,7 +96,7 @@ def _extract_family_max_z(metrics: dict[str, Any]) -> dict[str, float]:
             try:
                 if z is not None and math.isfinite(float(z)):
                     out[str(fam)] = float(z)
-            except Exception:
+            except _COERCE_ERRORS:
                 continue
     q = metrics.get("family_z_quantiles")
     if isinstance(q, dict):
@@ -105,7 +107,7 @@ def _extract_family_max_z(metrics: dict[str, Any]) -> dict[str, float]:
             try:
                 if z is not None and math.isfinite(float(z)):
                     out[str(fam)] = max(out.get(str(fam), float("-inf")), float(z))
-            except Exception:
+            except _COERCE_ERRORS:
                 continue
     return out
 
@@ -122,13 +124,13 @@ def _extract_multiple_testing(metrics: dict[str, Any]) -> dict[str, Any]:
         alpha = mt.get("alpha")
         if alpha is not None:
             out["alpha"] = float(alpha)
-    except Exception:
+    except _COERCE_ERRORS:
         pass
     try:
         m_val = mt.get("m")
         if m_val is not None:
             out["m"] = int(m_val)
-    except Exception:
+    except _COERCE_ERRORS:
         pass
     return out
 
@@ -190,13 +192,13 @@ def summarize_null_sweep_reports(
             if alpha_value is not None:
                 try:
                     mt_alpha = float(alpha_value)
-                except Exception:
+                except _COERCE_ERRORS:
                     pass
             m_value = mt.get("m")
             if m_value is not None:
                 try:
                     mt_m = int(m_value)
-                except Exception:
+                except _COERCE_ERRORS:
                     pass
 
         fam_z = _extract_family_max_z(metrics)
@@ -212,7 +214,7 @@ def summarize_null_sweep_reports(
         for fam, p in pvals.items():
             try:
                 pf = float(p)
-            except Exception:
+            except _COERCE_ERRORS:
                 continue
             if _finite01(pf):
                 parsed_pvals[str(fam)] = pf
@@ -228,13 +230,13 @@ def summarize_null_sweep_reports(
             for fam, count in fam_counts.items():
                 try:
                     candidate_by_family[str(fam)] += int(count)
-                except Exception:
+                except _COERCE_ERRORS:
                     continue
 
         caps_applied = metrics.get("caps_applied")
         try:
             caps_applied_int = int(caps_applied) if caps_applied is not None else 0
-        except Exception:
+        except _COERCE_ERRORS:
             caps_applied_int = 0
         violations = g.get("violations", [])
         has_warning_default.append(bool(caps_applied_int) or bool(violations))

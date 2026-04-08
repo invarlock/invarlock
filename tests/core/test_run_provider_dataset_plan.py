@@ -4,6 +4,10 @@ from types import SimpleNamespace
 
 from invarlock.core.run_provider_dataset_plan import (
     ProviderDatasetPlanDiagnostic,
+    _materialize_text_provider_dataset_plan,
+    _section_dict,
+    _section_value,
+    _vision_text_dataset_plan,
     build_provider_dataset_plan,
 )
 from invarlock.eval.data_support import DatasetDiagnostic
@@ -415,3 +419,109 @@ def test_build_provider_dataset_plan_supports_vision_text_examples() -> None:
     assert result.final_records[0]["example_id"] == "ex-2"
     assert result.dataset_meta["provider_kind"] == "vision_text"
     assert result.dataset_meta["provider_digest"]["provider"] == "vision_text"
+
+
+def test_provider_dataset_plan_section_helpers_cover_fallback_paths() -> None:
+    class _Section:
+        value = "fallback"
+
+        def get(self, _key: str) -> object:
+            raise TypeError("mapping disabled")
+
+    assert _section_value(_Section(), "value") == "fallback"
+    assert _section_value(_Section(), "missing") is None
+
+    class _Config:
+        dataset = {"name": "demo"}
+        text = SimpleNamespace(value="ns", _private="drop")
+
+        def section(self, _name: str) -> object:
+            raise KeyError("boom")
+
+    assert _section_dict(_Config(), "dataset") == {"name": "demo"}
+    assert _section_dict(_Config(), "text") == {"value": "ns"}
+
+
+def test_vision_text_dataset_plan_rebalances_when_final_arm_would_be_empty() -> None:
+    provider = SimpleNamespace(
+        examples=lambda split="validation": [
+            {"id": "ex-1", "image_path": "/tmp/a.png", "answers": ["cat"]}
+        ],
+        digest=lambda: {"provider": "vision_text"},
+    )
+
+    result = _vision_text_dataset_plan(
+        data_provider=provider,
+        resolved_split="validation",
+        used_fallback_split=False,
+        cfg_dataset=SimpleNamespace(seq_len=4),
+        requested_preview=1,
+        requested_final=1,
+        effective_preview=1,
+        effective_final=1,
+        resolved_loss_type="classification",
+        diagnostics=[],
+    )
+
+    assert result.preview_count == 0
+    assert result.final_count == 1
+    assert result.final_records[0]["example_id"] == "ex-1"
+    assert result.window_plan is not None
+    assert result.window_plan["coverage_ok"] is True
+
+
+def test_materialize_text_provider_dataset_plan_handles_provider_attr_failures() -> (
+    None
+):
+    class _BrokenProvider:
+        def __getattribute__(self, name: str) -> object:
+            if name in {"last_preview_labels", "last_final_labels"}:
+                raise TypeError("labels unavailable")
+            return super().__getattribute__(name)
+
+    result = _materialize_text_provider_dataset_plan(
+        data_provider=_BrokenProvider(),
+        resolved_split="validation",
+        used_fallback_split=False,
+        tokenizer=_DummyTokenizer(),
+        tokenizer_hash=None,
+        effective_windows={
+            "preview_records": [
+                {"input_ids": [1, 2], "attention_mask": [1, 1], "dataset_index": 1}
+            ],
+            "final_records": [
+                {"input_ids": [3, 4], "attention_mask": [1, 1], "dataset_index": 2}
+            ],
+            "actual_preview": 1,
+            "actual_final": 1,
+            "preview_total_tokens": 2,
+            "final_total_tokens": 2,
+            "dedupe_adjustments": [],
+        },
+        requested_preview=1,
+        requested_final=1,
+        effective_preview=1,
+        effective_final=1,
+        resolved_loss_type="ppl_causal",
+        window_plan=None,
+        use_mlm=False,
+        mask_prob=0.15,
+        mask_seed=43,
+        random_token_prob=0.1,
+        original_token_prob=0.1,
+        tier="balanced",
+        profile="dev",
+        apply_mlm_masks_fn=lambda *args, **kwargs: (0, []),
+        resolve_pm_min_tokens_target_fn=lambda **kwargs: 3,
+        hash_sequences_fn=lambda seqs: f"hash-{len(list(seqs))}",
+        tokenizer_digest_fn=lambda tokenizer: "digest-fallback",
+        safe_int_fn=lambda value, default=0: int(value or default),
+        tensor_or_list_to_ints_fn=lambda values: list(values),
+        diagnostics=[],
+    )
+
+    assert result.dataset_meta["tokenizer_hash"] == "digest-fallback"
+    assert result.window_plan is not None
+    assert result.window_plan["profile"] == "dev"
+    assert result.window_plan["tokens_floor_met"] is True
+    assert "labels" not in result.calibration_data[1]

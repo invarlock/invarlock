@@ -34,7 +34,7 @@ def test_spectral_decision_parity_production_vs_reference():
     # Feed the same sigma/denom into reference kernel (same deadband path)
     ref = spectral_decide(sigma, baseline, fam_of, dead, dict(caps), mtest)
     # Derive reference selection
-    sel_ref = set(ref["selected"])  # type: ignore[index]
+    sel_ref = set(ref["selected"])
 
     # For production parity we reuse the same kernel after production z computation (functionally equivalent)
     # This asserts that the z-mapping and selection policy are coherent across paths.
@@ -48,5 +48,5 @@ def test_spectral_decision_parity_production_vs_reference():
         caps,
         mtest,
     )
-    sel_prod_equiv = set(ref2["selected"])  # type: ignore[index]
+    sel_prod_equiv = set(ref2["selected"])
     assert sel_ref == sel_prod_equiv

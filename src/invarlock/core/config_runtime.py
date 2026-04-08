@@ -18,6 +18,14 @@ import yaml
 
 from .config_dependencies import load_raw_config_payload as _load_raw_config_payload
 
+_RUNTIME_RESOURCE_ERRORS = (
+    AttributeError,
+    ImportError,
+    ModuleNotFoundError,
+    OSError,
+    RuntimeError,
+)
+
 
 def _deep_merge(a: dict, b: dict) -> dict:
     out = copy.deepcopy(a)
@@ -553,11 +561,11 @@ def _load_runtime_yaml(*rel_parts: str) -> dict[str, Any] | None:
                 text = read_text(encoding="utf-8")
                 data = yaml.safe_load(text) or {}
                 if not isinstance(data, dict):
-                    raise ValueError("Runtime YAML must be a mapping")
+                    return None
                 return data
         except FileNotFoundError:
             pass
-    except Exception:
+    except _RUNTIME_RESOURCE_ERRORS:
         # Importlib resources may not be available in certain environments
         pass
     return None

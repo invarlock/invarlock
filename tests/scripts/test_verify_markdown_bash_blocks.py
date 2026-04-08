@@ -237,7 +237,7 @@ def test_run_blocks_writes_results(tmp_path: Path, monkeypatch) -> None:
         text="invarlock version",
     )
 
-    def _fake_run(cmd, **kwargs):  # type: ignore[no-untyped-def]
+    def _fake_run(cmd, **kwargs):
         return SimpleNamespace(returncode=0, stdout="ok\n", stderr="")
 
     monkeypatch.setattr(module.subprocess, "run", _fake_run)

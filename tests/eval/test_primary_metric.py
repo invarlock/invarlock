@@ -63,4 +63,4 @@ def test_ppl_paired_compare_shapes():
     base = [MetricContribution(2.0, 5), MetricContribution(2.0, 2)]
     res = ppl.paired_compare(subj, base, reps=100, seed=0, ci_level=0.90)
     assert {"delta", "ci", "display", "display_ci"} <= set(res.keys())
-    assert isinstance(res["ci"], tuple) and len(res["ci"]) == 2
+    assert isinstance(res["ci"], list) and len(res["ci"]) == 2

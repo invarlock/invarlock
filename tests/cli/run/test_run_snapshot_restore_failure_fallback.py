@@ -4,6 +4,7 @@ import json
 from contextlib import ExitStack
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import patch
 
 from invarlock.cli.commands.run import run_command
@@ -79,16 +80,18 @@ def test_until_pass_restore_failure_discards_model_and_reloads_next_attempt(
             self.load_calls = 0
             self.restore_calls = 0
 
-        def load_model(self, model_id, device=None):  # type: ignore[no-untyped-def]
+        def load_model(
+            self, model_id: str, device: str | None = None
+        ) -> SimpleNamespace:
             self.load_calls += 1
             return SimpleNamespace(
                 named_parameters=lambda: [], named_buffers=lambda: []
             )
 
-        def snapshot_chunked(self, model):  # type: ignore[no-untyped-def]
+        def snapshot_chunked(self, model: object) -> str:
             return str(tmp_path / "snapdir")
 
-        def restore_chunked(self, model, path):  # type: ignore[no-untyped-def]
+        def restore_chunked(self, model: object, path: str) -> None:
             self.restore_calls += 1
             if self.restore_calls >= 2:
                 raise RuntimeError("restore failed")
@@ -97,7 +100,7 @@ def test_until_pass_restore_failure_discards_model_and_reloads_next_attempt(
     execute_models: list[object] = []
 
     class Runner:
-        def execute(self, **kwargs):  # type: ignore[no-untyped-def]
+        def execute(self, **kwargs: Any) -> SimpleNamespace:
             execute_models.append(kwargs.get("model"))
             return SimpleNamespace(
                 edit={"plan_digest": "abcd", "deltas": {"params_changed": 0}},
@@ -131,32 +134,49 @@ def test_until_pass_restore_failure_discards_model_and_reloads_next_attempt(
             )
 
     class RetryController:
-        def __init__(self, max_attempts=3, timeout=None, verbose=False):  # type: ignore[no-untyped-def]
+        def __init__(
+            self,
+            max_attempts: int = 3,
+            timeout: float | None = None,
+            verbose: bool = False,
+        ) -> None:
             self.attempt_history: list[dict[str, object]] = []
 
-        def should_retry(self, passed):  # type: ignore[no-untyped-def]
+        def should_retry(self, passed: bool) -> bool:
             return (not passed) and len(self.attempt_history) < 3
 
-        def record_attempt(self, attempt, result_summary, edit_config):  # type: ignore[no-untyped-def]
+        def record_attempt(
+            self,
+            attempt: int,
+            result_summary: dict[str, object],
+            edit_config: object,
+        ) -> None:
             self.attempt_history.append(dict(result_summary))
 
-        def get_attempt_summary(self):  # type: ignore[no-untyped-def]
+        def get_attempt_summary(self) -> dict[str, float | int]:
             return {"total_attempts": len(self.attempt_history), "elapsed_time": 0.1}
 
     cert_calls = {"n": 0}
 
-    def make_report(report, baseline_report):  # type: ignore[no-untyped-def]
+    def make_report(
+        report: object, baseline_report: object
+    ) -> dict[str, dict[str, bool]]:
         cert_calls["n"] += 1
         if cert_calls["n"] == 1:
             return {"validation": {"primary_metric_acceptable": False}}
         return {"validation": {"primary_metric_acceptable": True}}
 
-    def save_report(report, run_dir, formats, filename_prefix):  # type: ignore[no-untyped-def]
+    def save_report(
+        report: object,
+        run_dir: str | Path,
+        formats: object,
+        filename_prefix: str,
+    ) -> dict[str, str]:
         captured["report"] = report
         return {"json": str(Path(run_dir) / f"{filename_prefix}.json")}
 
     class Provider:
-        def windows(self, **kwargs):  # type: ignore[no-untyped-def]
+        def windows(self, **kwargs: Any) -> tuple[SimpleNamespace, SimpleNamespace]:
             return (
                 SimpleNamespace(input_ids=[[1, 2, 3]], attention_masks=[[1, 1, 1]]),
                 SimpleNamespace(input_ids=[[4, 5, 6]], attention_masks=[[1, 1, 1]]),

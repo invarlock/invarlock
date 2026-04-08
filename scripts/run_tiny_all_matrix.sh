@@ -134,7 +134,7 @@ try:
     import tiktoken  # noqa: F401
     import torch, transformers, datasets  # noqa: F401
     print("deps: torch/transformers/datasets/protobuf/sentencepiece/tiktoken present")
-except Exception as e:
+except (ImportError, ModuleNotFoundError, OSError, RuntimeError) as e:
     print("deps: missing core HF stack; attempting install via pip...", e)
     import os, sys, subprocess
     cpu_torch_cmd = [

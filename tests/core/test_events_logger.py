@@ -84,7 +84,7 @@ def test_event_logger_context_manager_and_del(tmp_path: Path) -> None:
     log_path2 = tmp_path / "events2.jsonl"
     logger2 = EventLogger(log_path2, auto_flush=True)
     # simulate disabled file handle branch without disrupting context exit
-    logger2._file = None  # type: ignore[attr-defined]
+    logger2._file = None
     logger2.log("t", "y", LogLevel.INFO, {"b": 2})
     logger2.close()
     lines2 = read_jsonl(log_path2)
@@ -119,7 +119,7 @@ def test_event_logger_serializer_paths() -> None:
 def test_event_logger_open_failure_wraps_oserror(monkeypatch, tmp_path: Path) -> None:
     log_path = tmp_path / "events.jsonl"
 
-    def _boom_open(*args, **kwargs):  # type: ignore[no-untyped-def]
+    def _boom_open(*args, **kwargs):
         raise BuiltinOSError("disk offline")
 
     monkeypatch.setattr("builtins.open", _boom_open)

@@ -84,7 +84,7 @@ def test_apply_auto_adapter_if_needed_changes_only_when_auto(tmp_path: Path):
         def model_dump(self):
             return {"model": {"adapter": self.model.adapter, "id": self.model.id}}
 
-        def __class__(self, data):  # type: ignore[override]
+        def __class__(self, data):
             return Cfg(data)
 
     cfg_auto = Cfg({"model": {"adapter": "auto", "id": str(rope_model)}})

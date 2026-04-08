@@ -9,7 +9,7 @@ def test_root_import_does_not_require_torch(monkeypatch):
     # Simulate an environment where torch is not installed.
     original_import = builtins.__import__
 
-    def fake_import(name, *args, **kwargs):  # type: ignore[override]
+    def fake_import(name, *args, **kwargs):
         if name == "torch":
             raise ModuleNotFoundError("torch not available in test")
         return original_import(name, *args, **kwargs)
@@ -36,7 +36,7 @@ def test_root_import_does_not_require_torch(monkeypatch):
 def test_guard_helper_import_does_not_require_torch(monkeypatch):
     original_import = builtins.__import__
 
-    def fake_import(name, *args, **kwargs):  # type: ignore[override]
+    def fake_import(name, *args, **kwargs):
         if name == "torch":
             raise ModuleNotFoundError("torch not available in test")
         return original_import(name, *args, **kwargs)
@@ -62,7 +62,7 @@ def test_guard_helper_import_does_not_require_torch(monkeypatch):
 def test_utils_import_and_memory_probe_do_not_require_torch(monkeypatch):
     original_import = builtins.__import__
 
-    def fake_import(name, *args, **kwargs):  # type: ignore[override]
+    def fake_import(name, *args, **kwargs):
         if name == "torch":
             raise ModuleNotFoundError("torch not available in test")
         return original_import(name, *args, **kwargs)

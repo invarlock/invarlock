@@ -151,7 +151,7 @@ def test_print_guard_overhead_summary_uses_fallback_for_bad_default_threshold() 
     threshold = run_output_mod._print_guard_overhead_summary(
         console,
         {"evaluated": False},
-        default_threshold="bad",  # type: ignore[arg-type]
+        default_threshold="bad",
     )
     assert threshold == GUARD_OVERHEAD_THRESHOLD
 

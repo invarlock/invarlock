@@ -40,7 +40,10 @@ def test_docs_invariants_pm_first_strings():
             continue
         try:
             text = path.read_text(encoding="utf-8")
-        except Exception:
+        except (OSError, UnicodeDecodeError) as exc:
+            offenders.append(
+                f"{path}: unreadable reference doc ({exc.__class__.__name__}: {exc})"
+            )
             continue
         # Only scan reference pages; allow prose mentions of 'perplexity' (lowercase)
         lower = text  # case-sensitive banned checks

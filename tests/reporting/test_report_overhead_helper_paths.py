@@ -8,7 +8,7 @@ from invarlock.reporting import report_overhead as overhead
 
 
 class _ExplodingGetDict(dict):
-    def get(self, key, default=None):  # type: ignore[override]
+    def get(self, key, default=None):
         if key in {"mode", "skip_reason"}:
             raise RuntimeError(f"boom:{key}")
         return super().get(key, default)

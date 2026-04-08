@@ -11,6 +11,7 @@ import pytest
 import torch
 
 import invarlock.core.runner_eval_metrics as rem
+import invarlock.core.runner_eval_metrics_multimodal as remm
 from invarlock.adapters.hf_multimodal import HF_Multimodal_Adapter
 
 
@@ -640,8 +641,19 @@ def test_runner_eval_metrics_small_helpers_filter_and_normalize_inputs() -> None
         "input_ids": [1, 2, 3],
         "labels": [1, 2, 3],
     }
+    assert remm._decode_prediction_text(None) == ""
+    assert remm._decode_prediction_text(7) == "7"
     assert rem._normalize_answer_text("  Cat   Dog\n") == "cat dog"
+    assert rem._normalize_answer_text(None) == ""
     assert rem._normalize_answer_text(0) == "0"
+    assert remm._normalize_reference_answers(123) == []
+    assert (
+        rem._resolve_metric_kind(
+            SimpleNamespace(context={"eval": {"metric": {}}}),
+            fallback="ppl_causal",
+        )
+        == "ppl_causal"
+    )
     assert rem._is_multimodal_batch({"example_id": "ex-1"}) is True
     assert rem._is_multimodal_batch({"input_ids": [1, 2, 3]}) is False
 

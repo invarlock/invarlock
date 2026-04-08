@@ -323,52 +323,40 @@ def _append_quality_gates_section(
     lines.append("")
 
 
-def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
-    """
-    Render an evaluation report as a formatted Markdown report with pretty tables.
-
-    Render an already-normalized evaluation report into Markdown.
-    """
-    lines: list[str] = []
-    appendix_lines: list[str] = []
-    edit_name = str(evaluation_report.get("edit_name") or "").lower()
-
-    _append_report_header(lines, evaluation_report)
-
+def _append_plugin_provenance_section(
+    lines: list[str], evaluation_report: dict[str, Any]
+) -> None:
     plugins = evaluation_report.get("plugins", {})
-    if isinstance(plugins, dict) and plugins:
-        lines.append("## Plugin Provenance")
+    if not (isinstance(plugins, dict) and plugins):
         lines.append("")
+        return
 
-        adapter_plugin = plugins.get("adapter")
-        if isinstance(adapter_plugin, dict):
-            lines.append(f"- Adapter: {_format_plugin(adapter_plugin)}")
-
-        edit_plugin = plugins.get("edit")
-        if isinstance(edit_plugin, dict):
-            lines.append(f"- Edit: {_format_plugin(edit_plugin)}")
-
-        guard_plugins = plugins.get("guards")
-        if isinstance(guard_plugins, list) and guard_plugins:
-            guard_entries = [
-                _format_plugin(plugin)
-                for plugin in guard_plugins
-                if isinstance(plugin, dict)
-            ]
-            if guard_entries:
-                lines.append("- Guards:\n  - " + "\n  - ".join(guard_entries))
+    lines.append("## Plugin Provenance")
     lines.append("")
 
-    _append_executive_summary_section(lines, evaluation_report)
+    adapter_plugin = plugins.get("adapter")
+    if isinstance(adapter_plugin, dict):
+        lines.append(f"- Adapter: {_format_plugin(adapter_plugin)}")
 
-    _append_quality_gates_section(lines, evaluation_report)
+    edit_plugin = plugins.get("edit")
+    if isinstance(edit_plugin, dict):
+        lines.append(f"- Edit: {_format_plugin(edit_plugin)}")
 
-    append_guard_check_details_section(lines, evaluation_report)
+    guard_plugins = plugins.get("guards")
+    if isinstance(guard_plugins, list) and guard_plugins:
+        guard_entries = [
+            _format_plugin(plugin)
+            for plugin in guard_plugins
+            if isinstance(plugin, dict)
+        ]
+        if guard_entries:
+            lines.append("- Guards:\n  - " + "\n  - ".join(guard_entries))
+    lines.append("")
 
-    _append_primary_metric_section(lines, evaluation_report)
 
-    append_guard_observability_sections(lines, evaluation_report)
-
+def _append_inference_diagnostics_section(
+    appendix_lines: list[str], evaluation_report: dict[str, Any]
+) -> None:
     compression_diag = (
         evaluation_report.get("structure", {}).get("compression_diagnostics", {})
         if isinstance(evaluation_report.get("structure"), dict)
@@ -377,52 +365,29 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
     inference_flags = compression_diag.get("inferred") or {}
     inference_sources = compression_diag.get("inference_source") or {}
     inference_log = compression_diag.get("inference_log") or []
-    if inference_flags or inference_sources or inference_log:
-        appendix_lines.append("### Inference Diagnostics")
-        appendix_lines.append("")
-        if inference_flags:
-            appendix_lines.append("- **Fields Inferred:**")
-            for field, flag in inference_flags.items():
-                appendix_lines.append(f"  - {field}: {'yes' if flag else 'no'}")
-        if inference_sources:
-            appendix_lines.append("- **Sources:**")
-            for field, source in inference_sources.items():
-                appendix_lines.append(f"  - {field}: {source}")
-        if inference_log:
-            appendix_lines.append("- **Inference Log:**")
-            for entry in inference_log:
-                appendix_lines.append(f"  - {entry}")
-        appendix_lines.append("")
+    if not (inference_flags or inference_sources or inference_log):
+        return
 
-    append_model_context_sections(lines, evaluation_report)
+    appendix_lines.append("### Inference Diagnostics")
+    appendix_lines.append("")
+    if inference_flags:
+        appendix_lines.append("- **Fields Inferred:**")
+        for field, flag in inference_flags.items():
+            appendix_lines.append(f"  - {field}: {'yes' if flag else 'no'}")
+    if inference_sources:
+        appendix_lines.append("- **Sources:**")
+        for field, source in inference_sources.items():
+            appendix_lines.append(f"  - {field}: {source}")
+    if inference_log:
+        appendix_lines.append("- **Inference Log:**")
+        for entry in inference_log:
+            appendix_lines.append(f"  - {entry}")
+    appendix_lines.append("")
 
-    append_dataset_and_provenance_section(lines, evaluation_report)
 
-    # Structural Changes heading is printed with content later; avoid empty header here
-
-    # System Overhead section (latency/throughput)
-    sys_over = evaluation_report.get("system_overhead", {}) or {}
-    if isinstance(sys_over, dict) and sys_over:
-        _append_system_overhead_section(lines, sys_over)
-
-    # Accuracy Subgroups (informational)
-    try:
-        cls = evaluation_report.get("classification", {})
-        sub = cls.get("subgroups") if isinstance(cls, dict) else None
-        if isinstance(sub, dict) and sub:
-            _append_accuracy_subgroups(lines, sub)
-    except (
-        AttributeError,
-        ImportError,
-        KeyError,
-        OSError,
-        OverflowError,
-        RuntimeError,
-        TypeError,
-        ValueError,
-    ):
-        pass
-    # Structural Changes
+def _append_structural_changes_section(
+    lines: list[str], evaluation_report: dict[str, Any]
+) -> None:
     try:
         structure = evaluation_report.get("structure", {}) or {}
         params_changed = int(structure.get("params_changed", 0) or 0)
@@ -441,7 +406,6 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
             ValueError,
         ):
             bitwidth_changes = 0
-        # Decide whether to show the section
         has_changes = any(
             v > 0 for v in (params_changed, layers_modified, bitwidth_changes)
         )
@@ -453,8 +417,6 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
             lines.append("|-------------|-------|")
             lines.append(f"| Parameters Changed | {params_changed:,} |")
             if edit_name == "quant_rtn":
-                # For quantization: prefer a single clear line reconciling target vs applied
-                # using diagnostics when available. Fallback to bitwidth-change count.
                 try:
                     t_an = (structure.get("compression_diagnostics", {}) or {}).get(
                         "target_analysis", {}
@@ -505,19 +467,16 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
         TypeError,
         ValueError,
     ):
-        # Best-effort; omit section on error
         pass
 
-    # Add detailed breakdowns if available
-    if structure.get("bitwidths") and edit_name != "quant_rtn":
-        lines.append(f"| Bit-width Changes | {len(structure['bitwidths'])} layers |")
-    if structure.get("ranks"):
-        lines.append(f"| Rank Changes | {len(structure['ranks'])} layers |")
 
-    lines.append("")
-
-    # Compression Diagnostics
+def _append_compression_diagnostics_section(
+    lines: list[str], evaluation_report: dict[str, Any]
+) -> None:
+    structure = evaluation_report.get("structure", {}) or {}
     compression_diag = structure.get("compression_diagnostics", {})
+    edit_name = str(evaluation_report.get("edit_name", "unknown"))
+
     if edit_name == "noop":
         lines.append("### Compression Diagnostics")
         lines.append("")
@@ -527,7 +486,6 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
         lines.append("### Compression Diagnostics")
         lines.append("")
 
-        # Algorithm execution status
         status = compression_diag.get("execution_status", "unknown")
         status_emoji = (
             "✅" if status == "successful" else "❌" if status == "failed" else "⚠️"
@@ -535,7 +493,6 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
         lines.append(f"**Execution Status:** {status_emoji} {status.upper()}")
         lines.append("")
 
-        # Target module analysis
         target_analysis = compression_diag.get("target_analysis", {})
         if target_analysis:
             lines.append("**Target Module Analysis:**")
@@ -569,7 +526,6 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
             lines.append(f"| Scope | {target_analysis.get('scope', 'unknown')} |")
             lines.append("")
 
-        # Parameter effectiveness
         param_analysis = compression_diag.get("parameter_analysis", {})
         if param_analysis:
             lines.append("**Parameter Effectiveness:**")
@@ -583,7 +539,6 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
                     lines.append(f"- **{param}:** {info}")
             lines.append("")
 
-        # Algorithm-specific details
         algo_details = compression_diag.get("algorithm_details", {})
         if algo_details:
             lines.append("**Algorithm Details:**")
@@ -592,7 +547,6 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
                 lines.append(f"- **{key}:** {value}")
             lines.append("")
 
-        # Informational recommendations (non-normative)
         warnings = compression_diag.get("warnings", [])
         if warnings:
             lines.append("**ℹ️ Informational:**")
@@ -601,26 +555,26 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
                 lines.append(f"- {warning}")
             lines.append("")
 
-    # Variance Guard (Spectral/RMT summaries are already provided above)
+
+def _append_variance_guard_appendix(
+    appendix_lines: list[str], evaluation_report: dict[str, Any]
+) -> None:
     variance = evaluation_report.get("variance", {}) or {}
     if not isinstance(variance, dict):
         variance = {}
     appendix_lines.append("### Variance Guard")
     appendix_lines.append("")
 
-    # Display whether VE was enabled after A/B test
     variance_enabled = bool(variance.get("enabled"))
     appendix_lines.append(f"- **Enabled:** {'Yes' if variance_enabled else 'No'}")
 
     if variance_enabled:
-        # VE was enabled - show the gain
         gain_value = variance.get("gain", "N/A")
         if isinstance(gain_value, int | float):
             appendix_lines.append(f"- **Gain:** {gain_value:.3f}")
         else:
             appendix_lines.append(f"- **Gain:** {gain_value}")
     else:
-        # VE was not enabled - show succinct reason if available, else a clear disabled message
         ppl_no_ve = variance.get("ppl_no_ve")
         ppl_with_ve = variance.get("ppl_with_ve")
         ratio_ci = variance.get("ratio_ci")
@@ -634,7 +588,6 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
             appendix_lines.append(
                 "- Variance Guard: Disabled (predictive gate not evaluated for this edit)."
             )
-            # Add concise rationale aligned with Balanced predictive gate contract
             try:
                 ve_policy = evaluation_report.get("policies", {}).get("variance", {})
                 min_effect = ve_policy.get("min_effect_lognll")
@@ -675,43 +628,47 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
         )
     appendix_lines.append("")
 
-    lines.append("")
 
-    # MoE Observability (non-gating)
+def _append_moe_observability_section(
+    lines: list[str], evaluation_report: dict[str, Any]
+) -> None:
     moe = (
         evaluation_report.get("moe", {})
         if isinstance(evaluation_report.get("moe"), dict)
         else {}
     )
-    if moe:
-        lines.append("## MoE Observability")
-        lines.append("")
-        # Core router fields
-        for key in ("top_k", "capacity_factor", "expert_drop_rate"):
-            if key in moe:
-                lines.append(f"- **{key}:** {moe[key]}")
-        # Utilization summary
-        if "utilization_count" in moe or "utilization_mean" in moe:
-            uc = moe.get("utilization_count")
-            um = moe.get("utilization_mean")
-            parts = []
-            if uc is not None:
-                parts.append(f"N={int(uc)}")
-            if isinstance(um, int | float):
-                parts.append(f"mean={um:.3f}")
-            if parts:
-                lines.append(f"- **Utilization:** {'; '.join(parts)}")
-        # Delta summaries when available
-        for key, label in (
-            ("delta_load_balance_loss", "Δ load_balance_loss"),
-            ("delta_router_entropy", "Δ router_entropy"),
-            ("delta_utilization_mean", "Δ utilization mean"),
-        ):
-            if key in moe and isinstance(moe.get(key), int | float):
-                lines.append(f"- **{label}:** {float(moe[key]):+.4f}")
-        lines.append("")
+    if not moe:
+        return
+    lines.append("## MoE Observability")
+    lines.append("")
+    for key in ("top_k", "capacity_factor", "expert_drop_rate"):
+        if key in moe:
+            lines.append(f"- **{key}:** {moe[key]}")
+    if "utilization_count" in moe or "utilization_mean" in moe:
+        uc = moe.get("utilization_count")
+        um = moe.get("utilization_mean")
+        parts = []
+        if uc is not None:
+            parts.append(f"N={int(uc)}")
+        if isinstance(um, int | float):
+            parts.append(f"mean={um:.3f}")
+        if parts:
+            lines.append(f"- **Utilization:** {'; '.join(parts)}")
+    for key, label in (
+        ("delta_load_balance_loss", "Δ load_balance_loss"),
+        ("delta_router_entropy", "Δ router_entropy"),
+        ("delta_utilization_mean", "Δ utilization mean"),
+    ):
+        if key in moe and isinstance(moe.get(key), int | float):
+            lines.append(f"- **{label}:** {float(moe[key]):+.4f}")
+    lines.append("")
 
-    _append_policy_configuration_section(lines, evaluation_report)
+
+def _append_appendix_sections(
+    lines: list[str], appendix_lines: list[str], evaluation_report: dict[str, Any]
+) -> None:
+    _append_inference_diagnostics_section(appendix_lines, evaluation_report)
+    _append_variance_guard_appendix(appendix_lines, evaluation_report)
 
     appendix_lines.append("### Artifacts")
     appendix_lines.append("")
@@ -730,7 +687,77 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
         lines.append("")
         lines.extend(appendix_lines)
 
-    # Report Hash for Integrity
+
+def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
+    """
+    Render an evaluation report as a formatted Markdown report with pretty tables.
+
+    Render an already-normalized evaluation report into Markdown.
+    """
+    lines: list[str] = []
+    appendix_lines: list[str] = []
+
+    _append_report_header(lines, evaluation_report)
+
+    _append_plugin_provenance_section(lines, evaluation_report)
+
+    _append_executive_summary_section(lines, evaluation_report)
+
+    _append_quality_gates_section(lines, evaluation_report)
+
+    append_guard_check_details_section(lines, evaluation_report)
+
+    _append_primary_metric_section(lines, evaluation_report)
+
+    append_guard_observability_sections(lines, evaluation_report)
+
+    append_model_context_sections(lines, evaluation_report)
+
+    append_dataset_and_provenance_section(lines, evaluation_report)
+
+    # Structural Changes heading is printed with content later; avoid empty header here
+
+    sys_over = evaluation_report.get("system_overhead", {}) or {}
+    if isinstance(sys_over, dict) and sys_over:
+        _append_system_overhead_section(lines, sys_over)
+
+    try:
+        cls = evaluation_report.get("classification", {})
+        sub = cls.get("subgroups") if isinstance(cls, dict) else None
+        if isinstance(sub, dict) and sub:
+            _append_accuracy_subgroups(lines, sub)
+    except (
+        AttributeError,
+        ImportError,
+        KeyError,
+        OSError,
+        OverflowError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ):
+        pass
+    _append_structural_changes_section(lines, evaluation_report)
+
+    structure = evaluation_report.get("structure", {}) or {}
+    edit_name = str(evaluation_report.get("edit_name", "unknown"))
+    if structure.get("bitwidths") and edit_name != "quant_rtn":
+        lines.append(f"| Bit-width Changes | {len(structure['bitwidths'])} layers |")
+    if structure.get("ranks"):
+        lines.append(f"| Rank Changes | {len(structure['ranks'])} layers |")
+
+    lines.append("")
+
+    lines.append("")
+
+    _append_compression_diagnostics_section(lines, evaluation_report)
+
+    _append_moe_observability_section(lines, evaluation_report)
+
+    _append_policy_configuration_section(lines, evaluation_report)
+
+    _append_appendix_sections(lines, appendix_lines, evaluation_report)
+
     cert_hash = _compute_report_hash(evaluation_report)
     lines.append("## Evaluation Report Integrity")
     lines.append("")

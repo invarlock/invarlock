@@ -45,7 +45,12 @@ class _Backends:
     mps = _MPS()
 
 
-def randint(low: int, high: int, size, device: device | None = None):  # type: ignore[no-untyped-def]
+def randint(
+    low: int,
+    high: int,
+    size: tuple[int, int],
+    device: device | None = None,
+) -> list[list[int]]:
     # Return a simple Python list placeholder; tests that rely on real tensors skip when needed.
     import random
 
@@ -57,7 +62,7 @@ def manual_seed(seed: int) -> None:
     return None
 
 
-def tensor(values, device: device | None = None):  # type: ignore[no-untyped-def]
+def tensor(values: object, device: device | None = None) -> object:
     return values
 
 
@@ -76,7 +81,7 @@ try:  # pragma: no cover - simple import wiring for stub
     nn = _importlib.import_module(".nn", __name__)
     utils = _importlib.import_module(".utils", __name__)
     linalg = _importlib.import_module(".linalg", __name__)
-except Exception:  # defensive: leave attributes absent if import fails
+except ImportError:  # defensive: leave attributes absent if a stub submodule is missing
     pass
 
 
@@ -84,13 +89,18 @@ class _NoGrad:
     def __enter__(self):
         return None
 
-    def __exit__(self, exc_type, exc, tb):  # type: ignore[no-untyped-def]
+    def __exit__(
+        self,
+        exc_type: object,
+        exc: object,
+        tb: object,
+    ) -> bool:
         return False
 
-    def __call__(self, fn=None):  # type: ignore[no-untyped-def]
+    def __call__(self, fn: object = None) -> object:
         if fn is None:
 
-            def _decorator(f):
+            def _decorator(f: object) -> object:
                 return f
 
             return _decorator
@@ -100,5 +110,5 @@ class _NoGrad:
 no_grad = _NoGrad()
 
 
-def isfinite(x):  # type: ignore[no-untyped-def]
+def isfinite(x: object) -> bool:
     return True

@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -16,22 +17,22 @@ class DummyAdapter:
         self.snapshots: list[str] = []
         self.restores: list[str] = []
 
-    def snapshot(self, model) -> bytes:  # type: ignore[no-untyped-def]
+    def snapshot(self, model: object) -> bytes:
         self.snapshots.append("bytes")
         return b"model-bytes"
 
-    def restore(self, model, blob: bytes) -> None:  # type: ignore[no-untyped-def]
+    def restore(self, model: object, blob: bytes) -> None:
         assert blob == b"model-bytes"
         self.restores.append("bytes")
 
-    def snapshot_chunked(self, model) -> str:  # type: ignore[no-untyped-def]
+    def snapshot_chunked(self, model: object) -> str:
         path = self.tmpdir / "chunked_snapshot"
         path.mkdir(parents=True, exist_ok=True)
         (path / "chunk_0.bin").write_bytes(b"data")
         self.snapshots.append("chunked")
         return str(path)
 
-    def restore_chunked(self, model, snapshot_path: str) -> None:  # type: ignore[no-untyped-def]
+    def restore_chunked(self, model: object, snapshot_path: str) -> None:
         assert Path(snapshot_path).exists()
         self.restores.append("chunked")
 
@@ -107,7 +108,7 @@ def test_policy_checkpoint_should_rollback_logic():
 
 def test_policy_checkpoint_rollback_guard_paths(tmp_path: Path):
     class CorruptBytesAdapter(DummyAdapter):
-        def restore(self, model, blob: bytes) -> None:  # type: ignore[override,no-untyped-def]
+        def restore(self, model: object, blob: bytes | None) -> None:
             if blob is None:
                 raise TypeError("missing blob")
             super().restore(model, blob)
@@ -122,13 +123,14 @@ def test_policy_checkpoint_rollback_guard_paths(tmp_path: Path):
 
     # Create bytes checkpoint then corrupt it to ensure graceful failure
     cp.create_checkpoint()
-    cp.checkpoint_data["blob"] = None  # type: ignore[index]
+    checkpoint_data = cast(dict[str, Any], cp.checkpoint_data)
+    checkpoint_data["blob"] = None
     assert cp.rollback("corrupt") is False
 
 
 def test_policy_checkpoint_rollback_reraises_unexpected_errors(tmp_path: Path):
     class ExplodingAdapter(DummyAdapter):
-        def restore(self, model, blob: bytes) -> None:  # type: ignore[override,no-untyped-def]
+        def restore(self, model: object, blob: bytes) -> None:
             raise AssertionError("explode")
 
     adapter = ExplodingAdapter(tmp_path)
@@ -151,7 +153,8 @@ def test_create_policy_checkpoint_context_manager(
 
     with create_policy_checkpoint(model, adapter, policy) as cp:
         assert cp.checkpoint_data and cp.checkpoint_data["mode"] == "chunked"
-        path = Path(cp.checkpoint_data["path"])  # type: ignore[index]
+        checkpoint_data = cast(dict[str, Any], cp.checkpoint_data)
+        path = Path(str(checkpoint_data["path"]))
         assert path.exists()
     # After context exit, path should be cleaned up
     assert not path.exists()
@@ -196,7 +199,7 @@ def test_restore_checkpoint_chunked_missing_restore_chunked_returns_false(
         def __init__(self, tmpdir: Path):
             self.tmpdir = tmpdir
 
-        def snapshot_chunked(self, model) -> str:  # type: ignore[no-untyped-def]
+        def snapshot_chunked(self, model: object) -> str:
             path = self.tmpdir / "chunked_snapshot_no_restore"
             path.mkdir(parents=True, exist_ok=True)
             (path / "chunk_0.bin").write_bytes(b"data")
@@ -218,7 +221,7 @@ def test_checkpoint_manager_create_error_raises(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     class BadAdapter(DummyAdapter):
-        def snapshot(self, model) -> bytes:  # type: ignore[override]
+        def snapshot(self, model: object) -> bytes:
             raise RuntimeError("snap fail")
 
     adapter = BadAdapter(tmp_path)
@@ -231,7 +234,7 @@ def test_checkpoint_manager_reraises_unexpected_restore_errors(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     class ExplodingAdapter(DummyAdapter):
-        def restore(self, model, blob: bytes) -> None:  # type: ignore[override,no-untyped-def]
+        def restore(self, model: object, blob: bytes) -> None:
             raise AssertionError("explode")
 
     monkeypatch.delenv("INVARLOCK_SNAPSHOT_MODE", raising=False)

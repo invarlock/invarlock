@@ -12,6 +12,8 @@ import torch
 import torch.nn as nn
 from sklearn.feature_selection import mutual_info_regression
 
+_MI_SCORE_ERRORS = (FloatingPointError, RuntimeError, TypeError, ValueError)
+
 
 def _call_model(model: nn.Module, /, *args: Any, **kwargs: Any) -> Any:
     return model(*args, **kwargs)
@@ -152,7 +154,7 @@ def compute_neuron_mi_scores(
                                 random_state=42,
                             )[0]
                             neuron_mi_scores[neuron_idx] = mi_score
-                        except Exception:
+                        except _MI_SCORE_ERRORS:
                             neuron_mi_scores[neuron_idx] = 0.0
 
                     mi_scores.append(neuron_mi_scores)
@@ -208,7 +210,7 @@ def mi_neuron_scores(
                 neuron_activations.reshape(-1, 1), targets_np, random_state=42
             )[0]
             mi_scores[neuron_idx] = mi_score
-        except Exception:
+        except _MI_SCORE_ERRORS:
             mi_scores[neuron_idx] = 0.0
 
     return mi_scores

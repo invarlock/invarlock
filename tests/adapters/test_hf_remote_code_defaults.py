@@ -26,11 +26,11 @@ def test_hf_bnb_uses_resolved_remote_code(monkeypatch: pytest.MonkeyPatch):
         pass
 
     class _BitsAndBytesConfig:
-        def __init__(self, **kwargs: object):  # type: ignore[no-untyped-def]
+        def __init__(self, **kwargs: object) -> None:
             self.kwargs = dict(kwargs)
 
-    transformers.AutoModelForCausalLM = _AutoModelForCausalLM  # type: ignore[attr-defined]
-    transformers.BitsAndBytesConfig = _BitsAndBytesConfig  # type: ignore[attr-defined]
+    transformers.AutoModelForCausalLM = _AutoModelForCausalLM
+    transformers.BitsAndBytesConfig = _BitsAndBytesConfig
     monkeypatch.setitem(sys.modules, "transformers", transformers)
 
     from invarlock.plugins.hf_bnb_adapter import HF_BNB_Adapter
@@ -59,10 +59,10 @@ def test_hf_awq_uses_resolved_remote_code(monkeypatch: pytest.MonkeyPatch):
 
     class _AutoAWQForCausalLM:
         @staticmethod
-        def from_quantized(model_id: str, **kwargs: object):  # type: ignore[no-untyped-def]
+        def from_quantized(model_id: str, **kwargs: object) -> dict[str, object]:
             return {"model_id": model_id, "kwargs": dict(kwargs)}
 
-    autoawq.AutoAWQForCausalLM = _AutoAWQForCausalLM  # type: ignore[attr-defined]
+    autoawq.AutoAWQForCausalLM = _AutoAWQForCausalLM
     monkeypatch.setitem(sys.modules, "autoawq", autoawq)
 
     from invarlock.plugins.hf_awq_adapter import HF_AWQ_Adapter
@@ -89,10 +89,10 @@ def test_hf_gptq_uses_resolved_remote_code(monkeypatch: pytest.MonkeyPatch):
 
     class _AutoGPTQForCausalLM:
         @staticmethod
-        def from_quantized(model_id: str, **kwargs: object):  # type: ignore[no-untyped-def]
+        def from_quantized(model_id: str, **kwargs: object) -> dict[str, object]:
             return {"model_id": model_id, "kwargs": dict(kwargs)}
 
-    auto_gptq.AutoGPTQForCausalLM = _AutoGPTQForCausalLM  # type: ignore[attr-defined]
+    auto_gptq.AutoGPTQForCausalLM = _AutoGPTQForCausalLM
     monkeypatch.setitem(sys.modules, "auto_gptq", auto_gptq)
 
     from invarlock.plugins.hf_gptq_adapter import HF_GPTQ_Adapter

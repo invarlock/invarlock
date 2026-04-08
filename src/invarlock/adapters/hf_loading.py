@@ -18,6 +18,8 @@ _FALSE = {"0", "false", "no", "off"}
 _TORCH_UNSET = object()
 _torch_module: Any = _TORCH_UNSET
 _MISTRAL3_ARCH = "Mistral3ForConditionalGeneration"
+_COERCE_ERRORS = (TypeError, ValueError, OverflowError)
+_CUDA_CAPABILITY_ERRORS = (AttributeError, RuntimeError, OSError)
 
 _AUTO_LOADER_SPECS: dict[str, tuple[str, str]] = {
     "causal": ("transformers", "AutoModelForCausalLM"),
@@ -244,7 +246,7 @@ def default_dtype() -> Any:
                 and torch.cuda.is_bf16_supported()
             ):
                 return torch.bfloat16
-        except Exception:
+        except _CUDA_CAPABILITY_ERRORS:
             pass
         return torch.float16
 
@@ -283,7 +285,7 @@ def resolve_dtype(kwargs: dict[str, Any] | None = None) -> Any:
 def _normalize_model_type(value: Any) -> str | None:
     try:
         normalized = str(value or "").strip().lower()
-    except Exception:
+    except _COERCE_ERRORS:
         return None
     return normalized or None
 

@@ -27,7 +27,7 @@ def _maybe_number(value: str | None) -> int | float | None:
         return None
     try:
         number = float(text)
-    except Exception:
+    except (TypeError, ValueError, OverflowError):
         return None
     if number.is_integer():
         return int(number)
@@ -40,7 +40,7 @@ def _load_run_state_environment(run_dir: Path) -> dict[str, Any]:
         return {}
     try:
         payload = json.loads(state_path.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, json.JSONDecodeError):
         return {}
     return payload if isinstance(payload, dict) else {}
 

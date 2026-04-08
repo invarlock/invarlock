@@ -24,6 +24,8 @@ from . import spectral_results as _spectral_results
 from . import spectral_runtime as _spectral_runtime
 from . import spectral_selection as _spectral_selection
 
+_EVIDENCE_DUMP_ERRORS = (ImportError, OSError, RuntimeError, TypeError, ValueError)
+
 
 class SpectralGuard(Guard):
     """
@@ -255,7 +257,7 @@ class SpectralGuard(Guard):
                     }
                 },
             )
-        except Exception:
+        except _EVIDENCE_DUMP_ERRORS:
             pass
         return result
 

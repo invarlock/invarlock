@@ -103,15 +103,9 @@ except subprocess.TimeoutExpired as te:
     out = te.stdout or b""
     err = te.stderr or b""
     if isinstance(out, bytes):
-        try:
-            out = out.decode("utf-8", errors="replace")
-        except Exception:
-            out = ""
+        out = out.decode("utf-8", errors="replace")
     if isinstance(err, bytes):
-        try:
-            err = err.decode("utf-8", errors="replace")
-        except Exception:
-            err = ""
+        err = err.decode("utf-8", errors="replace")
     sys.stdout.write(out)
     sys.stderr.write(err)
     rc = 124
@@ -135,7 +129,7 @@ import sys
 try:
     import torch  # noqa: F401
     import transformers  # noqa: F401
-except Exception:
+except (ImportError, ModuleNotFoundError, OSError, RuntimeError):
     sys.exit(1)
 sys.exit(0)
 PY

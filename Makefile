@@ -40,7 +40,7 @@ COVERAGE_TESTS_CONFIG := \
 COVERAGE_TESTS_EVAL := \
 	tests/eval/test_metrics*.py tests/eval/test_report*.py \
 	tests/eval/test_validate_module.py tests/eval/test_baseline_artifacts.py \
-	tests/eval/test_bench.py tests/eval/test_metric_tail_gate.py \
+	tests/eval/test_bench*.py tests/eval/test_metric_tail_gate.py \
 	tests/eval/test_primary_metric*.py \
 	tests/eval/test_determinism.py tests/eval/test_mask_parity_fail.py \
 	tests/eval/test_task_metrics.py tests/eval/test_eval_bootstrap_wrapper.py \
@@ -53,7 +53,7 @@ COVERAGE_TESTS_EVAL := \
 
 COVERAGE_TESTS_EVAL_PROBES := \
 	tests/eval/test_fft.py tests/eval/test_fft_probe_cases.py \
-	tests/eval/test_mi.py \
+	tests/eval/test_mi*.py \
 	tests/eval/test_post_attention_probes.py tests/eval/test_post_attention_probe_cases.py
 
 COVERAGE_TESTS_CLI_COMMANDS := \

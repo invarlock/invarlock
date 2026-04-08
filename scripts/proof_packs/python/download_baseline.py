@@ -47,7 +47,7 @@ def sanitize_generation_config(model_dir: Path) -> None:
         return
     try:
         gen = json.loads(gen_path.read_text())
-    except Exception:
+    except (OSError, json.JSONDecodeError):
         return
 
     if gen.get("do_sample") is False:
@@ -69,7 +69,7 @@ def sanitize_generation_config(model_dir: Path) -> None:
                 gen_path.unlink()
                 gen_path.write_text(original, encoding="utf-8")
             gen_path.write_text(json.dumps(gen, indent=2) + "\n")
-        except Exception:
+        except OSError:
             pass
 
 
@@ -87,7 +87,7 @@ def write_model_profile(model_dir: Path, model_id: str, revision: str | None) ->
     if cfg_path.is_file():
         try:
             config = json.loads(cfg_path.read_text())
-        except Exception:
+        except (OSError, json.JSONDecodeError):
             config = {}
 
     profile = {
@@ -111,7 +111,7 @@ def _select_weight_download_policy(
 ) -> tuple[str, list[str]]:
     try:
         from huggingface_hub import list_repo_files
-    except Exception as exc:
+    except (ImportError, ModuleNotFoundError) as exc:
         raise RuntimeError(f"huggingface_hub not available: {exc}") from exc
 
     repo_files = list_repo_files(repo_id, repo_type="model", revision=revision)
@@ -156,7 +156,7 @@ def download_snapshot(
 ) -> str:
     try:
         from huggingface_hub import snapshot_download
-    except Exception as exc:
+    except (ImportError, ModuleNotFoundError) as exc:
         raise RuntimeError(f"huggingface_hub not available: {exc}") from exc
 
     weight_format, ignore_patterns = _select_weight_download_policy(repo_id, revision)
@@ -229,7 +229,13 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"Weight format: {weight_format} only")
                 print(f"Saved to {output_dir} ({mode_label})")
                 return 0
-            except Exception as snap_err:
+            except (
+                ImportError,
+                ModuleNotFoundError,
+                OSError,
+                RuntimeError,
+                ValueError,
+            ) as snap_err:
                 message = str(snap_err)
                 if baseline_mode == "snapshot_symlink":
                     print(
@@ -285,7 +291,7 @@ def main(argv: list[str] | None = None) -> int:
 
         try:
             model = AutoModelForCausalLM.from_pretrained(model_id, **model_kwargs)
-        except Exception as fa2_err:
+        except (OSError, RuntimeError, ValueError) as fa2_err:
             if use_fa2 and "flash" in str(fa2_err).lower():
                 print(
                     f"Flash Attention 2 failed, falling back to eager attention: {fa2_err}"
@@ -329,7 +335,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Saved to {output_dir} (save_pretrained)")
         return 0
 
-    except Exception as exc:
+    except (
+        ImportError,
+        ModuleNotFoundError,
+        OSError,
+        RuntimeError,
+        ValueError,
+        json.JSONDecodeError,
+    ) as exc:
         print(f"ERROR: Model download failed: {exc}", file=sys.stderr)
         return 1
 

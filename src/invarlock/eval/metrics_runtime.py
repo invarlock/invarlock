@@ -17,6 +17,13 @@ from invarlock.eval.metrics_model_io import (
 )
 
 logger = logging.getLogger(__name__)
+_METRICS_RUNTIME_ERRORS = (
+    AttributeError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 
 class PerplexityStatus:
@@ -563,7 +570,7 @@ def measure_latency(
                     input_ids=sample_input_ids,
                     attention_mask=sample_attention_mask,
                 )
-            except Exception as exc:
+            except _METRICS_RUNTIME_ERRORS as exc:
                 raise RuntimeError("Latency warmup failed.") from exc
 
     if device_t.type == "cuda":
@@ -578,7 +585,7 @@ def measure_latency(
                     input_ids=sample_input_ids,
                     attention_mask=sample_attention_mask,
                 )
-            except Exception as exc:
+            except _METRICS_RUNTIME_ERRORS as exc:
                 raise RuntimeError("Latency measurement failed.") from exc
 
     if device_t.type == "cuda":
@@ -652,7 +659,7 @@ def measure_memory(
 
                 max_memory = max(max_memory, current_memory)
                 measured_samples += 1
-            except Exception as exc:
+            except _METRICS_RUNTIME_ERRORS as exc:
                 if device_t.type == "cuda":
                     torch.cuda.empty_cache()
                 raise RuntimeError(

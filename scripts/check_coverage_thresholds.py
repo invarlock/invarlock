@@ -327,7 +327,7 @@ def _collect_branch_rates(root: ET.Element) -> dict[str, float]:
         """
         try:
             p = path.resolve()
-        except Exception:
+        except OSError:
             p = path
 
         # If the path already looks project-relative, keep it
@@ -345,7 +345,7 @@ def _collect_branch_rates(root: ET.Element) -> dict[str, float]:
         try:
             rel = p.relative_to(Path.cwd())
             return rel.as_posix()
-        except Exception:
+        except ValueError:
             return None
 
     def resolve_path(filename: str) -> str | None:

@@ -28,7 +28,7 @@ def _make_fake_torch(
     fake.cuda = SimpleNamespace()
     fake.cuda.is_available = lambda: cuda_available
     fake.cuda.get_device_properties = lambda idx: _Props()
-    fake.cuda.nccl = SimpleNamespace(version=lambda: nccl_version)  # type: ignore[arg-type]
+    fake.cuda.nccl = SimpleNamespace(version=lambda: nccl_version)
     fake.backends = SimpleNamespace(
         cudnn=SimpleNamespace(version=lambda: cudnn_version, allow_tf32=allow_tf32),
         cuda=SimpleNamespace(matmul=SimpleNamespace(allow_tf32=allow_tf32)),
@@ -65,7 +65,7 @@ def test_collect_backend_versions_without_torch(monkeypatch):
     # Force import of torch to fail inside the function by intercepting __import__
     real_import = builtins.__import__
 
-    def fake_import(name, *args, **kwargs):  # type: ignore[no-untyped-def]
+    def fake_import(name, *args, **kwargs):
         if name == "torch":
             raise ImportError("torch not available")
         return real_import(name, *args, **kwargs)
@@ -81,7 +81,7 @@ def test_collect_backend_versions_without_torch(monkeypatch):
 def test_collect_backend_versions_tolerates_platform_and_env_failures(monkeypatch):
     real_import = builtins.__import__
 
-    def fake_import(name, *args, **kwargs):  # type: ignore[no-untyped-def]
+    def fake_import(name, *args, **kwargs):
         if name == "torch":
             raise ImportError("torch not available")
         return real_import(name, *args, **kwargs)

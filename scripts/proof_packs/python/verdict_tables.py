@@ -15,6 +15,8 @@ DEFAULT_CORE_GUARDS: tuple[str, ...] = (
     "primary_metric",
 )
 DEFAULT_CATEGORIES: tuple[str, ...] = ("clean", "stress", "error_injection")
+_COERCE_ERRORS = (TypeError, ValueError, OverflowError)
+_JSON_READ_ERRORS = (OSError, TypeError, ValueError)
 
 
 def _as_bool(value: Any, *, default: bool = False) -> bool:
@@ -39,12 +41,12 @@ def _as_int(value: Any, *, default: int = 0) -> int:
     if isinstance(value, float):
         try:
             return int(value)
-        except Exception:
+        except _COERCE_ERRORS:
             return default
     if isinstance(value, str):
         try:
             return int(value.strip())
-        except Exception:
+        except _COERCE_ERRORS:
             return default
     return default
 
@@ -62,7 +64,7 @@ def _as_float(value: Any, *, default: float | None = None) -> float | None:
     if isinstance(value, str):
         try:
             v = float(value.strip())
-        except Exception:
+        except _COERCE_ERRORS:
             return default
         if v != v or abs(v) == float("inf"):
             return default
@@ -73,7 +75,7 @@ def _as_float(value: Any, *, default: float | None = None) -> float | None:
 def _load_json(path: Path) -> dict[str, Any]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-    except Exception as exc:  # noqa: BLE001
+    except _JSON_READ_ERRORS as exc:
         raise ValueError(f"Failed to read JSON: {path} ({exc})") from exc
     if not isinstance(payload, dict):
         raise ValueError(f"Expected JSON object: {path}")

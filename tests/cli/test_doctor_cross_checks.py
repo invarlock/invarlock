@@ -1,287 +1,189 @@
+from __future__ import annotations
+
 import json
-from unittest.mock import Mock, patch
 
-from typer.testing import CliRunner
+import pytest
+import typer
 
-
-def _mk_report(tokenizer=None, masking=None, split=None, pm_kind=None):
-    prov = {}
-    if split is not None:
-        prov["dataset_split"] = split
-    pd = {}
-    if tokenizer is not None:
-        pd["tokenizer_sha256"] = tokenizer
-    if masking is not None:
-        pd["masking_sha256"] = masking
-    if pd:
-        prov["provider_digest"] = pd
-    metrics = {}
-    if pm_kind is not None:
-        metrics = {"primary_metric": {"kind": pm_kind}}
-    return {"provenance": prov, "metrics": metrics}
+from invarlock.core.doctor_findings import build_cross_check_findings
+from tests.cli.test_doctor_preflight_and_cross_checks import (
+    _install_fake_torch,
+    _mk_report,
+    _patch_minimal_doctor_env,
+    doctor_mod,
+)
 
 
-def test_doctor_json_reports_tokenizer_digest_mismatch(tmp_path, monkeypatch):
-    monkeypatch.setenv("INVARLOCK_LIGHT_IMPORT", "1")
-
+def test_doctor_cross_checks_tokenizer_mismatch(monkeypatch, tmp_path, capsys):
+    _install_fake_torch(monkeypatch, cuda_available=False)
+    _patch_minimal_doctor_env(monkeypatch)
     baseline = tmp_path / "baseline.json"
     subject = tmp_path / "subject.json"
-    baseline.write_text(json.dumps(_mk_report(tokenizer="tokA", split="validation")))
-    subject.write_text(json.dumps(_mk_report(tokenizer="tokB", split="validation")))
-
-    with (
-        patch("invarlock.core.registry.get_registry") as mock_registry,
-        patch(
-            "invarlock.cli.device.get_device_info",
-            return_value={
-                "auto_selected": "cpu",
-                "cpu": {"available": True, "info": "Always"},
-            },
-        ),
-    ):
-        reg = Mock()
-        reg.list_adapters.return_value = []
-        reg.list_edits.return_value = []
-        reg.list_guards.return_value = []
-        reg.get_plugin_info.return_value = {
-            "module": "invarlock.adapters",
-            "entry_point": "",
-        }
-        mock_registry.return_value = reg
-
-        from invarlock.cli.app import app
-
-        r = CliRunner().invoke(
-            app,
-            [
-                "doctor",
-                "--json",
-                "--baseline-report",
-                str(baseline),
-                "--subject-report",
-                str(subject),
-            ],
+    baseline.write_text(
+        json.dumps(_mk_report(tokenizer="tokA", split="validation")), encoding="utf-8"
+    )
+    subject.write_text(
+        json.dumps(_mk_report(tokenizer="tokB", split="validation")), encoding="utf-8"
+    )
+    with pytest.raises(typer.Exit) as exc:
+        doctor_mod.doctor_command(
+            json_out=True,
+            baseline_report=str(baseline),
+            subject_report=str(subject),
         )
-
-    assert r.exit_code == 0  # warning only
-    payload = json.loads(r.stdout)
-    codes = {f["code"] for f in payload["findings"]}
+    assert exc.value.exit_code == 0
+    payload = json.loads(capsys.readouterr().out.splitlines()[-1])
+    codes = {f["code"] for f in payload.get("findings", [])}
     assert "D009" in codes
 
 
-def test_doctor_json_reports_mask_digest_missing_for_mlm_like(tmp_path, monkeypatch):
-    monkeypatch.setenv("INVARLOCK_LIGHT_IMPORT", "1")
-
+def test_doctor_cross_checks_mask_missing(monkeypatch, tmp_path, capsys):
+    _install_fake_torch(monkeypatch, cuda_available=False)
+    _patch_minimal_doctor_env(monkeypatch)
     baseline = tmp_path / "baseline.json"
     subject = tmp_path / "subject.json"
     baseline.write_text(
-        json.dumps(
-            _mk_report(
-                tokenizer="tokA", masking=None, split="validation", pm_kind="ppl_mlm"
-            )
-        )
+        json.dumps(_mk_report(tokenizer="tokA", split="validation", pm_kind="ppl_mlm")),
+        encoding="utf-8",
     )
     subject.write_text(
-        json.dumps(
-            _mk_report(
-                tokenizer="tokA", masking=None, split="validation", pm_kind="ppl_mlm"
-            )
-        )
+        json.dumps(_mk_report(tokenizer="tokA", split="validation", pm_kind="ppl_mlm")),
+        encoding="utf-8",
     )
-
-    with (
-        patch("invarlock.core.registry.get_registry") as mock_registry,
-        patch(
-            "invarlock.cli.device.get_device_info",
-            return_value={
-                "auto_selected": "cpu",
-                "cpu": {"available": True, "info": "Always"},
-            },
-        ),
-    ):
-        reg = Mock()
-        reg.list_adapters.return_value = []
-        reg.list_edits.return_value = []
-        reg.list_guards.return_value = []
-        reg.get_plugin_info.return_value = {
-            "module": "invarlock.adapters",
-            "entry_point": "",
-        }
-        mock_registry.return_value = reg
-
-        from invarlock.cli.app import app
-
-        r = CliRunner().invoke(
-            app,
-            [
-                "doctor",
-                "--json",
-                "--baseline-report",
-                str(baseline),
-                "--subject-report",
-                str(subject),
-            ],
+    with pytest.raises(typer.Exit) as exc:
+        doctor_mod.doctor_command(
+            json_out=True,
+            baseline_report=str(baseline),
+            subject_report=str(subject),
         )
-
-    assert r.exit_code == 0  # warning only
-    payload = json.loads(r.stdout)
-    codes = {f["code"] for f in payload["findings"]}
+    assert exc.value.exit_code == 0
+    payload = json.loads(capsys.readouterr().out.splitlines()[-1])
+    codes = {f["code"] for f in payload.get("findings", [])}
     assert "D010" in codes
 
 
-def test_doctor_json_d010_not_emitted_when_not_mlm(tmp_path, monkeypatch):
-    monkeypatch.setenv("INVARLOCK_LIGHT_IMPORT", "1")
-
+def test_doctor_cross_checks_split_mismatch_strict(monkeypatch, tmp_path, capsys):
+    _install_fake_torch(monkeypatch, cuda_available=False)
+    _patch_minimal_doctor_env(monkeypatch)
     baseline = tmp_path / "baseline.json"
     subject = tmp_path / "subject.json"
-    baseline.write_text(
-        json.dumps(
-            _mk_report(
-                tokenizer="tokA", masking=None, split="validation", pm_kind="accuracy"
-            )
+    baseline.write_text(json.dumps(_mk_report(split="validation")), encoding="utf-8")
+    subject.write_text(json.dumps(_mk_report(split="test")), encoding="utf-8")
+    with pytest.raises(typer.Exit) as exc:
+        doctor_mod.doctor_command(
+            json_out=True,
+            baseline_report=str(baseline),
+            subject_report=str(subject),
+            strict=True,
         )
-    )
+    assert exc.value.exit_code == 1
+    payload = json.loads(capsys.readouterr().out.splitlines()[-1])
+    entries = [f for f in payload.get("findings", []) if f.get("code") == "D011"]
+    assert entries and entries[0]["severity"] == "error"
+
+
+def test_doctor_cross_checks_accuracy_pseudo_counts(monkeypatch, tmp_path, capsys):
+    _install_fake_torch(monkeypatch, cuda_available=False)
+    _patch_minimal_doctor_env(monkeypatch)
+    baseline = tmp_path / "baseline.json"
+    subject = tmp_path / "subject.json"
+    baseline.write_text(json.dumps(_mk_report(split="validation")), encoding="utf-8")
     subject.write_text(
         json.dumps(
             _mk_report(
-                tokenizer="tokA", masking=None, split="validation", pm_kind="accuracy"
+                split="validation",
+                pm_kind="accuracy",
+                counts_source="pseudo_config",
+                estimated=True,
             )
-        )
+        ),
+        encoding="utf-8",
     )
-
-    with (
-        patch("invarlock.core.registry.get_registry") as mock_registry,
-        patch(
-            "invarlock.cli.device.get_device_info",
-            return_value={
-                "auto_selected": "cpu",
-                "cpu": {"available": True, "info": "Always"},
-            },
-        ),
-    ):
-        reg = Mock()
-        reg.list_adapters.return_value = []
-        reg.list_edits.return_value = []
-        reg.list_guards.return_value = []
-        reg.get_plugin_info.return_value = {
-            "module": "invarlock.adapters",
-            "entry_point": "",
-        }
-        mock_registry.return_value = reg
-
-        from invarlock.cli.app import app
-
-        r = CliRunner().invoke(
-            app,
-            [
-                "doctor",
-                "--json",
-                "--baseline-report",
-                str(baseline),
-                "--subject-report",
-                str(subject),
-            ],
+    with pytest.raises(typer.Exit) as exc:
+        doctor_mod.doctor_command(
+            json_out=True,
+            baseline_report=str(baseline),
+            subject_report=str(subject),
+            profile="ci",
         )
+    assert exc.value.exit_code == 1
+    payload = json.loads(capsys.readouterr().out.splitlines()[-1])
+    entries = [f for f in payload.get("findings", []) if f.get("code") == "D012"]
+    assert entries and entries[0]["severity"] == "error"
 
-    assert r.exit_code == 0
-    payload = json.loads(r.stdout)
-    codes = {f["code"] for f in payload["findings"]}
-    assert "D010" not in codes
+
+def _run_cross_check(tmp_path, baseline_payload, subject_payload, **kwargs):
+    baseline = tmp_path / "baseline_cc.json"
+    subject = tmp_path / "subject_cc.json"
+    baseline.write_text(json.dumps(baseline_payload), encoding="utf-8")
+    subject.write_text(json.dumps(subject_payload), encoding="utf-8")
+    findings, had_error = build_cross_check_findings(
+        str(baseline),
+        str(subject),
+        cfg_metric_kind=kwargs.get("cfg_metric_kind"),
+        strict=kwargs.get("strict", False),
+        profile=kwargs.get("profile"),
+    )
+    return had_error, [(finding.code, finding.severity) for finding in findings]
 
 
-def test_doctor_json_reports_split_mismatch(tmp_path, monkeypatch):
-    monkeypatch.setenv("INVARLOCK_LIGHT_IMPORT", "1")
+def test_cross_checks_d009_tokenizer(tmp_path):
+    had_error, calls = _run_cross_check(
+        tmp_path,
+        _mk_report(tokenizer="tokA", split="validation"),
+        _mk_report(tokenizer="tokB", split="validation"),
+    )
+    assert not had_error
+    assert ("D009", "warning") in calls
 
-    baseline = tmp_path / "baseline.json"
-    subject = tmp_path / "subject.json"
-    baseline.write_text(json.dumps(_mk_report(tokenizer="tokA", split="validation")))
-    subject.write_text(json.dumps(_mk_report(tokenizer="tokA", split="test")))
 
-    with (
-        patch("invarlock.core.registry.get_registry") as mock_registry,
-        patch(
-            "invarlock.cli.device.get_device_info",
-            return_value={
-                "auto_selected": "cpu",
-                "cpu": {"available": True, "info": "Always"},
-            },
+def test_cross_checks_d010_missing_mask(tmp_path):
+    had_error, calls = _run_cross_check(
+        tmp_path,
+        _mk_report(tokenizer="tokA", split="validation", pm_kind="ppl_mlm"),
+        _mk_report(tokenizer="tokA", split="validation", pm_kind="ppl_mlm"),
+        cfg_metric_kind="ppl_mlm",
+    )
+    assert not had_error
+    assert ("D010", "warning") in calls
+
+
+def test_cross_checks_d011_strict(tmp_path):
+    had_error, calls = _run_cross_check(
+        tmp_path,
+        _mk_report(tokenizer="tokA", split="validation"),
+        _mk_report(tokenizer="tokA", split="test"),
+        strict=True,
+    )
+    assert had_error
+    assert ("D011", "error") in calls
+
+
+def test_cross_checks_d012_profile(tmp_path):
+    had_error_dev, calls_dev = _run_cross_check(
+        tmp_path,
+        _mk_report(split="validation"),
+        _mk_report(
+            split="validation",
+            pm_kind="accuracy",
+            counts_source="pseudo_config",
+            estimated=True,
         ),
-    ):
-        reg = Mock()
-        reg.list_adapters.return_value = []
-        reg.list_edits.return_value = []
-        reg.list_guards.return_value = []
-        reg.get_plugin_info.return_value = {
-            "module": "invarlock.adapters",
-            "entry_point": "",
-        }
-        mock_registry.return_value = reg
+        profile=None,
+    )
+    assert not had_error_dev
+    assert ("D012", "warning") in calls_dev
 
-        from invarlock.cli.app import app
-
-        r = CliRunner().invoke(
-            app,
-            [
-                "doctor",
-                "--json",
-                "--baseline-report",
-                str(baseline),
-                "--subject-report",
-                str(subject),
-            ],
-        )
-
-    assert r.exit_code == 0  # warning only
-    payload = json.loads(r.stdout)
-    codes = {f["code"] for f in payload["findings"]}
-    assert "D011" in codes
-
-
-def test_d011_escalates_with_strict(tmp_path, monkeypatch):
-    monkeypatch.setenv("INVARLOCK_LIGHT_IMPORT", "1")
-
-    baseline = tmp_path / "baseline.json"
-    subject = tmp_path / "subject.json"
-    baseline.write_text(json.dumps(_mk_report(tokenizer="tokA", split="validation")))
-    subject.write_text(json.dumps(_mk_report(tokenizer="tokA", split="test")))
-
-    with (
-        patch("invarlock.core.registry.get_registry") as mock_registry,
-        patch(
-            "invarlock.cli.device.get_device_info",
-            return_value={
-                "auto_selected": "cpu",
-                "cpu": {"available": True, "info": "Always"},
-            },
+    had_error_ci, calls_ci = _run_cross_check(
+        tmp_path,
+        _mk_report(split="validation"),
+        _mk_report(
+            split="validation",
+            pm_kind="accuracy",
+            counts_source="pseudo_config",
+            estimated=True,
         ),
-    ):
-        reg = Mock()
-        reg.list_adapters.return_value = []
-        reg.list_edits.return_value = []
-        reg.list_guards.return_value = []
-        reg.get_plugin_info.return_value = {
-            "module": "invarlock.adapters",
-            "entry_point": "",
-        }
-        mock_registry.return_value = reg
-
-        from invarlock.cli.app import app
-
-        r = CliRunner().invoke(
-            app,
-            [
-                "doctor",
-                "--json",
-                "--baseline-report",
-                str(baseline),
-                "--subject-report",
-                str(subject),
-                "--strict",
-            ],
-        )
-
-    payload = json.loads(r.stdout)
-    findings = payload["findings"]
-    sev = {f["code"]: f["severity"] for f in findings}
-    assert sev.get("D011") == "error"
-    assert payload["resolution"]["exit_code"] == 1
+        profile="ci",
+    )
+    assert had_error_ci
+    assert ("D012", "error") in calls_ci

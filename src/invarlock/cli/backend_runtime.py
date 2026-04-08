@@ -5,6 +5,8 @@ import io
 import warnings
 from contextlib import redirect_stderr, redirect_stdout
 
+_SAFE_IMPORT_ERRORS = (ImportError, AttributeError, RuntimeError, OSError)
+
 
 def _safe_import(module_name: str, attr: str | None = None) -> bool:
     """Return True when a backend module (and optional symbol) imports cleanly."""
@@ -20,7 +22,7 @@ def _safe_import(module_name: str, attr: str | None = None) -> bool:
         if attr is None:
             return True
         return getattr(module, attr, None) is not None
-    except Exception:
+    except _SAFE_IMPORT_ERRORS:
         return False
 
 

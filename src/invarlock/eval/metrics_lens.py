@@ -28,6 +28,14 @@ from .metrics_support import (
 )
 
 logger = logging.getLogger(__name__)
+_LENS_METRIC_ERRORS = (
+    AttributeError,
+    KeyError,
+    MetricsError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 
 def _finalize_results(
@@ -85,13 +93,13 @@ def calculate_lens_metrics_for_model(
 
     try:
         _perform_pre_eval_checks(model, dataloader, resource_manager.device, config)
-    except Exception as e:
+    except _LENS_METRIC_ERRORS as e:
         logger.warning(f"Pre-evaluation checks failed: {e}")
 
     if hasattr(model, "base_model"):
         try:
             model = model.base_model
-        except Exception:
+        except AttributeError:
             pass
 
     model.eval()
@@ -122,7 +130,7 @@ def calculate_lens_metrics_for_model(
         results["mi_gini"] = _calculate_mi_gini(
             model, activation_data, dep_manager, config, device
         )
-    except Exception as e:
+    except _LENS_METRIC_ERRORS as e:
         logger.error(f"Metrics calculation failed: {e}")
         if config.strict_validation:
             raise MetricsError(

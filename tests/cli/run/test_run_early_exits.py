@@ -2,42 +2,19 @@ from __future__ import annotations
 
 import builtins
 import json
-import sys
 import textwrap
-import types
+from collections.abc import Sequence
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 import typer
 
+from tests.conftest import install_transformers_tokenizer_stub
+
 
 def _import_run_module():
-    # transformers stub to avoid heavy import during run module import
-    if "transformers" not in sys.modules:
-        tr = types.ModuleType("transformers")
-
-        class _Tok:
-            pad_token = "<pad>"
-            eos_token = "<eos>"
-
-            def get_vocab(self):
-                return {"<pad>": 0, "<eos>": 1}
-
-        class _Auto:
-            @staticmethod
-            def from_pretrained(*a, **k):
-                return _Tok()
-
-        class _GPT2(_Auto):
-            pass
-
-        tr.AutoTokenizer = _Auto  # type: ignore[attr-defined]
-        tr.GPT2Tokenizer = _GPT2  # type: ignore[attr-defined]
-        sys.modules["transformers"] = tr
-        sub = types.ModuleType("transformers.tokenization_utils_base")
-        sub.PreTrainedTokenizerBase = object  # type: ignore[attr-defined]
-        sys.modules["transformers.tokenization_utils_base"] = sub
+    install_transformers_tokenizer_stub()
 
     import importlib
 
@@ -115,10 +92,16 @@ def test_run_command_missing_torch_shows_extra_hint(
     # Simulate an environment where torch is not installed.
     original_import = builtins.__import__
 
-    def fake_import(name, *args, **kwargs):  # type: ignore[override]
+    def fake_import(
+        name: str,
+        globals: dict[str, object] | None = None,
+        locals: dict[str, object] | None = None,
+        fromlist: Sequence[str] = (),
+        level: int = 0,
+    ) -> object:
         if name == "torch":
             raise ModuleNotFoundError("torch not available in test")
-        return original_import(name, *args, **kwargs)
+        return original_import(name, globals, locals, fromlist, level)
 
     monkeypatch.setattr(builtins, "__import__", fake_import)
 

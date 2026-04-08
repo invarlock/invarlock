@@ -32,6 +32,17 @@ from .exceptions import DependencyError, PluginError
 
 __all__ = ["PluginInfo", "CoreRegistry", "get_registry"]
 
+_DISCOVERY_ERRORS = (AttributeError, ImportError, RuntimeError, TypeError, ValueError)
+_PLUGIN_LOAD_ERRORS = (
+    AttributeError,
+    DependencyError,
+    ImportError,
+    PluginError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 @dataclass
 class PluginInfo:
@@ -107,7 +118,7 @@ class CoreRegistry:
                     info = self._create_plugin_info(ep, "guards")
                     self._guards[ep.name] = info
 
-            except Exception as e:
+            except _DISCOVERY_ERRORS as e:
                 self._discovery_issue = f"Plugin discovery failed: {e}"
                 warnings.warn(f"Plugin discovery failed: {e}", stacklevel=2)
 
@@ -338,7 +349,7 @@ class CoreRegistry:
             cls = self._resolve_plugin_class(info)
             self._validate_plugin_abi(cls)
             instance = cls()
-        except Exception as error:
+        except _PLUGIN_LOAD_ERRORS as error:
             raise ImportError(
                 f"Failed to load {kind} '{info.name}': {error}"
             ) from error

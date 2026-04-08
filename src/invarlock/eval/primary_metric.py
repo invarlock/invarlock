@@ -324,12 +324,12 @@ class _PPLCausal(PrimaryMetric):
             "subject_point": subj_point,
             "baseline_point": base_point,
             "delta": delta_log,
-            "ci": (dlog_lo, dlog_hi),
+            "ci": [dlog_lo, dlog_hi],
             "display": ratio,
-            "display_ci": (
+            "display_ci": [
                 self.display_transform(dlog_lo),
                 self.display_transform(dlog_hi),
-            ),
+            ],
         }
 
 
@@ -489,9 +489,9 @@ class _Accuracy:
                 "subject_point": float("nan"),
                 "baseline_point": float("nan"),
                 "delta": float("nan"),
-                "ci": (float("nan"), float("nan")),
+                "ci": [float("nan"), float("nan")],
                 "display": float("nan"),
-                "display_ci": (float("nan"), float("nan")),
+                "display_ci": [float("nan"), float("nan")],
             }
         # Points in display space for subject/baseline (proportions, no transform)
         subj_point = float(sum(subj) / float(m))
@@ -525,9 +525,9 @@ class _Accuracy:
             "subject_point": subj_point,
             "baseline_point": base_point,
             "delta": delta,
-            "ci": (lo, hi),
+            "ci": [lo, hi],
             "display": self.display_transform(delta),
-            "display_ci": (self.display_transform(lo), self.display_transform(hi)),
+            "display_ci": [self.display_transform(lo), self.display_transform(hi)],
         }
 
 

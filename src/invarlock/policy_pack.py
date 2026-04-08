@@ -11,8 +11,19 @@ from invarlock.public_contracts import load_policy_pack_schema
 
 try:  # pragma: no cover - exercised in integration/tests
     import jsonschema
-except Exception:  # pragma: no cover
+except ModuleNotFoundError:  # pragma: no cover
     jsonschema = None
+
+if jsonschema is None:  # pragma: no cover - defensive import fallback
+    _JSONSCHEMA_VALIDATE_ERRORS: tuple[type[BaseException], ...] = ()
+else:  # pragma: no cover - exercised when jsonschema is installed
+    _JSONSCHEMA_VALIDATE_ERRORS = (
+        RuntimeError,
+        jsonschema.SchemaError,
+        TypeError,
+        ValueError,
+        jsonschema.ValidationError,
+    )
 
 POLICY_PACK_FORMAT = "policy-pack-v1"
 
@@ -114,7 +125,7 @@ def verify_policy_pack(pack: object) -> list[str]:
     if schema and jsonschema is not None:
         try:
             jsonschema.validate(instance=pack, schema=schema)
-        except Exception as exc:
+        except _JSONSCHEMA_VALIDATE_ERRORS as exc:
             errors.append(f"schema validation failed: {exc}")
 
     resolved_policy = pack.get("resolved_policy")

@@ -8,6 +8,7 @@ import argparse
 import logging
 from collections.abc import Sequence
 
+from invarlock.core.exceptions import InvarlockError
 from invarlock.eval.bench import (
     BenchmarkConfig,
     BenchmarkSummary,
@@ -27,6 +28,15 @@ from invarlock.eval.bench import (
     run_guard_effect_benchmark,
     scenario_result_to_dict,
     summary_to_step14_json,
+)
+
+_BENCH_COMMAND_ERRORS = (
+    InvarlockError,
+    ImportError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
 )
 
 __all__ = [
@@ -169,7 +179,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except KeyboardInterrupt:
         print("\n❌ Benchmark interrupted by user")
         return 1
-    except Exception as exc:
+    except _BENCH_COMMAND_ERRORS as exc:
         print(f"❌ Benchmark failed: {exc}")
         if args.verbose:
             import traceback

@@ -18,6 +18,12 @@ from typing import Any
 
 import yaml
 
+try:
+    from model_evidence_sweep_output import write_manifest, write_summary
+except ImportError:  # pragma: no cover - direct module load under pytest
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from model_evidence_sweep_output import write_manifest, write_summary
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SUPPORT_MATRIX_PATH = REPO_ROOT / "contracts" / "support_matrix.json"
 MODEL_FAMILY_CATALOG_PATH = REPO_ROOT / "contracts" / "model_family_catalog.json"
@@ -832,63 +838,6 @@ def run_lane(
         else None,
         status=status,
         detail=detail,
-    )
-
-
-def write_summary(
-    output_root: Path,
-    *,
-    suite: str,
-    execution_mode: str,
-    shard_index: int,
-    shard_count: int,
-    results: list[LaneResult],
-) -> None:
-    summary_tsv = output_root / "summary.tsv"
-    with summary_tsv.open("w", encoding="utf-8") as handle:
-        handle.write(
-            "slug\tlane_id\tstatus\tdetail\tevaluate_exit\tverify_exit\treport\n"
-        )
-        for result in results:
-            verify_exit = (
-                "NA" if result.verify_exit is None else str(result.verify_exit)
-            )
-            handle.write(
-                f"{result.slug}\t{result.lane_id}\t{result.status}\t"
-                f"{result.detail or ''}\t{result.evaluate_exit}\t"
-                f"{verify_exit}\t{result.report_path}\n"
-            )
-
-    payload = {
-        "suite": suite,
-        "execution_mode": execution_mode,
-        "shard_index": shard_index,
-        "shard_count": shard_count,
-        "ok": all(result.ok for result in results),
-        "results": [result.to_summary_entry() for result in results],
-    }
-    (output_root / "summary.json").write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-
-
-def write_manifest(
-    output_root: Path,
-    *,
-    suite: str,
-    execution_mode: str,
-    specs: list[EvidenceLane],
-) -> None:
-    payload = {
-        "generated_at": datetime.now(UTC).isoformat(),
-        "suite": suite,
-        "execution_mode": execution_mode,
-        "lanes": [spec.to_manifest_entry() for spec in specs],
-    }
-    (output_root / "manifest.json").write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
     )
 
 

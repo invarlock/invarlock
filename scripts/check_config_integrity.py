@@ -34,7 +34,7 @@ def find_includes_and_adapters(
                 m2 = adapter_re.match(line)
                 if m2:
                     adapters.add(m2.group(1))
-        except Exception as e:
+        except OSError as e:
             print(f"ERR reading {p}: {e}")
     return missing_includes, adapters
 
@@ -42,7 +42,7 @@ def find_includes_and_adapters(
 def registry_adapters() -> set[str]:
     try:
         from invarlock.core.registry import get_registry
-    except Exception:
+    except (ImportError, ModuleNotFoundError, RuntimeError):
         return set()
     reg = get_registry()
     return set(reg.list_adapters())

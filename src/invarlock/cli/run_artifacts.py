@@ -8,6 +8,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+_PROFILE_ERRORS = (AttributeError, RuntimeError, TypeError, ValueError)
+
 
 def persist_ref_masks(core_report: Any, run_dir: Path) -> Path | None:
     """Persist reference keep indices to artifact if present."""
@@ -52,7 +54,7 @@ def resolve_exit_code(
     """Resolve CLI exit code based on error class and active profile."""
     try:
         prof = (profile or "").strip().lower()
-    except Exception:
+    except _PROFILE_ERRORS:
         prof = ""
     if isinstance(exc, config_error_cls | validation_error_cls | data_error_cls):
         return 2

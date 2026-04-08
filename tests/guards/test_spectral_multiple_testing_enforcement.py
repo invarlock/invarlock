@@ -66,13 +66,13 @@ def test_spectral_multiple_testing_changes_selected_violations() -> None:
     bh = _run_case("bh")
     bonf = _run_case("bonferroni")
 
-    bh_modules = {v.get("module") for v in bh.get("violations", [])}  # type: ignore[union-attr]
-    bonf_modules = {v.get("module") for v in bonf.get("violations", [])}  # type: ignore[union-attr]
+    bh_modules = {v.get("module") for v in bh.get("violations", [])}
+    bonf_modules = {v.get("module") for v in bonf.get("violations", [])}
 
     assert bh_modules == {"mlp", "attn", "embed"}
     assert bonf_modules == {"mlp"}
 
-    bh_mt = (bh.get("policy") or {}).get("multiple_testing")  # type: ignore[union-attr]
+    bh_mt = (bh.get("policy") or {}).get("multiple_testing")
     assert isinstance(bh_mt, dict)
     assert bh_mt.get("method") == "bh"
     assert bh_mt.get("alpha") == 0.05

@@ -65,6 +65,9 @@ def _cert_with_provenance() -> dict:
                 },
             },
         },
+        "evaluation_windows": {
+            "final": {"logloss": [math.log(101.0)], "token_counts": [1]}
+        },
         "baseline_ref": {"primary_metric": {"kind": "ppl_causal", "final": 100.0}},
         "provenance": {
             "provider_digest": {

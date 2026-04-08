@@ -10,6 +10,7 @@ Validates that:
 from __future__ import annotations
 
 import ast
+import json
 import re
 import sys
 from dataclasses import dataclass
@@ -440,7 +441,12 @@ def main() -> None:
     # ---- field-path xrefs ----
     try:
         certs = _sample_reports()
-    except Exception as e:  # pragma: no cover
+    except (
+        OSError,
+        RuntimeError,
+        ValueError,
+        json.JSONDecodeError,
+    ) as e:  # pragma: no cover
         errors.append(
             LintError(Path("docs/assurance"), f"Failed to build sample report: {e}")
         )

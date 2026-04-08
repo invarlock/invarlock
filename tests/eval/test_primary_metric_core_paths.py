@@ -114,8 +114,8 @@ def test_numeric_coercion_helpers_reject_bools_and_nonfinite_floats() -> None:
 
 def test_ppl_causal_finalize_returns_nan_when_total_weight_non_positive() -> None:
     metric = _PPLCausal()
-    metric._values = [1.0]  # type: ignore[attr-defined]
-    metric._weights = [-1.0]  # type: ignore[attr-defined]
+    metric._values = [1.0]
+    metric._weights = [-1.0]
     assert math.isnan(metric.finalize())
 
 
@@ -125,7 +125,7 @@ def test_ppl_causal_paired_compare_uses_weight_fallback_when_needed(
     metric = _PPLCausal()
     captured: dict[str, object] = {}
 
-    def _fake_ci(subj_vals, base_vals, *, weights, **_kwargs):  # type: ignore[no-untyped-def]  # noqa: ARG001
+    def _fake_ci(subj_vals, base_vals, *, weights, **_kwargs):  # noqa: ARG001
         captured["weights"] = list(weights or [])
         return (0.0, 0.0)
 

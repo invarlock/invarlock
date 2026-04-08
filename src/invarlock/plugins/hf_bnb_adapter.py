@@ -27,6 +27,17 @@ from invarlock.core.api import ModelAdapter
 from invarlock.core.error_utils import wrap_errors
 from invarlock.core.exceptions import DependencyError, ModelLoadError
 
+_BNB_CONFIG_ERRORS = (OSError, TypeError, ValueError)
+_BNB_MODEL_LOAD_ERRORS = (
+    AttributeError,
+    ImportError,
+    ModelLoadError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 def _is_local_path(model_id: str) -> bool:
     """Check if model_id is a local filesystem path."""
@@ -68,7 +79,7 @@ def _detect_pre_quantized_bnb(model_id: str) -> tuple[bool, int]:
                 return True, 4
             return True, 8
 
-    except Exception:
+    except _BNB_CONFIG_ERRORS:
         pass
 
     return False, 0
@@ -143,7 +154,7 @@ class HF_BNB_Adapter(HFAdapterMixin, ModelAdapter):
                     trust_remote_code=trust_remote_code,
                     **load_kwargs,
                 )
-            except Exception as exc:
+            except _BNB_MODEL_LOAD_ERRORS as exc:
                 self._raise_load_error(
                     exc,
                     model_id=model_id,
@@ -176,7 +187,7 @@ class HF_BNB_Adapter(HFAdapterMixin, ModelAdapter):
                     quantization_config=quantization_config,
                     **load_kwargs,
                 )
-            except Exception as exc:
+            except _BNB_MODEL_LOAD_ERRORS as exc:
                 self._raise_load_error(exc, model_id=model_id)
 
         # BNB models handle their own device placement via device_map="auto"

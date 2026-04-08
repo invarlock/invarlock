@@ -8,7 +8,7 @@ class ZeroOutProj(nn.Linear):
     def __init__(self):
         super().__init__(2, 2, bias=False)
 
-    def forward(self, x):  # type: ignore[override]
+    def forward(self, x):
         # Produce zero-width output to trigger y.numel() == 0 in the forward hook
         y = super().forward(x)
         return y[:, :0]

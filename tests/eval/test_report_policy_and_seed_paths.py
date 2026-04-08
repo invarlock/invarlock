@@ -75,7 +75,7 @@ def _minimal_report():
 
 def test_to_json_invalid_raises():
     with pytest.raises(ValueError):
-        to_json({})  # type: ignore[arg-type]
+        to_json({})
 
 
 def test_to_markdown_title_and_compare():

@@ -1,40 +1,17 @@
 from __future__ import annotations
 
 import json
-import sys
 import types
 from pathlib import Path
 
 import pytest
 import typer
 
+from tests.conftest import install_transformers_tokenizer_stub
+
 
 def _import_run_module():
-    # transformers stub to avoid heavy import via model_profile
-    if "transformers" not in sys.modules:
-        tr = types.ModuleType("transformers")
-
-        class _Tok:
-            pad_token = "<pad>"
-            eos_token = "<eos>"
-
-            def get_vocab(self):
-                return {"<pad>": 0, "<eos>": 1}
-
-        class _Auto:
-            @staticmethod
-            def from_pretrained(*a, **k):
-                return _Tok()
-
-        class _GPT2(_Auto):
-            pass
-
-        tr.AutoTokenizer = _Auto  # type: ignore[attr-defined]
-        tr.GPT2Tokenizer = _GPT2  # type: ignore[attr-defined]
-        sys.modules["transformers"] = tr
-        sub = types.ModuleType("transformers.tokenization_utils_base")
-        sub.PreTrainedTokenizerBase = object  # type: ignore[attr-defined]
-        sys.modules["transformers.tokenization_utils_base"] = sub
+    install_transformers_tokenizer_stub()
 
     import importlib
 

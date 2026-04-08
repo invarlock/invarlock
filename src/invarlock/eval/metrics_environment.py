@@ -9,6 +9,7 @@ from typing import Any
 from .metrics_support import DependencyManager, MetricsConfig
 
 logger = logging.getLogger(__name__)
+_ENVIRONMENT_ERRORS = (AttributeError, RuntimeError, TypeError, ValueError)
 
 
 @dataclass(frozen=True)
@@ -62,7 +63,7 @@ def validate_metrics_environment() -> MetricsEnvironmentReport:
             missing_dependencies=tuple(dep_manager.missing_modules),
             messages=tuple(messages),
         )
-    except Exception as e:
+    except _ENVIRONMENT_ERRORS as e:
         logger.error(f"Environment validation failed: {e}")
         messages.append(str(e))
         return MetricsEnvironmentReport(

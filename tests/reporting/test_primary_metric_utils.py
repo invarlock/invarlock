@@ -39,7 +39,7 @@ def test_attach_primary_metric_from_report_with_ppl_analysis():
         pytest.approx(math.exp(0.1)),
         pytest.approx(math.exp(0.2)),
     ]
-    assert pm["ci"] == (0.1, 0.2)
+    assert pm["ci"] == [0.1, 0.2]
     assert pm["unstable"] is True
 
 

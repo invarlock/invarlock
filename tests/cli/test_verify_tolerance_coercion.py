@@ -50,6 +50,6 @@ def test_verify_tolerance_coercion_string_ok(tmp_path: Path) -> None:
     try:
         verify_command(
             [p], baseline=None, profile="dev", json_out=True, tolerance="not-a-float"
-        )  # type: ignore[arg-type]
+        )
     except typer.Exit as e:
         assert getattr(e, "exit_code", getattr(e, "code", None)) == 0

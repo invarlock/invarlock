@@ -121,7 +121,7 @@ def test_invariants_non_finite_buffer_detected():
 
 def test_invariants_surface_evidence_gaps_instead_of_sentinel_clean_values():
     class BrokenModel(TinyModel):
-        def parameters(self, recurse: bool = True):  # type: ignore[override]
+        def parameters(self, recurse: bool = True):
             raise RuntimeError("parameter enumeration failed")
 
     model = BrokenModel()

@@ -88,89 +88,97 @@ def _doctor_third_party_plugins_enabled() -> bool:
     return bool(resolve_shell_runtime_security_policy().allow_third_party_plugins)
 
 
-def doctor_command(
-    config: str | None = None,
-    profile: str | None = None,
-    baseline: str | None = None,
-    json_out: bool = False,
-    tier: str | None = None,
-    baseline_report: str | None = None,
-    subject_report: str | None = None,
-    strict: bool = False,
-):
-    """
-    Perform health checks on InvarLock installation.
+def _doctor_output_prefix(severity: str) -> str:
+    return (
+        "ERROR:"
+        if severity == "error"
+        else ("WARNING:" if severity == "warning" else "NOTE:")
+    )
 
-    Checks PyTorch, device availability, memory, and optional extras.
-    """
 
-    accumulator = DoctorAccumulator()
-
-    def _add(code: str, severity: str, message: str, **extra: object) -> None:
-        accumulator.add(code, severity, message, **extra)
-        if not json_out:
-            prefix = (
-                "ERROR:"
-                if severity == "error"
-                else ("WARNING:" if severity == "warning" else "NOTE:")
-            )
-            typer.echo(f"{prefix} {message} [INVARLOCK:{code}]")
-
-    def _record_findings(
-        findings: list[DoctorFinding], *, mark_error: bool | None = None
-    ) -> None:
-        accumulator.extend(findings, mark_error=mark_error)
-        if json_out:
-            return
-        for finding in findings:
-            prefix = (
-                "ERROR:"
-                if finding.severity == "error"
-                else ("WARNING:" if finding.severity == "warning" else "NOTE:")
-            )
-            typer.echo(f"{prefix} {finding.message} [INVARLOCK:{finding.code}]")
-
-    # Redirect rich Console output in JSON mode so no extra text is emitted
+def _doctor_print_message(
+    json_out: bool,
+    message: str,
+    severity: str,
+    code: str,
+) -> None:
     if json_out:
-        from io import StringIO
+        return
+    typer.echo(f"{_doctor_output_prefix(severity)} {message} [INVARLOCK:{code}]")
 
-        global console
-        console = Console(file=StringIO())
 
+def _doctor_add_finding(
+    accumulator: DoctorAccumulator,
+    json_out: bool,
+    code: str,
+    severity: str,
+    message: str,
+    **extra: object,
+) -> None:
+    accumulator.add(code, severity, message, **extra)
+    _doctor_print_message(json_out, message, severity, code)
+
+
+def _doctor_record_findings(
+    accumulator: DoctorAccumulator,
+    json_out: bool,
+    findings: list[DoctorFinding],
+    *,
+    mark_error: bool | None = None,
+) -> None:
+    accumulator.extend(findings, mark_error=mark_error)
+    if json_out:
+        return
+    for finding in findings:
+        typer.echo(
+            f"{_doctor_output_prefix(finding.severity)} {finding.message} [INVARLOCK:{finding.code}]"
+        )
+
+
+def _doctor_prepare_console(json_out: bool) -> Console:
+    global console
     if not json_out:
-        console.print("InvarLock Health Check")
-        console.print("=" * 50)
+        return console
+    from io import StringIO
 
-    # Environment facts (OS · Python · invarlock)
+    console = Console(file=StringIO())
+    return console
+
+
+def _doctor_load_invarlock_version() -> str:
     try:
-        _invarlock_version = str(
+        return str(
             getattr(importlib.import_module("invarlock"), "__version__", "unknown")
         )
     except ImportError:
-        _invarlock_version = "unknown"
-    if not json_out:
-        os_line = (
-            f"OS: {_platform.system()} {_platform.release()} ({_platform.machine()})"
-        )
-        py_line = f"Python: {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-        console.print(f"{os_line} · {py_line} · invarlock: {_invarlock_version}")
+        return "unknown"
 
-    health_status = True
-    had_error = False
-    cfg_metric_kind: str | None = None
 
-    # Check core components
+def _doctor_print_header(
+    json_out: bool, invarlock_version: str, console_obj: Console
+) -> None:
+    if json_out:
+        return
+    os_line = f"OS: {_platform.system()} {_platform.release()} ({_platform.machine()})"
+    py_line = f"Python: {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    console_obj.print("InvarLock Health Check")
+    console_obj.print("=" * 50)
+    console_obj.print(f"{os_line} · {py_line} · invarlock: {invarlock_version}")
+
+
+def _doctor_check_core_components(json_out: bool) -> bool:
     try:
-        from invarlock.core.registry import get_registry
-
+        from invarlock.core.registry import get_registry  # noqa: F401
+    except ImportError as exc:
         if not json_out:
-            console.print("[green]✅ Core components available[/green]")
-    except ImportError as e:
-        if not json_out:
-            console.print(f"[red]❌ Core components missing: {e}[/red]")
-        health_status = False
+            console.print(f"[red]❌ Core components missing: {exc}[/red]")
+        return False
+    if not json_out:
+        console.print("[green]✅ Core components available[/green]")
+    return True
 
-    # Check PyTorch
+
+def _doctor_check_torch_runtime(json_out: bool) -> tuple[bool, bool]:
     try:
         from ..device import get_device_info
 
@@ -179,192 +187,166 @@ def doctor_command(
             get_device_info_fn=get_device_info,
             which_fn=_shutil.which,
         )
-
-        torch_version = runtime_facts.version
-        if not json_out:
-            if torch_version:
-                console.print(f"[green]✅ PyTorch {torch_version}[/green]")
-            else:
-                console.print(
-                    "[yellow]⚠️  PyTorch present but version unavailable[/yellow]"
-                )
-
-        device_info = runtime_facts.device_info
-        if not json_out:
-            console.print("\nDevice Information")
-
-        for device_name, info in device_info.items():
-            if device_name == "auto_selected":
-                if not json_out:
-                    console.print(f"  ▶ Auto‑selected device: {info}")
-                continue
-
-            if info["available"]:
-                if (
-                    device_name == "cuda"
-                    and isinstance(info, dict)
-                    and "device_count" in info
-                ):
-                    if not json_out:
-                        console.print(
-                            f"  [green]✅ {device_name.upper()}: {info['device_count']} device(s) - {info['device_name']} ({info['memory_total']})[/green]"
-                        )
-                else:
-                    if not json_out:
-                        console.print(
-                            f"  [green]✅ {device_name.upper()}: Available[/green]"
-                        )
-            else:
-                if not json_out:
-                    console.print(
-                        f"  [dim]❌ {device_name.upper()}: {info['info']}[/dim]"
-                    )
-
-        # CUDA triage details
-        if (
-            runtime_facts.cuda_toolkit_found is not None
-            and runtime_facts.torch_cuda_build is not None
-            and runtime_facts.cuda_available is not None
-            and not json_out
-        ):
-            console.print(
-                f"  [dim]• CUDA toolkit: {'found' if runtime_facts.cuda_toolkit_found else 'not found'} · "
-                f"torch CUDA build: {'yes' if runtime_facts.torch_cuda_build else 'no'} · "
-                f"cuda.is_available(): {'true' if runtime_facts.cuda_available else 'false'}[/dim]"
-            )
-
-        # Memory check
-        if runtime_facts.gpu_memory_gb is not None:
-            if not json_out:
-                console.print(
-                    f"\nGPU Memory: {runtime_facts.gpu_memory_gb:.1f} GB total"
-                )
-            if runtime_facts.gpu_memory_low and not json_out:
-                console.print(
-                    "[yellow]⚠️  Warning: Less than 4GB GPU memory available[/yellow]"
-                )
-
     except ImportError:
         if not json_out:
             console.print("[red]❌ PyTorch not available[/red]")
             console.print("Install with: pip install torch")
-        health_status = False
+        return False, False
 
-    # Check optional dependencies
+    torch_version = runtime_facts.version
     if not json_out:
-        console.print("\nOptional Dependencies")
+        if torch_version:
+            console.print(f"[green]✅ PyTorch {torch_version}[/green]")
+        else:
+            console.print("[yellow]⚠️  PyTorch present but version unavailable[/yellow]")
 
-    # Query CUDA availability once
-    try:
-        import torch as _torch
-
-        has_cuda = bool(getattr(_torch, "cuda", None) and _torch.cuda.is_available())
-    except NON_FATAL_EXCEPTIONS:
-        has_cuda = False
-
-    optional_deps = collect_optional_dependency_facts(
-        has_cuda=has_cuda,
-        bitsandbytes_runtime_available_fn=bitsandbytes_runtime_available,
-        find_spec_fn=importlib.util.find_spec,
-    )
-
-    for dep in optional_deps:
-        if dep.name == "bitsandbytes":
-            runtime_available = bool(dep.runtime_available)
-            if runtime_available:
-                if not json_out:
-                    if has_cuda:
-                        console.print(
-                            "  [green]✅ bitsandbytes — 8/4-bit loading (GPU)[/green]"
-                        )
-                    else:
-                        console.print(
-                            "  [green]✅ bitsandbytes — runtime available on this host[/green]"
-                        )
-            elif not has_cuda:
-                if dep.present:
-                    if not json_out:
-                        console.print(
-                            "  [yellow]⚠️  bitsandbytes — GPU not detected and runtime unavailable on this host[/yellow]"
-                        )
-                else:
-                    if not json_out:
-                        console.print("  [dim]⚠️  bitsandbytes — not installed[/dim]")
-                        console.print(
-                            "     → Install: pip install 'invarlock[gpu]'",
-                            markup=False,
-                        )
-            else:
-                if not json_out:
-                    console.print(
-                        "  [yellow]⚠️  bitsandbytes — Present but runtime unavailable on this host[/yellow]"
-                    )
-                    console.print(
-                        "     → Reinstall with: pip install 'invarlock[gpu]' on a compatible host",
-                        markup=False,
-                    )
-            continue
-
-        if not json_out:
-            if dep.present:
-                console.print(f"  [green]✅ {dep.name} — {dep.description}[/green]")
-            else:
-                console.print(f"  [yellow]⚠️  {dep.name} — {dep.description}[/yellow]")
-                # Remediation for platform-gated stacks
-                if dep.name in {"auto_gptq", "autoawq"}:
-                    console.print(
-                        f"     → Install: pip install 'invarlock[{dep.extra_hint}]'  # Linux + CUDA only",
-                        markup=False,
-                    )
-                else:
-                    console.print(
-                        f"     → Install: pip install 'invarlock[{dep.extra_hint}]'",
-                        markup=False,
-                    )
-
-    # Optional: Config preflight (determinism & provider)
-    if config:
-        console.print("\n🧪 Preflight Lints (config)")
-        preflight = _doctor_preflight.run_doctor_config_preflight(
-            config_path=str(config),
-            profile=str(profile) if profile else None,
-            tier=str(tier) if tier else None,
-            baseline=str(baseline) if baseline else None,
-        )
-        for line in preflight.lines:
+        console.print("\nDevice Information")
+    for device_name, info in runtime_facts.device_info.items():
+        if device_name == "auto_selected":
             if not json_out:
-                console.print(line)
-        _record_findings(list(preflight.findings), mark_error=preflight.had_error)
-        had_error = had_error or preflight.had_error
-        cfg_metric_kind = preflight.metric_kind or cfg_metric_kind
-        if preflight.policy_meta is not None:
-            global POLICY_META
-            POLICY_META = preflight.policy_meta
+                console.print(f"  ▶ Auto‑selected device: {info}")
+            continue
+        if info["available"]:
+            if (
+                device_name == "cuda"
+                and isinstance(info, dict)
+                and "device_count" in info
+            ):
+                if not json_out:
+                    console.print(
+                        f"  [green]✅ {device_name.upper()}: {info['device_count']} device(s) - {info['device_name']} ({info['memory_total']})[/green]"
+                    )
+            elif not json_out:
+                console.print(f"  [green]✅ {device_name.upper()}: Available[/green]")
+        elif not json_out:
+            console.print(f"  [dim]❌ {device_name.upper()}: {info['info']}[/dim]")
+    if (
+        runtime_facts.cuda_toolkit_found is not None
+        and runtime_facts.torch_cuda_build is not None
+        and runtime_facts.cuda_available is not None
+        and not json_out
+    ):
+        console.print(
+            f"  [dim]• CUDA toolkit: {'found' if runtime_facts.cuda_toolkit_found else 'not found'} · "
+            f"torch CUDA build: {'yes' if runtime_facts.torch_cuda_build else 'no'} · "
+            f"cuda.is_available(): {'true' if runtime_facts.cuda_available else 'false'}[/dim]"
+        )
+    if runtime_facts.gpu_memory_gb is not None:
+        if not json_out:
+            console.print(f"\nGPU Memory: {runtime_facts.gpu_memory_gb:.1f} GB total")
+        if runtime_facts.gpu_memory_low and not json_out:
+            console.print(
+                "[yellow]⚠️  Warning: Less than 4GB GPU memory available[/yellow]"
+            )
+    has_cuda = (
+        bool(runtime_facts.cuda_available)
+        if runtime_facts.cuda_available is not None
+        else False
+    )
+    return has_cuda, True
 
-    # Baseline quick check for split fallback visibility (even without --config)
+
+def _doctor_load_optional_report_payload(
+    path_value: str | None,
+) -> dict[str, object] | None:
+    if not path_value:
+        return None
+    try:
+        _, payload, _, invalid = load_explicit_report_input(
+            path_value,
+            label="Report",
+            field="report",
+        )
+    except NON_FATAL_EXCEPTIONS:
+        return None
+    if invalid:
+        return None
+    return payload
+
+
+def _doctor_apply_preflight(
+    *,
+    config: str | None,
+    profile: str | None,
+    tier: str | None,
+    baseline: str | None,
+    json_out: bool,
+    accumulator: DoctorAccumulator,
+    had_error: bool,
+    cfg_metric_kind: str | None,
+) -> tuple[bool, str | None]:
     if not config:
-        quick_check_path = baseline or baseline_report
-        if quick_check_path:
-            _, baseline_payload, baseline_findings, invalid_baseline = (
-                load_explicit_report_input(
-                    quick_check_path,
-                    label="Baseline",
-                    field="baseline" if baseline else "baseline_report",
-                )
-            )
-            split_findings = (
-                build_split_fallback_findings(baseline_payload)
-                if baseline_payload is not None
-                else []
-            )
-            _record_findings(
-                list(baseline_findings) + list(split_findings),
-                mark_error=invalid_baseline,
-            )
-            had_error = had_error or invalid_baseline
-            if split_findings and not json_out:
-                console.print(f"  [yellow]⚠️  {DATASET_SPLIT_FALLBACK_WARNING}[/yellow]")
+        return had_error, cfg_metric_kind
+    console.print("\n🧪 Preflight Lints (config)")
+    preflight = _doctor_preflight.run_doctor_config_preflight(
+        config_path=str(config),
+        profile=str(profile) if profile else None,
+        tier=str(tier) if tier else None,
+        baseline=str(baseline) if baseline else None,
+    )
+    for line in preflight.lines:
+        if not json_out:
+            console.print(line)
+    _doctor_record_findings(
+        accumulator, json_out, list(preflight.findings), mark_error=preflight.had_error
+    )
+    had_error = had_error or preflight.had_error
+    cfg_metric_kind = preflight.metric_kind or cfg_metric_kind
+    if preflight.policy_meta is not None:
+        global POLICY_META
+        POLICY_META = preflight.policy_meta
+    return had_error, cfg_metric_kind
 
+
+def _doctor_apply_baseline_quick_check(
+    *,
+    config: str | None,
+    baseline: str | None,
+    baseline_report: str | None,
+    json_out: bool,
+    accumulator: DoctorAccumulator,
+    had_error: bool,
+) -> bool:
+    if config:
+        return had_error
+    quick_check_path = baseline or baseline_report
+    if not quick_check_path:
+        return had_error
+    _, baseline_payload, baseline_findings, invalid_baseline = (
+        load_explicit_report_input(
+            quick_check_path,
+            label="Baseline",
+            field="baseline" if baseline else "baseline_report",
+        )
+    )
+    split_findings = (
+        build_split_fallback_findings(baseline_payload)
+        if baseline_payload is not None
+        else []
+    )
+    _doctor_record_findings(
+        accumulator,
+        json_out,
+        list(baseline_findings) + list(split_findings),
+        mark_error=invalid_baseline,
+    )
+    had_error = had_error or invalid_baseline
+    if split_findings and not json_out:
+        console.print(f"  [yellow]⚠️  {DATASET_SPLIT_FALLBACK_WARNING}[/yellow]")
+    return had_error
+
+
+def _doctor_apply_cross_checks(
+    *,
+    baseline_report: str | None,
+    subject_report: str | None,
+    cfg_metric_kind: str | None,
+    strict: bool,
+    profile: str | None,
+    json_out: bool,
+    accumulator: DoctorAccumulator,
+    had_error: bool,
+) -> bool:
     cross_check_findings, cross_check_error = build_cross_check_findings(
         baseline_report,
         subject_report,
@@ -372,41 +354,68 @@ def doctor_command(
         strict=bool(strict),
         profile=profile,
     )
-    _record_findings(cross_check_findings, mark_error=cross_check_error)
-    had_error = had_error or cross_check_error
+    _doctor_record_findings(
+        accumulator, json_out, cross_check_findings, mark_error=cross_check_error
+    )
+    return had_error or cross_check_error
 
-    # D013: Tiny relax (dev) active — note only
+
+def _doctor_apply_tiny_relax(
+    *,
+    subject_report: str | None,
+    baseline_report: str | None,
+    json_out: bool,
+    accumulator: DoctorAccumulator,
+) -> None:
     try:
         tiny_env = _doctor_tiny_relax_enabled()
     except NON_FATAL_EXCEPTIONS:
         tiny_env = False
-
-    def _load_optional_report_payload(
-        path_value: str | None,
-    ) -> dict[str, object] | None:
-        if not path_value:
-            return None
-        try:
-            _, payload, _, invalid = load_explicit_report_input(
-                path_value,
-                label="Report",
-                field="report",
-            )
-        except NON_FATAL_EXCEPTIONS:
-            return None
-        if invalid:
-            return None
-        return payload
-
     tiny_finding = build_tiny_relax_finding(
-        subject_report=_load_optional_report_payload(subject_report),
-        baseline_report=_load_optional_report_payload(baseline_report),
+        subject_report=_doctor_load_optional_report_payload(subject_report),
+        baseline_report=_doctor_load_optional_report_payload(baseline_report),
         env_enabled=tiny_env,
     )
     if tiny_finding is not None:
-        _record_findings([tiny_finding])
+        _doctor_record_findings(accumulator, json_out, [tiny_finding])
 
-    # Check registry status
+
+def _doctor_format_backend_version(
+    backend: str | None, version: str | None
+) -> tuple[str, str]:
+    display_backend = backend or "—"
+    display_version = f"=={version}" if backend and version else "—"
+    return display_backend, display_version
+
+
+def _doctor_inventory_status_action(row: Any) -> str:
+    if row.mode == "auto-matcher" or row.status == "ready":
+        return "Ready"
+    if row.status == "needs_extra":
+        if row.required_extra:
+            return f"Needs extra: pip install '{row.required_extra}'"
+        return "Needs extra"
+    if row.detail:
+        return row.detail
+    return row.status
+
+
+def _doctor_dataset_network_label(network_mode: str) -> str:
+    if network_mode == "cache":
+        return "Cache/Net"
+    if network_mode == "yes":
+        return "Yes"
+    if network_mode == "no":
+        return "No"
+    return "Unknown"
+
+
+def _doctor_render_registry(
+    *,
+    json_out: bool,
+    has_cuda: bool,
+    accumulator: DoctorAccumulator,
+) -> bool:
     try:
         from invarlock.core.registry import get_registry
 
@@ -419,41 +428,15 @@ def doctor_command(
             console.print(f"  Adapters: {len(registry.list_adapters())}")
             console.print(f"  Edits: {len(registry.list_edits())}")
             console.print(f"  Guards: {len(registry.list_guards())}")
-        # Use module-level _os (avoid shadowing earlier uses)
         if _doctor_third_party_plugins_enabled():
-            _add(
+            _doctor_add_finding(
+                accumulator,
+                json_out,
                 "D006",
                 "note",
                 "Third-party plugin discovery is explicitly enabled by environment; "
                 "doctor will include optional third-party adapters in registry checks.",
             )
-
-        def _fmt_backend_ver(
-            backend: str | None, version: str | None
-        ) -> tuple[str, str]:
-            b = backend or "—"
-            v = f"=={version}" if backend and version else "—"
-            return b, v
-
-        def _inventory_status_action(row: Any) -> str:
-            if row.mode == "auto-matcher" or row.status == "ready":
-                return "Ready"
-            if row.status == "needs_extra":
-                if row.required_extra:
-                    return f"Needs extra: pip install '{row.required_extra}'"
-                return "Needs extra"
-            if row.detail:
-                return row.detail
-            return row.status
-
-        def _dataset_network_label(network_mode: str) -> str:
-            if network_mode == "cache":
-                return "Cache/Net"
-            if network_mode == "yes":
-                return "Yes"
-            if network_mode == "no":
-                return "No"
-            return "Unknown"
 
         try:
             bnb_runtime_ready = bitsandbytes_runtime_available()
@@ -469,13 +452,11 @@ def doctor_command(
         )
         if adapter_rows:
             adapter_summary = summarize_inventory_rows(adapter_rows)
-            # Counts over full set
             total = adapter_summary["total"]
             ready = adapter_summary["ready"]
             need = adapter_summary["needs_extra"]
             unsupported = adapter_summary["unsupported"]
             auto = adapter_summary["auto"]
-            # Hide unsupported rows in the display
             rows = [row for row in adapter_rows if row.status != "unsupported"]
             table = Table(
                 title=f"Adapters — total: {total} · ready: {ready} · auto: {auto} · missing-extras: {need} · unsupported: {unsupported}"
@@ -487,14 +468,16 @@ def doctor_command(
             table.add_column("Version", style="magenta")
             table.add_column("Status / Action", style="green")
             for row in rows:
-                backend_disp, ver_disp = _fmt_backend_ver(row.backend, row.version)
+                backend_disp, ver_disp = _doctor_format_backend_version(
+                    row.backend, row.version
+                )
                 table.add_row(
                     row.name,
                     row.origin.capitalize(),
                     "Auto‑matcher" if row.mode == "auto-matcher" else "Adapter",
                     backend_disp,
                     ver_disp,
-                    _inventory_status_action(row),
+                    _doctor_inventory_status_action(row),
                 )
             console.print(table)
 
@@ -519,18 +502,19 @@ def doctor_command(
                 table.add_column("Version", style="magenta")
                 table.add_column("Status / Action", style="green")
                 for row in grows:
-                    b, v = _fmt_backend_ver(row.backend, row.version)
+                    backend_disp, ver_disp = _doctor_format_backend_version(
+                        row.backend, row.version
+                    )
                     table.add_row(
                         row.name,
                         row.origin.capitalize(),
                         ("Guard" if row.mode == "guard" else "Edit"),
-                        b,
-                        v,
-                        _inventory_status_action(row),
+                        backend_disp,
+                        ver_disp,
+                        _doctor_inventory_status_action(row),
                     )
                 console.print(table)
 
-        # Datasets summary (best effort; non-fatal)
         try:
             data_mod = importlib.import_module("invarlock.eval.data")
             list_providers = getattr(data_mod, "list_providers", None)
@@ -544,12 +528,8 @@ def doctor_command(
                 dtable.add_column("Network", style="dim")
                 dtable.add_column("Status", style="green")
                 dtable.add_column("Params", style="dim")
-                from invarlock.cli.constants import (
-                    PROVIDER_NETWORK as provider_network,
-                )
-                from invarlock.cli.constants import (
-                    PROVIDER_PARAMS as provider_params,
-                )
+                from invarlock.cli.constants import PROVIDER_NETWORK as provider_network
+                from invarlock.cli.constants import PROVIDER_PARAMS as provider_params
 
                 for row in build_dataset_inventory_rows(
                     providers,
@@ -558,16 +538,161 @@ def doctor_command(
                 ):
                     dtable.add_row(
                         row.provider,
-                        _dataset_network_label(row.network_mode),
+                        _doctor_dataset_network_label(row.network_mode),
                         "✓ Available" if row.available else "Unavailable",
                         row.params,
                     )
                 console.print(dtable)
         except NON_FATAL_EXCEPTIONS:
             pass
-    except NON_FATAL_EXCEPTIONS as e:
+        return True
+    except NON_FATAL_EXCEPTIONS as exc:
         if not json_out:
-            console.print(f"  [red]❌ Registry error: {e}[/red]")
+            console.print(f"  [red]❌ Registry error: {exc}[/red]")
+        return False
+
+
+def doctor_command(
+    config: str | None = None,
+    profile: str | None = None,
+    baseline: str | None = None,
+    json_out: bool = False,
+    tier: str | None = None,
+    baseline_report: str | None = None,
+    subject_report: str | None = None,
+    strict: bool = False,
+):
+    """
+    Perform health checks on InvarLock installation.
+
+    Checks PyTorch, device availability, memory, and optional extras.
+    """
+
+    accumulator = DoctorAccumulator()
+    console_obj = _doctor_prepare_console(json_out)
+    _invarlock_version = _doctor_load_invarlock_version()
+    _doctor_print_header(json_out, _invarlock_version, console_obj)
+    health_status = True
+    had_error = False
+    cfg_metric_kind: str | None = None
+
+    if not _doctor_check_core_components(json_out):
+        health_status = False
+    has_cuda, torch_ok = _doctor_check_torch_runtime(json_out)
+    if not torch_ok:
+        health_status = False
+    if not json_out:
+        console_obj.print("\nOptional Dependencies")
+
+    try:
+        import torch as _torch
+
+        has_cuda = bool(getattr(_torch, "cuda", None) and _torch.cuda.is_available())
+    except NON_FATAL_EXCEPTIONS:
+        has_cuda = False
+
+    optional_deps = collect_optional_dependency_facts(
+        has_cuda=has_cuda,
+        bitsandbytes_runtime_available_fn=bitsandbytes_runtime_available,
+        find_spec_fn=importlib.util.find_spec,
+    )
+
+    for dep in optional_deps:
+        if dep.name == "bitsandbytes":
+            runtime_available = bool(dep.runtime_available)
+            if runtime_available:
+                if not json_out:
+                    if has_cuda:
+                        console_obj.print(
+                            "  [green]✅ bitsandbytes — 8/4-bit loading (GPU)[/green]"
+                        )
+                    else:
+                        console_obj.print(
+                            "  [green]✅ bitsandbytes — runtime available on this host[/green]"
+                        )
+            elif not has_cuda:
+                if dep.present:
+                    if not json_out:
+                        console_obj.print(
+                            "  [yellow]⚠️  bitsandbytes — GPU not detected and runtime unavailable on this host[/yellow]"
+                        )
+                else:
+                    if not json_out:
+                        console_obj.print(
+                            "  [dim]⚠️  bitsandbytes — not installed[/dim]"
+                        )
+                        console_obj.print(
+                            "     → Install: pip install 'invarlock[gpu]'",
+                            markup=False,
+                        )
+            else:
+                if not json_out:
+                    console_obj.print(
+                        "  [yellow]⚠️  bitsandbytes — Present but runtime unavailable on this host[/yellow]"
+                    )
+                    console_obj.print(
+                        "     → Reinstall with: pip install 'invarlock[gpu]' on a compatible host",
+                        markup=False,
+                    )
+            continue
+
+        if not json_out:
+            if dep.present:
+                console_obj.print(f"  [green]✅ {dep.name} — {dep.description}[/green]")
+            else:
+                console_obj.print(
+                    f"  [yellow]⚠️  {dep.name} — {dep.description}[/yellow]"
+                )
+                if dep.name in {"auto_gptq", "autoawq"}:
+                    console_obj.print(
+                        f"     → Install: pip install 'invarlock[{dep.extra_hint}]'  # Linux + CUDA only",
+                        markup=False,
+                    )
+                else:
+                    console_obj.print(
+                        f"     → Install: pip install 'invarlock[{dep.extra_hint}]'",
+                        markup=False,
+                    )
+
+    had_error, cfg_metric_kind = _doctor_apply_preflight(
+        config=config,
+        profile=profile,
+        tier=tier,
+        baseline=baseline,
+        json_out=json_out,
+        accumulator=accumulator,
+        had_error=had_error,
+        cfg_metric_kind=cfg_metric_kind,
+    )
+    had_error = _doctor_apply_baseline_quick_check(
+        config=config,
+        baseline=baseline,
+        baseline_report=baseline_report,
+        json_out=json_out,
+        accumulator=accumulator,
+        had_error=had_error,
+    )
+    had_error = _doctor_apply_cross_checks(
+        baseline_report=baseline_report,
+        subject_report=subject_report,
+        cfg_metric_kind=cfg_metric_kind,
+        strict=bool(strict),
+        profile=profile,
+        json_out=json_out,
+        accumulator=accumulator,
+        had_error=had_error,
+    )
+    _doctor_apply_tiny_relax(
+        subject_report=subject_report,
+        baseline_report=baseline_report,
+        json_out=json_out,
+        accumulator=accumulator,
+    )
+    if not _doctor_render_registry(
+        json_out=json_out,
+        has_cuda=has_cuda,
+        accumulator=accumulator,
+    ):
         health_status = False
 
     # Final status / JSON output

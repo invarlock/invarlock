@@ -234,7 +234,7 @@ if not path.is_file():
     raise SystemExit(0)
 try:
     payload = json.loads(path.read_text(encoding="utf-8"))
-except Exception:
+except (OSError, json.JSONDecodeError):
     print("INVALID")
     raise SystemExit(0)
 value = payload.get("verdict")

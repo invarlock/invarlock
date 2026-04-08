@@ -86,7 +86,7 @@ class TestQuantizationConfig:
 
         cfg = QuantizationConfig()
         with pytest.raises(FrozenInstanceError):
-            cfg.bits = 8  # type: ignore[misc]
+            cfg.bits = 8
 
 
 class TestModelCapabilities:

@@ -24,14 +24,19 @@ def test_cli_invariants_ban_removed_strings():
     ]
 
     offenders: list[str] = []
+    unreadable: list[str] = []
     for path in _iter_source_files(src_root):
         try:
             text = path.read_text(encoding="utf-8")
-        except Exception:
+        except (OSError, UnicodeDecodeError) as exc:
+            unreadable.append(
+                f"{path}: unable to read file ({exc.__class__.__name__}: {exc})"
+            )
             continue
         lower = text.lower()
         for needle in banned:
             if needle in lower:
                 offenders.append(f"{path}: contains '{needle}'")
 
+    assert not unreadable, "Unreadable CLI source files:\n" + "\n".join(unreadable)
     assert not offenders, "Removed CLI strings found in code:\n" + "\n".join(offenders)

@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 _CUDA_DEVICE_RE = re.compile(r"^cuda(?::\d+)?$")
+_TORCH_DEVICE_ERRORS = (ImportError, AttributeError, RuntimeError, OSError)
 
 
 def resolve_device(requested: str | None) -> str:
@@ -43,7 +44,7 @@ def is_device_available(device: str) -> bool:
             and torch_mod.backends.mps.is_available()
         ):
             return True
-    except Exception:
+    except _TORCH_DEVICE_ERRORS:
         return False
     return False
 
@@ -97,7 +98,7 @@ def get_device_info() -> dict[str, dict]:
             info["cuda"]["device_count"] = torch_mod.cuda.device_count()
             info["cuda"]["device_name"] = name
             info["cuda"]["memory_total"] = f"{mem / 1e9:.1f} GB"
-    except Exception:
+    except _TORCH_DEVICE_ERRORS:
         pass
     info["auto_selected"] = auto
     return info

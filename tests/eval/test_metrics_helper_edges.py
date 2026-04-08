@@ -35,7 +35,7 @@ def test_resource_manager_cpu_fallback_path(monkeypatch):
     cfg = MetricsConfig()
     rm = ResourceManager(cfg)
     # Force a CUDA-like device and tiny available memory so fallback triggers
-    rm.device = types.SimpleNamespace(type="cuda")  # type: ignore[attr-defined]
+    rm.device = types.SimpleNamespace(type="cuda")
     rm.memory_info = {"gpu_free_gb": 0.2, "system_available_gb": 8.0}
     assert rm.should_use_cpu_fallback(estimated_memory_gb=0.3) is True
 

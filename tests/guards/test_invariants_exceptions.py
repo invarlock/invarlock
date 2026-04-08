@@ -16,7 +16,7 @@ class ModelBadParams(nn.Module):
         super().__init__()
         self.ln = nn.LayerNorm(4)
 
-    def parameters(self, recurse: bool = True):  # type: ignore[override]
+    def parameters(self, recurse: bool = True):
         raise RuntimeError("parameters() failed")
 
 
@@ -24,7 +24,7 @@ class ModelBadNamedModules(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def named_modules(self, memo=None, prefix=""):  # type: ignore[override]
+    def named_modules(self, memo=None, prefix=""):
         raise RuntimeError("named_modules failed")
 
 
@@ -47,7 +47,7 @@ class ModelBadNamedParameters(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def named_parameters(self, prefix="", recurse=True):  # type: ignore[override]
+    def named_parameters(self, prefix="", recurse=True):
         raise RuntimeError("named_parameters failed")
 
 
@@ -56,7 +56,7 @@ class ModelMidStreamNamedParametersFailure(nn.Module):
         super().__init__()
         self.good = nn.Parameter(torch.ones(1))
 
-    def named_parameters(self, prefix="", recurse=True):  # type: ignore[override]
+    def named_parameters(self, prefix="", recurse=True):
         yield "good", self.good
         raise RuntimeError("named_parameters failed mid-stream")
 

@@ -326,7 +326,7 @@ def test_detect_spectral_violations_logs_module_errors() -> None:
     def _log_event(operation: str, **kwargs: object) -> None:
         events.append((operation, kwargs))
 
-    guard._log_event = _log_event  # type: ignore[method-assign]
+    guard._log_event = _log_event
 
     model = _TinyModel({"plain.linear": _TinyWeightModule(torch.eye(2))})
     violations = spectral_detection.detect_spectral_violations(

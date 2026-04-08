@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import pytest
@@ -47,6 +48,9 @@ def _release_ready_cert(*, include_guard_overhead: bool) -> dict:
                     "paired_windows": 2,
                 },
             },
+        },
+        "evaluation_windows": {
+            "final": {"logloss": [math.log(10.0)], "token_counts": [1]}
         },
         "primary_metric": {
             "kind": "ppl_causal",

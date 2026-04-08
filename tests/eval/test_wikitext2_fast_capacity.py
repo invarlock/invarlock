@@ -14,7 +14,7 @@ def test_wikitext2_fast_capacity_without_network(monkeypatch):
     # Return fixed sample list to avoid datasets
     monkeypatch.setattr(
         prov, "load", lambda split="validation", max_samples=2000, **kw: ["a", "b", "c"]
-    )  # type: ignore[no-untyped-def]
+    )
     # Fast capacity via fast_mode
     cap = prov.estimate_capacity(tokenizer=None, seq_len=16, stride=8, fast_mode=True)
     assert cap["available_nonoverlap"] == 3

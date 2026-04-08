@@ -15,7 +15,7 @@ def test_doctor_helpers_rows(monkeypatch):
 
     orig_find_spec = iu.find_spec
 
-    def _safe_find_spec(name, package=None):  # type: ignore[override]
+    def _safe_find_spec(name, package=None):
         try:
             return orig_find_spec(name, package)
         except ModuleNotFoundError:

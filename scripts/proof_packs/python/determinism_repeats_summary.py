@@ -41,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
     edit_name = argv[2]
     try:
         requested = int(argv[3])
-    except Exception:
+    except (TypeError, ValueError):
         requested = 0
     mode = argv[4]
     suite = argv[5]
@@ -56,7 +56,7 @@ def main(argv: list[str] | None = None) -> int:
             raw = path.read_bytes()
             hashes.append(hashlib.sha256(raw).hexdigest())
             data = json.loads(raw.decode("utf-8"))
-        except Exception as exc:
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
             errors.append(f"{path}: {exc}")
             continue
 

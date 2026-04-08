@@ -15,7 +15,7 @@ def test_evaluate_hf_id_normalization_and_preset_fallback(monkeypatch, tmp_path:
 
     captured = []
 
-    def _dump_yaml_capture(path: Path, data: dict):  # type: ignore[no-untyped-def]
+    def _dump_yaml_capture(path: Path, data: dict):
         captured.append((Path(path), data))
 
     monkeypatch.setattr(cert_mod, "_dump_yaml", _dump_yaml_capture)

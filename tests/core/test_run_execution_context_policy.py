@@ -155,7 +155,7 @@ def test_build_run_context_payload_skips_invalid_baseline_and_non_dict_context()
         model_profile=model_profile,
         resolved_loss_type="ppl_causal",
         tiny_relax_enabled=False,
-        to_serialisable_dict_fn=_to_serialisable,  # type: ignore[arg-type]
+        to_serialisable_dict_fn=_to_serialisable,
     )
 
     assert payload["profile"] == ""

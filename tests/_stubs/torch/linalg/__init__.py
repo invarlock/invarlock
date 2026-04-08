@@ -5,5 +5,5 @@ class LinAlgError(Exception):
     pass
 
 
-def svdvals(x):  # type: ignore[no-untyped-def]
+def svdvals(x: object) -> list[float]:
     raise LinAlgError("svdvals not implemented in torch stub")

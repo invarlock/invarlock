@@ -10,7 +10,7 @@ class FailingModel(nn.Module):
         # Provide at least one parameter so device resolution works
         self._stub = nn.Linear(1, 1)
 
-    def forward(self, input_ids, labels=None):  # type: ignore[override]
+    def forward(self, input_ids, labels=None):
         raise RuntimeError("intentional failure")
 
 

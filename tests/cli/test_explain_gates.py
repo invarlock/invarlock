@@ -53,7 +53,7 @@ def test_explain_gates_hysteresis_and_overhead_rendering(monkeypatch, tmp_path):
     # Patch make_report to a simple, controlled payload
     from invarlock.cli.commands import explain_gates as mod
 
-    def _fake_cert(_report, _baseline):  # type: ignore[no-untyped-def]
+    def _fake_cert(_report, _baseline):
         return {
             "auto": {"tier": "balanced"},
             "validation": {

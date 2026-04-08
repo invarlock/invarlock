@@ -233,7 +233,7 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
         gate_reason = "unknown"
         try:
             would_enable, gate_reason = guard._evaluate_ab_gate()  # noqa: SLF001
-        except Exception as exc:  # noqa: BLE001
+        except (RuntimeError, TypeError, ValueError) as exc:
             would_enable = False
             gate_reason = f"gate_error:{exc}"
     finally:

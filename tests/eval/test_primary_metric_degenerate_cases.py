@@ -23,7 +23,7 @@ def test_ppl_finalize_nan_when_no_values():
 def test_accuracy_paired_compare_empty_returns_nans():
     acc = get_metric("accuracy")
     res = acc.paired_compare([], [], reps=10, seed=0)
-    assert math.isnan(res["display"]) and isinstance(res["ci"], tuple)
+    assert math.isnan(res["display"]) and isinstance(res["ci"], list)
 
 
 def test_vqa_alias_metric_delegate():

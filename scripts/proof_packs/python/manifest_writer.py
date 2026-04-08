@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import hashlib
+import importlib
 import json
 import os
 import sys
@@ -12,12 +13,16 @@ from typing import Any
 from source_repo_metadata import SourceRepoMetadataError, build_source_repo_payload
 
 UTC = getattr(dt, "UTC", dt.timezone.utc)  # noqa: UP017
+_JSON_READ_ERRORS = (OSError, TypeError, ValueError)
+_VERSION_READ_ERRORS = (AttributeError, ImportError, ModuleNotFoundError)
+_CHECKSUM_ERRORS = (OSError, ValueError)
+_COERCE_ERRORS = (TypeError, ValueError, OverflowError)
 
 
 def _load_json(path: Path) -> Any:
     try:
         return json.loads(path.read_text())
-    except Exception:
+    except _JSON_READ_ERRORS:
         return None
 
 
@@ -110,11 +115,10 @@ def _sha256_prefixed(path: Path) -> str:
 
 def _maybe_get_invarlock_version() -> str:
     try:
-        import invarlock  # type: ignore[import-not-found]
-
+        invarlock = importlib.import_module("invarlock")
         version = getattr(invarlock, "__version__", "")
         return str(version) if isinstance(version, str) else ""
-    except Exception:
+    except _VERSION_READ_ERRORS:
         return ""
 
 
@@ -311,7 +315,7 @@ def write_manifest(
     if checksums_path.is_file():
         try:
             checksums_digest = _sha256_hex(checksums_path)
-        except Exception:
+        except _CHECKSUM_ERRORS:
             checksums_digest = ""
 
     used_models: set[str] = set(model_list)
@@ -415,7 +419,7 @@ def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     try:
         repeats = int(args.repeats)
-    except Exception:
+    except _COERCE_ERRORS:
         repeats = 0
     try:
         write_manifest(

@@ -387,7 +387,7 @@ class TestMakeEvaluationReport:
         ):
             evaluation_report = make_report(report, baseline)
         # Normalized evaluation_report may omit guard_overhead; validate the decision logic directly
-        sanitized, _ = _prepare_guard_overhead_section(report["guard_overhead"])  # type: ignore[index]
+        sanitized, _ = _prepare_guard_overhead_section(report["guard_overhead"])
         flags = _compute_validation_flags(
             ppl={
                 "ratio_vs_baseline": evaluation_report.get("primary_metric", {}).get(

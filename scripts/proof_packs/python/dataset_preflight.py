@@ -16,7 +16,7 @@ def main() -> int:
 
     try:
         from datasets import load_dataset
-    except Exception as exc:
+    except (ImportError, ModuleNotFoundError) as exc:
         print(
             "[DATASET_PREFLIGHT] ERROR: datasets library is required for provider=wikitext2."
         )
@@ -29,7 +29,7 @@ def main() -> int:
 
     try:
         ds = load_dataset("wikitext", "wikitext-2-raw-v1", split="validation")
-    except Exception as exc:
+    except (FileNotFoundError, OSError, RuntimeError, ValueError) as exc:
         print("[DATASET_PREFLIGHT] ERROR: failed to load wikitext2 validation split.")
         if offline:
             print(f"[DATASET_PREFLIGHT] HF_DATASETS_OFFLINE={offline}")
@@ -42,7 +42,7 @@ def main() -> int:
 
     try:
         size = len(ds)
-    except Exception:
+    except TypeError:
         size = -1
 
     print(f"[DATASET_PREFLIGHT] OK: provider=wikitext2 split=validation size={size}")

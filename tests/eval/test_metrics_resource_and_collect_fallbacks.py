@@ -16,13 +16,13 @@ def test_resource_manager_gpu_memory_info_cuda_path(monkeypatch):
     cfg = MetricsConfig()
     rm = ResourceManager(cfg)
     # Force a CUDA-like device but make get_device_properties fail
-    rm.device = types.SimpleNamespace(type="cuda")  # type: ignore[attr-defined]
+    rm.device = types.SimpleNamespace(type="cuda")
 
     class DummyProps:
         total_memory = 1024 * 1024 * 1024
 
     class DummyCuda:
-        def get_device_properties(self, idx):  # type: ignore[no-redef]
+        def get_device_properties(self, idx):
             return DummyProps()
 
         def memory_allocated(self):  # minimal API used in code

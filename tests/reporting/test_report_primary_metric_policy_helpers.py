@@ -70,7 +70,7 @@ def test_enforce_display_ci_alignment_backfills_ci_and_display_ci_in_dev():
     pm_policy.enforce_display_ci_alignment(
         "paired_baseline", pm, (0.0, 0.1), window_plan_profile="dev"
     )
-    assert pm["ci"] == (0.0, 0.1)
+    assert pm["ci"] == [0.0, 0.1]
     assert pm["display_ci"] == [
         pytest.approx(math.exp(0.0)),
         pytest.approx(math.exp(0.1)),

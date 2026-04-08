@@ -11,6 +11,14 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any, Protocol
 
+_WORKER_INIT_IMPORT_ERRORS = (
+    AttributeError,
+    ImportError,
+    ModuleNotFoundError,
+    OSError,
+    RuntimeError,
+)
+
 
 def deterministic_worker_init_fn(worker_id: int, *, base_seed: int = 0) -> None:
     """Best-effort deterministic worker initializer.
@@ -22,13 +30,13 @@ def deterministic_worker_init_fn(worker_id: int, *, base_seed: int = 0) -> None:
         import random
 
         random.seed((base_seed ^ (worker_id + 17)) & 0x7FFFFFFF)
-    except Exception:
+    except _WORKER_INIT_IMPORT_ERRORS:
         pass
     try:
         import numpy as _np
 
         _np.random.seed(((base_seed + 97) ^ (worker_id * 131)) & 0x7FFFFFFF)
-    except Exception:
+    except _WORKER_INIT_IMPORT_ERRORS:
         pass
     try:  # pragma: no cover - torch may be unavailable in CI
         import torch as _torch
@@ -38,7 +46,7 @@ def deterministic_worker_init_fn(worker_id: int, *, base_seed: int = 0) -> None:
             _torch.cuda.manual_seed_all(
                 (base_seed * 1013 + worker_id * 7951) & 0x7FFFFFFF
             )
-    except Exception:
+    except _WORKER_INIT_IMPORT_ERRORS:
         pass
 
 

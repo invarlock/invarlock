@@ -11,7 +11,7 @@ def test_dependency_manager_detects_available_modules(monkeypatch):
     def mi_scores(*_a, **_k):
         return 0.0
 
-    lens2_mi.mi_scores = mi_scores  # type: ignore[attr-defined]
+    lens2_mi.mi_scores = mi_scores
 
     lens3 = types.ModuleType("invarlock.eval.lens3")
 
@@ -35,7 +35,7 @@ def test_dependency_manager_detects_available_modules(monkeypatch):
 
         return DF()
 
-    lens3.scan_model_gains = scan_model_gains  # type: ignore[attr-defined]
+    lens3.scan_model_gains = scan_model_gains
 
     with monkeypatch.context() as m:
         # Ensure our fake modules are discovered under the expected names

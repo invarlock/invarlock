@@ -500,7 +500,7 @@ def test_create_plugin_info_rejects_non_string_values_and_uses_metadata_version(
 ) -> None:
     r = reg.CoreRegistry()
     bad_ep = _EP(name="bad", value="ignored")
-    bad_ep.value = 123  # type: ignore[assignment]
+    bad_ep.value = 123
 
     info_bad = r._create_plugin_info(bad_ep, "guards")
     assert info_bad.available is False
@@ -523,7 +523,7 @@ def test_create_plugin_info_rejects_non_string_values_and_uses_metadata_version(
 def test_check_runtime_dependencies_find_spec_exception_counts_missing(monkeypatch):
     r = reg.CoreRegistry()
 
-    def _boom(dep: str):  # type: ignore[no-untyped-def]
+    def _boom(dep: str):
         raise RuntimeError("boom")
 
     monkeypatch.setattr(reg.importlib.util, "find_spec", _boom)

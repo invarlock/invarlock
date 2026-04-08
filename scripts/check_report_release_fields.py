@@ -16,7 +16,7 @@ def validate_report(path: Path) -> list[str]:
 
     try:
         data = json.loads(path.read_text())
-    except Exception as exc:  # pragma: no cover - defensive
+    except (OSError, json.JSONDecodeError) as exc:  # pragma: no cover - defensive
         return [f"failed to parse JSON: {exc}"]
 
     profile = data.get("provenance", {}).get("window_plan", {}).get("profile")

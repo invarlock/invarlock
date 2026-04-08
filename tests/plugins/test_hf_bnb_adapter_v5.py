@@ -15,17 +15,17 @@ def test_hf_bnb_uses_quantization_config(monkeypatch: pytest.MonkeyPatch) -> Non
 
     class _Auto:
         @staticmethod
-        def from_pretrained(model_id: str, **kwargs: object):  # type: ignore[no-untyped-def]
+        def from_pretrained(model_id: str, **kwargs: object) -> object:
             calls["model_id"] = model_id
             calls["kwargs"] = dict(kwargs)
             return object()
 
     class _BitsAndBytesConfig:
-        def __init__(self, **kwargs: object):  # type: ignore[no-untyped-def]
+        def __init__(self, **kwargs: object) -> None:
             self.kwargs = dict(kwargs)
 
-    tr.AutoModelForCausalLM = _Auto  # type: ignore[attr-defined]
-    tr.BitsAndBytesConfig = _BitsAndBytesConfig  # type: ignore[attr-defined]
+    tr.AutoModelForCausalLM = _Auto
+    tr.BitsAndBytesConfig = _BitsAndBytesConfig
     monkeypatch.setitem(sys.modules, "transformers", tr)
 
     from invarlock.plugins.hf_bnb_adapter import HF_BNB_Adapter
@@ -47,18 +47,18 @@ def test_hf_bnb_surfaces_checkpoint_quantization_mismatch(
 
     class _Auto:
         @staticmethod
-        def from_pretrained(model_id: str, **kwargs: object):  # type: ignore[no-untyped-def]
+        def from_pretrained(model_id: str, **kwargs: object) -> object:
             raise ValueError(
                 "The model is quantized with FineGrainedFP8Config but you are "
                 "passing a BitsAndBytesConfig config."
             )
 
     class _BitsAndBytesConfig:
-        def __init__(self, **kwargs: object):  # type: ignore[no-untyped-def]
+        def __init__(self, **kwargs: object) -> None:
             self.kwargs = dict(kwargs)
 
-    tr.AutoModelForCausalLM = _Auto  # type: ignore[attr-defined]
-    tr.BitsAndBytesConfig = _BitsAndBytesConfig  # type: ignore[attr-defined]
+    tr.AutoModelForCausalLM = _Auto
+    tr.BitsAndBytesConfig = _BitsAndBytesConfig
     monkeypatch.setitem(sys.modules, "transformers", tr)
 
     from invarlock.plugins.hf_bnb_adapter import HF_BNB_Adapter

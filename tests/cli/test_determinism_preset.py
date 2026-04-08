@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import Any, cast
 
 from invarlock.core.determinism_policy import apply_determinism_preset
 
@@ -12,10 +13,10 @@ def test_determinism_preset_coercion_failure_paths(monkeypatch) -> None:
     )
 
     payload = apply_determinism_preset(
-        profile=object(),  # type: ignore[arg-type]
-        device=object(),  # type: ignore[arg-type]
+        profile=cast(Any, object()),
+        device=cast(Any, object()),
         seed=1,
-        threads=object(),  # type: ignore[arg-type]
+        threads=cast(Any, object()),
     )
     assert payload["requested"] == "off"
     assert payload["level"] == "off"
@@ -211,7 +212,7 @@ def test_determinism_preset_cuda_low_memory_selects_cublas_fallback(
         total_memory = 1 * 1024**3
 
     class _Cuda:
-        def get_device_properties(self, _idx: int):  # type: ignore[no-untyped-def]
+        def get_device_properties(self, _idx: int) -> _CudaProps:
             return _CudaProps()
 
     class _CudnnNoDeterministic:

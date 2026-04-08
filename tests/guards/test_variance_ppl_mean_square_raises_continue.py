@@ -22,7 +22,7 @@ def test_compute_ppl_for_batches_mean_square_exception_falls_back(monkeypatch):
     # Force Tensor.pow to raise inside the mean-of-squares fallback
     orig_pow = torch.Tensor.pow
 
-    def boom(self, *args, **kwargs):  # type: ignore[no-redef]
+    def boom(self, *args, **kwargs):
         raise RuntimeError("boom")
 
     monkeypatch.setattr(torch.Tensor, "pow", boom, raising=True)

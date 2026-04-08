@@ -4,6 +4,7 @@ import math
 from contextlib import ExitStack
 from itertools import permutations
 from pathlib import Path
+from shutil import rmtree
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -154,12 +155,7 @@ def test_output_dir_deleted_before_save_report(tmp_path: Path):
         # Delete the run_dir right before attempting to return paths
         if not called["once"]:
             called["once"] = True
-            try:
-                from shutil import rmtree
-
-                rmtree(run_dir, ignore_errors=True)
-            except Exception:
-                pass
+            rmtree(run_dir, ignore_errors=True)
         raise FileNotFoundError("run_dir vanished")
 
     with ExitStack() as stack:

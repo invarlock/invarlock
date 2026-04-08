@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import socket
 import threading
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -57,39 +58,31 @@ def test_temporarily_allow_network_concurrent_contexts() -> None:
     entered_b = threading.Event()
     release_a = threading.Event()
     release_b = threading.Event()
-    failures: list[Exception] = []
 
     def _worker(entered: threading.Event, release: threading.Event) -> None:
-        try:
-            with security.temporarily_allow_network():
-                if not security.network_policy_allows():
-                    raise RuntimeError("network should be allowed in temporary context")
-                entered.set()
-                if not release.wait(timeout=5):
-                    raise RuntimeError("worker release timed out")
-        except Exception as exc:  # pragma: no cover - explicit capture for threads
-            failures.append(exc)
+        with security.temporarily_allow_network():
+            if not security.network_policy_allows():
+                raise RuntimeError("network should be allowed in temporary context")
+            entered.set()
+            if not release.wait(timeout=5):
+                raise RuntimeError("worker release timed out")
 
-    thread_a = threading.Thread(target=_worker, args=(entered_a, release_a))
-    thread_b = threading.Thread(target=_worker, args=(entered_b, release_b))
-    thread_a.start()
-    thread_b.start()
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        future_a = executor.submit(_worker, entered_a, release_a)
+        future_b = executor.submit(_worker, entered_b, release_b)
 
-    assert entered_a.wait(timeout=5)
-    assert entered_b.wait(timeout=5)
-    # Allowance should stay scoped to the worker threads.
-    assert not security.network_policy_allows()
+        assert entered_a.wait(timeout=5)
+        assert entered_b.wait(timeout=5)
+        # Allowance should stay scoped to the worker threads.
+        assert not security.network_policy_allows()
 
-    release_a.set()
-    thread_a.join(timeout=5)
-    assert not thread_a.is_alive()
-    assert not security.network_policy_allows()
+        release_a.set()
+        future_a.result(timeout=5)
+        assert not security.network_policy_allows()
 
-    release_b.set()
-    thread_b.join(timeout=5)
-    assert not thread_b.is_alive()
-    assert not security.network_policy_allows()
-    assert not failures
+        release_b.set()
+        future_b.result(timeout=5)
+        assert not security.network_policy_allows()
 
     security.enforce_network_policy(True)
 

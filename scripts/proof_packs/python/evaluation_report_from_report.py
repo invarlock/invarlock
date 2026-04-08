@@ -22,19 +22,19 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         from invarlock.reporting.report_make import make_report
-    except Exception as exc:
+    except (ImportError, ModuleNotFoundError) as exc:
         print(f"Evaluation report generation warning: {exc}", file=sys.stderr)
         return 1
 
     try:
         report = json.loads(report_path.read_text())
-    except Exception as exc:
+    except (OSError, json.JSONDecodeError) as exc:
         print(f"Evaluation report generation warning: {exc}", file=sys.stderr)
         return 1
 
     try:
         evaluation_report = make_report(report, report)
-    except Exception as exc:
+    except (RuntimeError, TypeError, ValueError, KeyError) as exc:
         print(f"Evaluation report generation warning: {exc}", file=sys.stderr)
         return 1
 

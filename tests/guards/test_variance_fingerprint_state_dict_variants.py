@@ -12,7 +12,7 @@ class CustomModule(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def state_dict(self, *args, **kwargs):  # type: ignore[override]
+    def state_dict(self, *args, **kwargs):
         # Return a dict with a non-tensor value to flip else branch
         return {"key": "not-a-tensor"}
 

@@ -15,7 +15,7 @@ def test_bnb_missing_transformers_dependency(monkeypatch: pytest.MonkeyPatch) ->
     # Make importing transformers fail
     real_import = builtins.__import__
 
-    def _imp(name, *a, **k):  # type: ignore[no-untyped-def]
+    def _imp(name: str, *a: object, **k: object) -> object:
         if name == "transformers":
             raise ImportError("transformers unavailable")
         return real_import(name, *a, **k)
@@ -40,10 +40,10 @@ def test_hf_causal_invalid_model_id_maps_to_model_load_error(
 
     class _Auto:
         @staticmethod
-        def from_pretrained(*a, **k):  # type: ignore[no-untyped-def]
+        def from_pretrained(*a: object, **k: object) -> object:
             raise OSError("bad model id")
 
-    tr.AutoModelForCausalLM = _Auto  # type: ignore[attr-defined]
+    tr.AutoModelForCausalLM = _Auto
     monkeypatch.setitem(sys.modules, "transformers", tr)
 
     from invarlock.adapters.hf_causal import HF_Causal_Adapter
@@ -66,7 +66,7 @@ def test_gptq_missing_runtime_maps_to_dependency_error(
 
     real_import = builtins.__import__
 
-    def _imp(name, *a, **k):  # type: ignore[no-untyped-def]
+    def _imp(name: str, *a: object, **k: object) -> object:
         if name == "auto_gptq":
             raise ImportError("auto_gptq unavailable")
         return real_import(name, *a, **k)

@@ -339,7 +339,7 @@ def test_enforce_pairing_and_coverage_path_matrix() -> None:
 
 
 def test_propagate_pairing_stats_early_returns() -> None:
-    cert_mod._propagate_pairing_stats(evaluation_report=None, ppl_analysis=None)  # type: ignore[arg-type]
+    cert_mod._propagate_pairing_stats(evaluation_report=None, ppl_analysis=None)
     cert_mod._propagate_pairing_stats(evaluation_report={}, ppl_analysis=None)
     cert_mod._propagate_pairing_stats(
         evaluation_report={"dataset": None}, ppl_analysis={}
@@ -443,7 +443,7 @@ def test_make_evaluation_report_ratio_ci_fallback_skips_non_interval(
         "invarlock.core.bootstrap.compute_paired_delta_log_ci",
         lambda *_a, **_k: (-0.01, 0.01),
     )
-    monkeypatch.setattr(report_utils, "_coerce_interval", lambda _v: (0.0,))  # type: ignore[assignment]
+    monkeypatch.setattr(report_utils, "_coerce_interval", lambda _v: (0.0,))
 
     baseline = _mk_baseline()
     report = create_empty_report()

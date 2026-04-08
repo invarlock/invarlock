@@ -21,6 +21,7 @@ def test_no_render_helpers_imported_from_evaluation_report():
     ]
 
     offenders: list[str] = []
+    unreadable: list[str] = []
     for root, _dirs, files in os.walk(src_dir):
         for fn in files:
             if not fn.endswith(".py"):
@@ -28,10 +29,14 @@ def test_no_render_helpers_imported_from_evaluation_report():
             p = Path(root) / fn
             try:
                 text = p.read_text(encoding="utf-8")
-            except Exception:
+            except (OSError, UnicodeDecodeError) as exc:
+                unreadable.append(
+                    f"{p}: unable to read file ({exc.__class__.__name__}: {exc})"
+                )
                 continue
             for needle in banned_snippets:
                 if needle in text:
                     offenders.append(f"{p}: banned import -> {needle}")
 
+    assert not unreadable, "\n".join(unreadable)
     assert not offenders, "\n".join(offenders)

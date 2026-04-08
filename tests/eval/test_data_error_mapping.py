@@ -41,7 +41,7 @@ def test_windows_not_enough_samples_maps_to_data_error(monkeypatch: pytest.Monke
     data_mod = importlib.import_module("invarlock.eval.data")
     prov = data_mod.WikiText2Provider()
 
-    def _load_small(split: str = "validation", max_samples: int = 2000, **kwargs):  # type: ignore[no-untyped-def]
+    def _load_small(split: str = "validation", max_samples: int = 2000, **kwargs):
         return ["short sample"]
 
     monkeypatch.setattr(prov, "load", _load_small)
@@ -49,7 +49,7 @@ def test_windows_not_enough_samples_maps_to_data_error(monkeypatch: pytest.Monke
     class Tok:
         pad_token_id = 0
 
-        def encode(  # type: ignore[no-untyped-def]
+        def encode(
             self,
             text,
             truncation=True,

@@ -37,7 +37,7 @@ def test_baseline_v1_missing_pm_final_rejects() -> None:
 
 def test_baseline_rejects_non_dict() -> None:
     with pytest.raises(ValidationError, match="Baseline normalization failed"):
-        make_report(_mk_report(), None)  # type: ignore[arg-type]
+        make_report(_mk_report(), None)
 
 
 def test_single_html_renders_bullet_items() -> None:

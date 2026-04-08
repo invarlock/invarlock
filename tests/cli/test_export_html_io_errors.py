@@ -30,7 +30,7 @@ def test_export_html_write_error_exit1(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(html_mod, "render_report_html", lambda payload: "<html/>")
 
     # Force write failure
-    def _boom(*a, **k):  # type: ignore[no-untyped-def]
+    def _boom(*a, **k):
         raise OSError("disk full")
 
     monkeypatch.setattr(Path, "write_text", _boom)
