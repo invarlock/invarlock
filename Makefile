@@ -66,7 +66,8 @@ COVERAGE_TESTS_CLI_COMMANDS := \
 
 COVERAGE_TESTS_CLI_HELPERS := \
 	tests/cli/test_adapter_auto*.py tests/cli/test_no_color.py \
-	tests/cli/test_json_helpers.py tests/cli/test_runtime_launch_plan_contract.py \
+	tests/cli/test_internal_config_run.py tests/cli/test_json_helpers.py \
+	tests/cli/test_runtime_launch_plan_contract.py \
 	tests/unit/test_overhead_extraction.py
 
 COVERAGE_TESTS_ADAPTERS := \

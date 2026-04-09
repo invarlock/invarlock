@@ -189,6 +189,13 @@ write("failed_subject_run.json", failed_subject)
 PY
 
 run_capture \
+  "invarlock run (removed public command)" \
+  "$VERIFY_OUT/run_removed.out" \
+  "$CLI run" \
+  "2"
+assert_contains "$VERIFY_OUT/run_removed.out" "No such command 'run'"
+
+run_capture \
   "invarlock verify --json (malformed fixture)" \
   "$VERIFY_OUT/malformed.out" \
   "$CLI verify --json \"$FIXTURE_ROOT/malformed.json\"" \

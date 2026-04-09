@@ -277,6 +277,86 @@ def test_build_container_python_command_adds_cwd_host_mirror(
     assert f"{cwd}:{cwd}" in command
 
 
+def test_build_container_python_module_command_uses_module_entrypoint(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    monkeypatch.chdir(repo_root)
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "resolve_container_engine",
+        lambda: "docker",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "resolve_runtime_image",
+        lambda: "ghcr.io/invarlock/runtime:test",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "resolve_runtime_image_digest",
+        lambda: "sha256:abc",
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "container_image_available_locally",
+        lambda image, engine=None: True,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "network_allowed",
+        lambda: False,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_host_nvidia_visible",
+        lambda: True,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_container_pythonpath_entries",
+        lambda *, cwd: (["/workspace/src"], []),
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "_delegated_env_pairs",
+        lambda *, cwd: ({"EXTRA": "1"}, []),
+        raising=True,
+    )
+
+    command = runtime_security.build_container_python_module_command(
+        "invarlock.cli.internal_config_run",
+        _plan(
+            ["--config", "configs/demo.yaml", "--out", "runs"],
+            gpu_passthrough=True,
+        ),
+    )
+
+    assert command[:6] == [
+        "docker",
+        "run",
+        "--rm",
+        "--entrypoint",
+        "python",
+        "--gpus",
+    ]
+    assert "all" in command
+    assert "ghcr.io/invarlock/runtime:test" in command
+    assert "-m" in command
+    assert "invarlock.cli.internal_config_run" in command
+    assert "PYTHONPATH=/workspace/src" in command
+    assert "EXTRA=1" in command
+
+
 def test_delegate_python_script_to_container_uses_python_builder(monkeypatch) -> None:
     monkeypatch.setattr(
         runtime_security_helpers,
@@ -326,6 +406,29 @@ def test_delegate_python_script_to_container_passes_timeout(monkeypatch) -> None
     assert seen["timeout"] == runtime_security._CONTAINER_EXECUTION_TIMEOUT_SECONDS
 
 
+def test_delegate_python_module_to_container_uses_module_builder(monkeypatch) -> None:
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "build_container_python_module_command",
+        lambda module_name, plan: ["docker", "run", "python", "-m", module_name],
+        raising=True,
+    )
+    monkeypatch.setattr(
+        runtime_security.subprocess,
+        "run",
+        lambda command, check=False, timeout=None: SimpleNamespace(returncode=11),
+        raising=True,
+    )
+
+    assert (
+        runtime_security.delegate_python_module_to_container(
+            "invarlock.cli.internal_config_run",
+            _plan(["--config", "demo.yaml"]),
+        )
+        == 11
+    )
+
+
 def test_delegate_python_script_to_container_surfaces_timeout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -344,6 +447,28 @@ def test_delegate_python_script_to_container_surfaces_timeout(
     with pytest.raises(RuntimeError, match="timed out"):
         runtime_security.delegate_python_script_to_container(
             "scripts/proof_packs/python/run_from_config.py",
+            _plan(["--config", "demo.yaml"]),
+        )
+
+
+def test_delegate_python_module_to_container_surfaces_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        runtime_security_helpers,
+        "build_container_python_module_command",
+        lambda module_name, plan: ["docker", "run", "python", "-m", module_name],
+        raising=True,
+    )
+
+    def _run(command, check=False, timeout=None):
+        raise runtime_security.subprocess.TimeoutExpired(command, timeout)
+
+    monkeypatch.setattr(runtime_security.subprocess, "run", _run, raising=True)
+
+    with pytest.raises(RuntimeError, match="timed out"):
+        runtime_security.delegate_python_module_to_container(
+            "invarlock.cli.internal_config_run",
             _plan(["--config", "demo.yaml"]),
         )
 

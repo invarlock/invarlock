@@ -91,6 +91,7 @@ def _run_calibration_config(
     profile: str | None,
     out: Path,
     tier: str,
+    command_name: str | tuple[str, ...] = ("advanced", "calibrate"),
     allow_network: bool,
     allow_host_execution: bool,
     allow_third_party_plugins: bool,
@@ -107,7 +108,7 @@ def _run_calibration_config(
             allow_host_execution=allow_host_execution,
             allow_third_party_plugins=allow_third_party_plugins,
             allow_remote_code=allow_remote_code,
-            command_name="run",
+            command_name=command_name,
         )
     except RuntimeDelegationError as exc:
         console.print(f"[red]{exc}[/red]")
@@ -285,6 +286,7 @@ def null_sweep(
             profile=profile,
             out=run_out,
             tier=spec.tier,
+            command_name=("advanced", "calibrate", "null-sweep"),
             allow_network=allow_network,
             allow_host_execution=allow_host_execution,
             allow_third_party_plugins=allow_third_party_plugins,
@@ -561,6 +563,7 @@ def ve_sweep(
             profile=profile,
             out=run_out,
             tier=spec.tier,
+            command_name=("advanced", "calibrate", "ve-sweep"),
             allow_network=allow_network,
             allow_host_execution=allow_host_execution,
             allow_third_party_plugins=allow_third_party_plugins,

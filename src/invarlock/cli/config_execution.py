@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from invarlock.runtime_security import (
-    delegate_container_command,
+    delegate_python_module_to_container,
     host_execution_allowed,
     running_inside_container,
     runtime_allowances_scope,
@@ -107,7 +107,8 @@ def run_from_config(
     with runtime_allowances_scope(policy=policy):
         if delegate and not running_inside_container() and not host_execution_allowed():
             try:
-                exit_code = delegate_container_command(
+                exit_code = delegate_python_module_to_container(
+                    "invarlock.cli.internal_config_run",
                     build_request_container_launch_plan(
                         command_name,
                         ConfigExecutionRequest(
@@ -132,7 +133,7 @@ def run_from_config(
                             no_color=no_color,
                             prefer_local_files_only=prefer_local_files_only,
                         ),
-                    )
+                    ),
                 )
             except RuntimeError as exc:
                 raise RuntimeDelegationError(str(exc)) from exc

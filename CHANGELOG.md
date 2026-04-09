@@ -31,10 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed `quant_rtn` and report-generation fail-closed behavior so noop edits,
   failed subject runs, malformed primary-metric outputs, and invalid baseline
   pairing states no longer emit misleading downstream artifacts.
-- Fixed delegated config execution by restoring the hidden internal config-run
-  shell used by runtime delegation and calibration, and aligned attested vs
-  trusted-local tiny-smoke semantics by forwarding and resolving `tiny_relax`
-  provenance consistently.
+- Fixed delegated config execution by routing runtime delegation and
+  calibration through a package-internal config-runner module instead of a
+  hidden public CLI command, and aligned attested vs trusted-local tiny-smoke
+  semantics by forwarding and resolving `tiny_relax` provenance consistently.
 - Fixed trusted-local and attested live-demo paths across GPT-2 and 14B model
   flows, including CUDA runtime selection, HF cold-cache fallback handling,
   non-GPT-2 layer-count reporting, regenerated report runtime manifests, and

@@ -200,13 +200,22 @@ def _command_name_tokens(command_name: str | Iterable[str]) -> list[str]:
     return [str(token) for token in command_name]
 
 
+def _command_name_string(command_name: str | Iterable[str]) -> str:
+    return " ".join(_command_name_tokens(command_name))
+
+
 def build_request_container_launch_plan(
     command_name: str | Iterable[str],
     request: Any,
 ) -> ContainerLaunchPlan:
-    delegated_argv = _command_name_tokens(command_name)
+    delegated_argv: list[str] = []
+    _append_option(
+        delegated_argv,
+        "--invoked-command",
+        _command_name_string(command_name),
+    )
     _append_option(delegated_argv, "--config", request.config)
-    _append_option(delegated_argv, "--device", request.device)
+    _append_option(delegated_argv, "--device", request.device or "auto")
     _append_option(delegated_argv, "--profile", request.profile)
     _append_option(delegated_argv, "--out", request.out)
     _append_option(delegated_argv, "--edit", request.edit)

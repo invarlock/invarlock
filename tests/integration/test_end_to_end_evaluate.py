@@ -118,7 +118,8 @@ def test_cli_smoke_fast_uses_repo_selected_python() -> None:
     assert 'export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"' in contents
     assert "printf -v CLI '%q ' \"$PYTHON_BIN\" -m invarlock" in contents
     assert "\"$PYTHON_BIN\" - <<'PY'" in contents
-    assert 'run "invarlock run --help"            "$CLI run --help"' in contents
+    assert 'run "invarlock evaluate --help"' in contents
+    assert "invarlock run --help" not in contents
     assert (
         'SMOKE_CALIBRATE_NULL_CONFIG="${INVARLOCK_SMOKE_CALIBRATE_NULL_CONFIG:-configs/calibration/null_sweep_smoke.yaml}"'
         in contents
@@ -159,6 +160,7 @@ def test_cli_smoke_negative_exercises_failure_categories() -> None:
     assert "invarlock verify --json (invariants policy fail)" in contents
     assert "invarlock verify --json (spectral policy fail)" in contents
     assert "invarlock verify --json (rmt policy fail)" in contents
+    assert "invarlock run (removed public command)" in contents
     assert "invarlock report generate (failed subject run report)" in contents
     assert "invarlock advanced calibrate null-sweep (missing config)" in contents
     assert "summary.reason" in contents

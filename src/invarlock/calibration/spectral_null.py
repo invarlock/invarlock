@@ -158,7 +158,7 @@ def summarize_null_sweep_reports(
 ) -> dict[str, Any]:
     """Summarize spectral null-sweep results and recommend κ/alpha.
 
-    Inputs are run report dicts produced by `invarlock run` (or equivalent).
+    Inputs are config-driven run report dicts (or equivalent).
     """
 
     tier_norm = (tier or "").strip().lower() or "balanced"

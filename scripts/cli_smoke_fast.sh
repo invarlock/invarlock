@@ -319,7 +319,6 @@ run_env() {
 # Top-level and core commands (help-only: safe)
 run "invarlock --help"                "$CLI --help"
 run "invarlock version"               "$CLI version"
-run "invarlock run --help"            "$CLI run --help"
 run "invarlock evaluate --help"       "$CLI evaluate --help"
 run "invarlock verify --help"         "$CLI verify --help"
 run "invarlock report --help"         "$CLI report --help"

@@ -88,9 +88,9 @@ Lane intent:
 - `cli_smoke_negative.sh` covers malformed, policy-fail, and fail-closed categories
 - `cli_smoke_realistic.sh` wraps the GPT-2-sized smoke campaign
 
-The hidden internal `invarlock run` shell is used by delegated config
-execution and calibration internals. It is intentionally not part of the
-public CLI contract, so public docs and user examples should continue to use
+Delegated config execution and calibration internals re-enter through the
+package-internal `python -m invarlock.cli.internal_config_run` module, not a
+public CLI command. Public docs and user examples should continue to use
 `evaluate`, `verify`, `report`, `doctor`, and `advanced ...`.
 
 ---

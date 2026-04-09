@@ -276,8 +276,8 @@ These commands emit a single JSON object suitable for CI parsing.
   `invarlock advanced ...`.
 - Trusted host execution for the core evaluation path is expressed as
   `--assurance trusted-local`.
-- Internal delegated config execution uses a hidden `run` shell, but that
-  command is not part of the public CLI contract and may change without notice.
+- Internal delegated config execution uses a package-internal config-runner
+  module, not a public CLI command.
 - Optional runtime backends are installed with Python extras instead of CLI
   install and uninstall commands.
 

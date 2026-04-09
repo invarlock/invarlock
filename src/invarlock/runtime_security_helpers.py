@@ -862,11 +862,43 @@ def build_container_python_command(
     )
 
 
+def build_container_python_module_command(
+    module_name: str,
+    plan: Any,
+) -> list[str]:
+    context = _resolve_container_launch_context(plan)
+    return _compose_container_run_args(
+        context,
+        plan,
+        entrypoint=("--entrypoint", "python"),
+        argv=("-m", module_name, *plan.argv),
+    )
+
+
 def delegate_python_script_to_container(
     script_path: str | os.PathLike[str],
     plan: Any,
 ) -> int:
     command = build_container_python_command(script_path, plan)
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            timeout=_CONTAINER_EXECUTION_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            "Container execution timed out after "
+            f"{_CONTAINER_EXECUTION_TIMEOUT_SECONDS} seconds."
+        ) from exc
+    return int(completed.returncode)
+
+
+def delegate_python_module_to_container(
+    module_name: str,
+    plan: Any,
+) -> int:
+    command = build_container_python_module_command(module_name, plan)
     try:
         completed = subprocess.run(
             command,

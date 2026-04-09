@@ -160,7 +160,7 @@ def test_run_calibration_config_delegates_with_advanced_command_path(
     )
 
     assert report == tmp_path / "report.json"
-    assert seen["command_name"] == "run"
+    assert seen["command_name"] == ("advanced", "calibrate")
 
 
 def test_get_tier_guard_config_success_path(monkeypatch: pytest.MonkeyPatch) -> None:

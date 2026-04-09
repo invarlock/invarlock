@@ -242,8 +242,11 @@ def test_run_from_config_delegates_when_secure_default_requires_container(
     )
     monkeypatch.setattr(
         config_execution,
-        "delegate_container_command",
-        lambda plan: 7 if plan == "plan" else 99,
+        "delegate_python_module_to_container",
+        lambda module_name, plan: (
+            seen.__setitem__("module_name", module_name),
+            7 if plan == "plan" else 99,
+        )[1],
         raising=True,
     )
 
@@ -252,6 +255,7 @@ def test_run_from_config_delegates_when_secure_default_requires_container(
 
     assert excinfo.value.code == 7
     assert seen["policy"] == runtime_security.build_runtime_security_policy()
+    assert seen["module_name"] == "invarlock.cli.internal_config_run"
     assert seen["plan"] == (
         "run",
         config_execution.ConfigExecutionRequest(config="configs/demo.yaml"),
@@ -298,8 +302,10 @@ def test_run_from_config_wraps_runtime_delegation_failures(
     )
     monkeypatch.setattr(
         config_execution,
-        "delegate_container_command",
-        lambda plan: (_ for _ in ()).throw(RuntimeError("no runtime image")),
+        "delegate_python_module_to_container",
+        lambda module_name, plan: (_ for _ in ()).throw(
+            RuntimeError("no runtime image")
+        ),
         raising=True,
     )
 
