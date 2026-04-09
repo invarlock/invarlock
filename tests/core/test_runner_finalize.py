@@ -44,7 +44,9 @@ def test_finalize_rollback_on_tail_gate_fail_mode():
     called = {}
 
     class StubCM:
-        def restore_checkpoint(self, model, adapter, checkpoint_id):  # type: ignore[no-untyped-def]
+        def restore_checkpoint(
+            self, model: object, adapter: object, checkpoint_id: str
+        ) -> bool:
             called["id"] = checkpoint_id
             return True
 
@@ -136,6 +138,27 @@ def test_finalize_rolls_back_on_invalid_primary_metric_flag_even_with_finite_val
             "final": 1.01,
             "invalid": True,
             "degraded_reason": "non_finite_pm",
+        }
+    }
+    guard_results = {"spectral": {"passed": True}}
+    cfg = RunConfig(max_pm_ratio=10.0, spike_threshold=2.0)
+
+    status = runner._finalize_phase(
+        object(), object(), guard_results, metrics, cfg, report
+    )
+
+    assert status == RunStatus.ROLLBACK.value
+    assert report.meta.get("rollback_reason") == "primary_metric_invalid"
+
+
+def test_finalize_rolls_back_on_non_finite_numeric_primary_metric_values() -> None:
+    runner = CoreRunner()
+    report = RunReport()
+    metrics = {
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "preview": float("nan"),
+            "final": 1.0,
         }
     }
     guard_results = {"spectral": {"passed": True}}
@@ -250,13 +273,20 @@ def test_finalize_phase_records_rollback_failed_when_restore_returns_false(
 
     events: list[tuple[str, str, dict | None]] = []
 
-    def patched_log(component, operation, level, data=None):  # type: ignore[no-untyped-def]
+    def patched_log(
+        component: str,
+        operation: str,
+        level: str,
+        data: dict[str, object] | None = None,
+    ) -> None:
         events.append((component, operation, data))
 
     monkeypatch.setattr(CoreRunner, "_log_event", staticmethod(patched_log))
 
     class StubCM:
-        def restore_checkpoint(self, model, adapter, checkpoint_id):  # type: ignore[no-untyped-def]
+        def restore_checkpoint(
+            self, model: object, adapter: object, checkpoint_id: str
+        ) -> bool:
             return False
 
     runner.checkpoint_manager = StubCM()
@@ -319,13 +349,20 @@ def test_finalize_phase_records_restore_exceptions(
     report.meta["initial_checkpoint"] = "cp-1"
     events: list[tuple[str, str, dict | None]] = []
 
-    def patched_log(component, operation, level, data=None):  # type: ignore[no-untyped-def]
+    def patched_log(
+        component: str,
+        operation: str,
+        level: str,
+        data: dict[str, object] | None = None,
+    ) -> None:
         events.append((component, operation, data))
 
     monkeypatch.setattr(CoreRunner, "_log_event", staticmethod(patched_log))
 
     class StubCM:
-        def restore_checkpoint(self, model, adapter, checkpoint_id):  # type: ignore[no-untyped-def]
+        def restore_checkpoint(
+            self, model: object, adapter: object, checkpoint_id: str
+        ) -> bool:
             raise RuntimeError("restore exploded")
 
     runner.checkpoint_manager = StubCM()
@@ -355,7 +392,12 @@ def test_handle_error_uses_active_runtime_and_records_successful_emergency_rollb
     runner._active_adapter = object()
     events: list[tuple[str, str, dict | None]] = []
 
-    def patched_log(component, operation, level, data=None):  # type: ignore[no-untyped-def]
+    def patched_log(
+        component: str,
+        operation: str,
+        level: str,
+        data: dict[str, object] | None = None,
+    ) -> None:
         events.append((component, operation, data))
 
     monkeypatch.setattr(CoreRunner, "_log_event", staticmethod(patched_log))
@@ -364,7 +406,9 @@ def test_handle_error_uses_active_runtime_and_records_successful_emergency_rollb
         def __init__(self) -> None:
             self.calls: list[tuple[object, object, str]] = []
 
-        def restore_checkpoint(self, model, adapter, checkpoint_id):  # type: ignore[no-untyped-def]
+        def restore_checkpoint(
+            self, model: object, adapter: object, checkpoint_id: str
+        ) -> bool:
             self.calls.append((model, adapter, checkpoint_id))
             return True
 
@@ -391,7 +435,12 @@ def test_handle_error_logs_unsuccessful_and_failed_emergency_rollbacks(
 ) -> None:
     events: list[tuple[str, str, dict | None]] = []
 
-    def patched_log(component, operation, level, data=None):  # type: ignore[no-untyped-def]
+    def patched_log(
+        component: str,
+        operation: str,
+        level: str,
+        data: dict[str, object] | None = None,
+    ) -> None:
         events.append((component, operation, data))
 
     monkeypatch.setattr(CoreRunner, "_log_event", staticmethod(patched_log))
@@ -405,7 +454,9 @@ def test_handle_error_logs_unsuccessful_and_failed_emergency_rollbacks(
     events: list[tuple[str, str, dict | None]] = []
 
     class FalseCM:
-        def restore_checkpoint(self, model, adapter, checkpoint_id):  # type: ignore[no-untyped-def]
+        def restore_checkpoint(
+            self, model: object, adapter: object, checkpoint_id: str
+        ) -> bool:
             return False
 
     runner.checkpoint_manager = FalseCM()
@@ -419,7 +470,9 @@ def test_handle_error_logs_unsuccessful_and_failed_emergency_rollbacks(
     events.clear()
 
     class RaisingCM:
-        def restore_checkpoint(self, model, adapter, checkpoint_id):  # type: ignore[no-untyped-def]
+        def restore_checkpoint(
+            self, model: object, adapter: object, checkpoint_id: str
+        ) -> bool:
             raise RuntimeError("restore exploded")
 
     runner.checkpoint_manager = RaisingCM()

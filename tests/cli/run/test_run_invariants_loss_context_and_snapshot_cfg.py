@@ -92,6 +92,18 @@ def _provider():
     )
 
 
+def _runner_success():
+    return SimpleNamespace(
+        execute=lambda **k: SimpleNamespace(
+            edit={},
+            metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},
+            guards={},
+            context={"dataset_meta": {}},
+            status="success",
+        )
+    )
+
+
 def test_file_not_found_exit(tmp_path: Path):
     missing_cfg = tmp_path / "nope.yaml"
     with pytest.raises(click.exceptions.Exit):
@@ -482,6 +494,7 @@ def test_snapshot_auto_ram_fraction_env(tmp_path: Path, monkeypatch):
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider())
         )
+        stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner_success))
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
 
     assert adapter.rest_chunked >= 1
@@ -595,6 +608,7 @@ def test_snapshot_cfg_threshold_and_tempdir(tmp_path: Path, monkeypatch):
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider())
         )
+        stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner_success))
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
 
     assert adapter.rest_chunked >= 1

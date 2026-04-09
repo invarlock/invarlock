@@ -8,6 +8,8 @@ import torch
 
 from invarlock.runtime_security import runtime_allowances_scope
 
+_MISTRAL3_ARCH = "Mistral3ForConditionalGeneration"
+
 
 @pytest.mark.unit
 def test_resolve_trust_remote_code_defaults_false(monkeypatch):
@@ -181,10 +183,18 @@ def test_resolve_core_loader_strategy_uses_direct_submodule_when_allowed(
 @pytest.mark.parametrize(
     ("model_type", "loader_label"),
     [
+        (
+            "gpt_oss",
+            "transformers.models.gpt_oss.modeling_gpt_oss.GptOssForCausalLM",
+        ),
         ("qwen3", "transformers.models.qwen3.modeling_qwen3.Qwen3ForCausalLM"),
         (
             "qwen3_moe",
             "transformers.models.qwen3_moe.modeling_qwen3_moe.Qwen3MoeForCausalLM",
+        ),
+        (
+            "mistral3",
+            "transformers.models.mistral3.modeling_mistral3." + _MISTRAL3_ARCH,
         ),
         (
             "gemma3",
@@ -248,6 +258,86 @@ def test_resolve_core_loader_strategy_supports_multimodal_gemma4(
     assert (
         strategy.loader_label
         == "transformers.models.gemma4.modeling_gemma4.Gemma4ForConditionalGeneration"
+    )
+
+
+@pytest.mark.unit
+def test_resolve_core_loader_strategy_supports_multimodal_mistral3(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    import invarlock.adapters.hf_loading as hf_loading
+
+    model_dir = _write_local_config(tmp_path / "mistral3-mm", "mistral3")
+    monkeypatch.setattr(
+        hf_loading,
+        "_import_symbol",
+        lambda module_path, symbol_name: f"{module_path}.{symbol_name}",
+    )
+
+    strategy = hf_loading.resolve_core_loader_strategy(
+        task="multimodal",
+        model_id=str(model_dir),
+        allow_direct_submodule=True,
+    )
+
+    assert strategy.strategy == "direct_submodule"
+    assert strategy.model_type == "mistral3"
+    assert (
+        strategy.loader_label
+        == "transformers.models.mistral3.modeling_mistral3." + _MISTRAL3_ARCH
+    )
+
+
+@pytest.mark.unit
+def test_resolve_core_loader_strategy_infers_remote_model_type_from_model_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import invarlock.adapters.hf_loading as hf_loading
+
+    monkeypatch.setattr(
+        hf_loading,
+        "_import_symbol",
+        lambda module_path, symbol_name: f"{module_path}.{symbol_name}",
+    )
+
+    strategy = hf_loading.resolve_core_loader_strategy(
+        task="mlm",
+        model_id="prajjwal1/bert-tiny",
+        allow_direct_submodule=True,
+    )
+
+    assert strategy.strategy == "direct_submodule"
+    assert strategy.model_type == "bert"
+    assert (
+        strategy.loader_label
+        == "transformers.models.bert.modeling_bert.BertForMaskedLM"
+    )
+
+
+@pytest.mark.unit
+def test_resolve_core_loader_strategy_maps_deberta_v3_to_v2_loader_family(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import invarlock.adapters.hf_loading as hf_loading
+
+    monkeypatch.setattr(
+        hf_loading,
+        "_import_symbol",
+        lambda module_path, symbol_name: f"{module_path}.{symbol_name}",
+    )
+
+    strategy = hf_loading.resolve_core_loader_strategy(
+        task="mlm",
+        model_id="microsoft/deberta-v3-base",
+        allow_direct_submodule=True,
+    )
+
+    assert strategy.strategy == "direct_submodule"
+    assert strategy.model_type == "deberta-v2"
+    assert (
+        strategy.loader_label
+        == "transformers.models.deberta_v2.modeling_deberta_v2.DebertaV2ForMaskedLM"
     )
 
 

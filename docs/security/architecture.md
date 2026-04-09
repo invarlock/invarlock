@@ -13,8 +13,8 @@ Overview of the core security-related components and defaults.
 
 ## Runtime boundary (default containerized execution)
 
-- `invarlock evaluate`, `invarlock advanced calibrate`, and internal `run`
-  flows delegate to the runtime container by default.
+- `invarlock evaluate`, `invarlock advanced calibrate`, and internal
+  config-driven runner flows delegate to the runtime container by default.
 - Use `--assurance trusted-local` on `invarlock evaluate` for trusted public local runs, or
   `INVARLOCK_ALLOW_HOST_EXECUTION=1` / `--allow-host-execution` for advanced
   and internal workflows that intentionally bypass that boundary.

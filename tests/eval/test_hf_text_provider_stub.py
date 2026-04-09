@@ -13,7 +13,7 @@ def test_hf_text_provider_windows_with_stub_dataset(monkeypatch):
             for x in ("alpha", "", "beta"):
                 yield {"text": x}
 
-    monkeypatch.setattr(data_support_mod, "load_dataset", lambda *a, **k: _DS())  # type: ignore[no-untyped-def]
+    monkeypatch.setattr(data_support_mod, "load_dataset", lambda *a, **k: _DS())
     p = data_mod.HFTextProvider(
         dataset_name="stub", config_name=None, text_field="text", max_samples=10
     )

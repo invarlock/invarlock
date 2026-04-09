@@ -20,6 +20,14 @@ from invarlock.core.api import ModelAdapter
 from invarlock.core.error_utils import wrap_errors
 from invarlock.core.exceptions import DependencyError, ModelLoadError
 
+_AWQ_IMPORT_ERRORS = (
+    AttributeError,
+    ImportError,
+    ModuleNotFoundError,
+    OSError,
+    RuntimeError,
+)
+
 
 class HF_AWQ_Adapter(HFAdapterMixin, ModelAdapter):
     name = "hf_awq"
@@ -45,7 +53,7 @@ class HF_AWQ_Adapter(HFAdapterMixin, ModelAdapter):
                     mod = __import__(mod_path, fromlist=[attr])
                     AutoAWQForCausalLM = getattr(mod, attr)
                     break
-                except Exception:
+                except _AWQ_IMPORT_ERRORS:
                     continue
 
         if AutoAWQForCausalLM is None:  # pragma: no cover

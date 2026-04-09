@@ -40,7 +40,7 @@ def test_coerce_mapping_covers_multiple_sources_and_failures() -> None:
             raise RuntimeError("boom")
 
     inst = _ModelDumpRaises()
-    inst.x = 1  # type: ignore[attr-defined]
+    inst.x = 1
     with pytest.raises(RuntimeError, match="boom"):
         run_serial_mod._coerce_mapping(inst)
 

@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from invarlock.core.exceptions import ValidationError
 from invarlock.reporting.report_files import save_report
 from invarlock.reporting.report_make import make_report
 
@@ -60,7 +61,7 @@ def test_make_report_rejects_unsupported_baseline_schema():
         "meta": {},
         "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 100.0}},
     }
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError, match="Baseline normalization failed"):
         make_report(rep, base)
 
 

@@ -218,6 +218,15 @@ def test_resolve_tiny_relax_from_report_edges() -> None:
         )
         is False
     )
+    assert (
+        policy.resolve_tiny_relax_from_report({"auto": {"tiny_relax": "true"}}) is True
+    )
+    assert (
+        policy.resolve_tiny_relax_from_report(
+            {"provenance": {"flags": ["deterministic", "tiny_relax"]}}
+        )
+        is True
+    )
     assert policy.resolve_tiny_relax_from_report({"meta": {"auto": {}}}) is False
 
 

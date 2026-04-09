@@ -82,11 +82,6 @@ def classify_module_family(name: str, module: Any) -> str:
     module_type = module.__class__.__name__.lower()
     if "embedding" in module_type:
         return "embed"
-    if "conv1d" in module_type or "linear" in module_type:
-        if "attn" in lname:
-            return "attn"
-        if "mlp" in lname or "ffn" in lname:
-            return "ffn"
     return "other"
 
 
@@ -178,8 +173,6 @@ def summarize_family_z_scores(
 
     summary: dict[str, dict[str, float]] = {}
     for family, values in family_values.items():
-        if not values:
-            continue
         arr = np.array(values, dtype=float)
         cap = family_caps.get(family, {}).get("kappa")
         violations = int(np.sum(arr > float(cap))) if cap is not None else 0
@@ -205,8 +198,6 @@ def compute_family_stats(
 
     stats: dict[str, dict[str, float]] = {}
     for family, values in buckets.items():
-        if not values:
-            continue
         arr = np.array(values, dtype=float)
         stats[family] = {
             "count": len(values),

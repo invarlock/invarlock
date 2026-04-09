@@ -36,7 +36,7 @@ def test_run_commands_uses_argv_and_merges_inline_env(
 
     called: dict[str, object] = {}
 
-    def _fake_run(cmd, **kwargs):  # type: ignore[no-untyped-def]
+    def _fake_run(cmd, **kwargs):
         called["cmd"] = cmd
         called["kwargs"] = kwargs
 
@@ -72,7 +72,7 @@ def test_run_commands_uses_argv_and_merges_inline_env(
 def test_run_commands_records_parse_errors(tmp_path: Path, monkeypatch) -> None:
     module = _load_script_module()
 
-    def _never_called(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+    def _never_called(*_args, **_kwargs):
         raise AssertionError("subprocess.run should not be called for parse errors")
 
     monkeypatch.setattr(module.subprocess, "run", _never_called)

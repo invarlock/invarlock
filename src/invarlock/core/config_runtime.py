@@ -18,6 +18,14 @@ import yaml
 
 from .config_dependencies import load_raw_config_payload as _load_raw_config_payload
 
+_RUNTIME_RESOURCE_ERRORS = (
+    AttributeError,
+    ImportError,
+    ModuleNotFoundError,
+    OSError,
+    RuntimeError,
+)
+
 
 def _deep_merge(a: dict, b: dict) -> dict:
     out = copy.deepcopy(a)
@@ -553,11 +561,11 @@ def _load_runtime_yaml(*rel_parts: str) -> dict[str, Any] | None:
                 text = read_text(encoding="utf-8")
                 data = yaml.safe_load(text) or {}
                 if not isinstance(data, dict):
-                    raise ValueError("Runtime YAML must be a mapping")
+                    return None
                 return data
         except FileNotFoundError:
             pass
-    except Exception:
+    except _RUNTIME_RESOURCE_ERRORS:
         # Importlib resources may not be available in certain environments
         pass
     return None
@@ -579,4 +587,24 @@ def apply_profile(cfg: InvarLockConfig, profile: str) -> InvarLockConfig:
 
     if overrides is None:
         raise ValueError(f"Unknown profile: {profile}")
-    return InvarLockConfig(_deep_merge(cfg.model_dump(), overrides))
+    base_cfg = cfg.model_dump()
+    merged = _deep_merge(base_cfg, overrides)
+
+    # Runtime profiles provide defaults, but model/preset-specific primary-metric
+    # policy must remain authoritative when explicitly configured.
+    base_primary_metric = (
+        base_cfg.get("primary_metric")
+        if isinstance(base_cfg.get("primary_metric"), dict)
+        else {}
+    )
+    merged_primary_metric = (
+        merged.get("primary_metric")
+        if isinstance(merged.get("primary_metric"), dict)
+        else {}
+    )
+    if base_primary_metric and merged_primary_metric is not None:
+        for key, value in base_primary_metric.items():
+            merged_primary_metric[key] = copy.deepcopy(value)
+        merged["primary_metric"] = merged_primary_metric
+
+    return InvarLockConfig(merged)

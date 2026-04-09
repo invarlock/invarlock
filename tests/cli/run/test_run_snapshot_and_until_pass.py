@@ -69,6 +69,18 @@ def _common_ce():
     )
 
 
+def _runner_success():
+    return SimpleNamespace(
+        execute=lambda **k: SimpleNamespace(
+            edit={},
+            metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},
+            guards={},
+            context={"dataset_meta": {}},
+            status="success",
+        )
+    )
+
+
 class FakeTensor:
     def __init__(self, bytes_count: int):
         self._bytes = bytes_count
@@ -174,6 +186,7 @@ def test_snapshot_auto_chunked_selected_when_large_and_disk_ok(
                 lambda path: _disk_usage(free_mb=2048),
             )
         )
+        stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner_success))
         monkeypatch.delenv("INVARLOCK_SNAPSHOT_MODE", raising=False)
         run_command(
             config=str(cfg), device="cpu", out=str(tmp_path / "runs"), until_pass=False
@@ -254,6 +267,7 @@ def test_snapshot_cfg_mode_overrides_env(tmp_path: Path, monkeypatch):
                 ),
             )
         )
+        stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner_success))
         stack.enter_context(
             patch(
                 "invarlock.eval.data.get_provider",
@@ -544,6 +558,7 @@ def test_snapshot_auto_bytes_when_small_model(tmp_path: Path, monkeypatch):
                 lambda path: _disk_usage(free_mb=0),
             )
         )
+        stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner_success))
         run_command(
             config=str(cfg), device="cpu", out=str(tmp_path / "runs"), until_pass=False
         )
@@ -611,6 +626,7 @@ def test_snapshot_no_support_uses_reload(tmp_path: Path, monkeypatch):
                 lambda path: _disk_usage(free_mb=0),
             )
         )
+        stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner_success))
         run_command(
             config=str(cfg), device="cpu", out=str(tmp_path / "runs"), until_pass=False
         )
@@ -675,6 +691,7 @@ def test_snapshot_env_mode_overrides(tmp_path: Path, monkeypatch):
                 ),
             )
         )
+        stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner_success))
         # Force env override to bytes
         monkeypatch.setenv("INVARLOCK_SNAPSHOT_MODE", "bytes")
         run_command(

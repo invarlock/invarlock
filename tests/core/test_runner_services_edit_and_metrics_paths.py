@@ -66,7 +66,7 @@ def test_initialize_services_event_logger_run_id_skips_non_dict_context(
 
 def test_edit_phase_sets_defaults_when_deltas_not_dict() -> None:
     runner = CoreRunner()
-    runner._log_event = lambda *_a, **_k: None  # type: ignore[method-assign]
+    runner._log_event = lambda *_a, **_k: None
 
     class Edit:
         name = "noop"

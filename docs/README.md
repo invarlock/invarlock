@@ -39,6 +39,10 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
 Tip: enable Hub downloads per command when fetching models/datasets:
 `invarlock evaluate --allow-network ...`
 
+Preset sizing note: most repo presets keep small `preview_n` / `final_n` values
+for portable local smokes. Use `--profile ci` or `--profile release` when you
+need balanced-tier evaluations to clear the standard token-floor gates.
+
 Security-default note: `evaluate` uses the runtime container by default. Use
 `--assurance trusted-local` only for trusted local workflows that intentionally bypass that
 boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.
@@ -53,6 +57,15 @@ under the included `dev` profile so they can complete the full `evaluate` →
 floors. The tiny push smoke also uses an explicit trusted-local assurance override
 for proof-pack verification when CI produces an unsigned pack; the default
 package-native verifier behavior remains fail-closed for unsigned packs.
+
+Maintainer smoke note: the repo-wide CLI smoke matrix now lives under
+`scripts/cli_exhaustive_smoke.sh`, which dispatches three lanes:
+`scripts/cli_smoke_fast.sh` for broad command-surface and positive-path tiny
+flows, `scripts/cli_smoke_negative.sh` for malformed / policy-fail /
+fail-closed categories, and `scripts/cli_smoke_realistic.sh` for the slower
+GPT-2-sized path. Calibration smoke runs in that matrix use
+`configs/calibration/null_sweep_smoke.yaml` and
+`configs/calibration/rmt_ve_sweep_smoke.yaml`.
 
 ---
 
@@ -196,6 +209,7 @@ Notes
 | GPT-2 causal LM | Yes | Yes | Yes | Yes |
 | BERT / RoBERTa MLM | Yes | Yes | Yes | Yes |
 | Mistral 7B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
+| Ministral 3 causal LM (text-only eval) | Yes | Yes | Yes | No, repo-included pilot config only |
 | Qwen2 7B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
 | Qwen2.5 14B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
 | Qwen3 causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
@@ -209,8 +223,9 @@ Notes
 
 Published assurance basis covers GPT-2 and BERT profiles. Repo-included
 presets and pilot calibration configs for additional experimental families,
-including Mistral 7B, Qwen2 7B, Qwen2.5 14B, Qwen3, DeepSeek-R1-Distill-Qwen,
-Phi-4 text-only, Gemma 4 E2B text-only, TinyLlama 1.1B, OLMo 2, and Qwen3.5, do not become part of the published
+including Mistral 7B, Ministral 3 text-only, Qwen2 7B, Qwen2.5 14B, Qwen3,
+DeepSeek-R1-Distill-Qwen, Phi-4 text-only, Gemma 4 E2B text-only, TinyLlama
+1.1B, OLMo 2, and Qwen3.5, do not become part of the published
 assurance basis until supporting artifacts are attached. Access-gated vendor
 checkpoints are intentionally excluded from the included support matrix and
 preset inventory, and ungated families without clean pilot lanes remain in the

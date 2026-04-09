@@ -372,6 +372,19 @@ class TestJSONExporter:
         finally:
             Path(output_path).unlink(missing_ok=True)
 
+    def test_export_to_file_failure_returns_false(self):
+        """File write failures should be reported as exporter errors."""
+        from invarlock.observability.exporters import ExportedMetric, JSONExporter
+
+        exporter = JSONExporter(output_file="/tmp/metrics.json", pretty_print=True)
+        metrics = [ExportedMetric(name="test_metric", value=42.0, timestamp=1000.0)]
+
+        with patch("builtins.open", side_effect=OSError("disk full")):
+            result = exporter.export(metrics)
+
+        assert result is False
+        assert exporter.error_count == 1
+
 
 # =============================================================================
 # InfluxDBExporter Tests
@@ -622,6 +635,26 @@ class TestExportManager:
         results = manager.export_now(metrics)
 
         assert results["json"] is False
+
+    def test_export_now_handles_exporter_runtime_error(self):
+        """Exporter runtime failures should be downgraded to False results."""
+        from invarlock.observability.exporters import (
+            ExportedMetric,
+            ExportManager,
+            MetricsExporter,
+        )
+
+        class FailingExporter(MetricsExporter):
+            def export(self, metrics):  # noqa: ANN001
+                raise RuntimeError("export boom")
+
+        manager = ExportManager()
+        manager.add_exporter(FailingExporter("failing"))
+
+        metrics = [ExportedMetric(name="test", value=1.0, timestamp=time.time())]
+        results = manager.export_now(metrics)
+
+        assert results["failing"] is False
 
     def test_get_exporter_stats(self):
         """Test getting stats for all exporters."""

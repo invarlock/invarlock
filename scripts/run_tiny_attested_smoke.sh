@@ -8,6 +8,7 @@ WORK_ROOT="${1:-$(mktemp -d -t invarlock_tiny_attested_smoke.XXXXXX)}"
 MODEL_ID="${INVARLOCK_TINY_SMOKE_MODEL_ID:-sshleifer/tiny-gpt2}"
 MODE="${INVARLOCK_SMOKE_MODE:-attested}"
 PROFILE="${INVARLOCK_SMOKE_PROFILE:-dev}"
+SMOKE_DEVICE="${INVARLOCK_SMOKE_DEVICE:-auto}"
 
 PYTHON_BIN="${INVARLOCK_PYTHON:-}"
 if [[ -z "$PYTHON_BIN" ]]; then
@@ -20,10 +21,22 @@ export INVARLOCK_ALLOW_NETWORK="${INVARLOCK_ALLOW_NETWORK:-1}"
 export INVARLOCK_DEDUP_TEXTS="${INVARLOCK_DEDUP_TEXTS:-1}"
 export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
 
-if [[ "$MODE" == "attested" && -z "${INVARLOCK_RUNTIME_IMAGE:-}" ]]; then
+host_gpu_visible() {
+  [[ -e /dev/nvidiactl ]] || command -v nvidia-smi >/dev/null 2>&1
+}
+
+seed_local_runtime_image() {
+  if host_gpu_visible && docker image inspect invarlock-runtime:cuda-local >/dev/null 2>&1; then
+    export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"
+    return 0
+  fi
   if docker image inspect invarlock-runtime:local >/dev/null 2>&1; then
     export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:local"
   fi
+}
+
+if [[ "$MODE" == "attested" && -z "${INVARLOCK_RUNTIME_IMAGE:-}" ]]; then
+  seed_local_runtime_image
 fi
 
 mkdir -p "$WORK_ROOT"
@@ -91,10 +104,18 @@ ensure_current_runtime_image() {
   if [[ "$MODE" != "attested" ]]; then
     return 0
   fi
-  if [[ -n "${INVARLOCK_RUNTIME_IMAGE:-}" && "${INVARLOCK_RUNTIME_IMAGE}" != "invarlock-runtime:local" ]]; then
+  if [[ -n "${INVARLOCK_RUNTIME_IMAGE:-}" \
+    && "${INVARLOCK_RUNTIME_IMAGE}" != "invarlock-runtime:local" \
+    && "${INVARLOCK_RUNTIME_IMAGE}" != "invarlock-runtime:cuda-local" ]]; then
     return 0
   fi
   if ! command -v docker >/dev/null 2>&1 || ! command -v make >/dev/null 2>&1; then
+    return 0
+  fi
+  if host_gpu_visible; then
+    echo "[smoke] refreshing local CUDA attested runtime image"
+    make runtime-image-cuda
+    export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"
     return 0
   fi
   echo "[smoke] refreshing local attested runtime image"
@@ -136,6 +157,33 @@ debug_verify_failure() {
   fi
   echo "[smoke] verify_plain_diagnostics"
   "${CLI[@]}" verify "$EVAL_REPORT" "${VERIFY_ARGS[@]}" --profile "$PROFILE" || true
+}
+
+assert_semantic_pass() {
+  local report_path="$1"
+  REPORT_PATH="$report_path" "$PYTHON_BIN" - <<'PY'
+import json
+import os
+from pathlib import Path
+
+from invarlock.reporting.report_policy import resolve_tiny_relax_from_report
+
+report = json.loads(Path(os.environ["REPORT_PATH"]).read_text(encoding="utf-8"))
+if not resolve_tiny_relax_from_report(report):
+    raise SystemExit("tiny smoke report is missing tiny_relax provenance")
+
+validation = report.get("validation") or {}
+required_true = (
+    "primary_metric_acceptable",
+    "preview_final_drift_acceptable",
+    "invariants_pass",
+    "spectral_stable",
+    "rmt_stable",
+)
+for key in required_true:
+    if validation.get(key) is not True:
+        raise SystemExit(f"expected validation.{key} to be true, found {validation.get(key)!r}")
+PY
 }
 
 if seed_hf_cache_from_host; then
@@ -210,6 +258,7 @@ echo "[smoke] work_root=$WORK_ROOT"
 echo "[smoke] model_id=$MODEL_ID"
 echo "[smoke] preset=$PRESET_PATH"
 echo "[smoke] mode=$MODE profile=$PROFILE"
+echo "[smoke] device=$SMOKE_DEVICE"
 echo "[smoke] hf_home=$HF_HOME"
 echo "[smoke] hf_hub_cache=$HF_HUB_CACHE"
 
@@ -225,7 +274,7 @@ fi
   --profile "$PROFILE" \
   --preset "$PRESET_PATH" \
   --assurance "$ASSURANCE" \
-  --device cpu \
+  --device "$SMOKE_DEVICE" \
   --out "$SMOKE_RUN_DIR" \
   --report-out "$SMOKE_REPORT_DIR" \
   --timing
@@ -253,6 +302,7 @@ if [[ "$VERIFY_RC" != "0" ]]; then
   echo "[error] evaluation report verification failed" >&2
   exit "$VERIFY_RC"
 fi
+assert_semantic_pass "$EVAL_REPORT"
 "${CLI[@]}" report validate "$EVAL_REPORT"
 mkdir -p "$SMOKE_EXPORT_DIR"
 "${CLI[@]}" report html -i "$EVAL_REPORT" -o "$SMOKE_EXPORT_DIR/evaluation.html"

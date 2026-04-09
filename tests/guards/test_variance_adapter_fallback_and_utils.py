@@ -44,5 +44,5 @@ def test_normalize_module_name_and_pairing_ids():
     # transformer.h.* already normalized
     assert g._normalize_module_name("transformer.h.1.mlp.c_proj").endswith("mlp.c_proj")
     # pairing ids normalization preserves prefixes
-    ids = g._normalize_pairing_ids("preview", [1, "2", "preview::x"])  # type: ignore[list-item]
+    ids = g._normalize_pairing_ids("preview", [1, "2", "preview::x"])
     assert ids[0].startswith("preview::") and ids[-1] == "preview::x"

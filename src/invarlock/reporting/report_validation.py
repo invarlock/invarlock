@@ -45,6 +45,279 @@ def _guard_overhead_has_error_diagnostic(payload: Any) -> bool:
     return False
 
 
+def _resolve_drift_bounds(
+    pm_drift_band: dict[str, float] | None,
+    *,
+    default: tuple[float, float],
+) -> tuple[float, float]:
+    drift_min, drift_max = default
+    if not isinstance(pm_drift_band, dict):
+        return drift_min, drift_max
+    try:
+        cand_min_f = _coerce_finite_float(pm_drift_band.get("min"))
+        cand_max_f = _coerce_finite_float(pm_drift_band.get("max"))
+        if (
+            cand_min_f is not None
+            and cand_max_f is not None
+            and 0 < cand_min_f < cand_max_f
+        ):
+            return cand_min_f, cand_max_f
+    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
+        pass
+    return drift_min, drift_max
+
+
+def _resolve_effective_min_tokens(
+    *,
+    min_tokens: int,
+    pm_policy: dict[str, Any],
+    dataset_capacity: dict[str, Any] | None,
+) -> int:
+    eff_min_tokens = max(0, int(min_tokens))
+    try:
+        if isinstance(dataset_capacity, dict):
+            frac = float(pm_policy.get("min_token_fraction", 0.0) or 0.0)
+            avail_tokens_value = _coerce_finite_float(
+                dataset_capacity.get("tokens_available")
+            )
+            if avail_tokens_value is not None and frac > 0.0:
+                eff_min_tokens = max(
+                    eff_min_tokens,
+                    int(math.ceil(avail_tokens_value * frac)),
+                )
+    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
+        pass
+    return eff_min_tokens
+
+
+def _coverage_meets_floor(_ppl_metrics: dict[str, Any]) -> bool:
+    coverage_ok = False
+    try:
+        coverage = _ppl_metrics.get("bootstrap", {}).get("coverage")
+        if not isinstance(coverage, dict):
+            return False
+        prev_cov = coverage.get("preview")
+        fin_cov = coverage.get("final")
+        if not (isinstance(prev_cov, dict) and isinstance(fin_cov, dict)):
+            return False
+        prev_used_value = _coerce_finite_float(prev_cov.get("used"))
+        prev_req_value = _coerce_finite_float(prev_cov.get("required"))
+        fin_used_value = _coerce_finite_float(fin_cov.get("used"))
+        fin_req_value = _coerce_finite_float(fin_cov.get("required"))
+        prev_ok = bool(prev_cov.get("ok")) or (
+            prev_used_value is not None
+            and prev_req_value is not None
+            and prev_used_value >= prev_req_value
+        )
+        fin_ok = bool(fin_cov.get("ok")) or (
+            fin_used_value is not None
+            and fin_req_value is not None
+            and fin_used_value >= fin_req_value
+        )
+        coverage_ok = prev_ok and fin_ok
+    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
+        coverage_ok = False
+    return coverage_ok
+
+
+def _resolve_tokens_ok(
+    _ppl_metrics: dict[str, Any] | None,
+    *,
+    min_tokens: int,
+    pm_policy: dict[str, Any],
+    dataset_capacity: dict[str, Any] | None,
+) -> bool:
+    if not isinstance(_ppl_metrics, dict):
+        return True
+    pt_value = _coerce_finite_float(_ppl_metrics.get("preview_total_tokens"))
+    ft_value = _coerce_finite_float(_ppl_metrics.get("final_total_tokens"))
+    if pt_value is None or ft_value is None or min_tokens <= 0:
+        return True
+    try:
+        total_tokens = int(pt_value) + int(ft_value)
+        eff_min_tokens = _resolve_effective_min_tokens(
+            min_tokens=min_tokens,
+            pm_policy=pm_policy,
+            dataset_capacity=dataset_capacity,
+        )
+        tokens_ok = total_tokens >= eff_min_tokens
+        if tokens_ok or not _coverage_meets_floor(_ppl_metrics):
+            return tokens_ok
+        try:
+            tolerance_ratio = float(pm_policy.get("min_tokens_tolerance", 0.02) or 0.0)
+        except _NON_FATAL_EXCEPTIONS:
+            tolerance_ratio = 0.0
+        if tolerance_ratio < 0.0:
+            tolerance_ratio = 0.0
+        relaxed_floor = int(math.floor(float(eff_min_tokens) * (1.0 - tolerance_ratio)))
+        return total_tokens >= max(relaxed_floor, 0)
+    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
+        return True
+
+
+def _resolve_spectral_stable(
+    spectral: dict[str, Any],
+    *,
+    tier_policy: dict[str, Any],
+) -> bool:
+    summary = spectral.get("summary", {}) if isinstance(spectral, dict) else {}
+    max_caps = spectral.get("max_caps") or summary.get("max_caps")
+    if max_caps is None:
+        default_spectral = (
+            tier_policy.get("spectral", {}) if isinstance(tier_policy, dict) else {}
+        )
+        max_caps = default_spectral.get("max_caps", 5)
+    spectral_stable = bool(spectral.get("caps_applied", 0) <= int(max_caps))
+    if spectral.get("caps_exceeded"):
+        spectral_stable = False
+    return spectral_stable
+
+
+def _resolve_guard_overhead_pass(
+    guard_overhead: dict[str, Any] | None,
+    *,
+    tiny_relax: bool,
+) -> bool:
+    if not (isinstance(guard_overhead, dict) and guard_overhead):
+        return True
+    if "passed" in guard_overhead:
+        guard_overhead_pass = bool(guard_overhead.get("passed"))
+        if tiny_relax and (
+            not bool(guard_overhead.get("evaluated", True))
+            or _guard_overhead_has_error_diagnostic(guard_overhead)
+        ):
+            return True
+        return guard_overhead_pass
+    ratio_val = _coerce_finite_float(guard_overhead.get("overhead_ratio"))
+    threshold_val = _coerce_finite_float(guard_overhead.get("overhead_threshold", 0.01))
+    if threshold_val is None:
+        threshold_val = 0.01
+    if tiny_relax and threshold_val < 0.10:
+        threshold_val = 0.10
+    if ratio_val is None:
+        return True
+    return ratio_val <= (1.0 + max(0.0, threshold_val))
+
+
+def _apply_metric_specific_primary_metric_gate(
+    flags: dict[str, bool],
+    *,
+    primary_metric: dict[str, Any] | None,
+    metrics_policy: dict[str, Any],
+    ratio_limit_with_hyst: float,
+    tokens_ok_eff: bool,
+    compression_acceptable: bool,
+    tiny_relax: bool,
+    dataset_capacity: dict[str, Any] | None,
+) -> None:
+    if not (isinstance(primary_metric, dict) and primary_metric):
+        return
+    kind = str(primary_metric.get("kind", "")).lower()
+    if kind in {"ppl_causal", "ppl_mlm", "ppl_seq2seq"}:
+        pm_ratio_value = _coerce_finite_float(primary_metric.get("ratio_vs_baseline"))
+        if pm_ratio_value is not None:
+            ok = (pm_ratio_value <= ratio_limit_with_hyst) and bool(tokens_ok_eff)
+        else:
+            ok = bool(compression_acceptable)
+        flags["primary_metric_acceptable"] = bool(ok)
+        return
+    if kind not in {"accuracy", "vqa_accuracy"}:
+        return
+
+    acc_policy = (
+        metrics_policy.get("accuracy", {}) if isinstance(metrics_policy, dict) else {}
+    )
+    delta_min_pp = float(acc_policy.get("delta_min_pp", -1.0))
+    min_examples = int(acc_policy.get("min_examples", 200))
+    hysteresis_pp = float(acc_policy.get("hysteresis_delta_pp", 0.0))
+    delta_value = _coerce_finite_float(primary_metric.get("ratio_vs_baseline"))
+    meets_delta = delta_value is not None and (
+        delta_value >= (delta_min_pp - max(0.0, hysteresis_pp))
+    )
+    if tiny_relax and delta_value is None:
+        meets_delta = True
+
+    meets_n = True
+    n_fin_value = _coerce_finite_float(primary_metric.get("n_final"))
+    if n_fin_value is not None:
+        eff_min_examples = int(min_examples)
+        try:
+            if isinstance(dataset_capacity, dict):
+                frac = float(acc_policy.get("min_examples_fraction", 0.0) or 0.0)
+                avail_ex_value = _coerce_finite_float(
+                    dataset_capacity.get("examples_available")
+                )
+                if avail_ex_value is not None and frac > 0.0:
+                    eff_min_examples = max(
+                        eff_min_examples,
+                        int(math.ceil(avail_ex_value * frac)),
+                    )
+        except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
+            pass
+        meets_n = int(n_fin_value) >= eff_min_examples
+        if tiny_relax:
+            meets_n = True
+    elif "n_final" in primary_metric:
+        meets_n = False
+
+    flags["primary_metric_acceptable"] = bool(meets_delta and meets_n)
+    try:
+        if delta_value is not None and delta_value < delta_min_pp and meets_delta:
+            flags["hysteresis_applied"] = True
+    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
+        pass
+
+
+def _apply_ppl_primary_metric_reconcile(
+    flags: dict[str, bool],
+    *,
+    primary_metric: dict[str, Any] | None,
+    ratio_limit: float,
+    hysteresis_ratio: float,
+    tokens_ok_eff: bool,
+) -> None:
+    try:
+        if not (isinstance(primary_metric, dict) and primary_metric):
+            return
+        kind2 = str(primary_metric.get("kind", "")).lower()
+        if kind2 not in {"ppl_causal", "ppl_mlm", "ppl_seq2seq"}:
+            return
+        pmr_value = _coerce_finite_float(primary_metric.get("ratio_vs_baseline"))
+        if (
+            pmr_value is not None
+            and pmr_value <= (ratio_limit + max(0.0, hysteresis_ratio))
+            and bool(tokens_ok_eff)
+        ):
+            flags["primary_metric_acceptable"] = True
+    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
+        pass
+
+
+def _apply_optional_observability_flags(
+    flags: dict[str, bool],
+    *,
+    moe: dict[str, Any] | None,
+    pm_tail: dict[str, Any] | None,
+) -> None:
+    try:
+        if isinstance(moe, dict) and moe:
+            flags["moe_observed"] = True
+            flags["moe_identity_ok"] = True
+    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
+        pass
+    try:
+        tail_ok = True
+        if isinstance(pm_tail, dict) and pm_tail:
+            mode = str(pm_tail.get("mode", "warn") or "warn").strip().lower()
+            evaluated = bool(pm_tail.get("evaluated", False))
+            passed = bool(pm_tail.get("passed", True))
+            if mode == "fail" and evaluated and (not passed):
+                tail_ok = False
+        flags["primary_metric_tail_acceptable"] = bool(tail_ok)
+    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
+        flags["primary_metric_tail_acceptable"] = False
+
+
 def compute_validation_flags(
     ppl: dict[str, Any],
     spectral: dict[str, Any],
@@ -108,29 +381,16 @@ def compute_validation_flags(
     ratio_limit = (
         ratio_max_bound if ratio_max_bound is not None else float(ratio_limit_base)
     )
-    target_ratio_value = _coerce_finite_float(target_ratio)
-    if target_ratio_value is not None and target_ratio_value > 0:
-        ratio_limit = min(ratio_limit, target_ratio_value)
+    # target_pm_ratio is an auto-tuning objective, not a report acceptance gate.
+    # Keep gate evaluation anchored to the resolved tier / explicit acceptance range.
 
     # Canonical Gates
     # 1. Drift gate: by default 0.95 ≤ final/preview ≤ 1.05 (configurable)
     drift_ratio = _coerce_finite_float(ppl.get("preview_final_ratio", 1.0))
-    drift_min, drift_max = pm_drift_band_default
-    if isinstance(pm_drift_band, dict):
-        try:
-            cand_min = pm_drift_band.get("min")
-            cand_max = pm_drift_band.get("max")
-            cand_min_f = _coerce_finite_float(cand_min)
-            cand_max_f = _coerce_finite_float(cand_max)
-            if (
-                cand_min_f is not None
-                and cand_max_f is not None
-                and 0 < cand_min_f < cand_max_f
-            ):
-                drift_min = cand_min_f
-                drift_max = cand_max_f
-        except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
-            pass
+    drift_min, drift_max = _resolve_drift_bounds(
+        pm_drift_band,
+        default=pm_drift_band_default,
+    )
     preview_final_drift_acceptable = (
         drift_ratio is not None and drift_min <= drift_ratio <= drift_max
     )
@@ -156,71 +416,12 @@ def compute_validation_flags(
     hysteresis_ratio = float(pm_policy.get("hysteresis_ratio", 0.0))
     min_tokens = int(pm_policy.get("min_tokens", 0))
     # Evaluate sample-size sufficiency
-    tokens_ok = True
-    if isinstance(_ppl_metrics, dict):
-        pt = _ppl_metrics.get("preview_total_tokens")
-        ft = _ppl_metrics.get("final_total_tokens")
-        pt_value = _coerce_finite_float(pt)
-        ft_value = _coerce_finite_float(ft)
-        if pt_value is not None and ft_value is not None and min_tokens > 0:
-            try:
-                total_tokens = int(pt_value) + int(ft_value)
-                # Dataset-scale aware floors: use fraction of available tokens when provided
-                eff_min_tokens = max(0, int(min_tokens))
-                try:
-                    if isinstance(dataset_capacity, dict):
-                        frac = float(pm_policy.get("min_token_fraction", 0.0) or 0.0)
-                        avail_tokens = dataset_capacity.get("tokens_available")
-                        avail_tokens_value = _coerce_finite_float(avail_tokens)
-                        if avail_tokens_value is not None and frac > 0.0:
-                            eff_min_tokens = max(
-                                eff_min_tokens,
-                                int(math.ceil(avail_tokens_value * frac)),
-                            )
-                except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
-                    pass
-                tokens_ok = total_tokens >= eff_min_tokens
-                if not tokens_ok:
-                    coverage_ok = False
-                    try:
-                        coverage = _ppl_metrics.get("bootstrap", {}).get("coverage")
-                        if isinstance(coverage, dict):
-                            prev_cov = coverage.get("preview")
-                            fin_cov = coverage.get("final")
-                            if isinstance(prev_cov, dict) and isinstance(fin_cov, dict):
-                                prev_used = prev_cov.get("used")
-                                prev_req = prev_cov.get("required")
-                                fin_used = fin_cov.get("used")
-                                fin_req = fin_cov.get("required")
-                                prev_ok = bool(prev_cov.get("ok")) or (
-                                    _is_non_bool_finite_number(prev_used)
-                                    and _is_non_bool_finite_number(prev_req)
-                                    and float(prev_used) >= float(prev_req)
-                                )
-                                fin_ok = bool(fin_cov.get("ok")) or (
-                                    _is_non_bool_finite_number(fin_used)
-                                    and _is_non_bool_finite_number(fin_req)
-                                    and float(fin_used) >= float(fin_req)
-                                )
-                                coverage_ok = prev_ok and fin_ok
-                    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
-                        coverage_ok = False
-
-                    if coverage_ok:
-                        try:
-                            tolerance_ratio = float(
-                                pm_policy.get("min_tokens_tolerance", 0.02) or 0.0
-                            )
-                        except _NON_FATAL_EXCEPTIONS:
-                            tolerance_ratio = 0.0
-                        if tolerance_ratio < 0.0:
-                            tolerance_ratio = 0.0
-                        relaxed_floor = int(
-                            math.floor(float(eff_min_tokens) * (1.0 - tolerance_ratio))
-                        )
-                        tokens_ok = total_tokens >= max(relaxed_floor, 0)
-            except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
-                tokens_ok = True
+    tokens_ok = _resolve_tokens_ok(
+        _ppl_metrics,
+        min_tokens=min_tokens,
+        pm_policy=pm_policy,
+        dataset_capacity=dataset_capacity,
+    )
     # Under tiny_relax, treat token floors as informational only
     tokens_ok_eff = tokens_ok or tiny_relax
     # Apply hysteresis to ratio limit if needed
@@ -256,40 +457,15 @@ def compute_validation_flags(
     # 3. RMT ε-rule compliance
     rmt_stable = rmt.get("stable", True)
 
-    summary = spectral.get("summary", {}) if isinstance(spectral, dict) else {}
-    max_caps = spectral.get("max_caps") or summary.get("max_caps")
-    if max_caps is None:
-        default_spectral = (
-            tier_policy.get("spectral", {}) if isinstance(tier_policy, dict) else {}
-        )
-        max_caps = default_spectral.get("max_caps", 5)
-    spectral_stable = spectral.get("caps_applied", 0) <= int(max_caps)
-    if spectral.get("caps_exceeded"):
-        spectral_stable = False
-
-    guard_overhead_pass = True
-    if isinstance(guard_overhead, dict) and guard_overhead:
-        if "passed" in guard_overhead:
-            guard_overhead_pass = bool(guard_overhead.get("passed"))
-            if tiny_relax and (
-                not bool(guard_overhead.get("evaluated", True))
-                or _guard_overhead_has_error_diagnostic(guard_overhead)
-            ):
-                guard_overhead_pass = True
-        else:
-            ratio = guard_overhead.get("overhead_ratio")
-            threshold = guard_overhead.get("overhead_threshold", 0.01)
-            ratio_val = _coerce_finite_float(ratio)
-            threshold_val = _coerce_finite_float(threshold)
-            if threshold_val is None:
-                threshold_val = 0.01
-            if tiny_relax and threshold_val < 0.10:
-                threshold_val = 0.10
-            if ratio_val is None:
-                # In dev/Compare-&-Evaluate flows we often lack a bare run; treat missing metric as pass
-                guard_overhead_pass = True
-            else:
-                guard_overhead_pass = ratio_val <= (1.0 + max(0.0, threshold_val))
+    effective_tier_policy = tier_policy if isinstance(tier_policy, dict) else {}
+    spectral_stable = _resolve_spectral_stable(
+        spectral,
+        tier_policy=effective_tier_policy,
+    )
+    guard_overhead_pass = _resolve_guard_overhead_pass(
+        guard_overhead,
+        tiny_relax=tiny_relax,
+    )
 
     flags = {
         "preview_final_drift_acceptable": preview_final_drift_acceptable,
@@ -312,113 +488,27 @@ def compute_validation_flags(
 
     # Optional primary metric gating (metric-v1)
     try:
-        if isinstance(primary_metric, dict) and primary_metric:
-            kind = str(primary_metric.get("kind", "")).lower()
-            if kind in {"ppl_causal", "ppl_mlm", "ppl_seq2seq"}:
-                # Apply the same hysteresis and sample-size floors as primary_metric_acceptable
-                pm_ratio = primary_metric.get("ratio_vs_baseline")
-                pm_ratio_value = _coerce_finite_float(pm_ratio)
-                if pm_ratio_value is not None:
-                    ok = (pm_ratio_value <= ratio_limit_with_hyst) and bool(
-                        tokens_ok_eff
-                    )
-                else:
-                    # Fall back to compression_acceptable when PM ratio is unavailable
-                    ok = bool(compression_acceptable)
-                flags["primary_metric_acceptable"] = bool(ok)
-            elif kind in {"accuracy", "vqa_accuracy"}:
-                # Read thresholds from tier policy if available
-                acc_policy = (
-                    metrics_policy.get("accuracy", {})
-                    if isinstance(metrics_policy, dict)
-                    else {}
-                )
-                delta_min_pp = float(acc_policy.get("delta_min_pp", -1.0))
-                min_examples = int(acc_policy.get("min_examples", 200))
-                hysteresis_pp = float(acc_policy.get("hysteresis_delta_pp", 0.0))
-                delta = primary_metric.get("ratio_vs_baseline")
-                delta_value = _coerce_finite_float(delta)
-                meets_delta = delta_value is not None and (
-                    delta_value >= (delta_min_pp - max(0.0, hysteresis_pp))
-                )
-                if tiny_relax and delta_value is None:
-                    meets_delta = True
-                n_fin = primary_metric.get("n_final")
-                meets_n = True
-                n_fin_value = _coerce_finite_float(n_fin)
-                if n_fin_value is not None:
-                    # Dataset-scale aware min_examples when available
-                    eff_min_examples = int(min_examples)
-                    try:
-                        if isinstance(dataset_capacity, dict):
-                            frac = float(
-                                acc_policy.get("min_examples_fraction", 0.0) or 0.0
-                            )
-                            avail_ex = dataset_capacity.get("examples_available")
-                            avail_ex_value = _coerce_finite_float(avail_ex)
-                            if avail_ex_value is not None and frac > 0.0:
-                                eff_min_examples = max(
-                                    eff_min_examples,
-                                    int(math.ceil(avail_ex_value * frac)),
-                                )
-                    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
-                        pass
-                    meets_n = int(n_fin_value) >= eff_min_examples
-                    if tiny_relax:
-                        # In tiny demos accept smaller sample sizes
-                        meets_n = True
-                elif "n_final" in primary_metric:
-                    meets_n = False
-                flags["primary_metric_acceptable"] = bool(meets_delta and meets_n)
-                try:
-                    if (
-                        delta_value is not None
-                        and delta_value < delta_min_pp
-                        and meets_delta
-                    ):
-                        flags["hysteresis_applied"] = True
-                except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
-                    pass
+        _apply_metric_specific_primary_metric_gate(
+            flags,
+            primary_metric=primary_metric,
+            metrics_policy=metrics_policy,
+            ratio_limit_with_hyst=ratio_limit_with_hyst,
+            tokens_ok_eff=tokens_ok_eff,
+            compression_acceptable=compression_acceptable,
+            tiny_relax=tiny_relax,
+            dataset_capacity=dataset_capacity,
+        )
     except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
         # Fail-closed to False if something goes wrong
         flags["primary_metric_acceptable"] = False
 
-    # Reconcile: if ppl-like primary_metric ratio is present and within hysteresis-adjusted
-    # limit, prefer that decision to avoid spurious FAILs from upstream fallbacks.
-    try:
-        if isinstance(primary_metric, dict) and primary_metric:
-            kind2 = str(primary_metric.get("kind", "")).lower()
-            if kind2 in {"ppl_causal", "ppl_mlm", "ppl_seq2seq"}:
-                pmr = primary_metric.get("ratio_vs_baseline")
-                pmr_value = _coerce_finite_float(pmr)
-                if (
-                    pmr_value is not None
-                    and pmr_value <= (ratio_limit + max(0.0, hysteresis_ratio))
-                    and bool(tokens_ok_eff)
-                ):
-                    flags["primary_metric_acceptable"] = True
-    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        pass
-
-    # MoE observability flags (non-gating)
-    try:
-        if isinstance(moe, dict) and moe:
-            flags["moe_observed"] = True
-            flags["moe_identity_ok"] = True
-    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        pass
-
-    # Primary metric tail gate (warn/fail; default non-blocking)
-    try:
-        tail_ok = True
-        if isinstance(pm_tail, dict) and pm_tail:
-            mode = str(pm_tail.get("mode", "warn") or "warn").strip().lower()
-            evaluated = bool(pm_tail.get("evaluated", False))
-            passed = bool(pm_tail.get("passed", True))
-            if mode == "fail" and evaluated and (not passed):
-                tail_ok = False
-        flags["primary_metric_tail_acceptable"] = bool(tail_ok)
-    except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
-        flags["primary_metric_tail_acceptable"] = False
+    _apply_ppl_primary_metric_reconcile(
+        flags,
+        primary_metric=primary_metric,
+        ratio_limit=ratio_limit,
+        hysteresis_ratio=hysteresis_ratio,
+        tokens_ok_eff=tokens_ok_eff,
+    )
+    _apply_optional_observability_flags(flags, moe=moe, pm_tail=pm_tail)
 
     return flags

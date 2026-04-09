@@ -281,3 +281,72 @@ def test_eval_phase_debug_trace_handles_non_indexable_iterable(monkeypatch) -> N
         config=cfg,
     )
     assert metrics["primary_metric"]["final"] == 1.0
+
+
+def test_eval_phase_debug_trace_handles_broken_shape_probes(monkeypatch) -> None:
+    runner = CoreRunner()
+    model = _DummyModel()
+    adapter = _DummyAdapter()
+    report = RunReport()
+    cfg = RunConfig(context={})
+    events: list[dict[str, Any]] = []
+
+    class _BadLabels(list):
+        def __iter__(self):
+            raise RuntimeError("labels boom")
+
+    class _BrokenIndexable:
+        def __len__(self) -> int:
+            raise RuntimeError("len boom")
+
+        def __getitem__(self, _idx: int) -> dict[str, Any]:
+            return {"input_ids": [1, 2], "labels": _BadLabels([-100, 5])}
+
+    monkeypatch.setenv("INVARLOCK_DEBUG_TRACE", "1")
+    monkeypatch.setattr(
+        CoreRunner,
+        "_compute_real_metrics",
+        staticmethod(
+            lambda *_a, **_k: (
+                {
+                    "primary_metric": {
+                        "kind": "ppl_causal",
+                        "preview": 1.0,
+                        "final": 1.0,
+                    }
+                },
+                {"preview": {}, "final": {}},
+            )
+        ),
+    )
+
+    def _capture_event(_self, category, event, level, payload=None):
+        events.append(
+            {
+                "category": category,
+                "event": event,
+                "level": level,
+                "payload": payload,
+            }
+        )
+
+    monkeypatch.setattr(CoreRunner, "_log_event", _capture_event, raising=False)
+
+    metrics = runner._eval_phase(
+        model,
+        adapter,
+        calibration_data=_BrokenIndexable(),
+        report=report,
+        preview_n=None,
+        final_n=None,
+        config=cfg,
+    )
+
+    assert metrics["primary_metric"]["final"] == 1.0
+    snapshot = next(
+        item["payload"]
+        for item in events
+        if item["category"] == "eval" and item["event"] == "calibration_snapshot"
+    )
+    assert snapshot["length_hint"] is None
+    assert snapshot["first_batch_masked"] is None

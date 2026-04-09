@@ -21,6 +21,11 @@ The `evaluate` examples below use the secure-default runtime container. Add
 `--assurance trusted-local` only for trusted local workflows that intentionally bypass that
 boundary.
 
+Most preset files intentionally keep small YAML `preview_n` / `final_n` values
+so they remain fast and portable for repo smokes. For balanced-tier evaluations
+that are expected to clear the normal token-floor gates, keep the preset and
+run it with `--profile ci` or `--profile release`.
+
 ## Presets (Runnable)
 
 ### Causal LM (decoder-only)
@@ -88,7 +93,7 @@ Profiles control window counts and bootstrap depth:
 
 | Profile | Windows | Bootstrap | Use Case |
 | --- | --- | --- | --- |
-| `ci` | 200/200 | 1200 | Standard CI evaluation |
+| `ci` | 240/240 | 1200 | Standard CI evaluation |
 | `release` | 400/400 | 3200 | Production releases |
 | `ci_cpu` | 120/120 | 1200 | CPU-only environments |
 

@@ -79,6 +79,29 @@ def _provider_simple():
     )
 
 
+def _runner_success():
+    return SimpleNamespace(
+        execute=lambda **k: SimpleNamespace(
+            edit={},
+            metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},
+            guards={},
+            context={"dataset_meta": {}},
+            status="success",
+        )
+    )
+
+
+def _is_bare_control(kwargs: dict[str, object]) -> bool:
+    cfg = kwargs.get("config")
+    context = getattr(cfg, "context", None)
+    if not isinstance(context, dict):
+        return False
+    validation = context.get("validation")
+    return (
+        isinstance(validation, dict) and validation.get("guard_overhead_mode") == "bare"
+    )
+
+
 def test_cleanup_rmtree_exception_is_swallowed(tmp_path: Path, monkeypatch):
     cfg = _base_cfg(tmp_path)
 
@@ -160,6 +183,7 @@ def test_cleanup_rmtree_exception_is_swallowed(tmp_path: Path, monkeypatch):
                 side_effect=RuntimeError("boom"),
             )
         )
+        stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner_success))
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
 
 
@@ -176,7 +200,7 @@ def test_overhead_display_fallbacks(tmp_path: Path, percent, ratio, expect_na):
 
     class Runner:
         def execute(self, **kwargs):
-            if kwargs.get("guards") == []:
+            if _is_bare_control(kwargs):
                 return SimpleNamespace(
                     edit={},
                     metrics={"ppl_final": 1.0},
@@ -513,7 +537,7 @@ def test_guard_overhead_failure_exits(tmp_path: Path):
 
         def execute(self, **kwargs):
             self.calls += 1
-            if kwargs.get("guards") == []:
+            if _is_bare_control(kwargs):
                 # Bare run with ppl_final present
                 return SimpleNamespace(
                     edit={},
@@ -573,7 +597,7 @@ def test_overhead_threshold_bad_type_uses_default(tmp_path: Path):
 
     class Runner:
         def execute(self, **kwargs):
-            if kwargs.get("guards") == []:
+            if _is_bare_control(kwargs):
                 return SimpleNamespace(
                     edit={},
                     metrics={"ppl_final": 1.0},
@@ -767,6 +791,7 @@ def test_psutil_virtual_memory_failure(tmp_path: Path):
                 "invarlock.eval.data.get_provider", lambda *a, **k: _provider_simple()
             )
         )
+        stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner_success))
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))
 
 

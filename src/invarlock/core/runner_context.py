@@ -5,6 +5,15 @@ from typing import Any
 
 from .api import RunConfig
 
+_CUDA_FLAG_ERRORS = (
+    AttributeError,
+    ImportError,
+    ModuleNotFoundError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 _BOOL_TRUE = {"1", "true", "yes", "on"}
 _BOOL_FALSE = {"0", "false", "no", "off"}
 
@@ -48,7 +57,7 @@ def collect_cuda_flags() -> dict[str, Any]:
             matmul = torch.backends.cuda.matmul
             if hasattr(matmul, "allow_tf32"):
                 flags["cuda_matmul_allow_tf32"] = bool(matmul.allow_tf32)
-    except Exception:  # pragma: no cover - fallback when torch missing
+    except _CUDA_FLAG_ERRORS:  # pragma: no cover - fallback when torch missing
         pass
 
     workspace = os.environ.get("CUBLAS_WORKSPACE_CONFIG")

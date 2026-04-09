@@ -196,6 +196,31 @@ def test_apply_profile_ci_and_release():
     assert rel.require_section("eval")["bootstrap"]["replicates"] >= 3200
 
 
+def test_apply_profile_preserves_explicit_primary_metric_policy():
+    cfg = InvarLockConfig.from_sections(
+        model={"id": "gpt2", "adapter": "hf_causal"},
+        edit={"name": "noop", "plan": {}},
+        primary_metric={
+            "drift_band": {"min": 0.9, "max": 1.2},
+            "acceptance_range": {"min": 0.92, "max": 1.18},
+        },
+    )
+
+    ci = apply_profile(cfg, "ci")
+
+    assert ci.require_section("primary_metric")["drift_band"] == {
+        "min": 0.9,
+        "max": 1.2,
+    }
+    assert ci.require_section("primary_metric")["acceptance_range"] == {
+        "min": 0.92,
+        "max": 1.18,
+    }
+    assert ci.require_section("primary_metric")["overhead_threshold"] == pytest.approx(
+        0.01
+    )
+
+
 def test_load_config_include_missing_file(tmp_path: Path):
     cfg_path = tmp_path / "cfg.yaml"
     cfg_path.write_text(

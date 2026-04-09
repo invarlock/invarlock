@@ -49,8 +49,6 @@ def power_iter_sigma_max(
         return 0.0
 
     W = _as_matrix(matrix.detach())
-    if W.numel() == 0 or W.shape[0] == 0 or W.shape[1] == 0:
-        return 0.0
 
     device = W.device
     dtype = W.dtype
@@ -99,7 +97,7 @@ def row_col_norm_extrema(
 ) -> dict[str, float]:
     """Compute min/median/max of row/col L2 norms with float32 accumulation."""
     W = _as_matrix(matrix.detach())
-    if W.numel() == 0 or W.shape[0] == 0 or W.shape[1] == 0:
+    if W.numel() == 0:
         return {
             "row_min": 0.0,
             "row_median": 0.0,
@@ -122,8 +120,6 @@ def row_col_norm_extrema(
 
         def _median(sorted_vec: torch.Tensor) -> float:
             n = int(sorted_vec.numel())
-            if n <= 0:
-                return 0.0
             mid = n // 2
             if n % 2 == 1:
                 return float(sorted_vec[mid].item())

@@ -24,6 +24,11 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+_MARKDOWN_READ_ERRORS = (OSError, UnicodeDecodeError)
+_CLI_LOAD_ERRORS = (AttributeError, ImportError, RuntimeError, TypeError, ValueError)
+_CTX_CLOSE_ERRORS = (AttributeError, RuntimeError)
+_RELATIVE_PATH_ERRORS = (OSError, ValueError)
+
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
@@ -89,7 +94,7 @@ def extract_examples(paths: list[Path]) -> list[Example]:
     for path in paths:
         try:
             lines = path.read_text(encoding="utf-8").splitlines()
-        except Exception:
+        except _MARKDOWN_READ_ERRORS:
             continue
 
         in_fence = False
@@ -184,12 +189,12 @@ def _parse_cli_args(args: list[str]) -> str | None:
 
     from invarlock.cli.app import app as typer_app
 
-    click_cmd = click.CommandCollection(sources=[])  # type: ignore[assignment]
+    click_cmd: click.Command = click.CommandCollection(sources=[])
     try:
         import typer
 
-        click_cmd = typer.main.get_command(typer_app)  # type: ignore[assignment]
-    except Exception as exc:  # noqa: BLE001
+        click_cmd = typer.main.get_command(typer_app)
+    except _CLI_LOAD_ERRORS as exc:
         return f"Failed to load CLI command tree: {exc}"
 
     # Click help/completion options are eager and will raise click.Exit during parsing.
@@ -234,13 +239,13 @@ def _parse_cli_args(args: list[str]) -> str | None:
                 parent = ctx
         except click.ClickException as exc:
             return str(exc)
-        except Exception as exc:  # noqa: BLE001
+        except _CLI_LOAD_ERRORS as exc:
             return f"{type(exc).__name__}: {exc}"
         finally:
             for ctx in reversed(ctx_stack):
                 try:
                     ctx.close()
-                except Exception:
+                except _CTX_CLOSE_ERRORS:
                     pass
     return None
 
@@ -262,7 +267,7 @@ def _iter_markdown_files(repo_root: Path, *, paths: list[str] | None) -> list[Pa
     def _allowed(path: Path) -> bool:
         try:
             rel_parts = path.resolve().relative_to(repo_root.resolve()).parts
-        except Exception:
+        except _RELATIVE_PATH_ERRORS:
             # Explicit external file/dir paths are allowed (used by tests and
             # local validation). Excludes apply only within the repo.
             return True

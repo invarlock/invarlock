@@ -170,6 +170,7 @@ def build_provenance_block(
     compute_report_digest_fn: Any,
     collect_backend_versions_fn: Any,
     compute_edit_digest_fn: Any,
+    env_flags_payload: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Assemble report provenance with policy/baseline/edit/run context."""
 
@@ -178,6 +179,11 @@ def build_provenance_block(
     ) or {}
     baseline_report_hash = compute_report_digest_fn(baseline_raw)
     edited_report_hash = compute_report_digest_fn(report)
+    selected_env_flags = (
+        dict(env_flags_payload)
+        if isinstance(env_flags_payload, dict) and env_flags_payload
+        else collect_backend_versions_fn()
+    )
 
     provenance: dict[str, Any] = {
         "policy": dict(policy_provenance),
@@ -192,7 +198,7 @@ def build_provenance_block(
             "report_hash": edited_report_hash,
             "report_path": artifacts_payload.get("report_path"),
         },
-        "env_flags": collect_backend_versions_fn(),
+        "env_flags": selected_env_flags,
     }
 
     report_map = report if isinstance(report, dict) else {}

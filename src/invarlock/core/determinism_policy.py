@@ -180,8 +180,7 @@ def apply_determinism_preset(
                 level = "tolerance"
                 notes.append("deterministic_algorithms_unavailable")
                 try:
-                    if hasattr(torch, "use_deterministic_algorithms"):
-                        torch.use_deterministic_algorithms(True, warn_only=True)
+                    torch.use_deterministic_algorithms(True, warn_only=True)
                 except _TORCH_POLICY_ERRORS:
                     pass
 
@@ -229,9 +228,6 @@ def apply_determinism_preset(
             except _TORCH_POLICY_ERRORS:
                 pass
 
-    # Normalized level is always one of these.
-    if level not in {"off", "strict", "tolerance"}:
-        level = "tolerance" if requested == "strict" else "off"
     strict_enforcement = "not_requested"
     if requested == "strict":
         strict_enforcement = "ok" if level == "strict" else "unsafe"

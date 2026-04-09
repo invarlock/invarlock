@@ -17,10 +17,11 @@ from invarlock.core.run_orchestrator import (
     RunLoadModelOnceEvent,
     RunRetryAttemptStartedEvent,
     RunRetryValidationErrorEvent,
+    RunSnapshotModeEvent,
     RunTelemetryFailedEvent,
 )
+from tests.cli._support_console import RecordingConsole
 from tests.cli.run._internal_cli import internal_run_app as cli
-from tests.cli.support import RecordingConsole
 
 
 def _cfg(tmp_path: Path, *, provider: str = "synthetic") -> str:
@@ -548,6 +549,10 @@ def test_run_execution_event_rendering_covers_split_owner_branches(monkeypatch) 
     )
     run_execution_output_mod.render_run_execution_event(
         console,
+        RunSnapshotModeEvent(enabled=True),
+    )
+    run_execution_output_mod.render_run_execution_event(
+        console,
         RunRetryAttemptStartedEvent(attempt=2, max_attempts=4),
     )
     run_execution_output_mod.render_run_execution_event(
@@ -631,6 +636,7 @@ def test_run_execution_event_rendering_covers_split_owner_branches(monkeypatch) 
     assert "telemetry summary" in output
     assert "plain diagnostic" in output
     assert "Loading model once: gpt2" in output
+    assert "Snapshot mode: enabled" in output
     assert "Retry attempt 2/4" in output
     assert "Telemetry export failed: disk full" in output
     assert "FAILED gates: pm, spectral" in output

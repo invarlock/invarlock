@@ -118,18 +118,14 @@ def build_run_context_payload(
         "run_id": run_id,
     }
     if tiny_relax_enabled:
-        run_section = run_context.setdefault("run", {})
-        if isinstance(run_section, dict):
-            run_section["tiny_relax"] = True
+        run_context["run"] = {"tiny_relax": True}
 
     baseline_eval = _baseline_eval_windows(baseline_report_data)
     if baseline_eval is not None:
         run_context["baseline_eval_windows"] = baseline_eval
 
-    primary_metric = run_context.setdefault("primary_metric", {})
-    if not isinstance(primary_metric, dict):
-        primary_metric = {}
-        run_context["primary_metric"] = primary_metric
+    primary_metric: dict[str, Any] = {}
+    run_context["primary_metric"] = primary_metric
     primary_metric["acceptance_range"] = pm_acceptance_range
     run_context["pm_acceptance_range"] = pm_acceptance_range
     if pm_drift_band:

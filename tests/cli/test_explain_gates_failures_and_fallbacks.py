@@ -7,7 +7,7 @@ import typer
 from typer.testing import CliRunner
 
 from invarlock.cli.app import app
-from tests.cli.support import RecordingConsole
+from tests.cli._support_console import RecordingConsole
 
 
 def test_explain_gates_tokens_below_floor_and_drift_fail(monkeypatch, tmp_path):
@@ -18,7 +18,7 @@ def test_explain_gates_tokens_below_floor_and_drift_fail(monkeypatch, tmp_path):
 
     from invarlock.cli.commands import explain_gates as mod
 
-    def _fake_cert(_report, _baseline):  # type: ignore[no-untyped-def]
+    def _fake_cert(_report, _baseline):
         return {
             "auto": {"tier": "balanced"},
             "validation": {
@@ -79,7 +79,7 @@ def test_explain_gates_handles_failures_and_threshold_edges(monkeypatch, tmp_pat
                 raise ValueError("boom")
             return super().get(key, default)
 
-    def fake_cert(_report, _baseline):  # type: ignore[no-untyped-def]
+    def fake_cert(_report, _baseline):
         return {
             "auto": {"tier": "balanced"},
             "validation": {

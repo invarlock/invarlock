@@ -104,6 +104,17 @@ def _provider_simple():
     )
 
 
+def _is_bare_control(kwargs: dict[str, object]) -> bool:
+    cfg = kwargs.get("config")
+    context = getattr(cfg, "context", None)
+    if not isinstance(context, dict):
+        return False
+    validation = context.get("validation")
+    return (
+        isinstance(validation, dict) and validation.get("guard_overhead_mode") == "bare"
+    )
+
+
 @pytest.mark.parametrize("profile", ["ci", "release"])
 def test_parity_mismatch_evalwindow_exit(tmp_path: Path, profile: str):
     from invarlock.eval.data import EvaluationWindow
@@ -509,7 +520,7 @@ def test_overhead_bare_warning_present(tmp_path: Path):
 
     class Runner:
         def execute(self, **kwargs):
-            if kwargs.get("guards") == []:
+            if _is_bare_control(kwargs):
                 return SimpleNamespace(
                     edit={},
                     metrics={"ppl_preview": 1.0},
@@ -969,55 +980,3 @@ def test_edit_optional_fields_transfer(tmp_path: Path, opt_key: str):
             config=str(cfg), device="cpu", out=str(tmp_path / "runs"), until_pass=False
         )
     assert opt_key in captured["r"]["edit"]
-
-
-@pytest.mark.parametrize("indices_type", ["list", "tuple", "generator"])
-def test_provider_indices_various_types(tmp_path: Path, indices_type: str):
-    cfg = _cfg(tmp_path, 1, 1)
-
-    def _indices():
-        return (i for i in [0])
-
-    class Provider:
-        def windows(self, **kwargs):
-            if indices_type == "list":
-                idx = [0]
-            elif indices_type == "tuple":
-                idx = (0,)
-            else:
-                idx = _indices()
-            prev = SimpleNamespace(
-                input_ids=[[1, 2, 3]], attention_masks=[[1, 1, 1]], indices=idx
-            )
-            fin = SimpleNamespace(
-                input_ids=[[4, 5, 6]], attention_masks=[[1, 1, 1]], indices=idx
-            )
-            return prev, fin
-
-    with ExitStack() as stack:
-        for ctx in _common_ce():
-            stack.enter_context(ctx)
-        stack.enter_context(
-            patch("invarlock.eval.data.get_provider", lambda *a, **k: Provider())
-        )
-        stack.enter_context(
-            patch(
-                "invarlock.core.runner.CoreRunner",
-                lambda: SimpleNamespace(
-                    execute=lambda **k: SimpleNamespace(
-                        edit={},
-                        metrics={
-                            "ppl_preview": 1.0,
-                            "ppl_final": 1.0,
-                            "ppl_ratio": 1.0,
-                        },
-                        guards={},
-                        context={"dataset_meta": {}},
-                        status="success",
-                    )
-                ),
-            )
-        )
-        run_command(
-            config=str(cfg), device="cpu", out=str(tmp_path / "runs"), until_pass=False
-        )

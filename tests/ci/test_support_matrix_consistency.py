@@ -68,6 +68,7 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
         "GPT-2 causal LM",
         "BERT / RoBERTa MLM",
         "Mistral 7B causal LM",
+        "Ministral 3 causal LM (text-only eval)",
         "Qwen2 7B causal LM",
         "Qwen2.5 14B causal LM",
         "Qwen3 causal LM",
@@ -82,6 +83,10 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
     assert families["GPT-2 causal LM"]["support_tier"] == "published_basis"
     assert families["BERT / RoBERTa MLM"]["support_tier"] == "published_basis"
     assert families["Mistral 7B causal LM"]["support_tier"] != "published_basis"
+    assert (
+        families["Ministral 3 causal LM (text-only eval)"]["support_tier"]
+        == "supported_experimental"
+    )
     assert families["Qwen2 7B causal LM"]["support_tier"] != "published_basis"
     assert families["Qwen2.5 14B causal LM"]["support_tier"] == "supported_experimental"
     assert families["Qwen3 causal LM"]["support_tier"] == "supported_experimental"

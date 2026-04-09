@@ -218,6 +218,7 @@ def test_spectral_null_summary_halves_alpha_to_meet_target_rate() -> None:
 
 
 def test_variance_ve_helpers_cover_edge_cases() -> None:
+    assert variance_ve._extract_guard({"guards": "not-a-list"}, "variance") is None
     assert variance_ve._coerce_delta_ci((-0.1, 0.2)) == (-0.1, 0.2)
     assert variance_ve._coerce_delta_ci([0.1]) is None
     assert variance_ve._coerce_delta_ci(["a", "b"]) is None
@@ -260,6 +261,11 @@ def test_variance_ve_helpers_cover_edge_cases() -> None:
         [0.1, 0.1, 0.1], target_rate=0.4, safety_margin=0.0
     )
     assert thr1 == 0.1 and rate1 == 0.0
+
+    thr_invalid, rate_invalid = variance_ve._recommend_threshold_for_target_rate(
+        [0.2], target_rate=2.0, safety_margin=0.0
+    )
+    assert thr_invalid == 0.2 and rate_invalid == 0.0
 
     thr2, rate2 = variance_ve._recommend_threshold_for_target_rate(
         [0.2, 0.1, 0.0], target_rate=1.0 / 3.0, safety_margin=0.0
@@ -344,3 +350,33 @@ def test_variance_ve_summary_skips_missing_predictive_gate() -> None:
     ]
     summary = variance_ve.summarize_ve_sweep_reports(reports, tier="balanced")
     assert summary["n_runs"] == 1
+
+
+def test_variance_ve_summary_tolerates_invalid_margin_and_bad_mean_delta() -> None:
+    reports = [
+        {
+            "guards": [
+                {
+                    "name": "variance",
+                    "metrics": {
+                        "predictive_gate": {
+                            "evaluated": True,
+                            "mean_delta": "bad",
+                            "delta_ci": (-0.05, -0.01),
+                        }
+                    },
+                }
+            ]
+        }
+    ]
+
+    summary = variance_ve.summarize_ve_sweep_reports(
+        reports,
+        tier="balanced",
+        safety_margin=2.0,
+        predictive_one_sided=True,
+    )
+
+    assert summary["n_runs"] == 1
+    assert summary["observed"]["mean_ci_width"] == 0.04
+    assert summary["recommendations"]["min_effect_lognll"] == 0.0

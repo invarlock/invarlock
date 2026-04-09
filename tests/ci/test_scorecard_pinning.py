@@ -41,6 +41,7 @@ def test_clusterfuzz_wrapper_sets_contract_root_for_fuzzers() -> None:
 def test_clusterfuzz_pyinstaller_bundles_contracts_for_fuzzers() -> None:
     text = (Path.cwd() / ".clusterfuzzlite" / "build.sh").read_text(encoding="utf-8")
 
+    assert "--collect-data invarlock" in text
     assert '--add-data "$SRC/invarlock/contracts:contracts"' in text
 
 
@@ -71,9 +72,14 @@ def test_refresh_pinned_requirements_generates_runtime_and_clusterfuzz_locks() -
     ) in text
     assert (
         'compile_req_platform \\\n  "${WORKFLOW_DIR}/runtime-image.in" \\\n'
+        '  "${WORKFLOW_DIR}/runtime-image-py312-cu128.txt"'
+    ) in text
+    assert (
+        'compile_req_platform \\\n  "${WORKFLOW_DIR}/runtime-image.in" \\\n'
         '  "${WORKFLOW_DIR}/runtime-image-py312-aarch64.txt"'
     ) in text
     assert text.count("--torch-backend cpu") == 2
+    assert text.count("--torch-backend cu128") == 1
     assert (
         'compile_req_platform \\\n  "${WORKFLOW_DIR}/clusterfuzzlite.in" \\\n'
         '  "${WORKFLOW_DIR}/clusterfuzzlite-py311.txt"'

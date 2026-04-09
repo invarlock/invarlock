@@ -27,6 +27,10 @@ pip install "invarlock[hf]"
 # Repo checkout only: build the local runtime image once for attested runs
 make runtime-image
 
+# Podman users can prepare the same image explicitly with Podman
+make runtime-image-podman
+make runtime-smoke-podman
+
 invarlock doctor
 ```
 
@@ -41,6 +45,11 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --preset configs/presets/causal_lm/wikitext2_512.yaml \
   --report-out reports/eval
 ```
+
+Repo presets usually ship with small YAML window counts so the same files stay
+usable for local smokes. Keep using those presets, but pair them with
+`--profile ci` or `--profile release` when you need balanced-tier evaluations
+to meet the normal token-floor gates.
 
 `evaluate` uses the secure-default runtime container unless you explicitly pass
 `--assurance trusted-local` for a trusted host-side workflow. Attested runs emit
@@ -90,6 +99,8 @@ paired evaluation report.
 - For offline reads after warming caches, use `HF_DATASETS_OFFLINE=1`.
 - `--assurance trusted-local` is the explicit trusted-host bypass for `evaluate`.
 - `verify` expects `runtime.manifest.json` for attested evaluation outputs.
+- `--profile ci` currently expands causal-LM windows to `240/240`; `release`
+  expands them to `400/400`.
 
 ## Advanced And Demo Flows
 

@@ -5,6 +5,9 @@ import sys
 from pathlib import Path
 
 from invarlock.cli.config_execution import RuntimeDelegationError, run_from_config
+from invarlock.cli.runtime_launch_plan import (
+    build_current_process_container_launch_plan,
+)
 from invarlock.runtime_security import (
     apply_runtime_allowances,
     delegate_python_script_to_container,
@@ -51,7 +54,10 @@ def _delegate_if_needed(args: argparse.Namespace, argv: list[str]) -> int | None
     if running_inside_container() or host_execution_allowed():
         return None
     try:
-        return delegate_python_script_to_container(Path(__file__), argv=argv)
+        return delegate_python_script_to_container(
+            Path(__file__),
+            build_current_process_container_launch_plan(argv),
+        )
     except RuntimeError as exc:
         print(str(exc), file=sys.stderr)
         return 1

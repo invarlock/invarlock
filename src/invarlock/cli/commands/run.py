@@ -1,4 +1,4 @@
-"""Thin CLI shell for config-driven run execution."""
+"""Thin internal helper for config-driven run execution."""
 
 from __future__ import annotations
 

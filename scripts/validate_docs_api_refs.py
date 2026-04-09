@@ -84,7 +84,7 @@ def iter_refs(paths: Iterable[Path]) -> list[Ref]:
     for path in paths:
         try:
             lines = path.read_text(encoding="utf-8").splitlines()
-        except Exception:
+        except OSError:
             continue
         for i, line in enumerate(lines, start=1):
             for m in REF_PATTERN.finditer(line):
@@ -133,7 +133,14 @@ def resolve_ref(symbol: str) -> tuple[bool, str | None]:
                 break
             # Otherwise, keep searching shorter prefixes (might still resolve).
             continue
-        except Exception:
+        except (
+            ImportError,
+            AttributeError,
+            OSError,
+            RuntimeError,
+            SyntaxError,
+            ValueError,
+        ):
             # Any other import-time error is treated as optional/may depend on
             # local environment; do not fail docs validation on it.
             optional_dep_missing = True

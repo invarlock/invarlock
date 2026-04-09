@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Mapping, MutableMapping
 from typing import Any
 
+_CONFIG_ATTR_ERRORS = (AttributeError, RuntimeError, TypeError, ValueError)
+
 
 def fix_layer_drop_config(
     config: Any,
@@ -23,7 +25,7 @@ def fix_layer_drop_config(
         if hasattr(config, key):
             try:
                 setattr(config, key, int(kept_layers))
-            except Exception:
+            except _CONFIG_ATTR_ERRORS:
                 continue
 
     # Some architectures (e.g., Qwen2) store per-layer config lists such as
@@ -31,7 +33,7 @@ def fix_layer_drop_config(
     # truncated to match the new `num_hidden_layers` or model loading fails.
     try:
         items = list(vars(config).items())
-    except Exception:
+    except TypeError:
         items = []
 
     for name, value in items:
@@ -43,7 +45,7 @@ def fix_layer_drop_config(
             continue
         try:
             setattr(config, name, value[:kept_layers])
-        except Exception:
+        except _CONFIG_ATTR_ERRORS:
             continue
 
     if baseline_config is None:
@@ -60,7 +62,7 @@ def fix_layer_drop_config(
         if isinstance(sliding_window, int) and sliding_window > 0:
             try:
                 config.sliding_window = sliding_window
-            except Exception:
+            except _CONFIG_ATTR_ERRORS:
                 pass
 
 
@@ -80,7 +82,7 @@ def fix_layer_drop_config_json(
         if key in config:
             try:
                 config[key] = int(kept_layers)
-            except Exception:
+            except (TypeError, ValueError, OverflowError):
                 pass
 
     for name, value in list(config.items()):

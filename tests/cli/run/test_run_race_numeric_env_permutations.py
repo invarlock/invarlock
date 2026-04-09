@@ -4,6 +4,7 @@ import math
 from contextlib import ExitStack
 from itertools import permutations
 from pathlib import Path
+from shutil import rmtree
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -133,6 +134,18 @@ def _common_ce_detect_ce():
     )
 
 
+def _runner_success():
+    return SimpleNamespace(
+        execute=lambda **k: SimpleNamespace(
+            edit={},
+            metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},
+            guards={},
+            context={"dataset_meta": {}},
+            status="success",
+        )
+    )
+
+
 def test_output_dir_deleted_before_save_report(tmp_path: Path):
     # Simulate run_dir deleted just before saving report -> triggers final exception path
     cfg = _base_cfg(tmp_path)
@@ -142,12 +155,7 @@ def test_output_dir_deleted_before_save_report(tmp_path: Path):
         # Delete the run_dir right before attempting to return paths
         if not called["once"]:
             called["once"] = True
-            try:
-                from shutil import rmtree
-
-                rmtree(run_dir, ignore_errors=True)
-            except Exception:
-                pass
+            rmtree(run_dir, ignore_errors=True)
         raise FileNotFoundError("run_dir vanished")
 
     with ExitStack() as stack:
@@ -420,6 +428,7 @@ def test_env_var_poisoning_for_tmpdir_and_debug(tmp_path: Path, monkeypatch):
                 lambda: SimpleNamespace(available=200 * 1024 * 1024),
             )
         )
+        stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner_success))
         stack.enter_context(
             patch(
                 "invarlock.cli.run_runtime_exec.shutil.disk_usage",

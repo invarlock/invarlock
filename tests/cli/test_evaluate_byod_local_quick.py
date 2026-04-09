@@ -63,7 +63,11 @@ def _stub_runtime(monkeypatch, tmp_path: Path):
     # Minimal registry that avoids loading real models/edits/guards
     class DummyRegistry:
         def get_adapter(self, name):
-            return SimpleNamespace(name=name, load_model=lambda *a, **k: object())
+            return SimpleNamespace(
+                name=name,
+                load_model=lambda *a, **k: object(),
+                describe=lambda _model: {"n_layer": 1, "total_params": 1024},
+            )
 
         def get_edit(self, name):
             return SimpleNamespace(name=name)

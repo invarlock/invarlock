@@ -32,3 +32,8 @@ def test_resolve_pm_drift_band_from_report_paths(monkeypatch):
     }
     out6 = policy.resolve_pm_drift_band_from_report(nonfinite)
     assert out6 == {"min": 0.95, "max": 1.2}
+
+    meta_fallback = policy.resolve_pm_drift_band_from_report(
+        {"meta": {"pm_drift_band": {"min": 0.9, "max": 1.2}}}
+    )
+    assert meta_fallback == {"min": 0.9, "max": 1.2}

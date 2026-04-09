@@ -9,6 +9,7 @@ import pytest
 from invarlock.eval.providers.vision_text import (
     VisionTextProvider,
     _normalize_answers,
+    _resolve_image_path,
 )
 
 
@@ -238,3 +239,15 @@ def test_vision_text_provider_manifest_validation_errors(tmp_path: Path) -> None
     empty_manifest.write_text('\n"ignore"\n', encoding="utf-8")
     with pytest.raises(Exception, match="produced no samples"):
         VisionTextProvider(path=str(empty_manifest)).examples()
+
+
+def test_vision_text_provider_resolve_path_accepts_absolute_and_items_short_circuit(
+    tmp_path: Path,
+) -> None:
+    image_path = tmp_path / "absolute.ppm"
+    image_path.write_text("P3\n1 1\n255\n0 0 0\n", encoding="utf-8")
+
+    assert _resolve_image_path(str(image_path), base_dir=tmp_path) == image_path
+
+    provider = VisionTextProvider(items=[{"prompt": "What?", "answer": "cat"}])
+    assert provider._resolve_files() == []

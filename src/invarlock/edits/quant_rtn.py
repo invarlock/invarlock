@@ -31,6 +31,7 @@ from invarlock.core.api import (
     ModelAdapter,
     ModelEdit,
 )
+from invarlock.core.exceptions import EditError
 
 __all__ = ["RTNQuantEdit"]
 
@@ -45,6 +46,47 @@ class RTNQuantEdit(ModelEdit):
     """
 
     name = "quant_rtn"
+
+    @staticmethod
+    def _normalize_per_channel_option(value: Any, *, default: bool = True) -> bool:
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"1", "true", "yes", "on"}:
+                return True
+            if normalized in {"0", "false", "no", "off"}:
+                return False
+        raise ValueError(
+            "RTNQuantEdit expects per_channel to be a boolean-compatible value."
+        )
+
+    @staticmethod
+    def _normalize_module_selectors(
+        module_selectors: Any,
+    ) -> dict[str, list[str]]:
+        if not isinstance(module_selectors, dict):
+            return {}
+
+        normalized: dict[str, list[str]] = {}
+        for key, values in module_selectors.items():
+            if not isinstance(key, str):
+                continue
+            if isinstance(values, str):
+                cleaned = [values.strip()] if values.strip() else []
+            elif isinstance(values, list | tuple | set):
+                cleaned = [
+                    str(item).strip()
+                    for item in values
+                    if isinstance(item, str) and str(item).strip()
+                ]
+            else:
+                cleaned = []
+            if cleaned:
+                normalized[key.strip().lower()] = cleaned
+        return normalized
 
     @staticmethod
     def _validate_options(
@@ -74,6 +116,7 @@ class RTNQuantEdit(ModelEdit):
         seed: int = 42,
         guard_chain: GuardChain | None = None,
         max_modules: int | None = None,
+        module_selectors: dict[str, list[str]] | None = None,
     ):
         """
         Initialize RTN quantization edit.
@@ -94,13 +137,14 @@ class RTNQuantEdit(ModelEdit):
         )
 
         self.bitwidth = bitwidth
-        self.per_channel = per_channel  # Always True
+        self.per_channel = self._normalize_per_channel_option(per_channel, default=True)
         self.group_size = group_size
         self.clamp_ratio = clamp_ratio
         self.scope = scope
         self.seed = seed
         self.guard_chain = guard_chain
         self.max_modules = max_modules
+        self.module_selectors = self._normalize_module_selectors(module_selectors)
 
         # group_size is currently reserved for potential future variants; it is
         # ignored for the built-in INT8 demo edit.
@@ -169,6 +213,8 @@ class RTNQuantEdit(ModelEdit):
             "quantization_stats": quant_stats,
             "anti_tying_map": self._get_weight_tying_map(model),
         }
+        if self.module_selectors:
+            plan["module_selectors"] = dict(self.module_selectors)
         if (
             isinstance(self.max_modules, int)
             and self.max_modules > 0
@@ -241,6 +287,8 @@ class RTNQuantEdit(ModelEdit):
             "scope",
             "seed",
             "max_modules",
+            "module_selectors",
+            "per_channel",
         }
         unexpected = sorted(set(plan_data) - supported_keys)
         if unexpected:
@@ -252,6 +300,15 @@ class RTNQuantEdit(ModelEdit):
         clamp_ratio = float(plan_data.get("clamp_ratio", self.clamp_ratio))
         scope = str(plan_data.get("scope", self.scope))
         seed = int(plan_data.get("seed", self.seed))
+        per_channel = self._normalize_per_channel_option(
+            plan_data.get("per_channel", self.per_channel),
+            default=self.per_channel,
+        )
+        if not per_channel:
+            raise ValueError("RTNQuantEdit only supports per_channel=True.")
+        module_selectors = self._normalize_module_selectors(
+            plan_data.get("module_selectors", self.module_selectors)
+        )
         raw_max_modules = plan_data.get("max_modules", self.max_modules)
         max_modules = (
             int(raw_max_modules)
@@ -267,13 +324,14 @@ class RTNQuantEdit(ModelEdit):
 
         active_edit = RTNQuantEdit(
             bitwidth=bitwidth,
-            per_channel=self.per_channel,
+            per_channel=per_channel,
             group_size=group_size,
             clamp_ratio=clamp_ratio,
             scope=scope,
             seed=seed,
             guard_chain=self.guard_chain,
             max_modules=max_modules,
+            module_selectors=module_selectors,
         )
 
         # Set deterministic seed
@@ -286,6 +344,20 @@ class RTNQuantEdit(ModelEdit):
         if max_modules is not None:
             if max_modules < total_identified:
                 target_modules = target_modules[:max_modules]
+        if not target_modules:
+            raise EditError(
+                code="E321",
+                message=(
+                    "RTN quantization matched no target modules for the current "
+                    "model and scope."
+                ),
+                details={
+                    "scope": scope,
+                    "bitwidth": bitwidth,
+                    "max_modules": max_modules,
+                    "identified_modules": total_identified,
+                },
+            )
 
         tying_map = active_edit._get_weight_tying_map(model)
 
@@ -315,6 +387,17 @@ class RTNQuantEdit(ModelEdit):
             quant_result["module_name"] = module_name
             quantization_results.append(quant_result)
             total_params_quantized += quant_result["params_quantized"]
+        if not quantization_results or total_params_quantized <= 0:
+            raise EditError(
+                code="E322",
+                message="RTN quantization completed without changing any parameters.",
+                details={
+                    "scope": scope,
+                    "bitwidth": bitwidth,
+                    "max_modules": max_modules,
+                    "identified_modules": total_identified,
+                },
+            )
 
         # Execute GuardChain after edit (if provided)
         if active_edit.guard_chain is not None:
@@ -340,15 +423,9 @@ class RTNQuantEdit(ModelEdit):
         # Identify modified layers
         modified_layers = []
         for result in quantization_results:
-            # Extract layer name from module name (e.g., "transformer.h.0.mlp.c_fc" -> "layer_0")
-            name_parts = result["module_name"].split(".")
-            if "h" in name_parts:
-                h_idx = name_parts.index("h")
-                if h_idx + 1 < len(name_parts):
-                    layer_num = name_parts[h_idx + 1]
-                    layer_name = f"layer_{layer_num}"
-                    if layer_name not in modified_layers:
-                        modified_layers.append(layer_name)
+            layer_name = self._layer_label_from_module_name(result["module_name"])
+            if layer_name is not None and layer_name not in modified_layers:
+                modified_layers.append(layer_name)
 
         # Store edit plan for evaluation report generation
         modules_quantized = [r["module_name"] for r in quantization_results]
@@ -359,10 +436,13 @@ class RTNQuantEdit(ModelEdit):
             "group_size": group_size,
             "clamp_ratio": clamp_ratio,
             "seed": seed,
+            "per_channel": per_channel,
             "total_modules_quantized": len(modules_quantized),
             "total_params_quantized": total_params_quantized,
             "modules_quantized": modules_quantized,
         }
+        if module_selectors:
+            edit_plan["module_selectors"] = module_selectors
 
         # Return in the standard format expected by the framework
         return {
@@ -381,9 +461,24 @@ class RTNQuantEdit(ModelEdit):
             else {},
         }
 
+    @staticmethod
+    def _layer_label_from_module_name(module_name: str) -> str | None:
+        name_parts = module_name.split(".")
+        for layer_token in ("h", "layers"):
+            if layer_token not in name_parts:
+                continue
+            layer_idx = name_parts.index(layer_token) + 1
+            if layer_idx >= len(name_parts):
+                continue
+            layer_num = name_parts[layer_idx]
+            if layer_num.isdigit():
+                return f"layer_{layer_num}"
+        return None
+
     def _identify_target_modules(self, model: nn.Module) -> list[tuple[str, nn.Module]]:
         """Identify target modules based on scope configuration."""
         target_modules = []
+        selector_patterns = self._selector_patterns_for_scope()
 
         for name, module in model.named_modules():
             # Check for both Linear and Conv1D (GPT-2 uses Conv1D)
@@ -412,7 +507,10 @@ class RTNQuantEdit(ModelEdit):
                     "intermediate.dense",
                     "output.dense",
                 ]
-                if any(pattern in name.lower() for pattern in ffn_patterns):
+                if any(
+                    pattern in name.lower()
+                    for pattern in tuple(ffn_patterns) + tuple(selector_patterns)
+                ):
                     should_include = True
             elif self.scope == "attn":
                 # Attention layers - be more permissive with pattern matching
@@ -426,7 +524,10 @@ class RTNQuantEdit(ModelEdit):
                     "o_proj",
                     "attn",
                 ]
-                if any(pattern in name.lower() for pattern in attn_patterns):
+                if any(
+                    pattern in name.lower()
+                    for pattern in tuple(attn_patterns) + tuple(selector_patterns)
+                ):
                     should_include = True
             elif self.scope == "all":
                 # All linear layers above a minimum size threshold
@@ -437,6 +538,25 @@ class RTNQuantEdit(ModelEdit):
                 target_modules.append((name, module))
 
         return target_modules
+
+    def _selector_patterns_for_scope(self) -> tuple[str, ...]:
+        if not self.module_selectors:
+            return ()
+        if self.scope == "ffn":
+            keys = ("ffn", "feed_forward")
+        elif self.scope == "attn":
+            keys = ("attn", "attention")
+        else:
+            keys = tuple(self.module_selectors.keys())
+        patterns: list[str] = []
+        seen: set[str] = set()
+        for key in keys:
+            for value in self.module_selectors.get(key, []):
+                normalized = str(value).strip().lower()
+                if normalized and normalized not in seen:
+                    patterns.append(normalized)
+                    seen.add(normalized)
+        return tuple(patterns)
 
     def _get_module_by_name(self, model: nn.Module, name: str) -> nn.Module | None:
         """Get module by dotted name."""

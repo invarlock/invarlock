@@ -96,6 +96,10 @@ def _ppl_evaluation_report(
     }
     if isinstance(ratio, int | float) and math.isfinite(float(ratio)) and ratio > 0:
         cert["primary_metric"]["ci"] = [math.log(float(ratio)), math.log(float(ratio))]
+    if isinstance(final, int | float) and math.isfinite(float(final)) and final > 0:
+        cert["evaluation_windows"] = {
+            "final": {"logloss": [math.log(float(final))], "token_counts": [1]}
+        }
 
     if include_provider_digest:
         cert.setdefault("provenance", {})["provider_digest"] = {

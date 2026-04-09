@@ -1,4 +1,7 @@
+from types import SimpleNamespace
+
 from invarlock.guards.variance import VarianceGuard
+from invarlock.guards.variance_runtime import _decision_from_action, before_edit_guard
 
 
 def _prep(policy):
@@ -49,3 +52,16 @@ def test_validate_continue_when_aligned_and_no_warnings():
     result = g.validate(object(), adapter=None, context={})
     # Some warnings may be produced by ancillary checks; ensure passed True
     assert result["passed"] is True
+
+
+def test_variance_runtime_decision_and_before_edit_skip_paths() -> None:
+    assert _decision_from_action("rollback") == "rollback"
+
+    recorded: list[tuple[str, dict[str, object]]] = []
+    guard = SimpleNamespace(
+        _prepared=False,
+        _log_event=lambda event, **kwargs: recorded.append((event, kwargs)),
+    )
+
+    before_edit_guard(guard, model=object())
+    assert recorded == []

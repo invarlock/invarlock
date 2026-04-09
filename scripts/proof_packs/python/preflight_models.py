@@ -25,7 +25,11 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         from huggingface_hub import HfApi
-    except Exception as exc:  # pragma: no cover - depends on optional deps
+        from huggingface_hub.utils import HfHubHTTPError
+    except (
+        ImportError,
+        ModuleNotFoundError,
+    ) as exc:  # pragma: no cover - depends on optional deps
         print(
             "ERROR: huggingface_hub is required for preflight; install it before running with --net 1.",
             file=sys.stderr,
@@ -47,7 +51,19 @@ def main(argv: list[str] | None = None) -> int:
     for model_id in model_ids:
         try:
             info = api.model_info(model_id, token=False)
-        except Exception as err:
+        except HfHubHTTPError as err:
+            status = getattr(getattr(err, "response", None), "status_code", None)
+            if status in (401, 403):
+                msg = "requires authentication (gated/private)"
+            else:
+                msg = str(err)
+            print(
+                f"ERROR: {model_id} is not publicly accessible ({msg})",
+                file=sys.stderr,
+            )
+            errors.append(model_id)
+            continue
+        except (OSError, RuntimeError, ValueError) as err:
             status = getattr(getattr(err, "response", None), "status_code", None)
             if status in (401, 403):
                 msg = "requires authentication (gated/private)"

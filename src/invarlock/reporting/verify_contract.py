@@ -219,6 +219,242 @@ def _warn_adapter_family_mismatch(
     return ()
 
 
+def _resolve_tolerance(tolerance: float) -> float:
+    try:
+        return float(tolerance)
+    except _VERIFY_RECOVERABLE_EXCEPTIONS:
+        return 1e-9
+
+
+def _load_baseline_digest(baseline: Path | None) -> dict[str, Any] | None:
+    try:
+        if baseline is None:
+            return None
+        bdata = json.loads(baseline.read_text(encoding="utf-8"))
+        prov = bdata.get("provenance") if isinstance(bdata, dict) else None
+        if isinstance(prov, dict):
+            pd = prov.get("provider_digest")
+            if isinstance(pd, dict):
+                return pd
+    except _VERIFY_RECOVERABLE_EXCEPTIONS:
+        return None
+    return None
+
+
+def _resolve_profile_name(profile: str | None) -> str:
+    try:
+        return (profile or "").strip().lower()
+    except _VERIFY_RECOVERABLE_EXCEPTIONS:
+        return "dev"
+
+
+def _append_recompute_errors(
+    errors: list[str],
+    *,
+    cert_obj: dict[str, Any],
+    prof: str,
+    tol: float,
+    json_mode: bool,
+) -> tuple[VerifyDiagnostic, ...]:
+    pm = cert_obj.get("primary_metric", {}) if isinstance(cert_obj, dict) else {}
+    kind = str(pm.get("kind") or "").strip().lower() if isinstance(pm, dict) else ""
+    win = cert_obj.get("evaluation_windows", {}) if isinstance(cert_obj, dict) else {}
+    fin = win.get("final") if isinstance(win, dict) else None
+    tiny_relax = resolve_tiny_relax_from_report(cert_obj)
+    strict_recompute = prof in {"ci", "release"} and not tiny_relax
+    if kind in {"accuracy", "vqa_accuracy"}:
+        cls = (
+            cert_obj.get("metrics", {}).get("classification", {})
+            if isinstance(cert_obj.get("metrics"), dict)
+            else {}
+        )
+        n_correct = cls.get("n_correct") if isinstance(cls, dict) else None
+        n_total = cls.get("n_total") if isinstance(cls, dict) else None
+        if (
+            isinstance(n_correct, (int, float))
+            and isinstance(n_total, (int, float))
+            and n_total > 0
+        ):
+            acc = float(n_correct) / float(n_total)
+            disp_final = pm.get("final")
+            if isinstance(disp_final, (int, float)) and abs(
+                float(disp_final) - acc
+            ) > max(1e-12, tol):
+                errors.append(
+                    f"Accuracy mismatch: final={float(disp_final):.12f} recomputed={acc:.12f}"
+                )
+            return ()
+        if strict_recompute:
+            raise InvarlockError(
+                code="E004",
+                message=(
+                    "PROVIDER-DIGEST-MISSING: missing classification aggregates for recompute in CI/Release"
+                ),
+            )
+        if json_mode:
+            return ()
+        return (
+            VerifyDiagnostic(
+                level="warning",
+                message="Cannot recompute accuracy: missing aggregates (dev mode).",
+            ),
+        )
+
+    if not (isinstance(pm, dict) and isinstance(fin, dict)):
+        if strict_recompute:
+            raise InvarlockError(
+                code="E004",
+                message=(
+                    "PROVIDER-DIGEST-MISSING: evaluation_windows.final missing for recompute in CI/Release"
+                ),
+            )
+        if json_mode:
+            return ()
+        return (
+            VerifyDiagnostic(
+                level="warning",
+                message="Cannot recompute basis: evaluation_windows.final missing or incomplete (dev mode).",
+            ),
+        )
+    ll = fin.get("logloss")
+    wc = fin.get("token_counts")
+    if not (
+        isinstance(ll, list)
+        and isinstance(wc, list)
+        and ll
+        and wc
+        and len(ll) == len(wc)
+    ):
+        if strict_recompute:
+            raise InvarlockError(
+                code="E004",
+                message=(
+                    "PROVIDER-DIGEST-MISSING: evaluation_windows.final missing for recompute in CI/Release"
+                ),
+            )
+        if json_mode:
+            return ()
+        return (
+            VerifyDiagnostic(
+                level="warning",
+                message="Cannot recompute basis: evaluation_windows.final missing or incomplete (dev mode).",
+            ),
+        )
+    try:
+        num = sum(float(a) * float(b) for a, b in zip(ll, wc, strict=False))
+        den = sum(float(b) for b in wc)
+        if den <= 0:
+            return ()
+        recomputed_mean = float(num / den)
+        ap_final = pm.get("analysis_point_final")
+        if isinstance(ap_final, (int, float)):
+            if abs(float(ap_final) - recomputed_mean) > tol:
+                errors.append(
+                    f"Basis mismatch: analysis_point_final={ap_final:.12f} recomputed={recomputed_mean:.12f}"
+                )
+            return ()
+        disp_final = pm.get("final")
+        if isinstance(disp_final, (int, float)) and abs(
+            float(math.exp(recomputed_mean)) - float(disp_final)
+        ) > max(1e-12, tol):
+            errors.append(
+                f"Display mismatch: final={float(disp_final):.12f} exp(basis)={math.exp(recomputed_mean):.12f}"
+            )
+    except _VERIFY_RECOVERABLE_EXCEPTIONS:
+        pass
+    return ()
+
+
+def _verify_single_report(
+    cert_path: Path,
+    *,
+    baseline: Path | None,
+    baseline_digest: dict[str, Any] | None,
+    tolerance: float,
+    profile: str | None,
+    allow_unattested_artifacts: bool,
+    json_mode: bool,
+) -> tuple[dict[str, Any], list[str], bool, tuple[VerifyDiagnostic, ...]]:
+    cert_obj = _load_evaluation_report(cert_path)
+    prof = _resolve_profile_name(profile)
+    prov = cert_obj.get("provenance") if isinstance(cert_obj, dict) else None
+    subj_digest = prov.get("provider_digest") if isinstance(prov, dict) else None
+    if prof in {"ci", "release"}:
+        if not (isinstance(subj_digest, dict) and subj_digest.get("ids_sha256")):
+            raise InvarlockError(
+                code="E004",
+                message=(
+                    "PROVIDER-DIGEST-MISSING: subject missing provider_digest.ids_sha256"
+                ),
+            )
+        if baseline_digest is not None:
+            enforce_provider_parity(
+                subj_digest,
+                baseline_digest,
+                profile=profile,
+                invarlock_error_cls=InvarlockError,
+            )
+
+    errors = _validate_evaluation_report_payload(cert_path, profile=profile)
+    attestation_result = verify_runtime_attestation(
+        cert_path,
+        allow_unattested=bool(allow_unattested_artifacts),
+    )
+    errors.extend(issue.message for issue in attestation_result.issues)
+    if json_mode and any("schema validation failed" in str(e).lower() for e in errors):
+        raise _ValidationError(
+            code="E601",
+            message="REPORT-SCHEMA-INVALID: schema validation failed",
+            details={"path": str(cert_path)},
+        )
+    malformed = any(
+        ("schema validation failed" in e.lower())
+        or ("missing primary_metric.ratio_vs_baseline" in e)
+        or ("report is missing a finite primary_metric.ratio_vs_baseline" in e)
+        for e in errors
+    )
+
+    recompute_diagnostics = _append_recompute_errors(
+        errors,
+        cert_obj=cert_obj,
+        prof=prof,
+        tol=tolerance,
+        json_mode=json_mode,
+    )
+    if (
+        errors
+        and prof in {"ci", "release"}
+        and any(("mismatch" in str(e).lower()) for e in errors)
+    ):
+        first = next((e for e in errors if "mismatch" in str(e).lower()), errors[0])
+        raise _MetricsError(
+            code="E602",
+            message="RECOMPUTE-MISMATCH: report values disagree with recomputation",
+            details={"example": str(first)},
+        )
+
+    diagnostics: tuple[VerifyDiagnostic, ...] = ()
+    if json_mode:
+        return cert_obj, errors, malformed, diagnostics + recompute_diagnostics
+    if errors:
+        diagnostics = (VerifyDiagnostic(level="fail", message=str(cert_path)),) + tuple(
+            VerifyDiagnostic(level="detail", message=str(err)) for err in errors
+        )
+        return cert_obj, errors, malformed, diagnostics + recompute_diagnostics
+    try:
+        diagnostics = (
+            VerifyDiagnostic(level="pass", message=str(cert_path)),
+            *_warn_adapter_family_mismatch(
+                cert_path,
+                cert_obj,
+                trusted_baseline_path=baseline,
+            ),
+        )
+    except _VERIFY_RECOVERABLE_EXCEPTIONS:
+        diagnostics = (VerifyDiagnostic(level="pass", message=str(cert_path)),)
+    return cert_obj, errors, malformed, diagnostics + recompute_diagnostics
+
+
 def run_verify_reports(
     reports: list[Path],
     *,
@@ -232,227 +468,32 @@ def run_verify_reports(
 
     overall_ok = True
     diagnostics: list[VerifyDiagnostic] = []
-    try:
-        tol = float(tolerance)
-    except _VERIFY_RECOVERABLE_EXCEPTIONS:
-        tol = 1e-9
-
-    baseline_digest = None
-    try:
-        if baseline is not None:
-            bdata = json.loads(baseline.read_text(encoding="utf-8"))
-            prov = bdata.get("provenance") if isinstance(bdata, dict) else None
-            if isinstance(prov, dict):
-                pd = prov.get("provider_digest")
-                if isinstance(pd, dict):
-                    baseline_digest = pd
-    except _VERIFY_RECOVERABLE_EXCEPTIONS:
-        baseline_digest = None
-
+    tol = _resolve_tolerance(tolerance)
+    baseline_digest = _load_baseline_digest(baseline)
     malformed_any = False
     loaded_any_report = False
     try:
         for cert_path in reports:
-            cert_obj = _load_evaluation_report(cert_path)
-            loaded_any_report = True
-
-            try:
-                prof = (profile or "").strip().lower()
-            except _VERIFY_RECOVERABLE_EXCEPTIONS:
-                prof = "dev"
-            prov = cert_obj.get("provenance") if isinstance(cert_obj, dict) else None
-            subj_digest = None
-            if isinstance(prov, dict):
-                subj_digest = prov.get("provider_digest")
-            if prof in {"ci", "release"}:
-                if not (
-                    isinstance(subj_digest, dict) and subj_digest.get("ids_sha256")
-                ):
-                    raise InvarlockError(
-                        code="E004",
-                        message=(
-                            "PROVIDER-DIGEST-MISSING: subject missing provider_digest.ids_sha256"
-                        ),
-                    )
-                if baseline_digest is not None:
-                    enforce_provider_parity(
-                        subj_digest,
-                        baseline_digest,
-                        profile=profile,
-                        invarlock_error_cls=InvarlockError,
-                    )
-
-            errors = _validate_evaluation_report_payload(cert_path, profile=profile)
-            attestation_result = verify_runtime_attestation(
+            if not loaded_any_report:
+                try:
+                    _load_evaluation_report(cert_path)
+                    loaded_any_report = True
+                except _VERIFY_RECOVERABLE_EXCEPTIONS:
+                    pass
+            cert_obj, errors, is_malformed, report_diagnostics = _verify_single_report(
                 cert_path,
-                allow_unattested=bool(allow_unattested_artifacts),
+                baseline=baseline,
+                baseline_digest=baseline_digest,
+                tolerance=tol,
+                profile=profile,
+                allow_unattested_artifacts=allow_unattested_artifacts,
+                json_mode=json_mode,
             )
-            errors.extend(issue.message for issue in attestation_result.issues)
-            if json_mode and any(
-                "schema validation failed" in str(e).lower() for e in errors
-            ):
-                raise _ValidationError(
-                    code="E601",
-                    message="REPORT-SCHEMA-INVALID: schema validation failed",
-                    details={"path": str(cert_path)},
-                )
-            is_malformed = any(
-                ("schema validation failed" in e.lower())
-                or ("missing primary_metric.ratio_vs_baseline" in e)
-                or ("report is missing a finite primary_metric.ratio_vs_baseline" in e)
-                for e in errors
-            )
-            malformed_any = malformed_any or is_malformed
-
-            pm = (
-                cert_obj.get("primary_metric", {}) if isinstance(cert_obj, dict) else {}
-            )
-            kind = (
-                str(pm.get("kind") or "").strip().lower()
-                if isinstance(pm, dict)
-                else ""
-            )
-            win = (
-                cert_obj.get("evaluation_windows", {})
-                if isinstance(cert_obj, dict)
-                else {}
-            )
-            fin = win.get("final") if isinstance(win, dict) else None
-
-            if kind in {"accuracy", "vqa_accuracy"}:
-                cls = (
-                    cert_obj.get("metrics", {}).get("classification", {})
-                    if isinstance(cert_obj.get("metrics"), dict)
-                    else {}
-                )
-                n_correct = cls.get("n_correct") if isinstance(cls, dict) else None
-                n_total = cls.get("n_total") if isinstance(cls, dict) else None
-                if (
-                    isinstance(n_correct, int | float)
-                    and isinstance(n_total, int | float)
-                    and n_total > 0
-                ):
-                    acc = float(n_correct) / float(n_total)
-                    disp_final = pm.get("final")
-                    if isinstance(disp_final, int | float):
-                        if abs(float(disp_final) - acc) > max(1e-12, tol):
-                            errors.append(
-                                f"Accuracy mismatch: final={float(disp_final):.12f} recomputed={acc:.12f}"
-                            )
-                else:
-                    if prof in {"ci", "release"}:
-                        raise InvarlockError(
-                            code="E004",
-                            message=(
-                                "PROVIDER-DIGEST-MISSING: missing classification aggregates for recompute in CI/Release"
-                            ),
-                        )
-                    if not json_mode:
-                        diagnostics.append(
-                            VerifyDiagnostic(
-                                level="warning",
-                                message=(
-                                    "Cannot recompute accuracy: missing aggregates "
-                                    "(dev mode)."
-                                ),
-                            )
-                        )
-            else:
-                if isinstance(pm, dict) and isinstance(fin, dict):
-                    ll = fin.get("logloss")
-                    wc = fin.get("token_counts")
-                    if (
-                        isinstance(ll, list)
-                        and isinstance(wc, list)
-                        and ll
-                        and wc
-                        and len(ll) == len(wc)
-                    ):
-                        try:
-                            num = sum(
-                                float(a) * float(b)
-                                for a, b in zip(ll, wc, strict=False)
-                            )
-                            den = sum(float(b) for b in wc)
-                            if den > 0:
-                                recomputed_mean = float(num / den)
-                                ap_final = pm.get("analysis_point_final")
-                                if isinstance(ap_final, int | float):
-                                    if abs(float(ap_final) - recomputed_mean) > tol:
-                                        errors.append(
-                                            f"Basis mismatch: analysis_point_final={ap_final:.12f} recomputed={recomputed_mean:.12f}"
-                                        )
-                                else:
-                                    disp_final = pm.get("final")
-                                    if isinstance(disp_final, int | float):
-                                        if abs(
-                                            float(math.exp(recomputed_mean))
-                                            - float(disp_final)
-                                        ) > max(1e-12, tol):
-                                            errors.append(
-                                                f"Display mismatch: final={float(disp_final):.12f} exp(basis)={math.exp(recomputed_mean):.12f}"
-                                            )
-                        except _VERIFY_RECOVERABLE_EXCEPTIONS:
-                            pass
-                    else:
-                        if prof in {"ci", "release"}:
-                            raise InvarlockError(
-                                code="E004",
-                                message=(
-                                    "PROVIDER-DIGEST-MISSING: evaluation_windows.final missing for recompute in CI/Release"
-                                ),
-                            )
-                        if not json_mode:
-                            diagnostics.append(
-                                VerifyDiagnostic(
-                                    level="warning",
-                                    message=(
-                                        "Cannot recompute basis: "
-                                        "evaluation_windows.final missing or "
-                                        "incomplete (dev mode)."
-                                    ),
-                                )
-                            )
-
-            if (
-                errors
-                and prof in {"ci", "release"}
-                and any(("mismatch" in str(e).lower()) for e in errors)
-            ):
-                first = next(
-                    (e for e in errors if "mismatch" in str(e).lower()), errors[0]
-                )
-                raise _MetricsError(
-                    code="E602",
-                    message="RECOMPUTE-MISMATCH: report values disagree with recomputation",
-                    details={"example": str(first)},
-                )
-
+            loaded_any_report = True
             if errors:
                 overall_ok = False
-                if not json_mode:
-                    diagnostics.append(
-                        VerifyDiagnostic(level="fail", message=str(cert_path))
-                    )
-                    for err in errors:
-                        diagnostics.append(
-                            VerifyDiagnostic(level="detail", message=str(err))
-                        )
-            else:
-                if not json_mode:
-                    diagnostics.append(
-                        VerifyDiagnostic(level="pass", message=str(cert_path))
-                    )
-                    try:
-                        diagnostics.extend(
-                            _warn_adapter_family_mismatch(
-                                cert_path,
-                                cert_obj,
-                                trusted_baseline_path=baseline,
-                            )
-                        )
-                    except _VERIFY_RECOVERABLE_EXCEPTIONS:
-                        pass
+            malformed_any = malformed_any or is_malformed
+            diagnostics.extend(report_diagnostics)
 
         if not overall_ok:
             payload = _verify_output.build_verify_json_payload(

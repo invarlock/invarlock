@@ -46,12 +46,12 @@ class _DummyModel(nn.Module):
 
 
 def _raise_cpu(*_args, **_kwargs):  # pragma: no cover - raised when violated
-    # Use BaseException so broad `except Exception` blocks do not swallow it.
+    # Use BaseException so broad catch blocks do not swallow it.
     raise BaseException("cpu() called in guard path")
 
 
 def _raise_svd(*_args, **_kwargs):  # pragma: no cover - raised when violated
-    # Use BaseException so broad `except Exception` blocks do not swallow it.
+    # Use BaseException so broad catch blocks do not swallow it.
     raise BaseException("SVD called in guard path")
 
 

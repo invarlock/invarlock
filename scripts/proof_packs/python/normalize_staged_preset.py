@@ -7,7 +7,9 @@ from typing import Any
 
 try:
     import yaml
-except Exception as exc:  # pragma: no cover - proof-pack preflight enforces PyYAML
+except (
+    ModuleNotFoundError
+) as exc:  # pragma: no cover - proof-pack preflight enforces PyYAML
     raise SystemExit(
         "PyYAML is required to normalize staged proof-pack presets"
     ) from exc
@@ -81,7 +83,7 @@ def _coerce_required_int(payload: dict[str, Any], key: str) -> int:
 def schedule_from_baseline_report(report_path: Path) -> tuple[int, int, int, int]:
     try:
         payload = json.loads(report_path.read_text(encoding="utf-8"))
-    except Exception as exc:
+    except (OSError, json.JSONDecodeError) as exc:
         raise SystemExit(f"failed to load baseline report JSON: {report_path}") from exc
 
     source: dict[str, Any] = {}

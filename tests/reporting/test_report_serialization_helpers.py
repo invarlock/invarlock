@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from invarlock.core.exceptions import ValidationError
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import RunReport, create_empty_report
 from invarlock.reporting.run_report_formatters import to_json
@@ -31,7 +32,7 @@ def test_make_report_baseline_variants() -> None:
     }
     assert make_report(report, base_ok)["schema_version"] == "v1"
     base_bad = {"schema_version": "baseline-v1", "meta": {}, "metrics": {}}
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError, match="Baseline normalization failed"):
         make_report(report, base_bad)
     base_v1 = {
         "schema_version": "baseline-v1",

@@ -22,36 +22,38 @@ _VARIANCE_EVALUATION_ERRORS = (
 )
 
 
-def evaluate_calibration_pass(
-    guard: Any,
-    model: nn.Module,
-    calibration_batches: list[Any],
-    min_coverage: int,
-    calib_seed: int,
-    tag: str,
-    *,
-    compute_paired_delta_log_ci_fn: Any = compute_paired_delta_log_ci,
-) -> None:
-    """Run deterministic calibration for A/B evaluation and predictive gating."""
-    predictive_state: dict[str, Any] = {
+def _initial_predictive_state(guard: Any) -> dict[str, Any]:
+    predictive_enabled = bool(guard._policy.get("predictive_gate", True))
+    return {
         "evaluated": False,
-        "passed": not bool(guard._policy.get("predictive_gate", True)),
-        "reason": "disabled"
-        if not bool(guard._policy.get("predictive_gate", True))
-        else "no_calibration",
+        "passed": not predictive_enabled,
+        "reason": "disabled" if not predictive_enabled else "no_calibration",
         "delta_ci": (None, None),
         "gain_ci": (None, None),
         "mean_delta": None,
     }
 
-    requested = len(calibration_batches)
+
+def _persist_predictive_state(guard: Any, predictive_state: dict[str, Any]) -> None:
+    guard._predictive_gate_state = predictive_state
+    guard._stats["predictive_gate"] = predictive_state.copy()
+
+
+def _record_calibration_request(
+    guard: Any,
+    *,
+    requested: int,
+    min_coverage: int,
+    calib_seed: int,
+    tag: str,
+) -> str | None:
     guard._calibration_stats.update(
         {
             "requested": requested,
             "coverage": 0,
             "min_coverage": min_coverage,
             "seed": calib_seed,
-            "status": "no_calibration" if not calibration_batches else "insufficient",
+            "status": "no_calibration" if requested == 0 else "insufficient",
             "tag": tag,
         }
     )
@@ -68,66 +70,104 @@ def evaluate_calibration_pass(
     fingerprint = guard._fingerprint_targets()
     if fingerprint:
         guard._stats["target_fingerprint"] = fingerprint
+    return fingerprint
 
-    if not calibration_batches:
-        guard._ratio_ci = None
-        guard._predictive_gate_state = predictive_state
-        guard._stats["predictive_gate"] = predictive_state.copy()
-        return
 
+def _resolve_model_device(model: nn.Module) -> torch.device:
     try:
-        device = next(model.parameters()).device
+        return next(model.parameters()).device
     except StopIteration:
-        device = torch.device("cpu")
+        return torch.device("cpu")
+
+
+def _compute_condition_a_samples(
+    guard: Any,
+    model: nn.Module,
+    calibration_batches: list[Any],
+    device: torch.device,
+    calib_seed: int,
+) -> tuple[list[float], list[float], list[int], int]:
     torch.manual_seed(calib_seed)
     ppl_no_ve_samples, loss_no_ve_samples, token_counts = (
         guard._compute_ppl_for_batches(
-            model, calibration_batches, device, return_counts=True
+            model,
+            calibration_batches,
+            device,
+            return_counts=True,
         )
     )
     coverage = min(len(calibration_batches), len(ppl_no_ve_samples))
+    return ppl_no_ve_samples, loss_no_ve_samples, token_counts, coverage
+
+
+def _compute_condition_b_samples(
+    guard: Any,
+    model: nn.Module,
+    calibration_batches: list[Any],
+    device: torch.device,
+    calib_seed: int,
+    coverage: int,
+    min_coverage: int,
+) -> tuple[list[float], list[float], list[int]]:
+    if coverage < min_coverage or not guard._scales:
+        return [], [], []
+
+    prev_enable_attempts = guard._enable_attempt_count
+    prev_disable_attempts = guard._disable_attempt_count
+    prev_prepared_flag = guard._prepared
+    enable_success = False
+    try:
+        guard._prepared = True
+        enable_success = guard.enable(model)
+    finally:
+        guard._prepared = prev_prepared_flag
+
     ppl_with_ve_samples: list[float] = []
     loss_with_ve_samples: list[float] = []
     token_counts_with: list[int] = []
-
-    enable_success = False
-    if coverage >= min_coverage and guard._scales:
-        prev_enable_attempts = guard._enable_attempt_count
-        prev_disable_attempts = guard._disable_attempt_count
-        prev_prepared_flag = guard._prepared
-        try:
-            guard._prepared = True
-            enable_success = guard.enable(model)
-        finally:
-            guard._prepared = prev_prepared_flag
-        try:
-            torch.manual_seed(calib_seed)
-            if enable_success:
-                ppl_with_ve_samples, loss_with_ve_samples, token_counts_with = (
-                    guard._compute_ppl_for_batches(
-                        model, calibration_batches, device, return_counts=True
-                    )
+    try:
+        torch.manual_seed(calib_seed)
+        if enable_success:
+            ppl_with_ve_samples, loss_with_ve_samples, token_counts_with = (
+                guard._compute_ppl_for_batches(
+                    model,
+                    calibration_batches,
+                    device,
+                    return_counts=True,
                 )
-        finally:
-            if enable_success:
-                guard.disable(model)
-        guard._enable_attempt_count = prev_enable_attempts
-        guard._disable_attempt_count = prev_disable_attempts
+            )
+    finally:
+        if enable_success:
+            guard.disable(model)
 
-    coverage = min(
+    guard._enable_attempt_count = prev_enable_attempts
+    guard._disable_attempt_count = prev_disable_attempts
+    return ppl_with_ve_samples, loss_with_ve_samples, token_counts_with
+
+
+def _reconcile_coverage(
+    coverage: int,
+    ppl_with_ve_samples: list[float],
+    loss_with_ve_samples: list[float],
+    token_counts: list[int],
+    token_counts_with: list[int],
+) -> int:
+    return min(
         coverage,
         len(ppl_with_ve_samples) if ppl_with_ve_samples else coverage,
         len(loss_with_ve_samples) if loss_with_ve_samples else coverage,
         len(token_counts) if token_counts else coverage,
         len(token_counts_with) if token_counts_with else coverage,
     )
-    guard._calibration_stats.update(
-        {
-            "coverage": coverage,
-            "status": "insufficient" if coverage < min_coverage else "pending",
-        }
-    )
 
+
+def _record_condition_a(
+    guard: Any,
+    *,
+    tag: str,
+    fingerprint: str | None,
+    coverage: int,
+) -> None:
     window_ids = guard._calibration_window_ids
     status_a = "evaluated" if coverage > 0 else "no_data"
     guard._record_ab_provenance(
@@ -139,213 +179,176 @@ def evaluate_calibration_pass(
         status=status_a,
     )
 
-    if coverage >= min_coverage and not guard._scales:
-        ppl_no_ve_samples = ppl_no_ve_samples[:coverage]
-        ppl_no_ve_mean = safe_mean(ppl_no_ve_samples)
-        if ppl_no_ve_mean is None:
-            guard._ratio_ci = None
-            predictive_state["reason"] = "no_valid_samples"
-            guard._predictive_gate_state = predictive_state
-            guard._stats["predictive_gate"] = predictive_state.copy()
-            return
+
+def _handle_no_scales_path(
+    guard: Any,
+    *,
+    ppl_no_ve_samples: list[float],
+    coverage: int,
+    min_coverage: int,
+    calib_seed: int,
+    tag: str,
+    fingerprint: str | None,
+    predictive_state: dict[str, Any],
+) -> bool:
+    if coverage < min_coverage or guard._scales:
+        return False
+
+    trimmed_ppl_no_ve = ppl_no_ve_samples[:coverage]
+    ppl_no_ve_mean = safe_mean(trimmed_ppl_no_ve)
+    if ppl_no_ve_mean is None:
+        guard._ratio_ci = None
+        predictive_state["reason"] = "no_valid_samples"
+        _persist_predictive_state(guard, predictive_state)
+        return True
+
+    guard.set_ab_results(
+        ppl_no_ve=ppl_no_ve_mean,
+        ppl_with_ve=ppl_no_ve_mean,
+        windows_used=coverage,
+        seed_used=calib_seed,
+        ratio_ci=(1.0, 1.0),
+    )
+    guard._calibration_stats.update(
+        {
+            "status": "no_scaling_required",
+            "ppl_no_ve": ppl_no_ve_mean,
+            "ratio_ci": (1.0, 1.0),
+        }
+    )
+    guard._stats["ab_point_estimates"] = {
+        "tag": tag,
+        "ppl_no_ve": ppl_no_ve_mean,
+        "ppl_with_ve": ppl_no_ve_mean,
+    }
+    guard._record_ab_provenance(
+        "condition_b",
+        tag=tag,
+        mode="virtual_ve",
+        window_ids=guard._calibration_window_ids,
+        fingerprint=fingerprint,
+        status="no_scales",
+    )
+    predictive_state.update({"evaluated": True, "passed": False, "reason": "no_scales"})
+    _persist_predictive_state(guard, predictive_state)
+    return True
+
+
+def _weighted_mean_delta(
+    loss_with_ve_samples: list[float],
+    loss_no_ve_samples: list[float],
+    token_counts: list[int],
+) -> float:
+    if token_counts:
+        sw = 0.0
+        swx = 0.0
+        for with_loss, no_loss, weight in zip(
+            loss_with_ve_samples, loss_no_ve_samples, token_counts, strict=False
+        ):
+            sw += float(weight)
+            swx += float(weight) * (with_loss - no_loss)
+        return float(swx / sw) if sw > 0 else float("nan")
+
+    return float(
+        np.mean(
+            [
+                with_loss - no_loss
+                for with_loss, no_loss in zip(
+                    loss_with_ve_samples, loss_no_ve_samples, strict=False
+                )
+            ]
+        )
+    )
+
+
+def _compute_delta_ci(
+    guard: Any,
+    *,
+    loss_with_ve_samples: list[float],
+    loss_no_ve_samples: list[float],
+    token_counts: list[int],
+    calib_seed: int,
+    compute_paired_delta_log_ci_fn: Any,
+) -> tuple[float, float] | None:
+    try:
+        return compute_paired_delta_log_ci_fn(
+            loss_with_ve_samples,
+            loss_no_ve_samples,
+            weights=token_counts,
+            method="bca",
+            replicates=500,
+            alpha=guard._policy.get("alpha", 0.05),
+            seed=calib_seed + 211,
+        )
+    except _VARIANCE_EVALUATION_ERRORS as exc:
+        guard._log_event(
+            "predictive_gate_error",
+            level="WARN",
+            message="Failed to compute predictive ΔlogNLL CI",
+            error=str(exc),
+        )
+        return None
+
+
+def _handle_complete_calibration(
+    guard: Any,
+    *,
+    ppl_no_ve_samples: list[float],
+    loss_no_ve_samples: list[float],
+    ppl_with_ve_samples: list[float],
+    loss_with_ve_samples: list[float],
+    token_counts: list[int],
+    coverage: int,
+    calib_seed: int,
+    tag: str,
+    fingerprint: str | None,
+    predictive_state: dict[str, Any],
+    compute_paired_delta_log_ci_fn: Any,
+) -> None:
+    trimmed_ppl_no_ve = ppl_no_ve_samples[:coverage]
+    trimmed_loss_no_ve = loss_no_ve_samples[:coverage]
+    trimmed_ppl_with_ve = ppl_with_ve_samples[:coverage]
+    trimmed_loss_with_ve = loss_with_ve_samples[:coverage]
+    trimmed_token_counts = token_counts[:coverage]
+
+    ratios = [
+        with_val / no_val
+        for with_val, no_val in zip(
+            trimmed_ppl_with_ve, trimmed_ppl_no_ve, strict=False
+        )
+        if no_val > 0
+    ]
+    if ratios:
+        ratio_ci = guard._bootstrap_mean_ci(
+            ratios,
+            alpha=guard._policy.get("alpha", 0.05),
+            n_bootstrap=500,
+            seed=calib_seed,
+        )
+        ppl_no_ve_mean = safe_mean(trimmed_ppl_no_ve) or 0.0
+        ppl_with_ve_mean = safe_mean(trimmed_ppl_with_ve) or 0.0
         guard.set_ab_results(
             ppl_no_ve=ppl_no_ve_mean,
-            ppl_with_ve=ppl_no_ve_mean,
+            ppl_with_ve=ppl_with_ve_mean,
             windows_used=coverage,
             seed_used=calib_seed,
-            ratio_ci=(1.0, 1.0),
+            ratio_ci=ratio_ci,
         )
         guard._calibration_stats.update(
             {
-                "status": "no_scaling_required",
+                "status": "complete",
                 "ppl_no_ve": ppl_no_ve_mean,
-                "ratio_ci": (1.0, 1.0),
+                "ppl_with_ve": ppl_with_ve_mean,
+                "ratio_ci": ratio_ci,
             }
         )
-        guard._stats["ab_point_estimates"] = {
-            "tag": tag,
-            "ppl_no_ve": ppl_no_ve_mean,
-            "ppl_with_ve": ppl_no_ve_mean,
-        }
         guard._record_ab_provenance(
             "condition_b",
             tag=tag,
             mode="virtual_ve",
-            window_ids=window_ids,
+            window_ids=guard._calibration_window_ids,
             fingerprint=fingerprint,
-            status="no_scales",
-        )
-        predictive_state.update(
-            {"evaluated": True, "passed": False, "reason": "no_scales"}
-        )
-        guard._predictive_gate_state = predictive_state
-        guard._stats["predictive_gate"] = predictive_state.copy()
-        return
-
-    if coverage >= min_coverage and ppl_with_ve_samples and loss_with_ve_samples:
-        ppl_no_ve_samples = ppl_no_ve_samples[:coverage]
-        loss_no_ve_samples = loss_no_ve_samples[:coverage]
-        ppl_with_ve_samples = ppl_with_ve_samples[:coverage]
-        loss_with_ve_samples = loss_with_ve_samples[:coverage]
-        token_counts = token_counts[:coverage]
-
-        ratios = [
-            with_val / no_val
-            for with_val, no_val in zip(
-                ppl_with_ve_samples, ppl_no_ve_samples, strict=False
-            )
-            if no_val > 0
-        ]
-        if ratios:
-            ratio_ci = guard._bootstrap_mean_ci(
-                ratios,
-                alpha=guard._policy.get("alpha", 0.05),
-                n_bootstrap=500,
-                seed=calib_seed,
-            )
-            ppl_no_ve_mean = safe_mean(ppl_no_ve_samples) or 0.0
-            ppl_with_ve_mean = safe_mean(ppl_with_ve_samples) or 0.0
-            guard.set_ab_results(
-                ppl_no_ve=ppl_no_ve_mean,
-                ppl_with_ve=ppl_with_ve_mean,
-                windows_used=coverage,
-                seed_used=calib_seed,
-                ratio_ci=ratio_ci,
-            )
-            guard._calibration_stats.update(
-                {
-                    "status": "complete",
-                    "ppl_no_ve": ppl_no_ve_mean,
-                    "ppl_with_ve": ppl_with_ve_mean,
-                    "ratio_ci": ratio_ci,
-                }
-            )
-            guard._record_ab_provenance(
-                "condition_b",
-                tag=tag,
-                mode="virtual_ve",
-                window_ids=window_ids,
-                fingerprint=fingerprint,
-                status="evaluated",
-            )
-            guard._stats["ab_point_estimates"] = {
-                "tag": tag,
-                "ppl_no_ve": ppl_no_ve_mean,
-                "ppl_with_ve": ppl_with_ve_mean,
-                "coverage": coverage,
-            }
-
-        delta_ci: tuple[float, float] | None = None
-        try:
-            delta_ci = compute_paired_delta_log_ci_fn(
-                loss_with_ve_samples,
-                loss_no_ve_samples,
-                weights=token_counts,
-                method="bca",
-                replicates=500,
-                alpha=guard._policy.get("alpha", 0.05),
-                seed=calib_seed + 211,
-            )
-        except _VARIANCE_EVALUATION_ERRORS as exc:
-            delta_ci = None
-            guard._log_event(
-                "predictive_gate_error",
-                level="WARN",
-                message="Failed to compute predictive ΔlogNLL CI",
-                error=str(exc),
-            )
-
-        predictive_state["evaluated"] = True
-        if token_counts:
-            sw = 0.0
-            swx = 0.0
-            for with_loss, no_loss, weight in zip(
-                loss_with_ve_samples, loss_no_ve_samples, token_counts, strict=False
-            ):
-                sw += float(weight)
-                swx += float(weight) * (with_loss - no_loss)
-            mean_delta = float(swx / sw) if sw > 0 else float("nan")
-        else:
-            mean_delta = float(
-                np.mean(
-                    [
-                        with_loss - no_loss
-                        for with_loss, no_loss in zip(
-                            loss_with_ve_samples, loss_no_ve_samples, strict=False
-                        )
-                    ]
-                )
-            )
-        predictive_state["mean_delta"] = mean_delta
-
-        if delta_ci is not None and all(
-            isinstance(val, (int | float)) and math.isfinite(val) for val in delta_ci
-        ):
-            delta_ci = (float(delta_ci[0]), float(delta_ci[1]))
-            predictive_state["delta_ci"] = delta_ci
-            predictive_state["gain_ci"] = (-delta_ci[1], -delta_ci[0])
-            if not guard._policy.get("predictive_gate", True):
-                predictive_state["passed"] = True
-                predictive_state["reason"] = "disabled"
-            else:
-                one_sided = bool(guard._policy.get("predictive_one_sided", False))
-                min_effect = float(guard._policy.get("min_effect_lognll", 0.0) or 0.0)
-                passed, reason = predictive_gate_outcome(
-                    mean_delta=mean_delta,
-                    delta_ci=delta_ci,
-                    min_effect=min_effect,
-                    one_sided=one_sided,
-                )
-                predictive_state["passed"] = passed
-                predictive_state["reason"] = reason
-        else:
-            predictive_state["delta_ci"] = (None, None)
-            predictive_state["gain_ci"] = (None, None)
-            predictive_state["reason"] = (
-                predictive_state.get("reason", "ci_unavailable")
-                if predictive_state.get("reason") != "disabled"
-                else "disabled"
-            )
-            if guard._calibration_stats.get("status") == "complete":
-                guard._calibration_stats["status"] = "pending"
-    else:
-        guard._ratio_ci = None
-        guard._log_event(
-            "prepare_monitor_mode",
-            level="WARN",
-            message="VE calibration coverage insufficient; guard will monitor only",
-            requested=requested,
-            coverage=coverage,
-            min_coverage=min_coverage,
-            tag=tag,
-        )
-        if predictive_state.get("reason") not in {"disabled"}:
-            if coverage < min_coverage:
-                predictive_state["reason"] = "insufficient_coverage"
-            elif not ppl_with_ve_samples:
-                predictive_state["reason"] = "ve_enable_failed"
-
-        if "condition_b" not in guard._stats.get("ab_provenance", {}):
-            guard._record_ab_provenance(
-                "condition_b",
-                tag=tag,
-                mode="virtual_ve",
-                window_ids=window_ids,
-                fingerprint=fingerprint,
-                status="not_evaluated",
-            )
-
-    if (
-        "ab_point_estimates" not in guard._stats
-        or guard._stats["ab_point_estimates"].get("tag") != tag
-    ):
-        ppl_no_ve_mean = (
-            float(np.mean(ppl_no_ve_samples[:coverage])) if coverage > 0 else None
-        )
-        ppl_with_ve_mean = (
-            float(np.mean(ppl_with_ve_samples[:coverage]))
-            if ppl_with_ve_samples and coverage > 0
-            else None
+            status="evaluated",
         )
         guard._stats["ab_point_estimates"] = {
             "tag": tag,
@@ -354,8 +357,238 @@ def evaluate_calibration_pass(
             "coverage": coverage,
         }
 
-    guard._predictive_gate_state = predictive_state
-    guard._stats["predictive_gate"] = predictive_state.copy()
+    delta_ci = _compute_delta_ci(
+        guard,
+        loss_with_ve_samples=trimmed_loss_with_ve,
+        loss_no_ve_samples=trimmed_loss_no_ve,
+        token_counts=trimmed_token_counts,
+        calib_seed=calib_seed,
+        compute_paired_delta_log_ci_fn=compute_paired_delta_log_ci_fn,
+    )
+    predictive_state["evaluated"] = True
+    mean_delta = _weighted_mean_delta(
+        trimmed_loss_with_ve,
+        trimmed_loss_no_ve,
+        trimmed_token_counts,
+    )
+    predictive_state["mean_delta"] = mean_delta
+
+    if delta_ci is not None and all(
+        isinstance(val, int | float) and math.isfinite(val) for val in delta_ci
+    ):
+        normalized_ci = (float(delta_ci[0]), float(delta_ci[1]))
+        predictive_state["delta_ci"] = normalized_ci
+        predictive_state["gain_ci"] = (-normalized_ci[1], -normalized_ci[0])
+        if not guard._policy.get("predictive_gate", True):
+            predictive_state["passed"] = True
+            predictive_state["reason"] = "disabled"
+            return
+
+        one_sided = bool(guard._policy.get("predictive_one_sided", False))
+        min_effect = float(guard._policy.get("min_effect_lognll", 0.0) or 0.0)
+        passed, reason = predictive_gate_outcome(
+            mean_delta=mean_delta,
+            delta_ci=normalized_ci,
+            min_effect=min_effect,
+            one_sided=one_sided,
+        )
+        predictive_state["passed"] = passed
+        predictive_state["reason"] = reason
+        return
+
+    predictive_state["delta_ci"] = (None, None)
+    predictive_state["gain_ci"] = (None, None)
+    predictive_state["reason"] = (
+        predictive_state.get("reason", "ci_unavailable")
+        if predictive_state.get("reason") != "disabled"
+        else "disabled"
+    )
+    if guard._calibration_stats.get("status") == "complete":
+        guard._calibration_stats["status"] = "pending"
+
+
+def _handle_monitor_mode(
+    guard: Any,
+    *,
+    requested: int,
+    coverage: int,
+    min_coverage: int,
+    tag: str,
+    fingerprint: str | None,
+    predictive_state: dict[str, Any],
+    ppl_with_ve_samples: list[float],
+) -> None:
+    guard._ratio_ci = None
+    guard._log_event(
+        "prepare_monitor_mode",
+        level="WARN",
+        message="VE calibration coverage insufficient; guard will monitor only",
+        requested=requested,
+        coverage=coverage,
+        min_coverage=min_coverage,
+        tag=tag,
+    )
+    if predictive_state.get("reason") not in {"disabled"}:
+        if coverage < min_coverage:
+            predictive_state["reason"] = "insufficient_coverage"
+        elif not ppl_with_ve_samples:
+            predictive_state["reason"] = "ve_enable_failed"
+
+    if "condition_b" not in guard._stats.get("ab_provenance", {}):
+        guard._record_ab_provenance(
+            "condition_b",
+            tag=tag,
+            mode="virtual_ve",
+            window_ids=guard._calibration_window_ids,
+            fingerprint=fingerprint,
+            status="not_evaluated",
+        )
+
+
+def _ensure_ab_point_estimates(
+    guard: Any,
+    *,
+    tag: str,
+    ppl_no_ve_samples: list[float],
+    ppl_with_ve_samples: list[float],
+    coverage: int,
+) -> None:
+    if (
+        "ab_point_estimates" in guard._stats
+        and guard._stats["ab_point_estimates"].get("tag") == tag
+    ):
+        return
+
+    ppl_no_ve_mean = (
+        float(np.mean(ppl_no_ve_samples[:coverage])) if coverage > 0 else None
+    )
+    ppl_with_ve_mean = (
+        float(np.mean(ppl_with_ve_samples[:coverage]))
+        if ppl_with_ve_samples and coverage > 0
+        else None
+    )
+    guard._stats["ab_point_estimates"] = {
+        "tag": tag,
+        "ppl_no_ve": ppl_no_ve_mean,
+        "ppl_with_ve": ppl_with_ve_mean,
+        "coverage": coverage,
+    }
+
+
+def evaluate_calibration_pass(
+    guard: Any,
+    model: nn.Module,
+    calibration_batches: list[Any],
+    min_coverage: int,
+    calib_seed: int,
+    tag: str,
+    *,
+    compute_paired_delta_log_ci_fn: Any = compute_paired_delta_log_ci,
+) -> None:
+    """Run deterministic calibration for A/B evaluation and predictive gating."""
+    predictive_state = _initial_predictive_state(guard)
+    requested = len(calibration_batches)
+    fingerprint = _record_calibration_request(
+        guard,
+        requested=requested,
+        min_coverage=min_coverage,
+        calib_seed=calib_seed,
+        tag=tag,
+    )
+
+    if not calibration_batches:
+        guard._ratio_ci = None
+        _persist_predictive_state(guard, predictive_state)
+        return
+
+    device = _resolve_model_device(model)
+    ppl_no_ve_samples, loss_no_ve_samples, token_counts, coverage = (
+        _compute_condition_a_samples(
+            guard,
+            model,
+            calibration_batches,
+            device,
+            calib_seed,
+        )
+    )
+    ppl_with_ve_samples, loss_with_ve_samples, token_counts_with = (
+        _compute_condition_b_samples(
+            guard,
+            model,
+            calibration_batches,
+            device,
+            calib_seed,
+            coverage,
+            min_coverage,
+        )
+    )
+    coverage = _reconcile_coverage(
+        coverage,
+        ppl_with_ve_samples,
+        loss_with_ve_samples,
+        token_counts,
+        token_counts_with,
+    )
+    guard._calibration_stats.update(
+        {
+            "coverage": coverage,
+            "status": "insufficient" if coverage < min_coverage else "pending",
+        }
+    )
+    _record_condition_a(
+        guard,
+        tag=tag,
+        fingerprint=fingerprint,
+        coverage=coverage,
+    )
+
+    if _handle_no_scales_path(
+        guard,
+        ppl_no_ve_samples=ppl_no_ve_samples,
+        coverage=coverage,
+        min_coverage=min_coverage,
+        calib_seed=calib_seed,
+        tag=tag,
+        fingerprint=fingerprint,
+        predictive_state=predictive_state,
+    ):
+        return
+
+    if coverage >= min_coverage and ppl_with_ve_samples and loss_with_ve_samples:
+        _handle_complete_calibration(
+            guard,
+            ppl_no_ve_samples=ppl_no_ve_samples,
+            loss_no_ve_samples=loss_no_ve_samples,
+            ppl_with_ve_samples=ppl_with_ve_samples,
+            loss_with_ve_samples=loss_with_ve_samples,
+            token_counts=token_counts,
+            coverage=coverage,
+            calib_seed=calib_seed,
+            tag=tag,
+            fingerprint=fingerprint,
+            predictive_state=predictive_state,
+            compute_paired_delta_log_ci_fn=compute_paired_delta_log_ci_fn,
+        )
+    else:
+        _handle_monitor_mode(
+            guard,
+            requested=requested,
+            coverage=coverage,
+            min_coverage=min_coverage,
+            tag=tag,
+            fingerprint=fingerprint,
+            predictive_state=predictive_state,
+            ppl_with_ve_samples=ppl_with_ve_samples,
+        )
+
+    _ensure_ab_point_estimates(
+        guard,
+        tag=tag,
+        ppl_no_ve_samples=ppl_no_ve_samples,
+        ppl_with_ve_samples=ppl_with_ve_samples,
+        coverage=coverage,
+    )
+    _persist_predictive_state(guard, predictive_state)
 
 
 def refresh_after_edit_metrics(

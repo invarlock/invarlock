@@ -156,9 +156,13 @@ def test_encoder_mlm_smoke_uses_stable_tiny_model() -> None:
 def test_matrix_prefers_local_runtime_image_when_available() -> None:
     text = Path("scripts/run_tiny_all_matrix.sh").read_text(encoding="utf-8")
 
+    assert "docker image inspect invarlock-runtime:cuda-local" in text
+    assert 'export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"' in text
     assert "docker image inspect invarlock-runtime:local" in text
     assert 'export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:local"' in text
+    assert 'echo "[smoke] refreshing local CUDA attested runtime image"' in text
     assert 'echo "[smoke] refreshing local attested runtime image"' in text
+    assert "make runtime-image-cuda" in text
     assert "make runtime-image" in text
 
 

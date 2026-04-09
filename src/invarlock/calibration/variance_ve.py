@@ -3,6 +3,8 @@ from __future__ import annotations
 import math
 from typing import Any
 
+_COERCE_ERRORS = (TypeError, ValueError, OverflowError)
+
 
 def _extract_guard(report: dict[str, Any], name: str) -> dict[str, Any] | None:
     guards = report.get("guards")
@@ -19,7 +21,7 @@ def _coerce_delta_ci(value: Any) -> tuple[float, float] | None:
     try:
         lo = float(value[0])
         hi = float(value[1])
-    except Exception:
+    except _COERCE_ERRORS:
         return None
     if not (math.isfinite(lo) and math.isfinite(hi)):
         return None
@@ -118,7 +120,7 @@ def summarize_ve_sweep_reports(
         mean_delta = pg.get("mean_delta")
         try:
             mean_delta_f = float(mean_delta) if mean_delta is not None else None
-        except Exception:
+        except _COERCE_ERRORS:
             mean_delta_f = None
 
         gains.append(

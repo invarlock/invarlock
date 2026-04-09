@@ -148,7 +148,7 @@ class _ConstLossTinyModel(TinyModel):
         super().__init__(blocks)
         self._loss_value = float(loss_value)
 
-    def forward(self, input_ids, labels=None):  # type: ignore[override]
+    def forward(self, input_ids, labels=None):
         class Out:
             def __init__(self, loss):
                 self.loss = torch.tensor(float(loss))

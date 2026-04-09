@@ -5,9 +5,12 @@ import math
 import pytest
 
 from invarlock.core.exceptions import ValidationError
+from invarlock.eval import primary_metric as pm_mod
 from invarlock.eval.primary_metric import (
     MetricContribution,
     _Accuracy,
+    _coerce_float,
+    _coerce_int,
     _PPLCausal,
     compute_primary_metric_from_report,
     get_metric,
@@ -102,10 +105,17 @@ def test_validate_primary_metric_block_missing_preview_final_raises() -> None:
     assert getattr(ei.value, "code", None) == "E402"
 
 
+def test_numeric_coercion_helpers_reject_bools_and_nonfinite_floats() -> None:
+    assert _coerce_float(True) is None
+    assert _coerce_int(False) is None
+    assert _coerce_int(float("inf")) is None
+    assert _coerce_int(float("nan")) is None
+
+
 def test_ppl_causal_finalize_returns_nan_when_total_weight_non_positive() -> None:
     metric = _PPLCausal()
-    metric._values = [1.0]  # type: ignore[attr-defined]
-    metric._weights = [-1.0]  # type: ignore[attr-defined]
+    metric._values = [1.0]
+    metric._weights = [-1.0]
     assert math.isnan(metric.finalize())
 
 
@@ -115,7 +125,7 @@ def test_ppl_causal_paired_compare_uses_weight_fallback_when_needed(
     metric = _PPLCausal()
     captured: dict[str, object] = {}
 
-    def _fake_ci(subj_vals, base_vals, *, weights, **_kwargs):  # type: ignore[no-untyped-def]  # noqa: ARG001
+    def _fake_ci(subj_vals, base_vals, *, weights, **_kwargs):  # noqa: ARG001
         captured["weights"] = list(weights or [])
         return (0.0, 0.0)
 
@@ -130,6 +140,31 @@ def test_ppl_causal_paired_compare_uses_weight_fallback_when_needed(
         ci_level=0.95,
     )
     assert captured.get("weights") == [1.0]
+
+
+def test_ppl_causal_accumulate_and_pairing_skip_invalid_contributions(
+    monkeypatch,
+) -> None:
+    metric = _PPLCausal()
+    metric.accumulate(MetricContribution(value="bad", weight=1.0))
+    metric.accumulate(MetricContribution(value=0.4, weight="bad"))
+    assert math.isnan(metric.finalize())
+
+    monkeypatch.setattr(
+        pm_mod,
+        "compute_paired_delta_log_ci",
+        lambda *args, **kwargs: (float("nan"), float("nan")),
+    )
+    out = metric.paired_compare(
+        [MetricContribution(value="bad", weight=1.0), object()],
+        [],
+        reps=1,
+        seed=0,
+        ci_level=0.95,
+    )
+    assert math.isnan(out["subject_point"])
+    assert math.isnan(out["baseline_point"])
+    assert out["display"] == pytest.approx(1.0)
 
 
 def test_get_metric_unknown_kind_raises_key_error() -> None:
@@ -159,3 +194,71 @@ def test_compute_primary_metric_accuracy_handles_non_dict_preview_window() -> No
     payload = compute_primary_metric_from_report(report, kind="accuracy")
     assert math.isnan(payload["preview"])
     assert 0.0 <= payload["final"] <= 1.0
+
+
+def test_accuracy_paired_compare_ignores_invalid_values() -> None:
+    metric = _Accuracy()
+    result = metric.paired_compare(
+        [MetricContribution(value="bad"), {"value": True}, {"value": 1.0}],
+        [MetricContribution(value="bad"), {"value": False}, {"value": 0.0}],
+        reps=10,
+        seed=0,
+        ci_level=0.9,
+    )
+
+    assert result["subject_point"] == pytest.approx(1.0)
+    assert result["baseline_point"] == pytest.approx(0.0)
+
+
+def test_compute_primary_metric_accuracy_ensure_counts_handles_non_dict_windows() -> (
+    None
+):
+    report = {
+        "metrics": {
+            "classification": {
+                "preview": "bad-preview",
+                "final": {"input_ids": [[1, 2, 3], "bad-seq"]},
+            }
+        }
+    }
+    baseline = {"metrics": {"primary_metric": {"kind": "vqa_accuracy", "final": 2.0}}}
+
+    payload = compute_primary_metric_from_report(
+        report, kind="accuracy", baseline=baseline
+    )
+
+    assert math.isnan(payload["preview"])
+    assert payload["final"] == pytest.approx(1.0)
+    assert math.isnan(payload["ratio_vs_baseline"])
+
+
+def test_compute_accuracy_counts_prefers_explicit_bool_correct_flags() -> None:
+    from invarlock.eval.primary_metric import compute_accuracy_counts
+
+    correct, total = compute_accuracy_counts(
+        [{"correct": True}, {"correct": False}, {"input_ids": [1, 2, 3]}]
+    )
+
+    assert (correct, total) == (2, 3)
+
+
+def test_primary_metric_helper_coercers_skip_invalid_dict_entries() -> None:
+    ppl_metric = _PPLCausal()
+    assert ppl_metric._coerce_contrib_array(  # noqa: SLF001
+        [
+            {"value": "bad", "weight": 2},
+            {"value": 1.0, "weight": "bad"},
+            {"weight": 3.0},
+            {"value": 1.5, "weight": 2.0},
+        ]
+    ) == [(1.5, 2.0)]
+
+    acc_metric = _Accuracy()
+    assert acc_metric._coerce_vals(  # noqa: SLF001
+        [
+            {"value": "bad"},
+            {"other": 1.0},
+            {"value": 0.3},
+            MetricContribution(value=0.8),
+        ]
+    ) == [0.0, 1.0]

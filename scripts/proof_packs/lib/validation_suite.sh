@@ -118,7 +118,7 @@ if not path.is_file():
 
 try:
     payload = json.loads(path.read_text(encoding="utf-8"))
-except Exception:
+except (OSError, json.JSONDecodeError):
     print("INVALID")
     raise SystemExit(0)
 
@@ -1614,7 +1614,7 @@ try:
         print('13')
     else:
         print('7')
-except Exception as e:
+except (FileNotFoundError, OSError, TypeError, ValueError, json.JSONDecodeError) as e:
     # Debug: uncomment to see why detection fails
     # import sys; print(f'estimate_model_params error: {e}', file=sys.stderr)
     print('7')

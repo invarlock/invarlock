@@ -84,7 +84,7 @@ def test_apply_auto_adapter_if_needed_changes_only_when_auto(tmp_path: Path):
         def model_dump(self):
             return {"model": {"adapter": self.model.adapter, "id": self.model.id}}
 
-        def __class__(self, data):  # type: ignore[override]
+        def __class__(self, data):
             return Cfg(data)
 
     cfg_auto = Cfg({"model": {"adapter": "auto", "id": str(rope_model)}})
@@ -99,6 +99,11 @@ def test_apply_auto_adapter_if_needed_changes_only_when_auto(tmp_path: Path):
 class _BadQuantConfig(dict):
     def get(self, *_args, **_kwargs):
         raise RuntimeError("broken quant config")
+
+
+class _RecoverableBadQuantConfig(dict):
+    def get(self, *_args, **_kwargs):
+        raise ValueError("broken quant config")
 
 
 def test_read_local_hf_config_and_quant_detection_paths(
@@ -119,6 +124,12 @@ def test_read_local_hf_config_and_quant_detection_paths(
 
     assert (
         mod._detect_quant_family_from_cfg({"quantization_config": _BadQuantConfig()})
+        is None
+    )
+    assert (
+        mod._detect_quant_family_from_cfg(
+            {"quantization_config": _RecoverableBadQuantConfig()}
+        )
         is None
     )
 
@@ -156,7 +167,16 @@ def test_resolve_auto_adapter_additional_family_paths(tmp_path: Path) -> None:
 
 
 def test_resolve_auto_adapter_causal_model_type_only_hints(tmp_path: Path) -> None:
-    for model_type in ("llama", "qwen3", "qwen3_moe", "gemma3", "gemma4", "olmo2"):
+    for model_type in (
+        "llama",
+        "mistral3",
+        "qwen3",
+        "qwen3_moe",
+        "gemma3",
+        "gemma4",
+        "gpt_oss",
+        "olmo2",
+    ):
         model_dir = tmp_path / model_type
         model_dir.mkdir()
         (model_dir / "config.json").write_text(
@@ -175,3 +195,17 @@ def test_apply_auto_adapter_if_needed_exception_path() -> None:
     cfg = _BrokenConfig()
     with pytest.raises(RuntimeError, match="broken model"):
         mod.apply_auto_adapter_if_needed(cfg)
+
+
+def test_apply_auto_adapter_if_needed_returns_original_cfg_on_recoverable_errors() -> (
+    None
+):
+    class _RecoverableConfig:
+        def __init__(self) -> None:
+            self.model = type("M", (), {"adapter": "auto", "id": "gpt2"})()
+
+        def model_dump(self):
+            raise ValueError("broken dump")
+
+    cfg = _RecoverableConfig()
+    assert mod.apply_auto_adapter_if_needed(cfg) is cfg

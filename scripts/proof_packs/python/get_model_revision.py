@@ -18,7 +18,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         data = json.loads(path.read_text())
-    except Exception:
+    except (OSError, json.JSONDecodeError):
         return 0
 
     if not isinstance(data, dict):

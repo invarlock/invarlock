@@ -104,7 +104,7 @@ def test_save_report_manifest_best_effort_handles_non_object_eval_payload(
     saved = save_evaluation_bundle(
         run_report=rp,
         output_dir=tmp_path,
-        evaluation_report=[],  # type: ignore[arg-type]
+        evaluation_report=[],
     )
     assert "report" in saved
     assert "manifest" not in saved
@@ -187,5 +187,5 @@ def test_build_guard_evidence_payload_handles_guard_access_errors() -> None:
         def get(self, _key: str):
             raise RuntimeError("boom")
 
-    payload = report_evidence_mod.build_guard_evidence_payload(BadReport())  # type: ignore[arg-type]
+    payload = report_evidence_mod.build_guard_evidence_payload(BadReport())
     assert payload == {"guards_decisions": []}

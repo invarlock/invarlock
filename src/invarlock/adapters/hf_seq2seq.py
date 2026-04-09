@@ -25,6 +25,14 @@ from .hf_mixin import HFAdapterMixin
 TensorType = torch.Tensor
 ModuleType = nn.Module
 _ALLOW_DIRECT_SUBMODULE = False
+_SEQ2SEQ_PROBE_ERRORS = (
+    AttributeError,
+    LookupError,
+    RuntimeError,
+    StopIteration,
+    TypeError,
+    ValueError,
+)
 
 
 class HF_Seq2Seq_Adapter(HFAdapterMixin, ModelAdapter):
@@ -32,9 +40,7 @@ class HF_Seq2Seq_Adapter(HFAdapterMixin, ModelAdapter):
 
     name = "hf_seq2seq"
 
-    def load_model(  # type: ignore[override]
-        self, model_id: str, device: str = "auto", **kwargs: Any
-    ) -> ModuleType | Any:
+    def load_model(self, model_id: str, device: str = "auto", **kwargs: Any) -> Any:
         with wrap_errors(
             DependencyError,
             "E203",
@@ -89,13 +95,13 @@ class HF_Seq2Seq_Adapter(HFAdapterMixin, ModelAdapter):
                 )
         return self._safe_to_device(model, device)
 
-    def can_handle(self, model: ModuleType | Any) -> bool:  # type: ignore[override]
+    def can_handle(self, model: Any) -> bool:
         cfg = getattr(model, "config", None)
         if cfg is None:
             return False
         try:
             mt = str(getattr(cfg, "model_type", "")).lower()
-        except Exception:
+        except _SEQ2SEQ_PROBE_ERRORS:
             mt = ""
         if mt == "t5":
             return True
@@ -106,7 +112,7 @@ class HF_Seq2Seq_Adapter(HFAdapterMixin, ModelAdapter):
             and hasattr(model, "shared")
         )
 
-    def describe(self, model: ModuleType | Any) -> dict[str, Any]:  # type: ignore[override]
+    def describe(self, model: Any) -> dict[str, Any]:
         cfg = getattr(model, "config", None)
         if cfg is None:
             raise AdapterError(
@@ -130,7 +136,7 @@ class HF_Seq2Seq_Adapter(HFAdapterMixin, ModelAdapter):
 
         try:
             device = next(model.parameters()).device
-        except Exception:
+        except _SEQ2SEQ_PROBE_ERRORS:
             device = torch.device("cpu")
 
         heads_per_layer = [n_heads] * max(1, n_layer)
@@ -144,13 +150,13 @@ class HF_Seq2Seq_Adapter(HFAdapterMixin, ModelAdapter):
                     model.shared, "weight", object()
                 ):
                     tying_map["lm_head.weight"] = "shared.weight"
-        except Exception:
+        except _SEQ2SEQ_PROBE_ERRORS:
             pass
 
         total_params = 0
         try:
             total_params = sum(p.numel() for p in model.parameters())
-        except Exception:
+        except _SEQ2SEQ_PROBE_ERRORS:
             total_params = 0
 
         return {
@@ -168,10 +174,10 @@ class HF_Seq2Seq_Adapter(HFAdapterMixin, ModelAdapter):
         }
 
     # snapshot/restore provided by HFAdapterMixin
-    def snapshot(self, model: ModuleType) -> bytes:  # type: ignore[override]
+    def snapshot(self, model: ModuleType) -> bytes:
         return super().snapshot(model)
 
-    def restore(self, model: ModuleType, blob: bytes) -> None:  # type: ignore[override]
+    def restore(self, model: ModuleType, blob: bytes) -> None:
         return super().restore(model, blob)
 
 

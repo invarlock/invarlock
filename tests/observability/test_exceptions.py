@@ -6,7 +6,7 @@ import pytest
 
 from invarlock.observability.exporters import ExportedMetric, MetricsExporter
 from invarlock.observability.exporters import (
-    export_or_raise as _export_or_raise,  # type: ignore[attr-defined]
+    export_or_raise as _export_or_raise,
 )
 
 
@@ -14,7 +14,7 @@ class _FailingExporter(MetricsExporter):
     def __init__(self, name: str = "failing"):
         super().__init__(name)
 
-    def export(self, metrics):  # type: ignore[no-untyped-def]
+    def export(self, metrics):
         raise RuntimeError("boom")
 
 
@@ -22,7 +22,7 @@ class _FalseExporter(MetricsExporter):
     def __init__(self, name: str = "false"):
         super().__init__(name)
 
-    def export(self, metrics):  # type: ignore[no-untyped-def]
+    def export(self, metrics):
         return False
 
 

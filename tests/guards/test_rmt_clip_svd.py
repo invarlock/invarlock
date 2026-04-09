@@ -26,3 +26,6 @@ def test_clip_full_svd_exception_fallback(monkeypatch):
     )
     out = R.clip_full_svd(W, clip_val=1.0, return_components=False)
     assert torch.allclose(out, W) or out.shape == W.shape
+
+    U, S, Vt = R.clip_full_svd(W, clip_val=1.0, return_components=True)
+    assert U is None and S is None and Vt is None

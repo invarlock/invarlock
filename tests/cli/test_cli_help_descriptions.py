@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from typing import cast
 
 import typer
 from typer.main import get_command
@@ -6,16 +7,14 @@ from typer.main import get_command
 
 def _iter_commands(cmd: "typer.main.TyperCommand") -> Iterable[tuple[str, object]]:
     # Root level
-    for name, sub in cmd.commands.items():  # type: ignore[attr-defined]
+    commands = cast(dict[str, object], getattr(cmd, "commands", {}))
+    for name, sub in commands.items():
         yield name, sub
         # Recurse into groups
-        try:
-            subcommands = getattr(sub, "commands", None)
-            if isinstance(subcommands, dict):
-                for subname, subsub in subcommands.items():
-                    yield f"{name} {subname}", subsub
-        except Exception:  # pragma: no cover - defensive
-            continue
+        subcommands = getattr(sub, "commands", None)
+        if isinstance(subcommands, dict):
+            for subname, subsub in subcommands.items():
+                yield f"{name} {subname}", subsub
 
 
 def test_all_commands_have_help(monkeypatch):

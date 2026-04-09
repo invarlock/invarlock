@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 import logging
 
 import torch
@@ -354,3 +355,140 @@ def test_apply_rmt_correction_scales_tied_parameters() -> None:
         layer, factor=0.9, layer_name="layer", adapter=Adapter()
     )
     assert torch.allclose(tied.detach(), before) is False
+
+
+def test_rmt_detection_misc_verbose_and_fallback_branches(monkeypatch, caplog) -> None:
+    with caplog.at_level(logging.INFO, logger=rmt_detection.__name__):
+        rmt_detection._emit_verbose(False, "hidden")
+    assert "hidden" not in caplog.text
+
+    model = _TinyModel(n_layers=2)
+
+    monkeypatch.setattr(
+        rmt_analysis,
+        "layer_svd_stats",
+        lambda *_a, **_k: {
+            "sigma_min": 1.0,
+            "sigma_max": 2.0,
+            "worst_ratio": 2.0,
+            "worst_details": {"name": "attn.c_proj", "s_max": 2.0},
+        },
+    )
+    monkeypatch.setattr(rmt_detection, "_apply_rmt_correction", lambda *_a, **_k: None)
+
+    with caplog.at_level(logging.INFO, logger=rmt_detection.__name__):
+        rmt_detection.rmt_detect(
+            model,
+            threshold=1.5,
+            detect_only=False,
+            correction_factor=0.9,
+            verbose=False,
+            max_iterations=2,
+        )
+    assert "RMT correction stalled" not in caplog.text
+
+
+def test_rmt_detect_with_names_handles_fallback_junk_and_bad_ratios(
+    monkeypatch, caplog
+) -> None:
+    class FallbackModel(nn.Module):
+        def named_modules(self, *_a, **_k):  # noqa: ANN001
+            junk = nn.Module()
+            block = nn.Module()
+            block.attn = nn.Module()
+            block.mlp = nn.Module()
+            return iter([("junk", junk), ("layer0", block)])
+
+    class BadRatio:
+        def __gt__(self, other: object) -> bool:
+            _ = other
+            return False
+
+        def __float__(self) -> float:
+            raise ValueError("boom")
+
+    def fake_bad_ratio(_layer, *_a, **_k):  # noqa: ANN001
+        return {
+            "sigma_min": 1.0,
+            "sigma_max": 2.0,
+            "worst_ratio": BadRatio(),
+        }
+
+    monkeypatch.setattr(rmt_analysis, "layer_svd_stats", fake_bad_ratio)
+    out = rmt_detection.rmt_detect_with_names(
+        FallbackModel(), threshold=1.5, verbose=False
+    )
+    assert list(out["layers"]) == ["layer0"]
+    assert out["max_ratio"] == 0.0
+
+    model = _TinyModel(n_layers=1)
+    monkeypatch.setattr(
+        rmt_analysis,
+        "layer_svd_stats",
+        lambda *_a, **_k: {
+            "sigma_min": 1.0,
+            "sigma_max": 2.0,
+            "worst_ratio": 2.0,
+            "worst_details": {"name": "attn.c_proj", "s_max": 2.0},
+        },
+    )
+    with caplog.at_level(logging.INFO, logger=rmt_detection.__name__):
+        rmt_detection.rmt_detect_with_names(model, threshold=1.5, verbose=True)
+    assert "more layers flagged" not in caplog.text
+
+
+def test_apply_rmt_correction_covers_import_and_tied_parameter_failures(
+    monkeypatch, caplog
+) -> None:
+    layer = nn.Linear(4, 4, bias=False)
+    with torch.no_grad():
+        layer.weight.copy_(torch.eye(4) * 100.0)
+
+    original_import = builtins.__import__
+
+    def _fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "transformers.pytorch_utils":
+            raise ImportError("blocked")
+        return original_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", _fake_import)
+
+    class Adapter:
+        def get_tying_map(self):  # noqa: ANN001
+            raise RuntimeError("bad map")
+
+        def get_parameter_by_name(self, name: str):  # noqa: ANN001
+            raise KeyError(name)
+
+    rmt_detection._apply_rmt_correction(
+        layer,
+        factor=0.9,
+        layer_name="layer",
+        adapter=Adapter(),
+        verbose=False,
+    )
+
+    tied = nn.Parameter(layer.weight.detach().clone())
+
+    class AdapterVerbose:
+        def get_tying_map(self):  # noqa: ANN001
+            return {"layer.weight": ["tied.none", "tied.raise", "tied.ok"]}
+
+        def get_parameter_by_name(self, name: str):  # noqa: ANN001
+            if name == "tied.none":
+                return None
+            if name == "tied.raise":
+                raise RuntimeError("boom")
+            if name == "tied.ok":
+                return tied
+            raise KeyError(name)
+
+    with caplog.at_level(logging.INFO, logger=rmt_detection.__name__):
+        rmt_detection._apply_rmt_correction(
+            layer,
+            factor=0.9,
+            layer_name="layer",
+            adapter=AdapterVerbose(),
+            verbose=True,
+        )
+    assert "tied to" in caplog.text

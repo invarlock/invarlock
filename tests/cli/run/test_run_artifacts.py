@@ -135,7 +135,7 @@ def test_resolve_exit_code_covers_all_branches() -> None:
     assert (
         run_artifacts.resolve_exit_code(
             RuntimeError("boom"),
-            profile=_BadProfile(),  # type: ignore[arg-type]
+            profile=_BadProfile(),
             config_error_cls=ConfigError,
             validation_error_cls=ValidationError,
             data_error_cls=DataError,

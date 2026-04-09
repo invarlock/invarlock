@@ -11,6 +11,8 @@ from invarlock.eval.bootstrap import paired_delta_mean_ci
 from invarlock.eval.tasks.classification import accuracy_from_records
 from invarlock.eval.tasks.qa import exact_match_from_records
 from invarlock.eval.tasks.text_generation import (
+    _lcs_len,
+    _rouge_l,
     bleu1_from_records,
     rouge_l_from_records,
 )
@@ -83,6 +85,10 @@ def test_exact_match_from_records_covers_answer_shapes_and_nan() -> None:
 def test_text_generation_helpers_cover_edge_paths_and_nan() -> None:
     assert math.isnan(bleu1_from_records([{"reference": "missing prediction"}]))
     assert math.isnan(rouge_l_from_records([{"reference": "missing prediction"}]))
+    assert math.isnan(bleu1_from_records([{"prediction": "x"}]))
+    assert math.isnan(rouge_l_from_records([{"prediction": "x"}]))
+    assert _lcs_len([], ["a"]) == 0
+    assert _rouge_l("left", "right") == 0.0
 
     records = [
         {"prediction": "the cat sat", "references": ["the cat sat"]},

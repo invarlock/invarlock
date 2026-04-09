@@ -9,13 +9,15 @@ __all__ = [
     "evaluate_metric_tail",
 ]
 
+_COERCE_ERRORS = (TypeError, ValueError, OverflowError)
+
 
 def _as_finite_float(value: Any) -> float | None:
     if isinstance(value, bool):
         return None
     try:
         out = float(value)
-    except Exception:
+    except _COERCE_ERRORS:
         return None
     return out if math.isfinite(out) else None
 
@@ -25,7 +27,7 @@ def _coerce_non_bool_int(value: Any, default: int) -> int:
         return int(default)
     try:
         return int(value)
-    except Exception:
+    except _COERCE_ERRORS:
         return int(default)
 
 
@@ -86,8 +88,7 @@ def compute_tail_summary(
             if wv is None or wv < 0.0:
                 wv = 0.0
             values.append(float(dv))
-            if paired_weights is not None:
-                paired_weights.append(float(wv))
+            paired_weights.append(float(wv))
 
     n = int(len(values))
     values_sorted = sorted(values)
@@ -101,7 +102,7 @@ def compute_tail_summary(
         for q in quantiles:
             try:
                 qf = float(q)
-            except Exception:
+            except _COERCE_ERRORS:
                 continue
             label = f"q{int(round(100.0 * max(0.0, min(1.0, qf))))}"
             summary[label] = float("nan")
@@ -125,7 +126,7 @@ def compute_tail_summary(
     for q in quantiles:
         try:
             qf = float(q)
-        except Exception:
+        except _COERCE_ERRORS:
             continue
         qf = max(0.0, min(1.0, qf))
         label = f"q{int(round(100.0 * qf))}"

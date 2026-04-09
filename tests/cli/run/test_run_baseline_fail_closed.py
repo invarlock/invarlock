@@ -62,7 +62,7 @@ def _patch_minimal_run():
             return {"name": name, "module": f"{plugin_type}.{name}", "version": "test"}
 
     class DummyRunner:
-        def execute(self, **kwargs):  # type: ignore[no-untyped-def]
+        def execute(self, **kwargs):
             return SimpleNamespace(
                 edit={"plan_digest": "abcd", "deltas": {"params_changed": 0}},
                 metrics={
@@ -95,7 +95,7 @@ def _patch_minimal_run():
             )
 
     class Provider:
-        def windows(self, **kwargs):  # type: ignore[no-untyped-def]
+        def windows(self, **kwargs):
             return (
                 SimpleNamespace(input_ids=[[1, 2, 3]], attention_masks=[[1, 1, 1]]),
                 SimpleNamespace(input_ids=[[4, 5, 6]], attention_masks=[[1, 1, 1]]),

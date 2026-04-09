@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
 from invarlock.runtime_security import (
-    delegate_container_command,
+    delegate_python_module_to_container,
     host_execution_allowed,
     running_inside_container,
     runtime_allowances_scope,
@@ -47,7 +48,7 @@ class ConfigExecutionRequest:
 
 
 def build_request_container_launch_plan(
-    command_name: str,
+    command_name: str | Iterable[str],
     request: ConfigExecutionRequest,
 ):
     from invarlock.cli.runtime_launch_plan import (
@@ -92,7 +93,7 @@ def run_from_config(
     allow_remote_code: bool = False,
     allow_unattested_artifacts: bool = False,
     prefer_local_files_only: bool = False,
-    command_name: str = "run",
+    command_name: str | Iterable[str] = "run",
     delegate: bool = True,
 ) -> Path:
     """Run a config-driven job and return the emitted report path."""
@@ -106,7 +107,8 @@ def run_from_config(
     with runtime_allowances_scope(policy=policy):
         if delegate and not running_inside_container() and not host_execution_allowed():
             try:
-                exit_code = delegate_container_command(
+                exit_code = delegate_python_module_to_container(
+                    "invarlock.cli.internal_config_run",
                     build_request_container_launch_plan(
                         command_name,
                         ConfigExecutionRequest(
@@ -131,7 +133,7 @@ def run_from_config(
                             no_color=no_color,
                             prefer_local_files_only=prefer_local_files_only,
                         ),
-                    )
+                    ),
                 )
             except RuntimeError as exc:
                 raise RuntimeDelegationError(str(exc)) from exc
@@ -167,11 +169,16 @@ def run_from_config(
 
         report = Path(report_path).resolve()
         if report.exists():
+            manifest_command = (
+                " ".join(str(token) for token in command_name)
+                if not isinstance(command_name, str)
+                else command_name
+            )
             write_runtime_manifest(
                 report,
                 config_path=config,
                 extra={
-                    "command": command_name,
+                    "command": manifest_command,
                     "profile": profile,
                     "allow_network": policy.allow_network,
                     "allow_remote_code": policy.allow_remote_code,

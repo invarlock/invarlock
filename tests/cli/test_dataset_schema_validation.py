@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import importlib
 import json
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-import jsonschema  # type: ignore
 from typer.testing import CliRunner
+
+jsonschema = importlib.import_module("jsonschema")
 
 
 def test_provider_schema_local_jsonl_requires_path(tmp_path: Path) -> None:
@@ -17,7 +19,7 @@ def test_provider_schema_local_jsonl_requires_path(tmp_path: Path) -> None:
     try:
         jsonschema.validate(instance=cfg, schema=schema)
         ok = True
-    except jsonschema.ValidationError:  # type: ignore[attr-defined]
+    except jsonschema.ValidationError:
         ok = False
     assert ok is False
 

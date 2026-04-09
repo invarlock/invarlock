@@ -3,6 +3,32 @@ from __future__ import annotations
 import math
 from typing import Any
 
+_OVERHEAD_EXTRACTION_ERRORS = (
+    AttributeError,
+    KeyError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
+
+def _valid_primary_metric_snapshot(pm: Any) -> dict[str, Any] | None:
+    if not isinstance(pm, dict):
+        return None
+    fin = pm.get("final")
+    if isinstance(fin, int | float) and math.isfinite(float(fin)):
+        return pm
+    return None
+
+
+def _compute_snapshot_from_report(
+    report: dict[str, Any], *, kind: str
+) -> dict[str, Any] | None:
+    from invarlock.eval.primary_metric import compute_primary_metric_from_report
+
+    computed = compute_primary_metric_from_report(report, kind=kind)
+    return _valid_primary_metric_snapshot(computed)
+
 
 def _extract_pm_snapshot_for_overhead(
     src: object, *, kind: str
@@ -19,39 +45,31 @@ def _extract_pm_snapshot_for_overhead(
     try:
         metrics = getattr(src, "metrics", None)
         if isinstance(metrics, dict):
-            pm = metrics.get("primary_metric")
-            if isinstance(pm, dict):
-                fin = pm.get("final")
-                if isinstance(fin, int | float) and math.isfinite(float(fin)):
-                    return pm  # already a valid snapshot
-    except Exception:
+            snapshot = _valid_primary_metric_snapshot(metrics.get("primary_metric"))
+            if snapshot is not None:
+                return snapshot
+    except _OVERHEAD_EXTRACTION_ERRORS:
         pass
 
     # 2) If dict-shaped report provided, try computing from it directly
     try:
         if isinstance(src, dict):
-            from invarlock.eval.primary_metric import compute_primary_metric_from_report
-
-            pm2 = compute_primary_metric_from_report(src, kind=kind)
-            fin2 = pm2.get("final") if isinstance(pm2, dict) else None
-            if isinstance(fin2, int | float) and math.isfinite(float(fin2)):
-                return pm2
-    except Exception:
+            snapshot = _compute_snapshot_from_report(src, kind=kind)
+            if snapshot is not None:
+                return snapshot
+    except _OVERHEAD_EXTRACTION_ERRORS:
         pass
 
     # 3) Compute from evaluation_windows attribute on CoreRunner reports
     try:
         ew = getattr(src, "evaluation_windows", None)
         if isinstance(ew, dict) and ew:
-            from invarlock.eval.primary_metric import compute_primary_metric_from_report
-
-            pm3 = compute_primary_metric_from_report(
+            snapshot = _compute_snapshot_from_report(
                 {"evaluation_windows": ew}, kind=kind
             )
-            fin3 = pm3.get("final") if isinstance(pm3, dict) else None
-            if isinstance(fin3, int | float) and math.isfinite(float(fin3)):
-                return pm3
-    except Exception:
+            if snapshot is not None:
+                return snapshot
+    except _OVERHEAD_EXTRACTION_ERRORS:
         pass
 
     return None

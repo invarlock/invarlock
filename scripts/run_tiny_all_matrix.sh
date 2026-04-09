@@ -39,6 +39,12 @@ seed_local_runtime_image() {
   if [[ -n "${INVARLOCK_RUNTIME_IMAGE:-}" ]]; then
     return 0
   fi
+  if [[ -e /dev/nvidiactl || -n "$(command -v nvidia-smi 2>/dev/null)" ]] \
+    && command -v docker >/dev/null 2>&1 \
+    && docker image inspect invarlock-runtime:cuda-local >/dev/null 2>&1; then
+    export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"
+    return 0
+  fi
   if command -v docker >/dev/null 2>&1 \
     && docker image inspect invarlock-runtime:local >/dev/null 2>&1; then
     export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:local"
@@ -49,10 +55,18 @@ ensure_current_runtime_image() {
   if [[ "$RUN" != "1" || "$NET" != "1" ]]; then
     return 0
   fi
-  if [[ -n "${INVARLOCK_RUNTIME_IMAGE:-}" && "${INVARLOCK_RUNTIME_IMAGE}" != "invarlock-runtime:local" ]]; then
+  if [[ -n "${INVARLOCK_RUNTIME_IMAGE:-}" \
+    && "${INVARLOCK_RUNTIME_IMAGE}" != "invarlock-runtime:local" \
+    && "${INVARLOCK_RUNTIME_IMAGE}" != "invarlock-runtime:cuda-local" ]]; then
     return 0
   fi
   if ! command -v docker >/dev/null 2>&1 || ! command -v make >/dev/null 2>&1; then
+    return 0
+  fi
+  if [[ -e /dev/nvidiactl || -n "$(command -v nvidia-smi 2>/dev/null)" ]]; then
+    echo "[smoke] refreshing local CUDA attested runtime image"
+    make runtime-image-cuda
+    export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"
     return 0
   fi
   echo "[smoke] refreshing local attested runtime image"
@@ -120,7 +134,7 @@ try:
     import tiktoken  # noqa: F401
     import torch, transformers, datasets  # noqa: F401
     print("deps: torch/transformers/datasets/protobuf/sentencepiece/tiktoken present")
-except Exception as e:
+except (ImportError, ModuleNotFoundError, OSError, RuntimeError) as e:
     print("deps: missing core HF stack; attempting install via pip...", e)
     import os, sys, subprocess
     cpu_torch_cmd = [

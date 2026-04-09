@@ -187,6 +187,25 @@ def test_resolve_guard_policies_defaults_for_missing_or_invalid_auto_config() ->
     assert seen["overrides"] == {"spectral": {"deadband": 0.2}}
 
 
+def test_resolve_guard_policies_defaults_when_config_meta_has_no_auto_key() -> None:
+    runner = _RunnerStub()
+    seen: dict[str, object] = {}
+
+    def fake_resolver(
+        tier: str, edit_name: str | None, overrides: dict[str, object]
+    ) -> dict[str, dict[str, object]]:
+        seen["tier"] = tier
+        seen["edit_name"] = edit_name
+        seen["overrides"] = dict(overrides)
+        return {"spectral": {"deadband": 0.1}}
+
+    report = RunReport(meta={"config": {}, "edit_name": "quant"})
+    policies = resolve_guard_policies(runner, report, None, resolver=fake_resolver)
+
+    assert policies == {"spectral": {"deadband": 0.1}}
+    assert seen == {"tier": "balanced", "edit_name": "quant", "overrides": {}}
+
+
 def test_prepare_guards_phase_non_strict_invarlock_errors_are_recorded_and_skipped() -> (
     None
 ):

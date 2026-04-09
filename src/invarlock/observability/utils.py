@@ -13,6 +13,24 @@ from typing import Any
 
 import psutil
 
+_SYSTEM_INFO_ERRORS = (
+    AttributeError,
+    ImportError,
+    ModuleNotFoundError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+_LOG_EXCEPTION_DEFAULTS = (
+    AssertionError,
+    LookupError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 @dataclass
 class TimingContext:
@@ -341,7 +359,7 @@ def get_system_info() -> dict[str, Any]:
             "python_version": getattr(psutil, "sys", {}).get("version", "unknown"),
             "platform": getattr(psutil, "os", {}).get("name", "unknown"),
         }
-    except Exception as e:
+    except _SYSTEM_INFO_ERRORS as e:
         logging.getLogger(__name__).error(f"Failed to get system info: {e}")
         return {"error": str(e)}
 
@@ -532,6 +550,7 @@ def log_exceptions(
     logger: logging.Logger | None = None,
     level: int = logging.ERROR,
     reraise: bool = True,
+    caught_exceptions: tuple[type[BaseException], ...] = _LOG_EXCEPTION_DEFAULTS,
 ):
     """Decorator for logging exceptions."""
     if logger is None:
@@ -542,7 +561,7 @@ def log_exceptions(
         def wrapper(*args, **kwargs):
             try:
                 return func(*args, **kwargs)
-            except Exception as e:
+            except caught_exceptions as e:
                 logger.log(level, f"Exception in {func.__name__}: {e}", exc_info=True)
                 if reraise:
                     raise

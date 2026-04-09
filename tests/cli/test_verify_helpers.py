@@ -2,39 +2,14 @@ from __future__ import annotations
 
 import importlib
 import math
-import sys
-import types
 from pathlib import Path
 
 from invarlock.reporting.report_schema import REPORT_SCHEMA_VERSION
+from tests.conftest import install_transformers_tokenizer_stub
 
 
 def _import_verify_module():
-    # transformers stub so importing verify (which imports run) is safe
-    if "transformers" not in sys.modules:
-        tr = types.ModuleType("transformers")
-
-        class _Tok:
-            pad_token = "<pad>"
-            eos_token = "<eos>"
-
-            def get_vocab(self):
-                return {"<pad>": 0, "<eos>": 1}
-
-        class _Auto:
-            @staticmethod
-            def from_pretrained(*a, **k):
-                return _Tok()
-
-        class _GPT2(_Auto):
-            pass
-
-        tr.AutoTokenizer = _Auto  # type: ignore[attr-defined]
-        tr.GPT2Tokenizer = _GPT2  # type: ignore[attr-defined]
-        sys.modules["transformers"] = tr
-        sub = types.ModuleType("transformers.tokenization_utils_base")
-        sub.PreTrainedTokenizerBase = object  # type: ignore[attr-defined]
-        sys.modules["transformers.tokenization_utils_base"] = sub
+    install_transformers_tokenizer_stub()
     return importlib.import_module("invarlock.reporting.verify_contract")
 
 

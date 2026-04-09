@@ -280,6 +280,95 @@ def test_classify_module_family_uses_embedding_module_type_without_name_hint() -
     )
 
 
+def test_spectral_detection_family_iteration_and_unknown_scope_branches() -> None:
+    class Conv1DModule(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.weight = torch.zeros(2, 2)
+
+    assert (
+        spectral_detection.classify_module_family("layer.attn.proj", Conv1DModule())
+        == "attn"
+    )
+    assert (
+        spectral_detection.classify_module_family("layer.mlp.proj", Conv1DModule())
+        == "ffn"
+    )
+
+    model = _TinyModel(
+        {
+            "keep": _TinyWeightModule(torch.eye(2)),
+            "skip": _TinyWeightModule(torch.eye(2)),
+        }
+    )
+    families = spectral_detection.classify_model_families(
+        model,
+        existing={"seed": "other"},
+        should_process_module_fn=lambda name, *_args: name != "skip",
+        classify_module_family_fn=lambda *_args: "ffn",
+    )
+    assert families == {"seed": "other", "keep": "ffn"}
+
+    guard = type("Guard", (), {"scope": "unexpected"})()
+    assert spectral_detection.should_check_module(
+        guard, "plain.name", _TinyWeightModule(torch.eye(2))
+    )
+
+
+def test_spectral_detection_summary_and_degeneracy_error_branches(
+    monkeypatch,
+) -> None:
+    summary = spectral_detection.summarize_family_z_scores(
+        {"m": 1.0},
+        {"m": "ffn"},
+        {},
+    )
+    assert summary["ffn"]["violations"] == 0
+    assert "kappa" not in summary["ffn"]
+
+    stats = spectral_detection.compute_family_stats({"m": 2.0}, {"m": "ffn"})
+    assert stats["ffn"]["max"] == 2.0
+
+    guard = spectral_guard.SpectralGuard(scope="all", correction_enabled=False)
+    guard.deadband = 0.0
+    guard.ignore_preview_inflation = False
+    guard.prepared = True
+    guard.baseline_sigmas = {"plain.linear": 1.0}
+    guard.baseline_family_stats = {"other": {"mean": 0.0, "std": 1.0}}
+    guard.module_family_map = {"plain.linear": "other"}
+    guard.family_caps = {"other": {"kappa": 10.0}}
+    guard.target_sigma = 1.0
+    guard.degeneracy = {
+        "enabled": True,
+        "stable_rank": {"warn_ratio": 0.9, "fatal_ratio": 0.8},
+        "norm_collapse": {"warn_ratio": 0.9, "fatal_ratio": 0.8},
+    }
+    guard.baseline_degeneracy = {
+        "plain.linear": {"stable_rank": 10.0, "norm_collapse": 1.0}
+    }
+    guard._log_event = lambda *_args, **_kwargs: None
+    model = _TinyModel({"plain.linear": _TinyWeightModule(torch.eye(2))})
+
+    monkeypatch.setattr(
+        spectral_detection,
+        "frobenius_norm_sq",
+        lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("sr boom")),
+    )
+    monkeypatch.setattr(
+        spectral_detection,
+        "row_col_norm_extrema",
+        lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("nc boom")),
+    )
+
+    violations = spectral_detection.detect_spectral_violations(
+        guard,
+        model,
+        metrics={"plain.linear": 1.0},
+        phase="finalize",
+    )
+    assert violations == []
+
+
 def test_detect_spectral_violations_uses_default_kappa_and_degeneracy_defaults() -> (
     None
 ):
@@ -326,7 +415,7 @@ def test_detect_spectral_violations_logs_module_errors() -> None:
     def _log_event(operation: str, **kwargs: object) -> None:
         events.append((operation, kwargs))
 
-    guard._log_event = _log_event  # type: ignore[method-assign]
+    guard._log_event = _log_event
 
     model = _TinyModel({"plain.linear": _TinyWeightModule(torch.eye(2))})
     violations = spectral_detection.detect_spectral_violations(

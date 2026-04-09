@@ -232,6 +232,17 @@ def test_build_doctor_result_sorts_findings_and_summarizes() -> None:
     assert "resolution" not in payload
 
 
+def test_doctor_accumulator_marks_errors_and_sorts() -> None:
+    acc = mod.DoctorAccumulator()
+
+    acc.add("D100", "warning", "warn")
+    acc.add("D001", "error", "boom")
+    acc.sort()
+
+    assert acc.had_error is True
+    assert [item["code"] for item in acc.findings] == ["D001", "D100"]
+
+
 def test_mapping_get_handles_getter_exceptions() -> None:
     class BadGetter:
         def get(self, _key: str) -> object:
@@ -239,6 +250,14 @@ def test_mapping_get_handles_getter_exceptions() -> None:
 
     with pytest.raises(RuntimeError, match="boom"):
         mod._mapping_get(BadGetter(), "field")
+
+
+def test_mapping_get_returns_none_for_recoverable_getter_errors() -> None:
+    class BadGetter:
+        def get(self, _key: str) -> object:
+            raise ValueError("boom")
+
+    assert mod._mapping_get(BadGetter(), "field") is None
 
 
 def test_format_report_input_error_covers_remaining_reasons(tmp_path: Path) -> None:
@@ -259,3 +278,78 @@ def test_format_report_input_error_covers_remaining_reasons(tmp_path: Path) -> N
         exc=ReportInputError("unknown_reason", tmp_path / "mystery.json"),
     )
     assert "input is invalid" in fallback
+
+
+def test_build_cross_check_findings_marks_strict_split_mismatch_as_error(
+    tmp_path: Path,
+) -> None:
+    baseline = _write_json(
+        tmp_path / "baseline.json",
+        {"provenance": {"dataset_split": "validation"}},
+    )
+    subject = _write_json(
+        tmp_path / "subject.json",
+        {"provenance": {"dataset_split": "train"}},
+    )
+
+    findings, had_error = mod.build_cross_check_findings(
+        str(baseline),
+        str(subject),
+        cfg_metric_kind=None,
+        strict=True,
+        profile="ci",
+    )
+
+    assert had_error is True
+    assert findings[0].code == "D011"
+    assert findings[0].severity == "error"
+
+
+def test_build_cross_check_findings_marks_dev_split_mismatch_as_warning(
+    tmp_path: Path,
+) -> None:
+    baseline = _write_json(
+        tmp_path / "baseline-dev.json",
+        {"provenance": {"dataset_split": "validation"}},
+    )
+    subject = _write_json(
+        tmp_path / "subject-dev.json",
+        {"provenance": {"dataset_split": "train"}},
+    )
+
+    findings, had_error = mod.build_cross_check_findings(
+        str(baseline),
+        str(subject),
+        cfg_metric_kind=None,
+        strict=False,
+        profile="dev",
+    )
+
+    assert had_error is False
+    assert findings[0].code == "D011"
+    assert findings[0].severity == "warning"
+
+
+def test_build_provider_schema_findings_handles_exists_probe_errors_and_blank_text_field(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    dataset = tmp_path / "data.jsonl"
+    dataset.write_text('{"text": "hi"}\n', encoding="utf-8")
+
+    monkeypatch.setattr(
+        mod.Path,
+        "exists",
+        lambda self: (_ for _ in ()).throw(OSError("boom")),
+    )
+    findings, had_error = mod.build_provider_schema_findings(
+        {"kind": "vision_text", "file": dataset}
+    )
+    assert had_error is True
+    assert findings[0].code == "D011"
+
+    monkeypatch.undo()
+    findings, had_error = mod.build_provider_schema_findings(
+        {"kind": "local_jsonl", "file": dataset, "text_field": "   "}
+    )
+    assert had_error is False
+    assert [finding.code for finding in findings] == ["D012"]

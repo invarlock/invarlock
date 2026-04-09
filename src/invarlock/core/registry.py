@@ -32,6 +32,17 @@ from .exceptions import DependencyError, PluginError
 
 __all__ = ["PluginInfo", "CoreRegistry", "get_registry"]
 
+_DISCOVERY_ERRORS = (AttributeError, ImportError, RuntimeError, TypeError, ValueError)
+_PLUGIN_LOAD_ERRORS = (
+    AttributeError,
+    DependencyError,
+    ImportError,
+    PluginError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 @dataclass
 class PluginInfo:
@@ -107,7 +118,7 @@ class CoreRegistry:
                     info = self._create_plugin_info(ep, "guards")
                     self._guards[ep.name] = info
 
-            except Exception as e:
+            except _DISCOVERY_ERRORS as e:
                 self._discovery_issue = f"Plugin discovery failed: {e}"
                 warnings.warn(f"Plugin discovery failed: {e}", stacklevel=2)
 
@@ -243,11 +254,20 @@ class CoreRegistry:
         for dep in deps:
             try:
                 spec = importlib.util.find_spec(dep)
-            except Exception:
+            except (AttributeError, ImportError, RuntimeError, TypeError, ValueError):
                 spec = None
             if spec is None:
                 missing.append(dep)
         return missing
+
+    def _parse_entry_point_value(self, entry_point: EntryPoint) -> tuple[str, str]:
+        value = getattr(entry_point, "value", None)
+        if not isinstance(value, str):
+            raise TypeError("entry point value must be a string")
+        module_path, separator, class_name = value.partition(":")
+        if not module_path or separator != ":" or not class_name:
+            raise ValueError(f"malformed entry point value: {value}")
+        return module_path, class_name
 
     def _create_plugin_info(
         self, entry_point: EntryPoint, plugin_type: str
@@ -255,50 +275,90 @@ class CoreRegistry:
         """Create plugin info from entry point."""
         try:
             # Parse module and class from entry point value
-            module_path, class_name = entry_point.value.split(":")
-
-            # Determine package/version metadata
-            package_name: str | None = None
-            version: str | None = None
-
-            dist = getattr(entry_point, "dist", None)
-            if dist is not None:
-                package_name = getattr(dist, "metadata", {}).get("Name") or getattr(
-                    dist, "name", None
-                )
-                version = getattr(dist, "version", None)
-
-            if not package_name:
-                package_name = module_path.split(".")[0]
-                try:
-                    version = metadata_version(package_name)
-                except PackageNotFoundError:
-                    version = None
-
-            # Defer import to instantiation time to avoid heavy imports here
-            available = True
-            status = "Deferred load"
-
-            return PluginInfo(
-                name=entry_point.name,
-                module=module_path,
-                class_name=class_name,
-                available=available,
-                status=status,
-                package=package_name,
-                version=version,
-                entry_point=entry_point,
-            )
-
-        except Exception as e:
+            module_path, class_name = self._parse_entry_point_value(entry_point)
+        except (AttributeError, TypeError, ValueError) as error:
             return PluginInfo(
                 name=entry_point.name,
                 module="unknown",
                 class_name="unknown",
                 available=False,
-                status=f"Parse error: {e}",
+                status=f"Parse error: {error}",
                 entry_point=entry_point,
             )
+
+        # Determine package/version metadata
+        package_name: str | None = None
+        version: str | None = None
+
+        dist = getattr(entry_point, "dist", None)
+        if dist is not None:
+            metadata = getattr(dist, "metadata", None)
+            if isinstance(metadata, dict):
+                meta_name = metadata.get("Name")
+                if isinstance(meta_name, str) and meta_name:
+                    package_name = meta_name
+            if not package_name:
+                dist_name = getattr(dist, "name", None)
+                if isinstance(dist_name, str) and dist_name:
+                    package_name = dist_name
+            dist_version = getattr(dist, "version", None)
+            if isinstance(dist_version, str) and dist_version:
+                version = dist_version
+
+        if not package_name:
+            package_name = module_path.split(".")[0]
+            try:
+                version = metadata_version(package_name)
+            except PackageNotFoundError:
+                version = None
+
+        # Defer import to instantiation time to avoid heavy imports here
+        return PluginInfo(
+            name=entry_point.name,
+            module=module_path,
+            class_name=class_name,
+            available=True,
+            status="Deferred load",
+            package=package_name,
+            version=version,
+            entry_point=entry_point,
+        )
+
+    def _resolve_plugin_class(self, info: PluginInfo) -> Any:
+        if info.entry_point:
+            return info.entry_point.load()
+        module = importlib.import_module(info.module)
+        return getattr(module, info.class_name)
+
+    def _validate_plugin_abi(self, cls: Any) -> None:
+        provider_mod = importlib.import_module(cls.__module__)
+        plugin_abi = getattr(provider_mod, "INVARLOCK_CORE_ABI", None)
+        if plugin_abi is not None and str(plugin_abi) != INVARLOCK_CORE_ABI:
+            raise ImportError(
+                f"ABI mismatch: plugin={plugin_abi} != core={INVARLOCK_CORE_ABI}"
+            )
+
+    def _instantiate_plugin(
+        self,
+        info: PluginInfo,
+        *,
+        expected_type: type[Any],
+        kind: str,
+    ) -> Any:
+        try:
+            cls = self._resolve_plugin_class(info)
+            self._validate_plugin_abi(cls)
+            instance = cls()
+        except _PLUGIN_LOAD_ERRORS as error:
+            raise ImportError(
+                f"Failed to load {kind} '{info.name}': {error}"
+            ) from error
+        if not isinstance(instance, expected_type):
+            raise ImportError(
+                f"Failed to load {kind} '{info.name}': "
+                f"Expected {expected_type.__name__}, got {type(instance)}"
+            )
+        return instance
 
     def list_adapters(self) -> list[str]:
         """List all registered adapter names."""
@@ -327,29 +387,14 @@ class CoreRegistry:
         if not info.available:
             raise ImportError(f"Adapter '{name}' unavailable: {info.status}")
 
-        try:
-            if info.entry_point:
-                cls = info.entry_point.load()
-            else:
-                # Fallback loading
-                module = importlib.import_module(info.module)
-                cls = getattr(module, info.class_name)
-            # ABI compatibility check on the providing module
-            try:  # pragma: no cover - simple guard
-                provider_mod = importlib.import_module(cls.__module__)
-                plugin_abi = getattr(provider_mod, "INVARLOCK_CORE_ABI", None)
-                if plugin_abi is not None and str(plugin_abi) != INVARLOCK_CORE_ABI:
-                    raise ImportError(
-                        f"ABI mismatch: plugin={plugin_abi} != core={INVARLOCK_CORE_ABI}"
-                    )
-            except Exception as abi_exc:
-                raise ImportError(str(abi_exc)) from abi_exc
-            instance = cls()
-            if not isinstance(instance, ModelAdapter):
-                raise TypeError(f"Expected ModelAdapter, got {type(instance)}")
-            return instance
-        except Exception as e:
-            raise ImportError(f"Failed to load adapter '{name}': {e}") from e
+        return cast(
+            ModelAdapter,
+            self._instantiate_plugin(
+                info,
+                expected_type=ModelAdapter,
+                kind="adapter",
+            ),
+        )
 
     def get_edit(self, name: str) -> ModelEdit:
         """Get an edit instance by name."""
@@ -363,28 +408,14 @@ class CoreRegistry:
         if not info.available:
             raise ImportError(f"Edit '{name}' unavailable: {info.status}")
 
-        try:
-            if info.entry_point:
-                cls = info.entry_point.load()
-            else:
-                # Fallback loading
-                module = importlib.import_module(info.module)
-                cls = getattr(module, info.class_name)
-            try:  # ABI check
-                provider_mod = importlib.import_module(cls.__module__)
-                plugin_abi = getattr(provider_mod, "INVARLOCK_CORE_ABI", None)
-                if plugin_abi is not None and str(plugin_abi) != INVARLOCK_CORE_ABI:
-                    raise ImportError(
-                        f"ABI mismatch: plugin={plugin_abi} != core={INVARLOCK_CORE_ABI}"
-                    )
-            except Exception as abi_exc:
-                raise ImportError(str(abi_exc)) from abi_exc
-            instance = cls()
-            if not isinstance(instance, ModelEdit):
-                raise TypeError(f"Expected ModelEdit, got {type(instance)}")
-            return instance
-        except Exception as e:
-            raise ImportError(f"Failed to load edit '{name}': {e}") from e
+        return cast(
+            ModelEdit,
+            self._instantiate_plugin(
+                info,
+                expected_type=ModelEdit,
+                kind="edit",
+            ),
+        )
 
     def get_guard(self, name: str) -> Guard:
         """Get a guard instance by name."""
@@ -398,28 +429,14 @@ class CoreRegistry:
         if not info.available:
             raise ImportError(f"Guard '{name}' unavailable: {info.status}")
 
-        try:
-            if info.entry_point:
-                cls = info.entry_point.load()
-            else:
-                # Fallback loading
-                module = importlib.import_module(info.module)
-                cls = getattr(module, info.class_name)
-            try:  # ABI check
-                provider_mod = importlib.import_module(cls.__module__)
-                plugin_abi = getattr(provider_mod, "INVARLOCK_CORE_ABI", None)
-                if plugin_abi is not None and str(plugin_abi) != INVARLOCK_CORE_ABI:
-                    raise ImportError(
-                        f"ABI mismatch: plugin={plugin_abi} != core={INVARLOCK_CORE_ABI}"
-                    )
-            except Exception as abi_exc:
-                raise ImportError(str(abi_exc)) from abi_exc
-            instance = cls()
-            if not isinstance(instance, Guard):
-                raise TypeError(f"Expected Guard, got {type(instance)}")
-            return instance
-        except Exception as e:
-            raise ImportError(f"Failed to load guard '{name}': {e}") from e
+        return cast(
+            Guard,
+            self._instantiate_plugin(
+                info,
+                expected_type=Guard,
+                kind="guard",
+            ),
+        )
 
     def get_plugin_info(self, name: str, plugin_type: str) -> dict[str, Any]:
         """Get plugin information without instantiation."""
@@ -470,7 +487,7 @@ class CoreRegistry:
     def get_adapter_typed(self, name: str) -> ModelAdapter:
         try:
             return self.get_adapter(name)
-        except Exception as e:  # pragma: no cover - exercised in tests
+        except (ImportError, KeyError) as e:  # pragma: no cover - exercised in tests
             details = {"name": name, "kind": "adapter", "reason": type(e).__name__}
             if isinstance(e, ImportError | ModuleNotFoundError):
                 raise DependencyError(
@@ -483,7 +500,7 @@ class CoreRegistry:
     def get_edit_typed(self, name: str) -> ModelEdit:
         try:
             return self.get_edit(name)
-        except Exception as e:  # pragma: no cover - exercised in tests
+        except (ImportError, KeyError) as e:  # pragma: no cover - exercised in tests
             details = {"name": name, "kind": "edit", "reason": type(e).__name__}
             if isinstance(e, ImportError | ModuleNotFoundError):
                 raise DependencyError(
@@ -496,7 +513,7 @@ class CoreRegistry:
     def get_guard_typed(self, name: str) -> Guard:
         try:
             return self.get_guard(name)
-        except Exception as e:  # pragma: no cover - exercised in tests
+        except (ImportError, KeyError) as e:  # pragma: no cover - exercised in tests
             details = {"name": name, "kind": "guard", "reason": type(e).__name__}
             if isinstance(e, ImportError | ModuleNotFoundError):
                 raise DependencyError(

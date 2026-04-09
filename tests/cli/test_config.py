@@ -83,7 +83,7 @@ def test_guard_configs_family_caps_and_sigma_quantile():
 @pytest.mark.parametrize("clamp", [[], [0.1], [0.5, 0.1]])
 def test_variance_guard_config_clamp_validation(clamp):
     with pytest.raises(ValueError):
-        VarianceGuardConfig(clamp=clamp)  # type: ignore[arg-type]
+        VarianceGuardConfig(clamp=clamp)
 
 
 def test_variance_guard_config_happy_path_sets_floor() -> None:

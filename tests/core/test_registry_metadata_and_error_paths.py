@@ -495,10 +495,35 @@ def test_create_plugin_info_uses_dist_name_when_metadata_name_is_missing() -> No
     assert info.version == "1.2.3"
 
 
+def test_create_plugin_info_rejects_non_string_values_and_uses_metadata_version(
+    monkeypatch,
+) -> None:
+    r = reg.CoreRegistry()
+    bad_ep = _EP(name="bad", value="ignored")
+    bad_ep.value = 123
+
+    info_bad = r._create_plugin_info(bad_ep, "guards")
+    assert info_bad.available is False
+    assert "Parse error" in info_bad.status
+
+    monkeypatch.setattr(reg, "metadata_version", lambda pkg: f"{pkg}-version")
+    ep = _EP(
+        name="ok",
+        value="thirdparty.guard:Guard",
+        dist=types.SimpleNamespace(name=None, version=None, metadata="not-a-dict"),
+    )
+
+    info = r._create_plugin_info(ep, "guards")
+
+    assert info.available is True
+    assert info.package == "thirdparty"
+    assert info.version == "thirdparty-version"
+
+
 def test_check_runtime_dependencies_find_spec_exception_counts_missing(monkeypatch):
     r = reg.CoreRegistry()
 
-    def _boom(dep: str):  # type: ignore[no-untyped-def]
+    def _boom(dep: str):
         raise RuntimeError("boom")
 
     monkeypatch.setattr(reg.importlib.util, "find_spec", _boom)

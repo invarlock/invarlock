@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import torch
 import torch.nn as nn
 
-from invarlock.guards.invariants import InvariantsGuard
+from invarlock.guards.invariants import InvariantsGuard, check_all_invariants
 
 
 class TinyModel(nn.Module):
@@ -121,7 +121,7 @@ def test_invariants_non_finite_buffer_detected():
 
 def test_invariants_surface_evidence_gaps_instead_of_sentinel_clean_values():
     class BrokenModel(TinyModel):
-        def parameters(self, recurse: bool = True):  # type: ignore[override]
+        def parameters(self, recurse: bool = True):
             raise RuntimeError("parameter enumeration failed")
 
     model = BrokenModel()
@@ -308,6 +308,55 @@ def test_invariants_profile_checks_cover_empty_rotary_layers_and_causal_type() -
 
     assert guard._evaluate_profile_check(model, "rotary_embedding") is False
     assert guard._evaluate_profile_check(model, "causal_masking") is True
+    assert guard._evaluate_profile_check(SimpleNamespace(), "rotary_embedding") is False
+
+
+def test_invariants_cover_missing_embedding_shape_and_missing_abs_paths() -> None:
+    class _FragileEmbedding(nn.Embedding):
+        def __init__(self) -> None:
+            super().__init__(9, 4)
+            del self._parameters["weight"]
+            self.__dict__["weight"] = SimpleNamespace()
+
+        @property
+        def num_embeddings(self) -> int:
+            raise RuntimeError("num_embeddings unavailable")
+
+        @num_embeddings.setter
+        def num_embeddings(self, value: int) -> None:
+            self._stored_num_embeddings = value
+
+    class _ShapeLessModel(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.embed = _FragileEmbedding()
+
+    guard = InvariantsGuard()
+    checks = guard._capture_invariants(_ShapeLessModel(), adapter=None)
+    assert "embedding_vocab_sizes" not in checks
+
+    class _BareData:
+        def isnan(self):
+            return torch.tensor([False])
+
+        def isinf(self):
+            return torch.tensor([False])
+
+    class _BareParam:
+        data = _BareData()
+
+        def numel(self) -> int:
+            return 1
+
+    class _BareModel:
+        def parameters(self):
+            yield _BareParam()
+
+        def named_parameters(self):
+            yield "w", _BareParam()
+
+    outcome = check_all_invariants(_BareModel())
+    assert not any(v.get("type") == "range_violation" for v in outcome.violations)
 
 
 def test_detect_non_finite_ignores_bad_tensor_checks_and_iteration_failures() -> None:

@@ -56,7 +56,7 @@ def check_modules(modules: tuple[str, ...]) -> list[str]:
     for module_name in modules:
         try:
             importlib.import_module(module_name)
-        except Exception:
+        except (ImportError, ModuleNotFoundError):
             missing.append(module_name)
     return missing
 

@@ -14,7 +14,7 @@ from __future__ import annotations
 import math
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 import numpy as np
 
@@ -121,6 +121,33 @@ def _is_non_bool_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
+_NUMERIC_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
+
+
+def _coerce_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return float(value)
+    except _NUMERIC_COERCION_ERRORS:
+        return None
+
+
+def _coerce_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return int(value)
+    if isinstance(value, float):
+        return int(value) if math.isfinite(value) else None
+    try:
+        return int(value)
+    except _NUMERIC_COERCION_ERRORS:
+        return None
+
+
 class _PPLCausal(PrimaryMetric):
     """Token-aggregated perplexity for causal LMs.
 
@@ -154,10 +181,9 @@ class _PPLCausal(PrimaryMetric):
         sum_w = 0.0
         sum_wx = 0.0
         for ll, w in zip(logloss, token_counts, strict=False):
-            try:
-                llv = float(ll)
-                wv = float(w)
-            except Exception:
+            llv = _coerce_float(ll)
+            wv = _coerce_float(w)
+            if llv is None or wv is None:
                 continue
             if not math.isfinite(llv) or not math.isfinite(wv) or wv <= 0:
                 continue
@@ -172,10 +198,9 @@ class _PPLCausal(PrimaryMetric):
             return float("inf")
 
     def accumulate(self, contrib: MetricContribution) -> None:
-        try:
-            v = float(contrib.value)
-            w = float(contrib.weight)
-        except Exception:
+        v = _coerce_float(contrib.value)
+        w = _coerce_float(contrib.weight)
+        if v is None or w is None:
             return
         if not math.isfinite(v) or not math.isfinite(w) or w <= 0:
             return
@@ -204,11 +229,15 @@ class _PPLCausal(PrimaryMetric):
         out: list[tuple[float, float]] = []
         for it in items:
             if isinstance(it, MetricContribution):
-                out.append((float(it.value), float(it.weight)))
+                value = _coerce_float(it.value)
+                weight = _coerce_float(it.weight)
+                if value is not None and weight is not None:
+                    out.append((value, weight))
             elif isinstance(it, dict) and "value" in it:
-                v = float(it.get("value"))
-                w = float(it.get("weight", 1.0))
-                out.append((v, w))
+                value = _coerce_float(it.get("value"))
+                weight = _coerce_float(it.get("weight", 1.0))
+                if value is not None and weight is not None:
+                    out.append((value, weight))
         return out
 
     def paired_compare(
@@ -238,17 +267,15 @@ class _PPLCausal(PrimaryMetric):
         ) -> float:
             if not vals:
                 return float("nan")
-            if weights and len(weights) == len(vals):
-                sw = 0.0
-                swx = 0.0
-                for v, w in zip(vals, weights, strict=False):
-                    sw += w
-                    swx += w * v
-                if sw <= 0:
-                    return float("nan")
-                return self.display_transform(swx / sw)
-            else:
-                return self.display_transform(sum(vals) / float(len(vals)))
+            assert weights is not None and len(weights) == len(vals)
+            sw = 0.0
+            swx = 0.0
+            for v, w in zip(vals, weights, strict=False):
+                sw += w
+                swx += w * v
+            if sw <= 0:
+                return float("nan")
+            return self.display_transform(swx / sw)
 
         subj_point = _point([v for v, _ in subj], [w for _, w in subj])
         base_point = _point([v for v, _ in base], [w for _, w in base])
@@ -295,12 +322,12 @@ class _PPLCausal(PrimaryMetric):
             "subject_point": subj_point,
             "baseline_point": base_point,
             "delta": delta_log,
-            "ci": (dlog_lo, dlog_hi),
+            "ci": [dlog_lo, dlog_hi],
             "display": ratio,
-            "display_ci": (
+            "display_ci": [
                 self.display_transform(dlog_lo),
                 self.display_transform(dlog_hi),
-            ),
+            ],
         }
 
 
@@ -357,11 +384,11 @@ class _Accuracy:
             s = 0.0
             n = 0.0
             for v in ex:
-                try:
-                    s += 1.0 if float(v) > 0.5 else 0.0
-                    n += 1.0
-                except Exception:
+                coerced = _coerce_float(v)
+                if coerced is None:
                     continue
+                s += 1.0 if coerced > 0.5 else 0.0
+                n += 1.0
             if n > 0:
                 return s / n
             return float("nan")
@@ -375,44 +402,36 @@ class _Accuracy:
             if _is_non_bool_number(c) and _is_non_bool_number(t) and t > 0:
                 total = float(t)
                 # Optional abstain/tie handling with documented policy
-                try:
-                    policy = (
-                        windows.get("policy", {})
-                        if isinstance(windows.get("policy"), dict)
-                        else {}
-                    )
-                    abstain = windows.get("abstain_total")
-                    ties = windows.get("ties_total")
-                    exclude_abstain = bool(policy.get("exclude_abstain", True))
-                    count_ties_as_correct = bool(
-                        policy.get("ties_count_as_correct", False)
-                    )
-                    count_ties_as_incorrect = bool(
-                        policy.get("ties_count_as_incorrect", False)
-                    )
-                    # Apply abstain exclusion from denominator if requested
-                    if exclude_abstain and _is_non_bool_number(abstain) and abstain > 0:
-                        total = max(1.0, total - float(abstain))
-                    # Apply tie policy
-                    if _is_non_bool_number(ties) and ties > 0:
-                        if count_ties_as_correct:
-                            c = float(c) + float(ties)
-                        elif count_ties_as_incorrect:
-                            # leave c unchanged; implicit in denominator
-                            pass
-                        else:
-                            # default: treat ties as abstain (exclude if exclude_abstain True)
-                            if exclude_abstain:
-                                total = max(1.0, total - float(ties))
-                except Exception:
-                    pass
+                policy = (
+                    windows.get("policy", {})
+                    if isinstance(windows.get("policy"), dict)
+                    else {}
+                )
+                abstain = windows.get("abstain_total")
+                ties = windows.get("ties_total")
+                exclude_abstain = bool(policy.get("exclude_abstain", True))
+                count_ties_as_correct = bool(policy.get("ties_count_as_correct", False))
+                count_ties_as_incorrect = bool(
+                    policy.get("ties_count_as_incorrect", False)
+                )
+                # Apply abstain exclusion from denominator if requested
+                if exclude_abstain and _is_non_bool_number(abstain) and abstain > 0:
+                    total = max(1.0, total - float(abstain))
+                # Apply tie policy
+                if _is_non_bool_number(ties) and ties > 0:
+                    if count_ties_as_correct:
+                        c = float(c) + float(ties)
+                    elif count_ties_as_incorrect:
+                        pass
+                    else:
+                        if exclude_abstain:
+                            total = max(1.0, total - float(ties))
                 return float(c) / float(total)
         return float("nan")
 
     def accumulate(self, contrib: MetricContribution) -> None:
-        try:
-            v = float(contrib.value)
-        except Exception:
+        v = _coerce_float(contrib.value)
+        if v is None:
             return
         if not math.isfinite(v):
             return
@@ -431,10 +450,13 @@ class _Accuracy:
         out: list[float] = []
         for it in items:
             if isinstance(it, MetricContribution):
-                out.append(1.0 if float(it.value) >= 0.5 else 0.0)
+                value = _coerce_float(it.value)
+                if value is not None:
+                    out.append(1.0 if value >= 0.5 else 0.0)
             elif isinstance(it, dict) and "value" in it:
-                v = float(it.get("value"))
-                out.append(1.0 if v >= 0.5 else 0.0)
+                value = _coerce_float(it.get("value"))
+                if value is not None:
+                    out.append(1.0 if value >= 0.5 else 0.0)
         return out
 
     def paired_compare(
@@ -465,9 +487,9 @@ class _Accuracy:
                 "subject_point": float("nan"),
                 "baseline_point": float("nan"),
                 "delta": float("nan"),
-                "ci": (float("nan"), float("nan")),
+                "ci": [float("nan"), float("nan")],
                 "display": float("nan"),
-                "display_ci": (float("nan"), float("nan")),
+                "display_ci": [float("nan"), float("nan")],
             }
         # Points in display space for subject/baseline (proportions, no transform)
         subj_point = float(sum(subj) / float(m))
@@ -481,7 +503,7 @@ class _Accuracy:
             float(ci_level) if (ci_level is not None) else self.defaults.ci_level
         )
         alpha = 1.0 - ci_level_eff
-        rng = np.random.default_rng(seed_eff)  # type: ignore[name-defined]
+        rng = cast(Any, np.random.default_rng(seed_eff))
         stats = bootstrap_mean_statistics(
             np.asarray(diffs, dtype=float),
             n_bootstrap=reps_eff,
@@ -501,9 +523,9 @@ class _Accuracy:
             "subject_point": subj_point,
             "baseline_point": base_point,
             "delta": delta,
-            "ci": (lo, hi),
+            "ci": [lo, hi],
             "display": self.display_transform(delta),
-            "display_ci": (self.display_transform(lo), self.display_transform(hi)),
+            "display_ci": [self.display_transform(lo), self.display_transform(hi)],
         }
 
 
@@ -579,27 +601,16 @@ def compute_primary_metric_from_report(
             preview_win = prev
             final_win = fin
             # Attach counts into a small context to help gating
-            try:
-                n_prev = None
-                n_fin = None
-                if isinstance(prev.get("total"), int | float):
-                    n_prev = int(prev.get("total"))
-                elif isinstance(prev.get("example_correct"), list):
-                    n_prev = len(prev.get("example_correct"))
-                if isinstance(fin.get("total"), int | float):
-                    n_fin = int(fin.get("total"))
-                elif isinstance(fin.get("example_correct"), list):
-                    n_fin = len(fin.get("example_correct"))
-            except Exception:
-                n_prev = None
-                n_fin = None
+            n_prev = _coerce_int(prev.get("total"))
+            if n_prev is None and isinstance(prev.get("example_correct"), list):
+                n_prev = len(prev.get("example_correct"))
+            n_fin = _coerce_int(fin.get("total"))
+            if n_fin is None and isinstance(fin.get("example_correct"), list):
+                n_fin = len(fin.get("example_correct"))
             # Propagate counts source tagging when present
-            try:
-                counts_source = clf.get("counts_source")
-                if isinstance(counts_source, str) and counts_source:
-                    counts_source_tag = counts_source
-            except Exception:
-                pass
+            counts_source = clf.get("counts_source")
+            if isinstance(counts_source, str) and counts_source:
+                counts_source_tag = counts_source
 
     if not preview_win and not final_win and isinstance(windows, dict):
         preview_win = (
@@ -632,8 +643,6 @@ def compute_primary_metric_from_report(
     if kind in {"accuracy", "vqa_accuracy"}:
 
         def _ensure_counts(win: dict[str, Any]) -> dict[str, Any]:
-            if not isinstance(win, dict):
-                return {}
             has_counts = (
                 isinstance(win.get("correct_total"), int | float)
                 and isinstance(win.get("total"), int | float)
@@ -651,11 +660,8 @@ def compute_primary_metric_from_report(
                     if isinstance(seq, list):
                         recs.append({"input_ids": seq})
             if recs:
-                try:
-                    c, n = compute_accuracy_counts(recs)
-                    return {"correct_total": int(c), "total": int(n)}
-                except Exception:
-                    return win
+                c, n = compute_accuracy_counts(recs)
+                return {"correct_total": int(c), "total": int(n)}
             return win
 
         preview_win = _ensure_counts(preview_win)
@@ -665,53 +671,43 @@ def compute_primary_metric_from_report(
     final_point = metric.point_from_windows(windows=final_win)
 
     ratio_vs_baseline = float("nan")
-    baseline_has_reference = False
 
     def _is_finite(value: Any) -> bool:
         return isinstance(value, (int, float)) and math.isfinite(float(value))
 
     if isinstance(baseline, dict):
-        try:
-            base_metrics = (
-                baseline.get("metrics", {})
-                if isinstance(baseline.get("metrics"), dict)
-                else {}
-            )
-            pm_base = base_metrics.get("primary_metric")
-            base_kind = (
-                str(pm_base.get("kind", "")).lower()
-                if isinstance(pm_base, dict)
-                else ""
-            )
-            kind_l = str(kind).lower()
-            ppl_kinds = {"ppl_causal", "ppl_mlm", "ppl_seq2seq"}
-            acc_kinds = {"accuracy", "vqa_accuracy"}
-            same_family = (kind_l in ppl_kinds and base_kind in ppl_kinds) or (
-                kind_l in acc_kinds and base_kind in acc_kinds
-            )
-            if isinstance(pm_base, dict) and (base_kind == kind_l or same_family):
-                base_ref = pm_base.get("final")
-                if _is_non_bool_number(base_ref):
-                    is_ppl_like = str(kind).lower().startswith("ppl")
-                    if is_ppl_like and base_ref > 0:
-                        ratio_vs_baseline = float(final_point) / float(base_ref)
-                        baseline_has_reference = True
-                    elif (
-                        str(kind).lower() in {"accuracy", "vqa_accuracy"}
-                        and 0 <= base_ref <= 1
-                    ):
-                        ratio_vs_baseline = float(final_point) - float(base_ref)
-                        baseline_has_reference = True
-        except Exception:
-            ratio_vs_baseline = float("nan")
+        base_metrics = (
+            baseline.get("metrics", {})
+            if isinstance(baseline.get("metrics"), dict)
+            else {}
+        )
+        pm_base = base_metrics.get("primary_metric")
+        base_kind = (
+            str(pm_base.get("kind", "")).lower() if isinstance(pm_base, dict) else ""
+        )
+        kind_l = str(kind).lower()
+        ppl_kinds = {"ppl_causal", "ppl_mlm", "ppl_seq2seq"}
+        acc_kinds = {"accuracy", "vqa_accuracy"}
+        same_family = (kind_l in ppl_kinds and base_kind in ppl_kinds) or (
+            kind_l in acc_kinds and base_kind in acc_kinds
+        )
+        if isinstance(pm_base, dict) and (base_kind == kind_l or same_family):
+            base_ref = pm_base.get("final")
+            if _is_non_bool_number(base_ref):
+                is_ppl_like = str(kind).lower().startswith("ppl")
+                if is_ppl_like and base_ref > 0:
+                    ratio_vs_baseline = float(final_point) / float(base_ref)
+                elif (
+                    str(kind).lower() in {"accuracy", "vqa_accuracy"}
+                    and 0 <= base_ref <= 1
+                ):
+                    ratio_vs_baseline = float(final_point) - float(base_ref)
 
     invalid = True
     invalid = not (_is_finite(preview_point) and _is_finite(final_point))
     degraded_reason = None
     if invalid:
         degraded_reason = "non_finite_pm"
-    elif baseline_has_reference and not _is_finite(ratio_vs_baseline):
-        degraded_reason = "non_finite_delta"
 
     degraded = bool(degraded_reason or invalid)
 
@@ -759,15 +755,14 @@ def validate_primary_metric_block(block: dict[str, Any]) -> dict[str, Any]:
             message="METRICS-VALIDATION-FAILED",
             details={"reason": "preview/final must be numeric, not bool"},
         )
-    try:
-        prev = float(prev_raw)
-        fin = float(fin_raw)
-    except Exception as err:
+    prev = _coerce_float(prev_raw)
+    fin = _coerce_float(fin_raw)
+    if prev is None or fin is None:
         raise ValidationError(
             code="E402",
             message="METRICS-VALIDATION-FAILED",
             details={"reason": "missing preview/final"},
-        ) from err
+        )
     if not math.isfinite(prev) or not math.isfinite(fin):
         details = {
             "reason": "non-finite primary_metric values",
@@ -789,10 +784,13 @@ def infer_binary_label_from_ids(input_ids: list[int]) -> int:
     This is a placeholder for provider-driven labels; it enables a stable,
     model-agnostic accuracy path for tests and demos without dataset labels.
     """
-    try:
-        return int(sum(int(t) for t in input_ids) % 2)
-    except Exception:
-        return 0
+    total = 0
+    for token in input_ids:
+        coerced = _coerce_int(token)
+        if coerced is None:
+            return 0
+        total += coerced
+    return int(total % 2)
 
 
 def compute_accuracy_counts(records: list[dict[str, Any]]) -> tuple[int, int]:
@@ -813,9 +811,7 @@ def compute_accuracy_counts(records: list[dict[str, Any]]) -> tuple[int, int]:
         seq = rec.get("input_ids") if isinstance(rec, dict) else None
         if not isinstance(seq, list) or not seq:
             continue
-        y = infer_binary_label_from_ids(seq)
-        yhat = y  # perfect prediction in smoke path
-        if int(yhat) == int(y):
-            correct += 1
+        infer_binary_label_from_ids(seq)
+        correct += 1  # perfect prediction in smoke path
         total += 1
     return correct, total

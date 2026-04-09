@@ -12,6 +12,17 @@ from typing import Any
 
 from invarlock.core.exceptions import ObservabilityError
 
+_EXPORTER_ERRORS = (
+    ArithmeticError,
+    AssertionError,
+    AttributeError,
+    LookupError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 @dataclass
 class ExportedMetric:
@@ -115,7 +126,7 @@ class PrometheusExporter(MetricsExporter):
                 return self._push_to_gateway(metrics)
             else:
                 return self._update_cache(metrics)
-        except Exception as e:
+        except _EXPORTER_ERRORS as e:
             self.logger.error(f"Failed to export to Prometheus: {e}")
             self.error_count += 1
             return False
@@ -190,7 +201,7 @@ class JSONExporter(MetricsExporter):
             else:
                 return self._buffer_metrics(json_metrics)
 
-        except Exception as e:
+        except _EXPORTER_ERRORS as e:
             self.logger.error(f"Failed to export to JSON: {e}")
             self.error_count += 1
             return False
@@ -213,7 +224,7 @@ class JSONExporter(MetricsExporter):
             self.last_export_time = time.time()
             return True
 
-        except Exception as e:
+        except _EXPORTER_ERRORS as e:
             self.logger.error(f"Failed to write JSON file: {e}")
             self.error_count += 1
             return False
@@ -248,7 +259,7 @@ def export_or_raise(exporter: MetricsExporter, metrics: list[ExportedMetric]) ->
     try:
         ok = exporter.export(metrics)
     except (
-        Exception
+        _EXPORTER_ERRORS
     ) as e:  # pragma: no cover - covered via tests using failing exporter
         raise ObservabilityError(
             code="E801",
@@ -332,7 +343,7 @@ class InfluxDBExporter(MetricsExporter):
                 self.error_count += 1
                 return False
 
-        except Exception as e:
+        except _EXPORTER_ERRORS as e:
             self.logger.error(f"Failed to export to InfluxDB: {e}")
             self.error_count += 1
             return False
@@ -401,7 +412,7 @@ class StatsExporter(MetricsExporter):
             self.last_export_time = time.time()
             return True
 
-        except Exception as e:
+        except _EXPORTER_ERRORS as e:
             self.logger.error(f"Failed to export to StatsD: {e}")
             self.error_count += 1
             return False
@@ -469,7 +480,7 @@ class ExportManager:
             if exporter.enabled:
                 try:
                     results[name] = exporter.export(metrics)
-                except Exception as e:
+                except _EXPORTER_ERRORS as e:
                     self.logger.error(f"Exporter {name} failed: {e}")
                     results[name] = False
             else:
@@ -509,7 +520,7 @@ class ExportManager:
                         # Export to all enabled exporters
                         self.export_now(metrics)
 
-            except Exception as e:
+            except _EXPORTER_ERRORS as e:
                 self.logger.error(f"Error in export loop: {e}")
 
     def get_exporter_stats(self) -> dict[str, dict[str, Any]]:

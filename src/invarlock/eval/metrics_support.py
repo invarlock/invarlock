@@ -228,7 +228,7 @@ class InputValidator:
 
         try:
             param_count = sum(1 for _ in model.parameters())
-        except Exception as exc:
+        except (AttributeError, TypeError, RuntimeError, ValueError) as exc:
             raise ValidationError(
                 code="E402",
                 message="METRICS-VALIDATION-FAILED",

@@ -198,6 +198,19 @@ def test_decide_failed_retry_transition_holds_attempt_when_stopping() -> None:
     assert transition.diagnostics == ()
 
 
+def test_decide_failed_retry_transition_noops_without_controller() -> None:
+    transition = decide_failed_retry_transition(
+        None,
+        attempt=4,
+        attempt_summary={"passed": False},
+        edit_config={"energy_keep": 0.9},
+    )
+
+    assert transition.should_retry is False
+    assert transition.next_attempt == 4
+    assert transition.diagnostics == ()
+
+
 def test_build_restore_failure_attempt_summary_is_stable() -> None:
     assert build_restore_failure_attempt_summary() == {
         "passed": False,
@@ -269,6 +282,32 @@ def test_resolve_retry_validation_decision_marks_error_fail_closed() -> None:
     assert decision.validation_gates == ("report_error",)
     assert decision.error is not None
     assert decision.error.message == "boom"
+
+
+def test_resolve_retry_validation_decision_builds_fallback_error_diagnostic() -> None:
+    validation_result = type(
+        "ValidationResult",
+        (),
+        {
+            "status": "error",
+            "validation_gates": ("pm_ratio",),
+            "validation": {},
+            "diagnostic": "not-a-retry-diagnostic",
+        },
+    )()
+
+    decision = resolve_retry_validation_decision(
+        edit_config={"energy_keep": 0.99},
+        validation_result=validation_result,
+        should_retry=False,
+    )
+
+    assert decision.status == "error"
+    assert decision.validation_gates == ("pm_ratio",)
+    assert decision.error is not None
+    assert decision.error.code == "retry.validation_error"
+    assert decision.error.details == {"validation_gates": ("pm_ratio",)}
+    assert decision.diagnostics == (decision.error,)
 
 
 def test_resolve_retry_validation_transition_records_pass_without_retry() -> None:

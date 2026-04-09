@@ -127,3 +127,22 @@ def test_select_python_finds_named_home_conda_env_when_off_path(
 
     assert proc.returncode == 0, proc.stderr
     assert proc.stdout.strip() == str(conda_python)
+
+
+def test_select_python_prefers_named_home_conda_env_over_generic_python312(
+    tmp_path: Path,
+) -> None:
+    conda_python = (
+        tmp_path / "anaconda3" / "envs" / "invarlock-py312" / "bin" / "python"
+    )
+    conda_python.parent.mkdir(parents=True)
+    _write_fake_python(conda_python, "3.12.8")
+
+    proc = _run_selector(
+        tmp_path,
+        python_version="3.11.5",
+        python312_version="3.12.9",
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.strip() == str(conda_python)

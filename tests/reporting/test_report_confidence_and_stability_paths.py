@@ -3,7 +3,7 @@ from __future__ import annotations
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_primary_metric_policy import is_ppl_kind as _is_ppl_kind
 from invarlock.reporting.report_schema import validate_report
-from invarlock.reporting.report_types import RunReport, create_empty_report
+from invarlock.reporting.report_types import AutoConfig, RunReport, create_empty_report
 
 
 def _mk_report(
@@ -13,7 +13,12 @@ def _mk_report(
     r["meta"]["model_id"] = "m"
     r["meta"]["adapter"] = "hf"
     r["meta"]["device"] = "cpu"
-    r["meta"]["auto"] = {"tier": "balanced", "probes_used": 0, "target_pm_ratio": None}  # type: ignore[assignment]
+    r["meta"]["auto"] = AutoConfig(
+        enabled=False,
+        tier="balanced",
+        probes_used=0,
+        target_pm_ratio=None,
+    )
     r["data"]["dataset"] = "unit"
     r["data"]["split"] = "validation"
     r["data"]["seq_len"] = 8

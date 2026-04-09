@@ -115,7 +115,7 @@ def test_encode_error_invarlock_path_handles_non_dict_details(monkeypatch) -> No
 
 def test_encode_error_handles_category_introspection_failure() -> None:
     class _Meta(type):
-        def __getattribute__(cls, name: str):  # type: ignore[override]
+        def __getattribute__(cls, name: str):
             if name == "__name__":
                 raise RuntimeError("boom")
             return super().__getattribute__(name)
@@ -128,7 +128,7 @@ def test_encode_error_handles_category_introspection_failure() -> None:
 
 def test_encode_error_falls_back_when_invarlock_type_check_raises(monkeypatch) -> None:
     class _Meta(type):
-        def __instancecheck__(cls, instance):  # type: ignore[override]
+        def __instancecheck__(cls, instance):
             raise RuntimeError("boom")
 
     class FakeInvarlockError(Exception, metaclass=_Meta): ...

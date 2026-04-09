@@ -64,6 +64,12 @@ def test_normalize_multiple_testing_reraises_unexpected_numeric_errors() -> None
         at._normalize_multiple_testing({"alpha": _BadFloat()})
 
 
+def test_normalize_multiple_testing_ignores_none_numeric_fields() -> None:
+    assert at._normalize_multiple_testing(
+        {"method": "BH", "alpha": None, "m": None}
+    ) == {"method": "bh"}
+
+
 def test_tier_entry_to_policy_maps_sections_and_skips_bad_sections() -> None:
     out = at._tier_entry_to_policy(
         {
@@ -171,6 +177,12 @@ def test_load_profile_overrides_returns_empty_for_non_mapping(monkeypatch) -> No
     monkeypatch.setattr(at, "_load_runtime_yaml", lambda *_a, **_k: ["bad"])
 
     assert at._load_profile_overrides("ci", config_root=None) == {}
+
+
+def test_packaged_ci_profile_exposes_drift_band_override() -> None:
+    overrides = at._load_profile_overrides("ci", config_root=None)
+
+    assert overrides["primary_metric"]["drift_band"] == {"min": 0.95, "max": 1.07}
 
 
 def test_tier_entry_to_policy_keeps_rmt_without_family_map() -> None:

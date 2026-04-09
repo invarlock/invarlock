@@ -30,11 +30,10 @@ def test_evaluation_report_schema_valid_and_fallback(monkeypatch):
     }
     assert validate_report(cert) is True
 
-    # Force JSON schema failure by adding an unknown validation key; should fall back to minimal
+    # Unknown validation keys are rejected by the strict allow-list contract.
     cert2 = json.loads(json.dumps(cert))
     cert2["validation"] = {"not_allowed_key": True}
-    # Ensure our schema has been tightened by the module code
-    assert validate_report(cert2) is True
+    assert validate_report(cert2) is False
 
 
 def test_dataset_hashing_helpers():

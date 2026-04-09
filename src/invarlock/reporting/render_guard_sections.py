@@ -171,6 +171,328 @@ def append_guard_check_details_section(
     lines.append("")
 
 
+def _append_spectral_observability(
+    lines: list[str],
+    *,
+    evaluation_report: dict[str, Any],
+    validation: dict[str, Any],
+) -> None:
+    spectral_info = evaluation_report.get("spectral", {}) or {}
+    if not spectral_info:
+        return
+    lines.append("### Spectral Guard Summary")
+    lines.append("")
+    lines.append("| Metric | Value | Status |")
+    lines.append("|--------|-------|--------|")
+
+    spectral_ok = bool(validation.get("spectral_stable", False))
+    caps_applied = spectral_info.get("caps_applied")
+    max_caps = spectral_info.get("max_caps")
+    caps_val = (
+        f"{caps_applied}/{max_caps}"
+        if caps_applied is not None and max_caps is not None
+        else "-"
+    )
+    lines.append(
+        f"| Caps Applied | {caps_val} | {'✅ OK' if spectral_ok else '❌ FAIL'} |"
+    )
+
+    summary = spectral_info.get("summary", {}) or {}
+    caps_exceeded = summary.get("caps_exceeded")
+    if caps_exceeded is not None:
+        cap_status = "✅ OK" if not bool(caps_exceeded) else "⚠️ WARN"
+        lines.append(f"| Caps Exceeded | {caps_exceeded} | {cap_status} |")
+
+    top_scores = spectral_info.get("top_z_scores") or {}
+    max_family: str | None = None
+    max_module: str | None = None
+    max_abs_z: float | None = None
+    if isinstance(top_scores, dict):
+        for family, entries in top_scores.items():
+            if not isinstance(entries, list):
+                continue
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                z_val = entry.get("z")
+                if not (
+                    isinstance(z_val, (int, float)) and math.isfinite(float(z_val))
+                ):
+                    continue
+                z_abs = abs(float(z_val))
+                if max_abs_z is None or z_abs > max_abs_z:
+                    max_abs_z = z_abs
+                    max_family = str(family)
+                    max_module = (
+                        str(entry.get("module")) if entry.get("module") else None
+                    )
+
+    family_caps = spectral_info.get("family_caps") or {}
+    kappa = None
+    if max_family and isinstance(family_caps, dict):
+        try:
+            kappa = (family_caps.get(max_family, {}) or {}).get("kappa")
+        except _PARSE_EXCEPTIONS:
+            kappa = None
+    kappa_f = (
+        float(kappa)
+        if isinstance(kappa, (int, float)) and math.isfinite(float(kappa))
+        else None
+    )
+    if max_abs_z is not None:
+        max_val = f"{max_abs_z:.3f}"
+        if max_family:
+            max_val += f" ({max_family})"
+        if max_module:
+            max_val += f" – {max_module}"
+        if kappa_f is None:
+            max_status = "ℹ️ No κ"
+        elif max_abs_z <= kappa_f:
+            max_status = f"✅ Within κ={kappa_f:.3f}"
+        else:
+            max_status = f"❌ Exceeds κ={kappa_f:.3f}"
+        lines.append(f"| Max |z| | {max_val} | {max_status} |")
+
+    mt_info = spectral_info.get("multiple_testing", {}) or {}
+    if isinstance(mt_info, dict) and mt_info:
+        parts: list[str] = []
+        mt_method = mt_info.get("method")
+        mt_alpha = mt_info.get("alpha")
+        mt_m = mt_info.get("m")
+        if mt_method:
+            parts.append(f"method={mt_method}")
+        if isinstance(mt_alpha, (int, float)) and math.isfinite(float(mt_alpha)):
+            parts.append(f"α={float(mt_alpha):.3g}")
+        if isinstance(mt_m, (int, float)) and math.isfinite(float(mt_m)):
+            parts.append(f"m={int(mt_m)}")
+        lines.append(
+            f"| Multiple Testing | {', '.join(parts) if parts else '—'} | ℹ️ INFO |"
+        )
+
+    lines.append("")
+    caps_by_family = spectral_info.get("caps_applied_by_family") or {}
+    quantiles = spectral_info.get("family_z_quantiles") or {}
+    if not any(
+        bool(block)
+        for block in (caps_by_family, quantiles, family_caps, top_scores)
+        if isinstance(block, dict)
+    ):
+        return
+    lines.append("<details>")
+    lines.append("<summary>Per-family details</summary>")
+    lines.append("")
+    lines.append("| Family | κ | q95 | Max |z| | Violations |")
+    lines.append("|--------|---|-----|--------|------------|")
+
+    families: set[str] = set()
+    for block in (caps_by_family, quantiles, family_caps, top_scores):
+        if isinstance(block, dict):
+            families.update(str(key) for key in block.keys())
+    for family in sorted(families):
+        kappa = None
+        if isinstance(family_caps, dict):
+            kappa = (family_caps.get(family, {}) or {}).get("kappa")
+        kappa_str = (
+            f"{float(kappa):.3f}"
+            if isinstance(kappa, (int, float)) and math.isfinite(float(kappa))
+            else "-"
+        )
+        q95 = None
+        max_z = None
+        if isinstance(quantiles, dict):
+            stats = quantiles.get(family) or {}
+            if isinstance(stats, dict):
+                q95 = stats.get("q95")
+                max_z = stats.get("max")
+        q95_str = f"{q95:.3f}" if isinstance(q95, (int, float)) else "-"
+        max_str = f"{max_z:.3f}" if isinstance(max_z, (int, float)) else "-"
+        violations = (
+            caps_by_family.get(family) if isinstance(caps_by_family, dict) else None
+        )
+        v_str = str(int(violations)) if isinstance(violations, (int, float)) else "0"
+        lines.append(f"| {family} | {kappa_str} | {q95_str} | {max_str} | {v_str} |")
+
+    if isinstance(top_scores, dict) and top_scores:
+        lines.append("")
+        lines.append("Top |z| per family:")
+        for family in sorted(top_scores.keys()):
+            entries = top_scores[family]
+            if not isinstance(entries, list) or not entries:
+                continue
+            formatted_entries = []
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                module_name = entry.get("module", "unknown")
+                z_val = entry.get("z")
+                if isinstance(z_val, (int, float)) and math.isfinite(float(z_val)):
+                    z_str = f"{z_val:.3f}"
+                else:
+                    z_str = "n/a"
+                formatted_entries.append(f"{module_name} (|z|={z_str})")
+            lines.append(f"- {family}: {', '.join(formatted_entries)}")
+
+    lines.append("")
+    lines.append("</details>")
+    lines.append("")
+
+
+def _append_rmt_observability(
+    lines: list[str],
+    *,
+    evaluation_report: dict[str, Any],
+) -> None:
+    rmt_info_raw = evaluation_report.get("rmt", {}) or {}
+    rmt_info: dict[str, Any] = rmt_info_raw if isinstance(rmt_info_raw, dict) else {}
+    if not rmt_info:
+        return
+    lines.append("### RMT Guard")
+    lines.append("")
+    raw_rmt_families = rmt_info.get("families")
+    rmt_families: dict[str, Any] = (
+        raw_rmt_families if isinstance(raw_rmt_families, dict) else {}
+    )
+    stable = bool(rmt_info.get("stable", True))
+    status = "✅ OK" if stable else "❌ FAIL"
+    mode = rmt_info.get("mode")
+    if isinstance(mode, str) and mode.strip():
+        lines.append(f"- Mode: `{mode.strip()}`")
+    measurement_contract = (
+        rmt_info.get("measurement_contract")
+        if isinstance(rmt_info.get("measurement_contract"), dict)
+        else {}
+    )
+    if measurement_contract:
+        contract_parts: list[str] = []
+        estimator = measurement_contract.get("estimator")
+        if isinstance(estimator, dict) and estimator:
+            contract_parts.append(f"estimator={json.dumps(estimator, sort_keys=True)}")
+        activation_sampling = measurement_contract.get("activation_sampling")
+        if isinstance(activation_sampling, dict) and activation_sampling:
+            contract_parts.append(
+                f"activation_sampling={json.dumps(activation_sampling, sort_keys=True)}"
+            )
+        if contract_parts:
+            lines.append(f"- Measurement Contract: {'; '.join(contract_parts)}")
+    delta_total = rmt_info.get("delta_total")
+    if isinstance(delta_total, int):
+        lines.append(f"- Δ total: {delta_total:+d}")
+    lines.append(f"- Status: {status}")
+    lines.append(f"- Families: {len(rmt_families)}")
+    if not rmt_families:
+        lines.append("")
+        return
+    edge_risk_mode = any(
+        isinstance(data, dict) and ("edge_base" in data or "edge_cur" in data)
+        for data in rmt_families.values()
+    )
+    lines.append("")
+    lines.append("<details>")
+    lines.append("<summary>RMT family details</summary>")
+    lines.append("")
+    if edge_risk_mode:
+        lines.append("| Family | ε_f | Edge Base | Edge Cur | Δ |")
+        lines.append("|--------|-----|-----------|----------|---|")
+    else:
+        lines.append("| Family | ε_f | Bare | Guarded | Δ |")
+        lines.append("|--------|-----|------|---------|---|")
+    for family, data in rmt_families.items():
+        epsilon_val = data.get("epsilon")
+        epsilon_str = (
+            f"{epsilon_val:.3f}" if isinstance(epsilon_val, (int, float)) else "-"
+        )
+        if edge_risk_mode:
+            edge_base = data.get("edge_base")
+            edge_cur = data.get("edge_cur")
+            delta_val = data.get("delta")
+            edge_base_str = (
+                f"{edge_base:.3f}" if isinstance(edge_base, (int, float)) else "-"
+            )
+            edge_cur_str = (
+                f"{edge_cur:.3f}" if isinstance(edge_cur, (int, float)) else "-"
+            )
+            delta_str = (
+                f"{delta_val:+.3f}" if isinstance(delta_val, (int, float)) else "-"
+            )
+            lines.append(
+                f"| {family} | {epsilon_str} | {edge_base_str} | {edge_cur_str} | {delta_str} |"
+            )
+            continue
+        bare_count = data.get("bare", 0)
+        guarded_count = data.get("guarded", 0)
+        try:
+            bare_str = str(int(bare_count))
+        except _PARSE_EXCEPTIONS:
+            bare_str = "-"
+        try:
+            guarded_str = str(int(guarded_count))
+        except _PARSE_EXCEPTIONS:
+            guarded_str = "-"
+        try:
+            delta_count = int(guarded_count) - int(bare_count)
+        except _PARSE_EXCEPTIONS:
+            delta_count = None
+        delta_str = f"{delta_count:+d}" if isinstance(delta_count, int) else "-"
+        lines.append(
+            f"| {family} | {epsilon_str} | {bare_str} | {guarded_str} | {delta_str} |"
+        )
+    lines.append("")
+    lines.append("</details>")
+    lines.append("")
+
+
+def _append_guard_overhead_observability(
+    lines: list[str],
+    *,
+    evaluation_report: dict[str, Any],
+) -> None:
+    guard_overhead_info = evaluation_report.get("guard_overhead", {}) or {}
+    if not guard_overhead_info:
+        return
+    lines.append("### Guard Overhead")
+    lines.append("")
+    evaluated_flag = bool(guard_overhead_info.get("evaluated", True))
+    if not evaluated_flag:
+        lines.append("- Evaluated: false (skipped by policy/profile)")
+    bare_ppl = guard_overhead_info.get("bare_ppl")
+    guarded_ppl = guard_overhead_info.get("guarded_ppl")
+    if isinstance(bare_ppl, (int, float)) and math.isfinite(float(bare_ppl)):
+        lines.append(f"- Bare Primary Metric: {bare_ppl:.3f}")
+    if isinstance(guarded_ppl, (int, float)) and math.isfinite(float(guarded_ppl)):
+        lines.append(f"- Guarded Primary Metric: {guarded_ppl:.3f}")
+    ratio = guard_overhead_info.get("overhead_ratio")
+    percent = guard_overhead_info.get("overhead_percent")
+    if (
+        isinstance(ratio, (int, float))
+        and math.isfinite(float(ratio))
+        and isinstance(percent, (int, float))
+        and math.isfinite(float(percent))
+    ):
+        lines.append(f"- Overhead: {ratio:.4f}x ({percent:+.2f}%)")
+    elif isinstance(ratio, (int, float)) and math.isfinite(float(ratio)):
+        lines.append(f"- Overhead: {ratio:.4f}x")
+    overhead_source = guard_overhead_info.get("source")
+    if overhead_source:
+        lines.append(f"- Source: {overhead_source}")
+    plan_ctx = evaluation_report.get("provenance", {}).get("window_plan", {})
+    if isinstance(plan_ctx, dict) and plan_ctx:
+        plan_preview = (
+            plan_ctx.get("preview_n")
+            if plan_ctx.get("preview_n") is not None
+            else plan_ctx.get("actual_preview")
+        )
+        plan_final = (
+            plan_ctx.get("final_n")
+            if plan_ctx.get("final_n") is not None
+            else plan_ctx.get("actual_final")
+        )
+        plan_profile = plan_ctx.get("profile")
+        lines.append(
+            f"- Window Plan Used: profile={plan_profile}, preview={plan_preview}, final={plan_final}"
+        )
+    lines.append("")
+
+
 def append_guard_observability_sections(
     lines: list[str], evaluation_report: dict[str, Any]
 ) -> None:
@@ -178,323 +500,10 @@ def append_guard_observability_sections(
 
     lines.append("## Guard Observability")
     lines.append("")
-
-    spectral_info = evaluation_report.get("spectral", {}) or {}
-    if spectral_info:
-        lines.append("### Spectral Guard Summary")
-        lines.append("")
-        lines.append("| Metric | Value | Status |")
-        lines.append("|--------|-------|--------|")
-
-        spectral_ok = bool(validation.get("spectral_stable", False))
-        caps_applied = spectral_info.get("caps_applied")
-        max_caps = spectral_info.get("max_caps")
-        caps_val = (
-            f"{caps_applied}/{max_caps}"
-            if caps_applied is not None and max_caps is not None
-            else "-"
-        )
-        lines.append(
-            f"| Caps Applied | {caps_val} | {'✅ OK' if spectral_ok else '❌ FAIL'} |"
-        )
-
-        summary = spectral_info.get("summary", {}) or {}
-        caps_exceeded = summary.get("caps_exceeded")
-        if caps_exceeded is not None:
-            cap_status = "✅ OK" if not bool(caps_exceeded) else "⚠️ WARN"
-            lines.append(f"| Caps Exceeded | {caps_exceeded} | {cap_status} |")
-
-        top_scores = spectral_info.get("top_z_scores") or {}
-        max_family: str | None = None
-        max_module: str | None = None
-        max_abs_z: float | None = None
-        if isinstance(top_scores, dict):
-            for family, entries in top_scores.items():
-                if not isinstance(entries, list):
-                    continue
-                for entry in entries:
-                    if not isinstance(entry, dict):
-                        continue
-                    z_val = entry.get("z")
-                    if not (
-                        isinstance(z_val, int | float) and math.isfinite(float(z_val))
-                    ):
-                        continue
-                    z_abs = abs(float(z_val))
-                    if max_abs_z is None or z_abs > max_abs_z:
-                        max_abs_z = z_abs
-                        max_family = str(family)
-                        max_module = (
-                            str(entry.get("module")) if entry.get("module") else None
-                        )
-
-        family_caps = spectral_info.get("family_caps") or {}
-        kappa = None
-        if max_family and isinstance(family_caps, dict):
-            try:
-                kappa = (family_caps.get(max_family, {}) or {}).get("kappa")
-            except _PARSE_EXCEPTIONS:
-                kappa = None
-        kappa_f = (
-            float(kappa)
-            if isinstance(kappa, int | float) and math.isfinite(float(kappa))
-            else None
-        )
-
-        if max_abs_z is not None:
-            max_val = f"{max_abs_z:.3f}"
-            if max_family:
-                max_val += f" ({max_family})"
-            if max_module:
-                max_val += f" – {max_module}"
-            if kappa_f is None:
-                max_status = "ℹ️ No κ"
-            elif max_abs_z <= kappa_f:
-                max_status = f"✅ Within κ={kappa_f:.3f}"
-            else:
-                max_status = f"❌ Exceeds κ={kappa_f:.3f}"
-            lines.append(f"| Max |z| | {max_val} | {max_status} |")
-
-        mt_info = spectral_info.get("multiple_testing", {}) or {}
-        if isinstance(mt_info, dict) and mt_info:
-            mt_method = mt_info.get("method")
-            mt_alpha = mt_info.get("alpha")
-            mt_m = mt_info.get("m")
-            parts: list[str] = []
-            if mt_method:
-                parts.append(f"method={mt_method}")
-            if isinstance(mt_alpha, int | float) and math.isfinite(float(mt_alpha)):
-                parts.append(f"α={float(mt_alpha):.3g}")
-            if isinstance(mt_m, int | float) and math.isfinite(float(mt_m)):
-                parts.append(f"m={int(mt_m)}")
-            lines.append(
-                f"| Multiple Testing | {', '.join(parts) if parts else '—'} | ℹ️ INFO |"
-            )
-
-        lines.append("")
-
-        caps_by_family = spectral_info.get("caps_applied_by_family") or {}
-        quantiles = spectral_info.get("family_z_quantiles") or {}
-        if any(
-            bool(block)
-            for block in (caps_by_family, quantiles, family_caps, top_scores)
-            if isinstance(block, dict)
-        ):
-            lines.append("<details>")
-            lines.append("<summary>Per-family details</summary>")
-            lines.append("")
-            lines.append("| Family | κ | q95 | Max |z| | Violations |")
-            lines.append("|--------|---|-----|--------|------------|")
-
-            families: set[str] = set()
-            for block in (caps_by_family, quantiles, family_caps, top_scores):
-                if isinstance(block, dict):
-                    families.update(str(key) for key in block.keys())
-
-            for family in sorted(families):
-                kappa = None
-                if isinstance(family_caps, dict):
-                    kappa = (family_caps.get(family, {}) or {}).get("kappa")
-                kappa_str = (
-                    f"{float(kappa):.3f}"
-                    if isinstance(kappa, int | float) and math.isfinite(float(kappa))
-                    else "-"
-                )
-
-                q95 = None
-                max_z = None
-                if isinstance(quantiles, dict):
-                    stats = quantiles.get(family) or {}
-                    if isinstance(stats, dict):
-                        q95 = stats.get("q95")
-                        max_z = stats.get("max")
-                q95_str = f"{q95:.3f}" if isinstance(q95, int | float) else "-"
-                max_str = f"{max_z:.3f}" if isinstance(max_z, int | float) else "-"
-
-                violations = None
-                if isinstance(caps_by_family, dict):
-                    violations = caps_by_family.get(family)
-                v_str = (
-                    str(int(violations)) if isinstance(violations, int | float) else "0"
-                )
-
-                lines.append(
-                    f"| {family} | {kappa_str} | {q95_str} | {max_str} | {v_str} |"
-                )
-
-            if isinstance(top_scores, dict) and top_scores:
-                lines.append("")
-                lines.append("Top |z| per family:")
-                for family in sorted(top_scores.keys()):
-                    entries = top_scores[family]
-                    if not isinstance(entries, list) or not entries:
-                        continue
-                    formatted_entries = []
-                    for entry in entries:
-                        if not isinstance(entry, dict):
-                            continue
-                        module_name = entry.get("module", "unknown")
-                        z_val = entry.get("z")
-                        if isinstance(z_val, int | float) and math.isfinite(
-                            float(z_val)
-                        ):
-                            z_str = f"{z_val:.3f}"
-                        else:
-                            z_str = "n/a"
-                        formatted_entries.append(f"{module_name} (|z|={z_str})")
-                    lines.append(f"- {family}: {', '.join(formatted_entries)}")
-
-            lines.append("")
-            lines.append("</details>")
-            lines.append("")
-
-    rmt_info_raw = evaluation_report.get("rmt", {}) or {}
-    rmt_info: dict[str, Any] = rmt_info_raw if isinstance(rmt_info_raw, dict) else {}
-    if rmt_info:
-        lines.append("### RMT Guard")
-        lines.append("")
-        raw_rmt_families = rmt_info.get("families")
-        rmt_families: dict[str, Any] = (
-            raw_rmt_families if isinstance(raw_rmt_families, dict) else {}
-        )
-        stable = bool(rmt_info.get("stable", True))
-        status = "✅ OK" if stable else "❌ FAIL"
-        mode = rmt_info.get("mode")
-        if isinstance(mode, str) and mode.strip():
-            lines.append(f"- Mode: `{mode.strip()}`")
-        measurement_contract = (
-            rmt_info.get("measurement_contract")
-            if isinstance(rmt_info.get("measurement_contract"), dict)
-            else {}
-        )
-        if measurement_contract:
-            contract_parts: list[str] = []
-            estimator = measurement_contract.get("estimator")
-            if isinstance(estimator, dict) and estimator:
-                contract_parts.append(
-                    f"estimator={json.dumps(estimator, sort_keys=True)}"
-                )
-            activation_sampling = measurement_contract.get("activation_sampling")
-            if isinstance(activation_sampling, dict) and activation_sampling:
-                contract_parts.append(
-                    f"activation_sampling={json.dumps(activation_sampling, sort_keys=True)}"
-                )
-            if contract_parts:
-                lines.append(f"- Measurement Contract: {'; '.join(contract_parts)}")
-        delta_total = rmt_info.get("delta_total")
-        if isinstance(delta_total, int):
-            lines.append(f"- Δ total: {delta_total:+d}")
-        lines.append(f"- Status: {status}")
-        lines.append(f"- Families: {len(rmt_families)}")
-        if rmt_families:
-            edge_risk_mode = any(
-                isinstance(data, dict) and ("edge_base" in data or "edge_cur" in data)
-                for data in rmt_families.values()
-            )
-            lines.append("")
-            lines.append("<details>")
-            lines.append("<summary>RMT family details</summary>")
-            lines.append("")
-            if edge_risk_mode:
-                lines.append("| Family | ε_f | Edge Base | Edge Cur | Δ |")
-                lines.append("|--------|-----|-----------|----------|---|")
-            else:
-                lines.append("| Family | ε_f | Bare | Guarded | Δ |")
-                lines.append("|--------|-----|------|---------|---|")
-            for family, data in rmt_families.items():
-                epsilon_val = data.get("epsilon")
-                epsilon_str = (
-                    f"{epsilon_val:.3f}"
-                    if isinstance(epsilon_val, int | float)
-                    else "-"
-                )
-                if edge_risk_mode:
-                    edge_base = data.get("edge_base")
-                    edge_cur = data.get("edge_cur")
-                    delta_val = data.get("delta")
-                    edge_base_str = (
-                        f"{edge_base:.3f}"
-                        if isinstance(edge_base, int | float)
-                        else "-"
-                    )
-                    edge_cur_str = (
-                        f"{edge_cur:.3f}" if isinstance(edge_cur, int | float) else "-"
-                    )
-                    delta_str = (
-                        f"{delta_val:+.3f}"
-                        if isinstance(delta_val, int | float)
-                        else "-"
-                    )
-                    lines.append(
-                        f"| {family} | {epsilon_str} | {edge_base_str} | {edge_cur_str} | {delta_str} |"
-                    )
-                    continue
-                bare_count = data.get("bare", 0)
-                guarded_count = data.get("guarded", 0)
-                delta_count = None
-                try:
-                    bare_str = str(int(bare_count))
-                except _PARSE_EXCEPTIONS:
-                    bare_str = "-"
-                try:
-                    guarded_str = str(int(guarded_count))
-                except _PARSE_EXCEPTIONS:
-                    guarded_str = "-"
-                try:
-                    delta_count = int(guarded_count) - int(bare_count)
-                except _PARSE_EXCEPTIONS:
-                    delta_count = None
-                delta_str = f"{delta_count:+d}" if isinstance(delta_count, int) else "-"
-                lines.append(
-                    f"| {family} | {epsilon_str} | {bare_str} | {guarded_str} | {delta_str} |"
-                )
-            lines.append("")
-            lines.append("</details>")
-            lines.append("")
-        else:
-            lines.append("")
-
-    guard_overhead_info = evaluation_report.get("guard_overhead", {}) or {}
-    if guard_overhead_info:
-        lines.append("### Guard Overhead")
-        lines.append("")
-        evaluated_flag = bool(guard_overhead_info.get("evaluated", True))
-        if not evaluated_flag:
-            lines.append("- Evaluated: false (skipped by policy/profile)")
-        bare_ppl = guard_overhead_info.get("bare_ppl")
-        guarded_ppl = guard_overhead_info.get("guarded_ppl")
-        if isinstance(bare_ppl, int | float) and math.isfinite(float(bare_ppl)):
-            lines.append(f"- Bare Primary Metric: {bare_ppl:.3f}")
-        if isinstance(guarded_ppl, int | float) and math.isfinite(float(guarded_ppl)):
-            lines.append(f"- Guarded Primary Metric: {guarded_ppl:.3f}")
-        ratio = guard_overhead_info.get("overhead_ratio")
-        percent = guard_overhead_info.get("overhead_percent")
-        if (
-            isinstance(ratio, int | float)
-            and math.isfinite(float(ratio))
-            and isinstance(percent, int | float)
-            and math.isfinite(float(percent))
-        ):
-            lines.append(f"- Overhead: {ratio:.4f}x ({percent:+.2f}%)")
-        elif isinstance(ratio, int | float) and math.isfinite(float(ratio)):
-            lines.append(f"- Overhead: {ratio:.4f}x")
-        overhead_source = guard_overhead_info.get("source")
-        if overhead_source:
-            lines.append(f"- Source: {overhead_source}")
-        plan_ctx = evaluation_report.get("provenance", {}).get("window_plan", {})
-        if isinstance(plan_ctx, dict) and plan_ctx:
-            plan_preview = (
-                plan_ctx.get("preview_n")
-                if plan_ctx.get("preview_n") is not None
-                else plan_ctx.get("actual_preview")
-            )
-            plan_final = (
-                plan_ctx.get("final_n")
-                if plan_ctx.get("final_n") is not None
-                else plan_ctx.get("actual_final")
-            )
-            plan_profile = plan_ctx.get("profile")
-            lines.append(
-                f"- Window Plan Used: profile={plan_profile}, preview={plan_preview}, final={plan_final}"
-            )
-        lines.append("")
+    _append_spectral_observability(
+        lines,
+        evaluation_report=evaluation_report,
+        validation=validation,
+    )
+    _append_rmt_observability(lines, evaluation_report=evaluation_report)
+    _append_guard_overhead_observability(lines, evaluation_report=evaluation_report)

@@ -22,6 +22,7 @@ from .hf_causal import HF_Causal_Adapter
 from .hf_loading import resolve_core_loader_strategy
 
 _ALLOW_DIRECT_SUBMODULE = True
+_PROCESSOR_DIGEST_ERRORS = (DependencyError, ModelLoadError, RuntimeError)
 
 
 def _hash_json(payload: dict[str, Any]) -> str:
@@ -161,7 +162,7 @@ class HF_Multimodal_Adapter(HF_Causal_Adapter):
         if self._processor_digest is None:
             try:
                 self._require_processor()
-            except Exception:
+            except _PROCESSOR_DIGEST_ERRORS:
                 return None
         return self._processor_digest
 

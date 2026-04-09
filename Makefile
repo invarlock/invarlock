@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install test test-assurance lint format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync model-evidence-list model-evidence-sweep runtime-image runtime-smoke runtime-verify
+.PHONY: help install dev-install test test-assurance lint format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-verify
 
 PYTHON ?= $(shell bash scripts/select_python.sh)
 PIP := $(PYTHON) -m pip
@@ -14,6 +14,9 @@ PRE_COMMIT := $(PYTHON) -m pre_commit
 MODEL_EVIDENCE_ARGS ?=
 CONTAINER_ENGINE ?= $(shell if command -v docker >/dev/null 2>&1; then echo docker; elif command -v podman >/dev/null 2>&1; then echo podman; fi)
 RUNTIME_IMAGE ?= invarlock-runtime:local
+RUNTIME_IMAGE_CUDA ?= invarlock-runtime:cuda-local
+RUNTIME_IMAGE_CUDA_REQUIREMENTS ?= requirements/workflows/runtime-image-py312-cu128.txt
+RUNTIME_IMAGE_CUDA_INDEX_URL ?= https://download.pytorch.org/whl/cu128
 RUNTIME_IMAGE_DIGEST ?= sha256:local-runtime-image
 
 # Keep repo-wide coverage practical while still exercising the CLI command
@@ -37,7 +40,7 @@ COVERAGE_TESTS_CONFIG := \
 COVERAGE_TESTS_EVAL := \
 	tests/eval/test_metrics*.py tests/eval/test_report*.py \
 	tests/eval/test_validate_module.py tests/eval/test_baseline_artifacts.py \
-	tests/eval/test_bench.py tests/eval/test_metric_tail_gate.py \
+	tests/eval/test_bench*.py tests/eval/test_metric_tail_gate.py \
 	tests/eval/test_primary_metric*.py \
 	tests/eval/test_determinism.py tests/eval/test_mask_parity_fail.py \
 	tests/eval/test_task_metrics.py tests/eval/test_eval_bootstrap_wrapper.py \
@@ -50,7 +53,7 @@ COVERAGE_TESTS_EVAL := \
 
 COVERAGE_TESTS_EVAL_PROBES := \
 	tests/eval/test_fft.py tests/eval/test_fft_probe_cases.py \
-	tests/eval/test_mi.py \
+	tests/eval/test_mi*.py \
 	tests/eval/test_post_attention_probes.py tests/eval/test_post_attention_probe_cases.py
 
 COVERAGE_TESTS_CLI_COMMANDS := \
@@ -63,7 +66,8 @@ COVERAGE_TESTS_CLI_COMMANDS := \
 
 COVERAGE_TESTS_CLI_HELPERS := \
 	tests/cli/test_adapter_auto*.py tests/cli/test_no_color.py \
-	tests/cli/test_json_helpers.py tests/cli/test_runtime_launch_plan_contract.py \
+	tests/cli/test_internal_config_run.py tests/cli/test_json_helpers.py \
+	tests/cli/test_runtime_launch_plan_contract.py \
 	tests/unit/test_overhead_extraction.py
 
 COVERAGE_TESTS_ADAPTERS := \
@@ -96,10 +100,11 @@ COVERAGE_MODULES := \
 	--cov=invarlock.runtime_security_helpers \
 	--cov=invarlock.proof_pack_integrity \
 	--cov=invarlock.proof_pack_manifest \
+	--cov=invarlock.proof_pack_metadata \
 	--cov=invarlock.runtime_verify \
 	--cov=invarlock.proof_pack
 
-COVERAGE_INCLUDE := src/invarlock/eval/*,src/invarlock/guards/*,src/invarlock/calibration/*,src/invarlock/cli/*,src/invarlock/cli/commands/*,src/invarlock/core/*,src/invarlock/reporting/*,src/invarlock/adapters/hf_multimodal.py,src/invarlock/public_contracts.py,src/invarlock/policy_pack.py,src/invarlock/proof_pack.py,src/invarlock/proof_pack_integrity.py,src/invarlock/proof_pack_manifest.py,src/invarlock/runtime_security.py,src/invarlock/runtime_security_helpers.py,src/invarlock/runtime_verify.py,invarlock/eval/*,invarlock/guards/*,invarlock/calibration/*,invarlock/cli/*,invarlock/cli/commands/*,invarlock/core/*,invarlock/reporting/*,invarlock/adapters/hf_multimodal.py,invarlock/public_contracts.py,invarlock/policy_pack.py,invarlock/proof_pack.py,invarlock/proof_pack_integrity.py,invarlock/proof_pack_manifest.py,invarlock/runtime_security.py,invarlock/runtime_security_helpers.py,invarlock/runtime_verify.py
+COVERAGE_INCLUDE := src/invarlock/eval/*,src/invarlock/guards/*,src/invarlock/calibration/*,src/invarlock/cli/*,src/invarlock/cli/commands/*,src/invarlock/core/*,src/invarlock/reporting/*,src/invarlock/adapters/hf_multimodal.py,src/invarlock/public_contracts.py,src/invarlock/policy_pack.py,src/invarlock/proof_pack.py,src/invarlock/proof_pack_integrity.py,src/invarlock/proof_pack_manifest.py,src/invarlock/proof_pack_metadata.py,src/invarlock/runtime_security.py,src/invarlock/runtime_security_helpers.py,src/invarlock/runtime_verify.py,invarlock/eval/*,invarlock/guards/*,invarlock/calibration/*,invarlock/cli/*,invarlock/cli/commands/*,invarlock/core/*,invarlock/reporting/*,invarlock/adapters/hf_multimodal.py,invarlock/public_contracts.py,invarlock/policy_pack.py,invarlock/proof_pack.py,invarlock/proof_pack_integrity.py,invarlock/proof_pack_manifest.py,invarlock/proof_pack_metadata.py,invarlock/runtime_security.py,invarlock/runtime_security_helpers.py,invarlock/runtime_verify.py
 
 TEST_DIR_TARGETS := core cli eval guards edits adapters plugins scripts ci
 
@@ -129,14 +134,12 @@ coverage:  ## Run tests with coverage and generate XML
 		$(COVERAGE_MODULES) \
 		--cov-branch \
 		--cov-report=term --cov-report=xml:reports/cov.xml --cov-fail-under=90
-	mv .coverage .coverage.main
-	PYTHONPATH=src $(COVERAGE) run --parallel-mode -m pytest -q -p no:cov \
+	PYTHONPATH=src $(COVERAGE) run --append -m pytest -q -p no:cov \
 		$(COVERAGE_TESTS_EVAL_PROBES)
-	PYTHONPATH=src $(COVERAGE) run --parallel-mode -m pytest -q -p no:cov \
+	PYTHONPATH=src $(COVERAGE) run --append -m pytest -q -p no:cov \
 		$(COVERAGE_TESTS_RUNTIME)
-	PYTHONPATH=src $(COVERAGE) run --parallel-mode -m pytest -q -p no:cov \
+	PYTHONPATH=src $(COVERAGE) run --append -m pytest -q -p no:cov \
 		$(COVERAGE_TESTS_ADAPTERS)
-	$(COVERAGE) combine
 	$(COVERAGE) report --include="$(COVERAGE_INCLUDE)" --fail-under=90
 	$(COVERAGE) xml --include="$(COVERAGE_INCLUDE)" -o reports/cov.xml
 
@@ -239,7 +242,24 @@ model-evidence-sweep:  ## Run the maintained shipped-model evidence sweep
 
 runtime-image:  ## Build the local container runtime image used for secure-default execution
 	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ Docker or Podman is required."; exit 1; }
+	@if $(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE) >/dev/null 2>&1; then $(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE) >/dev/null 2>&1 || true; fi
 	$(CONTAINER_ENGINE) build -f runtime/Dockerfile -t $(RUNTIME_IMAGE) .
+
+runtime-image-podman: CONTAINER_ENGINE=podman
+runtime-image-podman: runtime-image  ## Build the local container runtime image with Podman
+
+runtime-image-cuda:  ## Build the local CUDA container runtime image for GPU-backed secure-default execution
+	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ Docker or Podman is required."; exit 1; }
+	@if $(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE_CUDA) >/dev/null 2>&1; then $(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE_CUDA) >/dev/null 2>&1 || true; fi
+	$(CONTAINER_ENGINE) build \
+		--build-arg RUNTIME_REQUIREMENTS_AMD64=$(RUNTIME_IMAGE_CUDA_REQUIREMENTS) \
+		--build-arg RUNTIME_REQUIREMENTS_ARM64=requirements/workflows/runtime-image-py312-aarch64.txt \
+		--build-arg PYTORCH_EXTRA_INDEX_URL=$(RUNTIME_IMAGE_CUDA_INDEX_URL) \
+		-f runtime/Dockerfile \
+		-t $(RUNTIME_IMAGE_CUDA) .
+
+runtime-image-cuda-podman: CONTAINER_ENGINE=podman
+runtime-image-cuda-podman: runtime-image-cuda  ## Build the local CUDA container runtime image with Podman
 
 runtime-smoke:  ## Smoke the local container runtime image
 	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ Docker or Podman is required."; exit 1; }
@@ -247,6 +267,16 @@ runtime-smoke:  ## Smoke the local container runtime image
 		--entrypoint python \
 		$(RUNTIME_IMAGE) \
 		-c "import datasets, safetensors, torch, transformers; print('runtime image imports ok')"
+
+runtime-smoke-podman: CONTAINER_ENGINE=podman
+runtime-smoke-podman: runtime-smoke  ## Smoke the local container runtime image with Podman
+
+runtime-smoke-cuda: RUNTIME_IMAGE=$(RUNTIME_IMAGE_CUDA)
+runtime-smoke-cuda: runtime-smoke  ## Smoke the local CUDA container runtime image
+
+runtime-smoke-cuda-podman: CONTAINER_ENGINE=podman
+runtime-smoke-cuda-podman: RUNTIME_IMAGE=$(RUNTIME_IMAGE_CUDA)
+runtime-smoke-cuda-podman: runtime-smoke  ## Smoke the local CUDA container runtime image with Podman
 
 runtime-verify:  ## Smoke the Python runtime verifier on the fixture bundle
 	PYTHONPATH=src $(PYTHON) -m invarlock.cli.runtime_verify \

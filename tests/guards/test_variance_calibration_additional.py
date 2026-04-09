@@ -7,6 +7,8 @@ import torch.nn as nn
 
 from invarlock.guards.variance import VarianceGuard
 from invarlock.guards.variance_evaluation import (
+    _compute_delta_ci,
+    _handle_monitor_mode,
     evaluate_calibration_pass,
     refresh_after_edit_metrics,
 )
@@ -288,6 +290,97 @@ def test_evaluate_calibration_pass_preserves_disabled_reason_in_monitor_mode(
     assert guard._stats["ab_provenance"]["condition_b"]["status"] == "not_evaluated"
 
 
+def test_compute_delta_ci_logs_predictive_gate_error_on_failure() -> None:
+    guard = _guard()
+
+    assert (
+        _compute_delta_ci(
+            guard,
+            loss_with_ve_samples=[0.1],
+            loss_no_ve_samples=[0.2],
+            token_counts=[1],
+            calib_seed=5,
+            compute_paired_delta_log_ci_fn=lambda *_args, **_kwargs: (
+                _ for _ in ()
+            ).throw(ValueError("ci boom")),
+        )
+        is None
+    )
+    assert any(event["operation"] == "predictive_gate_error" for event in guard.events)
+
+
+def test_evaluate_calibration_pass_marks_monitor_reason_when_enable_yields_no_samples(
+    monkeypatch,
+) -> None:
+    guard = _guard()
+    model = _TinyModel()
+    guard._target_modules = guard._resolve_target_modules(model, adapter=None)
+    guard._scales = {next(iter(guard._target_modules)): 0.95}
+    guard._calibration_window_ids = ["0"]
+    guard._stats.setdefault("ab_provenance", {})
+
+    calls = {"count": 0}
+
+    def fake_compute_ppl(_model, _batches, _device, *, return_counts=False):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return [2.0], [math.log(2.0)], [4]
+        return [], [], []
+
+    monkeypatch.setattr(guard, "_compute_ppl_for_batches", fake_compute_ppl)
+    monkeypatch.setattr(guard, "enable", lambda _model: True)
+    monkeypatch.setattr(guard, "disable", lambda _model: True)
+    monkeypatch.setattr(guard, "_fingerprint_targets", lambda: "fp")
+
+    evaluate_calibration_pass(
+        guard,
+        model,
+        calibration_batches=[object()],
+        min_coverage=1,
+        calib_seed=19,
+        tag="ve-enable-failed",
+    )
+
+    assert guard._predictive_gate_state["reason"] == "ve_enable_failed"
+    assert guard._stats["ab_provenance"]["condition_b"]["status"] == "not_evaluated"
+
+
+def test_refresh_after_edit_metrics_logs_scale_failure_and_clears_scales(
+    monkeypatch,
+) -> None:
+    guard = _guard()
+    model = _TinyModel()
+    guard._prepared = True
+    guard._calibration_batches = [object()]
+    guard._adapter_ref = None
+    guard._focus_modules = set()
+
+    monkeypatch.setattr(
+        guard,
+        "_resolve_target_modules",
+        lambda _model, _adapter=None: {"transformer.h.0.attn.c_proj": object()},
+    )
+    monkeypatch.setattr(
+        guard,
+        "_compute_variance_scales",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("scale boom")),
+    )
+    calls: list[str] = []
+    monkeypatch.setattr(
+        guard,
+        "_evaluate_calibration_pass",
+        lambda _model, _batches, _min_cov, _seed, tag: calls.append(tag),
+    )
+
+    refresh_after_edit_metrics(guard, model)
+
+    assert guard._scales == {}
+    assert any(
+        event["operation"] == "post_edit_scale_failure" for event in guard.events
+    )
+    assert calls == ["post_edit"]
+
+
 def test_refresh_after_edit_metrics_skips_scale_log_when_no_normalized_scales(
     monkeypatch,
 ) -> None:
@@ -322,3 +415,25 @@ def test_refresh_after_edit_metrics_skips_scale_log_when_no_normalized_scales(
     assert guard._scales == {}
     assert calls == ["post_edit"]
     assert guard._post_edit_evaluated is True
+
+
+def test_handle_monitor_mode_keeps_reason_and_skips_provenance_when_condition_b_exists() -> (
+    None
+):
+    guard = _guard()
+    guard._stats.setdefault("ab_provenance", {})["condition_b"] = {"status": "existing"}
+    predictive_state = {"reason": None}
+
+    _handle_monitor_mode(
+        guard,
+        requested=1,
+        coverage=1,
+        min_coverage=1,
+        tag="monitor",
+        fingerprint=None,
+        predictive_state=predictive_state,
+        ppl_with_ve_samples=[1.0],
+    )
+
+    assert predictive_state["reason"] is None
+    assert guard._stats["ab_provenance"]["condition_b"]["status"] == "existing"

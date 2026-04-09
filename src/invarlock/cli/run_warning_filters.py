@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 _NOISY_WARNING_PATTERNS = (r".*loss_type=None.*unrecognized.*",)
+_LOG_MESSAGE_ERRORS = (RuntimeError, TypeError, ValueError)
 
 
 def _resolve_warning_suppression(profile: str | None) -> tuple[bool, bool]:
@@ -123,7 +124,7 @@ def suppress_noisy_warnings(
         def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003
             try:
                 message = record.getMessage()
-            except Exception:
+            except _LOG_MESSAGE_ERRORS:
                 return True
             if any(p.search(message) for p in patterns):
                 suppressed.append(message)

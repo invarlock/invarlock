@@ -39,12 +39,13 @@ _NETWORK_DISABLED_ERROR = RuntimeError(
 _NETWORK_ALLOW_SCOPE = contextvars.ContextVar(
     "invarlock_network_allow_scope", default=0
 )
+_CONTEXT_SCOPE_ERRORS = (TypeError, ValueError)
 
 
 def _context_allows_network() -> bool:
     try:
         return int(_NETWORK_ALLOW_SCOPE.get()) > 0
-    except Exception:
+    except _CONTEXT_SCOPE_ERRORS:
         return False
 
 

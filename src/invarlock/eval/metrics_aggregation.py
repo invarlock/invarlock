@@ -19,6 +19,8 @@ from invarlock.utils.bootstrap import (
 )
 
 logger = logging.getLogger(__name__)
+_COERCE_ERRORS = (TypeError, ValueError, OverflowError)
+_MODEL_ANALYSIS_ERRORS = (AttributeError, RuntimeError, TypeError, ValueError, OSError)
 
 
 def bootstrap_confidence_interval(
@@ -105,7 +107,7 @@ def compute_parameter_deltas(
         total_params_after = sum(p.numel() for p in model_after.parameters())
         if total_params_after < total_params_before:
             deltas["sparsity"] = 1.0 - (total_params_after / total_params_before)
-    except Exception as e:
+    except _MODEL_ANALYSIS_ERRORS as e:
         logger.warning(f"Parameter delta computation failed: {e}")
 
     return deltas
@@ -143,7 +145,7 @@ def analyze_spectral_changes(
     except ImportError:
         logger.debug("Spectral analysis not available")
         return {"error": "spectral_analysis_unavailable"}
-    except Exception as e:
+    except _MODEL_ANALYSIS_ERRORS as e:
         logger.warning(f"Spectral analysis failed: {e}")
         return {"error": str(e)}
 
@@ -172,7 +174,7 @@ class PerplexityMetric:
             try:
                 loss_val = float(loss)
                 tok_val = float(tokens)
-            except Exception:
+            except _COERCE_ERRORS:
                 continue
             if (
                 not math.isfinite(loss_val)

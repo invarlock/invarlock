@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import os
 
+_TORCH_IMPORT_ERRORS = (ImportError, ModuleNotFoundError)
+_TORCH_CONFIG_ERRORS = (AttributeError, RuntimeError, TypeError, ValueError)
+
 
 def main() -> int:
     try:
         import torch
-    except Exception as exc:  # pragma: no cover - depends on torch availability
+    except (
+        _TORCH_IMPORT_ERRORS
+    ) as exc:  # pragma: no cover - depends on torch availability
         print(f"ERROR: torch is required for GPU environment reporting: {exc}")
         return 1
 
@@ -48,7 +53,7 @@ def main() -> int:
         try:
             if hasattr(torch, "use_deterministic_algorithms"):
                 torch.use_deterministic_algorithms(True, warn_only=False)
-        except Exception:
+        except _TORCH_CONFIG_ERRORS:
             print("WARNING: deterministic algorithms could not be fully enabled")
         try:
             cudnn_mod = getattr(torch.backends, "cudnn", None)
@@ -59,13 +64,13 @@ def main() -> int:
                     cudnn_mod.deterministic = True
                 if hasattr(cudnn_mod, "allow_tf32"):
                     cudnn_mod.allow_tf32 = False
-        except Exception:
+        except _TORCH_CONFIG_ERRORS:
             pass
         try:
             matmul = getattr(getattr(torch.backends, "cuda", object()), "matmul", None)
             if matmul is not None and hasattr(matmul, "allow_tf32"):
                 matmul.allow_tf32 = False
-        except Exception:
+        except _TORCH_CONFIG_ERRORS:
             pass
         print("\nTF32 enabled: False")
         print("cuDNN benchmark: False")
@@ -73,7 +78,7 @@ def main() -> int:
         print("\nDeterminism mode: throughput (PACK_DETERMINISM=throughput)")
         try:
             torch.backends.cuda.matmul.allow_tf32 = True
-        except Exception:
+        except _TORCH_CONFIG_ERRORS:
             pass
         try:
             cudnn_mod = getattr(torch.backends, "cudnn", None)
@@ -81,7 +86,7 @@ def main() -> int:
                 cudnn_mod.allow_tf32 = True
                 cudnn_mod.benchmark = True
                 cudnn_mod.enabled = True
-        except Exception:
+        except _TORCH_CONFIG_ERRORS:
             pass
         print("\nTF32 enabled: True")
         print("cuDNN benchmark: True")
@@ -97,7 +102,7 @@ def main() -> int:
 
         flash_avail = is_flash_attn_2_available()
         print(f"\nFlash Attention 2: {flash_avail}")
-    except Exception:
+    except (AttributeError, ImportError, ModuleNotFoundError, RuntimeError):
         print("\nFlash Attention 2: Unknown (transformers too old)")
 
     compile_avail = hasattr(torch, "compile")

@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
+
+_CUDA_DEVICE_RE = re.compile(r"^cuda(?::\d+)?$")
+_TORCH_DEVICE_ERRORS = (ImportError, AttributeError, RuntimeError, OSError)
 
 
 def resolve_device(requested: str | None) -> str:
@@ -40,7 +44,7 @@ def is_device_available(device: str) -> bool:
             and torch_mod.backends.mps.is_available()
         ):
             return True
-    except Exception:
+    except _TORCH_DEVICE_ERRORS:
         return False
     return False
 
@@ -49,12 +53,16 @@ def validate_device_for_config(
     device: str, config_requirements: dict[str, Any] | None = None
 ) -> tuple[bool, str]:
     # Simple validation stub; extend with model/profile specific checks as needed
-    valid = {"cpu", "cuda", "cuda:0", "mps"}
-    if device not in valid:
+    normalized = (device or "cpu").lower()
+    if normalized not in {"cpu", "mps"} and not _CUDA_DEVICE_RE.match(normalized):
         return False, f"Unsupported device '{device}'"
     if config_requirements and config_requirements.get("required_device"):
         req = str(config_requirements.get("required_device")).lower()
-        if device != req:
+        normalized_req = "cuda" if _CUDA_DEVICE_RE.match(req) else req
+        normalized_selected = (
+            "cuda" if _CUDA_DEVICE_RE.match(normalized) else normalized
+        )
+        if normalized_selected != normalized_req:
             return (
                 False,
                 f"Configuration requires device '{req}' but '{device}' was selected",
@@ -90,7 +98,7 @@ def get_device_info() -> dict[str, dict]:
             info["cuda"]["device_count"] = torch_mod.cuda.device_count()
             info["cuda"]["device_name"] = name
             info["cuda"]["memory_total"] = f"{mem / 1e9:.1f} GB"
-    except Exception:
+    except _TORCH_DEVICE_ERRORS:
         pass
     info["auto_selected"] = auto
     return info

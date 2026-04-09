@@ -8,6 +8,7 @@ from typing import Any
 
 import invarlock.guards.rmt_analysis as rmt_analysis
 import invarlock.guards.rmt_detection as rmt_detection
+from invarlock.core.exceptions import InvarlockError
 from invarlock.reporting.report_types import create_empty_report
 
 from .bench_policy import (
@@ -28,6 +29,17 @@ from .bench_policy import (
 )
 
 logger = logging.getLogger(__name__)
+_BENCHMARK_RECOVERABLE_ERRORS = (
+    InvarlockError,
+    AttributeError,
+    ImportError,
+    IndexError,
+    KeyError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 
 def _assign_dataset_provider(
@@ -51,6 +63,137 @@ def _extract_success_report_path(result: RunResult, *, run_label: str) -> str | 
     if not isinstance(report_path, str) or not report_path:
         raise RuntimeError(f"{run_label} run report is missing artifacts.report_path")
     return report_path
+
+
+def _build_benchmark_run_report(
+    *,
+    scenario: ScenarioConfig,
+    run_type: str,
+    dataset_name: str,
+    split: str,
+    tokenizer_hash: str | None,
+    run_dir: Path,
+    event_path: Path,
+    core_report: Any,
+    rmt_baseline_sigmas: dict[str, float],
+    rmt_baseline_mp_stats: dict[str, Any],
+    rmt_margin: float,
+    rmt_deadband: float,
+    model: Any,
+) -> dict[str, Any]:
+    report = create_empty_report()
+    report["meta"].update(
+        {
+            "model_id": scenario.model_id,
+            "adapter": scenario.adapter,
+            "device": str(scenario.device),
+            "commit": "",
+            "seed": scenario.seed,
+            "ts": datetime.now().isoformat(),
+        }
+    )
+    if tokenizer_hash:
+        report["meta"]["tokenizer_hash"] = tokenizer_hash
+    dur = core_report.meta.get("duration") if hasattr(core_report, "meta") else None
+    if isinstance(dur, (int, float)):
+        report["meta"]["duration_s"] = float(dur)
+    report["data"].update(
+        {
+            "dataset": dataset_name,
+            "split": split,
+            "seq_len": scenario.seq_len,
+            "stride": scenario.stride,
+            "preview_n": int(scenario.preview_n or 0),
+            "final_n": int(scenario.final_n or 0),
+        }
+    )
+    edit_meta = core_report.edit if hasattr(core_report, "edit") else {}
+    if not isinstance(edit_meta, dict):
+        raise RuntimeError("Core report returned invalid edit metadata payload")
+    plan_digest_raw = edit_meta.get("plan_digest", "")
+    if plan_digest_raw is None:
+        plan_digest = ""
+    elif isinstance(plan_digest_raw, str):
+        plan_digest = plan_digest_raw
+    else:
+        raise RuntimeError("Core report returned non-string plan_digest")
+    deltas = edit_meta.get("deltas", report["edit"]["deltas"])
+    if not isinstance(deltas, dict):
+        raise RuntimeError("Core report returned invalid edit delta payload")
+    report["edit"].update(
+        {
+            "name": scenario.edit,
+            "plan_digest": plan_digest,
+            "deltas": deltas,
+        }
+    )
+    if hasattr(core_report, "metrics") and isinstance(core_report.metrics, dict):
+        report["metrics"].update(core_report.metrics)
+    if hasattr(core_report, "evaluation_windows") and isinstance(
+        core_report.evaluation_windows, dict
+    ):
+        report["evaluation_windows"] = core_report.evaluation_windows
+    if hasattr(core_report, "guards") and isinstance(core_report.guards, dict):
+        for name, guard_result in core_report.guards.items():
+            if not isinstance(guard_result, dict):
+                continue
+            report["guards"].append(
+                {
+                    "name": name,
+                    "passed": guard_result.get("passed"),
+                    "decision": guard_result.get("decision"),
+                    "policy": guard_result.get("policy", {}),
+                    "metrics": guard_result.get("metrics", {}),
+                    "diagnostics": guard_result.get("diagnostics", []),
+                    "violations": guard_result.get("violations", []),
+                    "details": guard_result.get("details", {}),
+                }
+            )
+    try:
+        detection = rmt_detection.rmt_detect(
+            model=model,
+            threshold=rmt_margin,
+            detect_only=True,
+            baseline_sigmas=rmt_baseline_sigmas,
+            baseline_mp_stats=rmt_baseline_mp_stats,
+            deadband=rmt_deadband,
+        )
+    except _BENCHMARK_RECOVERABLE_ERRORS as exc:
+        raise RuntimeError(
+            f"RMT detection failed for {scenario.edit} ({run_type}): {exc}"
+        ) from exc
+    report["metrics"].setdefault("rmt", {})
+    if isinstance(report["metrics"].get("rmt"), dict):
+        report["metrics"]["rmt"]["outliers"] = int(
+            detection.get("n_layers_flagged", 0) or 0
+        )
+    status = getattr(core_report, "status", "")
+    rollback_reason = (
+        core_report.meta.get("rollback_reason")
+        if hasattr(core_report, "meta") and isinstance(core_report.meta, dict)
+        else None
+    )
+    report["flags"].update(
+        {
+            "guard_recovered": bool(
+                (
+                    hasattr(core_report, "meta")
+                    and core_report.meta.get("guard_recovered")
+                )
+                or str(status).lower() == "rollback"
+            ),
+            "rollback_reason": rollback_reason,
+        }
+    )
+    report["artifacts"].update(
+        {
+            "events_path": str(event_path),
+            "logs_path": "",
+            "checkpoint_path": None,
+            "report_path": str(run_dir / "report.json"),
+        }
+    )
+    return report
 
 
 class DependencyChecker:
@@ -225,7 +368,7 @@ def execute_single_run(
             for guard_name in ("invariants", "spectral", "rmt", "variance"):
                 try:
                     guards.append(registry.get_guard(guard_name))
-                except Exception as exc:
+                except _BENCHMARK_RECOVERABLE_ERRORS as exc:
                     raise RuntimeError(
                         f"Guard construction failed for {guard_name}: {exc}"
                     ) from exc
@@ -268,132 +411,26 @@ def execute_single_run(
             final_n=scenario.final_n,
         )
 
-        report = create_empty_report()
-        report["meta"].update(
-            {
-                "model_id": scenario.model_id,
-                "adapter": scenario.adapter,
-                "device": str(scenario.device),
-                "commit": "",
-                "seed": scenario.seed,
-                "ts": datetime.now().isoformat(),
-            }
-        )
-        if tokenizer_hash:
-            report["meta"]["tokenizer_hash"] = tokenizer_hash
-        dur = core_report.meta.get("duration") if hasattr(core_report, "meta") else None
-        if isinstance(dur, int | float):
-            report["meta"]["duration_s"] = float(dur)
-
-        report["data"].update(
-            {
-                "dataset": dataset_name,
-                "split": split,
-                "seq_len": scenario.seq_len,
-                "stride": scenario.stride,
-                "preview_n": int(scenario.preview_n or 0),
-                "final_n": int(scenario.final_n or 0),
-            }
-        )
-
-        edit_meta = core_report.edit if hasattr(core_report, "edit") else {}
-        if not isinstance(edit_meta, dict):
-            raise RuntimeError("Core report returned invalid edit metadata payload")
-
-        plan_digest_raw = edit_meta.get("plan_digest", "")
-        if plan_digest_raw is None:
-            plan_digest = ""
-        elif isinstance(plan_digest_raw, str):
-            plan_digest = plan_digest_raw
-        else:
-            raise RuntimeError("Core report returned non-string plan_digest")
-
-        deltas = edit_meta.get("deltas", report["edit"]["deltas"])
-        if not isinstance(deltas, dict):
-            raise RuntimeError("Core report returned invalid edit delta payload")
-        report["edit"].update(
-            {
-                "name": scenario.edit,
-                "plan_digest": plan_digest,
-                "deltas": deltas,
-            }
-        )
-
-        if hasattr(core_report, "metrics") and isinstance(core_report.metrics, dict):
-            report["metrics"].update(core_report.metrics)
-
-        if hasattr(core_report, "evaluation_windows") and isinstance(
-            core_report.evaluation_windows, dict
-        ):
-            report["evaluation_windows"] = core_report.evaluation_windows
-
-        if hasattr(core_report, "guards") and isinstance(core_report.guards, dict):
-            for name, guard_result in core_report.guards.items():
-                if not isinstance(guard_result, dict):
-                    continue
-                report["guards"].append(
-                    {
-                        "name": name,
-                        "passed": guard_result.get("passed"),
-                        "decision": guard_result.get("decision"),
-                        "policy": guard_result.get("policy", {}),
-                        "metrics": guard_result.get("metrics", {}),
-                        "diagnostics": guard_result.get("diagnostics", []),
-                        "violations": guard_result.get("violations", []),
-                        "details": guard_result.get("details", {}),
-                    }
-                )
-
-        try:
-            detection = rmt_detection.rmt_detect(
-                model=model,
-                threshold=rmt_margin,
-                detect_only=True,
-                baseline_sigmas=rmt_baseline_sigmas,
-                baseline_mp_stats=rmt_baseline_mp_stats,
-                deadband=rmt_deadband,
-            )
-        except Exception as exc:
-            raise RuntimeError(
-                f"RMT detection failed for {scenario.edit} ({run_type}): {exc}"
-            ) from exc
-        report["metrics"].setdefault("rmt", {})
-        if isinstance(report["metrics"].get("rmt"), dict):
-            report["metrics"]["rmt"]["outliers"] = int(
-                detection.get("n_layers_flagged", 0) or 0
-            )
-
-        status = getattr(core_report, "status", "")
-        rollback_reason = (
-            core_report.meta.get("rollback_reason")
-            if hasattr(core_report, "meta") and isinstance(core_report.meta, dict)
-            else None
-        )
-        report["flags"].update(
-            {
-                "guard_recovered": bool(
-                    (
-                        hasattr(core_report, "meta")
-                        and core_report.meta.get("guard_recovered")
-                    )
-                    or str(status).lower() == "rollback"
-                ),
-                "rollback_reason": rollback_reason,
-            }
-        )
-        report["artifacts"].update(
-            {
-                "events_path": str(event_path),
-                "logs_path": "",
-                "checkpoint_path": None,
-                "report_path": str(run_dir / "report.json"),
-            }
+        report = _build_benchmark_run_report(
+            scenario=scenario,
+            run_type=run_type,
+            dataset_name=dataset_name,
+            split=split,
+            tokenizer_hash=tokenizer_hash,
+            run_dir=run_dir,
+            event_path=event_path,
+            core_report=core_report,
+            rmt_baseline_sigmas=rmt_baseline_sigmas,
+            rmt_baseline_mp_stats=rmt_baseline_mp_stats,
+            rmt_margin=rmt_margin,
+            rmt_deadband=rmt_deadband,
+            model=model,
         )
         _write_json(Path(report["artifacts"]["report_path"]), report)
 
-        success = str(status).lower() != "failed"
+        success = str(getattr(core_report, "status", "")).lower() != "failed"
         return RunResult(run_type=run_type, report=report, success=success)
-    except Exception as exc:
+    except _BENCHMARK_RECOVERABLE_ERRORS as exc:
         logger.error(f"Run failed for {scenario.edit} ({run_type}): {exc}")
         return RunResult(
             run_type=run_type,
@@ -473,7 +510,7 @@ def execute_scenario(
                 json.dumps(evaluation_report, indent=2), encoding="utf-8"
             )
             artifacts["evaluation_report"] = str(report_path)
-        except Exception as exc:
+        except _BENCHMARK_RECOVERABLE_ERRORS as exc:
             raise RuntimeError(
                 f"Evaluation report generation failed for {scenario_slug}: {exc}"
             ) from exc

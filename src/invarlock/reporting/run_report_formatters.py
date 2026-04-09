@@ -586,8 +586,7 @@ def _generate_single_html(report: RunReport) -> list[str]:
             if in_table:
                 lines.append("                </tbody></table>")
                 in_table = False
-            if line:
-                lines.append(f"            <p>{html.escape(line)}</p>")
+            lines.append(f"            <p>{html.escape(line)}</p>")
 
     if in_table:
         lines.append("                </tbody></table>")
@@ -642,8 +641,7 @@ def _generate_comparison_html(report1: RunReport, report2: RunReport) -> list[st
             if in_table:
                 lines.append("                </tbody></table>")
                 in_table = False
-            if line:
-                lines.append(f"            <p>{html.escape(line)}</p>")
+            lines.append(f"            <p>{html.escape(line)}</p>")
 
     if in_table:
         lines.append("                </tbody></table>")

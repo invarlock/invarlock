@@ -17,6 +17,8 @@ def test_causal_lm_family_presets_load() -> None:
     presets = {
         "wikitext2_512.yaml": "sshleifer/tiny-gpt2",
         "mistral_7b_512.yaml": "mistralai/Mistral-7B-v0.1",
+        "ministral3_8b_512.yaml": "mistralai/Ministral-3-8B-Instruct-2512-BF16",
+        "ministral3_14b_512.yaml": "mistralai/Ministral-3-14B-Instruct-2512-BF16",
         "qwen2_7b_512.yaml": "Qwen/Qwen2-7B",
         "qwen2_5_14b_512.yaml": "Qwen/Qwen2.5-14B",
         "qwen3_8b_512.yaml": "Qwen/Qwen3-8B",
@@ -31,6 +33,8 @@ def test_causal_lm_family_presets_load() -> None:
     expected_provider_kinds = {
         "deepseek_r1_distill_qwen_7b_512.yaml": "hf_text",
         "gemma4_e2b_512.yaml": "hf_text",
+        "ministral3_8b_512.yaml": "hf_text",
+        "ministral3_14b_512.yaml": "hf_text",
         "olmo2_13b_512.yaml": "hf_text",
         "olmo2_7b_512.yaml": "hf_text",
         "phi4_reasoning_plus_512.yaml": "hf_text",
@@ -49,6 +53,8 @@ def test_causal_lm_family_presets_load() -> None:
         assert cfg.require_section("model")["adapter"] == "hf_causal"
         if name == "gemma4_e2b_512.yaml":
             assert cfg.require_section("model")["attn_implementation"] == "sdpa"
+        if name == "phi4_reasoning_plus_512.yaml":
+            assert cfg.require_section("model")["trust_remote_code"] is True
         provider = cfg.data["dataset"]["provider"]
         if name in expected_provider_kinds:
             assert provider["kind"] == expected_provider_kinds[name]
@@ -65,6 +71,8 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
     expected_drift_band = {"min": 0.9, "max": 1.2}
     configs = {
         "null_sweep_mistral_7b.yaml": "mistralai/Mistral-7B-v0.1",
+        "null_sweep_ministral3_8b.yaml": "mistralai/Ministral-3-8B-Instruct-2512-BF16",
+        "null_sweep_ministral3_14b.yaml": "mistralai/Ministral-3-14B-Instruct-2512-BF16",
         "null_sweep_qwen2_7b.yaml": "Qwen/Qwen2-7B",
         "null_sweep_qwen2_5_14b.yaml": "Qwen/Qwen2.5-14B",
         "null_sweep_qwen3_8b.yaml": "Qwen/Qwen3-8B",
@@ -81,9 +89,13 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
             (root / "configs/calibration" / name).read_text(encoding="utf-8")
         )
         assert data["model"]["id"] == model_id
+        if name == "null_sweep_phi4_reasoning_plus.yaml":
+            assert data["model"]["trust_remote_code"] is True
         if name in {
             "null_sweep_deepseek_r1_distill_qwen_7b.yaml",
             "null_sweep_gemma4_e2b.yaml",
+            "null_sweep_ministral3_8b.yaml",
+            "null_sweep_ministral3_14b.yaml",
             "null_sweep_olmo2_13b.yaml",
             "null_sweep_olmo2_7b.yaml",
             "null_sweep_phi4_reasoning_plus.yaml",

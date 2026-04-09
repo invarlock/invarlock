@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import pytest
@@ -61,6 +62,9 @@ def test_verify_ci_provider_parity_pass(tmp_path: Path, capsys) -> None:
             "ratio_vs_baseline": 1.0,
             "ci": [0.0, 0.0],
             "display_ci": [1.0, 1.0],
+        },
+        "evaluation_windows": {
+            "final": {"logloss": [math.log(10.0)], "token_counts": [1]}
         },
         "spectral": {
             "evaluated": True,

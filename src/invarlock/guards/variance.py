@@ -29,6 +29,8 @@ from .policies import VariancePolicyDict
 
 __all__ = ["VarianceGuard"]
 
+_EVIDENCE_DUMP_ERRORS = (ImportError, OSError, RuntimeError, TypeError, ValueError)
+
 
 class VarianceGuard(Guard):
     """Standalone Variance Guard with A/B testing for variance equalization."""
@@ -494,7 +496,7 @@ class VarianceGuard(Guard):
                     }
                 },
             )
-        except Exception:
+        except _EVIDENCE_DUMP_ERRORS:
             pass
         return result
 

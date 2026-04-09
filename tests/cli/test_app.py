@@ -1,3 +1,4 @@
+import builtins
 import os
 import re
 from unittest.mock import patch
@@ -30,13 +31,15 @@ def test_version_command_with_version():
 
 
 def test_version_command_no_version():
+    original_import = builtins.__import__
+
     with patch("invarlock.cli.app.console") as mock_console:
         with patch(
             "builtins.__import__",
             side_effect=lambda name, *args, **kwargs: (
                 ImportError("No module named 'invarlock'")
                 if name == "invarlock"
-                else __import__(name, *args, **kwargs)
+                else original_import(name, *args, **kwargs)
             ),
         ):
             version()

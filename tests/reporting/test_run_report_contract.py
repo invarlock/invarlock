@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+from invarlock.core.run_report_payload_policy import build_run_report_context
 from invarlock.reporting.report_types import create_empty_report
 from invarlock.reporting.run_report_contract import (
     assemble_run_report,
@@ -159,3 +160,91 @@ def test_persist_run_report_outputs_adds_telemetry_and_saved_paths(
     assert result.report_path_out == str(tmp_path / "report.json")
     assert result.telemetry_saved_path == str(tmp_path / "telemetry.json")
     assert report["artifacts"]["telemetry_path"].endswith("telemetry.json")
+
+
+def test_assemble_run_report_preserves_primary_metric_context() -> None:
+    core_report = SimpleNamespace(
+        context={"dataset_meta": {}, "window_plan": {}},
+        edit={},
+        guards={},
+        metrics={},
+    )
+    cfg = SimpleNamespace(
+        model=SimpleNamespace(id="gpt2", adapter="hf_causal"),
+        dataset=SimpleNamespace(provider="wikitext2", seq_len=128, stride=64),
+        meta=SimpleNamespace(commit="abc123"),
+    )
+
+    result = assemble_run_report(
+        core_report=core_report,
+        cfg=cfg,
+        run_context={
+            "primary_metric": {
+                "drift_band": {"min": 0.9, "max": 1.2},
+                "acceptance_range": {"min": 0.95, "max": 1.1},
+            }
+        },
+        profile_normalized="ci",
+        auto_config={"enabled": True},
+        resolved_device="cpu",
+        seed_bundle={"python": 43},
+        guard_overhead_threshold=0.01,
+        model_profile=SimpleNamespace(name="causal"),
+        determinism_meta={},
+        pm_acceptance_range=(0.95, 1.1),
+        pm_drift_band=(0.9, 1.2),
+        tokenizer_hash=None,
+        resolved_split="validation",
+        preview_count=8,
+        final_count=8,
+        snapshot_provenance={},
+        edit_op=SimpleNamespace(name="noop"),
+        edit_label=None,
+        run_dir=Path.cwd(),
+        run_config=SimpleNamespace(event_path=Path("events.jsonl")),
+        resolved_loss_type="causal",
+        timings={},
+        guard_overhead_payload=None,
+        baseline=None,
+        preview_records=[],
+        final_records=[],
+        use_mlm=False,
+        preview_mask_counts=None,
+        final_mask_counts=None,
+        profile="ci",
+        used_fallback_split=False,
+        baseline_report_data=None,
+        effective_preview=8,
+        effective_final=8,
+        metric_kind="ppl_causal",
+        window_plan=None,
+        debug_metric_diffs_enabled=False,
+        create_empty_report_fn=create_empty_report,
+        build_run_report_context_fn=build_run_report_context,
+        build_run_report_meta_fn=lambda **kwargs: {},
+        canonical_dataset_id_fn=lambda provider: provider,
+        safe_int_fn=int,
+        build_run_report_data_fn=lambda **kwargs: ({}, kwargs["tokenizer_hash"]),
+        build_snapshot_provenance_fn=lambda payload: payload,
+        build_edit_payload_fn=lambda **kwargs: ({}, None),
+        persist_ref_masks_fn=lambda core_report, run_dir: None,
+        build_artifacts_payload_fn=lambda **kwargs: {},
+        merge_core_timing_metrics_fn=lambda timings, metrics: timings,
+        build_metrics_payload_fn=lambda **kwargs: {},
+        prepare_guard_overhead_report_fn=lambda payload, **kwargs: payload,
+        finalize_run_provenance_fn=lambda **kwargs: SimpleNamespace(
+            missing_evaluation_windows_for_baseline=False
+        ),
+        build_guard_entries_fn=lambda guards: [],
+        build_flags_payload_fn=lambda guards: {},
+        enrich_run_report_metrics_fn=lambda **kwargs: SimpleNamespace(
+            pairing_violations=(), debug_diffs_line="", report=kwargs["report"]
+        ),
+        optional_torch_fn=lambda: None,
+        environ={},
+    )
+
+    assert result.report["context"]["primary_metric"] == {
+        "drift_band": {"min": 0.9, "max": 1.2},
+        "acceptance_range": {"min": 0.95, "max": 1.1},
+    }

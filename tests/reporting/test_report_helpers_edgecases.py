@@ -119,4 +119,4 @@ def test_extract_report_meta_records_missing_fields() -> None:
 
 def test_normalize_and_validate_report_rejects_invalid() -> None:
     with pytest.raises(ValueError):
-        normalization_mod.normalize_and_validate_run_report("oops")  # type: ignore[arg-type]
+        normalization_mod.normalize_and_validate_run_report("oops")

@@ -126,7 +126,7 @@ def test_seq2seq_windows_resizes_and_falls_back_when_mask_lengths_mismatch():
             }
         ]
 
-    provider.batches = fake_batches  # type: ignore[method-assign]
+    provider.batches = fake_batches
     prev, fin = provider.windows(_Tok(), seq_len=3, preview_n=1, final_n=1)
     assert provider._n == 2
     assert len(prev.input_ids[0]) == 3

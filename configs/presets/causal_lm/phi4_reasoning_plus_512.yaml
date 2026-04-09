@@ -4,6 +4,7 @@ model:
   id: "microsoft/Phi-4-reasoning-plus"
   adapter: "hf_causal"
   device: "auto"
+  trust_remote_code: true
 
 dataset:
   provider:

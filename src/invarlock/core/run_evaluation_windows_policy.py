@@ -26,7 +26,7 @@ def _nested_list_payload(value: Any) -> list[list[Any]]:
 
 def _window_payload(window: Mapping[str, Any] | None) -> dict[str, Any]:
     window_map = dict(window or {})
-    payload = {
+    payload: dict[str, Any] = {
         "window_ids": _list_payload(window_map.get("window_ids", [])),
         "example_ids": [
             str(value) for value in _list_payload(window_map.get("example_ids", []))
@@ -90,7 +90,7 @@ def _fallback_window_payload(
         if "image_path" in record or "example_id" in record or "answers" in record
     ]
     if multimodal_records:
-        payload: dict[str, Any] = {
+        multimodal_payload: dict[str, Any] = {
             "example_ids": [
                 str(record.get("example_id") or record.get("id") or "")
                 for record in multimodal_records
@@ -107,22 +107,22 @@ def _fallback_window_payload(
             None,
         )
         if processor_sha:
-            payload["processor_sha256"] = processor_sha
-        return payload
+            multimodal_payload["processor_sha256"] = processor_sha
+        return multimodal_payload
 
-    payload: dict[str, Any] = {
+    sequence_payload: dict[str, Any] = {
         "window_ids": list(range(start_index, start_index + len(records))),
         "input_ids": [list(record["input_ids"]) for record in records],
         "attention_masks": [list(record["attention_mask"]) for record in records],
         "token_counts": [_token_count(record) for record in records],
     }
     if use_mlm:
-        payload["masked_token_counts"] = list(mask_counts or [])
-        payload["labels"] = [
+        sequence_payload["masked_token_counts"] = list(mask_counts or [])
+        sequence_payload["labels"] = [
             record.get("labels", [-100] * len(record["input_ids"]))
             for record in records
         ]
-    return payload
+    return sequence_payload
 
 
 def build_fallback_evaluation_windows(

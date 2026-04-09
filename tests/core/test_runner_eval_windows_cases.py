@@ -186,6 +186,34 @@ def test_compute_slice_summary_treats_whitespace_false_store_flag_as_disabled(
     assert summary["labels"] == []
 
 
+def test_compute_slice_summary_zero_mask_batches_fall_back_without_debug_trace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("INVARLOCK_DEBUG_TRACE", raising=False)
+    runner = _RunnerRecorder()
+    model = _LossModel(0.1)
+    batch = {
+        "input_ids": torch.tensor([[1, 2, 3]], dtype=torch.long),
+        "labels": torch.tensor([[-100, -100, -100]], dtype=torch.long),
+    }
+
+    summary, error = compute_slice_summary(
+        runner,
+        model,
+        [batch],
+        max_batches=1,
+        start_idx=0,
+        device=next(model.parameters()).device,
+        resolved_loss_mode="causal",
+    )
+
+    assert error is None
+    assert summary["masked_token_counts"] == [3]
+    assert not any(
+        operation == "zero_mask_batch" for _, operation, _, _ in runner.events
+    )
+
+
 def test_compute_slice_summary_strips_whitespace_when_storage_is_disabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -286,3 +314,29 @@ def test_compute_slice_summary_logs_zero_mask_batches_and_uses_token_fallback(
             "fallback_weight": 3,
         }
     ]
+
+
+def test_compute_slice_summary_skips_non_finite_losses_and_reports_error() -> None:
+    runner = _RunnerRecorder()
+    model = _LossModel(float("nan"))
+    batch = {"input_ids": torch.tensor([[1, 2, 3]], dtype=torch.long)}
+
+    summary, error = compute_slice_summary(
+        runner,
+        model,
+        [batch],
+        max_batches=1,
+        start_idx=2,
+        device=next(model.parameters()).device,
+        resolved_loss_mode="causal",
+    )
+
+    assert summary["num_batches"] == 0
+    assert summary["log_losses"] == []
+    assert error == {
+        "error": "non_finite_loss",
+        "detail": "Evaluation produced only non-finite loss values; primary metric evidence is unavailable.",
+    }
+    operations = [operation for _, operation, _, _ in runner.events]
+    assert "non_finite_loss" in operations
+    assert "non_finite_loss_total" in operations

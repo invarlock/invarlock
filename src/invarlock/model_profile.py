@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -13,6 +14,8 @@ _TRANSFORMERS_UNSET = object()
 AutoTokenizer: Any = _TRANSFORMERS_UNSET
 _TOKENIZERS_UNSET = object()
 TokenizerImpl: Any = _TOKENIZERS_UNSET
+_TOKENIZER_LOOKUP_ERRORS = (RuntimeError, TypeError, ValueError)
+_TOKENIZER_LOAD_ERRORS = (ImportError, OSError, RuntimeError, TypeError, ValueError)
 
 
 class PreTrainedTokenizerBase:
@@ -51,11 +54,11 @@ def _ensure_tokenizers_support() -> Any:
     global TokenizerImpl
     if TokenizerImpl is _TOKENIZERS_UNSET:
         try:
-            import tokenizers  # type: ignore[import-untyped]
+            tokenizers_module = importlib.import_module("tokenizers")
         except ModuleNotFoundError:
             TokenizerImpl = None
         else:  # pragma: no cover - tokenizers optional
-            TokenizerImpl = tokenizers.Tokenizer
+            TokenizerImpl = tokenizers_module.Tokenizer
     return None if TokenizerImpl is _TOKENIZERS_UNSET else TokenizerImpl
 
 
@@ -164,7 +167,7 @@ class _LocalFastTokenizer(PreTrainedTokenizerBase):
             return None
         try:
             token_id = self._tokenizer.token_to_id(token)
-        except Exception:
+        except _TOKENIZER_LOOKUP_ERRORS:
             return None
         return None if token_id is None else int(token_id)
 
@@ -415,7 +418,7 @@ def _is_tokenizer_cache_miss(error: Exception) -> bool:
 
 
 def _is_slow_tokenizer_fallback_candidate(error: Exception) -> bool:
-    if not isinstance(error, (OSError, RuntimeError, TypeError, ValueError)):
+    if not isinstance(error, _TOKENIZER_LOAD_ERRORS):
         return False
     message = str(error).strip().lower()
     return any(
@@ -441,15 +444,49 @@ def _load_tokenizer_with_factory_retry(
     try:
         tokenizer = tokenizer_factory.from_pretrained(candidate, **kwargs)
         return cast("PreTrainedTokenizerBase", tokenizer)
-    except Exception as exc:
+    except _TOKENIZER_LOAD_ERRORS as exc:
         if not _is_slow_tokenizer_fallback_candidate(exc):
             raise
-        tokenizer = tokenizer_factory.from_pretrained(
-            candidate,
-            use_fast=False,
-            **kwargs,
-        )
-        return cast("PreTrainedTokenizerBase", tokenizer)
+        try:
+            tokenizer = tokenizer_factory.from_pretrained(
+                candidate,
+                use_fast=False,
+                **kwargs,
+            )
+            return cast("PreTrainedTokenizerBase", tokenizer)
+        except _TOKENIZER_LOAD_ERRORS as slow_exc:
+            if not _is_slow_tokenizer_fallback_candidate(slow_exc):
+                raise
+            explicit_factory = _resolve_explicit_slow_tokenizer_factory(candidate)
+            if explicit_factory is None:
+                raise
+            tokenizer = explicit_factory.from_pretrained(candidate, **kwargs)
+            return cast("PreTrainedTokenizerBase", tokenizer)
+
+
+def _resolve_explicit_slow_tokenizer_factory(candidate: str) -> Any | None:
+    hint_blob, arch_blob, _ = _profile_hints(candidate)
+    hint_space = f"{hint_blob} {arch_blob}".strip()
+    for key, symbol_name in (
+        ("deberta-v2", "DebertaV2Tokenizer"),
+        ("deberta_v2", "DebertaV2Tokenizer"),
+        ("debertav2", "DebertaV2Tokenizer"),
+        ("deberta", "DebertaTokenizer"),
+        ("distilbert", "DistilBertTokenizer"),
+        ("roberta", "RobertaTokenizer"),
+        ("albert", "AlbertTokenizer"),
+        ("electra", "ElectraTokenizer"),
+        ("bert", "BertTokenizer"),
+    ):
+        if key not in hint_space:
+            continue
+        try:
+            import transformers
+
+            return getattr(transformers, symbol_name)
+        except (AttributeError, ImportError, ModuleNotFoundError):
+            return None
+    return None
 
 
 def _tokenizer_candidates(model_id: str) -> list[str]:
@@ -503,7 +540,7 @@ def _load_tokenizer_for_model(
                 candidate,
                 local_files_only=True,
             )
-        except Exception as exc:
+        except _TOKENIZER_LOAD_ERRORS as exc:
             if not _is_tokenizer_cache_miss(exc):
                 raise
             continue
@@ -527,7 +564,7 @@ def _load_tokenizer_for_model(
                 candidate,
                 local_files_only=False,
             )
-        except Exception as exc:
+        except _TOKENIZER_LOAD_ERRORS as exc:
             if not _is_tokenizer_cache_miss(exc):
                 raise
             continue
@@ -610,11 +647,28 @@ def _rope_decoder_selectors() -> dict[str, list[str]]:
             "self_attn.k_proj",
             "self_attn.v_proj",
             "self_attn.o_proj",
+            "linear_attn.in_proj_qkv",
+            "linear_attn.out_proj",
         ],
         "ffn": [
             "mlp.up_proj",
             "mlp.down_proj",
             "mlp.gate_proj",
+        ],
+    }
+
+
+def _gpt_oss_selectors() -> dict[str, list[str]]:
+    return {
+        "attention": [
+            "self_attn.q_proj",
+            "self_attn.k_proj",
+            "self_attn.v_proj",
+            "self_attn.o_proj",
+        ],
+        "ffn": [
+            "mlp.router",
+            "mlp.experts",
         ],
     }
 
@@ -762,7 +816,10 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
         is_encoder_decoder
         or (
             seq2seq_arch
-            and not any(keyword in model_lower for keyword in ("gemma3", "gemma4"))
+            and not any(
+                keyword in model_lower
+                for keyword in ("gemma3", "gemma4", "mistral3", "ministral")
+            )
         )
         or any(keyword in model_lower for keyword in ("t5", "bart"))
     ):
@@ -777,25 +834,36 @@ def detect_model_profile(model_id: str, adapter: str | None = None) -> ModelProf
             cert_lints=(),
         )
 
+    causal_family_aliases = (
+        ("mixtral", "mixtral"),
+        ("gpt-oss", "gpt_oss"),
+        ("gpt_oss", "gpt_oss"),
+        ("ministral", "mistral"),
+        ("mistral", "mistral"),
+        ("qwen", "qwen"),
+        ("yi", "yi"),
+        ("llama", "llama"),
+        ("gemma", "gemma"),
+        ("olmo", "olmo"),
+    )
     if any(
-        keyword in adapter_lower
-        for keyword in ("llama", "mistral", "mixtral", "qwen", "yi", "gemma", "olmo")
-    ) or any(
-        keyword in model_lower
-        for keyword in ("llama", "mistral", "mixtral", "qwen", "yi", "gemma", "olmo")
-    ):
+        keyword in adapter_lower for keyword, _family in causal_family_aliases
+    ) or any(keyword in model_lower for keyword, _family in causal_family_aliases):
         family = "causal"
-        for keyword in ("mixtral", "mistral", "qwen", "yi", "llama", "gemma", "olmo"):
+        for keyword, mapped_family in causal_family_aliases:
             if keyword in adapter_lower or keyword in model_lower:
-                family = keyword
+                family = mapped_family
                 break
+        module_selectors = (
+            _gpt_oss_selectors() if family == "gpt_oss" else _rope_decoder_selectors()
+        )
         return ModelProfile(
             family=family,
             default_loss="causal",
             make_tokenizer=_make_causal_auto_tokenizer(model_id),
             default_metric="ppl_causal",
             default_provider="wikitext2",
-            module_selectors=_rope_decoder_selectors(),
+            module_selectors=module_selectors,
             invariants=("rope_rotary_embedding",),
             cert_lints=(
                 {

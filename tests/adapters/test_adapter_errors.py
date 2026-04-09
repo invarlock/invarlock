@@ -15,7 +15,7 @@ def test_bnb_missing_transformers_dependency(monkeypatch: pytest.MonkeyPatch) ->
     # Make importing transformers fail
     real_import = builtins.__import__
 
-    def _imp(name, *a, **k):  # type: ignore[no-untyped-def]
+    def _imp(name: str, *a: object, **k: object) -> object:
         if name == "transformers":
             raise ImportError("transformers unavailable")
         return real_import(name, *a, **k)
@@ -40,10 +40,10 @@ def test_hf_causal_invalid_model_id_maps_to_model_load_error(
 
     class _Auto:
         @staticmethod
-        def from_pretrained(*a, **k):  # type: ignore[no-untyped-def]
+        def from_pretrained(*a: object, **k: object) -> object:
             raise OSError("bad model id")
 
-    tr.AutoModelForCausalLM = _Auto  # type: ignore[attr-defined]
+    tr.AutoModelForCausalLM = _Auto
     monkeypatch.setitem(sys.modules, "transformers", tr)
 
     from invarlock.adapters.hf_causal import HF_Causal_Adapter
@@ -66,7 +66,7 @@ def test_gptq_missing_runtime_maps_to_dependency_error(
 
     real_import = builtins.__import__
 
-    def _imp(name, *a, **k):  # type: ignore[no-untyped-def]
+    def _imp(name: str, *a: object, **k: object) -> object:
         if name == "auto_gptq":
             raise ImportError("auto_gptq unavailable")
         return real_import(name, *a, **k)
@@ -207,6 +207,7 @@ def test_hf_mlm_loader_falls_back_only_for_masked_lm_loader_mismatch(
             HFLoaderStrategy("mlm", "direct", "primary", "primary"),
             HFLoaderStrategy("mlm", "auto", "auto", "auto"),
             HFLoaderStrategy("mlm_base", "base", "fallback", "fallback"),
+            HFLoaderStrategy("mlm", "auto", "ignored", "ignored"),
         )
     )
 
@@ -232,3 +233,92 @@ def test_hf_mlm_loader_falls_back_only_for_masked_lm_loader_mismatch(
 
     assert loaded == {"loader": "fallback"}
     assert calls == ["primary", "auto", "fallback"]
+
+
+def test_hf_mlm_loader_retries_with_direct_submodule_hint_for_remote_model_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from invarlock.adapters import hf_mlm as hf_mlm_mod
+    from invarlock.adapters.hf_loading import HFLoaderStrategy
+    from invarlock.adapters.hf_mlm import HF_MLM_Adapter
+
+    calls: list[str] = []
+    strategies = iter(
+        (
+            HFLoaderStrategy("mlm", "auto", "primary", "primary"),
+            HFLoaderStrategy("mlm", "auto", "auto", "auto"),
+            HFLoaderStrategy("mlm_base", "base", "fallback", "fallback"),
+            HFLoaderStrategy("mlm", "direct_submodule", "bert-direct", "bert-direct"),
+        )
+    )
+
+    monkeypatch.setattr(
+        hf_mlm_mod,
+        "resolve_core_loader_strategy",
+        lambda *args, **kwargs: next(strategies),
+    )
+
+    class DummyAdapter(HF_MLM_Adapter):
+        def _load_pretrained_model(self, loader, model_id, **kwargs):  # noqa: ANN001
+            calls.append(str(loader))
+            if loader != "bert-direct":
+                raise ValueError(
+                    "Unrecognized model in prajjwal1/bert-tiny. "
+                    "Should have a `model_type` key in its config.json."
+                )
+            return {"loader": loader}
+
+        def _safe_to_device(self, model, device):  # noqa: ANN001
+            return model
+
+    loaded = DummyAdapter().load_model("prajjwal1/bert-tiny", device="cpu")
+
+    assert loaded == {"loader": "bert-direct"}
+    assert calls == ["primary", "bert-direct"]
+
+
+def test_hf_causal_loader_retries_with_direct_submodule_hint_for_remote_model_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from invarlock.adapters import hf_causal as hf_causal_mod
+    from invarlock.adapters.hf_causal import HF_Causal_Adapter
+    from invarlock.adapters.hf_loading import HFLoaderStrategy
+
+    calls: list[str] = []
+    strategies = iter(
+        (
+            HFLoaderStrategy("causal", "auto", "primary", "primary"),
+            HFLoaderStrategy(
+                "causal",
+                "direct_submodule",
+                "mistral3-direct",
+                "mistral3-direct",
+            ),
+        )
+    )
+
+    monkeypatch.setattr(
+        hf_causal_mod,
+        "resolve_core_loader_strategy",
+        lambda *args, **kwargs: next(strategies),
+    )
+
+    class DummyAdapter(HF_Causal_Adapter):
+        def _load_pretrained_model(self, loader, model_id, **kwargs):  # noqa: ANN001
+            calls.append(str(loader))
+            if loader != "mistral3-direct":
+                raise ValueError(
+                    "Unrecognized configuration class for this kind of AutoModelForCausalLM"
+                )
+            return {"loader": loader}
+
+        def _safe_to_device(self, model, device):  # noqa: ANN001
+            return model
+
+    loaded = DummyAdapter().load_model(
+        "mistralai/Ministral-3-8B-Instruct-2512-BF16",
+        device="cpu",
+    )
+
+    assert loaded == {"loader": "mistral3-direct"}
+    assert calls == ["primary", "mistral3-direct"]

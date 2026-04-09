@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 
 import invarlock.guards.rmt as runtime_rmt
+import invarlock.guards.rmt_runtime as runtime_helpers
 
 
 def test_finalize_returns_plain_dict_when_guardoutcome_unavailable(
@@ -83,6 +84,75 @@ def test_validate_uses_dict_finalize_path() -> None:
     assert result["violations"] == [
         {"type": "rmt_error", "severity": "error", "message": "boom"}
     ]
+
+
+def test_runtime_helpers_cover_rollback_unknown_events_and_object_validate_path(
+    monkeypatch,
+) -> None:
+    assert runtime_helpers._decision_from_action("rollback") == "rollback"
+
+    guard = runtime_rmt.RMTGuard()
+    logged: list[str] = []
+    monkeypatch.setattr(guard, "_get_linear_modules", lambda _model: [])
+    monkeypatch.setattr(
+        guard,
+        "_log_event",
+        lambda operation, **_kwargs: logged.append(operation),
+    )
+    monkeypatch.setattr(
+        runtime_helpers.rmt_detection,
+        "step5_detect_and_correct_modules",
+        lambda *_a, **_k: {
+            "events": [
+                {"operation": "unknown", "module_name": "layer"},
+                {
+                    "operation": "rmt_correct_failed",
+                    "module_name": "layer",
+                    "error": "boom",
+                },
+            ],
+            "passed": False,
+        },
+    )
+
+    out = runtime_helpers.apply_rmt_detection_and_correction(guard, nn.Identity())
+    assert out == {"passed": False}
+    assert logged == ["rmt_correction", "rmt_correct_failed"]
+
+    result = runtime_helpers.validate_rmt_guard(
+        SimpleNamespace(
+            finalize=lambda *_a, **_k: SimpleNamespace(
+                passed=False,
+                action="rollback",
+                metrics={"prepared": True},
+                violations=[],
+            )
+        ),
+        model=None,
+        adapter=None,
+        context={},
+    )
+    assert result.passed is False
+    assert result.decision == "rollback"
+    assert result.violations == ()
+
+
+def test_finalize_rmt_guard_allows_empty_hydration_result() -> None:
+    guard = runtime_rmt.RMTGuard()
+    guard.prepared = True
+    guard._calibration_batches = [object()]
+    guard._compute_activation_edge_risk = lambda *_a, **_k: None
+
+    result = runtime_helpers.finalize_rmt_guard(
+        guard,
+        nn.Linear(2, 2, bias=False),
+        has_guard_outcome=False,
+        guard_outcome_type=dict,
+    )
+
+    assert result["passed"] is True
+    assert result["metrics"]["edge_risk_by_family"] == {}
+    assert result["violations"] == []
 
 
 def test_set_run_context_and_epsilon_setters_ignore_invalid_values() -> None:

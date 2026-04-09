@@ -26,12 +26,12 @@ def _parse_scope(raw_scope: str) -> tuple[str, int | None, int | None]:
             if item.startswith("layers="):
                 try:
                     layer_limit = int(item.split("=", 1)[1])
-                except Exception:
+                except (TypeError, ValueError):
                     layer_limit = None
             elif item.startswith("layer="):
                 try:
                     layer_exact = int(item.split("=", 1)[1])
-                except Exception:
+                except (TypeError, ValueError):
                     layer_exact = None
     return base, layer_limit, layer_exact
 
@@ -49,7 +49,7 @@ def _extract_layer_index(name: str) -> int | None:
         return None
     try:
         return int(name[start:end])
-    except Exception:
+    except (TypeError, ValueError):
         return None
 
 

@@ -2,8 +2,10 @@
 #
 # Notes:
 # - Requires `datasets` and initial network fetch unless cached.
-# - `--profile ci` defaults to 200/200 windows unless you set:
+# - `--profile ci` defaults to 240/240 windows unless you set:
 #     INVARLOCK_CI_PREVIEW=16 INVARLOCK_CI_FINAL=16
+# - Shipped preset counts stay smoke-sized; use `--profile ci|release` for
+#   balanced-tier evaluations that need pass-capable token coverage.
 # - For a smaller bootstrap in CI, create a local `profiles/ci.yaml` and point
 #   `INVARLOCK_CONFIG_ROOT` to it (see docs/user-guide/proof-packs-internals.md).
 #

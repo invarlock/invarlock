@@ -21,7 +21,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         payload = json.loads(report_path.read_text(encoding="utf-8"))
-    except Exception as exc:
+    except (OSError, json.JSONDecodeError) as exc:
         print(f"baseline_report_invalid_json:{exc}", file=sys.stderr)
         return 1
 

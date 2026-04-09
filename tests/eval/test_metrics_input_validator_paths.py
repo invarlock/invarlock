@@ -17,7 +17,7 @@ def test_validate_tensor_raises_on_non_tensor_input() -> None:
     cfg = MetricsConfig(strict_validation=True, use_cache=False)
     with torch.no_grad():
         try:
-            InputValidator.validate_tensor([1, 2, 3], "x", cfg)  # type: ignore[arg-type]
+            InputValidator.validate_tensor([1, 2, 3], "x", cfg)
         except ValidationError as exc:
             assert exc.code == "E402"
         else:

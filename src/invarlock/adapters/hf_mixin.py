@@ -145,12 +145,39 @@ def _is_local_loader_cache_miss(error: Exception) -> bool:
             "no such file",
             "not found",
             "could not locate",
+            "does not appear to have a file named",
             "missing cached",
             "local files only",
             "cannot find",
             "can't load the model",
         )
     )
+
+
+def _iter_named_parameters_preserving_ties(
+    model: torch.nn.Module,
+) -> list[tuple[str, torch.nn.Parameter]]:
+    """Return named parameters while preserving duplicate aliases when supported."""
+
+    named_parameters = getattr(model, "named_parameters", None)
+    if not callable(named_parameters):
+        raise TypeError("model.named_parameters must be callable")
+    try:
+        return list(named_parameters(remove_duplicate=False))
+    except TypeError:  # pragma: no cover - torch version dependent
+        aliased_params: list[tuple[str, torch.nn.Parameter]] = []
+        for module_name, module in model.named_modules():
+            raw_parameters = getattr(module, "_parameters", {})
+            if not isinstance(raw_parameters, dict):
+                continue
+            for attr_name, value in raw_parameters.items():
+                if not isinstance(value, torch.nn.Parameter):
+                    continue
+                full_name = f"{module_name}.{attr_name}" if module_name else attr_name
+                aliased_params.append((full_name, value))
+        if aliased_params:
+            return aliased_params
+        return list(named_parameters())
 
 
 class HFAdapterMixin:
@@ -253,7 +280,7 @@ class HFAdapterMixin:
                     loaded = loader.from_pretrained(
                         model_id, local_files_only=True, **kwargs
                     )
-                except Exception as local_error:
+                except OSError as local_error:
                     if not _is_local_loader_cache_miss(local_error):
                         raise
                     try:
@@ -266,7 +293,7 @@ class HFAdapterMixin:
                         loaded = loader.from_pretrained(model_id, **kwargs)
             else:
                 loaded = loader.from_pretrained(model_id, **kwargs)
-        except Exception as exc:
+        except OSError as exc:
             if not prefer_local_files_only or not _is_local_loader_cache_miss(exc):
                 raise
             try:
@@ -463,7 +490,7 @@ class HFAdapterMixin:
             if callable(save):
                 save(str(p))
                 return True
-        except Exception:
+        except (OSError, RuntimeError, TypeError, ValueError):
             return False
         return False
 
@@ -718,11 +745,7 @@ class HFAdapterMixin:
         """Return mapping of tied parameter names to source parameter names."""
 
         tying: dict[str, str] = {}
-        try:
-            named = model.named_parameters(remove_duplicate=False)  # type: ignore[call-arg]
-        except TypeError:  # pragma: no cover - torch version dependent
-            named = model.named_parameters()
-        params = dict(named)
+        params = dict(_iter_named_parameters_preserving_ties(model))
 
         def _is_tied(name_a: str, name_b: str) -> bool:
             a = params.get(name_a)
@@ -734,7 +757,7 @@ class HFAdapterMixin:
                     return True
                 if hasattr(a, "data_ptr") and hasattr(b, "data_ptr"):
                     return int(a.data_ptr()) == int(b.data_ptr())
-            except Exception:
+            except (RuntimeError, TypeError, ValueError):
                 return False
             return False
 
@@ -826,7 +849,7 @@ class HFAdapterMixin:
         if callable(to_dict):
             try:
                 data = to_dict()
-            except Exception:
+            except (RuntimeError, TypeError, ValueError):
                 data = None
             if isinstance(data, dict):
                 return _collect(data)
@@ -835,7 +858,7 @@ class HFAdapterMixin:
             data = vars(config)
         except TypeError:
             data = None
-        if isinstance(data, dict):
+        if isinstance(data, dict) and data:
             return _collect(data)
 
         result: dict[str, Any] = {}

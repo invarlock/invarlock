@@ -33,7 +33,7 @@ def hash_int_array(arr, *, salt: str | None = None, byteorder: str = "little") -
     # Accept numpy arrays to avoid extra copies
     try:
         import numpy as _np
-    except Exception:  # pragma: no cover - numpy always present in tests
+    except ModuleNotFoundError:  # pragma: no cover - numpy always present in tests
         # Fallback: best-effort conversion
         b = bytes(int(x) & 0xFFFFFFFF for x in arr)
         return hash_bytes(b, salt=salt.encode(_ENC) if salt else None)

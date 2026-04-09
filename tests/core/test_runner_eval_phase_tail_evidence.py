@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from invarlock.core.api import RunConfig, RunReport
 from invarlock.core.runner import CoreRunner
 from invarlock.core.runner_eval_phase import eval_phase
@@ -258,3 +260,35 @@ def test_eval_phase_skips_primary_metric_tail_for_non_ppl_metrics(
     )
 
     assert "primary_metric_tail" not in metrics
+
+
+def test_eval_phase_debug_trace_handles_broken_snapshot_probes(monkeypatch) -> None:
+    class _BrokenCalibration:
+        def __len__(self) -> int:
+            raise RuntimeError("bad len")
+
+        def __getitem__(self, _index: int) -> object:
+            raise RuntimeError("bad item")
+
+    runner = SimpleNamespace(
+        _log_event=lambda *_args, **_kwargs: None,
+        _compute_real_metrics=lambda *_args, **_kwargs: (
+            {"primary_metric": {"kind": "accuracy", "preview": 0.8, "final": 0.9}},
+            {"preview": {}, "final": {}},
+        ),
+        _resolve_policy_flags=lambda _config: {"strict_eval": False},
+    )
+    report = RunReport()
+    config = RunConfig(context={"run": {"strict_eval": False}})
+    monkeypatch.setenv("INVARLOCK_DEBUG_TRACE", "1")
+
+    metrics = eval_phase(
+        runner,
+        model=object(),
+        adapter=object(),
+        calibration_data=_BrokenCalibration(),
+        report=report,
+        config=config,
+    )
+
+    assert metrics["primary_metric"]["final"] == 0.9

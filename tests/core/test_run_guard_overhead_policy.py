@@ -101,7 +101,7 @@ def test_build_guard_overhead_summary_formats_percent() -> None:
 def test_build_guard_overhead_summary_falls_back_to_ratio_and_default() -> None:
     summary = build_guard_overhead_summary(
         {"evaluated": True, "passed": True, "overhead_ratio": 1.005},
-        default_threshold="bad",  # type: ignore[arg-type]
+        default_threshold="bad",
     )
     assert summary.passed is True
     assert summary.overhead_percent is None
@@ -300,7 +300,7 @@ def test_prepare_guard_overhead_report_selects_loss_specific_metric_kind(
         metrics = {"overhead_ratio": 1.0}
         passed = True
 
-    def extract_pm(source, *, kind):  # type: ignore[no-untyped-def]
+    def extract_pm(source, *, kind):
         calls.append((source, kind))
         if source == {"metrics": {}}:
             return {}

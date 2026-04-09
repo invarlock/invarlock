@@ -13,6 +13,8 @@ from invarlock.cli.run_pairing_helpers import (
     _to_int_list,
 )
 
+_INT_COERCE_ERRORS = (TypeError, ValueError, OverflowError)
+
 
 def _derive_mlm_seed(base_seed: int, window_id: str | int, position: int) -> int:
     payload = f"{base_seed}:{window_id}:{position}".encode()
@@ -63,13 +65,16 @@ def _apply_mlm_masks(
         if value is not None:
             try:
                 special_ids.add(int(value))
-            except Exception:
+            except _INT_COERCE_ERRORS:
                 pass
     try:
-        special_ids.update(
-            int(token) for token in getattr(tokenizer, "all_special_ids", []) or []
-        )
-    except Exception:
+        all_special_ids = getattr(tokenizer, "all_special_ids", None) or ()
+        for token in all_special_ids:
+            try:
+                special_ids.add(int(token))
+            except _INT_COERCE_ERRORS:
+                continue
+    except (AttributeError, RuntimeError, TypeError):
         pass
 
     masked_total = 0

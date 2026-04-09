@@ -94,11 +94,11 @@ def test_make_report_and_save_report(tmp_path: Path, monkeypatch) -> None:
     import pytest
 
     with pytest.raises(ValueError, match="save_evaluation_bundle"):
-        save_report(report, out, formats=["report"])  # type: ignore[arg-type]
+        save_report(report, out, formats=["report"])
 
     # Enable evidence emission
     monkeypatch.setenv("INVARLOCK_EVIDENCE_DEBUG", "1")
-    save_report(report, out, formats=["json", "markdown", "html"])  # type: ignore[arg-type]
+    save_report(report, out, formats=["json", "markdown", "html"])
     save_evaluation_bundle(
         run_report=report,
         output_dir=out,

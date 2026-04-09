@@ -12,6 +12,7 @@ from invarlock.core.run_guard_overhead_policy import (
 )
 
 KV_LABEL_WIDTH = 10
+_RETRY_SUMMARY_ERRORS = (AttributeError, KeyError, RuntimeError, TypeError, ValueError)
 
 
 def _style_from_console(console: Console, profile: str | None = None) -> OutputStyle:
@@ -115,5 +116,5 @@ def _print_retry_summary(console: Console, retry_controller: Any | None) -> None
                 f"Retry Summary: {summary['total_attempts']} attempts in {summary['elapsed_time']:.1f}s",
                 emoji="📊",
             )
-    except Exception:
+    except _RETRY_SUMMARY_ERRORS:
         return

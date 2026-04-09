@@ -66,7 +66,7 @@ def test_manifest_matches_schema(tmp_path: Path):
     assert manifest_path.exists()
     manifest = json.loads(manifest_path.read_text("utf-8"))
 
-    import jsonschema  # type: ignore
+    import jsonschema
 
     schema = json.loads(
         (Path.cwd() / "tests/schemas/manifest_v1.schema.json").read_text("utf-8")

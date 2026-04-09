@@ -25,6 +25,16 @@ def _is_non_bool_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
+def _coerce_finite_float(value: Any) -> float | None:
+    if not _is_non_bool_number(value):
+        return None
+    try:
+        coerced = float(value)
+    except _VERIFY_OUTPUT_EXCEPTIONS:
+        return None
+    return coerced if math.isfinite(coerced) else None
+
+
 def _coerce_ci_output(ci: Any) -> list[float] | None:
     if not (isinstance(ci, (tuple, list)) and len(ci) == 2):
         return None
@@ -59,20 +69,23 @@ def _build_recompute_summary(
             cls = metrics.get("classification", {}) if isinstance(metrics, dict) else {}
             n_correct = cls.get("n_correct") if isinstance(cls, dict) else None
             n_total = cls.get("n_total") if isinstance(cls, dict) else None
+            n_correct_value = _coerce_finite_float(n_correct)
+            n_total_value = _coerce_finite_float(n_total)
             if (
-                _is_non_bool_number(n_correct)
-                and _is_non_bool_number(n_total)
-                and n_total > 0
+                n_correct_value is not None
+                and n_total_value is not None
+                and n_total_value > 0.0
             ):
-                acc = float(n_correct) / float(n_total)
+                acc = n_correct_value / n_total_value
                 display_final = (
                     primary_metric.get("final")
                     if isinstance(primary_metric, dict)
                     else None
                 )
+                display_final_value = _coerce_finite_float(display_final)
                 ok = bool(
-                    _is_non_bool_number(display_final)
-                    and abs(float(display_final) - acc) <= max(1e-12, tolerance)
+                    display_final_value is not None
+                    and abs(display_final_value - acc) <= max(1e-12, tolerance)
                 )
                 recompute = {
                     "family": family,
@@ -116,9 +129,10 @@ def _build_recompute_summary(
                                 if isinstance(primary_metric, dict)
                                 else None
                             )
+                            display_final_value = _coerce_finite_float(display_final)
                             ok = bool(
-                                isinstance(display_final, (int, float))
-                                and abs(float(display_final) - recomputed)
+                                display_final_value is not None
+                                and abs(display_final_value - recomputed)
                                 <= max(1e-12, tolerance)
                             )
                         recompute = {
@@ -173,9 +187,7 @@ def build_verify_json_result_item(
         "kind": kind,
         "ok": ok,
         "reason": reason,
-        "ratio_vs_baseline": float(ratio)
-        if _is_non_bool_number(ratio) and math.isfinite(float(ratio))
-        else None,
+        "ratio_vs_baseline": _coerce_finite_float(ratio),
         "ci": ci_out,
         "recompute": recompute,
     }
@@ -262,6 +274,7 @@ def build_verify_success_line(report: dict[str, Any]) -> str:
     ci_out = _coerce_ci_output(ci)
     ci_text = None
     width = None
+    ratio_value = _coerce_finite_float(ratio)
     if ci_out is not None:
         ci_lo, ci_hi = ci_out
         ci_text = f"ci=[{ci_lo:.6f},{ci_hi:.6f}]"
@@ -271,8 +284,8 @@ def build_verify_success_line(report: dict[str, Any]) -> str:
         parts.append(f"metric={kind}")
     if _is_non_bool_number(n_prev) and _is_non_bool_number(n_fin):
         parts.append(f"n={n_prev}/{n_fin}")
-    if _is_non_bool_number(ratio):
-        parts.append(f"point={float(ratio):.6f}")
+    if ratio_value is not None:
+        parts.append(f"point={ratio_value:.6f}")
     if ci_text is not None:
         parts.append(ci_text)
     if isinstance(width, (int, float)):

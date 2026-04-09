@@ -18,7 +18,7 @@ def _patch_exists_block_configs(
 
     orig_exists = Path.exists
 
-    def fake_exists(self: Path) -> bool:  # type: ignore[override]
+    def fake_exists(self: Path) -> bool:
         s = str(self)
         if "configs/profiles" in s:
             return False

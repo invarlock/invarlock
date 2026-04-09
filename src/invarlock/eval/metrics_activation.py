@@ -8,6 +8,8 @@ from typing import Any, cast
 import torch
 import torch.nn as nn
 
+from invarlock.core.exceptions import ValidationError
+
 from .metrics_support import (
     DependencyManager,
     InputValidator,
@@ -17,6 +19,16 @@ from .metrics_support import (
 )
 
 logger = logging.getLogger(__name__)
+_ACTIVATION_ERRORS = (
+    AttributeError,
+    IndexError,
+    KeyError,
+    RuntimeError,
+    TypeError,
+    ValidationError,
+    ValueError,
+)
+_TENSOR_STACK_ERRORS = (RuntimeError, TypeError, ValueError)
 
 
 def _call_model(model: nn.Module, /, *args: Any, **kwargs: Any) -> Any:
@@ -64,6 +76,8 @@ def _mi_gini_optimized_cpu_path(
     config: MetricsConfig,
 ) -> float:
     l_count, sample_count, _ = feats_cpu.shape
+    if l_count <= 0:
+        return float("nan")
     if sample_count > max_per_layer:
         sel = torch.randperm(sample_count)[:max_per_layer]
         feats_cpu = feats_cpu[:, sel, :]
@@ -85,7 +99,7 @@ def _mi_gini_optimized_cpu_path(
             try:
                 score = mi_scores_fn(chunk_feats[j], targ_cpu)
                 chunk_scores.append(score)
-            except Exception as e:
+            except _ACTIVATION_ERRORS as e:
                 logger.warning(f"MI calculation failed for layer {i + j}: {e}")
                 chunk_scores.append(torch.zeros_like(chunk_feats[j, 0, :]))
 
@@ -97,13 +111,10 @@ def _mi_gini_optimized_cpu_path(
             total=l_count,
         )
 
-    if not mi_scores_all:
-        return float("nan")
-
     try:
         mi_mat = torch.stack(mi_scores_all)
         return _gini_vectorized(mi_mat)
-    except Exception as e:
+    except _TENSOR_STACK_ERRORS as e:
         logger.warning(f"Failed to stack MI scores: {e}")
         return float("nan")
 
@@ -194,7 +205,7 @@ def _perform_pre_eval_checks(
                     f"Input sequence length {sample_ids.shape[1]} exceeds "
                     f"model limit {tok_len_attr}"
                 )
-    except Exception as e:
+    except _ACTIVATION_ERRORS as e:
         logger.debug(f"Context length check failed: {e}")
 
     try:
@@ -205,7 +216,7 @@ def _perform_pre_eval_checks(
         }
         _ = _call_model(model, **model_input)
         logger.debug("Pre-evaluation dry run successful")
-    except Exception as e:
+    except _ACTIVATION_ERRORS as e:
         logger.warning(f"Pre-evaluation dry run failed: {e}")
 
 
@@ -251,7 +262,7 @@ def _collect_activations(
             if fc1_acts is not None:
                 fc1_activations_list.append(fc1_acts)
                 targets_list.append(input_ids[:, 1:])
-        except Exception as e:
+        except _ACTIVATION_ERRORS as e:
             logger.warning(f"Failed to process batch {i}: {e}")
             continue
         finally:
@@ -292,7 +303,7 @@ def _extract_fc1_activations(
                             activation, f"fc1_activation_{idx}", config
                         )
                         valid_activations.append(activation)
-                except Exception as e:
+                except _ACTIVATION_ERRORS as e:
                     logger.debug(
                         f"Failed to extract FC1 activation for block {idx}: {e}"
                     )
@@ -310,7 +321,7 @@ def _extract_fc1_activations(
                 ]
 
             return torch.stack(valid_activations)
-    except Exception as e:
+    except _TENSOR_STACK_ERRORS as e:
         logger.warning(f"FC1 activation extraction failed: {e}")
 
     return None
@@ -370,7 +381,7 @@ def _calculate_sigma_max(
         sigma_max = torch.max(gains_tensor[finite_mask]).item()
         logger.debug(f"Calculated σ_max: {sigma_max:.4f}")
         return sigma_max
-    except Exception as e:
+    except _ACTIVATION_ERRORS as e:
         logger.warning(f"σ_max calculation failed: {e}")
         return float("nan")
 
@@ -398,7 +409,7 @@ def _calculate_head_energy(
         head_energy = per_layer_energy[finite_mask].mean().item()
         logger.debug(f"Calculated head energy: {head_energy:.6f}")
         return head_energy
-    except Exception as e:
+    except _ACTIVATION_ERRORS as e:
         logger.warning(f"Head energy calculation failed: {e}")
         return float("nan")
 
@@ -460,7 +471,7 @@ def _calculate_mi_gini(
             )
             logger.debug(f"Calculated MI-Gini (CPU): {mi_gini:.6f}")
             return mi_gini
-    except Exception as e:
+    except _ACTIVATION_ERRORS as e:
         logger.warning(f"MI-Gini calculation failed: {e}")
         return float("nan")
 

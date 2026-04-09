@@ -13,11 +13,11 @@ def parse_batch(val: str | None, default: int) -> int:
     if val.startswith("auto:"):
         try:
             return int(val.split(":", 1)[1])
-        except Exception:
+        except (TypeError, ValueError):
             return default
     try:
         return int(val)
-    except Exception:
+    except (TypeError, ValueError):
         return default
 
 
@@ -28,7 +28,7 @@ def main() -> int:
 
     try:
         profile = json.loads(profile_path.read_text())
-    except Exception:
+    except (OSError, json.JSONDecodeError):
         return 0
 
     if not isinstance(profile, dict):

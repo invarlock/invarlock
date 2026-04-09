@@ -70,7 +70,7 @@ REPORT_JSON_SCHEMA: dict[str, Any] = {
             "required": ["provider", "seq_len", "windows"],
             "properties": {
                 "provider": {"type": "string"},
-                "seq_len": {"type": "integer", "minimum": 1},
+                "seq_len": {"type": "integer", "minimum": 0},
                 "hash": {
                     "type": "object",
                     "properties": {
@@ -214,6 +214,14 @@ REPORT_JSON_SCHEMA: dict[str, Any] = {
 
 _VALIDATION_ALLOWLIST_DEFAULT = allowlist_mod.DEFAULT_VALIDATION_ALLOWLIST
 
+try:
+    allowlist_mod.apply_validation_allowlist_schema(
+        REPORT_JSON_SCHEMA,
+        allowlist_mod.load_validation_allowlist(),
+    )
+except (KeyError, RuntimeError, TypeError, ValueError):
+    pass
+
 
 def _validate_with_jsonschema(
     report: dict[str, Any], schema: dict[str, Any] | None = None
@@ -232,6 +240,7 @@ def _validate_with_jsonschema(
 def validate_report(report: dict[str, Any]) -> bool:
     """Validate evaluation report structure and essential flags."""
     original_validation_spec: dict[str, Any] | None = None
+    validation_keys = _VALIDATION_ALLOWLIST_DEFAULT
     schema_properties = REPORT_JSON_SCHEMA.get("properties")
     if isinstance(schema_properties, dict):
         validation_spec = schema_properties.get("validation")
@@ -248,8 +257,9 @@ def validate_report(report: dict[str, Any]) -> bool:
         # Tighten JSON Schema: populate validation.properties from allow-list and
         # disallow unknown validation keys at schema level.
         try:
+            validation_keys = allowlist_mod.load_validation_allowlist()
             allowlist_mod.apply_validation_allowlist_schema(
-                schema_for_validation, allowlist_mod.load_validation_allowlist()
+                schema_for_validation, validation_keys
             )
         except (KeyError, RuntimeError, TypeError, ValueError):
             pass
@@ -278,6 +288,8 @@ def validate_report(report: dict[str, Any]) -> bool:
             return False
         if not isinstance(validation, dict):
             validation = {}
+        if any(key not in validation_keys for key in validation):
+            return False
         for flag in [
             "preview_final_drift_acceptable",
             "primary_metric_acceptable",

@@ -121,7 +121,7 @@ def extract_bash_blocks(paths: list[Path]) -> list[BashBlock]:
     for path in paths:
         try:
             lines = path.read_text(encoding="utf-8").splitlines()
-        except Exception:
+        except OSError:
             continue
         in_fence = False
         block_lines: list[str] = []

@@ -88,16 +88,16 @@ def test_create_custom_rmt_policy_rejects_invalid_epsilon_inputs():
     from invarlock.core.exceptions import ValidationError
 
     with pytest.raises(ValidationError):
-        create_custom_rmt_policy(epsilon_default="nope")  # type: ignore[arg-type]
+        create_custom_rmt_policy(epsilon_default="nope")
 
     with pytest.raises(ValidationError):
         create_custom_rmt_policy(epsilon_default=-0.1)
 
     with pytest.raises(ValidationError):
-        create_custom_rmt_policy(epsilon_by_family="nope")  # type: ignore[arg-type]
+        create_custom_rmt_policy(epsilon_by_family="nope")
 
     with pytest.raises(ValidationError):
-        create_custom_rmt_policy(epsilon_by_family={"ffn": "bad"})  # type: ignore[dict-item]
+        create_custom_rmt_policy(epsilon_by_family={"ffn": "bad"})
 
     with pytest.raises(ValidationError):
         create_custom_rmt_policy(epsilon_by_family={"ffn": -0.01})

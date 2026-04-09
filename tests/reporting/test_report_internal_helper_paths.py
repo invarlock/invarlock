@@ -62,7 +62,7 @@ def test_normalize_baseline_dict_soft_fallback():
 
 def test_normalize_baseline_invalid_type():
     with pytest.raises(ValueError):
-        report_normalization_mod.normalize_baseline("not a baseline")  # type: ignore[arg-type]
+        report_normalization_mod.normalize_baseline("not a baseline")
 
 
 def test_extract_structural_deltas_infers_scope_and_details():

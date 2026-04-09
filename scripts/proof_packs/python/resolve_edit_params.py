@@ -6,18 +6,21 @@ import sys
 from pathlib import Path
 from typing import Any
 
+_COERCE_ERRORS = (TypeError, ValueError, OverflowError)
+_FILE_READ_ERRORS = (OSError, TypeError, ValueError)
+
 
 def _safe_int(value: str) -> int | None:
     try:
         return int(value)
-    except Exception:
+    except _COERCE_ERRORS:
         return None
 
 
 def _safe_float(value: str) -> float | None:
     try:
         return float(value)
-    except Exception:
+    except _COERCE_ERRORS:
         return None
 
 
@@ -37,7 +40,7 @@ def _load_tuned_entry(
 
     try:
         data = json.loads(path.read_text())
-    except Exception:
+    except _FILE_READ_ERRORS:
         return {}, "invalid", "invalid_tuned_edit_params_file"
 
     if not isinstance(data, dict):
@@ -110,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
         if model_id_path.exists():
             try:
                 model_id = model_id_path.read_text().strip()
-            except Exception:
+            except OSError:
                 model_id = ""
         model_key = model_id or model_output_dir.name
 
@@ -164,7 +167,7 @@ def main(argv: list[str] | None = None) -> int:
         elif edit_type == "magnitude_prune":
             try:
                 pct = int(float(param1) * 100)
-            except Exception:
+            except _COERCE_ERRORS:
                 pct = 0
             edit_dir_name = f"prune_{pct}pct_{version}" if version else ""
         elif edit_type == "lowrank_svd":

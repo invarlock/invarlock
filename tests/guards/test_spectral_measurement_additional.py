@@ -92,6 +92,29 @@ def test_capture_baseline_sigmas_skips_out_of_scope_modules() -> None:
     assert sigmas == {"kept": 1.5}
 
 
+def test_capture_baseline_sigmas_and_scan_model_gains_use_explicit_modules() -> None:
+    modules = [("kept", _Module(torch.eye(2))), ("skip", _Module(torch.eye(2)))]
+
+    sigmas = capture_baseline_sigmas(
+        _Model(dict(modules)),
+        scope="all",
+        modules=modules,
+        should_process_module_fn=lambda name, *_args: name == "kept",
+        compute_sigma_max_fn=lambda _weight: 2.0,
+    )
+    assert sigmas == {"kept": 2.0}
+
+    gains = scan_model_gains(
+        _Model(dict(modules)),
+        scope="all",
+        modules=modules,
+        should_process_module_fn=lambda name, *_args: name == "kept",
+        compute_sigma_max_fn=lambda _weight: 3.0,
+    )
+    assert gains["total_layers"] == 2
+    assert gains["scanned_modules"] == 1
+
+
 def test_scan_model_gains_reports_when_no_modules_are_scanned() -> None:
     model = _Model({"skipped": _Module(torch.eye(2))})
 

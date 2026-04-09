@@ -38,7 +38,7 @@ def test_ppl_causal_paired_compare(monkeypatch):
         seed=1,
         ci_level=0.9,
     )
-    assert result["ci"] == (0.1, 0.2)
+    assert result["ci"] == [0.1, 0.2]
     assert result["display_ci"][0] == pytest.approx(math.exp(0.1))
 
 

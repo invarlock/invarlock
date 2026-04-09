@@ -13,10 +13,19 @@ def _load_app(monkeypatch):
     return app
 
 
-def test_run_command_reports_migration(monkeypatch):
+def test_run_command_is_not_public(monkeypatch):
     app = _load_app(monkeypatch)
     runner = CliRunner()
     res = runner.invoke(app, ["run"])
+    assert res.exit_code == 2, res.output
+    out = strip_ansi(res.output)
+    assert "No such command 'run'" in out
+
+
+def test_run_help_is_not_public(monkeypatch):
+    app = _load_app(monkeypatch)
+    runner = CliRunner()
+    res = runner.invoke(app, ["run", "--help"])
     assert res.exit_code == 2, res.output
     out = strip_ansi(res.output)
     assert "No such command 'run'" in out

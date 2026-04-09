@@ -9,6 +9,8 @@ from typing import Any, Literal, TypedDict
 from .data import EvaluationWindow
 from .data_support import DatasetDiagnostic
 
+_WINDOW_COERCION_ERRORS = (AttributeError, RuntimeError, TypeError, ValueError)
+
 
 class WindowRecord(TypedDict):
     input_ids: list[int]
@@ -80,17 +82,17 @@ def _tensor_or_list_to_ints(value: Any) -> list[int]:
     if hasattr(candidate, "detach"):
         try:
             candidate = candidate.detach()
-        except Exception:
+        except _WINDOW_COERCION_ERRORS:
             pass
     if hasattr(candidate, "cpu"):
         try:
             candidate = candidate.cpu()
-        except Exception:
+        except _WINDOW_COERCION_ERRORS:
             pass
     if hasattr(candidate, "tolist"):
         try:
             candidate = candidate.tolist()
-        except Exception:
+        except _WINDOW_COERCION_ERRORS:
             pass
     if isinstance(candidate, tuple):
         candidate = list(candidate)
@@ -102,7 +104,7 @@ def _tensor_or_list_to_ints(value: Any) -> list[int]:
             return []
         try:
             result.append(int(item))
-        except Exception:
+        except _WINDOW_COERCION_ERRORS:
             return []
     return result
 
@@ -137,7 +139,7 @@ def _window_records(window: Any) -> tuple[list[WindowRecord], int]:
         dataset_index = indices[idx_local] if idx_local < len(indices) else idx_local
         try:
             dataset_index = int(dataset_index)
-        except Exception:
+        except (TypeError, ValueError):
             dataset_index = None
         records.append(
             {

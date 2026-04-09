@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "invarlock"
-version = "0.6.0"
+version = "0.7.0"
 description = "Edit‑agnostic robustness evaluation reports for weight edits (InvarLock framework)"
 authors = [{ name = "InvarLock Team", email = "oss@invarlock.dev" }]
 maintainers = [{ name = "InvarLock Maintainers", email = "support@invarlock.dev" }]
@@ -171,7 +171,7 @@ all = [
 dev = [
   "pytest>=7.0",
   "pytest-cov>=4.0",
-  "ruff==0.15.8",
+  "ruff==0.15.9",
   "black>=23.0",
   "mypy>=1.0",
   "hypothesis>=6.98",
@@ -189,7 +189,7 @@ dev = [
 
 ci = [
   "pytest>=7.0",
-  "ruff==0.15.8",
+  "ruff==0.15.9",
   "mkdocs>=1.5",
   "mkdocs-material>=9.5",
   "mkdocs-mermaid2-plugin>=1.1",

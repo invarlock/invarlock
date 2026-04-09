@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import hashlib
-from array import array
 from typing import Any
 
-import typer
 from rich.console import Console
 
 from invarlock.core.metric_provider_resolution import (
@@ -72,9 +69,7 @@ def extract_pairing_schedule(
     if not isinstance(windows, dict):
         return None
 
-    def _wrap_single_row(raw: Any, *, expected_rows: int) -> list | None:
-        if not isinstance(raw, list):
-            return None
+    def _wrap_single_row(raw: list[Any], *, expected_rows: int) -> list:
         if expected_rows == 1 and raw and not isinstance(raw[0], list):
             return [raw]
         return raw
@@ -167,14 +162,11 @@ def extract_pairing_schedule(
             labels = []
             for idx, raw_label in enumerate(maybe_labels):
                 label_list = tensor_or_list_to_ints_fn(raw_label)
-                if idx < len(input_ids):
-                    target_len = len(input_ids[idx])
-                    if len(label_list) < target_len:
-                        label_list = label_list + [-100] * (
-                            target_len - len(label_list)
-                        )
-                    elif len(label_list) > target_len:
-                        label_list = label_list[:target_len]
+                target_len = len(input_ids[idx])
+                if len(label_list) < target_len:
+                    label_list = label_list + [-100] * (target_len - len(label_list))
+                elif len(label_list) > target_len:
+                    label_list = label_list[:target_len]
                 labels.append(label_list)
 
         masked_counts: list[int] | None = None
@@ -314,6 +306,10 @@ def validate_and_harvest_baseline_schedule(
     invarlock_error_cls: type[BaseException] | None = None,
 ) -> dict[str, Any]:
     """Validate baseline pairing compatibility and harvest dataset metadata."""
+    from invarlock.cli.run_pairing_baseline import (
+        validate_and_harvest_baseline_schedule_impl,
+    )
+
     if canonical_dataset_id_fn is None:
         canonical_dataset_id_fn = _canonical_dataset_id
     if tensor_or_list_to_ints_fn is None:
@@ -328,514 +324,22 @@ def validate_and_harvest_baseline_schedule(
         from invarlock.core.exceptions import InvarlockError
 
         invarlock_error_cls = InvarlockError
-
-    def _emit(tag: str, message: str, emoji: str) -> None:
-        if console is not None and event_fn is not None:
-            event_fn(console, tag, message, emoji=emoji, profile=profile)
-
-    def _fail_schedule(reason: str) -> None:
-        path = baseline_path_str or "baseline"
-        prof = (profile or "dev").strip().lower()
-        message = f"PAIRING-EVIDENCE-MISSING: {path}: {reason}"
-        shell_mode = console is not None and event_fn is not None
-        if prof in {"ci", "release"} or typed_failures:
-            raise invarlock_error_cls(code="E001", message=message)
-        if not shell_mode:
-            raise typer.Exit(1)
-        _emit(
-            "FAIL",
-            f"Baseline pairing schedule '{path}' is incompatible: {reason}",
-            "❌",
-        )
-        raise typer.Exit(1)
-
-    baseline_meta = (
-        baseline_report_data.get("data")
-        if isinstance(baseline_report_data, dict)
-        else {}
+    return validate_and_harvest_baseline_schedule_impl(
+        cfg,
+        pairing_schedule,
+        baseline_report_data,
+        tokenizer_hash=tokenizer_hash,
+        resolved_loss_type=resolved_loss_type,
+        profile=profile,
+        baseline_path_str=baseline_path_str,
+        console=console,
+        event_fn=event_fn,
+        typed_failures=typed_failures,
+        canonical_dataset_id_fn=canonical_dataset_id_fn,
+        tensor_or_list_to_ints_fn=tensor_or_list_to_ints_fn,
+        hash_sequences_fn=hash_sequences_fn,
+        invarlock_error_cls=invarlock_error_cls,
     )
-    if not isinstance(baseline_meta, dict):
-        baseline_meta = {}
-
-    def _extract_meta(field: str, default: Any = None) -> Any:
-        value = baseline_meta.get(field)
-        return value if value is not None else default
-
-    try:
-        preview = (
-            pairing_schedule.get("preview")
-            if isinstance(pairing_schedule, dict)
-            else None
-        )
-        final = (
-            pairing_schedule.get("final")
-            if isinstance(pairing_schedule, dict)
-            else None
-        )
-        if not isinstance(preview, dict) or not isinstance(final, dict):
-            _fail_schedule("missing preview/final evaluation_windows sections")
-
-        def _hash_strings(values: list[str]) -> str:
-            return hashlib.blake2s(
-                "||".join(values).encode("utf-8"),
-                digest_size=16,
-            ).hexdigest()
-
-        def _multimodal_arm_check(
-            label: str,
-            section: dict[str, Any],
-        ) -> tuple[list[str], list[dict[str, Any]]]:
-            records_raw = section.get("records")
-            records: list[dict[str, Any]] = []
-            if isinstance(records_raw, list):
-                for record in records_raw:
-                    if not isinstance(record, dict):
-                        _fail_schedule(f"{label} record is not an object")
-                    records.append(dict(record))
-            example_ids_raw = section.get("example_ids")
-            if isinstance(example_ids_raw, list) and example_ids_raw:
-                example_ids = [str(value) for value in example_ids_raw]
-            else:
-                example_ids = [
-                    str(record.get("id") or record.get("example_id") or "")
-                    for record in records
-                ]
-            if not example_ids:
-                _fail_schedule(f"{label} missing example_ids")
-            if records and len(records) != len(example_ids):
-                _fail_schedule(
-                    f"{label} coherence error: len(example_ids)={len(example_ids)} len(records)={len(records)}"
-                )
-            for idx, example_id in enumerate(example_ids):
-                if not example_id:
-                    _fail_schedule(
-                        f"{label} example_ids contains empty id at index {idx}"
-                    )
-            if records:
-                for idx, record in enumerate(records):
-                    record_id = str(record.get("id") or record.get("example_id") or "")
-                    if record_id and record_id != example_ids[idx]:
-                        _fail_schedule(f"{label} record id mismatch at index {idx}")
-            return example_ids, records
-
-        multimodal_schedule = any(
-            isinstance(section.get("example_ids"), list)
-            or isinstance(section.get("records"), list)
-            for section in (preview, final)
-        )
-        if multimodal_schedule:
-            preview_ids, preview_records = _multimodal_arm_check("preview", preview)
-            final_ids, final_records = _multimodal_arm_check("final", final)
-
-            if len(set(preview_ids)) != len(preview_ids):
-                _fail_schedule("duplicate example_ids detected in preview arm")
-            if len(set(final_ids)) != len(final_ids):
-                _fail_schedule("duplicate example_ids detected in final arm")
-            if set(preview_ids) & set(final_ids):
-                _fail_schedule("example_ids overlap between preview and final arms")
-
-            preview_hash = _hash_strings(preview_ids)
-            final_hash = _hash_strings(final_ids)
-            dataset_hash = hashlib.blake2s(
-                (preview_hash + final_hash).encode("utf-8"),
-                digest_size=16,
-            ).hexdigest()
-
-            for meta_key, expected_value in (
-                ("preview_hash", preview_hash),
-                ("final_hash", final_hash),
-                ("dataset_hash", dataset_hash),
-            ):
-                baseline_value = baseline_meta.get(meta_key)
-                if (
-                    isinstance(baseline_value, str)
-                    and baseline_value
-                    and baseline_value != expected_value
-                ):
-                    prof = (profile or "dev").strip().lower()
-                    if prof in {"ci", "release"}:
-                        _fail_schedule(f"{meta_key} mismatch vs baseline report data")
-                    if console is not None and event_fn is not None:
-                        event_fn(
-                            console,
-                            "WARN",
-                            f"Baseline {meta_key} mismatch; continuing in dev profile.",
-                            emoji="⚠️",
-                            profile=prof,
-                        )
-
-            effective_preview = len(preview_ids)
-            effective_final = len(final_ids)
-            cfg_dataset = getattr(cfg.dataset, "provider", None)
-            if cfg_dataset is None:
-                cfg_dataset = getattr(cfg.dataset, "dataset", None)
-            cfg_dataset = canonical_dataset_id_fn(cfg_dataset)
-            baseline_dataset = canonical_dataset_id_fn(_extract_meta("dataset"))
-            if (
-                baseline_dataset is not None
-                and cfg_dataset is not None
-                and baseline_dataset != cfg_dataset
-            ):
-                _fail_schedule(
-                    f"dataset mismatch (baseline {baseline_dataset} vs config {cfg_dataset})"
-                )
-
-            cfg_split = getattr(cfg.dataset, "split", "validation")
-            baseline_split = _extract_meta("split")
-            if (
-                baseline_split is not None
-                and cfg_split is not None
-                and baseline_split != cfg_split
-            ):
-                _fail_schedule(
-                    f"split mismatch (baseline {baseline_split} vs config {cfg_split})"
-                )
-
-            baseline_prov = (
-                baseline_report_data.get("provenance")
-                if isinstance(baseline_report_data, dict)
-                else {}
-            )
-            if not isinstance(baseline_prov, dict):
-                baseline_prov = {}
-            baseline_provider_digest = baseline_prov.get("provider_digest")
-            if not isinstance(baseline_provider_digest, dict):
-                baseline_provider_digest = {}
-
-            dataset_meta = {
-                key: baseline_meta.get(key)
-                for key in (
-                    "dataset_hash",
-                    "preview_hash",
-                    "final_hash",
-                    "provider_kind",
-                    "provider_digest",
-                    "processor_sha256",
-                )
-                if baseline_meta.get(key) is not None
-            }
-            dataset_meta.setdefault("provider_kind", "vision_text")
-            dataset_meta.setdefault("preview_hash", preview_hash)
-            dataset_meta.setdefault("final_hash", final_hash)
-            dataset_meta.setdefault("dataset_hash", dataset_hash)
-            processor_sha = (
-                preview.get("processor_sha256")
-                or final.get("processor_sha256")
-                or baseline_provider_digest.get("processor_sha256")
-            )
-            if isinstance(processor_sha, str) and processor_sha:
-                dataset_meta["processor_sha256"] = processor_sha
-            dataset_meta["loss_type"] = resolved_loss_type
-            window_plan = baseline_meta.get("window_plan")
-            if not isinstance(window_plan, dict):
-                window_plan = {
-                    "profile": "vision_text",
-                    "requested_preview": effective_preview,
-                    "requested_final": effective_final,
-                    "actual_preview": effective_preview,
-                    "actual_final": effective_final,
-                    "coverage_ok": True,
-                }
-            return {
-                "effective_preview": effective_preview,
-                "effective_final": effective_final,
-                "preview_count": effective_preview,
-                "final_count": effective_final,
-                "dataset_meta": dataset_meta,
-                "window_plan": window_plan,
-                "calibration_data": [],
-            }
-
-        def _arm_check(
-            label: str,
-            section: dict[str, Any],
-        ) -> tuple[list[int], list[list[int]]]:
-            window_ids = section.get("window_ids")
-            input_ids = section.get("input_ids")
-            masks = section.get("attention_masks")
-            if not isinstance(window_ids, list) or not isinstance(input_ids, list):
-                _fail_schedule(f"invalid {label} section: missing window_ids/input_ids")
-            if len(window_ids) != len(input_ids):
-                _fail_schedule(
-                    f"{label} coherence error: len(window_ids)={len(window_ids)} len(input_ids)={len(input_ids)}"
-                )
-
-            ids_int: list[int] = []
-            seqs: list[list[int]] = []
-            for idx, (wid, seq) in enumerate(zip(window_ids, input_ids, strict=False)):
-                try:
-                    wid_int = int(wid)
-                except _PAIRING_INT_ERRORS:
-                    _fail_schedule(
-                        f"{label} window_ids contains non-int at index {idx}"
-                    )
-                ids_int.append(wid_int)
-                seq_ints = tensor_or_list_to_ints_fn(seq)
-                if not seq_ints:
-                    _fail_schedule(f"{label} input_ids empty at index {idx}")
-                seqs.append(seq_ints)
-
-            masks_rows: list[list[int]] = []
-            masks_missing = masks is None or masks == []
-            if (
-                isinstance(masks, list)
-                and masks
-                and len(seqs) == 1
-                and not isinstance(masks[0], list)
-            ):
-                masks = [masks]
-
-            if isinstance(masks, list) and masks:
-                if len(masks) != len(seqs):
-                    _fail_schedule(
-                        f"{label} coherence error: len(attention_masks)={len(masks)} len(input_ids)={len(seqs)}"
-                    )
-                for idx, (seq_ints, mask) in enumerate(zip(seqs, masks, strict=False)):
-                    if not isinstance(mask, list):
-                        _fail_schedule(
-                            f"{label} attention_masks row is not a list at index {idx}"
-                        )
-                    mask_ints = tensor_or_list_to_ints_fn(mask)
-                    if len(mask_ints) != len(seq_ints):
-                        _fail_schedule(
-                            f"{label} attention_masks length mismatch at index {idx}"
-                        )
-                    masks_rows.append(mask_ints)
-            else:
-                masks_missing = True
-                masks_rows = [[1] * len(seq) for seq in seqs]
-
-            if masks_missing:
-                try:
-                    section["attention_masks"] = masks_rows
-                except _PAIRING_ASSIGNMENT_ERRORS:
-                    pass
-
-            labels = section.get("labels")
-            if isinstance(labels, list) and labels:
-                if len(labels) != len(seqs):
-                    _fail_schedule(f"{label} labels length mismatch")
-                for idx, row in enumerate(labels):
-                    row_ints = tensor_or_list_to_ints_fn(row)
-                    if len(row_ints) != len(seqs[idx]):
-                        _fail_schedule(f"{label} labels length mismatch at index {idx}")
-
-            for key in ("masked_token_counts", "actual_token_counts"):
-                if section.get(key) is not None:
-                    raw_counts = section.get(key)
-                    if not isinstance(raw_counts, list) or len(raw_counts) != len(seqs):
-                        _fail_schedule(f"{label} {key} length mismatch")
-
-            return ids_int, seqs
-
-        preview_ids, preview_seqs = _arm_check("preview", preview)
-        final_ids, final_seqs = _arm_check("final", final)
-
-        if len(set(preview_ids)) != len(preview_ids):
-            _fail_schedule("duplicate window_ids detected in preview arm")
-        if len(set(final_ids)) != len(final_ids):
-            _fail_schedule("duplicate window_ids detected in final arm")
-        if set(preview_ids) & set(final_ids):
-            _fail_schedule("window_ids overlap between preview and final arms")
-
-        def _hash_tokens(tokens: list[int]) -> bytes:
-            if not tokens:
-                return b""
-            token_array = array("I", (int(token) & 0xFFFFFFFF for token in tokens))
-            return hashlib.blake2b(token_array.tobytes(), digest_size=16).digest()
-
-        preview_hashes = [_hash_tokens(seq) for seq in preview_seqs]
-        final_hashes = [_hash_tokens(seq) for seq in final_seqs]
-        if len(set(preview_hashes)) != len(preview_hashes):
-            _fail_schedule("duplicate token sequences detected in preview arm")
-        if len(set(final_hashes)) != len(final_hashes):
-            _fail_schedule("duplicate token sequences detected in final arm")
-        if set(preview_hashes) & set(final_hashes):
-            _fail_schedule("preview/final token sequence overlap detected")
-
-        expected_preview_hash = hash_sequences_fn(preview_seqs)
-        expected_final_hash = hash_sequences_fn(final_seqs)
-        expected_dataset_hash = hashlib.blake2s(
-            (expected_preview_hash + expected_final_hash).encode("utf-8"),
-            digest_size=16,
-        ).hexdigest()
-
-        baseline_preview_hash = baseline_meta.get("preview_hash")
-        baseline_final_hash = baseline_meta.get("final_hash")
-        baseline_dataset_hash = baseline_meta.get("dataset_hash")
-
-        if (
-            isinstance(baseline_preview_hash, str)
-            and baseline_preview_hash
-            and baseline_preview_hash != expected_preview_hash
-        ):
-            prof = (profile or "dev").strip().lower()
-            if prof in {"ci", "release"}:
-                _fail_schedule("preview_hash mismatch vs baseline report data")
-            if console is not None and event_fn is not None:
-                event_fn(
-                    console,
-                    "WARN",
-                    "Baseline preview_hash mismatch; continuing in dev profile.",
-                    emoji="⚠️",
-                    profile=prof,
-                )
-
-        if (
-            isinstance(baseline_final_hash, str)
-            and baseline_final_hash
-            and baseline_final_hash != expected_final_hash
-        ):
-            prof = (profile or "dev").strip().lower()
-            if prof in {"ci", "release"}:
-                _fail_schedule("final_hash mismatch vs baseline report data")
-            if console is not None and event_fn is not None:
-                event_fn(
-                    console,
-                    "WARN",
-                    "Baseline final_hash mismatch; continuing in dev profile.",
-                    emoji="⚠️",
-                    profile=prof,
-                )
-
-        if (
-            isinstance(baseline_dataset_hash, str)
-            and baseline_dataset_hash
-            and baseline_dataset_hash != expected_dataset_hash
-        ):
-            prof = (profile or "dev").strip().lower()
-            if prof in {"ci", "release"}:
-                _fail_schedule("dataset_hash mismatch vs baseline report data")
-            if console is not None and event_fn is not None:
-                event_fn(
-                    console,
-                    "WARN",
-                    "Baseline dataset_hash mismatch; continuing in dev profile.",
-                    emoji="⚠️",
-                    profile=prof,
-                )
-    except invarlock_error_cls:
-        raise
-    except typer.Exit:
-        raise
-    except (AttributeError, KeyError, TypeError, ValueError) as exc:
-        _fail_schedule(f"failed to validate baseline schedule integrity ({exc})")
-
-    baseline_preview = len(pairing_schedule["preview"].get("input_ids") or [])
-    baseline_final = len(pairing_schedule["final"].get("input_ids") or [])
-    cfg_preview = getattr(cfg.dataset, "preview_n", None)
-    cfg_final = getattr(cfg.dataset, "final_n", None)
-    if (
-        cfg_preview is not None
-        and baseline_preview is not None
-        and baseline_preview != cfg_preview
-    ) or (
-        cfg_final is not None
-        and baseline_final is not None
-        and baseline_final != cfg_final
-    ):
-        _emit(
-            "WARN",
-            (
-                "Adjusting evaluation window counts to match baseline schedule "
-                f"({baseline_preview}/{baseline_final})."
-            ),
-            "⚠️",
-        )
-
-    effective_preview = int(baseline_preview)
-    effective_final = int(baseline_final)
-    preview_count = effective_preview
-    final_count = effective_final
-
-    cfg_seq_len = getattr(cfg.dataset, "seq_len", None)
-    baseline_seq_len = _extract_meta("seq_len")
-    if (
-        cfg_seq_len is not None
-        and baseline_seq_len is not None
-        and baseline_seq_len != cfg_seq_len
-    ):
-        _fail_schedule(
-            f"sequence length mismatch (baseline {baseline_seq_len} vs config {cfg_seq_len})"
-        )
-
-    cfg_stride = getattr(cfg.dataset, "stride", getattr(cfg.dataset, "seq_len", None))
-    baseline_stride = _extract_meta("stride")
-    if (
-        baseline_stride is not None
-        and cfg_stride is not None
-        and baseline_stride != cfg_stride
-    ):
-        _fail_schedule(
-            f"stride mismatch (baseline {baseline_stride} vs config {cfg_stride})"
-        )
-
-    cfg_dataset = getattr(cfg.dataset, "provider", None)
-    if cfg_dataset is None:
-        cfg_dataset = getattr(cfg.dataset, "dataset", None)
-    cfg_dataset = canonical_dataset_id_fn(cfg_dataset)
-    baseline_dataset = canonical_dataset_id_fn(_extract_meta("dataset"))
-    if (
-        baseline_dataset is not None
-        and cfg_dataset is not None
-        and baseline_dataset != cfg_dataset
-    ):
-        _fail_schedule(
-            f"dataset mismatch (baseline {baseline_dataset} vs config {cfg_dataset})"
-        )
-
-    cfg_split = getattr(cfg.dataset, "split", "validation")
-    baseline_split = _extract_meta("split")
-    if (
-        baseline_split is not None
-        and cfg_split is not None
-        and baseline_split != cfg_split
-    ):
-        _fail_schedule(
-            f"split mismatch (baseline {baseline_split} vs config {cfg_split})"
-        )
-
-    baseline_tokenizer_hash = baseline_meta.get("tokenizer_hash")
-    if (
-        baseline_tokenizer_hash
-        and tokenizer_hash
-        and baseline_tokenizer_hash != tokenizer_hash
-    ):
-        _fail_schedule(
-            "tokenizer hash mismatch between baseline and current configuration"
-        )
-
-    dataset_meta = {
-        key: baseline_meta.get(key)
-        for key in (
-            "tokenizer_hash",
-            "tokenizer_name",
-            "vocab_size",
-            "bos_token",
-            "eos_token",
-            "pad_token",
-            "add_prefix_space",
-            "dataset_hash",
-            "preview_hash",
-            "final_hash",
-            "preview_total_tokens",
-            "final_total_tokens",
-        )
-        if baseline_meta.get(key) is not None
-    }
-    dataset_meta["loss_type"] = resolved_loss_type
-    window_plan = baseline_meta.get("window_plan")
-    calibration_data: list[Any] | None = []
-
-    return {
-        "effective_preview": effective_preview,
-        "effective_final": effective_final,
-        "preview_count": preview_count,
-        "final_count": final_count,
-        "dataset_meta": dataset_meta,
-        "window_plan": window_plan,
-        "calibration_data": calibration_data,
-    }
 
 
 def enforce_provider_parity(

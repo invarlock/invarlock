@@ -267,40 +267,33 @@ def test_collect_tokenized_samples_paths(monkeypatch):
     assert out2 == []
     # Torch-like tensors path
     # Torch-like tensors path (best-effort; skip if environment disagrees)
-    try:
 
-        class FakeTensor:
-            def __init__(self, arr):
-                self._arr = arr
+    class FakeTensor:
+        def __init__(self, arr):
+            self._arr = arr
 
-            def squeeze(self, *args, **kwargs):  # noqa: D401
-                class _W:
-                    def __init__(self, arr):
-                        self._arr = arr
+        def squeeze(self, *args, **kwargs):  # noqa: D401
+            class _W:
+                def __init__(self, arr):
+                    self._arr = arr
 
-                    def tolist(self):
-                        return self._arr
+                def tolist(self):
+                    return self._arr
 
-                return _W(self._arr)
+            return _W(self._arr)
 
-        class TokTorch:
-            def __call__(self, text, **kw):  # noqa: ARG002
-                return {
-                    "input_ids": FakeTensor([1, 2, 0, 0]),
-                    "attention_mask": FakeTensor([1, 1, 0, 0]),
-                }
+    class TokTorch:
+        def __call__(self, text, **kw):  # noqa: ARG002
+            return {
+                "input_ids": FakeTensor([1, 2, 0, 0]),
+                "attention_mask": FakeTensor([1, 1, 0, 0]),
+            }
 
-        monkeypatch.setattr(data_support_mod, "HAS_TORCH", True)
-        out3 = pt._collect_tokenized_samples(["cc"], [0], TokTorch(), 4)
-        if not out3:
-            import pytest
-
-            pytest.skip("torch-like squeeze path not exercised in this environment")
-        assert out3 and out3[0][3] == 2
-    except Exception:
-        import pytest
-
-        pytest.skip("torch-like squeeze path not available")
+    monkeypatch.setattr(data_support_mod, "HAS_TORCH", True)
+    out3 = pt._collect_tokenized_samples(["cc"], [0], TokTorch(), 4)
+    if not out3:
+        pytest.skip("torch-like squeeze path not exercised in this environment")
+    assert out3 and out3[0][3] == 2
 
 
 def test_byte_ngram_scoring_empty_returns_false(monkeypatch):

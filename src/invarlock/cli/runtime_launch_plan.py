@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,15 @@ def _command_tokens(argv: list[str]) -> list[str]:
     return [token for token in argv if not token.startswith("-")]
 
 
+def _leading_command_path(argv: list[str]) -> tuple[str, ...]:
+    path: list[str] = []
+    for token in argv:
+        if token.startswith("-"):
+            break
+        path.append(token)
+    return tuple(path)
+
+
 def _requested_device(argv: list[str]) -> str | None:
     if "--device" in argv:
         idx = argv.index("--device")
@@ -30,10 +40,12 @@ def _requested_device(argv: list[str]) -> str | None:
             return str(argv[idx + 1]).strip().lower()
         return None
 
-    command_tokens = _command_tokens(argv)
-    if not command_tokens:
+    command_path = _leading_command_path(argv)
+    if not command_path:
         return None
-    if command_tokens[0] in {"evaluate", "run", "calibrate"}:
+    if command_path[0] in {"evaluate", "run", "calibrate"}:
+        return "auto"
+    if command_path[:2] == ("advanced", "calibrate"):
         return "auto"
     return None
 
@@ -182,13 +194,28 @@ def _append_bool_flag(argv: list[str], flag: str, enabled: bool) -> None:
         argv.append(flag)
 
 
+def _command_name_tokens(command_name: str | Iterable[str]) -> list[str]:
+    if isinstance(command_name, str):
+        return [command_name]
+    return [str(token) for token in command_name]
+
+
+def _command_name_string(command_name: str | Iterable[str]) -> str:
+    return " ".join(_command_name_tokens(command_name))
+
+
 def build_request_container_launch_plan(
-    command_name: str,
+    command_name: str | Iterable[str],
     request: Any,
 ) -> ContainerLaunchPlan:
-    delegated_argv: list[str] = [str(command_name)]
+    delegated_argv: list[str] = []
+    _append_option(
+        delegated_argv,
+        "--invoked-command",
+        _command_name_string(command_name),
+    )
     _append_option(delegated_argv, "--config", request.config)
-    _append_option(delegated_argv, "--device", request.device)
+    _append_option(delegated_argv, "--device", request.device or "auto")
     _append_option(delegated_argv, "--profile", request.profile)
     _append_option(delegated_argv, "--out", request.out)
     _append_option(delegated_argv, "--edit", request.edit)

@@ -128,7 +128,7 @@ def extract_commands(paths: Iterable[Path]) -> list[tuple[str, int, str]]:
     for path in paths:
         try:
             lines = path.read_text(encoding="utf-8").splitlines()
-        except Exception:
+        except OSError:
             continue
         in_fence = False
         i = 0
@@ -365,7 +365,7 @@ def run_commands(
                     "stdout": te.stdout[-4000:] if isinstance(te.stdout, str) else "",
                     "stderr": te.stderr[-4000:] if isinstance(te.stderr, str) else "",
                 }
-            except Exception as e:
+            except (OSError, ValueError) as e:
                 record = {
                     "id": c.id,
                     "file": c.file,
@@ -440,7 +440,7 @@ def main(argv: list[str] | None = None) -> int:
         total_executed += 1
         try:
             rec = json.loads(raw)
-        except Exception:
+        except json.JSONDecodeError:
             continue
         exit_code = rec.get("exit_code")
         if exit_code != 0:

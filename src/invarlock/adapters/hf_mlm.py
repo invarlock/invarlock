@@ -25,9 +25,36 @@ _MLM_FALLBACK_TOKENS = (
     "maskedlm",
     "masked language",
     "for automodel",
+    "unrecognized model",
+    "model_type",
     "unrecognized configuration class",
     "is not supported for this model",
 )
+_HF_MLM_PROBE_ERRORS = (
+    AttributeError,
+    IndexError,
+    KeyError,
+    RuntimeError,
+    StopIteration,
+    TypeError,
+    ValueError,
+)
+_HF_MLM_CLASS_NAMES = {
+    "BertModel",
+    "BertForSequenceClassification",
+    "BertForMaskedLM",
+    "RobertaModel",
+    "RobertaForSequenceClassification",
+    "RobertaForMaskedLM",
+    "DistilBertModel",
+    "DistilBertForSequenceClassification",
+    "DistilBertForMaskedLM",
+    "AlbertModel",
+    "AlbertForSequenceClassification",
+    "ElectraModel",
+    "ElectraForSequenceClassification",
+}
+_HF_MLM_MODEL_TYPES = {"bert", "roberta", "distilbert", "albert", "electra"}
 
 
 def _should_retry_mlm_loader(exc: BaseException) -> bool:
@@ -36,6 +63,239 @@ def _should_retry_mlm_loader(exc: BaseException) -> bool:
         return False
     message = str(cause).strip().lower()
     return any(token in message for token in _MLM_FALLBACK_TOKENS)
+
+
+def _has_set_attr(obj: Any, name: str) -> bool:
+    return _module_has(obj, name)
+
+
+def _module_has(obj: Any, name: str) -> bool:
+    if isinstance(obj, nn.Module):
+        in_modules = hasattr(obj, "_modules") and name in obj._modules
+        in_params = hasattr(obj, "_parameters") and name in obj._parameters
+        in_buffers = hasattr(obj, "_buffers") and name in obj._buffers
+        in_dict = name in getattr(obj, "__dict__", {})
+        return in_modules or in_params or in_buffers or in_dict
+    return name in getattr(obj, "__dict__", {})
+
+
+def _first_sequence_item(values: Any) -> Any | None:
+    if values is None:
+        return None
+    try:
+        length = len(values)
+        if isinstance(length, int) and length > 0:
+            return values[0]
+        if isinstance(length, int) and length <= 0:
+            return None
+    except _HF_MLM_PROBE_ERRORS:
+        pass
+    try:
+        return next(iter(values))
+    except _HF_MLM_PROBE_ERRORS:
+        return None
+
+
+def _has_non_empty_layers(layers: Any) -> bool:
+    return _first_sequence_item(layers) is not None
+
+
+def _resolve_wrapper_encoder(model: Any) -> Any | None:
+    if _module_has(model, "bert") and _module_has(model.bert, "encoder"):
+        return model.bert.encoder
+    if _module_has(model, "roberta") and _module_has(model.roberta, "encoder"):
+        return model.roberta.encoder
+    if _module_has(model, "distilbert") and _module_has(
+        model.distilbert, "transformer"
+    ):
+        return model.distilbert.transformer
+    return None
+
+
+def _resolve_mlm_encoder(model: Any) -> tuple[Any | None, bool]:
+    direct_encoder = getattr(model, "encoder", None)
+    if _module_has(model, "encoder") and _module_has(direct_encoder, "layer"):
+        return direct_encoder, False
+    wrapper_encoder = _resolve_wrapper_encoder(model)
+    if wrapper_encoder is not None:
+        return wrapper_encoder, True
+    return None, False
+
+
+def _resolve_embeddings_module(model: Any) -> Any | None:
+    if _module_has(model, "embeddings"):
+        return model.embeddings
+    if _module_has(model, "bert") and _module_has(model.bert, "embeddings"):
+        return model.bert.embeddings
+    if _module_has(model, "roberta") and _module_has(model.roberta, "embeddings"):
+        return model.roberta.embeddings
+    if _module_has(model, "distilbert") and _module_has(model.distilbert, "embeddings"):
+        return model.distilbert.embeddings
+    return None
+
+
+def _resolve_layer_by_index(layers: Any, layer_idx: int, encoder: Any) -> Any:
+    try:
+        return layers[layer_idx]
+    except _HF_MLM_PROBE_ERRORS:
+        pass
+
+    try:
+        for index, layer_candidate in enumerate(iter(layers)):
+            if index == layer_idx:
+                return layer_candidate
+    except _HF_MLM_PROBE_ERRORS:
+        pass
+
+    if isinstance(encoder, nn.Module):
+        try:
+            for index, child in enumerate(encoder.children()):
+                if index == layer_idx:
+                    return child
+        except _HF_MLM_PROBE_ERRORS:
+            pass
+
+    raise AdapterError(
+        code="E202",
+        message="ADAPTER-STRUCTURE-INVALID: could not access encoder layer",
+        details={"layer_idx": int(layer_idx)},
+    )
+
+
+def _has_complete_attention_structure(layer: Any) -> bool:
+    if not (
+        hasattr(layer, "attention")
+        and hasattr(layer, "intermediate")
+        and hasattr(layer, "output")
+        and hasattr(layer.attention, "self")
+    ):
+        return False
+    return all(
+        _has_set_attr(layer.attention.self, name) for name in ("query", "key", "value")
+    )
+
+
+def _prediction_head_tied_to_embeddings(
+    model: Any, bert_model: Any, config: Any
+) -> bool:
+    decoder = getattr(
+        getattr(getattr(model, "cls", None), "predictions", None), "decoder", None
+    )
+    decoder_weight = getattr(decoder, "weight", None)
+    embeddings = getattr(
+        getattr(bert_model, "embeddings", None), "word_embeddings", None
+    )
+    embedding_weight = getattr(embeddings, "weight", None)
+    if decoder_weight is None or embedding_weight is None:
+        return False
+    if decoder_weight is embedding_weight:
+        return True
+    if getattr(config, "model_type", None) != "roberta":
+        return False
+    try:
+        return decoder_weight.shape == embedding_weight.shape
+    except _HF_MLM_PROBE_ERRORS:
+        return False
+
+
+def _resolve_encoder(
+    model: Any,
+    *,
+    prefer_wrapper: bool,
+) -> tuple[Any | None, bool]:
+    wrapper_encoder = _resolve_wrapper_encoder(model)
+    direct_encoder = (
+        model.encoder
+        if _module_has(model, "encoder") and _module_has(model.encoder, "layer")
+        else None
+    )
+    if prefer_wrapper:
+        if wrapper_encoder is not None and _module_has(wrapper_encoder, "layer"):
+            return wrapper_encoder, True
+        if direct_encoder is not None:
+            return direct_encoder, False
+    else:
+        if direct_encoder is not None and wrapper_encoder is None:
+            return direct_encoder, False
+        if wrapper_encoder is not None and _module_has(wrapper_encoder, "layer"):
+            return wrapper_encoder, True
+        if direct_encoder is not None:
+            return direct_encoder, False
+    return None, False
+
+
+def _require_encoder_layers(
+    model: Any,
+    *,
+    prefer_wrapper: bool,
+    message: str,
+) -> tuple[Any, Any, bool]:
+    encoder, from_wrapper = _resolve_encoder(model, prefer_wrapper=prefer_wrapper)
+    layers = getattr(encoder, "layer", None) if encoder is not None else None
+    if encoder is None or layers is None:
+        raise AdapterError(
+            code="E202",
+            message=message,
+            details={"model_class": model.__class__.__name__},
+        )
+    return encoder, layers, from_wrapper
+
+
+def _supports_hf_mlm_class(model: Any) -> bool:
+    model_name = model.__class__.__name__
+    if model_name not in _HF_MLM_CLASS_NAMES:
+        return False
+    config = getattr(model, "config", None)
+    model_type = getattr(config, "model_type", None)
+    if model_type is None:
+        return model_name in {
+            "BertModel",
+            "BertForSequenceClassification",
+            "RobertaModel",
+            "RobertaForSequenceClassification",
+            "DistilBertModel",
+            "DistilBertForSequenceClassification",
+        }
+    return str(model_type).lower() in _HF_MLM_MODEL_TYPES
+
+
+def _resolve_parameter_device(model: Any) -> Any:
+    try:
+        return next(iter(model.parameters())).device
+    except (AttributeError, RuntimeError, StopIteration, TypeError, ValueError):
+        return torch.device("cpu")
+
+
+def _count_model_parameters(model: Any) -> int:
+    try:
+        return int(sum(int(p.numel()) for p in model.parameters()))
+    except (AttributeError, RuntimeError, TypeError, ValueError):
+        return 0
+
+
+def _extract_prediction_head_tying(model: Any, config: Any) -> dict[str, str]:
+    if _module_has(model, "roberta"):
+        bert_model = model.roberta
+        base_name = "roberta"
+    elif _module_has(model, "bert"):
+        bert_model = model.bert
+        base_name = "bert"
+    else:
+        return {}
+    if not _module_has(bert_model, "embeddings"):
+        return {}
+    if not _prediction_head_tied_to_embeddings(model, bert_model, config):
+        return {}
+    return {
+        "cls.predictions.decoder.weight": (
+            f"{base_name}.embeddings.word_embeddings.weight"
+        )
+    }
+
+
+def _resolve_supported_model_type(config: Any) -> str:
+    model_type = str(getattr(config, "model_type", "bert") or "bert").lower()
+    return model_type if model_type in _HF_MLM_MODEL_TYPES else "bert"
 
 
 class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
@@ -108,6 +368,35 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
         except ModelLoadError as exc:
             if not _should_retry_mlm_loader(exc):
                 raise
+            direct_strategy = resolve_core_loader_strategy(
+                task="mlm",
+                model_id=model_id,
+                kwargs=kwargs,
+                allow_direct_submodule=True,
+            )
+            if (
+                direct_strategy.strategy == "direct_submodule"
+                and direct_strategy.loader_label != strategy.loader_label
+            ):
+                try:
+                    self._last_loader_strategy = direct_strategy.strategy
+                    self._last_loader_label = direct_strategy.loader_label
+                    with wrap_errors(
+                        ModelLoadError,
+                        "E201",
+                        f"MODEL-LOAD-FAILED: {direct_strategy.loader_label}",
+                        lambda e: {"model_id": model_id},
+                    ):
+                        model = self._load_pretrained_model(
+                            direct_strategy.loader,
+                            model_id,
+                            **kwargs,
+                        )
+                except ModelLoadError as direct_exc:
+                    if not _should_retry_mlm_loader(direct_exc):
+                        raise
+                else:
+                    return self._safe_to_device(model, device)
             if strategy.strategy != "auto":
                 try:
                     self._last_loader_strategy = auto_strategy.strategy
@@ -170,169 +459,25 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
             True if this is a HuggingFace BERT compatible model
         """
 
-        # Helper to detect explicitly set attributes (avoid Mock auto-creation)
-        def _has_set_attr(obj, name: str) -> bool:
-            d = getattr(obj, "__dict__", None)
-            if isinstance(d, dict):
-                return name in d
-            return hasattr(obj, name)
-
-        # Direct-encoder structural validation first (no wrapper attributes)
-        if (
-            hasattr(model, "encoder")
-            and hasattr(model.encoder, "layer")
-            and not (
-                hasattr(model, "bert")
-                or hasattr(model, "roberta")
-                or hasattr(model, "distilbert")
-            )
-        ):
-            layers_obj = model.encoder.layer
-            first_layer = None
-            # Try to obtain the first layer robustly
-            try:
-                n = len(layers_obj)
-                if isinstance(n, int) and n > 0:
-                    first_layer = layers_obj[0]
-            except Exception:
-                try:
-                    it = iter(layers_obj)
-                    first_layer = next(it)
-                except Exception:
-                    first_layer = None
-            # If we cannot find a first layer, it's not a valid BERT encoder
-            if first_layer is None:
-                return False
-            # Require complete attention structure for direct-encoder models
-            if not (
-                hasattr(first_layer, "attention")
-                and hasattr(first_layer, "intermediate")
-                and hasattr(first_layer, "output")
-                and hasattr(first_layer.attention, "self")
-            ):
-                return False
-            q = getattr(first_layer.attention.self, "query", None)
-            k = getattr(first_layer.attention.self, "key", None)
-            v = getattr(first_layer.attention.self, "value", None)
-            if not (q is not None and k is not None and v is not None):
-                return False
-            # If the structure is complete, it's a valid direct BERT encoder
-            return True
-
-        # Wrapper attributes alone are insufficient; require non-empty encoder/transformer layers
-        # Fast-path acceptance for common wrapper structures with non-empty encoder layers
-        def _has_non_empty_layers(layers) -> bool:
-            if layers is None:
-                return False
-            # Length-based check that guards against Mock truthiness
-            try:
-                n = len(layers)  # may return non-int for mocks
-                if isinstance(n, int) and n > 0:
+        encoder, from_wrapper = _resolve_mlm_encoder(model)
+        if encoder is not None:
+            layers = getattr(encoder, "layer", None)
+            if _has_non_empty_layers(layers):
+                if from_wrapper:
                     return True
-            except Exception:
-                pass
-            # Iterator fallback: must successfully yield a first element
-            try:
-                it = iter(layers)
-                first = next(it)
-                return first is not None
-            except Exception:
-                return False
-
-        bert_layers = getattr(getattr(model, "bert", None), "encoder", None)
-        bert_layers = getattr(bert_layers, "layer", None)
-        if _has_non_empty_layers(bert_layers):
-            return True
-
-        roberta_layers = getattr(getattr(model, "roberta", None), "encoder", None)
-        roberta_layers = getattr(roberta_layers, "layer", None)
-        if _has_non_empty_layers(roberta_layers):
-            return True
-
-        distil_layers = getattr(getattr(model, "distilbert", None), "transformer", None)
-        distil_layers = getattr(distil_layers, "layer", None)
-        if _has_non_empty_layers(distil_layers):
-            return True
+                try:
+                    first_layer = _resolve_layer_by_index(layers, 0, encoder)
+                except AdapterError:
+                    pass
+                else:
+                    if _has_complete_attention_structure(first_layer):
+                        return True
 
         # Direct HuggingFace BERT model type check
         # Avoid importing specific model classes at module import time.
         # Instead, check by class name to remain compatible across transformers versions.
-        name = model.__class__.__name__
-        if name in {
-            "BertModel",
-            "BertForSequenceClassification",
-            "RobertaModel",
-            "RobertaForSequenceClassification",
-            "DistilBertModel",
-            "DistilBertForSequenceClassification",
-        }:
+        if _supports_hf_mlm_class(model):
             return True
-
-        # Check for HuggingFace BERT class names
-        model_name = model.__class__.__name__
-        bert_class_names = [
-            "BertModel",
-            "BertForSequenceClassification",
-            "BertForMaskedLM",
-            "RobertaModel",
-            "RobertaForSequenceClassification",
-            "RobertaForMaskedLM",
-            "DistilBertModel",
-            "DistilBertForSequenceClassification",
-            "DistilBertForMaskedLM",
-            "AlbertModel",
-            "AlbertForSequenceClassification",
-            "ElectraModel",
-            "ElectraForSequenceClassification",
-        ]
-        if model_name in bert_class_names:
-            # Verify it has HF config
-            if hasattr(model, "config") and hasattr(model.config, "model_type"):
-                bert_model_types = [
-                    "bert",
-                    "roberta",
-                    "distilbert",
-                    "albert",
-                    "electra",
-                ]
-                return model.config.model_type in bert_model_types
-
-        # Accept common wrapper structures early (bert/roberta/distilbert) with non-empty encoder layers
-        if (
-            hasattr(model, "bert")
-            and hasattr(model.bert, "encoder")
-            and hasattr(model.bert.encoder, "layer")
-        ):
-            try:
-                layers = model.bert.encoder.layer
-                if _has_non_empty_layers(layers):
-                    return True
-            except Exception:
-                pass
-
-        if (
-            hasattr(model, "roberta")
-            and hasattr(model.roberta, "encoder")
-            and hasattr(model.roberta.encoder, "layer")
-        ):
-            try:
-                layers = model.roberta.encoder.layer
-                if _has_non_empty_layers(layers):
-                    return True
-            except Exception:
-                pass
-
-        if (
-            hasattr(model, "distilbert")
-            and hasattr(model.distilbert, "transformer")
-            and hasattr(model.distilbert.transformer, "layer")
-        ):
-            try:
-                layers = model.distilbert.transformer.layer
-                if _has_non_empty_layers(layers):
-                    return True
-            except Exception:
-                pass
 
         # Structural validation for BERT-like models
         if hasattr(model, "config"):
@@ -345,72 +490,29 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
                 and hasattr(config, "hidden_size")
             ):
                 # Look for BERT encoder structure
-                encoder = None
-                from_wrapper = False
-                if hasattr(model, "encoder"):
-                    encoder = model.encoder
-                elif hasattr(model, "bert") and hasattr(model.bert, "encoder"):
-                    encoder = model.bert.encoder
-                    from_wrapper = True
-                elif hasattr(model, "roberta") and hasattr(model.roberta, "encoder"):
-                    encoder = model.roberta.encoder
-                    from_wrapper = True
-                elif hasattr(model, "distilbert") and hasattr(
-                    model.distilbert, "transformer"
-                ):
-                    encoder = model.distilbert.transformer
-                    from_wrapper = True
+                encoder, from_wrapper = _resolve_mlm_encoder(model)
 
                 if encoder and hasattr(encoder, "layer"):
                     # Validate BERT layer structure
+                    layers = encoder.layer
                     try:
-                        layers = encoder.layer
-                        layer = None
-                        if hasattr(layers, "__len__"):
-                            try:
-                                if len(layers) > 0:
-                                    layer = layers[0]
-                                else:
-                                    return False
-                            except Exception:
-                                layer = None
-                        if layer is None and hasattr(layers, "__iter__"):
-                            try:
-                                layer = next(iter(layers))
-                            except (StopIteration, TypeError):
-                                return False
-                        if layer is None:
-                            return False
+                        layer = _resolve_layer_by_index(layers, 0, encoder)
+                    except AdapterError:
+                        return False
 
-                        # For wrapper structures, require minimal attention structure presence on first layer
-                        if from_wrapper:
-                            if hasattr(layer, "attention") and hasattr(
-                                layer.attention, "self"
-                            ):
-                                if (
-                                    _has_set_attr(layer.attention.self, "query")
-                                    and _has_set_attr(layer.attention.self, "key")
-                                    and _has_set_attr(layer.attention.self, "value")
-                                ):
-                                    return True
-                            return False
-
-                        # Strict checks for direct-encoder models
+                    if from_wrapper:
                         if (
                             hasattr(layer, "attention")
-                            and hasattr(layer, "intermediate")
-                            and hasattr(layer, "output")
                             and hasattr(layer.attention, "self")
+                            and _has_set_attr(layer.attention.self, "query")
+                            and _has_set_attr(layer.attention.self, "key")
+                            and _has_set_attr(layer.attention.self, "value")
                         ):
-                            if (
-                                _has_set_attr(layer.attention.self, "query")
-                                and _has_set_attr(layer.attention.self, "key")
-                                and _has_set_attr(layer.attention.self, "value")
-                            ):
-                                return True
-
-                    except (AttributeError, TypeError):
+                            return True
                         return False
+
+                    if _has_complete_attention_structure(layer):
+                        return True
 
         return False
 
@@ -445,64 +547,13 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
             )
 
         # Determine encoder structure (robust and Mock-safe)
-        def _module_has(obj, name: str) -> bool:
-            # Prefer nn.Module registries to avoid Mock auto attributes
-            if isinstance(obj, nn.Module):
-                in_modules = hasattr(obj, "_modules") and name in obj._modules
-                in_params = hasattr(obj, "_parameters") and name in obj._parameters
-                in_buffers = hasattr(obj, "_buffers") and name in obj._buffers
-                in_dict = name in getattr(obj, "__dict__", {})
-                return in_modules or in_params or in_buffers or in_dict
-            # Fallback: only accept explicitly set attributes
-            return name in getattr(obj, "__dict__", {})
-
-        encoder = None
-        if _module_has(model, "encoder") and _module_has(model.encoder, "layer"):
-            encoder = model.encoder
-        elif (
-            _module_has(model, "bert")
-            and _module_has(model.bert, "encoder")
-            and _module_has(model.bert.encoder, "layer")
-        ):
-            encoder = model.bert.encoder
-        elif (
-            _module_has(model, "roberta")
-            and _module_has(model.roberta, "encoder")
-            and _module_has(model.roberta.encoder, "layer")
-        ):
-            encoder = model.roberta.encoder
-        elif (
-            _module_has(model, "distilbert")
-            and _module_has(model.distilbert, "transformer")
-            and _module_has(model.distilbert.transformer, "layer")
-        ):
-            encoder = model.distilbert.transformer
-        else:
-            # Fallback for direct-encoder models that are real nn.Module instances (not Mocks)
-            if (
-                isinstance(model, nn.Module)
-                and hasattr(model, "encoder")
-                and hasattr(model.encoder, "layer")
-            ):
-                encoder = model.encoder
-            else:
-                raise AdapterError(
-                    code="E202",
-                    message=(
-                        "ADAPTER-STRUCTURE-INVALID: unrecognized HuggingFace BERT model structure"
-                    ),
-                    details={"model_class": model.__class__.__name__},
-                )
-
-        layers = getattr(encoder, "layer", None)
-        if layers is None:
-            raise AdapterError(
-                code="E202",
-                message=(
-                    "ADAPTER-STRUCTURE-INVALID: unrecognized HuggingFace BERT model structure"
-                ),
-                details={"model_class": model.__class__.__name__},
-            )
+        encoder, layers, _ = _require_encoder_layers(
+            model,
+            prefer_wrapper=False,
+            message=(
+                "ADAPTER-STRUCTURE-INVALID: unrecognized HuggingFace BERT model structure"
+            ),
+        )
 
         # Extract basic configuration
         n_layers = len(layers)
@@ -520,26 +571,17 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
             )
 
         # Get device info (robust to mocks/non-iterables)
-        try:
-            params = model.parameters()
-            it = iter(params)
-            first = next(it)
-            device = first.device
-        except Exception:
-            device = torch.device("cpu")
+        device = _resolve_parameter_device(model)
 
         # Calculate total parameters (fallback to 0 on mocks)
-        try:
-            total_params = sum(p.numel() for p in model.parameters())
-        except Exception:
-            total_params = 0
+        total_params = _count_model_parameters(model)
 
         # Get MLP dimensions for each layer
         mlp_dims = []
         heads_per_layer = []
 
         for layer_idx in range(n_layers):
-            layer = layers[layer_idx]
+            layer = _resolve_layer_by_index(layers, layer_idx, encoder)
 
             # For BERT, all layers have the same head count
             heads_per_layer.append(n_heads)
@@ -560,68 +602,10 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
         # But some variants might tie embeddings to output layers
         tying_map = {}
 
-        # Check for potential weight tying in classification models
-        if hasattr(model, "cls") and hasattr(model.cls, "predictions"):
-            if hasattr(model.cls.predictions, "decoder"):
-                # Some BERT models tie the prediction head to embeddings
-                bert_model = None
-                if hasattr(model, "bert"):
-                    bert_model = model.bert
-                elif hasattr(model, "roberta"):
-                    bert_model = model.roberta
-
-                if bert_model and hasattr(bert_model, "embeddings"):
-                    if hasattr(bert_model.embeddings, "word_embeddings"):
-                        # Check if decoder weight is tied to embeddings
-                        tied = False
-                        if hasattr(model.cls.predictions, "decoder") and hasattr(
-                            model.cls.predictions.decoder, "weight"
-                        ):
-                            try:
-                                # Strict identity check first
-                                tied = (
-                                    model.cls.predictions.decoder.weight
-                                    is bert_model.embeddings.word_embeddings.weight
-                                )
-                            except Exception:
-                                tied = False
-                            # Permissive fallback for RoBERTa mocks: accept same-shape weights as tied
-                            if (
-                                not tied
-                                and getattr(config, "model_type", None) == "roberta"
-                            ):
-                                try:
-                                    tied = (
-                                        hasattr(model, "roberta")
-                                        and hasattr(model.roberta, "embeddings")
-                                        and hasattr(
-                                            model.roberta.embeddings, "word_embeddings"
-                                        )
-                                        and hasattr(
-                                            model.roberta.embeddings.word_embeddings,
-                                            "weight",
-                                        )
-                                        and hasattr(
-                                            model.cls.predictions.decoder, "weight"
-                                        )
-                                        and model.cls.predictions.decoder.weight.shape
-                                        == model.roberta.embeddings.word_embeddings.weight.shape
-                                    )
-                                except Exception:
-                                    tied = False
-                        if tied:
-                            # Prefer attribute presence to decide base namespace
-                            base_name = (
-                                "roberta" if hasattr(model, "roberta") else "bert"
-                            )
-                            tying_map["cls.predictions.decoder.weight"] = (
-                                f"{base_name}.embeddings.word_embeddings.weight"
-                            )
+        tying_map = _extract_prediction_head_tying(model, config)
 
         # Determine model type
-        model_type = getattr(config, "model_type", "bert")
-        if model_type not in ["bert", "roberta", "distilbert", "albert", "electra"]:
-            model_type = "bert"  # fallback
+        model_type = _resolve_supported_model_type(config)
 
         # Architecture feature flags (wrapper-aware)
         has_pooler_flag = (
@@ -697,60 +681,7 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
         Returns:
             Dictionary mapping tied parameter names to their source parameter names
         """
-        tying_info = {}
-
-        # Check for prediction head ↔ embeddings tying (in some BERT variants)
-        if hasattr(model, "cls") and hasattr(model.cls, "predictions"):
-            if hasattr(model.cls.predictions, "decoder"):
-                bert_model = None
-                if hasattr(model, "bert"):
-                    bert_model = model.bert
-                elif hasattr(model, "roberta"):
-                    bert_model = model.roberta
-
-                if bert_model and hasattr(bert_model, "embeddings"):
-                    if hasattr(bert_model.embeddings, "word_embeddings"):
-                        tied = False
-                        if hasattr(model.cls.predictions, "decoder") and hasattr(
-                            model.cls.predictions.decoder, "weight"
-                        ):
-                            try:
-                                # Strict identity check
-                                tied = (
-                                    model.cls.predictions.decoder.weight
-                                    is bert_model.embeddings.word_embeddings.weight
-                                )
-                            except Exception:
-                                tied = False
-                            # Permissive fallback for RoBERTa mocks: accept same-shape weights as tied
-                            if not tied and hasattr(model, "roberta"):
-                                try:
-                                    tied = (
-                                        hasattr(model.roberta, "embeddings")
-                                        and hasattr(
-                                            model.roberta.embeddings, "word_embeddings"
-                                        )
-                                        and hasattr(
-                                            model.roberta.embeddings.word_embeddings,
-                                            "weight",
-                                        )
-                                        and hasattr(
-                                            model.cls.predictions.decoder, "weight"
-                                        )
-                                        and model.cls.predictions.decoder.weight.shape
-                                        == model.roberta.embeddings.word_embeddings.weight.shape
-                                    )
-                                except Exception:
-                                    tied = False
-                        if tied:
-                            base_name = (
-                                "roberta" if hasattr(model, "roberta") else "bert"
-                            )
-                            tying_info["cls.predictions.decoder.weight"] = (
-                                f"{base_name}.embeddings.word_embeddings.weight"
-                            )
-
-        return tying_info
+        return _extract_prediction_head_tying(model, getattr(model, "config", None))
 
     def _restore_weight_tying(
         self, model: nn.Module, tied_param: str, source_param: str
@@ -787,89 +718,30 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
         """
 
         # Determine encoder structure (Mock-safe explicit attribute checks)
-        def _module_has(obj, name: str) -> bool:
-            if isinstance(obj, nn.Module):
-                if hasattr(obj, "_modules") and name in obj._modules:
-                    return True
-                if name in getattr(obj, "__dict__", {}):
-                    return True
-                return False
-            return name in getattr(obj, "__dict__", {})
-
-        encoder = None
-        # Prefer wrapper containers first to avoid Mock auto-attributes
-        if _module_has(model, "bert") and _module_has(model.bert, "encoder"):
-            encoder = model.bert.encoder
-        elif _module_has(model, "roberta") and _module_has(model.roberta, "encoder"):
-            encoder = model.roberta.encoder
-        elif _module_has(model, "distilbert") and _module_has(
-            model.distilbert, "transformer"
-        ):
-            encoder = model.distilbert.transformer
-        elif _module_has(model, "encoder"):
-            encoder = model.encoder
-        else:
-            raise AdapterError(
-                code="E202",
-                message=(
-                    "ADAPTER-STRUCTURE-INVALID: could not find encoder in BERT model"
-                ),
-                details={"model_class": model.__class__.__name__},
-            )
-
-        # Access layer robustly (supports mocks/iterables without __getitem__)
-        layers = encoder.layer
-        # If layers is a Mock/non-iterable, try nn.Module registry fallback
-        if not (
-            hasattr(layers, "__getitem__") or hasattr(layers, "__iter__")
-        ) and isinstance(encoder, nn.Module):
-            if hasattr(encoder, "_modules") and "layer" in encoder._modules:
-                layers = encoder._modules["layer"]
+        encoder, layers, _ = _require_encoder_layers(
+            model,
+            prefer_wrapper=True,
+            message="ADAPTER-STRUCTURE-INVALID: could not find encoder in BERT model",
+        )
 
         try:
-            layer = layers[layer_idx]
-        except Exception:
-            # Iterator fallback
-            try:
-                it = iter(layers)
-                for i, layer_candidate in enumerate(it):
-                    if i == layer_idx:
-                        layer = layer_candidate
-                        break
-                else:
-                    raise IndexError("layer index out of range")
-            except Exception:
-                # nn.Module children() fallback: pick nth child as layer
-                try:
-                    if isinstance(encoder, nn.Module):
-                        child_iter = encoder.children()
-                        for i, child in enumerate(child_iter):
-                            if i == layer_idx:
-                                layer = child
-                                break
-                        else:
-                            raise IndexError("layer index out of range")
-                    else:
-                        raise TypeError("encoder is not nn.Module")
-                except Exception as e:
-                    raise AdapterError(
-                        code="E202",
-                        message=(
-                            "ADAPTER-STRUCTURE-INVALID: could not access encoder layer"
-                        ),
-                        details={"error": str(e)},
-                    ) from e
-
-        modules = {
-            "attention.self.query": layer.attention.self.query,  # Query projection
-            "attention.self.key": layer.attention.self.key,  # Key projection
-            "attention.self.value": layer.attention.self.value,  # Value projection
-            "attention.output.dense": layer.attention.output.dense,  # Attention output projection
-            "intermediate.dense": layer.intermediate.dense,  # FFN intermediate
-            "output.dense": layer.output.dense,  # FFN output
-            "attention.output.LayerNorm": layer.attention.output.LayerNorm,  # Attention LayerNorm
-            "output.LayerNorm": layer.output.LayerNorm,  # FFN LayerNorm
-        }
+            layer = _resolve_layer_by_index(layers, layer_idx, encoder)
+            modules = {
+                "attention.self.query": layer.attention.self.query,  # Query projection
+                "attention.self.key": layer.attention.self.key,  # Key projection
+                "attention.self.value": layer.attention.self.value,  # Value projection
+                "attention.output.dense": layer.attention.output.dense,  # Attention output projection
+                "intermediate.dense": layer.intermediate.dense,  # FFN intermediate
+                "output.dense": layer.output.dense,  # FFN output
+                "attention.output.LayerNorm": layer.attention.output.LayerNorm,  # Attention LayerNorm
+                "output.LayerNorm": layer.output.LayerNorm,  # FFN LayerNorm
+            }
+        except (AttributeError, KeyError, TypeError) as exc:
+            raise AdapterError(
+                code="E202",
+                message=("ADAPTER-STRUCTURE-INVALID: could not access encoder layer"),
+                details={"error": str(exc), "layer_idx": int(layer_idx)},
+            ) from exc
 
         return modules
 
@@ -886,24 +758,7 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
         config = model.config
 
         # Find embeddings module (Mock-safe explicit attribute checks)
-        def _module_has(obj, name: str) -> bool:
-            if isinstance(obj, nn.Module):
-                if hasattr(obj, "_modules") and name in obj._modules:
-                    return True
-                return name in getattr(obj, "__dict__", {})
-            return name in getattr(obj, "__dict__", {})
-
-        embeddings = None
-        if _module_has(model, "embeddings"):
-            embeddings = model.embeddings
-        elif _module_has(model, "bert") and _module_has(model.bert, "embeddings"):
-            embeddings = model.bert.embeddings
-        elif _module_has(model, "roberta") and _module_has(model.roberta, "embeddings"):
-            embeddings = model.roberta.embeddings
-        elif _module_has(model, "distilbert") and _module_has(
-            model.distilbert, "embeddings"
-        ):
-            embeddings = model.distilbert.embeddings
+        embeddings = _resolve_embeddings_module(model)
 
         has_word_embeddings = bool(embeddings) and _module_has(
             embeddings, "word_embeddings"

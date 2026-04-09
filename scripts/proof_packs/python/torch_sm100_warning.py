@@ -6,7 +6,7 @@ import sys
 def main() -> int:
     try:
         import torch
-    except Exception as exc:
+    except (ImportError, ModuleNotFoundError, OSError, RuntimeError) as exc:
         print(f"WARNING: failed to import torch: {exc}", file=sys.stderr)
         return 0
 

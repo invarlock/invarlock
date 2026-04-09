@@ -20,7 +20,7 @@ def test_explain_gates_dataset_split_line(monkeypatch, tmp_path):
 
     from invarlock.cli.commands import explain_gates as mod
 
-    def _fake_cert(_report, _baseline):  # type: ignore[no-untyped-def]
+    def _fake_cert(_report, _baseline):
         return {
             "validation": {
                 "primary_metric_acceptable": True,

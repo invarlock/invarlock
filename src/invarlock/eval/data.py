@@ -6,7 +6,7 @@ Owns the provider registry and the public eval-data import surface.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from invarlock.core.exceptions import ValidationError as _ValErr
 
@@ -23,7 +23,7 @@ from .data_windows import EvaluationWindow, compute_window_hash
 from .providers.seq2seq import Seq2SeqProvider
 from .providers.vision_text import VisionTextProvider
 
-_PROVIDERS: dict[str, type[object]] = {
+_PROVIDERS: dict[str, type[DatasetProvider]] = {
     "wikitext2": WikiText2Provider,
     "synthetic": SyntheticProvider,
     "hf_text": HFTextProvider,
@@ -47,7 +47,7 @@ def get_provider(name: str, **kwargs: Any) -> DatasetProvider:
     provider_class = _PROVIDERS[name]
     init_kwargs = dict(kwargs)
     init_kwargs.pop("emit", None)
-    return provider_class(**init_kwargs)  # type: ignore[call-arg,return-value]
+    return cast(DatasetProvider, provider_class(**init_kwargs))
 
 
 def list_providers() -> list[str]:

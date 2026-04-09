@@ -369,6 +369,59 @@ class TestFilteredLoadingInfo:
         assert len(DummyLoader.calls) == 1
         assert DummyLoader.calls[0]["local_files_only"] is True
 
+
+class TestSnapshotHelpers:
+    """Tests for snapshot and config helper fallback paths."""
+
+    def test_extract_weight_tying_info_falls_back_for_legacy_named_parameters(self):
+        mixin = SimpleMixin()
+
+        class LegacyNamedParametersModel(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.transformer = nn.Module()
+                self.transformer.wte = nn.Embedding(4, 4)
+                self.lm_head = nn.Linear(4, 4, bias=False)
+                self.lm_head.weight = self.transformer.wte.weight
+
+            def named_parameters(
+                self, prefix: str = "", recurse: bool = True, **kwargs
+            ):
+                if "remove_duplicate" in kwargs:
+                    raise TypeError("legacy torch signature")
+                return super().named_parameters(prefix=prefix, recurse=recurse)
+
+        model = LegacyNamedParametersModel()
+
+        assert mixin._extract_weight_tying_info(model) == {
+            "lm_head.weight": "transformer.wte.weight"
+        }
+
+    def test_serialize_config_falls_back_to_public_attrs_when_to_dict_fails(self):
+        mixin = SimpleMixin()
+
+        class BrokenConfig:
+            alpha = 1
+            labels = ["a", "b"]
+            _private = "hidden"
+
+            def to_dict(self) -> dict[str, object]:
+                raise RuntimeError("config boom")
+
+        assert mixin._serialize_config(BrokenConfig()) == {
+            "alpha": 1,
+            "labels": ["a", "b"],
+        }
+
+    def test_save_pretrained_returns_false_on_oserror(self, tmp_path):
+        mixin = SimpleMixin()
+
+        class BrokenModel(nn.Module):
+            def save_pretrained(self, _path: str) -> None:
+                raise OSError("disk full")
+
+        assert mixin.save_pretrained(BrokenModel(), tmp_path / "broken-save") is False
+
     def test_falls_back_online_when_local_cache_missing(self):
         mixin = SimpleMixin()
 
@@ -388,6 +441,36 @@ class TestFilteredLoadingInfo:
         model = mixin._load_pretrained_model(
             DummyLoader,
             "gpt2",
+            prefer_local_files_only=True,
+        )
+
+        assert isinstance(model, DummyModel)
+        assert len(DummyLoader.calls) == 2
+        assert DummyLoader.calls[0]["local_files_only"] is True
+        assert "local_files_only" not in DummyLoader.calls[1]
+
+    def test_falls_back_online_when_hf_reports_missing_weights_filename(self):
+        mixin = SimpleMixin()
+
+        class DummyModel:
+            pass
+
+        class DummyLoader:
+            calls: list[dict[str, object]] = []
+
+            @classmethod
+            def from_pretrained(cls, model_id: str, **kwargs: object):
+                cls.calls.append({"model_id": model_id, **kwargs})
+                if kwargs.get("local_files_only") is True:
+                    raise OSError(
+                        f"{model_id} does not appear to have a file named "
+                        "pytorch_model.bin or model.safetensors."
+                    )
+                return DummyModel()
+
+        model = mixin._load_pretrained_model(
+            DummyLoader,
+            "Qwen/Qwen2.5-14B",
             prefer_local_files_only=True,
         )
 

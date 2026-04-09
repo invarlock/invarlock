@@ -15,6 +15,7 @@ from invarlock.guards.policies import (
     get_variance_policy,
     get_variance_policy_for_model_size,
 )
+from invarlock.guards.rmt_policy import apply_rmt_policy_overrides
 
 
 def test_get_variance_policy_overlay_and_fallback(monkeypatch: pytest.MonkeyPatch):
@@ -271,6 +272,61 @@ def test_rmt_policy_and_errors():
     assert policy["q"] == 0.5
     assert policy["deadband"] == 0.25
     assert policy["margin"] == 1.6
+
+
+def test_apply_rmt_policy_overrides_handles_invalid_and_partial_activation_config() -> (
+    None
+):
+    class _Guard:
+        def __init__(self) -> None:
+            self.q = 0.5
+            self.deadband = 0.1
+            self.margin = 1.5
+            self.correct = True
+            self.epsilon_default = 0.08
+            self.epsilon_by_family = {"attn": 0.08}
+            self._require_activation = False
+            self.estimator = {"type": "power_iter", "iters": 3, "init": "ones"}
+            self.activation_sampling = {
+                "windows": {"count": 4, "indices_policy": "evenly_spaced"}
+            }
+
+        def _set_epsilon_by_family(self, value) -> None:  # noqa: ANN001
+            if isinstance(value, dict):
+                self.epsilon_by_family.update(value)
+
+        def _set_epsilon_default(self, value) -> None:  # noqa: ANN001
+            self.epsilon_default = float(value)
+
+    guard = _Guard()
+
+    apply_rmt_policy_overrides(
+        guard,
+        {
+            "q": object(),
+            "estimator": {"iters": -2, "init": "bad"},
+            "activation": {
+                "sampling": {"windows": {"count": "bad", "indices_policy": "last"}}
+            },
+            "activation_required": True,
+        },
+    )
+
+    assert guard.q == "auto"
+    assert guard.estimator == {"type": "power_iter", "iters": 1, "init": "ones"}
+    assert guard.activation_sampling["windows"] == {
+        "count": 4,
+        "indices_policy": "last",
+    }
+    assert guard._require_activation is True
+
+    apply_rmt_policy_overrides(guard, {"activation": {"sampling": []}})
+    apply_rmt_policy_overrides(guard, {"activation": {"sampling": {"windows": []}}})
+
+    assert guard.activation_sampling["windows"] == {
+        "count": 4,
+        "indices_policy": "last",
+    }
 
 
 def test_get_rmt_policy_overlay_and_fallback(monkeypatch: pytest.MonkeyPatch):

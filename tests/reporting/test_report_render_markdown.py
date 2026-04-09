@@ -49,10 +49,9 @@ def test_render_report_markdown_is_presentation_only() -> None:
 
 def test_validate_evaluation_report_rejects_unknown_validation_keys() -> None:
     cert = _mk_cert()
-    # Add an unexpected key; JSONSchema validation should fail and fallback minimal check should still accept structure
-    cert["validation"]["unexpected_key_for_test"] = True  # type: ignore[index]
-    # validate_report uses JSONSchema first; since schema disallows unknown keys in validation, it will fall back
-    assert validate_report(cert) is True
+    # Unknown validation keys are rejected by the strict allow-list contract.
+    cert["validation"]["unexpected_key_for_test"] = True
+    assert validate_report(cert) is False
 
 
 def test_render_report_markdown_tolerates_missing_generated_at() -> None:

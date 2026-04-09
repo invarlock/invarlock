@@ -148,10 +148,17 @@ def transition_progress_step(
     progress_steps[to_key] = now
 
 
-def render_run_execution_event(console: Any, event: RunExecutionEvent) -> None:
-    def _emit_status_line(tag: str, message: str, *, emoji: str | None = None) -> None:
-        _event(console, tag, message, emoji=emoji)
+def _emit_status_line(
+    console: Any,
+    tag: str,
+    message: str,
+    *,
+    emoji: str | None = None,
+) -> None:
+    _event(console, tag, message, emoji=emoji)
 
+
+def _render_setup_event(console: Any, event: RunExecutionEvent) -> bool:
     if isinstance(event, RunDeviceResolvedEvent):
         resolution_note = _device_resolution_note(
             event.requested_device,
@@ -165,8 +172,7 @@ def render_run_execution_event(console: Any, event: RunExecutionEvent) -> None:
             ),
             markup=False,
         )
-        return
-
+        return True
     if isinstance(event, RunOutputDirectoryReadyEvent):
         emit_console_line(
             console, _format_kv_line("Output", event.run_dir), markup=False
@@ -174,95 +180,95 @@ def render_run_execution_event(console: Any, event: RunExecutionEvent) -> None:
         emit_console_line(
             console, _format_kv_line("Run ID", event.run_id), markup=False
         )
-        return
-
+        return True
     if isinstance(event, RunEditSelectedEvent):
         emit_console_line(
             console, _format_kv_line("Edit", event.edit_name), markup=False
         )
-        return
-
+        return True
     if isinstance(event, RunGuardChainResolvedEvent):
         emit_console_line(
             console,
             _format_kv_line("Guards", " → ".join(event.guard_names)),
             markup=False,
         )
-        return
+        return True
+    return False
 
-    if isinstance(event, RunDiagnosticEvent):
-        code = event.code or ""
-        context = event.context
-        if code == "guard_missing":
-            _event(
-                console,
-                "WARN",
-                f"Guard '{context.get('guard_name', '')}' not found, skipping",
-                emoji="⚠️",
-            )
-            return
-        if code == "export_tokenizer_missing":
-            _event(
-                console,
-                "WARN",
-                "Exported model checkpoint without tokenizer artifacts; local tokenizer reload may fail.",
-                emoji="⚠️",
-            )
-            return
-        if code == "export_adapter_directory_missing":
-            _event(
-                console,
-                "WARN",
-                "Model export requested but adapter did not save a HF directory.",
-                emoji="⚠️",
-            )
-            return
-        if code == "export_failed":
-            _event(
-                console,
-                "WARN",
-                "Model export requested but failed due to an unexpected error.",
-                emoji="⚠️",
-            )
-            return
-        if code == "snapshot_restore_fallback":
-            _event(
-                console,
-                "WARN",
-                "Snapshot restore failed; switching to reload-per-attempt.",
-                emoji="⚠️",
-            )
-            error = context.get("error")
-            if error:
-                _event(console, "WARN", f"↳ {error}")
-            return
-        if code == "retry_validation_telemetry_summary":
-            emit_console_line(console, str(context.get("summary", "")), markup=False)
-            return
-        if code == "metric_diffs_debug":
-            emit_console_line(
-                console,
-                f"[debug] DEBUG_METRIC_DIFFS: {context.get('summary', '')}",
-                markup=False,
-            )
-            return
 
-        if isinstance(event.summary, str) and event.summary:
-            tag = str(event.level or context.get("tag") or "INFO").upper()
-            emoji = context.get("emoji")
-            if not isinstance(emoji, str):
-                emoji = None
-            _event(console, tag, event.summary, emoji=emoji)
-            return
+def _render_diagnostic_event(console: Any, event: RunExecutionEvent) -> bool:
+    if not isinstance(event, RunDiagnosticEvent):
+        return False
+    code = event.code or ""
+    context = event.context
+    diagnostic_messages = {
+        "export_tokenizer_missing": (
+            "WARN",
+            "Exported model checkpoint without tokenizer artifacts; local tokenizer reload may fail.",
+            "⚠️",
+        ),
+        "export_adapter_directory_missing": (
+            "WARN",
+            "Model export requested but adapter did not save a HF directory.",
+            "⚠️",
+        ),
+        "export_failed": (
+            "WARN",
+            "Model export requested but failed due to an unexpected error.",
+            "⚠️",
+        ),
+    }
+    if code == "guard_missing":
+        _event(
+            console,
+            "WARN",
+            f"Guard '{context.get('guard_name', '')}' not found, skipping",
+            emoji="⚠️",
+        )
+        return True
+    if code in diagnostic_messages:
+        tag, message, emoji = diagnostic_messages[code]
+        _event(console, tag, message, emoji=emoji)
+        return True
+    if code == "snapshot_restore_fallback":
+        _event(
+            console,
+            "WARN",
+            "Snapshot restore failed; switching to reload-per-attempt.",
+            emoji="⚠️",
+        )
+        error = context.get("error")
+        if error:
+            _event(console, "WARN", f"↳ {error}")
+        return True
+    if code == "retry_validation_telemetry_summary":
+        emit_console_line(console, str(context.get("summary", "")), markup=False)
+        return True
+    if code == "metric_diffs_debug":
+        emit_console_line(
+            console,
+            f"[debug] DEBUG_METRIC_DIFFS: {context.get('summary', '')}",
+            markup=False,
+        )
+        return True
+    if isinstance(event.summary, str) and event.summary:
+        tag = str(event.level or context.get("tag") or "INFO").upper()
+        emoji = context.get("emoji")
+        if not isinstance(emoji, str):
+            emoji = None
+        _event(console, tag, event.summary, emoji=emoji)
+        return True
+    return False
 
+
+def _render_metric_or_failure_event(console: Any, event: RunExecutionEvent) -> bool:
     if isinstance(event, RunGuardOverheadSummaryEvent):
         _print_guard_overhead_summary(
             console,
             event.guard_overhead_info or {},
             default_threshold=float(event.default_threshold or 0.01),
         )
-        return
-
+        return True
     if isinstance(event, RunRetrySummaryEvent):
         summary = event.summary
         emit_console_blank_line(console)
@@ -272,121 +278,93 @@ def render_run_execution_event(console: Any, event: RunExecutionEvent) -> None:
             f"Retry Summary: {summary.get('total_attempts', 0)} attempts in {float(summary.get('elapsed_time', 0.0) or 0.0):.1f}s",
             emoji="📊",
         )
-        return
-
+        return True
     if isinstance(event, RunPrimaryMetricSummaryEvent):
         _emit_status_line(
+            console,
             "METRIC",
             f"Primary Metric [{event.metric_kind}] — preview: {event.preview:.3f}, final: {event.final:.3f}",
             emoji="📌",
         )
         if event.ratio_vs_baseline is not None:
             _emit_status_line(
+                console,
                 "METRIC",
                 f"Ratio vs baseline [{event.metric_kind}]: {event.ratio_vs_baseline:.3f}",
                 emoji="🔗",
             )
-        return
+        return True
+    if not isinstance(event, RunFailureEvent):
+        return False
+    failure = event.failure
+    code = failure.code
+    context = failure.context
+    if code == "torch_missing":
+        _emit_status_line(
+            console,
+            "FAIL",
+            'Torch is required for this command. Install extras with: pip install "invarlock[hf]" or "invarlock[adapters]".',
+            emoji="❌",
+        )
+        return True
+    if code == "edit_name_missing":
+        _emit_status_line(
+            console,
+            "FAIL",
+            "Edit configuration must specify a non-empty `edit.name`.",
+            emoji="❌",
+        )
+        return True
+    if code == "unknown_edit":
+        _emit_status_line(
+            console,
+            "FAIL",
+            f"Unknown edit '{context.get('edit_name', '')}'.",
+            emoji="❌",
+        )
+        return True
+    if code == "baseline_windows_missing":
+        _emit_status_line(console, "FAIL", str(failure.summary or ""), emoji="❌")
+        return True
+    if code == "guard_overhead_budget_exceeded":
+        threshold_fraction = float(context.get("threshold_fraction", 0.01) or 0.01)
+        _emit_status_line(
+            console,
+            "FAIL",
+            "Guard overhead gate exceeded the configured budget "
+            f"(>{threshold_fraction * 100:.1f}% increase)",
+            emoji="❌",
+        )
+        return True
+    if code == "config_file_missing":
+        _emit_status_line(
+            console,
+            "FAIL",
+            f"Configuration file not found: {context.get('path', '')}",
+            emoji="❌",
+        )
+        return True
+    if code == "schema_invalid_run_report":
+        _emit_status_line(
+            console,
+            "FAIL",
+            "Schema invalid: run report structure failed validation",
+            emoji="❌",
+        )
+        return True
+    if code == "pipeline_failed":
+        _emit_status_line(
+            console,
+            "FAIL",
+            f"Pipeline execution failed: {failure.summary or ''}",
+            emoji="❌",
+        )
+        return True
+    _emit_status_line(console, "FAIL", str(failure.summary or code), emoji="❌")
+    return True
 
-    if isinstance(event, RunFailureEvent):
-        failure = event.failure
-        code = failure.code
-        context = failure.context
-        if code == "torch_missing":
-            _emit_status_line(
-                "FAIL",
-                'Torch is required for this command. Install extras with: pip install "invarlock[hf]" or "invarlock[adapters]".',
-                emoji="❌",
-            )
-            return
-        if code == "edit_name_missing":
-            _emit_status_line(
-                "FAIL",
-                "Edit configuration must specify a non-empty `edit.name`.",
-                emoji="❌",
-            )
-            return
-        if code == "unknown_edit":
-            _emit_status_line(
-                "FAIL",
-                f"Unknown edit '{context.get('edit_name', '')}'.",
-                emoji="❌",
-            )
-            return
-        if code == "baseline_windows_missing":
-            _emit_status_line("FAIL", str(failure.summary or ""), emoji="❌")
-            return
-        if code == "guard_overhead_budget_exceeded":
-            threshold_fraction = float(context.get("threshold_fraction", 0.01) or 0.01)
-            _emit_status_line(
-                "FAIL",
-                "Guard overhead gate exceeded the configured budget "
-                f"(>{threshold_fraction * 100:.1f}% increase)",
-                emoji="❌",
-            )
-            return
-        if code == "config_file_missing":
-            _emit_status_line(
-                "FAIL",
-                f"Configuration file not found: {context.get('path', '')}",
-                emoji="❌",
-            )
-            return
-        if code == "schema_invalid_run_report":
-            _emit_status_line(
-                "FAIL",
-                "Schema invalid: run report structure failed validation",
-                emoji="❌",
-            )
-            return
-        if code == "pipeline_failed":
-            _emit_status_line(
-                "FAIL",
-                f"Pipeline execution failed: {failure.summary or ''}",
-                emoji="❌",
-            )
-            return
-        _emit_status_line("FAIL", str(failure.summary or code), emoji="❌")
-        return
 
-    if isinstance(event, RunDeterministicSeedsEvent):
-        torch_display = event.torch_seed if event.torch_seed is not None else "N/A"
-        _emit_status_line(
-            "INIT",
-            "Deterministic seeds → "
-            f"python={event.python_seed}, numpy={event.numpy_seed}, torch={torch_display}",
-            emoji="🎲",
-        )
-        return
-    if isinstance(event, RunBaselineScheduleLoadedEvent):
-        _emit_status_line(
-            "DATA",
-            "Loaded baseline evaluation schedule for pairing",
-            emoji="🧬",
-        )
-        return
-    if isinstance(event, RunPipelineStartedEvent):
-        _emit_status_line("INIT", "Starting InvarLock pipeline...", emoji="🚀")
-        return
-    if isinstance(event, RunConfigLoadingEvent):
-        _emit_status_line(
-            "INIT",
-            f"Loading configuration: {event.config_path}",
-            emoji="📋",
-        )
-        return
-    if isinstance(event, RunConfigLoadedEvent):
-        return
-    if isinstance(event, RunAdapterSelectedEvent):
-        _emit_status_line("DATA", f"Adapter: {event.adapter_name}", emoji="🔌")
-        return
-    if isinstance(event, RunDatasetLoadingEvent):
-        _emit_status_line(
-            "DATA",
-            f"Loading dataset: {event.provider}",
-            emoji="📊",
-        )
-        return
+def _render_progress_or_debug_event(console: Any, event: RunExecutionEvent) -> bool:
     if isinstance(event, RunCalibrationBatchSizesDebugEvent):
         emit_console_line(
             console,
@@ -394,21 +372,110 @@ def render_run_execution_event(console: Any, event: RunExecutionEvent) -> None:
             f"{event.preview_count} final={event.final_count} total={event.total_count}",
             markup=False,
         )
-        return
+        return True
     if isinstance(event, RunMaskedTokensDebugEvent):
         emit_console_line(
             console,
             f"[debug] masked tokens (preview/final) = {event.preview_masked}/{event.final_masked}",
             markup=False,
         )
-        return
+        return True
     if isinstance(event, RunPreviewLabelsDebugEvent):
         emit_console_line(
             console,
             f"[debug] sample labels first preview entry (first 10) = {list(event.labels)}",
             markup=False,
         )
-        return
+        return True
+    lifecycle_messages = {
+        RunDeterministicSeedsEvent: (
+            "INIT",
+            lambda e: "Deterministic seeds → "
+            f"python={e.python_seed}, numpy={e.numpy_seed}, torch={e.torch_seed if e.torch_seed is not None else 'N/A'}",
+            "🎲",
+        ),
+        RunBaselineScheduleLoadedEvent: (
+            "DATA",
+            lambda _e: "Loaded baseline evaluation schedule for pairing",
+            "🧬",
+        ),
+        RunPipelineStartedEvent: (
+            "INIT",
+            lambda _e: "Starting InvarLock pipeline...",
+            "🚀",
+        ),
+        RunConfigLoadingEvent: (
+            "INIT",
+            lambda e: f"Loading configuration: {e.config_path}",
+            "📋",
+        ),
+        RunAdapterSelectedEvent: (
+            "DATA",
+            lambda e: f"Adapter: {e.adapter_name}",
+            "🔌",
+        ),
+        RunDatasetLoadingEvent: (
+            "DATA",
+            lambda e: f"Loading dataset: {e.provider}",
+            "📊",
+        ),
+        RunTelemetrySavedEvent: (
+            "DATA",
+            lambda e: f"Telemetry: {e.path}",
+            "📈",
+        ),
+        RunTelemetryFailedEvent: (
+            "WARN",
+            lambda e: f"Telemetry export failed: {e.error}",
+            "⚠️",
+        ),
+        RunEvaluationReportStartedEvent: (
+            "EXEC",
+            lambda _e: "Generating evaluation report...",
+            "📜",
+        ),
+        RunEvaluationReportPassedEvent: (
+            "PASS",
+            lambda _e: "Evaluation report PASSED all gates!",
+            "✅",
+        ),
+        RunEvaluationReportFailedEvent: (
+            "FAIL",
+            lambda e: "Evaluation report FAILED gates: " + ", ".join(e.gate_codes),
+            "⚠️",
+        ),
+        RunAutoTuneAdjustmentEvent: (
+            "INIT",
+            lambda e: "Auto-tune adjust: global_k → "
+            f"{e.global_k} (bounds {e.keep_low}-{e.keep_high})",
+            "🔧",
+        ),
+        RunRetryExhaustedEvent: (
+            "FAIL",
+            lambda e: f"Exhausted retry budget after {e.attempt} attempts",
+            "❌",
+        ),
+        RunRetryValidationErrorEvent: (
+            "WARN",
+            lambda e: f"Evaluation report validation failed: {e.summary}",
+            "⚠️",
+        ),
+        RunCleanupStatusEvent: (
+            "INFO",
+            lambda e: f"Cleanup: {'removed' if e.removed else 'skipped'}",
+            "🧹",
+        ),
+    }
+    for event_type, (tag, message_fn, emoji) in lifecycle_messages.items():
+        if isinstance(event, event_type):
+            _emit_status_line(console, tag, message_fn(event), emoji=emoji)
+            return True
+    return False
+
+
+def _render_execution_progress_event(console: Any, event: RunExecutionEvent) -> bool:
+    if isinstance(event, RunConfigLoadedEvent):
+        return True
     if isinstance(event, RunExecutePipelineEvent):
         transition_progress_step(
             console,
@@ -419,84 +486,52 @@ def render_run_execution_event(console: Any, event: RunExecutionEvent) -> None:
             from_emoji="🔧",
         )
         _emit_status_line(
+            console,
             "EXEC",
             f"Executing pipeline with {event.guard_count} guards...",
             emoji="⚙️",
         )
-        return
+        return True
     if isinstance(event, RunLoadModelOnceEvent):
         begin_progress_step(console, "load_model")
         _emit_status_line(
+            console,
             "INIT",
             f"Loading model once: {event.model_id}",
             emoji="🔧",
         )
-        return
+        return True
     if isinstance(event, RunSnapshotModeEvent):
         state = "enabled" if event.enabled else "disabled"
-        _emit_status_line("INIT", f"Snapshot mode: {state}", emoji="💾")
-        return
+        _emit_status_line(console, "INIT", f"Snapshot mode: {state}", emoji="💾")
+        return True
     if isinstance(event, RunAttemptStartedEvent):
         message = (
             f"Attempt {event.attempt}/{event.max_attempts}"
             if event.max_attempts is not None
             else f"Attempt {event.attempt}"
         )
-        _emit_status_line("EXEC", message, emoji="🚀")
-        return
+        _emit_status_line(console, "EXEC", message, emoji="🚀")
+        return True
     if isinstance(event, RunRetryAttemptStartedEvent):
         _emit_status_line(
+            console,
             "EXEC",
             f"Retry attempt {event.attempt}/{event.max_attempts}",
             emoji="🔄",
         )
+        return True
+    return False
+
+
+def render_run_execution_event(console: Any, event: RunExecutionEvent) -> None:
+    if _render_setup_event(console, event):
         return
-    if isinstance(event, RunTelemetrySavedEvent):
-        _emit_status_line("DATA", f"Telemetry: {event.path}", emoji="📈")
+    if _render_diagnostic_event(console, event):
         return
-    if isinstance(event, RunTelemetryFailedEvent):
-        _emit_status_line(
-            "WARN",
-            f"Telemetry export failed: {event.error}",
-            emoji="⚠️",
-        )
+    if _render_metric_or_failure_event(console, event):
         return
-    if isinstance(event, RunEvaluationReportStartedEvent):
-        _emit_status_line("EXEC", "Generating evaluation report...", emoji="📜")
+    if _render_progress_or_debug_event(console, event):
         return
-    if isinstance(event, RunEvaluationReportPassedEvent):
-        _emit_status_line("PASS", "Evaluation report PASSED all gates!", emoji="✅")
-        return
-    if isinstance(event, RunEvaluationReportFailedEvent):
-        _emit_status_line(
-            "FAIL",
-            "Evaluation report FAILED gates: " + ", ".join(event.gate_codes),
-            emoji="⚠️",
-        )
-        return
-    if isinstance(event, RunAutoTuneAdjustmentEvent):
-        _emit_status_line(
-            "INIT",
-            "Auto-tune adjust: global_k → "
-            f"{event.global_k} (bounds {event.keep_low}-{event.keep_high})",
-            emoji="🔧",
-        )
-        return
-    if isinstance(event, RunRetryExhaustedEvent):
-        _emit_status_line(
-            "FAIL",
-            f"Exhausted retry budget after {event.attempt} attempts",
-            emoji="❌",
-        )
-        return
-    if isinstance(event, RunRetryValidationErrorEvent):
-        _emit_status_line(
-            "WARN",
-            f"Evaluation report validation failed: {event.summary}",
-            emoji="⚠️",
-        )
-        return
-    if isinstance(event, RunCleanupStatusEvent):
-        status = "removed" if event.removed else "skipped"
-        _emit_status_line("INFO", f"Cleanup: {status}", emoji="🧹")
+    if _render_execution_progress_event(console, event):
         return

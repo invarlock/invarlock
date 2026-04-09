@@ -17,6 +17,9 @@ _TRUE = {"1", "true", "yes", "on"}
 _FALSE = {"0", "false", "no", "off"}
 _TORCH_UNSET = object()
 _torch_module: Any = _TORCH_UNSET
+_MISTRAL3_ARCH = "Mistral3ForConditionalGeneration"
+_COERCE_ERRORS = (TypeError, ValueError, OverflowError)
+_CUDA_CAPABILITY_ERRORS = (AttributeError, RuntimeError, OSError)
 
 _AUTO_LOADER_SPECS: dict[str, tuple[str, str]] = {
     "causal": ("transformers", "AutoModelForCausalLM"),
@@ -29,11 +32,19 @@ _AUTO_LOADER_SPECS: dict[str, tuple[str, str]] = {
 _DIRECT_SUBMODULE_SPECS: dict[str, dict[str, tuple[str, str]]] = {
     "causal": {
         "gpt2": ("transformers.models.gpt2.modeling_gpt2", "GPT2LMHeadModel"),
+        "gpt_oss": (
+            "transformers.models.gpt_oss.modeling_gpt_oss",
+            "GptOssForCausalLM",
+        ),
         "opt": ("transformers.models.opt.modeling_opt", "OPTForCausalLM"),
         "llama": ("transformers.models.llama.modeling_llama", "LlamaForCausalLM"),
         "mistral": (
             "transformers.models.mistral.modeling_mistral",
             "MistralForCausalLM",
+        ),
+        "mistral3": (
+            "transformers.models.mistral3.modeling_mistral3",
+            _MISTRAL3_ARCH,
         ),
         "mixtral": (
             "transformers.models.mixtral.modeling_mixtral",
@@ -109,8 +120,55 @@ _DIRECT_SUBMODULE_SPECS: dict[str, dict[str, tuple[str, str]]] = {
             "transformers.models.gemma4.modeling_gemma4",
             "Gemma4ForConditionalGeneration",
         ),
+        "mistral3": (
+            "transformers.models.mistral3.modeling_mistral3",
+            _MISTRAL3_ARCH,
+        ),
     },
 }
+
+_MODEL_ID_TYPE_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("mistral3", ("ministral-3", "ministral3", "mistral3")),
+    ("qwen3_moe", ("qwen3_moe", "qwen3-moe")),
+    ("qwen3", ("qwen3",)),
+    (
+        "qwen2",
+        ("qwen2.5", "qwen2-5", "qwen2_5", "qwen1.5", "qwen1-5", "qwen1_5", "qwen2"),
+    ),
+    ("gemma4", ("gemma-4", "gemma4")),
+    ("gemma3", ("gemma-3", "gemma3")),
+    (
+        "deberta-v2",
+        (
+            "deberta-v2",
+            "deberta_v2",
+            "debertav2",
+            "deberta-v3",
+            "deberta_v3",
+            "debertav3",
+        ),
+    ),
+    ("deberta", ("deberta",)),
+    ("distilbert", ("distilbert",)),
+    ("roberta", ("roberta",)),
+    ("electra", ("electra",)),
+    ("albert", ("albert",)),
+    ("bert", ("bert",)),
+    ("mbart", ("mbart",)),
+    ("bart", ("bart",)),
+    ("marian", ("marian", "opus-mt")),
+    ("t5", ("t5",)),
+    ("mixtral", ("mixtral",)),
+    ("mistral", ("mistral",)),
+    ("llama", ("llama",)),
+    ("olmo2", ("olmo-2", "olmo2")),
+    ("gpt_neox", ("gpt-neox", "gpt_neox")),
+    ("gpt_oss", ("gpt-oss", "gpt_oss")),
+    ("opt", ("facebook/opt", "/opt-", " opt-", "opt-")),
+    ("phi3", ("phi-3", "phi3")),
+    ("phi", ("phi-",)),
+    ("gpt2", ("gpt2",)),
+)
 
 
 @dataclass(frozen=True)
@@ -188,7 +246,7 @@ def default_dtype() -> Any:
                 and torch.cuda.is_bf16_supported()
             ):
                 return torch.bfloat16
-        except Exception:
+        except _CUDA_CAPABILITY_ERRORS:
             pass
         return torch.float16
 
@@ -227,7 +285,7 @@ def resolve_dtype(kwargs: dict[str, Any] | None = None) -> Any:
 def _normalize_model_type(value: Any) -> str | None:
     try:
         normalized = str(value or "").strip().lower()
-    except Exception:
+    except _COERCE_ERRORS:
         return None
     return normalized or None
 
@@ -244,6 +302,17 @@ def _read_local_config(model_id: str) -> dict[str, Any] | None:
     except (OSError, ValueError, TypeError):
         return None
     return raw if isinstance(raw, dict) else None
+
+
+def _infer_model_type_from_model_id(model_id: str) -> str | None:
+    model_lower = _normalize_model_type(model_id)
+    if model_lower is None:
+        return None
+    padded = f" {model_lower} "
+    for model_type, hints in _MODEL_ID_TYPE_HINTS:
+        if any(hint in model_lower or hint in padded for hint in hints):
+            return model_type
+    return None
 
 
 def _import_symbol(module_path: str, symbol_name: str) -> Any:
@@ -297,6 +366,8 @@ def resolve_core_loader_strategy(
     config_data = _read_local_config(model_id)
     if isinstance(config_data, dict):
         model_type = _normalize_model_type(config_data.get("model_type"))
+    if model_type is None:
+        model_type = _infer_model_type_from_model_id(model_id)
 
     if allow_direct_submodule and not resolve_trust_remote_code(kwargs):
         direct = _resolve_direct_submodule_loader(task, model_type)

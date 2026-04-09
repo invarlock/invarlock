@@ -40,6 +40,25 @@ def _coerce_finite_float_local(value: Any) -> float | None:
     return parsed
 
 
+def _primary_metric_policy_source(
+    report: dict[str, Any] | None,
+    *,
+    meta_key: str,
+) -> Any:
+    ctx = report.get("context") if isinstance(report, dict) else None
+    if isinstance(ctx, dict):
+        pm_ctx = ctx.get("primary_metric")
+        if isinstance(pm_ctx, dict):
+            source = pm_ctx.get(meta_key.removeprefix("pm_"))
+            if source is not None:
+                return source
+
+    meta = report.get("meta") if isinstance(report, dict) else None
+    if isinstance(meta, dict):
+        return meta.get(meta_key)
+    return None
+
+
 def resolve_pm_acceptance_range_from_report(
     report: dict[str, Any] | None,
 ) -> dict[str, float]:
@@ -50,18 +69,13 @@ def resolve_pm_acceptance_range_from_report(
 
     cfg_min = None
     cfg_max = None
-    ctx = report.get("context") if isinstance(report, dict) else None
-    if isinstance(ctx, dict):
-        pm_ctx = (
-            ctx.get("primary_metric")
-            if isinstance(ctx.get("primary_metric"), dict)
-            else {}
-        )
-        if isinstance(pm_ctx, dict):
-            acceptance_range = pm_ctx.get("acceptance_range")
-            if isinstance(acceptance_range, dict):
-                cfg_min = _coerce_finite_float_local(acceptance_range.get("min"))
-                cfg_max = _coerce_finite_float_local(acceptance_range.get("max"))
+    acceptance_range = _primary_metric_policy_source(
+        report,
+        meta_key="pm_acceptance_range",
+    )
+    if isinstance(acceptance_range, dict):
+        cfg_min = _coerce_finite_float_local(acceptance_range.get("min"))
+        cfg_max = _coerce_finite_float_local(acceptance_range.get("max"))
     has_explicit = any(v is not None for v in (cfg_min, cfg_max))
     if not has_explicit:
         return {}
@@ -104,17 +118,13 @@ def resolve_pm_drift_band_from_report(
     cfg_min = None
     cfg_max = None
 
-    ctx = report.get("context") if isinstance(report, dict) else None
-    if isinstance(ctx, dict):
-        pm_ctx = ctx.get("primary_metric")
-        if isinstance(pm_ctx, dict):
-            band = pm_ctx.get("drift_band")
-            if isinstance(band, dict):
-                cfg_min = _coerce_finite_float_local(band.get("min"))
-                cfg_max = _coerce_finite_float_local(band.get("max"))
-            elif isinstance(band, list | tuple) and len(band) == 2:
-                cfg_min = _coerce_finite_float_local(band[0])
-                cfg_max = _coerce_finite_float_local(band[1])
+    band = _primary_metric_policy_source(report, meta_key="pm_drift_band")
+    if isinstance(band, dict):
+        cfg_min = _coerce_finite_float_local(band.get("min"))
+        cfg_max = _coerce_finite_float_local(band.get("max"))
+    elif isinstance(band, list | tuple) and len(band) == 2:
+        cfg_min = _coerce_finite_float_local(band[0])
+        cfg_max = _coerce_finite_float_local(band[1])
     has_explicit = any(v is not None for v in (cfg_min, cfg_max))
     if not has_explicit:
         return {}
@@ -162,5 +172,17 @@ def resolve_tiny_relax_from_report(report: dict[str, Any] | None) -> bool:
             eval_val = coerce_bool_like(eval_ctx.get("tiny_relax"))
             if eval_val is not None:
                 return bool(eval_val)
+
+    auto = report.get("auto")
+    if isinstance(auto, dict):
+        auto_val = coerce_bool_like(auto.get("tiny_relax"))
+        if auto_val is not None:
+            return bool(auto_val)
+
+    provenance = report.get("provenance")
+    if isinstance(provenance, dict):
+        flags = provenance.get("flags")
+        if isinstance(flags, list):
+            return "tiny_relax" in {str(flag).strip().lower() for flag in flags}
 
     return False

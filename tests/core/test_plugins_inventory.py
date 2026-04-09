@@ -59,6 +59,16 @@ def test_is_minimal_plugins_view_and_cuda_detection() -> None:
         is True
     )
     assert detect_cuda_available(object()) is False
+    assert (
+        detect_cuda_available(
+            SimpleNamespace(
+                cuda=SimpleNamespace(
+                    is_available=lambda: (_ for _ in ()).throw(RuntimeError("boom"))
+                )
+            )
+        )
+        is False
+    )
 
 
 def test_gather_adapter_inventory_rows_and_json_payloads() -> None:
@@ -112,6 +122,66 @@ def test_gather_generic_and_combined_inventory_payloads() -> None:
 
     assert any(item["kind"] == "guard" for item in combined)
     assert any(item["origin"] == "third_party" for item in combined)
+
+
+def test_gather_adapter_inventory_rows_tolerates_probe_failures() -> None:
+    registry = _Registry()
+
+    rows = gather_adapter_inventory_rows(
+        registry=registry,
+        minimal=False,
+        has_cuda=True,
+        is_linux=True,
+        extras_checker=lambda _name, _kind: (_ for _ in ()).throw(ValueError("bad")),
+        provenance_extractor=lambda _name: (_ for _ in ()).throw(
+            RuntimeError("missing provenance")
+        ),
+        bitsandbytes_runtime_available=lambda: True,
+    )
+
+    bnb_row = next(row for row in rows if row["name"] == "hf_bnb")
+    assert bnb_row["backend"] == ""
+    assert bnb_row["status"] == "needs_extra"
+    assert bnb_row["enable"] == "pip install 'invarlock[gpu]'"
+
+
+def test_gather_adapter_inventory_rows_handles_empty_missing_hint_and_cuda_runtime_gaps() -> (
+    None
+):
+    class _RegistryWithOptional(_Registry):
+        def __init__(self) -> None:
+            super().__init__()
+            self._adapters["custom_optional"] = {
+                "module": "vendor.optional",
+                "entry_point": "custom",
+            }
+
+    registry = _RegistryWithOptional()
+
+    def _provenance(name: str) -> SimpleNamespace:
+        if name == "hf_bnb":
+            return SimpleNamespace(library="bitsandbytes", version="1.0")
+        return SimpleNamespace(library="vendor-lib", version=None)
+
+    rows = gather_adapter_inventory_rows(
+        registry=registry,
+        minimal=False,
+        has_cuda=True,
+        is_linux=True,
+        extras_checker=lambda name, _kind: "⚠️ missing"
+        if name == "custom_optional"
+        else "",
+        provenance_extractor=_provenance,
+        bitsandbytes_runtime_available=lambda: False,
+    )
+
+    custom_row = next(row for row in rows if row["name"] == "custom_optional")
+    bnb_row = next(row for row in rows if row["name"] == "hf_bnb")
+
+    assert custom_row["status"] == "needs_extra"
+    assert custom_row["enable"] == ""
+    assert bnb_row["status"] == "unsupported"
+    assert bnb_row["enable"] == "bitsandbytes unavailable on this host"
 
 
 def test_dataset_inventory_json_items_preserve_provider_module() -> None:

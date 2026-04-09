@@ -17,6 +17,4 @@ def _count_pattern(pattern: str) -> int:
 
 def test_except_exception_pass_budget_does_not_regress() -> None:
     count = _count_pattern(r"except\s+Exception(?:\s+as\s+\w+)?:\r?\n\s+pass")
-    assert count <= 426, (
-        f"except Exception: pass count regressed to {count} (budget 426)"
-    )
+    assert count <= 426, f"broad-catch pass count regressed to {count} (budget 426)"

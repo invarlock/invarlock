@@ -51,7 +51,7 @@ def test_main_writes_summary_and_invokes_both_surfaces(
 
     calls: list[list[str]] = []
 
-    def _fake_run(cmd, **kwargs):  # type: ignore[no-untyped-def]
+    def _fake_run(cmd, **kwargs):
         calls.append(list(cmd))
         return SimpleNamespace(returncode=0, stdout="ok\n", stderr="")
 

@@ -40,6 +40,16 @@ from ..constants import PLUGINS_FORMAT_VERSION
 from ..security_helpers import runtime_security_scoped
 
 console = Console()
+_PLUGIN_REGISTRY_IMPORT_ERRORS = (AttributeError, ImportError, RuntimeError)
+_PLUGIN_COMMAND_ERRORS = (
+    AttributeError,
+    ImportError,
+    KeyError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 # Group: plugins
 plugins_app = typer.Typer(
@@ -78,8 +88,563 @@ def _load_provider_registry_map() -> dict[str, Any]:
     try:
         data_mod = importlib.import_module("invarlock.eval.data")
         return getattr(data_mod, "_PROVIDERS", {}) or {}
-    except Exception:
+    except _PLUGIN_REGISTRY_IMPORT_ERRORS:
         return {}
+
+
+def _is_minimal_plugins_enabled() -> bool:
+    return is_minimal_plugins_view(os.environ.get("INVARLOCK_MINIMAL"))
+
+
+def _filter_only_rows(
+    rows: list[dict[str, Any]], only: str | None
+) -> list[dict[str, Any]]:
+    return filter_inventory_rows(rows, only)
+
+
+def _fmt_backend(backend: str | None, version: str | None) -> tuple[str, str]:
+    name = backend or "—"
+    if backend and version:
+        return backend, f"=={version}"
+    return name, "—"
+
+
+def _gather_adapter_rows(registry: Any) -> list[dict[str, Any]]:
+    try:
+        import torch as _torch
+
+        torch_mod: Any = _torch
+        has_cuda = detect_cuda_available(torch_mod)
+    except ImportError:
+        has_cuda = False
+    from invarlock.core.adapter_provenance import extract_adapter_provenance
+
+    rows = gather_adapter_inventory_rows(
+        registry=registry,
+        minimal=_is_minimal_plugins_enabled(),
+        has_cuda=has_cuda,
+        is_linux=platform.system().lower() == "linux",
+        extras_checker=_check_plugin_extras,
+        provenance_extractor=extract_adapter_provenance,
+        bitsandbytes_runtime_available=bitsandbytes_runtime_available,
+    )
+    for row in rows:
+        row["capability"] = adapter_capability(str(row.get("name") or ""))
+    return rows
+
+
+def _print_adapters_compact(rows: list[dict[str, Any]]) -> None:
+    need = sum(1 for r in rows if r["status"] == "needs_extra")
+    ready = sum(1 for r in rows if r["status"] == "ready")
+    auto = sum(1 for r in rows if r["support"] == "auto")
+    unsupported = sum(1 for r in rows if r["status"] == "unsupported")
+    title = (
+        "Adapters — ready: "
+        f"{ready} · auto: {auto} · missing-extras: {need} · unsupported: {unsupported}"
+    )
+    table = Table(title=title)
+    table.add_column("Adapter", style="cyan")
+    table.add_column("Origin", style="dim")
+    table.add_column("Mode", style="dim")
+    table.add_column("Backend", style="magenta")
+    table.add_column("Version", style="magenta")
+    table.add_column("Status / Action", style="green")
+    for idx, row in enumerate(rows):
+        backend_disp, version_disp = _fmt_backend(
+            row.get("backend"), row.get("backend_version")
+        )
+        origin_disp = row.get("origin", row.get("support", "")).capitalize()
+        mode_disp = "Auto‑matcher" if row.get("mode") == "auto-matcher" else "Adapter"
+        if row["support"] == "auto" or row["status"] == "ready":
+            status_disp = "Ready"
+        elif row["status"] == "needs_extra":
+            status_disp = f"Needs extra: {row['enable'] or ''}".rstrip(": ")
+        elif row["status"] == "unsupported":
+            status_disp = "Unsupported on this platform"
+        else:
+            status_disp = row["status"]
+        next_support = rows[idx + 1]["support"] if idx + 1 < len(rows) else None
+        end_section = next_support is not None and next_support != row["support"]
+        table.add_row(
+            row["name"],
+            origin_disp,
+            mode_disp,
+            backend_disp,
+            version_disp,
+            _escape(status_disp),
+            end_section=end_section,
+        )
+    console.print(table)
+
+
+def _print_adapters_verbose(rows: list[dict[str, Any]]) -> None:
+    table = Table(title="Adapters (verbose)")
+    table.add_column("Adapter", style="cyan")
+    table.add_column("Origin", style="dim")
+    table.add_column("Mode", style="dim")
+    table.add_column("Backend", style="magenta")
+    table.add_column("Version", style="magenta")
+    table.add_column("Status", style="green")
+    table.add_column("Module", style="dim")
+    table.add_column("Entry Point", style="dim")
+    for row in rows:
+        backend_disp, version_disp = _fmt_backend(
+            row.get("backend"), row.get("backend_version")
+        )
+        entry = row["entry_point"] or ""
+        entry_disp = (
+            entry if entry else ("(auto matcher)" if row["support"] == "auto" else "")
+        )
+        table.add_row(
+            row["name"],
+            (row.get("origin") or row.get("support") or "").capitalize(),
+            ("Auto‑matcher" if row.get("mode") == "auto-matcher" else "Adapter"),
+            backend_disp,
+            version_disp,
+            row["status"].replace("needs_extra", "Needs extra").capitalize(),
+            row["module"],
+            entry_disp,
+        )
+    console.print(table)
+
+
+def _print_adapters_json(rows: list[dict[str, Any]]) -> None:
+    _emit_plugins_json("adapters", adapter_inventory_json_items(rows))
+
+
+def _explain_adapter(name: str, *, rows: list[dict[str, Any]]) -> None:
+    row = next((item for item in rows if item["name"] == name), None)
+    if not row:
+        console.print(f"[red]❌ Unknown adapter: {name}[/red]")
+        raise typer.Exit(1)
+    backend_disp = (
+        f"{row['backend']} {row['backend_version']}"
+        if row["backend"] and row["backend_version"]
+        else (f"{row['backend']} (missing)" if row["backend"] else "-")
+    )
+    console.print(f"[bold]{row['name']}[/bold]")
+    console.print(f"  Support     : {row['support'].capitalize()}")
+    console.print(f"  Backend     : {backend_disp}")
+    if row["support"] == "auto":
+        console.print("  Status      : Ready (auto matcher)")
+    elif row["status"] == "ready":
+        console.print("  Status      : Ready")
+    elif row["status"] == "needs_extra":
+        console.print("  Status      : Needs extra")
+        if row["enable"]:
+            console.print(f"  Enable      : {_escape(row['enable'])}")
+    elif row["status"] == "partial":
+        console.print("  Status      : Partial (GPU-only features disabled)")
+    if row["name"] == "hf_gptq":
+        console.print("  Matches     : AutoGPTQ-quantized HF repos (from_quantized)")
+        console.print(
+            "  Notes       : Linux/CUDA recommended; upstream auto-gptq "
+            "packaging may require a pinned or vendor wheel"
+        )
+    elif row["name"] == "hf_awq":
+        console.print("  Matches     : AWQ-quantized HF repos")
+        console.print("  Notes       : GPU recommended; metadata ingestion on CPU")
+    elif row["name"] == "hf_bnb":
+        console.print("  Matches     : Transformers 4/8-bit loading with bitsandbytes")
+        console.print(
+            "  Notes       : GPU recommended; falls back to metadata only on CPU"
+        )
+    else:
+        console.print("  Matches     : Hugging Face Transformers (core adapters)")
+    console.print(f"  Module      : {row['module']}")
+    entry = row["entry_point"] or ""
+    if entry:
+        console.print(f"  Entry point : {entry}")
+
+
+def _gather_generic_rows(registry: Any, plugin_type: str) -> list[dict[str, Any]]:
+    return gather_generic_inventory_rows(
+        registry=registry,
+        plugin_type=plugin_type,
+        extras_checker=_check_plugin_extras,
+    )
+
+
+def _print_generic_compact(rows: list[dict[str, Any]], title: str) -> None:
+    need = sum(1 for row in rows if row["status"] == "needs_extra")
+    ready = sum(1 for row in rows if row["status"] == "ready")
+    table = Table(title=f"{title} — ready: {ready} · missing-extras: {need}")
+    table.add_column("Name", style="cyan")
+    table.add_column("Origin", style="dim")
+    table.add_column("Mode", style="dim")
+    table.add_column("Backend", style="magenta")
+    table.add_column("Version", style="magenta")
+    table.add_column("Status / Action", style="green")
+    for idx, row in enumerate(rows):
+        backend_disp, version_disp = _fmt_backend(
+            row.get("backend"), row.get("backend_version")
+        )
+        origin_disp = row.get("origin", row.get("support", "")).capitalize()
+        mode_disp = "Guard" if row.get("mode") == "guard" else "Edit"
+        if row["status"] == "ready":
+            status_disp = "Ready"
+        elif row["status"] == "needs_extra":
+            status_disp = f"Needs extra: {row['enable'] or ''}".rstrip(": ")
+        else:
+            status_disp = row["status"]
+        next_support = rows[idx + 1]["support"] if idx + 1 < len(rows) else None
+        end_section = next_support is not None and next_support != row["support"]
+        table.add_row(
+            row["name"],
+            origin_disp,
+            mode_disp,
+            backend_disp,
+            version_disp,
+            _escape(status_disp),
+            end_section=end_section,
+        )
+    console.print(table)
+
+
+def _print_generic_verbose(rows: list[dict[str, Any]], title: str) -> None:
+    table = Table(title=f"{title} (verbose)")
+    table.add_column("Name", style="cyan")
+    table.add_column("Origin", style="dim")
+    table.add_column("Mode", style="dim")
+    table.add_column("Backend", style="magenta")
+    table.add_column("Version", style="magenta")
+    table.add_column("Status", style="green")
+    table.add_column("Module", style="dim")
+    table.add_column("Entry Point", style="dim")
+    for idx, row in enumerate(rows):
+        entry = row["entry_point"] or ""
+        next_support = rows[idx + 1]["support"] if idx + 1 < len(rows) else None
+        end_section = next_support is not None and next_support != row["support"]
+        backend_disp, version_disp = _fmt_backend(
+            row.get("backend"), row.get("backend_version")
+        )
+        table.add_row(
+            row["name"],
+            (row.get("origin") or row.get("support") or "").capitalize(),
+            ("Guard" if row.get("mode") == "guard" else "Edit"),
+            backend_disp,
+            version_disp,
+            row["status"].replace("needs_extra", "Needs extra").capitalize(),
+            row["module"],
+            entry,
+            end_section=end_section,
+        )
+    console.print(table)
+
+
+def _print_generic_json(rows: list[dict[str, Any]], kind: str) -> None:
+    _emit_plugins_json(kind, generic_inventory_json_items(rows, kind=kind))
+
+
+def _render_dataset_table(
+    title: str, providers: list[str], *, verbose: bool = False
+) -> None:
+    from invarlock.cli.constants import PROVIDER_KIND as provider_kind
+    from invarlock.cli.constants import PROVIDER_NETWORK as provider_network
+    from invarlock.cli.constants import PROVIDER_PARAMS as provider_params
+
+    providers_map = _load_provider_registry_map()
+
+    def _net_label(name: str) -> str:
+        val = (provider_network.get(name, "") or "").lower()
+        if val == "cache":
+            return "Cache/Net"
+        if val == "yes":
+            return "Yes"
+        if val == "no":
+            return "No"
+        return "Unknown"
+
+    rows: list[dict[str, str]] = []
+    for provider_name in providers:
+        rows.append(
+            {
+                "name": provider_name,
+                "network": _net_label(provider_name),
+                "kind": provider_kind.get(provider_name, "-"),
+                "module": getattr(
+                    providers_map.get(provider_name, None), "__module__", "unknown"
+                ),
+            }
+        )
+    net_order = {"No": 0, "Cache/Net": 1, "Yes": 2, "Unknown": 3}
+    rows.sort(key=lambda row: (net_order.get(row["network"], 9), row["name"]))
+
+    cnt_no = sum(1 for row in rows if row["network"] == "No")
+    cnt_cache = sum(1 for row in rows if row["network"] == "Cache/Net")
+    cnt_yes = sum(1 for row in rows if row["network"] == "Yes")
+    table = Table(
+        title=(
+            f"{title} — offline: {cnt_no} · cache/net: {cnt_cache} · network: {cnt_yes}"
+        )
+    )
+    table.add_column("Provider", style="cyan")
+    table.add_column("Network", style="dim")
+    table.add_column("Kind", style="dim")
+    table.add_column("Params", style="dim")
+    if verbose:
+        table.add_column("Module", style="dim")
+    table.add_column("Status / Action", style="green")
+
+    for idx, row in enumerate(rows):
+        end_section = idx + 1 < len(rows) and rows[idx + 1]["network"] != row["network"]
+        cols = [
+            row["name"],
+            row["network"],
+            row.get("kind", "-"),
+            provider_params.get(row["name"], "-"),
+        ]
+        if verbose:
+            cols.append(row["module"])
+        cols.append("✓ Available")
+        table.add_row(*cols, end_section=end_section)
+
+    console.print(table)
+
+
+def _explain_generic(
+    name: str,
+    plugin_type: str,
+    *,
+    rows: list[dict[str, Any]],
+) -> None:
+    row = next((item for item in rows if item["name"] == name), None)
+    if not row:
+        console.print(f"[red]❌ Unknown {plugin_type[:-1]}: {name}[/red]")
+        raise typer.Exit(1)
+    console.print(f"[bold]{row['name']}[/bold]")
+    console.print(f"  Support     : {row['support'].capitalize()}")
+    backend_label = row.get("backend") or "—"
+    console.print(f"  Backend     : {backend_label}")
+    if row["status"] == "ready":
+        console.print("  Status      : Ready")
+    elif row["status"] == "needs_extra":
+        console.print("  Status      : Needs extra")
+        if row["enable"]:
+            console.print(f"  Enable      : {_escape(row['enable'])}")
+    console.print(f"  Module      : {row['module']}")
+    entry = row["entry_point"] or ""
+    if entry:
+        console.print(f"  Entry point : {entry}")
+
+
+def _show_plugin_category(
+    title: str,
+    plugin_list: list[str],
+    plugin_type: str,
+    *,
+    registry: Any,
+    only: str | None,
+    verbose: bool,
+    json_out: bool,
+    explain: str | None,
+    hide_unsupported: bool,
+) -> None:
+    if not plugin_list and plugin_type != "adapters":
+        console.print(f"[yellow]No {title.lower()} plugins found[/yellow]")
+        return
+
+    if plugin_type == "adapters":
+        all_rows = _gather_adapter_rows(registry)
+        if explain:
+            _explain_adapter(explain, rows=all_rows)
+            return
+        rows = _filter_only_rows(all_rows, only)
+        if hide_unsupported:
+            rows = [row for row in rows if row.get("status") != "unsupported"]
+        if json_out:
+            _print_adapters_json(rows)
+        elif verbose:
+            _print_adapters_verbose(rows)
+        else:
+            _print_adapters_compact(rows)
+        return
+
+    if plugin_type in {"guards", "edits"}:
+        rows = _gather_generic_rows(registry, plugin_type)
+        if explain:
+            _explain_generic(explain, plugin_type, rows=rows)
+            return
+        rows = _filter_only_rows(rows, only)
+        if json_out:
+            _print_generic_json(rows, plugin_type)
+        elif verbose:
+            _print_generic_verbose(rows, title)
+        else:
+            _print_generic_compact(rows, title)
+        return
+
+    _render_dataset_table(title, plugin_list, verbose=verbose)
+
+
+def _handle_plugins_category(
+    *,
+    category: str | None,
+    registry: Any,
+    list_providers_fn: Any,
+    only: str | None,
+    verbose: bool,
+    json_out: bool,
+    explain: str | None,
+    hide_unsupported: bool,
+) -> None:
+    if category == "guards":
+        _show_plugin_category(
+            "Guard Plugins",
+            registry.list_guards(),
+            "guards",
+            registry=registry,
+            only=only,
+            verbose=verbose,
+            json_out=json_out,
+            explain=explain,
+            hide_unsupported=hide_unsupported,
+        )
+        return
+    if category == "edits":
+        _show_plugin_category(
+            "Edit Plugins",
+            registry.list_edits(),
+            "edits",
+            registry=registry,
+            only=only,
+            verbose=verbose,
+            json_out=json_out,
+            explain=explain,
+            hide_unsupported=hide_unsupported,
+        )
+        return
+    if category == "adapters":
+        _show_plugin_category(
+            "Adapter Plugins",
+            registry.list_adapters(),
+            "adapters",
+            registry=registry,
+            only=only,
+            verbose=verbose,
+            json_out=json_out,
+            explain=explain,
+            hide_unsupported=hide_unsupported,
+        )
+        return
+    if category == "datasets":
+        providers = sorted(list_providers_fn())
+        if json_out:
+            providers_map = _load_provider_registry_map()
+            _emit_plugins_json(
+                "datasets",
+                dataset_inventory_json_items(providers, providers_map),
+            )
+        else:
+            _show_plugin_category(
+                "Dataset Providers",
+                providers,
+                "datasets",
+                registry=registry,
+                only=only,
+                verbose=verbose,
+                json_out=json_out,
+                explain=explain,
+                hide_unsupported=hide_unsupported,
+            )
+        return
+    if category is None or category in ["list", "all"]:
+        _show_plugin_category(
+            "Guard Plugins",
+            registry.list_guards(),
+            "guards",
+            registry=registry,
+            only=only,
+            verbose=verbose,
+            json_out=json_out,
+            explain=explain,
+            hide_unsupported=hide_unsupported,
+        )
+        _show_plugin_category(
+            "Edit Plugins",
+            registry.list_edits(),
+            "edits",
+            registry=registry,
+            only=only,
+            verbose=verbose,
+            json_out=json_out,
+            explain=explain,
+            hide_unsupported=hide_unsupported,
+        )
+        _show_plugin_category(
+            "Adapter Plugins",
+            registry.list_adapters(),
+            "adapters",
+            registry=registry,
+            only=only,
+            verbose=verbose,
+            json_out=json_out,
+            explain=explain,
+            hide_unsupported=hide_unsupported,
+        )
+        providers = sorted(list_providers_fn())
+        if providers:
+            _show_plugin_category(
+                "Dataset Providers",
+                providers,
+                "datasets",
+                registry=registry,
+                only=only,
+                verbose=verbose,
+                json_out=json_out,
+                explain=explain,
+                hide_unsupported=hide_unsupported,
+            )
+        return
+    if category == "plugins":
+        if json_out:
+            _emit_plugins_json(
+                "plugins",
+                combined_plugins_json_items(
+                    adapter_rows=_gather_adapter_rows(registry),
+                    guard_rows=_gather_generic_rows(registry, "guards"),
+                    edit_rows=_gather_generic_rows(registry, "edits"),
+                ),
+            )
+        else:
+            _show_plugin_category(
+                "Adapter Plugins",
+                registry.list_adapters(),
+                "adapters",
+                registry=registry,
+                only=only,
+                verbose=verbose,
+                json_out=json_out,
+                explain=explain,
+                hide_unsupported=hide_unsupported,
+            )
+            _show_plugin_category(
+                "Guard Plugins",
+                registry.list_guards(),
+                "guards",
+                registry=registry,
+                only=only,
+                verbose=verbose,
+                json_out=json_out,
+                explain=explain,
+                hide_unsupported=hide_unsupported,
+            )
+            _show_plugin_category(
+                "Edit Plugins",
+                registry.list_edits(),
+                "edits",
+                registry=registry,
+                only=only,
+                verbose=verbose,
+                json_out=json_out,
+                explain=explain,
+                hide_unsupported=hide_unsupported,
+            )
+        return
+    console.print(
+        f"[red]❌ Unknown category '{category}'. Valid: guards, edits, adapters, datasets, list, all[/red]"
+    )
+    raise typer.Exit(2)
 
 
 @runtime_security_scoped
@@ -109,456 +674,21 @@ def plugins_command(
         from invarlock.eval.data import list_providers
 
         registry = get_registry()
-
-        def _is_minimal() -> bool:
-            return is_minimal_plugins_view(os.environ.get("INVARLOCK_MINIMAL"))
-
-        def _gather_adapter_rows() -> list[dict]:
-            try:
-                import torch as _torch
-
-                torch_mod: Any = _torch
-                has_cuda = detect_cuda_available(torch_mod)
-            except ImportError:
-                has_cuda = False
-            from invarlock.core.adapter_provenance import extract_adapter_provenance
-
-            rows = gather_adapter_inventory_rows(
-                registry=registry,
-                minimal=_is_minimal(),
-                has_cuda=has_cuda,
-                is_linux=platform.system().lower() == "linux",
-                extras_checker=_check_plugin_extras,
-                provenance_extractor=extract_adapter_provenance,
-                bitsandbytes_runtime_available=bitsandbytes_runtime_available,
-            )
-            for row in rows:
-                row["capability"] = adapter_capability(str(row.get("name") or ""))
-            return rows
-
-        def _filter_only(rows: list[dict]) -> list[dict]:
-            return filter_inventory_rows(rows, only)
-
-        def _fmt_backend(backend: str | None, version: str | None) -> tuple[str, str]:
-            name = backend or "—"
-            if backend and version:
-                return backend, f"=={version}"
-            return name, "—"
-
-        def _print_adapters_compact(rows: list[dict]) -> None:
-            need = sum(1 for r in rows if r["status"] == "needs_extra")
-            ready = sum(1 for r in rows if r["status"] == "ready")
-            auto = sum(1 for r in rows if r["support"] == "auto")
-            unsupported = sum(1 for r in rows if r["status"] == "unsupported")
-            title = f"Adapters — ready: {ready} · auto: {auto} · missing-extras: {need} · unsupported: {unsupported}"
-            table = Table(title=title)
-            table.add_column("Adapter", style="cyan")
-            table.add_column("Origin", style="dim")
-            table.add_column("Mode", style="dim")
-            table.add_column("Backend", style="magenta")
-            table.add_column("Version", style="magenta")
-            table.add_column("Status / Action", style="green")
-            for idx, r in enumerate(rows):
-                backend_disp, version_disp = _fmt_backend(
-                    r.get("backend"), r.get("backend_version")
-                )
-                origin_disp = r.get("origin", r.get("support", "")).capitalize()
-                mode_disp = (
-                    "Auto‑matcher" if r.get("mode") == "auto-matcher" else "Adapter"
-                )
-                if r["support"] == "auto":
-                    status_disp = "Ready"
-                elif r["status"] == "ready":
-                    status_disp = "Ready"
-                elif r["status"] == "needs_extra":
-                    status_disp = f"Needs extra: {r['enable'] or ''}".rstrip(": ")
-                elif r["status"] == "unsupported":
-                    status_disp = "Unsupported on this platform"
-                else:
-                    status_disp = r["status"]
-                next_support = rows[idx + 1]["support"] if idx + 1 < len(rows) else None
-                end_section = next_support is not None and next_support != r["support"]
-                table.add_row(
-                    r["name"],
-                    origin_disp,
-                    mode_disp,
-                    backend_disp,
-                    version_disp,
-                    _escape(status_disp),
-                    end_section=end_section,
-                )
-            # Hints
-            console.print(table)
-
-        def _print_adapters_verbose(rows: list[dict]) -> None:
-            table = Table(title="Adapters (verbose)")
-            table.add_column("Adapter", style="cyan")
-            table.add_column("Origin", style="dim")
-            table.add_column("Mode", style="dim")
-            table.add_column("Backend", style="magenta")
-            table.add_column("Version", style="magenta")
-            table.add_column("Status", style="green")
-            table.add_column("Module", style="dim")
-            table.add_column("Entry Point", style="dim")
-            for r in rows:
-                backend_disp, version_disp = _fmt_backend(
-                    r.get("backend"), r.get("backend_version")
-                )
-                entry = r["entry_point"] or ""
-                entry_disp = (
-                    entry
-                    if entry
-                    else ("(auto matcher)" if r["support"] == "auto" else "")
-                )
-                table.add_row(
-                    r["name"],
-                    (r.get("origin") or r.get("support") or "").capitalize(),
-                    ("Auto‑matcher" if r.get("mode") == "auto-matcher" else "Adapter"),
-                    backend_disp,
-                    version_disp,
-                    r["status"].replace("needs_extra", "Needs extra").capitalize(),
-                    r["module"],
-                    entry_disp,
-                )
-            console.print(table)
-
-        def _print_adapters_json(rows: list[dict]) -> None:
-            _emit_plugins_json("adapters", adapter_inventory_json_items(rows))
-
-        def _explain_adapter(name: str) -> None:
-            rows = _gather_adapter_rows()
-            r = next((x for x in rows if x["name"] == name), None)
-            if not r:
-                console.print(f"[red]❌ Unknown adapter: {name}[/red]")
-                raise typer.Exit(1)
-            backend_disp = (
-                f"{r['backend']} {r['backend_version']}"
-                if r["backend"] and r["backend_version"]
-                else (f"{r['backend']} (missing)" if r["backend"] else "-")
-            )
-            console.print(f"[bold]{r['name']}[/bold]")
-            console.print(f"  Support     : {r['support'].capitalize()}")
-            console.print(f"  Backend     : {backend_disp}")
-            if r["support"] == "auto":
-                console.print("  Status      : Ready (auto matcher)")
-            elif r["status"] == "ready":
-                console.print("  Status      : Ready")
-            elif r["status"] == "needs_extra":
-                console.print("  Status      : Needs extra")
-                if r["enable"]:
-                    console.print(f"  Enable      : {_escape(r['enable'])}")
-            elif r["status"] == "partial":
-                console.print("  Status      : Partial (GPU-only features disabled)")
-            if r["name"] == "hf_gptq":
-                console.print(
-                    "  Matches     : AutoGPTQ-quantized HF repos (from_quantized)"
-                )
-                console.print(
-                    "  Notes       : Linux/CUDA recommended; upstream auto-gptq "
-                    "packaging may require a pinned or vendor wheel"
-                )
-            elif r["name"] == "hf_awq":
-                console.print("  Matches     : AWQ-quantized HF repos")
-                console.print(
-                    "  Notes       : GPU recommended; metadata ingestion on CPU"
-                )
-            elif r["name"] == "hf_bnb":
-                console.print(
-                    "  Matches     : Transformers 4/8-bit loading with bitsandbytes"
-                )
-                console.print(
-                    "  Notes       : GPU recommended; falls back to metadata only on CPU"
-                )
-            else:
-                console.print(
-                    "  Matches     : Hugging Face Transformers (core adapters)"
-                )
-            console.print(f"  Module      : {r['module']}")
-            entry = r["entry_point"] or ""
-            if entry:
-                console.print(f"  Entry point : {entry}")
-
-        # Generic (guards/edits) helpers for compact/verbose/json/explain
-        def _gather_generic_rows(plugin_type: str) -> list[dict]:
-            return gather_generic_inventory_rows(
-                registry=registry,
-                plugin_type=plugin_type,
-                extras_checker=_check_plugin_extras,
-            )
-
-        def _print_generic_compact(rows: list[dict], title: str) -> None:
-            need = sum(1 for r in rows if r["status"] == "needs_extra")
-            ready = sum(1 for r in rows if r["status"] == "ready")
-            table = Table(title=f"{title} — ready: {ready} · missing-extras: {need}")
-            table.add_column("Name", style="cyan")
-            table.add_column("Origin", style="dim")
-            table.add_column("Mode", style="dim")
-            table.add_column("Backend", style="magenta")
-            table.add_column("Version", style="magenta")
-            table.add_column("Status / Action", style="green")
-            for idx, r in enumerate(rows):
-                backend_disp, version_disp = _fmt_backend(
-                    r.get("backend"), r.get("backend_version")
-                )
-                origin_disp = r.get("origin", r.get("support", "")).capitalize()
-                mode_disp = "Guard" if r.get("mode") == "guard" else "Edit"
-                if r["status"] == "ready":
-                    status_disp = "Ready"
-                elif r["status"] == "needs_extra":
-                    status_disp = f"Needs extra: {r['enable'] or ''}".rstrip(": ")
-                else:
-                    status_disp = r["status"]
-                next_support = rows[idx + 1]["support"] if idx + 1 < len(rows) else None
-                end_section = next_support is not None and next_support != r["support"]
-                table.add_row(
-                    r["name"],
-                    origin_disp,
-                    mode_disp,
-                    backend_disp,
-                    version_disp,
-                    _escape(status_disp),
-                    end_section=end_section,
-                )
-            console.print(table)
-
-        def _print_generic_verbose(rows: list[dict], title: str) -> None:
-            table = Table(title=f"{title} (verbose)")
-            table.add_column("Name", style="cyan")
-            table.add_column("Origin", style="dim")
-            table.add_column("Mode", style="dim")
-            table.add_column("Backend", style="magenta")
-            table.add_column("Version", style="magenta")
-            table.add_column("Status", style="green")
-            table.add_column("Module", style="dim")
-            table.add_column("Entry Point", style="dim")
-            for idx, r in enumerate(rows):
-                entry = r["entry_point"] or ""
-                next_support = rows[idx + 1]["support"] if idx + 1 < len(rows) else None
-                end_section = next_support is not None and next_support != r["support"]
-                backend_disp, version_disp = _fmt_backend(
-                    r.get("backend"), r.get("backend_version")
-                )
-                table.add_row(
-                    r["name"],
-                    (r.get("origin") or r.get("support") or "").capitalize(),
-                    ("Guard" if r.get("mode") == "guard" else "Edit"),
-                    backend_disp,
-                    version_disp,
-                    r["status"].replace("needs_extra", "Needs extra").capitalize(),
-                    r["module"],
-                    entry,
-                    end_section=end_section,
-                )
-            console.print(table)
-
-        def _print_generic_json(rows: list[dict], kind: str) -> None:
-            _emit_plugins_json(
-                kind,
-                generic_inventory_json_items(rows, kind=kind),
-            )
-
-        def _render_dataset_table(
-            title: str, providers: list[str], *, verbose: bool = False
-        ) -> None:
-            from invarlock.cli.constants import (
-                PROVIDER_KIND as provider_kind,
-            )
-            from invarlock.cli.constants import (
-                PROVIDER_NETWORK as provider_network,
-            )
-            from invarlock.cli.constants import (
-                PROVIDER_PARAMS as provider_params,
-            )
-
-            _providers_map = _load_provider_registry_map()
-
-            def _net_label(name: str) -> str:
-                val = (provider_network.get(name, "") or "").lower()
-                if val == "cache":
-                    return "Cache/Net"
-                if val == "yes":
-                    return "Yes"
-                if val == "no":
-                    return "No"
-                return "Unknown"
-
-            rows: list[dict] = []
-            for pname in providers:
-                rows.append(
-                    {
-                        "name": pname,
-                        "network": _net_label(pname),
-                        "kind": provider_kind.get(pname, "-"),
-                        "module": getattr(
-                            _providers_map.get(pname, None), "__module__", "unknown"
-                        ),
-                    }
-                )
-            net_order = {"No": 0, "Cache/Net": 1, "Yes": 2, "Unknown": 3}
-            rows.sort(key=lambda r: (net_order.get(r["network"], 9), r["name"]))
-
-            cnt_no = sum(1 for r in rows if r["network"] == "No")
-            cnt_cache = sum(1 for r in rows if r["network"] == "Cache/Net")
-            cnt_yes = sum(1 for r in rows if r["network"] == "Yes")
-            table = Table(
-                title=f"{title} — offline: {cnt_no} · cache/net: {cnt_cache} · network: {cnt_yes}"
-            )
-            table.add_column("Provider", style="cyan")
-            table.add_column("Network", style="dim")
-            table.add_column("Kind", style="dim")
-            table.add_column("Params", style="dim")
-            if verbose:
-                table.add_column("Module", style="dim")
-            table.add_column("Status / Action", style="green")
-
-            for idx, r in enumerate(rows):
-                end_section = (
-                    idx + 1 < len(rows) and rows[idx + 1]["network"] != r["network"]
-                )
-                cols = [
-                    r["name"],
-                    r["network"],
-                    r.get("kind", "-"),
-                    provider_params.get(r["name"], "-"),
-                ]
-                if verbose:
-                    cols.append(r["module"])
-                cols.append("✓ Available")
-                table.add_row(*cols, end_section=end_section)
-
-            console.print(table)
-
-        def _explain_generic(name: str, plugin_type: str) -> None:
-            rows = _gather_generic_rows(plugin_type)
-            r = next((x for x in rows if x["name"] == name), None)
-            if not r:
-                console.print(f"[red]❌ Unknown {plugin_type[:-1]}: {name}[/red]")
-                raise typer.Exit(1)
-            console.print(f"[bold]{r['name']}[/bold]")
-            console.print(f"  Support     : {r['support'].capitalize()}")
-            backend_label = r.get("backend") or "—"
-            console.print(f"  Backend     : {backend_label}")
-            if r["status"] == "ready":
-                console.print("  Status      : Ready")
-            elif r["status"] == "needs_extra":
-                console.print("  Status      : Needs extra")
-                if r["enable"]:
-                    console.print(f"  Enable      : {_escape(r['enable'])}")
-            console.print(f"  Module      : {r['module']}")
-            entry = r["entry_point"] or ""
-            if entry:
-                console.print(f"  Entry point : {entry}")
-
-        def show_plugins(title: str, plugin_list: list[str], plugin_type: str):
-            """Show plugins in a formatted table without instantiation."""
-            if not plugin_list and plugin_type != "adapters":
-                console.print(f"[yellow]No {title.lower()} plugins found[/yellow]")
-                return
-
-            if plugin_type == "adapters":
-                if explain:
-                    _explain_adapter(explain)
-                    return
-                rows = _gather_adapter_rows()
-                rows = _filter_only(rows)
-                if hide_unsupported:
-                    rows = [r for r in rows if r.get("status") != "unsupported"]
-                if json_out:
-                    _print_adapters_json(rows)
-                elif verbose:
-                    _print_adapters_verbose(rows)
-                else:
-                    _print_adapters_compact(rows)
-                return
-
-            # Guards/Edits: compact/verbose/json/explain
-            if plugin_type in {"guards", "edits"}:
-                if explain:
-                    _explain_generic(explain, plugin_type)
-                    return
-                rows = _gather_generic_rows(plugin_type)
-                rows = _filter_only(rows)
-                if json_out:
-                    _print_generic_json(rows, plugin_type)
-                elif verbose:
-                    _print_generic_verbose(rows, title)
-                else:
-                    _print_generic_compact(rows, title)
-                return
-
-            _render_dataset_table(title, plugin_list, verbose=verbose)
-
-        # Show specific category or all
-        if category == "guards":
-            show_plugins("Guard Plugins", registry.list_guards(), "guards")
-        elif category == "edits":
-            show_plugins("Edit Plugins", registry.list_edits(), "edits")
-        elif category == "adapters":
-            # Wrap show to apply hide_unsupported for adapters
-            # Inline minimal adapter rendering with filtering/JSON/explain
-            rows = _gather_adapter_rows()
-            rows = _filter_only(rows)
-            if hide_unsupported:
-                rows = [r for r in rows if r.get("status") != "unsupported"]
-            if json_out:
-                _print_adapters_json(rows)
-            elif explain:
-                _explain_adapter(explain)
-            elif verbose:
-                _print_adapters_verbose(rows)
-            else:
-                _print_adapters_compact(rows)
-        elif category == "datasets":
-            # Show dataset providers
-            providers = sorted(list_providers())
-
-            if json_out:
-                _providers_map = _load_provider_registry_map()
-                _emit_plugins_json(
-                    "datasets",
-                    dataset_inventory_json_items(providers, _providers_map),
-                )
-            else:
-                show_plugins("Dataset Providers", providers, "datasets")
-        elif category is None or category in ["list", "all"]:
-            # Show all categories
-            show_plugins("Guard Plugins", registry.list_guards(), "guards")
-            show_plugins("Edit Plugins", registry.list_edits(), "edits")
-            show_plugins("Adapter Plugins", registry.list_adapters(), "adapters")
-
-            # Dataset providers
-            providers = sorted(list_providers())
-            if providers:
-                show_plugins("Dataset Providers", providers, "datasets")
-        elif category == "plugins":
-            if json_out:
-                # Combine adapters + guards + edits
-                ad_rows = _gather_adapter_rows()
-                g_rows = _gather_generic_rows("guards")
-                e_rows = _gather_generic_rows("edits")
-                _emit_plugins_json(
-                    "plugins",
-                    combined_plugins_json_items(
-                        adapter_rows=ad_rows,
-                        guard_rows=g_rows,
-                        edit_rows=e_rows,
-                    ),
-                )
-            else:
-                # Fallback: print three tables
-                show_plugins("Adapter Plugins", registry.list_adapters(), "adapters")
-                show_plugins("Guard Plugins", registry.list_guards(), "guards")
-                show_plugins("Edit Plugins", registry.list_edits(), "edits")
-        else:
-            console.print(
-                f"[red]❌ Unknown category '{category}'. Valid: guards, edits, adapters, datasets, list, all[/red]"
-            )
-            raise typer.Exit(2)
+        _handle_plugins_category(
+            category=category,
+            registry=registry,
+            list_providers_fn=list_providers,
+            only=only,
+            verbose=verbose,
+            json_out=json_out,
+            explain=explain,
+            hide_unsupported=hide_unsupported,
+        )
 
     except typer.Exit:
         # Propagate intended exit codes from command flow
         raise
-    except Exception as e:
+    except _PLUGIN_COMMAND_ERRORS as e:
         console.print(f"[red]❌ Plugin listing failed: {e}[/red]")
         raise typer.Exit(1) from e
 

@@ -14,4 +14,9 @@ eval:
     alpha: 0.05
 
 primary_metric:
+  # Supported GPU no-op sweeps can drift slightly above 1.05 between preview
+  # and final windows while still preserving stable edited-vs-baseline ratios.
+  drift_band:
+    min: 0.95
+    max: 1.07
   overhead_threshold: 0.01

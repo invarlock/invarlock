@@ -16,13 +16,13 @@ def test_resource_manager_gpu_memory_info_cuda_path(monkeypatch):
     cfg = MetricsConfig()
     rm = ResourceManager(cfg)
     # Force a CUDA-like device but make get_device_properties fail
-    rm.device = types.SimpleNamespace(type="cuda")  # type: ignore[attr-defined]
+    rm.device = types.SimpleNamespace(type="cuda")
 
     class DummyProps:
         total_memory = 1024 * 1024 * 1024
 
     class DummyCuda:
-        def get_device_properties(self, idx):  # type: ignore[no-redef]
+        def get_device_properties(self, idx):
             return DummyProps()
 
         def memory_allocated(self):  # minimal API used in code
@@ -150,6 +150,12 @@ def test_infer_model_vocab_size_propagates_embedding_probe_failures():
 
 
 def test_metrics_runtime_helper_resolution_and_pad_token_paths(monkeypatch):
+    class _MissingWeightEmbedding:
+        weight = None
+
+    class _ZeroShapeEmbedding:
+        weight = torch.zeros((0, 2))
+
     class Parameterless(nn.Module):
         def forward(self, *args, **kwargs):  # noqa: ANN002, ANN003
             raise NotImplementedError
@@ -182,6 +188,14 @@ def test_metrics_runtime_helper_resolution_and_pad_token_paths(monkeypatch):
             self.emb_a = nn.Embedding(3, 2)
             self.emb_b = nn.Embedding(9, 2)
 
+    class EmbeddingsMissingWeight(nn.Module):
+        def get_input_embeddings(self):
+            return _MissingWeightEmbedding()
+
+    class EmbeddingsZeroShape(nn.Module):
+        def get_input_embeddings(self):
+            return _ZeroShapeEmbedding()
+
     class ConfigFallback(nn.Module):
         def __init__(self):
             super().__init__()
@@ -189,6 +203,8 @@ def test_metrics_runtime_helper_resolution_and_pad_token_paths(monkeypatch):
 
     assert runtime_mod._infer_model_vocab_size(EmbeddingsModel()) == 7
     assert runtime_mod._infer_model_vocab_size(ModuleFallback()) == 9
+    assert runtime_mod._infer_model_vocab_size(EmbeddingsMissingWeight()) is None
+    assert runtime_mod._infer_model_vocab_size(EmbeddingsZeroShape()) is None
     assert runtime_mod._infer_model_vocab_size(ConfigFallback()) == 11
     assert runtime_mod._resolve_pad_token_id(EmbeddingsModel(), 7) == 3
     assert runtime_mod._resolve_pad_token_id(ConfigFallback(), 11) == 0
@@ -247,6 +263,19 @@ def test_runtime_token_sanitizer_and_raw_tensor_batches_cover_skip_paths():
     assert cleaned_mask is None
     assert cleaned_labels.tolist() == [[1, 9]]
 
+    sanitized_ids, sanitized_mask, sanitized_labels = (
+        runtime_mod._sanitize_token_ids_for_model(
+            torch.tensor([[1, 9]]),
+            None,
+            None,
+            vocab_size=5,
+            pad_token_id=0,
+        )
+    )
+    assert sanitized_ids.tolist() == [[1, 0]]
+    assert sanitized_mask is None
+    assert sanitized_labels is None
+
     class TinyLM(nn.Module):
         def __init__(self, vocab=5):
             super().__init__()
@@ -265,6 +294,45 @@ def test_runtime_token_sanitizer_and_raw_tensor_batches_cover_skip_paths():
     dataloader = ["bad-batch", torch.tensor([[1]]), torch.tensor([[1, 2, 3]])]
     ppl = runtime_mod.compute_perplexity_strict(model, dataloader, device="cpu")
     assert ppl >= 1.0
+
+
+def test_compute_perplexity_strict_masked_lm_skips_all_masked_tokens() -> None:
+    class TinyMaskedLM(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.emb = nn.Embedding(4, 3)
+            self.config = types.SimpleNamespace(
+                model_type="bert",
+                vocab_size=4,
+                pad_token_id=0,
+            )
+
+        def get_input_embeddings(self):
+            return self.emb
+
+        def forward(
+            self,
+            input_ids=None,
+            attention_mask=None,
+            token_type_ids=None,
+            labels=None,
+            return_dict=True,
+        ):
+            del input_ids, attention_mask, token_type_ids, return_dict
+            assert labels is not None
+            return types.SimpleNamespace(loss=torch.tensor(0.5))
+
+    batch = {
+        "input_ids": torch.tensor([[1, 2, 3]], dtype=torch.long),
+        "attention_mask": torch.zeros((1, 3), dtype=torch.long),
+    }
+
+    with pytest.raises(runtime_mod.ValidationError):
+        runtime_mod.compute_perplexity_strict(
+            TinyMaskedLM().eval(),
+            [batch],
+            device="cpu",
+        )
 
 
 def test_pre_eval_checks_dry_run_failure_and_compute_perplexity_no_valid_tokens():
@@ -301,3 +369,112 @@ def test_pre_eval_checks_dry_run_failure_and_compute_perplexity_no_valid_tokens(
 
     with pytest.raises(MValidationError):
         compute_perplexity(TinyLM().eval(), [batch], max_samples=1, device="cpu")
+
+
+def test_metrics_runtime_invalid_label_filters_and_cuda_helper_paths(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class TinyRuntimeModel(nn.Module):
+        def forward(self, input_ids=None, attention_mask=None, return_dict=True):
+            del attention_mask, return_dict
+            batch, seq_len = input_ids.shape
+            logits = torch.zeros((batch, seq_len, 2), dtype=torch.float32)
+            return types.SimpleNamespace(logits=logits)
+
+    model = TinyRuntimeModel().eval()
+    batch = {
+        "input_ids": torch.tensor([[9, 9, 9]], dtype=torch.long),
+        "labels": torch.tensor([[9, 9, 9]], dtype=torch.long),
+        "attention_mask": torch.tensor([[1, 1, 1]], dtype=torch.long),
+    }
+
+    with pytest.raises(runtime_mod.ValidationError):
+        runtime_mod.compute_perplexity_strict(model, [batch], device="cpu")
+    with pytest.raises(runtime_mod.ValidationError):
+        runtime_mod.compute_perplexity(model, [batch], max_samples=1, device="cpu")
+    with pytest.raises(runtime_mod.ValidationError):
+        runtime_mod.compute_ppl(
+            model,
+            runtime_mod.EvaluationWindow([[9, 9, 9]], [[1, 1, 1]], [0]),
+            device="cpu",
+        )
+
+    class _Cuda:
+        def __init__(self) -> None:
+            self.calls: list[str] = []
+
+        def synchronize(self) -> None:
+            self.calls.append("synchronize")
+
+        def empty_cache(self) -> None:
+            self.calls.append("empty_cache")
+
+        def memory_allocated(self) -> float:
+            self.calls.append("memory_allocated")
+            return 8 * 1024 * 1024
+
+        def reset_peak_memory_stats(self) -> None:
+            self.calls.append("reset_peak_memory_stats")
+
+    cuda = _Cuda()
+    monkeypatch.setattr(runtime_mod.torch, "cuda", cuda, raising=False)
+    cuda_device = types.SimpleNamespace(type="cuda")
+
+    runtime_mod._maybe_cuda_synchronize(cuda_device)
+    baseline_mb, process = runtime_mod._memory_measurement_baseline(cuda_device)
+    current_mb = runtime_mod._current_memory_mb(cuda_device, process)
+    runtime_mod._cleanup_memory_measurement_failure(cuda_device)
+
+    assert baseline_mb == pytest.approx(8.0)
+    assert current_mb == pytest.approx(8.0)
+    assert process is None
+    assert cuda.calls == [
+        "synchronize",
+        "empty_cache",
+        "memory_allocated",
+        "reset_peak_memory_stats",
+        "memory_allocated",
+        "empty_cache",
+    ]
+
+
+def test_compute_ppl_uses_mps_cpu_gather_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class TinyRuntimeModel(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.config = types.SimpleNamespace(vocab_size=5, pad_token_id=0)
+            self.emb = nn.Embedding(5, 2)
+
+        def get_input_embeddings(self):
+            return self.emb
+
+        def forward(self, input_ids=None, attention_mask=None, return_dict=True):
+            del attention_mask, return_dict
+            batch, seq_len = input_ids.shape
+            logits = torch.zeros((batch, seq_len, 5), dtype=torch.float32)
+            return types.SimpleNamespace(logits=logits)
+
+    original_tensor_to = torch.Tensor.to
+
+    def _identity_to(self, *args, **kwargs):
+        del args, kwargs
+        return self
+
+    monkeypatch.setattr(
+        runtime_mod,
+        "_resolve_eval_device",
+        lambda *_args, **_kwargs: "mps",
+    )
+    monkeypatch.setattr(torch.Tensor, "to", _identity_to, raising=False)
+    try:
+        ppl = runtime_mod.compute_ppl(
+            TinyRuntimeModel().eval(),
+            runtime_mod.EvaluationWindow([[1, 2, 3]], [[1, 1, 1]], [0]),
+            device="mps",
+        )
+    finally:
+        monkeypatch.setattr(torch.Tensor, "to", original_tensor_to, raising=False)
+
+    assert ppl >= 1.0

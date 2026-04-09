@@ -27,7 +27,7 @@ def test_validate_model_raises_when_parameter_iteration_fails() -> None:
         def forward(self, **_kwargs):  # noqa: D401, ANN003
             return None
 
-        def parameters(self, recurse: bool = True):  # type: ignore[override]
+        def parameters(self, recurse: bool = True):
             raise RuntimeError("boom")
 
     cfg = MetricsConfig(strict_validation=False, use_cache=False)

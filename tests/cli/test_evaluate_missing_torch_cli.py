@@ -13,7 +13,7 @@ def test_evaluate_missing_torch_shows_extra_hint_via_cli(
     """Ensure CLI surfaces a clear extras hint when torch is missing."""
     original_import = builtins.__import__
 
-    def fake_import(name, *args, **kwargs):  # type: ignore[override]
+    def fake_import(name, *args, **kwargs):
         if name == "torch":
             raise ModuleNotFoundError("torch not available in test")
         return original_import(name, *args, **kwargs)

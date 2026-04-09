@@ -257,6 +257,12 @@ def _make_ci_ready(cert: dict) -> dict:
     pm = cert.setdefault("primary_metric", {})
     if "ci" not in pm and "display_ci" in pm:
         pm["ci"] = [math.log(float(bound)) for bound in pm["display_ci"]]
+    final_val = pm.get("final")
+    if isinstance(final_val, int | float) and final_val > 0:
+        cert.setdefault("evaluation_windows", {}).setdefault(
+            "final",
+            {"logloss": [math.log(float(final_val))], "token_counts": [1]},
+        )
     return cert
 
 

@@ -218,8 +218,9 @@ def _validate_primary_metric(report: dict[str, Any]) -> list[str]:
         baseline_final = None
         if isinstance(baseline_pm, dict):
             bv = baseline_pm.get("final")
-            if _coerce_float(bv) is not None:
-                baseline_final = float(bv)
+            baseline_final_value = _coerce_float(bv)
+            if baseline_final_value is not None:
+                baseline_final = baseline_final_value
         final_value = _coerce_float(final)
         baseline_final_value = _coerce_float(baseline_final)
         if final_value is not None and baseline_final_value is not None:

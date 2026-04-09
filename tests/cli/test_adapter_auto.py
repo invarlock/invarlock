@@ -7,6 +7,8 @@ from invarlock.core.adapter_auto import (
     resolve_auto_adapter,
 )
 
+_MISTRAL3_ARCH = "Mistral3ForConditionalGeneration"
+
 
 def _write_cfg(tmp_path: Path, model_type: str, arch: str) -> Path:
     d = tmp_path / "model"
@@ -20,6 +22,11 @@ def _write_cfg(tmp_path: Path, model_type: str, arch: str) -> Path:
 
 def test_resolve_auto_adapter_mistral(tmp_path):
     model_dir = _write_cfg(tmp_path, "mistral", "MistralForCausalLM")
+    assert resolve_auto_adapter(str(model_dir)) == "hf_causal"
+
+
+def test_resolve_auto_adapter_mistral3(tmp_path):
+    model_dir = _write_cfg(tmp_path, "mistral3", _MISTRAL3_ARCH)
     assert resolve_auto_adapter(str(model_dir)) == "hf_causal"
 
 
@@ -55,6 +62,11 @@ def test_resolve_auto_adapter_bert(tmp_path):
 
 def test_resolve_auto_adapter_gpt_fallback(tmp_path):
     model_dir = _write_cfg(tmp_path, "gpt2", "GPT2LMHeadModel")
+    assert resolve_auto_adapter(str(model_dir)) == "hf_causal"
+
+
+def test_resolve_auto_adapter_gpt_oss(tmp_path):
+    model_dir = _write_cfg(tmp_path, "gpt_oss", "GptOssForCausalLM")
     assert resolve_auto_adapter(str(model_dir)) == "hf_causal"
 
 

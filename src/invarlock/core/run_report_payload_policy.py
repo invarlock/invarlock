@@ -16,6 +16,10 @@ def build_run_report_context(
     run_policy_context = dict(run_section) if isinstance(run_section, dict) else {}
     eval_section = run_context.get("eval")
     eval_policy_context = dict(eval_section) if isinstance(eval_section, dict) else {}
+    primary_metric_section = run_context.get("primary_metric")
+    primary_metric_context = (
+        dict(primary_metric_section) if isinstance(primary_metric_section, dict) else {}
+    )
     assurance_section = run_context.get("assurance")
     return {
         "profile": profile_normalized,
@@ -25,6 +29,7 @@ def build_run_report_context(
         ),
         "run": run_policy_context,
         "eval": eval_policy_context,
+        "primary_metric": primary_metric_context,
     }
 
 
@@ -220,21 +225,20 @@ def build_metrics_payload(
         if isinstance(capacity_meta, Mapping):
             metrics_payload["window_capacity"] = dict(capacity_meta)
         stats_section = metrics_payload.setdefault("stats", {})
-        if isinstance(stats_section, dict):
-            stats_section.update(
-                {
-                    "requested_preview": window_plan_ctx.get("requested_preview"),
-                    "requested_final": window_plan_ctx.get("requested_final"),
-                    "actual_preview": window_plan_ctx.get("actual_preview"),
-                    "actual_final": window_plan_ctx.get("actual_final"),
-                    "coverage_ok": window_plan_ctx.get("coverage_ok"),
-                    "preview_total_tokens": window_plan_ctx.get("preview_total_tokens"),
-                    "final_total_tokens": window_plan_ctx.get("final_total_tokens"),
-                    "min_tokens_target": window_plan_ctx.get("min_tokens_target"),
-                    "tokens_floor_met": window_plan_ctx.get("tokens_floor_met"),
-                    "dedupe_adjustments": window_plan_ctx.get("dedupe_adjustments"),
-                }
-            )
+        stats_section.update(
+            {
+                "requested_preview": window_plan_ctx.get("requested_preview"),
+                "requested_final": window_plan_ctx.get("requested_final"),
+                "actual_preview": window_plan_ctx.get("actual_preview"),
+                "actual_final": window_plan_ctx.get("actual_final"),
+                "coverage_ok": window_plan_ctx.get("coverage_ok"),
+                "preview_total_tokens": window_plan_ctx.get("preview_total_tokens"),
+                "final_total_tokens": window_plan_ctx.get("final_total_tokens"),
+                "min_tokens_target": window_plan_ctx.get("min_tokens_target"),
+                "tokens_floor_met": window_plan_ctx.get("tokens_floor_met"),
+                "dedupe_adjustments": window_plan_ctx.get("dedupe_adjustments"),
+            }
+        )
     optional_keys = [
         "classification",
         "logloss_preview",

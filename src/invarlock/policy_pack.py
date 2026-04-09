@@ -11,16 +11,40 @@ from invarlock.public_contracts import load_policy_pack_schema
 
 try:  # pragma: no cover - exercised in integration/tests
     import jsonschema
-except Exception:  # pragma: no cover
+except ModuleNotFoundError:  # pragma: no cover
     jsonschema = None
+
+if jsonschema is None:  # pragma: no cover - defensive import fallback
+    _JSONSCHEMA_VALIDATE_ERRORS: tuple[type[BaseException], ...] = ()
+else:  # pragma: no cover - exercised when jsonschema is installed
+    _JSONSCHEMA_VALIDATE_ERRORS = (
+        RuntimeError,
+        jsonschema.SchemaError,
+        TypeError,
+        ValueError,
+        jsonschema.ValidationError,
+    )
 
 POLICY_PACK_FORMAT = "policy-pack-v1"
 
 
+_STRUCTURED_TEXT_LOAD_ERRORS = (
+    json.JSONDecodeError,
+    OverflowError,
+    RecursionError,
+    TypeError,
+    ValueError,
+    yaml.YAMLError,
+)
+
+
 def _load_structured_text(text: str, *, suffix: str) -> Any:
-    if suffix.lower() in {".yaml", ".yml"}:
-        return yaml.safe_load(text)
-    return json.loads(text)
+    try:
+        if suffix.lower() in {".yaml", ".yml"}:
+            return yaml.safe_load(text)
+        return json.loads(text)
+    except _STRUCTURED_TEXT_LOAD_ERRORS as exc:
+        raise ValueError("policy pack could not be decoded as JSON/YAML") from exc
 
 
 def _load_structured_file(path: Path) -> Any:
@@ -114,7 +138,7 @@ def verify_policy_pack(pack: object) -> list[str]:
     if schema and jsonschema is not None:
         try:
             jsonschema.validate(instance=pack, schema=schema)
-        except Exception as exc:
+        except _JSONSCHEMA_VALIDATE_ERRORS as exc:
             errors.append(f"schema validation failed: {exc}")
 
     resolved_policy = pack.get("resolved_policy")

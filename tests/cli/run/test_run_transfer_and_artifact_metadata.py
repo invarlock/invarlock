@@ -842,6 +842,7 @@ def test_baseline_pairing_valid_schedule(monkeypatch, tmp_path):
             )
         ),
     )
+    monkeypatch.setattr("invarlock.core.runner.CoreRunner", _runner_min)
     run_command(
         config=str(cfg),
         device="cpu",
@@ -879,6 +880,7 @@ def test_baseline_missing_eval_windows_fallback(monkeypatch, tmp_path):
             )
         ),
     )
+    monkeypatch.setattr("invarlock.core.runner.CoreRunner", _runner_min)
     run_command(
         config=str(cfg),
         device="cpu",

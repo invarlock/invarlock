@@ -22,9 +22,25 @@ try:
     import yaml
 
     _YAML_AVAILABLE = True
-except Exception:  # pragma: no cover - optional dependency
+    _YAML_LOAD_ERRORS = (OSError, yaml.YAMLError)
+except ModuleNotFoundError:  # pragma: no cover - optional dependency
     yaml = None
     _YAML_AVAILABLE = False
+    _YAML_LOAD_ERRORS = (OSError,)
+
+
+def _yaml_safe_load(payload: str) -> Any:
+    if yaml is None:
+        raise RuntimeError("PyYAML is unavailable")
+    loader = yaml.safe_load
+    return loader(payload)
+
+
+def _yaml_safe_dump(payload: Any, *, sort_keys: bool) -> str:
+    if yaml is None:
+        raise RuntimeError("PyYAML is unavailable")
+    dumper = yaml.safe_dump
+    return dumper(payload, sort_keys=sort_keys)
 
 
 def get_default_guards_order() -> list[str]:
@@ -58,7 +74,7 @@ def _quantile(values: list[float], q: float) -> float | None:
 def _load_json(path: Path) -> Any:
     try:
         return json.loads(path.read_text())
-    except Exception:
+    except (OSError, json.JSONDecodeError):
         return None
 
 
@@ -82,7 +98,7 @@ def _resolve_dataset_provider_spec(
             raise SystemExit(
                 "INVARLOCK_DATASET_PROVIDER_YAML is set but PyYAML is unavailable"
             )
-        parsed = yaml.safe_load(raw_yaml)  # type: ignore[attr-defined]
+        parsed = _yaml_safe_load(raw_yaml)
         if not isinstance(parsed, dict):
             raise SystemExit("INVARLOCK_DATASET_PROVIDER_YAML must parse to a mapping")
         provider = dict(parsed)
@@ -120,7 +136,7 @@ def _resolve_dataset_provider_spec(
         text_field = os.environ.get("INVARLOCK_HF_TEXT_FIELD") or "text"
         try:
             max_samples = int(os.environ.get("INVARLOCK_HF_MAX_SAMPLES") or "2000")
-        except Exception:
+        except (TypeError, ValueError):
             max_samples = 2000
         cache_dir = os.environ.get("INVARLOCK_HF_CACHE_DIR") or os.environ.get(
             "HF_DATASETS_CACHE"
@@ -162,7 +178,7 @@ def _resolve_dataset_provider_spec(
             max_samples = int(
                 os.environ.get("INVARLOCK_LOCAL_JSONL_MAX_SAMPLES") or "2000"
             )
-        except Exception:
+        except (TypeError, ValueError):
             max_samples = 2000
         provider = {
             "kind": "local_jsonl",
@@ -191,8 +207,8 @@ def _load_guard_order_and_assurance(
         )
         if cfg_path is not None:
             try:
-                cfg = yaml.safe_load(cfg_path.read_text())  # type: ignore[attr-defined]
-            except Exception:
+                cfg = _yaml_safe_load(cfg_path.read_text())
+            except _YAML_LOAD_ERRORS:
                 cfg = None
             if isinstance(cfg, dict):
                 guards_block = cfg.get("guards") or {}
@@ -224,7 +240,7 @@ def _merge_record(cert: Any, report: Any) -> dict[str, Any] | None:
             pm["ratio_vs_baseline"] = float(pm["final"]) / max(
                 float(pm["preview"]), 1e-10
             )
-        except Exception:
+        except (TypeError, ValueError, OverflowError):
             pass
     if pm and not rec.get("primary_metric"):
         rec["primary_metric"] = pm
@@ -361,7 +377,7 @@ def calibrate_drift(recs: list[dict[str, Any]]) -> dict[str, Any]:
                 if val is None:
                     return None
                 parsed = float(val)
-            except Exception:
+            except (TypeError, ValueError, OverflowError):
                 return None
             return parsed if math.isfinite(parsed) else None
 
@@ -486,7 +502,7 @@ def calibrate_spectral(
             try:
                 if mc is not None:
                     max_caps = int(mc)
-            except Exception:
+            except (TypeError, ValueError, OverflowError):
                 pass
 
         fam_caps = spec.get("family_caps", {})
@@ -498,7 +514,7 @@ def calibrate_spectral(
                     if isinstance(cap, dict):
                         cap = cap.get("kappa")
                     existing_caps[str(fam)] = float(cap)
-                except Exception:
+                except (TypeError, ValueError, OverflowError):
                     pass
 
         z_map = spec.get("final_z_scores")
@@ -734,7 +750,7 @@ def _coerce_int_env(name: str) -> int | None:
         return None
     try:
         return int(raw)
-    except Exception:
+    except (TypeError, ValueError):
         return None
 
 
@@ -758,7 +774,7 @@ def _apply_spectral_max_caps(
     base = spectral.get("max_caps")
     try:
         base_int = int(base) if base is not None else None
-    except Exception:
+    except (TypeError, ValueError, OverflowError):
         base_int = None
 
     override = _coerce_int_env("PACK_SPECTRAL_MAX_CAPS")
@@ -805,7 +821,7 @@ def generate_preset(
         try:
             lo = float(band[0])
             hi = float(band[1])
-        except Exception:
+        except (TypeError, ValueError, OverflowError):
             lo, hi = float("nan"), float("nan")
         if math.isfinite(lo) and math.isfinite(hi) and 0 < lo < hi:
             drift_band_cfg = {"min": lo, "max": hi}
@@ -882,9 +898,7 @@ def generate_preset(
 
     preset_file.parent.mkdir(parents=True, exist_ok=True)
     if _YAML_AVAILABLE and preset_file.suffix.lower() in {".yaml", ".yml"}:
-        preset_file.write_text(
-            yaml.safe_dump(preset, sort_keys=False)  # type: ignore[attr-defined]
-        )
+        preset_file.write_text(_yaml_safe_dump(preset, sort_keys=False))
     else:
         preset_file = preset_file.with_suffix(".json")
         preset_file.write_text(json.dumps(preset, indent=2) + "\n")
@@ -900,9 +914,7 @@ def generate_preset(
             f"{preset_file.stem}__{edit_type}{preset_file.suffix}"
         )
         if _YAML_AVAILABLE and out.suffix.lower() in {".yaml", ".yml"}:
-            out.write_text(
-                yaml.safe_dump(derived, sort_keys=False)  # type: ignore[attr-defined]
-            )
+            out.write_text(_yaml_safe_dump(derived, sort_keys=False))
         else:
             out = out.with_suffix(".json")
             out.write_text(json.dumps(derived, indent=2) + "\n")

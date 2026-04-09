@@ -28,7 +28,7 @@ def test_export_html_success_and_strip_css(monkeypatch, tmp_path: Path):
 def test_export_html_validation_error_exit2(monkeypatch, tmp_path: Path):
     import invarlock.reporting.html as html_mod
 
-    def _raise(_):  # type: ignore[no-untyped-def]
+    def _raise(_):
         raise ValueError("bad cert")
 
     monkeypatch.setattr(html_mod, "render_report_html", _raise)
@@ -75,7 +75,7 @@ def test_export_html_accepts_plain_python_arguments(monkeypatch, tmp_path: Path)
 def test_export_html_render_generic_error(monkeypatch, tmp_path: Path):
     import invarlock.reporting.html as html_mod
 
-    def _raise(_payload):  # type: ignore[no-untyped-def]
+    def _raise(_payload):
         raise RuntimeError("boom")
 
     monkeypatch.setattr(html_mod, "render_report_html", _raise)

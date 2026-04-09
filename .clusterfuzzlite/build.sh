@@ -38,6 +38,7 @@ for fuzzer in $(find "$SRC/invarlock/fuzzers" -name '*_fuzzer.py' | sort); do
   pyinstaller \
     --distpath "$OUT" \
     --onefile \
+    --collect-data invarlock \
     --add-data "$SRC/invarlock/contracts:contracts" \
     --name "$fuzzer_package" \
     "$fuzzer"

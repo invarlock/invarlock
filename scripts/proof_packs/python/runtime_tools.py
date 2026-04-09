@@ -13,7 +13,7 @@ def iso_to_epoch(iso: str) -> int:
         return 0
     try:
         dt = datetime.datetime.strptime(iso, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
-    except Exception:
+    except ValueError:
         return 0
     return int(dt.timestamp())
 

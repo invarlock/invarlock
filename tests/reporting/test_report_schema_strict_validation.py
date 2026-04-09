@@ -11,6 +11,14 @@ from invarlock.reporting.report_schema import (
 )
 
 
+def _import_jsonschema():
+    try:
+        import jsonschema
+    except (ImportError, ModuleNotFoundError):
+        return None
+    return jsonschema
+
+
 def _mock_report_with_windows():
     # Deterministic synthetic windows for ppl_causal
     preview = {
@@ -72,14 +80,14 @@ def test_validation_schema_rejects_unknown_keys():
     cert = make_report(report, baseline)
     # Inject an unknown validation key; strict schema must reject it
     cert.setdefault("validation", {})["foo_acceptable"] = True
-    try:
-        import jsonschema  # type: ignore
+    assert validate_report(cert) is False
 
-        with pytest.raises(jsonschema.ValidationError):
-            jsonschema.validate(instance=cert, schema=REPORT_JSON_SCHEMA)
-    except Exception:
-        # Fallback to helper which uses jsonschema when present
-        assert validate_report(cert) is False
+    jsonschema = _import_jsonschema()
+    if jsonschema is None:
+        return
+
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(instance=cert, schema=REPORT_JSON_SCHEMA)
 
 
 @pytest.mark.unit
@@ -90,10 +98,9 @@ def test_validation_schema_accepts_allowlisted_keys():
     cert.setdefault("validation", {})["hysteresis_applied"] = False
     # Helper should accept allow-listed keys.
     assert validate_report(cert) is True
-    try:
-        import jsonschema  # type: ignore
 
-        jsonschema.validate(instance=cert, schema=REPORT_JSON_SCHEMA)
-    except Exception:
-        # jsonschema optional; validate_report already checked above
-        pass
+    jsonschema = _import_jsonschema()
+    if jsonschema is None:
+        return
+
+    jsonschema.validate(instance=cert, schema=REPORT_JSON_SCHEMA)

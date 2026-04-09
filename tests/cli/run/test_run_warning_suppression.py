@@ -43,7 +43,7 @@ def test_warning_suppression_filters_and_event_logging(
         def _noop_showwarning(*_a, **_k) -> None:  # noqa: ANN001
             return
 
-        warnings.showwarning = _noop_showwarning  # type: ignore[assignment]
+        warnings.showwarning = _noop_showwarning
         try:
             with suppress_noisy_warnings(
                 "ci",
@@ -101,7 +101,7 @@ def test_warning_suppression_filters_and_event_logging(
                     line=None,
                 )
         finally:
-            warnings.showwarning = real_showwarning  # type: ignore[assignment]
+            warnings.showwarning = real_showwarning
     finally:
         root_logger.removeHandler(handler)
         tf_logger.removeHandler(handler)

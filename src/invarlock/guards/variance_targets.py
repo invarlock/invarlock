@@ -98,15 +98,10 @@ def scale_matches_target(scale_name: str, target_name: str) -> bool:
     if scale_name.startswith("block") and ("attn" in scale_name or "mlp" in scale_name):
         parts = scale_name.split(".")
         if len(parts) == 2:
-            layer_part = parts[0]
+            layer_num = parts[0][5:]
             component = parts[1]
-            if layer_part.startswith("block"):
-                try:
-                    layer_num = layer_part[5:]
-                    if f"h.{layer_num}.{component}" in target_name:
-                        return True
-                except (ValueError, IndexError):
-                    pass
+            if f"h.{layer_num}.{component}" in target_name:
+                return True
     return False
 
 

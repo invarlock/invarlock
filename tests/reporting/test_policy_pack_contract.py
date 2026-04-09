@@ -99,6 +99,19 @@ def test_policy_pack_structured_text_loader_supports_json_and_yaml() -> None:
     ) == {"tier": "balanced"}
 
 
+def test_policy_pack_structured_text_loader_normalizes_yaml_overflow(
+    monkeypatch,
+) -> None:
+    def _boom(_: str):
+        raise OverflowError("int too large")
+
+    monkeypatch.setattr(policy_pack_mod.yaml, "safe_load", _boom)
+    with pytest.raises(
+        ValueError, match="policy pack could not be decoded as JSON/YAML"
+    ):
+        policy_pack_mod._load_structured_text("tier: balanced\n", suffix=".yaml")
+
+
 def test_policy_pack_build_defaults_and_metadata() -> None:
     pack = build_policy_pack(
         tier="aggressive",

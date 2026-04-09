@@ -51,3 +51,21 @@ def test_ratio_gate_respects_tier_limits():
 
     assert balanced_cert["validation"]["primary_metric_acceptable"] is False
     assert conservative_cert["validation"]["primary_metric_acceptable"] is True
+
+
+@pytest.mark.integration
+def test_ratio_gate_ignores_auto_target_pm_ratio_hint():
+    baseline = create_empty_report()
+    baseline["metrics"]["primary_metric"] = {
+        "kind": "ppl_causal",
+        "preview": 40.0,
+        "final": 40.0,
+        "ratio_vs_baseline": 1.0,
+    }
+
+    subject = _ratio_report(40.0, 41.2, tier="balanced")  # 1.03x
+    subject["meta"]["auto"]["target_pm_ratio"] = 1.0
+
+    cert = make_report(subject, baseline)
+
+    assert cert["validation"]["primary_metric_acceptable"] is True

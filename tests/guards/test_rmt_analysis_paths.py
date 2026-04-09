@@ -3,6 +3,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
+import invarlock.guards.rmt_analysis as rmt_analysis_mod
 from invarlock.guards.rmt_analysis import (
     analyze_weight_distribution,
     capture_baseline_mp_stats,
@@ -157,3 +158,53 @@ def test_layer_svd_stats_exception_path(monkeypatch):
         assert isinstance(out, dict) and "worst_ratio" in out
     finally:
         monkeypatch.setattr(tla, "svdvals", original)
+
+
+def test_capture_baseline_mp_stats_skips_svd_failures(monkeypatch):
+    model = TinyModel()
+    monkeypatch.setattr(
+        rmt_analysis_mod,
+        "collect_linear_rmt_modules",
+        lambda *_args, **_kwargs: [("fragile", model.transformer.h[0].attn.c_attn)],
+    )
+    monkeypatch.setattr(
+        torch.linalg,
+        "svdvals",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("svd fail")),
+    )
+
+    assert capture_baseline_mp_stats(model) == {}
+
+
+def test_analyze_weight_distribution_skips_non_finite_weights() -> None:
+    class _NonFiniteModel(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.good = nn.Parameter(torch.eye(2))
+            self.bad = nn.Parameter(torch.tensor([[float("nan"), 0.0], [0.0, 1.0]]))
+
+        def named_parameters(self, prefix: str = "", recurse: bool = True):
+            yield "good.weight", self.good
+            yield "bad.weight", self.bad
+
+    stats = analyze_weight_distribution(_NonFiniteModel())
+    assert isinstance(stats, dict)
+    assert stats["mean"] == 0.5
+
+
+def test_capture_baseline_mp_stats_breaks_on_non_matrix_weight() -> None:
+    class _VectorModule(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.weight = nn.Parameter(torch.ones(4))
+
+    model = TinyModel()
+    vector_module = _VectorModule()
+    original_collect = rmt_analysis_mod.collect_linear_rmt_modules
+    rmt_analysis_mod.collect_linear_rmt_modules = lambda *_args, **_kwargs: [
+        ("vector", vector_module)
+    ]
+    try:
+        assert capture_baseline_mp_stats(model) == {}
+    finally:
+        rmt_analysis_mod.collect_linear_rmt_modules = original_collect

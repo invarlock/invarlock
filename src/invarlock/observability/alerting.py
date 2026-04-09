@@ -2,6 +2,7 @@
 Alerting and notification system.
 """
 
+import importlib
 import logging
 import smtplib
 import time
@@ -12,15 +13,28 @@ from enum import Enum
 from typing import Any
 
 try:
-    import requests  # type: ignore[import]
-except Exception:  # pragma: no cover - exercised when requests is absent
+    requests = importlib.import_module("requests")
+except ModuleNotFoundError:  # pragma: no cover - exercised when requests is absent
 
     class _MissingRequests:
         @staticmethod
         def post(*args: Any, **kwargs: Any) -> Any:
             raise ModuleNotFoundError("requests")
 
-    requests = _MissingRequests()  # type: ignore[assignment]
+    requests: Any = _MissingRequests()
+
+
+_ALERT_NOTIFICATION_ERRORS = (
+    ArithmeticError,
+    AssertionError,
+    AttributeError,
+    LookupError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+    smtplib.SMTPException,
+)
 
 
 class AlertSeverity(Enum):
@@ -302,7 +316,7 @@ class AlertManager:
                     self.logger.warning(
                         f"Unknown notification channel type: {channel.type}"
                     )
-            except Exception as e:
+            except _ALERT_NOTIFICATION_ERRORS as e:
                 self.logger.error(
                     f"Failed to send notification via {channel.name}: {e}"
                 )

@@ -38,7 +38,7 @@ def _resolve_min_tokens_target(tier: str, profile: str | None) -> int:
     pm_ratio = metrics.get("pm_ratio", {}) if isinstance(metrics, dict) else {}
     try:
         return int(pm_ratio.get("min_tokens", 0) or 0)
-    except Exception:
+    except (TypeError, ValueError, OverflowError):
         return 0
 
 

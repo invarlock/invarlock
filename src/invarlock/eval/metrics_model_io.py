@@ -9,6 +9,8 @@ import torch.nn as nn
 
 from invarlock.core.exceptions import MetricsError, ValidationError
 
+_MODEL_OUTPUT_FALLBACK_ERRORS = (AttributeError, TypeError, ValueError, RuntimeError)
+
 
 def call_model(model: nn.Module, /, *args: Any, **kwargs: Any) -> Any:
     return cast(Any, model)(*args, **kwargs)
@@ -29,7 +31,7 @@ def forward_logits_causal(
         logits = getattr(outputs, "logits", None)
         if logits is None and isinstance(outputs, tuple | list) and outputs:
             logits = outputs[0]
-    except Exception:
+    except _MODEL_OUTPUT_FALLBACK_ERRORS:
         outputs = call_model(model, input_ids=input_ids, attention_mask=attention_mask)
         if isinstance(outputs, tuple | list):
             logits = outputs[0] if outputs else None

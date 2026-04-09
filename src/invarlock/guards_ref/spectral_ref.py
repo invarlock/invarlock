@@ -3,6 +3,17 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 
+_FLOAT_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
+
+
+def _coerce_float(value: object, default: float) -> float:
+    if not isinstance(value, bool | int | float | str):
+        return float(default)
+    try:
+        return float(value)
+    except _FLOAT_COERCION_ERRORS:
+        return float(default)
+
 
 def bh_select(pvals: list[float], alpha: float) -> list[bool]:
     """
@@ -81,10 +92,7 @@ def spectral_decide(
     method_obj = (mtest or {}).get("method", "bh")
     method = str(method_obj).lower()
     alpha_obj = (mtest or {}).get("alpha", 0.05)
-    try:
-        alpha = float(alpha_obj)  # type: ignore[arg-type]
-    except Exception:
-        alpha = 0.05
+    alpha = _coerce_float(alpha_obj, 0.05)
     if method in {"bh", "benjamini-hochberg", "benjamini_hochberg"}:
         rejects = bh_select(pvals, alpha)
     elif method in {"bonferroni"}:
@@ -117,12 +125,8 @@ def spectral_decide(
     }
 
 
-def _finite01(p: float) -> bool:
-    try:
-        return (
-            (isinstance(p, int | float))
-            and math.isfinite(p)
-            and (0.0 <= float(p) <= 1.0)
-        )
-    except Exception:
+def _finite01(p: object) -> bool:
+    if not isinstance(p, int | float):
         return False
+    value = _coerce_float(p, float("nan"))
+    return math.isfinite(value) and (0.0 <= value <= 1.0)

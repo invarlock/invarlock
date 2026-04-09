@@ -170,7 +170,7 @@ def test_report_builder_support_covers_meta_and_baseline_fallback_paths() -> Non
     assert "tokenizer_hash" not in direct_baseline_ref
 
     class ExplodingMetrics(dict):
-        def get(self, key, default=None):  # type: ignore[override]
+        def get(self, key, default=None):
             raise ValueError("boom")
 
     with pytest.raises(MetricsError, match="E233"):

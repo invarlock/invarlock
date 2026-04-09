@@ -7,6 +7,14 @@ from typing import Any
 from .api import ModelAdapter, RunConfig, RunReport
 from .types import LogLevel, RunStatus
 
+_ROLLBACK_ERRORS = (
+    AttributeError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 def finalize_phase(
     runner: Any,
@@ -134,7 +142,7 @@ def finalize_phase(
                     model, adapter, checkpoint_id
                 )
             )
-        except Exception as exc:
+        except _ROLLBACK_ERRORS as exc:
             restored = False
             restore_error = str(exc)
 
@@ -207,7 +215,7 @@ def handle_error(
                     LogLevel.CRITICAL,
                     {"checkpoint": checkpoint_id, "error": "restore_failed"},
                 )
-        except Exception as rollback_error:
+        except _ROLLBACK_ERRORS as rollback_error:
             runner._log_event(
                 "runner",
                 "rollback_failed",

@@ -453,3 +453,21 @@ class TestResourceMonitor:
 
         # Keys should be the same
         assert set(usage1.keys()) == set(usage2.keys())
+
+    def test_collect_usage_handles_resource_probe_error(self, monkeypatch):
+        """Probe failures should return partial-empty usage rather than raising."""
+        from invarlock.observability.core import MonitoringConfig, ResourceMonitor
+        from invarlock.observability.metrics import MetricsRegistry
+
+        registry = MetricsRegistry()
+        config = MonitoringConfig()
+        monitor = ResourceMonitor(registry, config)
+
+        monkeypatch.setattr(
+            "invarlock.observability.core.psutil.cpu_percent",
+            lambda interval=1: (_ for _ in ()).throw(OSError("cpu unavailable")),
+        )
+
+        usage = monitor.collect_usage()
+
+        assert usage == {}

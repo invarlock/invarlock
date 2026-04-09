@@ -17,6 +17,13 @@ from invarlock.eval.metrics_model_io import (
 )
 
 logger = logging.getLogger(__name__)
+_METRICS_RUNTIME_ERRORS = (
+    AttributeError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 
 class PerplexityStatus:
@@ -431,6 +438,37 @@ def _memory_validation_error(
     )
 
 
+def _maybe_cuda_synchronize(device: torch.device) -> None:
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+
+
+def _memory_measurement_baseline(device: torch.device) -> tuple[float, object | None]:
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
+        baseline_memory = torch.cuda.memory_allocated() / (1024 * 1024)
+        torch.cuda.reset_peak_memory_stats()
+        return baseline_memory, None
+
+    import psutil
+
+    process = psutil.Process()
+    baseline_memory = process.memory_info().rss / (1024 * 1024)
+    return baseline_memory, process
+
+
+def _current_memory_mb(device: torch.device, process: object | None) -> float:
+    if device.type == "cuda":
+        return torch.cuda.memory_allocated() / (1024 * 1024)
+    assert process is not None
+    return process.memory_info().rss / (1024 * 1024)
+
+
+def _cleanup_memory_measurement_failure(device: torch.device) -> None:
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
+
+
 @torch.no_grad()
 def compute_ppl(
     model: nn.Module,
@@ -563,11 +601,10 @@ def measure_latency(
                     input_ids=sample_input_ids,
                     attention_mask=sample_attention_mask,
                 )
-            except Exception as exc:
+            except _METRICS_RUNTIME_ERRORS as exc:
                 raise RuntimeError("Latency warmup failed.") from exc
 
-    if device_t.type == "cuda":
-        torch.cuda.synchronize()
+    _maybe_cuda_synchronize(device_t)
 
     start_time = time.perf_counter()
     with torch.inference_mode():
@@ -578,11 +615,10 @@ def measure_latency(
                     input_ids=sample_input_ids,
                     attention_mask=sample_attention_mask,
                 )
-            except Exception as exc:
+            except _METRICS_RUNTIME_ERRORS as exc:
                 raise RuntimeError("Latency measurement failed.") from exc
 
-    if device_t.type == "cuda":
-        torch.cuda.synchronize()
+    _maybe_cuda_synchronize(device_t)
 
     total_time_ms = (time.perf_counter() - start_time) * 1000
     total_tokens = int(sample_attention_mask.sum().item()) * measurement_steps
@@ -607,16 +643,7 @@ def measure_memory(
     device_t = _resolve_eval_device(model, device)
     model.eval()
 
-    if device_t.type == "cuda":
-        torch.cuda.empty_cache()
-        baseline_memory = torch.cuda.memory_allocated() / (1024 * 1024)
-        torch.cuda.reset_peak_memory_stats()
-        process = None
-    else:
-        import psutil
-
-        process = psutil.Process()
-        baseline_memory = process.memory_info().rss / (1024 * 1024)
+    baseline_memory, process = _memory_measurement_baseline(device_t)
 
     max_memory = baseline_memory
     measured_samples = 0
@@ -644,17 +671,11 @@ def measure_memory(
                     input_ids=input_ids_tensor, attention_mask=attention_mask_tensor
                 )
 
-                if device_t.type == "cuda":
-                    current_memory = torch.cuda.memory_allocated() / (1024 * 1024)
-                else:
-                    assert process is not None
-                    current_memory = process.memory_info().rss / (1024 * 1024)
-
+                current_memory = _current_memory_mb(device_t, process)
                 max_memory = max(max_memory, current_memory)
                 measured_samples += 1
-            except Exception as exc:
-                if device_t.type == "cuda":
-                    torch.cuda.empty_cache()
+            except _METRICS_RUNTIME_ERRORS as exc:
+                _cleanup_memory_measurement_failure(device_t)
                 raise RuntimeError(
                     f"Memory measurement failed for sample {i}."
                 ) from exc
