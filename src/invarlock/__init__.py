@@ -12,7 +12,7 @@ For torch-dependent functionality, see subpackages under `invarlock.*`:
 - `invarlock.eval`: Metrics, guard-overhead checks, and evaluation reporting
 """
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 
 # Core exports - torch-independent
 from .config import CFG, Defaults, get_default_config

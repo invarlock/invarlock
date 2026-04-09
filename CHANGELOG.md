@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+## [0.7.0] - 2026-04-09
+
+### Added
 - Added first-class GPT-OSS causal support and pilot Ministral 3 8B/14B
   presets, calibration configs, and support-matrix/catalog coverage.
 - Added a CUDA-capable attested runtime image path for GPU hosts, smoke-sized
