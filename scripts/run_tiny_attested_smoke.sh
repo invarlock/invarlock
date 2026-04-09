@@ -159,6 +159,33 @@ debug_verify_failure() {
   "${CLI[@]}" verify "$EVAL_REPORT" "${VERIFY_ARGS[@]}" --profile "$PROFILE" || true
 }
 
+assert_semantic_pass() {
+  local report_path="$1"
+  REPORT_PATH="$report_path" "$PYTHON_BIN" - <<'PY'
+import json
+import os
+from pathlib import Path
+
+from invarlock.reporting.report_policy import resolve_tiny_relax_from_report
+
+report = json.loads(Path(os.environ["REPORT_PATH"]).read_text(encoding="utf-8"))
+if not resolve_tiny_relax_from_report(report):
+    raise SystemExit("tiny smoke report is missing tiny_relax provenance")
+
+validation = report.get("validation") or {}
+required_true = (
+    "primary_metric_acceptable",
+    "preview_final_drift_acceptable",
+    "invariants_pass",
+    "spectral_stable",
+    "rmt_stable",
+)
+for key in required_true:
+    if validation.get(key) is not True:
+        raise SystemExit(f"expected validation.{key} to be true, found {validation.get(key)!r}")
+PY
+}
+
 if seed_hf_cache_from_host; then
   export INVARLOCK_SMOKE_CACHE_SEEDED=1
 elif prefetch_tiny_model_on_host && seed_hf_cache_from_host; then
@@ -275,6 +302,7 @@ if [[ "$VERIFY_RC" != "0" ]]; then
   echo "[error] evaluation report verification failed" >&2
   exit "$VERIFY_RC"
 fi
+assert_semantic_pass "$EVAL_REPORT"
 "${CLI[@]}" report validate "$EVAL_REPORT"
 mkdir -p "$SMOKE_EXPORT_DIR"
 "${CLI[@]}" report html -i "$EVAL_REPORT" -o "$SMOKE_EXPORT_DIR/evaluation.html"

@@ -244,7 +244,7 @@ def test_compute_validation_flags_clamps_negative_min_tokens_tolerance(
     assert flags.get("primary_metric_acceptable") is False
 
 
-def test_resolve_tiny_relax_from_report_context_only() -> None:
+def test_resolve_tiny_relax_from_report_context_and_auto_fields() -> None:
     assert (
         report_policy_mod.resolve_tiny_relax_from_report(
             {"context": {"run": {"tiny_relax": "on"}}}
@@ -255,6 +255,10 @@ def test_resolve_tiny_relax_from_report_context_only() -> None:
         report_policy_mod.resolve_tiny_relax_from_report(
             {"context": {"eval": {"tiny_relax": 1}}}
         )
+        is True
+    )
+    assert (
+        report_policy_mod.resolve_tiny_relax_from_report({"auto": {"tiny_relax": True}})
         is True
     )
     assert (

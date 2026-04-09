@@ -173,4 +173,16 @@ def resolve_tiny_relax_from_report(report: dict[str, Any] | None) -> bool:
             if eval_val is not None:
                 return bool(eval_val)
 
+    auto = report.get("auto")
+    if isinstance(auto, dict):
+        auto_val = coerce_bool_like(auto.get("tiny_relax"))
+        if auto_val is not None:
+            return bool(auto_val)
+
+    provenance = report.get("provenance")
+    if isinstance(provenance, dict):
+        flags = provenance.get("flags")
+        if isinstance(flags, list):
+            return "tiny_relax" in {str(flag).strip().lower() for flag in flags}
+
     return False
