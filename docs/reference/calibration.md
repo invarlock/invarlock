@@ -16,6 +16,12 @@
 | **Network** | Offline by default; use `--allow-network` on calibration commands when a sweep needs model or dataset downloads. |
 | **Source of truth** | `src/invarlock/cli/commands/calibrate.py`, `src/invarlock/calibration/`. |
 
+Smoke-sized configs are also shipped for maintainers who want to exercise the
+calibration command surface without a full policy-tuning campaign:
+`configs/calibration/null_sweep_smoke.yaml` and
+`configs/calibration/rmt_ve_sweep_smoke.yaml`. These are intended for smoke
+coverage and operational validation, not for published calibration evidence.
+
 ## Quick Start
 
 The commands below use the secure-default runtime container. Add
@@ -38,6 +44,21 @@ invarlock advanced calibrate ve-sweep \
   --out reports/calibration/ve_sweep \
   --tier balanced --tier conservative \
   --n-seeds 10
+```
+
+For smoke-only runs, swap the configs above for the shipped smoke configs and
+keep the run small:
+
+```bash
+invarlock advanced calibrate null-sweep \
+  --allow-network \
+  --config configs/calibration/null_sweep_smoke.yaml \
+  --out reports/calibration/null_sweep_smoke
+
+invarlock advanced calibrate ve-sweep \
+  --allow-network \
+  --config configs/calibration/rmt_ve_sweep_smoke.yaml \
+  --out reports/calibration/ve_sweep_smoke
 ```
 
 ## Concepts

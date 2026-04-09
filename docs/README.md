@@ -58,6 +58,15 @@ floors. The tiny push smoke also uses an explicit trusted-local assurance overri
 for proof-pack verification when CI produces an unsigned pack; the default
 package-native verifier behavior remains fail-closed for unsigned packs.
 
+Maintainer smoke note: the repo-wide CLI smoke matrix now lives under
+`scripts/cli_exhaustive_smoke.sh`, which dispatches three lanes:
+`scripts/cli_smoke_fast.sh` for broad command-surface and positive-path tiny
+flows, `scripts/cli_smoke_negative.sh` for malformed / policy-fail /
+fail-closed categories, and `scripts/cli_smoke_realistic.sh` for the slower
+GPT-2-sized path. Calibration smoke runs in that matrix use
+`configs/calibration/null_sweep_smoke.yaml` and
+`configs/calibration/rmt_ve_sweep_smoke.yaml`.
+
 ---
 
 ## Documentation Map

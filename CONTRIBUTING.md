@@ -71,6 +71,28 @@ invarlock --help
 invarlock doctor --json
 ```
 
+For maintainer-facing CLI smoke coverage, use the lane scripts directly:
+
+```bash
+bash scripts/cli_smoke_fast.sh
+bash scripts/cli_smoke_negative.sh
+bash scripts/cli_smoke_realistic.sh
+
+# or dispatch the full matrix
+bash scripts/cli_exhaustive_smoke.sh
+```
+
+Lane intent:
+
+- `cli_smoke_fast.sh` covers broad command-surface and positive-path tiny-model flows
+- `cli_smoke_negative.sh` covers malformed, policy-fail, and fail-closed categories
+- `cli_smoke_realistic.sh` wraps the GPT-2-sized smoke campaign
+
+The hidden internal `invarlock run` shell is used by delegated config
+execution and calibration internals. It is intentionally not part of the
+public CLI contract, so public docs and user examples should continue to use
+`evaluate`, `verify`, `report`, `doctor`, and `advanced ...`.
+
 ---
 
 ## 2. Repository Layout
@@ -372,7 +394,8 @@ make verify
 ```
 
 This runs tests, a smoke regression (`scripts/run_smoke_regression.sh`),
-ruff lint, ruff format (check mode), and markdown lint over docs.
+CLI command-surface smokes, ruff lint, ruff format (check mode), packaged
+contract sync checks, and markdown lint over docs.
 
 ---
 

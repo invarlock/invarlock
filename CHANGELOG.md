@@ -8,14 +8,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added first-class GPT-OSS causal support and pilot Ministral 3 8B/14B
+  presets, calibration configs, and support-matrix/catalog coverage.
+- Added a CUDA-capable attested runtime image path for GPU hosts, smoke-sized
+  calibration configs, and a split CLI smoke matrix with fast, negative-path,
+  and GPT-2 realistic lanes.
+- Added broader explicit per-file coverage thresholds, repo-wide debt
+  checklists, and tighter architecture guardrails for the newly split core,
+  reporting, and test owners.
 
 ### Changed
+- Refactored large runtime, reporting, proof-pack, and test owners into
+  smaller modules with tighter shell/core boundaries and clearer ownership.
+- Reorganized the test suite around behavior-based file placement, `_support_*`
+  helper modules, and split previously monolithic core/CLI/reporting tests into
+  focused suites.
+- Updated smoke and calibration maintainer flows to use the repo-selected
+  Python, dedicated smoke configs, and lane-oriented scripts instead of the
+  earlier monolithic CLI smoke harness.
 
 ### Fixed
+- Fixed `quant_rtn` and report-generation fail-closed behavior so noop edits,
+  failed subject runs, malformed primary-metric outputs, and invalid baseline
+  pairing states no longer emit misleading downstream artifacts.
+- Fixed delegated config execution by restoring the hidden internal config-run
+  shell used by runtime delegation and calibration, and aligned attested vs
+  trusted-local tiny-smoke semantics by forwarding and resolving `tiny_relax`
+  provenance consistently.
+- Fixed trusted-local and attested live-demo paths across GPT-2 and 14B model
+  flows, including CUDA runtime selection, HF cold-cache fallback handling,
+  non-GPT-2 layer-count reporting, regenerated report runtime manifests, and
+  primary-metric acceptance handling.
+- Fixed developer-path regressions around Python interpreter selection, the
+  mypy gate, Dependabot/CodeQL updater stability, ClusterFuzzLite Docker
+  inputs, and repo gate coverage expectations.
+- Reduced repo-wide static debt by removing remaining source `type: ignore`
+  suppressions, narrowing broad exception fallbacks, and hardening
+  observability, eval, calibration, and adapter boundary paths.
 
 ### Dependencies
+- Bumped workflow and dev-security dependencies including `cryptography` to
+  `46.0.7`, `ruff` to `0.15.9`, `katex` to `0.16.45`, and refreshed the pinned
+  CodeQL action state and Dependabot handling.
+- Added a `cu128` runtime-image lockfile for the CUDA attested runtime path.
 
 ### Documentation
+- Refreshed maintainer and user docs around profile-driven token floors, smoke
+  strategy, calibration surfaces, and the current trusted-local / attested
+  operating model.
 
 ## [0.6.0] - 2026-04-04
 
