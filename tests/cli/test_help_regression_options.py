@@ -13,13 +13,23 @@ def _load_app(monkeypatch):
     return app
 
 
-def test_run_command_reports_migration(monkeypatch):
+def test_run_command_requires_config(monkeypatch):
     app = _load_app(monkeypatch)
     runner = CliRunner()
     res = runner.invoke(app, ["run"])
     assert res.exit_code == 2, res.output
     out = strip_ansi(res.output)
-    assert "No such command 'run'" in out
+    assert "Missing option '--config'" in out
+
+
+def test_run_help_is_hidden_but_typed(monkeypatch):
+    app = _load_app(monkeypatch)
+    runner = CliRunner()
+    res = runner.invoke(app, ["run", "--help"])
+    assert res.exit_code == 0, res.output
+    out = strip_ansi(res.stdout)
+    assert "--config" in out
+    assert "--device" in out
 
 
 def test_evaluate_help_exposes_baseline_and_subject(monkeypatch):

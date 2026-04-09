@@ -18,6 +18,7 @@ def test_runtime_launch_plan_helper_functions_cover_device_and_flag_parsing(
     assert runtime_launch_plan._requested_device(["evaluate"]) == "auto"
     assert runtime_launch_plan._requested_device(["run"]) == "auto"
     assert runtime_launch_plan._requested_device(["calibrate"]) == "auto"
+    assert runtime_launch_plan._requested_device(["advanced", "calibrate"]) == "auto"
     assert runtime_launch_plan._requested_device(["verify"]) is None
     assert runtime_launch_plan._requested_device(["--help"]) is None
     assert (
@@ -310,3 +311,13 @@ def test_normalize_delegated_argv_rewrites_paths_and_builders(
     assert "--max-attempts" not in request_plan_default.argv
     assert "--until-pass" not in request_plan_default.argv
     assert "--no-cleanup" not in request_plan_default.argv
+
+    calibrate_request_plan = runtime_launch_plan.build_request_container_launch_plan(
+        ("advanced", "calibrate", "null-sweep"),
+        request,
+    )
+    assert list(calibrate_request_plan.argv[:3]) == [
+        "advanced",
+        "calibrate",
+        "null-sweep",
+    ]

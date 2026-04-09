@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -47,7 +48,7 @@ class ConfigExecutionRequest:
 
 
 def build_request_container_launch_plan(
-    command_name: str,
+    command_name: str | Iterable[str],
     request: ConfigExecutionRequest,
 ):
     from invarlock.cli.runtime_launch_plan import (
@@ -92,7 +93,7 @@ def run_from_config(
     allow_remote_code: bool = False,
     allow_unattested_artifacts: bool = False,
     prefer_local_files_only: bool = False,
-    command_name: str = "run",
+    command_name: str | Iterable[str] = "run",
     delegate: bool = True,
 ) -> Path:
     """Run a config-driven job and return the emitted report path."""
@@ -167,11 +168,16 @@ def run_from_config(
 
         report = Path(report_path).resolve()
         if report.exists():
+            manifest_command = (
+                " ".join(str(token) for token in command_name)
+                if not isinstance(command_name, str)
+                else command_name
+            )
             write_runtime_manifest(
                 report,
                 config_path=config,
                 extra={
-                    "command": command_name,
+                    "command": manifest_command,
                     "profile": profile,
                     "allow_network": policy.allow_network,
                     "allow_remote_code": policy.allow_remote_code,

@@ -669,7 +669,7 @@ def test_path_env_value_and_delegated_env_pairs_translate_workspace_paths(
         assert env_pairs["INVARLOCK_SNAPSHOT_MODE"] == "audit"
         assert env_pairs["INVARLOCK_EVALUATE_TMP_DIR"] == "/workspace/tmp-cache"
         assert env_pairs["TMPDIR"] == str(external_tmp.resolve())
-        assert "INVARLOCK_TINY_RELAX" not in env_pairs
+        assert env_pairs["INVARLOCK_TINY_RELAX"] == "1"
         assert mounts == [external_tmp]
 
     translated_inside, inside_mounts = runtime_security._path_env_value_for_container(

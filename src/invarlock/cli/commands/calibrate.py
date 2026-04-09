@@ -107,7 +107,7 @@ def _run_calibration_config(
             allow_host_execution=allow_host_execution,
             allow_third_party_plugins=allow_third_party_plugins,
             allow_remote_code=allow_remote_code,
-            command_name="calibrate",
+            command_name="run",
         )
     except RuntimeDelegationError as exc:
         console.print(f"[red]{exc}[/red]")

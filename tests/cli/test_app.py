@@ -58,6 +58,15 @@ def test_cli_help_lists_core_commands():
         assert not re.search(rf"^\s*│\s+{re.escape(removed)}\s", output, re.MULTILINE)
 
 
+def test_hidden_run_command_remains_invocable() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["run", "--help"])
+    assert result.exit_code == 0
+    output = strip_ansi(result.stdout)
+    assert "--config" in output
+    assert "--allow-host-execution" in output
+
+
 def test_cli_version_flag_exits_through_root_callback():
     runner = CliRunner()
     with (

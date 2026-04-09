@@ -9,7 +9,7 @@ from invarlock.cli.app import app
 
 def test_removed_commands_fail_with_migration_guidance():
     runner = CliRunner()
-    for command in ("run", "proof-pack", "policy", "plugins", "calibrate"):
+    for command in ("proof-pack", "policy", "plugins", "calibrate"):
         result = runner.invoke(app, [command])
         assert result.exit_code == 2
         out = strip_ansi(result.output)

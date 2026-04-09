@@ -132,6 +132,37 @@ def test_run_calibration_config_runtime_delegation_error_exits(
     assert excinfo.value.exit_code == 1
 
 
+def test_run_calibration_config_delegates_with_advanced_command_path(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    seen: dict[str, object] = {}
+
+    def _run_from_config(**kwargs):
+        seen.update(kwargs)
+        return tmp_path / "report.json"
+
+    monkeypatch.setattr(
+        calibrate_mod,
+        "run_from_config",
+        _run_from_config,
+    )
+
+    report = calibrate_mod._run_calibration_config(
+        config=tmp_path / "config.yaml",
+        device="cpu",
+        profile="ci",
+        out=tmp_path / "out",
+        tier="balanced",
+        allow_network=True,
+        allow_host_execution=False,
+        allow_third_party_plugins=False,
+        allow_remote_code=False,
+    )
+
+    assert report == tmp_path / "report.json"
+    assert seen["command_name"] == "run"
+
+
 def test_get_tier_guard_config_success_path(monkeypatch: pytest.MonkeyPatch) -> None:
     real_import = builtins.__import__
     fake_module = types.ModuleType("invarlock.guards.tier_config")
