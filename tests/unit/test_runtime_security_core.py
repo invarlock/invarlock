@@ -17,9 +17,9 @@ def test_runtime_bool_helpers_and_execution_mode(monkeypatch) -> None:
     monkeypatch.setenv(runtime_security.ALLOW_THIRD_PARTY_PLUGINS_ENV, "1")
     monkeypatch.setenv(runtime_security.CONTAINER_EXECUTION_ENV, "1")
 
-    assert runtime_security._coerce_bool("on") is True
-    assert runtime_security._coerce_bool("off") is False
-    assert runtime_security._coerce_bool("maybe") is None
+    assert runtime_security_helpers._coerce_bool("on") is True
+    assert runtime_security_helpers._coerce_bool("off") is False
+    assert runtime_security_helpers._coerce_bool("maybe") is None
     assert runtime_security.network_allowed() is True
     assert runtime_security.host_execution_allowed() is False
     assert runtime_security.remote_code_allowed() is True
@@ -53,7 +53,7 @@ def test_serialize_canonical_json_normalizes_supported_types() -> None:
         ],
     }
 
-    encoded = runtime_security.serialize_canonical_json(payload)
+    encoded = runtime_security_helpers.serialize_canonical_json(payload)
     decoded = json.loads(encoded)
 
     assert decoded["path"] == "artifact.txt"
@@ -147,8 +147,9 @@ def test_resolve_runtime_image_prefers_explicit_local_and_default(monkeypatch) -
     monkeypatch.setattr(
         runtime_security_helpers,
         "container_image_available_locally",
-        lambda image, engine=None: image
-        == runtime_security.RUNTIME_IMAGE_LOCAL_DEFAULT,
+        lambda image, engine=None: (
+            image == runtime_security.RUNTIME_IMAGE_LOCAL_DEFAULT
+        ),
         raising=True,
     )
     assert (
@@ -185,8 +186,9 @@ def test_resolve_runtime_image_prefers_local_cuda_when_gpu_visible(monkeypatch) 
     monkeypatch.setattr(
         runtime_security_helpers,
         "container_image_available_locally",
-        lambda image, engine=None: image
-        == runtime_security.RUNTIME_IMAGE_CUDA_LOCAL_DEFAULT,
+        lambda image, engine=None: (
+            image == runtime_security.RUNTIME_IMAGE_CUDA_LOCAL_DEFAULT
+        ),
         raising=True,
     )
 
@@ -198,7 +200,7 @@ def test_resolve_runtime_image_prefers_local_cuda_when_gpu_visible(monkeypatch) 
 
 def test_inspect_container_image_parses_repo_digest_and_image_id(monkeypatch) -> None:
     monkeypatch.setattr(
-        runtime_security.subprocess,
+        runtime_security_helpers.subprocess,
         "run",
         lambda *args, **kwargs: SimpleNamespace(
             returncode=0,
@@ -206,13 +208,13 @@ def test_inspect_container_image_parses_repo_digest_and_image_id(monkeypatch) ->
         ),
         raising=True,
     )
-    assert runtime_security._inspect_container_image("docker", "img") == (
+    assert runtime_security_helpers._inspect_container_image("docker", "img") == (
         True,
         "sha256:abc",
     )
 
     monkeypatch.setattr(
-        runtime_security.subprocess,
+        runtime_security_helpers.subprocess,
         "run",
         lambda *args, **kwargs: SimpleNamespace(
             returncode=0,
@@ -220,7 +222,7 @@ def test_inspect_container_image_parses_repo_digest_and_image_id(monkeypatch) ->
         ),
         raising=True,
     )
-    assert runtime_security._inspect_container_image("docker", "img") == (
+    assert runtime_security_helpers._inspect_container_image("docker", "img") == (
         True,
         "sha256:def",
     )
@@ -230,31 +232,40 @@ def test_inspect_container_image_handles_failures_and_digestless_images(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
-        runtime_security.subprocess,
+        runtime_security_helpers.subprocess,
         "run",
         lambda *args, **kwargs: SimpleNamespace(returncode=2, stdout=""),
         raising=True,
     )
-    assert runtime_security._inspect_container_image("docker", "img") == (False, None)
+    assert runtime_security_helpers._inspect_container_image("docker", "img") == (
+        False,
+        None,
+    )
 
     monkeypatch.setattr(
-        runtime_security.subprocess,
+        runtime_security_helpers.subprocess,
         "run",
         lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout="[]\nimage-id\n"),
         raising=True,
     )
-    assert runtime_security._inspect_container_image("docker", "img") == (True, None)
+    assert runtime_security_helpers._inspect_container_image("docker", "img") == (
+        True,
+        None,
+    )
 
     monkeypatch.setattr(
-        runtime_security.subprocess,
+        runtime_security_helpers.subprocess,
         "run",
         lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout=""),
         raising=True,
     )
-    assert runtime_security._inspect_container_image("docker", "img") == (True, None)
+    assert runtime_security_helpers._inspect_container_image("docker", "img") == (
+        True,
+        None,
+    )
 
     monkeypatch.setattr(
-        runtime_security.subprocess,
+        runtime_security_helpers.subprocess,
         "run",
         lambda *args, **kwargs: SimpleNamespace(
             returncode=0,
@@ -262,13 +273,16 @@ def test_inspect_container_image_handles_failures_and_digestless_images(
         ),
         raising=True,
     )
-    assert runtime_security._inspect_container_image("docker", "img") == (True, None)
+    assert runtime_security_helpers._inspect_container_image("docker", "img") == (
+        True,
+        None,
+    )
 
 
 def test_container_engine_and_device_helpers(monkeypatch) -> None:
     monkeypatch.setenv(runtime_security.CONTAINER_ENGINE_ENV, "podman")
     monkeypatch.setattr(
-        runtime_security.shutil,
+        runtime_security_helpers.shutil,
         "which",
         lambda name: f"/usr/bin/{name}" if name in {"docker", "podman"} else None,
         raising=True,
@@ -277,7 +291,7 @@ def test_container_engine_and_device_helpers(monkeypatch) -> None:
 
     monkeypatch.setenv(runtime_security.CONTAINER_ENGINE_ENV, "bogus")
     monkeypatch.setattr(
-        runtime_security.shutil,
+        runtime_security_helpers.shutil,
         "which",
         lambda name: "/usr/bin/podman" if name == "podman" else None,
         raising=True,
@@ -324,20 +338,20 @@ def test_runtime_security_device_helpers_cover_missing_tokens_and_devnode(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
-        runtime_security.shutil,
+        runtime_security_helpers.shutil,
         "which",
         lambda name: None,
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security.Path,
+        runtime_security_helpers.Path,
         "exists",
         lambda self: str(self) == "/dev/nvidiactl",
         raising=False,
     )
 
     assert runtime_security.resolve_container_engine() is None
-    assert runtime_security._host_nvidia_visible() is True
+    assert runtime_security_helpers._host_nvidia_visible() is True
     assert runtime_launch_plan._requested_device(["--help"]) is None
 
 

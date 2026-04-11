@@ -155,10 +155,10 @@ def _patch_doctor_preflight_common(
     monkeypatch: pytest.MonkeyPatch, cfg: object
 ) -> None:
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.load_config", lambda _path: cfg, raising=False
+        "invarlock.core.config_loader.load_config", lambda _path: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.apply_profile",
+        "invarlock.core.config_loader.apply_profile",
         lambda cfg_obj, _profile: cfg_obj,
         raising=False,
     )
@@ -646,16 +646,8 @@ def test_finalize_related_types_and_decisions_cover_fallback_paths() -> None:
     guard_result = core_types_mod.GuardValidationResult(passed=True, decision="allow")
     guard_result["diagnostics"] = "bad"
     assert guard_result.diagnostics == ()
-    assert (
-        core_types_mod.normalize_guard_decision(None, fallback_action="warn")
-        == "monitor"
-    )
-    assert (
-        core_types_mod.normalize_guard_decision(
-            None, fallback_action="  ", passed=False
-        )
-        == "block"
-    )
+    assert core_types_mod.normalize_guard_decision("monitor") == "monitor"
+    assert core_types_mod.normalize_guard_decision(None, passed=False) == "block"
 
 
 def test_finalize_phase_marks_non_finite_primary_metric_payload_invalid() -> None:

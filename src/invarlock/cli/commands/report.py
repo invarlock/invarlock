@@ -6,9 +6,11 @@ Provides the `invarlock report` group with explicit subcommands for
 generating, explaining, validating, and rendering report artifacts.
 """
 
+from __future__ import annotations
+
 import math
 from time import perf_counter
-from typing import Any, NoReturn
+from typing import TYPE_CHECKING, Any, NoReturn
 
 import typer
 from rich.console import Console
@@ -19,14 +21,9 @@ from invarlock.core.report_inputs import (
     load_evaluation_report_input_json,
     load_run_report_input_json,
 )
-from invarlock.reporting.report_contract import (
-    ReportGenerationResult,
-    generate_reports,
-)
-from invarlock.reporting.report_telemetry import (
-    telemetry_output_enabled,
-    telemetry_summary_line,
-)
+
+if TYPE_CHECKING:
+    from invarlock.reporting.report_contract import ReportGenerationResult
 
 console = Console()
 
@@ -44,6 +41,24 @@ _REPORT_RENDER_ERRORS = (
     ValueError,
 )
 _REPORT_COMMAND_ERRORS = (OSError, RuntimeError, TypeError)
+
+
+def _generate_reports(**kwargs: Any) -> ReportGenerationResult:
+    from invarlock.reporting.report_contract import generate_reports
+
+    return generate_reports(**kwargs)
+
+
+def _telemetry_output_enabled() -> bool:
+    from invarlock.reporting.report_telemetry import telemetry_output_enabled
+
+    return telemetry_output_enabled()
+
+
+def _telemetry_summary_line(evaluation_report: dict[str, Any]) -> str | None:
+    from invarlock.reporting.report_telemetry import telemetry_summary_line
+
+    return telemetry_summary_line(evaluation_report)
 
 
 def _raise_report_input_failure(message: str, *, no_color: bool = False) -> NoReturn:
@@ -173,8 +188,8 @@ def _render_generation_result(
         if "report" in result.formats and result.evaluation_report:
             try:
                 evaluation_report = result.evaluation_report
-                if telemetry_output_enabled():
-                    summary_line = telemetry_summary_line(evaluation_report)
+                if _telemetry_output_enabled():
+                    summary_line = _telemetry_summary_line(evaluation_report)
                     if summary_line:
                         console.print(summary_line, markup=False)
                 block = result.validation_block or {"overall_pass": False, "rows": []}
@@ -354,7 +369,7 @@ def report_callback(
     except ReportInputError as exc:
         _raise_report_input_failure(str(exc), no_color=no_color)
     try:
-        result = generate_reports(
+        result = _generate_reports(
             run=str(run_path),
             format=format,
             compare=str(compare_path) if compare_path is not None else None,

@@ -23,7 +23,7 @@ def test_evaluation_report_acceptance_range_applied():
         "invariants": {"status": "pass"},
         "_ppl_metrics": {"preview_total_tokens": 60000, "final_total_tokens": 60000},
         "guard_overhead": {},
-        "primary_metric": {"ratio_vs_baseline": 1.12},
+        "primary_metric": {"kind": "ppl_causal", "ratio_vs_baseline": 1.12},
         "moe": {},
         "dataset_capacity": {"tokens_available": 120000},
     }

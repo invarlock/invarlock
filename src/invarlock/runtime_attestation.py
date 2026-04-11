@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 from invarlock.runtime_security import (
@@ -18,7 +18,7 @@ from invarlock.runtime_security import (
 from invarlock.runtime_verify import verify_runtime_manifest
 
 
-class RuntimeAttestationIssueCode(str, Enum):
+class RuntimeAttestationIssueCode(StrEnum):
     MANIFEST_MISSING = "manifest_missing"
     MANIFEST_INVALID = "manifest_invalid"
     EXECUTION_MODE_INVALID = "execution_mode_invalid"

@@ -166,9 +166,9 @@ def test_report_command_prints_telemetry_summary_line(monkeypatch):
         evaluation_report={"validation": {"overall": True}, "primary_metric": {}},
         validation_block={"overall_pass": True, "rows": []},
     )
-    monkeypatch.setattr(report_mod, "telemetry_output_enabled", lambda: True)
+    monkeypatch.setattr(report_mod, "_telemetry_output_enabled", lambda: True)
     monkeypatch.setattr(
-        report_mod, "telemetry_summary_line", lambda _report: "telemetry"
+        report_mod, "_telemetry_summary_line", lambda _report: "telemetry"
     )
 
     captured: list[str] = []
@@ -188,8 +188,8 @@ def test_report_command_skips_empty_telemetry_summary_line(monkeypatch):
         evaluation_report={"validation": {"overall": True}, "primary_metric": {}},
         validation_block={"overall_pass": True, "rows": []},
     )
-    monkeypatch.setattr(report_mod, "telemetry_output_enabled", lambda: True)
-    monkeypatch.setattr(report_mod, "telemetry_summary_line", lambda _report: "")
+    monkeypatch.setattr(report_mod, "_telemetry_output_enabled", lambda: True)
+    monkeypatch.setattr(report_mod, "_telemetry_summary_line", lambda _report: "")
 
     captured: list[str] = []
 
@@ -211,7 +211,7 @@ def test_report_command_evaluation_report_validation_error(monkeypatch):
     )
     monkeypatch.setattr(
         report_mod,
-        "generate_reports",
+        "_generate_reports",
         lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("bad report")),
     )
     monkeypatch.setattr(
@@ -291,7 +291,7 @@ def test_report_command_maps_nonbaseline_value_error_to_exit_two(monkeypatch) ->
 
     monkeypatch.setattr(
         report_mod,
-        "generate_reports",
+        "_generate_reports",
         lambda **_kwargs: (_ for _ in ()).throw(ValueError("bad input path")),
     )
     monkeypatch.setattr(
@@ -327,7 +327,7 @@ def test_report_callback_maps_generic_error_to_exit_one(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         report_mod,
-        "generate_reports",
+        "_generate_reports",
         lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
     )
     monkeypatch.setattr(
@@ -378,10 +378,10 @@ def test_report_command_summary_skips_telemetry_when_disabled(monkeypatch) -> No
             captured.append(" ".join(str(a) for a in args))
 
     monkeypatch.setattr(report_mod, "console", _CaptureConsole())
-    monkeypatch.setattr(report_mod, "telemetry_output_enabled", lambda: False)
+    monkeypatch.setattr(report_mod, "_telemetry_output_enabled", lambda: False)
     monkeypatch.setattr(
         report_mod,
-        "telemetry_summary_line",
+        "_telemetry_summary_line",
         lambda _report: (_ for _ in ()).throw(RuntimeError("should not run")),
     )
 
@@ -409,8 +409,8 @@ def test_report_command_summary_handles_missing_optional_fields(monkeypatch) -> 
             captured.append(" ".join(str(a) for a in args))
 
     monkeypatch.setattr(report_mod, "console", _CaptureConsole())
-    monkeypatch.setattr(report_mod, "telemetry_output_enabled", lambda: True)
-    monkeypatch.setattr(report_mod, "telemetry_summary_line", lambda _report: None)
+    monkeypatch.setattr(report_mod, "_telemetry_output_enabled", lambda: True)
+    monkeypatch.setattr(report_mod, "_telemetry_summary_line", lambda _report: None)
 
     report_mod._render_generation_result(result=result, style="audit", no_color=False)
     rendered = "\n".join(captured)
@@ -507,10 +507,10 @@ def test_render_generation_result_maps_inner_report_error_to_exit_one(monkeypatc
         evaluation_report={"primary_metric": {}},
         validation_block={"overall_pass": True, "rows": []},
     )
-    monkeypatch.setattr(report_mod, "telemetry_output_enabled", lambda: True)
+    monkeypatch.setattr(report_mod, "_telemetry_output_enabled", lambda: True)
     monkeypatch.setattr(
         report_mod,
-        "telemetry_summary_line",
+        "_telemetry_summary_line",
         lambda _report: (_ for _ in ()).throw(RuntimeError("bad telemetry")),
     )
     monkeypatch.setattr(
@@ -556,7 +556,7 @@ def test_report_callback_skips_subcommand_and_delegates_success(monkeypatch) -> 
         delegated.append(kwargs)
         return _make_generation_result(formats=["json"], saved_files={"json": "a.json"})
 
-    monkeypatch.setattr(report_mod, "generate_reports", fake_generate)
+    monkeypatch.setattr(report_mod, "_generate_reports", fake_generate)
     monkeypatch.setattr(
         report_mod,
         "load_run_report_input_json",
@@ -610,7 +610,7 @@ def test_report_command_maps_report_input_error_to_exit_two(monkeypatch) -> None
     )
     monkeypatch.setattr(
         report_mod,
-        "generate_reports",
+        "_generate_reports",
         lambda **_kwargs: (_ for _ in ()).throw(
             report_mod.ReportInputError("not_found", Path("run.json"))
         ),

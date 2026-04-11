@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from invarlock.core.abi import INVARLOCK_CORE_ABI as CORE_ABI
 from invarlock.core.api import Guard, ModelAdapter
 from invarlock.core.types import GuardValidationResult
+
+INVARLOCK_CORE_ABI = CORE_ABI
 
 
 class HelloGuard(Guard):
@@ -26,7 +29,7 @@ class HelloGuard(Guard):
         passed = score <= self.threshold
         return GuardValidationResult(
             passed=passed,
-            decision="monitor" if passed else "block",
+            decision="allow" if passed else "block",
             metrics={"score": score},
             extras={
                 "message": (

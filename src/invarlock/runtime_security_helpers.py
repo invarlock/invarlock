@@ -9,12 +9,15 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
-from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from invarlock.core.config_dependencies import inspect_config_dependencies
+# Canonical runtime-security helpers live here; container execution and manifest
+# serialization are split into owner modules imported below.
+from invarlock import runtime_security_container as _container_impl
+from invarlock import runtime_security_manifest as _manifest_impl
+from invarlock.core.config_loader import inspect_config_dependencies
 
 ALLOW_HOST_EXECUTION_ENV = "INVARLOCK_ALLOW_HOST_EXECUTION"
 ALLOW_NETWORK_ENV = "INVARLOCK_ALLOW_NETWORK"
@@ -74,7 +77,6 @@ __all__ = [
     "RuntimeManifestLoadIssueCode",
     "RuntimeManifestLoadResult",
     "running_inside_container",
-    "serialize_canonical_json",
     "third_party_plugins_allowed",
     "unattested_artifacts_allowed",
     "write_runtime_manifest",
@@ -115,7 +117,7 @@ class RuntimeManifestExecution:
     allow_third_party_plugins: bool
 
 
-class RuntimeManifestLoadIssueCode(str, Enum):
+class RuntimeManifestLoadIssueCode(StrEnum):
     MISSING = "missing"
     READ_FAILED = "read_failed"
     INVALID_JSON = "invalid_json"
@@ -816,101 +818,39 @@ def runtime_allowances_scope(
 
 
 def build_container_command(plan: Any) -> list[str]:
-    context = _resolve_container_launch_context(plan)
-    # The runtime image already sets `python -m invarlock` as its entrypoint.
-    return _compose_container_run_args(
-        context,
-        plan,
-        argv=tuple(plan.argv),
-    )
+    return _container_impl.build_container_command(plan)
 
 
 def delegate_container_command(plan: Any) -> int:
-    command = build_container_command(plan)
-    try:
-        completed = subprocess.run(
-            command,
-            check=False,
-            timeout=_CONTAINER_EXECUTION_TIMEOUT_SECONDS,
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise RuntimeError(
-            "Container execution timed out after "
-            f"{_CONTAINER_EXECUTION_TIMEOUT_SECONDS} seconds."
-        ) from exc
-    return int(completed.returncode)
+    return _container_impl.delegate_container_command(plan)
 
 
 def build_container_python_command(
     script_path: str | os.PathLike[str],
     plan: Any,
 ) -> list[str]:
-    context = _resolve_container_launch_context(plan)
-    cwd = context.cwd
-    script_host_path = _absolute_host_path(Path(script_path), cwd=cwd)
-    script_mounts: set[Path] = set()
-    if _record_path_dependencies(script_host_path, script_mounts, cwd=cwd):
-        container_script = _workspace_path(script_host_path, cwd=cwd)
-    else:
-        container_script = str(script_host_path)
-    return _compose_container_run_args(
-        context,
-        plan,
-        entrypoint=("--entrypoint", "python"),
-        extra_mounts=tuple(script_mounts),
-        argv=(container_script, *plan.argv),
-    )
+    return _container_impl.build_container_python_command(script_path, plan)
 
 
 def build_container_python_module_command(
     module_name: str,
     plan: Any,
 ) -> list[str]:
-    context = _resolve_container_launch_context(plan)
-    return _compose_container_run_args(
-        context,
-        plan,
-        entrypoint=("--entrypoint", "python"),
-        argv=("-m", module_name, *plan.argv),
-    )
+    return _container_impl.build_container_python_module_command(module_name, plan)
 
 
 def delegate_python_script_to_container(
     script_path: str | os.PathLike[str],
     plan: Any,
 ) -> int:
-    command = build_container_python_command(script_path, plan)
-    try:
-        completed = subprocess.run(
-            command,
-            check=False,
-            timeout=_CONTAINER_EXECUTION_TIMEOUT_SECONDS,
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise RuntimeError(
-            "Container execution timed out after "
-            f"{_CONTAINER_EXECUTION_TIMEOUT_SECONDS} seconds."
-        ) from exc
-    return int(completed.returncode)
+    return _container_impl.delegate_python_script_to_container(script_path, plan)
 
 
 def delegate_python_module_to_container(
     module_name: str,
     plan: Any,
 ) -> int:
-    command = build_container_python_module_command(module_name, plan)
-    try:
-        completed = subprocess.run(
-            command,
-            check=False,
-            timeout=_CONTAINER_EXECUTION_TIMEOUT_SECONDS,
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise RuntimeError(
-            "Container execution timed out after "
-            f"{_CONTAINER_EXECUTION_TIMEOUT_SECONDS} seconds."
-        ) from exc
-    return int(completed.returncode)
+    return _container_impl.delegate_python_module_to_container(module_name, plan)
 
 
 def _config_digest(
@@ -936,90 +876,16 @@ def write_runtime_manifest(
     extra: dict[str, Any] | None = None,
     execution: RuntimeManifestExecution | None = None,
 ) -> Path:
-    report = Path(report_path).resolve()
-    digest, digest_source = _config_digest(
-        config_path=config_path, config_payload=config_payload
+    return _manifest_impl.write_runtime_manifest(
+        report_path,
+        config_path=config_path,
+        config_payload=config_payload,
+        extra=extra,
+        execution=execution,
     )
-    runtime_execution = execution or RuntimeManifestExecution(
-        execution_mode=current_execution_mode(),
-        container_execution=running_inside_container(),
-        image_ref=resolve_runtime_image(),
-        image_digest=resolve_runtime_image_digest(),
-        allow_network=network_allowed(),
-        allow_remote_code=remote_code_allowed(),
-        allow_third_party_plugins=third_party_plugins_allowed(),
-    )
-    manifest: dict[str, Any] = {
-        "manifest_version": RUNTIME_MANIFEST_VERSION,
-        "generated_at_utc": datetime.now(UTC).isoformat(),
-        "verifier_contract_version": RUNTIME_VERIFIER_CONTRACT_VERSION,
-        "report": {
-            "path": str(report),
-            "filename": report.name,
-            "sha256": _sha256_path(report),
-        },
-        "config": {
-            "path": str(Path(config_path).resolve())
-            if config_path is not None
-            else None,
-            "sha256": digest,
-            "source": digest_source,
-        },
-        "execution_mode": runtime_execution.execution_mode,
-        "runtime": {
-            "image_ref": _attested_runtime_image_ref(
-                runtime_execution.image_ref,
-                runtime_execution.image_digest,
-            ),
-            "image_digest": runtime_execution.image_digest,
-            "container_execution": runtime_execution.container_execution,
-            "allow_network": runtime_execution.allow_network,
-            "allow_remote_code": runtime_execution.allow_remote_code,
-            "allow_third_party_plugins": (runtime_execution.allow_third_party_plugins),
-        },
-    }
-    if isinstance(extra, dict) and extra:
-        manifest["context"] = _json_safe(extra)
-    manifest_path = report.parent / RUNTIME_MANIFEST_FILENAME
-    manifest_path.write_text(
-        json.dumps(_json_safe(manifest), indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-    return manifest_path
 
 
 def load_runtime_manifest(
     report_path: str | os.PathLike[str],
 ) -> RuntimeManifestLoadResult:
-    report = Path(report_path)
-    manifest_path = report.parent / RUNTIME_MANIFEST_FILENAME
-    if not manifest_path.exists():
-        return RuntimeManifestLoadResult(
-            path=manifest_path,
-            payload=None,
-            issue_code=RuntimeManifestLoadIssueCode.MISSING,
-        )
-    try:
-        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except OSError:
-        return RuntimeManifestLoadResult(
-            path=manifest_path,
-            payload=None,
-            issue_code=RuntimeManifestLoadIssueCode.READ_FAILED,
-            issue_message=f"unable to read {manifest_path.name}",
-        )
-    except json.JSONDecodeError:
-        return RuntimeManifestLoadResult(
-            path=manifest_path,
-            payload=None,
-            issue_code=RuntimeManifestLoadIssueCode.INVALID_JSON,
-            issue_message=f"{manifest_path.name} is not valid JSON",
-        )
-    if not isinstance(payload, dict):
-        return RuntimeManifestLoadResult(
-            path=manifest_path,
-            payload=None,
-            issue_code=RuntimeManifestLoadIssueCode.INVALID_PAYLOAD,
-            issue_message=f"{manifest_path.name} must decode to a JSON object",
-        )
-    return RuntimeManifestLoadResult(path=manifest_path, payload=payload)
+    return _manifest_impl.load_runtime_manifest(report_path)

@@ -5,11 +5,8 @@ from pathlib import Path
 import pytest
 
 from invarlock.cli.run_config import _resolve_requested_edit_name
-from invarlock.core.config_runtime import (
-    InvarLockConfig,
-    apply_profile,
-    load_tiers,
-)
+from invarlock.core.config_loader import apply_profile, load_tiers
+from invarlock.core.config_runtime import InvarLockConfig
 
 
 def test_load_tiers_from_runtime_override(tmp_path: Path, monkeypatch):
@@ -51,7 +48,7 @@ def test_apply_profile_runtime_profile_success(tmp_path: Path, monkeypatch):
 
 
 def test_load_runtime_yaml_env_non_mapping_raises(tmp_path: Path, monkeypatch) -> None:
-    import invarlock.core.config_runtime as config_mod
+    import invarlock.core.config_loader as config_mod
 
     rt = tmp_path / "runtime"
     rt.mkdir()
@@ -63,7 +60,7 @@ def test_load_runtime_yaml_env_non_mapping_raises(tmp_path: Path, monkeypatch) -
 
 
 def test_load_runtime_yaml_package_non_mapping_raises(monkeypatch) -> None:
-    import invarlock.core.config_runtime as config_mod
+    import invarlock.core.config_loader as config_mod
 
     class _DummyRes:
         def __init__(self) -> None:
@@ -90,7 +87,7 @@ def test_load_runtime_yaml_package_non_mapping_raises(monkeypatch) -> None:
 
 
 def test_load_tiers_not_found_raises(monkeypatch):
-    import invarlock.core.config_runtime as config_mod
+    import invarlock.core.config_loader as config_mod
 
     monkeypatch.setenv("INVARLOCK_CONFIG_ROOT", "")
     monkeypatch.setattr(config_mod, "_load_runtime_yaml", lambda *a, **k: None)

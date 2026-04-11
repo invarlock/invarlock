@@ -6,14 +6,15 @@ from types import SimpleNamespace
 
 import pytest
 
-from invarlock.core import run_orchestrator_execute_prepare as prepare_mod
+from invarlock.core import run_orchestrator_execute_execution as execution_mod
+from invarlock.core import run_orchestrator_execute_seed as seed_mod
 
 
 def test_prepare_execution_state_emits_snapshot_retry_and_reuses_loaded_model(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr(
-        prepare_mod._execute_helpers_module,
+        execution_mod._execute_helpers_module,
         "_build_run_execution_config_payloads_impl",
         lambda **_kwargs: SimpleNamespace(auto_config={}, edit_config={}),
         raising=False,
@@ -29,7 +30,7 @@ def test_prepare_execution_state_emits_snapshot_retry_and_reuses_loaded_model(
         def restore(self, *_args, **_kwargs):  # pragma: no cover - capability marker
             return None
 
-    state = prepare_mod._prepare_execution_state(
+    state = execution_mod._prepare_execution_state(
         cfg=SimpleNamespace(model=SimpleNamespace(id="demo-model")),
         model_profile=SimpleNamespace(),
         profile_normalized="dev",
@@ -86,14 +87,11 @@ def test_prepare_execution_state_emits_snapshot_retry_and_reuses_loaded_model(
 def test_resolve_loss_seed_defaults_when_torch_is_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(prepare_mod, "set_seed", lambda _value: None)
-    monkeypatch.setattr(
-        prepare_mod.np.random,
-        "get_state",
-        lambda: ("MT19937", [42], 0, 0, 0),
+    numpy_stub = SimpleNamespace(
+        random=SimpleNamespace(get_state=lambda: ("MT19937", [42], 0, 0, 0))
     )
 
-    state = prepare_mod._resolve_loss_seed_and_determinism_state(
+    state = seed_mod._resolve_loss_seed_and_determinism_state(
         SimpleNamespace(eval={"loss": {"type": "auto"}}),
         model_profile=SimpleNamespace(default_loss="ce"),
         profile_normalized="dev",
@@ -110,6 +108,8 @@ def test_resolve_loss_seed_defaults_when_torch_is_missing(
             TypeError,
             ValueError,
         ),
+        set_seed_fn=lambda _value: None,
+        numpy_module=numpy_stub,
     )
 
     assert state.seed_bundle == {"python": 42, "numpy": 42, "torch": None}
@@ -119,7 +119,7 @@ def test_prepare_execution_state_uses_snapshot_model_when_not_reused(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr(
-        prepare_mod._execute_helpers_module,
+        execution_mod._execute_helpers_module,
         "_build_run_execution_config_payloads_impl",
         lambda **_kwargs: SimpleNamespace(auto_config={}, edit_config={}),
         raising=False,
@@ -134,7 +134,7 @@ def test_prepare_execution_state_uses_snapshot_model_when_not_reused(
         def restore(self, *_args, **_kwargs):
             return None
 
-    execution_state = prepare_mod._prepare_execution_state(
+    execution_state = execution_mod._prepare_execution_state(
         cfg=SimpleNamespace(model=SimpleNamespace(id="demo-model")),
         model_profile=SimpleNamespace(),
         profile_normalized="dev",

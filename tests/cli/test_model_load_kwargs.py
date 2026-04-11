@@ -81,6 +81,32 @@ def test_extract_model_load_kwargs_rejects_removed_keys():
 
 
 @pytest.mark.unit
+def test_extract_model_load_kwargs_rejects_removed_dtype_alias_values() -> None:
+    cfg = InvarLockConfig(
+        {
+            "model": {
+                "id": "foo",
+                "adapter": "dummy",
+                "device": "cuda",
+                "dtype": "bf16",
+            }
+        }
+    )
+
+    with pytest.raises(InvarlockError) as excinfo:
+        _ = run_config_mod.extract_model_load_kwargs(
+            cfg,
+            invarlock_error_cls=InvarlockError,
+        )
+
+    assert excinfo.value.code == "E007"
+    assert excinfo.value.details == {
+        "removed_values": ["model.dtype=bf16"],
+        "replacement": "model.dtype=bfloat16",
+    }
+
+
+@pytest.mark.unit
 def test_load_model_with_cfg_passes_all_kwargs_to_var_kw_adapter(
     monkeypatch: pytest.MonkeyPatch,
 ):

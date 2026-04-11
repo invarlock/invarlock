@@ -92,10 +92,10 @@ class NaNCheckGuard(Guard):
                 nan_params.append(name)
 
         if nan_params:
-            action = "abort" if self.strict else "warn"
+            decision = "block" if self.strict else "monitor"
             return {
                 "passed": False,
-                "action": action,
+                "decision": decision,
                 "message": f"Found NaN in {len(nan_params)} parameters",
                 "metrics": {
                     "nan_param_count": len(nan_params),
@@ -105,7 +105,7 @@ class NaNCheckGuard(Guard):
 
         return {
             "passed": True,
-            "action": "continue",
+            "decision": "allow",
             "message": f"All {total_params} parameters are finite",
             "metrics": {"checked_params": total_params},
         }
@@ -234,7 +234,7 @@ class ThresholdGuard(Guard):
         if violations:
             return {
                 "passed": False,
-                "action": "abort",
+                "decision": "block",
                 "message": f"{len(violations)} params exceed magnitude threshold",
                 "warnings": [w["param"] for w in warnings],
                 "metrics": {
@@ -247,7 +247,7 @@ class ThresholdGuard(Guard):
         if warnings:
             return {
                 "passed": True,
-                "action": "warn",
+                "decision": "monitor",
                 "message": f"{len(warnings)} params near threshold",
                 "warnings": [w["param"] for w in warnings],
                 "metrics": {
@@ -258,7 +258,7 @@ class ThresholdGuard(Guard):
 
         return {
             "passed": True,
-            "action": "continue",
+            "decision": "allow",
             "message": "All weight magnitudes within bounds",
             "metrics": {"max_magnitude": max_seen},
         }
@@ -328,7 +328,7 @@ def test_validate_passes_normal_weights(model, adapter):
     result = guard.validate(model, adapter, {})
 
     assert result["passed"] is True
-    assert result["action"] == "continue"
+    assert result["decision"] == "allow"
 
 
 def test_validate_fails_large_weights(model, adapter):
@@ -339,7 +339,7 @@ def test_validate_fails_large_weights(model, adapter):
     result = guard.validate(model, adapter, {})
 
     assert result["passed"] is False
-    assert result["action"] == "abort"
+    assert result["decision"] == "block"
     assert "violations" in result["metrics"]
 
 
@@ -352,7 +352,7 @@ def test_validate_warns_near_threshold(model, adapter):
     result = guard.validate(model, adapter, {})
 
     assert result["passed"] is True
-    assert result["action"] == "warn"
+    assert result["decision"] == "monitor"
 
 
 def test_scope_filtering(model, adapter):
@@ -529,7 +529,7 @@ print(f"Validate: {result}")
 | --- | --- | --- |
 | Plugin not listed | Entry point not found | Check `pyproject.toml` syntax and reinstall. |
 | Import error | Missing dependency | Add to `project.dependencies`. |
-| `passed` key missing | Incomplete return dict | Include `passed`, `action`, `message`. |
+| `passed` key missing | Incomplete return dict | Include `passed`, `decision`, and any diagnostics or message fields your guard emits. |
 | Guard skipped | Not in `guards.order` | Add guard name to order list. |
 
 ## Related Documentation

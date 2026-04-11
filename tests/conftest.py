@@ -99,9 +99,9 @@ def _default_security_bypass_for_local_tests(monkeypatch: pytest.MonkeyPatch):
 
 
 @pytest.fixture(autouse=True)
-def _compat_path_write_text(monkeypatch: pytest.MonkeyPatch):
+def _path_write_text_with_append(monkeypatch: pytest.MonkeyPatch):
     # Some tests use Path.write_text(..., append=True) which is not available
-    # in all Python versions. Provide a tiny compatibility shim.
+    # in all Python versions. Provide a local append-capable test helper.
     def _write_text(
         self: Path,
         data: str,

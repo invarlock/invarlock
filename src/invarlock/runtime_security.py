@@ -1,8 +1,7 @@
-"""Public runtime-security facade.
+"""Public runtime-security API.
 
-Implementation helpers live in `invarlock.runtime_security_helpers`. The facade
-keeps the supported public API stable without mirroring helper globals back into
-the implementation module at call time.
+Implementation lives in `invarlock.runtime_security_helpers` plus the split
+container and manifest owner modules that it imports.
 
 Typed request-scoped policy surface retained at the owner boundary:
 - class RuntimeSecurityPolicy
@@ -14,7 +13,6 @@ Typed request-scoped policy surface retained at the owner boundary:
 
 from __future__ import annotations
 
-from invarlock import runtime_security_helpers as _helpers
 from invarlock.runtime_security_helpers import (
     ALLOW_HOST_EXECUTION_ENV,
     ALLOW_NETWORK_ENV,
@@ -57,42 +55,10 @@ from invarlock.runtime_security_helpers import (
     resolve_runtime_image_digest,
     running_inside_container,
     runtime_allowances_scope,
-    serialize_canonical_json,
     third_party_plugins_allowed,
     unattested_artifacts_allowed,
     write_runtime_manifest,
 )
-
-_CONTAINER_EXECUTION_TIMEOUT_SECONDS = _helpers._CONTAINER_EXECUTION_TIMEOUT_SECONDS
-_CONTAINER_INSPECT_TIMEOUT_SECONDS = _helpers._CONTAINER_INSPECT_TIMEOUT_SECONDS
-_PATH_ENV_VARS = _helpers._PATH_ENV_VARS
-_absolute_host_path = _helpers._absolute_host_path
-_attested_runtime_image_ref = _helpers._attested_runtime_image_ref
-_coerce_bool = _helpers._coerce_bool
-_config_digest = _helpers._config_digest
-_container_pythonpath_entries = _helpers._container_pythonpath_entries
-_delegated_env_pairs = _helpers._delegated_env_pairs
-_host_nvidia_visible = _helpers._host_nvidia_visible
-_inspect_container_image = _helpers._inspect_container_image
-_iter_absolute_pythonpath_entries = _helpers._iter_absolute_pythonpath_entries
-_iter_external_symlink_target_mounts = _helpers._iter_external_symlink_target_mounts
-_minimize_mounts = _helpers._minimize_mounts
-_mount_root_for_path = _helpers._mount_root_for_path
-_mount_root_for_resolved_path = _helpers._mount_root_for_resolved_path
-_normalize_config_path_for_container = _helpers._normalize_config_path_for_container
-_normalize_local_model_path_for_container = (
-    _helpers._normalize_local_model_path_for_container
-)
-_normalize_output_path_for_container = _helpers._normalize_output_path_for_container
-_path_env_value_for_container = _helpers._path_env_value_for_container
-_path_is_within = _helpers._path_is_within
-_runtime_flag_value = _helpers._runtime_flag_value
-_workspace_path = _helpers._workspace_path
-inspect_config_dependencies = _helpers.inspect_config_dependencies
-os = _helpers.os
-Path = _helpers.Path
-shutil = _helpers.shutil
-subprocess = _helpers.subprocess
 
 __all__ = [
     "ALLOW_HOST_EXECUTION_ENV",
@@ -136,7 +102,6 @@ __all__ = [
     "RuntimeManifestLoadIssueCode",
     "RuntimeManifestLoadResult",
     "running_inside_container",
-    "serialize_canonical_json",
     "third_party_plugins_allowed",
     "unattested_artifacts_allowed",
     "write_runtime_manifest",

@@ -77,9 +77,9 @@ def prepare_config_for_run(
 
         invarlock_config_cls = InvarLockConfig
     if load_config_fn is None:
-        from invarlock.core.config_runtime import load_config as load_config_fn
+        from invarlock.core.config_loader import load_config as load_config_fn
     if apply_profile_fn is None:
-        from invarlock.core.config_runtime import apply_profile as apply_profile_fn
+        from invarlock.core.config_loader import apply_profile as apply_profile_fn
     if apply_auto_adapter_fn is None:
         try:
             from invarlock.core.adapter_auto import (
@@ -375,15 +375,26 @@ def extract_model_load_kwargs(
 
     if "dtype" in extra and isinstance(extra.get("dtype"), str):
         dtype_str = str(extra.get("dtype") or "").strip().lower()
-        aliases = {
+        removed_dtype_aliases = {
             "fp16": "float16",
             "half": "float16",
             "bf16": "bfloat16",
             "fp32": "float32",
         }
-        if dtype_str in aliases:
-            extra["dtype"] = aliases[dtype_str]
-        elif dtype_str:
+        if dtype_str in removed_dtype_aliases:
+            canonical = removed_dtype_aliases[dtype_str]
+            raise invarlock_error_cls(
+                code="E007",
+                message=(
+                    "CONFIG-VALUE-REMOVED: "
+                    f"model.dtype={dtype_str}. Use model.dtype={canonical}."
+                ),
+                details={
+                    "removed_values": [f"model.dtype={dtype_str}"],
+                    "replacement": f"model.dtype={canonical}",
+                },
+            )
+        if dtype_str:
             extra["dtype"] = dtype_str
 
     return extra

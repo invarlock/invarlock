@@ -134,12 +134,12 @@ def _setup_config_env(monkeypatch, cfg):
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.load_config",
+        "invarlock.core.config_loader.load_config",
         lambda path: cfg,
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.apply_profile",
+        "invarlock.core.config_loader.apply_profile",
         lambda cfg_obj, profile: cfg_obj,
         raising=False,
     )
@@ -287,66 +287,66 @@ def test_doctor_config_preflight_findings(monkeypatch, tmp_path, capsys):
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_loader.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.apply_profile",
+        "invarlock.core.config_loader.apply_profile",
         lambda cfg, profile: cfg,
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_loader.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.apply_profile",
+        "invarlock.core.config_loader.apply_profile",
         lambda cfg, profile: cfg,
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_loader.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.apply_profile",
+        "invarlock.core.config_loader.apply_profile",
         lambda cfg, profile: cfg,
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_loader.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.apply_profile",
+        "invarlock.core.config_loader.apply_profile",
         lambda cfg, profile: cfg,
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_loader.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.apply_profile",
+        "invarlock.core.config_loader.apply_profile",
         lambda cfg, profile: cfg,
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_loader.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.apply_profile",
+        "invarlock.core.config_loader.apply_profile",
         lambda cfg, profile: cfg,
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_loader.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.apply_profile",
+        "invarlock.core.config_loader.apply_profile",
         lambda cfg, profile: cfg,
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_loader.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.apply_profile",
+        "invarlock.core.config_loader.apply_profile",
         lambda cfg, profile: cfg,
         raising=False,
     )
@@ -663,10 +663,10 @@ def test_doctor_config_capacity_floors(monkeypatch, tmp_path, capsys):
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_loader.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.apply_profile",
+        "invarlock.core.config_loader.apply_profile",
         lambda cfg, profile: cfg,
         raising=False,
     )
@@ -840,10 +840,10 @@ def test_doctor_determinism_warning_prints(monkeypatch, tmp_path):
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_loader.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.apply_profile",
+        "invarlock.core.config_loader.apply_profile",
         lambda cfg, profile: cfg,
         raising=False,
     )

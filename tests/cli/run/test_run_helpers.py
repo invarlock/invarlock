@@ -401,7 +401,7 @@ def test_to_serialisable_dict_uses_dict_method(tmp_path: Path):
 
     with ExitStack() as stack:
         stack.enter_context(
-            patch("invarlock.core.config_runtime.load_config", lambda p: Cfg())
+            patch("invarlock.core.config_loader.load_config", lambda p: Cfg())
         )
         stack.enter_context(
             patch(

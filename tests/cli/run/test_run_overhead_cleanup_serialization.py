@@ -154,9 +154,7 @@ def test_cleanup_rmtree_exception_is_swallowed(tmp_path: Path, monkeypatch):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(
-            patch("invarlock.core.config_runtime.load_config", load_cfg)
-        )
+        stack.enter_context(patch("invarlock.core.config_loader.load_config", load_cfg))
         stack.enter_context(
             patch(
                 "invarlock.core.registry.get_registry",
@@ -253,6 +251,23 @@ def test_baseline_schedule_skips_provider_windows(tmp_path: Path):
         json.dumps(
             {
                 "meta": {"tokenizer_hash": "tokhash123"},
+                "metrics": {
+                    "primary_metric": {
+                        "kind": "ppl_causal",
+                        "preview": 1.0,
+                        "final": 1.0,
+                    }
+                },
+                "edit": {
+                    "name": "structured",
+                    "plan_digest": "baseline",
+                    "deltas": {
+                        "params_changed": 0,
+                        "heads_pruned": 0,
+                        "neurons_pruned": 0,
+                        "layers_modified": 0,
+                    },
+                },
                 "evaluation_windows": {
                     "preview": {
                         "window_ids": [0],
@@ -315,7 +330,42 @@ def test_baseline_schedule_skips_provider_windows(tmp_path: Path):
 def test_until_pass_baseline_disappears_between_attempts(tmp_path: Path):
     cfg = _base_cfg(tmp_path)
     baseline = tmp_path / "baseline.json"
-    baseline.write_text(json.dumps({"meta": {"tokenizer_hash": "tokhash123"}}))
+    baseline.write_text(
+        json.dumps(
+            {
+                "meta": {"tokenizer_hash": "tokhash123"},
+                "metrics": {
+                    "primary_metric": {
+                        "kind": "ppl_causal",
+                        "preview": 1.0,
+                        "final": 1.0,
+                    }
+                },
+                "edit": {
+                    "name": "structured",
+                    "plan_digest": "baseline",
+                    "deltas": {
+                        "params_changed": 0,
+                        "heads_pruned": 0,
+                        "neurons_pruned": 0,
+                        "layers_modified": 0,
+                    },
+                },
+                "evaluation_windows": {
+                    "preview": {
+                        "window_ids": [0],
+                        "input_ids": [[1, 2, 3]],
+                        "attention_masks": [[1, 1, 1]],
+                    },
+                    "final": {
+                        "window_ids": [1],
+                        "input_ids": [[4, 5, 6]],
+                        "attention_masks": [[1, 1, 1]],
+                    },
+                },
+            }
+        )
+    )
 
     attempts = {"exec": 0, "cert": 0}
 
@@ -362,7 +412,7 @@ def test_until_pass_baseline_disappears_between_attempts(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(patch("invarlock.core.retry.RetryController", RC))
         stack.enter_context(
-            patch("invarlock.reporting.report_make.make_report", make_cert)
+            patch("invarlock.cli.run_execution.build_evaluation_report", make_cert)
         )
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",
@@ -418,7 +468,7 @@ def test_until_pass_baseline_disappears_between_attempts(tmp_path: Path):
             out=str(tmp_path / "runs"),
         )
 
-    assert attempts["cert"] == 1
+    assert attempts["cert"] == 2
 
 
 def test_restore_chunked_missing_dir_causes_exit(tmp_path: Path):
@@ -471,9 +521,7 @@ def test_restore_chunked_missing_dir_causes_exit(tmp_path: Path):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(
-            patch("invarlock.core.config_runtime.load_config", load_cfg)
-        )
+        stack.enter_context(patch("invarlock.core.config_loader.load_config", load_cfg))
         stack.enter_context(
             patch(
                 "invarlock.core.registry.get_registry",

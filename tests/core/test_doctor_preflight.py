@@ -31,10 +31,10 @@ def test_run_doctor_config_preflight_collects_findings(monkeypatch, tmp_path) ->
     )
 
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_loader.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.apply_profile",
+        "invarlock.core.config_loader.apply_profile",
         lambda cfg_obj, profile: cfg_obj,
         raising=False,
     )
@@ -114,10 +114,10 @@ def test_run_doctor_config_preflight_handles_baseline_split_and_metric_failures(
     )
 
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_loader.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.apply_profile",
+        "invarlock.core.config_loader.apply_profile",
         lambda cfg_obj, profile: cfg_obj,
         raising=False,
     )
@@ -165,7 +165,7 @@ def test_run_doctor_config_preflight_notes_missing_capacity_estimator(
     )
 
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_loader.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
         "invarlock.model_profile.detect_model_profile",
@@ -215,7 +215,7 @@ def test_run_doctor_config_preflight_tolerates_capacity_path_exceptions(
     )
 
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_loader.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
         "invarlock.model_profile.detect_model_profile",
@@ -267,7 +267,7 @@ def test_run_doctor_config_preflight_handles_worker_profile_and_metric_failures(
     )
 
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_loader.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
         "invarlock.model_profile.detect_model_profile",
@@ -307,7 +307,7 @@ def test_run_doctor_config_preflight_skips_split_warning_for_clean_baseline(
     )
 
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_loader.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
         "invarlock.core.metric_provider_resolution.resolve_metric_and_provider",
@@ -340,7 +340,7 @@ def test_run_doctor_config_preflight_tolerates_provider_lookup_exceptions(
     )
 
     monkeypatch.setattr(
-        "invarlock.core.config_runtime.load_config", lambda path: cfg, raising=False
+        "invarlock.core.config_loader.load_config", lambda path: cfg, raising=False
     )
     monkeypatch.setattr(
         "invarlock.model_profile.detect_model_profile",

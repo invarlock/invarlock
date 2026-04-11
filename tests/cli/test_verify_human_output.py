@@ -15,6 +15,9 @@ def _valid_cert(ratio: float = 2.0) -> dict:
     return {
         "schema_version": "v1",
         "run_id": "r1",
+        "artifacts": {"generated_at": "t"},
+        "plugins": {},
+        "meta": {},
         "primary_metric": {
             "kind": "ppl_causal",
             "final": 10.0,
@@ -22,6 +25,8 @@ def _valid_cert(ratio: float = 2.0) -> dict:
             "display_ci": [0.98, 1.02],
         },
         "dataset": {
+            "provider": "unit",
+            "seq_len": 8,
             "windows": {
                 "preview": 1,
                 "final": 1,
@@ -31,7 +36,7 @@ def _valid_cert(ratio: float = 2.0) -> dict:
                     "coverage": {"preview": {"used": 1}, "final": {"used": 1}},
                     "paired_windows": 1,
                 },
-            }
+            },
         },
         "baseline_ref": {"primary_metric": {"final": 5.0}},
     }
@@ -62,7 +67,6 @@ def test_verify_human_ok_line_missing_optional_fields(tmp_path: Path, capsys) ->
     cert = _valid_cert()
     # Remove optional pieces so human line covers alternate branches
     del cert["primary_metric"]["display_ci"]
-    del cert["primary_metric"]["kind"]
     c = _write_cert(tmp_path / "ok2.json", cert)
     verify_command([c], baseline=None, tolerance=1e-9, profile="dev", json_out=False)
     out = capsys.readouterr().out

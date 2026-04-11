@@ -267,14 +267,21 @@ def resolve_dtype(kwargs: dict[str, Any] | None = None) -> Any:
             s = val.strip().lower()
             if s == "auto":
                 return "auto"
+            removed_aliases = {
+                "fp16": "float16",
+                "half": "float16",
+                "bf16": "bfloat16",
+                "fp32": "float32",
+            }
+            if s in removed_aliases:
+                canonical = removed_aliases[s]
+                raise ValueError(
+                    f"model.dtype={s} is not supported; use model.dtype={canonical}"
+                )
             mapping = {
                 "float16": torch.float16,
-                "fp16": torch.float16,
-                "half": torch.float16,
                 "bfloat16": torch.bfloat16,
-                "bf16": torch.bfloat16,
                 "float32": torch.float32,
-                "fp32": torch.float32,
             }
             if s in mapping:
                 return mapping[s]

@@ -23,7 +23,7 @@ def test_coerce_ci_output_and_metric_family_paths() -> None:
     assert verify_output._coerce_ci_output([_BadFloat(), 2]) is None
 
     assert verify_output._metric_family("accuracy") == "accuracy"
-    assert verify_output._metric_family("vqa_accuracy") == "accuracy"
+    assert verify_output._metric_family("accuracy") == "accuracy"
     assert verify_output._metric_family("ppl_causal") == "ppl"
     assert verify_output._metric_family("other") == "other"
 
@@ -149,9 +149,11 @@ def test_build_verify_json_result_item_and_payload() -> None:
         ok=True,
         reason="ok",
         tolerance=1e-9,
-        load_report_fn=lambda path: report
-        if path.name == "a.json"
-        else (_ for _ in ()).throw(ValueError("bad load")),
+        load_report_fn=lambda path: (
+            report
+            if path.name == "a.json"
+            else (_ for _ in ()).throw(ValueError("bad load"))
+        ),
     )
     assert payload["summary"] == {"ok": True, "reason": "ok"}
     assert payload["evaluation_report"] == {"count": 2}

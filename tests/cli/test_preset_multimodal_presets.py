@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from invarlock.core.config_runtime import load_config
+from invarlock.core.config_loader import load_config
 
 
 def _repo_root() -> Path:
@@ -26,7 +26,7 @@ def test_multimodal_preset_loads_and_points_at_demo_fixture() -> None:
     assert (
         dataset["provider"]["path"] == "tests/fixtures/vision_text/demo_manifest.jsonl"
     )
-    assert eval_section["metric"]["kind"] == "vqa_accuracy"
+    assert eval_section["metric"]["kind"] == "accuracy"
     assert eval_section["loss"]["type"] == "classification"
 
     fixture = root / dataset["provider"]["path"]

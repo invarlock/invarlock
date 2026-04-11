@@ -11,7 +11,10 @@ from typing import Any
 
 import torch.nn as nn
 
+from invarlock.core.abi import INVARLOCK_CORE_ABI as CORE_ABI
 from invarlock.core.api import EditRuntime, ModelAdapter, ModelEdit
+
+INVARLOCK_CORE_ABI = CORE_ABI
 
 
 class NoopEdit(ModelEdit):

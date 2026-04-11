@@ -96,12 +96,12 @@ def test_policy_checkpoint_should_rollback_logic():
     assert should and reason == "guard_rollback"
 
     # Auto rollback when enabled and a guard failed
-    outcomes = [GuardOutcome("a", False, action="none")]
+    outcomes = [GuardOutcome("a", False, decision="allow")]
     should, reason = cp.should_rollback(outcomes)
     assert should and reason == "auto_rollback"
 
     # Otherwise do not rollback
-    outcomes = [GuardOutcome("a", True, action="none")]
+    outcomes = [GuardOutcome("a", True, decision="allow")]
     should, reason = cp.should_rollback(outcomes)
     assert not should and reason == ""
 
@@ -112,7 +112,7 @@ def test_policy_checkpoint_does_not_auto_rollback_when_policy_disabled() -> None
     policy = type("P", (), {"enable_auto_rollback": False})()
     cp = PolicyCheckpoint(model, adapter, policy)
 
-    should, reason = cp.should_rollback([GuardOutcome("a", False, action="none")])
+    should, reason = cp.should_rollback([GuardOutcome("a", False, decision="allow")])
 
     assert should is False
     assert reason == ""

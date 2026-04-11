@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import importlib
 from types import SimpleNamespace
 
 import pytest
 
+from invarlock.core.abi import INVARLOCK_CORE_ABI
 from invarlock.core.api import Guard, ModelAdapter, ModelEdit
 from invarlock.core.registry import CoreRegistry, PluginInfo
 
@@ -96,3 +98,62 @@ def test_registry_rejects_adapter_edit_and_guard_abi_mismatch(monkeypatch) -> No
     guard_registry._guards["bad"].class_name = "BadGuard"
     with pytest.raises(ImportError, match="ABI mismatch"):
         guard_registry.get_guard("bad")
+
+
+def test_registry_rejects_plugins_without_declared_abi(monkeypatch) -> None:
+    _BadAdapter.__module__ = "missing.adapter"
+    _BadEdit.__module__ = "missing.edit"
+    _BadGuard.__module__ = "missing.guard"
+
+    modules = {
+        "missing.adapter": SimpleNamespace(BadAdapter=_BadAdapter),
+        "missing.edit": SimpleNamespace(BadEdit=_BadEdit),
+        "missing.guard": SimpleNamespace(BadGuard=_BadGuard),
+    }
+
+    def fake_import(name: str):
+        if name in modules:
+            return modules[name]
+        raise ImportError(name)
+
+    monkeypatch.setattr("invarlock.core.registry.importlib.import_module", fake_import)
+
+    adapter_registry = _registry_with("adapters", "missing", "missing.adapter")
+    adapter_registry._adapters["missing"].class_name = "BadAdapter"
+    with pytest.raises(ImportError, match="ABI missing"):
+        adapter_registry.get_adapter("missing")
+
+    edit_registry = _registry_with("edits", "missing", "missing.edit")
+    edit_registry._edits["missing"].class_name = "BadEdit"
+    with pytest.raises(ImportError, match="ABI missing"):
+        edit_registry.get_edit("missing")
+
+    guard_registry = _registry_with("guards", "missing", "missing.guard")
+    guard_registry._guards["missing"].class_name = "BadGuard"
+    with pytest.raises(ImportError, match="ABI missing"):
+        guard_registry.get_guard("missing")
+
+
+def test_builtin_provider_modules_declare_core_abi() -> None:
+    provider_modules = (
+        "invarlock.adapters.auto",
+        "invarlock.adapters.hf_causal",
+        "invarlock.adapters.hf_mlm",
+        "invarlock.adapters.hf_multimodal",
+        "invarlock.adapters.hf_seq2seq",
+        "invarlock.edits.noop",
+        "invarlock.edits.quant_rtn",
+        "invarlock.guards.invariants",
+        "invarlock.guards.rmt",
+        "invarlock.guards.spectral",
+        "invarlock.guards.variance",
+        "invarlock.plugins.hello_guard",
+    )
+
+    missing = []
+    for module_name in provider_modules:
+        module = importlib.import_module(module_name)
+        if getattr(module, "INVARLOCK_CORE_ABI", None) != INVARLOCK_CORE_ABI:
+            missing.append(module_name)
+
+    assert not missing, "\n".join(missing)

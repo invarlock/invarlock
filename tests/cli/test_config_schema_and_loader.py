@@ -7,11 +7,14 @@ from invarlock.cli.run_config import (
     _apply_requested_edit_override,
     _resolve_requested_edit_name,
 )
+from invarlock.core import config_loader as loader_mod
 from invarlock.core import config_runtime as cfg_mod
-from invarlock.core.config_dependencies import (
+from invarlock.core.config_loader import (
     absolute_path_no_resolve,
+    apply_profile,
     inspect_config_dependencies,
     iter_absolute_path_strings,
+    load_config,
 )
 from invarlock.core.config_runtime import (
     AutoConfig,
@@ -23,8 +26,6 @@ from invarlock.core.config_runtime import (
     SpectralGuardConfig,
     VarianceGuardConfig,
     _deep_merge,
-    apply_profile,
-    load_config,
 )
 
 
@@ -297,7 +298,7 @@ def test_load_runtime_yaml_env_root_missing_file_falls_back_to_package(
 ) -> None:
     monkeypatch.setenv("INVARLOCK_CONFIG_ROOT", str(tmp_path))
 
-    data = cfg_mod._load_runtime_yaml("profiles", "ci.yaml")
+    data = loader_mod._load_runtime_yaml("profiles", "ci.yaml")
 
     assert isinstance(data, dict)
     assert data

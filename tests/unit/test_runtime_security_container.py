@@ -65,7 +65,7 @@ def test_apply_runtime_allowances_and_delegate_container_command(monkeypatch) ->
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security.subprocess,
+        runtime_security_helpers.subprocess,
         "run",
         lambda command, check=False, timeout=None: SimpleNamespace(returncode=7),
         raising=True,
@@ -90,14 +90,16 @@ def test_delegate_container_command_passes_timeout_and_surfaces_expiry(
 
     def _run(command, check=False, timeout=None):
         seen["timeout"] = timeout
-        raise runtime_security.subprocess.TimeoutExpired(command, timeout)
+        raise runtime_security_helpers.subprocess.TimeoutExpired(command, timeout)
 
-    monkeypatch.setattr(runtime_security.subprocess, "run", _run, raising=True)
+    monkeypatch.setattr(runtime_security_helpers.subprocess, "run", _run, raising=True)
 
     with pytest.raises(RuntimeError, match="timed out"):
         runtime_security.delegate_container_command(_plan(["evaluate"]))
 
-    assert seen["timeout"] == runtime_security._CONTAINER_EXECUTION_TIMEOUT_SECONDS
+    assert (
+        seen["timeout"] == runtime_security_helpers._CONTAINER_EXECUTION_TIMEOUT_SECONDS
+    )
 
 
 def test_apply_runtime_allowances_rolls_back_network_policy_errors(
@@ -365,7 +367,7 @@ def test_delegate_python_script_to_container_uses_python_builder(monkeypatch) ->
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security.subprocess,
+        runtime_security_helpers.subprocess,
         "run",
         lambda command, check=False, timeout=None: SimpleNamespace(returncode=9),
         raising=True,
@@ -394,7 +396,7 @@ def test_delegate_python_script_to_container_passes_timeout(monkeypatch) -> None
         seen["timeout"] = timeout
         return SimpleNamespace(returncode=9)
 
-    monkeypatch.setattr(runtime_security.subprocess, "run", _run, raising=True)
+    monkeypatch.setattr(runtime_security_helpers.subprocess, "run", _run, raising=True)
 
     assert (
         runtime_security.delegate_python_script_to_container(
@@ -403,7 +405,9 @@ def test_delegate_python_script_to_container_passes_timeout(monkeypatch) -> None
         )
         == 9
     )
-    assert seen["timeout"] == runtime_security._CONTAINER_EXECUTION_TIMEOUT_SECONDS
+    assert (
+        seen["timeout"] == runtime_security_helpers._CONTAINER_EXECUTION_TIMEOUT_SECONDS
+    )
 
 
 def test_delegate_python_module_to_container_uses_module_builder(monkeypatch) -> None:
@@ -414,7 +418,7 @@ def test_delegate_python_module_to_container_uses_module_builder(monkeypatch) ->
         raising=True,
     )
     monkeypatch.setattr(
-        runtime_security.subprocess,
+        runtime_security_helpers.subprocess,
         "run",
         lambda command, check=False, timeout=None: SimpleNamespace(returncode=11),
         raising=True,
@@ -440,9 +444,9 @@ def test_delegate_python_script_to_container_surfaces_timeout(
     )
 
     def _run(command, check=False, timeout=None):
-        raise runtime_security.subprocess.TimeoutExpired(command, timeout)
+        raise runtime_security_helpers.subprocess.TimeoutExpired(command, timeout)
 
-    monkeypatch.setattr(runtime_security.subprocess, "run", _run, raising=True)
+    monkeypatch.setattr(runtime_security_helpers.subprocess, "run", _run, raising=True)
 
     with pytest.raises(RuntimeError, match="timed out"):
         runtime_security.delegate_python_script_to_container(
@@ -462,9 +466,9 @@ def test_delegate_python_module_to_container_surfaces_timeout(
     )
 
     def _run(command, check=False, timeout=None):
-        raise runtime_security.subprocess.TimeoutExpired(command, timeout)
+        raise runtime_security_helpers.subprocess.TimeoutExpired(command, timeout)
 
-    monkeypatch.setattr(runtime_security.subprocess, "run", _run, raising=True)
+    monkeypatch.setattr(runtime_security_helpers.subprocess, "run", _run, raising=True)
 
     with pytest.raises(RuntimeError, match="timed out"):
         runtime_security.delegate_python_module_to_container(

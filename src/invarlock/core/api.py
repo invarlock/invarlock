@@ -249,30 +249,21 @@ class GuardChain:
                 return False
         return True
 
-    def get_worst_action(self, outcomes: list[Any]) -> str:
-        """Get the worst action from all outcomes."""
+    def get_worst_decision(self, outcomes: list[Any]) -> str:
+        """Get the worst typed decision from all outcomes."""
         decisions = []
-        actions = []
         for outcome in outcomes:
             decision = getattr(outcome, "decision", None)
-            action = getattr(outcome, "action", None)
-            if isinstance(action, str):
-                actions.append(action)
             if isinstance(decision, str):
                 from .types import normalize_guard_decision
 
-                normalized_decision = normalize_guard_decision(
-                    decision,
-                    fallback_action=action if isinstance(action, str) else None,
-                )
+                normalized_decision = normalize_guard_decision(decision)
                 decisions.append(normalized_decision)
 
         # Import from types to avoid circular dependency
-        from .types import decision_to_action, get_worst_action, get_worst_decision
+        from .types import get_worst_decision
 
-        if decisions:
-            return decision_to_action(get_worst_decision(decisions))
-        return get_worst_action(actions)
+        return get_worst_decision(decisions)
 
 
 # Type alias for calibration data

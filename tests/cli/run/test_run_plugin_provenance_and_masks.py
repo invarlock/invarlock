@@ -275,7 +275,7 @@ def test_unknown_guards_skipped_and_known_kept(tmp_path: Path):
             patch("invarlock.core.registry.get_registry", lambda: Reg())
         )
         stack.enter_context(
-            patch("invarlock.core.config_runtime.load_config", lambda p: DummyCfg())
+            patch("invarlock.core.config_loader.load_config", lambda p: DummyCfg())
         )
         stack.enter_context(
             patch(
@@ -688,7 +688,7 @@ def test_plugin_provenance_counts_present(tmp_path: Path):
             patch("invarlock.core.registry.get_registry", lambda: Reg())
         )
         stack.enter_context(
-            patch("invarlock.core.config_runtime.load_config", lambda p: DummyCfg())
+            patch("invarlock.core.config_loader.load_config", lambda p: DummyCfg())
         )
         stack.enter_context(
             patch(

@@ -54,6 +54,23 @@ def test_until_pass_restore_failure_discards_model_and_reloads_next_attempt(
         json.dumps(
             {
                 "meta": {"tokenizer_hash": "tokhash123"},
+                "metrics": {
+                    "primary_metric": {
+                        "kind": "ppl_causal",
+                        "preview": 1.0,
+                        "final": 1.0,
+                    }
+                },
+                "edit": {
+                    "name": "structured",
+                    "plan_digest": "baseline",
+                    "deltas": {
+                        "params_changed": 0,
+                        "heads_pruned": 0,
+                        "neurons_pruned": 0,
+                        "layers_modified": 0,
+                    },
+                },
                 "evaluation_windows": {
                     "preview": {
                         "window_ids": [0],
@@ -213,7 +230,7 @@ def test_until_pass_restore_failure_discards_model_and_reloads_next_attempt(
         )
         stack.enter_context(
             patch(
-                "invarlock.reporting.report_make.make_report",
+                "invarlock.cli.run_execution.build_evaluation_report",
                 make_report,
             )
         )

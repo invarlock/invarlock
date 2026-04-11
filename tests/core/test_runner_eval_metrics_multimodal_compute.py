@@ -57,7 +57,7 @@ def test_compute_real_metrics_supports_vision_text_classification() -> None:
         context={
             "eval": {
                 "loss": {"type": "classification", "resolved_type": "classification"},
-                "metric": {"kind": "vqa_accuracy"},
+                "metric": {"kind": "accuracy"},
             }
         }
     )
@@ -85,7 +85,7 @@ def test_compute_real_metrics_supports_vision_text_classification() -> None:
         config=config,
     )
 
-    assert metrics["primary_metric"]["kind"] == "vqa_accuracy"
+    assert metrics["primary_metric"]["kind"] == "accuracy"
     assert metrics["classification"]["preview"]["correct_total"] == 1
     assert metrics["classification"]["final"]["correct_total"] == 0
     assert metrics["classification"]["counts_source"] == "measured"
@@ -93,6 +93,13 @@ def test_compute_real_metrics_supports_vision_text_classification() -> None:
     assert eval_windows["final"]["records"][0]["correct"] is False
     assert metrics["primary_metric"]["preview"] == 1.0
     assert metrics["primary_metric"]["final"] == 0.0
+
+
+def test_multimodal_metric_kind_rejects_unknown_config_value() -> None:
+    config = SimpleNamespace(context={"eval": {"metric": {"kind": "vqa_accuracy"}}})
+
+    with pytest.raises(ValueError, match="Unsupported metric kind"):
+        rem._resolve_metric_kind(config, fallback="accuracy")
 
 
 def test_compute_real_metrics_retries_multimodal_processor_without_truncation(
@@ -206,7 +213,7 @@ def test_compute_real_metrics_retries_multimodal_processor_without_truncation(
                         "type": "classification",
                         "resolved_type": "classification",
                     },
-                    "metric": {"kind": "vqa_accuracy"},
+                    "metric": {"kind": "accuracy"},
                 }
             }
         ),

@@ -17,6 +17,9 @@ def _mk_cert_accuracy_ok() -> dict:
     return {
         "schema_version": "v1",
         "run_id": "r",
+        "artifacts": {"generated_at": "t"},
+        "plugins": {},
+        "meta": {},
         "dataset": {
             "provider": "unit",
             "seq_len": 8,

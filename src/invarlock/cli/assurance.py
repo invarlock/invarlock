@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class AssuranceMode(str, Enum):
+class AssuranceMode(StrEnum):
     ATTESTED = "attested"
     TRUSTED_LOCAL = "trusted-local"
 

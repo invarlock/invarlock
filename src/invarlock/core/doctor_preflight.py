@@ -82,7 +82,7 @@ def run_doctor_config_preflight(
     tier: str | None = None,
     baseline: str | None = None,
 ) -> DoctorConfigPreflightResult:
-    import invarlock.core.config_runtime as config_runtime
+    import invarlock.core.config_loader as config_loader
     import invarlock.core.metric_provider_resolution as metric_provider_resolution
 
     findings: list[DoctorFinding] = []
@@ -91,9 +91,9 @@ def run_doctor_config_preflight(
     metric_kind: str | None = None
     policy_meta: dict[str, Any] | None = None
 
-    cfg = config_runtime.load_config(config_path)
+    cfg = config_loader.load_config(config_path)
     if profile:
-        cfg = config_runtime.apply_profile(cfg, profile)
+        cfg = config_loader.apply_profile(cfg, profile)
 
     dataset_cfg = getattr(cfg, "dataset", None)
     provider_cfg = getattr(dataset_cfg, "provider", None)

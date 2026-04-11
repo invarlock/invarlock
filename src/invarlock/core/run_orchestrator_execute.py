@@ -7,7 +7,7 @@ from functools import partial
 from time import perf_counter
 from typing import Any, NoReturn
 
-import numpy as np
+import numpy as np  # noqa: F401
 
 import invarlock.core.run_orchestrator_execute_helpers as _execute_helpers
 from invarlock.core.exceptions import InvarlockError
@@ -17,25 +17,31 @@ from invarlock.core.run_execution_context_policy import (
 from invarlock.core.run_execution_context_policy import (
     build_run_execution_config_payloads as _build_run_execution_config_payloads_impl,
 )
+from invarlock.core.run_orchestrator_execute_events import (
+    _emit_run_diagnostic,
+    _emit_run_guard_overhead_summary,
+    _emit_run_retry_summary,
+    _emit_transition_diagnostic,
+    _raise_run_halt,
+)
 from invarlock.core.run_orchestrator_execute_helpers import (
     RunEventEmitter as RunEventEmitter,
 )
 from invarlock.core.run_orchestrator_execute_helpers import (
     _cfg_section_value,
-    _cleanup_snapshot_tmpdir,
-    _emit_run_diagnostic,
-    _emit_run_guard_overhead_summary,
-    _emit_run_retry_summary,
-    _emit_transition_diagnostic,
-    _execute_run_pipeline_steps,
-    _map_pipeline_failure,
-    _raise_run_halt,
 )
 from invarlock.core.run_orchestrator_execute_helpers import (
     _coerce_float as _coerce_float,
 )
 from invarlock.core.run_orchestrator_execute_helpers import (
     _coerce_int as _coerce_int,
+)
+from invarlock.core.run_orchestrator_execute_outcome import (
+    _cleanup_snapshot_tmpdir,
+    _map_pipeline_failure,
+)
+from invarlock.core.run_orchestrator_execute_pipeline import (
+    _execute_run_pipeline_steps,
 )
 from invarlock.core.run_orchestrator_types import (
     RunExecutionEvent,
@@ -180,13 +186,6 @@ def execute_run_request_impl(
             _resolve_guard_overhead_threshold_impl
         )
         _execute_helpers._should_measure_overhead_impl = _should_measure_overhead_impl
-        _execute_helpers._resolve_retry_validation_transition_impl = (
-            _resolve_retry_validation_transition_impl
-        )
-        _execute_helpers._build_timing_summary_payload_impl = (
-            _build_timing_summary_payload_impl
-        )
-        _execute_helpers.np = np
         outcome_result, snapshot_tmpdir = _execute_run_pipeline_steps(
             request=request,
             services=services,
@@ -204,6 +203,10 @@ def execute_run_request_impl(
             record_timed_step=_record_timed_step,
             optional_torch=_optional_torch,
             require_torch=_require_torch,
+            build_timing_summary_payload_fn=_build_timing_summary_payload_impl,
+            resolve_retry_validation_transition_fn=(
+                _resolve_retry_validation_transition_impl
+            ),
             cfg_value=_cfg_value,
             config_value_exceptions=config_value_exceptions,
             numeric_exceptions=numeric_exceptions,

@@ -3,11 +3,26 @@ from __future__ import annotations
 import importlib as _importlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, cast
 
+from invarlock.core.abi import INVARLOCK_CORE_ABI as CORE_ABI
 from invarlock.core.api import ModelAdapter
 
 from ..core.adapter_auto import resolve_auto_adapter
+
+INVARLOCK_CORE_ABI = CORE_ABI
+
+
+class _LoadableAdapter(Protocol):
+    def can_handle(self, model: Any) -> bool: ...
+
+    def describe(self, model: Any) -> dict[str, Any]: ...
+
+    def snapshot(self, model: Any) -> bytes: ...
+
+    def restore(self, model: Any, blob: bytes) -> None: ...
+
+    def load_model(self, model_id: str, device: str = "auto", **kwargs: Any) -> Any: ...
 
 
 def _detect_quantization_from_path(model_id: str) -> str | None:
@@ -100,53 +115,69 @@ class _DelegatingAdapter(ModelAdapter):
     name = "auto_adapter"
 
     def __init__(self) -> None:
-        self._delegate: ModelAdapter | None = None
+        self._delegate: _LoadableAdapter | None = None
 
-    def _load_adapter(self, adapter_name: str) -> ModelAdapter:
+    def _load_adapter(self, adapter_name: str) -> _LoadableAdapter:
         """Load an adapter by name."""
         if adapter_name == "hf_causal":
-            HF_Causal_Adapter = _importlib.import_module(
-                ".hf_causal", __package__
-            ).HF_Causal_Adapter
-            return HF_Causal_Adapter()
+            adapter_cls = cast(
+                type[_LoadableAdapter],
+                _importlib.import_module(".hf_causal", __package__).HF_Causal_Adapter,
+            )
+            return adapter_cls()
         if adapter_name == "hf_mlm":
-            HF_MLM_Adapter = _importlib.import_module(
-                ".hf_mlm", __package__
-            ).HF_MLM_Adapter
-            return HF_MLM_Adapter()
+            adapter_cls = cast(
+                type[_LoadableAdapter],
+                _importlib.import_module(".hf_mlm", __package__).HF_MLM_Adapter,
+            )
+            return adapter_cls()
         if adapter_name == "hf_multimodal":
-            HF_Multimodal_Adapter = _importlib.import_module(
-                ".hf_multimodal", __package__
-            ).HF_Multimodal_Adapter
-            return HF_Multimodal_Adapter()
+            adapter_cls = cast(
+                type[_LoadableAdapter],
+                _importlib.import_module(
+                    ".hf_multimodal", __package__
+                ).HF_Multimodal_Adapter,
+            )
+            return adapter_cls()
         if adapter_name == "hf_seq2seq":
-            HF_Seq2Seq_Adapter = _importlib.import_module(
-                ".hf_seq2seq", __package__
-            ).HF_Seq2Seq_Adapter
-            return HF_Seq2Seq_Adapter()
+            adapter_cls = cast(
+                type[_LoadableAdapter],
+                _importlib.import_module(".hf_seq2seq", __package__).HF_Seq2Seq_Adapter,
+            )
+            return adapter_cls()
         elif adapter_name == "hf_bnb":
-            HF_BNB_Adapter = _importlib.import_module(
-                "invarlock.plugins.hf_bnb_adapter"
-            ).HF_BNB_Adapter
-            return HF_BNB_Adapter()
+            adapter_cls = cast(
+                type[_LoadableAdapter],
+                _importlib.import_module(
+                    "invarlock.plugins.hf_bnb_adapter"
+                ).HF_BNB_Adapter,
+            )
+            return adapter_cls()
         elif adapter_name == "hf_awq":
-            HF_AWQ_Adapter = _importlib.import_module(
-                "invarlock.plugins.hf_awq_adapter"
-            ).HF_AWQ_Adapter
-            return HF_AWQ_Adapter()
+            adapter_cls = cast(
+                type[_LoadableAdapter],
+                _importlib.import_module(
+                    "invarlock.plugins.hf_awq_adapter"
+                ).HF_AWQ_Adapter,
+            )
+            return adapter_cls()
         elif adapter_name == "hf_gptq":
-            HF_GPTQ_Adapter = _importlib.import_module(
-                "invarlock.plugins.hf_gptq_adapter"
-            ).HF_GPTQ_Adapter
-            return HF_GPTQ_Adapter()
+            adapter_cls = cast(
+                type[_LoadableAdapter],
+                _importlib.import_module(
+                    "invarlock.plugins.hf_gptq_adapter"
+                ).HF_GPTQ_Adapter,
+            )
+            return adapter_cls()
         else:
             # Default to causal adapter
-            HF_Causal_Adapter = _importlib.import_module(
-                ".hf_causal", __package__
-            ).HF_Causal_Adapter
-            return HF_Causal_Adapter()
+            adapter_cls = cast(
+                type[_LoadableAdapter],
+                _importlib.import_module(".hf_causal", __package__).HF_Causal_Adapter,
+            )
+            return adapter_cls()
 
-    def _ensure_delegate_from_id(self, model_id: str) -> ModelAdapter:
+    def _ensure_delegate_from_id(self, model_id: str) -> _LoadableAdapter:
         if self._delegate is not None:
             return self._delegate
 
@@ -161,7 +192,7 @@ class _DelegatingAdapter(ModelAdapter):
         self._delegate = self._load_adapter(resolved)
         return self._delegate
 
-    def _ensure_delegate_from_model(self, model: Any) -> ModelAdapter:
+    def _ensure_delegate_from_model(self, model: Any) -> _LoadableAdapter:
         if self._delegate is not None:
             return self._delegate
 

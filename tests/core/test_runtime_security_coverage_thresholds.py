@@ -29,7 +29,8 @@ def test_runtime_flag_value_preserves_unknown_env_under_policy(
 
     with runtime_security.runtime_allowances_scope(allow_network=True):
         assert (
-            runtime_security._runtime_flag_value("INVARLOCK_UNKNOWN_FLAG") == "from-env"
+            runtime_security_helpers._runtime_flag_value("INVARLOCK_UNKNOWN_FLAG")
+            == "from-env"
         )
 
 
@@ -38,13 +39,13 @@ def test_attested_runtime_image_ref_keeps_digest_and_allows_unattested_override(
 ):
     digest_pinned = "ghcr.io/invarlock/runtime:test@sha256:" + ("a" * 64)
     assert (
-        runtime_security._attested_runtime_image_ref(digest_pinned, None)
+        runtime_security_helpers._attested_runtime_image_ref(digest_pinned, None)
         == digest_pinned
     )
 
     with runtime_security.runtime_allowances_scope(allow_unattested_artifacts=True):
         assert (
-            runtime_security._attested_runtime_image_ref(
+            runtime_security_helpers._attested_runtime_image_ref(
                 "ghcr.io/invarlock/runtime:test",
                 None,
             )
@@ -56,7 +57,7 @@ def test_inspect_container_image_parses_repo_digest_and_image_id(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        runtime_security.subprocess,
+        runtime_security_helpers.subprocess,
         "run",
         lambda *args, **kwargs: SimpleNamespace(
             returncode=0,
@@ -65,13 +66,13 @@ def test_inspect_container_image_parses_repo_digest_and_image_id(
         raising=True,
     )
 
-    assert runtime_security._inspect_container_image("docker", "img") == (
+    assert runtime_security_helpers._inspect_container_image("docker", "img") == (
         True,
         "sha256:abc",
     )
 
     monkeypatch.setattr(
-        runtime_security.subprocess,
+        runtime_security_helpers.subprocess,
         "run",
         lambda *args, **kwargs: SimpleNamespace(
             returncode=0,
@@ -80,7 +81,7 @@ def test_inspect_container_image_parses_repo_digest_and_image_id(
         raising=True,
     )
 
-    assert runtime_security._inspect_container_image("docker", "img") == (
+    assert runtime_security_helpers._inspect_container_image("docker", "img") == (
         True,
         "sha256:def",
     )
@@ -90,33 +91,39 @@ def test_inspect_container_image_handles_digestless_images(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        runtime_security.subprocess,
+        runtime_security_helpers.subprocess,
         "run",
         lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout="[]\nimage-id\n"),
         raising=True,
     )
 
-    assert runtime_security._inspect_container_image("docker", "img") == (True, None)
+    assert runtime_security_helpers._inspect_container_image("docker", "img") == (
+        True,
+        None,
+    )
 
 
 def test_inspect_container_image_handles_empty_stdout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        runtime_security.subprocess,
+        runtime_security_helpers.subprocess,
         "run",
         lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout=""),
         raising=True,
     )
 
-    assert runtime_security._inspect_container_image("docker", "img") == (True, None)
+    assert runtime_security_helpers._inspect_container_image("docker", "img") == (
+        True,
+        None,
+    )
 
 
 def test_inspect_container_image_ignores_repo_digests_without_sha(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        runtime_security.subprocess,
+        runtime_security_helpers.subprocess,
         "run",
         lambda *args, **kwargs: SimpleNamespace(
             returncode=0,
@@ -125,7 +132,10 @@ def test_inspect_container_image_ignores_repo_digests_without_sha(
         raising=True,
     )
 
-    assert runtime_security._inspect_container_image("docker", "img") == (True, None)
+    assert runtime_security_helpers._inspect_container_image("docker", "img") == (
+        True,
+        None,
+    )
 
 
 def test_build_container_python_command_adds_cwd_host_mirror(
@@ -206,9 +216,9 @@ def test_delegate_python_script_to_container_surfaces_timeout(
     )
 
     def _run(command, check=False, timeout=None):
-        raise runtime_security.subprocess.TimeoutExpired(command, timeout)
+        raise runtime_security_helpers.subprocess.TimeoutExpired(command, timeout)
 
-    monkeypatch.setattr(runtime_security.subprocess, "run", _run, raising=True)
+    monkeypatch.setattr(runtime_security_helpers.subprocess, "run", _run, raising=True)
 
     with pytest.raises(RuntimeError, match="timed out"):
         runtime_security.delegate_python_script_to_container(
@@ -306,5 +316,8 @@ def test_iter_external_symlink_target_mounts_skips_targets_already_covered_by_cw
     link_path.symlink_to(covered_target)
 
     assert (
-        runtime_security._iter_external_symlink_target_mounts(link_path, cwd=cwd) == []
+        runtime_security_helpers._iter_external_symlink_target_mounts(
+            link_path, cwd=cwd
+        )
+        == []
     )

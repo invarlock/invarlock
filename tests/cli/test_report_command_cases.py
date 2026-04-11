@@ -103,7 +103,7 @@ def test_report_command_normalizes_md_and_handles_sparse_primary_metric(
                 },
             },
         ),
-        patch("invarlock.reporting.report_contract.validate_report"),
+        patch("invarlock.reporting.report_contract.validate_report", return_value=True),
         patch(
             "invarlock.reporting.report_contract.compute_console_validation_block",
             render_mod.compute_console_validation_block,
@@ -125,6 +125,47 @@ def test_report_command_normalizes_md_and_handles_sparse_primary_metric(
     assert save_report.call_args_list[0].kwargs["formats"] == ["markdown"]
 
 
+def test_generate_reports_fails_closed_when_evaluation_report_is_invalid(
+    tmp_path: Path,
+) -> None:
+    run_path = tmp_path / "run.json"
+    run_path.write_text("{}", encoding="utf-8")
+
+    with (
+        patch(
+            "invarlock.reporting.report_contract.load_report_payload",
+            side_effect=[
+                {"meta": {}, "metrics": {"primary_metric": {"kind": "accuracy"}}},
+                {"meta": {}, "metrics": {"primary_metric": {"kind": "accuracy"}}},
+            ],
+        ),
+        patch(
+            "invarlock.reporting.report_contract.make_report",
+            return_value={
+                "schema_version": "1",
+                "primary_metric": {
+                    "kind": "accuracy",
+                    "preview": 1.0,
+                    "final": 1.0,
+                    "ratio_vs_baseline": 0.0,
+                },
+            },
+        ),
+        patch(
+            "invarlock.reporting.report_contract.validate_report", return_value=False
+        ),
+    ):
+        with pytest.raises(
+            ValueError, match="Generated evaluation report failed schema validation"
+        ):
+            generate_reports(
+                run=str(run_path),
+                format="report",
+                baseline=str(run_path),
+                output=str(tmp_path / "out"),
+            )
+
+
 def test_report_command_generic_failure_maps_to_exit_one(monkeypatch) -> None:
     monkeypatch.setattr(
         report_mod,
@@ -133,7 +174,7 @@ def test_report_command_generic_failure_maps_to_exit_one(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         report_mod,
-        "generate_reports",
+        "_generate_reports",
         lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
     )
     monkeypatch.setattr(report_mod, "print_event", lambda *_args, **_kwargs: None)

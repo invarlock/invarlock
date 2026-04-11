@@ -378,16 +378,12 @@ def test_evaluate_attested_bundle_manifest_inherits_container_execution(
     )
     monkeypatch.setattr(mod, "generate_reports", fake_report, raising=False)
     monkeypatch.setattr(
-        mod,
-        "resolve_runtime_image",
+        "invarlock.cli.evaluate_output.resolve_runtime_image",
         lambda: "ghcr.io/invarlock/invarlock-runtime:test",
-        raising=True,
     )
     monkeypatch.setattr(
-        mod,
-        "resolve_runtime_image_digest",
+        "invarlock.cli.evaluate_output.resolve_runtime_image_digest",
         lambda: "sha256:" + ("a" * 64),
-        raising=True,
     )
 
     evaluate_command(

@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from invarlock.cli import run_serialization as run_serial_mod
-from invarlock.core.config_runtime import load_config
+from invarlock.core.config_loader import load_config
 
 
 def test_run_config_guard_overrides_prune_none(tmp_path):

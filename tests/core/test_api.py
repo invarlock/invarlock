@@ -44,7 +44,9 @@ class TestGuardChainComprehensive:
         )
         self.full_guard.before_edit = Mock(return_value={"before": "result"})
         self.full_guard.after_edit = Mock(return_value={"after": "result"})
-        self.full_guard.finalize = Mock(return_value=Mock(passed=True, action="none"))
+        self.full_guard.finalize = Mock(
+            return_value=Mock(passed=True, decision="allow")
+        )
 
         # Minimal guard with only validate method
         self.minimal_guard = Mock(spec=Guard)
@@ -57,7 +59,9 @@ class TestGuardChainComprehensive:
         self.none_guard.prepare = Mock(return_value={"ready": False})
         self.none_guard.before_edit = Mock(return_value=None)  # Returns None
         self.none_guard.after_edit = Mock(return_value=None)  # Returns None
-        self.none_guard.finalize = Mock(return_value=Mock(passed=False, action="warn"))
+        self.none_guard.finalize = Mock(
+            return_value=Mock(passed=False, decision="monitor")
+        )
 
         self.model = Mock()
         self.adapter = Mock(spec=ModelAdapter)
@@ -158,72 +162,39 @@ class TestGuardChainComprehensive:
         # Test with empty outcomes
         assert chain.all_passed([])
 
-    def test_get_worst_action_comprehensive(self):
-        """Test get_worst_action method with different action types."""
+    def test_get_worst_decision_comprehensive(self):
+        """Test get_worst_decision method with typed decisions."""
         chain = GuardChain([])
 
-        # Test with various action combinations
-        outcomes_with_actions = [
-            Mock(action="none"),
-            Mock(action="warn"),
-            Mock(action="rollback"),
+        outcomes_with_decisions = [
+            Mock(decision="allow"),
+            Mock(decision="monitor"),
+            Mock(decision="rollback"),
         ]
 
-        # Should import and use get_worst_action from types
-        result = chain.get_worst_action(outcomes_with_actions)
-        assert isinstance(result, str)
+        assert chain.get_worst_decision(outcomes_with_decisions) == "rollback"
 
-        # Test with outcomes without action attribute
-        outcomes_no_actions = [
-            Mock(spec=["other_attr"]),  # No action attribute
+        outcomes_without_decisions = [
+            Mock(spec=["other_attr"]),
             Mock(spec=["other_attr"]),
         ]
-        result = chain.get_worst_action(outcomes_no_actions)
-        assert isinstance(result, str)
+        assert chain.get_worst_decision(outcomes_without_decisions) == "allow"
 
-        # Test with empty outcomes
-        result = chain.get_worst_action([])
-        assert isinstance(result, str)
+        assert chain.get_worst_decision([]) == "allow"
 
-    def test_get_worst_action_prefers_typed_decisions_when_present(self):
-        """Typed decisions should override legacy action labels when both are present."""
+    def test_get_worst_decision_ignores_unknown_labels(self):
         chain = GuardChain([])
 
-        outcomes = [Mock(decision="monitor", action="abort")]
+        outcomes = [Mock(decision="monitor"), Mock(decision="mystery")]
 
-        assert chain.get_worst_action(outcomes) == "warn"
+        assert chain.get_worst_decision(outcomes) == "monitor"
 
-    def test_get_worst_action_returns_worst_legacy_action_when_decisions_absent(self):
-        chain = GuardChain([])
-
-        outcomes = [Mock(spec=["action"]), Mock(spec=["action"])]
-        outcomes[0].action = "warn"
-        outcomes[1].action = "rollback"
-
-        assert chain.get_worst_action(outcomes) == "rollback"
-
-    def test_get_worst_action_ignores_blank_decision_when_legacy_action_is_present(
-        self,
-    ):
-        chain = GuardChain([])
-
-        outcomes = [Mock(decision="   ", action="rollback")]
-
-        assert chain.get_worst_action(outcomes) == "rollback"
-
-    def test_get_worst_action_ignores_unrecognized_decision_without_action(self):
-        chain = GuardChain([])
-
-        outcomes = [Mock(decision="mystery")]
-
-        assert chain.get_worst_action(outcomes) == "none"
-
-    def test_get_worst_action_accumulates_multiple_typed_decisions(self):
+    def test_get_worst_decision_accumulates_multiple_typed_decisions(self):
         chain = GuardChain([])
 
         outcomes = [Mock(decision="monitor"), Mock(decision="block")]
 
-        assert chain.get_worst_action(outcomes) == "abort"
+        assert chain.get_worst_decision(outcomes) == "block"
 
     def test_guard_chain_initialization(self):
         """Test GuardChain initialization with different parameters."""
@@ -418,7 +389,9 @@ class TestAbstractInterfacesCoverage:
             def validate(self, model, adapter, context):
                 return {
                     "passed": context.get("should_pass", True),
-                    "action": "none" if context.get("should_pass", True) else "warn",
+                    "decision": (
+                        "allow" if context.get("should_pass", True) else "monitor"
+                    ),
                     "metrics": {"score": 0.95},
                 }
 
@@ -427,11 +400,11 @@ class TestAbstractInterfacesCoverage:
 
         result1 = guard.validate(Mock(), Mock(), {"should_pass": True})
         assert result1["passed"]
-        assert result1["action"] == "none"
+        assert result1["decision"] == "allow"
 
         result2 = guard.validate(Mock(), Mock(), {"should_pass": False})
         assert not result2["passed"]
-        assert result2["action"] == "warn"
+        assert result2["decision"] == "monitor"
 
 
 class TestTypeAliases:

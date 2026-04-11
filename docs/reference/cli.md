@@ -178,6 +178,8 @@ Core subcommands:
   - `verify` accepts directories containing canonical `evaluation.report.json`
     and optional baselines containing canonical `report.json` or
     `evaluation.report.json`
+    - If a directory contains both canonical filenames, it is ambiguous and
+      rejected; pass the exact file path instead.
 
 Example:
 
@@ -201,7 +203,8 @@ Common options:
 - `--subject-report`
 - `--strict`
 - Report inputs accept an explicit JSON file path or a directory containing
-  canonical `report.json` or `evaluation.report.json`.
+  canonical `report.json` or `evaluation.report.json`; ambiguous directories
+  with both canonical files are rejected and require an explicit file path.
 
 Example:
 

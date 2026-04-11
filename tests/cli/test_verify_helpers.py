@@ -634,6 +634,20 @@ def test_primary_metric_validation_helper_paths_for_invalid_modes() -> None:
     assert verify_mod._validate_primary_metric(cert_invalid_prefix) == []
 
 
+def test_primary_metric_validation_rejects_unknown_kind() -> None:
+    verify_mod = _import_verify_module()
+    cert_unknown = {
+        "primary_metric": {
+            "kind": "vqa_accuracy",
+            "final": 0.9,
+            "ratio_vs_baseline": 1.0,
+        }
+    }
+
+    errs = verify_mod._validate_primary_metric(cert_unknown)
+    assert any("unsupported primary_metric.kind" in err for err in errs)
+
+
 def test_recompute_validation_flags_and_policy_gate_paths(monkeypatch) -> None:
     verify_mod = _import_verify_module()
     captured: dict[str, object] = {}

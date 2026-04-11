@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from invarlock.core.config_runtime import load_config
+from invarlock.core.config_loader import load_config
 
 EXPECTED_CONFIGS = [
     ("presets/causal_lm", "gpt2_smoke_128.yaml", None),

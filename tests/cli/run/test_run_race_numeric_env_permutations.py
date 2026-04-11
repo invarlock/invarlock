@@ -300,7 +300,7 @@ def test_vars_failure_in_to_serialisable_dict(tmp_path: Path):
         for ctx in _common_ce_detect_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.core.config_runtime.load_config", lambda p: Cfg())
+            patch("invarlock.core.config_loader.load_config", lambda p: Cfg())
         )
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider_min())
@@ -624,7 +624,7 @@ def test_mlm_probability_inversion(tmp_path: Path):
             )
         )
         stack.enter_context(
-            patch("invarlock.core.config_runtime.load_config", lambda p: Cfg())
+            patch("invarlock.core.config_loader.load_config", lambda p: Cfg())
         )
         stack.enter_context(
             patch("invarlock.cli.run_runtime.detect_model_profile", detect_mlm)
@@ -735,7 +735,7 @@ def test_baseline_mlm_no_masked_tokens_exit(tmp_path: Path):
             )
         )
         stack.enter_context(
-            patch("invarlock.core.config_runtime.load_config", lambda p: Cfg())
+            patch("invarlock.core.config_loader.load_config", lambda p: Cfg())
         )
         stack.enter_context(
             patch("invarlock.cli.run_runtime.detect_model_profile", detect_mlm)
@@ -836,7 +836,7 @@ def test_guard_order_permutations(tmp_path: Path, order):
 
     with ExitStack() as stack:
         stack.enter_context(
-            patch("invarlock.core.config_runtime.load_config", lambda p: DummyCfg())
+            patch("invarlock.core.config_loader.load_config", lambda p: DummyCfg())
         )
         stack.enter_context(
             patch("invarlock.core.registry.get_registry", lambda: Reg())

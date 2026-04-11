@@ -297,7 +297,7 @@ def test_apply_profile_raises_causes_exit(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.core.config_runtime.apply_profile",
+                "invarlock.core.config_loader.apply_profile",
                 side_effect=RuntimeError("bad profile"),
             )
         )

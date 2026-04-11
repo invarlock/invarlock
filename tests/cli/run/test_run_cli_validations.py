@@ -31,7 +31,7 @@ def test_run_command_file_not_found():
             assert exc_info.value.exit_code == 1
 
 
-@patch("invarlock.core.config_runtime.load_config")
+@patch("invarlock.core.config_loader.load_config")
 @patch("invarlock.cli.run_config._resolve_requested_edit_name")
 def test_run_command_invalid_edit_kind(mock_resolve_edit, mock_load):
     mock_config = Mock()
@@ -58,7 +58,7 @@ def test_run_command_invalid_edit_kind(mock_resolve_edit, mock_load):
             assert exc_info.value.exit_code == 2
 
 
-@patch("invarlock.core.config_runtime.load_config")
+@patch("invarlock.core.config_loader.load_config")
 def test_run_command_invalid_config_key_exits_2(mock_load):
     mock_load.side_effect = ValueError(
         "edit.parameters is not supported; use edit.plan."
@@ -81,7 +81,7 @@ def test_run_command_invalid_config_key_exits_2(mock_load):
             assert exc_info.value.exit_code == 2
 
 
-@patch("invarlock.core.config_runtime.load_config")
+@patch("invarlock.core.config_loader.load_config")
 def test_run_command_invalid_tier(mock_load):
     mock_config = Mock()
     mock_config.model.device = "auto"
@@ -106,7 +106,7 @@ def test_run_command_invalid_tier(mock_load):
             assert exc_info.value.exit_code == 1
 
 
-@patch("invarlock.core.config_runtime.load_config")
+@patch("invarlock.core.config_loader.load_config")
 def test_run_command_invalid_probes(mock_load):
     mock_config = Mock()
     mock_config.model.device = "auto"
@@ -132,8 +132,8 @@ def test_run_command_invalid_probes(mock_load):
 
 
 @patch("invarlock.cli.run_runtime.validate_guard_overhead")
-@patch("invarlock.core.config_runtime.load_config")
-@patch("invarlock.core.config_runtime.apply_profile")
+@patch("invarlock.core.config_loader.load_config")
+@patch("invarlock.core.config_loader.apply_profile")
 @patch("invarlock.cli.device.resolve_device", return_value="cpu")
 @patch("invarlock.cli.device.validate_device_for_config", return_value=(True, ""))
 @patch("invarlock.core.registry.get_registry")

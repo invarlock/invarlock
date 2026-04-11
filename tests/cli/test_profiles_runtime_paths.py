@@ -5,7 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from invarlock.core.config_runtime import InvarLockConfig, apply_profile
+from invarlock.core.config_loader import apply_profile
+from invarlock.core.config_runtime import InvarLockConfig
 
 
 def _patch_exists_block_configs(
