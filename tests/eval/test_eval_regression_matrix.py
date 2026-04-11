@@ -107,10 +107,8 @@ def test_metrics_aggregation_covers_non_matching_layer_names_and_missing_after_n
     assert deltas["layers_modified"] == 0
 
     spectral_module = types.ModuleType("invarlock.guards.spectral_measurement")
-    spectral_module.compute_spectral_norms = (
-        lambda model, scope="ffn": {"layer_a": 2.0, "layer_b": 4.0}
-        if model is before
-        else {"layer_a": 3.0}
+    spectral_module.compute_spectral_norms = lambda model, scope="ffn": (
+        {"layer_a": 2.0, "layer_b": 4.0} if model is before else {"layer_a": 3.0}
     )
     monkeypatch.setitem(
         __import__("sys").modules,
@@ -203,11 +201,11 @@ def test_post_attention_probes_cover_missing_ln_extra_layers_and_none_grads(
     monkeypatch.setattr(
         post_attention.torch,
         "norm",
-        lambda inp, p="fro", dim=None, keepdim=False, out=None, dtype=None: torch.ones(
-            inp.size(2), device=inp.device
-        )
-        if isinstance(dim, tuple | list) and len(dim) == 3 and inp.dim() == 4
-        else torch.linalg.vector_norm(inp),
+        lambda inp, p="fro", dim=None, keepdim=False, out=None, dtype=None: (
+            torch.ones(inp.size(2), device=inp.device)
+            if isinstance(dim, tuple | list) and len(dim) == 3 and inp.dim() == 4
+            else torch.linalg.vector_norm(inp)
+        ),
     )
 
     head_model = _HeadScoreModel(
@@ -364,7 +362,7 @@ def test_metrics_runtime_invalid_label_branches_and_cuda_helpers(
 
     dep_manager = SimpleNamespace(
         is_available=lambda _name: True,
-        get_module=lambda _name: (lambda _model, _batch: _Frame(["embed", "lm_head"])),
+        get_module=lambda _name: lambda _model, _batch: _Frame(["embed", "lm_head"]),
     )
     sigma_max = metrics_activation_mod._calculate_sigma_max(  # noqa: SLF001
         nn.Linear(2, 2),

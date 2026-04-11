@@ -8,6 +8,7 @@ from invarlock.reporting.primary_metric_utils import (
     _attach_classification_primary_metric_fallback,
     _attach_ppl_analysis_fields,
     _attach_primary_metric_from_report,
+    _attach_primary_metric_from_windows,
     _ensure_primary_metric_display_ci,
     _finalize_primary_metric_snapshot,
     _resolve_logspace_ci,
@@ -51,6 +52,74 @@ def test_attach_primary_metric_from_report_with_ppl_analysis():
     assert pm["unstable"] is True
 
 
+def test_resolve_logspace_ci_prefers_ppl_analysis_pairing_and_falls_back():
+    assert _resolve_logspace_ci(
+        {"logloss_delta_ci": (0.3, 0.4)},
+        {"stats": {"pairing": "paired_baseline"}, "logloss_delta_ci": (0.1, 0.2)},
+    ) == (0.1, 0.2)
+    assert _resolve_logspace_ci(
+        {"logloss_delta_ci": (0.3, 0.4)},
+        {"stats": {"pairing": "independent"}, "logloss_delta_ci": (0.1, 0.2)},
+    ) == (0.3, 0.4)
+
+
+def test_attach_ppl_analysis_fields_populates_mean_logloss_and_ci():
+    pm_copy = {"kind": "ppl_causal"}
+    report = {
+        "evaluation_windows": {
+            "preview": {"logloss": [1.0, 2.0], "token_counts": [1, 1]},
+            "final": {"logloss": [3.0], "token_counts": [2]},
+        }
+    }
+    _attach_ppl_analysis_fields(
+        pm_copy,
+        report=report,
+        metrics_map={"logloss_delta_ci": (0.1, 0.2)},
+        ppl_analysis={
+            "stats": {"pairing": "paired_baseline"},
+            "logloss_delta_ci": (0.1, 0.2),
+        },
+    )
+
+    assert pm_copy["analysis_basis"] == "mean_logloss"
+    assert pm_copy["analysis_point_preview"] == pytest.approx(1.5)
+    assert pm_copy["analysis_point_final"] == pytest.approx(3.0)
+    assert pm_copy["ci"] == [0.1, 0.2]
+
+
+def test_attach_ppl_analysis_fields_skips_non_finite_window_means():
+    pm_preview = {"kind": "ppl_causal"}
+    pm_final = {"kind": "ppl_causal"}
+    base_report = {
+        "evaluation_windows": {
+            "preview": {"logloss": [], "token_counts": []},
+            "final": {"logloss": [3.0], "token_counts": [2]},
+        }
+    }
+    _attach_ppl_analysis_fields(
+        pm_preview,
+        report=base_report,
+        metrics_map={},
+        ppl_analysis=None,
+    )
+    assert "analysis_point_preview" not in pm_preview
+    assert pm_preview["analysis_point_final"] == pytest.approx(3.0)
+
+    _attach_ppl_analysis_fields(
+        pm_final,
+        report={
+            "evaluation_windows": {
+                "preview": {"logloss": [1.0, 2.0], "token_counts": [1, 1]},
+                "final": {"logloss": [], "token_counts": []},
+            }
+        },
+        metrics_map={},
+        ppl_analysis=None,
+    )
+    assert pm_final["analysis_point_preview"] == pytest.approx(1.5)
+    assert "analysis_point_final" not in pm_final
+
+
 def test_attach_primary_metric_classification_fallback(monkeypatch):
     evaluation_report: dict[str, object] = {}
     report = {
@@ -80,7 +149,7 @@ def test_attach_primary_metric_classification_fallback(monkeypatch):
     )
 
     pm = evaluation_report["primary_metric"]
-    assert pm["kind"] == "vqa_accuracy"
+    assert pm["kind"] == "accuracy"
     assert pm["final"] == pytest.approx(0.8)
     assert pm["display_ci"] == [pm["final"], pm["final"]]
     assert pm["ratio_vs_baseline"] == pytest.approx(10.0)
@@ -114,6 +183,35 @@ def test_attach_primary_metric_uses_report_windows(monkeypatch):
     }
 
 
+def test_attach_primary_metric_from_windows_uses_seq2seq_kind(monkeypatch):
+    evaluation_report: dict[str, object] = {}
+    report = {"metrics": {"loss_type": "seq2seq"}}
+    seen: dict[str, object] = {}
+
+    import invarlock.eval.primary_metric as pm_mod
+
+    def _stub(report, kind, baseline):  # noqa: ANN001
+        seen["kind"] = kind
+        seen["baseline"] = baseline
+        return {"kind": kind, "final": 1.23}
+
+    monkeypatch.setattr(
+        pm_mod,
+        "compute_primary_metric_from_report",
+        _stub,
+        raising=False,
+    )
+
+    _attach_primary_metric_from_windows(evaluation_report, report, {"x": 1})
+
+    assert seen["kind"] == "ppl_seq2seq"
+    assert seen["baseline"] == {"x": 1}
+    assert evaluation_report["primary_metric"] == {
+        "kind": "ppl_seq2seq",
+        "final": 1.23,
+    }
+
+
 def test_attach_primary_metric_display_ci_fallback(monkeypatch):
     evaluation_report = {"primary_metric": {"ratio_vs_baseline": 1.2}}
     report = {}
@@ -135,6 +233,15 @@ def test_attach_primary_metric_display_ci_fallback(monkeypatch):
     )
 
     assert evaluation_report["primary_metric"]["display_ci"] == [1.2, 1.2]
+
+
+def test_attach_primary_metric_display_ci_defaults_and_marks_estimated():
+    evaluation_report = {"primary_metric": {"kind": "ppl_causal"}}
+
+    _ensure_primary_metric_display_ci(evaluation_report)
+
+    assert evaluation_report["primary_metric"]["display_ci"] == [1.0, 1.0]
+    assert evaluation_report["primary_metric"]["estimated"] is True
 
 
 def test_attach_primary_metric_marks_nonfinite_as_degraded():
@@ -189,6 +296,47 @@ def test_attach_primary_metric_skips_ratio_nan_without_baseline():
     assert "degraded_reason" not in pm
 
 
+def test_finalize_primary_metric_snapshot_marks_non_finite_delta():
+    pm_copy = {
+        "kind": "ppl_causal",
+        "preview": 1.2,
+        "final": 1.8,
+        "ratio_vs_baseline": float("nan"),
+    }
+
+    out = _finalize_primary_metric_snapshot(
+        pm_copy,
+        report={},
+        metrics_map={},
+        baseline_ref={"primary_metric": {"final": 0.0}},
+        ppl_analysis=None,
+    )
+
+    assert out["degraded"] is True
+    assert out["degraded_reason"] == "non_finite_delta"
+
+
+def test_finalize_primary_metric_snapshot_preserves_existing_degraded_reason():
+    pm_copy = {
+        "kind": "ppl_causal",
+        "preview": 1.2,
+        "final": 1.8,
+        "ratio_vs_baseline": 1.5,
+        "degraded_reason": "preset",
+    }
+
+    out = _finalize_primary_metric_snapshot(
+        pm_copy,
+        report={},
+        metrics_map={},
+        baseline_ref=None,
+        ppl_analysis=None,
+    )
+
+    assert out["degraded"] is True
+    assert out["degraded_reason"] == "preset"
+
+
 def test_attach_primary_metric_recomputes_ratio_without_marking_degraded():
     evaluation_report: dict[str, object] = {}
     report = {
@@ -214,6 +362,27 @@ def test_attach_primary_metric_recomputes_ratio_without_marking_degraded():
     assert pm["ratio_vs_baseline"] == pytest.approx(1.2)
     assert pm["degraded"] is False
     assert "degraded_reason" not in pm
+
+
+def test_finalize_primary_metric_snapshot_marks_primary_metric_invalid():
+    pm_copy = {
+        "kind": "ppl_causal",
+        "preview": 1.2,
+        "final": 1.8,
+        "ratio_vs_baseline": 1.5,
+        "invalid": True,
+    }
+
+    out = _finalize_primary_metric_snapshot(
+        pm_copy,
+        report={},
+        metrics_map={},
+        baseline_ref=None,
+        ppl_analysis=None,
+    )
+
+    assert out["degraded"] is True
+    assert out["degraded_reason"] == "primary_metric_invalid"
 
 
 def test_attach_primary_metric_marks_non_finite_delta_when_baseline_is_zero() -> None:

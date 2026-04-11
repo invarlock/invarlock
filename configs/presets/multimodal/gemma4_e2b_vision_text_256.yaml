@@ -19,7 +19,7 @@ dataset:
 
 eval:
   metric:
-    kind: "vqa_accuracy"
+    kind: "accuracy"
   loss:
     type: "classification"
 

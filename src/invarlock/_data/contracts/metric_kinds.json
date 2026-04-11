@@ -5,6 +5,5 @@
   "ppl_causal",
   "ppl_mlm",
   "ppl_seq2seq",
-  "rouge",
-  "vqa_accuracy"
+  "rouge"
 ]

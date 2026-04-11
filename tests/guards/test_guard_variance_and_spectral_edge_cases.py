@@ -1,8 +1,5 @@
 """
-Comprehensive Guard System Tests
-===============================
-
-Comprehensive tests for all guard modules to achieve 70% coverage.
+Variance and spectral guard edge-case tests.
 """
 
 from unittest.mock import Mock, patch
@@ -28,8 +25,8 @@ from invarlock.guards.variance import VarianceGuard
 from invarlock.guards.variance_scaling import equalise_residual_variance
 
 
-class TestVarianceGuardCoverageBoost:
-    """Targeted tests to boost variance guard coverage to 70%."""
+class TestVarianceGuardEdgeCases:
+    """Exercise variance guard edge cases and lifecycle behavior."""
 
     def setup_method(self):
         """Set up test fixtures."""
@@ -210,8 +207,8 @@ class TestVarianceGuardCoverageBoost:
         )
 
 
-class TestSpectralGuardExceptionCoverage:
-    """Tests specifically designed to trigger exception handling paths in spectral functions."""
+class TestSpectralGuardExceptionPaths:
+    """Exercise spectral guard exception and fallback paths."""
 
     def test_spectral_guard_validate_exception_handling(self):
         """Unexpected validation failures should raise."""

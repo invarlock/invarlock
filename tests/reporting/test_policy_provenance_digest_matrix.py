@@ -66,6 +66,11 @@ def _baseline() -> dict:
     return {
         "run_id": "b",
         "model_id": "m",
+        "ppl_final": 40.0,
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "final": 40.0,
+        },
         "evaluation_windows": {"final": {"window_ids": [1], "logloss": [0.1]}},
     }
 

@@ -199,18 +199,34 @@ def published_basis_lanes() -> list[dict[str, Any]]:
 def contract_reference(filename: str) -> dict[str, Any]:
     ref: dict[str, Any] = {"path": contract_relpath(filename)}
     try:
-        payload = _load_object_contract_or_raise(filename)
-    except ContractLoadError as exc:
-        ref["load_error"] = exc.reason
-        return ref
-    if isinstance(payload.get("format_version"), str):
-        ref["format_version"] = payload["format_version"]
-    if isinstance(payload.get("format"), str):
-        ref["format"] = payload["format"]
-    if isinstance(payload.get("core_abi"), str):
-        ref["core_abi"] = payload["core_abi"]
-    if isinstance(payload.get("match_policy"), str):
-        ref["match_policy"] = payload["match_policy"]
+        payload = _load_contract_or_raise(filename)
+    except (ContractLoadError, KeyError):
+        try:
+            payload = load_json_contract(filename)
+        except (
+            FileNotFoundError,
+            ModuleNotFoundError,
+            NotADirectoryError,
+            OSError,
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+        ) as exc:
+            ref["load_error"] = str(exc)
+            return ref
+    if isinstance(payload, dict):
+        if isinstance(payload.get("format_version"), str):
+            ref["format_version"] = payload["format_version"]
+        if isinstance(payload.get("format"), str):
+            ref["format"] = payload["format"]
+        if isinstance(payload.get("core_abi"), str):
+            ref["core_abi"] = payload["core_abi"]
+        if isinstance(payload.get("match_policy"), str):
+            ref["match_policy"] = payload["match_policy"]
+    elif isinstance(payload, list):
+        ref["kind"] = "array"
+        ref["item_count"] = len(payload)
+    else:
+        ref["kind"] = type(payload).__name__
     return ref
 
 
@@ -220,6 +236,9 @@ def contract_catalog() -> dict[str, Any]:
         "model_family_catalog": contract_reference("model_family_catalog.json"),
         "adapter_capabilities": contract_reference("adapter_capabilities.json"),
         "plugin_compatibility": contract_reference("plugin_compatibility.json"),
+        "validation_keys": contract_reference("validation_keys.json"),
+        "console_labels": contract_reference("console_labels.json"),
+        "metric_kinds": contract_reference("metric_kinds.json"),
         "runtime_manifest": contract_reference("runtime_manifest.schema.json"),
         "proof_pack_manifest": contract_reference("proof_pack_manifest.schema.json"),
         "policy_pack": contract_reference("policy_pack.schema.json"),

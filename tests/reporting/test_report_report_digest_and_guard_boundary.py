@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_make import _compute_report_digest
 from invarlock.reporting.report_overhead import prepare_guard_overhead_section
+from invarlock.reporting.report_provenance import compute_report_digest
 
 
 def test_compute_report_digest_minimal():
@@ -10,7 +10,7 @@ def test_compute_report_digest_minimal():
         "edit": {"name": "noop", "plan_digest": "deadbeef"},
         "metrics": {"spectral": {"caps_applied": 0}, "rmt": {"outliers": 0}},
     }
-    h = _compute_report_digest(rep)
+    h = compute_report_digest(rep)
     assert isinstance(h, str) and len(h) == 16
 
 

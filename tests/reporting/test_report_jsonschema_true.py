@@ -19,7 +19,8 @@ def test_validate_evaluation_report_jsonschema_true(monkeypatch):
         "dataset": {
             "provider": "p",
             "seq_len": 8,
-            "windows": {"preview": 0, "final": 0},
+            "windows": {"preview": 0, "final": 0, "stats": {}},
         },
+        "primary_metric": {"kind": "ppl_causal", "final": 1.0},
     }
     assert C.validate_report(cert) is True

@@ -157,8 +157,9 @@ def test_run_report_contract_persistence_covers_missing_json_and_telemetry_error
             run_dir=tmp_path,
             run_config={},
             telemetry=False,
-            save_telemetry_report_fn=lambda *_args, **_kwargs: tmp_path
-            / "telemetry.json",
+            save_telemetry_report_fn=lambda *_args, **_kwargs: (
+                tmp_path / "telemetry.json"
+            ),
         )
 
     monkeypatch.setattr(

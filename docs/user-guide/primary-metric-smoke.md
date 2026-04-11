@@ -6,7 +6,7 @@
 | --- | --- |
 | **Purpose** | Demonstrate PM computation for each metric kind. |
 | **Audience** | Developers understanding PM math and testing pipelines. |
-| **Metric kinds** | `ppl_causal`, `ppl_mlm`, `ppl_seq2seq`, `accuracy`, `vqa_accuracy`. |
+| **Metric kinds** | `ppl_causal`, `ppl_mlm`, `ppl_seq2seq`, `accuracy`, `accuracy`. |
 | **Network** | Fully offline; uses in-memory windows only. |
 | **Source of truth** | `src/invarlock/eval/primary_metric.py`. |
 
@@ -97,11 +97,7 @@ pm = compute_primary_metric_from_report(report, kind="accuracy", baseline=baseli
 print(pm)  # preview=0.80, final=0.90, ratio_vs_baseline=0.05 (delta)
 ```
 
-## Alias (multimodal)
-
-One convenience alias delegates to the base metric:
-
-- `vqa_accuracy` → `accuracy`
+## Multimodal Accuracy
 
 ```python
 rep = {"metrics": {"classification": {
@@ -109,9 +105,8 @@ rep = {"metrics": {"classification": {
   "final":   {"correct_total": 190, "total": 200},
 }}}
 base = {"metrics": {"accuracy": 0.90}}
-pm_vqa = compute_primary_metric_from_report(rep, kind="vqa_accuracy", baseline=base)
-pm_acc = compute_primary_metric_from_report(rep, kind="accuracy",     baseline=base)
-assert pm_vqa["ratio_vs_baseline"] == pm_acc["ratio_vs_baseline"]
+pm = compute_primary_metric_from_report(rep, kind="accuracy", baseline=base)
+assert pm["ratio_vs_baseline"] == 0.05
 ```
 
 ---

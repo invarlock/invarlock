@@ -7,7 +7,7 @@ import threading
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 import psutil
 import torch
@@ -298,7 +298,7 @@ class MonitoringManager:
                 from .exporters import JSONExporter
 
                 exporter = JSONExporter(self.config.json_export_path)
-                exporter.export(self.metrics.get_all_metrics())
+                exporter.export(cast(Any, self.metrics.get_all_metrics()))
 
         except _MONITORING_ERRORS as e:
             self.logger.error(f"Error exporting metrics: {e}")

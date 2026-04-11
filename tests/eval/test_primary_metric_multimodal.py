@@ -28,7 +28,7 @@ def test_ppl_seq2seq_behaves_like_expected():
     assert math.isclose(pm["ratio_vs_baseline"], 6.0 / 5.0, rel_tol=1e-12)
 
 
-def test_vqa_accuracy_alias_behaves_like_accuracy():
+def test_accuracy_alias_behaves_like_accuracy():
     report = {
         "metrics": {
             "classification": {
@@ -44,7 +44,7 @@ def test_vqa_accuracy_alias_behaves_like_accuracy():
     }
 
     pm_alias = compute_primary_metric_from_report(
-        report, kind="vqa_accuracy", baseline=baseline
+        report, kind="accuracy", baseline=baseline
     )
     pm_acc = compute_primary_metric_from_report(
         report, kind="accuracy", baseline=baseline

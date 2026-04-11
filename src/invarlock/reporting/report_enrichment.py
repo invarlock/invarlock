@@ -311,11 +311,13 @@ def ensure_primary_metric_display_ci(evaluation_report: dict[str, Any]) -> None:
         )
         if isinstance(pm, dict) and pm:
             disp = pm.get("display_ci")
-            if not (
+            if (
                 isinstance(disp, list | tuple)
                 and len(disp) == 2
                 and all(isinstance(x, int | float) for x in disp)
             ):
+                pm["display_ci"] = [float(disp[0]), float(disp[1])]
+            else:
                 point = None
                 for key in ("ratio_vs_baseline", "final", "preview"):
                     val = pm.get(key)

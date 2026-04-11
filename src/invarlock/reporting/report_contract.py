@@ -205,7 +205,8 @@ def generate_reports(
             provenance_env_flags=_extract_saved_provenance_env_flags(primary_report),
         )
         _assert_evaluation_report_is_finite(evaluation_report)
-        validate_report(evaluation_report)
+        if not validate_report(evaluation_report):
+            raise ValueError("Generated evaluation report failed schema validation.")
         validation_block = compute_console_validation_block(evaluation_report)
 
     save_formats = [fmt for fmt in formats if fmt != "report"]

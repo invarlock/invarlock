@@ -14,6 +14,7 @@ from typing import Any, Literal
 import torch
 import torch.nn as nn
 
+from invarlock.core.abi import INVARLOCK_CORE_ABI as CORE_ABI
 from invarlock.core.api import Guard
 from invarlock.core.types import GuardValidationResult
 
@@ -59,6 +60,8 @@ from .rmt_runtime import (
 from .rmt_runtime import (
     validate_rmt_guard as _validate_rmt_guard_impl,
 )
+
+INVARLOCK_CORE_ABI = CORE_ABI
 
 __all__ = [
     "RMTGuard",

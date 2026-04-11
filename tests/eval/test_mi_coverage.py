@@ -2,6 +2,7 @@
 
 from unittest.mock import Mock, patch
 
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -102,6 +103,65 @@ class TestMIModuleCoverage:
                 call_args = mock_mi.call_args_list[0]
                 neuron_acts, targets = call_args[0]
                 assert len(targets) >= len(neuron_acts)
+
+    def test_targets_and_activations_stay_paired_when_subsampled(self):
+        """Test that subsampled activations use the matching target rows."""
+
+        class SubsamplePairingModel(nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.config = Mock()
+                self.config.n_layer = 1
+
+                class Block(nn.Module):
+                    def __init__(self) -> None:
+                        super().__init__()
+
+                        class MLP(nn.Module):
+                            def __init__(self) -> None:
+                                super().__init__()
+                                self.c_fc = nn.Linear(1, 1, bias=False)
+
+                        self.mlp = MLP()
+
+                self.transformer = nn.Module()
+                self.transformer.h = nn.ModuleList([Block()])
+                self.dummy_param = nn.Parameter(torch.randn(1))
+
+            def forward(self, input_ids):
+                batch_size, seq_len = input_ids.shape
+                x = torch.randn(batch_size, seq_len, 1)
+                self.transformer.h[0].mlp.c_fc(x)
+                result = Mock()
+                result.logits = torch.randn(batch_size, seq_len, 8)
+                return result
+
+        model = SubsamplePairingModel()
+        input_ids = torch.arange(10002, dtype=torch.long).unsqueeze(0)
+
+        with patch("invarlock.eval.probes.mi.mutual_info_regression") as mock_mi:
+            captured_targets = []
+
+            def capture_targets(features, targets, random_state=42):
+                captured_targets.append(np.asarray(targets))
+                return np.asarray([0.25])
+
+            mock_mi.side_effect = capture_targets
+
+            with patch("torch.randperm") as mock_randperm:
+                mock_randperm.return_value = torch.arange(10000, 0, -1)
+
+                scores = compute_neuron_mi_scores(
+                    model=model,
+                    calib_data=[{"input_ids": input_ids}],
+                    oracle_windows=1,
+                )
+
+        assert len(scores) == 1
+        assert scores[0].shape == (1,)
+        assert len(captured_targets) == 1
+        expected_targets = np.arange(1, 10002)[torch.arange(10000, 0, -1).numpy()]
+        assert np.array_equal(captured_targets[0], expected_targets)
 
     def test_exception_handling_in_neuron_mi(self):
         """Test exception handling during individual neuron MI computation."""

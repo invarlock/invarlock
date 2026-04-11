@@ -11,14 +11,7 @@ code and config are synchronized.
 """
 
 import math
-from typing import Any, Literal, cast
-
-try:  # Python 3.12+
-    from typing import NotRequired, TypedDict
-except ImportError:  # Python <3.12 fallback
-    from typing import NotRequired
-
-    from typing_extensions import TypedDict
+from typing import Any, Literal, NotRequired, TypedDict, cast
 
 from invarlock.core.exceptions import (
     GuardError,

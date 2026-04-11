@@ -69,9 +69,11 @@ def test_reporting_owner_modules_expose_injection_points():
         "abc123",
         {"window_plan": {"profile": "dev"}},
         "run123",
-        compute_report_digest_fn=lambda payload: str(payload.get("run_id", "missing"))
-        if isinstance(payload, dict)
-        else "missing",
+        compute_report_digest_fn=lambda payload: (
+            str(payload.get("run_id", "missing"))
+            if isinstance(payload, dict)
+            else "missing"
+        ),
         collect_backend_versions_fn=lambda: {"python": "3.12"},
         compute_edit_digest_fn=lambda _report: {"family": "cert_only"},
     )

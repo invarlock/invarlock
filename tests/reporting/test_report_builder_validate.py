@@ -17,7 +17,7 @@ class TestValidateEvaluationReport:
             "dataset": {
                 "provider": "dummy",
                 "seq_len": 8,
-                "windows": {"preview": 1, "final": 1},
+                "windows": {"preview": 1, "final": 1, "stats": {}},
             },
             "baseline_ref": {},
             "primary_metric": {
@@ -142,10 +142,6 @@ class TestValidateEvaluationReport:
         evaluation_report = {"schema_version": "v1", "ppl": "not_a_dict"}
         assert validate_report(evaluation_report) is False
 
-        # Test AttributeError case (None input) - should raise AttributeError
-        with pytest.raises(AttributeError):
-            validate_report(None)
-
-        # Test AttributeError case (string input) - should raise AttributeError
-        with pytest.raises(AttributeError):
-            validate_report("not_a_dict")
+        # Non-dict inputs fail closed instead of bubbling attribute errors.
+        assert validate_report(None) is False
+        assert validate_report("not_a_dict") is False

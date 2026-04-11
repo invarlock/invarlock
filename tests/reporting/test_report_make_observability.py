@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from invarlock.reporting import report_make as report_make_mod
+from invarlock.reporting import report_make_assembly as report_make_assembly_mod
 from invarlock.reporting import report_normalization as report_normalization_mod
 from invarlock.reporting import report_primary_metric_analysis as report_pm_analysis_mod
 from invarlock.reporting.report_make import make_report
@@ -138,10 +138,10 @@ def test_make_evaluation_report_rejects_non_contract_allowlist_source_in_ci(
     report.setdefault("context", {})["profile"] = "ci"
 
     monkeypatch.setattr(
-        report_make_mod,
-        "_VALIDATION_ALLOWLIST_SOURCE",
-        "fallback",
-        raising=False,
+        report_make_assembly_mod,
+        "load_validation_allowlist_with_source",
+        lambda: ({"primary_metric_acceptable"}, "fallback"),
+        raising=True,
     )
 
     evaluation_report = make_report(report, baseline)

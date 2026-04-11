@@ -6,12 +6,14 @@ from invarlock.reporting.policy_utils import (
     _compute_thresholds_payload,
     _compute_variance_policy_digest,
 )
-from invarlock.reporting.report_make import (
-    TIER_RATIO_LIMITS,
-    _compute_confidence_label,
-    _compute_edit_digest,
+from invarlock.reporting.report_confidence import (
+    compute_confidence_label as _compute_confidence_label,
 )
+from invarlock.reporting.report_make import TIER_RATIO_LIMITS
 from invarlock.reporting.report_primary_metric_policy import is_ppl_kind as _is_ppl_kind
+from invarlock.reporting.report_provenance import (
+    compute_edit_digest as _compute_edit_digest,
+)
 from invarlock.reporting.utils import (
     _coerce_int,
     _coerce_interval,
@@ -23,11 +25,8 @@ from invarlock.reporting.utils import (
 
 
 def test_ppl_helpers_and_edit_digest() -> None:
-    assert (
-        _is_ppl_kind("ppl")
-        and _is_ppl_kind("ppl_causal")
-        and _is_ppl_kind("ppl_seq2seq")
-    )
+    assert _is_ppl_kind("ppl_causal") and _is_ppl_kind("ppl_seq2seq")
+    assert not _is_ppl_kind("ppl")
     assert not _is_ppl_kind("accuracy")
     # Legacy _get_ppl_final removed; rely on primary_metric parsing in evaluation_reports.
     # Edit digest

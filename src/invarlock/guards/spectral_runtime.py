@@ -299,7 +299,6 @@ def validate_guard(
     caps_exceeded = bool(outcome["caps_exceeded"])
     passed = bool(outcome["passed"])
     decision = str(outcome["decision"])
-    _ = str(outcome["action"])
 
     family_summary = summarize_family_z_scores(
         guard.latest_z_scores, guard.module_family_map, guard.family_caps

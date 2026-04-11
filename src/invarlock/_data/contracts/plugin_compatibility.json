@@ -12,6 +12,6 @@
   "version_bump_rules": [
     "Bump core_abi when adapter, edit, or guard interfaces change incompatibly.",
     "Keep exact-match loading until an explicit compatibility matrix is published.",
-    "Treat missing INVARLOCK_CORE_ABI as legacy-compatible; mismatched values fail closed."
+    "Plugins must declare INVARLOCK_CORE_ABI; missing or mismatched values fail closed."
   ]
 }

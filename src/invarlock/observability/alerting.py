@@ -12,6 +12,7 @@ from email.mime.text import MIMEText
 from enum import Enum
 from typing import Any
 
+requests: Any
 try:
     requests = importlib.import_module("requests")
 except ModuleNotFoundError:  # pragma: no cover - exercised when requests is absent
@@ -21,7 +22,7 @@ except ModuleNotFoundError:  # pragma: no cover - exercised when requests is abs
         def post(*args: Any, **kwargs: Any) -> Any:
             raise ModuleNotFoundError("requests")
 
-    requests: Any = _MissingRequests()
+    requests = _MissingRequests()
 
 
 _ALERT_NOTIFICATION_ERRORS = (

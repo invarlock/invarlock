@@ -6,6 +6,12 @@ import math
 from collections.abc import Callable
 from typing import Any
 
+from invarlock.core.metric_kind_contract import (
+    MetricKindContractError,
+    is_ppl_metric_kind,
+    normalize_metric_kind,
+)
+
 GetTierPoliciesFn = Callable[[], dict[str, Any]]
 _NON_FATAL_EXCEPTIONS = (
     AttributeError,
@@ -212,8 +218,15 @@ def _apply_metric_specific_primary_metric_gate(
 ) -> None:
     if not (isinstance(primary_metric, dict) and primary_metric):
         return
-    kind = str(primary_metric.get("kind", "")).lower()
-    if kind in {"ppl_causal", "ppl_mlm", "ppl_seq2seq"}:
+    try:
+        kind = normalize_metric_kind(primary_metric.get("kind"))
+    except (MetricKindContractError, ValueError):
+        flags["primary_metric_acceptable"] = False
+        return
+    if kind is None:
+        flags["primary_metric_acceptable"] = False
+        return
+    if is_ppl_metric_kind(kind):
         pm_ratio_value = _coerce_finite_float(primary_metric.get("ratio_vs_baseline"))
         if pm_ratio_value is not None:
             ok = (pm_ratio_value <= ratio_limit_with_hyst) and bool(tokens_ok_eff)
@@ -221,7 +234,8 @@ def _apply_metric_specific_primary_metric_gate(
             ok = bool(compression_acceptable)
         flags["primary_metric_acceptable"] = bool(ok)
         return
-    if kind not in {"accuracy", "vqa_accuracy"}:
+    if kind != "accuracy":
+        flags["primary_metric_acceptable"] = False
         return
 
     acc_policy = (
@@ -279,8 +293,11 @@ def _apply_ppl_primary_metric_reconcile(
     try:
         if not (isinstance(primary_metric, dict) and primary_metric):
             return
-        kind2 = str(primary_metric.get("kind", "")).lower()
-        if kind2 not in {"ppl_causal", "ppl_mlm", "ppl_seq2seq"}:
+        kind2 = normalize_metric_kind(primary_metric.get("kind"))
+        if kind2 is None:
+            flags["primary_metric_acceptable"] = False
+            return
+        if not is_ppl_metric_kind(kind2):
             return
         pmr_value = _coerce_finite_float(primary_metric.get("ratio_vs_baseline"))
         if (
@@ -289,6 +306,8 @@ def _apply_ppl_primary_metric_reconcile(
             and bool(tokens_ok_eff)
         ):
             flags["primary_metric_acceptable"] = True
+    except (MetricKindContractError, ValueError):
+        flags["primary_metric_acceptable"] = False
     except _NON_FATAL_EXCEPTIONS:  # pragma: no cover
         pass
 

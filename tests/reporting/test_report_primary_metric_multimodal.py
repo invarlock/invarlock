@@ -4,14 +4,14 @@ from invarlock.reporting.render import render_report_markdown
 from invarlock.reporting.report_validation import compute_validation_flags
 
 
-def test_primary_metric_vqa_accuracy_gating_and_render():
+def test_primary_metric_accuracy_gating_and_render():
     ppl = {"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.0}
     spectral = {"caps_applied": 0, "max_caps": 5}
     rmt = {"stable": True}
     invariants = {"status": "pass"}
     # Alias kind should be accepted for gating as accuracy
     pm = {
-        "kind": "vqa_accuracy",
+        "kind": "accuracy",
         "final": 0.92,
         "ratio_vs_baseline": +0.02,
         "n_final": 400,

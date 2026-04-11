@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import copy
+import importlib
+
+import pytest
 
 import invarlock.reporting.report_schema as schema_mod
 import invarlock.reporting.report_validation_allowlist as allowlist_mod
+from invarlock.core import metric_kind_contract as metric_kind_mod
 
 
 def test_load_validation_allowlist_default(monkeypatch):
@@ -62,11 +66,11 @@ def test_validate_report_schema_version_mismatch():
     assert schema_mod.validate_report({"schema_version": "v0"}) is False
 
 
-def test_validate_report_fallback_and_allowlist(monkeypatch):
+def test_validate_report_rejects_payload_when_schema_validation_fails(monkeypatch):
     cert = {
         "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
         "run_id": "run-123",
-        "primary_metric": {"final": 1.0},
+        "primary_metric": {"kind": "accuracy", "final": 1.0},
         "validation": {"custom_flag": True},
     }
 
@@ -80,7 +84,7 @@ def test_validate_report_fallback_and_allowlist(monkeypatch):
     monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda *_args: False)
 
     try:
-        assert schema_mod.validate_report(cert) is True
+        assert schema_mod.validate_report(cert) is False
         vspec = schema_mod.REPORT_JSON_SCHEMA["properties"]["validation"]
         assert vspec == orig_schema
     finally:
@@ -93,17 +97,17 @@ def test_validate_report_does_not_leak_allowlist_mutations_between_calls(
     custom = {
         "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
         "run_id": "run-123",
-        "primary_metric": {"final": 1.0},
+        "primary_metric": {"kind": "accuracy", "final": 1.0},
         "validation": {"custom_flag": True},
     }
     standard = {
         "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
         "run_id": "run-456",
-        "primary_metric": {"final": 1.0},
+        "primary_metric": {"kind": "accuracy", "final": 1.0},
         "validation": {"primary_metric_acceptable": True},
     }
 
-    monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda *_args: False)
+    monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda *_args: True)
     monkeypatch.setattr(
         allowlist_mod, "load_validation_allowlist", lambda: {"custom_flag"}
     )
@@ -121,7 +125,7 @@ def test_validate_report_rejects_non_boolean_flags(monkeypatch):
     cert = {
         "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
         "run_id": "run-123",
-        "primary_metric": {"final": 1.0},
+        "primary_metric": {"kind": "accuracy", "final": 1.0},
         "validation": {"primary_metric_acceptable": "yes"},
     }
     monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda _: True)
@@ -187,3 +191,88 @@ def test_validate_report_handles_type_error_from_validation_block(monkeypatch):
     }
     monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda _: True)
     assert schema_mod.validate_report(cert) is False
+
+
+def test_validate_report_rejects_unknown_primary_metric_kind(monkeypatch):
+    cert = {
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
+        "run_id": "run-unknown-kind",
+        "primary_metric": {"kind": "vqa_accuracy", "final": 1.0},
+    }
+
+    monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda *_args: True)
+    assert schema_mod.validate_report(cert) is False
+
+
+def test_validate_report_rejects_non_concrete_primary_metric_kind(monkeypatch):
+    cert = {
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
+        "run_id": "run-auto-kind",
+        "primary_metric": {"kind": "auto", "final": 1.0},
+    }
+
+    monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda *_args: True)
+    assert schema_mod.validate_report(cert) is False
+
+
+def test_validate_report_rejects_non_mapping_primary_metric(monkeypatch):
+    cert = {
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
+        "run_id": "run-bad-primary-metric",
+        "primary_metric": ["accuracy"],
+    }
+
+    monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda *_args: True)
+    assert schema_mod.validate_report(cert) is False
+
+
+def test_validate_report_rejects_unknown_validation_key(monkeypatch):
+    cert = {
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
+        "run_id": "run-bad-validation-key",
+        "primary_metric": {"kind": "accuracy", "final": 1.0},
+        "validation": {"unexpected_flag": True},
+    }
+
+    monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda *_args: True)
+    monkeypatch.setattr(
+        allowlist_mod,
+        "load_validation_allowlist",
+        lambda: {"primary_metric_acceptable"},
+    )
+    assert schema_mod.validate_report(cert) is False
+
+
+def test_report_schema_import_tolerates_allowlist_bootstrap_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            allowlist_mod,
+            "apply_validation_allowlist_schema",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("boom")),
+        )
+        reloaded = importlib.reload(schema_mod)
+        assert "validation" in reloaded.REPORT_JSON_SCHEMA["properties"]
+
+    importlib.reload(schema_mod)
+
+
+def test_report_schema_import_tolerates_metric_kind_bootstrap_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            metric_kind_mod,
+            "load_metric_kind_catalog",
+            lambda: (_ for _ in ()).throw(
+                metric_kind_mod.MetricKindContractError("boom")
+            ),
+        )
+        reloaded = importlib.reload(schema_mod)
+        kind_schema = reloaded.REPORT_JSON_SCHEMA["properties"]["primary_metric"][
+            "properties"
+        ]["kind"]
+        assert isinstance(kind_schema, dict)
+
+    importlib.reload(schema_mod)

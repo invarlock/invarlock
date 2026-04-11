@@ -557,8 +557,6 @@ def summarize_memory_snapshots(
     def _peak(key: str) -> float | None:
         values: list[float] = []
         for entry in snapshots:
-            if not isinstance(entry, dict):
-                continue
             value = entry.get(key)
             if isinstance(value, int | float):
                 values.append(float(value))

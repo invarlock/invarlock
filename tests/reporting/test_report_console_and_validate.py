@@ -39,8 +39,9 @@ def test_compute_console_validation_block_guard_omitted_and_included():
     assert blk3["overall_pass"] is False
 
 
-def test_validate_evaluation_report_fallback_and_flag_types(monkeypatch):
-    # Force JSON schema validator to fail to exercise fallback path
+def test_validate_evaluation_report_rejects_payload_when_schema_validation_fails(
+    monkeypatch,
+):
     monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda c: False)
     good = {
         "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
@@ -51,7 +52,7 @@ def test_validate_evaluation_report_fallback_and_flag_types(monkeypatch):
             "preview_final_drift_acceptable": True,
         },
     }
-    assert schema_mod.validate_report(good) is True
+    assert schema_mod.validate_report(good) is False
 
     bad = {
         **good,

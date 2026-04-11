@@ -94,8 +94,8 @@ guards:
 
 | Hook | When called | Evidence |
 | --- | --- | --- |
-| `prepare` | Before edit (GuardWithPrepare only). | `report.guards[].actions`, `report.guards[].metrics`. |
-| `validate` | After edit. | `report.guards[].passed`, `report.guards[].action`, `warnings`, `errors`. |
+| `prepare` | Before edit (GuardWithPrepare only). | `report.meta.tier_policies`, `report.meta.guard_prepare_failures` (when prepare fails). |
+| `validate` | After edit. | `report.guards[].passed`, `report.guards[].decision`, `report.guards[].diagnostics`, `report.guards[].violations`. |
 
 ### Verify gate requirements
 
@@ -132,7 +132,7 @@ guards:
 guards:
   invariants:
     strict_mode: false
-    on_fail: warn   # warn | rollback | abort
+    on_fail: monitor   # monitor | rollback | block
 ```
 
 ### Spectral Guard (measurement contract)

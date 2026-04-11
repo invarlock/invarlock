@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import invarlock.reporting.report_make as cert
 from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.report_confidence import compute_confidence_label
 from invarlock.reporting.report_make import make_report
 
 
@@ -106,7 +106,7 @@ def test_confidence_thresholds_can_be_overridden_by_policy(monkeypatch):
 
 def test_compute_confidence_label_accuracy_basis():
     evaluation_report = {
-        "primary_metric": {"kind": "accuracy", "display_ci": (0.75, 0.80)},
+        "primary_metric": {"kind": "accuracy", "display_ci": (75.0, 80.0)},
         "validation": {"primary_metric_acceptable": True},
         "resolved_policy": {
             "confidence": {
@@ -115,9 +115,10 @@ def test_compute_confidence_label_accuracy_basis():
             }
         },
     }
-    label = cert._compute_confidence_label(evaluation_report)
+    label = compute_confidence_label(evaluation_report)
     assert label["basis"] == "accuracy"
-    assert label["label"] == "High"
+    assert label["width"] == 5.0
+    assert label["label"] == "Low"
 
 
 def test_compute_confidence_label_handles_missing_ci():
@@ -126,7 +127,7 @@ def test_compute_confidence_label_handles_missing_ci():
         "validation": {"primary_metric_acceptable": False},
         "resolved_policy": {},
     }
-    label = cert._compute_confidence_label(evaluation_report)
+    label = compute_confidence_label(evaluation_report)
     assert label["basis"] == "primary_metric"
     assert label["label"] == "Low"
 
@@ -137,5 +138,5 @@ def test_compute_confidence_label_skips_non_interval_display_ci():
         "validation": {"primary_metric_acceptable": True},
         "resolved_policy": {},
     }
-    label = cert._compute_confidence_label(evaluation_report)
+    label = compute_confidence_label(evaluation_report)
     assert label["basis"] == "primary_metric"

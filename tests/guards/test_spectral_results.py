@@ -81,7 +81,7 @@ def test_partition_and_evaluate_spectral_outcome() -> None:
         max_caps=0,
     )
     assert outcome["passed"] is False
-    assert outcome["action"] == "abort"
+    assert outcome["decision"] == "block"
     assert outcome["caps_exceeded"] is True
 
     warn_outcome = evaluate_spectral_outcome(
@@ -91,7 +91,7 @@ def test_partition_and_evaluate_spectral_outcome() -> None:
         max_caps=2,
     )
     assert warn_outcome["passed"] is True
-    assert warn_outcome["action"] == "warn"
+    assert warn_outcome["decision"] == "monitor"
 
     continue_outcome = evaluate_spectral_outcome(
         fatal_violations=[],
@@ -100,7 +100,7 @@ def test_partition_and_evaluate_spectral_outcome() -> None:
         max_caps=2,
     )
     assert continue_outcome["passed"] is True
-    assert continue_outcome["action"] == "continue"
+    assert continue_outcome["decision"] == "allow"
 
 
 def test_build_spectral_diagnostics_marks_fatal_and_budgeted_entries() -> None:

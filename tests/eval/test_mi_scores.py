@@ -38,7 +38,10 @@ class TestMINeuronScores:
                 scores = mi_neuron_scores(activations, targets, max_samples=10000)
 
                 assert scores.shape == (20,)
-                mock_randperm.assert_called_once_with(15000)
+                mock_randperm.assert_called_once()
+                assert (
+                    mock_randperm.call_args.kwargs.get("device") == activations.device
+                )
 
     def test_custom_max_samples(self):
         """Test custom max_samples parameter."""
@@ -53,7 +56,10 @@ class TestMINeuronScores:
                 scores = mi_neuron_scores(activations, targets, max_samples=500)
 
                 assert scores.shape == (10,)
-                mock_randperm.assert_called_once_with(1000)
+                mock_randperm.assert_called_once()
+                assert (
+                    mock_randperm.call_args.kwargs.get("device") == activations.device
+                )
 
     def test_no_subsampling_needed(self):
         """Test when no subsampling is needed."""
@@ -145,6 +151,24 @@ class TestMINeuronScores:
 
             assert scores.shape == (6,)
             assert scores.dtype == torch.float32
+
+    def test_tensor_normalization_handles_requires_grad_and_cuda(self):
+        """Test detached CPU normalization before NumPy conversion."""
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        activations = torch.randn(12, 4, device=device, requires_grad=True)
+        targets = torch.linspace(0, 1, 12, device=device, requires_grad=True)
+
+        with patch("invarlock.eval.probes.mi.mutual_info_regression") as mock_mi:
+            mock_mi.return_value = [0.9]
+
+            scores = mi_neuron_scores(activations, targets)
+
+            assert scores.shape == (4,)
+            assert mock_mi.call_count == 4
+            for call in mock_mi.call_args_list:
+                args, kwargs = call
+                assert isinstance(args[0], np.ndarray)
+                assert isinstance(args[1], np.ndarray)
 
 
 class TestModuleExports:

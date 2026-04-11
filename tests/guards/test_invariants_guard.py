@@ -50,7 +50,7 @@ def test_invariants_guard_ignores_scalar_and_non_sequence_profile_checks() -> No
 
 
 def test_invariants_guard_detects_non_finite_weights():
-    guard = InvariantsGuard(on_fail="abort")
+    guard = InvariantsGuard(on_fail="block")
     model = DummyBertModel()
 
     guard.prepare(model, adapter=None, calib=None, policy={})
@@ -62,12 +62,12 @@ def test_invariants_guard_detects_non_finite_weights():
     outcome = guard.finalize(model)
 
     assert outcome.passed is False
-    assert outcome.action == "abort"
+    assert outcome.decision == "block"
     assert any(v["type"] == "non_finite_tensor" for v in outcome.violations)
 
 
 def test_invariants_guard_detects_embedding_vocab_mismatch():
-    guard = InvariantsGuard(on_fail="abort")
+    guard = InvariantsGuard(on_fail="block")
     model = DummyBertModel()
 
     guard.prepare(model, adapter=None, calib=None, policy={})
@@ -89,7 +89,7 @@ class LayerNormModel(nn.Module):
 
 
 def test_invariants_guard_detects_missing_layer_norm():
-    guard = InvariantsGuard(on_fail="abort")
+    guard = InvariantsGuard(on_fail="block")
     model = LayerNormModel()
 
     guard.prepare(model, adapter=None, calib=None, policy={})

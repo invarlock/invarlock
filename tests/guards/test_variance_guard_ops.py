@@ -248,4 +248,4 @@ def test_validate_returns_monitor_warning_action():
     guard._prepared = True
     guard._monitor_only = True
     res = guard.validate(model=None, adapter=None, context={})
-    assert res["action"] in {"warn", "continue"}
+    assert res["decision"] in {"monitor", "allow"}

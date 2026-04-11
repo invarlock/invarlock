@@ -82,7 +82,7 @@ def test_validate_evaluation_report_uses_jsonschema(monkeypatch):
     assert dummy.calls == 1
 
 
-def test_validate_evaluation_report_falls_back_when_jsonschema_fails(monkeypatch):
+def test_validate_evaluation_report_rejects_payload_when_jsonschema_fails(monkeypatch):
     class FailingSchema:
         def validate(self, instance, schema):
             raise ValueError("boom")
@@ -94,7 +94,7 @@ def test_validate_evaluation_report_falls_back_when_jsonschema_fails(monkeypatch
         "primary_metric": {"final": 1.0},
         "validation": {"primary_metric_acceptable": True},
     }
-    assert schema_mod.validate_report(evaluation_report) is True
+    assert schema_mod.validate_report(evaluation_report) is False
 
 
 def test_validate_evaluation_report_rejects_invalid_flags(monkeypatch):
@@ -133,7 +133,7 @@ def test_validate_evaluation_report_accepts_short_nonblank_run_id_without_jsonsc
         "validation": {"primary_metric_acceptable": True},
     }
 
-    assert schema_mod.validate_report(evaluation_report) is True
+    assert schema_mod.validate_report(evaluation_report) is False
 
 
 def test_validate_evaluation_report_rejects_blank_metric_kind_without_jsonschema(
@@ -213,7 +213,7 @@ def test_validate_evaluation_report_normalizes_missing_validation_from_mapping(
         {
             "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
             "run_id": "run-7",
-            "primary_metric": {"final": 1.0},
+            "primary_metric": {"kind": "ppl_causal", "final": 1.0},
         }
     )
 

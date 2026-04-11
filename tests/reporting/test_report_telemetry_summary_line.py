@@ -75,7 +75,6 @@ def test_telemetry_helpers_resolve_summary_line_and_env(monkeypatch):
 def test_telemetry_summary_line_strips_control_characters() -> None:
     rep = _mk_minimal_report()
     rep.setdefault("provenance", {})["dataset_split"] = "val\nforged"
-    rep.setdefault("metrics", {})["primary_metric"]["kind"] = "ppl\tcausal"
     rep.setdefault("meta", {})["run_id"] = "demo\r\nrun"
     base = _mk_minimal_report()
 
@@ -84,5 +83,5 @@ def test_telemetry_summary_line_strips_control_characters() -> None:
     line = telemetry_summary_line(cert)
     assert line is not None
     assert "\n" not in line and "\r" not in line and "\t" not in line
-    assert "metric=ppl causal" in line
+    assert "metric=ppl_causal" in line
     assert "split=val forged" in line

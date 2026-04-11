@@ -56,6 +56,21 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     )
     assert catalog["plugin_compatibility"]["core_abi"] == "0.1"
     assert catalog["plugin_compatibility"]["match_policy"] == "exact_match"
+    assert catalog["validation_keys"]["path"] == "contracts/validation_keys.json"
+    assert catalog["validation_keys"]["kind"] == "array"
+    assert catalog["validation_keys"]["item_count"] == len(
+        contracts.load_json_contract("validation_keys.json")
+    )
+    assert catalog["console_labels"]["path"] == "contracts/console_labels.json"
+    assert catalog["console_labels"]["kind"] == "array"
+    assert catalog["console_labels"]["item_count"] == len(
+        contracts.load_json_contract("console_labels.json")
+    )
+    assert catalog["metric_kinds"]["path"] == "contracts/metric_kinds.json"
+    assert catalog["metric_kinds"]["kind"] == "array"
+    assert catalog["metric_kinds"]["item_count"] == len(
+        contracts.load_json_contract("metric_kinds.json")
+    )
     assert (
         catalog["runtime_manifest"]["path"] == "contracts/runtime_manifest.schema.json"
     )
@@ -84,6 +99,30 @@ def test_public_contract_paths_are_repo_relative() -> None:
     assert Path(
         contracts.contract_reference("support_matrix.json")["path"]
     ).as_posix() == ("contracts/support_matrix.json")
+
+
+def test_readme_surfaces_public_contract_catalog_entries() -> None:
+    readme = Path("README.md").read_text(encoding="utf-8")
+
+    assert "doctor --json" in readme
+    assert "advanced plugins ... --json" in readme
+    assert "`validation_keys`, `console_labels`, and `metric_kinds`" in readme
+
+
+def test_contract_reference_records_scalar_payload_kind(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    contracts_dir = tmp_path / "contracts"
+    contracts_dir.mkdir()
+    (contracts_dir / "scalar.json").write_text("42\n", encoding="utf-8")
+
+    monkeypatch.setattr(contracts, "CONTRACTS_ROOT", contracts_dir)
+    monkeypatch.setattr(contracts, "PACKAGE_CONTRACTS_ROOT", contracts_dir)
+
+    assert contracts.contract_reference("scalar.json") == {
+        "path": "contracts/scalar.json",
+        "kind": "int",
+    }
 
 
 def test_public_contract_loader_falls_back_to_packaged_contracts(
@@ -173,6 +212,8 @@ def test_public_contract_loader_discovers_ancestor_contracts_for_build_out(
     monkeypatch.setattr(contracts, "CONTRACTS_ROOT", tmp_path / "missing")
     monkeypatch.setattr(contracts, "PACKAGE_CONTRACTS_ROOT", tmp_path / "missing")
     monkeypatch.setattr(contracts, "__file__", str(build_out / "public_contracts.py"))
+    monkeypatch.setattr(sys, "argv", [])
+    monkeypatch.setattr(sys, "executable", "")
     monkeypatch.chdir(build_out)
 
     payload = contracts.load_policy_pack_schema()
@@ -270,6 +311,8 @@ def test_public_contract_loader_raises_when_all_roots_are_missing(
     monkeypatch.setattr(
         contracts, "__file__", str(tmp_path / "sandbox" / "public_contracts.py")
     )
+    monkeypatch.setattr(sys, "argv", [])
+    monkeypatch.setattr(sys, "executable", "")
     monkeypatch.setenv("INVARLOCK_CONTRACTS_ROOT", str(tmp_path / "env-contracts"))
     monkeypatch.setenv("GITHUB_WORKSPACE", str(workspace))
     monkeypatch.chdir(workspace)
@@ -432,4 +475,9 @@ def test_public_contract_lane_and_adapter_helpers_cover_non_matching_entries(
         "format": "compatibility-doc",
         "core_abi": "0.1",
         "match_policy": "exact_match",
+    }
+    assert contracts.contract_reference("validation_keys.json") == {
+        "path": "contracts/validation_keys.json",
+        "kind": "array",
+        "item_count": len(contracts.load_json_contract("validation_keys.json")),
     }

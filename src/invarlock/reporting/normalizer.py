@@ -159,9 +159,7 @@ def normalize_run_report(report: Mapping[str, Any] | RunReport) -> RunReport:
                 ):
                     point = float(num) / float(den)
             if isinstance(point, float):
-                # infer kind from model_id hint when available
-                model_id = _str(meta.get("model_id", "")).lower()
-                kind = "vqa_accuracy" if "vqa" in model_id else "accuracy"
+                kind = "accuracy"
                 pm_acc: dict[str, Any] = {
                     "kind": kind,
                     "unit": "accuracy",

@@ -26,7 +26,7 @@ def test_normalize_run_report_accuracy_fallback_and_retention():
     )
 
 
-def test_normalize_run_report_vqa_kind_inference():
+def test_normalize_run_report_accuracy_kind_inference():
     raw = {
         "meta": {
             "model_id": "my-vqa-model",
@@ -38,7 +38,7 @@ def test_normalize_run_report_vqa_kind_inference():
         "metrics": {"classification": {"final": 0.9}},
     }
     rep = normalize_run_report(raw)
-    assert rep["metrics"]["primary_metric"]["kind"] == "vqa_accuracy"
+    assert rep["metrics"]["primary_metric"]["kind"] == "accuracy"
 
 
 def test_normalize_run_report_preserves_pm_drift_band_and_acceptance_range():

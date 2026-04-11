@@ -4,13 +4,19 @@ import math
 
 import pytest
 
-from invarlock.reporting import report_make as C
 from invarlock.reporting import report_normalization as normalization_mod
+from invarlock.reporting.report_builder_support import (
+    extract_report_meta as _extract_report_meta,
+)
 from invarlock.reporting.report_primary_metric_policy import is_ppl_kind as _is_ppl_kind
+from invarlock.reporting.report_provenance import (
+    compute_edit_digest as _compute_edit_digest,
+)
 from invarlock.reporting.utils import (
     _coerce_int,
     _coerce_interval,
     _infer_scope_from_modules,
+    _sanitize_seed_bundle,
 )
 
 
@@ -46,7 +52,7 @@ def test_coerce_int_variants() -> None:
 
 
 def test_sanitize_seed_bundle_partial_and_fallback() -> None:
-    sanitized = C._sanitize_seed_bundle({"python": 1, "numpy": None}, fallback=42)
+    sanitized = _sanitize_seed_bundle({"python": 1, "numpy": None}, fallback=42)
     # Explicit/missing None entries preserve None; others use fallback
     assert (
         sanitized["python"] == 1
@@ -74,11 +80,9 @@ def test_coerce_interval_from_string_and_list() -> None:
 
 
 def test_compute_edit_digest_quant_and_default() -> None:
-    d = C._compute_edit_digest(
-        {"edit": {"name": "quant_rtn", "config": {"bitwidth": 8}}}
-    )
+    d = _compute_edit_digest({"edit": {"name": "quant_rtn", "config": {"bitwidth": 8}}})
     assert d["family"] == "quantization" and isinstance(d["impl_hash"], str)
-    d2 = C._compute_edit_digest({"edit": {"name": "noop"}})
+    d2 = _compute_edit_digest({"edit": {"name": "noop"}})
     assert d2["family"] == "cert_only"
 
 
@@ -92,21 +96,21 @@ def test_extract_report_meta_prefers_python_seed() -> None:
             "seeds": {"python": 9, "numpy": None},
         }
     }
-    meta = C._extract_report_meta(report)
+    meta = _extract_report_meta(report)
     assert meta["seed"] == 9
     assert meta["seeds"]["python"] == 9
 
 
 def test_extract_report_meta_defaults_seed_to_zero() -> None:
     report = {"meta": {"model_id": "demo", "adapter": "hf", "device": "cpu"}}
-    meta = C._extract_report_meta(report)
+    meta = _extract_report_meta(report)
     assert meta["seed"] == 0
 
 
 def test_extract_report_meta_records_missing_fields() -> None:
     diagnostics: list[dict[str, object]] = []
     report = {"meta": {"adapter": "", "device": None}}
-    meta = C._extract_report_meta(report, diagnostics)
+    meta = _extract_report_meta(report, diagnostics)
 
     assert meta["model_id"] is None
     assert meta["adapter"] is None

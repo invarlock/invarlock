@@ -251,20 +251,7 @@ def test_prepare_guard_overhead_section_ratio_threshold():
     assert sanitized["evaluated"] is True
     assert sanitized["overhead_ratio"] == pytest.approx(1.05)
     assert passed is False
-    assert sanitized["diagnostics"] == [
-        {
-            "kind": "guard_overhead_message",
-            "severity": "info",
-            "message": "note",
-            "details": {},
-        },
-        {
-            "kind": "guard_overhead_warning",
-            "severity": "warning",
-            "message": "slow",
-            "details": {},
-        },
-    ]
+    assert sanitized["diagnostics"] == []
     assert sanitized["checks"] == {"ratio": True}
 
 
@@ -274,9 +261,9 @@ def test_prepare_guard_overhead_section_soft_pass_when_ratio_missing():
     assert sanitized["passed"] is True
     assert sanitized["diagnostics"] == [
         {
-            "kind": "guard_overhead_message",
-            "severity": "info",
-            "message": "x",
+            "kind": "guard_overhead_unavailable",
+            "severity": "warning",
+            "message": "Guard overhead ratio unavailable",
             "details": {},
         }
     ]

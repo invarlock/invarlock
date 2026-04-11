@@ -58,6 +58,7 @@ def test_compute_edit_digest_paths():
 def test_is_ppl_kind_variants():
     assert primary_metric_policy_mod.is_ppl_kind("ppl_causal")
     assert primary_metric_policy_mod.is_ppl_kind("ppl_seq2seq")
+    assert not primary_metric_policy_mod.is_ppl_kind("perplexity")
     assert not primary_metric_policy_mod.is_ppl_kind("accuracy")
 
 

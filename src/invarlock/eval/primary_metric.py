@@ -529,32 +529,11 @@ class _Accuracy:
         }
 
 
-class _AliasMetric:
-    """Light alias wrapper that re-labels `kind` while delegating behavior."""
-
-    def __init__(self, alias: str, base: PrimaryMetric) -> None:
-        self._alias = str(alias)
-        self._base = base
-        # Copy metadata
-        self.kind = self._alias
-        self.unit = base.unit
-        self.direction = base.direction
-        self.aggregation_scope = base.aggregation_scope
-        self.paired = base.paired
-        self.gating_basis = base.gating_basis
-        self.supports_bootstrap = base.supports_bootstrap
-
-    def point_from_windows(self, *, windows: dict[str, Any]) -> float:
-        return self._base.point_from_windows(windows=windows)
-
-
 _REGISTRY: dict[str, PrimaryMetric] = {
     _PPLCausal.kind: _PPLCausal(),
     _PPLMLM.kind: _PPLMLM(),
     _PPLSeq2Seq.kind: _PPLSeq2Seq(),
     _Accuracy.kind: _Accuracy(),
-    # Multimodal aliases
-    "vqa_accuracy": _AliasMetric("vqa_accuracy", _Accuracy()),
 }
 
 
@@ -587,7 +566,7 @@ def compute_primary_metric_from_report(
     counts_source_tag: str | None = None
     n_prev: int | None = None
     n_fin: int | None = None
-    if kind in {"accuracy", "vqa_accuracy"}:
+    if kind == "accuracy":
         # Prefer classification aggregates if provided (may not have evaluation_windows)
         metrics = (
             report.get("metrics", {}) if isinstance(report.get("metrics"), dict) else {}
@@ -640,7 +619,7 @@ def compute_primary_metric_from_report(
             "degraded_reason": "non_finite_pm",
         }
     # For accuracy kinds, derive counts from input_ids if aggregates are missing
-    if kind in {"accuracy", "vqa_accuracy"}:
+    if kind == "accuracy":
 
         def _ensure_counts(win: dict[str, Any]) -> dict[str, Any]:
             has_counts = (
@@ -687,7 +666,7 @@ def compute_primary_metric_from_report(
         )
         kind_l = str(kind).lower()
         ppl_kinds = {"ppl_causal", "ppl_mlm", "ppl_seq2seq"}
-        acc_kinds = {"accuracy", "vqa_accuracy"}
+        acc_kinds = {"accuracy"}
         same_family = (kind_l in ppl_kinds and base_kind in ppl_kinds) or (
             kind_l in acc_kinds and base_kind in acc_kinds
         )
@@ -697,10 +676,7 @@ def compute_primary_metric_from_report(
                 is_ppl_like = str(kind).lower().startswith("ppl")
                 if is_ppl_like and base_ref > 0:
                     ratio_vs_baseline = float(final_point) / float(base_ref)
-                elif (
-                    str(kind).lower() in {"accuracy", "vqa_accuracy"}
-                    and 0 <= base_ref <= 1
-                ):
+                elif str(kind).lower() == "accuracy" and 0 <= base_ref <= 1:
                     ratio_vs_baseline = float(final_point) - float(base_ref)
 
     invalid = True
@@ -728,7 +704,7 @@ def compute_primary_metric_from_report(
     if degraded and degraded_reason:
         payload["degraded_reason"] = degraded_reason
     # Carry counts for accuracy to aid gating
-    if kind in {"accuracy", "vqa_accuracy"}:
+    if kind == "accuracy":
         if n_prev is not None:
             payload["n_preview"] = int(n_prev)
         if n_fin is not None:

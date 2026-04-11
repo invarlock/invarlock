@@ -283,8 +283,8 @@ def test_analyze_spectral_changes_skips_layers_missing_from_after_norms(
     spectral_module = types.ModuleType("invarlock.guards.spectral_measurement")
     sentinel_before = object()
     sentinel_after = object()
-    spectral_module.compute_spectral_norms = (
-        lambda model, scope="ffn": {"layer_a": 2.0, "layer_b": 4.0}
+    spectral_module.compute_spectral_norms = lambda model, scope="ffn": (
+        {"layer_a": 2.0, "layer_b": 4.0}
         if model is sentinel_before
         else {"layer_a": 3.0}
     )

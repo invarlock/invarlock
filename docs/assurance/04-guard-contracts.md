@@ -8,7 +8,7 @@
 
 - [1. Guard Contracts](#1-guard-contracts) — what each guard checks and how it fails
 - [2. Statistical Method Primer](#2-statistical-method-primer) — paired Δlog perplexity and bootstrap CIs
-- [3. Calibration & Evaluation Slice Requirements](#3-calibration--evaluation-slice-requirements) — acceptance criteria for evaluation schedules
+- [3. Calibration & Evaluation Slice Requirements](#calibration-evaluation-slice-requirements) — acceptance criteria for evaluation schedules
 - [4. Reproducibility Kit](#4-reproducibility-kit) — how to reproduce a report
 - [5. Device Tolerance Guidance](#5-device-tolerance-guidance) — expected drift across backends
 - [6. Threshold Rationale (Defaults)](#6-threshold-rationale-defaults) — why the defaults are what they are
@@ -66,8 +66,8 @@ The chosen δ is published in reports as `spectral.summary.deadband`.
 
 **Caps and `max_caps`**: every time a module breaches its family cap the guard
 records a cap. Runs may continue while `caps_applied ≤ max_caps`. Once the
-limit is exceeded the guard returns `action = abort`, and the report
-stores both the count and the limit under
+limit is exceeded the guard emits a blocking decision, and the report stores
+both the count and the limit under
 `spectral.{caps_applied,max_caps}`.
 
 ### Quality Gates (Acceptance)
@@ -77,7 +77,7 @@ stores both the count and the limit under
     `ratio_vs_baseline ≤ tier_limit` where tier limits are 1.05 (Conservative),
     1.10 (Balanced), 1.20 (Aggressive). When a ratio CI is present, the upper
     bound must also be ≤ the same limit. Gate flag: `validation.primary_metric_acceptable`.
-  - accuracy kinds (accuracy, vqa_accuracy): gate on Δ accuracy vs baseline
+  - accuracy kinds (accuracy, accuracy): gate on Δ accuracy vs baseline
     (percentage points) with minimum coverage. Defaults (policy‑controlled):
     - Balanced: Δ ≥ −1.0 pp and `n_final ≥ 200`
     - Conservative: Δ ≥ −0.5 pp and `n_final ≥ 200`
@@ -149,7 +149,7 @@ half-width approximation for planning is `half_width ≈ z · σ̂ / √n` with
 These values are linted by `tests/eval/test_assurance_contracts.py` and surfaced
 in reports so reviewers can audit reproducibility.
 
-## 3. Calibration & Evaluation Slice Requirements
+## Calibration Evaluation Slice Requirements
 
 An evaluation schedule is accepted when:
 

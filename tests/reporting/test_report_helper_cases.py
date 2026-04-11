@@ -6,9 +6,18 @@ from types import SimpleNamespace
 import pytest
 
 from invarlock.reporting import report_edit_summary as report_edit_summary_mod
-from invarlock.reporting import report_make as cert
 from invarlock.reporting import report_overhead as report_overhead_mod
 from invarlock.reporting import report_validation as report_validation_mod
+from invarlock.reporting.report_confidence import (
+    compute_confidence_label as _compute_confidence_label,
+)
+from invarlock.reporting.report_normalization import _generate_run_id
+from invarlock.reporting.report_provenance import (
+    compute_edit_digest as _compute_edit_digest,
+)
+from invarlock.reporting.report_provenance import (
+    compute_report_digest as _compute_report_digest,
+)
 
 
 def _basic_pm(final: float) -> dict[str, object]:
@@ -19,7 +28,7 @@ def test_compute_edit_digest_quantization_and_fallback():
     quant_report = {
         "edit": {"name": "quant_rtn", "config": {"bitwidth": 4, "scope": "ffn"}}
     }
-    digest = cert._compute_edit_digest(quant_report)
+    digest = _compute_edit_digest(quant_report)
     assert digest["family"] == "quantization"
     assert digest["version"] == 1
 
@@ -27,20 +36,20 @@ def test_compute_edit_digest_quantization_and_fallback():
         def get(self, *_args, **_kwargs):
             raise RuntimeError("boom")
 
-    fallback = cert._compute_edit_digest({"edit": BadEdits()})
+    fallback = _compute_edit_digest({"edit": BadEdits()})
     assert fallback["family"] == "cert_only"
 
 
 def test_compute_confidence_label_respects_custom_thresholds():
     evaluation_report = {
         "validation": {"primary_metric_acceptable": True},
-        "primary_metric": {"kind": "accuracy", "display_ci": (0.50, 0.55)},
+        "primary_metric": {"kind": "accuracy", "display_ci": (50.0, 55.0)},
         "resolved_policy": {"confidence": {"accuracy_delta_pp_width_max": 0.1}},
     }
-    label = cert._compute_confidence_label(evaluation_report)
-    assert label["label"] == "High"
+    label = _compute_confidence_label(evaluation_report)
+    assert label["label"] == "Low"
     evaluation_report["primary_metric"]["unstable"] = True
-    label_unstable = cert._compute_confidence_label(evaluation_report)
+    label_unstable = _compute_confidence_label(evaluation_report)
     assert label_unstable["label"] == "Medium"
 
 
@@ -55,8 +64,8 @@ def test_compute_report_digest_changes_with_inputs():
         "edit": {"name": "noop", "plan_digest": "deadbeef"},
         "metrics": {"spectral": {"caps_applied": 1}, "rmt": {"outliers": 0}},
     }
-    digest1 = cert._compute_report_digest(base)
-    digest2 = cert._compute_report_digest({**base, "edit": {"name": "other"}})
+    digest1 = _compute_report_digest(base)
+    digest2 = _compute_report_digest({**base, "edit": {"name": "other"}})
     assert digest1 != digest2
 
 
@@ -125,15 +134,15 @@ def test_compute_quality_overhead_from_guard_accuracy_delta(monkeypatch):
 
 
 def test_generate_run_id_uses_existing_and_hashes_otherwise():
-    existing = cert._generate_run_id({"meta": {"run_id": "abc"}})
+    existing = _generate_run_id({"meta": {"run_id": "abc"}})
     assert existing == "abc"
-    derived = cert._generate_run_id({"meta": {"model_id": "m", "ts": "now"}})
+    derived = _generate_run_id({"meta": {"model_id": "m", "ts": "now"}})
     assert len(derived) == 16 and derived != "abc"
 
 
 def test_generate_run_id_handles_non_dict_meta():
     report = SimpleNamespace(meta="legacy-meta")
-    run_id = cert._generate_run_id(report)
+    run_id = _generate_run_id(report)
     assert isinstance(run_id, str)
     assert len(run_id) == 16
 

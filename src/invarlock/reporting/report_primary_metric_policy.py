@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from invarlock.core.metric_kind_contract import is_ppl_metric_kind
 from invarlock.core.runner_pairing import BOOTSTRAP_COVERAGE_REQUIREMENTS
 
 _NON_FATAL_EXCEPTIONS = (
@@ -15,21 +16,7 @@ _NON_FATAL_EXCEPTIONS = (
 
 
 def is_ppl_kind(name: Any) -> bool:
-    try:
-        normalized = str(name or "").lower()
-    except _NON_FATAL_EXCEPTIONS:
-        normalized = ""
-    return normalized in {
-        "ppl",
-        "perplexity",
-        "ppl_causal",
-        "causal_ppl",
-        "ppl_mlm",
-        "mlm_ppl",
-        "ppl_masked",
-        "ppl_seq2seq",
-        "seq2seq_ppl",
-    }
+    return is_ppl_metric_kind(name)
 
 
 def fallback_paired_windows(

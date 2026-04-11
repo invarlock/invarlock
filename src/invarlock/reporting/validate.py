@@ -245,7 +245,7 @@ def validate_against_baseline(
 
         # Bounds check
         if current_ratio is not None:
-            if pm_kind in {"accuracy", "vqa_accuracy"}:
+            if pm_kind == "accuracy":
                 # Interpret current_ratio as delta proportion; compare in pp when bounds provided
                 if isinstance(delta_bounds_pp, tuple) and len(delta_bounds_pp) == 2:
                     delta_pp = 100.0 * float(current_ratio)
@@ -272,7 +272,7 @@ def validate_against_baseline(
                         f"Ratio {current_ratio:.3f} within acceptable bounds {ratio_bounds}"
                     )
         else:
-            if pm_kind in {"accuracy", "vqa_accuracy"}:
+            if pm_kind == "accuracy":
                 checks["delta_bounds_pp"] = False
             else:
                 checks["ratio_bounds"] = False

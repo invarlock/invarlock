@@ -693,7 +693,7 @@ Common knobs for the setup script:
 | `INVARLOCK_DATASET` | `wikitext2` | Dataset provider |
 | `INVARLOCK_DATASET_PROVIDER_YAML` | unset | Raw YAML mapping for `dataset.provider` (advanced; overrides provider kind + args) |
 | `INVARLOCK_DATASET_PROVIDER_JSON` | unset | Raw JSON object for `dataset.provider` (advanced; overrides provider kind + args) |
-| `INVARLOCK_HF_DATASET_NAME` | `allenai/c4` | HF dataset name when `INVARLOCK_DATASET=hf_text` (legacy `c4` auto-migrated) |
+| `INVARLOCK_HF_DATASET_NAME` | `allenai/c4` | HF dataset name when `INVARLOCK_DATASET=hf_text` |
 | `INVARLOCK_HF_CONFIG_NAME` | `en` (for `allenai/c4`) | HF dataset config when `INVARLOCK_DATASET=hf_text` |
 | `INVARLOCK_HF_TEXT_FIELD` | `text` | Text field when `INVARLOCK_DATASET=hf_text` |
 | `INVARLOCK_HF_MAX_SAMPLES` | `2000` | Max rows consumed when `INVARLOCK_DATASET=hf_text` |

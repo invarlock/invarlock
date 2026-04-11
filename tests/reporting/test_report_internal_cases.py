@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import math
 
-from invarlock.reporting import report_make as C
 from invarlock.reporting import report_normalization as report_normalization_mod
 from invarlock.reporting import report_overhead as report_overhead_mod
+from invarlock.reporting import report_provenance as provenance_mod
 from invarlock.reporting.policy_utils import _build_resolved_policies
 from invarlock.reporting.utils import _coerce_int, _sanitize_seed_bundle
 
@@ -80,7 +80,7 @@ def test_compute_report_and_quality_overhead():
     assert out and out["basis"] == "ratio" and out["value"] > 1.0
 
     # compute_report_digest minimal
-    digest = C._compute_report_digest(
+    digest = provenance_mod.compute_report_digest(
         {
             "meta": {"model_id": "m", "adapter": "hf", "commit": "abc", "ts": "t"},
             "edit": {"name": "noop", "plan_digest": "d"},

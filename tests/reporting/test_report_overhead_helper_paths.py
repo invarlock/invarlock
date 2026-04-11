@@ -180,7 +180,7 @@ def test_diagnostic_helpers_cover_append_and_coerce_variants() -> None:
     ]
 
 
-def test_prepare_guard_overhead_direct_ratio_mode_fallback_and_legacy_messages() -> (
+def test_prepare_guard_overhead_direct_ratio_mode_fallback_ignores_text_buckets() -> (
     None
 ):
     payload, passed = overhead.prepare_guard_overhead_section(
@@ -211,11 +211,7 @@ def test_prepare_guard_overhead_direct_ratio_mode_fallback_and_legacy_messages()
     assert payload["overhead_percent"] == pytest.approx(10.0)
     assert payload["checks"] == {"ratio_ok": False}
     assert payload["evaluated"] is True
-    assert [item["kind"] for item in payload["diagnostics"]] == [
-        "guard_overhead_message",
-        "guard_overhead_warning",
-        "guard_overhead_error",
-    ]
+    assert payload["diagnostics"] == []
 
 
 def test_prepare_guard_overhead_zero_baseline_soft_passes_with_default_warning() -> (

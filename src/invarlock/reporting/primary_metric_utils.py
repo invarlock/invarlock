@@ -279,8 +279,7 @@ def _attach_classification_primary_metric_fallback(
         )
         if not (isinstance(clf, dict) and clf):
             return
-        model_id = str((report.get("meta", {}) or {}).get("model_id", "")).lower()
-        pm_kind = "vqa_accuracy" if "vqa" in model_id else "accuracy"
+        pm_kind = "accuracy"
         pm_point = None
         try:
             val_value = _coerce_finite_float(clf.get("final"))

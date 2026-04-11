@@ -7,6 +7,8 @@ import hashlib
 import math
 from typing import Any, cast
 
+from invarlock.core.metric_kind_contract import is_ppl_metric_kind
+
 from .normalizer import normalize_run_report
 from .report_types import RunReport, validate_report
 
@@ -33,21 +35,7 @@ def _finite_float_or_none(value: Any) -> float | None:
 def _is_ppl_kind(name: Any) -> bool:
     """Return True when the metric kind is a ppl-like metric."""
 
-    try:
-        normalized = str(name or "").lower()
-    except _PARSE_EXCEPTIONS:  # pragma: no cover
-        normalized = ""
-    return normalized in {
-        "ppl",
-        "perplexity",
-        "ppl_causal",
-        "causal_ppl",
-        "ppl_mlm",
-        "mlm_ppl",
-        "ppl_masked",
-        "ppl_seq2seq",
-        "seq2seq_ppl",
-    }
+    return is_ppl_metric_kind(name)
 
 
 def _generate_run_id(report: RunReport | dict[str, Any]) -> str:
@@ -341,82 +329,68 @@ def _baseline_normalized_v1_eval_report(
     return baseline_out
 
 
-def _baseline_legacy_output(
-    baseline: dict[str, Any], baseline_out: dict[str, Any], *, pm_is_ppl: bool
-) -> dict[str, Any]:
-    legacy_ppl_final: float | None = _finite_float_or_none(
-        baseline_out.get("ppl_final")
-    )
-    legacy_ppl_preview: float | None = _finite_float_or_none(
-        baseline_out.get("ppl_preview")
-    )
-
-    metrics_blk = baseline_out.get("metrics", {})
-    if legacy_ppl_final is None:
-        if isinstance(metrics_blk, dict):
-            direct_final = metrics_blk.get("ppl_final")
-            direct_preview = metrics_blk.get("ppl_preview", direct_final)
-            if isinstance(direct_final, int | float) and math.isfinite(
-                float(direct_final)
-            ):
-                legacy_ppl_final = float(direct_final)
-            if isinstance(direct_preview, int | float) and math.isfinite(
-                float(direct_preview)
-            ):
-                legacy_ppl_preview = float(direct_preview)
-            if legacy_ppl_final is None and pm_is_ppl:
-                pm = metrics_blk.get("primary_metric", {})
-                if isinstance(pm, dict):
-                    final_value = pm.get("final")
-                    preview_value = pm.get("preview", final_value)
-                    if isinstance(final_value, int | float):
-                        legacy_ppl_final = float(final_value)
-                    if isinstance(preview_value, int | float):
-                        legacy_ppl_preview = float(preview_value)
-        if legacy_ppl_final is None and pm_is_ppl:
-            pm_top = baseline_out.get("primary_metric", {})
-            if isinstance(pm_top, dict):
-                final_value = pm_top.get("final")
-                preview_value = pm_top.get("preview", final_value)
-                if isinstance(final_value, int | float):
-                    legacy_ppl_final = float(final_value)
-                if isinstance(preview_value, int | float):
-                    legacy_ppl_preview = float(preview_value)
-        if legacy_ppl_final is None:
-            evaluation_windows = baseline_out.get("evaluation_windows")
-            if isinstance(evaluation_windows, dict):
-                legacy_ppl_final = _baseline_derive_ppl_from_logloss_block(
-                    evaluation_windows.get("final")
-                )
-                if legacy_ppl_preview is None:
-                    legacy_ppl_preview = _baseline_derive_ppl_from_logloss_block(
-                        evaluation_windows.get("preview")
-                    )
-
-    if legacy_ppl_final is None and not pm_is_ppl:
-        if "ppl_final" in baseline_out:
-            ppl_final_float = _finite_float_or_none(baseline_out.get("ppl_final"))
-            if ppl_final_float is None or ppl_final_float <= 0.0:
-                baseline_out.pop("ppl_final", None)
-        if "ppl_preview" in baseline_out:
-            ppl_preview_float = _finite_float_or_none(baseline_out.get("ppl_preview"))
-            if ppl_preview_float is None or ppl_preview_float <= 0.0:
-                baseline_out.pop("ppl_preview", None)
-        return baseline_out
-
-    legacy_ppl_final = _baseline_coerce_valid_ppl(legacy_ppl_final, label="ppl_final")
-    if legacy_ppl_preview is None:
-        legacy_ppl_preview = legacy_ppl_final
-    else:
-        legacy_ppl_preview = _baseline_coerce_valid_ppl(
-            legacy_ppl_preview, label="ppl_preview"
+def _baseline_canonical_output(baseline: dict[str, Any]) -> dict[str, Any]:
+    run_id = _baseline_optional_short_string(baseline.get("run_id"))
+    model_id = _baseline_optional_short_string(baseline.get("model_id"))
+    if run_id is None or model_id is None:
+        raise ValueError(
+            "Invalid baseline: canonical baseline dict requires non-empty run_id "
+            "and model_id."
         )
 
-    baseline_out["ppl_final"] = legacy_ppl_final
+    baseline_out = copy.deepcopy(baseline)
+    baseline_out["run_id"] = run_id
+    baseline_out["model_id"] = model_id
+
+    primary_metric = baseline_out.get("primary_metric")
+    if primary_metric is not None and not isinstance(primary_metric, dict):
+        raise ValueError(
+            "Invalid baseline primary_metric: expected a mapping when provided."
+        )
+    pm_kind = (
+        _baseline_normalize_kind(primary_metric.get("kind"))
+        if isinstance(primary_metric, dict)
+        else ""
+    )
+    pm_is_ppl = _is_ppl_kind(pm_kind)
+
+    ppl_final = _finite_float_or_none(baseline_out.get("ppl_final"))
+    ppl_preview = _finite_float_or_none(baseline_out.get("ppl_preview"))
+    if ppl_final is None and isinstance(primary_metric, dict) and pm_is_ppl:
+        ppl_final = _finite_float_or_none(primary_metric.get("final"))
+        if ppl_preview is None:
+            ppl_preview = _finite_float_or_none(
+                primary_metric.get("preview", primary_metric.get("final"))
+            )
+
+    if ppl_final is None:
+        baseline_out.pop("ppl_final", None)
+        baseline_out.pop("ppl_preview", None)
+        if pm_is_ppl:
+            raise ValueError(
+                "Invalid baseline: ppl baselines require a finite top-level "
+                "ppl_final or primary_metric.final."
+            )
+        return baseline_out
+
+    normalized_ppl_final = _baseline_coerce_valid_ppl(ppl_final, label="ppl_final")
+    baseline_out["ppl_final"] = normalized_ppl_final
+    if ppl_preview is None:
+        baseline_out.pop("ppl_preview", None)
+        return baseline_out
+
+    normalized_ppl_preview = _baseline_coerce_valid_ppl(
+        ppl_preview, label="ppl_preview"
+    )
     if "ppl_preview" in baseline_out or not math.isclose(
-        float(legacy_ppl_preview), float(legacy_ppl_final), rel_tol=0.0, abs_tol=0.0
+        float(normalized_ppl_preview),
+        float(normalized_ppl_final),
+        rel_tol=0.0,
+        abs_tol=0.0,
     ):
-        baseline_out["ppl_preview"] = legacy_ppl_preview
+        baseline_out["ppl_preview"] = normalized_ppl_preview
+    else:
+        baseline_out.pop("ppl_preview", None)
     return baseline_out
 
 
@@ -424,9 +398,7 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
     """Normalize baseline payloads into a canonical comparison dictionary."""
 
     if not isinstance(baseline, dict):
-        raise ValueError(
-            "Baseline must be a RunReport dict or normalized baseline dict"
-        )
+        raise ValueError("Baseline must be a RunReport dict or canonical baseline dict")
 
     schema_version = baseline.get("schema_version")
     if (
@@ -505,23 +477,7 @@ def normalize_baseline(baseline: RunReport | dict[str, Any]) -> dict[str, Any]:
             metrics_ppl_preview=metrics_ppl_preview,
         )
 
-    baseline_out = baseline.copy()
-    metrics_blk = baseline_out.get("metrics", {})
-    pm_kind = ""
-    if isinstance(metrics_blk, dict):
-        pm_metrics = metrics_blk.get("primary_metric")
-        if isinstance(pm_metrics, dict):
-            pm_kind = _baseline_normalize_kind(pm_metrics.get("kind"))
-    if not pm_kind:
-        pm_top = baseline_out.get("primary_metric", {})
-        if isinstance(pm_top, dict):
-            pm_kind = _baseline_normalize_kind(pm_top.get("kind"))
-    pm_is_ppl = _is_ppl_kind(pm_kind)
-    return _baseline_legacy_output(
-        baseline,
-        baseline_out,
-        pm_is_ppl=pm_is_ppl,
-    )
+    return _baseline_canonical_output(baseline)
 
 
 __all__ = ["normalize_and_validate_run_report", "normalize_baseline"]

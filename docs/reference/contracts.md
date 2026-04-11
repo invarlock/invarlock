@@ -38,6 +38,12 @@ These JSON files are included in installed wheels under
 `contracts/<name>.json`, and `invarlock.public_contracts` resolves them from the
 repo checkout when present or from packaged wheel data otherwise.
 
+The public contract catalog exposes the list-shaped files as first-class
+entries too: `validation_keys`, `console_labels`, and `metric_kinds` are
+surfaced by `invarlock.public_contracts.contract_catalog()` and embedded in the
+JSON payloads emitted by `invarlock doctor --json` and `invarlock advanced
+plugins ... --json`.
+
 ## CLI surfaces
 
 The CLI exposes these contracts directly:
@@ -57,9 +63,14 @@ verifier used for direct report/manifest checks. The repo shell
 verifier remains available for proof-pack workflow maintainers, and pure wheel
 installs can verify packs with `invarlock advanced proof-pack verify`.
 
+Third-party plugins are fail-closed on ABI declaration: adapters, edits, and
+guards must declare `INVARLOCK_CORE_ABI`, and the value must match the exact
+core ABI published in `contracts/plugin_compatibility.json`.
+
 For support-related automation, `plugins adapters --json` and `doctor --json`
 expose both the strict `support_matrix` contract and the broader
-`model_family_catalog` contract.
+`model_family_catalog` contract, plus the `validation_keys`, `console_labels`,
+and `metric_kinds` entries from the public contract catalog.
 
 ## Policy packs
 

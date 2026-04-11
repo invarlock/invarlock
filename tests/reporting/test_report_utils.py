@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 from invarlock.reporting import report_schema as schema_mod
-from invarlock.reporting.report_console import compute_console_validation_block
-from invarlock.reporting.report_make import (
-    _compute_confidence_label,
-    _compute_edit_digest,
+from invarlock.reporting.report_confidence import (
+    compute_confidence_label as _compute_confidence_label,
 )
+from invarlock.reporting.report_console import compute_console_validation_block
 from invarlock.reporting.report_primary_metric_policy import is_ppl_kind as _is_ppl_kind
+from invarlock.reporting.report_provenance import (
+    compute_edit_digest as _compute_edit_digest,
+)
 
 
 def test_is_ppl_kind_and_get_ppl_final() -> None:
-    assert _is_ppl_kind("ppl")
     assert _is_ppl_kind("ppl_causal")
+    assert not _is_ppl_kind("perplexity")
+    assert not _is_ppl_kind("ppl")
     assert not _is_ppl_kind("accuracy")
 
     # Legacy _get_ppl_final removed; rely on normalized primary_metric in evaluation_reports.
@@ -70,15 +73,33 @@ def test_validate_evaluation_report_rejects_non_boolean_flags() -> None:
     assert schema_mod.validate_report(bad) is False
 
 
-def test_validate_evaluation_report_fallback_ok_and_schema_minimal() -> None:
-    # Force minimal fallback path: missing many properties, but minimal fields present
+def test_validate_evaluation_report_rejects_minimal_payload_without_schema_success() -> (
+    None
+):
     minimal = {
         "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
         "run_id": "r",
         "primary_metric": {"kind": "ppl_causal"},
     }
-    # JSONSchema may reject; fallback minimal check should pass
-    assert schema_mod.validate_report(minimal) is True
+    assert schema_mod.validate_report(minimal) is False
+
+
+def test_validate_evaluation_report_rejects_unknown_primary_metric_kind() -> None:
+    bad = {
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
+        "run_id": "r",
+        "artifacts": {"generated_at": "t"},
+        "plugins": {},
+        "meta": {},
+        "dataset": {
+            "provider": "p",
+            "seq_len": 8,
+            "windows": {"preview": 0, "final": 0},
+        },
+        "primary_metric": {"kind": "perplexity", "final": 10.0},
+        "validation": {"primary_metric_acceptable": True},
+    }
+    assert schema_mod.validate_report(bad) is False
 
 
 def test_console_validation_block_guard_skipped_and_included() -> None:

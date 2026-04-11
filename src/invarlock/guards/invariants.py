@@ -11,8 +11,11 @@ from typing import Any
 import torch
 import torch.nn as nn
 
+from invarlock.core.abi import INVARLOCK_CORE_ABI as CORE_ABI
 from invarlock.core.api import Guard
 from invarlock.core.types import GuardDiagnostic, GuardOutcome, GuardValidationResult
+
+INVARLOCK_CORE_ABI = CORE_ABI
 
 _INVARIANT_CAPTURE_ERRORS = (
     AttributeError,
@@ -30,13 +33,13 @@ class InvariantsGuard(Guard):
 
     name = "invariants"
 
-    def __init__(self, strict_mode: bool = False, on_fail: str = "warn"):
+    def __init__(self, strict_mode: bool = False, on_fail: str = "monitor"):
         """
         Initialize invariants guard.
 
         Args:
             strict_mode: Whether to use strict validation
-            on_fail: Action to take on failure ("warn", "rollback", "abort")
+            on_fail: Decision to take on failure ("monitor", "rollback", "block")
         """
         self.strict_mode = strict_mode
         self.on_fail = on_fail
@@ -106,7 +109,6 @@ class InvariantsGuard(Guard):
             self.prepare(model, adapter, None, {})
 
         outcome = self.finalize(model)
-        decision = _decision_from_action(outcome.action)
         violations = tuple(dict(item) for item in (outcome.violations or []))
         diagnostics = tuple(
             GuardDiagnostic(
@@ -123,7 +125,7 @@ class InvariantsGuard(Guard):
         )
         return GuardValidationResult(
             passed=bool(outcome.passed),
-            decision=decision,
+            decision=str(outcome.decision),
             metrics=dict(outcome.metrics or {}),
             diagnostics=diagnostics,
             policy={
@@ -151,7 +153,7 @@ class InvariantsGuard(Guard):
             return GuardOutcome(
                 name=self.name,
                 passed=False,
-                action="warn",
+                decision="block",
                 violations=[{"type": "not_prepared", "message": "Guard not prepared"}],
                 metrics={},
             )
@@ -292,27 +294,27 @@ class InvariantsGuard(Guard):
 
         if fatal_count:
             passed = False
-            if self.on_fail in {"abort", "rollback"}:
-                action = self.on_fail
+            if self.on_fail in {"block", "rollback"}:
+                decision = self.on_fail
             else:
-                action = "abort"
+                decision = "block"
         elif warning_count:
-            if self.on_fail in {"abort", "rollback"}:
+            if self.on_fail in {"block", "rollback"}:
                 passed = False
-                action = self.on_fail
+                decision = self.on_fail
             else:
                 passed = True
-                action = "warn"
+                decision = "monitor"
         else:
             passed = True
-            action = "none"
+            decision = "allow"
 
         metrics: dict[str, Any] = {
             "checks_performed": len(self.baseline_checks),
             "violations_found": len(annotated_violations),
             "fatal_violations": fatal_count,
             "warning_violations": warning_count,
-            "decision": _decision_from_action(action),
+            "decision": decision,
         }
         if non_finite_locations:
             metrics["non_finite_found"] = len(non_finite_locations)
@@ -326,7 +328,7 @@ class InvariantsGuard(Guard):
         return GuardOutcome(
             name=self.name,
             passed=passed,
-            action=action,
+            decision=decision,
             violations=annotated_violations,
             metrics=metrics,
         )
@@ -558,17 +560,6 @@ class InvariantsGuard(Guard):
         return True
 
 
-def _decision_from_action(action: str) -> str:
-    normalized = str(action or "none").strip().lower()
-    if normalized == "warn":
-        return "monitor"
-    if normalized == "rollback":
-        return "rollback"
-    if normalized in {"abort", "reject"}:
-        return "block"
-    return "allow"
-
-
 def check_adapter_aware_invariants(
     model: Any, verbose: bool = False
 ) -> tuple[bool, dict[str, Any]]:
@@ -668,7 +659,7 @@ def check_all_invariants(model: Any, threshold: float = 1e-6) -> GuardOutcome:
         return GuardOutcome(
             name="check_all_invariants",
             passed=False,
-            action="reject",
+            decision="block",
             violations=violations,
             metrics={},
         )
@@ -685,7 +676,7 @@ def check_all_invariants(model: Any, threshold: float = 1e-6) -> GuardOutcome:
         return GuardOutcome(
             name="check_all_invariants",
             passed=False,
-            action="reject",
+            decision="block",
             violations=violations,
             metrics={"parameters_checked": 0, "violations_found": len(violations)},
         )
@@ -736,12 +727,12 @@ def check_all_invariants(model: Any, threshold: float = 1e-6) -> GuardOutcome:
                 )
 
     passed = len(violations) == 0
-    action = "continue" if passed else "reject"
+    decision = "allow" if passed else "block"
 
     return GuardOutcome(
         name="check_all_invariants",
         passed=passed,
-        action=action,
+        decision=decision,
         violations=violations,
         metrics={
             "parameters_checked": len(named_parameters),

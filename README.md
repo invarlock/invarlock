@@ -123,6 +123,9 @@ invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/eva
 If you pass a directory to `invarlock report generate` or
 `invarlock report explain`, it must contain canonical `report.json`.
 `invarlock report html` expects canonical `evaluation.report.json`.
+`invarlock verify` accepts directories with canonical report files, but a
+directory containing both `report.json` and `evaluation.report.json` is
+ambiguous and rejected; pass the exact file path instead.
 
 Example output (abridged; counts vary by profile/config):
 
@@ -139,7 +142,14 @@ Attestation: reports/eval/runtime.manifest.json
 
 - Core workflow: `invarlock evaluate` → `invarlock verify` →
   `invarlock report html`.
-- Advanced workflows live under `invarlock advanced ...`.
+- Report inspection and validation: `invarlock report generate`,
+  `invarlock report explain`, and `invarlock report validate`.
+- Environment and release checks: `invarlock doctor` plus the JSON surfaces
+  emitted by `doctor --json` and `advanced plugins ... --json`.
+- The public contract catalog exposed by those JSON surfaces includes
+  `validation_keys`, `console_labels`, and `metric_kinds`.
+- Advanced workflows: `invarlock advanced proof-pack`, `invarlock advanced policy`,
+  `invarlock advanced plugins`, and `invarlock advanced calibrate`.
 - Trusted host execution for the core evaluate path uses `--assurance trusted-local`.
 - Optional adapter/backend installs use normal Python extras such as
   `pip install "invarlock[hf]"` rather than CLI install commands.
@@ -167,7 +177,7 @@ pip install invarlock
 pip install "invarlock[hf]"
 ```
 
-Optional extras: `invarlock[gpu]`, `invarlock[awq,gptq]`. Full setup: <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/getting-started.md>.
+Optional extras: `invarlock[probes]`, `invarlock[gpu]`, `invarlock[awq,gptq]`. Full setup: <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/getting-started.md>.
 
 ## Documentation
 

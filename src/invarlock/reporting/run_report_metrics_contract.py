@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from invarlock.core.metric_kind_contract import normalize_metric_kind
 from invarlock.reporting.run_metric_utils import (
     format_debug_metric_diffs,
     merge_primary_metric_health,
@@ -77,7 +78,7 @@ def _classification_counts_from_primary_metric(
         kind = str(primary_metric.get("kind", "")).lower()
     except (AttributeError, TypeError, ValueError):
         return None
-    if kind not in {"accuracy", "vqa_accuracy"}:
+    if kind != "accuracy":
         return None
     preview = _coerce_finite_float(primary_metric.get("preview"))
     final = _coerce_finite_float(primary_metric.get("final"))
@@ -261,7 +262,6 @@ def enrich_run_report_metrics(
             ModuleNotFoundError,
             RuntimeError,
             TypeError,
-            ValueError,
         ):
             pass
 
@@ -294,6 +294,7 @@ def enrich_run_report_metrics(
             )
         )
         if metric_kind_resolved:
+            metric_kind_resolved = normalize_metric_kind(metric_kind_resolved)
             from invarlock.eval.primary_metric import compute_primary_metric_from_report
 
             baseline_report = (
@@ -357,7 +358,6 @@ def enrich_run_report_metrics(
         ModuleNotFoundError,
         RuntimeError,
         TypeError,
-        ValueError,
     ):
         pass
 

@@ -61,7 +61,9 @@ def test_normalize_baseline_dict_soft_fallback():
 
 
 def test_normalize_baseline_invalid_type():
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError, match="Baseline must be a RunReport dict or canonical baseline dict"
+    ):
         report_normalization_mod.normalize_baseline("not a baseline")
 
 
