@@ -52,6 +52,7 @@ def test_gpt2_smoke_campaign_script_is_executable() -> None:
         "run_gpt2_smoke_campaign.sh should be executable"
     )
     contents = script_path.read_text(encoding="utf-8")
+    assert 'PYTHON_BIN="$(bash "$REPO_ROOT/scripts/select_workspace_python.sh")"' in contents
     assert "ensure_writable_hf_cache" in contents
     assert "INVARLOCK_SMOKE_HOST_HF_CACHE_ROOT" in contents
     assert 'CLI=("$PYTHON_BIN" -m invarlock)' in contents
@@ -77,6 +78,7 @@ def test_tiny_attested_smoke_campaign_script_is_executable() -> None:
         "run_tiny_attested_smoke.sh should be executable"
     )
     contents = script_path.read_text(encoding="utf-8")
+    assert 'PYTHON_BIN="$(bash "$REPO_ROOT/scripts/select_workspace_python.sh")"' in contents
     assert "kind: local_jsonl" in contents
     assert "sshleifer/tiny-gpt2" in contents
     assert "tiny_relax: true" in contents
@@ -114,7 +116,7 @@ def test_cli_smoke_fast_uses_repo_selected_python() -> None:
 
     contents = script_path.read_text(encoding="utf-8")
     assert 'PYTHON_BIN="${INVARLOCK_PYTHON:-}"' in contents
-    assert 'PYTHON_BIN="$(bash "$ROOT/scripts/select_python.sh")"' in contents
+    assert 'PYTHON_BIN="$(bash "$ROOT/scripts/select_workspace_python.sh")"' in contents
     assert 'export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"' in contents
     assert "printf -v CLI '%q ' \"$PYTHON_BIN\" -m invarlock" in contents
     assert "\"$PYTHON_BIN\" - <<'PY'" in contents
@@ -155,6 +157,7 @@ def test_cli_smoke_negative_exercises_failure_categories() -> None:
 
     contents = script_path.read_text(encoding="utf-8")
     assert "tests/artifacts/golden_runs/gpt2/evaluation.report.json" in contents
+    assert 'PYTHON_BIN="$(bash "$ROOT/scripts/select_workspace_python.sh")"' in contents
     assert "invarlock verify --json (malformed fixture)" in contents
     assert "invarlock verify --json (primary metric policy fail)" in contents
     assert "invarlock verify --json (invariants policy fail)" in contents
@@ -209,7 +212,7 @@ def test_run_cpu_telemetry_uses_repo_selected_python() -> None:
 
     contents = script_path.read_text(encoding="utf-8")
     assert 'PYTHON_BIN="${INVARLOCK_PYTHON:-}"' in contents
-    assert 'PYTHON_BIN="$(bash "$ROOT/scripts/select_python.sh")"' in contents
+    assert 'PYTHON_BIN="$(bash "$ROOT/scripts/select_workspace_python.sh")"' in contents
     assert 'export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"' in contents
     assert 'CLI=("$PYTHON_BIN" -m invarlock)' in contents
     assert (

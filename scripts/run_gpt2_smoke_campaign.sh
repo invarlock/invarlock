@@ -16,7 +16,7 @@ fi
 
 PYTHON_BIN="${INVARLOCK_PYTHON:-}"
 if [[ -z "$PYTHON_BIN" ]]; then
-  PYTHON_BIN="$(bash "$REPO_ROOT/scripts/select_python.sh")"
+  PYTHON_BIN="$(bash "$REPO_ROOT/scripts/select_workspace_python.sh")"
 fi
 export PYTHONPATH="$REPO_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
 CLI=("$PYTHON_BIN" -m invarlock)

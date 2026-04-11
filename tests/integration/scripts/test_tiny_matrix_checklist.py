@@ -133,7 +133,7 @@ def test_hf_extras_include_sentencepiece_for_runtime_tokenizer_support() -> None
 def test_matrix_uses_repo_python_selector_and_py312_floor() -> None:
     text = Path("scripts/run_tiny_all_matrix.sh").read_text(encoding="utf-8")
 
-    assert 'PYTHON_BIN="${PYTHON_BIN:-$(bash scripts/select_python.sh)}"' in text
+    assert 'PYTHON_BIN="${PYTHON_BIN:-$(bash scripts/select_workspace_python.sh)}"' in text
     assert "requires Python 3.12+" in text
     assert 'CLI=("$PYTHON_BIN" -m invarlock.cli)' in text
 
@@ -191,6 +191,7 @@ def test_run_mode_falls_back_to_python_module_when_console_script_missing(
     env["NET"] = "0"
     env["INVARLOCK_TINY_RELAX"] = "1"
     env["TMP_DIR"] = str(tmp_path / "tmp")
+    env["PYTHON_BIN"] = str(fake_python)
     path_parts = os.environ.get("PATH", "").split(os.pathsep)
     installed_cli = shutil.which("invarlock")
     if installed_cli:

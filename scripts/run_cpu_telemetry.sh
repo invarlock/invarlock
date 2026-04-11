@@ -10,7 +10,7 @@ cd "$ROOT"
 
 PYTHON_BIN="${INVARLOCK_PYTHON:-}"
 if [[ -z "${PYTHON_BIN}" ]]; then
-  PYTHON_BIN="$(bash "$ROOT/scripts/select_python.sh")"
+  PYTHON_BIN="$(bash "$ROOT/scripts/select_workspace_python.sh")"
 fi
 export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
 CLI=("$PYTHON_BIN" -m invarlock)

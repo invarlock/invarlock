@@ -11,7 +11,7 @@ else
 fi
 
 if [[ -z "${PYTHON_BIN}" ]]; then
-  PYTHON_BIN="$(bash scripts/select_python.sh)"
+  PYTHON_BIN="$(bash scripts/select_workspace_python.sh)"
 fi
 
 "${PYTHON_BIN}" -m pytest -q tests/cli/test_cli_smoke.py tests/cli/test_app_version.py tests/cli/test_verify_json_shape.py
