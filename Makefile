@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install test test-assurance lint format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-verify
+.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-verify ensure-mypy
 
 PYTHON ?= $(shell bash scripts/select_python.sh)
 PIP := $(PYTHON) -m pip
@@ -18,6 +18,7 @@ RUNTIME_IMAGE_CUDA ?= invarlock-runtime:cuda-local
 RUNTIME_IMAGE_CUDA_REQUIREMENTS ?= requirements/workflows/runtime-image-py312-cu128.txt
 RUNTIME_IMAGE_CUDA_INDEX_URL ?= https://download.pytorch.org/whl/cu128
 RUNTIME_IMAGE_DIGEST ?= sha256:local-runtime-image
+COVERAGE_POLICY := $(PYTHON) scripts/coverage_policy.py
 
 # Keep repo-wide coverage practical while still exercising the CLI command
 # surface that would otherwise pull the project floor below the real trust core.
@@ -70,10 +71,17 @@ COVERAGE_TESTS_CLI_HELPERS := \
 	tests/cli/test_runtime_launch_plan_contract.py \
 	tests/unit/test_overhead_extraction.py
 
+COVERAGE_TESTS_OBSERVABILITY := \
+	tests/observability \
+	tests/unit/test_import_safety.py
+
 COVERAGE_TESTS_ADAPTERS := \
 	tests/adapters/test_adapter_contracts.py \
+	tests/adapters/test_adapter_auto_runtime.py \
 	tests/adapters/test_hf_loading_helpers.py \
-	tests/adapters/test_hf_multimodal_adapter.py
+	tests/adapters/test_hf_multimodal_adapter.py \
+	tests/adapters/test_adapter_errors.py \
+	tests/adapters/test_adapters_hf_and_integration.py
 
 COVERAGE_TESTS_RUNTIME := \
 	tests/cli/test_security_default_contract.py \
@@ -91,20 +99,56 @@ COVERAGE_TESTS := \
 	$(COVERAGE_TESTS_CONFIG) \
 	$(COVERAGE_TESTS_EVAL) \
 	$(COVERAGE_TESTS_CLI_COMMANDS) \
-	$(COVERAGE_TESTS_CLI_HELPERS)
+	$(COVERAGE_TESTS_CLI_HELPERS) \
+	$(COVERAGE_TESTS_OBSERVABILITY)
 
 COVERAGE_MODULES := \
-	--cov=src/invarlock/eval --cov=src/invarlock/guards --cov=src/invarlock/calibration \
-	--cov=src/invarlock/cli --cov=src/invarlock/core --cov=src/invarlock/reporting \
-	--cov=invarlock.public_contracts --cov=invarlock.policy_pack \
-	--cov=invarlock.runtime_security_helpers \
-	--cov=invarlock.proof_pack_integrity \
-	--cov=invarlock.proof_pack_manifest \
-	--cov=invarlock.proof_pack_metadata \
-	--cov=invarlock.runtime_verify \
-	--cov=invarlock.proof_pack
+	$(shell $(COVERAGE_POLICY) coverage-modules)
 
-COVERAGE_INCLUDE := src/invarlock/eval/*,src/invarlock/guards/*,src/invarlock/calibration/*,src/invarlock/cli/*,src/invarlock/cli/commands/*,src/invarlock/core/*,src/invarlock/reporting/*,src/invarlock/adapters/hf_multimodal.py,src/invarlock/public_contracts.py,src/invarlock/policy_pack.py,src/invarlock/proof_pack.py,src/invarlock/proof_pack_integrity.py,src/invarlock/proof_pack_manifest.py,src/invarlock/proof_pack_metadata.py,src/invarlock/runtime_security.py,src/invarlock/runtime_security_helpers.py,src/invarlock/runtime_verify.py,invarlock/eval/*,invarlock/guards/*,invarlock/calibration/*,invarlock/cli/*,invarlock/cli/commands/*,invarlock/core/*,invarlock/reporting/*,invarlock/adapters/hf_multimodal.py,invarlock/public_contracts.py,invarlock/policy_pack.py,invarlock/proof_pack.py,invarlock/proof_pack_integrity.py,invarlock/proof_pack_manifest.py,invarlock/proof_pack_metadata.py,invarlock/runtime_security.py,invarlock/runtime_security_helpers.py,invarlock/runtime_verify.py
+COVERAGE_INCLUDE := $(shell $(COVERAGE_POLICY) coverage-include)
+MYPY_TYPED_SURFACE := \
+	src/invarlock/observability/alerting.py \
+	src/invarlock/observability/core.py \
+	src/invarlock/observability/exporters.py \
+	src/invarlock/observability/health.py \
+	src/invarlock/observability/metrics.py \
+	src/invarlock/observability/utils.py \
+	src/invarlock/config.py \
+	src/invarlock/adapters/auto.py \
+	src/invarlock/core/config_loader.py \
+	src/invarlock/core/config_runtime.py \
+	src/invarlock/core/metric_kind_contract.py \
+	src/invarlock/core/metric_provider_resolution.py \
+	src/invarlock/core/registry.py \
+	src/invarlock/core/runner_eval_metrics_multimodal.py \
+	src/invarlock/core/builtin_plugin_catalog.py \
+	src/invarlock/core/run_orchestrator_execute_seed.py \
+	src/invarlock/core/run_orchestrator_execute_environment.py \
+	src/invarlock/core/run_orchestrator_execute_dataset.py \
+	src/invarlock/core/run_orchestrator_execute_attempts.py \
+	src/invarlock/core/run_orchestrator_execute_execution.py \
+	src/invarlock/core/run_orchestrator_execute_events.py \
+	src/invarlock/core/run_orchestrator_execute_helpers.py \
+	src/invarlock/core/run_orchestrator_execute_outcome.py \
+	src/invarlock/core/run_orchestrator_execute_pipeline.py \
+	src/invarlock/cli/__init__.py \
+	src/invarlock/cli/__main__.py \
+	src/invarlock/cli/_json.py \
+	src/invarlock/cli/app.py \
+	src/invarlock/cli/evaluate_output.py \
+	src/invarlock/cli/evaluate_phases.py \
+	src/invarlock/cli/commands/evaluate.py \
+	src/invarlock/cli/commands/verify.py \
+	src/invarlock/cli/runtime_verify.py \
+	src/invarlock/eval/probes/mi.py \
+	src/invarlock/reporting/report_confidence.py \
+	src/invarlock/reporting/report_schema.py \
+	src/invarlock/reporting/report_types.py \
+	src/invarlock/reporting/verify_check_helpers.py \
+	src/invarlock/runtime_security.py \
+	src/invarlock/runtime_security_helpers.py \
+	src/invarlock/runtime_security_container.py \
+	src/invarlock/runtime_security_manifest.py
 
 TEST_DIR_TARGETS := core cli eval guards edits adapters plugins scripts ci
 
@@ -120,10 +164,22 @@ dev-install:  ## Install package with development dependencies
 	$(MAKE) ensure-python
 	$(PIP) install -e ".[dev]"
 
+lock-sync:  ## Check uv.lock is in sync with pyproject.toml
+	UV_NO_CACHE=1 uv lock --check
+
 ##@ Development
 test:  ## Run tests
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTEST) tests/ -v
+
+test-fast:  ## Run the fast lane with marker selection
+	$(MAKE) ensure-python
+	INVARLOCK_LIGHT_IMPORT=1 INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=0 \
+		PYTHONPATH=src $(PYTEST) -q -m "not integration and not slow and not manual" tests
+
+test-integration:  ## Run the integration lane
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTEST) -q -m integration tests/integration
 
 ##@ Coverage
 coverage:  ## Run tests with coverage and generate XML
@@ -187,8 +243,14 @@ test-assurance:  ## Run assurance-related tests only
 
 lint:  ## Run linting
 	$(MAKE) ensure-ruff
+	$(MAKE) ensure-mypy
 	$(RUFF) check src/ tests/ scripts/
 	$(MYPY) src/
+
+mypy-typed-surface:  ## Run mypy on the enforced typed surface
+	$(MAKE) ensure-python
+	$(MAKE) ensure-mypy
+	PYTHONPATH=src $(MYPY) $(MYPY_TYPED_SURFACE)
 
 format:  ## Format code
 	$(MAKE) ensure-ruff
@@ -381,6 +443,15 @@ ensure-ruff:
 		:; \
 	else \
 		printf '%s\n' "ruff is required but not installed; install it in the selected environment (e.g. '$(PYTHON) -m pip install ruff')" >&2; \
+		exit 1; \
+	fi
+
+ensure-mypy:
+	@$(MAKE) ensure-python
+	@if $(PYTHON) -c "import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('mypy') else 1)"; then \
+		:; \
+	else \
+		printf '%s\n' "mypy is required but not installed; install it in the selected environment (e.g. '$(PYTHON) -m pip install mypy')" >&2; \
 		exit 1; \
 	fi
 

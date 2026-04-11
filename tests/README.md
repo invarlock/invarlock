@@ -41,6 +41,18 @@ INVARLOCK_LIGHT_IMPORT=1 INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=0 \
 pytest -q -m "not integration and not slow and not manual" tests
 ```
 
+Or use the Makefile fast lane:
+
+```
+make test-fast
+```
+
+Run the slower integration/smoke backstop separately:
+
+```
+make test-integration
+```
+
 Run the curated CI subset locally:
 
 ```
@@ -58,6 +70,9 @@ pytest -q \
   tests/reporting/test_report_markdown_estimated_suffix.py \
   tests/reporting/test_report_markdown_no_estimated_for_measured.py
 ```
+
+The curated CI subset is intentionally narrower than `make test-fast`; use it
+when reproducing the fast PR gate selection or debugging that specific lane.
 
 ## Runtime artifacts
 

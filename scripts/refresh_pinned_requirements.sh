@@ -54,9 +54,19 @@ compile_pyproject "${WORKFLOW_DIR}/docs-ci-py313.txt" \
   --extra ci \
   --extra docs-ci
 
+compile_pyproject "${WORKFLOW_DIR}/assurance-ci-py313.txt" \
+  --python-version 3.13 \
+  --extra hf \
+  --extra ci \
+  --extra docs-ci
+
 compile_pyproject "${WORKFLOW_DIR}/hf-py313.txt" \
   --python-version 3.13 \
   --extra hf
+
+compile_pyproject "${WORKFLOW_DIR}/advanced-py313.txt" \
+  --python-version 3.13 \
+  --extra advanced
 
 compile_req_platform \
   "${WORKFLOW_DIR}/runtime-image.in" \

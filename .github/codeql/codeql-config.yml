@@ -2,6 +2,7 @@ name: InvarLock CodeQL configuration
 
 paths:
   - src/invarlock
+  - scripts
 
 query-filters:
   - exclude:

@@ -1,6 +1,16 @@
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
+
+
+def _load_coverage_policy():
+    policy_path = Path(__file__).resolve().parents[2] / "scripts" / "coverage_policy.py"
+    spec = importlib.util.spec_from_file_location("coverage_policy", policy_path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _coverage_tests_eval_block() -> str:
@@ -56,6 +66,7 @@ def test_coverage_target_includes_probe_suite_for_plain_coverage_run() -> None:
 
 
 def test_coverage_target_includes_core_cli_surface_and_runtime_security_tests() -> None:
+    policy = _load_coverage_policy()
     makefile = Path(__file__).resolve().parents[2] / "Makefile"
     text = makefile.read_text(encoding="utf-8")
 
@@ -66,27 +77,103 @@ def test_coverage_target_includes_core_cli_surface_and_runtime_security_tests() 
         "tests/cli/test_python_m_invarlock.py",
         "tests/cli/test_security_default_contract.py",
         "tests/cli/test_container_delegation.py",
-        "invarlock/runtime_security.py",
     ):
         assert pattern in text
+    assert "invarlock/runtime_security.py" in policy.coverage_include()
 
 
-def test_coverage_include_does_not_embed_space_prefixed_cli_patterns() -> None:
+def test_coverage_target_includes_adapter_auto_runtime_suite() -> None:
     makefile = Path(__file__).resolve().parents[2] / "Makefile"
     text = makefile.read_text(encoding="utf-8")
 
-    line = next(
-        raw_line
-        for raw_line in text.splitlines()
-        if raw_line.startswith("COVERAGE_INCLUDE :=")
+    assert "tests/adapters/test_adapter_auto_runtime.py" in text
+
+
+def test_coverage_policy_is_shared_with_makefile_and_expanded_surface() -> None:
+    policy = _load_coverage_policy()
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    text = makefile.read_text(encoding="utf-8")
+
+    assert "COVERAGE_POLICY := $(PYTHON) scripts/coverage_policy.py" in text
+    assert "COVERAGE_MODULES := \\" in text
+    assert "\t$(shell $(COVERAGE_POLICY) coverage-modules)" in text
+    assert "COVERAGE_INCLUDE := $(shell $(COVERAGE_POLICY) coverage-include)" in text
+
+    assert "src/invarlock/observability/" in policy.CORE_PREFIXES
+    assert "src/invarlock/config.py" in policy.CORE_FILES
+    assert "src/invarlock/adapters/auto.py" in policy.CORE_FILES
+
+    assert policy.COVERAGE_MODULE_FLAGS == ("--cov",)
+
+    assert not any(
+        flag.startswith("--cov=src/invarlock/") for flag in policy.COVERAGE_MODULE_FLAGS
     )
 
-    assert "\\" not in line
-    assert ", src/invarlock/cli/*" not in line
-    assert ", invarlock/cli/*" not in line
-    assert "src/invarlock/cli/*" in line
-    assert "src/invarlock/cli/commands/*" in line
-    assert "src/invarlock/public_contracts.py" in line
-    assert "src/invarlock/proof_pack.py" in line
-    assert "src/invarlock/runtime_security.py" in line
-    assert "invarlock/cli/commands/*" in line
+    for pattern in (
+        "src/invarlock/observability/*",
+        "src/invarlock/config.py",
+        "src/invarlock/adapters/auto.py",
+        "invarlock/observability/*",
+        "invarlock/config.py",
+        "invarlock/adapters/auto.py",
+    ):
+        assert pattern in policy.COVERAGE_INCLUDE_PATTERNS
+
+
+def test_makefile_exposes_marker_based_fast_and_integration_lanes() -> None:
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    text = makefile.read_text(encoding="utf-8")
+
+    assert "test-fast:" in text
+    assert "test-integration:" in text
+    assert '-m "not integration and not slow and not manual"' in text
+    assert "-m integration tests/integration" in text
+
+
+def test_makefile_exposes_typed_surface_target() -> None:
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    text = makefile.read_text(encoding="utf-8")
+
+    assert "mypy-typed-surface:" in text
+    for path in (
+        "src/invarlock/observability/metrics.py",
+        "src/invarlock/config.py",
+        "src/invarlock/adapters/auto.py",
+        "src/invarlock/core/builtin_plugin_catalog.py",
+        "src/invarlock/core/config_loader.py",
+        "src/invarlock/core/metric_provider_resolution.py",
+        "src/invarlock/core/run_orchestrator_execute_seed.py",
+        "src/invarlock/core/run_orchestrator_execute_environment.py",
+        "src/invarlock/core/run_orchestrator_execute_dataset.py",
+        "src/invarlock/core/run_orchestrator_execute_attempts.py",
+        "src/invarlock/core/run_orchestrator_execute_execution.py",
+        "src/invarlock/core/run_orchestrator_execute_helpers.py",
+        "src/invarlock/cli/app.py",
+        "src/invarlock/cli/runtime_verify.py",
+        "src/invarlock/eval/probes/mi.py",
+        "src/invarlock/reporting/report_schema.py",
+        "src/invarlock/runtime_security_helpers.py",
+    ):
+        assert path in text
+
+
+def test_makefile_exposes_lockfile_sync_target() -> None:
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    text = makefile.read_text(encoding="utf-8")
+
+    assert "lock-sync:" in text
+    assert "UV_NO_CACHE=1 uv lock --check" in text
+
+
+def test_coverage_include_does_not_embed_space_prefixed_cli_patterns() -> None:
+    policy = _load_coverage_policy()
+    include = policy.coverage_include()
+
+    assert ", src/invarlock/cli/*" not in include
+    assert ", invarlock/cli/*" not in include
+    assert "src/invarlock/cli/*" in include
+    assert "src/invarlock/cli/commands/*" in include
+    assert "src/invarlock/public_contracts.py" in include
+    assert "src/invarlock/proof_pack.py" in include
+    assert "src/invarlock/runtime_security.py" in include
+    assert "invarlock/cli/commands/*" in include

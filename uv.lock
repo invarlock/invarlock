@@ -1308,18 +1308,14 @@ source = { editable = "." }
 dependencies = [
     { name = "click" },
     { name = "cryptography" },
-    { name = "hypothesis" },
     { name = "jsonschema" },
     { name = "markdown" },
-    { name = "pandas" },
     { name = "psutil" },
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "rich" },
-    { name = "scikit-learn" },
     { name = "shellingham" },
     { name = "typer" },
-    { name = "typing-extensions" },
 ]
 
 [package.optional-dependencies]
@@ -1345,6 +1341,7 @@ advanced = [
     { name = "pillow" },
     { name = "protobuf" },
     { name = "requests" },
+    { name = "scikit-learn" },
     { name = "sentencepiece" },
     { name = "tiktoken" },
     { name = "torch" },
@@ -1364,6 +1361,7 @@ all = [
     { name = "pillow" },
     { name = "protobuf" },
     { name = "requests" },
+    { name = "scikit-learn" },
     { name = "sentencepiece" },
     { name = "tiktoken" },
     { name = "torch" },
@@ -1383,6 +1381,7 @@ ci = [
     { name = "mkdocs-material" },
     { name = "mkdocs-mermaid2-plugin" },
     { name = "pytest" },
+    { name = "pytest-cov" },
     { name = "requests" },
     { name = "ruff" },
 ]
@@ -1405,9 +1404,7 @@ dev = [
     { name = "twine" },
 ]
 docs-ci = [
-    { name = "hypothesis" },
     { name = "linkchecker" },
-    { name = "mypy" },
     { name = "requests" },
 ]
 edits = [
@@ -1453,6 +1450,9 @@ hf = [
 ]
 precommit-ci = [
     { name = "pre-commit" },
+]
+probes = [
+    { name = "scikit-learn" },
 ]
 release-ci = [
     { name = "build" },
@@ -1503,9 +1503,7 @@ requires-dist = [
     { name = "huggingface-hub", marker = "extra == 'advanced'", specifier = ">=1.0.0" },
     { name = "huggingface-hub", marker = "extra == 'all'", specifier = ">=1.0.0" },
     { name = "huggingface-hub", marker = "extra == 'hf'", specifier = ">=1.0.0" },
-    { name = "hypothesis", specifier = ">=6.98" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.98" },
-    { name = "hypothesis", marker = "extra == 'docs-ci'", specifier = ">=6.98" },
     { name = "jsonschema", specifier = ">=4.0" },
     { name = "linkchecker", marker = "extra == 'docs-ci'", specifier = ">=10.5" },
     { name = "markdown", specifier = ">=3.5" },
@@ -1517,12 +1515,10 @@ requires-dist = [
     { name = "mkdocs-mermaid2-plugin", marker = "extra == 'ci'", specifier = ">=1.1" },
     { name = "mkdocs-mermaid2-plugin", marker = "extra == 'dev'", specifier = ">=1.1" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0" },
-    { name = "mypy", marker = "extra == 'docs-ci'", specifier = ">=1.0" },
     { name = "numpy", marker = "extra == 'advanced'", specifier = ">=1.24" },
     { name = "numpy", marker = "extra == 'all'", specifier = ">=1.24" },
     { name = "numpy", marker = "extra == 'guards'", specifier = ">=1.24" },
     { name = "numpy", marker = "extra == 'hf'", specifier = ">=1.24" },
-    { name = "pandas", specifier = ">=2.2" },
     { name = "pillow", marker = "extra == 'adapters'", specifier = ">=11.3.0" },
     { name = "pillow", marker = "extra == 'advanced'", specifier = ">=11.3.0" },
     { name = "pillow", marker = "extra == 'all'", specifier = ">=11.3.0" },
@@ -1538,6 +1534,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'ci'", specifier = ">=7.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
+    { name = "pytest-cov", marker = "extra == 'ci'", specifier = ">=4.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "requests", marker = "extra == 'advanced'", specifier = ">=2.33.0" },
@@ -1557,7 +1554,9 @@ requires-dist = [
     { name = "safetensors", marker = "extra == 'gptq'", specifier = ">=0.4.0" },
     { name = "safetensors", marker = "extra == 'gpu'", specifier = ">=0.4.0" },
     { name = "safetensors", marker = "extra == 'hf'", specifier = ">=0.4.0" },
-    { name = "scikit-learn", specifier = ">=1.4" },
+    { name = "scikit-learn", marker = "extra == 'advanced'", specifier = ">=1.4" },
+    { name = "scikit-learn", marker = "extra == 'all'", specifier = ">=1.4" },
+    { name = "scikit-learn", marker = "extra == 'probes'", specifier = ">=1.4" },
     { name = "sentencepiece", marker = "extra == 'adapters'", specifier = ">=0.2.1" },
     { name = "sentencepiece", marker = "extra == 'advanced'", specifier = ">=0.2.1" },
     { name = "sentencepiece", marker = "extra == 'all'", specifier = ">=0.2.1" },
@@ -1591,9 +1590,8 @@ requires-dist = [
     { name = "twine", marker = "extra == 'dev'", specifier = ">=4.0.0" },
     { name = "twine", marker = "extra == 'release-ci'", specifier = ">=4.0.0" },
     { name = "typer", specifier = ">=0.15" },
-    { name = "typing-extensions", specifier = ">=4.7" },
 ]
-provides-extras = ["adapters", "hf", "guards", "edits", "eval", "gptq", "awq", "gpu", "advanced", "all", "dev", "ci", "docs-ci", "precommit-ci", "release-ci", "security-ci"]
+provides-extras = ["adapters", "hf", "guards", "edits", "eval", "probes", "gptq", "awq", "gpu", "advanced", "all", "dev", "ci", "docs-ci", "precommit-ci", "release-ci", "security-ci"]
 
 [[package]]
 name = "isoduration"

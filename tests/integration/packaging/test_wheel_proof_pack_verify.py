@@ -73,6 +73,20 @@ def _create_venv(tmp_path: Path, python_exe: Path) -> tuple[Path, Path, Path]:
     else:
         venv_python = env_dir / "bin" / "python"
         cli_exe = env_dir / "bin" / "invarlock"
+    source_sites = _site_packages(python_exe)
+    target_sites = _site_packages(venv_python)
+    if target_sites:
+        target_site = target_sites[0]
+        extra_paths = [
+            str(path)
+            for path in source_sites
+            if path.exists() and path not in target_sites
+        ]
+        if extra_paths:
+            (target_site / "_invarlock_source_site_packages.pth").write_text(
+                "\n".join(extra_paths) + "\n",
+                encoding="utf-8",
+            )
     return env_dir, venv_python, cli_exe
 
 
@@ -92,6 +106,20 @@ def _run(
         cwd=cwd,
         env=resolved_env,
     )
+
+
+def _site_packages(python_exe: Path) -> list[Path]:
+    proc = subprocess.run(
+        [
+            str(python_exe),
+            "-c",
+            "import json, site; print(json.dumps(site.getsitepackages()))",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return [Path(entry).resolve() for entry in json.loads(proc.stdout)]
 
 
 def _sha256_file(path: Path) -> str:
@@ -300,6 +328,24 @@ def test_wheel_install_can_verify_proof_pack_outside_repo_tree(tmp_path: Path) -
     assert env_dir.resolve() in import_path.parents
     assert repo_root.resolve() not in import_path.parents
     assert cli_exe.is_file()
+
+    minimal_help = _run(
+        python_exe,
+        ["-m", "invarlock", "--help"],
+        cwd=tmp_path,
+        env={"INVARLOCK_LIGHT_IMPORT": "1"},
+    )
+    assert minimal_help.returncode == 0, minimal_help.stdout + minimal_help.stderr
+    assert "evaluate" in minimal_help.stdout
+    assert "verify" in minimal_help.stdout
+
+    cli_app_import = _run(
+        python_exe,
+        ["-c", "import invarlock.cli.app"],
+        cwd=tmp_path,
+        env={"INVARLOCK_LIGHT_IMPORT": "1"},
+    )
+    assert cli_app_import.returncode == 0, cli_app_import.stdout + cli_app_import.stderr
 
     pack_dir = _build_proof_pack(tmp_path / "pack")
 

@@ -41,8 +41,9 @@ Overview of the core security-related components and defaults.
 
 ## Supply chain (reference)
 
-- SBOM generation (see `scripts/generate_sbom.sh`).
-- `pip-audit` with a small allowlist (see pip-audit page) in CI.
+- SBOM generation (see `scripts/generate_sbom.sh`), run against the installed-artifact environment in PR/release jobs and the tool environment in the scheduled backstop.
+- `pip-audit` with a small allowlist (see pip-audit page) in CI, run against the base install surface plus the pinned `hf` and `advanced` shipped surfaces in PR jobs, and against the installed-artifact release surface in release jobs.
+- `gitleaks` history scanning with JSON/SARIF artifacts in PR and release jobs.
 - Pre-commit formatting/linting and version checks in CI to reduce drift.
 
 ## Design principles

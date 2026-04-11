@@ -11,12 +11,14 @@ Tagged GitHub Releases publish:
 
 - distribution artifacts (`*.whl`, `*.tar.gz`)
 - Sigstore sidecars for those distributions
-- a CycloneDX SBOM
+- a CycloneDX SBOM generated from the installed release surface
 - the GitHub build-provenance bundle captured during release publishing
 - `invarlock-<version>-offline-bundle.tar.gz`
 
 The offline bundle is a convenience archive for procurement and security review.
 It groups the release materials that would otherwise be downloaded separately.
+The release workflow validates release tags before publishing and rebuilds from
+the resolved commit SHA for the chosen tag.
 
 ## Offline bundle contents
 
@@ -43,7 +45,8 @@ The bundle tarball itself is also Sigstore-signed during the release workflow.
    `*.sigstore.json` bundle and the expected GitHub tag identity.
 5. Review `provenance/` for the GitHub build-provenance attestation.
 6. Review `invarlock-<version>-sbom.cdx.json` with an offline
-   CycloneDX-capable scanner.
+   CycloneDX-capable scanner. The SBOM is built from the release install
+   surface, not from the CI tool environment.
 
 Example for one distribution artifact:
 
@@ -57,6 +60,10 @@ cosign verify-blob dist/invarlock-<version>-py3-none-any.whl \
 ## Notes
 
 - Release verification and proof-pack verification are intentionally separate.
+- Manual release dispatch rejects malformed, missing, or non-tag release refs
+  before build/publish begins.
+- Release tag resolution peels annotated tags to immutable commit SHAs before
+  build/publish begins.
 - Proof packs use signed `manifest.json` + `checksums.sha256` +
   `invarlock advanced proof-pack verify` (repo workflows may use `verify_pack.sh`).
 - Release bundles use Sigstore-signed distribution artifacts plus the GitHub

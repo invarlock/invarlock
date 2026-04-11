@@ -25,7 +25,7 @@ Copy-paste checklist for production or CI deployments:
 - [ ] Dependencies locked (`pip freeze > requirements.lock`)
 - [ ] Python ≥ 3.12
 - [ ] pip-audit clean or exceptions documented
-- [ ] SBOM generated (`scripts/generate_sbom.sh`)
+- [ ] SBOM generated from the installed release surface (`scripts/generate_sbom.sh --scope install-surface --python ...`)
 
 ## Model & Data
 - [ ] Model source verified (local path or trusted HF repo)
@@ -61,8 +61,11 @@ Copy-paste checklist for production or CI deployments:
 
 - Prefer `pipx` or conda-managed environments for clean installs.
 - Keep Python at 3.12+ and update dependencies regularly.
-- Use the supply-chain workflow (SBOM + pip-audit + secret scan) as a
-  reference; see the allowlist page for documented exceptions.
+- Use the PR-time supply-chain workflow for pre-merge checks (install-surface
+  SBOM + `pip-audit` on the base/`hf`/`advanced` shipped surfaces + `gitleaks`
+  history JSON/SARIF artifacts), and keep the
+  scheduled/tag CI supply-chain job as the slower backstop. See the allowlist
+  page for documented exceptions.
 
 ## Release verification
 
@@ -84,6 +87,8 @@ Copy-paste checklist for production or CI deployments:
 - The offline bundle tarball itself is also Sigstore-signed on release, so
   buyers can verify the archive before extraction and then verify the inner
   distributions individually.
+- Manual release dispatch validates the requested tag before build/publish and
+  resolves the release from an immutable tag commit SHA.
 
 ## See also
 

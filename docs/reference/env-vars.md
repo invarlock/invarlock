@@ -63,12 +63,11 @@ INVARLOCK_EVAL_DEVICE=cpu INVARLOCK_ALLOW_NETWORK=1 \
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `INVARLOCK_TRUST_REMOTE_CODE` | unset | Request `trust_remote_code=true` compatibility mode. |
 | `INVARLOCK_ALLOW_REMOTE_CODE` | unset | Explicitly allow remote model code execution. |
 
-`INVARLOCK_TRUST_REMOTE_CODE`, `TRUST_REMOTE_CODE_BOOL`, and `ALLOW_REMOTE_CODE`
-only request remote code. The request fails unless
-`INVARLOCK_ALLOW_REMOTE_CODE=1` is also present or `--allow-remote-code` is used.
+`INVARLOCK_ALLOW_REMOTE_CODE` is the only environment gate for remote model
+code execution. Use `INVARLOCK_ALLOW_REMOTE_CODE=1` or `--allow-remote-code`
+when remote code is required.
 
 ### Evaluation & pairing
 

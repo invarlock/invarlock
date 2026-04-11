@@ -2,12 +2,26 @@ name: repo-hygiene
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [ main, staging/next ]
 
 permissions:
   contents: read
 
 jobs:
+  lockfile-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+      - name: Set up uv
+        uses: astral-sh/setup-uv@681c641aba71e4a1c380be3ab5e12ad51f415867
+        with:
+          version: "0.10.10"
+      - name: Check uv.lock sync
+        run: make lock-sync
+
   no-generated-artifacts:
     runs-on: ubuntu-latest
     steps:
@@ -20,7 +34,7 @@ jobs:
           set -euo pipefail
           base="${{ github.event.pull_request.base.sha }}"
           head="${{ github.sha }}"
-          files="$(git diff --name-only --diff-filter=AM "$base" "$head")"
+          files="$(git diff --name-only --diff-filter=ACMR "$base" "$head")"
           if echo "$files" | grep -E '^(site/|node_modules/|dist/|build/|reports_report/|reports_.*/|runs/)' ; then
             echo "❌ Generated artifacts detected in the PR diff."; exit 1;
           else
@@ -58,5 +72,5 @@ jobs:
             if [ "$sz" -gt "$threshold" ]; then
               echo "❌ $f is ${sz} bytes (>10MB)"; rc=1
             fi
-          done < <(git diff --name-only --diff-filter=AM "$base" "$head")
+          done < <(git diff --name-only --diff-filter=ACMR "$base" "$head")
           exit $rc

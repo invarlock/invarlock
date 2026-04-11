@@ -1,0 +1,12 @@
+{
+  "owner": "security-maintainers",
+  "entries": [
+    {
+      "advisory": "GHSA-4xh5-x5gv-qwph",
+      "owner": "security-maintainers",
+      "expires": "2026-05-11",
+      "tracking_issue": "https://github.com/pypa/pip/issues/13607",
+      "reason": "Temporary pip-audit exception while the installer dependency chain is being refreshed and the upstream pip issue remains under review."
+    }
+  ]
+}

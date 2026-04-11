@@ -174,11 +174,17 @@ Common patterns:
 INVARLOCK_LIGHT_IMPORT=1 INVARLOCK_DISABLE_PLUGIN_DISCOVERY=1 \
 pytest -q -m "not integration and not slow and not manual" tests
 
+# Same lane via Makefile
+make test-fast
+
 # Full suite (can be slow)
 pytest -q
 
 # Integration tests (auto‑marked via tests/integration/conftest.py)
 pytest -q tests/integration
+
+# Same integration/smoke backstop via Makefile
+make test-integration
 ```
 
 For more curated examples (including the CI subset), see `tests/README.md`.
@@ -186,8 +192,10 @@ For more curated examples (including the CI subset), see `tests/README.md`.
 ### 3.3 Coverage policy
 
 Coverage configuration lives in `pyproject.toml` under `[tool.coverage.*]`.
-Per‑file branch coverage thresholds are enforced by
-`scripts/check_coverage_thresholds.py` and the `make coverage-enforce` target.
+The canonical threshold/source-of-truth lives in
+`scripts/coverage_policy.py`; both `scripts/check_coverage_thresholds.py` and
+the Makefile coverage targets consume that shared policy. Per-file branch
+coverage thresholds are enforced by `make coverage-enforce`.
 
 Key points:
 
@@ -214,15 +222,17 @@ Key points:
   ```
 
 - **Critical surface** includes (see `THRESHOLDS`, `CORE_PREFIXES`, and
-  `CORE_FILES` in `scripts/check_coverage_thresholds.py`):
+  `CORE_FILES` in `scripts/coverage_policy.py`):
   - Core runtime: everything under `src/invarlock/core/`
     (runner, registry, contracts, auto_tuning, events, types, checkpoint, api, retry)
   - Guards: everything under `src/invarlock/guards/`
     (invariants, spectral, spectral_analysis, rmt, variance, policies)
-  - Evaluation/reporting entry points:
+  - Observability/runtime support: everything under `src/invarlock/observability/`
+    plus explicit runtime/config entry points such as
+    `src/invarlock/config.py` and `src/invarlock/adapters/auto.py`
+  - Evaluation/reporting entry points and contracts:
     `src/invarlock/eval/metrics.py`,
-    `src/invarlock/reporting/report.py`,
-    `src/invarlock/reporting/report_builder.py`,
+    `src/invarlock/reporting/report_contract.py`,
     `src/invarlock/reporting/report_types.py`,
     `src/invarlock/reporting/report_schema.py`,
     `src/invarlock/reporting/validate.py`,
@@ -230,10 +240,10 @@ Key points:
     `src/invarlock/policy_pack.py`,
   - CLI commands:
     `src/invarlock/cli/commands/run.py`,
-    `src/invarlock/cli/commands/verify.py`,
+    `src/invarlock/cli/commands/evaluate.py`,
+    `src/invarlock/cli/app.py`,
     `src/invarlock/cli/commands/policy.py`,
-    `src/invarlock/cli/verify_checks.py`,
-    `src/invarlock/cli/verify_output.py`
+    `src/invarlock/runtime_verify.py`
 
 - Split-aware enforcement uses four levels:
   - **100% branch** for lifecycle shells:
@@ -277,7 +287,7 @@ Key points:
 When you modify a file covered by thresholds, please:
 
 - Add or extend tests to keep its measured coverage at or above its enforced floor
-- Update/add entries in `scripts/check_coverage_thresholds.py` if you
+- Update/add entries in `scripts/coverage_policy.py` if you
   expand the critical surface or add new core modules
 
 If the checker reports **“no coverage data present”**, ensure the module is

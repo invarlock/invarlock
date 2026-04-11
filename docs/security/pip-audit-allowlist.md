@@ -1,14 +1,18 @@
 # pip-audit Allowlist
 
-The CI supply-chain job runs `pip-audit` with the following exception:
+The CI supply-chain jobs run `pip-audit` through
+`scripts/security/run_pip_audit.py`, which owns allowlist parsing and
+enforcement. The JSON source of truth is
+`scripts/security/pip_audit_allowlist.json`.
 
-| Vulnerability ID      | Package | Reason                                                                                               |
-| --------------------- | ------- | ---------------------------------------------------------------------------------------------------- |
-| `GHSA-4xh5-x5gv-qwph` | `pip`   | Upstream fix pending as of 2025-01; monitor for patched release and drop this ignore once available. |
+The current exception is:
+
+| Vulnerability ID      | Package | Expires      | Tracking Issue | Reason |
+| --------------------- | ------- | ------------ | -------------- | ------ |
+| `GHSA-4xh5-x5gv-qwph` | `pip`   | `2026-05-11` | [pip#13607](https://github.com/pypa/pip/issues/13607) | Temporary exception while the installer dependency chain is being refreshed and the upstream pip issue remains under review. |
 
 All other findings must be remediated prior to release. Update this table and
-the `--ignore-vuln` flag in `.github/workflows/ci.yml` whenever the allowlist
-changes.
+the JSON allowlist entry whenever the allowlist changes.
 
 ## CVE Response Process
 
@@ -44,28 +48,28 @@ Maintainer assesses exploitability:
 When adding to the allowlist:
 
 ```markdown
-| `GHSA-xxxx-xxxx-xxxx` | `package` | [Reason]; expires YYYY-MM-DD or when [condition]. |
+| `GHSA-xxxx-xxxx-xxxx` | `package` | YYYY-MM-DD | [owner/repo#123](https://github.com/owner/repo/issues/123) | [Reason] |
 ```
 
 Include:
 
 - Clear reason why it's acceptable to ignore
-- Expiry date or removal condition
-- Link to upstream tracking issue if available
+- Expiry date within 30 days
+- Link to a GitHub tracking issue
 
 ### 5. Periodic Review
 
 - Allowlist entries reviewed monthly
 - Entries removed when upstream fix is available and upgraded
-- Stale entries (> 90 days) escalated for re-triage
+- Entries beyond 30 days are rejected by the allowlist loader
 
 ### 6. Documentation
 
 For each allowlisted CVE:
 
-1. Add entry to table above with reason
-2. Update `.github/workflows/ci.yml` with `--ignore-vuln`
-3. Create tracking issue linking to upstream fix
+1. Add entry to the JSON allowlist with a reason, expiry, and tracking issue.
+2. Update the table above so the docs stay aligned with the JSON source.
+3. Use a GitHub issue link that tracks the upstream fix or the repo follow-up.
 
 ## See Also
 
