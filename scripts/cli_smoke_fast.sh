@@ -355,7 +355,7 @@ run "invarlock advanced plugins edits --help"    "$CLI advanced plugins edits --
 run "invarlock advanced plugins edits --json"    "$CLI advanced plugins edits --json"
 run "invarlock doctor --json"                    "$CLI doctor --json"
 
-# Extended: verify, evaluate/run with and without network
+# Extended: verify and evaluate with and without network
 TMP_DIR="$(mktemp -d -t invarlock_cli_smoke.XXXXXX.dir)"
 printf '%s\n' '{"verdict":"PASS","summary":{"status":"smoke"}}' >"$TMP_DIR/final_verdict.json"
 printf '%s\n' '{"commit":"smoke","branch":"staging/next"}' >"$TMP_DIR/source_repo.json"

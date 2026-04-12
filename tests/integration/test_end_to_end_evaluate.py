@@ -151,6 +151,7 @@ def test_cli_smoke_fast_uses_repo_selected_python() -> None:
     assert "unexpected_failures=${UNEXPECTED_FAILURES}" in contents
     assert "report verify --help" not in contents
     assert "command -v invarlock" not in contents
+    assert "evaluate/run" not in contents
     assert "--source sshleifer/tiny-gpt2" not in contents
     assert "--edited sshleifer/tiny-gpt2" not in contents
 
