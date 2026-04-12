@@ -86,7 +86,6 @@ Install `invarlock[hf]` only when you need `evaluate` to load Hugging Face
 models. The secure-default CLI path runs model-loading commands inside the
 runtime container and expects an OCI container engine such as `podman` or
 `docker`.
-
 In a repo checkout, build the local runtime image once with
 `make runtime-image`; InvarLock automatically prefers
 `invarlock-runtime:local` when it is present. Trusted local workflows can opt
