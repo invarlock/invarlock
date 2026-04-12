@@ -5,6 +5,17 @@ from collections.abc import Iterable
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+PUBLIC_BOUNDARY_PATTERNS = (
+    re.compile(r"\baiware\b", re.IGNORECASE),
+    re.compile(r"\bplatform repo\b", re.IGNORECASE),
+    re.compile(r"\bprivate repo\b", re.IGNORECASE),
+    re.compile(r"\binternal repo\b", re.IGNORECASE),
+    re.compile(r"\bcompanion repo\b", re.IGNORECASE),
+    re.compile(r"\bsibling repo\b", re.IGNORECASE),
+    re.compile(r"\bclosed-source\b", re.IGNORECASE),
+    re.compile(r"\bcommercial platform\b", re.IGNORECASE),
+    re.compile(r"\bproprietary platform\b", re.IGNORECASE),
+)
 
 
 def _iter_docs() -> list[Path]:
@@ -18,6 +29,15 @@ def _iter_markdown_surfaces() -> list[Path]:
     }
     surfaces.update((REPO_ROOT / "docs").rglob("*.md"))
     surfaces.update((REPO_ROOT / "configs").rglob("*.md"))
+    return sorted(path for path in surfaces if path.is_file())
+
+
+def _iter_public_boundary_surfaces() -> list[Path]:
+    surfaces = set(_iter_markdown_surfaces())
+    for suffix in ("*.yaml", "*.yml"):
+        surfaces.update((REPO_ROOT / "configs").rglob(suffix))
+    surfaces.update((REPO_ROOT / "src" / "invarlock" / "cli").rglob("*.py"))
+    surfaces.add(REPO_ROOT / "src" / "invarlock" / "core" / "report_inputs.py")
     return sorted(path for path in surfaces if path.is_file())
 
 
@@ -166,6 +186,22 @@ def test_public_docs_do_not_teach_cert_terminology_for_proof_packs() -> None:
     assert not hits, (
         "Public proof-pack docs must use report terminology instead of cert terminology: "
         + ", ".join(hits)
+    )
+
+
+def test_public_surfaces_do_not_use_repo_boundary_language() -> None:
+    hits: list[str] = []
+    for path in _iter_public_boundary_surfaces():
+        text = path.read_text(encoding="utf-8")
+        for pattern in PUBLIC_BOUNDARY_PATTERNS:
+            if pattern.search(text):
+                hits.append(
+                    f"{path.relative_to(REPO_ROOT)} -> {pattern.pattern}"
+                )
+
+    assert not hits, (
+        "Public surfaces must stay standalone and repo-agnostic: "
+        + ", ".join(sorted(hits))
     )
 
 
