@@ -183,9 +183,7 @@ def test_select_workspace_python_prefers_named_home_conda_env_over_generic_pytho
 
 def test_select_workspace_python_is_self_contained() -> None:
     text = (
-        Path(__file__).resolve().parents[2]
-        / "scripts"
-        / "select_workspace_python.sh"
+        Path(__file__).resolve().parents[2] / "scripts" / "select_workspace_python.sh"
     ).read_text(encoding="utf-8")
 
     assert "select_python.sh" not in text

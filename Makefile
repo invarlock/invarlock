@@ -316,7 +316,7 @@ model-evidence-sweep:  ## Run the maintained shipped-model evidence sweep
 	PYTHONPATH=src INVARLOCK_ALLOW_NETWORK=1 $(PYTHON) scripts/model_evidence_sweep.py $(MODEL_EVIDENCE_ARGS)
 
 runtime-image:  ## Build the local container runtime image used for secure-default execution
-	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ Docker or Podman is required."; exit 1; }
+	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ An OCI container engine (Docker or Podman) is required."; exit 1; }
 	@if $(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE) >/dev/null 2>&1; then $(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE) >/dev/null 2>&1 || true; fi
 	$(CONTAINER_ENGINE) build -f runtime/Dockerfile -t $(RUNTIME_IMAGE) .
 
@@ -324,7 +324,7 @@ runtime-image-podman: CONTAINER_ENGINE=podman
 runtime-image-podman: runtime-image  ## Build the local container runtime image with Podman
 
 runtime-image-cuda:  ## Build the local CUDA container runtime image for GPU-backed secure-default execution
-	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ Docker or Podman is required."; exit 1; }
+	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ An OCI container engine (Docker or Podman) is required."; exit 1; }
 	@if $(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE_CUDA) >/dev/null 2>&1; then $(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE_CUDA) >/dev/null 2>&1 || true; fi
 	$(CONTAINER_ENGINE) build \
 		--build-arg RUNTIME_REQUIREMENTS_AMD64=$(RUNTIME_IMAGE_CUDA_REQUIREMENTS) \
@@ -337,7 +337,7 @@ runtime-image-cuda-podman: CONTAINER_ENGINE=podman
 runtime-image-cuda-podman: runtime-image-cuda  ## Build the local CUDA container runtime image with Podman
 
 runtime-smoke:  ## Smoke the local container runtime image
-	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ Docker or Podman is required."; exit 1; }
+	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ An OCI container engine (Docker or Podman) is required."; exit 1; }
 	$(CONTAINER_ENGINE) run --rm \
 		--entrypoint python \
 		$(RUNTIME_IMAGE) \
@@ -508,9 +508,9 @@ config-check: ## Verify config includes and adapter availability
 # Run GitHub Actions workflows locally using nektos/act
 # Install: brew install act (macOS) or see https://github.com/nektos/act
 
-ci-local:  ## Run all CI workflows locally (requires Docker + act)
+ci-local:  ## Run all CI workflows locally (requires act; this helper currently assumes Docker)
 	@command -v act >/dev/null 2>&1 || { echo "❌ 'act' not found. Install: brew install act"; exit 1; }
-	@command -v docker >/dev/null 2>&1 || { echo "❌ Docker not running. Start Docker Desktop first."; exit 1; }
+	@command -v docker >/dev/null 2>&1 || { echo "❌ Docker is required for this local act helper. Start Docker Desktop first."; exit 1; }
 	act push --job tests-docs --env INVARLOCK_LIGHT_IMPORT=1 --env INVARLOCK_DISABLE_PLUGIN_DISCOVERY=1
 
 ci-local-list:  ## List available workflows and jobs

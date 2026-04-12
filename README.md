@@ -84,8 +84,8 @@ The minimal install (`pip install invarlock`) is enough for `doctor`,
 `verify`, `report html`, and proof-pack verification from an installed wheel.
 Install `invarlock[hf]` only when you need `evaluate` to load Hugging Face
 models. The secure-default CLI path runs model-loading commands inside the
-runtime container and expects an OCI container engine such as `docker` or
-`podman`.
+runtime container and expects an OCI container engine such as `podman` or
+`docker`.
 
 In a repo checkout, build the local runtime image once with
 `make runtime-image`; InvarLock automatically prefers

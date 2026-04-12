@@ -102,8 +102,9 @@ directly. For trusted local host execution in these repo-only wrappers, set
 `run_pack.sh` or `run_suite.sh`. Installed-wheel/public workflows should use
 `invarlock evaluate --assurance trusted-local` instead. Otherwise, the underlying
 model-loading commands use the secure-default runtime container path and expect
-`docker` or `podman`, plus a locally built `invarlock-runtime:local` image from
-`make runtime-image`. If both engines are installed, set
+an OCI container engine such as `podman` or `docker`, plus a locally built
+`invarlock-runtime:local` image from `make runtime-image`. If both engines are
+installed, set
 `INVARLOCK_CONTAINER_ENGINE=podman` to force Podman.
 
 Validated secure-default parity contract for proof-pack wrappers:
