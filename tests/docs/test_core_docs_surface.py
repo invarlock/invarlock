@@ -45,6 +45,21 @@ def test_core_docs_do_not_promote_removed_top_level_commands():
             assert needle not in text, f"{needle} still promoted in {rel_path}"
 
 
+def test_public_compare_examples_use_baseline_subject_terms() -> None:
+    surfaces = [
+        "README.md",
+        "docs/user-guide/compare-and-evaluate.md",
+        "docs/user-guide/quickstart.md",
+        "docs/reference/cli.md",
+        "configs/presets/causal_lm/hf_text_c4_128.yaml",
+    ]
+
+    for rel_path in surfaces:
+        text = _read(rel_path)
+        assert "--source " not in text, f"--source still present in {rel_path}"
+        assert "--edited " not in text, f"--edited still present in {rel_path}"
+
+
 def test_support_surfaces_use_trusted_local_assurance_for_public_evaluate_examples():
     surfaces = [
         "CONTRIBUTING.md",

@@ -39,7 +39,7 @@ the canonical guard chain, policy digest, and measurement contract.
 │                                                                             │
 │  ┌──────────┐    ┌────────────────────────────────┐    ┌──────────────┐     │
 │  │  Config  │───▶│            CLI LAYER           │───▶│    report    │     │
-│  │  (YAML)  │    │   evaluate | run | verify ...  │    │    (JSON)    │     │
+│  │  (YAML)  │    │ evaluate | verify | report ... │    │    (JSON)    │     │
 │  └──────────┘    └───────────────┬────────────────┘    └──────────────┘     │
 │                                  │                                          │
 │  ┌──────────┐    ┌───────────────▼────────────────┐    ┌──────────────┐     │
@@ -63,7 +63,7 @@ InvarLock follows a layered architecture with clear separation of concerns:
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                            CLI SHELL LAYER                                  │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐           │
-│  │ evaluate │ │   run    │ │  verify  │ │  report  │ │  doctor  │           │
+│  │ evaluate │ │  verify  │ │  report  │ │  doctor  │ │ advanced │           │
 │  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘           │
 │       │            │            │            │            │                 │
 ├───────┴────────────┴────────────┴────────────┴────────────┴─────────────────┤
@@ -341,9 +341,9 @@ tests. The intended invariants are:
   exports.
 - No `rmt_legacy` references in production source. RMT ownership lives in
   `rmt.py`, `rmt_analysis.py`, `rmt_detection.py`, and `rmt_math.py`.
-- No dependency-map orchestration for `run`. The command shell must not rebuild
-  giant `deps` dictionaries or inject `run_impl` callables to recreate removed
-  indirection.
+- No dependency-map orchestration in command shells. Public command owners must
+  stay thin and must not rebuild giant `deps` dictionaries or inject callables
+  to recreate removed indirection.
 - No compatibility-only command signatures once a canonical owner contract
   exists. Example: lens-metric calculation takes a required `MetricsConfig`
   instead of deprecated per-call overrides.

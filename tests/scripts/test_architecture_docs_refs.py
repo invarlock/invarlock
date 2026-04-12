@@ -31,11 +31,13 @@ def test_architecture_doc_tracks_shell_core_redesign() -> None:
         "## Architecture Guardrails",
         "No lazy exports",
         "No `rmt_legacy` references in production source.",
-        "No dependency-map orchestration for `run`.",
+        "No dependency-map orchestration in command shells.",
         "No CLI imports inside owner layers.",
     )
 
     missing = [snippet for snippet in required_snippets if snippet not in text]
     assert not missing, "\n".join(missing)
+    assert "evaluate | run | verify" not in text
+    assert "│  │ evaluate │ │   run    │" not in text
     assert "report_builder.py" not in text
     assert "report_make_support.py" not in text

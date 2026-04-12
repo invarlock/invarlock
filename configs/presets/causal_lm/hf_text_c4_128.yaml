@@ -12,8 +12,8 @@
 # Example smoke test:
 #   INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_CI_PREVIEW=16 INVARLOCK_CI_FINAL=16 \
 #   invarlock evaluate \
-#     --source sshleifer/tiny-gpt2 \
-#     --edited sshleifer/tiny-gpt2 \
+#     --baseline sshleifer/tiny-gpt2 \
+#     --subject sshleifer/tiny-gpt2 \
 #     --preset configs/presets/causal_lm/hf_text_c4_128.yaml \
 #     --profile ci \
 #     --tier balanced \
