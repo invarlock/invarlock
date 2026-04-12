@@ -52,7 +52,10 @@ def test_gpt2_smoke_campaign_script_is_executable() -> None:
         "run_gpt2_smoke_campaign.sh should be executable"
     )
     contents = script_path.read_text(encoding="utf-8")
-    assert 'PYTHON_BIN="$(bash "$REPO_ROOT/scripts/select_workspace_python.sh")"' in contents
+    assert (
+        'PYTHON_BIN="$(bash "$REPO_ROOT/scripts/select_workspace_python.sh")"'
+        in contents
+    )
     assert "ensure_writable_hf_cache" in contents
     assert "INVARLOCK_SMOKE_HOST_HF_CACHE_ROOT" in contents
     assert 'CLI=("$PYTHON_BIN" -m invarlock)' in contents
@@ -78,7 +81,10 @@ def test_tiny_attested_smoke_campaign_script_is_executable() -> None:
         "run_tiny_attested_smoke.sh should be executable"
     )
     contents = script_path.read_text(encoding="utf-8")
-    assert 'PYTHON_BIN="$(bash "$REPO_ROOT/scripts/select_workspace_python.sh")"' in contents
+    assert (
+        'PYTHON_BIN="$(bash "$REPO_ROOT/scripts/select_workspace_python.sh")"'
+        in contents
+    )
     assert "kind: local_jsonl" in contents
     assert "sshleifer/tiny-gpt2" in contents
     assert "tiny_relax: true" in contents

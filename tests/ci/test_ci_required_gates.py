@@ -23,9 +23,10 @@ def test_ci_adds_actionlint_and_packaging_smoke_gates() -> None:
     tests_docs = workflow["jobs"]["tests-docs"]
     docs_steps = tests_docs["steps"]
     actionlint_step = _find_step_by_name(docs_steps, "Run actionlint")
-    assert "go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7" in actionlint_step[
-        "run"
-    ]
+    assert (
+        "go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7"
+        in actionlint_step["run"]
+    )
     assert "make actionlint" in actionlint_step["run"]
 
     min_py312 = workflow["jobs"]["tests-min-py312"]

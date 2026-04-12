@@ -601,7 +601,9 @@ def test_release_workflow_builds_and_bundles_release_assets():
     )
     assert sigstore_steps[1]["with"]["upload-signing-artifacts"] is False
 
-    public_bundle_step = _find_step_by_name(bundle_steps, "Create public contract bundle")
+    public_bundle_step = _find_step_by_name(
+        bundle_steps, "Create public contract bundle"
+    )
     assert public_bundle_step["env"]["INVARLOCK_RELEASE_TAG"] == (
         "${{ needs.resolve_release_ref.outputs.release_tag }}"
     )
@@ -726,6 +728,7 @@ def test_ci_pr_assurance_gates_are_required_jobs() -> None:
 
     typed_step = _find_step_by_name(typed_steps, "Run typed-surface mypy")
     assert typed_step["run"] == "make mypy-typed-surface"
+
 
 def test_scorecard_workflow_is_configured():
     workflow_path = Path(".github/workflows/scorecards.yml")

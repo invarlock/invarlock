@@ -45,8 +45,7 @@ def load_validation_allowlist_strict() -> set[str]:
         data = load_json_contract("validation_keys.json")
     except (FileNotFoundError, OSError, RuntimeError, TypeError, ValueError) as exc:
         raise ValidationAllowlistContractError(
-            "Failed to load validation key contract from "
-            "contracts/validation_keys.json"
+            "Failed to load validation key contract from contracts/validation_keys.json"
         ) from exc
     return _normalize_validation_allowlist_payload(data)
 

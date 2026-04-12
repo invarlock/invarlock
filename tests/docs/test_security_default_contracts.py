@@ -195,9 +195,7 @@ def test_public_surfaces_do_not_use_repo_boundary_language() -> None:
         text = path.read_text(encoding="utf-8")
         for pattern in PUBLIC_BOUNDARY_PATTERNS:
             if pattern.search(text):
-                hits.append(
-                    f"{path.relative_to(REPO_ROOT)} -> {pattern.pattern}"
-                )
+                hits.append(f"{path.relative_to(REPO_ROOT)} -> {pattern.pattern}")
 
     assert not hits, (
         "Public surfaces must stay standalone and repo-agnostic: "

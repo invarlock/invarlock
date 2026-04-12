@@ -9,8 +9,8 @@ import gzip
 import hashlib
 import json
 import shutil
-import tempfile
 import tarfile
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -78,14 +78,18 @@ def _read_runtime_files(runtime_dir: Path) -> tuple[Path, list[Path]]:
 
     tiers_path = runtime_dir / "tiers.yaml"
     profile_dir = runtime_dir / "profiles"
-    profile_files = sorted(
-        path for path in profile_dir.glob("*.yaml") if path.is_file()
-    ) if profile_dir.is_dir() else []
+    profile_files = (
+        sorted(path for path in profile_dir.glob("*.yaml") if path.is_file())
+        if profile_dir.is_dir()
+        else []
+    )
 
     if not tiers_path.is_file():
         raise SystemExit(f"ERROR: runtime tiers file not found: {tiers_path}")
     if not profile_files:
-        raise SystemExit("ERROR: public contract bundle requires at least one runtime profile")
+        raise SystemExit(
+            "ERROR: public contract bundle requires at least one runtime profile"
+        )
 
     return tiers_path, profile_files
 
@@ -130,7 +134,9 @@ def _build_readme(version: str, tag: str, repo: str) -> str:
 def _build_tarball(bundle_root: Path, tarball_path: Path) -> None:
     files = sorted(path for path in bundle_root.rglob("*") if path.is_file())
     with tarball_path.open("wb") as raw_file:
-        with gzip.GzipFile(filename="", mode="wb", fileobj=raw_file, mtime=0) as gz_file:
+        with gzip.GzipFile(
+            filename="", mode="wb", fileobj=raw_file, mtime=0
+        ) as gz_file:
             with tarfile.open(fileobj=gz_file, mode="w") as archive:
                 for path in files:
                     arcname = path.relative_to(bundle_root.parent).as_posix()
@@ -196,7 +202,9 @@ def main(argv: list[str] | None = None) -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
     output_dir = output_dir.resolve()
 
-    staging_dir = Path(tempfile.mkdtemp(prefix=f".{bundle_name}.tmp.", dir=str(output_dir)))
+    staging_dir = Path(
+        tempfile.mkdtemp(prefix=f".{bundle_name}.tmp.", dir=str(output_dir))
+    )
     try:
         bundle_root = staging_dir / bundle_name
         bundle_root.mkdir(parents=True, exist_ok=True)
@@ -268,9 +276,7 @@ def main(argv: list[str] | None = None) -> int:
                 "tag": tag,
                 "repo": repo,
                 "commit": commit,
-                "generated_at": dt.datetime.now(UTC)
-                .isoformat()
-                .replace("+00:00", "Z"),
+                "generated_at": dt.datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             },
             "contract_catalog": next(
                 item for item in inventory if item["path"] == "contract_catalog.json"

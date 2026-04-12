@@ -11,8 +11,9 @@
 | **Next step** | [Compare & evaluate](compare-and-evaluate.md) for production use. |
 
 This guide focuses on the public core CLI: `evaluate`, `verify`, `report
-generate`, `report explain`, and `report html`. The minimal install is enough
-for verification, report rendering, and proof-pack inspection. Add
+generate`, `report explain`, and `report html`. The default path produces a
+machine-readable evaluation report. The minimal install is enough for
+verification, report rendering, and proof-pack inspection. Add
 `invarlock[hf]` only when you want the evaluate path to load Hugging Face
 models.
 
