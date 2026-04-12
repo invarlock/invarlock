@@ -180,6 +180,14 @@ def test_makefile_exposes_lockfile_sync_target() -> None:
     assert "UV_NO_CACHE=1 uv lock --check" in text
 
 
+def test_makefile_prefers_workspace_python_selector_for_local_targets() -> None:
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    text = makefile.read_text(encoding="utf-8")
+
+    assert "PYTHON ?= $(shell bash scripts/select_workspace_python.sh)" in text
+    assert "PYTHON ?= $(shell bash scripts/select_python.sh)" not in text
+
+
 def test_coverage_include_does_not_embed_space_prefixed_cli_patterns() -> None:
     policy = _load_coverage_policy()
     include = policy.coverage_include()
