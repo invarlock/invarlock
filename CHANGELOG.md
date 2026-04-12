@@ -48,9 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed accuracy-confidence labeling so accuracy metrics evaluate confidence
   width in true percentage points, while non-accuracy ratio metrics keep their
   ratio-width behavior.
-- Fixed the default local `make` interpreter path so repo targets like
-  `docs-check` prefer the workspace `.venv` before generic system Python
-  fallback.
+- Fixed the repo-owned Python selector so local `make`, smoke, and packaging
+  paths all resolve through the workspace-aware selector, with the workspace
+  `.venv` preferred before generic system Python fallback.
 - Fixed metric-kind handling to fail closed across config resolution,
   multimodal metric propagation, report validation, and verification; unknown
   or stale aliases no longer bypass accuracy-specific checks.

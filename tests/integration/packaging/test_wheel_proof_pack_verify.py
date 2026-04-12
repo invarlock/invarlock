@@ -27,7 +27,7 @@ def _select_python(repo_root: Path) -> Path:
     if current.exists() and sys.version_info >= (3, 12):
         return current
     proc = subprocess.run(
-        ["/bin/bash", str(repo_root / "scripts" / "select_python.sh")],
+        ["/bin/bash", str(repo_root / "scripts" / "select_workspace_python.sh")],
         capture_output=True,
         text=True,
         check=False,
