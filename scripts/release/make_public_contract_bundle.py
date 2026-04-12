@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import datetime as dt
 import gzip
 import hashlib
 import json
@@ -13,8 +12,6 @@ import tarfile
 import tempfile
 from pathlib import Path
 from typing import Any
-
-UTC = getattr(dt, "UTC", dt.timezone.utc)  # noqa: UP017
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONTRACTS_DIR = REPO_ROOT / "contracts"
@@ -276,7 +273,6 @@ def main(argv: list[str] | None = None) -> int:
                 "tag": tag,
                 "repo": repo,
                 "commit": commit,
-                "generated_at": dt.datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             },
             "contract_catalog": next(
                 item for item in inventory if item["path"] == "contract_catalog.json"

@@ -62,7 +62,6 @@ def _create_venv(tmp_path: Path, python_exe: Path) -> tuple[Path, Path, Path]:
             str(python_exe),
             "-m",
             "venv",
-            "--system-site-packages",
             str(env_dir),
         ],
         check=True,
@@ -73,20 +72,6 @@ def _create_venv(tmp_path: Path, python_exe: Path) -> tuple[Path, Path, Path]:
     else:
         venv_python = env_dir / "bin" / "python"
         cli_exe = env_dir / "bin" / "invarlock"
-    source_sites = _site_packages(python_exe)
-    target_sites = _site_packages(venv_python)
-    if target_sites:
-        target_site = target_sites[0]
-        extra_paths = [
-            str(path)
-            for path in source_sites
-            if path.exists() and path not in target_sites
-        ]
-        if extra_paths:
-            (target_site / "_invarlock_source_site_packages.pth").write_text(
-                "\n".join(extra_paths) + "\n",
-                encoding="utf-8",
-            )
     return env_dir, venv_python, cli_exe
 
 
@@ -108,18 +93,46 @@ def _run(
     )
 
 
-def _site_packages(python_exe: Path) -> list[Path]:
+def _python_minor_version(python_exe: Path) -> tuple[int, int]:
     proc = subprocess.run(
         [
             str(python_exe),
             "-c",
-            "import json, site; print(json.dumps(site.getsitepackages()))",
+            "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')",
         ],
         capture_output=True,
         text=True,
         check=True,
     )
-    return [Path(entry).resolve() for entry in json.loads(proc.stdout)]
+    major, minor = proc.stdout.strip().split(".", maxsplit=1)
+    return int(major), int(minor)
+
+
+def _install_core_dependencies(repo_root: Path, python_exe: Path) -> None:
+    version = _python_minor_version(python_exe)
+    requirements = (
+        repo_root
+        / "requirements"
+        / "workflows"
+        / (f"core-py{version[0]}{version[1]}.txt")
+    )
+    if not requirements.is_file():
+        pytest.skip(
+            f"Missing pinned core requirements for Python {version[0]}.{version[1]}"
+        )
+    subprocess.run(
+        [
+            str(python_exe),
+            "-m",
+            "pip",
+            "install",
+            "--require-hashes",
+            "-r",
+            str(requirements),
+        ],
+        check=True,
+        cwd=repo_root,
+    )
 
 
 def _sha256_file(path: Path) -> str:
@@ -310,6 +323,7 @@ def test_wheel_install_can_verify_proof_pack_outside_repo_tree(tmp_path: Path) -
     selected_python = _select_python(repo_root)
     wheel = _build_wheel(tmp_path / "dist", selected_python)
     env_dir, python_exe, cli_exe = _create_venv(tmp_path, selected_python)
+    _install_core_dependencies(repo_root, python_exe)
 
     install = _run(
         python_exe,
@@ -341,11 +355,22 @@ def test_wheel_install_can_verify_proof_pack_outside_repo_tree(tmp_path: Path) -
 
     cli_app_import = _run(
         python_exe,
-        ["-c", "import invarlock.cli.app"],
+        [
+            "-c",
+            (
+                "import json; "
+                "import invarlock.cli.app; "
+                "import invarlock.public_contracts as public_contracts; "
+                "print(json.dumps(sorted(public_contracts.contract_catalog().keys())))"
+            ),
+        ],
         cwd=tmp_path,
         env={"INVARLOCK_LIGHT_IMPORT": "1"},
     )
     assert cli_app_import.returncode == 0, cli_app_import.stdout + cli_app_import.stderr
+    exported_contracts = json.loads(cli_app_import.stdout.strip())
+    assert "metric_kinds" in exported_contracts
+    assert "support_matrix" in exported_contracts
 
     pack_dir = _build_proof_pack(tmp_path / "pack")
 

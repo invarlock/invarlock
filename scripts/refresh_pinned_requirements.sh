@@ -44,10 +44,16 @@ compile_pyproject "${WORKFLOW_DIR}/ci-hf-py312.txt" \
   --extra hf \
   --extra ci
 
+compile_pyproject "${WORKFLOW_DIR}/core-py312.txt" \
+  --python-version 3.12
+
 compile_pyproject "${WORKFLOW_DIR}/ci-hf-py313.txt" \
   --python-version 3.13 \
   --extra hf \
   --extra ci
+
+compile_pyproject "${WORKFLOW_DIR}/core-py313.txt" \
+  --python-version 3.13
 
 compile_pyproject "${WORKFLOW_DIR}/docs-ci-py313.txt" \
   --python-version 3.13 \

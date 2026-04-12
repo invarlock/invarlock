@@ -39,5 +39,9 @@ def test_architecture_doc_tracks_shell_core_redesign() -> None:
     assert not missing, "\n".join(missing)
     assert "evaluate | run | verify" not in text
     assert "│  │ evaluate │ │   run    │" not in text
+    assert "| `run` |" not in text
+    assert "| `plugins` |" not in text
+    assert "| `advanced` |" in text
+    assert "| `version` |" in text
     assert "report_builder.py" not in text
     assert "report_make_support.py" not in text

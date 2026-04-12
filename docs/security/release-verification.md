@@ -53,7 +53,9 @@ It contains:
 
 The manifest uses schema `invarlock/public-contract-bundle-v1`. It records the
 release version, tag, repository, commit SHA, and sha256 inventory entries for
-the extracted files.
+the extracted files. For identical inputs, the generated tarball is
+reproducible because archive timestamps are fixed and the manifest omits
+build-clock fields.
 
 ## Recommended verification flow
 

@@ -118,11 +118,11 @@ policy owners.
 | Command | Purpose | Primary Output |
 | --- | --- | --- |
 | `evaluate` | Compare baseline vs subject with pinned windows | report JSON + MD |
-| `run` | Single-model evaluation pipeline | Report JSON + Events JSONL |
 | `verify` | Validate report against schema and pairing | Exit code + messages |
 | `report` | Render/compare reports and reports | MD/HTML/JSON artifacts |
 | `doctor` | Environment diagnostics | Health check output |
-| `plugins` | List adapters, guards, edits | Plugin inventory |
+| `advanced` | Maintenance workflows such as proof packs, policy packs, plugins, and calibration | Exit code + workflow-specific artifacts |
+| `version` | Emit package and schema version information | Version string |
 
 ### Core Policy / Contracts (`src/invarlock/core/`, `src/invarlock/reporting/`)
 

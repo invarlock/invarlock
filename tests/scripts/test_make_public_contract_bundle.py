@@ -102,6 +102,7 @@ def test_make_public_contract_bundle_packages_contracts_and_runtime_data(
     assert manifest["bundle"]["tag"] == "v0.3.12"
     assert manifest["bundle"]["repo"] == "invarlock/invarlock"
     assert manifest["bundle"]["commit"] == "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+    assert "generated_at" not in manifest["bundle"]
     assert manifest["contract_catalog"]["path"] == "contract_catalog.json"
     assert manifest["counts"] == {
         "contracts": 3,
@@ -166,3 +167,34 @@ def test_make_public_contract_bundle_requires_contracts(tmp_path: Path) -> None:
 
     assert proc.returncode != 0
     assert "requires at least one contract" in (proc.stderr or proc.stdout)
+
+
+def test_make_public_contract_bundle_is_reproducible(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "release" / "make_public_contract_bundle.py"
+
+    contracts_dir = tmp_path / "contracts"
+    runtime_dir = tmp_path / "runtime"
+    output_one = tmp_path / "out-one"
+    output_two = tmp_path / "out-two"
+
+    _write(
+        contracts_dir / "support_matrix.json",
+        json.dumps({"format_version": "support-matrix-v1", "lanes": []}),
+    )
+    _write(
+        contracts_dir / "metric_kinds.json",
+        json.dumps(["ppl", "xent"]),
+    )
+    _write(runtime_dir / "tiers.yaml", "balanced: {}\n")
+    _write(runtime_dir / "profiles" / "ci.yaml", "profile: ci\n")
+
+    first = _run_bundle(script, contracts_dir, runtime_dir, output_one)
+    second = _run_bundle(script, contracts_dir, runtime_dir, output_two)
+
+    assert first.returncode == 0, first.stderr or first.stdout
+    assert second.returncode == 0, second.stderr or second.stdout
+
+    tarball_one = output_one / "invarlock-0.3.12-public-contract-bundle.tar.gz"
+    tarball_two = output_two / "invarlock-0.3.12-public-contract-bundle.tar.gz"
+    assert tarball_one.read_bytes() == tarball_two.read_bytes()
