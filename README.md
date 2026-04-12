@@ -80,15 +80,20 @@ in CI.
 Colab (CPU-friendly):
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_quickstart_cpu.ipynb)
 
-The secure-default CLI path runs model-loading commands inside the runtime
-container and expects an OCI container engine such as `docker` or `podman`.
+The minimal install (`pip install invarlock`) is enough for `doctor`,
+`verify`, `report html`, and proof-pack verification from an installed wheel.
+Install `invarlock[hf]` only when you need `evaluate` to load Hugging Face
+models. The secure-default CLI path runs model-loading commands inside the
+runtime container and expects an OCI container engine such as `docker` or
+`podman`.
+
 In a repo checkout, build the local runtime image once with
 `make runtime-image`; InvarLock automatically prefers
 `invarlock-runtime:local` when it is present. Trusted local workflows can opt
-into host execution explicitly with `--assurance trusted-local` on `invarlock evaluate`, but
-the attested verification step below expects container execution. The
-quickstart block below assumes a repo checkout; do not skip
-`make runtime-image` if you want the attested container path.
+into host execution explicitly with `--assurance trusted-local` on
+`invarlock evaluate`, but the attested verification step below expects
+container execution. The quickstart block below assumes a repo checkout; do
+not skip `make runtime-image` if you want the attested container path.
 
 ```bash
 # Repo-checkout quickstart for the attested container path
@@ -165,7 +170,8 @@ Proof packs bundle reports + verification metadata into a distributable artifact
 
 Note: `configs/` and most `scripts/` remain repo resources and are not included in
 wheels. Installed wheels include the public contracts and the
-`invarlock advanced proof-pack verify` verifier.
+`invarlock advanced proof-pack verify` verifier, so downstream users can check
+bundles without cloning the repository.
 
 ## Installation
 
@@ -178,6 +184,11 @@ pip install "invarlock[hf]"
 ```
 
 Optional extras: `invarlock[probes]`, `invarlock[gpu]`, `invarlock[awq,gptq]`. Full setup: <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/getting-started.md>.
+
+The minimal install covers the core verification and reporting flows. Add
+`invarlock[hf]` only for model-loading evaluate runs, and use the installed
+wheel's proof-pack verifier when you need to inspect a bundle without cloning
+the repository.
 
 ## Documentation
 

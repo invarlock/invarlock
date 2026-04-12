@@ -7,14 +7,16 @@
 | **Purpose** | Install InvarLock and complete the core evaluate → verify → report flow. |
 | **Audience** | New users setting up their first local or CI evaluation. |
 | **Python** | 3.12+ recommended (CI uses 3.13). |
-| **Install** | `pip install "invarlock[hf]"` for Hugging Face-backed evaluation. |
+| **Install** | `pip install invarlock` for verification/reporting; add `invarlock[hf]` only for Hugging Face-backed evaluation. |
 | **Next step** | [Quickstart](quickstart.md) for copy-paste commands. |
 
 This guide covers installation, environment setup, and the smallest useful
 InvarLock workflow: compare a baseline against a subject, verify the attested
 report, and render HTML for review. The same top-level loop also underpins the
 included image-text path when you use the explicit multimodal preset and
-provider configuration.
+provider configuration. The minimal install is enough for `doctor`,
+`verify`, `report generate`, `report explain`, and `report html`; use
+`invarlock[hf]` only when you need `evaluate` to load Hugging Face models.
 
 ## Install InvarLock
 
@@ -97,6 +99,11 @@ invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/eva
 These commands validate the paired math, schema, and runtime attestation, then
 render a shareable HTML artifact from the same report.
 
+`report generate` and `report explain` take canonical `report.json` inputs,
+while `report html` takes canonical `evaluation.report.json`. Pass exact file
+paths for deterministic results; directory inputs are command-specific and
+ambiguous directories are rejected.
+
 ## Execution Modes
 
 - `evaluate` defaults to the runtime container (`--assurance attested`).
@@ -123,6 +130,13 @@ surfaces live under `invarlock advanced`:
 - `invarlock advanced policy ...`
 - `invarlock advanced plugins ...`
 - `invarlock advanced calibrate ...`
+
+Installed wheels also include the proof-pack verifier, so downstream users can
+inspect bundles without cloning the repository:
+
+```bash
+invarlock advanced proof-pack verify <pack> --strict
+```
 
 Optional adapter and backend installs use Python extras such as
 `pip install "invarlock[awq,gptq]"`; they are not managed through CLI
