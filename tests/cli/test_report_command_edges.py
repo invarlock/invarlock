@@ -688,6 +688,21 @@ def test_report_validate_rejects_noncanonical_directory(monkeypatch, tmp_path):
     assert exc.value.exit_code == 2
 
 
+def test_report_validate_rejects_ambiguous_directory(monkeypatch, tmp_path):
+    report_dir = tmp_path / "report-dir"
+    report_dir.mkdir()
+    (report_dir / "report.json").write_text("{}", encoding="utf-8")
+    (report_dir / "evaluation.report.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(
+        report_mod, "console", type("C", (), {"print": lambda *_: None})()
+    )
+
+    with pytest.raises(typer.Exit) as exc:
+        report_mod.report_validate(report=str(report_dir))
+
+    assert exc.value.exit_code == 2
+
+
 def test_report_validate_schema_failure(monkeypatch, tmp_path):
     report = tmp_path / "evaluation.report.json"
     report.write_text(
@@ -880,6 +895,31 @@ def test_report_explain_rejects_noncanonical_directory_inputs(
     assert exc.value.exit_code == 2
 
 
+@pytest.mark.parametrize("invalid_slot", ["report", "baseline"])
+def test_report_explain_rejects_ambiguous_directory_inputs(
+    monkeypatch, tmp_path, invalid_slot
+):
+    report_dir = tmp_path / "report-dir"
+    report_dir.mkdir()
+    (report_dir / "report.json").write_text("{}", encoding="utf-8")
+    baseline_dir = tmp_path / "baseline-dir"
+    baseline_dir.mkdir()
+    (baseline_dir / "report.json").write_text("{}", encoding="utf-8")
+    invalid_dir = report_dir if invalid_slot == "report" else baseline_dir
+    (invalid_dir / "evaluation.report.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(
+        report_mod, "console", type("C", (), {"print": lambda *_: None})()
+    )
+
+    with pytest.raises(typer.Exit) as exc:
+        report_mod.report_explain(
+            subject_report=str(report_dir),
+            baseline_report=str(baseline_dir),
+        )
+
+    assert exc.value.exit_code == 2
+
+
 def test_report_html_resolves_canonical_directory_input(monkeypatch, tmp_path):
     report_dir = tmp_path / "report-dir"
     report_dir.mkdir()
@@ -904,6 +944,21 @@ def test_report_html_rejects_noncanonical_directory(monkeypatch, tmp_path):
     report_dir = tmp_path / "report-dir"
     report_dir.mkdir()
     (report_dir / "my_report.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(
+        report_mod, "console", type("C", (), {"print": lambda *_: None})()
+    )
+
+    with pytest.raises(typer.Exit) as exc:
+        report_mod.report_html(input=str(report_dir), output="out.html")
+
+    assert exc.value.exit_code == 2
+
+
+def test_report_html_rejects_ambiguous_directory(monkeypatch, tmp_path):
+    report_dir = tmp_path / "report-dir"
+    report_dir.mkdir()
+    (report_dir / "report.json").write_text("{}", encoding="utf-8")
+    (report_dir / "evaluation.report.json").write_text("{}", encoding="utf-8")
     monkeypatch.setattr(
         report_mod, "console", type("C", (), {"print": lambda *_: None})()
     )

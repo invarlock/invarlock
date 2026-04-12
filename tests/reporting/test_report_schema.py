@@ -109,13 +109,13 @@ def test_validate_report_does_not_leak_allowlist_mutations_between_calls(
 
     monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda *_args: True)
     monkeypatch.setattr(
-        allowlist_mod, "load_validation_allowlist", lambda: {"custom_flag"}
+        allowlist_mod, "load_validation_allowlist_strict", lambda: {"custom_flag"}
     )
     assert schema_mod.validate_report(custom) is True
 
     monkeypatch.setattr(
         allowlist_mod,
-        "load_validation_allowlist",
+        "load_validation_allowlist_strict",
         lambda: {"primary_metric_acceptable"},
     )
     assert schema_mod.validate_report(standard) is True
@@ -149,11 +149,13 @@ def test_validate_report_allowlist_error(monkeypatch):
     }
     monkeypatch.setattr(
         allowlist_mod,
-        "load_validation_allowlist",
-        lambda: (_ for _ in ()).throw(RuntimeError("boom")),
+        "load_validation_allowlist_strict",
+        lambda: (_ for _ in ()).throw(
+            allowlist_mod.ValidationAllowlistContractError("boom")
+        ),
     )
     monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda _: True)
-    assert schema_mod.validate_report(cert) is True
+    assert schema_mod.validate_report(cert) is False
 
 
 def test_validate_report_handles_missing_validation_schema(monkeypatch):
@@ -164,7 +166,7 @@ def test_validate_report_handles_missing_validation_schema(monkeypatch):
     }
     monkeypatch.setitem(schema_mod.REPORT_JSON_SCHEMA, "properties", None)
     monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda _: True)
-    assert schema_mod.validate_report(cert) is True
+    assert schema_mod.validate_report(cert) is False
 
 
 def test_validate_report_handles_non_mapping_validation_spec(monkeypatch):
@@ -177,7 +179,7 @@ def test_validate_report_handles_non_mapping_validation_spec(monkeypatch):
     try:
         schema_mod.REPORT_JSON_SCHEMA["properties"] = {"validation": []}
         monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda _: True)
-        assert schema_mod.validate_report(cert) is True
+        assert schema_mod.validate_report(cert) is False
     finally:
         schema_mod.REPORT_JSON_SCHEMA["properties"] = original
 
@@ -201,6 +203,28 @@ def test_validate_report_rejects_unknown_primary_metric_kind(monkeypatch):
     }
 
     monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda *_args: True)
+    assert schema_mod.validate_report(cert) is False
+
+
+def test_validate_report_metric_kind_contract_error_fails_closed(
+    monkeypatch,
+) -> None:
+    cert = {
+        "schema_version": schema_mod.REPORT_SCHEMA_VERSION,
+        "run_id": "run-kind-contract",
+        "primary_metric": {"kind": "accuracy", "final": 1.0},
+    }
+
+    monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda *_args: True)
+    monkeypatch.setattr(
+        schema_mod,
+        "normalize_metric_kind",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            metric_kind_mod.MetricKindContractError("boom")
+        ),
+        raising=False,
+    )
+
     assert schema_mod.validate_report(cert) is False
 
 

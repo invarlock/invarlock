@@ -4,6 +4,11 @@ from typing import Any
 
 from invarlock.public_contracts import load_json_contract
 
+
+class ValidationAllowlistContractError(RuntimeError):
+    """Raised when the public validation allow-list contract cannot be trusted."""
+
+
 DEFAULT_VALIDATION_ALLOWLIST = {
     "primary_metric_acceptable",
     "primary_metric_tail_acceptable",
@@ -22,17 +27,40 @@ def _load_validation_allowlist_default() -> set[str]:
     return set(DEFAULT_VALIDATION_ALLOWLIST)
 
 
-def load_validation_allowlist_with_source() -> tuple[set[str], str]:
+def _normalize_validation_allowlist_payload(data: object) -> set[str]:
+    if not isinstance(data, list):
+        raise ValidationAllowlistContractError(
+            "Validation key contract must be a non-empty JSON array of strings."
+        )
+    keys = {str(key).strip() for key in data if isinstance(key, str) and key.strip()}
+    if not keys:
+        raise ValidationAllowlistContractError(
+            "Validation key contract must declare at least one concrete key."
+        )
+    return keys
+
+
+def load_validation_allowlist_strict() -> set[str]:
     try:
         data = load_json_contract("validation_keys.json")
-    except (FileNotFoundError, OSError, RuntimeError, TypeError, ValueError):
-        return _load_validation_allowlist_default(), "fallback:load-error"
-    if isinstance(data, list):
-        return {str(key) for key in data}, "contracts"
-    return (
-        _load_validation_allowlist_default(),
-        "fallback:invalid-contract-validation-keys",
-    )
+    except (FileNotFoundError, OSError, RuntimeError, TypeError, ValueError) as exc:
+        raise ValidationAllowlistContractError(
+            "Failed to load validation key contract from "
+            "contracts/validation_keys.json"
+        ) from exc
+    return _normalize_validation_allowlist_payload(data)
+
+
+def load_validation_allowlist_with_source() -> tuple[set[str], str]:
+    try:
+        return load_validation_allowlist_strict(), "contracts"
+    except ValidationAllowlistContractError as exc:
+        if exc.__cause__ is not None:
+            return _load_validation_allowlist_default(), "fallback:load-error"
+        return (
+            _load_validation_allowlist_default(),
+            "fallback:invalid-contract-validation-keys",
+        )
 
 
 def load_validation_allowlist() -> set[str]:

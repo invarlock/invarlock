@@ -68,7 +68,16 @@ def test_mark_calibration_context_repairs_non_mapping_state() -> None:
 def test_get_tier_guard_config_missing_optional_deps_and_reraise(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    class CaptureConsole:
+        def __init__(self) -> None:
+            self.lines: list[str] = []
+
+        def print(self, *args: object, **_kwargs: object) -> None:
+            self.lines.append(" ".join(str(arg) for arg in args))
+
     real_import = builtins.__import__
+    console = CaptureConsole()
+    monkeypatch.setattr(calibrate_mod, "console", console, raising=False)
 
     def _missing_torch(
         name: str,
@@ -86,6 +95,9 @@ def test_get_tier_guard_config_missing_optional_deps_and_reraise(
     monkeypatch.setattr(builtins, "__import__", _missing_torch)
     with pytest.raises(typer.Exit):
         calibrate_mod.get_tier_guard_config("balanced", "variance_guard")
+    rendered = "\n".join(console.lines)
+    assert "invarlock[hf]" in rendered
+    assert "torch/transformers" in rendered
 
     def _missing_other(
         name: str,
@@ -194,9 +206,18 @@ def test_calibrate_commands_exit_on_missing_optional_deps(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    class CaptureConsole:
+        def __init__(self) -> None:
+            self.lines: list[str] = []
+
+        def print(self, *args: object, **_kwargs: object) -> None:
+            self.lines.append(" ".join(str(arg) for arg in args))
+
     cfg = _write_base_config(tmp_path)
     out = tmp_path / "out"
     real_import = builtins.__import__
+    console = CaptureConsole()
+    monkeypatch.setattr(calibrate_mod, "console", console, raising=False)
 
     def _missing_spectral(
         name: str,
@@ -225,6 +246,9 @@ def test_calibrate_commands_exit_on_missing_optional_deps(
             safety_margin=0.05,
             target_any_warning_rate=0.01,
         )
+    rendered = "\n".join(console.lines)
+    assert "invarlock[hf]" in rendered
+    assert "torch/transformers" in rendered
 
     def _missing_variance(
         name: str,

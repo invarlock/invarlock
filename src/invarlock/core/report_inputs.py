@@ -89,6 +89,13 @@ def resolve_report_input_path(
     if candidate.is_dir():
         if not allow_canonical_directory:
             raise ReportInputError("directory_forbidden", candidate)
+        canonical_matches = [
+            candidate / name
+            for name in CANONICAL_REPORT_FILENAMES
+            if (candidate / name).is_file()
+        ]
+        if len(canonical_matches) > 1:
+            raise ReportInputError("ambiguous_directory", candidate)
         if expected_kind == "run":
             run_candidate = candidate / RUN_REPORT_FILENAME
             if run_candidate.is_file():
@@ -99,13 +106,6 @@ def resolve_report_input_path(
             if evaluation_candidate.is_file():
                 return evaluation_candidate.resolve()
             raise ReportInputError("missing_evaluation_canonical", candidate)
-        canonical_matches = [
-            candidate / name
-            for name in CANONICAL_REPORT_FILENAMES
-            if (candidate / name).is_file()
-        ]
-        if len(canonical_matches) > 1:
-            raise ReportInputError("ambiguous_directory", candidate)
         if len(canonical_matches) == 1:
             return canonical_matches[0].resolve()
         raise ReportInputError("missing_canonical", candidate)
@@ -151,7 +151,10 @@ def load_run_report_input_json(
         raise ReportInputError(
             "expected_run_payload",
             resolved,
-            detail="pass the report.json artifact emitted by evaluate/run",
+            detail=(
+                "pass the report.json artifact emitted by the baseline or subject "
+                "side of invarlock evaluate"
+            ),
         )
     return resolved, payload
 
@@ -170,7 +173,10 @@ def load_evaluation_report_input_json(
         raise ReportInputError(
             "expected_evaluation_payload",
             resolved,
-            detail="pass the evaluation.report.json artifact emitted by verify/reporting",
+            detail=(
+                "pass the evaluation.report.json artifact emitted by "
+                "invarlock evaluate or invarlock report generate"
+            ),
         )
     return resolved, payload
 

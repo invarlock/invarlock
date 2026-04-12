@@ -25,6 +25,14 @@ def test_load_validation_allowlist_prefers_contract_file(monkeypatch):
     assert allowlist_mod.DEFAULT_VALIDATION_ALLOWLIST.issubset(keys2)
 
 
+def test_load_validation_allowlist_strict_prefers_contract_file(monkeypatch):
+    monkeypatch.setattr(
+        allowlist_mod, "load_json_contract", lambda _filename: ["a", "b"]
+    )
+
+    assert allowlist_mod.load_validation_allowlist_strict() == {"a", "b"}
+
+
 def test_load_validation_allowlist_with_source_reports_fallback() -> None:
     keys, source = allowlist_mod.load_validation_allowlist_with_source()
     assert isinstance(keys, set)

@@ -270,12 +270,18 @@ def validate_report(report: object) -> bool:
         # Tighten JSON Schema: populate validation.properties from allow-list and
         # disallow unknown validation keys at schema level.
         try:
-            validation_keys = allowlist_mod.load_validation_allowlist()
+            validation_keys = allowlist_mod.load_validation_allowlist_strict()
             allowlist_mod.apply_validation_allowlist_schema(
                 schema_for_validation, validation_keys
             )
-        except (KeyError, RuntimeError, TypeError, ValueError):
-            pass
+        except (
+            KeyError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+            allowlist_mod.ValidationAllowlistContractError,
+        ):
+            return False
 
         try:
             jsonschema_ok = _validate_with_jsonschema(report, schema_for_validation)
