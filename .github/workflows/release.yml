@@ -394,6 +394,28 @@ jobs:
         with:
           inputs: release-assets/*-offline-bundle.tar.gz
           upload-signing-artifacts: false
+      - name: Create public contract bundle
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          INVARLOCK_RELEASE_TAG: ${{ needs.resolve_release_ref.outputs.release_tag }}
+          INVARLOCK_RELEASE_SHA: ${{ needs.resolve_release_ref.outputs.release_sha }}
+        run: |
+          set -euo pipefail
+          tag="${INVARLOCK_RELEASE_TAG}"
+          version="${tag#v}"
+          python scripts/release/make_public_contract_bundle.py \
+            --version "${version}" \
+            --tag "${tag}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --commit "${INVARLOCK_RELEASE_SHA}" \
+            --contracts-dir contracts \
+            --runtime-dir src/invarlock/_data/runtime \
+            --output-dir release-assets
+      - name: Sign public contract bundle
+        uses: sigstore/gh-action-sigstore-python@04cffa1d795717b140764e8b640de88853c92acc
+        with:
+          inputs: release-assets/*-public-contract-bundle.tar.gz
+          upload-signing-artifacts: false
       - name: Create or update GitHub release
         env:
           GITHUB_TOKEN: ${{ github.token }}

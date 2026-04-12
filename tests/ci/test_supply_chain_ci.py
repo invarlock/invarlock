@@ -577,7 +577,7 @@ def test_release_workflow_builds_and_bundles_release_assets():
         for step in bundle_steps
         if str(step.get("uses", "")).startswith("sigstore/gh-action-sigstore-python@")
     ]
-    assert len(sigstore_steps) == 2
+    assert len(sigstore_steps) == 3
     assert sigstore_steps[0]["name"] == "Sign release artifacts"
     assert sigstore_steps[0]["with"]["inputs"] == "dist/*"
     assert sigstore_steps[0]["with"]["upload-signing-artifacts"] is True
@@ -601,12 +601,32 @@ def test_release_workflow_builds_and_bundles_release_assets():
     )
     assert sigstore_steps[1]["with"]["upload-signing-artifacts"] is False
 
+    public_bundle_step = _find_step_by_name(bundle_steps, "Create public contract bundle")
+    assert public_bundle_step["env"]["INVARLOCK_RELEASE_TAG"] == (
+        "${{ needs.resolve_release_ref.outputs.release_tag }}"
+    )
+    assert public_bundle_step["env"]["INVARLOCK_RELEASE_SHA"] == (
+        "${{ needs.resolve_release_ref.outputs.release_sha }}"
+    )
+    assert "scripts/release/make_public_contract_bundle.py" in public_bundle_step["run"]
+    assert "--contracts-dir contracts" in public_bundle_step["run"]
+    assert "--runtime-dir src/invarlock/_data/runtime" in public_bundle_step["run"]
+    assert "--output-dir release-assets" in public_bundle_step["run"]
+
+    assert sigstore_steps[2]["name"] == "Sign public contract bundle"
+    assert (
+        sigstore_steps[2]["with"]["inputs"]
+        == "release-assets/*-public-contract-bundle.tar.gz"
+    )
+    assert sigstore_steps[2]["with"]["upload-signing-artifacts"] is False
+
     release_step = _find_step_by_name(bundle_steps, "Create or update GitHub release")
-    assert bundle_steps.index(sigstore_steps[1]) < bundle_steps.index(release_step)
+    assert bundle_steps.index(sigstore_steps[2]) < bundle_steps.index(release_step)
     assert "*.sigstore.json" in release_step["run"]
     assert "cp dist/* release-assets/" in release_step["run"]
     assert 'gh release upload "$tag" release-assets/* --clobber' in release_step["run"]
     assert "release-assets/*-offline-bundle.tar.gz" not in release_step["run"]
+    assert "release-assets/*-public-contract-bundle.tar.gz" not in release_step["run"]
     assert "gh release create" in release_step["run"]
     assert "gh release upload" in release_step["run"]
     assert "release-assets/*" in release_step["run"]
@@ -652,6 +672,7 @@ def test_supply_chain_docs_match_workflow_truth() -> None:
     assert "scripts/security/pip_audit_allowlist.json" in allowlist_doc
     assert "installed release surface" in release_doc
     assert "resolved commit SHA" in release_doc
+    assert "public-contract-bundle" in release_doc
     assert "gitleaks" in architecture_doc
     assert "installed-artifact environment" in architecture_doc
 
@@ -705,7 +726,6 @@ def test_ci_pr_assurance_gates_are_required_jobs() -> None:
 
     typed_step = _find_step_by_name(typed_steps, "Run typed-surface mypy")
     assert typed_step["run"] == "make mypy-typed-surface"
-
 
 def test_scorecard_workflow_is_configured():
     workflow_path = Path(".github/workflows/scorecards.yml")
