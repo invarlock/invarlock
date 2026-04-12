@@ -634,9 +634,9 @@ def _resolve_container_launch_context(plan: Any) -> _ContainerLaunchContext:
     if engine is None:
         raise RuntimeError(
             "Host execution is disabled by default and no container engine "
-            "(docker/podman) is available. Set "
-            f"{CONTAINER_ENGINE_ENV}=docker|podman, "
-            f"{ALLOW_HOST_EXECUTION_ENV}=1 or install docker/podman."
+            "such as Podman or Docker is available. Set "
+            f"{CONTAINER_ENGINE_ENV}=podman|docker, "
+            f"{ALLOW_HOST_EXECUTION_ENV}=1 or install Podman or Docker."
         )
 
     cwd = Path.cwd().resolve()

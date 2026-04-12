@@ -81,7 +81,8 @@ Colab (CPU-friendly):
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_quickstart_cpu.ipynb)
 
 The secure-default CLI path runs model-loading commands inside the runtime
-container and expects an OCI container engine such as `docker` or `podman`.
+runtime container and expects an OCI container engine such as `podman` or
+`docker`.
 In a repo checkout, build the local runtime image once with
 `make runtime-image`; InvarLock automatically prefers
 `invarlock-runtime:local` when it is present. Trusted local workflows can opt

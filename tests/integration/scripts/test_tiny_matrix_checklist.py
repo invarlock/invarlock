@@ -133,7 +133,9 @@ def test_hf_extras_include_sentencepiece_for_runtime_tokenizer_support() -> None
 def test_matrix_uses_repo_python_selector_and_py312_floor() -> None:
     text = Path("scripts/run_tiny_all_matrix.sh").read_text(encoding="utf-8")
 
-    assert 'PYTHON_BIN="${PYTHON_BIN:-$(bash scripts/select_workspace_python.sh)}"' in text
+    assert (
+        'PYTHON_BIN="${PYTHON_BIN:-$(bash scripts/select_workspace_python.sh)}"' in text
+    )
     assert "requires Python 3.12+" in text
     assert 'CLI=("$PYTHON_BIN" -m invarlock.cli)' in text
 

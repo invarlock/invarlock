@@ -92,7 +92,7 @@ All workflows use Python 3.12+ and Node.js 18 where needed. Ensure your self-hos
 
 ## Running CI Locally with `act`
 
-You can run GitHub Actions workflows locally using [nektos/act](https://github.com/nektos/act), which emulates GitHub's runner environment in Docker containers.
+You can run GitHub Actions workflows locally using [nektos/act](https://github.com/nektos/act), which emulates GitHub's runner environment in Docker containers. This Docker requirement applies to the local `act` helper path, not to InvarLock's general secure-default runtime support.
 
 ### Installation
 
@@ -106,7 +106,7 @@ go install github.com/nektos/act@latest
 # Or download from: https://github.com/nektos/act/releases
 ```
 
-**Prerequisites**: Docker must be running.
+**Prerequisites**: Docker must be running for this documented `act` flow.
 
 ### Quick Start
 
