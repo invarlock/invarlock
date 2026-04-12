@@ -130,6 +130,21 @@ def test_makefile_exposes_marker_based_fast_and_integration_lanes() -> None:
     assert "-m integration tests/integration" in text
 
 
+def test_makefile_exposes_actionlint_and_minimal_packaging_smoke_targets() -> None:
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    text = makefile.read_text(encoding="utf-8")
+
+    assert "actionlint:" in text
+    assert "command -v actionlint" in text
+    assert "actionlint .github/workflows/*.yml" in text
+
+    assert "packaging-smoke-minimal:" in text
+    assert (
+        "tests/integration/packaging/test_wheel_proof_pack_verify.py::"
+        "test_wheel_install_can_verify_proof_pack_outside_repo_tree"
+    ) in text
+
+
 def test_makefile_exposes_typed_surface_target() -> None:
     makefile = Path(__file__).resolve().parents[2] / "Makefile"
     text = makefile.read_text(encoding="utf-8")

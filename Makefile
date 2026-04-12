@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-verify ensure-mypy
+.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-verify actionlint packaging-smoke-minimal ensure-mypy
 
 PYTHON ?= $(shell bash scripts/select_python.sh)
 PIP := $(PYTHON) -m pip
@@ -293,6 +293,19 @@ cli-smoke-advanced:  ## Smoke the advanced CLI namespace
 	PYTHONPATH=src $(PYTHON) -m invarlock advanced policy --help >/dev/null
 	PYTHONPATH=src $(PYTHON) -m invarlock advanced plugins --help >/dev/null
 	PYTHONPATH=src $(PYTHON) -m invarlock advanced calibrate --help >/dev/null
+
+actionlint:  ## Lint GitHub Actions workflow files
+	@command -v actionlint >/dev/null 2>&1 || { \
+		echo "❌ actionlint is required but not installed; add it to PATH first."; \
+		exit 1; \
+	}
+	actionlint .github/workflows/*.yml
+
+packaging-smoke-minimal:  ## Smoke the minimal wheel install and proof-pack verify path
+	$(MAKE) ensure-python
+	@PYTHON="$$(if [ -x .venv/bin/python ]; then printf '%s' .venv/bin/python; else printf '%s' "$(PYTHON)"; fi)"; \
+	INVARLOCK_LIGHT_IMPORT=1 PYTHONPATH=src "$$PYTHON" -m pytest -q \
+		tests/integration/packaging/test_wheel_proof_pack_verify.py::test_wheel_install_can_verify_proof_pack_outside_repo_tree
 
 model-evidence-list:  ## Print the maintained shipped-model evidence manifest
 	$(MAKE) ensure-python
