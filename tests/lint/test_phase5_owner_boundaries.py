@@ -241,6 +241,10 @@ def test_phase5_large_modules_do_not_regrow() -> None:
         REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_attempts.py": 890,
         REPO_ROOT / "src/invarlock/eval/primary_metric.py": 850,
         REPO_ROOT / "src/invarlock/reporting/report_primary_metric_analysis.py": 840,
+        REPO_ROOT / "src/invarlock/cli/commands/doctor.py": 730,
+        REPO_ROOT / "src/invarlock/cli/commands/report.py": 613,
+        REPO_ROOT / "src/invarlock/cli/commands/calibrate.py": 713,
+        REPO_ROOT / "src/invarlock/reporting/report_validation.py": 533,
     }
 
     for path, threshold in thresholds.items():
