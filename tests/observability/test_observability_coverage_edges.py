@@ -604,10 +604,28 @@ def test_health_checker_branch_coverage(monkeypatch):
         health.psutil,
         "virtual_memory",
         lambda: _MemoryInfo(
+            percent=95.0, available=5 * 1024**3, used=5 * 1024**3, total=10 * 1024**3
+        ),
+    )
+    assert checker.check_component("memory").status == health.HealthStatus.CRITICAL
+
+    monkeypatch.setattr(
+        health.psutil,
+        "virtual_memory",
+        lambda: _MemoryInfo(
             percent=85.0, available=8 * 1024**3, used=2 * 1024**3, total=10 * 1024**3
         ),
     )
     assert checker.check_component("memory").status == health.HealthStatus.WARNING
+
+    monkeypatch.setattr(
+        health.psutil,
+        "virtual_memory",
+        lambda: _MemoryInfo(
+            percent=50.0, available=9 * 1024**3, used=1 * 1024**3, total=10 * 1024**3
+        ),
+    )
+    assert checker.check_component("memory").status == health.HealthStatus.HEALTHY
 
     monkeypatch.setattr(health.psutil, "cpu_percent", lambda interval=1: 97.0)
     monkeypatch.setattr(
@@ -634,6 +652,15 @@ def test_health_checker_branch_coverage(monkeypatch):
     assert cpu_warning.details["core_count"] == 8
 
     monkeypatch.setattr(
+        health.psutil,
+        "cpu_percent",
+        lambda interval=1: (_ for _ in ()).throw(OSError("cpu unavailable")),
+    )
+    cpu_failure = checker.check_component("cpu")
+    assert cpu_failure.status == health.HealthStatus.CRITICAL
+    assert cpu_failure.details["error"] == "cpu unavailable"
+
+    monkeypatch.setattr(
         health.psutil, "disk_usage", lambda path: _DiskInfo(used=96, total=100)
     )
     assert checker.check_component("disk").status == health.HealthStatus.CRITICAL
@@ -655,6 +682,13 @@ def test_health_checker_branch_coverage(monkeypatch):
         "get_device_properties",
         lambda index: types.SimpleNamespace(name="Fake GPU", total_memory=100),
     )
+    monkeypatch.setattr(
+        health.torch.cuda,
+        "memory_stats",
+        lambda index: {"allocated_bytes.all.current": 80},
+    )
+    assert checker.check_component("gpu").status == health.HealthStatus.HEALTHY
+
     monkeypatch.setattr(
         health.torch.cuda,
         "memory_stats",
@@ -794,6 +828,47 @@ def test_invarlock_health_checker_partial_missing_and_endpoint(monkeypatch):
     assert "torch" in missing_torch.details["missing"]
     monkeypatch.setattr(builtins, "__import__", real_import)
 
+    def import_with_adapter_setup_failure(
+        name, globals=None, locals=None, fromlist=(), level=0
+    ):
+        if name == "invarlock.adapters.hf_causal":
+            raise OSError("adapter import failed")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", import_with_adapter_setup_failure)
+    checker = health.InvarLockHealthChecker()
+    adapter_import_failure = checker.check_component("adapters")
+    assert adapter_import_failure.status == health.HealthStatus.CRITICAL
+    assert adapter_import_failure.details["error"] == "adapter import failed"
+
+    def import_with_guard_setup_failure(
+        name, globals=None, locals=None, fromlist=(), level=0
+    ):
+        if name == "invarlock.guards.invariants":
+            raise OSError("guard import failed")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", import_with_guard_setup_failure)
+    checker = health.InvarLockHealthChecker()
+    guard_import_failure = checker.check_component("guards")
+    assert guard_import_failure.status == health.HealthStatus.CRITICAL
+    assert guard_import_failure.details["error"] == "guard import failed"
+
+    def import_with_dependency_probe_failure(
+        name, globals=None, locals=None, fromlist=(), level=0
+    ):
+        if name == "numpy":
+            raise OSError("dependency probe failed")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", import_with_dependency_probe_failure)
+    checker = health.InvarLockHealthChecker()
+    dependency_probe_failure = checker.check_component("dependencies")
+    assert dependency_probe_failure.status == health.HealthStatus.CRITICAL
+    assert dependency_probe_failure.details["error"] == "dependency probe failed"
+
+    monkeypatch.setattr(builtins, "__import__", real_import)
+
     class FakeHealthChecker:
         def __init__(self, summary):
             self._summary = summary
@@ -828,6 +903,54 @@ def test_invarlock_health_checker_partial_missing_and_endpoint(monkeypatch):
     assert headers == [("Content-type", "application/json")]
     assert b'"overall_status": "healthy"' in handler.wfile.getvalue()
 
+    monkeypatch.setattr(
+        health,
+        "InvarLockHealthChecker",
+        lambda: FakeHealthChecker(
+            {
+                "overall_status": "warning",
+                "components": {},
+                "status_counts": {},
+                "total_components": 0,
+                "last_check": 0,
+            }
+        ),
+    )
+    _, warning_handler_class = health.create_health_endpoint()
+    warning_handler = warning_handler_class.__new__(warning_handler_class)
+    warning_handler.path = "/health"
+    warning_handler.wfile = io.BytesIO()
+    warning_responses: list[int] = []
+    warning_handler.send_response = warning_responses.append
+    warning_handler.send_header = lambda key, value: None
+    warning_handler.end_headers = lambda: None
+    warning_handler.do_GET()
+    assert warning_responses == [200]
+
+    monkeypatch.setattr(
+        health,
+        "InvarLockHealthChecker",
+        lambda: FakeHealthChecker(
+            {
+                "overall_status": "critical",
+                "components": {},
+                "status_counts": {},
+                "total_components": 0,
+                "last_check": 0,
+            }
+        ),
+    )
+    _, critical_handler_class = health.create_health_endpoint()
+    critical_handler = critical_handler_class.__new__(critical_handler_class)
+    critical_handler.path = "/health"
+    critical_handler.wfile = io.BytesIO()
+    critical_responses: list[int] = []
+    critical_handler.send_response = critical_responses.append
+    critical_handler.send_header = lambda key, value: None
+    critical_handler.end_headers = lambda: None
+    critical_handler.do_GET()
+    assert critical_responses == [503]
+
     missing_handler = handler_class.__new__(handler_class)
     missing_handler.path = "/missing"
     missing_handler.wfile = io.BytesIO()
@@ -838,6 +961,17 @@ def test_invarlock_health_checker_partial_missing_and_endpoint(monkeypatch):
     missing_handler.do_GET()
     missing_handler.log_message("ignored")
     assert not_found == [404]
+
+    def import_without_http_server(
+        name, globals=None, locals=None, fromlist=(), level=0
+    ):
+        if name == "http.server":
+            raise ImportError("http.server")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", import_without_http_server)
+    assert health.create_health_endpoint() == (None, None)
+    monkeypatch.setattr(builtins, "__import__", real_import)
 
 
 @pytest.mark.unit
