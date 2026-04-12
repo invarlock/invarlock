@@ -184,9 +184,10 @@ REPORT_JSON_SCHEMA: dict[str, Any] = {
         },
         "validation": {
             "type": "object",
-            # properties populated at import-time from allow-list; default permissive
+            # Properties are populated from the validation-key contract when
+            # available. The empty baseline remains fail-closed.
             "properties": {},
-            "additionalProperties": {"type": "boolean"},
+            "additionalProperties": False,
         },
         "rmt": {
             "type": "object",
@@ -218,14 +219,20 @@ REPORT_JSON_SCHEMA: dict[str, Any] = {
 }
 
 
-_VALIDATION_ALLOWLIST_DEFAULT = allowlist_mod.DEFAULT_VALIDATION_ALLOWLIST
+_VALIDATION_ALLOWLIST_DEFAULT: set[str] = set()
 
 try:
     allowlist_mod.apply_validation_allowlist_schema(
         REPORT_JSON_SCHEMA,
-        allowlist_mod.load_validation_allowlist(),
+        allowlist_mod.load_validation_allowlist_strict(),
     )
-except (KeyError, RuntimeError, TypeError, ValueError):
+except (
+    KeyError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+    allowlist_mod.ValidationAllowlistContractError,
+):
     pass
 
 try:

@@ -291,8 +291,9 @@ fields while enforcing a small, stable core:
 
 **Validation flags:**
 
-- `validation` is an object of booleans; the allow‑list is loaded from
-  `contracts/validation_keys.json` when present, or from a small default set.
+- `validation` is an object of booleans; allowed keys come from
+  `contracts/validation_keys.json`, and report validation fails closed when that
+  contract is missing or malformed.
 - Common flags:
   - `primary_metric_acceptable`
   - `primary_metric_tail_acceptable`

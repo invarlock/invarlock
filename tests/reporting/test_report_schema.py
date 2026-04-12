@@ -15,8 +15,11 @@ def test_load_validation_allowlist_default(monkeypatch):
         raise FileNotFoundError
 
     monkeypatch.setattr(allowlist_mod, "load_json_contract", _missing)
-    allowlist = allowlist_mod.load_validation_allowlist()
-    assert allowlist == set(schema_mod._VALIDATION_ALLOWLIST_DEFAULT)
+    with pytest.raises(
+        allowlist_mod.ValidationAllowlistContractError,
+        match="Failed to load validation key contract",
+    ):
+        allowlist_mod.load_validation_allowlist()
 
 
 def test_load_validation_allowlist_reads_file(monkeypatch):
@@ -33,8 +36,11 @@ def test_load_validation_allowlist_non_list_payload(monkeypatch):
     monkeypatch.setattr(
         allowlist_mod, "load_json_contract", lambda _filename: {"oops": True}
     )
-    allowlist = allowlist_mod.load_validation_allowlist()
-    assert allowlist == set(schema_mod._VALIDATION_ALLOWLIST_DEFAULT)
+    with pytest.raises(
+        allowlist_mod.ValidationAllowlistContractError,
+        match="non-empty JSON array of strings",
+    ):
+        allowlist_mod.load_validation_allowlist()
 
 
 def test_validate_with_jsonschema_handles_missing_library(monkeypatch):
@@ -79,7 +85,7 @@ def test_validate_report_rejects_payload_when_schema_validation_fails(monkeypatc
     )
 
     monkeypatch.setattr(
-        allowlist_mod, "load_validation_allowlist", lambda: {"custom_flag"}
+        allowlist_mod, "load_validation_allowlist_strict", lambda: {"custom_flag"}
     )
     monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda *_args: False)
 
@@ -137,8 +143,11 @@ def test_load_validation_allowlist_handles_exception(monkeypatch):
         raise RuntimeError("fail")
 
     monkeypatch.setattr(allowlist_mod, "load_json_contract", boom)
-    allowlist = allowlist_mod.load_validation_allowlist()
-    assert allowlist == set(schema_mod._VALIDATION_ALLOWLIST_DEFAULT)
+    with pytest.raises(
+        allowlist_mod.ValidationAllowlistContractError,
+        match="Failed to load validation key contract",
+    ):
+        allowlist_mod.load_validation_allowlist()
 
 
 def test_validate_report_allowlist_error(monkeypatch):
@@ -261,7 +270,7 @@ def test_validate_report_rejects_unknown_validation_key(monkeypatch):
     monkeypatch.setattr(schema_mod, "_validate_with_jsonschema", lambda *_args: True)
     monkeypatch.setattr(
         allowlist_mod,
-        "load_validation_allowlist",
+        "load_validation_allowlist_strict",
         lambda: {"primary_metric_acceptable"},
     )
     assert schema_mod.validate_report(cert) is False
@@ -273,11 +282,15 @@ def test_report_schema_import_tolerates_allowlist_bootstrap_errors(
     with monkeypatch.context() as patch:
         patch.setattr(
             allowlist_mod,
-            "apply_validation_allowlist_schema",
-            lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("boom")),
+            "load_validation_allowlist_strict",
+            lambda: (_ for _ in ()).throw(
+                allowlist_mod.ValidationAllowlistContractError("boom")
+            ),
         )
         reloaded = importlib.reload(schema_mod)
-        assert "validation" in reloaded.REPORT_JSON_SCHEMA["properties"]
+        validation_schema = reloaded.REPORT_JSON_SCHEMA["properties"]["validation"]
+        assert validation_schema["properties"] == {}
+        assert validation_schema["additionalProperties"] is False
 
     importlib.reload(schema_mod)
 

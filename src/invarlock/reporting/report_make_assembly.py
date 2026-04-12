@@ -17,10 +17,7 @@ from . import report_policy as report_policy_mod
 from . import report_provenance as report_provenance_mod
 from . import report_validation as report_validation_mod
 from .report_types import RunReport
-from .report_validation_allowlist import (
-    load_validation_allowlist,
-    load_validation_allowlist_with_source,
-)
+from .report_validation_allowlist import load_validation_allowlist
 
 
 def _copy_meta_provenance_fields(
@@ -169,7 +166,8 @@ def _resolve_policy_edit_and_telemetry_context(
     record_blocking_diagnostic: Callable[[str, str], None],
     non_fatal_exceptions: tuple[type[BaseException], ...],
 ) -> dict[str, Any]:
-    _, validation_allowlist_source = load_validation_allowlist_with_source()
+    load_validation_allowlist()
+    validation_allowlist_source = "contracts"
     profile, explicit_overrides = _resolve_policy_inputs(
         report,
         build_diagnostics,
@@ -197,14 +195,6 @@ def _resolve_policy_edit_and_telemetry_context(
         "policy_digest": resolved_digest,
         "validation_allowlist_source": validation_allowlist_source,
     }
-    if profile in {"ci", "release"} and validation_allowlist_source != "contracts":
-        record_blocking_diagnostic(
-            "policy.validation_allowlist_source_invalid",
-            (
-                "CI/Release evaluation reports must resolve validation allowlists "
-                "from contracts-only sources."
-            ),
-        )
     auto["policy_digest"] = resolved_digest
 
     for guard_name in ("spectral", "rmt", "variance"):

@@ -23,10 +23,6 @@ DEFAULT_VALIDATION_ALLOWLIST = {
 }
 
 
-def _load_validation_allowlist_default() -> set[str]:
-    return set(DEFAULT_VALIDATION_ALLOWLIST)
-
-
 def _normalize_validation_allowlist_payload(data: object) -> set[str]:
     if not isinstance(data, list):
         raise ValidationAllowlistContractError(
@@ -50,21 +46,8 @@ def load_validation_allowlist_strict() -> set[str]:
     return _normalize_validation_allowlist_payload(data)
 
 
-def load_validation_allowlist_with_source() -> tuple[set[str], str]:
-    try:
-        return load_validation_allowlist_strict(), "contracts"
-    except ValidationAllowlistContractError as exc:
-        if exc.__cause__ is not None:
-            return _load_validation_allowlist_default(), "fallback:load-error"
-        return (
-            _load_validation_allowlist_default(),
-            "fallback:invalid-contract-validation-keys",
-        )
-
-
 def load_validation_allowlist() -> set[str]:
-    keys, _ = load_validation_allowlist_with_source()
-    return keys
+    return load_validation_allowlist_strict()
 
 
 def apply_validation_allowlist_schema(
