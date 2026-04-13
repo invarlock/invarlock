@@ -89,7 +89,7 @@ jobs:
           --verbose
 
     - name: Upload benchmark results
-      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       if: always()  # Upload even if benchmark fails
       with:
         name: guard-effect-results-py${{ matrix.python-version }}
@@ -100,7 +100,7 @@ jobs:
 
     - name: Comment PR with results
       if: github.event_name == 'pull_request' && always()
-      uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
       with:
         script: |
           const fs = require('fs');
@@ -181,7 +181,7 @@ jobs:
           --verbose
 
     - name: Upload release benchmark results
-      uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       if: always()
       with:
         name: guard-effect-results-release
