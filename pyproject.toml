@@ -194,10 +194,12 @@ ci = [
   "pytest>=7.0",
   "pytest-cov>=4.0",
   "ruff==0.15.9",
+  "mypy>=1.0",
   "mkdocs>=1.5",
   "mkdocs-material>=9.5",
   "mkdocs-mermaid2-plugin>=1.1",
   "build>=0.10.0",
+  "wheel>=0.46.0",
   "requests>=2.33.0",
 ]
 

@@ -85,9 +85,15 @@ jobs:
 
     - name: Check for secrets
       run: |
-        grep -r -E "sk-[a-zA-Z0-9]{48}" docs/ && exit 1 || true
-        grep -r -E "ghp_[a-zA-Z0-9]{36}" docs/ && exit 1 || true
-        grep -r -E "/home/|/Users/|C:\\\\" docs/ && exit 1 || true
+        if grep -r -E "sk-[a-zA-Z0-9]{48}" docs/; then
+          exit 1
+        fi
+        if grep -r -E "ghp_[a-zA-Z0-9]{36}" docs/; then
+          exit 1
+        fi
+        if grep -r -E "/home/|/Users/|C:\\\\" docs/; then
+          exit 1
+        fi
 
     - name: Validate examples
       run: python scripts/docs_check.py --examples
