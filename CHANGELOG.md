@@ -77,6 +77,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed release, security, and live-smoke workflow behavior around immutable
   tag resolution, fail-closed CodeQL execution, shipped-surface dependency
   auditing, and repo-managed interpreter selection for end-to-end scripts.
+- Fixed the Python 3.13 advanced install surface so shipped `gptq`/`advanced`
+  extras no longer pull unsupported upstream `auto-gptq` builds on the PR
+  supply-chain path; GPTQ remains available on the narrower Linux stacks that
+  upstream packaging currently supports.
 
 ### Dependencies
 - Removed test/scientific-only packages from the base runtime where they were

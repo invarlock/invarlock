@@ -102,7 +102,7 @@ probes = [
 # External edit integrations
 gptq = [
   "torch>=2.1.0",
-  "auto-gptq>=0.7.0; platform_system == \"Linux\"",
+  "auto-gptq>=0.7.0; platform_system == \"Linux\" and python_version < \"3.13\"",
   "triton>=2.3.0; platform_system == \"Linux\"",
   "transformers>=5.5.0",
   "safetensors>=0.4.0",
@@ -139,7 +139,7 @@ advanced = [
   "huggingface_hub>=1.0.0",
   "accelerate>=0.27",
   "bitsandbytes>=0.41",
-  "auto-gptq>=0.7.0; platform_system == \"Linux\"",
+  "auto-gptq>=0.7.0; platform_system == \"Linux\" and python_version < \"3.13\"",
   "autoawq>=0.2.0; platform_system == \"Linux\"",
   "triton>=2.3.0; platform_system == \"Linux\"",
   "aiohttp>=3.12.14",
@@ -162,7 +162,7 @@ all = [
   "huggingface_hub>=1.0.0",
   "accelerate>=0.27",
   "bitsandbytes>=0.41",
-  "auto-gptq>=0.7.0; platform_system == \"Linux\"",
+  "auto-gptq>=0.7.0; platform_system == \"Linux\" and python_version < \"3.13\"",
   "autoawq>=0.2.0; platform_system == \"Linux\"",
   "triton>=2.3.0; platform_system == \"Linux\"",
   "aiohttp>=3.12.14",

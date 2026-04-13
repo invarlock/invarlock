@@ -96,9 +96,7 @@ jobs:
           python -m venv .advanced-venv
           . .advanced-venv/bin/activate
           python -m pip install dist/*.whl --no-deps
-          python -m pip install --require-hashes -r requirements/workflows/hf-py313.txt
-          BUILD_CUDA_EXT=0 python -m pip install --require-hashes --no-build-isolation \
-            -r requirements/workflows/advanced-py313.txt
+          python -m pip install --require-hashes -r requirements/workflows/advanced-py313.txt
           site_packages="$(python - <<'PY'
           import site
           paths = site.getsitepackages()

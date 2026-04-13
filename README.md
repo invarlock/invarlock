@@ -182,7 +182,11 @@ pip install invarlock
 pip install "invarlock[hf]"
 ```
 
-Optional extras: `invarlock[probes]`, `invarlock[gpu]`, `invarlock[awq,gptq]`. Full setup: <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/getting-started.md>.
+Optional extras: `invarlock[probes]`, `invarlock[gpu]`, `invarlock[awq,gptq]`.
+On Python 3.13+ stacks, `gptq` may still require a vendor wheel or a
+supported older interpreter because upstream `auto-gptq` packaging is narrower
+than the core InvarLock support matrix. Full setup:
+<https://github.com/invarlock/invarlock/blob/main/docs/user-guide/getting-started.md>.
 
 The minimal install covers the core verification and reporting flows. Add
 `invarlock[hf]` only for model-loading evaluate runs, and use the installed

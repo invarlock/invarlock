@@ -100,7 +100,7 @@ Machine-readable adapter capability metadata is published at
 | `hf_auto` | Auto-select HF adapter | `invarlock[adapters]` | All platforms with torch | Delegates to a role adapter; prefers quant adapters when detected. |
 | `hf_bnb` | Bitsandbytes quantized LMs | `invarlock[gpu]` | Platform-dependent | Uses `device_map="auto"`; no `.to()`. Latest bitsandbytes wheels can work outside Linux/CUDA when the runtime imports cleanly. |
 | `hf_awq` | AWQ quantized LMs | `invarlock[awq]` | Linux only | Requires `autoawq`/`triton`. |
-| `hf_gptq` | GPTQ quantized LMs | `invarlock[gptq]` | Linux only | Requires `auto-gptq`/`triton`; some upstream wheel combinations may require a pinned or vendor build on newer Python/CUDA stacks. |
+| `hf_gptq` | GPTQ quantized LMs | `invarlock[gptq]` | Linux only | Requires `auto-gptq`/`triton`; packaged extras currently stop at upstream-supported pre-3.13 Python stacks, and newer Python/CUDA combinations may require a vendor build. |
 
 ### Adapter capabilities
 
@@ -194,8 +194,9 @@ finally:
 - **Linux-only adapters not available**: `hf_awq` and `hf_gptq` depend on
   `triton` and remain Linux-only in `pyproject.toml`.
 - **GPTQ install fails even on Linux/CUDA**: `auto-gptq` packaging is
-  upstream-dependent; some Python/CUDA combinations may require a pinned or
-  vendor wheel beyond `pip install "invarlock[gptq]"`.
+  upstream-dependent; Python 3.13+ and some newer CUDA stacks may require a
+  pinned or vendor wheel, or a supported interpreter, beyond
+  `pip install "invarlock[gptq]"`.
 - **Bitsandbytes not detected**: `hf_bnb` is platform-dependent. If the backend
   imports cleanly, `invarlock advanced plugins adapters` will report it as ready even on
   non-CUDA hosts.

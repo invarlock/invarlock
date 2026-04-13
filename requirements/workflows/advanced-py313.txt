@@ -5,9 +5,7 @@ accelerate==1.13.0 \
     --hash=sha256:d631b4e0f5b3de4aff2d7e9e6857d164810dfc3237d54d017f075122d057b236
     # via
     #   invarlock (pyproject.toml)
-    #   auto-gptq
     #   autoawq
-    #   peft
 aiohappyeyeballs==2.6.1 \
     --hash=sha256:c3f9d0113123803ccadfdf3f0faa505bc78e6a72d1cc4806cbd719826e943558 \
     --hash=sha256:f349ba8f4b75cb25c99c5c2d84e997e485204d2902a9597802b0371f09331fb8
@@ -159,17 +157,6 @@ attrs==26.1.0 \
     #   aiohttp
     #   jsonschema
     #   referencing
-auto-gptq==0.7.1 \
-    --hash=sha256:4a1e5972b8ff65956f207908d8789c56fc0d521678ff37bd57e98f392971b3fd \
-    --hash=sha256:57b4b284ca4ff4e060088252cbfb18a6f7332477fe57cf2b7ef9af158cce9730 \
-    --hash=sha256:5c61ad380e9b4c603757c254765e9083a90a820cd0aff1b5d2c6f7fd96c85e80 \
-    --hash=sha256:5d0f3c1b4905e1f14f5b88a33d3dfaf313ebfa138f73c43315f80b40a2d8bb1f \
-    --hash=sha256:84efeb9527b2d49f3555b2ba9451018c5ff41722c0b0e2fde74f5183ba0c008d \
-    --hash=sha256:8d9d3fbfff94e129bcde0432fd5f6ba09f26aeceea0890a68c898210ba448135 \
-    --hash=sha256:a372d81d523b8d2f98639bbca63c0c427cab0ed55b8a57bb96706b0942aa01c9 \
-    --hash=sha256:d87cd69532bfeb81150a0f8db5ebb5f5f295fa72b5a0403102e791ccac44b933 \
-    --hash=sha256:fc69a93ab8b24e7854abbb3adbdb3a8c28c8f4db9c82229341922a4b59e0eff1
-    # via invarlock (pyproject.toml)
 autoawq==0.2.9 \
     --hash=sha256:f3397687118c7d23c769de0de05ff1dca8950a2644acbe1b6eb1399c691fe7ee
     # via invarlock (pyproject.toml)
@@ -491,7 +478,6 @@ datasets==4.8.4 \
     --hash=sha256:cdc8bee4698e549d78bf1fed6aea2eebc760b22b084f07e6fc020c6577a6ce6d
     # via
     #   invarlock (pyproject.toml)
-    #   auto-gptq
     #   autoawq
 dill==0.4.1 \
     --hash=sha256:1e1ce33e978ae97fcfcff5638477032b801c46c7c65cf717f95fbc2248f79a9d \
@@ -647,10 +633,6 @@ fsspec==2026.2.0 \
     #   datasets
     #   huggingface-hub
     #   torch
-gekko==1.3.2 \
-    --hash=sha256:a399cd9f896c864adbdfbb9dd052f957d106f454e0a711bd53db696c889ace7e \
-    --hash=sha256:d1ae9a096eb496f16df8f42a3dba7dcea59e2d17bf9a7d6d2b9187a06959e00a
-    # via auto-gptq
 h11==0.16.0 \
     --hash=sha256:4e35b956cf45792e4caa5885e69fba00bdbc6ffafbfa020300e549b208ee5ff1 \
     --hash=sha256:63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86
@@ -708,7 +690,6 @@ huggingface-hub==1.10.1 \
     #   accelerate
     #   autoawq
     #   datasets
-    #   peft
     #   tokenizers
     #   transformers
 hyperframe==6.1.0 \
@@ -1094,12 +1075,9 @@ numpy==2.4.4 \
     # via
     #   invarlock (pyproject.toml)
     #   accelerate
-    #   auto-gptq
     #   bitsandbytes
     #   datasets
-    #   gekko
     #   pandas
-    #   peft
     #   scikit-learn
     #   scipy
     #   transformers
@@ -1192,7 +1170,6 @@ packaging==26.0 \
     #   bitsandbytes
     #   datasets
     #   huggingface-hub
-    #   peft
     #   transformers
 pandas==3.0.2 \
     --hash=sha256:01f31a546acd5574ef77fe199bc90b55527c225c20ccda6601cf6b0fd5ed597c \
@@ -1244,10 +1221,6 @@ pandas==3.0.2 \
     --hash=sha256:f4753e73e34c8d83221ba58f232433fca2748be8b18dbca02d242ed153945043 \
     --hash=sha256:f8d68083e49e16b84734eb1a4dcae4259a75c90fb6e2251ab9a00b61120c06ab
     # via datasets
-peft==0.18.1 \
-    --hash=sha256:0bf06847a3551e3019fc58c440cffc9a6b73e6e2962c95b52e224f77bbdb50f1 \
-    --hash=sha256:2dd0d6bfce936d1850e48aaddbd250941c5c02fc8ef3237cd8fd5aac35e0bae2
-    # via auto-gptq
 pillow==12.2.0 \
     --hash=sha256:00a2865911330191c0b818c59103b58a5e697cae67042366970a6b6f1b20b7f9 \
     --hash=sha256:01afa7cf67f74f09523699b4e88c73fb55c13346d212a59a2db1f86b0a63e8c5 \
@@ -1502,7 +1475,6 @@ psutil==7.2.2 \
     # via
     #   invarlock (pyproject.toml)
     #   accelerate
-    #   peft
 pyarrow==23.0.1 \
     --hash=sha256:00be9576d970c31defb5c32eb72ef585bf600ef6d0a82d5eccaae96639cf9d07 \
     --hash=sha256:07deae7783782ac7250989a7b2ecde9b3c343a643f82e8a4df03d93b633006f0 \
@@ -1773,7 +1745,6 @@ pyyaml==6.0.3 \
     #   accelerate
     #   datasets
     #   huggingface-hub
-    #   peft
     #   transformers
 referencing==0.37.0 \
     --hash=sha256:381329a9f99628c9069361716891d34ad94af76e461dcb0335825aecc7692231 \
@@ -1912,10 +1883,6 @@ rich==14.3.4 \
     # via
     #   invarlock (pyproject.toml)
     #   typer
-rouge==1.0.1 \
-    --hash=sha256:12b48346ca47d6bcf3c45061f315452b9ccec0620ee895ec85b7efc3d54aae34 \
-    --hash=sha256:28d118536e8c774dc47d1d15ec266479b4dd0914c4672ce117d4002789bdc644
-    # via auto-gptq
 rpds-py==0.30.0 \
     --hash=sha256:07ae8a593e1c3c6b82ca3292efbe73c30b61332fd612e05abee07c79359f292f \
     --hash=sha256:0a59119fc6e3f460315fe9d08149f8102aa322299deaa5cab5b40092345c2136 \
@@ -2061,8 +2028,6 @@ safetensors==0.7.0 \
     --hash=sha256:f4729811a6640d019a4b7ba8638ee2fd21fa5ca8c7e7bdf0fed62068fcaac737
     # via
     #   accelerate
-    #   auto-gptq
-    #   peft
     #   transformers
 scikit-learn==1.8.0 \
     --hash=sha256:00d6f1d66fbcf4eba6e356e1420d33cc06c70a45bb1363cd6f6a8e4ebbbdece2 \
@@ -2232,9 +2197,7 @@ sentencepiece==0.2.1 \
     --hash=sha256:e10fa50bdbaa5e2445dbd387979980d391760faf0ec99a09bd7780ff37eaec44 \
     --hash=sha256:e37e4b4c4a11662b5db521def4e44d4d30ae69a1743241412a93ae40fdcab4bb \
     --hash=sha256:e52144670738b4b477fade6c2a9b6af71a8d0094514c9853ac9f6fc1fcfabae7
-    # via
-    #   invarlock (pyproject.toml)
-    #   auto-gptq
+    # via invarlock (pyproject.toml)
 setuptools==81.0.0 \
     --hash=sha256:487b53915f52501f0a79ccfd0c02c165ffe06631443a886740b91af4b7a5845a \
     --hash=sha256:fdd925d5c5d9f62e4b74b30d6dd7828ce236fd6ed998a08d81de62ce5a6310d6
@@ -2248,9 +2211,7 @@ shellingham==1.5.4 \
 six==1.17.0 \
     --hash=sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274 \
     --hash=sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81
-    # via
-    #   python-dateutil
-    #   rouge
+    # via python-dateutil
 sympy==1.14.0 \
     --hash=sha256:d3d3fe8df1e5a0b42f0e7bdf50541697dbe7d23746e894990c030e2b05e72517 \
     --hash=sha256:e091cc3e99d2141a0ba2847328f5479b05d94a6635cb96148ccb3f34671bd8f5
@@ -2378,27 +2339,21 @@ torch==2.11.0 \
     # via
     #   invarlock (pyproject.toml)
     #   accelerate
-    #   auto-gptq
     #   autoawq
     #   bitsandbytes
-    #   peft
 tqdm==4.67.3 \
     --hash=sha256:7d825f03f89244ef73f1d4ce193cb1774a8179fd96f31d7e1dcde62092b960bb \
     --hash=sha256:ee1e4c0e59148062281c49d80b25b67771a127c85fc9676d3be5f243206826bf
     # via
-    #   auto-gptq
     #   datasets
     #   huggingface-hub
-    #   peft
     #   transformers
 transformers==5.5.3 \
     --hash=sha256:3f60128e840b40d352655903552e1eed4f94ed49369a4d43e1bc067bd32d3f50 \
     --hash=sha256:e48f3ec31dd96505e96e66b63a1e43e1ad7a65749e108d9227caaf51051cdb02
     # via
     #   invarlock (pyproject.toml)
-    #   auto-gptq
     #   autoawq
-    #   peft
 triton==3.6.0 \
     --hash=sha256:0b3a97e8ed304dfa9bd23bb41ca04cdf6b2e617d5e782a8653d616037a5d537d \
     --hash=sha256:10c7f76c6e72d2ef08df639e3d0d30729112f47a56b0c81672edc05ee5116ac9 \
@@ -2429,7 +2384,6 @@ typing-extensions==4.15.0 \
     --hash=sha256:0cea48d173cc12fa28ecabc3b837ea3cf6f38c6d1136f85cbaaf598984861466 \
     --hash=sha256:f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548
     # via
-    #   invarlock (pyproject.toml)
     #   autoawq
     #   huggingface-hub
     #   pydantic

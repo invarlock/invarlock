@@ -145,7 +145,9 @@ invarlock advanced calibrate --help
 ```
 
 Use Python extras such as `pip install "invarlock[awq,gptq]"` when you need
-optional backends.
+optional backends. On Python 3.13+ stacks, `gptq` may still require a vendor
+wheel or a supported older interpreter because upstream `auto-gptq` packaging
+remains narrower than the core InvarLock support matrix.
 
 ## Core Concepts
 

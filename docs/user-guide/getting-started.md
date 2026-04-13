@@ -140,7 +140,9 @@ invarlock advanced proof-pack verify <pack> --strict
 
 Optional adapter and backend installs use Python extras such as
 `pip install "invarlock[awq,gptq]"`; they are not managed through CLI
-install or uninstall commands.
+install or uninstall commands. On Python 3.13+ stacks, `gptq` may still
+require a vendor wheel or a supported older interpreter because upstream
+`auto-gptq` packaging remains narrower than the core InvarLock support matrix.
 
 ## Device Support
 
