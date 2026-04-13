@@ -193,7 +193,8 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
 
     gitleaks_install = _find_step_by_name(steps, "Install gitleaks")
     assert (
-        "go install github.com/gitleaks/gitleaks/v8@v8.30.0" in gitleaks_install["run"]
+        "go install github.com/zricethezav/gitleaks/v8@v8.30.0"
+        in gitleaks_install["run"]
     )
 
     build_step = _find_step_by_name(steps, "Build release wheel")
@@ -500,7 +501,8 @@ def test_release_workflow_builds_and_bundles_release_assets():
 
     gitleaks_install = _find_step_by_name(build_steps, "Install gitleaks")
     assert (
-        "go install github.com/gitleaks/gitleaks/v8@v8.30.0" in gitleaks_install["run"]
+        "go install github.com/zricethezav/gitleaks/v8@v8.30.0"
+        in gitleaks_install["run"]
     )
 
     gitleaks_scan = _find_step_by_name(build_steps, "Run gitleaks history scan")
