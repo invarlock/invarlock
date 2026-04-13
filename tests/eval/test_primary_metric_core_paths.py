@@ -221,7 +221,7 @@ def test_compute_primary_metric_accuracy_ensure_counts_handles_non_dict_windows(
             }
         }
     }
-    baseline = {"metrics": {"primary_metric": {"kind": "vqa_accuracy", "final": 2.0}}}
+    baseline = {"metrics": {"primary_metric": {"kind": "accuracy", "final": 2.0}}}
 
     payload = compute_primary_metric_from_report(
         report, kind="accuracy", baseline=baseline

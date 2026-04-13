@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import importlib
 import json
 from copy import deepcopy
 
@@ -14,12 +13,9 @@ from invarlock.reporting import (
     report_validation,
 )
 from invarlock.reporting import (
-    report_make as cert_mod,
-)
-from invarlock.reporting import (
     report_primary_metric_policy as pm_policy,
 )
-from invarlock.reporting import report_schema as cert_schema_mod
+from invarlock.reporting import report_validation_allowlist as allowlist_mod
 from invarlock.reporting import utils as report_utils
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_schema import validate_report
@@ -339,15 +335,15 @@ def test_enforce_pairing_and_coverage_path_matrix() -> None:
 
 
 def test_propagate_pairing_stats_early_returns() -> None:
-    cert_mod._propagate_pairing_stats(evaluation_report=None, ppl_analysis=None)
-    cert_mod._propagate_pairing_stats(evaluation_report={}, ppl_analysis=None)
-    cert_mod._propagate_pairing_stats(
+    pm_policy.propagate_pairing_stats(evaluation_report=None, ppl_analysis=None)
+    pm_policy.propagate_pairing_stats(evaluation_report={}, ppl_analysis=None)
+    pm_policy.propagate_pairing_stats(
         evaluation_report={"dataset": None}, ppl_analysis={}
     )
-    cert_mod._propagate_pairing_stats(
+    pm_policy.propagate_pairing_stats(
         evaluation_report={"dataset": {"windows": None}}, ppl_analysis={}
     )
-    cert_mod._propagate_pairing_stats(
+    pm_policy.propagate_pairing_stats(
         evaluation_report={"dataset": {"windows": {"stats": None}}}, ppl_analysis={}
     )
 
@@ -413,27 +409,18 @@ def test_compute_validation_flags_acceptance_bounds_and_accuracy_tiny_relax() ->
     assert flags2.get("primary_metric_acceptable") is True
 
 
-def test_evaluation_report_module_schema_tightening_paths(monkeypatch) -> None:
-    original_schema = cert_schema_mod.REPORT_JSON_SCHEMA
-    try:
-        monkeypatch.setattr(
-            cert_schema_mod, "REPORT_JSON_SCHEMA", {"properties": "nope"}
+def test_validation_allowlist_schema_tightening_paths() -> None:
+    with pytest.raises(RuntimeError, match="properties must be a mapping"):
+        allowlist_mod.apply_validation_allowlist_schema(
+            {"properties": "nope"},
+            {"primary_metric_acceptable"},
         )
-        with pytest.raises(RuntimeError, match="properties must be a mapping"):
-            importlib.reload(cert_mod)
 
-        monkeypatch.setattr(
-            cert_schema_mod,
-            "REPORT_JSON_SCHEMA",
+    with pytest.raises(RuntimeError, match="properties.validation must be a mapping"):
+        allowlist_mod.apply_validation_allowlist_schema(
             {"properties": {"validation": "nope"}},
+            {"primary_metric_acceptable"},
         )
-        with pytest.raises(
-            RuntimeError, match="properties.validation must be a mapping"
-        ):
-            importlib.reload(cert_mod)
-    finally:
-        monkeypatch.setattr(cert_schema_mod, "REPORT_JSON_SCHEMA", original_schema)
-        importlib.reload(cert_mod)
 
 
 def test_make_evaluation_report_ratio_ci_fallback_skips_non_interval(

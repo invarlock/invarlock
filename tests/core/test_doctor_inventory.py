@@ -148,9 +148,9 @@ def test_build_generic_inventory_rows_uses_plugin_extra_hints() -> None:
     rows = build_generic_inventory_rows(
         registry,
         kind="edits",
-        check_plugin_extras=lambda name, kind: "⚠️ missing invarlock[quant]"
-        if name == "quant_rtn"
-        else "",
+        check_plugin_extras=lambda name, kind: (
+            "⚠️ missing invarlock[quant]" if name == "quant_rtn" else ""
+        ),
     )
 
     assert len(rows) == 1

@@ -9,19 +9,7 @@ on:
     branches: [ main ]
     # Allow supply-chain job to run on release tags too.
     tags: [ 'v*' ]
-    paths-ignore:
-      # docs-only changes are validated in docs-ci.yml on push/PR instead.
-      - 'docs/**'
-      - '*.md'
-      - '.markdownlint*'
-      - 'mkdocs.yml'
   pull_request:
-    paths-ignore:
-      # docs-only changes are validated in docs-ci.yml on push/PR instead.
-      - 'docs/**'
-      - '*.md'
-      - '.markdownlint*'
-      - 'mkdocs.yml'
   workflow_dispatch:
     inputs:
       full:
@@ -69,6 +57,12 @@ jobs:
 
       - name: Install (core + hf + docs)
         run: python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
+
+      - name: Run actionlint
+        run: |
+          export PATH="$HOME/go/bin:$PATH"
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+          make actionlint
 
       - name: Curated tests (light import for help/doctor)
         run: |
@@ -141,6 +135,73 @@ jobs:
             tests/reporting \
             tests/cli/test_python_m_invarlock.py
 
+      - name: Packaging smoke (minimal install)
+        run: make packaging-smoke-minimal
+
+  coverage-enforce:
+    if: ${{ github.event_name != 'schedule' && !(github.event_name == 'workflow_dispatch' && inputs.full == 'true') }}
+    runs-on: ubuntu-latest
+    env:
+      INVARLOCK_LIGHT_IMPORT: "1"
+      PYTHON: "python"
+      PYTHONPATH: ${{ github.workspace }}/src
+      PYTHONWARNINGS: "default"
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.13"
+
+      - name: Cache pip
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+        if: ${{ github.actor != 'nektos/act' }}
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-assurance-pip-3.13-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-assurance-pip-3.13-
+
+      - name: Install (hf + assurance tools)
+        run: python -m pip install --require-hashes -r requirements/workflows/assurance-ci-py313.txt
+
+      - name: Enforce coverage thresholds
+        run: make coverage-enforce
+
+  typed-surface:
+    if: ${{ github.event_name != 'schedule' && !(github.event_name == 'workflow_dispatch' && inputs.full == 'true') }}
+    runs-on: ubuntu-latest
+    env:
+      INVARLOCK_LIGHT_IMPORT: "1"
+      PYTHON: "python"
+      PYTHONPATH: ${{ github.workspace }}/src
+      PYTHONWARNINGS: "default"
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: "3.13"
+
+      - name: Cache pip
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+        if: ${{ github.actor != 'nektos/act' }}
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-typed-pip-3.13-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-typed-pip-3.13-
+
+      - name: Install (hf + assurance tools)
+        run: python -m pip install --require-hashes -r requirements/workflows/assurance-ci-py313.txt
+
+      - name: Run typed-surface mypy
+        run: make mypy-typed-surface
+
   # Scheduled (or manual full) gate: broader tests + lint/format + docs build.
   verify-full:
     if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.full == 'true') }}
@@ -175,6 +236,10 @@ jobs:
       - name: Full verify
         run: |
           make verify
+          export PATH="$HOME/go/bin:$PATH"
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+          make actionlint
+          make packaging-smoke-minimal
           mkdocs build --strict
 
   # Supply-chain security (weekly + tags only to save cost)
@@ -193,8 +258,8 @@ jobs:
       - name: Install supply-chain tools
         run: python -m pip install --require-hashes -r requirements/workflows/security-ci-py313.txt
 
-      - name: Generate SBOM
-        run: bash scripts/generate_sbom.sh
+      - name: Generate tool-environment SBOM
+        run: bash scripts/generate_sbom.sh --scope tool-environment
 
       - name: Run pip-audit
-        run: pip-audit --ignore-vuln GHSA-4xh5-x5gv-qwph
+        run: python scripts/security/run_pip_audit.py

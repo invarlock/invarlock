@@ -401,7 +401,7 @@ def test_to_serialisable_dict_uses_dict_method(tmp_path: Path):
 
     with ExitStack() as stack:
         stack.enter_context(
-            patch("invarlock.core.config_runtime.load_config", lambda p: Cfg())
+            patch("invarlock.core.config_loader.load_config", lambda p: Cfg())
         )
         stack.enter_context(
             patch(
@@ -433,6 +433,19 @@ def test_to_serialisable_dict_uses_dict_method(tmp_path: Path):
                         context={"dataset_meta": {}},
                         status="success",
                     )
+                ),
+            )
+        )
+        stack.enter_context(
+            patch(
+                "invarlock.cli.run_runtime.resolve_tokenizer",
+                lambda *_a, **_k: (
+                    SimpleNamespace(
+                        eos_token="</s>",
+                        pad_token="</s>",
+                        vocab_size=50000,
+                    ),
+                    "tokhash123",
                 ),
             )
         )

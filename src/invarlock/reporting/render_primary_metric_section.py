@@ -75,7 +75,7 @@ def append_primary_metric_section(
 
     lines.append("")
     kind_name = str(kind).lower()
-    if estimated_flag and kind_name in {"accuracy", "vqa_accuracy"}:
+    if estimated_flag and kind_name == "accuracy":
         lines.append(
             "- Note: Accuracy derived from pseudo counts (quick dev preset); use a labeled preset for measured accuracy."
         )
@@ -84,7 +84,7 @@ def append_primary_metric_section(
     lines.append(f"| Preview | {_fmt_by_kind(preview, str(kind))} |")
     lines.append(f"| Final | {_fmt_by_kind(final, str(kind))} |")
 
-    if kind in {"accuracy", "vqa_accuracy"}:
+    if kind == "accuracy":
         lines.append(f"| Δ vs Baseline | {_fmt_by_kind(ratio, str(kind))} |")
         try:
             baseline_point = primary_metric.get("baseline_point")

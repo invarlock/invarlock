@@ -16,9 +16,12 @@ from typing import Any
 from invarlock.adapters.capabilities import ModelCapabilities
 from invarlock.adapters.hf_loading import resolve_trust_remote_code
 from invarlock.adapters.hf_mixin import HFAdapterMixin
+from invarlock.core.abi import INVARLOCK_CORE_ABI as CORE_ABI
 from invarlock.core.api import ModelAdapter
 from invarlock.core.error_utils import wrap_errors
 from invarlock.core.exceptions import DependencyError, ModelLoadError
+
+INVARLOCK_CORE_ABI = CORE_ABI
 
 _AWQ_IMPORT_ERRORS = (
     AttributeError,

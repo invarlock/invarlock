@@ -273,15 +273,16 @@ def test_hf_multimodal_load_model_uses_resolved_strategy(
     calls: list[tuple[str, str, dict[str, object]]] = []
     monkeypatch.setattr(
         "invarlock.adapters.hf_multimodal.resolve_core_loader_strategy",
-        lambda **kwargs: auto_strategy
-        if kwargs.get("allow_direct_submodule") is False
-        else strategy,
+        lambda **kwargs: (
+            auto_strategy if kwargs.get("allow_direct_submodule") is False else strategy
+        ),
     )
     monkeypatch.setattr(
         adapter,
         "_load_pretrained_model",
-        lambda loader, model_id, **kwargs: calls.append((loader, model_id, kwargs))
-        or {"loader": loader},
+        lambda loader, model_id, **kwargs: (
+            calls.append((loader, model_id, kwargs)) or {"loader": loader}
+        ),
     )
     monkeypatch.setattr(
         adapter,
@@ -315,9 +316,9 @@ def test_hf_multimodal_load_model_falls_back_to_auto_loader(
 
     monkeypatch.setattr(
         "invarlock.adapters.hf_multimodal.resolve_core_loader_strategy",
-        lambda **kwargs: auto_strategy
-        if kwargs.get("allow_direct_submodule") is False
-        else strategy,
+        lambda **kwargs: (
+            auto_strategy if kwargs.get("allow_direct_submodule") is False else strategy
+        ),
     )
     load_calls: list[str] = []
 

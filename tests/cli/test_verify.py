@@ -491,6 +491,40 @@ def test_verify_rejects_noncanonical_baseline_directory(tmp_path: Path):
     assert result.exit_code == 2
 
 
+def test_verify_rejects_ambiguous_report_directory(tmp_path: Path) -> None:
+    report_dir = tmp_path / "report-dir"
+    report_dir.mkdir()
+    (report_dir / "report.json").write_text("{}", encoding="utf-8")
+    (report_dir / "evaluation.report.json").write_text(
+        json.dumps(_build_sample_evaluation_report()),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["verify", str(report_dir)])
+
+    assert result.exit_code == 2
+
+
+def test_verify_rejects_ambiguous_baseline_directory(tmp_path: Path) -> None:
+    report_dir = tmp_path / "report-dir"
+    report_dir.mkdir()
+    (report_dir / "evaluation.report.json").write_text(
+        json.dumps(_build_sample_evaluation_report()),
+        encoding="utf-8",
+    )
+    baseline_dir = tmp_path / "baseline-dir"
+    baseline_dir.mkdir()
+    (baseline_dir / "report.json").write_text("{}", encoding="utf-8")
+    (baseline_dir / "evaluation.report.json").write_text("{}", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        ["verify", str(report_dir), "--baseline", str(baseline_dir)],
+    )
+
+    assert result.exit_code == 2
+
+
 def test_validate_pairing_overlap_violation_direct() -> None:
     cert = _build_sample_evaluation_report()
     windows = cert.setdefault("dataset", {}).setdefault("windows", {})

@@ -20,15 +20,19 @@ def test_load_validation_allowlist_prefers_contract_file(monkeypatch):
     monkeypatch.setattr(
         allowlist_mod, "load_json_contract", lambda _filename: {"bad": True}
     )
-    keys2 = allowlist_mod.load_validation_allowlist()
-    # Fallback to default allowlist when file content is invalid
-    assert allowlist_mod.DEFAULT_VALIDATION_ALLOWLIST.issubset(keys2)
+    with pytest.raises(
+        allowlist_mod.ValidationAllowlistContractError,
+        match="non-empty JSON array of strings",
+    ):
+        allowlist_mod.load_validation_allowlist()
 
 
-def test_load_validation_allowlist_with_source_reports_fallback() -> None:
-    keys, source = allowlist_mod.load_validation_allowlist_with_source()
-    assert isinstance(keys, set)
-    assert source == "contracts" or source.startswith("fallback:")
+def test_load_validation_allowlist_strict_prefers_contract_file(monkeypatch):
+    monkeypatch.setattr(
+        allowlist_mod, "load_json_contract", lambda _filename: ["a", "b"]
+    )
+
+    assert allowlist_mod.load_validation_allowlist_strict() == {"a", "b"}
 
 
 def test_apply_validation_allowlist_schema_fails_closed() -> None:
@@ -58,6 +62,7 @@ def test_compute_edit_digest_paths():
 def test_is_ppl_kind_variants():
     assert primary_metric_policy_mod.is_ppl_kind("ppl_causal")
     assert primary_metric_policy_mod.is_ppl_kind("ppl_seq2seq")
+    assert not primary_metric_policy_mod.is_ppl_kind("perplexity")
     assert not primary_metric_policy_mod.is_ppl_kind("accuracy")
 
 

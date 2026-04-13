@@ -19,7 +19,11 @@ def emit(payload: Any, exit_code: int) -> None:
     - Accepts dicts or dataclasses
     - Exits with provided code via Typer
     """
-    payload_obj: Any = asdict(payload) if is_dataclass(payload) else payload
+    payload_obj: Any = (
+        asdict(payload)
+        if is_dataclass(payload) and not isinstance(payload, type)
+        else payload
+    )
     if isinstance(payload_obj, dict):
         payload_obj.setdefault("ts", _ts())
         payload_obj.setdefault("component", "cli")

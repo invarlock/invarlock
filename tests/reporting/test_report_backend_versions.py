@@ -5,7 +5,6 @@ import os
 import sys
 from types import SimpleNamespace
 
-from invarlock.reporting import report_make as C
 from invarlock.reporting import report_provenance as provenance_mod
 
 
@@ -44,7 +43,7 @@ def test_collect_backend_versions_with_fake_torch(monkeypatch):
     fake_torch = _make_fake_torch(cuda_available=True)
     monkeypatch.setitem(__import__("sys").modules, "torch", fake_torch)
 
-    info = C._collect_backend_versions()
+    info = provenance_mod.collect_backend_versions()
     # Python/platform keys are always present when platform module works
     assert isinstance(info.get("python"), str)
     # Torch-derived keys should be populated from the fake module
@@ -72,7 +71,7 @@ def test_collect_backend_versions_without_torch(monkeypatch):
 
     monkeypatch.setattr(builtins, "__import__", fake_import)
 
-    info = C._collect_backend_versions()
+    info = provenance_mod.collect_backend_versions()
     # Should still return Python/platform basics, but no torch keys
     assert isinstance(info.get("python"), str)
     assert "torch" not in info
@@ -97,7 +96,7 @@ def test_collect_backend_versions_tolerates_platform_and_env_failures(monkeypatc
     monkeypatch.setattr(provenance_mod.platform, "python_version", boom)
     monkeypatch.setattr(provenance_mod, "os", SimpleNamespace(environ=RaisingEnv()))
 
-    info = C._collect_backend_versions()
+    info = provenance_mod.collect_backend_versions()
     assert "python" not in info
     assert "cublas_workspace_config" not in info
 
@@ -122,7 +121,7 @@ def test_collect_backend_versions_handles_partial_torch_metadata(monkeypatch):
 
     monkeypatch.setitem(sys.modules, "torch", fake_torch)
 
-    info = C._collect_backend_versions()
+    info = provenance_mod.collect_backend_versions()
     assert info["torch"] == "2.4.0"
     assert info["device_name"] == "Partial GPU"
     assert "torch_cuda" not in info
@@ -169,7 +168,7 @@ def test_collect_backend_versions_tolerates_runtime_errors(monkeypatch):
 
     monkeypatch.setitem(sys.modules, "torch", fake_torch)
 
-    info = C._collect_backend_versions()
+    info = provenance_mod.collect_backend_versions()
     assert info["torch"] == "2.5.0"
     assert info["torch_cuda"] == "12.4"
     assert info["torch_cudnn"] == "9.0.0"
@@ -193,7 +192,7 @@ def test_collect_backend_versions_skips_missing_optional_backends(monkeypatch):
 
     monkeypatch.setitem(sys.modules, "torch", fake_torch)
 
-    info = C._collect_backend_versions()
+    info = provenance_mod.collect_backend_versions()
     assert info["torch"] == "2.6.0"
     assert info["torch_cuda"] == "12.5"
     assert info["torch_cudnn"] == "9.1.0"

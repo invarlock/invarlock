@@ -10,8 +10,8 @@
 | **Requires** | `invarlock[adapters]` for HF adapters, `invarlock[edits]` for built-in edits, `invarlock[guards]` for guard math, `invarlock[eval]` for dataset providers. |
 | **Network** | Offline by default; CLI runs use `evaluate --allow-network`, while Python callers set `INVARLOCK_ALLOW_NETWORK=1` to download models or datasets. |
 | **Inputs** | Model instance, adapter, edit, guard list, `RunConfig`, optional calibration data. |
-| **Outputs / Artifacts** | `RunReport` object; optional event logs/checkpoints; evaluation bundles via `report_make.make_report(...)` and `report_bundle.save_evaluation_bundle(...)`. |
-| **Source of truth** | `src/invarlock/core/runner.py`, `src/invarlock/core/api.py`, `src/invarlock/cli/config_execution.py`, `src/invarlock/reporting/report_make.py`, `src/invarlock/reporting/report_bundle.py`, `src/invarlock/reporting/report_console.py`, `src/invarlock/reporting/report_files.py`, `src/invarlock/reporting/report_schema.py`. |
+| **Outputs / Artifacts** | `RunReport` object; optional event logs/checkpoints; evaluation bundles via `invarlock.reporting.make_report(...)` and `report_bundle.save_evaluation_bundle(...)`. |
+| **Source of truth** | `src/invarlock/core/runner.py`, `src/invarlock/core/api.py`, `src/invarlock/cli/config_execution.py`, `src/invarlock/reporting/report_make.py`, `src/invarlock/reporting/report_make_inputs.py`, `src/invarlock/reporting/report_make_assembly.py`, `src/invarlock/reporting/report_make_output.py`, `src/invarlock/reporting/report_bundle.py`, `src/invarlock/reporting/report_console.py`, `src/invarlock/reporting/report_files.py`, `src/invarlock/reporting/report_schema.py`. |
 
 ## Quick Start
 
@@ -49,7 +49,7 @@ print("primary metric:", report.metrics.get("primary_metric"))
 - **Snapshots**: retries use snapshot/restore; configure via
   `context.snapshot.*` when using YAML configs.
 - **reports**: generated from `RunReport` + baseline report via
-  `invarlock.reporting.report_make.make_report`, then persisted as an
+  `invarlock.reporting.make_report`, then persisted as an
   evaluation bundle with `invarlock.reporting.report_bundle.save_evaluation_bundle`.
 - **Verification**: CLI-side `invarlock verify` enforces
   `runtime.manifest.json` attestation for attested outputs in addition to schema
@@ -62,7 +62,7 @@ print("primary metric:", report.metrics.get("primary_metric"))
 | User code | Build `RunConfig`, call `execute`, consume `RunReport`. |
 | CoreRunner | Orchestrate phases, apply edit, assemble status + metrics. |
 | Adapter | Load/describe model, snapshot/restore. |
-| Guards | `prepare`/`validate`, return action (warn/rollback/abort). |
+| Guards | `prepare`/`validate`, return typed decisions (`allow`/`monitor`/`rollback`/`block`). |
 | Eval | Build windows, compute primary metric + tail metrics. |
 | report | `make_report(report, baseline)` + `save_evaluation_bundle(...)` for evaluation-bundle generation. |
 
@@ -144,9 +144,9 @@ report = CoreRunner().execute(
 
 | Outcome | Trigger | RunReport evidence |
 | --- | --- | --- |
-| Warn | Guard returns `action: warn`. | `report.guards[].warnings`; `report.status = success`. |
-| Rollback | Guard failures or primary-metric gates fail. | `report.status = rollback`; `report.meta.rollback_reason`. |
-| Abort | Exceptions or `action: abort`. | `report.status = failed`; `report.error`. |
+| Monitor | Guard returns `decision: monitor`. | `report.guards[].decision = monitor`; `report.status = success`. |
+| Rollback | Guard returns `decision: rollback`, or guard/primary-metric gates fail. | `report.status = rollback`; `report.meta.rollback_reason`. |
+| Failed | Unrecoverable runner exception. | `report.status = failed`; `report.error`. |
 
 ### Interfaces
 
@@ -162,13 +162,15 @@ class CustomGuard(Guard):
         return {"ready": True}
 
     def validate(self, model, adapter, context):
-        return {"passed": True, "action": "warn", "metrics": {"ok": 1}}
+        return {"passed": True, "decision": "monitor", "metrics": {"ok": 1}}
 ```
 
 Notes:
 
 - The runner calls `prepare(...)` when the guard implements it (`GuardWithPrepare`).
 - `validate(...)` is always called during the guard phase.
+- `validate(...)` should emit the typed decision vocabulary:
+  `allow`, `monitor`, `rollback`, or `block`.
 - Optional lifecycle helpers (`before_edit`, `after_edit`, `finalize`) are only
   invoked when you manage guards manually (for example via `GuardChain`).
 

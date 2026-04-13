@@ -8,9 +8,6 @@ def test_guard_overhead_prepare_with_ratio_and_string_threshold():
     raw = {
         "overhead_ratio": 1.015,
         "overhead_threshold": "0.02",  # string convertible
-        "messages": ["ok"],
-        "warnings": None,
-        "errors": None,
         "checks": None,
     }
     sanitized, passed = prepare_guard_overhead_section(raw)
@@ -18,6 +15,7 @@ def test_guard_overhead_prepare_with_ratio_and_string_threshold():
     assert passed is True
     assert math.isclose(sanitized["overhead_ratio"], 1.015, rel_tol=1e-9)
     assert math.isclose(sanitized["threshold_percent"], 2.0, rel_tol=1e-9)
+    assert sanitized["diagnostics"] == []
 
     flags = compute_validation_flags(
         ppl={"ratio_vs_baseline": 1.0, "preview_final_ratio": 1.0},

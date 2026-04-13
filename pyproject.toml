@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "invarlock"
-version = "0.7.0"
+version = "0.7.1"
 description = "Edit‑agnostic robustness evaluation reports for weight edits (InvarLock framework)"
 authors = [{ name = "InvarLock Team", email = "oss@invarlock.dev" }]
 maintainers = [{ name = "InvarLock Maintainers", email = "support@invarlock.dev" }]
@@ -32,15 +32,11 @@ dependencies = [
     "click>=8.1",
     "shellingham>=1.5.0",
     "cryptography>=46.0.0",
-    "pandas>=2.2",
-    "scikit-learn>=1.4",
     "pydantic>=2.0",
     "rich>=13.0",
     "pyyaml>=6.0",
     "markdown>=3.5",
     "psutil>=5.9",
-    "hypothesis>=6.98",
-    "typing_extensions>=4.7",
     "jsonschema>=4.0",
 ]
 [project.urls]
@@ -98,10 +94,15 @@ eval = [
   "requests>=2.33.0",
 ]
 
+# Dedicated probe stack for mutual-information/probe execution.
+probes = [
+  "scikit-learn>=1.4",
+]
+
 # External edit integrations
 gptq = [
   "torch>=2.1.0",
-  "auto-gptq>=0.7.0; platform_system == \"Linux\"",
+  "auto-gptq>=0.7.0; platform_system == \"Linux\" and python_version < \"3.13\"",
   "triton>=2.3.0; platform_system == \"Linux\"",
   "transformers>=5.5.0",
   "safetensors>=0.4.0",
@@ -134,10 +135,11 @@ advanced = [
   "datasets>=3.0",
   "requests>=2.33.0",
   "numpy>=1.24",
+  "scikit-learn>=1.4",
   "huggingface_hub>=1.0.0",
   "accelerate>=0.27",
   "bitsandbytes>=0.41",
-  "auto-gptq>=0.7.0; platform_system == \"Linux\"",
+  "auto-gptq>=0.7.0; platform_system == \"Linux\" and python_version < \"3.13\"",
   "autoawq>=0.2.0; platform_system == \"Linux\"",
   "triton>=2.3.0; platform_system == \"Linux\"",
   "aiohttp>=3.12.14",
@@ -156,10 +158,11 @@ all = [
   "datasets>=3.0",
   "requests>=2.33.0",
   "numpy>=1.24",
+  "scikit-learn>=1.4",
   "huggingface_hub>=1.0.0",
   "accelerate>=0.27",
   "bitsandbytes>=0.41",
-  "auto-gptq>=0.7.0; platform_system == \"Linux\"",
+  "auto-gptq>=0.7.0; platform_system == \"Linux\" and python_version < \"3.13\"",
   "autoawq>=0.2.0; platform_system == \"Linux\"",
   "triton>=2.3.0; platform_system == \"Linux\"",
   "aiohttp>=3.12.14",
@@ -189,19 +192,20 @@ dev = [
 
 ci = [
   "pytest>=7.0",
+  "pytest-cov>=4.0",
   "ruff==0.15.9",
+  "mypy>=1.0",
   "mkdocs>=1.5",
   "mkdocs-material>=9.5",
   "mkdocs-mermaid2-plugin>=1.1",
   "build>=0.10.0",
+  "wheel>=0.46.0",
   "requests>=2.33.0",
 ]
 
 docs-ci = [
   "linkchecker>=10.5",
   "requests>=2.33.0",
-  "mypy>=1.0",
-  "hypothesis>=6.98",
 ]
 
 precommit-ci = [
@@ -323,9 +327,13 @@ strict_equality = true
 
 [[tool.mypy.overrides]]
 module = [
+    "psutil",
+    "psutil.*",
     "torch.*",
     "transformers.*",
     "auto_gptq.*",
+    "requests",
+    "requests.*",
     "yaml",
     "jsonschema",
     "datasets.*",
@@ -337,18 +345,160 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = [
-    "invarlock.adapters.*",
-    "invarlock.edits.*",
-    "invarlock.eval.*",
-    "invarlock.guards.*",
-    "invarlock.observability.*",
-    "invarlock.cli.*",
+    "invarlock.adapters.__init__",
+    "invarlock.adapters.base",
+    "invarlock.adapters.base_types",
+    "invarlock.adapters.capabilities",
+    "invarlock.adapters.hf_causal",
+    "invarlock.adapters.hf_loading",
+    "invarlock.adapters.hf_mixin",
+    "invarlock.adapters.hf_mlm",
+    "invarlock.adapters.hf_multimodal",
+    "invarlock.adapters.hf_seq2seq",
+    "invarlock.edits.__init__",
+    "invarlock.edits.noop",
+    "invarlock.edits.quant_rtn",
+    "invarlock.edits.registry",
+    "invarlock.eval.__init__",
+    "invarlock.eval.bench",
+    "invarlock.eval.bench_policy",
+    "invarlock.eval.bench_regression",
+    "invarlock.eval.bench_runner",
+    "invarlock.eval.bootstrap",
+    "invarlock.eval.data",
+    "invarlock.eval.data_capacity",
+    "invarlock.eval.data_difficulty",
+    "invarlock.eval.data_providers",
+    "invarlock.eval.data_stratification",
+    "invarlock.eval.data_support",
+    "invarlock.eval.data_tokenization",
+    "invarlock.eval.data_windows",
+    "invarlock.eval.metrics",
+    "invarlock.eval.metrics_activation",
+    "invarlock.eval.metrics_aggregation",
+    "invarlock.eval.metrics_environment",
+    "invarlock.eval.metrics_lens",
+    "invarlock.eval.metrics_model_io",
+    "invarlock.eval.metrics_runtime",
+    "invarlock.eval.metrics_support",
+    "invarlock.eval.primary_metric",
+    "invarlock.eval.probes.__init__",
+    "invarlock.eval.probes.fft",
+    "invarlock.eval.probes.post_attention",
+    "invarlock.eval.providers.base",
+    "invarlock.eval.providers.local_jsonl",
+    "invarlock.eval.providers.local_jsonl_pairs",
+    "invarlock.eval.providers.local_jsonl_shared",
+    "invarlock.eval.providers.seq2seq",
+    "invarlock.eval.providers.text_lm",
+    "invarlock.eval.providers.vision_text",
+    "invarlock.eval.tail_stats",
+    "invarlock.eval.tasks.__init__",
+    "invarlock.eval.tasks.classification",
+    "invarlock.eval.tasks.qa",
+    "invarlock.eval.tasks.text_generation",
+    "invarlock.eval.window_planning",
+    "invarlock.guards.__init__",
+    "invarlock.guards._contracts",
+    "invarlock.guards._estimators",
+    "invarlock.guards.invariants",
+    "invarlock.guards.policies",
+    "invarlock.guards.rmt",
+    "invarlock.guards.rmt_activation_runtime",
+    "invarlock.guards.rmt_analysis",
+    "invarlock.guards.rmt_detection",
+    "invarlock.guards.rmt_math",
+    "invarlock.guards.rmt_policy",
+    "invarlock.guards.rmt_result_contract",
+    "invarlock.guards.rmt_runtime",
+    "invarlock.guards.rmt_types",
+    "invarlock.guards.spectral",
+    "invarlock.guards.spectral_analysis",
+    "invarlock.guards.spectral_control",
+    "invarlock.guards.spectral_detection",
+    "invarlock.guards.spectral_measurement",
+    "invarlock.guards.spectral_policy",
+    "invarlock.guards.spectral_results",
+    "invarlock.guards.spectral_runtime",
+    "invarlock.guards.spectral_selection",
+    "invarlock.guards.spectral_types",
+    "invarlock.guards.tier_config",
+    "invarlock.guards.variance",
+    "invarlock.guards.variance_batching",
+    "invarlock.guards.variance_evaluation",
+    "invarlock.guards.variance_ops",
+    "invarlock.guards.variance_policy",
+    "invarlock.guards.variance_prepare",
+    "invarlock.guards.variance_results",
+    "invarlock.guards.variance_runtime",
+    "invarlock.guards.variance_scaling",
+    "invarlock.guards.variance_targets",
+    "invarlock.guards.variance_types",
     "invarlock.model_utils",
     "invarlock.sparsity_utils",
     "invarlock.utils",
     "invarlock.core.runner",
 ]
 ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = [
+    "invarlock.cli.assurance",
+    "invarlock.cli.backend_runtime",
+    "invarlock.cli.bench",
+    "invarlock.cli.commands.__init__",
+    "invarlock.cli.commands.advanced",
+    "invarlock.cli.commands.calibrate",
+    "invarlock.cli.commands.doctor",
+    "invarlock.cli.commands.explain_gates",
+    "invarlock.cli.commands.export_html",
+    "invarlock.cli.commands.plugins",
+    "invarlock.cli.commands.policy",
+    "invarlock.cli.commands.proof_pack",
+    "invarlock.cli.commands.report",
+    "invarlock.cli.commands.run",
+    "invarlock.cli.config_execution",
+    "invarlock.cli.constants",
+    "invarlock.cli.device",
+    "invarlock.cli.doctor_helpers",
+    "invarlock.cli.internal_config_run",
+    "invarlock.cli.output",
+    "invarlock.cli.overhead_utils",
+    "invarlock.cli.run_artifact_output",
+    "invarlock.cli.run_artifacts",
+    "invarlock.cli.run_config",
+    "invarlock.cli.run_execution",
+    "invarlock.cli.run_execution_output",
+    "invarlock.cli.run_masking",
+    "invarlock.cli.run_overhead",
+    "invarlock.cli.run_pairing",
+    "invarlock.cli.run_pairing_baseline",
+    "invarlock.cli.run_pairing_helpers",
+    "invarlock.cli.run_runtime",
+    "invarlock.cli.run_runtime_exec",
+    "invarlock.cli.run_serialization",
+    "invarlock.cli.run_shell_output",
+    "invarlock.cli.run_warning_filters",
+    "invarlock.cli.runtime_launch_plan",
+    "invarlock.cli.security_helpers",
+    "invarlock.cli.utils",
+]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = [
+    "invarlock.adapters.auto",
+    "invarlock.cli.__init__",
+    "invarlock.cli.__main__",
+    "invarlock.cli._json",
+    "invarlock.cli.app",
+    "invarlock.cli.commands.evaluate",
+    "invarlock.cli.commands.verify",
+    "invarlock.cli.evaluate_output",
+    "invarlock.cli.evaluate_phases",
+    "invarlock.cli.runtime_verify",
+]
+ignore_errors = false
 
 
 [tool.pytest.ini_options]

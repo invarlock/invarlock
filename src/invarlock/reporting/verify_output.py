@@ -47,7 +47,7 @@ def _coerce_ci_output(ci: Any) -> list[float] | None:
 
 
 def _metric_family(kind: str) -> str:
-    if kind in {"accuracy", "vqa_accuracy"}:
+    if kind == "accuracy":
         return "accuracy"
     if kind.startswith("ppl"):
         return "ppl"

@@ -202,17 +202,17 @@ name = "auto-gptq"
 version = "0.7.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "accelerate", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
-    { name = "datasets", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
-    { name = "gekko", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
-    { name = "numpy", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
-    { name = "peft", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
-    { name = "rouge", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
-    { name = "safetensors", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
-    { name = "sentencepiece", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
-    { name = "torch", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
-    { name = "tqdm", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
-    { name = "transformers", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "accelerate", marker = "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "datasets", marker = "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "gekko", marker = "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "numpy", marker = "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "peft", marker = "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "rouge", marker = "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "safetensors", marker = "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "sentencepiece", marker = "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "torch", marker = "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "tqdm", marker = "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "transformers", marker = "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/90/e5/b22697903982284fe284568fb2663a2196694a8eee637f5cf4ccfe435a38/auto_gptq-0.7.1.tar.gz", hash = "sha256:5c61ad380e9b4c603757c254765e9083a90a820cd0aff1b5d2c6f7fd96c85e80", size = 126148, upload-time = "2024-03-01T13:09:30.998Z" }
 
@@ -1102,7 +1102,7 @@ name = "gekko"
 version = "1.3.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numpy", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "numpy", marker = "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/12/0e/fe8a9e823c059141560106cdf5e0e4338c71a60d4802e32dca0e2b2129d5/gekko-1.3.2.tar.gz", hash = "sha256:a399cd9f896c864adbdfbb9dd052f957d106f454e0a711bd53db696c889ace7e", size = 13080745, upload-time = "2025-12-31T18:47:38.139Z" }
 wheels = [
@@ -1303,23 +1303,19 @@ wheels = [
 
 [[package]]
 name = "invarlock"
-version = "0.7.0"
+version = "0.7.1"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
     { name = "cryptography" },
-    { name = "hypothesis" },
     { name = "jsonschema" },
     { name = "markdown" },
-    { name = "pandas" },
     { name = "psutil" },
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "rich" },
-    { name = "scikit-learn" },
     { name = "shellingham" },
     { name = "typer" },
-    { name = "typing-extensions" },
 ]
 
 [package.optional-dependencies]
@@ -1335,7 +1331,7 @@ adapters = [
 advanced = [
     { name = "accelerate" },
     { name = "aiohttp" },
-    { name = "auto-gptq", marker = "sys_platform == 'linux'" },
+    { name = "auto-gptq", marker = "python_full_version < '3.13' and sys_platform == 'linux'" },
     { name = "autoawq", marker = "sys_platform == 'linux'" },
     { name = "bitsandbytes" },
     { name = "datasets" },
@@ -1345,6 +1341,7 @@ advanced = [
     { name = "pillow" },
     { name = "protobuf" },
     { name = "requests" },
+    { name = "scikit-learn" },
     { name = "sentencepiece" },
     { name = "tiktoken" },
     { name = "torch" },
@@ -1354,7 +1351,7 @@ advanced = [
 all = [
     { name = "accelerate" },
     { name = "aiohttp" },
-    { name = "auto-gptq", marker = "sys_platform == 'linux'" },
+    { name = "auto-gptq", marker = "python_full_version < '3.13' and sys_platform == 'linux'" },
     { name = "autoawq", marker = "sys_platform == 'linux'" },
     { name = "bitsandbytes" },
     { name = "datasets" },
@@ -1364,6 +1361,7 @@ all = [
     { name = "pillow" },
     { name = "protobuf" },
     { name = "requests" },
+    { name = "scikit-learn" },
     { name = "sentencepiece" },
     { name = "tiktoken" },
     { name = "torch" },
@@ -1382,9 +1380,12 @@ ci = [
     { name = "mkdocs" },
     { name = "mkdocs-material" },
     { name = "mkdocs-mermaid2-plugin" },
+    { name = "mypy" },
     { name = "pytest" },
+    { name = "pytest-cov" },
     { name = "requests" },
     { name = "ruff" },
+    { name = "wheel" },
 ]
 dev = [
     { name = "bitsandbytes" },
@@ -1405,9 +1406,7 @@ dev = [
     { name = "twine" },
 ]
 docs-ci = [
-    { name = "hypothesis" },
     { name = "linkchecker" },
-    { name = "mypy" },
     { name = "requests" },
 ]
 edits = [
@@ -1419,7 +1418,7 @@ eval = [
     { name = "torch" },
 ]
 gptq = [
-    { name = "auto-gptq", marker = "sys_platform == 'linux'" },
+    { name = "auto-gptq", marker = "python_full_version < '3.13' and sys_platform == 'linux'" },
     { name = "safetensors" },
     { name = "torch" },
     { name = "transformers" },
@@ -1454,6 +1453,9 @@ hf = [
 precommit-ci = [
     { name = "pre-commit" },
 ]
+probes = [
+    { name = "scikit-learn" },
+]
 release-ci = [
     { name = "build" },
     { name = "cyclonedx-bom" },
@@ -1475,9 +1477,9 @@ requires-dist = [
     { name = "aiohttp", marker = "extra == 'advanced'", specifier = ">=3.12.14" },
     { name = "aiohttp", marker = "extra == 'all'", specifier = ">=3.12.14" },
     { name = "aiohttp", marker = "extra == 'hf'", specifier = ">=3.12.14" },
-    { name = "auto-gptq", marker = "sys_platform == 'linux' and extra == 'advanced'", specifier = ">=0.7.0" },
-    { name = "auto-gptq", marker = "sys_platform == 'linux' and extra == 'all'", specifier = ">=0.7.0" },
-    { name = "auto-gptq", marker = "sys_platform == 'linux' and extra == 'gptq'", specifier = ">=0.7.0" },
+    { name = "auto-gptq", marker = "python_full_version < '3.13' and sys_platform == 'linux' and extra == 'advanced'", specifier = ">=0.7.0" },
+    { name = "auto-gptq", marker = "python_full_version < '3.13' and sys_platform == 'linux' and extra == 'all'", specifier = ">=0.7.0" },
+    { name = "auto-gptq", marker = "python_full_version < '3.13' and sys_platform == 'linux' and extra == 'gptq'", specifier = ">=0.7.0" },
     { name = "autoawq", marker = "sys_platform == 'linux' and extra == 'advanced'", specifier = ">=0.2.0" },
     { name = "autoawq", marker = "sys_platform == 'linux' and extra == 'all'", specifier = ">=0.2.0" },
     { name = "autoawq", marker = "sys_platform == 'linux' and extra == 'awq'", specifier = ">=0.2.0" },
@@ -1503,9 +1505,7 @@ requires-dist = [
     { name = "huggingface-hub", marker = "extra == 'advanced'", specifier = ">=1.0.0" },
     { name = "huggingface-hub", marker = "extra == 'all'", specifier = ">=1.0.0" },
     { name = "huggingface-hub", marker = "extra == 'hf'", specifier = ">=1.0.0" },
-    { name = "hypothesis", specifier = ">=6.98" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.98" },
-    { name = "hypothesis", marker = "extra == 'docs-ci'", specifier = ">=6.98" },
     { name = "jsonschema", specifier = ">=4.0" },
     { name = "linkchecker", marker = "extra == 'docs-ci'", specifier = ">=10.5" },
     { name = "markdown", specifier = ">=3.5" },
@@ -1516,13 +1516,12 @@ requires-dist = [
     { name = "mkdocs-material", marker = "extra == 'dev'", specifier = ">=9.5" },
     { name = "mkdocs-mermaid2-plugin", marker = "extra == 'ci'", specifier = ">=1.1" },
     { name = "mkdocs-mermaid2-plugin", marker = "extra == 'dev'", specifier = ">=1.1" },
+    { name = "mypy", marker = "extra == 'ci'", specifier = ">=1.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0" },
-    { name = "mypy", marker = "extra == 'docs-ci'", specifier = ">=1.0" },
     { name = "numpy", marker = "extra == 'advanced'", specifier = ">=1.24" },
     { name = "numpy", marker = "extra == 'all'", specifier = ">=1.24" },
     { name = "numpy", marker = "extra == 'guards'", specifier = ">=1.24" },
     { name = "numpy", marker = "extra == 'hf'", specifier = ">=1.24" },
-    { name = "pandas", specifier = ">=2.2" },
     { name = "pillow", marker = "extra == 'adapters'", specifier = ">=11.3.0" },
     { name = "pillow", marker = "extra == 'advanced'", specifier = ">=11.3.0" },
     { name = "pillow", marker = "extra == 'all'", specifier = ">=11.3.0" },
@@ -1538,6 +1537,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'ci'", specifier = ">=7.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
+    { name = "pytest-cov", marker = "extra == 'ci'", specifier = ">=4.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "requests", marker = "extra == 'advanced'", specifier = ">=2.33.0" },
@@ -1557,7 +1557,9 @@ requires-dist = [
     { name = "safetensors", marker = "extra == 'gptq'", specifier = ">=0.4.0" },
     { name = "safetensors", marker = "extra == 'gpu'", specifier = ">=0.4.0" },
     { name = "safetensors", marker = "extra == 'hf'", specifier = ">=0.4.0" },
-    { name = "scikit-learn", specifier = ">=1.4" },
+    { name = "scikit-learn", marker = "extra == 'advanced'", specifier = ">=1.4" },
+    { name = "scikit-learn", marker = "extra == 'all'", specifier = ">=1.4" },
+    { name = "scikit-learn", marker = "extra == 'probes'", specifier = ">=1.4" },
     { name = "sentencepiece", marker = "extra == 'adapters'", specifier = ">=0.2.1" },
     { name = "sentencepiece", marker = "extra == 'advanced'", specifier = ">=0.2.1" },
     { name = "sentencepiece", marker = "extra == 'all'", specifier = ">=0.2.1" },
@@ -1591,9 +1593,9 @@ requires-dist = [
     { name = "twine", marker = "extra == 'dev'", specifier = ">=4.0.0" },
     { name = "twine", marker = "extra == 'release-ci'", specifier = ">=4.0.0" },
     { name = "typer", specifier = ">=0.15" },
-    { name = "typing-extensions", specifier = ">=4.7" },
+    { name = "wheel", marker = "extra == 'ci'", specifier = ">=0.46.0" },
 ]
-provides-extras = ["adapters", "hf", "guards", "edits", "eval", "gptq", "awq", "gpu", "advanced", "all", "dev", "ci", "docs-ci", "precommit-ci", "release-ci", "security-ci"]
+provides-extras = ["adapters", "hf", "guards", "edits", "eval", "probes", "gptq", "awq", "gpu", "advanced", "all", "dev", "ci", "docs-ci", "precommit-ci", "release-ci", "security-ci"]
 
 [[package]]
 name = "isoduration"
@@ -2827,16 +2829,16 @@ name = "peft"
 version = "0.18.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "accelerate", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
-    { name = "huggingface-hub", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
-    { name = "numpy", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
-    { name = "packaging", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
-    { name = "psutil", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
-    { name = "pyyaml", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
-    { name = "safetensors", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
-    { name = "torch", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
-    { name = "tqdm", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
-    { name = "transformers", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "accelerate", marker = "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "huggingface-hub", marker = "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "numpy", marker = "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "packaging", marker = "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "psutil", marker = "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "pyyaml", marker = "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "safetensors", marker = "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "torch", marker = "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "tqdm", marker = "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "transformers", marker = "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/d8/48/147b3ea999560b40a34fd78724c7777aa9d18409c2250bdcaf9c4f2db7fc/peft-0.18.1.tar.gz", hash = "sha256:2dd0d6bfce936d1850e48aaddbd250941c5c02fc8ef3237cd8fd5aac35e0bae2", size = 635030, upload-time = "2026-01-09T13:08:01.136Z" }
 wheels = [
@@ -3681,7 +3683,7 @@ name = "rouge"
 version = "1.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "six", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "six", marker = "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/db/e4/3420a1ab1e82a280fb6107f7ae99e88eb12383c978fe573c0c64d0327d6b/rouge-1.0.1.tar.gz", hash = "sha256:12b48346ca47d6bcf3c45061f315452b9ccec0620ee895ec85b7efc3d54aae34", size = 14292, upload-time = "2021-07-20T08:45:56.53Z" }
 wheels = [
@@ -4487,6 +4489,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/1d/7a/eb316761ec35664ea5174709a68bbd3389de60d4a1ebab8808bfc264ed67/webcolors-25.10.0.tar.gz", hash = "sha256:62abae86504f66d0f6364c2a8520de4a0c47b80c03fc3a5f1815fedbef7c19bf", size = 53491, upload-time = "2025-10-31T07:51:03.977Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e2/cc/e097523dd85c9cf5d354f78310927f1656c422bd7b2613b2db3e3f9a0f2c/webcolors-25.10.0-py3-none-any.whl", hash = "sha256:032c727334856fc0b968f63daa252a1ac93d33db2f5267756623c210e57a4f1d", size = 14905, upload-time = "2025-10-31T07:51:01.778Z" },
+]
+
+[[package]]
+name = "wheel"
+version = "0.46.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/89/24/a2eb353a6edac9a0303977c4cb048134959dd2a51b48a269dfc9dde00c8a/wheel-0.46.3.tar.gz", hash = "sha256:e3e79874b07d776c40bd6033f8ddf76a7dad46a7b8aa1b2787a83083519a1803", size = 60605, upload-time = "2026-01-22T12:39:49.136Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/87/22/b76d483683216dde3d67cba61fb2444be8d5be289bf628c13fc0fd90e5f9/wheel-0.46.3-py3-none-any.whl", hash = "sha256:4b399d56c9d9338230118d705d9737a2a468ccca63d5e813e2a4fc7815d8bc4d", size = 30557, upload-time = "2026-01-22T12:39:48.099Z" },
 ]
 
 [[package]]

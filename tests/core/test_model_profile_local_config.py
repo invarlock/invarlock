@@ -404,9 +404,9 @@ def test_resolve_tokenizer_uses_explicit_slow_tokenizer_when_auto_retry_still_fa
     monkeypatch.setattr(
         mp,
         "_resolve_explicit_slow_tokenizer_factory",
-        lambda candidate: _BertTokenizerFactory
-        if candidate == "prajjwal1/bert-tiny"
-        else None,
+        lambda candidate: (
+            _BertTokenizerFactory if candidate == "prajjwal1/bert-tiny" else None
+        ),
     )
 
     profile = mp.detect_model_profile("prajjwal1/bert-tiny", adapter="hf_mlm")

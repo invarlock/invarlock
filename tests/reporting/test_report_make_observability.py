@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from invarlock.reporting import report_make as report_make_mod
+import pytest
+
+from invarlock.reporting import report_make_assembly as report_make_assembly_mod
 from invarlock.reporting import report_normalization as report_normalization_mod
 from invarlock.reporting import report_primary_metric_analysis as report_pm_analysis_mod
+from invarlock.reporting import report_validation_allowlist as allowlist_mod
 from invarlock.reporting.report_make import make_report
 from tests.reporting.test_report_full_context import _rich_run_report
 
@@ -129,25 +132,23 @@ def test_make_evaluation_report_marks_broken_env_flag_provenance_unhealthy(
     assert evaluation_report["validation"]["primary_metric_acceptable"] is False
 
 
-def test_make_evaluation_report_rejects_non_contract_allowlist_source_in_ci(
+def test_make_evaluation_report_fails_closed_when_validation_contract_is_unavailable(
     monkeypatch,
 ) -> None:
     report, baseline = _rich_run_report()
     report = deepcopy(report)
     baseline = deepcopy(baseline)
-    report.setdefault("context", {})["profile"] = "ci"
-
     monkeypatch.setattr(
-        report_make_mod,
-        "_VALIDATION_ALLOWLIST_SOURCE",
-        "fallback",
-        raising=False,
+        report_make_assembly_mod,
+        "load_validation_allowlist",
+        lambda: (_ for _ in ()).throw(
+            allowlist_mod.ValidationAllowlistContractError("allowlist-missing")
+        ),
+        raising=True,
     )
 
-    evaluation_report = make_report(report, baseline)
-    diagnostics = evaluation_report.get("meta", {}).get("build_diagnostics", [])
-    codes = {entry.get("code") for entry in diagnostics if isinstance(entry, dict)}
-
-    assert "policy.validation_allowlist_source_invalid" in codes
-    assert "validation_allowlist_fallback" not in evaluation_report["policy_provenance"]
-    assert evaluation_report["validation"]["primary_metric_acceptable"] is False
+    with pytest.raises(
+        allowlist_mod.ValidationAllowlistContractError,
+        match="allowlist-missing",
+    ):
+        make_report(report, baseline)

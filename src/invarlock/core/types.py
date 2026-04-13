@@ -3,28 +3,14 @@ InvarLock Core Types
 ================
 
 Core type definitions and enums used throughout InvarLock.
-Torch-independent type system for cross-module compatibility.
+Torch-independent typed contracts for core execution and guard decisions.
 """
 
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, NamedTuple
 
-_ACTION_PRIORITY = {"none": 0, "warn": 1, "rollback": 2, "abort": 3}
 _DECISION_PRIORITY = {"allow": 0, "monitor": 1, "rollback": 2, "block": 3}
-_ACTION_TO_DECISION = {
-    "none": "allow",
-    "warn": "monitor",
-    "rollback": "rollback",
-    "abort": "block",
-    "reject": "block",
-}
-_DECISION_TO_ACTION = {
-    "allow": "none",
-    "monitor": "warn",
-    "rollback": "rollback",
-    "block": "abort",
-}
 
 
 class EditType(Enum):
@@ -128,7 +114,6 @@ class GuardValidationResult(dict[str, Any]):
         payload = {
             "passed": bool(passed),
             "decision": str(decision),
-            "action": decision_to_action(str(decision)),
             "metrics": dict(metrics or {}),
             "diagnostics": [
                 {
@@ -158,13 +143,6 @@ class GuardValidationResult(dict[str, Any]):
     @property
     def metrics(self) -> dict[str, Any]:
         return dict(self.get("metrics", {}))
-
-    @property
-    def action(self) -> str:
-        raw = self.get("action")
-        if isinstance(raw, str) and raw:
-            return raw
-        return decision_to_action(self.decision)
 
     @property
     def diagnostics(self) -> tuple[GuardDiagnostic, ...]:
@@ -205,7 +183,6 @@ class GuardValidationResult(dict[str, Any]):
         for key in (
             "passed",
             "decision",
-            "action",
             "metrics",
             "diagnostics",
             "policy",
@@ -232,7 +209,6 @@ class GuardOutcome:
     name: str
     passed: bool
     decision: str = ""
-    action: str = ""
     violations: list[dict[str, Any]] | None = None
     metrics: dict[str, Any] | None = None
 
@@ -241,20 +217,16 @@ class GuardOutcome:
             self.violations = []
         if self.metrics is None:
             self.metrics = {}
-        if not self.decision:
-            self.decision = normalize_guard_decision(
-                fallback_action=self.action or None,
-                passed=self.passed,
-            )
-        if not self.action:
-            self.action = decision_to_action(self.decision)
+        self.decision = normalize_guard_decision(
+            self.decision or None, passed=self.passed
+        )
 
 
 @dataclass
 class PolicyConfig:
     """Configuration for guard policies."""
 
-    on_violation: str = "warn"
+    on_violation: str = "monitor"
     guard_overrides: dict[str, str] | None = None
     enable_auto_rollback: bool = False
 
@@ -271,13 +243,11 @@ class PolicyConfig:
         if self.guard_overrides and guard_name in self.guard_overrides:
             return normalize_guard_decision(
                 self.guard_overrides[guard_name],
-                fallback_action=self.guard_overrides[guard_name],
                 passed=False,
             )
 
         normalized_requested = normalize_guard_decision(
             requested_decision,
-            fallback_action=requested_decision,
             passed=False,
         )
         if normalized_requested != "allow":
@@ -285,56 +255,24 @@ class PolicyConfig:
 
         return normalize_guard_decision(
             self.on_violation,
-            fallback_action=self.on_violation,
             passed=False,
         )
-
-    def get_action_for_guard(self, guard_name: str, requested_action: str) -> str:
-        """Get the action for a specific guard."""
-        decision = self.get_decision_for_guard(guard_name, requested_action)
-        return decision_to_action(decision)
-
-
-def get_worst_action(actions: list[str]) -> str:
-    """Get the worst (most severe) action from a list."""
-    if not actions:
-        return "none"
-
-    return max(actions, key=lambda action: _ACTION_PRIORITY.get(action, 0))
 
 
 def normalize_guard_decision(
     decision: str | None = None,
     *,
-    fallback_action: str | None = None,
     passed: bool | None = None,
 ) -> str:
-    """Normalize mixed action/decision inputs onto the typed guard-decision model."""
+    """Normalize guard decisions onto the typed decision vocabulary."""
     if isinstance(decision, str):
         normalized = decision.strip().lower()
-        if normalized:
-            if normalized in _DECISION_PRIORITY:
-                return normalized
-            mapped = _ACTION_TO_DECISION.get(normalized)
-            if mapped is not None:
-                return mapped
-
-    if isinstance(fallback_action, str):
-        normalized_action = fallback_action.strip().lower()
-        if normalized_action:
-            mapped = _ACTION_TO_DECISION.get(normalized_action)
-            if mapped is not None:
-                return mapped
+        if normalized in _DECISION_PRIORITY:
+            return normalized
 
     if passed is False:
         return "block"
     return "allow"
-
-
-def decision_to_action(decision: str) -> str:
-    """Convert a typed guard decision back to the legacy action vocabulary."""
-    normalized = normalize_guard_decision(decision)
-    return _DECISION_TO_ACTION.get(normalized, decision)
 
 
 def get_worst_decision(decisions: list[str]) -> str:
@@ -344,8 +282,7 @@ def get_worst_decision(decisions: list[str]) -> str:
     return max(
         decisions,
         key=lambda decision: _DECISION_PRIORITY.get(
-            normalize_guard_decision(decision, fallback_action=decision),
-            0,
+            normalize_guard_decision(decision), 0
         ),
     )
 

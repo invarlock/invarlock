@@ -15,7 +15,10 @@ def test_architecture_doc_tracks_shell_core_redesign() -> None:
         "cli/run_overhead.py",
         "cli/run_artifacts.py",
         "cli/run_execution.py",
-        "`report_make.py` | Canonical evaluation-report assembly owner",
+        "`report_make.py` | Public evaluation-report entrypoint that coordinates the split report-making owners",
+        "`report_make_inputs.py` | Input normalization, baseline reference building, and build-section extraction",
+        "`report_make_assembly.py` | Policy/provenance/guard assembly and report build-context composition",
+        "`report_make_output.py` | Final evaluation-report shaping and output payload construction",
         "`report_bundle.py` | Evaluation-bundle persistence, manifest writing, and evidence attachment",
         "`report_contract.py` | Input loading and report-generation planning",
         "`report_console.py`",
@@ -28,11 +31,17 @@ def test_architecture_doc_tracks_shell_core_redesign() -> None:
         "## Architecture Guardrails",
         "No lazy exports",
         "No `rmt_legacy` references in production source.",
-        "No dependency-map orchestration for `run`.",
+        "No dependency-map orchestration in command shells.",
         "No CLI imports inside owner layers.",
     )
 
     missing = [snippet for snippet in required_snippets if snippet not in text]
     assert not missing, "\n".join(missing)
+    assert "evaluate | run | verify" not in text
+    assert "│  │ evaluate │ │   run    │" not in text
+    assert "| `run` |" not in text
+    assert "| `plugins` |" not in text
+    assert "| `advanced` |" in text
+    assert "| `version` |" in text
     assert "report_builder.py" not in text
     assert "report_make_support.py" not in text

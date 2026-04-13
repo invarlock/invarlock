@@ -87,7 +87,14 @@ security or alignment.
   use must be opted into per command.
 - Runtime security defaults keep model-loading commands containerized, third-party
   plugins disabled, and remote model code off unless explicitly allowed.
-- Supply-chain checks in CI (SBOM generation, `pip-audit`, secret scanning).
+- Supply-chain checks in CI and PR validation (install-surface SBOM
+  generation, `pip-audit` on the base/`hf`/`advanced` shipped surfaces,
+  `gitleaks` history JSON/SARIF scanning), with scheduled/tag
+  backstops for drift detection.
+- CodeQL scans shipped Python code plus repository helper scripts, and the
+  analysis workflow fails closed if upload/analysis cannot complete.
+- Release automation only rebuilds and publishes from validated tags resolved
+  to an immutable commit SHA.
 - Strict configuration and report validation (`invarlock doctor`,
   `invarlock verify`) to detect misconfiguration, schema drift, and runtime
   attestation mismatches.

@@ -15,7 +15,7 @@ def _fmt_by_kind(x: Any, k: str) -> str:
     except (TypeError, ValueError):
         return "N/A"
     k = str(k).lower()
-    if k in {"accuracy", "vqa_accuracy"}:
+    if k == "accuracy":
         return f"{xv * 100.0:.1f}"
     if k.startswith("ppl"):
         return f"{xv:.3g}"

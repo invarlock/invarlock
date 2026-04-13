@@ -14,11 +14,6 @@ major={major}
 minor={minor}
 patch={patch}
 
-if [[ "${{1:-}}" == "--version" ]]; then
-  printf 'Python %s.%s.%s\\n' "$major" "$minor" "$patch"
-  exit 0
-fi
-
 if [[ "${{1:-}}" == "-c" ]]; then
   code="${{2:-}}"
   if [[ "$code" == *"sys.version_info[:2] == (3, 12)"* ]]; then
@@ -37,6 +32,11 @@ exit 0
     path.chmod(path.stat().st_mode | stat.S_IXUSR)
 
 
+def _copy_executable(src: Path, dst: Path) -> None:
+    dst.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+    dst.chmod(src.stat().st_mode | stat.S_IXUSR)
+
+
 def _run_selector(
     tmp_path: Path,
     *,
@@ -45,9 +45,16 @@ def _run_selector(
     extra_env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     repo_root = Path(__file__).resolve().parents[2]
+    fake_repo = tmp_path / "repo"
+    scripts_dir = fake_repo / "scripts"
     bin_dir = tmp_path / "bin"
+    scripts_dir.mkdir(parents=True)
     bin_dir.mkdir()
 
+    _copy_executable(
+        repo_root / "scripts" / "select_workspace_python.sh",
+        scripts_dir / "select_workspace_python.sh",
+    )
     _write_fake_python(bin_dir / "python", python_version)
     if python312_version is not None:
         _write_fake_python(bin_dir / "python3.12", python312_version)
@@ -60,16 +67,42 @@ def _run_selector(
         env.update(extra_env)
 
     return subprocess.run(
-        ["/bin/bash", str(repo_root / "scripts" / "select_python.sh")],
+        ["/bin/bash", str(scripts_dir / "select_workspace_python.sh")],
         capture_output=True,
         text=True,
         check=False,
-        cwd=repo_root,
+        cwd=fake_repo,
         env=env,
     )
 
 
-def test_select_python_prefers_active_supported_python_on_github_actions(
+def test_select_workspace_python_prefers_repo_venv(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    fake_repo = tmp_path / "repo"
+    scripts_dir = fake_repo / "scripts"
+    venv_bin = fake_repo / ".venv" / "bin"
+    scripts_dir.mkdir(parents=True)
+    venv_bin.mkdir(parents=True)
+
+    _copy_executable(
+        repo_root / "scripts" / "select_workspace_python.sh",
+        scripts_dir / "select_workspace_python.sh",
+    )
+    _write_fake_python(venv_bin / "python", "3.12.7")
+
+    proc = subprocess.run(
+        ["/bin/bash", str(scripts_dir / "select_workspace_python.sh")],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=fake_repo,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.strip() == str(venv_bin / "python")
+
+
+def test_select_workspace_python_prefers_active_supported_python_on_github_actions(
     tmp_path: Path,
 ) -> None:
     proc = _run_selector(
@@ -83,7 +116,7 @@ def test_select_python_prefers_active_supported_python_on_github_actions(
     assert proc.stdout.strip() == str(tmp_path / "bin" / "python")
 
 
-def test_select_python_prefers_active_supported_python_in_virtualenv(
+def test_select_workspace_python_prefers_active_supported_python_in_virtualenv(
     tmp_path: Path,
 ) -> None:
     proc = _run_selector(
@@ -97,7 +130,7 @@ def test_select_python_prefers_active_supported_python_in_virtualenv(
     assert proc.stdout.strip() == str(tmp_path / "bin" / "python")
 
 
-def test_select_python_keeps_default_python312_preference_without_active_env(
+def test_select_workspace_python_keeps_default_python312_preference_without_active_env(
     tmp_path: Path,
 ) -> None:
     proc = _run_selector(
@@ -110,7 +143,7 @@ def test_select_python_keeps_default_python312_preference_without_active_env(
     assert proc.stdout.strip() == str(tmp_path / "bin" / "python3.12")
 
 
-def test_select_python_finds_named_home_conda_env_when_off_path(
+def test_select_workspace_python_finds_named_home_conda_env_when_off_path(
     tmp_path: Path,
 ) -> None:
     conda_python = (
@@ -129,7 +162,7 @@ def test_select_python_finds_named_home_conda_env_when_off_path(
     assert proc.stdout.strip() == str(conda_python)
 
 
-def test_select_python_prefers_named_home_conda_env_over_generic_python312(
+def test_select_workspace_python_prefers_named_home_conda_env_over_generic_python312(
     tmp_path: Path,
 ) -> None:
     conda_python = (
@@ -146,3 +179,11 @@ def test_select_python_prefers_named_home_conda_env_over_generic_python312(
 
     assert proc.returncode == 0, proc.stderr
     assert proc.stdout.strip() == str(conda_python)
+
+
+def test_select_workspace_python_is_self_contained() -> None:
+    text = (
+        Path(__file__).resolve().parents[2] / "scripts" / "select_workspace_python.sh"
+    ).read_text(encoding="utf-8")
+
+    assert "select_python.sh" not in text

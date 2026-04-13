@@ -57,7 +57,7 @@ def test_resolve_provider_and_split_provider_and_split_access_errors():
         )
 
 
-def test_extract_model_load_kwargs_dtype_aliasing_and_normalization():
+def test_extract_model_load_kwargs_rejects_removed_dtype_aliases_and_preserves_custom_strings():
     class _Cfg:
         def model_dump(self):
             return {
@@ -69,7 +69,16 @@ def test_extract_model_load_kwargs_dtype_aliasing_and_normalization():
                 }
             }
 
-    assert run_config_mod.extract_model_load_kwargs(_Cfg()) == {"dtype": "float16"}
+    with pytest.raises(InvarlockError) as excinfo:
+        run_config_mod.extract_model_load_kwargs(
+            _Cfg(), invarlock_error_cls=InvarlockError
+        )
+
+    assert excinfo.value.code == "E007"
+    assert excinfo.value.details == {
+        "removed_values": ["model.dtype=fp16"],
+        "replacement": "model.dtype=float16",
+    }
 
     class _Cfg2:
         def model_dump(self):
@@ -82,9 +91,10 @@ def test_extract_model_load_kwargs_dtype_aliasing_and_normalization():
                 }
             }
 
-    assert run_config_mod.extract_model_load_kwargs(_Cfg2()) == {
-        "dtype": "custom_dtype"
-    }
+    assert run_config_mod.extract_model_load_kwargs(
+        _Cfg2(),
+        invarlock_error_cls=InvarlockError,
+    ) == {"dtype": "custom_dtype"}
 
 
 def test_run_bare_control_skip_model_load_requires_live_model(monkeypatch):

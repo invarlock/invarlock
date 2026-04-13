@@ -274,7 +274,23 @@ def test_retry_summary_prints_and_snapshot_cleanup(tmp_path: Path, monkeypatch):
         json.dumps(
             {
                 "meta": {"tokenizer_hash": "tokhash123"},
-                "metrics": {},
+                "metrics": {
+                    "primary_metric": {
+                        "kind": "ppl_causal",
+                        "preview": 1.0,
+                        "final": 1.0,
+                    }
+                },
+                "edit": {
+                    "name": "structured",
+                    "plan_digest": "baseline",
+                    "deltas": {
+                        "params_changed": 0,
+                        "heads_pruned": 0,
+                        "neurons_pruned": 0,
+                        "layers_modified": 0,
+                    },
+                },
                 "evaluation_windows": {
                     "preview": {"input_ids": [[1, 2]]},
                     "final": {"input_ids": [[3, 4]]},
@@ -292,7 +308,7 @@ def test_retry_summary_prints_and_snapshot_cleanup(tmp_path: Path, monkeypatch):
         )
         stack.enter_context(patch("invarlock.core.retry.RetryController", RC))
         stack.enter_context(
-            patch("invarlock.reporting.report_make.make_report", make_cert)
+            patch("invarlock.cli.run_execution.build_evaluation_report", make_cert)
         )
         stack.enter_context(
             patch(

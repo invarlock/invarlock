@@ -411,7 +411,7 @@ class InvarLockHealthChecker(HealthChecker):
                 from invarlock.adapters.hf_multimodal import HF_Multimodal_Adapter
                 from invarlock.adapters.hf_seq2seq import HF_Seq2Seq_Adapter
 
-                adapters = {
+                adapters: dict[str, type[Any]] = {
                     "hf_causal": HF_Causal_Adapter,
                     "hf_mlm": HF_MLM_Adapter,
                     "hf_multimodal": HF_Multimodal_Adapter,

@@ -17,7 +17,7 @@ NET="${NET:-0}"
 TORCH_CPU_INDEX_URL="${TORCH_CPU_INDEX_URL:-https://download.pytorch.org/whl/cpu}"
 export TORCH_CPU_INDEX_URL
 
-PYTHON_BIN="${PYTHON_BIN:-$(bash scripts/select_python.sh)}"
+PYTHON_BIN="${PYTHON_BIN:-$(bash scripts/select_workspace_python.sh)}"
 if ! "$PYTHON_BIN" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)' >/dev/null 2>&1; then
   echo "ERROR: scripts/run_tiny_all_matrix.sh requires Python 3.12+." >&2
   echo "Set PYTHON_BIN to a supported interpreter or activate a Python 3.12+ environment." >&2

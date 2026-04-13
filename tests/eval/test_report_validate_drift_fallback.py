@@ -7,10 +7,14 @@ from invarlock.reporting.report_schema import (
 def test_validate_evaluation_report_accepts_pm_only_without_ppl_block():
     cert = {
         "schema_version": REPORT_SCHEMA_VERSION,
-        "run_id": "r1",
+        "run_id": "rid1",
         "meta": {},
         "auto": {},
-        "dataset": {"windows": {"preview": 1, "final": 1, "seed": 42}},
+        "dataset": {
+            "provider": "dummy",
+            "seq_len": 8,
+            "windows": {"preview": 1, "final": 1, "seed": 42, "stats": {}},
+        },
         "baseline_ref": {},
         "primary_metric": {
             "kind": "ppl_causal",

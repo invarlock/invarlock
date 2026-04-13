@@ -45,6 +45,9 @@ from invarlock.reporting.render_markdown import (
     _get_window_plan_summary,
     render_report_markdown,
 )
+from invarlock.reporting.report_builder_support import (
+    extract_report_meta as _extract_report_meta,
+)
 from invarlock.reporting.report_console import (
     compute_report_hash as _compute_report_hash,
 )
@@ -60,11 +63,7 @@ from invarlock.reporting.report_edit_summary import (
 from invarlock.reporting.report_edit_summary import (
     extract_structural_deltas as _extract_structural_deltas,
 )
-from invarlock.reporting.report_make import (
-    _compute_report_digest,
-    _extract_report_meta,
-    make_report,
-)
+from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_normalization import (
     _generate_run_id,
 )
@@ -73,6 +72,9 @@ from invarlock.reporting.report_normalization import (
 )
 from invarlock.reporting.report_overhead import (
     prepare_guard_overhead_section as _prepare_guard_overhead_section,
+)
+from invarlock.reporting.report_provenance import (
+    compute_report_digest as _compute_report_digest,
 )
 from invarlock.reporting.report_schema import REPORT_SCHEMA_VERSION, validate_report
 from invarlock.reporting.report_validation import (

@@ -51,5 +51,3 @@ jobs:
           category: "/language:python"
           # Upload SARIF results to GitHub Security tab
           upload: true
-        # Allow workflow to pass even if code scanning is not enabled in repo settings
-        continue-on-error: true

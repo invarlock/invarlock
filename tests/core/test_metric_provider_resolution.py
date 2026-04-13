@@ -146,3 +146,41 @@ def test_resolve_metric_and_provider_handles_section_lookup_errors() -> None:
     assert kind == "ppl_seq2seq"
     assert provider == "wikitext2"
     assert opts == {}
+
+
+def test_resolve_metric_and_provider_rejects_unknown_metric_override(monkeypatch):
+    monkeypatch.setattr(
+        mpr, "resolve_provider_kind_and_kwargs", lambda _value: ("", {})
+    )
+
+    cfg = SimpleNamespace(dataset=SimpleNamespace(provider=None))
+    profile = SimpleNamespace(default_provider=None, default_metric=None)
+
+    with pytest.raises(ValueError, match="Unsupported metric kind"):
+        mpr.resolve_metric_and_provider(
+            cfg,
+            profile,
+            resolved_loss_type="classification",
+            metric_kind_override="vqa_accuracy",
+        )
+
+
+def test_resolve_metric_and_provider_rejects_unknown_metric_kind_from_config(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        mpr, "resolve_provider_kind_and_kwargs", lambda _value: ("", {})
+    )
+
+    class _Cfg:
+        dataset = SimpleNamespace(provider=None)
+
+        def section(self, name: str):  # noqa: ANN001
+            if name == "eval":
+                return {"metric": {"kind": "unknown_metric"}}
+            return {}
+
+    profile = SimpleNamespace(default_provider=None, default_metric=None)
+
+    with pytest.raises(ValueError, match="Unsupported metric kind"):
+        mpr.resolve_metric_and_provider(_Cfg(), profile, resolved_loss_type="mlm")

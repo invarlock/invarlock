@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from invarlock.reporting.run_report_metrics_contract import (
     enrich_run_report_metrics,
 )
@@ -170,7 +172,7 @@ def test_enrich_run_report_metrics_preserves_measured_multimodal_classification(
         model_profile=SimpleNamespace(),
         baseline_requested=False,
         baseline_report_data=None,
-        metric_kind="vqa_accuracy",
+        metric_kind="accuracy",
         resolved_loss_type="classification",
         effective_preview=1,
         effective_final=1,
@@ -178,7 +180,7 @@ def test_enrich_run_report_metrics_preserves_measured_multimodal_classification(
         window_plan=None,
         debug_metric_diffs_enabled=False,
         resolve_metric_and_provider_fn=lambda *args, **kwargs: (
-            "vqa_accuracy",
+            "accuracy",
             None,
             {},
         ),
@@ -195,7 +197,7 @@ def test_enrich_run_report_metrics_derives_measured_counts_from_accuracy_metric(
     report = {
         "metrics": {
             "primary_metric": {
-                "kind": "vqa_accuracy",
+                "kind": "accuracy",
                 "preview": 1.0,
                 "final": 0.0,
                 "n_preview": 1,
@@ -224,7 +226,7 @@ def test_enrich_run_report_metrics_derives_measured_counts_from_accuracy_metric(
         model_profile=SimpleNamespace(),
         baseline_requested=False,
         baseline_report_data=None,
-        metric_kind="vqa_accuracy",
+        metric_kind="accuracy",
         resolved_loss_type="classification",
         effective_preview=1,
         effective_final=1,
@@ -232,7 +234,7 @@ def test_enrich_run_report_metrics_derives_measured_counts_from_accuracy_metric(
         window_plan=None,
         debug_metric_diffs_enabled=False,
         resolve_metric_and_provider_fn=lambda *args, **kwargs: (
-            "vqa_accuracy",
+            "accuracy",
             None,
             {},
         ),
@@ -241,3 +243,33 @@ def test_enrich_run_report_metrics_derives_measured_counts_from_accuracy_metric(
     assert result.report["metrics"]["classification"]["counts_source"] == "measured"
     assert result.report["metrics"]["classification"]["preview"]["correct_total"] == 1
     assert result.report["metrics"]["classification"]["final"]["correct_total"] == 0
+
+
+def test_enrich_run_report_metrics_rejects_unknown_metric_kind() -> None:
+    report = {"metrics": {}, "data": {"preview_n": 1, "final_n": 1}}
+    core_report = SimpleNamespace(evaluation_windows=None, metrics={})
+    run_config = SimpleNamespace(context={"eval": {"loss": {"resolved_type": "ce"}}})
+    cfg = SimpleNamespace(dataset=SimpleNamespace(preview_n=1, final_n=1))
+
+    with pytest.raises(ValueError, match="Unsupported metric kind"):
+        enrich_run_report_metrics(
+            report=report,
+            core_report=core_report,
+            run_config=run_config,
+            cfg=cfg,
+            model_profile=SimpleNamespace(),
+            baseline_requested=False,
+            baseline_report_data=None,
+            metric_kind="perplexity",
+            resolved_loss_type="ce",
+            effective_preview=1,
+            effective_final=1,
+            profile_normalized="dev",
+            window_plan=None,
+            debug_metric_diffs_enabled=False,
+            resolve_metric_and_provider_fn=lambda *args, **kwargs: (
+                "perplexity",
+                None,
+                {},
+            ),
+        )

@@ -51,5 +51,5 @@ def test_check_all_invariants_handles_single_use_named_parameters() -> None:
     outcome = check_all_invariants(_SingleUseModel())
 
     assert outcome.passed is True
-    assert outcome.action == "continue"
+    assert outcome.decision == "allow"
     assert outcome.metrics["parameters_checked"] == 1

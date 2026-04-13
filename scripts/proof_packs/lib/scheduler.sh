@@ -338,32 +338,6 @@ should_use_adaptive_gpus() {
     return 1
 }
 
-# Legacy GPU sizing by category (kept for backwards compatibility; unused by the
-# current profile-based planner).
-# Usage: get_required_gpus_from_category <model_size_category>
-get_required_gpus_from_category() {
-    local category="$1"
-
-    case "${category}" in
-        "70"|"72")
-            # Conservative: reserve a single GPU to match single-GPU loading behavior.
-            echo "1"
-            ;;
-        "moe")
-            # Mixtral-8x7B needs ~90GB - fits on single high-memory GPU
-            echo "1"
-            ;;
-        "40"|"30")
-            # 30-40B models need ~60-80GB - fit on single high-memory GPU
-            echo "1"
-            ;;
-        *)
-            # 7B-14B models - single GPU
-            echo "1"
-            ;;
-    esac
-}
-
 # Task-level reservation lock (serialize reservations per task)
 # Usage: _acquire_task_reservation_lock <task_id> [timeout_seconds]
 _acquire_task_reservation_lock() {

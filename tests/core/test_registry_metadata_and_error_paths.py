@@ -1,11 +1,11 @@
 import sys
 import types
-import warnings
 from typing import Any
 
 import pytest
 
 import invarlock.core.registry as reg
+from invarlock.core.builtin_plugin_catalog import builtin_plugin_specs
 
 
 class _EP:
@@ -87,55 +87,33 @@ def _install_plugin_module(
     return DummyAdapter, DummyEdit, DummyGuard
 
 
-def test_registry_fallback_on_entry_points_error(monkeypatch, tmp_path):
+def test_registry_fails_closed_on_entry_points_error(monkeypatch) -> None:
     monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "1")
-    # Force entry_points() to error to exercise warning + fallback path
     monkeypatch.setattr(
         reg, "entry_points", lambda: (_ for _ in ()).throw(RuntimeError("boom"))
     )
 
-    captured: list[str] = []
-    monkeypatch.setattr(
-        warnings, "warn", lambda msg, stacklevel=2: captured.append(str(msg))
-    )
+    with pytest.raises(RuntimeError, match="Plugin discovery failed: boom"):
+        reg.CoreRegistry().list_adapters()
 
-    r = reg.CoreRegistry()
-    # First call triggers discovery
-    adapters = r.list_adapters()
-    guards = r.list_guards()
-    edits = r.list_edits()
 
-    assert any("Plugin discovery failed" in m for m in captured)
-    # Fallback should register a set of built-ins
-    assert "hf_causal" in adapters
-    assert "hello_guard" in guards
-    # Only quant_rtn (and internal noop) remain as core edits
-    assert "quant_rtn" in edits
+def test_check_runtime_dependencies_treats_find_spec_errors_as_missing(
+    monkeypatch,
+) -> None:
+    registry = reg.CoreRegistry()
 
-    # Idempotency of lazy init path
-    assert set(adapters) == set(r.list_adapters())
+    def _find_spec(name: str):
+        if name == "broken.dep":
+            raise RuntimeError("probe failed")
+        if name == "present.dep":
+            return object()
+        return None
 
-    # hello_guard should be loadable without heavy deps
-    g = r.get_guard("hello_guard")
-    assert g.name == "hello_guard"
+    monkeypatch.setattr(reg.importlib.util, "find_spec", _find_spec)
 
-    # Unknown plugin info and metadata behavior
-    info = r.get_plugin_info("nope", "guards")
-    assert info["available"] is False and info["module"] == "unknown"
-    assert "Plugin discovery failed" in info["status"]
-    with pytest.raises(KeyError):
-        r.get_plugin_metadata("nope", "guards")
-
-    ok, msg = r.validate_configuration(
-        "nope_adapter", "nope_edit", ["noop", "nope_guard"]
-    )
-    assert (
-        not ok
-        and "Plugin discovery failed" in msg
-        and "Unknown adapter" in msg
-        and "Unknown edit" in msg
-        and "Unknown guard" in msg
-    )
+    assert registry._check_runtime_dependencies(
+        ["broken.dep", "missing.dep", "present.dep"]
+    ) == ["broken.dep", "missing.dep"]
 
 
 def test_registry_skips_entry_point_lookup_when_third_party_plugins_are_disabled(
@@ -150,9 +128,7 @@ def test_registry_skips_entry_point_lookup_when_third_party_plugins_are_disabled
     registry = reg.CoreRegistry()
 
     assert "hf_causal" in registry.list_adapters()
-    assert registry.get_plugin_info("hf_causal", "adapters")["status"] == (
-        "Available (fallback)"
-    )
+    assert registry.get_plugin_info("hf_causal", "adapters")["status"] == "Built-in"
 
 
 def test_registry_entry_points_select_and_get_paths(monkeypatch):
@@ -251,7 +227,7 @@ def test_get_plugin_info_reports_entry_point_group_for_entry_point_plugins(
     assert info["entry_point_group"] == "invarlock.guards"
 
 
-def test_registry_entry_point_collision_and_typed_getters(monkeypatch):
+def test_registry_rejects_entry_point_name_collisions(monkeypatch) -> None:
     monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "1")
     adapter_cls, edit_cls, guard_cls = _install_plugin_module(
         monkeypatch,
@@ -291,19 +267,65 @@ def test_registry_entry_point_collision_and_typed_getters(monkeypatch):
     monkeypatch.setattr(reg, "entry_points", lambda: _EPContainerSelect())
     registry = reg.CoreRegistry()
 
-    assert registry.get_plugin_info("hf_causal", "adapters")["package"] == (
+    with pytest.raises(RuntimeError, match="Duplicate adapter plugin name: hf_causal"):
+        registry.list_adapters()
+
+
+def test_registry_entry_points_with_distinct_names_support_typed_getters(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "1")
+    adapter_cls, edit_cls, guard_cls = _install_plugin_module(
+        monkeypatch,
+        "invarlock_test_registry_distinct_entry_points",
+        abi=reg.INVARLOCK_CORE_ABI,
+    )
+
+    adapter_ep = _EP(
+        name="custom_adapter",
+        value="invarlock_test_registry_distinct_entry_points:DummyAdapter",
+        dist=_Dist("third-party-adapter", "1.2.3"),
+        loader=adapter_cls,
+    )
+    edit_ep = _EP(
+        name="custom_edit",
+        value="invarlock_test_registry_distinct_entry_points:DummyEdit",
+        dist=_Dist("third-party-edit", "2.3.4"),
+        loader=edit_cls,
+    )
+    guard_ep = _EP(
+        name="custom_guard",
+        value="invarlock_test_registry_distinct_entry_points:DummyGuard",
+        dist=_Dist("third-party-guard", "3.4.5"),
+        loader=guard_cls,
+    )
+
+    class _EPContainerSelect:
+        def select(self, *, group: str):
+            if group == "invarlock.adapters":
+                return [adapter_ep]
+            if group == "invarlock.edits":
+                return [edit_ep]
+            if group == "invarlock.guards":
+                return [guard_ep]
+            return []
+
+    monkeypatch.setattr(reg, "entry_points", lambda: _EPContainerSelect())
+    registry = reg.CoreRegistry()
+
+    assert registry.get_plugin_info("custom_adapter", "adapters")["package"] == (
         "third-party-adapter"
     )
-    assert registry.get_plugin_info("quant_rtn", "edits")["package"] == (
+    assert registry.get_plugin_info("custom_edit", "edits")["package"] == (
         "third-party-edit"
     )
-    assert registry.get_plugin_info("hello_guard", "guards")["package"] == (
+    assert registry.get_plugin_info("custom_guard", "guards")["package"] == (
         "third-party-guard"
     )
 
-    adapter = registry.get_adapter_typed("hf_causal")
-    edit = registry.get_edit_typed("quant_rtn")
-    guard = registry.get_guard("hello_guard")
+    adapter = registry.get_adapter_typed("custom_adapter")
+    edit = registry.get_edit_typed("custom_edit")
+    guard = registry.get_guard("custom_guard")
     assert isinstance(adapter, adapter_cls)
     assert isinstance(edit, edit_cls)
     assert isinstance(guard, guard_cls)
@@ -331,7 +353,7 @@ def test_registry_optional_plugin_metadata_tracks_missing_dependencies(
     assert gptq_info["available"] is False
     assert gptq_info["status"] == "Needs extra: auto_gptq"
     assert awq_info["available"] is True
-    assert awq_info["status"] == "Available (plugin)"
+    assert awq_info["status"] == "Built-in"
     assert bnb_info["available"] is False
     assert bnb_info["status"] == "Needs extra: bitsandbytes"
 
@@ -462,10 +484,9 @@ def test_get_registry_returns_global_singleton() -> None:
 def test_create_plugin_info_parse_and_metadata_paths(monkeypatch):
     r = reg.CoreRegistry()
 
-    # Entry point with malformed value triggers parse error branch
     bad_ep = _EP(name="bad", value="malformed-without-colon")
-    info_bad = r._create_plugin_info(bad_ep, "guards")
-    assert info_bad.available is False and "Parse error" in info_bad.status
+    with pytest.raises(ValueError, match="malformed entry point value"):
+        r._create_plugin_info(bad_ep, "guards")
 
     # Entry point with dist=None forces package_name from module and metadata_version lookup
     # Simulate PackageNotFoundError from metadata_version
@@ -477,6 +498,7 @@ def test_create_plugin_info_parse_and_metadata_paths(monkeypatch):
     ok_ep = _EP(name="ok", value="invarlock.plugins.hello_guard:HelloGuard", dist=None)
     info_ok = r._create_plugin_info(ok_ep, "guards")
     assert info_ok.available is True
+    assert info_ok.status == "Deferred load"
     # Package name inferred from module path → top-level package
     assert info_ok.package == "invarlock"
 
@@ -502,9 +524,8 @@ def test_create_plugin_info_rejects_non_string_values_and_uses_metadata_version(
     bad_ep = _EP(name="bad", value="ignored")
     bad_ep.value = 123
 
-    info_bad = r._create_plugin_info(bad_ep, "guards")
-    assert info_bad.available is False
-    assert "Parse error" in info_bad.status
+    with pytest.raises(TypeError, match="entry point value must be a string"):
+        r._create_plugin_info(bad_ep, "guards")
 
     monkeypatch.setattr(reg, "metadata_version", lambda pkg: f"{pkg}-version")
     ep = _EP(
@@ -516,6 +537,7 @@ def test_create_plugin_info_rejects_non_string_values_and_uses_metadata_version(
     info = r._create_plugin_info(ep, "guards")
 
     assert info.available is True
+    assert info.status == "Deferred load"
     assert info.package == "thirdparty"
     assert info.version == "thirdparty-version"
 
@@ -657,3 +679,84 @@ def test_registry_unavailable_and_abi_mismatch_paths(monkeypatch):
         registry.get_edit("bad_abi_edit")
     with pytest.raises(ImportError, match="ABI mismatch"):
         registry.get_guard("bad_abi_guard")
+
+
+def test_registry_duplicate_builtin_and_coverage_helpers() -> None:
+    registry = reg.CoreRegistry()
+    registry._adapters["hf_causal"] = reg.PluginInfo(
+        name="hf_causal",
+        module="invarlock.adapters.hf_causal",
+        class_name="HF_Causal_Adapter",
+        available=True,
+        status="Built-in",
+        entry_point=None,
+    )
+
+    with pytest.raises(RuntimeError, match="Duplicate built-in plugin registration"):
+        registry._register_builtin_plugins()
+
+    assert "quant_rtn" in reg.CoreRegistry().list_edits()
+
+
+def test_builtin_plugin_catalog_is_table_driven_and_complete() -> None:
+    adapter_names = {spec.name for spec in builtin_plugin_specs("adapters")}
+    edit_names = {spec.name for spec in builtin_plugin_specs("edits")}
+    guard_names = {spec.name for spec in builtin_plugin_specs("guards")}
+
+    assert {"hf_causal", "hf_auto", "hf_multimodal"} <= adapter_names
+    assert {"quant_rtn", "noop"} <= edit_names
+    assert {"invariants", "spectral", "variance", "rmt"} <= guard_names
+
+
+def test_registry_plugin_info_and_validation_error_paths(monkeypatch) -> None:
+    registry = reg.CoreRegistry()
+    registry._initialized = True
+
+    class _NotAdapter:
+        pass
+
+    module_name = "invarlock_test_registry_not_adapter"
+    dummy_mod = types.ModuleType(module_name)
+    dummy_mod.INVARLOCK_CORE_ABI = reg.INVARLOCK_CORE_ABI
+    _NotAdapter.__module__ = module_name
+    dummy_mod.NotAdapter = _NotAdapter
+    monkeypatch.setitem(sys.modules, module_name, dummy_mod)
+
+    registry._adapters["bad_adapter"] = reg.PluginInfo(
+        name="bad_adapter",
+        module=module_name,
+        class_name="NotAdapter",
+        available=True,
+        status="Available",
+        entry_point=None,
+    )
+
+    with pytest.raises(ImportError, match="Expected ModelAdapter"):
+        registry.get_adapter("bad_adapter")
+
+    assert registry.get_plugin_info("missing_guard", "guards") == {
+        "available": False,
+        "status": "Not found",
+        "module": "unknown",
+    }
+
+    with pytest.raises(KeyError, match="Unknown guard plugin 'missing_guard'"):
+        registry.get_plugin_metadata("missing_guard", "guards")
+
+    with pytest.raises(reg.PluginError, match="PLUGIN-LOAD-FAILED"):
+        registry.get_guard_typed("missing_guard")
+
+
+def test_registry_validate_configuration_covers_unknown_and_noop_paths() -> None:
+    registry = reg.CoreRegistry()
+
+    ok, message = registry.validate_configuration(
+        "missing_adapter",
+        "missing_edit",
+        ["noop", "missing_guard"],
+    )
+
+    assert ok is False
+    assert "Unknown adapter: missing_adapter" in message
+    assert "Unknown edit: missing_edit" in message
+    assert "Unknown guard: missing_guard" in message

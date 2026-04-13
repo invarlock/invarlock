@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+import invarlock.core.config_loader as loader_mod
 import invarlock.core.config_runtime as config_mod
 from invarlock.core.config_runtime import (
     AutoConfig,
@@ -143,6 +144,6 @@ def test_load_runtime_yaml_tolerates_inner_package_file_not_found(
             return _PkgRoot()
 
     monkeypatch.delenv("INVARLOCK_CONFIG_ROOT", raising=False)
-    monkeypatch.setattr(config_mod, "_ires", _Pkg())
+    monkeypatch.setattr(loader_mod, "_ires", _Pkg())
 
-    assert config_mod._load_runtime_yaml("profiles", "ci.yaml") is None
+    assert loader_mod._load_runtime_yaml("profiles", "ci.yaml") is None

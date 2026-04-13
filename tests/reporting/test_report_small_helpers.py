@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_make import (
-    _compute_confidence_label,
-    _compute_edit_digest,
+from invarlock.reporting.report_confidence import (
+    compute_confidence_label as _compute_confidence_label,
 )
 from invarlock.reporting.report_primary_metric_policy import is_ppl_kind as _is_ppl_kind
+from invarlock.reporting.report_provenance import (
+    compute_edit_digest as _compute_edit_digest,
+)
 
 
 def test_is_ppl_kind_variants() -> None:

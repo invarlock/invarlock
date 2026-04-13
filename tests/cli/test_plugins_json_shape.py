@@ -44,3 +44,17 @@ def test_plugins_json_sorting_tie_breakers():
         ),
     )
     assert items == ordered
+
+
+def test_plugins_json_embeds_expanded_contract_catalog():
+    r = CliRunner().invoke(app, ["advanced", "plugins", "list", "plugins", "--json"])
+    assert r.exit_code == 0, r.output
+    payload = json.loads(r.stdout.strip().splitlines()[-1])
+    contracts = payload["contracts"]
+    for key, filename in {
+        "validation_keys": "validation_keys.json",
+        "console_labels": "console_labels.json",
+        "metric_kinds": "metric_kinds.json",
+    }.items():
+        assert contracts[key]["path"] == f"contracts/{filename}"
+        assert contracts[key]["kind"] == "array"

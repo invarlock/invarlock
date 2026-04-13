@@ -42,12 +42,12 @@ def test_weight_tying_violation_detected():
 
 def test_strict_invariant_violation_is_fatal():
     model = TinyModel()
-    guard = InvariantsGuard(strict_mode=True, on_fail="abort")
+    guard = InvariantsGuard(strict_mode=True, on_fail="block")
     guard.prepare(model, adapter=None, calib=None, policy={})
     # Modify structure to change structure_hash
     model.extra_layer = nn.Linear(1, 1)
     out = guard.finalize(model)
-    assert out.passed is False and out.action in {"abort", "rollback"}
+    assert out.passed is False and out.decision in {"block", "rollback"}
 
 
 def test_invariants_not_prepared_reports_violation():
@@ -60,7 +60,7 @@ def test_invariants_not_prepared_reports_violation():
 
 def test_invariants_detects_non_finite_and_missing_layernorm():
     model = TinyModel()
-    guard = InvariantsGuard(strict_mode=True, on_fail="abort")
+    guard = InvariantsGuard(strict_mode=True, on_fail="block")
     # Prepare captures baseline invariants
     guard.prepare(model, adapter=None, calib=None, policy={})
 
@@ -73,7 +73,7 @@ def test_invariants_detects_non_finite_and_missing_layernorm():
 
     outcome = guard.finalize(model)
     assert outcome.passed is False
-    assert outcome.action in {"abort", "rollback"}
+    assert outcome.decision in {"block", "rollback"}
     types = {v.get("type") for v in outcome.violations}
     assert "non_finite_tensor" in types
     assert "layer_norm_missing" in types
@@ -88,7 +88,7 @@ def test_invariants_strict_mode_rollback_vs_warn():
     # Remove LayerNorm to force layer_norm_missing in strict mode
     model.ln = nn.Identity()
     out_strict = strict_guard.finalize(model)
-    assert out_strict.passed is False and out_strict.action == "rollback"
+    assert out_strict.passed is False and out_strict.decision == "rollback"
 
     # Lenient mode yields warnings and passes
     model2 = TinyModel()
@@ -96,17 +96,17 @@ def test_invariants_strict_mode_rollback_vs_warn():
     lenient.prepare(model2, adapter=None, calib=None, policy={})
     model2.ln = nn.Identity()
     out_lenient = lenient.finalize(model2)
-    assert out_lenient.passed is True and out_lenient.action == "warn"
+    assert out_lenient.passed is True and out_lenient.decision == "monitor"
 
 
 def test_invariants_lenient_abort_on_warning():
-    # When on_fail=abort in lenient mode, warnings cause abort and passed=False
+    # When on_fail=block in lenient mode, warnings cause a blocking decision.
     model = TinyModel()
-    guard = InvariantsGuard(strict_mode=False, on_fail="abort")
+    guard = InvariantsGuard(strict_mode=False, on_fail="block")
     guard.prepare(model, adapter=None, calib=None, policy={})
     model.ln = nn.Identity()
     out = guard.finalize(model)
-    assert out.passed is False and out.action == "abort"
+    assert out.passed is False and out.decision == "block"
 
 
 def test_invariants_non_finite_buffer_detected():
@@ -125,7 +125,7 @@ def test_invariants_surface_evidence_gaps_instead_of_sentinel_clean_values():
             raise RuntimeError("parameter enumeration failed")
 
     model = BrokenModel()
-    guard = InvariantsGuard(strict_mode=True, on_fail="abort")
+    guard = InvariantsGuard(strict_mode=True, on_fail="block")
     guard.prepare(model, adapter=None, calib=None, policy={})
 
     outcome = guard.finalize(model)

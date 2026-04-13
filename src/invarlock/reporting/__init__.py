@@ -6,10 +6,26 @@ Provides the evaluation report schema, builder, and renderers.
 
 from __future__ import annotations
 
-from .html import render_report_html
-from .render import render_report_markdown
-from .report_make import make_report
 from .report_schema import REPORT_JSON_SCHEMA, REPORT_SCHEMA_VERSION, validate_report
+
+
+def make_report(*args, **kwargs):
+    from .report_make import make_report as _make_report
+
+    return _make_report(*args, **kwargs)
+
+
+def render_report_markdown(*args, **kwargs):
+    from .render import render_report_markdown as _render_report_markdown
+
+    return _render_report_markdown(*args, **kwargs)
+
+
+def render_report_html(*args, **kwargs):
+    from .html import render_report_html as _render_report_html
+
+    return _render_report_html(*args, **kwargs)
+
 
 __all__ = [
     "REPORT_SCHEMA_VERSION",

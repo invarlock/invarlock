@@ -27,7 +27,7 @@ def _select_python(repo_root: Path) -> Path:
     if current.exists() and sys.version_info >= (3, 12):
         return current
     proc = subprocess.run(
-        ["/bin/bash", str(repo_root / "scripts" / "select_python.sh")],
+        ["/bin/bash", str(repo_root / "scripts" / "select_workspace_python.sh")],
         capture_output=True,
         text=True,
         check=False,
@@ -62,7 +62,6 @@ def _create_venv(tmp_path: Path, python_exe: Path) -> tuple[Path, Path, Path]:
             str(python_exe),
             "-m",
             "venv",
-            "--system-site-packages",
             str(env_dir),
         ],
         check=True,
@@ -91,6 +90,48 @@ def _run(
         check=False,
         cwd=cwd,
         env=resolved_env,
+    )
+
+
+def _python_minor_version(python_exe: Path) -> tuple[int, int]:
+    proc = subprocess.run(
+        [
+            str(python_exe),
+            "-c",
+            "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    major, minor = proc.stdout.strip().split(".", maxsplit=1)
+    return int(major), int(minor)
+
+
+def _install_core_dependencies(repo_root: Path, python_exe: Path) -> None:
+    version = _python_minor_version(python_exe)
+    requirements = (
+        repo_root
+        / "requirements"
+        / "workflows"
+        / (f"core-py{version[0]}{version[1]}.txt")
+    )
+    if not requirements.is_file():
+        pytest.skip(
+            f"Missing pinned core requirements for Python {version[0]}.{version[1]}"
+        )
+    subprocess.run(
+        [
+            str(python_exe),
+            "-m",
+            "pip",
+            "install",
+            "--require-hashes",
+            "-r",
+            str(requirements),
+        ],
+        check=True,
+        cwd=repo_root,
     )
 
 
@@ -282,6 +323,7 @@ def test_wheel_install_can_verify_proof_pack_outside_repo_tree(tmp_path: Path) -
     selected_python = _select_python(repo_root)
     wheel = _build_wheel(tmp_path / "dist", selected_python)
     env_dir, python_exe, cli_exe = _create_venv(tmp_path, selected_python)
+    _install_core_dependencies(repo_root, python_exe)
 
     install = _run(
         python_exe,
@@ -300,6 +342,35 @@ def test_wheel_install_can_verify_proof_pack_outside_repo_tree(tmp_path: Path) -
     assert env_dir.resolve() in import_path.parents
     assert repo_root.resolve() not in import_path.parents
     assert cli_exe.is_file()
+
+    minimal_help = _run(
+        python_exe,
+        ["-m", "invarlock", "--help"],
+        cwd=tmp_path,
+        env={"INVARLOCK_LIGHT_IMPORT": "1"},
+    )
+    assert minimal_help.returncode == 0, minimal_help.stdout + minimal_help.stderr
+    assert "evaluate" in minimal_help.stdout
+    assert "verify" in minimal_help.stdout
+
+    cli_app_import = _run(
+        python_exe,
+        [
+            "-c",
+            (
+                "import json; "
+                "import invarlock.cli.app; "
+                "import invarlock.public_contracts as public_contracts; "
+                "print(json.dumps(sorted(public_contracts.contract_catalog().keys())))"
+            ),
+        ],
+        cwd=tmp_path,
+        env={"INVARLOCK_LIGHT_IMPORT": "1"},
+    )
+    assert cli_app_import.returncode == 0, cli_app_import.stdout + cli_app_import.stderr
+    exported_contracts = json.loads(cli_app_import.stdout.strip())
+    assert "metric_kinds" in exported_contracts
+    assert "support_matrix" in exported_contracts
 
     pack_dir = _build_proof_pack(tmp_path / "pack")
 

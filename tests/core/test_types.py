@@ -3,48 +3,35 @@ from invarlock.core.types import (
     GuardOutcome,
     GuardValidationResult,
     PolicyConfig,
-    decision_to_action,
-    get_worst_action,
     get_worst_decision,
     normalize_guard_decision,
 )
 
 
-def test_policy_config_action_resolution():
-    # Default on_violation used when requested is 'none'
+def test_policy_config_decision_resolution():
+    # Default on_violation used when requested is allow.
     cfg = PolicyConfig(
-        on_violation="warn", guard_overrides=None, enable_auto_rollback=False
+        on_violation="monitor", guard_overrides=None, enable_auto_rollback=False
     )
-    assert cfg.get_action_for_guard("spectral", "none") == "warn"
+    assert cfg.get_decision_for_guard("spectral", "allow") == "monitor"
 
-    # Requested action other than none takes precedence
-    assert cfg.get_action_for_guard("spectral", "rollback") == "rollback"
+    # Requested decision other than allow takes precedence.
+    assert cfg.get_decision_for_guard("spectral", "rollback") == "rollback"
 
-    # Guard-specific override takes highest precedence
-    cfg.guard_overrides = {"spectral": "abort"}
-    assert cfg.get_action_for_guard("spectral", "warn") == "abort"
+    # Guard-specific override takes highest precedence.
+    cfg.guard_overrides = {"spectral": "block"}
+    assert cfg.get_decision_for_guard("spectral", "monitor") == "block"
 
 
-def test_get_worst_action_and_guard_outcome_defaults():
-    # Worst action across a set
-    actions = ["none", "warn", "rollback", "abort"]
-    assert get_worst_action(actions) == "abort"
-
-    # Empty list falls back to none
-    assert get_worst_action([]) == "none"
-
-    # Unknown actions retain their label but lowest priority
-    assert get_worst_action(["foo"]) == "foo"
+def test_get_worst_decision_and_guard_outcome_defaults():
     assert get_worst_decision(["allow", "monitor", "rollback", "block"]) == "block"
-    assert normalize_guard_decision("warn") == "monitor"
-    assert decision_to_action("block") == "abort"
+    assert normalize_guard_decision("monitor") == "monitor"
 
-    # GuardOutcome defaults populated
+    # GuardOutcome defaults populated.
     o = GuardOutcome("g", True)
     assert isinstance(o.violations, list) and o.violations == []
     assert isinstance(o.metrics, dict) and o.metrics == {}
     assert o.decision == "allow"
-    assert o.action == "none"
 
 
 def test_guard_validation_result_properties_and_extras() -> None:
@@ -68,7 +55,6 @@ def test_guard_validation_result_properties_and_extras() -> None:
 
     assert result.passed is False
     assert result.decision == "monitor"
-    assert result.action == "warn"
     assert result.metrics == {"score": 0.1}
     assert result.policy == {"threshold": 0.5}
     assert result.details == {"reason": "policy"}
@@ -86,7 +72,6 @@ def test_guard_validation_result_properties_and_extras() -> None:
 
 def test_guard_validation_result_property_fallbacks_filter_invalid_records() -> None:
     result = GuardValidationResult(passed=True, decision="allow")
-    result.pop("action", None)
     result["diagnostics"] = [
         "ignore-me",
         {"kind": "diag", "severity": "info", "message": "kept", "details": {"x": 1}},
@@ -96,7 +81,6 @@ def test_guard_validation_result_property_fallbacks_filter_invalid_records() -> 
     result["policy"] = {"mode": "strict"}
     result["details"] = {"detail": "kept"}
 
-    assert result.action == "none"
     assert result.diagnostics == (
         GuardDiagnostic(
             kind="diag",
@@ -111,32 +95,44 @@ def test_guard_validation_result_property_fallbacks_filter_invalid_records() -> 
     assert result.details == {"detail": "kept"}
 
 
-def test_decision_normalization_and_priority_edges() -> None:
-    assert normalize_guard_decision(None, fallback_action="reject") == "block"
-    assert normalize_guard_decision(None, passed=False) == "block"
-    assert (
-        normalize_guard_decision(None, fallback_action="mystery", passed=False)
-        == "block"
+def test_guard_validation_result_and_outcome_cover_non_default_paths() -> None:
+    result = GuardValidationResult(passed=True, decision="allow")
+    result["diagnostics"] = {"kind": "ignored"}
+
+    assert result.diagnostics == ()
+    assert normalize_guard_decision("mystery") == "allow"
+
+    outcome = GuardOutcome(
+        "variance",
+        False,
+        decision="allow",
+        violations=[{"kind": "present"}],
+        metrics={"score": 1},
     )
-    assert decision_to_action("monitor") == "warn"
+
+    assert outcome.violations == [{"kind": "present"}]
+    assert outcome.metrics == {"score": 1}
+    assert outcome.decision == "allow"
+
+
+def test_decision_normalization_and_priority_edges() -> None:
+    assert normalize_guard_decision(None, passed=False) == "block"
+    assert normalize_guard_decision("mystery", passed=False) == "block"
     assert get_worst_decision([]) == "allow"
     assert get_worst_decision(["monitor", "allow", "rollback"]) == "rollback"
 
 
 def test_guard_outcome_and_policy_config_cover_explicit_branches() -> None:
     override_cfg = PolicyConfig(
-        on_violation="warn",
+        on_violation="monitor",
         guard_overrides={"variance": "rollback"},
         enable_auto_rollback=False,
     )
     assert override_cfg.guard_overrides == {"variance": "rollback"}
     assert override_cfg.get_decision_for_guard("variance", "allow") == "rollback"
-    assert override_cfg.get_action_for_guard("variance", "allow") == "rollback"
 
-    by_action = GuardOutcome("variance", False, action="warn")
-    assert by_action.decision == "monitor"
-    assert by_action.action == "warn"
+    implied = GuardOutcome("variance", False)
+    assert implied.decision == "block"
 
     by_decision = GuardOutcome("spectral", False, decision="rollback")
     assert by_decision.decision == "rollback"
-    assert by_decision.action == "rollback"

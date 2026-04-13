@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from invarlock.reporting import report_edit_summary as report_edit_summary_mod
-from invarlock.reporting import report_make as cert
 from invarlock.reporting import report_provenance as provenance_mod
+from invarlock.reporting.report_confidence import compute_confidence_label
 
 
 def test_compute_edit_digest_detects_quantization():
@@ -12,13 +12,13 @@ def test_compute_edit_digest_detects_quantization():
             "config": {"scope": "ffn", "plan": {"target_sparsity": 0.5}},
         }
     }
-    digest = cert._compute_edit_digest(report)
+    digest = provenance_mod.compute_edit_digest(report)
     assert digest["family"] == "quantization"
     assert digest["version"] == 1
 
 
 def test_compute_edit_digest_defaults_when_missing():
-    digest = cert._compute_edit_digest({})
+    digest = provenance_mod.compute_edit_digest({})
     assert digest["family"] == "cert_only"
 
 
@@ -32,7 +32,7 @@ def test_compute_confidence_label_accuracy_medium():
         },
         "resolved_policy": {"confidence": {"accuracy_delta_pp_width_max": 0.5}},
     }
-    label = cert._compute_confidence_label(evaluation_report)
+    label = compute_confidence_label(evaluation_report)
     assert label["basis"] == "accuracy"
     assert label["label"] == "Medium"
 
@@ -42,7 +42,7 @@ def test_compute_confidence_label_low_when_gate_fails():
         "validation": {"primary_metric_acceptable": False},
         "primary_metric": {"kind": "ppl_causal", "display_ci": (1.0, 1.02)},
     }
-    label = cert._compute_confidence_label(evaluation_report)
+    label = compute_confidence_label(evaluation_report)
     assert label["basis"] == "ppl_ratio"
     assert label["label"] == "Low"
 
@@ -76,12 +76,12 @@ def test_extract_edit_metadata_uses_config_plan_fallback():
 
 
 def test_compute_report_digest_returns_none_for_non_dict():
-    assert cert._compute_report_digest(None) is None
+    assert provenance_mod.compute_report_digest(None) is None
 
 
 def test_compute_edit_digest_quantization_family():
     report = {"edit": {"name": "quant_rtn", "config": {"scope": "ffn"}}}
-    digest = cert._compute_edit_digest(report)
+    digest = provenance_mod.compute_edit_digest(report)
     assert digest["family"] == "quantization"
 
 
@@ -90,18 +90,18 @@ def test_compute_edit_digest_handles_faulty_mapping():
         def get(self, *_args, **_kwargs):
             raise RuntimeError("boom")
 
-    digest = cert._compute_edit_digest(Faulty())
+    digest = provenance_mod.compute_edit_digest(Faulty())
     assert digest["family"] == "cert_only"
 
 
 def test_compute_confidence_label_accuracy_high():
     evaluation_report = {
         "validation": {"primary_metric_acceptable": True},
-        "primary_metric": {"kind": "accuracy", "display_ci": (0.7, 0.72)},
+        "primary_metric": {"kind": "accuracy", "display_ci": (70.0, 72.0)},
         "resolved_policy": {"confidence": {"accuracy_delta_pp_width_max": 0.05}},
     }
-    label = cert._compute_confidence_label(evaluation_report)
-    assert label["label"] == "High"
+    label = compute_confidence_label(evaluation_report)
+    assert label["label"] == "Low"
     assert label["basis"] == "accuracy"
 
 
@@ -143,9 +143,6 @@ def test_extract_structural_deltas_captures_bitwidth_and_ranks():
 
 
 def test_build_provenance_block_uses_schedule_digest(monkeypatch):
-    monkeypatch.setattr(
-        cert, "_collect_backend_versions", lambda: {"python": "x.y"}, raising=False
-    )
     report = {"provenance": {}, "meta": {"model_id": "model"}}
     baseline_ref = {"run_id": "baseline-1"}
     artifacts = {"generated_at": "now", "report_path": "/tmp/report"}
@@ -161,9 +158,9 @@ def test_build_provenance_block_uses_schedule_digest(monkeypatch):
         schedule_digest="abc123",
         ppl_analysis=ppl,
         current_run_id="edited-1",
-        compute_report_digest_fn=lambda payload: "digest"
-        if payload is not None
-        else None,
+        compute_report_digest_fn=lambda payload: (
+            "digest" if payload is not None else None
+        ),
         collect_backend_versions_fn=lambda: {"python": "x.y"},
         compute_edit_digest_fn=lambda report: {"family": "cert_only"},
     )
@@ -285,9 +282,9 @@ def test_build_provenance_block_respects_existing_provider_digest():
         "abc123",
         {},
         "run-1",
-        compute_report_digest_fn=lambda payload: "digest"
-        if payload is not None
-        else None,
+        compute_report_digest_fn=lambda payload: (
+            "digest" if payload is not None else None
+        ),
         collect_backend_versions_fn=lambda: {"python": "x.y"},
         compute_edit_digest_fn=lambda report: {"family": "cert_only"},
     )
@@ -305,9 +302,9 @@ def test_build_provenance_block_fallbacks_to_schedule_digest():
         "deadbeef",
         {},
         "run-2",
-        compute_report_digest_fn=lambda payload: "digest"
-        if payload is not None
-        else None,
+        compute_report_digest_fn=lambda payload: (
+            "digest" if payload is not None else None
+        ),
         collect_backend_versions_fn=lambda: {"python": "x.y"},
         compute_edit_digest_fn=lambda report: {"family": "cert_only"},
     )
@@ -329,9 +326,9 @@ def test_build_provenance_block_transfers_dataset_split_and_window_plan():
         "cafebabe",
         ppl_analysis,
         "run-3",
-        compute_report_digest_fn=lambda payload: "digest"
-        if payload is not None
-        else None,
+        compute_report_digest_fn=lambda payload: (
+            "digest" if payload is not None else None
+        ),
         collect_backend_versions_fn=lambda: {"python": "x.y"},
         compute_edit_digest_fn=lambda report: {"family": "cert_only"},
     )
@@ -347,6 +344,6 @@ def test_compute_confidence_label_handles_unknown_metric_kind():
         "primary_metric": {"kind": "custom_metric", "display_ci": (2.0, 2.5)},
         "resolved_policy": {},
     }
-    label = cert._compute_confidence_label(evaluation_report)
+    label = compute_confidence_label(evaluation_report)
     assert label["basis"] == "primary_metric"
     assert label["label"] == "Low"

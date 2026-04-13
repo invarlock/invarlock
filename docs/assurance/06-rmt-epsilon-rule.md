@@ -35,8 +35,8 @@ The contract fixes the estimator budget and the activation sampling policy; thos
 knobs are recorded in the report.
 
 This note documents the runtime report contract for the activation edge-risk
-mode surfaced in reports; it does not describe every legacy utility that still
-lives in `src/invarlock/guards/rmt.py`.
+mode surfaced in reports; it does not catalog the full implementation surface
+inside `src/invarlock/guards/rmt.py`.
 
 ## Derivation (sketch)
 

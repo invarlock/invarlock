@@ -233,7 +233,9 @@ def test_rmt_finalize_activation_required_failure():
 
     result = guard.finalize(NoMaskModel())
     passed = result.passed if hasattr(result, "passed") else result.get("passed")
-    action = result.action if hasattr(result, "action") else result.get("action")
+    decision = (
+        result.decision if hasattr(result, "decision") else result.get("decision")
+    )
     metrics = (
         result.metrics if hasattr(result, "metrics") else result.get("metrics", {})
     )
@@ -243,8 +245,8 @@ def test_rmt_finalize_activation_required_failure():
     errors = result.get("errors") if isinstance(result, dict) else None
 
     assert passed is False
-    if action is not None:
-        assert action == "abort"
+    if decision is not None:
+        assert decision == "block"
     assert metrics.get("activation_required") is True
     assert metrics.get("activation_ready") is False
     assert metrics.get("activation_reason") == "activation_required"
@@ -332,13 +334,15 @@ def test_rmt_finalize_enforces_epsilon_band_and_action() -> None:
 
     result = guard.finalize(NoMaskModel())
     passed = result.passed if hasattr(result, "passed") else result.get("passed")
-    action = result.action if hasattr(result, "action") else result.get("action")
+    decision = (
+        result.decision if hasattr(result, "decision") else result.get("decision")
+    )
     metrics = (
         result.metrics if hasattr(result, "metrics") else result.get("metrics", {})
     )
 
     assert passed is False
-    assert action == "abort"
+    assert decision == "block"
     assert metrics["stable"] is False
     assert (
         metrics["epsilon_violations"]
@@ -360,14 +364,16 @@ def test_rmt_finalize_allows_epsilon_band_boundary() -> None:
 
     result = guard.finalize(NoMaskModel())
     passed = result.passed if hasattr(result, "passed") else result.get("passed")
-    action = result.action if hasattr(result, "action") else result.get("action")
+    decision = (
+        result.decision if hasattr(result, "decision") else result.get("decision")
+    )
     metrics = (
         result.metrics if hasattr(result, "metrics") else result.get("metrics", {})
     )
 
     assert passed is True
-    if action is not None:
-        assert action == "continue"
+    if decision is not None:
+        assert decision == "allow"
     assert metrics["stable"] is True
     assert metrics["epsilon_violations"] == []
 

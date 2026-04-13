@@ -9,14 +9,12 @@ This is the single source of truth for all evaluation results.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, NotRequired, TypedDict
 
-try:  # Python 3.12+
-    from typing import NotRequired, TypedDict
-except ImportError:  # Legacy fallback
-    from typing import NotRequired
-
-    from typing_extensions import TypedDict
+from invarlock.core.metric_kind_contract import (
+    MetricKindContractError,
+    normalize_metric_kind,
+)
 
 
 def _is_non_bool_number(value: object) -> bool:
@@ -258,9 +256,12 @@ def validate_report(report: object) -> bool:
     if not isinstance(pm, dict) or not pm:
         return False
 
-    pm_kind = pm.get("kind")
+    try:
+        pm_kind = normalize_metric_kind(pm.get("kind"))
+    except (MetricKindContractError, ValueError):
+        return False
     pm_final = pm.get("final")
-    if not (isinstance(pm_kind, str) and pm_kind.strip()):
+    if not isinstance(pm_kind, str):
         return False
     if pm_final is not None and not _is_non_bool_number(pm_final):
         return False

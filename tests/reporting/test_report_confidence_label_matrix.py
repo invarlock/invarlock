@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from invarlock.reporting import report_make as C
+from invarlock.reporting.report_confidence import compute_confidence_label
+from invarlock.reporting.report_schema import REPORT_SCHEMA_VERSION
 
 
 def _base_cert() -> dict:
     return {
-        "schema_version": C.REPORT_SCHEMA_VERSION,
+        "schema_version": REPORT_SCHEMA_VERSION,
         "run_id": "r",
         "artifacts": {"generated_at": "t"},
         "meta": {},
@@ -24,7 +25,7 @@ def test_confidence_label_high_medium_low_ppl() -> None:
     # High: narrow width, acceptable, not unstable
     c1 = dict(cert)
     c1["primary_metric"] = {"kind": "ppl_causal", "display_ci": [0.99, 1.00]}
-    out1 = C._compute_confidence_label(c1)
+    out1 = compute_confidence_label(c1)
     assert out1["label"] in {"High", "Medium", "Low"}
 
     # Medium: borderline width and unstable
@@ -34,18 +35,18 @@ def test_confidence_label_high_medium_low_ppl() -> None:
         "display_ci": [0.99, 1.02],
         "unstable": True,
     }
-    out2 = C._compute_confidence_label(c2)
+    out2 = compute_confidence_label(c2)
     assert out2["label"] in {"High", "Medium", "Low"}
 
     # Low: very wide interval
     c3 = _base_cert()
     c3["primary_metric"] = {"kind": "ppl_causal", "display_ci": [0.90, 1.10]}
-    out3 = C._compute_confidence_label(c3)
+    out3 = compute_confidence_label(c3)
     assert out3["label"] in {"High", "Medium", "Low"}
 
 
 def test_confidence_label_accuracy_basis() -> None:
     cert = _base_cert()
     cert["primary_metric"] = {"kind": "accuracy", "display_ci": [0.70, 0.71]}
-    out = C._compute_confidence_label(cert)
-    assert out["basis"] in {"accuracy", "vqa_accuracy", "ppl_ratio"}
+    out = compute_confidence_label(cert)
+    assert out["basis"] in {"accuracy", "ppl_ratio"}

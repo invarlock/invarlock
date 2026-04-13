@@ -525,15 +525,14 @@ test_should_use_adaptive_gpus_counts_single_gpu_tasks_and_adapts_only_when_safe(
     should_use_adaptive_gpus 2 4 2 || t_fail "expected adaptation when no single-GPU tasks are waiting"
 }
 
-test_required_gpu_category_case_arms_cover_classifier() {
+test_required_gpu_category_helper_removed() {
     mock_reset
     # shellcheck source=../scheduler.sh
     source "${TEST_ROOT}/scripts/proof_packs/lib/scheduler.sh"
 
-    assert_eq "1" "$(get_required_gpus_from_category 70)" "70B category"
-    assert_eq "1" "$(get_required_gpus_from_category moe)" "moe category"
-    assert_eq "1" "$(get_required_gpus_from_category 40)" "40B category"
-    assert_eq "1" "$(get_required_gpus_from_category other)" "default category"
+    if type -t get_required_gpus_from_category >/dev/null 2>&1; then
+        t_fail "expected legacy get_required_gpus_from_category helper to be removed"
+    fi
 }
 
 test_task_reservation_lock_timeout_stale_owner_and_ownerless_grace_branches() {

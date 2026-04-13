@@ -16,17 +16,17 @@ def test_config_digest_and_load_runtime_manifest(tmp_path: Path) -> None:
     report_path = tmp_path / "evaluation.report.json"
     report_path.write_text('{"ok":true}\n', encoding="utf-8")
 
-    digest, source = runtime_security._config_digest(config_path=config_path)
+    digest, source = runtime_security_helpers._config_digest(config_path=config_path)
     assert digest is not None
     assert source == "file"
 
-    digest, source = runtime_security._config_digest(
+    digest, source = runtime_security_helpers._config_digest(
         config_payload={"model": {"id": "gpt2"}}
     )
     assert digest is not None
     assert source == "inline"
 
-    digest, source = runtime_security._config_digest()
+    digest, source = runtime_security_helpers._config_digest()
     assert digest is None
     assert source == "missing"
 
@@ -82,7 +82,7 @@ def test_load_runtime_manifest_reports_read_failures(
 
 
 def test_config_digest_falls_back_to_payload_when_path_is_missing() -> None:
-    digest, source = runtime_security._config_digest(
+    digest, source = runtime_security_helpers._config_digest(
         config_path="missing.yaml",
         config_payload={"model": {"id": "demo"}},
     )
@@ -191,15 +191,19 @@ def test_inspect_container_image_timeout_is_bounded(
 
     def _run(command, capture_output=False, text=False, check=False, timeout=None):
         seen["timeout"] = timeout
-        raise runtime_security.subprocess.TimeoutExpired(command, timeout)
+        raise runtime_security_helpers.subprocess.TimeoutExpired(command, timeout)
 
-    monkeypatch.setattr(runtime_security.subprocess, "run", _run, raising=True)
+    monkeypatch.setattr(runtime_security_helpers.subprocess, "run", _run, raising=True)
 
-    exists, digest = runtime_security._inspect_container_image("docker", "demo:latest")
+    exists, digest = runtime_security_helpers._inspect_container_image(
+        "docker", "demo:latest"
+    )
 
     assert exists is False
     assert digest is None
-    assert seen["timeout"] == runtime_security._CONTAINER_INSPECT_TIMEOUT_SECONDS
+    assert (
+        seen["timeout"] == runtime_security_helpers._CONTAINER_INSPECT_TIMEOUT_SECONDS
+    )
 
 
 def test_flag_occurrences_cover_split_and_inline_forms() -> None:
@@ -228,8 +232,8 @@ def test_runtime_security_helpers_cover_empty_and_deduplicated_path_sets(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.delenv("PYTHONPATH", raising=False)
-    assert runtime_security._coerce_bool(None) is None
-    assert runtime_security._iter_absolute_pythonpath_entries() == []
+    assert runtime_security_helpers._coerce_bool(None) is None
+    assert runtime_security_helpers._iter_absolute_pythonpath_entries() == []
 
     cwd = tmp_path / "repo"
     parent_mount = tmp_path / "external"
@@ -237,11 +241,11 @@ def test_runtime_security_helpers_cover_empty_and_deduplicated_path_sets(
     cwd.mkdir()
     child_mount.mkdir(parents=True)
 
-    assert runtime_security._container_pythonpath_entries(cwd=cwd) == (
+    assert runtime_security_helpers._container_pythonpath_entries(cwd=cwd) == (
         ["/workspace/src"],
         [],
     )
-    assert runtime_security._minimize_mounts([child_mount, parent_mount]) == [
+    assert runtime_security_helpers._minimize_mounts([child_mount, parent_mount]) == [
         parent_mount
     ]
 
@@ -273,12 +277,16 @@ def test_path_helpers_resolve_workspace_and_membership(tmp_path: Path) -> None:
     nested = cwd / "nested" / "report.json"
     external = tmp_path / "outside" / "artifact.json"
 
-    assert runtime_security._absolute_host_path("nested/report.json", cwd=cwd) == nested
-    assert runtime_security._absolute_host_path(external, cwd=cwd) == external
-    assert runtime_security._path_is_within(nested, cwd) is True
-    assert runtime_security._path_is_within(external, cwd) is False
     assert (
-        runtime_security._workspace_path(cwd / "nested", cwd=cwd) == "/workspace/nested"
+        runtime_security_helpers._absolute_host_path("nested/report.json", cwd=cwd)
+        == nested
+    )
+    assert runtime_security_helpers._absolute_host_path(external, cwd=cwd) == external
+    assert runtime_security_helpers._path_is_within(nested, cwd) is True
+    assert runtime_security_helpers._path_is_within(external, cwd) is False
+    assert (
+        runtime_security_helpers._workspace_path(cwd / "nested", cwd=cwd)
+        == "/workspace/nested"
     )
 
 
@@ -292,9 +300,9 @@ def test_mount_root_helpers_cover_files_directories_and_resolved_targets(
     link_path = tmp_path / "weights-link"
     link_path.symlink_to(file_path)
 
-    assert runtime_security._mount_root_for_path(root_dir) == root_dir
-    assert runtime_security._mount_root_for_path(file_path) == root_dir
-    assert runtime_security._mount_root_for_resolved_path(link_path) == root_dir
+    assert runtime_security_helpers._mount_root_for_path(root_dir) == root_dir
+    assert runtime_security_helpers._mount_root_for_path(file_path) == root_dir
+    assert runtime_security_helpers._mount_root_for_resolved_path(link_path) == root_dir
 
 
 def test_iter_external_symlink_target_mounts_ignores_in_workspace_targets(
@@ -309,7 +317,10 @@ def test_iter_external_symlink_target_mounts_ignores_in_workspace_targets(
     link_path.symlink_to(inside_target)
 
     assert (
-        runtime_security._iter_external_symlink_target_mounts(link_path, cwd=cwd) == []
+        runtime_security_helpers._iter_external_symlink_target_mounts(
+            link_path, cwd=cwd
+        )
+        == []
     )
 
 
@@ -325,7 +336,7 @@ def test_iter_external_symlink_target_mounts_finds_external_targets_recursively(
 
     direct_link = cwd / "artifact-link"
     direct_link.symlink_to(target)
-    assert runtime_security._iter_external_symlink_target_mounts(
+    assert runtime_security_helpers._iter_external_symlink_target_mounts(
         direct_link, cwd=cwd
     ) == [external_root]
 
@@ -335,14 +346,14 @@ def test_iter_external_symlink_target_mounts_finds_external_targets_recursively(
     deep_link = nested / "deep-link"
     deep_link.symlink_to(target)
     assert (
-        runtime_security._iter_external_symlink_target_mounts(
+        runtime_security_helpers._iter_external_symlink_target_mounts(
             tree, cwd=cwd, recursive=False
         )
         == []
     )
-    assert runtime_security._iter_external_symlink_target_mounts(tree, cwd=cwd) == [
-        external_root
-    ]
+    assert runtime_security_helpers._iter_external_symlink_target_mounts(
+        tree, cwd=cwd
+    ) == [external_root]
 
 
 def test_iter_external_symlink_target_mounts_skips_targets_already_covered_by_cwd(
@@ -360,7 +371,10 @@ def test_iter_external_symlink_target_mounts_skips_targets_already_covered_by_cw
     link_path.symlink_to(covered_target)
 
     assert (
-        runtime_security._iter_external_symlink_target_mounts(link_path, cwd=cwd) == []
+        runtime_security_helpers._iter_external_symlink_target_mounts(
+            link_path, cwd=cwd
+        )
+        == []
     )
 
 
@@ -373,7 +387,7 @@ def test_iter_absolute_pythonpath_entries_filters_relative_empty_and_duplicates(
     abs_b.mkdir()
     monkeypatch.setenv(
         "PYTHONPATH",
-        runtime_security.os.pathsep.join(
+        runtime_security_helpers.os.pathsep.join(
             [
                 "",
                 str(abs_a),
@@ -384,7 +398,7 @@ def test_iter_absolute_pythonpath_entries_filters_relative_empty_and_duplicates(
         ),
     )
 
-    assert runtime_security._iter_absolute_pythonpath_entries() == [
+    assert runtime_security_helpers._iter_absolute_pythonpath_entries() == [
         abs_a.resolve(),
         abs_b.resolve(),
     ]
@@ -400,10 +414,10 @@ def test_container_pythonpath_entries_map_workspace_and_external_mounts(
     external.mkdir()
     monkeypatch.setenv(
         "PYTHONPATH",
-        runtime_security.os.pathsep.join([str(inside), str(external)]),
+        runtime_security_helpers.os.pathsep.join([str(inside), str(external)]),
     )
 
-    entries, mounts = runtime_security._container_pythonpath_entries(cwd=cwd)
+    entries, mounts = runtime_security_helpers._container_pythonpath_entries(cwd=cwd)
 
     assert entries == ["/workspace/src", str(external.resolve())]
     assert mounts == [external]
@@ -422,7 +436,7 @@ def test_normalize_output_and_local_model_paths_cover_inside_outside_and_missing
     missing = cwd / "missing-model"
 
     normalized_output, output_mounts = (
-        runtime_security._normalize_output_path_for_container(
+        runtime_security_helpers._normalize_output_path_for_container(
             "reports",
             cwd=cwd,
         )
@@ -432,7 +446,7 @@ def test_normalize_output_and_local_model_paths_cover_inside_outside_and_missing
 
     external_output = external_root / "report.json"
     normalized_external_output, external_output_mounts = (
-        runtime_security._normalize_output_path_for_container(
+        runtime_security_helpers._normalize_output_path_for_container(
             str(external_output),
             cwd=cwd,
         )
@@ -441,7 +455,7 @@ def test_normalize_output_and_local_model_paths_cover_inside_outside_and_missing
     assert external_output_mounts == {external_root}
 
     normalized_inside_model, inside_mounts, treated_inside = (
-        runtime_security._normalize_local_model_path_for_container(
+        runtime_security_helpers._normalize_local_model_path_for_container(
             str(inside_model),
             cwd=cwd,
         )
@@ -451,7 +465,7 @@ def test_normalize_output_and_local_model_paths_cover_inside_outside_and_missing
     assert treated_inside is True
 
     normalized_missing, missing_mounts, treated_missing = (
-        runtime_security._normalize_local_model_path_for_container(
+        runtime_security_helpers._normalize_local_model_path_for_container(
             str(missing),
             cwd=cwd,
         )
@@ -461,7 +475,7 @@ def test_normalize_output_and_local_model_paths_cover_inside_outside_and_missing
     assert treated_missing is False
 
     normalized_external_model, external_mounts, treated_external = (
-        runtime_security._normalize_local_model_path_for_container(
+        runtime_security_helpers._normalize_local_model_path_for_container(
             str(external_root),
             cwd=cwd,
         )
@@ -546,7 +560,7 @@ def test_normalize_config_path_for_container_scans_dependencies_and_wraps_errors
     )
 
     normalized, mounts, needs_mirror = (
-        runtime_security._normalize_config_path_for_container(
+        runtime_security_helpers._normalize_config_path_for_container(
             "config.yaml",
             cwd=cwd,
             scan_dependencies=True,
@@ -563,7 +577,7 @@ def test_normalize_config_path_for_container_scans_dependencies_and_wraps_errors
         raising=True,
     )
     with pytest.raises(RuntimeError, match="not mountable"):
-        runtime_security._normalize_config_path_for_container(
+        runtime_security_helpers._normalize_config_path_for_container(
             "config.yaml",
             cwd=cwd,
             scan_dependencies=True,
@@ -645,13 +659,13 @@ def test_path_env_value_and_delegated_env_pairs_translate_workspace_paths(
         allow_unattested_artifacts=True,
     ):
         translated_inside, inside_mounts = (
-            runtime_security._path_env_value_for_container(
+            runtime_security_helpers._path_env_value_for_container(
                 str(inside_tmp),
                 cwd=cwd,
             )
         )
         translated_external, external_mounts = (
-            runtime_security._path_env_value_for_container(
+            runtime_security_helpers._path_env_value_for_container(
                 str(external_tmp),
                 cwd=cwd,
             )
@@ -661,7 +675,7 @@ def test_path_env_value_and_delegated_env_pairs_translate_workspace_paths(
         assert translated_external == str(external_tmp.resolve())
         assert external_mounts == [external_tmp]
 
-        env_pairs, mounts = runtime_security._delegated_env_pairs(cwd=cwd)
+        env_pairs, mounts = runtime_security_helpers._delegated_env_pairs(cwd=cwd)
         assert env_pairs[runtime_security.ALLOW_NETWORK_ENV] == "1"
         assert env_pairs[runtime_security.ALLOW_REMOTE_CODE_ENV] == "1"
         assert env_pairs[runtime_security.ALLOW_THIRD_PARTY_PLUGINS_ENV] == "0"
@@ -672,12 +686,14 @@ def test_path_env_value_and_delegated_env_pairs_translate_workspace_paths(
         assert env_pairs["INVARLOCK_TINY_RELAX"] == "1"
         assert mounts == [external_tmp]
 
-    translated_inside, inside_mounts = runtime_security._path_env_value_for_container(
-        str(inside_tmp),
-        cwd=cwd,
+    translated_inside, inside_mounts = (
+        runtime_security_helpers._path_env_value_for_container(
+            str(inside_tmp),
+            cwd=cwd,
+        )
     )
     translated_external, external_mounts = (
-        runtime_security._path_env_value_for_container(
+        runtime_security_helpers._path_env_value_for_container(
             str(external_tmp),
             cwd=cwd,
         )

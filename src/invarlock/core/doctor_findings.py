@@ -215,7 +215,7 @@ def build_cross_check_findings(
 
     spm = _as_dict(_as_dict(sdata.get("metrics")).get("primary_metric"))
     pm_kind = _as_lower(spm.get("kind"))
-    if pm_kind in {"accuracy", "vqa_accuracy"}:
+    if pm_kind == "accuracy":
         estimated = bool(spm.get("estimated"))
         counts_source = _as_lower(spm.get("counts_source"))
         if estimated or counts_source == "pseudo_config":

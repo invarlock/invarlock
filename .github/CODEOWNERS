@@ -1,3 +1,18 @@
+# Security-sensitive workflows, locks, docs, and helper scripts.
+.github/workflows/codeql.yml @MLPulse @invarlock-dev
+.github/workflows/ci.yml @MLPulse @invarlock-dev
+.github/workflows/dependabot-main-guard.yml @MLPulse @invarlock-dev
+.github/workflows/release.yml @MLPulse @invarlock-dev
+.github/workflows/supply-chain-pr.yml @MLPulse @invarlock-dev
+.github/codeql/ @MLPulse @invarlock-dev
+.github/dependabot.yml @MLPulse @invarlock-dev
+.github/WORKFLOWS.md @MLPulse @invarlock-dev
+docs/security/ @MLPulse @invarlock-dev
+requirements/workflows/*security*.txt @MLPulse @invarlock-dev
+scripts/generate_sbom.sh @MLPulse @invarlock-dev
+scripts/refresh_pinned_requirements.sh @MLPulse @invarlock-dev
+scripts/security/ @MLPulse @invarlock-dev
+
 # Code owners for automatic review assignment
 # Format: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 

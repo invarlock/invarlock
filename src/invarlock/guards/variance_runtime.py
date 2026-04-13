@@ -14,17 +14,6 @@ from .variance_results import (
 )
 
 
-def _decision_from_action(action: str) -> str:
-    normalized = str(action or "continue").lower()
-    if normalized == "warn":
-        return "monitor"
-    if normalized == "rollback":
-        return "rollback"
-    if normalized in {"abort", "reject"}:
-        return "block"
-    return "allow"
-
-
 def _build_diagnostics(
     *, warnings: list[str], errors: list[str]
 ) -> tuple[GuardDiagnostic, ...]:
@@ -86,10 +75,9 @@ def validate_guard(
     passed = result.get("passed", False)
 
     if passed:
-        action = "warn" if warnings else "continue"
+        decision = "monitor" if warnings else "allow"
     else:
-        action = "warn" if guard._monitor_only else "abort"
-    decision = _decision_from_action(action)
+        decision = "monitor" if guard._monitor_only else "block"
 
     violations = tuple(
         {
@@ -227,10 +215,10 @@ def finalize_guard(guard: Any, model: nn.Module) -> dict[str, Any]:
         stats=guard._stats,
         policy=guard._policy,
     )
-    result["decision"] = _decision_from_action(
-        "continue"
+    result["decision"] = (
+        "allow"
         if passed and not warnings
-        else ("warn" if passed or guard._monitor_only else "abort")
+        else ("monitor" if passed or guard._monitor_only else "block")
     )
     result["diagnostics"] = [
         {

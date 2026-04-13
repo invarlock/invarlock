@@ -136,9 +136,9 @@ def keygen_command(
     else:
         if payload["ok"]:
             console.print("[green]Proof-pack signing keypair created[/green]")
-            console.print(f"Private key: {payload['private_key']}")
-            console.print(f"Public key: {payload['public_key']}")
-            console.print(f"Fingerprint: {payload['signing_key_fingerprint']}")
+            typer.echo(f"Private key: {payload['private_key']}")
+            typer.echo(f"Public key: {payload['public_key']}")
+            typer.echo(f"Fingerprint: {payload['signing_key_fingerprint']}")
         else:
             for error in payload["errors"]:
                 console.print(f"[red]ERROR:[/red] {error}")

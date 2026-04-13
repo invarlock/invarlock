@@ -19,17 +19,6 @@ __all__ = [
 ]
 
 
-def _decision_from_action(action: str) -> str:
-    normalized = str(action or "continue").lower()
-    if normalized == "warn":
-        return "monitor"
-    if normalized == "rollback":
-        return "rollback"
-    if normalized in {"abort", "reject"}:
-        return "block"
-    return "allow"
-
-
 def _typed_diagnostics(
     violations: list[dict[str, Any]],
 ) -> tuple[GuardDiagnostic, ...]:
@@ -262,7 +251,7 @@ def validate_rmt_guard(
     result = guard.finalize(model, adapter)
     if (
         hasattr(result, "passed")
-        and hasattr(result, "action")
+        and hasattr(result, "decision")
         and hasattr(result, "metrics")
     ):
         violations_list: list[dict[str, Any]] = []
@@ -271,10 +260,9 @@ def validate_rmt_guard(
                 dict(item) if isinstance(item, dict) else {"message": str(item)}
                 for item in result.violations
             ]
-        action = str(result.action)
         return GuardValidationResult(
             passed=bool(result.passed),
-            decision=_decision_from_action(action),
+            decision=str(result.decision),
             metrics=dict(result.metrics),
             diagnostics=_typed_diagnostics(violations_list),
             violations=tuple(violations_list),
@@ -287,12 +275,14 @@ def validate_rmt_guard(
         }
         for item in result.get("errors", [])
     ]
-    action = str(
-        result.get("action", "continue" if result.get("passed", False) else "warn")
-    )
     return GuardValidationResult(
         passed=bool(result.get("passed", False)),
-        decision=_decision_from_action(action),
+        decision=str(
+            result.get(
+                "decision",
+                "allow" if result.get("passed", False) else "block",
+            )
+        ),
         metrics=dict(result.get("metrics", {})),
         diagnostics=_typed_diagnostics(violations),
         violations=tuple(violations),
@@ -317,7 +307,7 @@ def finalize_rmt_guard(
             return guard_outcome_type(
                 name=guard.name,
                 passed=False,
-                action="abort",
+                decision="block",
                 violations=[
                     {
                         "type": "preparation",
@@ -347,7 +337,7 @@ def finalize_rmt_guard(
             return guard_outcome_type(
                 name=guard.name,
                 passed=False,
-                action="abort",
+                decision="block",
                 violations=[
                     {
                         "type": "activation_required",
@@ -391,7 +381,7 @@ def finalize_rmt_guard(
         guard_assert(eps >= 0.0, f"rmt.epsilon[{fam}] must be >= 0")
 
     stable = not guard.epsilon_violations
-    action = "continue" if stable else "abort"
+    decision = "allow" if stable else "block"
     finalize_time = time.time() - start_time
 
     metrics: dict[str, Any] = {
@@ -429,7 +419,7 @@ def finalize_rmt_guard(
         return guard_outcome_type(
             name=guard.name,
             passed=stable,
-            action=action,
+            decision=decision,
             violations=violations,
             metrics=metrics,
         )
@@ -437,7 +427,7 @@ def finalize_rmt_guard(
         "passed": stable,
         "metrics": metrics,
         "violations": violations,
-        "decision": _decision_from_action(action),
+        "decision": decision,
         "diagnostics": [
             {
                 "kind": str(item.get("type", "epsilon_band")),

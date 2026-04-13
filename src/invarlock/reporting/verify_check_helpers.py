@@ -7,6 +7,11 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from invarlock.core.metric_kind_contract import (
+    MetricKindContractError,
+    is_ppl_metric_kind,
+    normalize_metric_kind,
+)
 from invarlock.reporting import report_schema as _report_schema
 from invarlock.reporting.report_policy import (
     resolve_pm_acceptance_range_from_report,
@@ -203,12 +208,21 @@ def _validate_primary_metric(report: dict[str, Any]) -> list[str]:
             }
         return False
 
-    kind = str(pm.get("kind", "")).lower()
+    try:
+        kind = normalize_metric_kind(pm.get("kind"))
+    except (MetricKindContractError, ValueError):
+        errors.append(
+            f"report has unsupported primary_metric.kind: {pm.get('kind')!r}."
+        )
+        return errors
+    if kind is None:
+        errors.append("report missing primary_metric.kind.")
+        return errors
     ratio_vs_baseline = pm.get("ratio_vs_baseline")
     final = pm.get("final")
     pm_invalid = _declares_invalid_primary_metric(pm)
 
-    if kind.startswith("ppl"):
+    if is_ppl_metric_kind(kind):
         baseline_ref = report.get("baseline_ref", {}) or {}
         baseline_pm = (
             baseline_ref.get("primary_metric")

@@ -80,15 +80,19 @@ in CI.
 Colab (CPU-friendly):
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_quickstart_cpu.ipynb)
 
-The secure-default CLI path runs model-loading commands inside the runtime
-container and expects an OCI container engine such as `docker` or `podman`.
+The minimal install (`pip install invarlock`) is enough for `doctor`,
+`verify`, `report html`, and proof-pack verification from an installed wheel.
+Install `invarlock[hf]` only when you need `evaluate` to load Hugging Face
+models. The secure-default CLI path runs model-loading commands inside the
+runtime container and expects an OCI container engine such as `podman` or
+`docker`.
 In a repo checkout, build the local runtime image once with
 `make runtime-image`; InvarLock automatically prefers
 `invarlock-runtime:local` when it is present. Trusted local workflows can opt
-into host execution explicitly with `--assurance trusted-local` on `invarlock evaluate`, but
-the attested verification step below expects container execution. The
-quickstart block below assumes a repo checkout; do not skip
-`make runtime-image` if you want the attested container path.
+into host execution explicitly with `--assurance trusted-local` on
+`invarlock evaluate`, but the attested verification step below expects
+container execution. The quickstart block below assumes a repo checkout; do
+not skip `make runtime-image` if you want the attested container path.
 
 ```bash
 # Repo-checkout quickstart for the attested container path
@@ -123,6 +127,9 @@ invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/eva
 If you pass a directory to `invarlock report generate` or
 `invarlock report explain`, it must contain canonical `report.json`.
 `invarlock report html` expects canonical `evaluation.report.json`.
+`invarlock verify` accepts directories with canonical report files, but a
+directory containing both `report.json` and `evaluation.report.json` is
+ambiguous and rejected; pass the exact file path instead.
 
 Example output (abridged; counts vary by profile/config):
 
@@ -139,7 +146,14 @@ Attestation: reports/eval/runtime.manifest.json
 
 - Core workflow: `invarlock evaluate` → `invarlock verify` →
   `invarlock report html`.
-- Advanced workflows live under `invarlock advanced ...`.
+- Report inspection and validation: `invarlock report generate`,
+  `invarlock report explain`, and `invarlock report validate`.
+- Environment and release checks: `invarlock doctor` plus the JSON surfaces
+  emitted by `doctor --json` and `advanced plugins ... --json`.
+- The public contract catalog exposed by those JSON surfaces includes
+  `validation_keys`, `console_labels`, and `metric_kinds`.
+- Advanced workflows: `invarlock advanced proof-pack`, `invarlock advanced policy`,
+  `invarlock advanced plugins`, and `invarlock advanced calibrate`.
 - Trusted host execution for the core evaluate path uses `--assurance trusted-local`.
 - Optional adapter/backend installs use normal Python extras such as
   `pip install "invarlock[hf]"` rather than CLI install commands.
@@ -155,7 +169,8 @@ Proof packs bundle reports + verification metadata into a distributable artifact
 
 Note: `configs/` and most `scripts/` remain repo resources and are not included in
 wheels. Installed wheels include the public contracts and the
-`invarlock advanced proof-pack verify` verifier.
+`invarlock advanced proof-pack verify` verifier, so downstream users can check
+bundles without cloning the repository.
 
 ## Installation
 
@@ -167,7 +182,16 @@ pip install invarlock
 pip install "invarlock[hf]"
 ```
 
-Optional extras: `invarlock[gpu]`, `invarlock[awq,gptq]`. Full setup: <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/getting-started.md>.
+Optional extras: `invarlock[probes]`, `invarlock[gpu]`, `invarlock[awq,gptq]`.
+On Python 3.13+ stacks, `gptq` may still require a vendor wheel or a
+supported older interpreter because upstream `auto-gptq` packaging is narrower
+than the core InvarLock support matrix. Full setup:
+<https://github.com/invarlock/invarlock/blob/main/docs/user-guide/getting-started.md>.
+
+The minimal install covers the core verification and reporting flows. Add
+`invarlock[hf]` only for model-loading evaluate runs, and use the installed
+wheel's proof-pack verifier when you need to inspect a bundle without cloning
+the repository.
 
 ## Documentation
 

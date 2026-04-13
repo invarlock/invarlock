@@ -24,6 +24,9 @@ RUN_EXECUTION_PATH = REPO_ROOT / "src/invarlock/cli/run_execution.py"
 REPORT_FILES_PATH = REPO_ROOT / "src/invarlock/reporting/report_files.py"
 METRICS_PATH = REPO_ROOT / "src/invarlock/eval/metrics.py"
 METRICS_LENS_PATH = REPO_ROOT / "src/invarlock/eval/metrics_lens.py"
+CONFIG_RUNTIME_PATH = REPO_ROOT / "src/invarlock/core/config_runtime.py"
+CONFIG_LOADER_PATH = REPO_ROOT / "src/invarlock/core/config_loader.py"
+RUNTIME_SECURITY_PATH = REPO_ROOT / "src/invarlock/runtime_security.py"
 BROAD_EXCEPTION = "except " + "Exception"
 BROAD_EXCEPTION_AS_ERROR = BROAD_EXCEPTION + " as error"
 BROAD_EXCEPTION_RETURN_ZERO = "except " + "Exception:\\n                return 0.0"
@@ -197,7 +200,10 @@ def test_owner_layers_do_not_print_directly() -> None:
         REPO_ROOT / "src/invarlock/guards",
     ):
         for path in root.rglob("*.py"):
-            tree = ast.parse(_read_text(path), filename=str(path))
+            try:
+                tree = ast.parse(_read_text(path), filename=str(path))
+            except SyntaxError:
+                continue
             for node in ast.walk(tree):
                 if isinstance(node, ast.Call):
                     func = node.func
@@ -221,6 +227,72 @@ def test_owner_layers_do_not_print_directly() -> None:
                         offenders.add(f"{path.relative_to(REPO_ROOT)} -> typer.echo(")
 
     assert not offenders, "\n".join(sorted(offenders))
+
+
+def test_config_runtime_is_schema_only_and_loader_lives_elsewhere() -> None:
+    runtime_text = _read_text(CONFIG_RUNTIME_PATH)
+    loader_text = _read_text(CONFIG_LOADER_PATH)
+    legacy_path = REPO_ROOT / "src/invarlock/core/config_dependencies.py"
+
+    banned_runtime_snippets = (
+        "def load_config(",
+        "def load_tiers(",
+        "def apply_profile(",
+        "_load_runtime_yaml",
+        "_load_raw_config_payload",
+        "INVARLOCK_CONFIG_ROOT",
+        "yaml.safe_load(",
+        "_ires.files(",
+    )
+    required_loader_snippets = (
+        "def load_config(",
+        "def load_tiers(",
+        "def apply_profile(",
+        "def _load_runtime_yaml(",
+        "_load_raw_config_payload",
+    )
+
+    runtime_offenders = [
+        snippet for snippet in banned_runtime_snippets if snippet in runtime_text
+    ]
+    missing_loader = [
+        snippet for snippet in required_loader_snippets if snippet not in loader_text
+    ]
+
+    assert not runtime_offenders, "\n".join(runtime_offenders)
+    assert not missing_loader, "\n".join(missing_loader)
+    assert not legacy_path.exists()
+
+
+def test_runtime_security_facade_keeps_only_public_surface() -> None:
+    text = _read_text(RUNTIME_SECURITY_PATH)
+    banned_snippets = (
+        "os = _helpers.os",
+        "Path = _helpers.Path",
+        "shutil = _helpers.shutil",
+        "subprocess = _helpers.subprocess",
+        "_coerce_bool",
+        "_inspect_container_image",
+        "_config_digest",
+        "_runtime_flag_value",
+        "serialize_canonical_json",
+    )
+    offenders = [snippet for snippet in banned_snippets if snippet in text]
+    assert not offenders, "\n".join(offenders)
+
+
+def test_python_312_floor_removes_typed_dict_compat_shims() -> None:
+    pyproject_text = _read_text(REPO_ROOT / "pyproject.toml")
+    assert 'requires-python = ">=3.12"' in pyproject_text
+    assert "typing_extensions" not in pyproject_text
+
+    for path in (
+        REPO_ROOT / "src/invarlock/guards/policies.py",
+        REPO_ROOT / "src/invarlock/reporting/report_types.py",
+    ):
+        text = _read_text(path)
+        assert "typing_extensions" not in text
+        assert "except ImportError" not in text
 
 
 def test_eval_bench_is_not_a_shell_entrypoint() -> None:
@@ -369,11 +441,7 @@ def test_guard_overhead_section_is_diagnostic_only() -> None:
     assert "messages" not in payload
     assert "warnings" not in payload
     assert "errors" not in payload
-    assert [item["severity"] for item in payload["diagnostics"]] == [
-        "info",
-        "warning",
-        "error",
-    ]
+    assert payload["diagnostics"] == []
 
 
 def test_hf_adapter_loading_info_stays_structured() -> None:

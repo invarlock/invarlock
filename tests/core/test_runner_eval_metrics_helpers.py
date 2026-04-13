@@ -73,10 +73,10 @@ def test_runner_eval_metrics_small_helpers_filter_and_normalize_inputs() -> None
     )
     assert (
         remm._resolve_metric_kind(
-            SimpleNamespace(context={"eval": {"metric": {"kind": "VQA_Accuracy"}}}),
+            SimpleNamespace(context={"eval": {"metric": {"kind": "Accuracy"}}}),
             fallback="ppl_causal",
         )
-        == "vqa_accuracy"
+        == "accuracy"
     )
     assert (
         remm._resolve_metric_kind(

@@ -131,7 +131,7 @@ def test_profile_apply_failure_exit(tmp_path: Path):
         )
         stack.enter_context(
             patch(
-                "invarlock.core.config_runtime.apply_profile",
+                "invarlock.core.config_loader.apply_profile",
                 side_effect=RuntimeError("bad profile"),
             )
         )
@@ -441,7 +441,7 @@ def test_mlm_mask_prob_zero_sets_labels_and_zero_counts(tmp_path: Path):
                 return {}
 
         stack.enter_context(
-            patch("invarlock.core.config_runtime.load_config", lambda p: Cfg())
+            patch("invarlock.core.config_loader.load_config", lambda p: Cfg())
         )
 
         def runner_exec6(**kwargs):
@@ -518,6 +518,23 @@ def _baseline_with_meta(tmp_path: Path, meta: dict, preview_ids, final_ids) -> P
     p = tmp_path / "baseline.json"
     payload = {
         "meta": meta,
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 1.0,
+                "final": 1.0,
+            }
+        },
+        "edit": {
+            "name": "structured",
+            "plan_digest": "baseline",
+            "deltas": {
+                "params_changed": 0,
+                "heads_pruned": 0,
+                "neurons_pruned": 0,
+                "layers_modified": 0,
+            },
+        },
         "evaluation_windows": {
             "preview": {"window_ids": [0], "input_ids": preview_ids},
             "final": {"window_ids": [1], "input_ids": final_ids},
@@ -911,6 +928,23 @@ def test_retry_controller_until_pass_two_attempts(tmp_path: Path):
         json.dumps(
             {
                 "meta": {"tokenizer_hash": "tokhash123"},
+                "metrics": {
+                    "primary_metric": {
+                        "kind": "ppl_causal",
+                        "preview": 1.0,
+                        "final": 1.0,
+                    }
+                },
+                "edit": {
+                    "name": "structured",
+                    "plan_digest": "baseline",
+                    "deltas": {
+                        "params_changed": 0,
+                        "heads_pruned": 0,
+                        "neurons_pruned": 0,
+                        "layers_modified": 0,
+                    },
+                },
                 "evaluation_windows": {
                     "preview": {"window_ids": [0], "input_ids": [[1, 2, 3]]},
                     "final": {"window_ids": [1], "input_ids": [[4, 5, 6]]},
@@ -973,7 +1007,7 @@ def test_retry_controller_until_pass_two_attempts(tmp_path: Path):
 
         stack.enter_context(patch("invarlock.core.retry.RetryController", RC))
         stack.enter_context(
-            patch("invarlock.reporting.report_make.make_report", make_cert)
+            patch("invarlock.cli.run_execution.build_evaluation_report", make_cert)
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(

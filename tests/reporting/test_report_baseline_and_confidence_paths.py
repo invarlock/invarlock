@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from invarlock.reporting import report_make as C
+from invarlock.reporting.report_confidence import compute_confidence_label
 from invarlock.reporting.report_make import make_report
 
 
@@ -17,7 +17,7 @@ def test_confidence_label_variants():
         },
         "resolved_policy": {"confidence": {"ppl_ratio_width_max": 0.03}},
     }
-    out = C._compute_confidence_label(cert)
+    out = compute_confidence_label(cert)
     assert out["label"] in {"High", "Medium", "Low"}
 
     # Medium when unstable even with tight CI
@@ -30,7 +30,7 @@ def test_confidence_label_variants():
         },
         "resolved_policy": {"confidence": {"ppl_ratio_width_max": 0.03}},
     }
-    out_u = C._compute_confidence_label(cert_u)
+    out_u = compute_confidence_label(cert_u)
     assert out_u["label"] in {"Medium", "Low"}
 
     # Low when not acceptable
@@ -43,7 +43,7 @@ def test_confidence_label_variants():
         },
         "resolved_policy": {"confidence": {"ppl_ratio_width_max": 0.03}},
     }
-    out_bad = C._compute_confidence_label(cert_bad)
+    out_bad = compute_confidence_label(cert_bad)
     assert out_bad["label"] == "Low"
 
 

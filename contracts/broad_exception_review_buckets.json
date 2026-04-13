@@ -11,5 +11,20 @@
     "questionable": "Active paths that coerce config, pair data, or shape user-visible outputs need a narrower catch or stronger justification before they should remain broad.",
     "should_remove": "Trust-critical determinism, guard evidence, guard execution, and pairing logic must not rely on blanket catches because they can hide correctness gaps or downgrade fail-closed behavior."
   },
-  "entries": []
+  "entries": [
+    {
+      "path": "src/invarlock/cli/evaluate_phases.py",
+      "lines": [
+        64,
+        114,
+        124,
+        188,
+        250,
+        306,
+        316
+      ],
+      "bucket": "acceptable",
+      "rationale": "Phase-shell wrappers preserve buffered child output, normalize CLI exit codes, and isolate heterogeneous failures while orchestration and report-contract helpers still raise mixed exception types."
+    }
+  ]
 }

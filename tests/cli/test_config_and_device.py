@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-import invarlock.core.config_runtime as config_mod
+import invarlock.core.config_loader as config_mod
 from invarlock.cli.device import (
     get_device_info,
     is_device_available,
@@ -13,14 +13,13 @@ from invarlock.cli.run_config import (
     _apply_requested_edit_override,
     _resolve_requested_edit_name,
 )
+from invarlock.core.config_loader import apply_profile, load_config
 from invarlock.core.config_runtime import (
     DatasetConfig,
     EvalBootstrapConfig,
     InvarLockConfig,
     SpectralGuardConfig,
     VarianceGuardConfig,
-    apply_profile,
-    load_config,
 )
 
 

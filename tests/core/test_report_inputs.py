@@ -59,8 +59,29 @@ def test_resolve_report_input_path_rejects_ambiguous_directory(tmp_path: Path) -
     (tmp_path / "report.json").write_text("{}", encoding="utf-8")
     (tmp_path / "evaluation.report.json").write_text("{}", encoding="utf-8")
 
-    with pytest.raises(ReportInputError, match="Ambiguous report directory"):
+    with pytest.raises(ReportInputError, match="Ambiguous report directory") as exc:
         resolve_report_input_path(tmp_path)
+
+    assert "report.json and evaluation.report.json" in str(exc.value)
+
+
+@pytest.mark.parametrize("expected_kind", ["run", "evaluation"])
+def test_resolve_report_input_path_rejects_ambiguous_directory_for_expected_kind(
+    tmp_path: Path, expected_kind: str
+) -> None:
+    (tmp_path / "report.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "evaluation.report.json").write_text("{}", encoding="utf-8")
+
+    with pytest.raises(ReportInputError, match="Ambiguous report directory"):
+        resolve_report_input_path(tmp_path, expected_kind=expected_kind)  # type: ignore[arg-type]
+
+
+def test_load_report_input_json_rejects_ambiguous_directory(tmp_path: Path) -> None:
+    (tmp_path / "report.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "evaluation.report.json").write_text("{}", encoding="utf-8")
+
+    with pytest.raises(ReportInputError, match="Ambiguous report directory"):
+        load_report_input_json(tmp_path)
 
 
 def test_resolve_report_input_path_rejects_directory_without_canonical_file(

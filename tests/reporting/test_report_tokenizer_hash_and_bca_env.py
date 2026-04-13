@@ -158,7 +158,7 @@ def test_evaluation_report_uses_explicit_bca_when_many_paired_windows(
         lambda _ci: (1.0, 1.0),
     )
     monkeypatch.setattr(
-        "invarlock.reporting.report_make.compute_primary_metric_from_report",
+        "invarlock.eval.primary_metric.compute_primary_metric_from_report",
         lambda *_a, **_k: {"kind": "ppl_causal", "final": 10.0},
     )
 

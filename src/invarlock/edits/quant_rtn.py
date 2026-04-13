@@ -24,6 +24,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from invarlock.core.abi import INVARLOCK_CORE_ABI as CORE_ABI
 from invarlock.core.api import (
     CalibrationData,
     EditRuntime,
@@ -32,6 +33,8 @@ from invarlock.core.api import (
     ModelEdit,
 )
 from invarlock.core.exceptions import EditError
+
+INVARLOCK_CORE_ABI = CORE_ABI
 
 __all__ = ["RTNQuantEdit"]
 

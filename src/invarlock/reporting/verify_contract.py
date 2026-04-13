@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import math
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -53,7 +53,7 @@ class VerifyDiagnostic:
     message: str
 
 
-class VerifyOutcome(str, Enum):
+class VerifyOutcome(StrEnum):
     OK = "ok"
     POLICY_FAIL = "policy_fail"
     MALFORMED = "malformed"
@@ -262,7 +262,7 @@ def _append_recompute_errors(
     fin = win.get("final") if isinstance(win, dict) else None
     tiny_relax = resolve_tiny_relax_from_report(cert_obj)
     strict_recompute = prof in {"ci", "release"} and not tiny_relax
-    if kind in {"accuracy", "vqa_accuracy"}:
+    if kind == "accuracy":
         cls = (
             cert_obj.get("metrics", {}).get("classification", {})
             if isinstance(cert_obj.get("metrics"), dict)

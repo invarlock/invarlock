@@ -13,7 +13,7 @@ def _base_evaluation_report() -> dict:
         "dataset": {
             "provider": "synthetic",
             "seq_len": 16,
-            "windows": {"preview": 2, "final": 2},
+            "windows": {"preview": 2, "final": 2, "stats": {}},
         },
         "primary_metric": {"kind": "accuracy", "final": 0.9},
         "validation": {
@@ -31,7 +31,7 @@ def test_validate_report_accepts_valid_payload():
     assert schema_mod.validate_report(cert) is True
 
 
-def test_validate_report_fallback_when_schema_fails(monkeypatch):
+def test_validate_report_rejects_payload_when_schema_fails(monkeypatch):
     monkeypatch.setattr(
         schema_mod, "_validate_with_jsonschema", lambda cert: False, raising=False
     )
@@ -40,7 +40,7 @@ def test_validate_report_fallback_when_schema_fails(monkeypatch):
         "run_id": "fallback",
         "primary_metric": {"kind": "ppl_mlm"},
     }
-    assert schema_mod.validate_report(cert) is True
+    assert schema_mod.validate_report(cert) is False
 
 
 def test_validate_report_rejects_bad_validation_values():

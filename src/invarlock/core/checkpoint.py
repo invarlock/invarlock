@@ -73,7 +73,6 @@ class PolicyCheckpoint:
         for outcome in outcomes:
             decision = normalize_guard_decision(
                 getattr(outcome, "decision", None),
-                fallback_action=getattr(outcome, "action", None),
                 passed=getattr(outcome, "passed", None),
             )
             if decision == "block":
@@ -82,7 +81,6 @@ class PolicyCheckpoint:
         for outcome in outcomes:
             decision = normalize_guard_decision(
                 getattr(outcome, "decision", None),
-                fallback_action=getattr(outcome, "action", None),
                 passed=getattr(outcome, "passed", None),
             )
             if decision == "rollback":

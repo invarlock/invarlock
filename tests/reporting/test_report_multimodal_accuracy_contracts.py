@@ -33,7 +33,7 @@ def test_build_primary_metric_analysis_populates_multimodal_coverage_and_pairing
     report = {
         "metrics": {
             "primary_metric": {
-                "kind": "vqa_accuracy",
+                "kind": "accuracy",
                 "preview": 1.0,
                 "final": 1.0,
                 "ratio_vs_baseline": 0.0,

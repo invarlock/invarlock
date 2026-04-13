@@ -114,7 +114,7 @@ def build_safety_dashboard_summary(
         pm_ok = None
     pm_value = pm.get("ratio_vs_baseline")
 
-    if pm_kind in {"accuracy", "vqa_accuracy"}:
+    if pm_kind == "accuracy":
         measured = f"{pm_value:+.2f} pp" if isinstance(pm_value, int | float) else "N/A"
         th_map = {
             "conservative": -0.5,
@@ -249,7 +249,7 @@ def build_quality_gates_summary(
         gating_basis = pm_block.get("gating_basis") or "point"
         pm_ok = bool(validation.get("primary_metric_acceptable", True))
         status = "✅ PASS" if pm_ok else "❌ FAIL"
-        if pm_kind in {"accuracy", "vqa_accuracy"}:
+        if pm_kind == "accuracy":
             measured = f"{value:+.2f} pp" if isinstance(value, int | float) else "N/A"
             th_map = {
                 "conservative": -0.5,

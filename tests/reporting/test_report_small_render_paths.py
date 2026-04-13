@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from invarlock.reporting import report_make as C
-from invarlock.reporting.policy_utils import _compute_variance_policy_digest
+from invarlock.reporting.policy_utils import (
+    _compute_thresholds_hash,
+    _compute_thresholds_payload,
+    _compute_variance_policy_digest,
+)
 from invarlock.reporting.utils import _pair_logloss_windows
 
 
@@ -31,7 +34,7 @@ def test_compute_variance_policy_digest_variants():
 
 
 def test_thresholds_payload_and_hash_shape():
-    payload = C._compute_thresholds_payload("balanced", resolved_policy={})
+    payload = _compute_thresholds_payload("balanced", resolved_policy={})
     assert set(payload).issuperset({"tier", "pm_ratio", "accuracy", "variance"})
-    digest = C._compute_thresholds_hash(payload)
+    digest = _compute_thresholds_hash(payload)
     assert isinstance(digest, str) and len(digest) == 16

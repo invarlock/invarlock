@@ -1,3 +1,5 @@
+import importlib
+import importlib.util
 import json
 import subprocess
 import sys
@@ -40,6 +42,14 @@ def _run_checker(
     if extra_args:
         cmd.extend(extra_args)
     return subprocess.run(cmd, capture_output=True, text=True, check=False)
+
+
+def _load_module(path: Path, name: str):
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_two_tier_policy_enforced(tmp_path: Path) -> None:
@@ -90,6 +100,22 @@ def test_two_tier_policy_enforced(tmp_path: Path) -> None:
     assert "src/invarlock/cli/commands/run.py" not in err
 
 
+def test_checker_uses_canonical_coverage_policy_module(monkeypatch) -> None:
+    root = Path(__file__).resolve().parents[2]
+    monkeypatch.syspath_prepend(str(root / "scripts"))
+    sys.modules.pop("coverage_policy", None)
+    checker = _load_module(
+        root / "scripts" / "check_coverage_thresholds.py",
+        "check_coverage_thresholds_under_test",
+    )
+    policy = importlib.import_module("coverage_policy")
+
+    assert checker.CORE_PREFIXES is policy.CORE_PREFIXES
+    assert checker.CORE_FILES is policy.CORE_FILES
+    assert checker.CORE_FLOOR_DEFAULT == policy.CORE_FLOOR_DEFAULT
+    assert checker.DEFAULT_FLOOR_DEFAULT == policy.DEFAULT_FLOOR_DEFAULT
+
+
 def test_overrides_take_precedence(tmp_path: Path) -> None:
     # Explicit overrides should win over a stricter core-floor flag.
     xml = tmp_path / "cov.xml"
@@ -118,7 +144,7 @@ def test_overrides_take_precedence(tmp_path: Path) -> None:
         )
         < 1e-9
     )
-    assert payload["configured_threshold_files"] == 158
+    assert payload["configured_threshold_files"] == 160
     assert payload["evaluated_files"] == 1
     assert payload["measured_threshold_files"] == 1
     assert "src/invarlock/cli/app.py" in payload["missing_threshold_files"]
@@ -183,20 +209,20 @@ def test_summary_reports_measured_vs_configured_threshold_counts(
 
     assert proc.returncode == 0, proc.stderr
     assert (
-        "Coverage OK: 1/158 threshold-listed files had coverage data and met "
+        "Coverage OK: 1/160 threshold-listed files had coverage data and met "
         "per-file thresholds." in proc.stdout
     )
     assert (
-        "157 threshold-listed files were absent from the coverage report."
+        "159 threshold-listed files were absent from the coverage report."
         in proc.stdout
     )
 
     payload = json.loads(json_out.read_text())
     assert payload["status"] == "ok"
-    assert payload["configured_threshold_files"] == 158
+    assert payload["configured_threshold_files"] == 160
     assert payload["evaluated_files"] == 1
     assert payload["measured_threshold_files"] == 1
-    assert len(payload["missing_threshold_files"]) == 157
+    assert len(payload["missing_threshold_files"]) == 159
 
 
 def test_ratchets_selected_files_to_ninety_five_percent(tmp_path: Path) -> None:
@@ -312,7 +338,7 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
             ("src/invarlock/core/api.py", 0.999, 1.0),
             ("src/invarlock/core/abi.py", 0.999, 1.0),
             ("src/invarlock/core/adapter_provenance.py", 0.999, 1.0),
-            ("src/invarlock/core/config_dependencies.py", 0.999, 1.0),
+            ("src/invarlock/core/config_loader.py", 0.999, 1.0),
             ("src/invarlock/core/contracts.py", 0.999, 1.0),
             ("src/invarlock/core/doctor_runtime.py", 0.999, 1.0),
             ("src/invarlock/core/error_encoding.py", 0.999, 1.0),
@@ -364,7 +390,10 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
             ("src/invarlock/core/bootstrap.py", 0.999, 1.0),
             ("src/invarlock/core/config_runtime.py", 0.999, 1.0),
             ("src/invarlock/core/run_orchestrator_execute.py", 0.999, 1.0),
+            ("src/invarlock/core/run_orchestrator_execute_events.py", 0.999, 1.0),
             ("src/invarlock/core/run_snapshot_policy.py", 0.999, 1.0),
+            ("src/invarlock/core/run_orchestrator_execute_outcome.py", 0.999, 1.0),
+            ("src/invarlock/core/run_orchestrator_execute_pipeline.py", 0.999, 1.0),
             ("src/invarlock/core/runner_eval_metrics_multimodal.py", 0.999, 1.0),
             ("src/invarlock/core/runner_eval_metrics_stats.py", 0.999, 1.0),
             ("src/invarlock/core/runner_eval_phase.py", 0.999, 1.0),
@@ -393,7 +422,7 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
         "src/invarlock/core/api.py",
         "src/invarlock/core/abi.py",
         "src/invarlock/core/adapter_provenance.py",
-        "src/invarlock/core/config_dependencies.py",
+        "src/invarlock/core/config_loader.py",
         "src/invarlock/core/contracts.py",
         "src/invarlock/core/doctor_runtime.py",
         "src/invarlock/core/error_encoding.py",
@@ -445,6 +474,9 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
         "src/invarlock/core/bootstrap.py",
         "src/invarlock/core/config_runtime.py",
         "src/invarlock/core/run_orchestrator_execute.py",
+        "src/invarlock/core/run_orchestrator_execute_events.py",
+        "src/invarlock/core/run_orchestrator_execute_outcome.py",
+        "src/invarlock/core/run_orchestrator_execute_pipeline.py",
         "src/invarlock/core/run_snapshot_policy.py",
         "src/invarlock/core/runner_eval_metrics_multimodal.py",
         "src/invarlock/core/runner_eval_metrics_stats.py",
@@ -524,7 +556,6 @@ def test_newly_promoted_core_thresholds_are_explicit(tmp_path: Path) -> None:
             ("src/invarlock/core/run_baseline_evidence.py", 0.899, 1.0),
             ("src/invarlock/core/run_execution_context_policy.py", 0.899, 1.0),
             ("src/invarlock/core/run_orchestrator_execute_attempts.py", 0.899, 1.0),
-            ("src/invarlock/core/run_orchestrator_execute_prepare.py", 0.899, 1.0),
             ("src/invarlock/core/run_retry_policy.py", 0.899, 1.0),
             ("src/invarlock/cli/run_pairing_baseline.py", 0.899, 1.0),
         ],
@@ -541,7 +572,6 @@ def test_newly_promoted_core_thresholds_are_explicit(tmp_path: Path) -> None:
         "src/invarlock/core/run_baseline_evidence.py",
         "src/invarlock/core/run_execution_context_policy.py",
         "src/invarlock/core/run_orchestrator_execute_attempts.py",
-        "src/invarlock/core/run_orchestrator_execute_prepare.py",
         "src/invarlock/core/run_retry_policy.py",
         "src/invarlock/cli/run_pairing_baseline.py",
     ):

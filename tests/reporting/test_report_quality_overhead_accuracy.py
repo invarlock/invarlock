@@ -49,4 +49,4 @@ def test_make_evaluation_report_attaches_quality_overhead_for_accuracy() -> None
     cert = make_report(report, baseline)
     qo = cert.get("quality_overhead", {})
     assert isinstance(qo, dict) and qo.get("basis") == "delta_pp"
-    assert qo.get("kind") in {"accuracy", "vqa_accuracy"}
+    assert qo.get("kind") == "accuracy"

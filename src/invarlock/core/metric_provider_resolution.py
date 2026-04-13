@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from .metric_kind_contract import normalize_metric_kind
 from .provider_config import resolve_provider_kind_and_kwargs
 
 _METRIC_LOOKUP_ERRORS = (AttributeError, KeyError, TypeError, ValueError)
@@ -62,9 +63,7 @@ def resolve_metric_and_provider(
 
     metric_kind = None
     if isinstance(metric_kind_override, str) and metric_kind_override.strip():
-        metric_override = metric_kind_override.strip().lower()
-        if metric_override != "auto":
-            metric_kind = metric_override
+        metric_kind = normalize_metric_kind(metric_kind_override, allow_auto=True)
 
     reps = None
     ci_level = None
@@ -74,17 +73,11 @@ def resolve_metric_and_provider(
         ci_level = _metric_value("ci_level")
 
     normalized_kind: str | None
-    if isinstance(metric_kind, str) and metric_kind:
-        normalized_kind = metric_kind.strip().lower()
-        if normalized_kind == "auto":
-            normalized_kind = None
-    else:
-        normalized_kind = None
+    normalized_kind = normalize_metric_kind(metric_kind, allow_auto=True)
 
     if not normalized_kind:
         default_metric = getattr(model_profile, "default_metric", None)
-        if isinstance(default_metric, str) and default_metric.strip():
-            normalized_kind = default_metric.strip().lower()
+        normalized_kind = normalize_metric_kind(default_metric, allow_auto=True)
 
     if not normalized_kind:
         loss_type = (resolved_loss_type or "").strip().lower()

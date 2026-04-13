@@ -13,6 +13,7 @@ from typing import Any
 
 import numpy as np
 
+from invarlock.core.abi import INVARLOCK_CORE_ABI as CORE_ABI
 from invarlock.core.api import Guard
 from invarlock.core.types import GuardValidationResult
 
@@ -23,6 +24,8 @@ from . import spectral_policy as _spectral_policy
 from . import spectral_results as _spectral_results
 from . import spectral_runtime as _spectral_runtime
 from . import spectral_selection as _spectral_selection
+
+INVARLOCK_CORE_ABI = CORE_ABI
 
 _EVIDENCE_DUMP_ERRORS = (ImportError, OSError, RuntimeError, TypeError, ValueError)
 

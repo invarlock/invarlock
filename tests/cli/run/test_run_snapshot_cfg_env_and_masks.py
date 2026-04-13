@@ -49,6 +49,17 @@ def _common_ce():
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
+            "invarlock.cli.run_runtime.resolve_tokenizer",
+            lambda *_a, **_k: (
+                SimpleNamespace(
+                    eos_token="</s>",
+                    pad_token="</s>",
+                    vocab_size=50000,
+                ),
+                "tokhash123",
+            ),
+        ),
+        patch(
             "invarlock.reporting.report_files.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
@@ -247,9 +258,7 @@ def test_snapshot_cfg_threshold_and_tempdir(tmp_path: Path, monkeypatch):
     with ExitStack() as stack:
         for ctx in _common_ce():
             stack.enter_context(ctx)
-        stack.enter_context(
-            patch("invarlock.core.config_runtime.load_config", load_cfg)
-        )
+        stack.enter_context(patch("invarlock.core.config_loader.load_config", load_cfg))
         stack.enter_context(
             patch("invarlock.cli.run_runtime.psutil.virtual_memory", vm)
         )

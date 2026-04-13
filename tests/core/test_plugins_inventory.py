@@ -79,9 +79,9 @@ def test_gather_adapter_inventory_rows_and_json_payloads() -> None:
         minimal=False,
         has_cuda=False,
         is_linux=True,
-        extras_checker=lambda name, _kind: "⚠️ missing invarlock[gpu]"
-        if name == "hf_bnb"
-        else "",
+        extras_checker=lambda name, _kind: (
+            "⚠️ missing invarlock[gpu]" if name == "hf_bnb" else ""
+        ),
         provenance_extractor=lambda name: (
             SimpleNamespace(library="bitsandbytes", version=None)
             if name == "hf_bnb"
@@ -168,9 +168,9 @@ def test_gather_adapter_inventory_rows_handles_empty_missing_hint_and_cuda_runti
         minimal=False,
         has_cuda=True,
         is_linux=True,
-        extras_checker=lambda name, _kind: "⚠️ missing"
-        if name == "custom_optional"
-        else "",
+        extras_checker=lambda name, _kind: (
+            "⚠️ missing" if name == "custom_optional" else ""
+        ),
         provenance_extractor=_provenance,
         bitsandbytes_runtime_available=lambda: False,
     )

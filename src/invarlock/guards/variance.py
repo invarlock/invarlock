@@ -13,6 +13,7 @@ from typing import Any
 
 import torch.nn as nn
 
+from invarlock.core.abi import INVARLOCK_CORE_ABI as CORE_ABI
 from invarlock.core.api import Guard
 from invarlock.core.bootstrap import compute_paired_delta_log_ci
 from invarlock.core.types import GuardValidationResult
@@ -26,6 +27,8 @@ from . import variance_runtime as _variance_runtime
 from . import variance_scaling as _variance_scaling
 from . import variance_targets as _variance_targets
 from .policies import VariancePolicyDict
+
+INVARLOCK_CORE_ABI = CORE_ABI
 
 __all__ = ["VarianceGuard"]
 

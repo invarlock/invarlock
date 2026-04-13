@@ -11,12 +11,15 @@ from typing import Any
 import torch
 import torch.nn as nn
 
+from invarlock.core.abi import INVARLOCK_CORE_ABI as CORE_ABI
 from invarlock.core.api import ModelAdapter
 from invarlock.core.error_utils import wrap_errors
 from invarlock.core.exceptions import AdapterError, DependencyError, ModelLoadError
 
 from .hf_loading import resolve_core_loader_strategy
 from .hf_mixin import HFAdapterMixin
+
+INVARLOCK_CORE_ABI = CORE_ABI
 
 TensorType = torch.Tensor
 ModuleType = nn.Module

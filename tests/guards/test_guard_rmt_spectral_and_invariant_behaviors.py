@@ -1,8 +1,5 @@
 """
-Comprehensive Guard System Tests
-===============================
-
-Comprehensive tests for all guard modules to achieve 70% coverage.
+Guard invariant, RMT, and spectral behavior tests.
 """
 
 import pytest
@@ -43,8 +40,8 @@ from invarlock.guards.spectral_measurement import (
 )
 
 
-class TestAdditionalUtilityFunctions:
-    """Test additional utility functions for better coverage."""
+class TestGuardUtilityBehaviors:
+    """Exercise guard utility behaviors across invariant and policy helpers."""
 
     def setup_method(self):
         """Set up test fixtures."""
@@ -228,8 +225,8 @@ class TestAdditionalUtilityFunctions:
             get_validation_gate("invalid_gate")
 
 
-class TestRMTGuardCoverageBoost:
-    """Targeted tests to boost RMT guard coverage to 70%."""
+class TestRMTGuardBehaviors:
+    """Exercise RMT guard detection, reporting, and finalize behavior."""
 
     def setup_method(self):
         """Set up test fixtures."""
@@ -429,8 +426,8 @@ class TestRMTGuardCoverageBoost:
         assert metrics["epsilon_violations"]
 
 
-class TestSpectralGuardCoverageBoost:
-    """Targeted tests to boost spectral guard coverage to 70%."""
+class TestSpectralGuardBehaviors:
+    """Exercise spectral guard control and measurement behavior."""
 
     def setup_method(self):
         """Set up test fixtures."""

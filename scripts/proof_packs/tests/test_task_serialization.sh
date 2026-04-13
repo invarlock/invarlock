@@ -476,13 +476,28 @@ test_get_task_fields_and_simple_accessors_return_expected_values() {
     assert_eq "14" "$(get_task_model_size "${task}")" "model_size_gb accessor"
     assert_eq "2" "$(get_task_required_gpus "${task}")" "required_gpus accessor"
 
-    # Missing required_gpus defaults to 1.
+    # Missing required_gpus fails closed.
     jq 'del(.required_gpus)' "${task}" > "${task}.tmp" && mv "${task}.tmp" "${task}"
-    assert_eq "1" "$(get_task_required_gpus "${task}")" "required_gpus default"
+    run get_task_required_gpus "${task}"
+    assert_rc "1" "${RUN_RC}" "required_gpus missing should fail"
+    assert_match 'required_gpus must be a positive integer' "${RUN_ERR}" "missing required_gpus error"
 
-    # Null required_gpus defaults to 1.
+    # Null required_gpus fails closed.
     jq '.required_gpus = null' "${task}" > "${task}.tmp" && mv "${task}.tmp" "${task}"
-    assert_eq "1" "$(get_task_required_gpus "${task}")" "required_gpus null defaults"
+    run get_task_required_gpus "${task}"
+    assert_rc "1" "${RUN_RC}" "required_gpus null should fail"
+    assert_match 'required_gpus must be a positive integer' "${RUN_ERR}" "null required_gpus error"
+
+    # Non-numeric and zero values fail closed.
+    jq '.required_gpus = "abc"' "${task}" > "${task}.tmp" && mv "${task}.tmp" "${task}"
+    run get_task_required_gpus "${task}"
+    assert_rc "1" "${RUN_RC}" "required_gpus string should fail"
+    assert_match 'required_gpus must be a positive integer' "${RUN_ERR}" "string required_gpus error"
+
+    jq '.required_gpus = 0' "${task}" > "${task}.tmp" && mv "${task}.tmp" "${task}"
+    run get_task_required_gpus "${task}"
+    assert_rc "1" "${RUN_RC}" "required_gpus zero should fail"
+    assert_match 'required_gpus must be a positive integer' "${RUN_ERR}" "zero required_gpus error"
 }
 
 test_print_task_summary_and_queue_summary_print_expected_headers() {

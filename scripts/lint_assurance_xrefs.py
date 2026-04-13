@@ -212,9 +212,12 @@ def _path_exists_in_obj(obj: Any, path: str) -> bool:
 
 
 def _sample_reports() -> list[dict[str, Any]]:
-    from invarlock.reporting.report_make import make_report
-
+    # Keep this sample self-contained. Docs CI intentionally installs a narrow
+    # docs-only dependency surface, so the linter must not rely on report-build
+    # modules that import runtime stacks such as numpy/torch.
     ppl_report = {
+        "schema_version": "v1",
+        "run_id": "sample-ppl",
         "meta": {
             "model_id": "m",
             "adapter": "hf",
@@ -222,192 +225,193 @@ def _sample_reports() -> list[dict[str, Any]]:
             "seed": 1,
             "device": "cpu",
             "ts": "now",
-            "auto": {"enabled": True, "tier": "balanced"},
             "tokenizer_hash": "tok",
             "seeds": {"python": 1, "numpy": None, "torch": None},
             "env_flags": {"CUBLAS_WORKSPACE_CONFIG": ":4096:8"},
             "determinism": {"requested": "strict", "level": "strict"},
         },
-        "data": {
-            "dataset": "ds",
+        "auto": {"tier": "balanced", "policy_digest": "auto-digest"},
+        "dataset": {
+            "name": "ds",
             "split": "validation",
-            "seq_len": 8,
-            "stride": 8,
-            "preview_n": 2,
-            "final_n": 2,
+            "windows": {
+                "stats": {
+                    "paired_windows": 2,
+                    "requested_preview": 2,
+                    "requested_final": 2,
+                    "actual_preview": 2,
+                    "actual_final": 2,
+                    "coverage": {"preview": {"used": 2}, "final": {"used": 2}},
+                    "bootstrap": {
+                        "replicates": 200,
+                        "alpha": 0.05,
+                        "method": "percentile",
+                        "seed": 1,
+                    },
+                    "paired_delta_summary": {
+                        "mean": -0.01,
+                        "std": 0.02,
+                        "degenerate": False,
+                    },
+                    "window_match_fraction": 1.0,
+                    "window_overlap_fraction": 0.0,
+                }
+            },
         },
         "edit": {
             "name": "noop",
             "plan_digest": "d",
             "deltas": {"params_changed": 0, "layers_modified": 0},
         },
-        "guards": [
-            {
-                "name": "spectral",
-                "policy": {
-                    "deadband": 0.10,
-                    "max_caps": 5,
-                    "family_caps": {"ffn": {"kappa": 3.0}},
-                    "multiple_testing": {"method": "bh", "alpha": 0.05, "m": 4},
-                },
-                "metrics": {
-                    "caps_applied": 0,
-                    "caps_exceeded": False,
-                    "modules_checked": 1,
-                    "top_z_scores": {"ffn": [{"module": "mlp.c_proj", "z": 2.3}]},
-                    "measurement_contract": {"kind": "spectral", "version": 1},
-                },
-            },
-            {
-                "name": "rmt",
-                "policy": {
-                    "deadband": 0.10,
-                    "margin": 1.5,
-                    "epsilon_default": 0.10,
-                    "epsilon_by_family": {"ffn": 0.10},
-                },
-                "metrics": {
-                    "outliers": 0,
-                    "stable": True,
-                    "measurement_contract": {"kind": "rmt", "version": 1},
-                },
-            },
-            {
-                "name": "variance",
-                "policy": {
-                    "deadband": 0.02,
-                    "min_abs_adjust": 0.012,
-                    "max_scale_step": 0.03,
-                    "min_effect_lognll": 0.0009,
-                    "predictive_one_sided": True,
-                    "topk_backstop": 1,
-                    "max_adjusted_modules": 1,
-                },
-                "metrics": {
-                    "ve_enabled": False,
-                    "scope": "ffn",
-                    "target_modules": 1,
-                    "predictive_gate": {
-                        "evaluated": True,
-                        "passed": False,
-                        "reason": "ci_contains_zero",
-                        "delta_ci": (-0.01, 0.01),
-                        "mean_delta": -0.001,
-                    },
-                    "proposed_scales": {"layer": 1.0},
-                    "ab_seed_used": 1,
-                    "ab_windows_used": 2,
-                    "ab_provenance": {"condition_a": {"window_ids": [1, 2]}},
-                },
-            },
-        ],
+        "artifacts": {
+            "report_path": "reports/eval/evaluation.report.json",
+            "events_path": "",
+            "logs_path": "",
+            "checkpoint_path": None,
+        },
         "guard_overhead": {
             "bare_ppl": 10.0,
             "guarded_ppl": 10.1,
+            "overhead_ratio": 1.01,
+            "overhead_percent": 1.0,
             "overhead_threshold": 0.01,
+            "diagnostics": {"mode": "sample"},
         },
-        "metrics": {
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "preview": 10.0,
-                "final": 10.5,
-                # Intentionally set just above the base tier limit so the sample
-                # report exercises `validation.hysteresis_applied`.
-                # Balanced: ratio_limit_base=1.10, hysteresis_ratio=0.002 → 1.102
-                "ratio_vs_baseline": 1.101,
-                "display_ci": [1.01, 1.09],
-                "reps": 200,
-                "ci_level": 0.95,
+        "invariants": {"stable": True},
+        "policy_digest": {"thresholds_hash": "thresholds", "changed": False},
+        "policy_provenance": {
+            "policy_digest": "policy-digest",
+            "overrides": [],
+        },
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "preview": 10.0,
+            "final": 10.5,
+            "ratio_vs_baseline": 1.101,
+            "display_ci": [1.01, 1.09],
+            "ci": [1.01, 1.09],
+            "reps": 200,
+        },
+        "provenance": {
+            "baseline": {
+                "model_id": "baseline",
+                "report_path": "reports/baseline/evaluation.report.json",
             },
-            "logloss_delta_ci": (-0.02, 0.01),
-            "paired_delta_summary": {"mean": -0.01, "std": 0.02, "degenerate": False},
-            "bootstrap": {
-                "replicates": 200,
-                "alpha": 0.05,
-                "method": "percentile",
+            "edited": {
+                "model_id": "edited",
+                "report_path": "reports/edited/evaluation.report.json",
+            },
+            "env_flags": {"CUBLAS_WORKSPACE_CONFIG": ":4096:8"},
+            "provider_digest": {"ids_sha256": "provider-sha"},
+        },
+        "resolved_policy": {
+            "metrics": {
+                "accuracy": {"min_examples_fraction": 0.01},
+            },
+            "rmt": {
+                "margin": 1.5,
+                "deadband": 0.10,
+                "epsilon_by_family": {"ffn": 0.10},
+            },
+            "spectral": {"max_caps": 5},
+            "variance": {
+                "min_effect_lognll": 0.0009,
+                "predictive_one_sided": True,
+                "max_adjusted_modules": 1,
+            },
+        },
+        "rmt": {
+            "edge_risk_by_family": {"ffn": 0.1},
+            "edge_risk_by_family_base": {"ffn": 0.05},
+            "epsilon_by_family": {"ffn": 0.10},
+            "epsilon_default": 0.10,
+            "epsilon_violations": [],
+            "families": [
+                {
+                    "edge_base": 0.01,
+                    "edge_cur": 0.02,
+                    "epsilon": 0.10,
+                    "allowed": 0.11,
+                    "ratio": 1.05,
+                    "delta": 0.01,
+                }
+            ],
+            "measurement_contract_hash": "rmt-hash",
+            "stable": True,
+            "status": "ok",
+            "mode": "warn",
+            "max_edge_ratio": 1.05,
+            "max_edge_delta": 0.01,
+        },
+        "spectral": {
+            "caps_applied": 0,
+            "caps_exceeded": False,
+            "families": [{"kappa": 3.0, "violations": []}],
+            "family_caps": {"ffn": {"kappa": 3.0}},
+            "max_caps": 5,
+            "measurement_contract_hash": "spectral-hash",
+            "multiple_testing": {"method": "bh", "alpha": 0.05, "m": 4},
+            "sigma_quantile": 0.99,
+            "summary": {
+                "deadband": 0.10,
+                "sigma_quantile": 0.99,
+                "modules_checked": 1,
+                "max_caps": 5,
+                "caps_exceeded": False,
+            },
+            "top_z_scores": {"ffn": [{"module": "mlp.c_proj", "z": 2.3}]},
+        },
+        "telemetry": {"latency_ms_per_tok": 1.0},
+        "validation": {
+            "guard_overhead_acceptable": True,
+            "invariants_pass": True,
+            "preview_final_drift_acceptable": True,
+            "primary_metric_acceptable": True,
+            "primary_metric_tail_acceptable": True,
+            "rmt_stable": True,
+            "spectral_stable": True,
+        },
+        "variance": {
+            "enabled": False,
+            "gain": 0.0,
+            "scope": "ffn",
+            "target_modules": 1,
+            "proposed_scales": {"layer": 1.0},
+            "ab_test": {
                 "seed": 1,
-                "coverage": {"preview": {"used": 2}, "final": {"used": 2}},
+                "windows_used": 2,
+                "provenance": {"window_ids": [1, 2]},
             },
-            "window_match_fraction": 1.0,
-            "window_overlap_fraction": 0.0,
+            "predictive_gate": {
+                "delta_ci": [-0.01, 0.01],
+                "mean_delta": -0.001,
+                "reason": "ci_contains_zero",
+                "passed": False,
+            },
         },
-        "evaluation_windows": {
-            "final": {
-                "window_ids": [1, 2],
-                "logloss": [0.1, 0.2],
-                "token_counts": [1, 1],
-            }
-        },
-        "artifacts": {"events_path": "", "logs_path": "", "checkpoint_path": None},
-        "flags": {"guard_recovered": False, "rollback_reason": None},
+        "structure": {},
+        "system_overhead": {},
+        "policies": {},
+        "confidence": {},
     }
-    ppl_baseline = {
-        "run_id": "baseline-ppl",
-        "model_id": "m",
-        "meta": {"model_id": "m", "adapter": "hf", "device": "cpu"},
-        "edit": {"name": "noop"},
-        "ppl_final": 10.0,
-        "ppl_preview": 10.0,
-        "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
-        "primary_metric": {"kind": "ppl_causal", "final": 10.0},
-        "evaluation_windows": {
-            "final": {
-                "window_ids": [1, 2],
-                "logloss": [0.1, 0.2],
-                "token_counts": [1, 1],
-            }
-        },
-    }
-
     acc_report = {
-        "meta": {
-            "model_id": "m",
-            "adapter": "hf",
-            "commit": "deadbeef",
-            "seed": 1,
-            "device": "cpu",
-            "ts": "now",
-            "auto": {"enabled": True, "tier": "balanced"},
-        },
-        "data": {
-            "dataset": "ds",
-            "split": "validation",
-            "seq_len": 8,
-            "stride": 8,
-            "preview_n": 2,
-            "final_n": 2,
-        },
-        "edit": {
-            "name": "noop",
-            "plan_digest": "d",
-            "deltas": {"params_changed": 0, "layers_modified": 0},
-        },
-        "guards": [],
-        "metrics": {
-            "primary_metric": {
-                "kind": "accuracy",
-                "final": 0.8,
-                "display_ci": [0.78, 0.82],
-            }
-        },
-        "artifacts": {"events_path": "", "logs_path": "", "checkpoint_path": None},
-        "flags": {"guard_recovered": False, "rollback_reason": None},
-    }
-    acc_baseline = {
-        "run_id": "baseline-acc",
-        "model_id": "m",
+        "schema_version": "v1",
+        "run_id": "sample-acc",
         "meta": {"model_id": "m", "adapter": "hf", "device": "cpu"},
+        "dataset": {"name": "ds"},
         "edit": {"name": "noop"},
-        "ppl_final": 10.0,
-        "ppl_preview": 10.0,
-        "metrics": {"primary_metric": {"kind": "accuracy", "final": 0.79}},
-        "primary_metric": {"kind": "accuracy", "final": 0.79},
+        "artifacts": {"report_path": "reports/eval/evaluation.report.json"},
+        "primary_metric": {
+            "kind": "accuracy",
+            "preview": 0.79,
+            "final": 0.80,
+            "display_ci": [0.78, 0.82],
+        },
+        "resolved_policy": {"metrics": {"accuracy": {"min_examples_fraction": 0.01}}},
+        "validation": {"primary_metric_acceptable": True},
     }
 
-    return [
-        make_report(ppl_report, ppl_baseline),
-        make_report(acc_report, acc_baseline),
-    ]
+    return [ppl_report, acc_report]
 
 
 def main() -> None:

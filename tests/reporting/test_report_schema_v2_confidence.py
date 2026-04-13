@@ -79,7 +79,7 @@ def test_generated_evaluation_report_populates_confidence_fields():
         "confidence should be present on evaluation_report"
     )
     assert conf.get("label") in {"High", "Medium", "Low"}
-    assert conf.get("basis") in {"ppl_ratio", "accuracy", "vqa_accuracy"}
+    assert conf.get("basis") in {"ppl_ratio", "accuracy"}
     # width/threshold should be numeric when CI is present
     assert isinstance(conf.get("width"), float)
     assert isinstance(conf.get("threshold"), float)

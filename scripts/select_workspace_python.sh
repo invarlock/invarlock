@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+
 is_python_312() {
   local candidate="$1"
   "$candidate" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 12) else 1)' >/dev/null 2>&1
@@ -45,6 +48,11 @@ print_if_supported() {
   fi
   return 1
 }
+
+repo_venv_python="$REPO_ROOT/.venv/bin/python"
+if [[ -x "$repo_venv_python" ]]; then
+  print_if_supported "$repo_venv_python" || true
+fi
 
 if prefer_active_python && command -v python >/dev/null 2>&1; then
   print_if_supported "python" || true

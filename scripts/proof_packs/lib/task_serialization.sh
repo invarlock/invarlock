@@ -298,9 +298,9 @@ get_task_model_size() {
 get_task_required_gpus() {
     local val
     val=$(get_task_field "$1" "required_gpus")
-    # Default to 1 if missing or non-numeric (backward compatibility).
-    if ! [[ "${val}" =~ ^[0-9]+$ ]]; then
-        val="1"
+    if ! [[ "${val}" =~ ^[0-9]+$ ]] || [[ "${val}" -lt 1 ]]; then
+        echo "ERROR: required_gpus must be a positive integer, got: ${val:-<missing>}" >&2
+        return 1
     fi
     echo "${val}"
 }

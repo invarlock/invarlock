@@ -245,7 +245,7 @@ class TestEndToEndPipeline:
                 with patch.object(guard, "validate") as mock_validate:
                     mock_validate.return_value = {
                         "passed": True,
-                        "action": "continue",
+                        "decision": "allow",
                         "message": "Guard validation passed",
                     }
 
@@ -401,13 +401,13 @@ class TestEndToEndPipeline:
         with patch.object(spectral_guard, "validate") as mock_validate:
             mock_validate.return_value = {
                 "passed": False,
-                "action": "abort",
+                "decision": "block",
                 "message": "Spectral violation detected",
             }
 
             result = spectral_guard.validate(self.model, self.adapter, {})
             assert not result["passed"]
-            assert result["action"] == "abort"
+            assert result["decision"] == "block"
 
     def test_output_generation_and_saving(self):
         """Test output generation and file saving."""
@@ -637,14 +637,14 @@ class TestPipelineErrorScenarios:
         with patch.object(spectral_guard, "validate") as mock_validate:
             mock_validate.return_value = {
                 "passed": False,
-                "action": "abort",
+                "decision": "block",
                 "message": "Spectral norm exceeded threshold",
                 "violations": [{"type": "spectral_violation", "severity": "high"}],
             }
 
             result = spectral_guard.validate(self.model, self.adapter, {})
             assert not result["passed"]
-            assert result["action"] == "abort"
+            assert result["decision"] == "block"
             assert len(result["violations"]) > 0
 
         # Test RMT guard failure

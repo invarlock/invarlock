@@ -19,6 +19,9 @@ def _mk_ppl_cert(pm_final: float = 10.0, mismatch: bool = False) -> dict:
     cert = {
         "schema_version": "v1",
         "run_id": "r1",
+        "artifacts": {"generated_at": "t"},
+        "plugins": {},
+        "meta": {},
         "dataset": {
             "provider": "unit",
             "seq_len": 8,

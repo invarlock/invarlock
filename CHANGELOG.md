@@ -13,6 +13,103 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.7.1] - 2026-04-12
+
+### Added
+- Clarified the minimal-install onboarding path and the exact
+  `verify`/`report`/proof-pack command inputs so wheel-only users can validate
+  artifacts without cloning the repository.
+- Added the released
+  `invarlock-<version>-public-contract-bundle.tar.gz` asset, including the
+  manifest/schema inventory downstream consumers can verify without cloning the
+  repository.
+- Added PR-time supply-chain enforcement with shipped-surface SBOM generation,
+  `pip-audit` coverage for the base/`hf`/`advanced` install surfaces,
+  repo-history `gitleaks` artifacts, tighter security-sensitive `CODEOWNERS`
+  rules, and release-time supply-chain gates before publish.
+- Added a canonical coverage-policy source plus PR-time `coverage-enforce` and
+  typed-surface `mypy` gates, along with the new split owner modules they
+  validate across config loading, reporting, runtime security, CLI execution,
+  and orchestration.
+- Added explicit `actionlint` and minimal wheel-install packaging smoke gates
+  to the local make surface and CI workflow.
+- Added an explicit workspace-Python selector for live smoke and telemetry
+  scripts so local end-to-end wrappers prefer the repo `.venv` before generic
+  interpreter fallback.
+
+### Changed
+- Tightened public docs, config comments, and CLI guardrails so the published
+  OSS surface stays standalone, repo-agnostic, and aligned with the canonical
+  `evaluate` / `verify` / `report` / `doctor` / `advanced` command set.
+- Refactored config loading, runtime-security, evaluate execution, registry,
+  and report assembly into smaller owner modules with stricter core/shell
+  boundaries and no compatibility shims.
+- Expanded the public contract catalog and JSON surfaces to publish
+  `validation_keys`, `console_labels`, and canonical `metric_kinds`, and kept
+  CLI/docs handling fail-closed when directories contain both `report.json`
+  and `evaluation.report.json`.
+- Simplified import surfaces so reporting and probe namespaces stay
+  light-import-safe while concrete heavy implementations live behind their
+  owning modules.
+
+### Fixed
+- Fixed accuracy-confidence labeling so accuracy metrics evaluate confidence
+  width in true percentage points, while non-accuracy ratio metrics keep their
+  ratio-width behavior.
+- Fixed docs consistency CI by making the assurance cross-reference linter use
+  self-contained sample reports instead of importing runtime report-building
+  modules that require `numpy` under the docs-only workflow dependency set.
+- Fixed the repo-owned Python selector so local `make`, smoke, and packaging
+  paths all resolve through the workspace-aware selector, with the workspace
+  `.venv` preferred before generic system Python fallback.
+- Fixed metric-kind handling to fail closed across config resolution,
+  multimodal metric propagation, report validation, and verification; unknown
+  or stale aliases no longer bypass accuracy-specific checks.
+- Fixed report validation and verification to fail closed when
+  `validation_keys.json` is missing or malformed, reject ambiguous directories
+  that contain both `report.json` and `evaluation.report.json`, and keep
+  optional dependency failures precise at the command boundary.
+- Fixed report validation to return invalid when `jsonschema` is unavailable or
+  broken, instead of accepting partially validated payloads.
+- Fixed MI probe subsampling so activations and targets stay paired, and
+  normalized tensor handling for GPU and grad-tracking tensors before NumPy /
+  scikit-learn processing.
+- Fixed release, security, and live-smoke workflow behavior around immutable
+  tag resolution, fail-closed CodeQL execution, shipped-surface dependency
+  auditing, and repo-managed interpreter selection for end-to-end scripts.
+- Fixed the Python 3.13 advanced install surface so shipped `gptq`/`advanced`
+  extras no longer pull unsupported upstream `auto-gptq` builds on the PR
+  supply-chain path; GPTQ remains available on the narrower Linux stacks that
+  upstream packaging currently supports.
+
+### Dependencies
+- Removed test/scientific-only packages from the base runtime where they were
+  not required, moved MI-probe dependencies behind narrower extras, and
+  refreshed workflow lockfiles to match the tightened CI and release surfaces,
+  including `aiohttp==3.13.5` and `linkchecker==10.6.0` on the shipped docs
+  and security paths.
+- Pinned typed and packaging workflow lockfiles to include `mypy==1.20.0` and
+  `wheel==0.46.3` so the new typed-surface and minimal wheel-install gates run
+  under the shipped CI surface instead of relying on implicit tool installs.
+- Bumped docs spell-check tooling from `cspell` `9.7.0` to `10.0.0`.
+- Added pinned CI/release workflow tooling for `actionlint` `v1.7.7` and
+  `gitleaks` `v8.30.0` as part of the new fail-closed workflow and
+  supply-chain gates.
+- Bumped the release publish action to `pypa/gh-action-pypi-publish`
+  `1.14.0`.
+- Raised the docs CI Node runtime from `18` to `22` so the refreshed
+  spell-check toolchain remains on a supported engine.
+
+### Documentation
+- Refreshed workflow, security, CLI, config, and contract docs to match the
+  new assurance model, supply-chain gates, fail-closed report validation, and
+  light-import-safe module boundaries.
+- Documented the standalone public contract bundle and the minimal-install
+  verify/report/proof-pack onboarding path.
+- Clarified secure-default runtime docs and user-facing guidance to describe an
+  OCI container engine requirement first, keep Podman/Docker examples explicit,
+  and scope Docker-only language to the local `act` workflow.
+
 ## [0.7.0] - 2026-04-09
 
 ### Added

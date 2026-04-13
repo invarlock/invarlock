@@ -93,6 +93,23 @@ def test_make_evaluation_report_uses_paired_baseline_ratio_ci():
     baseline = {
         "run_id": "baseline-1",
         "model_id": "gpt2",
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 10.0,
+                "final": 10.0,
+            }
+        },
+        "edit": {
+            "name": "structured",
+            "plan_digest": "baseline",
+            "deltas": {
+                "params_changed": 0,
+                "heads_pruned": 0,
+                "neurons_pruned": 0,
+                "layers_modified": 0,
+            },
+        },
         "evaluation_windows": {
             "final": {"window_ids": [2, 1], "logloss": [2.5, 0.7]},
         },

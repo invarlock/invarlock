@@ -21,6 +21,23 @@ def test_run_command_until_pass_auto_tune_head_budget_paths(tmp_path: Path) -> N
         json.dumps(
             {
                 "meta": {"tokenizer_hash": "tokhash123"},
+                "metrics": {
+                    "primary_metric": {
+                        "kind": "ppl_causal",
+                        "preview": 1.0,
+                        "final": 1.0,
+                    }
+                },
+                "edit": {
+                    "name": "structured",
+                    "plan_digest": "baseline",
+                    "deltas": {
+                        "params_changed": 0,
+                        "heads_pruned": 0,
+                        "neurons_pruned": 0,
+                        "layers_modified": 0,
+                    },
+                },
                 "evaluation_windows": {
                     "preview": {
                         "window_ids": [0],
@@ -126,7 +143,7 @@ def test_run_command_until_pass_auto_tune_head_budget_paths(tmp_path: Path) -> N
                     post_stub,
                 ),
                 patch("invarlock.core.retry.RetryController", RC),
-                patch("invarlock.reporting.report_make.make_report", make_cert),
+                patch("invarlock.cli.run_execution.build_evaluation_report", make_cert),
             ):
                 stack.enter_context(p)
             run_command(

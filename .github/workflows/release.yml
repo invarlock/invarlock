@@ -24,19 +24,115 @@ permissions:
   contents: read
 
 jobs:
+  resolve_release_ref:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      release_tag: ${{ steps.resolve_release_ref.outputs.release_tag }}
+      release_sha: ${{ steps.resolve_release_ref.outputs.release_sha }}
+    steps:
+      - name: Resolve release ref
+        id: resolve_release_ref
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          remote="https://github.com/${GITHUB_REPOSITORY}.git"
+          resolve_sha() {
+            local tag="$1"
+            case "${tag}" in
+              v*)
+                ;;
+              *)
+                echo "release_tag must start with v" >&2
+                exit 1
+                ;;
+            esac
+
+            mapfile -t remote_refs < <(
+              git ls-remote --tags "${remote}" "refs/tags/${tag}" "refs/tags/${tag}^{}" || true
+            )
+            if [ "${#remote_refs[@]}" -eq 0 ]; then
+              echo "release_tag '${tag}' was not found as a tag" >&2
+              exit 1
+            fi
+
+            local sha=""
+            for ref in "${remote_refs[@]}"; do
+              ref_sha="${ref%%$'\t'*}"
+              ref_name="${ref#*$'\t'}"
+              if [ "${ref_name}" = "refs/tags/${tag}^{}" ]; then
+                sha="${ref_sha}"
+                break
+              fi
+              if [ -z "${sha}" ]; then
+                sha="${ref_sha}"
+              fi
+            done
+
+            if [ -z "${sha}" ]; then
+              echo "failed to resolve commit SHA for ${tag}" >&2
+              exit 1
+            fi
+
+            printf '%s\n' "${sha}"
+          }
+
+          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            tag="${GITHUB_REF_NAME}"
+          else
+            tag="${{ inputs.release_tag }}"
+            if [ -z "${tag}" ]; then
+              echo "release_tag is required for manual release dispatch" >&2
+              exit 1
+            fi
+          fi
+
+          sha="$(resolve_sha "${tag}")"
+
+          echo "release_tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "release_sha=${sha}" >> "$GITHUB_OUTPUT"
+
   build_check:
+    needs: resolve_release_ref
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          ref: ${{ github.event_name == 'push' && github.ref || inputs.release_tag }}
+          ref: ${{ needs.resolve_release_ref.outputs.release_sha }}
+          fetch-depth: 0
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: '3.13'
       - name: Install build tooling
         run: python -m pip install --require-hashes -r requirements/workflows/release-security-py313.txt
+      - name: Install gitleaks
+        run: |
+          go install github.com/zricethezav/gitleaks/v8@v8.30.0
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Run gitleaks history scan
+        id: gitleaks_scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/supply-chain
+          set +e
+          gitleaks git . \
+            --redact \
+            --no-banner \
+            --report-format json \
+            --report-path artifacts/supply-chain/gitleaks.json
+          exit_code=$?
+          gitleaks git . \
+            --redact \
+            --no-banner \
+            --report-format sarif \
+            --report-path artifacts/supply-chain/gitleaks.sarif
+          set -e
+          echo "exit_code=${exit_code}" >> "$GITHUB_OUTPUT"
       - name: Build wheel/sdist
         run: |
           rm -rf build dist
@@ -55,18 +151,34 @@ jobs:
 
           wheel = next(Path("dist").glob("*.whl"))
           digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
-          requirements = Path(".smoke/smoke-requirements.txt")
-          requirements.parent.mkdir(parents=True, exist_ok=True)
-          requirements.write_text(
-              f"{wheel.resolve()} --hash=sha256:{digest}\n",
-              encoding="utf-8",
-          )
+          print(f"Wheel digest verified: {digest}")
           PY
-          python -m pip install --no-deps --require-hashes -r .smoke/smoke-requirements.txt
-          python -c "import invarlock; import sys; print('invarlock version', getattr(invarlock, '__version__', 'n/a')); sys.exit(0)"
-      - name: Generate release SBOM
-        run: bash scripts/generate_sbom.sh artifacts/supply-chain/sbom.json
+          python -m pip install dist/*.whl
+          invarlock --help
+          python -c "import invarlock.cli.app"
+      - name: Create release install-surface venv
+        id: install_surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .artifact-venv
+          python -m venv .artifact-venv
+          . .artifact-venv/bin/activate
+          python -m pip install dist/*.whl
+          site_packages="$(python - <<'PY'
+          import site
+          paths = site.getsitepackages()
+          print(paths[0] if paths else site.getusersitepackages())
+          PY
+          )"
+          echo "python=.artifact-venv/bin/python" >> "$GITHUB_OUTPUT"
+          echo "site_packages=${site_packages}" >> "$GITHUB_OUTPUT"
+      - name: Run release pip-audit
+        run: python scripts/security/run_pip_audit.py --path "${{ steps.install_surface.outputs.site_packages }}"
+      - name: Generate release install-surface SBOM
+        run: bash scripts/generate_sbom.sh --scope install-surface --python "${{ steps.install_surface.outputs.python }}" artifacts/supply-chain/sbom.json
       - name: Upload dist artifacts
+        if: always()
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: dist
@@ -76,15 +188,34 @@ jobs:
           if-no-files-found: error
           retention-days: 3
       - name: Upload SBOM artifact
+        if: always()
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: release-sbom
           path: artifacts/supply-chain/sbom.json
           if-no-files-found: error
           retention-days: 3
+      - name: Upload gitleaks artifacts
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: release-gitleaks
+          path: |
+            artifacts/supply-chain/gitleaks.json
+            artifacts/supply-chain/gitleaks.sarif
+          if-no-files-found: error
+          retention-days: 3
+      - name: Fail on secret findings
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ steps.gitleaks_scan.outputs.exit_code }}" != "0" ]; then
+            echo "gitleaks detected secrets; see uploaded artifact for details" >&2
+            exit 1
+          fi
 
   publish:
-    needs: build_check
+    needs: [build_check, resolve_release_ref]
     runs-on: ubuntu-latest
     environment: ${{ github.event_name == 'push' && 'pypi' || inputs.target }}
     permissions:
@@ -99,7 +230,8 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          ref: ${{ github.event_name == 'push' && github.ref || inputs.release_tag }}
+          ref: ${{ needs.resolve_release_ref.outputs.release_sha }}
+          fetch-depth: 0
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: '3.13'
@@ -141,16 +273,16 @@ jobs:
           if-no-files-found: error
           retention-days: 3
       - name: Publish to TestPyPI/PyPI
-        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
         with:
           packages-dir: publish-dist
           repository-url: ${{ steps.vars.outputs.publish_repository_url }}
           skip-existing: true
 
   testpypi_smoke:
-    needs: publish
+    needs: [publish, resolve_release_ref]
     if: >-
-      ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true && inputs.target == 'testpypi' && inputs.release_tag != '' }}
+      ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true && inputs.target == 'testpypi' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -160,7 +292,7 @@ jobs:
           python-version: '3.13'
       - name: Download published TestPyPI wheel
         env:
-          INVARLOCK_RELEASE_VERSION: ${{ inputs.release_tag }}
+          INVARLOCK_RELEASE_VERSION: ${{ needs.resolve_release_ref.outputs.release_tag }}
         run: |
           set -euo pipefail
           mkdir -p wheelhouse
@@ -198,11 +330,12 @@ jobs:
         run: |
           python -m venv .venv
           . .venv/bin/activate
-          python -m pip install --no-deps --require-hashes -r wheelhouse/requirements.txt
-          invarlock --help || python -c "import invarlock; import sys; print('invarlock version', getattr(invarlock,'__version__','n/a')); sys.exit(0)"
+          python -m pip install wheelhouse/*.whl
+          invarlock --help
+          python -c "import invarlock.cli.app"
 
   bundle_release:
-    needs: publish
+    needs: [publish, resolve_release_ref]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -217,6 +350,9 @@ jobs:
       }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ needs.resolve_release_ref.outputs.release_sha }}
+          fetch-depth: 0
       - name: Download dist artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
@@ -240,7 +376,7 @@ jobs:
       - name: Create offline verification bundle
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
-          INVARLOCK_RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
+          INVARLOCK_RELEASE_TAG: ${{ needs.resolve_release_ref.outputs.release_tag }}
         run: |
           set -euo pipefail
           tag="${INVARLOCK_RELEASE_TAG}"
@@ -258,10 +394,32 @@ jobs:
         with:
           inputs: release-assets/*-offline-bundle.tar.gz
           upload-signing-artifacts: false
+      - name: Create public contract bundle
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          INVARLOCK_RELEASE_TAG: ${{ needs.resolve_release_ref.outputs.release_tag }}
+          INVARLOCK_RELEASE_SHA: ${{ needs.resolve_release_ref.outputs.release_sha }}
+        run: |
+          set -euo pipefail
+          tag="${INVARLOCK_RELEASE_TAG}"
+          version="${tag#v}"
+          python scripts/release/make_public_contract_bundle.py \
+            --version "${version}" \
+            --tag "${tag}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --commit "${INVARLOCK_RELEASE_SHA}" \
+            --contracts-dir contracts \
+            --runtime-dir src/invarlock/_data/runtime \
+            --output-dir release-assets
+      - name: Sign public contract bundle
+        uses: sigstore/gh-action-sigstore-python@04cffa1d795717b140764e8b640de88853c92acc
+        with:
+          inputs: release-assets/*-public-contract-bundle.tar.gz
+          upload-signing-artifacts: false
       - name: Create or update GitHub release
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          INVARLOCK_RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
+          INVARLOCK_RELEASE_TAG: ${{ needs.resolve_release_ref.outputs.release_tag }}
         run: |
           set -euo pipefail
           tag="${INVARLOCK_RELEASE_TAG}"

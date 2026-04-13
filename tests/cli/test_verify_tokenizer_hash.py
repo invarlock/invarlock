@@ -14,6 +14,8 @@ def _minimal_cert(token_hash_edited: str, token_hash_baseline: str) -> dict:
     return {
         "schema_version": "v1",
         "run_id": "run-tokenizer-hash-test",
+        "artifacts": {"generated_at": "t"},
+        "plugins": {},
         "meta": {
             "model_id": "gpt2-small",
             "adapter": "hf_causal",
@@ -59,6 +61,13 @@ def _minimal_cert(token_hash_edited: str, token_hash_baseline: str) -> dict:
             "final": 10.0,
             "ratio_vs_baseline": 1.0,
             "display_ci": [10.0, 10.0],
+        },
+        "validation": {
+            "primary_metric_acceptable": True,
+            "preview_final_drift_acceptable": True,
+            "invariants_pass": True,
+            "spectral_stable": True,
+            "rmt_stable": True,
         },
         # dataset section defined above
     }

@@ -38,7 +38,7 @@ class DummyGuard:
         self.policy = {}
 
     def validate(self, model: Any, adapter: Any, context: dict) -> dict[str, Any]:
-        return {"passed": True, "action": "none"}
+        return {"passed": True, "decision": "allow"}
 
 
 def test_serialize_config_and_services_init_cleanup(tmp_path: Path):

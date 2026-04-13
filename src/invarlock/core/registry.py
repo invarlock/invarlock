@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
-import warnings
 from collections.abc import Iterable
 from dataclasses import dataclass
 from importlib.metadata import (
@@ -28,6 +27,7 @@ from invarlock.runtime_security import third_party_plugins_allowed
 
 from .abi import INVARLOCK_CORE_ABI
 from .api import Guard, ModelAdapter, ModelEdit
+from .builtin_plugin_catalog import builtin_plugin_specs
 from .exceptions import DependencyError, PluginError
 
 __all__ = ["PluginInfo", "CoreRegistry", "get_registry"]
@@ -81,7 +81,6 @@ class CoreRegistry:
         self._adapters: dict[str, PluginInfo] = {}
         self._edits: dict[str, PluginInfo] = {}
         self._guards: dict[str, PluginInfo] = {}
-        self._discovery_issue: str | None = None
         self._initialized = False
 
     def _ensure_initialized(self) -> None:
@@ -93,152 +92,90 @@ class CoreRegistry:
         self._initialized = True
 
     def _discover_plugins(self) -> None:
-        """Discover all plugins through entry points with fallback registration."""
-        self._discovery_issue = None
-        # Try third-party entry points only when explicitly enabled.
-        if third_party_plugins_allowed():
-            try:
-                eps = entry_points()
+        """Register built-ins and discover third-party plugins."""
+        self._register_builtin_plugins()
+        if not third_party_plugins_allowed():
+            return
 
-                # Discover adapters
-                adapter_eps = _select_entry_points(eps, "invarlock.adapters")
-                for ep in adapter_eps:
-                    info = self._create_plugin_info(ep, "adapters")
-                    self._adapters[ep.name] = info
+        try:
+            eps = entry_points()
+            self._register_entry_points(
+                self._adapters,
+                _select_entry_points(eps, "invarlock.adapters"),
+                "adapters",
+            )
+            self._register_entry_points(
+                self._edits,
+                _select_entry_points(eps, "invarlock.edits"),
+                "edits",
+            )
+            self._register_entry_points(
+                self._guards,
+                _select_entry_points(eps, "invarlock.guards"),
+                "guards",
+            )
+        except _DISCOVERY_ERRORS as error:
+            raise RuntimeError(f"Plugin discovery failed: {error}") from error
 
-                # Discover edits
-                edit_eps = _select_entry_points(eps, "invarlock.edits")
-                for ep in edit_eps:
-                    info = self._create_plugin_info(ep, "edits")
-                    self._edits[ep.name] = info
+    def _register_builtin_plugins(self) -> None:
+        """Register the shipped plugin surface explicitly."""
 
-                # Discover guards
-                guard_eps = _select_entry_points(eps, "invarlock.guards")
-                for ep in guard_eps:
-                    info = self._create_plugin_info(ep, "guards")
-                    self._guards[ep.name] = info
-
-            except _DISCOVERY_ERRORS as e:
-                self._discovery_issue = f"Plugin discovery failed: {e}"
-                warnings.warn(f"Plugin discovery failed: {e}", stacklevel=2)
-
-        # Fallback registration for development
-        self._register_fallback_plugins()
-
-    def _register_fallback_plugins(self) -> None:
-        """Register fallback plugins when entry points are not available."""
-
-        def _fallback(
+        def _register_builtin(
             registry: dict[str, PluginInfo],
             name: str,
             module: str,
             class_name: str,
-            status: str = "Available (fallback)",
             required_deps: list[str] | None = None,
         ) -> None:
-            if name not in registry:
-                # Check runtime dependencies for optional plugins
-                actual_available = True
-                actual_status = status
-                if required_deps:
-                    missing = self._check_runtime_dependencies(required_deps)
-                    if missing:
-                        actual_available = False
-                        actual_status = f"Needs extra: {', '.join(missing)}"
+            if name in registry:
+                raise RuntimeError(f"Duplicate built-in plugin registration: {name}")
+            actual_available = True
+            actual_status = "Built-in"
+            if required_deps:
+                missing = self._check_runtime_dependencies(required_deps)
+                if missing:
+                    actual_available = False
+                    actual_status = f"Needs extra: {', '.join(missing)}"
 
-                registry[name] = PluginInfo(
-                    name=name,
-                    module=module,
-                    class_name=class_name,
-                    available=actual_available,
-                    status=actual_status,
-                    package="invarlock",
-                    version=INVARLOCK_VERSION,
+            registry[name] = PluginInfo(
+                name=name,
+                module=module,
+                class_name=class_name,
+                available=actual_available,
+                status=actual_status,
+                package="invarlock",
+                version=INVARLOCK_VERSION,
+            )
+
+        registries = {
+            "adapters": self._adapters,
+            "edits": self._edits,
+            "guards": self._guards,
+        }
+        for plugin_type, registry in registries.items():
+            for spec in builtin_plugin_specs(plugin_type):
+                _register_builtin(
+                    registry,
+                    spec.name,
+                    spec.module,
+                    spec.class_name,
+                    required_deps=list(spec.required_deps) or None,
                 )
 
-        # Register built-in adapters
-        _fallback(
-            self._adapters,
-            "hf_causal",
-            "invarlock.adapters.hf_causal",
-            "HF_Causal_Adapter",
-        )
-        _fallback(
-            self._adapters,
-            "hf_mlm",
-            "invarlock.adapters.hf_mlm",
-            "HF_MLM_Adapter",
-        )
-        _fallback(
-            self._adapters,
-            "hf_multimodal",
-            "invarlock.adapters.hf_multimodal",
-            "HF_Multimodal_Adapter",
-        )
-        _fallback(
-            self._adapters,
-            "hf_seq2seq",
-            "invarlock.adapters.hf_seq2seq",
-            "HF_Seq2Seq_Adapter",
-        )
-        _fallback(
-            self._adapters,
-            "hf_auto",
-            "invarlock.adapters.auto",
-            "HF_Auto_Adapter",
-        )
-        # Optional plugin adapters (verify runtime dependencies)
-        _fallback(
-            self._adapters,
-            "hf_gptq",
-            "invarlock.plugins.hf_gptq_adapter",
-            "HF_GPTQ_Adapter",
-            status="Available (plugin)",
-            required_deps=["auto_gptq"],
-        )
-        _fallback(
-            self._adapters,
-            "hf_awq",
-            "invarlock.plugins.hf_awq_adapter",
-            "HF_AWQ_Adapter",
-            status="Available (plugin)",
-            # `autoawq` installs the `awq` import name (not `autoawq`) in practice.
-            required_deps=["awq"],
-        )
-        _fallback(
-            self._adapters,
-            "hf_bnb",
-            "invarlock.plugins.hf_bnb_adapter",
-            "HF_BNB_Adapter",
-            status="Available (plugin)",
-            required_deps=["bitsandbytes"],
-        )
-
-        # Register built-in edits (quant-only core) and internal no-op
-        _fallback(self._edits, "quant_rtn", "invarlock.edits", "RTNQuantEdit")
-        _fallback(self._edits, "noop", "invarlock.edits.noop", "NoopEdit")
-
-        # Register built-in guards
-        _fallback(
-            self._guards,
-            "invariants",
-            "invarlock.guards.invariants",
-            "InvariantsGuard",
-        )
-        _fallback(
-            self._guards,
-            "spectral",
-            "invarlock.guards.spectral",
-            "SpectralGuard",
-        )
-        _fallback(
-            self._guards,
-            "variance",
-            "invarlock.guards.variance",
-            "VarianceGuard",
-        )
-        _fallback(self._guards, "rmt", "invarlock.guards.rmt", "RMTGuard")
-        _fallback(self._guards, "hello_guard", "invarlock.plugins", "HelloGuard")
+    def _register_entry_points(
+        self,
+        registry: dict[str, PluginInfo],
+        entry_points_for_group: list[EntryPoint],
+        plugin_type: str,
+    ) -> None:
+        for entry_point in entry_points_for_group:
+            if entry_point.name in registry:
+                raise RuntimeError(
+                    f"Duplicate {plugin_type.rstrip('s')} plugin name: {entry_point.name}"
+                )
+            registry[entry_point.name] = self._create_plugin_info(
+                entry_point, plugin_type
+            )
 
     def _check_runtime_dependencies(self, deps: list[str]) -> list[str]:
         """
@@ -273,18 +210,8 @@ class CoreRegistry:
         self, entry_point: EntryPoint, plugin_type: str
     ) -> PluginInfo:
         """Create plugin info from entry point."""
-        try:
-            # Parse module and class from entry point value
-            module_path, class_name = self._parse_entry_point_value(entry_point)
-        except (AttributeError, TypeError, ValueError) as error:
-            return PluginInfo(
-                name=entry_point.name,
-                module="unknown",
-                class_name="unknown",
-                available=False,
-                status=f"Parse error: {error}",
-                entry_point=entry_point,
-            )
+        _ = plugin_type
+        module_path, class_name = self._parse_entry_point_value(entry_point)
 
         # Determine package/version metadata
         package_name: str | None = None
@@ -333,7 +260,12 @@ class CoreRegistry:
     def _validate_plugin_abi(self, cls: Any) -> None:
         provider_mod = importlib.import_module(cls.__module__)
         plugin_abi = getattr(provider_mod, "INVARLOCK_CORE_ABI", None)
-        if plugin_abi is not None and str(plugin_abi) != INVARLOCK_CORE_ABI:
+        if not isinstance(plugin_abi, str) or not plugin_abi.strip():
+            raise ImportError(
+                "ABI missing: plugin must declare "
+                f"INVARLOCK_CORE_ABI={INVARLOCK_CORE_ABI}"
+            )
+        if plugin_abi != INVARLOCK_CORE_ABI:
             raise ImportError(
                 f"ABI mismatch: plugin={plugin_abi} != core={INVARLOCK_CORE_ABI}"
             )
@@ -455,8 +387,7 @@ class CoreRegistry:
             raise ValueError(f"Unknown plugin type: {plugin_type}")
 
         if name not in registry:
-            status = self._discovery_issue or "Not found"
-            return {"available": False, "status": status, "module": "unknown"}
+            return {"available": False, "status": "Not found", "module": "unknown"}
 
         info = registry[name]
         return {
@@ -530,9 +461,6 @@ class CoreRegistry:
         self._ensure_initialized()
 
         issues = []
-        if self._discovery_issue:
-            issues.append(self._discovery_issue)
-
         # Check adapter
         if adapter_name not in self._adapters:
             issues.append(f"Unknown adapter: {adapter_name}")

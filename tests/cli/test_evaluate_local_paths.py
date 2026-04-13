@@ -179,7 +179,6 @@ def test_evaluate_local_paths_pm_and_digests(monkeypatch, tmp_path: Path):
         "ppl_mlm",
         "ppl_seq2seq",
         "accuracy",
-        "vqa_accuracy",
     }
     # ratio should be deterministic at 1.0
     assert abs(float(pm.get("ratio_vs_baseline", 0.0)) - 1.0) < 1e-6

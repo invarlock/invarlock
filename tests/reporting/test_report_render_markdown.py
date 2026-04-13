@@ -14,14 +14,14 @@ from invarlock.reporting.report_schema import validate_report
 def _mk_cert() -> dict:
     return {
         "schema_version": "v1",
-        "run_id": "r1",
+        "run_id": "rid1",
         "artifacts": {"generated_at": "t"},
         "plugins": {},
         "meta": {},
         "dataset": {
             "provider": "p",
             "seq_len": 8,
-            "windows": {"preview": 0, "final": 0},
+            "windows": {"preview": 0, "final": 0, "stats": {}},
         },
         "primary_metric": {
             "kind": "ppl_causal",
@@ -120,11 +120,13 @@ def test_render_report_markdown_hides_empty_window_plan_summary() -> None:
     assert "Window Plan:" not in md
 
 
-def test_render_report_markdown_accepts_legacy_minimal_fixture() -> None:
+def test_render_report_markdown_accepts_canonical_golden_fixture() -> None:
     fixture = Path("tests/artifacts/golden_runs/gpt2/evaluation.report.json")
     cert = json.loads(fixture.read_text())
 
     assert validate_report(cert) is True
+    assert cert["schema_version"] == "v1"
+    assert isinstance(cert.get("primary_metric"), dict)
     md = render_report_markdown(cert)
 
     assert "# InvarLock Evaluation Report" in md

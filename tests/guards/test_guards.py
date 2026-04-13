@@ -66,13 +66,13 @@ class TestInvariantsGuardComprehensive:
         """Test guard initialization."""
         assert self.guard.name == "invariants"
         assert not self.guard.strict_mode
-        assert self.guard.on_fail == "warn"
+        assert self.guard.on_fail == "monitor"
         assert not self.guard.prepared
 
         # Test custom initialization
-        strict_guard = InvariantsGuard(strict_mode=True, on_fail="abort")
+        strict_guard = InvariantsGuard(strict_mode=True, on_fail="block")
         assert strict_guard.strict_mode
-        assert strict_guard.on_fail == "abort"
+        assert strict_guard.on_fail == "block"
 
     def test_prepare_method(self):
         """Test guard preparation."""
@@ -132,7 +132,7 @@ class TestInvariantsGuardComprehensive:
             outcome = self.guard.finalize(self.model)
 
         assert outcome.passed is True
-        assert outcome.action == "warn"
+        assert outcome.decision == "monitor"
         assert outcome.metrics.get("warning_violations") == 1
         assert not outcome.metrics.get("fatal_violations")
 
@@ -153,7 +153,7 @@ class TestInvariantsGuardComprehensive:
             outcome = self.guard.finalize(self.model)
 
         assert outcome.passed is False
-        assert outcome.action in {"abort", "rollback"}
+        assert outcome.decision in {"block", "rollback"}
         assert outcome.metrics.get("fatal_violations") == 1
         assert outcome.metrics.get("violations_found") == 1
 

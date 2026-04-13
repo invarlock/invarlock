@@ -150,12 +150,14 @@ def test_report_builder_support_covers_meta_and_baseline_fallback_paths() -> Non
             "metrics": {"classification": {"f1": 0.9}},
         },
         {"run_id": "base", "model_id": "baseline", "tokenizer_hash": "tokhash"},
-        compute_primary_metric_from_report_fn=lambda payload: {
-            "kind": "acc",
-            "final": 0.8,
-        }
-        if "evaluation_windows" in payload
-        else {"kind": "acc", "final": 0.7},
+        compute_primary_metric_from_report_fn=lambda payload: (
+            {
+                "kind": "acc",
+                "final": 0.8,
+            }
+            if "evaluation_windows" in payload
+            else {"kind": "acc", "final": 0.7}
+        ),
     )
     assert baseline_ref["primary_metric"]["final"] == 0.8
     assert baseline_ref["metrics"]["classification"] == {"f1": 0.9}
@@ -361,9 +363,9 @@ def test_run_report_contract_covers_env_collection_and_persistence_edges(
         prepare_guard_overhead_report_fn=lambda payload, **_kwargs: payload,
         finalize_run_provenance_fn=lambda **_kwargs: {"ok": True},
         build_guard_entries_fn=lambda guards: [] if guards is None else [{"name": "x"}],
-        build_flags_payload_fn=lambda guards: {}
-        if guards is None
-        else {"all_passed": True},
+        build_flags_payload_fn=lambda guards: (
+            {} if guards is None else {"all_passed": True}
+        ),
         enrich_run_report_metrics_fn=lambda **kwargs: kwargs["report"],
         optional_torch_fn=lambda: None,
         environ={},

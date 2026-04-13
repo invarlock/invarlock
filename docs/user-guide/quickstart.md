@@ -6,14 +6,16 @@
 | --- | --- |
 | **Purpose** | Complete the core evaluation workflow in a few commands. |
 | **Audience** | New users running their first evaluation. |
-| **Requires** | `invarlock[hf]` for Hugging Face-backed evaluation. |
+| **Requires** | `pip install invarlock` for verify/report/proof-pack flows; add `invarlock[hf]` only for Hugging Face-backed `evaluate`. |
 | **Network** | Use `--allow-network` on `evaluate` when a run needs model or dataset downloads. |
 | **Next step** | [Compare & evaluate](compare-and-evaluate.md) for production use. |
 
-This guide focuses on the public core CLI: `evaluate`, `verify`, and
-`report html`. The default path is baseline versus subject evaluation with a
-machine-readable evaluation report, deterministic pairing, and an attested
-runtime manifest.
+This guide focuses on the public core CLI: `evaluate`, `verify`, `report
+generate`, `report explain`, and `report html`. The default path produces a
+machine-readable evaluation report. The minimal install is enough for
+verification, report rendering, and proof-pack inspection. Add
+`invarlock[hf]` only when you want the evaluate path to load Hugging Face
+models.
 
 If any terms are unfamiliar, see the [Glossary](../assurance/glossary.md).
 
@@ -22,6 +24,9 @@ If any terms are unfamiliar, see the [Glossary](../assurance/glossary.md).
 ### 1. Prepare the environment
 
 ```bash
+pip install invarlock
+
+# Optional: only for evaluate with Hugging Face-backed models
 pip install "invarlock[hf]"
 
 # Repo checkout only: build the local runtime image once for attested runs
@@ -57,6 +62,13 @@ to meet the normal token-floor gates.
 trusted host-side bypass, verify the resulting report with
 `invarlock verify --assurance trusted-local ...`.
 
+Proof-pack verification works from an installed wheel and does not require a
+repo checkout:
+
+```bash
+invarlock advanced proof-pack verify <pack> --strict
+```
+
 ### 3. Verify the evaluation report
 
 ```bash
@@ -70,6 +82,11 @@ invarlock verify --assurance trusted-local reports/eval/evaluation.report.json
 The verifier re-checks schema, paired math, gate results, and the adjacent
 runtime manifest before you promote results. Use the trusted-local form only
 when the evaluation itself ran with `--assurance trusted-local`.
+
+`invarlock report generate` and `invarlock report explain` expect canonical
+`report.json` inputs. `invarlock report html` expects canonical
+`evaluation.report.json`. Directory inputs are command-specific and ambiguous
+directories are rejected.
 
 ### 4. Render shareable HTML
 
@@ -128,7 +145,9 @@ invarlock advanced calibrate --help
 ```
 
 Use Python extras such as `pip install "invarlock[awq,gptq]"` when you need
-optional backends.
+optional backends. On Python 3.13+ stacks, `gptq` may still require a vendor
+wheel or a supported older interpreter because upstream `auto-gptq` packaging
+remains narrower than the core InvarLock support matrix.
 
 ## Core Concepts
 

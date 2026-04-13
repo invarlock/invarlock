@@ -63,12 +63,11 @@ INVARLOCK_EVAL_DEVICE=cpu INVARLOCK_ALLOW_NETWORK=1 \
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `INVARLOCK_TRUST_REMOTE_CODE` | unset | Request `trust_remote_code=true` compatibility mode. |
 | `INVARLOCK_ALLOW_REMOTE_CODE` | unset | Explicitly allow remote model code execution. |
 
-`INVARLOCK_TRUST_REMOTE_CODE`, `TRUST_REMOTE_CODE_BOOL`, and `ALLOW_REMOTE_CODE`
-only request remote code. The request fails unless
-`INVARLOCK_ALLOW_REMOTE_CODE=1` is also present or `--allow-remote-code` is used.
+`INVARLOCK_ALLOW_REMOTE_CODE` is the only environment gate for remote model
+code execution. Use `INVARLOCK_ALLOW_REMOTE_CODE=1` or `--allow-remote-code`
+when remote code is required.
 
 ### Evaluation & pairing
 
@@ -150,7 +149,7 @@ Strictness/tiny-relax/overhead-skip are also config/profile policy:
 | --- | --- | --- |
 | `INVARLOCK_ALLOW_HOST_EXECUTION` | unset | Advanced/internal host-execution override. Prefer `invarlock evaluate --assurance trusted-local` for the public compare/evaluate path. |
 | `INVARLOCK_CONTAINER_EXECUTION` | unset | Internal recursion guard marking runtime-container execution. |
-| `INVARLOCK_CONTAINER_ENGINE` | unset | Force the OCI engine used for secure-default container execution (`docker` or `podman`). |
+| `INVARLOCK_CONTAINER_ENGINE` | unset | Force the OCI engine used for secure-default container execution (`podman` or `docker`). |
 | `INVARLOCK_RUNTIME_IMAGE` | unset | Override the OCI image used for containerized model execution. |
 | `INVARLOCK_RUNTIME_IMAGE_DIGEST` | unset | Supply the immutable digest recorded into `runtime.manifest.json`. |
 
@@ -164,7 +163,7 @@ Strictness/tiny-relax/overhead-skip are also config/profile policy:
 ## Troubleshooting
 
 - **Downloads blocked**: set `INVARLOCK_ALLOW_NETWORK=1` and retry.
-- **Multiple container engines installed**: set `INVARLOCK_CONTAINER_ENGINE=docker` or `INVARLOCK_CONTAINER_ENGINE=podman`.
+- **Multiple container engines installed**: set `INVARLOCK_CONTAINER_ENGINE=podman` or `INVARLOCK_CONTAINER_ENGINE=docker`.
 - **HF dataset cache lock/permission errors on local reruns**: set `INVARLOCK_HF_DATASETS_CACHE=/path/to/writable/cache` or let InvarLock retry under its own writable cache.
 - **Calibration iterables fail**: use `INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE=1`.
 - **Third-party plugins missing**: set `INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=1` or use `--allow-third-party-plugins`.

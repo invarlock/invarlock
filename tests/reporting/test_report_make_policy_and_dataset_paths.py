@@ -316,38 +316,38 @@ def test_make_report_surfaces_baseline_failures_explicitly(monkeypatch) -> None:
         dataset_info={"hash": {}, "windows": _BrokenWindows()},
     )
     monkeypatch.setattr(
-        cert,
+        dataset_hashing,
         "_extract_dataset_info",
         lambda *_args, **_kwargs: {"hash": {}, "windows": _BrokenWindows()},
         raising=False,
     )
     monkeypatch.setattr(
-        cert.report_primary_metric_analysis_mod,
+        pm_analysis_mod,
         "build_primary_metric_analysis",
         lambda *_args, **_kwargs: ({}, "dev"),
         raising=False,
     )
 
     monkeypatch.setattr(
-        cert.report_normalization_mod,
+        report_normalization,
         "normalize_and_validate_run_report",
-        lambda payload: (_ for _ in ()).throw(RuntimeError("baseline-bad"))
-        if payload is baseline
-        else report,
+        lambda payload: (
+            (_ for _ in ()).throw(RuntimeError("baseline-bad"))
+            if payload is baseline
+            else report
+        ),
         raising=False,
     )
     monkeypatch.setattr(
-        cert,
-        "_extract_report_meta",
+        "invarlock.reporting.report_builder_support.extract_report_meta",
         lambda _report, *_args, **_kwargs: {
             "model_id": "demo-model",
             "adapter": "hf",
             "device": "cpu",
         },
-        raising=False,
     )
     monkeypatch.setattr(
-        cert,
+        primary_metric_mod,
         "compute_primary_metric_from_report",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("pm-bad")),
         raising=False,
@@ -357,7 +357,7 @@ def test_make_report_surfaces_baseline_failures_explicitly(monkeypatch) -> None:
         make_report(report, baseline)
 
     monkeypatch.setattr(
-        cert.report_normalization_mod,
+        report_normalization,
         "normalize_and_validate_run_report",
         lambda payload: report,
         raising=False,
@@ -713,8 +713,8 @@ def test_make_evaluation_report_preserves_nullable_provenance(monkeypatch):
     assert evaluation_report["meta"]["model_id"] is None
     assert evaluation_report["meta"]["adapter"] is None
     assert evaluation_report["meta"]["device"] is None
-    assert evaluation_report["edit_name"] is None
-    assert evaluation_report["edit"]["name"] is None
+    assert "edit_name" not in evaluation_report
+    assert "name" not in evaluation_report["edit"]
     assert evaluation_report["baseline_ref"]["model_id"] is None
     assert evaluation_report["baseline_ref"]["run_id"] is None
     diagnostics = evaluation_report["meta"].get("build_diagnostics", [])

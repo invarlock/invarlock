@@ -5,6 +5,8 @@ import time
 from inspect import getattr_static
 from typing import Any
 
+from invarlock.core.metric_kind_contract import normalize_metric_kind
+
 
 def _model_kwargs(prepared: dict[str, Any]) -> dict[str, Any]:
     return {
@@ -63,8 +65,8 @@ def _resolve_metric_kind(config: Any, *, fallback: str) -> str:
         return fallback
     metric_section = eval_section.get("metric")
     if isinstance(metric_section, dict):
-        kind = str(metric_section.get("kind") or "").strip().lower()
-        if kind and kind != "auto":
+        kind = normalize_metric_kind(metric_section.get("kind"), allow_auto=True)
+        if kind:
             return kind
     return fallback
 
@@ -222,7 +224,7 @@ def _build_multimodal_eval_result(
         if total_tokens > 0
         else 0.0
     )
-    metric_kind = _resolve_metric_kind(config, fallback="vqa_accuracy")
+    metric_kind = _resolve_metric_kind(config, fallback="accuracy")
     preview_accuracy = float(preview_payload.get("accuracy", float("nan")))
     final_accuracy = float(final_payload.get("accuracy", float("nan")))
     primary_metric = {

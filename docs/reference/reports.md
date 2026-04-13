@@ -155,7 +155,7 @@ Attested evaluations also emit `runtime.manifest.json` next to
 
 The example below shows a realistic, PM‑only report envelope. It follows
 the validator in `invarlock.reporting.report_schema` and the
-fields produced by `invarlock.reporting.report_make.make_report`.
+fields produced by `invarlock.reporting.make_report`.
 
 ```json
 {
@@ -291,8 +291,9 @@ fields while enforcing a small, stable core:
 
 **Validation flags:**
 
-- `validation` is an object of booleans; the allow‑list is loaded from
-  `contracts/validation_keys.json` when present, or from a small default set.
+- `validation` is an object of booleans; allowed keys come from
+  `contracts/validation_keys.json`, and report validation fails closed when that
+  contract is missing or malformed.
 - Common flags:
   - `primary_metric_acceptable`
   - `primary_metric_tail_acceptable`

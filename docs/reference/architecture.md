@@ -39,7 +39,7 @@ the canonical guard chain, policy digest, and measurement contract.
 │                                                                             │
 │  ┌──────────┐    ┌────────────────────────────────┐    ┌──────────────┐     │
 │  │  Config  │───▶│            CLI LAYER           │───▶│    report    │     │
-│  │  (YAML)  │    │   evaluate | run | verify ...  │    │    (JSON)    │     │
+│  │  (YAML)  │    │ evaluate | verify | report ... │    │    (JSON)    │     │
 │  └──────────┘    └───────────────┬────────────────┘    └──────────────┘     │
 │                                  │                                          │
 │  ┌──────────┐    ┌───────────────▼────────────────┐    ┌──────────────┐     │
@@ -63,7 +63,7 @@ InvarLock follows a layered architecture with clear separation of concerns:
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                            CLI SHELL LAYER                                  │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐           │
-│  │ evaluate │ │   run    │ │  verify  │ │  report  │ │  doctor  │           │
+│  │ evaluate │ │  verify  │ │  report  │ │  doctor  │ │ advanced │           │
 │  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘           │
 │       │            │            │            │            │                 │
 ├───────┴────────────┴────────────┴────────────┴────────────┴─────────────────┤
@@ -118,11 +118,11 @@ policy owners.
 | Command | Purpose | Primary Output |
 | --- | --- | --- |
 | `evaluate` | Compare baseline vs subject with pinned windows | report JSON + MD |
-| `run` | Single-model evaluation pipeline | Report JSON + Events JSONL |
 | `verify` | Validate report against schema and pairing | Exit code + messages |
 | `report` | Render/compare reports and reports | MD/HTML/JSON artifacts |
 | `doctor` | Environment diagnostics | Health check output |
-| `plugins` | List adapters, guards, edits | Plugin inventory |
+| `advanced` | Maintenance workflows such as proof packs, policy packs, plugins, and calibration | Exit code + workflow-specific artifacts |
+| `version` | Emit package and schema version information | Version string |
 
 ### Core Policy / Contracts (`src/invarlock/core/`, `src/invarlock/reporting/`)
 
@@ -150,8 +150,8 @@ Runtime attestation uses a single verifier implementation:
 
 - `core/runtime_manifest_verify.py` is the authoritative verifier for
   `runtime.manifest.json` plus report-digest binding checks.
-- `runtime_verify.py` and `cli/runtime_verify.py` are thin wrappers over that
-  verifier for programmatic and CLI use.
+- `runtime_verify.py` and `cli/runtime_verify.py` are the programmatic and CLI
+  entrypoints for that verifier.
 - `runtime_attestation.py` calls the same verifier when `invarlock verify`
   enforces attestation on attested reports.
 - Product behavior does not depend on finding an external verifier binary on
@@ -189,7 +189,10 @@ Report generation, validation, persistence, and rendering.
 | --- | --- |
 | `report_schema.py` | Evaluation report schema and structural validation |
 | `report_validation.py` | Canonical validation-flag computation |
-| `report_make.py` | Canonical evaluation-report assembly owner |
+| `report_make.py` | Public evaluation-report entrypoint that coordinates the split report-making owners |
+| `report_make_inputs.py` | Input normalization, baseline reference building, and build-section extraction |
+| `report_make_assembly.py` | Policy/provenance/guard assembly and report build-context composition |
+| `report_make_output.py` | Final evaluation-report shaping and output payload construction |
 | `report_bundle.py` | Evaluation-bundle persistence, manifest writing, and evidence attachment |
 | `report_contract.py` | Input loading and report-generation planning |
 | `report_console.py` | Console/report validation summary helpers used by CLI/reporting surfaces |
@@ -338,9 +341,9 @@ tests. The intended invariants are:
   exports.
 - No `rmt_legacy` references in production source. RMT ownership lives in
   `rmt.py`, `rmt_analysis.py`, `rmt_detection.py`, and `rmt_math.py`.
-- No dependency-map orchestration for `run`. The command shell must not rebuild
-  giant `deps` dictionaries or inject `run_impl` callables to preserve legacy
-  seams.
+- No dependency-map orchestration in command shells. Public command owners must
+  stay thin and must not rebuild giant `deps` dictionaries or inject callables
+  to recreate removed indirection.
 - No compatibility-only command signatures once a canonical owner contract
   exists. Example: lens-metric calculation takes a required `MetricsConfig`
   instead of deprecated per-call overrides.

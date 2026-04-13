@@ -25,6 +25,9 @@ def _valid_cert(ratio: float = 2.0) -> dict:
     return {
         "schema_version": "v1",
         "run_id": "r1",
+        "artifacts": {"generated_at": "t"},
+        "plugins": {},
+        "meta": {},
         "primary_metric": {
             "kind": "ppl_causal",
             "final": 10.0,
@@ -32,6 +35,8 @@ def _valid_cert(ratio: float = 2.0) -> dict:
             "display_ci": [0.98, 1.02],
         },
         "dataset": {
+            "provider": "unit",
+            "seq_len": 8,
             "windows": {
                 "preview": 1,
                 "final": 1,
@@ -41,7 +46,7 @@ def _valid_cert(ratio: float = 2.0) -> dict:
                     "coverage": {"preview": {"used": 1}, "final": {"used": 1}},
                     "paired_windows": 1,
                 },
-            }
+            },
         },
         "baseline_ref": {"primary_metric": {"final": 5.0}},
     }
@@ -81,15 +86,26 @@ def test_verify_json_mixed_policy_fail(tmp_path: Path, capsys) -> None:
 
 def test_verify_json_malformed(tmp_path: Path, capsys) -> None:
     verify_command = _import_verify_command()
-    bad = {"schema_version": "v0", "run_id": "r1", "primary_metric": {"final": 1.0}}
+    bad = {
+        "schema_version": "v0",
+        "run_id": "r1",
+        "artifacts": {"generated_at": "t"},
+        "plugins": {},
+        "meta": {},
+        "dataset": {
+            "provider": "unit",
+            "seq_len": 8,
+            "windows": {"preview": 1, "final": 1, "stats": {}},
+        },
+        "primary_metric": {"final": 1.0},
+    }
     c_bad = _write_cert(tmp_path / "m.json", bad)
     with pytest.raises(typer.Exit) as ei:
         verify_command(
             [c_bad], baseline=None, tolerance=1e-9, profile="dev", json_out=True
         )
-    assert ei.value.exit_code in (2, 1)  # prefer 2, but tolerate 1 if schema lenient
+    assert ei.value.exit_code == 2
     out = capsys.readouterr().out.strip()
     payload = json.loads(out)
     assert payload["summary"]["ok"] is False
-    # reason is 'malformed' when schema fails; but allow 'policy_fail' if minimal validator passes
-    assert payload["summary"]["reason"] in {"malformed", "policy_fail"}
+    assert payload["summary"]["reason"] == "malformed"

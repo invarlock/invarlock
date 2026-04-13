@@ -16,19 +16,15 @@ def test_resolve_trust_remote_code_defaults_false(monkeypatch):
     from invarlock.adapters.hf_loading import resolve_trust_remote_code
 
     monkeypatch.delenv("INVARLOCK_ALLOW_REMOTE_CODE", raising=False)
-    monkeypatch.delenv("INVARLOCK_TRUST_REMOTE_CODE", raising=False)
-    monkeypatch.delenv("ALLOW_REMOTE_CODE", raising=False)
-    monkeypatch.delenv("TRUST_REMOTE_CODE_BOOL", raising=False)
 
     assert resolve_trust_remote_code({}) is False
 
 
 @pytest.mark.unit
-def test_resolve_trust_remote_code_ignores_env_opt_in(monkeypatch):
+def test_resolve_trust_remote_code_requires_explicit_kwargs(monkeypatch):
     from invarlock.adapters.hf_loading import resolve_trust_remote_code
 
     monkeypatch.setenv("INVARLOCK_ALLOW_REMOTE_CODE", "1")
-    monkeypatch.setenv("INVARLOCK_TRUST_REMOTE_CODE", "1")
     assert resolve_trust_remote_code({}) is False
 
 
@@ -36,7 +32,6 @@ def test_resolve_trust_remote_code_ignores_env_opt_in(monkeypatch):
 def test_resolve_trust_remote_code_kwargs_override(monkeypatch):
     from invarlock.adapters.hf_loading import resolve_trust_remote_code
 
-    monkeypatch.setenv("INVARLOCK_TRUST_REMOTE_CODE", "0")
     with runtime_allowances_scope(allow_remote_code=True):
         assert resolve_trust_remote_code({"trust_remote_code": True}) is True
 
@@ -105,6 +100,18 @@ def test_resolve_torch_dtype_parses_strings(monkeypatch):
     assert resolve_dtype({"dtype": "float16"}) is torch.float16
     assert resolve_dtype({"dtype": "bfloat16"}) is torch.bfloat16
     assert resolve_dtype({"dtype": "auto"}) == "auto"
+
+
+@pytest.mark.unit
+def test_resolve_torch_dtype_rejects_removed_aliases(monkeypatch):
+    from invarlock.adapters.hf_loading import resolve_dtype
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    if hasattr(torch.backends, "mps"):
+        monkeypatch.setattr(torch.backends.mps, "is_available", lambda: False)
+
+    with pytest.raises(ValueError, match="model.dtype=fp16"):
+        resolve_dtype({"dtype": "fp16"})
 
 
 def _write_local_config(path: Path, model_type: str) -> Path:

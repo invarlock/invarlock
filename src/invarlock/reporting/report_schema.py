@@ -3,9 +3,15 @@ from __future__ import annotations
 import copy
 from typing import Any
 
+from invarlock.core.metric_kind_contract import (
+    MetricKindContractError,
+    load_metric_kind_catalog,
+    normalize_metric_kind,
+)
+
 from . import report_validation_allowlist as allowlist_mod
 
-# Optional JSON Schema validation support (best-effort)
+# JSON Schema validation is required for canonical report acceptance.
 try:  # pragma: no cover - exercised in integration
     import jsonschema
 except (ImportError, ModuleNotFoundError):  # pragma: no cover
@@ -41,7 +47,7 @@ REPORT_JSON_SCHEMA: dict[str, Any] = {
     ],
     "properties": {
         "schema_version": {"const": REPORT_SCHEMA_VERSION},
-        "run_id": {"type": "string", "minLength": 4},
+        "run_id": {"type": "string", "minLength": 1},
         "edit_name": {"type": "string"},
         "policy_digest": {
             "type": "object",
@@ -178,9 +184,10 @@ REPORT_JSON_SCHEMA: dict[str, Any] = {
         },
         "validation": {
             "type": "object",
-            # properties populated at import-time from allow-list; default permissive
+            # Properties are populated from the validation-key contract when
+            # available. The empty baseline remains fail-closed.
             "properties": {},
-            "additionalProperties": {"type": "boolean"},
+            "additionalProperties": False,
         },
         "rmt": {
             "type": "object",
@@ -212,14 +219,27 @@ REPORT_JSON_SCHEMA: dict[str, Any] = {
 }
 
 
-_VALIDATION_ALLOWLIST_DEFAULT = allowlist_mod.DEFAULT_VALIDATION_ALLOWLIST
+_VALIDATION_ALLOWLIST_DEFAULT: set[str] = set()
 
 try:
     allowlist_mod.apply_validation_allowlist_schema(
         REPORT_JSON_SCHEMA,
-        allowlist_mod.load_validation_allowlist(),
+        allowlist_mod.load_validation_allowlist_strict(),
     )
-except (KeyError, RuntimeError, TypeError, ValueError):
+except (
+    KeyError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+    allowlist_mod.ValidationAllowlistContractError,
+):
+    pass
+
+try:
+    REPORT_JSON_SCHEMA["properties"]["primary_metric"]["properties"]["kind"]["enum"] = (
+        sorted(load_metric_kind_catalog())
+    )
+except (KeyError, MetricKindContractError, TypeError):
     pass
 
 
@@ -237,8 +257,10 @@ def _validate_with_jsonschema(
         return False
 
 
-def validate_report(report: dict[str, Any]) -> bool:
+def validate_report(report: object) -> bool:
     """Validate evaluation report structure and essential flags."""
+    if not isinstance(report, dict):
+        return False
     original_validation_spec: dict[str, Any] | None = None
     validation_keys = _VALIDATION_ALLOWLIST_DEFAULT
     schema_properties = REPORT_JSON_SCHEMA.get("properties")
@@ -252,17 +274,21 @@ def validate_report(report: dict[str, Any]) -> bool:
 
         schema_for_validation = copy.deepcopy(REPORT_JSON_SCHEMA)
 
-        # Prefer JSON Schema structural validation; if unavailable or too strict,
-        # fall back to a lenient minimal check used by unit tests.
         # Tighten JSON Schema: populate validation.properties from allow-list and
         # disallow unknown validation keys at schema level.
         try:
-            validation_keys = allowlist_mod.load_validation_allowlist()
+            validation_keys = allowlist_mod.load_validation_allowlist_strict()
             allowlist_mod.apply_validation_allowlist_schema(
                 schema_for_validation, validation_keys
             )
-        except (KeyError, RuntimeError, TypeError, ValueError):
-            pass
+        except (
+            KeyError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+            allowlist_mod.ValidationAllowlistContractError,
+        ):
+            return False
 
         try:
             jsonschema_ok = _validate_with_jsonschema(report, schema_for_validation)
@@ -270,18 +296,17 @@ def validate_report(report: dict[str, Any]) -> bool:
             jsonschema_ok = _validate_with_jsonschema(report)
 
         if not jsonschema_ok:
-            # Minimal fallback: require schema version + run_id + primary_metric
-            run_id = report.get("run_id")
-            run_id_ok = isinstance(run_id, str) and bool(run_id.strip())
-            pm = report.get("primary_metric")
-            pm_final = pm.get("final") if isinstance(pm, dict) else None
-            pm_kind = pm.get("kind") if isinstance(pm, dict) else None
-            pm_ok = isinstance(pm, dict) and (
-                (isinstance(pm_final, int | float) and not isinstance(pm_final, bool))
-                or (isinstance(pm_kind, str) and bool(pm_kind.strip()))
-            )
-            if not (run_id_ok and pm_ok):
-                return False
+            return False
+
+        primary_metric = report.get("primary_metric")
+        if not isinstance(primary_metric, dict):
+            return False
+        try:
+            normalized_kind = normalize_metric_kind(primary_metric.get("kind"))
+        except (MetricKindContractError, ValueError):
+            return False
+        if normalized_kind is None:
+            return False
 
         validation = report.get("validation", {})
         if "validation" in report and not isinstance(validation, dict):

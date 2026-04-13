@@ -89,10 +89,12 @@ def _mk_baseline() -> dict:
     }
 
 
-def test_is_ppl_kind_accepts_aliases_and_handles_bad_str() -> None:
-    assert _is_ppl_kind("ppl")
-    assert _is_ppl_kind("perplexity")
+def test_is_ppl_kind_accepts_only_canonical_catalog_entries_and_handles_bad_str() -> (
+    None
+):
     assert _is_ppl_kind("ppl_mlm")
+    assert not _is_ppl_kind("perplexity")
+    assert not _is_ppl_kind("ppl")
     assert not _is_ppl_kind("accuracy")
 
     class _Bad:
@@ -170,8 +172,10 @@ def test_make_evaluation_report_marks_unstable_when_token_floor_violated(
     report["metrics"]["final_total_tokens"] = 10
 
     monkeypatch.setattr(
-        "invarlock.reporting.report_make.get_tier_policies",
-        lambda: {"balanced": {"metrics": {"pm_ratio": {"min_tokens": 100}}}},
+        "invarlock.core.auto_tuning.get_tier_policies",
+        lambda *_args, **_kwargs: {
+            "balanced": {"metrics": {"pm_ratio": {"min_tokens": 100}}}
+        },
     )
     monkeypatch.setattr(
         "invarlock.core.bootstrap.compute_paired_delta_log_ci",

@@ -77,7 +77,6 @@ from invarlock.eval import window_planning as window_planning_mod
 from invarlock.exit_codes import (
     resolve_command_exit_code as _resolve_exit_code,
 )
-from invarlock.reporting import report_make as report_make_mod
 from invarlock.reporting import report_telemetry as report_telemetry_mod
 from invarlock.reporting import report_types as report_types_mod
 from invarlock.reporting import run_provenance_contract as run_provenance_contract_mod
@@ -86,6 +85,7 @@ from invarlock.reporting import (
     run_report_metrics_contract as run_report_metrics_contract_mod,
 )
 from invarlock.reporting import telemetry as telemetry_mod
+from invarlock.reporting.report_make import make_report as build_evaluation_report
 from invarlock.reporting.run_retry_validation import (
     validate_retry_evaluation_report as _validate_retry_evaluation_report,
 )
@@ -284,7 +284,7 @@ def _validate_retry_evaluation_report_with_runtime_deps(**kwargs: Any) -> Any:
     return _validate_retry_evaluation_report(
         **kwargs,
         build_retry_result_summary_fn=_build_retry_result_summary_impl,
-        make_report_fn=report_make_mod.make_report,
+        make_report_fn=build_evaluation_report,
         telemetry_output_enabled_fn=report_telemetry_mod.telemetry_output_enabled,
         telemetry_summary_line_fn=report_telemetry_mod.telemetry_summary_line,
     )

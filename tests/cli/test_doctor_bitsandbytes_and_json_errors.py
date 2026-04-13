@@ -178,6 +178,33 @@ def test_cross_check_reports_reject_noncanonical_directory_inputs(tmp_path):
     assert any(finding.code == "D014" for finding in findings)
 
 
+def test_cross_check_reports_reject_ambiguous_directory_inputs(tmp_path):
+    baseline_dir = tmp_path / "baseline"
+    baseline_dir.mkdir()
+    subject_dir = tmp_path / "subject"
+    subject_dir.mkdir()
+    (baseline_dir / "report.json").write_text(json.dumps({}), encoding="utf-8")
+    (baseline_dir / "evaluation.report.json").write_text(
+        json.dumps({}),
+        encoding="utf-8",
+    )
+    (subject_dir / "evaluation.report.json").write_text(
+        json.dumps({}),
+        encoding="utf-8",
+    )
+
+    findings, had_error = build_cross_check_findings(
+        str(baseline_dir),
+        str(subject_dir),
+        cfg_metric_kind=None,
+        strict=False,
+        profile=None,
+    )
+
+    assert had_error is True
+    assert any(finding.code == "D014" for finding in findings)
+
+
 def test_doctor_json_mode_emits_findings(monkeypatch, capsys):
     _install_fake_torch(monkeypatch, cuda_available=False)
     _patch_minimal_doctor_env(monkeypatch)

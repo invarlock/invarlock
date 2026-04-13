@@ -23,7 +23,7 @@ def test_evaluation_report_schema_valid_and_fallback(monkeypatch):
         "dataset": {
             "provider": "ds",
             "seq_len": 4,
-            "windows": {"preview": 1, "final": 1},
+            "windows": {"preview": 1, "final": 1, "stats": {}},
         },
         "primary_metric": {"kind": "ppl_causal", "final": 10.0},
         "validation": {},

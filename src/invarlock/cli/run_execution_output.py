@@ -390,8 +390,10 @@ def _render_progress_or_debug_event(console: Any, event: RunExecutionEvent) -> b
     lifecycle_messages = {
         RunDeterministicSeedsEvent: (
             "INIT",
-            lambda e: "Deterministic seeds → "
-            f"python={e.python_seed}, numpy={e.numpy_seed}, torch={e.torch_seed if e.torch_seed is not None else 'N/A'}",
+            lambda e: (
+                "Deterministic seeds → "
+                f"python={e.python_seed}, numpy={e.numpy_seed}, torch={e.torch_seed if e.torch_seed is not None else 'N/A'}"
+            ),
             "🎲",
         ),
         RunBaselineScheduleLoadedEvent: (
@@ -446,8 +448,10 @@ def _render_progress_or_debug_event(console: Any, event: RunExecutionEvent) -> b
         ),
         RunAutoTuneAdjustmentEvent: (
             "INIT",
-            lambda e: "Auto-tune adjust: global_k → "
-            f"{e.global_k} (bounds {e.keep_low}-{e.keep_high})",
+            lambda e: (
+                "Auto-tune adjust: global_k → "
+                f"{e.global_k} (bounds {e.keep_low}-{e.keep_high})"
+            ),
             "🔧",
         ),
         RunRetryExhaustedEvent: (

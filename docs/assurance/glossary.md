@@ -236,7 +236,7 @@ The canonical task metric used for gating (perplexity for LMs, accuracy for clas
 
 | Aspect | Details |
 | --- | --- |
-| **Supported kinds** | `ppl_causal`, `ppl_mlm`, `accuracy`, `vqa_accuracy` |
+| **Supported kinds** | `ppl_causal`, `ppl_mlm`, `accuracy`, `accuracy` |
 | **Gating logic** | Ratio vs baseline must stay within tier thresholds |
 | **Related terms** | Primary Metric Tail, BCa Bootstrap, Window Pairing |
 | **report fields** | `primary_metric.{kind,preview,final,ratio_vs_baseline,ci}` |

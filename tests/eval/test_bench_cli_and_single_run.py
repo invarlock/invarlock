@@ -176,9 +176,7 @@ class TestExecuteSingleRun:
         )
         monkeypatch.setattr(
             "invarlock.eval.data.get_provider",
-            lambda *_a, **_k: (
-                provider_kwargs_seen.append(dict(_k)) or DummyProvider()
-            ),
+            lambda *_a, **_k: provider_kwargs_seen.append(dict(_k)) or DummyProvider(),
         )
         monkeypatch.setattr(
             "invarlock.core.registry.get_registry", lambda: DummyRegistry()

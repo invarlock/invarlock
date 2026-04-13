@@ -9,13 +9,7 @@ from invarlock.runtime_security import runtime_allowances_scope
 
 
 def _clear_remote_code_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    for name in (
-        "INVARLOCK_ALLOW_REMOTE_CODE",
-        "INVARLOCK_TRUST_REMOTE_CODE",
-        "TRUST_REMOTE_CODE_BOOL",
-        "ALLOW_REMOTE_CODE",
-    ):
-        monkeypatch.delenv(name, raising=False)
+    monkeypatch.delenv("INVARLOCK_ALLOW_REMOTE_CODE", raising=False)
 
 
 @pytest.mark.unit

@@ -93,8 +93,8 @@ def test_accuracy_accumulate_and_paired_compare():
 
 
 def test_get_metric_alias_lookup():
-    metric = pm_mod.get_metric("vqa_accuracy")
-    assert metric.kind == "vqa_accuracy"
+    metric = pm_mod.get_metric("accuracy")
+    assert metric.kind == "accuracy"
 
     with pytest.raises(KeyError):
         pm_mod.get_metric("unknown_metric")

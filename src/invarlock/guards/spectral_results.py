@@ -104,13 +104,10 @@ def evaluate_spectral_outcome(
     passed = not fatal_violations and not caps_exceeded
     if fatal_violations or caps_exceeded:
         decision = "block"
-        action = "abort"
     elif caps_applied > 0:
         decision = "monitor"
-        action = "warn"
     else:
         decision = "allow"
-        action = "continue"
     return {
         "selected_violations": [*fatal_violations, *selected_budgeted],
         "candidate_budgeted": len(budgeted_violations),
@@ -118,7 +115,6 @@ def evaluate_spectral_outcome(
         "caps_exceeded": caps_exceeded,
         "passed": passed,
         "decision": decision,
-        "action": action,
     }
 
 

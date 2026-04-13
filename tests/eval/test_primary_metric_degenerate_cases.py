@@ -26,9 +26,9 @@ def test_accuracy_paired_compare_empty_returns_nans():
     assert math.isnan(res["display"]) and isinstance(res["ci"], list)
 
 
-def test_vqa_alias_metric_delegate():
-    vqa = get_metric("vqa_accuracy")
-    assert vqa.kind == "vqa_accuracy"
+def test_accuracy_metric_lookup():
+    metric = get_metric("accuracy")
+    assert metric.kind == "accuracy"
 
 
 def _fresh_metric(kind: str):
@@ -89,7 +89,7 @@ def test_compute_primary_metric_from_report_counts_and_estimates():
     }
     baseline = {
         "metrics": {
-            "primary_metric": {"kind": "vqa_accuracy", "final": 0.75},
+            "primary_metric": {"kind": "accuracy", "final": 0.75},
         }
     }
     payload = compute_primary_metric_from_report(
@@ -114,7 +114,7 @@ def test_compute_primary_metric_baseline_family_match():
     }
     baseline = {
         "metrics": {
-            "primary_metric": {"kind": "vqa_accuracy", "final": 0.6},
+            "primary_metric": {"kind": "accuracy", "final": 0.6},
         }
     }
     payload = compute_primary_metric_from_report(

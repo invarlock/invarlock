@@ -83,6 +83,19 @@ def test_compute_validation_flags_rejects_bool_preview_final_ratio() -> None:
     assert flags["preview_final_drift_acceptable"] is False
 
 
+def test_compute_validation_flags_fail_closed_on_unknown_primary_metric_kind() -> None:
+    flags = report_validation_mod.compute_validation_flags(
+        ppl={"preview_final_ratio": 1.0, "ratio_vs_baseline": 1.0},
+        spectral={"caps_applied": 0},
+        rmt={"stable": True},
+        invariants={"status": "pass"},
+        tier="balanced",
+        primary_metric={"kind": "perplexity", "ratio_vs_baseline": 1.0},
+    )
+
+    assert flags["primary_metric_acceptable"] is False
+
+
 def test_tiny_relax_relaxes_tokens_floor_for_ppl():
     # Balanced default with pm_ratio policy and tiny token counts should still pass under tiny_relax
     flags = report_validation_mod.compute_validation_flags(

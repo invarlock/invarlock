@@ -19,7 +19,7 @@ def compute_confidence_label(evaluation_report: dict[str, Any]) -> dict[str, Any
             lo, hi = float(display_ci[0]), float(display_ci[1])
             if kind.startswith("ppl"):
                 basis = "ppl_ratio"
-            elif kind in {"accuracy", "vqa_accuracy"}:
+            elif kind == "accuracy":
                 basis = kind
     except _NON_FATAL_EXCEPTIONS:
         pass
@@ -40,9 +40,7 @@ def compute_confidence_label(evaluation_report: dict[str, Any]) -> dict[str, Any
                     accuracy_threshold = float(accuracy_delta)
     except _NON_FATAL_EXCEPTIONS:
         pass
-    threshold = (
-        accuracy_threshold if basis in {"accuracy", "vqa_accuracy"} else ratio_threshold
-    )
+    threshold = accuracy_threshold if basis == "accuracy" else ratio_threshold
 
     try:
         unstable = bool((evaluation_report.get("primary_metric") or {}).get("unstable"))
