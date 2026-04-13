@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+## [0.7.1] - 2026-04-12
+
+### Added
 - Clarified the minimal-install onboarding path and the exact
   `verify`/`report`/proof-pack command inputs so wheel-only users can validate
   artifacts without cloning the repository.
@@ -74,6 +82,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed test/scientific-only packages from the base runtime where they were
   not required, moved MI-probe dependencies behind narrower extras, and
   refreshed workflow lockfiles to match the tightened CI and release surfaces.
+- Bumped docs and release-workflow dependencies including `cspell` to
+  `10.0.0`, `pypa/gh-action-pypi-publish` to `1.14.0`, and the docs CI Node
+  runtime to `22` so the refreshed spell-check toolchain remains supported.
 
 ### Documentation
 - Refreshed workflow, security, CLI, config, and contract docs to match the
