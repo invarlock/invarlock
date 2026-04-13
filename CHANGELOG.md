@@ -81,11 +81,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Dependencies
 - Removed test/scientific-only packages from the base runtime where they were
   not required, moved MI-probe dependencies behind narrower extras, and
-  refreshed workflow lockfiles to match the tightened CI and release surfaces.
+  refreshed workflow lockfiles to match the tightened CI and release surfaces,
+  including `aiohttp==3.13.5` and `linkchecker==10.6.0` on the shipped docs
+  and security paths.
 - Pinned typed and packaging workflow lockfiles to include `mypy==1.20.0` and
   `wheel==0.46.3` so the new typed-surface and minimal wheel-install gates run
   under the shipped CI surface instead of relying on implicit tool installs.
 - Bumped docs spell-check tooling from `cspell` `9.7.0` to `10.0.0`.
+- Added pinned CI/release workflow tooling for `actionlint` `v1.7.7` and
+  `gitleaks` `v8.30.0` as part of the new fail-closed workflow and
+  supply-chain gates.
 - Bumped the release publish action to `pypa/gh-action-pypi-publish`
   `1.14.0`.
 - Raised the docs CI Node runtime from `18` to `22` so the refreshed
