@@ -436,6 +436,19 @@ def test_to_serialisable_dict_uses_dict_method(tmp_path: Path):
                 ),
             )
         )
+        stack.enter_context(
+            patch(
+                "invarlock.cli.run_runtime.resolve_tokenizer",
+                lambda *_a, **_k: (
+                    SimpleNamespace(
+                        eos_token="</s>",
+                        pad_token="</s>",
+                        vocab_size=50000,
+                    ),
+                    "tokhash123",
+                ),
+            )
+        )
         stack.enter_context(patch("invarlock.cli.device.resolve_device", lambda d: d))
         stack.enter_context(
             patch(

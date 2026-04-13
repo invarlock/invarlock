@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import json
 import os
+import re
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -10,6 +11,8 @@ from typer.testing import CliRunner
 os.environ["INVARLOCK_LIGHT_IMPORT"] = "1"
 
 from invarlock.cli.app import app
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def test_policy_build_and_verify_cli(tmp_path: Path) -> None:
@@ -92,7 +95,9 @@ def test_policy_build_rejects_non_mapping_resolved_policy(tmp_path: Path) -> Non
     )
 
     assert result.exit_code == 2
-    assert "--resolved-policy must decode to an object" in result.output
+    normalized_output = " ".join(_ANSI_RE.sub("", result.output).split())
+    assert "resolved-policy" in normalized_output
+    assert "must decode to an object" in normalized_output
 
 
 def test_policy_build_records_optional_approval_metadata(tmp_path: Path) -> None:

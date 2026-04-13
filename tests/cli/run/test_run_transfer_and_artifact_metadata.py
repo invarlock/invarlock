@@ -753,6 +753,13 @@ def test_guard_overhead_ratio_display_path(monkeypatch, tmp_path):
             )
         ),
     )
+    monkeypatch.setattr(
+        "invarlock.cli.run_runtime.resolve_tokenizer",
+        lambda *_a, **_k: (
+            SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
+            "tokhash123",
+        ),
+    )
     monkeypatch.setattr("invarlock.cli.device.resolve_device", lambda d: d)
     monkeypatch.setattr(
         "invarlock.cli.device.validate_device_for_config", lambda d: (True, "")
@@ -842,6 +849,13 @@ def test_baseline_pairing_valid_schedule(monkeypatch, tmp_path):
             )
         ),
     )
+    monkeypatch.setattr(
+        "invarlock.cli.run_runtime.resolve_tokenizer",
+        lambda *_a, **_k: (
+            SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
+            "tokhash123",
+        ),
+    )
     monkeypatch.setattr("invarlock.core.runner.CoreRunner", _runner_min)
     run_command(
         config=str(cfg),
@@ -878,6 +892,13 @@ def test_baseline_missing_eval_windows_fallback(monkeypatch, tmp_path):
                 SimpleNamespace(input_ids=[[1, 2]], attention_masks=[[1, 1]]),
                 SimpleNamespace(input_ids=[[3, 4]], attention_masks=[[1, 1]]),
             )
+        ),
+    )
+    monkeypatch.setattr(
+        "invarlock.cli.run_runtime.resolve_tokenizer",
+        lambda *_a, **_k: (
+            SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
+            "tokhash123",
         ),
     )
     monkeypatch.setattr("invarlock.core.runner.CoreRunner", _runner_min)

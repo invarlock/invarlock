@@ -98,6 +98,15 @@ def main(argv: list[str] | None = None) -> int:
             "to audit more than one installed surface."
         ),
     )
+    parser.add_argument(
+        "--requirement",
+        action="append",
+        default=[],
+        help=(
+            "Requirements file to audit without installing the surface first. "
+            "May be supplied multiple times."
+        ),
+    )
     args = parser.parse_args(argv)
 
     owner, entries = _load_allowlist(Path(args.allowlist))
@@ -112,6 +121,8 @@ def main(argv: list[str] | None = None) -> int:
     cmd = ["pip-audit"]
     for path in args.path:
         cmd.extend(["--path", path])
+    for requirement in args.requirement:
+        cmd.extend(["-r", requirement])
     for entry in entries:
         cmd.extend(["--ignore-vuln", entry.advisory])
 

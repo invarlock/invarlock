@@ -868,5 +868,18 @@ def test_guard_order_permutations(tmp_path: Path, order):
                 ),
             )
         )
+        stack.enter_context(
+            patch(
+                "invarlock.cli.run_runtime.resolve_tokenizer",
+                lambda *_a, **_k: (
+                    SimpleNamespace(
+                        eos_token="</s>",
+                        pad_token="</s>",
+                        vocab_size=50000,
+                    ),
+                    "tokhash123",
+                ),
+            )
+        )
         # Should not crash regardless of guard order
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))

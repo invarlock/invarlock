@@ -49,6 +49,17 @@ def _common_ce():
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
+            "invarlock.cli.run_runtime.resolve_tokenizer",
+            lambda *_a, **_k: (
+                SimpleNamespace(
+                    eos_token="</s>",
+                    pad_token="</s>",
+                    vocab_size=50000,
+                ),
+                "tokhash123",
+            ),
+        ),
+        patch(
             "invarlock.reporting.report_files.save_report",
             lambda report, run_dir, formats, filename_prefix: {
                 "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
