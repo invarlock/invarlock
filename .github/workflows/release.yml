@@ -111,7 +111,7 @@ jobs:
         run: python -m pip install --require-hashes -r requirements/workflows/release-security-py313.txt
       - name: Install gitleaks
         run: |
-          go install github.com/gitleaks/gitleaks/v8@v8.30.0
+          go install github.com/zricethezav/gitleaks/v8@v8.30.0
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
       - name: Run gitleaks history scan
         id: gitleaks_scan
