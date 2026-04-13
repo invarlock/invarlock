@@ -130,7 +130,7 @@ jobs:
           echo "exit_code=${exit_code}" >> "$GITHUB_OUTPUT"
 
       - name: Upload supply-chain artifacts
-        if: always()
+        if: ${{ always() && steps.gitleaks_scan.outcome != 'skipped' }}
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: supply-chain-pr-artifacts
@@ -142,7 +142,7 @@ jobs:
           retention-days: 3
 
       - name: Fail on secret findings
-        if: always()
+        if: ${{ always() && steps.gitleaks_scan.outcome != 'skipped' }}
         shell: bash
         run: |
           if [ "${{ steps.gitleaks_scan.outputs.exit_code }}" != "0" ]; then
