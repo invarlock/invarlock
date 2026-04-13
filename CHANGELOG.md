@@ -82,9 +82,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed test/scientific-only packages from the base runtime where they were
   not required, moved MI-probe dependencies behind narrower extras, and
   refreshed workflow lockfiles to match the tightened CI and release surfaces.
-- Bumped docs and release-workflow dependencies including `cspell` to
-  `10.0.0`, `pypa/gh-action-pypi-publish` to `1.14.0`, and the docs CI Node
-  runtime to `22` so the refreshed spell-check toolchain remains supported.
+- Pinned typed and packaging workflow lockfiles to include `mypy==1.20.0` and
+  `wheel==0.46.3` so the new typed-surface and minimal wheel-install gates run
+  under the shipped CI surface instead of relying on implicit tool installs.
+- Bumped docs spell-check tooling from `cspell` `9.7.0` to `10.0.0`.
+- Bumped the release publish action to `pypa/gh-action-pypi-publish`
+  `1.14.0`.
+- Raised the docs CI Node runtime from `18` to `22` so the refreshed
+  spell-check toolchain remains on a supported engine.
 
 ### Documentation
 - Refreshed workflow, security, CLI, config, and contract docs to match the
