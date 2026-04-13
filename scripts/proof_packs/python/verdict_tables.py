@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from collections import Counter, defaultdict
 from itertools import combinations
 from pathlib import Path
@@ -58,7 +59,7 @@ def _as_float(value: Any, *, default: float | None = None) -> float | None:
         return float(int(value))
     if isinstance(value, int | float):
         v = float(value)
-        if v != v or abs(v) == float("inf"):
+        if not math.isfinite(v):
             return default
         return v
     if isinstance(value, str):
@@ -66,7 +67,7 @@ def _as_float(value: Any, *, default: float | None = None) -> float | None:
             v = float(value.strip())
         except _COERCE_ERRORS:
             return default
-        if v != v or abs(v) == float("inf"):
+        if not math.isfinite(v):
             return default
         return v
     return default

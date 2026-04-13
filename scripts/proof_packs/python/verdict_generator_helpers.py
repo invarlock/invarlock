@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -81,13 +82,13 @@ def _as_float(value: Any, *, default: float | None = None) -> float | None:
         return float(int(value))
     if isinstance(value, int | float):
         v = float(value)
-        return v if v == v and abs(v) != float("inf") else default
+        return v if math.isfinite(v) else default
     if isinstance(value, str):
         try:
             v = float(value.strip())
         except (TypeError, ValueError, OverflowError):
             return default
-        return v if v == v and abs(v) != float("inf") else default
+        return v if math.isfinite(v) else default
     return default
 
 

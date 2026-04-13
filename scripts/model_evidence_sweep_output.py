@@ -3,10 +3,26 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Protocol, Sequence
 
-if TYPE_CHECKING:
-    from model_evidence_sweep import EvidenceLane, LaneResult
+
+class SummaryResult(Protocol):
+    slug: str
+    lane_id: str
+    status: str
+    detail: str | None
+    evaluate_exit: int
+    verify_exit: int | None
+    report_path: str
+
+    @property
+    def ok(self) -> bool: ...
+
+    def to_summary_entry(self) -> dict[str, object]: ...
+
+
+class EvidenceSpec(Protocol):
+    def to_manifest_entry(self) -> dict[str, str]: ...
 
 
 def write_summary(
@@ -16,7 +32,7 @@ def write_summary(
     execution_mode: str,
     shard_index: int,
     shard_count: int,
-    results: list[LaneResult],
+    results: Sequence[SummaryResult],
 ) -> None:
     summary_tsv = output_root / "summary.tsv"
     with summary_tsv.open("w", encoding="utf-8") as handle:
@@ -52,7 +68,7 @@ def write_manifest(
     *,
     suite: str,
     execution_mode: str,
-    specs: list[EvidenceLane],
+    specs: Sequence[EvidenceSpec],
 ) -> None:
     payload = {
         "generated_at": datetime.now(UTC).isoformat(),

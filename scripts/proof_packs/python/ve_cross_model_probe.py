@@ -230,7 +230,6 @@ def run_probe(args: argparse.Namespace) -> dict[str, Any]:
         calibration = guard._calibration_stats  # noqa: SLF001
 
         would_enable = False
-        gate_reason = "unknown"
         try:
             would_enable, gate_reason = guard._evaluate_ab_gate()  # noqa: SLF001
         except (RuntimeError, TypeError, ValueError) as exc:
