@@ -48,6 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed accuracy-confidence labeling so accuracy metrics evaluate confidence
   width in true percentage points, while non-accuracy ratio metrics keep their
   ratio-width behavior.
+- Fixed docs consistency CI by making the assurance cross-reference linter use
+  self-contained sample reports instead of importing runtime report-building
+  modules that require `numpy` under the docs-only workflow dependency set.
 - Fixed the repo-owned Python selector so local `make`, smoke, and packaging
   paths all resolve through the workspace-aware selector, with the workspace
   `.venv` preferred before generic system Python fallback.
@@ -78,6 +81,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   light-import-safe module boundaries.
 - Documented the standalone public contract bundle and the minimal-install
   verify/report/proof-pack onboarding path.
+- Clarified secure-default runtime docs and user-facing guidance to describe an
+  OCI container engine requirement first, keep Podman/Docker examples explicit,
+  and scope Docker-only language to the local `act` workflow.
 
 ## [0.7.0] - 2026-04-09
 
