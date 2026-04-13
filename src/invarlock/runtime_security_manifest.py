@@ -79,9 +79,7 @@ def load_runtime_manifest(
 ) -> Any:
     helpers = _helpers()
     report = Path(report_path)
-    result_type = cast(
-        "type[RuntimeManifestLoadResult]", helpers.RuntimeManifestLoadResult
-    )
+    result_type = cast("type[Any]", helpers.RuntimeManifestLoadResult)
     manifest_path = report.parent / str(helpers.RUNTIME_MANIFEST_FILENAME)
     if not manifest_path.exists():
         return result_type(
