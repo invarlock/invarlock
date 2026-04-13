@@ -11,7 +11,7 @@ from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 # Canonical runtime-security helpers live here; container execution and manifest
 # serialization are split into owner modules imported below.
@@ -888,4 +888,7 @@ def write_runtime_manifest(
 def load_runtime_manifest(
     report_path: str | os.PathLike[str],
 ) -> RuntimeManifestLoadResult:
-    return _manifest_impl.load_runtime_manifest(report_path)
+    return cast(
+        RuntimeManifestLoadResult,
+        _manifest_impl.load_runtime_manifest(report_path),
+    )
