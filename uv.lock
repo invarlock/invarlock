@@ -1377,6 +1377,7 @@ awq = [
 ]
 ci = [
     { name = "build" },
+    { name = "hypothesis" },
     { name = "mkdocs" },
     { name = "mkdocs-material" },
     { name = "mkdocs-mermaid2-plugin" },
@@ -1505,6 +1506,7 @@ requires-dist = [
     { name = "huggingface-hub", marker = "extra == 'advanced'", specifier = ">=1.0.0" },
     { name = "huggingface-hub", marker = "extra == 'all'", specifier = ">=1.0.0" },
     { name = "huggingface-hub", marker = "extra == 'hf'", specifier = ">=1.0.0" },
+    { name = "hypothesis", marker = "extra == 'ci'", specifier = ">=6.98" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.98" },
     { name = "jsonschema", specifier = ">=4.0" },
     { name = "linkchecker", marker = "extra == 'docs-ci'", specifier = ">=10.5" },

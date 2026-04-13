@@ -71,6 +71,16 @@ def test_gpt2_smoke_campaign_script_is_executable() -> None:
     assert "prefetching GPT-2 + WikiText-2 into host HF cache" in contents
     assert "evaluation report verification failed" in contents
     assert "proof-pack verification failed" in contents
+    assert 'SMOKE_EXPORT_DIR="$WORK_ROOT/exports"' in contents
+    assert 'mkdir -p "$SMOKE_EXPORT_DIR"' in contents
+    assert (
+        '"${CLI[@]}" report html -i "$EVAL_REPORT" -o "$SMOKE_EXPORT_DIR/evaluation.html"'
+        in contents
+    )
+    assert (
+        '"${CLI[@]}" report html -i "$EVAL_REPORT" -o "$SMOKE_REPORT_DIR/evaluation.html"'
+        not in contents
+    )
 
 
 def test_tiny_attested_smoke_campaign_script_is_executable() -> None:

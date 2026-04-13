@@ -47,6 +47,7 @@ mkdir -p "$WORK_ROOT"
 
 SMOKE_RUN_DIR="$WORK_ROOT/runs"
 SMOKE_REPORT_DIR="$WORK_ROOT/reports/eval"
+SMOKE_EXPORT_DIR="$WORK_ROOT/exports"
 PROOF_PACK_DIR="$WORK_ROOT/proof_pack"
 SMOKE_CACHE_ROOT="$WORK_ROOT/.hf"
 HOST_HF_CACHE_ROOT="${INVARLOCK_SMOKE_HOST_HF_CACHE_ROOT:-${HF_HOME:-${HOME}/.cache/huggingface}}"
@@ -207,7 +208,8 @@ if [[ "$VERIFY_RC" != "0" ]]; then
   exit "$VERIFY_RC"
 fi
 "${CLI[@]}" report validate "$EVAL_REPORT"
-"${CLI[@]}" report html -i "$EVAL_REPORT" -o "$SMOKE_REPORT_DIR/evaluation.html"
+mkdir -p "$SMOKE_EXPORT_DIR"
+"${CLI[@]}" report html -i "$EVAL_REPORT" -o "$SMOKE_EXPORT_DIR/evaluation.html"
 "${CLI[@]}" report explain --subject-report "$EDITED_REPORT" --baseline-report "$BASELINE_REPORT"
 
 printf '%s\n' '{"verdict":"PASS","note":"gpt2 smoke campaign"}' > "$WORK_ROOT/final_verdict.json"

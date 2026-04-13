@@ -193,6 +193,7 @@ dev = [
 ci = [
   "pytest>=7.0",
   "pytest-cov>=4.0",
+  "hypothesis>=6.98",
   "ruff==0.15.9",
   "mypy>=1.0",
   "mkdocs>=1.5",

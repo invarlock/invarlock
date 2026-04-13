@@ -958,6 +958,15 @@ def test_gpt2_smoke_workflow_is_configured() -> None:
     assert "scripts/run_gpt2_smoke_campaign.sh" in smoke["run"]
 
 
+def test_ci_hf_lockfiles_include_hypothesis_for_property_tests() -> None:
+    for path in (
+        Path("requirements/workflows/ci-hf-py312.txt"),
+        Path("requirements/workflows/ci-hf-py313.txt"),
+    ):
+        text = path.read_text(encoding="utf-8")
+        assert "hypothesis==" in text, f"hypothesis missing from {path}"
+
+
 def test_tiny_attested_smoke_workflow_is_configured() -> None:
     workflow = _load_workflow(Path(".github/workflows/tiny-attested-smoke.yml"))
     triggers = workflow["on"]
