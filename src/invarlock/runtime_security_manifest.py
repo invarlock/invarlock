@@ -4,10 +4,7 @@ import json
 import os
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
-
-if TYPE_CHECKING:
-    from invarlock.runtime_security_helpers import RuntimeManifestLoadResult
+from typing import Any, cast
 
 
 def _helpers():
@@ -79,7 +76,7 @@ def write_runtime_manifest(
 
 def load_runtime_manifest(
     report_path: str | os.PathLike[str],
-) -> RuntimeManifestLoadResult:
+) -> Any:
     helpers = _helpers()
     report = Path(report_path)
     result_type = cast(
