@@ -247,6 +247,8 @@ def _parse_cli_args(args: list[str]) -> str | None:
                     ctx.close()
                 except _CTX_CLOSE_ERRORS:
                     pass
+
+
 def _iter_markdown_files(repo_root: Path, *, paths: list[str] | None) -> list[Path]:
     if paths:
         out: list[Path] = []
