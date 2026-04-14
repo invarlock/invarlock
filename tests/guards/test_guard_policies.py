@@ -7,7 +7,11 @@ import pytest
 import yaml
 
 from invarlock.core.auto_tuning import TIER_POLICIES
-from invarlock.guards.variance_policy import predictive_gate_outcome, set_ab_results
+from invarlock.guards.variance_policy import (
+    evaluate_ab_gate,
+    predictive_gate_outcome,
+    set_ab_results,
+)
 
 
 def test_predictive_gate_one_sided_behaviour():
@@ -183,3 +187,57 @@ def test_set_ab_results_rejects_bool_upper_ratio_for_manual_override() -> None:
     )
 
     assert guard._predictive_gate_state == {}
+
+
+def test_set_ab_results_handles_arithmetic_exceptions_as_numeric_error() -> None:
+    class _OverflowFloat(float):
+        def __sub__(self, _other):  # type: ignore[override]
+            raise OverflowError("boom")
+
+    events: list[tuple[str, dict[str, object]]] = []
+    guard = SimpleNamespace(
+        _ppl_no_ve=None,
+        _ppl_with_ve=None,
+        _ab_windows_used=None,
+        _ab_seed_used=None,
+        _ratio_ci=None,
+        _ab_gain=None,
+        _post_edit_evaluated=False,
+        _predictive_gate_state={},
+        _log_event=lambda operation, **data: events.append((operation, data)),
+    )
+
+    set_ab_results(
+        guard,
+        ppl_no_ve=_OverflowFloat(1.0),
+        ppl_with_ve=0.8,
+        windows_used=2,
+        seed_used=7,
+        ratio_ci=None,
+    )
+
+    assert guard._ab_gain == 0.0
+    assert events[0][1]["gain_status"] == "numeric_error"
+
+
+def test_evaluate_ab_gate_non_ci_mode_skips_ratio_ci_requirement() -> None:
+    guard = SimpleNamespace(
+        _policy={
+            "mode": "point",
+            "min_rel_gain": 0.0,
+            "min_gain": 0.05,
+            "predictive_gate": False,
+        },
+        TIE_BREAKER_DEADBAND=0.0,
+        ABSOLUTE_FLOOR=0.01,
+        _predictive_gate_state={},
+        _ratio_ci=None,
+        _ab_gain=0.2,
+        _ppl_no_ve=1.0,
+        _ppl_with_ve=0.8,
+    )
+
+    passed, reason = evaluate_ab_gate(guard)
+
+    assert passed is True
+    assert reason.startswith("criteria_met")

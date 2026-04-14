@@ -1,5 +1,7 @@
 import pytest
 
+import invarlock.guards as guards_pkg
+import invarlock.guards.policies as guard_policies
 from invarlock.core.exceptions import GuardError, PolicyViolationError, ValidationError
 from invarlock.guards.policies import (
     check_policy_drift,
@@ -16,6 +18,17 @@ from invarlock.guards.policies import (
     get_variance_policy_for_model_size,
 )
 from invarlock.guards.rmt_policy import apply_rmt_policy_overrides
+
+guards_pkg.policies = guard_policies
+
+
+def _patch_tier_guard_config(monkeypatch: pytest.MonkeyPatch, replacement) -> None:
+    monkeypatch.setattr(
+        guard_policies,
+        "get_tier_guard_config",
+        replacement,
+        raising=True,
+    )
 
 
 def test_get_variance_policy_overlay_and_fallback(monkeypatch: pytest.MonkeyPatch):
@@ -34,11 +47,7 @@ def test_get_variance_policy_overlay_and_fallback(monkeypatch: pytest.MonkeyPatc
         }
 
     # Overlay branch
-    monkeypatch.setattr(
-        "invarlock.guards.policies.get_tier_guard_config",
-        _fake_variance_tier,
-        raising=True,
-    )
+    _patch_tier_guard_config(monkeypatch, _fake_variance_tier)
     overlaid = get_variance_policy("balanced", use_yaml=True)
     assert overlaid["deadband"] == 0.07
     assert overlaid["min_effect_lognll"] == 0.002
@@ -52,11 +61,7 @@ def test_get_variance_policy_overlay_and_fallback(monkeypatch: pytest.MonkeyPatc
         assert name == "balanced"
         return {"deadband": 0.09}
 
-    monkeypatch.setattr(
-        "invarlock.guards.policies.get_tier_guard_config",
-        _partial_variance_tier,
-        raising=True,
-    )
+    _patch_tier_guard_config(monkeypatch, _partial_variance_tier)
     partial = get_variance_policy("balanced", use_yaml=True)
     assert partial["deadband"] == 0.09
 
@@ -66,9 +71,7 @@ def test_get_variance_policy_overlay_and_fallback(monkeypatch: pytest.MonkeyPatc
     def _boom(*_args, **_kwargs):
         raise RuntimeError("tiers lookup failed")
 
-    monkeypatch.setattr(
-        "invarlock.guards.policies.get_tier_guard_config", _boom, raising=True
-    )
+    _patch_tier_guard_config(monkeypatch, _boom)
     fallback = get_variance_policy("balanced", use_yaml=True)
     assert fallback == baseline
 
@@ -83,11 +86,7 @@ def test_get_variance_policy_preserves_default_deadband_when_overlay_omits_it(
         assert name == "balanced"
         return {"min_effect_lognll": 0.004}
 
-    monkeypatch.setattr(
-        "invarlock.guards.policies.get_tier_guard_config",
-        _variance_without_deadband,
-        raising=True,
-    )
+    _patch_tier_guard_config(monkeypatch, _variance_without_deadband)
 
     overlay = get_variance_policy("balanced", use_yaml=True)
 
@@ -112,11 +111,7 @@ def test_get_variance_policy_ignores_bool_numeric_overlay_values(
             "predictive_one_sided": True,
         }
 
-    monkeypatch.setattr(
-        "invarlock.guards.policies.get_tier_guard_config",
-        _invalid_variance_tier,
-        raising=True,
-    )
+    _patch_tier_guard_config(monkeypatch, _invalid_variance_tier)
 
     overlay = get_variance_policy("balanced", use_yaml=True)
 
@@ -160,11 +155,7 @@ def test_get_spectral_policy_overlays_and_fallback(monkeypatch: pytest.MonkeyPat
             "multiple_testing": {"method": "bh", "alpha": 0.01, "m": 3},
         }
 
-    monkeypatch.setattr(
-        "invarlock.guards.policies.get_tier_guard_config",
-        _fake_tier_config,
-        raising=True,
-    )
+    _patch_tier_guard_config(monkeypatch, _fake_tier_config)
     overlay = get_spectral_policy("balanced", use_yaml=True)
     assert overlay["sigma_quantile"] == 0.77
     assert overlay["deadband"] == 0.09
@@ -179,11 +170,7 @@ def test_get_spectral_policy_overlays_and_fallback(monkeypatch: pytest.MonkeyPat
         assert name == "balanced"
         return {"deadband": 0.11}
 
-    monkeypatch.setattr(
-        "invarlock.guards.policies.get_tier_guard_config",
-        _partial_tier_config,
-        raising=True,
-    )
+    _patch_tier_guard_config(monkeypatch, _partial_tier_config)
     partial = get_spectral_policy("balanced", use_yaml=True)
     # Only deadband should change; other keys remain defaults.
     assert partial["deadband"] == 0.11
@@ -194,9 +181,7 @@ def test_get_spectral_policy_overlays_and_fallback(monkeypatch: pytest.MonkeyPat
     def _boom(*_args, **_kwargs):
         raise RuntimeError("tiers lookup failed")
 
-    monkeypatch.setattr(
-        "invarlock.guards.policies.get_tier_guard_config", _boom, raising=True
-    )
+    _patch_tier_guard_config(monkeypatch, _boom)
     fallback = get_spectral_policy("balanced", use_yaml=True)
     assert fallback == baseline
 
@@ -216,11 +201,7 @@ def test_get_spectral_policy_ignores_invalid_overlay_values(
             "max_spectral_norm": 7.5,
         }
 
-    monkeypatch.setattr(
-        "invarlock.guards.policies.get_tier_guard_config",
-        _invalid_tier_config,
-        raising=True,
-    )
+    _patch_tier_guard_config(monkeypatch, _invalid_tier_config)
 
     overlay = get_spectral_policy("balanced", use_yaml=True)
 
@@ -341,11 +322,7 @@ def test_get_rmt_policy_overlay_and_fallback(monkeypatch: pytest.MonkeyPatch):
             "epsilon_by_family": {"ffn": True, "attn": 0.3},
         }
 
-    monkeypatch.setattr(
-        "invarlock.guards.policies.get_tier_guard_config",
-        _fake_rmt_tier,
-        raising=True,
-    )
+    _patch_tier_guard_config(monkeypatch, _fake_rmt_tier)
     overlaid = get_rmt_policy("balanced", use_yaml=True)
     assert overlaid["deadband"] == 0.21
     assert overlaid["margin"] == 1.7
@@ -357,11 +334,7 @@ def test_get_rmt_policy_overlay_and_fallback(monkeypatch: pytest.MonkeyPatch):
         assert name == "balanced"
         return {"deadband": 0.19}
 
-    monkeypatch.setattr(
-        "invarlock.guards.policies.get_tier_guard_config",
-        _partial_rmt_tier,
-        raising=True,
-    )
+    _patch_tier_guard_config(monkeypatch, _partial_rmt_tier)
     partial = get_rmt_policy("balanced", use_yaml=True)
     assert partial["deadband"] == 0.19
 
@@ -370,9 +343,7 @@ def test_get_rmt_policy_overlay_and_fallback(monkeypatch: pytest.MonkeyPatch):
     def _boom(*_args, **_kwargs):
         raise RuntimeError("tiers lookup failed")
 
-    monkeypatch.setattr(
-        "invarlock.guards.policies.get_tier_guard_config", _boom, raising=True
-    )
+    _patch_tier_guard_config(monkeypatch, _boom)
     fallback = get_rmt_policy("balanced", use_yaml=True)
     assert fallback == baseline
 
@@ -391,11 +362,7 @@ def test_get_rmt_policy_ignores_invalid_overlay_values(
             "epsilon_by_family": {"ffn": True},
         }
 
-    monkeypatch.setattr(
-        "invarlock.guards.policies.get_tier_guard_config",
-        _invalid_rmt_tier,
-        raising=True,
-    )
+    _patch_tier_guard_config(monkeypatch, _invalid_rmt_tier)
 
     overlay = get_rmt_policy("balanced", use_yaml=True)
 
@@ -419,11 +386,7 @@ def test_get_rmt_policy_ignores_bool_deadband_and_margin_overlay_values(
             "epsilon_default": 0.22,
         }
 
-    monkeypatch.setattr(
-        "invarlock.guards.policies.get_tier_guard_config",
-        _invalid_rmt_tier,
-        raising=True,
-    )
+    _patch_tier_guard_config(monkeypatch, _invalid_rmt_tier)
 
     overlay = get_rmt_policy("balanced", use_yaml=True)
 
@@ -439,11 +402,7 @@ def test_falsey_yaml_overlays_keep_default_policies(
     baseline_rmt = get_rmt_policy("balanced", use_yaml=False)
     baseline_variance = get_variance_policy("balanced", use_yaml=False)
 
-    monkeypatch.setattr(
-        "invarlock.guards.policies.get_tier_guard_config",
-        lambda *_a, **_k: {},
-        raising=True,
-    )
+    _patch_tier_guard_config(monkeypatch, lambda *_a, **_k: {})
 
     assert get_spectral_policy("balanced", use_yaml=True) == baseline_spectral
     assert get_rmt_policy("balanced", use_yaml=True) == baseline_rmt

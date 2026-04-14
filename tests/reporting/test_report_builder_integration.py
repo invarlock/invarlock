@@ -105,7 +105,7 @@ class TestDriftValidationGates:
         validation = evaluation_report["validation"]
         assert validation["preview_final_drift_acceptable"] is True
         assert validation["primary_metric_acceptable"] is True
-        from tests.utils.pm import pm as _pm
+        from tests.reporting._support_primary_metric import pm as _pm
 
         M = _pm(evaluation_report)
         assert (float(M["final"]) / float(M["preview"])) == pytest.approx(

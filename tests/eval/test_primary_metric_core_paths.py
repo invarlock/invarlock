@@ -129,9 +129,7 @@ def test_ppl_causal_paired_compare_uses_weight_fallback_when_needed(
         captured["weights"] = list(weights or [])
         return (0.0, 0.0)
 
-    monkeypatch.setattr(
-        "invarlock.eval.primary_metric.compute_paired_delta_log_ci", _fake_ci
-    )
+    monkeypatch.setattr(pm_mod, "compute_paired_delta_log_ci", _fake_ci)
     metric.paired_compare(
         [MetricContribution(1.0, 0.0)],
         [MetricContribution(1.0, 0.0)],

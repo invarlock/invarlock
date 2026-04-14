@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ast
 
-from tests.lint.test_architecture_guardrails import (
+from tests.lint.test_architecture_guardrails_import_boundaries import (
     METRICS_LENS_PATH,
     REPO_ROOT,
     _read_text,

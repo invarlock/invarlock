@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from invarlock.eval.probes.mi import compute_neuron_mi_scores, mi_neuron_scores
+import invarlock.eval.probes.mi as mi_mod
 from tests.eval._support_mi import MockGPT2Model
 
 
@@ -18,10 +18,10 @@ class TestMIModuleCoverage:
         model = MockGPT2Model(n_layers=1)
         calib_data = [{"input_ids": torch.randint(0, 1000, (2, 8))}]
 
-        with patch("invarlock.eval.probes.mi.mutual_info_regression") as mock_mi:
+        with patch.object(mi_mod, "mutual_info_regression") as mock_mi:
             mock_mi.return_value = [0.5]
 
-            scores = compute_neuron_mi_scores(
+            scores = mi_mod.compute_neuron_mi_scores(
                 model=model, calib_data=calib_data, oracle_windows=1
             )
 
@@ -36,10 +36,10 @@ class TestMIModuleCoverage:
         for _ in range(3):
             calib_data.append({"input_ids": torch.randint(0, 1000, (4, 12))})
 
-        with patch("invarlock.eval.probes.mi.mutual_info_regression") as mock_mi:
+        with patch.object(mi_mod, "mutual_info_regression") as mock_mi:
             mock_mi.return_value = [0.6]
 
-            scores = compute_neuron_mi_scores(
+            scores = mi_mod.compute_neuron_mi_scores(
                 model=model,
                 calib_data=calib_data,
                 oracle_windows=3,
@@ -56,12 +56,12 @@ class TestMIModuleCoverage:
         for _ in range(5):
             calib_data.append({"input_ids": torch.randint(0, 1000, (8, 10))})
 
-        with patch("invarlock.eval.probes.mi.mutual_info_regression") as mock_mi:
+        with patch.object(mi_mod, "mutual_info_regression") as mock_mi:
             with patch("torch.randperm") as mock_randperm:
                 mock_randperm.return_value = torch.arange(100)
                 mock_mi.return_value = [0.4]
 
-                scores = compute_neuron_mi_scores(
+                scores = mi_mod.compute_neuron_mi_scores(
                     model=model, calib_data=calib_data, oracle_windows=5
                 )
 
@@ -73,10 +73,10 @@ class TestMIModuleCoverage:
         model = MockGPT2Model(n_layers=1, mlp_dim=150)
         calib_data = [{"input_ids": torch.randint(0, 1000, (2, 6))}]
 
-        with patch("invarlock.eval.probes.mi.mutual_info_regression") as mock_mi:
+        with patch.object(mi_mod, "mutual_info_regression") as mock_mi:
             mock_mi.return_value = [0.7]
 
-            scores = compute_neuron_mi_scores(
+            scores = mi_mod.compute_neuron_mi_scores(
                 model=model, calib_data=calib_data, oracle_windows=1
             )
 
@@ -89,10 +89,10 @@ class TestMIModuleCoverage:
         model = MockGPT2Model(n_layers=1, mlp_dim=10)
         calib_data = [{"input_ids": torch.randint(0, 1000, (3, 7))}]
 
-        with patch("invarlock.eval.probes.mi.mutual_info_regression") as mock_mi:
+        with patch.object(mi_mod, "mutual_info_regression") as mock_mi:
             mock_mi.return_value = [0.8]
 
-            scores = compute_neuron_mi_scores(
+            scores = mi_mod.compute_neuron_mi_scores(
                 model=model, calib_data=calib_data, oracle_windows=1
             )
 
@@ -139,7 +139,7 @@ class TestMIModuleCoverage:
         model = SubsamplePairingModel()
         input_ids = torch.arange(10002, dtype=torch.long).unsqueeze(0)
 
-        with patch("invarlock.eval.probes.mi.mutual_info_regression") as mock_mi:
+        with patch.object(mi_mod, "mutual_info_regression") as mock_mi:
             captured_targets = []
 
             def capture_targets(features, targets, random_state=42):
@@ -151,7 +151,7 @@ class TestMIModuleCoverage:
             with patch("torch.randperm") as mock_randperm:
                 mock_randperm.return_value = torch.arange(10000, 0, -1)
 
-                scores = compute_neuron_mi_scores(
+                scores = mi_mod.compute_neuron_mi_scores(
                     model=model,
                     calib_data=[{"input_ids": input_ids}],
                     oracle_windows=1,
@@ -168,7 +168,7 @@ class TestMIModuleCoverage:
         model = MockGPT2Model(n_layers=1, mlp_dim=5)
         calib_data = [{"input_ids": torch.randint(0, 1000, (2, 5))}]
 
-        with patch("invarlock.eval.probes.mi.mutual_info_regression") as mock_mi:
+        with patch.object(mi_mod, "mutual_info_regression") as mock_mi:
 
             def failing_mi(*args, **kwargs):
                 if mock_mi.call_count % 2 == 0:
@@ -177,7 +177,7 @@ class TestMIModuleCoverage:
 
             mock_mi.side_effect = failing_mi
 
-            scores = compute_neuron_mi_scores(
+            scores = mi_mod.compute_neuron_mi_scores(
                 model=model, calib_data=calib_data, oracle_windows=1
             )
 
@@ -227,10 +227,10 @@ class TestMIRealExecutionCoverage:
         model = RealHookModel()
         calib_data = [{"input_ids": torch.randint(0, 100, (2, 8))}]
 
-        with patch("invarlock.eval.probes.mi.mutual_info_regression") as mock_mi:
+        with patch.object(mi_mod, "mutual_info_regression") as mock_mi:
             mock_mi.return_value = [0.5]
 
-            scores = compute_neuron_mi_scores(
+            scores = mi_mod.compute_neuron_mi_scores(
                 model=model, calib_data=calib_data, oracle_windows=1
             )
 
@@ -280,10 +280,10 @@ class TestMIRealExecutionCoverage:
             {"input_ids": torch.randint(0, 100, (2, 8))},
         ]
 
-        with patch("invarlock.eval.probes.mi.mutual_info_regression") as mock_mi:
+        with patch.object(mi_mod, "mutual_info_regression") as mock_mi:
             mock_mi.return_value = [0.6]
 
-            scores = compute_neuron_mi_scores(
+            scores = mi_mod.compute_neuron_mi_scores(
                 model=model,
                 calib_data=calib_data,
                 oracle_windows=2,
@@ -340,11 +340,12 @@ class TestMIRealExecutionCoverage:
             mi_call_count += 1
             return [0.4 + 0.1 * mi_call_count]
 
-        with patch(
-            "invarlock.eval.probes.mi.mutual_info_regression",
+        with patch.object(
+            mi_mod,
+            "mutual_info_regression",
             side_effect=counting_mi_regression,
         ):
-            scores = compute_neuron_mi_scores(
+            scores = mi_mod.compute_neuron_mi_scores(
                 model=model, calib_data=calib_data, oracle_windows=3
             )
 
@@ -365,11 +366,12 @@ class TestMIRealExecutionCoverage:
             mi_calls.append((X.shape, len(y)))
             return [0.3 + len(mi_calls) * 0.05]
 
-        with patch(
-            "invarlock.eval.probes.mi.mutual_info_regression",
+        with patch.object(
+            mi_mod,
+            "mutual_info_regression",
             side_effect=tracking_mi_regression,
         ):
-            scores = mi_neuron_scores(activations, targets, max_samples=100)
+            scores = mi_mod.mi_neuron_scores(activations, targets, max_samples=100)
 
             assert scores.shape == (n_neurons,)
             assert len(mi_calls) == n_neurons
@@ -425,10 +427,10 @@ class TestMIRealExecutionCoverage:
             return torch.arange(min(n, 10000))
 
         with patch("torch.randperm", side_effect=mock_randperm):
-            with patch("invarlock.eval.probes.mi.mutual_info_regression") as mock_mi:
+            with patch.object(mi_mod, "mutual_info_regression") as mock_mi:
                 mock_mi.return_value = [0.7]
 
-                scores = compute_neuron_mi_scores(
+                scores = mi_mod.compute_neuron_mi_scores(
                     model=model, calib_data=calib_data, oracle_windows=10
                 )
 
@@ -481,11 +483,12 @@ class TestMIRealExecutionCoverage:
                 raise ValueError("MI computation failed")
             return [0.5]
 
-        with patch(
-            "invarlock.eval.probes.mi.mutual_info_regression",
+        with patch.object(
+            mi_mod,
+            "mutual_info_regression",
             side_effect=failing_mi_regression,
         ):
-            scores = compute_neuron_mi_scores(
+            scores = mi_mod.compute_neuron_mi_scores(
                 model=model, calib_data=calib_data, oracle_windows=1
             )
 

@@ -622,7 +622,7 @@ class TestMakeEvaluationReport:
             return_value=True,
         ):
             evaluation_report = make_report(report, baseline)
-        from tests.utils.pm import pm as _pm
+        from tests.reporting._support_primary_metric import pm as _pm
 
         M = _pm(evaluation_report)
         assert isinstance(M.get("preview"), int | float)

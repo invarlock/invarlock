@@ -6,6 +6,7 @@ import pytest
 import torch
 import torch.nn as nn
 
+import invarlock.guards.rmt_math as rmt_math
 from invarlock.guards import rmt_activation_runtime as runtime
 from invarlock.guards import rmt_result_contract
 
@@ -270,15 +271,13 @@ def test_activation_edge_risk_handles_zero_std_mp_edge_failure_and_iters_clamp(
 
     monkeypatch.setattr(torch, "sqrt", original_sqrt)
     monkeypatch.setattr(
-        "invarlock.guards.rmt_math.mp_bulk_edge",
+        rmt_math,
+        "mp_bulk_edge",
         lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
     )
     assert runtime.activation_edge_risk(torch.randn(3, 2)) is None
 
-    monkeypatch.setattr(
-        "invarlock.guards.rmt_math.mp_bulk_edge",
-        lambda *args, **kwargs: 1.0,
-    )
+    monkeypatch.setattr(rmt_math, "mp_bulk_edge", lambda *args, **kwargs: 1.0)
     assert (
         runtime.activation_edge_risk(
             torch.randn(3, 2), estimator={"iters": 0, "init": "e0"}

@@ -11,26 +11,35 @@ via `tests/integration/conftest.py`.
 
 ## Organization
 
-- Keep tests under the directory that matches the production owner surface.
+- Keep executable tests under the directory that matches the production owner surface.
+- Final executable owner dirs: `tests/adapters`, `tests/calibration`, `tests/ci`, `tests/cli`, `tests/core`, `tests/docs`, `tests/edits`, `tests/eval`, `tests/fuzzing`, `tests/guards`, `tests/integration`, `tests/lint`, `tests/observability`, `tests/plugins`, `tests/proof_packs`, `tests/reporting`, `tests/runtime`, `tests/scripts`.
+- Non-executable support and data dirs stay isolated: `tests/_stubs`, `tests/artifacts`, `tests/fixtures`, `tests/schemas`.
+- `tests/artifacts` is the golden-data bucket. Keep stable report fixtures, proof-pack payloads, and other maintainer-owned artifact snapshots there instead of folding them into `tests/fixtures`.
+- Nested owner buckets are allowed when they clarify ownership. Current nested buckets:
+  - `tests/guards/property`
+  - `tests/guards/differential`
+- Owner examples:
   - `tests/core`: orchestration, contracts, runner internals, and core policy logic.
   - `tests/cli`: command-line shells, CLI serialization, and command-facing UX behavior.
   - `tests/eval`: metrics, providers, datasets, probes, and evaluation-specific validation.
-  - `tests/reporting`: report generation, normalization, rendering, validation, proof-pack/report bundles, and report-facing helper modules.
+  - `tests/reporting`: report generation, normalization, rendering, validation, proof-pack report assembly, and report-facing helper modules.
+  - `tests/runtime`: runtime security, network policy, container/runtime image, and runtime-manifest verification behavior.
   - `tests/guards`: guard math, policies, runtime behavior, and guard-specific extraction logic.
 - Report-generation, report-rendering, and report-validation tests belong in `tests/reporting`, not `tests/eval`, unless the test is explicitly about eval-time metric validation.
 - Shared helper modules inside test areas should use a support name such as `_support_*.py` or `_internal_*.py`; avoid mixing generic helper filenames with actual test modules.
+- Deprecated generic buckets such as `unit`, `api`, `packaging`, `security`, `utils`, and the legacy top-level guard property/differential buckets should not be reintroduced.
 
 ## Naming
 
 - Prefer behavior-based names such as `test_report_builder_render.py` or `test_run_retry_and_exit.py`.
-- Avoid transitional names like `additional`, `extra_branches`, `coverage_boost`, `threshold_ratchet`, or `smoke_cov` when a behavior-oriented name is available.
+- Avoid transitional names like `additional`, `extra`, `more`, `cases`, `edgecases`, `split`, `tail`, or `part2` when a behavior-oriented name is available.
 - Reserve broad `*_regression_matrix.py` files for genuinely cross-cutting edge-case matrices that do not fit a single module-focused test file.
 - Prefer named imports from support modules. Wildcard imports are legacy-only and should not be used in new test files.
 
 ## Size
 
-- Split large files by behavior before they turn into monoliths. As a rule of thumb, once a test file approaches `700-800` LOC, create a new sibling file around a clear sub-surface instead of appending another bucket of cases.
-- If a file name needs suffixes like `split`, `split_tail`, or `part2`, that is usually a signal the tests should be reorganized around behavior instead of chronology.
+- Split large files by behavior before they turn into monoliths. Once a tracked test file crosses `800` LOC, split it into behavior-local siblings before adding more cases.
+- If a file name needs suffixes like `split`, `tail`, or `part2`, that is usually a signal the tests should be reorganized around behavior instead of chronology.
 
 ## Typical invocations
 
@@ -78,4 +87,4 @@ when reproducing the fast PR gate selection or debugging that specific lane.
 
 - CLI commands and scripts write run artifacts under `runs/` and evaluation reports under `reports/eval/` at the repository (or working directory) root.
 - Attested evaluation outputs include `runtime.manifest.json` adjacent to `evaluation.report.json`; archive both when they are emitted.
-- Test fixtures should live under `tests/fixtures` (or per-area test dirs), not under `tests/runs` or `tests/reports`.
+- Test fixtures should live under `tests/fixtures`, `tests/artifacts`, or per-area test dirs, not under `tests/runs` or `tests/reports`.

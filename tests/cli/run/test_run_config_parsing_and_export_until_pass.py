@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from tests.cli.run.test_run_config_parsing_and_export import (
+from tests.cli.run.test_run_config_parsing_provider_and_export import (
     _Cfg,
     _core_report,
     _detect_profile,

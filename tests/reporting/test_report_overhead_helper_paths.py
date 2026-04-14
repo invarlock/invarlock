@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import invarlock.reporting.validate as validate_mod
 from invarlock.reporting import report_overhead as overhead
 
 
@@ -55,9 +56,7 @@ def test_prepare_guard_overhead_imports_default_validator(monkeypatch) -> None:
             passed=True,
         )
 
-    monkeypatch.setattr(
-        "invarlock.reporting.validate.validate_guard_overhead", _validate_stub
-    )
+    monkeypatch.setattr(validate_mod, "validate_guard_overhead", _validate_stub)
 
     payload, passed = overhead.prepare_guard_overhead_section(
         {

@@ -34,28 +34,29 @@ COVERAGE_TESTS_VERIFY := \
 
 COVERAGE_TESTS_CONFIG := \
 	tests/cli/test_config_failfast.py tests/cli/test_error_codes.py \
-	tests/cli/test_config.py tests/cli/test_config_cases.py \
+	tests/cli/test_config.py tests/cli/test_config_validation.py \
 	tests/cli/test_config_runtime_loader.py tests/cli/test_config_schema_and_loader.py \
 	tests/cli/test_device.py tests/cli/test_config_and_device.py
 
 COVERAGE_TESTS_EVAL := \
-	tests/eval/test_metrics*.py tests/eval/test_report*.py \
-	tests/eval/test_validate_module.py tests/eval/test_baseline_artifacts.py \
-	tests/eval/test_bench*.py tests/eval/test_metric_tail_gate.py \
+	tests/eval/test_metrics*.py tests/eval/test_baseline_artifacts.py \
+	tests/eval/test_validate_module*.py tests/eval/test_bench*.py \
+	tests/eval/test_metric_gate_summary_inputs.py \
 	tests/eval/test_primary_metric*.py \
+	tests/eval/test_eval_import_safety.py \
 	tests/eval/test_determinism.py tests/eval/test_mask_parity_fail.py \
 	tests/eval/test_task_metrics.py tests/eval/test_eval_bootstrap_wrapper.py \
 	tests/eval/test_data*.py tests/eval/test_hf_text_provider*.py \
-	tests/eval/test_local_jsonl*.py tests/eval/test_synthetic_provider_cases.py \
+	tests/eval/test_local_jsonl*.py tests/eval/test_synthetic_provider_paths.py \
 	tests/eval/test_wikitext2_fast_capacity.py \
-	tests/eval/test_provider_deterministic_loader_cases.py \
+	tests/eval/test_provider_deterministic_loader_paths.py \
 	tests/eval/test_difficulty_scorer_modes.py \
 	tests/eval/providers
 
 COVERAGE_TESTS_EVAL_PROBES := \
-	tests/eval/test_fft.py tests/eval/test_fft_probe_cases.py \
+	tests/eval/test_fft.py tests/eval/test_fft_probe_paths.py \
 	tests/eval/test_mi*.py \
-	tests/eval/test_post_attention_probes.py tests/eval/test_post_attention_probe_cases.py
+	tests/eval/test_post_attention_probes.py tests/eval/test_post_attention_probe_paths.py
 
 COVERAGE_TESTS_CLI_COMMANDS := \
 	tests/cli/test_doctor*.py tests/cli/test_plugins*.py tests/cli/test_evaluate*.py \
@@ -63,17 +64,16 @@ COVERAGE_TESTS_CLI_COMMANDS := \
 	tests/cli/test_core_command_surface.py tests/cli/test_execution_mode.py \
 	tests/cli/test_removed_command_migrations.py tests/cli/test_python_m_invarlock.py \
 	tests/cli/test_explain_gates*.py tests/cli/test_report*.py \
-	tests/cli/test_calibrate_harness_artifacts.py tests/cli/test_determinism_preset.py
+	tests/cli/test_calibrate_harness_*.py tests/cli/test_determinism_preset.py
 
 COVERAGE_TESTS_CLI_HELPERS := \
 	tests/cli/test_adapter_auto*.py tests/cli/test_no_color.py \
 	tests/cli/test_internal_config_run.py tests/cli/test_json_helpers.py \
 	tests/cli/test_runtime_launch_plan_contract.py \
-	tests/unit/test_overhead_extraction.py
+	tests/cli/test_overhead_extraction.py
 
 COVERAGE_TESTS_OBSERVABILITY := \
-	tests/observability \
-	tests/unit/test_import_safety.py
+	tests/observability
 
 COVERAGE_TESTS_ADAPTERS := \
 	tests/adapters/test_adapter_contracts.py \
@@ -84,13 +84,17 @@ COVERAGE_TESTS_ADAPTERS := \
 	tests/adapters/test_adapters_hf_and_integration.py
 
 COVERAGE_TESTS_RUNTIME := \
-	tests/cli/test_security_default_contract.py \
+	tests/cli/test_security_default_container_contract.py \
 	tests/cli/test_container_delegation.py \
-	tests/reporting/test_runtime_manifest_contract.py \
-	tests/unit/test_runtime_security_container.py \
-	tests/unit/test_runtime_security_core.py \
-	tests/unit/test_runtime_security_manifest.py \
-	tests/unit/test_runtime_security_paths.py
+	tests/runtime/test_network_policy.py \
+	tests/runtime/test_runtime_image_contract.py \
+	tests/runtime/test_runtime_manifest_contract.py \
+	tests/runtime/test_runtime_security_container.py \
+	tests/runtime/test_runtime_security_core.py \
+	tests/runtime/test_runtime_security_facade.py \
+	tests/runtime/test_runtime_security_manifest.py \
+	tests/runtime/test_runtime_security_paths.py \
+	tests/runtime/test_runtime_security_decision_matrix.py
 
 COVERAGE_TESTS := \
 	$(COVERAGE_TESTS_CORE) \
@@ -150,7 +154,8 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/runtime_security_container.py \
 	src/invarlock/runtime_security_manifest.py
 
-TEST_DIR_TARGETS := core cli eval guards edits adapters plugins scripts ci
+TEST_DIR_TARGETS := adapters calibration ci cli core docs edits eval fuzzing guards integration lint observability plugins proof_packs reporting runtime scripts
+GROUPED_TEST_DIR_TARGETS := $(filter-out integration,$(TEST_DIR_TARGETS))
 
 help:  ## Show this help message
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
@@ -204,7 +209,7 @@ coverage-enforce:  ## Run coverage and enforce per-file thresholds
 	$(PYTHON) scripts/check_coverage_thresholds.py --coverage reports/cov.xml --json reports/thresholds.json
 
 # Grouped test targets
-.PHONY: $(addprefix test-,$(TEST_DIR_TARGETS))
+.PHONY: $(addprefix test-,$(GROUPED_TEST_DIR_TARGETS))
 test-core: TEST_DIR = core
 test-core: ## Run tests/core
 test-cli: TEST_DIR = cli
@@ -217,13 +222,29 @@ test-edits: TEST_DIR = edits
 test-edits: ## Run tests/edits
 test-adapters: TEST_DIR = adapters
 test-adapters: ## Run tests/adapters
+test-calibration: TEST_DIR = calibration
+test-calibration: ## Run tests/calibration
+test-docs: TEST_DIR = docs
+test-docs: ## Run tests/docs
+test-fuzzing: TEST_DIR = fuzzing
+test-fuzzing: ## Run tests/fuzzing
+test-lint: TEST_DIR = lint
+test-lint: ## Run tests/lint
+test-observability: TEST_DIR = observability
+test-observability: ## Run tests/observability
 test-plugins: TEST_DIR = plugins
 test-plugins: ## Run tests/plugins
+test-proof_packs: TEST_DIR = proof_packs
+test-proof_packs: ## Run tests/proof_packs
+test-reporting: TEST_DIR = reporting
+test-reporting: ## Run tests/reporting
+test-runtime: TEST_DIR = runtime
+test-runtime: ## Run tests/runtime
 test-scripts: TEST_DIR = scripts
 test-scripts: ## Run tests/scripts
 test-ci: TEST_DIR = ci
 test-ci: ## Run tests/ci
-$(addprefix test-,$(TEST_DIR_TARGETS)):
+$(addprefix test-,$(GROUPED_TEST_DIR_TARGETS)):
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTEST) -q tests/$(TEST_DIR)
 

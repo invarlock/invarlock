@@ -48,7 +48,10 @@ PYTHONPATH=src pytest tests/guards/ -v
 PYTHONPATH=src pytest tests/guards/test_spectral_*.py -v
 
 # Differential tests (guard implementation parity)
-PYTHONPATH=src pytest tests/guards_differential/ -v
+PYTHONPATH=src pytest tests/guards/differential/ -v
+
+# Property-based guard tests
+PYTHONPATH=src pytest tests/guards/property/ -v
 ```
 
 ## Markers
@@ -64,5 +67,5 @@ Per CONTRIBUTING.md, guards are part of the critical surface:
 
 ## Related Test Directories
 
-- `tests/guards_differential/` - Tests verifying parity between reference and optimized implementations
-- `tests/guards_property/` - Property-based tests using Hypothesis
+- `tests/guards/differential/` - Tests verifying parity between reference and optimized implementations
+- `tests/guards/property/` - Property-based tests using Hypothesis

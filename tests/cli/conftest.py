@@ -42,7 +42,8 @@ def _should_preserve_secure_default_cli_test(node: pytest.FixtureRequest) -> boo
     path = Path(str(node.node.path))
     return path.name in {
         "test_container_delegation.py",
-        "test_security_default_contract.py",
+        "test_security_default_container_contract.py",
+        "test_security_default_model_mounts.py",
     }
 
 

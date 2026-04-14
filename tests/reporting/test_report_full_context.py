@@ -152,10 +152,21 @@ def test_make_evaluation_report_rich_context_generates_diagnostics(monkeypatch):
         return {"final": metrics.get("final", 1.0), "direction": "lower"}
 
     monkeypatch.setattr(
-        primary_metric_mod, "compute_primary_metric_from_report", fake_compute
+        cert.report_make_inputs_mod.primary_metric_mod,
+        "compute_primary_metric_from_report",
+        fake_compute,
     )
     monkeypatch.setattr(
         primary_metric_mod, "get_metric", lambda *_: SimpleNamespace(direction="lower")
+    )
+    monkeypatch.setattr(
+        cert.report_make_output_mod.report_overhead_mod,
+        "compute_quality_overhead_from_guard",
+        lambda *_args, **_kwargs: {
+            "basis": "ratio",
+            "value": 1.01,
+            "kind": "ppl_causal",
+        },
     )
 
     report, baseline = _rich_run_report()

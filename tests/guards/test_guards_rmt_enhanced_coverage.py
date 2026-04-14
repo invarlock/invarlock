@@ -11,8 +11,8 @@ import pytest
 import torch
 import torch.nn as nn
 
+import invarlock.guards.rmt as rmt_mod
 from invarlock.core.exceptions import GuardError, ValidationError
-from invarlock.guards.rmt import RMTGuard
 from invarlock.guards.rmt_analysis import (
     capture_baseline_mp_stats,
     layer_svd_stats,
@@ -37,7 +37,7 @@ class TestRMTEnhancedCoverage:
     def setup_method(self):
         """Set up test fixtures."""
         self.model = self._create_comprehensive_model()
-        self.guard = RMTGuard()
+        self.guard = rmt_mod.RMTGuard()
 
     def _create_comprehensive_model(self):
         """Create a comprehensive model for RMT testing."""
@@ -468,10 +468,11 @@ class TestRMTEnhancedCoverage:
 
     def test_rmt_guard_prepare_failure(self):
         """Test RMTGuard prepare method failure (lines 1275-1284)."""
-        guard = RMTGuard()
+        guard = rmt_mod.RMTGuard()
 
-        with patch(
-            "invarlock.guards.rmt.RMTGuard._collect_calibration_batches",
+        with patch.object(
+            rmt_mod.RMTGuard,
+            "_collect_calibration_batches",
             side_effect=RuntimeError("Capture failed"),
         ):
             result = guard.prepare(
@@ -488,7 +489,7 @@ class TestRMTEnhancedCoverage:
 
     def test_rmt_guard_before_edit(self):
         """Test RMTGuard before_edit method (lines 1299-1300)."""
-        guard = RMTGuard()
+        guard = rmt_mod.RMTGuard()
 
         # Test when not prepared
         guard.before_edit(self.model)  # Should not crash
@@ -500,7 +501,7 @@ class TestRMTEnhancedCoverage:
 
     def test_rmt_guard_after_edit_comprehensive(self):
         """Test RMTGuard after_edit method comprehensively (lines 1317-1379)."""
-        guard = RMTGuard()
+        guard = rmt_mod.RMTGuard()
 
         # Test without preparation (lines 1309-1315)
         guard.after_edit(self.model)
@@ -512,8 +513,9 @@ class TestRMTEnhancedCoverage:
 
         # Test exception handling (lines 1371-1379)
         guard.prepared = True
-        with patch(
-            "invarlock.guards.rmt.RMTGuard._compute_activation_edge_risk",
+        with patch.object(
+            rmt_mod.RMTGuard,
+            "_compute_activation_edge_risk",
             side_effect=RuntimeError("Detection failed"),
         ):
             guard._calibration_batches = [{"input_ids": torch.randint(0, 100, (1, 64))}]
@@ -522,7 +524,7 @@ class TestRMTEnhancedCoverage:
 
     def test_rmt_guard_validate_method(self):
         """Test RMTGuard validate method (lines 1399-1411)."""
-        guard = RMTGuard()
+        guard = rmt_mod.RMTGuard()
 
         # Test validate calling finalize
         result = guard.validate(self.model, None, {})
@@ -533,7 +535,7 @@ class TestRMTEnhancedCoverage:
 
     def test_rmt_guard_finalize_not_prepared(self):
         """Test RMTGuard finalize when not prepared (lines 1441)."""
-        guard = RMTGuard()
+        guard = rmt_mod.RMTGuard()
 
         result = guard.finalize(self.model)
         # Handle both GuardOutcome and dict return types
@@ -549,7 +551,7 @@ class TestRMTEnhancedCoverage:
 
     def test_rmt_guard_finalize_comprehensive(self):
         """Test RMTGuard finalize with various scenarios (lines 1536-1551)."""
-        guard = RMTGuard()
+        guard = rmt_mod.RMTGuard()
         guard.prepare(self.model, None, None, {})
 
         guard.baseline_edge_risk_by_family = {"attn": 1.0}
@@ -574,7 +576,7 @@ class TestRMTEnhancedCoverage:
 
     def test_rmt_guard_get_linear_modules(self):
         """Test RMTGuard _get_linear_modules method (lines 1068-1069)."""
-        guard = RMTGuard()
+        guard = rmt_mod.RMTGuard()
 
         # Test with transformers import failure
         import sys
@@ -612,7 +614,7 @@ class TestRMTEnhancedCoverage:
 
     def test_rmt_guard_apply_detection_and_correction(self):
         """Test RMTGuard after_edit produces an analysis result."""
-        guard = RMTGuard()
+        guard = rmt_mod.RMTGuard()
         guard.prepare(self.model, None, None, {})
         guard.after_edit(self.model)
         assert isinstance(guard._last_result, dict)
@@ -620,7 +622,7 @@ class TestRMTEnhancedCoverage:
 
     def test_rmt_guard_policy_method(self):
         """Test RMTGuard policy method (line 1181)."""
-        guard = RMTGuard(q=2.0, deadband=0.05, margin=1.8, correct=False)
+        guard = rmt_mod.RMTGuard(q=2.0, deadband=0.05, margin=1.8, correct=False)
         policy = guard.policy()
 
         assert isinstance(policy, dict)

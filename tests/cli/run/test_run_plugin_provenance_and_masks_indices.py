@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from tests.cli.run.test_run_plugin_provenance_and_masks import (
+from tests.cli.run.test_run_plugin_provenance_metrics import (
     _cfg,
     _common_ce,
     run_command,

@@ -11,6 +11,33 @@ import pytest
 from invarlock.reporting.report_types import AutoConfig
 
 _VALID_TEST_IMAGE_DIGEST = "sha256:" + ("a" * 64)
+_PATCH_TARGET_MODULES = (
+    "invarlock.cli.bench",
+    "invarlock.core.auto_tuning",
+    "invarlock.core.bootstrap",
+    "invarlock.core.config_loader",
+    "invarlock.core.determinism_policy",
+    "invarlock.core.metric_provider_resolution",
+    "invarlock.core.registry",
+    "invarlock.core.run_orchestrator_execute",
+    "invarlock.core.runner",
+    "invarlock.core.runtime_manifest_verify",
+    "invarlock.eval.bench_runner",
+    "invarlock.eval.data",
+    "invarlock.eval.metrics_activation",
+    "invarlock.eval.metrics_support",
+    "invarlock.eval.primary_metric",
+    "invarlock.eval.providers.seq2seq",
+    "invarlock.model_utils",
+    "invarlock.model_profile",
+    "invarlock.observability.core",
+    "invarlock.observability.health",
+    "invarlock.plugins.bitsandbytes",
+    "invarlock.proof_pack",
+    "invarlock.reporting.report_console",
+    "invarlock.reporting.report_make",
+    "invarlock.reporting.report_telemetry",
+)
 
 
 def install_transformers_tokenizer_stub() -> None:
@@ -47,6 +74,20 @@ def install_transformers_tokenizer_stub() -> None:
         sub = types.ModuleType("transformers.tokenization_utils_base")
         sub.PreTrainedTokenizerBase = object
         sys.modules["transformers.tokenization_utils_base"] = sub
+
+
+def _reattach_parent_package_attrs(module_name: str) -> None:
+    parts = module_name.split(".")
+    for idx in range(1, len(parts)):
+        parent_name = ".".join(parts[:idx])
+        child_name = parts[idx]
+        child_module_name = ".".join(parts[: idx + 1])
+        parent_module = sys.modules.get(parent_name)
+        child_module = sys.modules.get(child_module_name)
+        if parent_module is None or child_module is None:
+            continue
+        if not hasattr(parent_module, child_name):
+            setattr(parent_module, child_name, child_module)
 
 
 def make_test_auto_config(
@@ -86,6 +127,22 @@ def _restore_invarlock_env():
                 os.environ.pop(k, None)
             else:
                 os.environ[k] = v
+
+
+@pytest.fixture(autouse=True)
+def _materialize_patch_targets(request: pytest.FixtureRequest):
+    nodeid = request.node.nodeid
+    if "import_safety" in nodeid:
+        yield
+        return
+
+    for module_name in _PATCH_TARGET_MODULES:
+        try:
+            import_module(module_name)
+            _reattach_parent_package_attrs(module_name)
+        except Exception:
+            continue
+    yield
 
 
 @pytest.fixture(autouse=True)

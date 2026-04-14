@@ -34,13 +34,13 @@ def test_coverage_target_includes_active_eval_data_and_helper_tests() -> None:
     expected_patterns = (
         "tests/eval/test_task_metrics.py",
         "tests/eval/test_eval_bootstrap_wrapper.py",
-        "tests/eval/test_metric_tail_gate.py",
+        "tests/eval/test_metric_gate_summary_inputs.py",
         "tests/eval/test_data*.py",
         "tests/eval/test_hf_text_provider*.py",
         "tests/eval/test_local_jsonl*.py",
-        "tests/eval/test_synthetic_provider_cases.py",
+        "tests/eval/test_synthetic_provider_paths.py",
         "tests/eval/test_wikitext2_fast_capacity.py",
-        "tests/eval/test_provider_deterministic_loader_cases.py",
+        "tests/eval/test_provider_deterministic_loader_paths.py",
         "tests/eval/test_difficulty_scorer_modes.py",
         "tests/eval/providers",
     )
@@ -56,10 +56,10 @@ def test_coverage_target_includes_probe_suite_for_plain_coverage_run() -> None:
     assert "COVERAGE_TESTS_EVAL_PROBES :=" in text
     for pattern in (
         "tests/eval/test_fft.py",
-        "tests/eval/test_fft_probe_cases.py",
+        "tests/eval/test_fft_probe_paths.py",
         "tests/eval/test_mi*.py",
         "tests/eval/test_post_attention_probes.py",
-        "tests/eval/test_post_attention_probe_cases.py",
+        "tests/eval/test_post_attention_probe_paths.py",
     ):
         assert pattern in text
     assert "$(COVERAGE) run --append -m pytest -q -p no:cov" in text
@@ -75,7 +75,7 @@ def test_coverage_target_includes_core_cli_surface_and_runtime_security_tests() 
         "tests/cli/test_execution_mode.py",
         "tests/cli/test_removed_command_migrations.py",
         "tests/cli/test_python_m_invarlock.py",
-        "tests/cli/test_security_default_contract.py",
+        "tests/cli/test_security_default_container_contract.py",
         "tests/cli/test_container_delegation.py",
     ):
         assert pattern in text

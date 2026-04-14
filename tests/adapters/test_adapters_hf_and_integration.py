@@ -11,7 +11,7 @@ from invarlock.adapters.auto import HF_Auto_Adapter
 from invarlock.adapters.base import AdapterConfig, AdapterManager, PerformanceTracker
 from invarlock.adapters.hf_causal import HF_Causal_Adapter
 from invarlock.adapters.hf_mlm import HF_MLM_Adapter
-from tests.adapters.test_adapters import (
+from tests.adapters.test_adapters_base_types import (
     ConcreteAdapter,
     MockBertModel,
     MockGPT2Model,

@@ -5,6 +5,7 @@ from copy import deepcopy
 
 import pytest
 
+import invarlock.core.bootstrap as bootstrap_mod
 import invarlock.eval.primary_metric as primary_metric_mod
 from invarlock.core.exceptions import MetricsError, ValidationError
 from invarlock.reporting import (
@@ -15,6 +16,7 @@ from invarlock.reporting import (
     guards_variance,
     policy_utils,
     primary_metric_utils,
+    report_builder_support,
     report_edit_summary,
     report_normalization,
 )
@@ -232,8 +234,7 @@ def test_make_evaluation_report_raises_on_drift_identity(monkeypatch):
 
     monkeypatch.setattr(report_utils, "_pair_logloss_windows", fake_pair)
     monkeypatch.setattr(
-        "invarlock.core.bootstrap.compute_paired_delta_log_ci",
-        lambda *args, **kwargs: (0.0, 0.0),
+        bootstrap_mod, "compute_paired_delta_log_ci", lambda *args, **kwargs: (0.0, 0.0)
     )
     monkeypatch.setattr(
         pm_analysis_mod,
@@ -261,8 +262,7 @@ def test_make_evaluation_report_raises_on_ratio_ci_mismatch(monkeypatch):
 
     monkeypatch.setattr(report_utils, "_pair_logloss_windows", fake_pair)
     monkeypatch.setattr(
-        "invarlock.core.bootstrap.compute_paired_delta_log_ci",
-        lambda *args, **kwargs: (0.0, 0.0),
+        bootstrap_mod, "compute_paired_delta_log_ci", lambda *args, **kwargs: (0.0, 0.0)
     )
     monkeypatch.setattr(
         pm_analysis_mod,
@@ -339,7 +339,8 @@ def test_make_report_surfaces_baseline_failures_explicitly(monkeypatch) -> None:
         raising=False,
     )
     monkeypatch.setattr(
-        "invarlock.reporting.report_builder_support.extract_report_meta",
+        report_builder_support,
+        "extract_report_meta",
         lambda _report, *_args, **_kwargs: {
             "model_id": "demo-model",
             "adapter": "hf",
