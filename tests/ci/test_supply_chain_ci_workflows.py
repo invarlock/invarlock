@@ -479,7 +479,7 @@ def test_release_workflow_uses_trusted_publishing():
     assert step_with["skip-existing"] is True
 
 
-def test_release_workflow_builds_and_bundles_release_assets():
+def test_release_workflow_builds_and_publishes_tag_only_artifacts():
     workflow = _load_workflow(Path(".github/workflows/release.yml"))
     resolve = workflow["jobs"]["resolve_release_ref"]
     assert resolve["steps"][0]["name"] == "Resolve release ref"
@@ -555,85 +555,13 @@ def test_release_workflow_builds_and_bundles_release_assets():
 
     dist_upload = _find_step_by_name(build_steps, "Upload dist artifacts")
     assert dist_upload["with"]["path"] == "dist/*.whl\ndist/*.tar.gz\n"
-
-    bundle = workflow["jobs"]["bundle_release"]
-    assert bundle["needs"] == ["publish", "resolve_release_ref"]
-    assert bundle["permissions"] == {
-        "contents": "write",
-        "id-token": "write",
-    }
-    assert "startsWith(github.ref, 'refs/tags/v')" in bundle["if"]
-    assert "inputs.target == 'pypi'" in bundle["if"]
-
-    bundle_steps = bundle.get("steps", [])
-    checkout_step = bundle_steps[0]
-    assert checkout_step["uses"].startswith("actions/checkout@")
-    assert (
-        checkout_step["with"]["ref"]
-        == "${{ needs.resolve_release_ref.outputs.release_sha }}"
+    retired_bundle_job = "bundle" + "_release"
+    release_cli_prefix = "gh" + " release"
+    assert retired_bundle_job not in workflow["jobs"]
+    assert not any(
+        release_cli_prefix in str(step.get("run", ""))
+        for step in _iter_job_steps(workflow)
     )
-    assert checkout_step["with"]["fetch-depth"] == 0
-
-    sigstore_steps = [
-        step
-        for step in bundle_steps
-        if str(step.get("uses", "")).startswith("sigstore/gh-action-sigstore-python@")
-    ]
-    assert len(sigstore_steps) == 3
-    assert sigstore_steps[0]["name"] == "Sign release artifacts"
-    assert sigstore_steps[0]["with"]["inputs"] == "dist/*"
-    assert sigstore_steps[0]["with"]["upload-signing-artifacts"] is True
-
-    bundle_build_step = _find_step_by_name(
-        bundle_steps, "Create offline verification bundle"
-    )
-    assert (
-        bundle_build_step["env"]["INVARLOCK_RELEASE_TAG"]
-        == "${{ needs.resolve_release_ref.outputs.release_tag }}"
-    )
-    assert "scripts/release/make_offline_bundle.sh" in bundle_build_step["run"]
-    assert "--dist-dir dist" in bundle_build_step["run"]
-    assert "--sbom artifacts/supply-chain/sbom.json" in bundle_build_step["run"]
-    assert "--provenance-dir provenance" in bundle_build_step["run"]
-    assert "--output-dir release-assets" in bundle_build_step["run"]
-
-    assert sigstore_steps[1]["name"] == "Sign offline verification bundle"
-    assert (
-        sigstore_steps[1]["with"]["inputs"] == "release-assets/*-offline-bundle.tar.gz"
-    )
-    assert sigstore_steps[1]["with"]["upload-signing-artifacts"] is False
-
-    public_bundle_step = _find_step_by_name(
-        bundle_steps, "Create public contract bundle"
-    )
-    assert public_bundle_step["env"]["INVARLOCK_RELEASE_TAG"] == (
-        "${{ needs.resolve_release_ref.outputs.release_tag }}"
-    )
-    assert public_bundle_step["env"]["INVARLOCK_RELEASE_SHA"] == (
-        "${{ needs.resolve_release_ref.outputs.release_sha }}"
-    )
-    assert "scripts/release/make_public_contract_bundle.py" in public_bundle_step["run"]
-    assert "--contracts-dir contracts" in public_bundle_step["run"]
-    assert "--runtime-dir src/invarlock/_data/runtime" in public_bundle_step["run"]
-    assert "--output-dir release-assets" in public_bundle_step["run"]
-
-    assert sigstore_steps[2]["name"] == "Sign public contract bundle"
-    assert (
-        sigstore_steps[2]["with"]["inputs"]
-        == "release-assets/*-public-contract-bundle.tar.gz"
-    )
-    assert sigstore_steps[2]["with"]["upload-signing-artifacts"] is False
-
-    release_step = _find_step_by_name(bundle_steps, "Create or update GitHub release")
-    assert bundle_steps.index(sigstore_steps[2]) < bundle_steps.index(release_step)
-    assert "*.sigstore.json" in release_step["run"]
-    assert "cp dist/* release-assets/" in release_step["run"]
-    assert 'gh release upload "$tag" release-assets/* --clobber' in release_step["run"]
-    assert "release-assets/*-offline-bundle.tar.gz" not in release_step["run"]
-    assert "release-assets/*-public-contract-bundle.tar.gz" not in release_step["run"]
-    assert "gh release create" in release_step["run"]
-    assert "gh release upload" in release_step["run"]
-    assert "release-assets/*" in release_step["run"]
 
     testpypi_smoke = workflow["jobs"]["testpypi_smoke"]
     assert testpypi_smoke["needs"] == ["publish", "resolve_release_ref"]
@@ -676,7 +604,7 @@ def test_supply_chain_docs_match_workflow_truth() -> None:
     assert "scripts/security/pip_audit_allowlist.json" in allowlist_doc
     assert "installed release surface" in release_doc
     assert "resolved commit SHA" in release_doc
-    assert "public-contract-bundle" in release_doc
+    assert "PyPI" in release_doc
     assert "gitleaks" in architecture_doc
     assert "installed-artifact environment" in architecture_doc
 

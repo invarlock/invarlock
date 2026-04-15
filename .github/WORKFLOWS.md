@@ -38,7 +38,7 @@ See also: [`SECURITY.md`](../SECURITY.md) for vulnerability reporting policy.
 
 ### Release Workflows
 
-- **`release.yml`** - Build and publish to PyPI/TestPyPI
+- **`release.yml`** - Tag-gated build and publish workflow for PyPI/TestPyPI
 
 ### Benchmark Workflows
 
@@ -68,7 +68,7 @@ job or step, emit attested outputs, and verify them without bypasses.
 - Maintainers must land the equivalent dependency fix on `staging/next`, validate it there, and let it reach `main` through the normal promotion/release flow.
 - `github/codeql-action` is tracked by Dependabot again; maintainers should review the resulting PRs like any other security-sensitive workflow change.
 - The PR supply-chain workflow scans repository history with `gitleaks`, uploads JSON/SARIF artifacts, audits the built wheel install surface for SBOM generation, and runs `pip-audit` against the base, `hf`, and `advanced` shipped dependency surfaces.
-- The release workflow peels annotated tags to immutable commit SHAs before checkout/publish and uses an installed-wheel environment for its release SBOM.
+- The release workflow peels annotated tags to immutable commit SHAs before checkout/publish, uses an installed-wheel environment for its release SBOM, and publishes distributions without a separate public release-asset upload step.
 - The scheduled/tag CI supply-chain job remains the slower backstop and keeps the tool-environment SBOM.
 - The PR typed-surface lane covers observability, config loading/runtime, metric resolution, report schema/verification helpers, MI probes, registry metadata including the built-in plugin catalog, runtime-security modules, the split run-orchestrator owner modules, and CLI entrypoints.
 
