@@ -141,7 +141,7 @@ to change proposals or releases when you update calibration.
 - [Threat Model](security/threat-model.md) — Assets and adversaries
 - [Security Architecture](security/architecture.md) — Components and defaults
 - [Best Practices](security/best-practices.md) — Operational recommendations
-- [Release Verification](security/release-verification.md) — Offline verification of published release bundles
+- [Release Verification](security/release-verification.md) — Verification of published package artifacts and source tags
 - [pip-audit Allowlist](security/pip-audit-allowlist.md)
 
 ### Governance
