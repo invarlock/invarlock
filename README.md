@@ -14,9 +14,6 @@
   <a href="https://github.com/invarlock/invarlock/actions/workflows/ci.yml">
     <img alt="CI" src="https://img.shields.io/github/actions/workflow/status/invarlock/invarlock/ci.yml?branch=main&logo=github&label=CI" />
   </a>
-  <a href="https://scorecard.dev/viewer/?uri=github.com/invarlock/invarlock">
-    <img alt="OpenSSF Scorecard" src="https://api.scorecard.dev/projects/github.com/invarlock/invarlock/badge" />
-  </a>
   <a href="https://pypi.org/project/invarlock/">
     <img alt="PyPI" src="https://badge.fury.io/py/invarlock.svg" />
   </a>

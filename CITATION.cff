@@ -7,10 +7,10 @@ abstract: >
   It provides paired log-space evaluation against a baseline, layered guards (Spectral, RMT, Variance),
   guard-overhead checks, and a machine-readable evaluation report artifact with determinism and provenance.
 repository-code: https://github.com/invarlock/invarlock
-repository-artifact: https://github.com/invarlock/invarlock/releases
+repository-artifact: https://github.com/invarlock/invarlock/tags
 license: Apache-2.0
-version: 0.7.1
-date-released: 2026-04-12
+version: 0.7.2
+date-released: 2026-04-15
 authors:
   - name: "InvarLock"
     affiliation: "InvarLock"
@@ -34,8 +34,8 @@ preferred-citation:
     - name: "InvarLock"
   repository-code: https://github.com/invarlock/invarlock
   url: https://github.com/invarlock/invarlock
-  version: 0.7.1
-  date-released: 2026-04-12
+  version: 0.7.2
+  date-released: 2026-04-15
   license: Apache-2.0
   # identifiers:
   #   - type: doi

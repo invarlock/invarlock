@@ -13,6 +13,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.7.2] - 2026-04-15
+
+### Changed
+- Refactored the test tree around owner-aligned surfaces, including runtime,
+  reporting, guards, CLI, integration, lint, and CI buckets, and aligned the
+  Makefile and path-contract checks to the normalized layout.
+- Switched release publishing to a tag-plus-PyPI flow, removed public
+  release-page asset uploads from the release workflow, and aligned release
+  verification docs, workflow assertions, and citation metadata to the new
+  release surface.
+- Tightened scheduled verification and CI smoke coverage for the GPT-2 lane,
+  gitleaks workflow assertions, and the maintained dependency pins used by the
+  release and verification paths.
+
+### Fixed
+- Refreshed the security-sensitive dependency set used by the validated
+  workflow surfaces, including `pytest 9.0.3`, `pillow 12.2.0`, and
+  `cryptography 46.0.7`.
+- Resolved code-scanning findings in the evidence-sweep and proof-pack helper
+  scripts, removed unreachable CLI example logic, and completed the remaining
+  ruff cleanup needed for the repository verification gate.
+
 ## [0.7.1] - 2026-04-12
 
 ### Added

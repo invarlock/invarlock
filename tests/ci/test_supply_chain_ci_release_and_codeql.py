@@ -219,14 +219,16 @@ def test_repo_hygiene_covers_staging_next_and_renames() -> None:
     assert "--diff-filter=ACMR" in large_file_step["run"]
 
 
-def test_readme_exposes_scorecard_badge():
+def test_readme_does_not_expose_public_scorecard_badge() -> None:
     readme = Path("README.md").read_text(encoding="utf-8")
-    assert "OpenSSF Scorecard" in readme
+    assert "OpenSSF Scorecard" not in readme
     assert (
         "https://api.scorecard.dev/projects/github.com/invarlock/invarlock/badge"
-        in readme
+        not in readme
     )
-    assert "https://scorecard.dev/viewer/?uri=github.com/invarlock/invarlock" in readme
+    assert (
+        "https://scorecard.dev/viewer/?uri=github.com/invarlock/invarlock" not in readme
+    )
 
 
 def test_readme_mentions_probes_extra() -> None:
