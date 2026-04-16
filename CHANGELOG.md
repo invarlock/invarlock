@@ -8,10 +8,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added wheel-shipped public evidence under
+  `invarlock/_data/public_evidence/published_basis/...` together with the
+  matching repo-visible `public_evidence/published_basis/...` source copies so
+  downstream users can inspect published-basis artifacts without reaching into
+  test fixtures.
+- Added a curated `make docs-live-fast` maintainer lane, a dedicated live
+  examples guide, and explicit docs/CI coverage for the runnable markdown and
+  notebook surfaces that are expected to stay working over time.
 
 ### Changed
+- Versioned `invarlock-runtime-verify --json` with
+  `format_version: "runtime-verify-v1"`, moved support-matrix evidence paths
+  to logical `public_evidence/published_basis/...` locations, and made
+  packaged runtime-profile provenance portable through `runtime/tiers.yaml`.
+- Refreshed maintainer workflow dependency pins across the docs/tooling and
+  GitHub Actions surfaces, including `markdownlint-cli2 0.22.0`,
+  `ruff 0.15.11`, updated `actions/cache`, `github/codeql-action`,
+  `google/clusterfuzzlite`, and `actions/attest-build-provenance`.
+- Tightened public docs around the stable CLI/report/contract-read surface,
+  kept the detached contract bundle as a maintainer-local helper instead of a
+  public release artifact, and aligned docs/navigation around the runnable
+  notebook and live-example entry points.
+- Refactored the proof-pack, runtime-security, verify-check, model-profile,
+  guard-policy, and orchestration-attempt internals into smaller owner modules
+  without changing the public CLI surface.
 
 ### Fixed
+- Fixed the live-example verification path so `make docs-live` now runs the
+  true full markdown-plus-notebook lane, while `docs-live-fast` remains the
+  deterministic curated subset used by docs checks and CI.
+- Fixed host-mode docs replay and notebook smoke execution to normalize heavy
+  examples onto smoke-sized assets, keep the BYOD example runnable, and keep
+  public runtime-tier references on the logical `runtime/tiers.yaml` path.
+- Fixed minimal wheel-smoke coverage so installed distributions continue to
+  cover `doctor`, `verify`, `report html`, `invarlock-runtime-verify`,
+  contract catalog loading, and advanced proof-pack verification from outside
+  the repo tree.
 
 ## [0.7.2] - 2026-04-15
 
