@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -68,6 +69,7 @@ def test_support_surfaces_use_trusted_local_assurance_for_public_evaluate_exampl
         "notebooks/invarlock_compare_evaluate.ipynb",
         "notebooks/invarlock_custom_datasets.ipynb",
         "notebooks/invarlock_policy_tiers.ipynb",
+        "notebooks/invarlock_python_api.ipynb",
         "notebooks/invarlock_evaluation_report_deep_dive.ipynb",
     ]
 
@@ -125,3 +127,42 @@ def test_proof_pack_docs_keep_repo_wrappers_advanced_and_use_current_verify_surf
     assert "invarlock proof-pack verify" not in text
     assert "invarlock run" not in text
     assert "--allow-host-execution" not in text
+
+
+def test_notebook_links_and_docs_navigation_cover_curated_live_examples() -> None:
+    mkdocs = _read("mkdocs.yml")
+    docs_hub = _read("docs/README.md")
+    deep_dive = _read("notebooks/invarlock_evaluation_report_deep_dive.ipynb")
+
+    assert "invarlock_evaluation_report_deep_dive.ipynb" in deep_dive
+    assert "notebooks/invarlock_python_api.ipynb" in docs_hub
+    assert "notebooks/invarlock_policy_tiers.ipynb" in docs_hub
+    assert "Live Examples" in mkdocs
+
+
+def test_programmatic_docs_mark_python_surface_as_advanced_not_contract_stable() -> (
+    None
+):
+    quickstart = _read("docs/reference/programmatic-quickstart.md")
+    api = _read("docs/reference/api-guide.md")
+    index = _read("docs/reference/index.md")
+
+    assert "advanced/non-stable" in quickstart
+    assert "advanced/non-stable" in api
+    assert "CoreRunner.execute and helpers" not in index
+
+
+def test_byod_end_to_end_example_has_enough_rows_for_requested_windows() -> None:
+    text = _read("docs/user-guide/bring-your-own-data.md")
+    match = re.search(
+        r"## End-to-end example \(local JSONL\)\n\n```bash\n(.*?)\n```",
+        text,
+        re.DOTALL,
+    )
+    assert match is not None
+    block = match.group(1)
+    preview = int(re.search(r"preview_n:\s*(\d+)", block).group(1))
+    final = int(re.search(r"final_n:\s*(\d+)", block).group(1))
+    rows = len(re.findall(r'\{"text":"[^"]+"\}', block))
+
+    assert rows >= preview + final

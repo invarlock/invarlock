@@ -376,7 +376,7 @@ Guard threshold preset selecting the safety profile for a run.
 | Aspect | Details |
 | --- | --- |
 | **Options** | `conservative` (strictest), `balanced` (default), `aggressive` (loosest) |
-| **Source** | `src/invarlock/_data/runtime/tiers.yaml` |
+| **Source** | `runtime/tiers.yaml` |
 | **Related terms** | Policy Digest, Policy Overrides |
 | **report fields** | `auto.tier`, `resolved_policy.*` |
 | **See also** | [Tier Policy Catalog](../reference/tier-policy-catalog.md) |

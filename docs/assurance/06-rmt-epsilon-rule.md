@@ -59,7 +59,7 @@ inside `src/invarlock/guards/rmt.py`.
 - Conservative uses the same per-family ε defaults:
   $\epsilon_f = \{0.01, 0.01, 0.01, 0.01\}$.
   Values are recorded in the packaged `tiers.yaml`
-  (`invarlock._data.runtime/tiers.yaml`) and surfaced in reports. Provide
+  (`runtime/tiers.yaml`) and surfaced in reports. Provide
   overrides via `INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml` when needed.
 
 *Example:* with `r_base = 1.20` and ε = 0.01, the guard allows

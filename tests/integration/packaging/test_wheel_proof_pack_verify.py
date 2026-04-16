@@ -23,18 +23,25 @@ pytestmark = pytest.mark.integration
 
 
 def _select_python(repo_root: Path) -> Path:
-    current = Path(sys.executable)
-    if current.exists() and sys.version_info >= (3, 12):
-        return current
+    workspace_python = repo_root / (
+        ".venv/Scripts/python.exe" if os.name == "nt" else ".venv/bin/python"
+    )
+    if workspace_python.exists():
+        return workspace_python
+
     proc = subprocess.run(
         ["/bin/bash", str(repo_root / "scripts" / "select_workspace_python.sh")],
         capture_output=True,
         text=True,
         check=False,
     )
-    if proc.returncode != 0 or not proc.stdout.strip():
-        pytest.skip("Could not locate a Python 3.12+ interpreter for wheel smoke.")
-    return Path(proc.stdout.strip())
+    if proc.returncode == 0 and proc.stdout.strip():
+        return Path(proc.stdout.strip())
+
+    current = Path(sys.executable)
+    if current.exists() and sys.version_info >= (3, 12):
+        return current
+    pytest.skip("Could not locate a Python 3.12+ interpreter for wheel smoke.")
 
 
 def _build_wheel(tmp_path: Path, python_exe: Path) -> Path:
@@ -73,6 +80,11 @@ def _create_venv(tmp_path: Path, python_exe: Path) -> tuple[Path, Path, Path]:
         venv_python = env_dir / "bin" / "python"
         cli_exe = env_dir / "bin" / "invarlock"
     return env_dir, venv_python, cli_exe
+
+
+def _sibling_console_script(cli_exe: Path, name: str) -> Path:
+    suffix = cli_exe.suffix if cli_exe.suffix else ""
+    return cli_exe.with_name(f"{name}{suffix}")
 
 
 def _run(
@@ -342,6 +354,8 @@ def test_wheel_install_can_verify_proof_pack_outside_repo_tree(tmp_path: Path) -
     assert env_dir.resolve() in import_path.parents
     assert repo_root.resolve() not in import_path.parents
     assert cli_exe.is_file()
+    runtime_verify_exe = _sibling_console_script(cli_exe, "invarlock-runtime-verify")
+    assert runtime_verify_exe.is_file()
 
     minimal_help = _run(
         python_exe,
@@ -371,6 +385,82 @@ def test_wheel_install_can_verify_proof_pack_outside_repo_tree(tmp_path: Path) -
     exported_contracts = json.loads(cli_app_import.stdout.strip())
     assert "metric_kinds" in exported_contracts
     assert "support_matrix" in exported_contracts
+
+    doctor = _run(
+        cli_exe,
+        ["doctor", "--json"],
+        cwd=tmp_path,
+        env={"INVARLOCK_LIGHT_IMPORT": "1"},
+    )
+    assert doctor.returncode in (0, 1), doctor.stdout + doctor.stderr
+    doctor_payload = json.loads(doctor.stdout.strip().splitlines()[-1])
+    assert doctor_payload["format_version"] == "doctor-v1"
+
+    installed_public_evidence = _run(
+        python_exe,
+        [
+            "-c",
+            (
+                "import json; "
+                "from importlib import resources; "
+                "root = resources.files('invarlock').joinpath("
+                "'_data', 'public_evidence', 'published_basis'); "
+                "print(json.dumps({"
+                "'gpt2': root.joinpath('gpt2', 'evaluation.report.json').is_file(), "
+                "'bert': root.joinpath('bert', 'proof_pack_recipe.json').is_file()"
+                "}))"
+            ),
+        ],
+        cwd=tmp_path,
+    )
+    assert installed_public_evidence.returncode == 0, (
+        installed_public_evidence.stdout + installed_public_evidence.stderr
+    )
+    assert json.loads(installed_public_evidence.stdout.strip()) == {
+        "gpt2": True,
+        "bert": True,
+    }
+
+    report_dir = tmp_path / "report"
+    report_path = report_dir / "evaluation.report.json"
+    _write_json(report_path, _build_attested_report())
+    _write_runtime_manifest(report_path)
+
+    verify_report = _run(
+        cli_exe,
+        ["verify", "--json", str(report_path)],
+        cwd=tmp_path,
+    )
+    assert verify_report.returncode == 0, verify_report.stdout + verify_report.stderr
+    verify_payload = json.loads(verify_report.stdout.strip().splitlines()[-1])
+    assert verify_payload["format_version"] == "verify-v1"
+    assert verify_payload["summary"]["ok"] is True
+
+    html_path = tmp_path / "evaluation.html"
+    export_html = _run(
+        cli_exe,
+        ["report", "html", "-i", str(report_path), "-o", str(html_path)],
+        cwd=tmp_path,
+    )
+    assert export_html.returncode == 0, export_html.stdout + export_html.stderr
+    assert html_path.is_file()
+    assert "<html" in html_path.read_text(encoding="utf-8").lower()
+
+    runtime_verify = _run(
+        runtime_verify_exe,
+        [
+            "--report",
+            str(report_path),
+            "--manifest",
+            str(report_dir / RUNTIME_MANIFEST_FILENAME),
+            "--json",
+        ],
+        cwd=tmp_path,
+    )
+    assert runtime_verify.returncode == 0, runtime_verify.stdout + runtime_verify.stderr
+    runtime_payload = json.loads(runtime_verify.stdout.strip().splitlines()[-1])
+    assert runtime_payload["format_version"] == "runtime-verify-v1"
+    assert runtime_payload["ok"] is True
 
     pack_dir = _build_proof_pack(tmp_path / "pack")
 

@@ -83,6 +83,9 @@ jobs:
     - name: Check consistency
       run: python scripts/docs_check.py --consistency
 
+    - name: Run curated live examples
+      run: make docs-live-fast
+
     - name: Check for secrets
       run: |
         if grep -r -E "sk-[a-zA-Z0-9]{48}" docs/; then

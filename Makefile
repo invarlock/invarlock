@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-verify actionlint packaging-smoke-minimal ensure-mypy
+.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-verify actionlint packaging-smoke-minimal ensure-mypy
 
 PYTHON ?= $(shell bash scripts/select_workspace_python.sh)
 PIP := $(PYTHON) -m pip
@@ -491,14 +491,28 @@ ensure-mypy:
 
 ## (verify-ci and verify-release targets removed)
 
-.PHONY: docs-check docs-live docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell
-docs-check: ## Run consolidated docs validation (build, links, refs, examples, consistency)
+.PHONY: docs-check docs-live docs-live-fast docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell
+docs-check: ## Run consolidated docs validation plus curated live examples
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTHON) scripts/docs_check.py --all
 
+docs-live-fast: ## Live-run the curated deterministic docs and notebook subset
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTHON) scripts/verify_live_examples.py \
+		--markdown-execution-mode host \
+		--skip-markdown-model-loading \
+		--skip-notebook-model-loading \
+		--paths \
+		README.md \
+		docs/user-guide/getting-started.md \
+		docs/user-guide/quickstart.md \
+		notebooks/invarlock_python_api.ipynb \
+		notebooks/invarlock_policy_tiers.ipynb
+
 docs-live: ## Live-run runnable markdown CLI examples and notebooks
 	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTHON) scripts/verify_live_examples.py
+	PYTHONPATH=src $(PYTHON) scripts/verify_live_examples.py \
+		--markdown-execution-mode host
 
 docs-check-build: ## Build docs strictly and run link checks
 	$(MAKE) ensure-python
@@ -532,7 +546,7 @@ config-check: ## Verify config includes and adapter availability
 ci-local:  ## Run all CI workflows locally (requires act; this helper currently assumes Docker)
 	@command -v act >/dev/null 2>&1 || { echo "❌ 'act' not found. Install: brew install act"; exit 1; }
 	@command -v docker >/dev/null 2>&1 || { echo "❌ Docker is required for this local act helper. Start Docker Desktop first."; exit 1; }
-	act push --job tests-docs --env INVARLOCK_LIGHT_IMPORT=1 --env INVARLOCK_DISABLE_PLUGIN_DISCOVERY=1
+	act push --job tests-docs --env INVARLOCK_LIGHT_IMPORT=1 --env INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=0
 
 ci-local-list:  ## List available workflows and jobs
 	@command -v act >/dev/null 2>&1 || { echo "❌ 'act' not found. Install: brew install act"; exit 1; }

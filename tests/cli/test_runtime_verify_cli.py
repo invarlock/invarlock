@@ -35,6 +35,7 @@ def test_runtime_verify_cli_json_success(
 
     assert exit_code == 0
     assert payload == {
+        "format_version": "runtime-verify-v1",
         "ok": True,
         "errors": [],
         "report": str(tmp_path / "evaluation.report.json"),

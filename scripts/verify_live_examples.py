@@ -130,6 +130,22 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--skip-markdown-model-loading",
+        action="store_true",
+        help=(
+            "Skip markdown model-loading commands (`evaluate`, `run`, `calibrate`) "
+            "and rely on seeded demo evidence for downstream verify/report replay."
+        ),
+    )
+    parser.add_argument(
+        "--skip-notebook-model-loading",
+        action="store_true",
+        help=(
+            "Skip heavyweight notebook model-loading cells and rely on seeded demo "
+            "evidence for downstream verify/report replay."
+        ),
+    )
+    parser.add_argument(
         "--skip-notebooks",
         action="store_true",
         help="Skip notebook execution.",
@@ -179,6 +195,8 @@ def main(argv: list[str] | None = None) -> int:
         ]
         if markdown_paths:
             markdown_cmd.extend(["--paths", *markdown_paths])
+        if args.skip_markdown_model_loading:
+            markdown_cmd.append("--skip-model-loading")
         markdown_result = _run_subprocess(
             markdown_cmd,
             env=env,
@@ -200,6 +218,8 @@ def main(argv: list[str] | None = None) -> int:
         ]
         if args.run_notebook_pip:
             notebook_cmd.append("--run-pip")
+        if args.skip_notebook_model_loading:
+            notebook_cmd.append("--skip-model-loading")
         notebook_cmd.extend(notebook_paths)
         notebook_result = _run_subprocess(
             notebook_cmd,

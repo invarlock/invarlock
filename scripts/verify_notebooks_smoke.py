@@ -29,12 +29,65 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+DEMO_EVALUATION_REPORT_FIXTURE = (
+    ROOT
+    / "src"
+    / "invarlock"
+    / "_data"
+    / "public_evidence"
+    / "published_basis"
+    / "gpt2"
+    / "evaluation.report.json"
+)
 HOST_EXECUTION_ENV = "INVARLOCK_ALLOW_HOST_EXECUTION"
+SMOKE_MODEL_SCRIPT_REWRITES = (
+    (re.compile(r"(?m)(--baseline\s+)distilgpt2\b"), r"\1sshleifer/tiny-gpt2"),
+    (re.compile(r"(?m)(--baseline\s+)gpt2\b"), r"\1sshleifer/tiny-gpt2"),
+    (re.compile(r"(?m)(--subject\s+)distilgpt2\b"), r"\1sshleifer/tiny-gpt2"),
+    (re.compile(r"(?m)(--subject\s+)gpt2\b"), r"\1sshleifer/tiny-gpt2"),
+    (re.compile(r"(?m)(--profile\s+)(?:ci|release)\b"), r"\1dev"),
+    (re.compile(r"(?m)(--n-seeds\s+)\d+\b"), r"\g<1>1"),
+    (
+        re.compile(r"configs/presets/causal_lm/wikitext2_512\.yaml"),
+        "configs/presets/causal_lm/gpt2_smoke_128.yaml",
+    ),
+    (
+        re.compile(r"configs/calibration/null_sweep_ci\.yaml"),
+        "configs/calibration/null_sweep_smoke.yaml",
+    ),
+    (
+        re.compile(r"configs/calibration/rmt_ve_sweep_ci\.yaml"),
+        "configs/calibration/rmt_ve_sweep_smoke.yaml",
+    ),
+)
 _ENV_PREFIX_PATTERN = r"(?P<env>(?:[A-Za-z_][A-Za-z0-9_]*=[^\s]+\s+)*)"
 _INVARLOCK_PREFIX = re.compile(rf"^(?P<indent>\s*){_ENV_PREFIX_PATTERN}invarlock(?=\s)")
 _PY_INVARLOCK_PREFIX = re.compile(
     rf"^(?P<indent>\s*){_ENV_PREFIX_PATTERN}(?:python|python3)\s+-m\s+invarlock(?=\s)"
 )
+_CURATED_NOTEBOOK_SKIP_MARKERS = {
+    "invarlock_compare_evaluate.ipynb": ("invarlock evaluate",),
+    "invarlock_custom_datasets.ipynb": ("invarlock evaluate",),
+    "invarlock_evaluation_report_deep_dive.ipynb": ("invarlock evaluate",),
+    "invarlock_policy_tiers.ipynb": ("invarlock evaluate",),
+    "invarlock_python_api.ipynb": (
+        "from transformers import AutoTokenizer",
+        "from invarlock.adapters.auto import HF_Auto_Adapter",
+    ),
+    "invarlock_quickstart_cpu.ipynb": ("invarlock evaluate",),
+}
+_POLICY_TIER_RATIO_LIMITS = {
+    "conservative": 1.05,
+    "balanced": 1.10,
+    "aggressive": 1.20,
+}
+
+
+def _rewrite_live_smoke_shell_script(script: str) -> str:
+    rewritten = script
+    for pattern, replacement in SMOKE_MODEL_SCRIPT_REWRITES:
+        rewritten = pattern.sub(replacement, rewritten)
+    return rewritten
 
 
 def _iter_code_cells(nb: dict) -> list[tuple[int, str]]:
@@ -70,14 +123,26 @@ def _convert_cell(
     cell_source: str,
     notebook_name: str,
     skip_pip: bool,
+    skip_model_loading: bool,
 ) -> list[str]:
     lines = cell_source.splitlines()
     if not lines:
         return []
+    if _should_skip_cell(
+        notebook_name=notebook_name,
+        cell_source=cell_source,
+        skip_model_loading=skip_model_loading,
+    ):
+        return [
+            f"print({(f'[{notebook_name}] cell {cell_index} (skip-model-loading)').__repr__()})\n",
+            "\n",
+        ]
 
     first = lines[0].lstrip()
     if first.startswith("%%bash"):
         script = "\n".join(lines[1:]).rstrip() + "\n"
+        if not skip_model_loading:
+            script = _rewrite_live_smoke_shell_script(script)
         return [
             f"print({(f'[{notebook_name}] cell {cell_index} (%%bash)').__repr__()})\n",
             f"_run_bash({script!r})\n",
@@ -92,6 +157,8 @@ def _convert_cell(
             if skip_pip and _is_pip_install(cmd):
                 out.append(f"print({(f'  (skip) {cmd}').__repr__()})\n")
                 continue
+            if not skip_model_loading:
+                cmd = _rewrite_live_smoke_shell_script(cmd)
             out.append(f"_run_bash({cmd!r})\n")
             continue
         out.append(raw + "\n")
@@ -100,7 +167,9 @@ def _convert_cell(
 
 
 def _should_skip_shell_line(stripped: str) -> bool:
-    if stripped == "make runtime-image":
+    if stripped.startswith("make runtime-image") or stripped.startswith(
+        "make runtime-smoke"
+    ):
         return True
     if stripped.startswith(("docker ", "podman ")):
         return True
@@ -111,7 +180,288 @@ def _should_skip_shell_line(stripped: str) -> bool:
     )
 
 
-def write_script(*, nb_path: Path, out_py: Path, skip_pip: bool) -> None:
+def _should_skip_cell(
+    *,
+    notebook_name: str,
+    cell_source: str,
+    skip_model_loading: bool,
+) -> bool:
+    if not skip_model_loading:
+        return False
+    markers = _CURATED_NOTEBOOK_SKIP_MARKERS.get(notebook_name, ())
+    return any(marker in cell_source for marker in markers)
+
+
+def _demo_verify_pass_report() -> dict:
+    src_root = ROOT / "src"
+    if (src_root / "invarlock").is_dir():
+        src_path = str(src_root)
+        if src_path not in sys.path:
+            sys.path.insert(0, src_path)
+        try:
+            from invarlock.reporting.report_make import make_report
+
+            run_report = {
+                "meta": {
+                    "model_id": "docs-demo-model",
+                    "adapter": "hf_causal",
+                    "commit": "docs-demo",
+                    "seed": 42,
+                    "device": "cpu",
+                    "ts": "2026-04-03T00:00:00+00:00",
+                    "auto": {
+                        "enabled": False,
+                        "tier": "balanced",
+                        "probes_used": 0,
+                        "target_pm_ratio": None,
+                    },
+                },
+                "data": {
+                    "dataset": "unit",
+                    "split": "validation",
+                    "seq_len": 8,
+                    "stride": 8,
+                    "preview_n": 2,
+                    "final_n": 2,
+                },
+                "edit": {
+                    "name": "noop",
+                    "plan_digest": "docs-demo",
+                    "deltas": {
+                        "params_changed": 0,
+                        "sparsity": None,
+                        "bitwidth_map": None,
+                        "layers_modified": 0,
+                    },
+                },
+                "guards": [],
+                "metrics": {
+                    "primary_metric": {
+                        "kind": "ppl_causal",
+                        "preview": 10.0,
+                        "final": 10.0,
+                    },
+                    "bootstrap": {
+                        "method": "percentile",
+                        "replicates": 50,
+                        "alpha": 0.05,
+                        "seed": 0,
+                        "coverage": {
+                            "preview": {"used": 2},
+                            "final": {"used": 2},
+                        },
+                    },
+                    "paired_delta_summary": {"mean": 0.0},
+                    "preview_total_tokens": 50000,
+                    "final_total_tokens": 50000,
+                    "logloss_delta": 0.0,
+                    "logloss_delta_ci": [-0.01, 0.01],
+                },
+                "artifacts": {
+                    "events_path": "",
+                    "logs_path": "",
+                    "checkpoint_path": None,
+                },
+                "flags": {
+                    "guard_recovered": False,
+                    "rollback_reason": None,
+                },
+                "evaluation_windows": {
+                    "final": {
+                        "window_ids": [1, 2],
+                        "logloss": [2.30, 2.31],
+                        "token_counts": [100, 100],
+                    }
+                },
+            }
+            baseline_report = {
+                "run_id": "docs-demo-base",
+                "model_id": "docs-demo-model",
+                "meta": {"seed": 0, "model_id": "docs-demo-model"},
+                "evaluation_windows": {
+                    "final": {
+                        "window_ids": [1, 2],
+                        "logloss": [2.30, 2.30],
+                        "token_counts": [100, 100],
+                    }
+                },
+                "data": {
+                    "seq_len": 8,
+                    "preview_n": 2,
+                    "final_n": 2,
+                    "dataset": "unit",
+                    "split": "validation",
+                    "stride": 8,
+                },
+                "edit": {
+                    "name": "none",
+                    "plan_digest": "0",
+                    "deltas": {
+                        "params_changed": 0,
+                        "layers_modified": 0,
+                        "sparsity": None,
+                        "bitwidth_map": None,
+                    },
+                },
+                "guards": [],
+                "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 10.0}},
+                "artifacts": {
+                    "events_path": "",
+                    "logs_path": "",
+                    "checkpoint_path": None,
+                },
+                "flags": {
+                    "guard_recovered": False,
+                    "rollback_reason": None,
+                },
+            }
+            report = make_report(run_report, baseline_report)
+            validation = report.setdefault("validation", {})
+            if isinstance(validation, dict):
+                validation["primary_metric_acceptable"] = True
+            report["resolved_policy"] = {
+                "metrics": {
+                    "pm_ratio": {
+                        "ratio_limit_base": 1.1,
+                        "min_tokens": 1,
+                        "min_token_fraction": 0.0,
+                        "hysteresis_ratio": 0.0,
+                    }
+                }
+            }
+            report.setdefault(
+                "policy_digest",
+                {
+                    "policy_version": "policy-v1",
+                    "tier_policy_name": "balanced",
+                    "thresholds_hash": "docs-demo-policy",
+                    "changed": False,
+                },
+            )
+            report.setdefault("provenance", {}).setdefault(
+                "provider_digest", {"ids_sha256": "docs-demo-provider"}
+            )
+            return report
+        except Exception:
+            pass
+
+    if DEMO_EVALUATION_REPORT_FIXTURE.is_file():
+        report = json.loads(DEMO_EVALUATION_REPORT_FIXTURE.read_text(encoding="utf-8"))
+        report.setdefault("provenance", {}).setdefault(
+            "provider_digest", {"ids_sha256": "docs-demo-provider"}
+        )
+        return report
+
+    return {
+        "schema_version": "v1",
+        "run_id": "docs-demo",
+        "artifacts": {"generated_at": "2026-04-16T00:00:00+00:00"},
+        "plugins": {},
+        "meta": {"seed": 42},
+        "primary_metric": {
+            "kind": "ppl_causal",
+            "final": 10.0,
+            "ratio_vs_baseline": 1.0,
+            "display_ci": [1.0, 1.01],
+        },
+        "dataset": {
+            "provider": "unit",
+            "seq_len": 8,
+            "windows": {
+                "preview": 1,
+                "final": 1,
+                "stats": {
+                    "window_match_fraction": 1.0,
+                    "window_overlap_fraction": 0.0,
+                    "coverage": {"preview": {"used": 1}, "final": {"used": 1}},
+                    "paired_windows": 1,
+                },
+            },
+        },
+        "baseline_ref": {"primary_metric": {"final": 10.0}},
+        "validation": {"primary_metric_acceptable": True},
+        "resolved_policy": {
+            "metrics": {
+                "pm_ratio": {
+                    "ratio_limit_base": 1.1,
+                    "min_tokens": 1,
+                    "min_token_fraction": 0.0,
+                    "hysteresis_ratio": 0.0,
+                }
+            }
+        },
+        "policy_digest": {
+            "policy_version": "policy-v1",
+            "tier_policy_name": "balanced",
+            "thresholds_hash": "docs-demo-policy",
+            "changed": False,
+        },
+        "provenance": {"provider_digest": {"ids_sha256": "docs-demo-provider"}},
+    }
+
+
+def _write_json(path: Path, payload: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+
+def _seed_curated_demo_outputs(*, nb_path: Path, run_dir: Path) -> None:
+    if nb_path.name == "invarlock_policy_tiers.ipynb":
+        base_report = _demo_verify_pass_report()
+        for tier, ratio_limit_base in _POLICY_TIER_RATIO_LIMITS.items():
+            report = json.loads(json.dumps(base_report))
+            report.setdefault("primary_metric", {})["ratio_vs_baseline"] = 2.0
+            resolved_policy = report.setdefault("resolved_policy", {})
+            metrics = resolved_policy.setdefault("metrics", {})
+            pm_ratio = metrics.setdefault("pm_ratio", {})
+            pm_ratio["ratio_limit_base"] = ratio_limit_base
+            _write_json(
+                run_dir / "reports" / f"tier_{tier}" / "evaluation.report.json", report
+            )
+        return
+
+    if nb_path.name == "invarlock_python_api.ipynb":
+        _write_json(
+            run_dir / "reports" / "python_api" / "evaluation.report.json",
+            _demo_verify_pass_report(),
+        )
+        return
+
+    report_targets = {
+        "invarlock_compare_evaluate.ipynb": (
+            run_dir / "reports" / "compare_evaluate" / "evaluation.report.json"
+        ),
+        "invarlock_custom_datasets.ipynb": (
+            run_dir / "reports" / "byod" / "evaluation.report.json"
+        ),
+        "invarlock_evaluation_report_deep_dive.ipynb": (
+            run_dir / "reports" / "eval_deep_dive" / "evaluation.report.json"
+        ),
+        "invarlock_quickstart_cpu.ipynb": (
+            run_dir / "reports" / "eval" / "evaluation.report.json"
+        ),
+    }
+    target = report_targets.get(nb_path.name)
+    if target is not None:
+        report = _demo_verify_pass_report()
+        if nb_path.name == "invarlock_custom_datasets.ipynb":
+            report.setdefault("dataset", {})["provider"] = "local_jsonl"
+            report.setdefault("provenance", {})["provider_digest"] = {
+                "ids_sha256": "docs-demo-provider",
+                "provider": "local_jsonl",
+            }
+        _write_json(target, report)
+
+
+def write_script(
+    *,
+    nb_path: Path,
+    out_py: Path,
+    skip_pip: bool,
+    skip_model_loading: bool = False,
+) -> None:
     nb = json.loads(nb_path.read_text(encoding="utf-8"))
     code_cells = _iter_code_cells(nb)
 
@@ -140,7 +490,8 @@ def write_script(*, nb_path: Path, out_py: Path, skip_pip: bool) -> None:
             '    if not stripped or stripped.startswith("#"):',
             "        return line",
             "    if (",
-            '        stripped == "make runtime-image"',
+            '        stripped.startswith("make runtime-image")',
+            '        or stripped.startswith("make runtime-smoke")',
             '        or stripped.startswith(("docker ", "podman "))',
             "        or (",
             '            "runtime.manifest.json" in stripped',
@@ -195,6 +546,7 @@ def write_script(*, nb_path: Path, out_py: Path, skip_pip: bool) -> None:
                 cell_source=cell_source,
                 notebook_name=notebook_name,
                 skip_pip=skip_pip,
+                skip_model_loading=skip_model_loading,
             )
         )
 
@@ -277,6 +629,14 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Do not skip `pip install ...` lines from notebooks.",
     )
+    parser.add_argument(
+        "--skip-model-loading",
+        action="store_true",
+        help=(
+            "Skip curated heavyweight model-loading cells and reuse seeded demo "
+            "reports for downstream verification steps."
+        ),
+    )
     args = parser.parse_args(argv)
 
     ts = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
@@ -299,10 +659,17 @@ def main(argv: list[str] | None = None) -> int:
 
     skip_pip = not bool(args.run_pip)
     for nb in nb_paths:
-        run_dir = out_root / nb.stem
+        run_dir = out_root / f"{nb.stem}_{ts}"
         run_dir.mkdir(parents=True, exist_ok=True)
+        if args.skip_model_loading:
+            _seed_curated_demo_outputs(nb_path=nb, run_dir=run_dir)
         script_path = run_dir / f"{nb.stem}.py"
-        write_script(nb_path=nb, out_py=script_path, skip_pip=skip_pip)
+        write_script(
+            nb_path=nb,
+            out_py=script_path,
+            skip_pip=skip_pip,
+            skip_model_loading=args.skip_model_loading,
+        )
         print(f"Running: {nb.name}")
         run_script(script_path=script_path, cwd=run_dir, timeout_s=int(args.timeout_s))
         print(f"OK: {nb.name}")

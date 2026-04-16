@@ -4,6 +4,7 @@ import argparse
 import json
 from collections.abc import Sequence
 
+from invarlock.cli.constants import RUNTIME_VERIFY_FORMAT_VERSION
 from invarlock.runtime_verify import verify_runtime_manifest
 
 
@@ -29,6 +30,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     result = verify_runtime_manifest(args.report, args.manifest)
 
     payload = {
+        "format_version": RUNTIME_VERIFY_FORMAT_VERSION,
         "ok": result.ok,
         "errors": list(result.errors),
         "report": result.report,

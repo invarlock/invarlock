@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 import venv
 from pathlib import Path
 
@@ -13,8 +14,41 @@ pytestmark = pytest.mark.integration
 
 def _create_venv(tmp_path: Path) -> tuple[Path, Path]:
     env_dir = tmp_path / "venv"
-    builder = venv.EnvBuilder(with_pip=True)
-    builder.create(env_dir)
+
+    preferred_python = shutil.which("python3.12")
+    current_python = Path(sys.executable)
+    candidate_pythons: list[Path] = []
+    if preferred_python:
+        candidate_pythons.append(Path(preferred_python))
+    if current_python not in candidate_pythons:
+        candidate_pythons.append(current_python)
+
+    creation_errors: list[str] = []
+    for python_exe in candidate_pythons:
+        result = subprocess.run(
+            [str(python_exe), "-m", "venv", str(env_dir)],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode == 0:
+            break
+        creation_errors.append(
+            f"{python_exe} -> {result.returncode}\n{result.stdout}{result.stderr}"
+        )
+        shutil.rmtree(env_dir, ignore_errors=True)
+    else:
+        builder = venv.EnvBuilder(with_pip=True)
+        try:
+            builder.create(env_dir)
+        except subprocess.CalledProcessError as exc:
+            combined_errors = "\n\n".join(creation_errors)
+            raise AssertionError(
+                "failed to create isolated venv for import-safety test\n"
+                f"{combined_errors}\n\n"
+                f"fallback builder failed: {exc}"
+            ) from exc
+
     if os.name == "nt":
         python_exe = env_dir / "Scripts" / "python.exe"
     else:

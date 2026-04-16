@@ -81,7 +81,8 @@ The canonical public contract data ships in two places:
 
 If a downstream workflow needs a detached archive, maintainers can still build
 one locally with `scripts/release/make_public_contract_bundle.py`. That helper
-packages:
+is maintainer-local only and is not part of the public release artifact set.
+It packages:
 
 - `contracts/*.json`
 - `contract_catalog.json`

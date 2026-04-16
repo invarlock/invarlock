@@ -11,7 +11,7 @@
 | **Network** | Offline by default; guard logic itself is local. |
 | **Inputs** | Model, adapter, calibration data, tier policy (`--tier`/`auto_config`). |
 | **Outputs / Artifacts** | `report.guards` entries, report `resolved_policy`, `validation.*` flags. |
-| **Source of truth** | `src/invarlock/guards/*.py`, `src/invarlock/guards/policies.py`, `src/invarlock/_data/runtime/tiers.yaml`. |
+| **Source of truth** | `src/invarlock/guards/*.py`, `src/invarlock/guards/policies.py`, packaged `runtime/tiers.yaml`. |
 
 See the [Glossary](../assurance/glossary.md) for definitions of guard terms such
 as kappa threshold, epsilon band, and guard overhead.

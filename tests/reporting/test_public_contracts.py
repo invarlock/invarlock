@@ -101,6 +101,28 @@ def test_public_contract_paths_are_repo_relative() -> None:
     ).as_posix() == ("contracts/support_matrix.json")
 
 
+def test_support_matrix_published_basis_evidence_uses_public_evidence_paths() -> None:
+    support_matrix = contracts.load_support_matrix()
+
+    published_basis = [
+        lane
+        for lane in support_matrix["lanes"]
+        if lane.get("support_tier") == "published_basis"
+    ]
+    assert published_basis
+
+    for lane in published_basis:
+        evidence = lane.get("evidence", {})
+        assert evidence["evaluation_report_fixture"].startswith(
+            "public_evidence/published_basis/"
+        )
+        assert evidence["proof_pack_recipe"].startswith(
+            "public_evidence/published_basis/"
+        )
+        assert "tests/fixtures/" not in evidence["evaluation_report_fixture"]
+        assert "tests/fixtures/" not in evidence["proof_pack_recipe"]
+
+
 def test_readme_surfaces_public_contract_catalog_entries() -> None:
     readme = Path("README.md").read_text(encoding="utf-8")
 

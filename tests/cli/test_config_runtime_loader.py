@@ -100,3 +100,11 @@ def test_load_tiers_not_found_raises(monkeypatch):
     monkeypatch.setattr(config_mod, "_ires", _NoRes())
     with pytest.raises(FileNotFoundError):
         _ = load_tiers()
+
+
+def test_packaged_release_profile_never_exposes_repo_source_tiers_path() -> None:
+    import invarlock.core.config_loader as config_mod
+
+    profile = config_mod._load_runtime_yaml("profiles", "release.yaml")
+    assert profile is not None
+    assert profile["context"]["policy_snapshot"]["tiers_file"] == "runtime/tiers.yaml"

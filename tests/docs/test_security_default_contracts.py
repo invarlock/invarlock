@@ -120,13 +120,17 @@ def test_markdown_surfaces_with_model_loading_examples_explain_execution_context
 
 def test_deprecated_plugin_disable_env_is_absent_from_repo_surfaces() -> None:
     hits: list[str] = []
-    for root in (
+    scan_roots = [
         REPO_ROOT / ".github",
         REPO_ROOT / "docs",
         REPO_ROOT / "scripts",
         REPO_ROOT / "src" / "invarlock",
-    ):
-        for path in sorted(root.rglob("*")):
+        REPO_ROOT / "CONTRIBUTING.md",
+        REPO_ROOT / "Makefile",
+    ]
+    for root in scan_roots:
+        paths = [root] if root.is_file() else sorted(root.rglob("*"))
+        for path in paths:
             if not path.is_file():
                 continue
             try:
@@ -139,6 +143,22 @@ def test_deprecated_plugin_disable_env_is_absent_from_repo_surfaces() -> None:
 
     assert not hits, (
         "Deprecated plugin disable env should not appear in repo surfaces: "
+        + ", ".join(hits)
+    )
+
+
+def test_public_docs_use_logical_runtime_tiers_path() -> None:
+    hits: list[str] = []
+    for path in _iter_docs():
+        text = path.read_text(encoding="utf-8")
+        if (
+            "invarlock._data.runtime/tiers.yaml" in text
+            or "src/invarlock/_data/runtime/tiers.yaml" in text
+        ):
+            hits.append(str(path.relative_to(REPO_ROOT)))
+
+    assert not hits, (
+        "Public docs must refer to runtime tiers via logical runtime/tiers.yaml path: "
         + ", ".join(hits)
     )
 

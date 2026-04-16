@@ -42,7 +42,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/invarlock/invarlock"
 Repository = "https://github.com/invarlock/invarlock"
-Documentation = "https://github.com/invarlock/invarlock/tree/main/docs"
+Documentation = "https://github.com/invarlock/invarlock/blob/main/docs/README.md"
 Issues = "https://github.com/invarlock/invarlock/issues"
 Changelog = "https://github.com/invarlock/invarlock/blob/main/CHANGELOG.md"
 
@@ -186,6 +186,7 @@ dev = [
   "matplotlib>=3.7",
   "bitsandbytes>=0.41",
   "build>=0.10.0",
+  "wheel>=0.46.0",
   "requests>=2.33.0",
   "twine>=4.0.0",
 ]
@@ -259,6 +260,7 @@ where = ["src"]
 "*" = ["py.typed"]
 "invarlock" = [
   "_data/contracts/*.json",
+  "_data/public_evidence/published_basis/*/*.json",
 ]
 "invarlock._data.runtime" = [
   "profiles/*.yaml",

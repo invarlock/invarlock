@@ -171,7 +171,7 @@ Common patterns:
 
 ```bash
 # Fast local run (no integration/slow/manual)
-INVARLOCK_LIGHT_IMPORT=1 INVARLOCK_DISABLE_PLUGIN_DISCOVERY=1 \
+INVARLOCK_LIGHT_IMPORT=1 INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=0 \
 pytest -q -m "not integration and not slow and not manual" tests
 
 # Same lane via Makefile
@@ -306,7 +306,8 @@ Common commands:
 ```bash
 make docs           # mkdocs build --strict
 make docs-serve     # mkdocs serve -a 127.0.0.1:8000
-make docs-check     # consolidated docs validation (build, links, refs, examples, consistency)
+make docs-check     # consolidated docs validation plus curated live examples
+make docs-live-fast # curated deterministic live docs/notebook subset
 make docs-lint      # markdown + spell lint (via scripts/docs_lint.py)
 ```
 

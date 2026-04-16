@@ -23,6 +23,7 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,6 +31,36 @@ TMP = ROOT / "tmp"
 EXECUTION_MODES = ("container", "host")
 HOST_EXECUTION_ENV = "INVARLOCK_ALLOW_HOST_EXECUTION"
 MODEL_LOADING_COMMANDS = {"evaluate", "run", "calibrate"}
+DEFAULT_EVALUATE_SMOKE_PRESET = "configs/presets/causal_lm/gpt2_smoke_128.yaml"
+SMOKE_MODEL_ID_MAP = {
+    "distilgpt2": "sshleifer/tiny-gpt2",
+    "gpt2": "sshleifer/tiny-gpt2",
+}
+SMOKE_PATH_MAP = {
+    "configs/calibration/null_sweep_ci.yaml": "configs/calibration/null_sweep_smoke.yaml",
+    "configs/calibration/rmt_ve_sweep_ci.yaml": "configs/calibration/rmt_ve_sweep_smoke.yaml",
+    "configs/presets/causal_lm/wikitext2_512.yaml": DEFAULT_EVALUATE_SMOKE_PRESET,
+}
+SMOKE_SCRIPT_REWRITES = (
+    (re.compile(r"(?m)(--baseline\s+)distilgpt2\b"), r"\1sshleifer/tiny-gpt2"),
+    (re.compile(r"(?m)(--baseline\s+)gpt2\b"), r"\1sshleifer/tiny-gpt2"),
+    (re.compile(r"(?m)(--subject\s+)distilgpt2\b"), r"\1sshleifer/tiny-gpt2"),
+    (re.compile(r"(?m)(--subject\s+)gpt2\b"), r"\1sshleifer/tiny-gpt2"),
+    (re.compile(r"(?m)(--profile\s+)(?:ci|release)\b"), r"\1dev"),
+    (re.compile(r"(?m)(--n-seeds\s+)\d+\b"), r"\g<1>1"),
+    (
+        re.compile(r"configs/presets/causal_lm/wikitext2_512\.yaml"),
+        DEFAULT_EVALUATE_SMOKE_PRESET,
+    ),
+    (
+        re.compile(r"configs/calibration/null_sweep_ci\.yaml"),
+        "configs/calibration/null_sweep_smoke.yaml",
+    ),
+    (
+        re.compile(r"configs/calibration/rmt_ve_sweep_ci\.yaml"),
+        "configs/calibration/rmt_ve_sweep_smoke.yaml",
+    ),
+)
 DEMO_EVALUATION_REPORT_FIXTURE = (
     ROOT / "tests" / "artifacts" / "golden_runs" / "gpt2" / "evaluation.report.json"
 )
@@ -38,11 +69,13 @@ DEMO_RUNTIME_MANIFEST_FIXTURE = (
 )
 
 EXCLUDE_TOP_LEVEL_DIRS = {
+    "build",
     ".git",
     ".mypy_cache",
     ".pytest_cache",
     ".ruff_cache",
     ".venv",
+    ".venv-release",
     ".evaluate_tmp",
     "node_modules",
     "reports",
@@ -63,7 +96,12 @@ SKIP_TOKENS = (
     "...",
     "…",
     "config.yaml",
+    "custom_format",
+    "make dev-install",
+    "my_plugin",
     "my_config.yaml",
+    "run_pack.sh",
+    "run_suite.sh",
     "runs/latest",
     "/path/to/",
     "/absolute/path/to/",
@@ -236,7 +274,9 @@ def _is_model_loading_command(command_tokens: list[str]) -> bool:
 
 
 def _should_skip_line_for_host_mode(stripped: str) -> bool:
-    if stripped == "make runtime-image":
+    if stripped.startswith("make runtime-image") or stripped.startswith(
+        "make runtime-smoke"
+    ):
         return True
     if stripped.startswith(("docker ", "podman ")):
         return True
@@ -247,10 +287,80 @@ def _should_skip_line_for_host_mode(stripped: str) -> bool:
     )
 
 
+def _rewrite_model_loading_tokens_for_live_smoke(argv: list[str]) -> list[str]:
+    if any(flag in argv for flag in ("--help", "-h")):
+        return argv
+
+    rewritten: list[str] = []
+    saw_baseline_report = False
+    saw_profile = False
+    saw_preset = False
+    i = 0
+    while i < len(argv):
+        token = argv[i]
+        if token == "--baseline-report":
+            saw_baseline_report = True
+        if token == "--profile":
+            saw_profile = True
+        if token == "--preset":
+            saw_preset = True
+        if token in {"--baseline", "--subject"} and i + 1 < len(argv):
+            rewritten.extend([token, SMOKE_MODEL_ID_MAP.get(argv[i + 1], argv[i + 1])])
+            i += 2
+            continue
+        if token == "--profile" and i + 1 < len(argv):
+            profile = argv[i + 1]
+            rewritten.extend([token, "dev" if profile in {"ci", "release"} else profile])
+            i += 2
+            continue
+        if token == "--n-seeds" and i + 1 < len(argv):
+            rewritten.extend([token, "1"])
+            i += 2
+            continue
+        if token in {"--preset", "--config"} and i + 1 < len(argv):
+            rewritten.extend([token, SMOKE_PATH_MAP.get(argv[i + 1], argv[i + 1])])
+            i += 2
+            continue
+        rewritten.append(token)
+        i += 1
+
+    command_tokens = _command_tokens(rewritten)
+    if rewritten[:1] == ["invarlock"]:
+        insert_at = 4 if command_tokens[:2] == ["advanced", "calibrate"] else 2
+    elif (
+        len(rewritten) >= 3
+        and rewritten[0] in {"python", "python3"}
+        and rewritten[1] == "-m"
+        and rewritten[2].startswith("invarlock")
+    ):
+        insert_at = 6 if command_tokens[:2] == ["advanced", "calibrate"] else 4
+    else:
+        return rewritten
+
+    inserts: list[str] = []
+    if not saw_profile:
+        inserts.extend(["--profile", "dev"])
+    if command_tokens[:1] == ["evaluate"] and not saw_preset and not saw_baseline_report:
+        inserts.extend(["--preset", DEFAULT_EVALUATE_SMOKE_PRESET])
+
+    if not inserts:
+        return rewritten
+    return [*rewritten[:insert_at], *inserts, *rewritten[insert_at:]]
+
+
+def _rewrite_live_smoke_script_text(text: str) -> str:
+    rewritten = text
+    for pattern, replacement in SMOKE_SCRIPT_REWRITES:
+        rewritten = pattern.sub(replacement, rewritten)
+    return rewritten
+
+
 def _insert_option_after_command(argv: list[str], option: str) -> list[str]:
     if argv[:1] == ["invarlock"]:
         insert_at = 2
         if len(argv) >= 3 and argv[1] == "report" and argv[2] == "verify":
+            insert_at = 3
+        if len(argv) >= 3 and argv[1] == "report" and argv[2] == "html":
             insert_at = 3
         return [*argv[:insert_at], option, *argv[insert_at:]]
     if (
@@ -261,6 +371,8 @@ def _insert_option_after_command(argv: list[str], option: str) -> list[str]:
     ):
         insert_at = 4
         if len(argv) >= 5 and argv[3] == "report" and argv[4] == "verify":
+            insert_at = 5
+        if len(argv) >= 5 and argv[3] == "report" and argv[4] == "html":
             insert_at = 5
         return [*argv[:insert_at], option, *argv[insert_at:]]
     return [*argv, option]
@@ -279,6 +391,10 @@ def _rewrite_invarlock_tokens(
     env_prefix = [
         token for token in env_prefix if not token.startswith(f"{HOST_EXECUTION_ENV}=")
     ]
+
+    if execution_mode == "host" and _is_model_loading_command(command_tokens):
+        argv = _rewrite_model_loading_tokens_for_live_smoke(argv)
+        command_tokens = _command_tokens(argv)
 
     def _strip_option_with_value(
         tokens: list[str],
@@ -300,6 +416,8 @@ def _rewrite_invarlock_tokens(
         argv = [token for token in argv if token != "--allow-host-execution"]
         if _is_assurance_command(command_tokens):
             argv = _strip_option_with_value(argv, "--assurance")
+        if command_tokens[:2] == ["report", "html"] and "--force" not in argv:
+            argv = _insert_option_after_command(argv, "--force")
         return env_prefix, argv
 
     if _is_assurance_command(command_tokens):
@@ -317,14 +435,25 @@ def _rewrite_invarlock_tokens(
     elif _is_model_loading_command(command_tokens):
         if "--allow-host-execution" not in argv:
             env_prefix.append(f"{HOST_EXECUTION_ENV}=1")
+    if command_tokens[:2] == ["report", "html"] and "--force" not in argv:
+        argv = _insert_option_after_command(argv, "--force")
     return env_prefix, argv
 
 
-def _sanitize_script(block: BashBlock, *, execution_mode: str = "container") -> str:
+def _sanitize_script(
+    block: BashBlock,
+    *,
+    execution_mode: str = "container",
+    skip_model_loading: bool = False,
+) -> str:
     rendered: list[str] = []
     py = shlex.quote(sys.executable)
+    skipping_continuation = False
     for raw in block.text.splitlines():
         stripped = raw.strip()
+        if skipping_continuation:
+            skipping_continuation = stripped.endswith("\\")
+            continue
         if not stripped:
             rendered.append("")
             continue
@@ -360,6 +489,11 @@ def _sanitize_script(block: BashBlock, *, execution_mode: str = "container") -> 
             parsed_tokens = []
         if parsed_tokens:
             env_prefix, argv = _split_env_prefix(parsed_tokens)
+            command_tokens = _command_tokens(argv)
+            if skip_model_loading and _is_model_loading_command(command_tokens):
+                rendered.append(f"echo '[skip-model-loading] {stripped}'")
+                skipping_continuation = has_trailing_backslash
+                continue
             env_prefix, argv = _rewrite_invarlock_tokens(
                 env_prefix=env_prefix,
                 argv=argv,
@@ -379,7 +513,10 @@ def _sanitize_script(block: BashBlock, *, execution_mode: str = "container") -> 
         if has_trailing_backslash and line != raw:
             line = line.rstrip() + " \\"
         rendered.append(line)
-    return "\n".join(rendered).strip() + "\n"
+    sanitized = "\n".join(rendered).strip() + "\n"
+    if execution_mode == "host" and not skip_model_loading:
+        sanitized = _rewrite_live_smoke_script_text(sanitized)
+    return sanitized
 
 
 def _default_env(workspace: Path) -> dict[str, str]:
@@ -436,6 +573,9 @@ def _seed_demo_inputs(workspace: Path) -> None:
     evaluation_targets = (
         workspace / "reports" / "eval" / "evaluation.report.json",
         workspace / "report_bundle" / "evaluation.report.json",
+        workspace / "reports" / "baseline_calib" / "evaluation.report.json",
+        workspace / "reports" / "baseline_cpu" / "evaluation.report.json",
+        workspace / "reports" / "baseline_mps" / "evaluation.report.json",
     )
     manifest_targets = (
         workspace / "reports" / "eval" / "runtime.manifest.json",
@@ -561,13 +701,28 @@ def _seed_demo_inputs(workspace: Path) -> None:
             "rollback_reason": None,
         },
     }
-    _write_json(workspace / "runs" / "source" / "report.json", baseline_report)
+    for target in (
+        workspace / "runs" / "baseline" / "report.json",
+        workspace / "runs" / "source" / "report.json",
+        workspace / "runs" / "baseline_calib" / "source" / "demo" / "report.json",
+    ):
+        _write_json(target, baseline_report)
     _write_json(workspace / "runs" / "subject" / "report.json", run_report)
 
     evaluation_report = _build_demo_evaluation_report(run_report, baseline_report)
     if evaluation_report is not None:
+        target_payloads = {
+            workspace / "reports" / "baseline_cpu" / "evaluation.report.json": {
+                **evaluation_report,
+                "meta": {**evaluation_report.get("meta", {}), "device": "cpu"},
+            },
+            workspace / "reports" / "baseline_mps" / "evaluation.report.json": {
+                **evaluation_report,
+                "meta": {**evaluation_report.get("meta", {}), "device": "mps"},
+            },
+        }
         for target in evaluation_targets:
-            _write_json(target, evaluation_report)
+            _write_json(target, target_payloads.get(target, evaluation_report))
     elif DEMO_EVALUATION_REPORT_FIXTURE.is_file():
         for target in evaluation_targets:
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -592,11 +747,13 @@ def run_blocks(
     *,
     output_root: Path,
     execution_mode: str = "container",
+    skip_model_loading: bool = False,
 ) -> int:
     output_root.mkdir(parents=True, exist_ok=True)
     results_path = output_root / "results.jsonl"
     workspace_root = output_root / "workspaces"
     workspace_root.mkdir(parents=True, exist_ok=True)
+    run_stamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
 
     grouped: dict[str, list[BashBlock]] = {}
     for block in blocks:
@@ -606,7 +763,9 @@ def run_blocks(
         for file_index, (file_path, file_blocks) in enumerate(
             sorted(grouped.items()), start=1
         ):
-            workspace = workspace_root / f"{file_index:03d}_{Path(file_path).stem}"
+            workspace = (
+                workspace_root / f"{file_index:03d}_{Path(file_path).stem}_{run_stamp}"
+            )
             _prepare_workspace(workspace)
             _seed_demo_inputs(workspace)
             env = _default_env(workspace)
@@ -629,7 +788,11 @@ def run_blocks(
                     continue
 
                 script_path.write_text(
-                    _sanitize_script(block, execution_mode=execution_mode),
+                    _sanitize_script(
+                        block,
+                        execution_mode=execution_mode,
+                        skip_model_loading=skip_model_loading,
+                    ),
                     encoding="utf-8",
                 )
                 completed = subprocess.run(
@@ -696,6 +859,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "as explicit trusted-host commands."
         ),
     )
+    parser.add_argument(
+        "--skip-model-loading",
+        action="store_true",
+        help=(
+            "Skip model-loading commands (`evaluate`, `run`, `calibrate`) while "
+            "still replaying downstream verify/report steps against seeded demo data."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -707,6 +878,7 @@ def main(argv: list[str] | None = None) -> int:
         blocks,
         output_root=Path(args.output_root).expanduser().resolve(),
         execution_mode=args.execution_mode,
+        skip_model_loading=args.skip_model_loading,
     )
 
 

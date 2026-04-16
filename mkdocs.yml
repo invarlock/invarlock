@@ -1,6 +1,6 @@
 site_name: InvarLock Documentation
 site_description: Official documentation for the InvarLock toolkit
-site_url: https://invarlock.local
+site_url: https://github.com/invarlock/invarlock
 repo_url: https://github.com/invarlock/invarlock
 repo_name: invarlock
 
@@ -11,6 +11,7 @@ nav:
       - Quickstart: user-guide/quickstart.md
       - Primary Metric Smoke: user-guide/primary-metric-smoke.md
       - Compare & Evaluate (BYOE): user-guide/compare-and-evaluate.md
+      - Live Examples: user-guide/live-examples.md
       - Bring Your Own Data: user-guide/bring-your-own-data.md
       - Plugin Workflow: user-guide/plugins.md
       - Configuration Gallery: user-guide/config-gallery.md

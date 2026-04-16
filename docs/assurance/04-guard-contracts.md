@@ -111,7 +111,7 @@ immediate rollback regardless of other gates. See also
 **Sigma quantile (qσ)** controls the target sigma used for spectral monitoring.
 Balanced uses `sigma_quantile = 0.95`, Conservative `0.90` (see
 the packaged tiers configuration at
-`invarlock._data.runtime/tiers.yaml`). reports expose this under
+`runtime/tiers.yaml`). reports expose this under
 `spectral.sigma_quantile`.
 Per-family z-caps use $\kappa_f$; defaults are defined in the packaged tiers
 configuration and summarized in the Threshold Rationale table below.

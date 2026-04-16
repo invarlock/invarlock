@@ -77,6 +77,7 @@ GPT-2-sized path. Calibration smoke runs in that matrix use
 - [Quickstart](user-guide/quickstart.md)
 - [Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)
 - [Primary Metric Smoke](user-guide/primary-metric-smoke.md)
+- [Live Examples](user-guide/live-examples.md)
 - [Configuration Gallery](user-guide/config-gallery.md)
 - [Example Reports](user-guide/example-reports.md)
 - [Reading a report](user-guide/reading-report.md)
@@ -170,15 +171,28 @@ configured acceptance envelopes even when aggressive compression is attempted.
 
 ## Live Example Verification
 
+- Curated CI-safe live examples are gated by `make docs-live-fast` and cover
+  `README.md`, `docs/user-guide/getting-started.md`,
+  `docs/user-guide/quickstart.md`,
+  `notebooks/invarlock_python_api.ipynb`, and
+  `notebooks/invarlock_policy_tiers.ipynb`.
 - Runnable documentation surfaces can be verified locally with
-  `python scripts/verify_live_examples.py` or `make docs-live`.
-- This live check executes concrete Markdown CLI snippets through the active
-  checkout and smoke-runs notebooks under `notebooks/`.
+  `make docs-live-fast`, `python scripts/verify_live_examples.py`, or
+  `make docs-live`.
+- The curated fast lane replays concrete Markdown CLI snippets in trusted-local
+  mode with seeded demo evidence, then smoke-runs the curated notebook subset.
+- For heavyweight notebook cells that would otherwise trigger model downloads or
+  full evaluations, the curated lane reuses seeded demo reports and keeps the
+  downstream contract-reading and verification steps live.
+- `make docs-live` remains the broader local lane that replays runnable
+  Markdown examples and smoke-runs notebooks under `notebooks/`, using the same
+  trusted-local seeded-demo approach for heavyweight model-loading steps.
 - Artifacts land under `tmp/live_examples/`, including per-command JSONL
   results, notebook stdout/stderr logs, and a machine-readable `summary.json`.
 - Placeholder/template snippets must remain parseable, but only concrete
   runnable examples should be treated as copy-paste-ready.
-- This verifier is local-only and is not enforced in GitHub Actions.
+- GitHub Actions enforce the curated deterministic subset; the full verifier
+  remains a local or long-gate lane.
 
 ---
 

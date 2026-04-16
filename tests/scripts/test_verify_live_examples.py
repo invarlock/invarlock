@@ -82,3 +82,44 @@ def test_main_writes_summary_and_invokes_both_surfaces(
     assert summary["failures"] == []
     assert summary["markdown"]["returncode"] == 0
     assert summary["notebooks"]["returncode"] == 0
+
+
+def test_main_limits_paths_to_curated_subset(tmp_path: Path, monkeypatch) -> None:
+    module = _load_script_module()
+    (tmp_path / "README.md").write_text("# root\n", encoding="utf-8")
+    notebooks = tmp_path / "notebooks"
+    notebooks.mkdir()
+    (notebooks / "demo.ipynb").write_text("{}", encoding="utf-8")
+    docs = tmp_path / "docs" / "user-guide"
+    docs.mkdir(parents=True)
+    (docs / "quickstart.md").write_text("# quickstart\n", encoding="utf-8")
+    module.ROOT = tmp_path
+
+    calls: list[list[str]] = []
+
+    def _fake_run(cmd, **kwargs):
+        calls.append(list(cmd))
+        return SimpleNamespace(returncode=0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr(module.subprocess, "run", _fake_run)
+
+    exit_code = module.main(
+        [
+            "--paths",
+            "README.md",
+            "docs/user-guide/quickstart.md",
+            "notebooks/demo.ipynb",
+            "--skip-markdown-model-loading",
+            "--skip-notebook-model-loading",
+            "--output-root",
+            str(tmp_path / "artifacts"),
+        ]
+    )
+
+    assert exit_code == 0
+    assert "--paths" in calls[0]
+    assert "--skip-model-loading" in calls[0]
+    assert "README.md" in calls[0]
+    assert "docs/user-guide/quickstart.md" in calls[0]
+    assert "--skip-model-loading" in calls[1]
+    assert "notebooks/demo.ipynb" in calls[1]

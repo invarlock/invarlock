@@ -100,7 +100,7 @@ Calibration values are derived from null-sweep runs using the order-statistic
 and parametric methods described in the tier calibration documentation
 ([09-tier-v1-calibration.md](09-tier-v1-calibration.md)). The calibrated κ
 values are stored in the packaged `tiers.yaml`
-(`invarlock._data.runtime/tiers.yaml`).
+(`runtime/tiers.yaml`).
 
 To recalibrate, run null baselines (no edit) and collect per-module z-scores.
 Allocate the WARN budget across families proportionally by module count, then

@@ -28,6 +28,8 @@ def test_ci_adds_actionlint_and_packaging_smoke_gates() -> None:
         in actionlint_step["run"]
     )
     assert "make actionlint" in actionlint_step["run"]
+    docs_live_fast_step = _find_step_by_name(docs_steps, "Run curated live examples")
+    assert docs_live_fast_step["run"] == "make docs-live-fast"
 
     min_py312 = workflow["jobs"]["tests-min-py312"]
     min_steps = min_py312["steps"]

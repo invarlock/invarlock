@@ -143,6 +143,22 @@ def test_makefile_exposes_actionlint_and_minimal_packaging_smoke_targets() -> No
         "tests/integration/packaging/test_wheel_proof_pack_verify.py::"
         "test_wheel_install_can_verify_proof_pack_outside_repo_tree"
     ) in text
+    assert "docs-live-fast:" in text
+    assert "docs-live:" in text
+    assert "scripts/verify_live_examples.py" in text
+    docs_live_fast_block = text.split("docs-live-fast:", 1)[1].split(
+        "docs-live:", 1
+    )[0]
+    docs_live_block = text.split("docs-live:", 1)[1].split(
+        "docs-check-build:", 1
+    )[0]
+
+    assert "--markdown-execution-mode host" in docs_live_fast_block
+    assert "--skip-markdown-model-loading" in docs_live_fast_block
+    assert "--skip-notebook-model-loading" in docs_live_fast_block
+    assert "--markdown-execution-mode host" in docs_live_block
+    assert "--skip-markdown-model-loading" not in docs_live_block
+    assert "--skip-notebook-model-loading" not in docs_live_block
 
 
 def test_makefile_exposes_typed_surface_target() -> None:

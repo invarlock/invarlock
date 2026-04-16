@@ -1405,6 +1405,7 @@ dev = [
     { name = "ruff" },
     { name = "sphinx" },
     { name = "twine" },
+    { name = "wheel" },
 ]
 docs-ci = [
     { name = "linkchecker" },
@@ -1596,6 +1597,7 @@ requires-dist = [
     { name = "twine", marker = "extra == 'release-ci'", specifier = ">=4.0.0" },
     { name = "typer", specifier = ">=0.15" },
     { name = "wheel", marker = "extra == 'ci'", specifier = ">=0.46.0" },
+    { name = "wheel", marker = "extra == 'dev'", specifier = ">=0.46.0" },
 ]
 provides-extras = ["adapters", "hf", "guards", "edits", "eval", "probes", "gptq", "awq", "gpu", "advanced", "all", "dev", "ci", "docs-ci", "precommit-ci", "release-ci", "security-ci"]
 

@@ -136,6 +136,8 @@ def test_sanitize_script_host_mode_skips_container_only_lines() -> None:
         block_index=1,
         text=(
             "make runtime-image\n"
+            "make runtime-image-podman\n"
+            "make runtime-smoke-podman\n"
             "test -f reports/eval/runtime.manifest.json\n"
             "docker ps\n"
         ),
@@ -144,8 +146,24 @@ def test_sanitize_script_host_mode_skips_container_only_lines() -> None:
     rendered = module._sanitize_script(block, execution_mode="host")
 
     assert "[skip-host] make runtime-image" in rendered
+    assert "[skip-host] make runtime-image-podman" in rendered
+    assert "[skip-host] make runtime-smoke-podman" in rendered
     assert "[skip-host] test -f reports/eval/runtime.manifest.json" in rendered
     assert "[skip-host] docker ps" in rendered
+
+
+def test_sanitize_script_adds_force_to_report_html() -> None:
+    module = _load_script_module()
+    block = module.BashBlock(
+        file="docs/reference/cli.md",
+        line=1,
+        block_index=1,
+        text="invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html\n",
+    )
+
+    rendered = module._sanitize_script(block, execution_mode="host")
+
+    assert "-m invarlock report html --force" in rendered
 
 
 def test_sanitize_script_container_mode_strips_host_bypass_flags() -> None:
@@ -164,6 +182,132 @@ def test_sanitize_script_container_mode_strips_host_bypass_flags() -> None:
 
     assert "INVARLOCK_ALLOW_HOST_EXECUTION=1" not in rendered
     assert "--assurance trusted-local" not in rendered
+
+
+def test_sanitize_script_skip_model_loading_skips_full_multiline_command() -> None:
+    module = _load_script_module()
+    block = module.BashBlock(
+        file="README.md",
+        line=1,
+        block_index=1,
+        text=(
+            "invarlock evaluate --allow-network \\\n"
+            "  --baseline gpt2 \\\n"
+            "  --subject distilgpt2\n"
+            "invarlock verify reports/eval/evaluation.report.json\n"
+        ),
+    )
+
+    rendered = module._sanitize_script(block, skip_model_loading=True)
+
+    assert "[skip-model-loading] invarlock evaluate --allow-network \\" in rendered
+    assert "--baseline gpt2" not in rendered
+    assert "--subject distilgpt2" not in rendered
+    assert "-m invarlock verify reports/eval/evaluation.report.json" in rendered
+
+
+def test_sanitize_script_host_mode_rewrites_heavy_evaluate_inputs_to_smoke_assets() -> (
+    None
+):
+    module = _load_script_module()
+    block = module.BashBlock(
+        file="README.md",
+        line=1,
+        block_index=1,
+        text=(
+            "invarlock evaluate --allow-network \\\n"
+            "  --baseline gpt2 \\\n"
+            "  --subject distilgpt2 \\\n"
+            "  --preset configs/presets/causal_lm/wikitext2_512.yaml\n"
+        ),
+    )
+
+    rendered = module._sanitize_script(block, execution_mode="host")
+
+    assert "--baseline sshleifer/tiny-gpt2 \\" in rendered
+    assert "--subject sshleifer/tiny-gpt2 \\" in rendered
+    assert "configs/presets/causal_lm/gpt2_smoke_128.yaml" in rendered
+    assert "--baseline gpt2" not in rendered
+    assert "--subject distilgpt2" not in rendered
+
+
+def test_sanitize_script_host_mode_injects_smoke_preset_when_missing() -> None:
+    module = _load_script_module()
+    block = module.BashBlock(
+        file="docs/reference/env-vars.md",
+        line=1,
+        block_index=1,
+        text="invarlock evaluate --baseline gpt2 --subject gpt2\n",
+    )
+
+    rendered = module._sanitize_script(block, execution_mode="host")
+
+    assert "--profile dev" in rendered
+    assert "--preset configs/presets/causal_lm/gpt2_smoke_128.yaml" in rendered
+    assert "--baseline sshleifer/tiny-gpt2" in rendered
+    assert "--subject sshleifer/tiny-gpt2" in rendered
+
+
+def test_sanitize_script_host_mode_rewrites_calibration_configs_to_smoke_variants() -> (
+    None
+):
+    module = _load_script_module()
+    block = module.BashBlock(
+        file="docs/reference/calibration.md",
+        line=1,
+        block_index=1,
+        text=(
+            "invarlock advanced calibrate null-sweep \\\n"
+            "  --config configs/calibration/null_sweep_ci.yaml \\\n"
+            "  --out reports/calibration/null_sweep\n"
+        ),
+    )
+
+    rendered = module._sanitize_script(block, execution_mode="host")
+
+    assert "configs/calibration/null_sweep_smoke.yaml" in rendered
+    assert "configs/calibration/null_sweep_ci.yaml" not in rendered
+
+
+def test_sanitize_script_host_mode_rewrites_profiles_and_seed_counts_for_smoke() -> (
+    None
+):
+    module = _load_script_module()
+    block = module.BashBlock(
+        file="docs/reference/calibration.md",
+        line=1,
+        block_index=1,
+        text=(
+            "invarlock advanced calibrate null-sweep \\\n"
+            "  --config configs/calibration/null_sweep_ci.yaml \\\n"
+            "  --profile release \\\n"
+            "  --n-seeds 10 \\\n"
+            "  --out reports/calibration/null_sweep\n"
+        ),
+    )
+
+    rendered = module._sanitize_script(block, execution_mode="host")
+
+    assert "--profile dev" in rendered
+    assert "--n-seeds 1" in rendered
+    assert "--profile release" not in rendered
+    assert "--n-seeds 10" not in rendered
+
+
+def test_sanitize_script_help_commands_do_not_receive_smoke_profile_injection() -> (
+    None
+):
+    module = _load_script_module()
+    block = module.BashBlock(
+        file="docs/README.md",
+        line=1,
+        block_index=1,
+        text="invarlock advanced calibrate --help\n",
+    )
+
+    rendered = module._sanitize_script(block, execution_mode="host")
+
+    assert "--profile dev" not in rendered
 
 
 def test_seed_demo_inputs_writes_expected_fixture_files(tmp_path: Path) -> None:
@@ -215,8 +359,17 @@ def test_seed_demo_inputs_writes_expected_fixture_files(tmp_path: Path) -> None:
 
     assert (workspace / "reports" / "eval" / "evaluation.report.json").is_file()
     assert (workspace / "report_bundle" / "evaluation.report.json").is_file()
+    assert (
+        workspace / "reports" / "baseline_calib" / "evaluation.report.json"
+    ).is_file()
+    assert (workspace / "reports" / "baseline_cpu" / "evaluation.report.json").is_file()
+    assert (workspace / "reports" / "baseline_mps" / "evaluation.report.json").is_file()
     assert (workspace / "reports" / "eval" / "runtime.manifest.json").is_file()
+    assert (workspace / "runs" / "baseline" / "report.json").is_file()
     assert (workspace / "runs" / "subject" / "report.json").is_file()
+    assert (
+        workspace / "runs" / "baseline_calib" / "source" / "demo" / "report.json"
+    ).is_file()
     assert (workspace / "resolved_policy.json").is_file()
     assert (workspace / "compatibility.json").is_file()
 

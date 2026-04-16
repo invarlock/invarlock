@@ -97,6 +97,9 @@ jobs:
         run: |
           mkdocs build --strict
 
+      - name: Run curated live examples
+        run: make docs-live-fast
+
   # Minimum-supported Python (3.12) smoke (small subset).
   tests-min-py312:
     if: ${{ github.event_name != 'schedule' }}
