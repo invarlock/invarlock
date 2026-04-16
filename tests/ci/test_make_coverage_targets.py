@@ -146,12 +146,8 @@ def test_makefile_exposes_actionlint_and_minimal_packaging_smoke_targets() -> No
     assert "docs-live-fast:" in text
     assert "docs-live:" in text
     assert "scripts/verify_live_examples.py" in text
-    docs_live_fast_block = text.split("docs-live-fast:", 1)[1].split(
-        "docs-live:", 1
-    )[0]
-    docs_live_block = text.split("docs-live:", 1)[1].split(
-        "docs-check-build:", 1
-    )[0]
+    docs_live_fast_block = text.split("docs-live-fast:", 1)[1].split("docs-live:", 1)[0]
+    docs_live_block = text.split("docs-live:", 1)[1].split("docs-check-build:", 1)[0]
 
     assert "--markdown-execution-mode host" in docs_live_fast_block
     assert "--skip-markdown-model-loading" in docs_live_fast_block

@@ -104,9 +104,7 @@ def test_write_script_can_skip_curated_model_loading_cells(tmp_path: Path) -> No
     assert "_run_bash('invarlock doctor --json || true')" in rendered
 
 
-def test_rewrite_live_smoke_shell_script_uses_smoke_assets_for_heavy_examples() -> (
-    None
-):
+def test_rewrite_live_smoke_shell_script_uses_smoke_assets_for_heavy_examples() -> None:
     module = _load_script_module()
 
     rendered = module._rewrite_live_smoke_shell_script(
@@ -123,9 +121,7 @@ def test_rewrite_live_smoke_shell_script_uses_smoke_assets_for_heavy_examples() 
     assert "--subject distilgpt2" not in rendered
 
 
-def test_rewrite_live_smoke_shell_script_normalizes_profiles_and_seed_counts() -> (
-    None
-):
+def test_rewrite_live_smoke_shell_script_normalizes_profiles_and_seed_counts() -> None:
     module = _load_script_module()
 
     rendered = module._rewrite_live_smoke_shell_script(

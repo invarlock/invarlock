@@ -310,7 +310,9 @@ def _rewrite_model_loading_tokens_for_live_smoke(argv: list[str]) -> list[str]:
             continue
         if token == "--profile" and i + 1 < len(argv):
             profile = argv[i + 1]
-            rewritten.extend([token, "dev" if profile in {"ci", "release"} else profile])
+            rewritten.extend(
+                [token, "dev" if profile in {"ci", "release"} else profile]
+            )
             i += 2
             continue
         if token == "--n-seeds" and i + 1 < len(argv):
@@ -340,7 +342,11 @@ def _rewrite_model_loading_tokens_for_live_smoke(argv: list[str]) -> list[str]:
     inserts: list[str] = []
     if not saw_profile:
         inserts.extend(["--profile", "dev"])
-    if command_tokens[:1] == ["evaluate"] and not saw_preset and not saw_baseline_report:
+    if (
+        command_tokens[:1] == ["evaluate"]
+        and not saw_preset
+        and not saw_baseline_report
+    ):
         inserts.extend(["--preset", DEFAULT_EVALUATE_SMOKE_PRESET])
 
     if not inserts:

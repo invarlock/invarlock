@@ -294,9 +294,7 @@ def test_sanitize_script_host_mode_rewrites_profiles_and_seed_counts_for_smoke()
     assert "--n-seeds 10" not in rendered
 
 
-def test_sanitize_script_help_commands_do_not_receive_smoke_profile_injection() -> (
-    None
-):
+def test_sanitize_script_help_commands_do_not_receive_smoke_profile_injection() -> None:
     module = _load_script_module()
     block = module.BashBlock(
         file="docs/README.md",
