@@ -23,8 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to logical `public_evidence/published_basis/...` locations, and made
   packaged runtime-profile provenance portable through `runtime/tiers.yaml`.
 - Refreshed maintainer workflow dependency pins across the docs/tooling and
-  GitHub Actions surfaces, including `markdownlint-cli2 0.22.0`,
-  `ruff 0.15.11`, updated `actions/cache`, `github/codeql-action`,
+  GitHub Actions surfaces, including `ruff 0.15.11`, updated `actions/cache`,
+  `github/codeql-action`,
   `google/clusterfuzzlite`, and `actions/attest-build-provenance`.
 - Tightened public docs around the stable CLI/report/contract-read surface,
   kept the detached contract bundle as a maintainer-local helper instead of a
