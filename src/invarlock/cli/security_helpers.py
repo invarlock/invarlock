@@ -90,8 +90,12 @@ def runtime_security_scoped(
 ) -> Callable[..., Any]:
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
-        assurance = str(kwargs.get("assurance", "") or "").strip().lower()
-        trusted_local = assurance == "trusted-local"
+        execution_mode = (
+            str(kwargs.get("execution_mode", kwargs.get("assurance", "")) or "")
+            .strip()
+            .lower()
+        )
+        trusted_local = execution_mode == "trusted-local"
         with configure_runtime_security(
             allow_network=bool(kwargs.get("allow_network", False)),
             allow_host_execution=bool(kwargs.get("allow_host_execution", False))

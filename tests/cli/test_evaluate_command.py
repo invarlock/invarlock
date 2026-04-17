@@ -332,7 +332,7 @@ def test_evaluate_quiet_summary_emits_status(monkeypatch, tmp_path, capsys):
     assert "Output:" in out
 
 
-def test_evaluate_attested_bundle_manifest_inherits_container_execution(
+def test_evaluate_container_bundle_manifest_inherits_container_execution(
     monkeypatch, tmp_path
 ):
     src = tmp_path / "src_model"
@@ -391,7 +391,7 @@ def test_evaluate_attested_bundle_manifest_inherits_container_execution(
         subject=str(edt),
         adapter="auto",
         profile="dev",
-        assurance="attested",
+        execution_mode="container",
         out=str(tmp_path / "runs"),
         report_out=str(tmp_path / "reports"),
     )

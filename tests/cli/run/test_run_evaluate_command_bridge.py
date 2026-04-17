@@ -175,7 +175,7 @@ def test_evaluate_command_local_mode_prefers_local_files_only(monkeypatch, tmp_p
         subject=str(edt),
         adapter="auto",
         profile="ci",
-        assurance="trusted-local",
+        execution_mode="trusted-local",
         out=str(tmp_path / "runs"),
         report_out=str(tmp_path / "reports"),
         timing=False,
@@ -187,7 +187,7 @@ def test_evaluate_command_local_mode_prefers_local_files_only(monkeypatch, tmp_p
         assert call["prefer_local_files_only"] is True
 
 
-def test_evaluate_command_passes_trusted_local_assurance_to_runs(
+def test_evaluate_command_passes_trusted_local_execution_mode_to_runs(
     monkeypatch, tmp_path
 ) -> None:
     src = tmp_path / "src_model"
@@ -223,7 +223,7 @@ def test_evaluate_command_passes_trusted_local_assurance_to_runs(
         subject=str(edt),
         adapter="auto",
         profile="dev",
-        assurance="trusted-local",
+        execution_mode="trusted-local",
         out=str(tmp_path / "runs"),
         report_out=str(tmp_path / "reports"),
         timing=False,

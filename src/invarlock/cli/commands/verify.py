@@ -27,13 +27,15 @@ from .._json import emit as _emit_json
 console = Console()
 
 
-def _allow_unattested_artifacts_for_assurance(assurance: str) -> bool:
-    normalized_assurance = str(assurance or "").strip().lower()
-    if normalized_assurance == "attested":
+def _allow_unattested_artifacts_for_runtime_provenance(
+    runtime_provenance: str,
+) -> bool:
+    normalized_runtime_provenance = str(runtime_provenance or "").strip().lower()
+    if normalized_runtime_provenance == "container":
         return False
-    if normalized_assurance == "trusted-local":
+    if normalized_runtime_provenance == "trusted-local":
         return True
-    raise ValueError("Assurance level must be one of: attested, trusted-local.")
+    raise ValueError("Runtime provenance must be one of: container, trusted-local.")
 
 
 def _render_verify_diagnostic(diagnostic: VerifyDiagnostic) -> None:
@@ -77,7 +79,7 @@ def verify_command(
     tolerance: float = 1e-9,
     profile: str | None = "dev",
     json_out: bool = False,
-    assurance: str = "attested",
+    runtime_provenance: str = "container",
 ) -> None:
     """
     Verify evaluation report integrity.
@@ -90,7 +92,9 @@ def verify_command(
         baseline=baseline,
         tolerance=tolerance,
         profile=profile,
-        allow_unattested_artifacts=_allow_unattested_artifacts_for_assurance(assurance),
+        allow_unattested_artifacts=(
+            _allow_unattested_artifacts_for_runtime_provenance(runtime_provenance)
+        ),
         json_mode=bool(json_out),
     )
     exit_code = _verify_exit_code(result, profile=profile)

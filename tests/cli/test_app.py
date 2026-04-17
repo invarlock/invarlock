@@ -71,7 +71,7 @@ def test_cli_version_flag_exits_through_root_callback():
     emit_version.assert_called_once_with()
 
 
-def test_evaluate_cli_forwards_assurance(monkeypatch):
+def test_evaluate_cli_forwards_execution_mode(monkeypatch):
     seen: dict[str, object] = {}
 
     def fake_evaluate_command(**kwargs):
@@ -91,13 +91,13 @@ def test_evaluate_cli_forwards_assurance(monkeypatch):
             "baseline",
             "--subject",
             "subject",
-            "--assurance",
+            "--execution-mode",
             "trusted-local",
         ],
     )
 
     assert result.exit_code == 0, result.output
-    assert seen["assurance"] == "trusted-local"
+    assert seen["execution_mode"] == "trusted-local"
 
 
 def test_ordered_group_handles_advanced_and_unknown_lazy_subapps():

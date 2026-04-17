@@ -59,13 +59,13 @@ def _format_ratio(value: Any) -> str:
 
 def _evaluation_report_manifest_execution(
     *,
-    assurance: str,
+    execution_mode: str,
     allow_network: bool,
     allow_remote_code: bool,
     allow_third_party_plugins: bool,
 ) -> RuntimeManifestExecution | None:
-    normalized_assurance = str(assurance or "").strip().lower()
-    if normalized_assurance != "attested":
+    normalized_execution_mode = str(execution_mode or "").strip().lower()
+    if normalized_execution_mode != "container":
         return None
     return RuntimeManifestExecution(
         execution_mode="container",

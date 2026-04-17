@@ -56,8 +56,8 @@ def test_gpt2_smoke_campaign_script_is_executable() -> None:
     assert "INVARLOCK_SMOKE_CACHE_COMPLETE" in contents
     assert "prefetch_hf_assets_on_host" in contents
     assert "ensure_current_runtime_image" in contents
-    assert 'echo "[smoke] refreshing local attested runtime image"' in contents
-    assert 'echo "[smoke] refreshing local CUDA attested runtime image"' in contents
+    assert 'echo "[smoke] refreshing local container runtime image"' in contents
+    assert 'echo "[smoke] refreshing local CUDA container runtime image"' in contents
     assert "make runtime-image" in contents
     assert "make runtime-image-cuda" in contents
     assert 'export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"' in contents
@@ -76,12 +76,12 @@ def test_gpt2_smoke_campaign_script_is_executable() -> None:
     )
 
 
-def test_tiny_attested_smoke_campaign_script_is_executable() -> None:
+def test_tiny_container_smoke_campaign_script_is_executable() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "run_tiny_attested_smoke.sh"
-    assert script_path.exists(), "Expected scripts/run_tiny_attested_smoke.sh to exist"
+    script_path = repo_root / "scripts" / "run_tiny_container_smoke.sh"
+    assert script_path.exists(), "Expected scripts/run_tiny_container_smoke.sh to exist"
     assert os.access(script_path, os.X_OK), (
-        "run_tiny_attested_smoke.sh should be executable"
+        "run_tiny_container_smoke.sh should be executable"
     )
     contents = script_path.read_text(encoding="utf-8")
     assert (
@@ -93,8 +93,8 @@ def test_tiny_attested_smoke_campaign_script_is_executable() -> None:
     assert "tiny_relax: true" in contents
     assert "prefetch_tiny_model_on_host" in contents
     assert "ensure_current_runtime_image" in contents
-    assert 'echo "[smoke] refreshing local attested runtime image"' in contents
-    assert 'echo "[smoke] refreshing local CUDA attested runtime image"' in contents
+    assert 'echo "[smoke] refreshing local container runtime image"' in contents
+    assert 'echo "[smoke] refreshing local CUDA container runtime image"' in contents
     assert "make runtime-image" in contents
     assert "make runtime-image-cuda" in contents
     assert "INVARLOCK_RUNTIME_IMAGE_DIGEST" in contents

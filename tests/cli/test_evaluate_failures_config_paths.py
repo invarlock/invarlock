@@ -446,12 +446,12 @@ def test_evaluate_happy_path_with_preset_and_auto_adapter(monkeypatch, tmp_path:
     assert calls["runs"] == 2 and calls["reports"] == 1
 
 
-def test_evaluate_rejects_invalid_assurance() -> None:
-    with pytest.raises(click.BadParameter, match="Assurance level must be one of"):
+def test_evaluate_rejects_invalid_execution_mode() -> None:
+    with pytest.raises(click.BadParameter, match="Execution mode must be one of"):
         mod.evaluate_command(
             baseline="baseline",
             subject="subject",
-            assurance="invalid",
+            execution_mode="invalid",
         )
 
 

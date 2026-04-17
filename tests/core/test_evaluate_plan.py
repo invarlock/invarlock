@@ -6,13 +6,14 @@ import pytest
 
 from invarlock.core.evaluate_plan import (
     DEFAULT_EVALUATE_GUARDS_ORDER,
+    EvaluateExecutionPolicy,
     build_baseline_run_config,
     build_evaluate_command_plan,
     build_subject_edit_run_config,
     default_preset_data_for_adapter,
     determine_subject_label,
     normalize_model_id,
-    resolve_evaluate_assurance_policy,
+    resolve_evaluate_execution_policy,
     resolve_evaluate_tmp_dir,
     resolve_guards_order,
     sanitize_preset_data_for_evaluate,
@@ -127,21 +128,22 @@ def test_build_subject_edit_run_config_normalizes_placeholders_and_guards() -> N
     assert cfg["guards"] == {"order": ["invariants", "variance"]}
 
 
-def test_resolve_evaluate_assurance_policy_rejects_unknown_assurance() -> None:
+def test_resolve_evaluate_execution_policy_rejects_unknown_mode() -> None:
     with pytest.raises(ValueError):
-        resolve_evaluate_assurance_policy(
-            assurance="remote",
+        resolve_evaluate_execution_policy(
+            execution_mode="remote",
             allow_host_execution=False,
         )
 
 
-def test_resolve_evaluate_assurance_policy_marks_trusted_local_host_enabled() -> None:
-    policy = resolve_evaluate_assurance_policy(
-        assurance="trusted-local",
+def test_resolve_evaluate_execution_policy_marks_trusted_local_host_enabled() -> None:
+    policy = resolve_evaluate_execution_policy(
+        execution_mode="trusted-local",
         allow_host_execution=False,
     )
 
-    assert policy.assurance == "trusted-local"
+    assert isinstance(policy, EvaluateExecutionPolicy)
+    assert policy.execution_mode == "trusted-local"
     assert policy.allow_host_execution is True
     assert policy.prefer_local_files_only is True
     assert policy.allow_unattested_artifacts is True
