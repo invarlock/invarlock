@@ -336,7 +336,7 @@ packaging-smoke-front-door:  ## Smoke installed-wheel evaluate -> verify -> repo
 	$(MAKE) ensure-python
 	@PYTHON="$$(if [ -x .venv/bin/python ]; then printf '%s' .venv/bin/python; else printf '%s' "$(PYTHON)"; fi)"; \
 	PYTHONPATH=src "$$PYTHON" -m pytest -q \
-		tests/integration/packaging/test_wheel_evidence_pack_verify.py::test_wheel_install_runs_front_door_evaluate_verify_report_html_outside_repo_tree
+		tests/integration/packaging/test_wheel_front_door_contract.py::test_wheel_install_runs_front_door_evaluate_verify_report_html_outside_repo_tree
 
 model-evidence-list:  ## Print the maintained shipped-model evidence manifest
 	$(MAKE) ensure-python

@@ -179,7 +179,7 @@ def test_makefile_exposes_front_door_packaging_smoke_target() -> None:
 
     assert "packaging-smoke-front-door:" in text
     assert (
-        "tests/integration/packaging/test_wheel_evidence_pack_verify.py::"
+        "tests/integration/packaging/test_wheel_front_door_contract.py::"
         "test_wheel_install_runs_front_door_evaluate_verify_report_html_outside_repo_tree"
     ) in text
     front_door_block = text.split("packaging-smoke-front-door:", 1)[1].split(
