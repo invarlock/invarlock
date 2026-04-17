@@ -85,9 +85,7 @@ def test_gitignore_keeps_current_output_paths_and_drops_stale_legacy_scratch() -
         assert pattern in text, f"required gitignore pattern missing: {pattern}"
 
     for pattern in removed_patterns:
-        assert pattern not in text, (
-            f"stale gitignore pattern still present: {pattern}"
-        )
+        assert pattern not in text, f"stale gitignore pattern still present: {pattern}"
 
 
 def test_public_docs_use_repo_and_package_native_wording_for_pack_verification() -> (

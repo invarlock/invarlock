@@ -4,7 +4,7 @@ import importlib.util
 import json
 import sys
 from pathlib import Path
-from types import ModuleType, SimpleNamespace
+from types import ModuleType
 
 
 def _load_script_module() -> ModuleType:
@@ -51,11 +51,15 @@ def test_main_writes_summary_and_invokes_both_surfaces(
 
     calls: list[list[str]] = []
 
-    def _fake_run(cmd, **kwargs):
+    def _fake_run_subprocess(cmd, **kwargs):
         calls.append(list(cmd))
-        return SimpleNamespace(returncode=0, stdout="ok\n", stderr="")
+        return {
+            "command": list(cmd),
+            "returncode": 0,
+            "log_path": "artifacts/run.log",
+        }
 
-    monkeypatch.setattr(module.subprocess, "run", _fake_run)
+    monkeypatch.setattr(module, "_run_subprocess", _fake_run_subprocess)
 
     out_root = tmp_path / "artifacts"
     exit_code = module.main(
@@ -97,11 +101,15 @@ def test_main_limits_paths_to_curated_subset(tmp_path: Path, monkeypatch) -> Non
 
     calls: list[list[str]] = []
 
-    def _fake_run(cmd, **kwargs):
+    def _fake_run_subprocess(cmd, **kwargs):
         calls.append(list(cmd))
-        return SimpleNamespace(returncode=0, stdout="ok\n", stderr="")
+        return {
+            "command": list(cmd),
+            "returncode": 0,
+            "log_path": "artifacts/run.log",
+        }
 
-    monkeypatch.setattr(module.subprocess, "run", _fake_run)
+    monkeypatch.setattr(module, "_run_subprocess", _fake_run_subprocess)
 
     exit_code = module.main(
         [
@@ -135,3 +143,31 @@ def test_default_notebook_inventory_requires_explicit_classification() -> None:
 
     assert list(module.DEFAULT_NOTEBOOK_PATHS) == discovered
     assert module._resolve_notebook_paths(None) == discovered
+
+
+def test_run_subprocess_streams_output_to_log_and_console(
+    tmp_path: Path, capsys
+) -> None:
+    module = _load_script_module()
+    module.ROOT = tmp_path
+
+    script = tmp_path / "emit.py"
+    script.write_text(
+        "print('alpha')\nprint('beta')\n",
+        encoding="utf-8",
+    )
+    log_path = tmp_path / "artifacts" / "run.log"
+
+    result = module._run_subprocess(
+        [sys.executable, str(script)],
+        env=module._default_env(),
+        log_path=log_path,
+    )
+
+    assert result["returncode"] == 0
+    assert log_path.read_text(encoding="utf-8") == "alpha\nbeta\n"
+    captured = capsys.readouterr()
+    assert "[live] Running:" in captured.out
+    assert "alpha" in captured.out
+    assert "beta" in captured.out
+    assert "[live] Finished rc=0:" in captured.out

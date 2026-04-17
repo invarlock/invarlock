@@ -4,7 +4,7 @@ import importlib.util
 import json
 import sys
 from pathlib import Path
-from types import ModuleType, SimpleNamespace
+from types import ModuleType
 
 
 def _load_script_module() -> ModuleType:
@@ -378,7 +378,7 @@ def test_prepare_workspace_stages_lightweight_repo_view(tmp_path: Path) -> None:
     module = _load_script_module()
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
-    for dirname in ("src", "scripts", "configs", "runtime", "tests"):
+    for dirname in (".github", "src", "scripts", "configs", "runtime", "tests"):
         (repo_root / dirname).mkdir()
         (repo_root / dirname / "marker.txt").write_text(dirname, encoding="utf-8")
     (repo_root / "README.md").write_text("# repo\n", encoding="utf-8")
@@ -396,6 +396,7 @@ def test_prepare_workspace_stages_lightweight_repo_view(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     module._prepare_workspace(workspace)
 
+    assert (workspace / ".github").is_symlink()
     assert (workspace / "src").is_symlink()
     assert (workspace / "scripts").is_symlink()
     assert (workspace / "configs").is_symlink()
@@ -425,10 +426,13 @@ def test_run_blocks_writes_results(tmp_path: Path, monkeypatch) -> None:
         text="invarlock version",
     )
 
-    def _fake_run(cmd, **kwargs):
-        return SimpleNamespace(returncode=0, stdout="ok\n", stderr="")
+    def _fake_run_logged_script(**kwargs):
+        log_path = kwargs["log_path"]
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text("ok\n", encoding="utf-8")
+        return 0, "ok\n"
 
-    monkeypatch.setattr(module.subprocess, "run", _fake_run)
+    monkeypatch.setattr(module, "_run_logged_script", _fake_run_logged_script)
 
     out_root = tmp_path / "out"
     assert module.run_blocks([block], output_root=out_root) == 0
@@ -442,3 +446,74 @@ def test_run_blocks_writes_results(tmp_path: Path, monkeypatch) -> None:
     assert len(records) == 1
     assert records[0]["execution_mode"] == "container"
     assert records[0]["status"] == "ok"
+    assert records[0]["stdout"] == "ok\n"
+    assert records[0]["stderr"] == ""
+
+
+def test_run_blocks_clears_stale_output_root(tmp_path: Path, monkeypatch) -> None:
+    module = _load_script_module()
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    (repo_root / "README.md").write_text("# test\n", encoding="utf-8")
+    (repo_root / "src").mkdir()
+    module.ROOT = repo_root
+    module.TMP = repo_root / "tmp"
+
+    block = module.BashBlock(
+        file=str(repo_root / "README.md"),
+        line=1,
+        block_index=1,
+        text="invarlock version",
+    )
+
+    def _fake_run_logged_script(**kwargs):
+        log_path = kwargs["log_path"]
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text("ok\n", encoding="utf-8")
+        return 0, "ok\n"
+
+    monkeypatch.setattr(module, "_run_logged_script", _fake_run_logged_script)
+
+    out_root = tmp_path / "out"
+    out_root.mkdir()
+    (out_root / "results.jsonl").write_text("garbage\n", encoding="utf-8")
+    (out_root / "logs").mkdir()
+    (out_root / "logs" / "stale.log").write_text("stale\n", encoding="utf-8")
+
+    assert module.run_blocks([block], output_root=out_root) == 0
+
+    records = [
+        json.loads(line)
+        for line in (out_root / "results.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert len(records) == 1
+    assert records[0]["id"] == "001-01"
+    assert not (out_root / "logs" / "stale.log").exists()
+
+
+def test_run_logged_script_streams_output_to_log_and_console(
+    tmp_path: Path, capsys
+) -> None:
+    module = _load_script_module()
+    script = tmp_path / "emit.sh"
+    script.write_text("printf 'alpha\\n'; printf 'beta\\n'\n", encoding="utf-8")
+    log_path = tmp_path / "logs" / "emit.log"
+
+    returncode, output_tail = module._run_logged_script(
+        cmd=["bash", str(script)],
+        cwd=tmp_path,
+        env=module._default_env(tmp_path),
+        log_path=log_path,
+        label="demo-block",
+    )
+
+    assert returncode == 0
+    assert output_tail == "alpha\nbeta\n"
+    assert log_path.read_text(encoding="utf-8") == "alpha\nbeta\n"
+    captured = capsys.readouterr()
+    assert "[markdown-live] Running demo-block" in captured.out
+    assert "alpha" in captured.out
+    assert "beta" in captured.out
+    assert "[markdown-live] Finished demo-block rc=0" in captured.out

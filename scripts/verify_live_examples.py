@@ -86,23 +86,26 @@ def _run_subprocess(
     log_path: Path,
 ) -> dict[str, object]:
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    completed = subprocess.run(
-        cmd,
-        cwd=str(ROOT),
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    log_path.write_text(
-        (completed.stdout or "")
-        + ("\n" if completed.stdout and completed.stderr else "")
-        + (completed.stderr or ""),
-        encoding="utf-8",
-    )
+    print(f"[live] Running: {' '.join(cmd)}", flush=True)
+    with log_path.open("w", encoding="utf-8") as log_file:
+        process = subprocess.Popen(
+            cmd,
+            cwd=str(ROOT),
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+        assert process.stdout is not None
+        for line in process.stdout:
+            log_file.write(line)
+            print(line, end="")
+        returncode = process.wait()
+    print(f"[live] Finished rc={returncode}: {' '.join(cmd)}", flush=True)
     return {
         "command": cmd,
-        "returncode": int(completed.returncode),
+        "returncode": int(returncode),
         "log_path": str(log_path.relative_to(ROOT)),
     }
 

@@ -78,6 +78,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dead markdownlint curated paths, and obsolete deep-clean output names from
   the current repo shape.
 - Fixed the live-example verification path so `make docs-live` now runs the
+  markdown and notebook lanes with streamed progress output, stages
+  `.github/` into the lightweight markdown workspaces for repo-shape checks,
+  and clears stale live-example output before reruns so interrupted sessions
+  do not corrupt later `results.jsonl` reads.
   true full markdown-plus-notebook lane, while `docs-live-fast` remains the
   deterministic curated subset used by docs checks and CI.
 - Fixed host-mode docs replay and notebook smoke execution to normalize heavy

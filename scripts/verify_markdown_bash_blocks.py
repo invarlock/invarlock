@@ -69,6 +69,7 @@ DEMO_RUNTIME_MANIFEST_FIXTURE = (
 )
 
 WORKSPACE_STAGE_DIRS = {
+    ".github",
     "configs",
     "contracts",
     "docs",
@@ -629,6 +630,37 @@ def _write_json(path: Path, payload: object) -> None:
     )
 
 
+def _run_logged_script(
+    *,
+    cmd: list[str],
+    cwd: Path,
+    env: dict[str, str],
+    log_path: Path,
+    label: str,
+) -> tuple[int, str]:
+    print(f"[markdown-live] Running {label}", flush=True)
+    output_tail = ""
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("w", encoding="utf-8") as log_file:
+        process = subprocess.Popen(
+            cmd,
+            cwd=str(cwd),
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+        assert process.stdout is not None
+        for line in process.stdout:
+            log_file.write(line)
+            print(line, end="")
+            output_tail = (output_tail + line)[-4000:]
+        returncode = process.wait()
+    print(f"[markdown-live] Finished {label} rc={returncode}", flush=True)
+    return returncode, output_tail
+
+
 def _build_demo_evaluation_report(
     run_report: dict[str, object],
     baseline_report: dict[str, object],
@@ -838,6 +870,8 @@ def run_blocks(
     execution_mode: str = "container",
     skip_model_loading: bool = False,
 ) -> int:
+    if output_root.exists():
+        shutil.rmtree(output_root)
     output_root.mkdir(parents=True, exist_ok=True)
     results_path = output_root / "results.jsonl"
     workspace_root = output_root / "workspaces"
@@ -884,41 +918,35 @@ def run_blocks(
                     ),
                     encoding="utf-8",
                 )
-                completed = subprocess.run(
-                    ["bash", "-euo", "pipefail", str(script_path.name)],
-                    cwd=str(workspace),
+                returncode, output_tail = _run_logged_script(
+                    cmd=["bash", "-euo", "pipefail", str(script_path.name)],
+                    cwd=workspace,
                     env=env,
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                )
-                log_path.write_text(
-                    (completed.stdout or "")
-                    + ("\n" if completed.stdout and completed.stderr else "")
-                    + (completed.stderr or ""),
-                    encoding="utf-8",
+                    log_path=log_path,
+                    label=f"{block_id} {Path(block.file).name}:{block.line}",
                 )
                 record = {
                     "id": block_id,
                     "file": block.file,
                     "line": block.line,
                     "execution_mode": execution_mode,
-                    "status": "ok" if completed.returncode == 0 else "failed",
-                    "exit_code": int(completed.returncode),
+                    "status": "ok" if returncode == 0 else "failed",
+                    "exit_code": int(returncode),
                     "log_path": str(log_path),
-                    "stdout": (completed.stdout or "")[-4000:],
-                    "stderr": (completed.stderr or "")[-4000:],
+                    "stdout": output_tail,
+                    "stderr": "",
                 }
                 out.write(json.dumps(record) + "\n")
                 out.flush()
 
     failures = 0
-    for raw in results_path.read_text(encoding="utf-8").splitlines():
-        if not raw.strip():
-            continue
-        record = json.loads(raw)
-        if record.get("status") == "failed":
-            failures += 1
+    with results_path.open(encoding="utf-8") as results_file:
+        for raw in results_file:
+            if not raw.strip():
+                continue
+            record = json.loads(raw)
+            if record.get("status") == "failed":
+                failures += 1
     print(f"Verified {len(blocks)} bash block(s) → {results_path}")
     if failures:
         print(f"Markdown bash block failures: {failures}", file=sys.stderr)
