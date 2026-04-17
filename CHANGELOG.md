@@ -41,6 +41,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactored the proof-pack, runtime-security, verify-check, model-profile,
   guard-policy, and orchestration-attempt internals into smaller owner modules
   without changing the public CLI surface.
+- Renamed the internal runtime-provenance and proof-pack provenance helper
+  families to remove the remaining attestation-era naming, switched proof-pack
+  inspect integrity payloads to `manifest_provenance_ok`, moved runtime
+  verification fixtures under `tests/fixtures/runtime_provenance`, and dropped
+  the last `--assurance` rewrite path from the markdown live-example sanitizer.
 
 ### Fixed
 - Fixed runtime-contract docs and assurance hygiene by teaching the assurance
