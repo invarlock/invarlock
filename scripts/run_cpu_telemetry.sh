@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Lightweight CPU-only telemetry sweep for CI profile edits.
-# Produces attested reports under reports/telemetry/cpu-ci with latency/memory metrics.
+# Produces container-backed reports under reports/telemetry/cpu-ci with latency/memory metrics.
 
 set -euo pipefail
 

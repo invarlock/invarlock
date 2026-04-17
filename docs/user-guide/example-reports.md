@@ -6,7 +6,7 @@
 | --- | --- |
 | **Purpose** | Show how to generate and interpret InvarLock reports. |
 | **Audience** | Users learning the evaluation workflow. |
-| **Outputs** | `evaluation.report.json`, `evaluation_report.md`, `report.json`, and `runtime.manifest.json` for attested outputs. |
+| **Outputs** | `evaluation.report.json`, `evaluation_report.md`, `report.json`, and `runtime.manifest.json` for container-backed outputs. |
 | **Requires** | `invarlock[hf]` for HF adapter workflows. |
 
 InvarLock emits both machine-readable reports and human-friendly summaries.
@@ -15,9 +15,9 @@ Use the steps below to reproduce representative artifacts from this repository v
 ## 1. Generate a report Bundle
 
 The command below shows the secure-default runtime-container path. It writes an
-attested `runtime.manifest.json` next to `evaluation.report.json`. Trusted
-public host-side workflows use `--assurance trusted-local` and should verify the
-resulting report with `invarlock verify --assurance trusted-local ...`.
+container-backed `runtime.manifest.json` next to `evaluation.report.json`. Trusted
+public host-side workflows use `--execution-mode trusted-local` and should verify the
+resulting report with `invarlock verify --runtime-provenance trusted-local ...`.
 
 ```bash
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
@@ -68,7 +68,7 @@ For audits, collect the following files:
 |------|---------|
 | `runs/<name>/**/report.json` | Execution log, metrics, and guard telemetry |
 | `reports/<name>/evaluation.report.json` | Machine-readable evaluation report |
-| `reports/<name>/runtime.manifest.json` | Runtime attestation for secure-default outputs |
+| `reports/<name>/runtime.manifest.json` | Runtime provenance for secure-default outputs |
 | `reports/<name>/evaluation_report.md` | Human-friendly summary for reviewers |
 
 Reports remain valid only for the same baseline reference, pairing assumptions,

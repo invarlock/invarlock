@@ -22,7 +22,7 @@ Bands were empirically derived on pilot models and are enforced in CI. Actual va
 ## Determinism & Setup
 
 - Enable framework determinism (PyTorch deterministic algorithms; disable TF32 where applicable).
-- Record seed bundle and device in the attested report bundle: `meta.seeds.*`, `meta.device`.
+- Record seed bundle and device in the container-backed report bundle: `meta.seeds.*`, `meta.device`.
 - Use identical window plans (paired, non‑overlapping) and the same resolved policy/digest.
 
 ## Reproducible Check

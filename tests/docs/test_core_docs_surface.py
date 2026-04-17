@@ -75,8 +75,8 @@ def test_support_surfaces_use_trusted_local_assurance_for_public_evaluate_exampl
 
     for rel_path in surfaces:
         text = _read(rel_path)
-        assert "--assurance trusted-local" in text, (
-            f"--assurance trusted-local missing from {rel_path}"
+        assert "--execution-mode trusted-local" in text, (
+            f"--execution-mode trusted-local missing from {rel_path}"
         )
         assert "INVARLOCK_ALLOW_HOST_EXECUTION=1" not in text, (
             f"legacy host-execution env still promoted in {rel_path}"
@@ -115,8 +115,8 @@ def test_public_security_and_reference_docs_use_trusted_local_assurance_for_publ
 
     for rel_path in surfaces:
         text = _read(rel_path)
-        assert "--assurance trusted-local" in text, (
-            f"--assurance trusted-local missing from {rel_path}"
+        assert "--execution-mode trusted-local" in text, (
+            f"--execution-mode trusted-local missing from {rel_path}"
         )
 
 

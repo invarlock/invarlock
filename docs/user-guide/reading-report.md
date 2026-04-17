@@ -7,7 +7,7 @@
 | **Purpose** | Understand and interpret InvarLock v1 reports. |
 | **Audience** | Reviewers validating evaluation evidence. |
 | **Key sections** | Executive Summary, Quality Gates, Primary Metric, Provenance, Measurement contracts. |
-| **Validation** | Use `invarlock verify <evaluation.report.json>` to check schema, pairing, and required runtime attestation via `runtime.manifest.json`. |
+| **Validation** | Use `invarlock verify <evaluation.report.json>` to check schema, pairing, and required runtime provenance via `runtime.manifest.json`. |
 | **Source of truth** | [reports](../reference/reports.md) for full schema. |
 
 This guide highlights the key sections of a v1 report and how to

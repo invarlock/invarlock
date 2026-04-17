@@ -65,7 +65,7 @@ The unedited reference model run used for comparison and gating.
 
 **Example:** `invarlock evaluate --baseline gpt2 --subject gpt2-quant`
 This follows the secure-default runtime-container path unless a trusted local
-workflow uses `--assurance trusted-local`.
+workflow uses `--execution-mode trusted-local`.
 
 ---
 
@@ -123,7 +123,7 @@ unmodified baseline.
 
 #### Evidence Bundle
 
-Set of files produced for audit: reports, attestation sidecars, and supporting
+Set of files produced for audit: reports, runtime-provenance sidecars, and supporting
 events or derived renderings.
 
 | Aspect | Details |
@@ -206,7 +206,7 @@ Guard measurement procedure signature and digest recorded in reports.
 | Aspect | Details |
 | --- | --- |
 | **Context** | Spectral and RMT guards record estimator + sampling policy |
-| **Verified by** | `invarlock verify --profile ci\|release` (plus `runtime.manifest.json` attestation for attested outputs) |
+| **Verified by** | `invarlock verify --profile ci\|release` (plus `runtime.manifest.json` runtime provenance for container-backed outputs) |
 | **report fields** | `spectral.measurement_contract_hash`, `rmt.measurement_contract_hash` |
 | **See also** | [Guard Contracts](04-guard-contracts.md) |
 

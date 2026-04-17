@@ -638,8 +638,8 @@ def test_runtime_attestation_does_not_embed_cli_flag_guidance() -> None:
     for snippet in (
         "--allow-unattested-artifacts",
         "pass --allow-unattested-artifacts",
-        "--assurance trusted-local",
-        "pass --assurance trusted-local",
+        "--execution-mode trusted-local",
+        "pass --execution-mode trusted-local",
     ):
         if snippet in text:
             offenders.append(snippet)

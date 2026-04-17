@@ -15,7 +15,7 @@ Overview of the core security-related components and defaults.
 
 - `invarlock evaluate`, `invarlock advanced calibrate`, and internal
   config-driven runner flows delegate to the runtime container by default.
-- Use `--assurance trusted-local` on `invarlock evaluate` for trusted public local runs, or
+- Use `--execution-mode trusted-local` on `invarlock evaluate` for trusted public local runs, or
   `INVARLOCK_ALLOW_HOST_EXECUTION=1` / `--allow-host-execution` for advanced
   and internal workflows that intentionally bypass that boundary.
 - Third-party plugin discovery and remote model code execution are separate
@@ -31,11 +31,11 @@ Overview of the core security-related components and defaults.
 ## report verification
 
 - `invarlock verify` re-checks schema, pairing math (Δlog → ratio),
-  drift/overhead gates, and runtime attestation via `runtime.manifest.json`.
+  drift/overhead gates, and runtime provenance via `runtime.manifest.json`.
 - `invarlock-runtime-verify` is the low-level package-native CLI for direct
   report/manifest checks, and it uses the same Python verifier implementation
-  as runtime attestation.
-- Product attestation does not depend on an external verifier binary or
+  as runtime provenance.
+- Product runtime-provenance verification does not depend on an external verifier binary or
   `PATH` lookup, so verifier behavior stays stable across installs.
 - Use it before promotion or downstream automation to prevent policy regressions.
 

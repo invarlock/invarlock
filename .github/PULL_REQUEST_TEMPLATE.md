@@ -8,7 +8,7 @@
 ## Testing
 - [ ] Unit tests added/updated
 - [ ] Integration test or local run
-- [ ] `invarlock verify` on attested outputs (if evaluation reports are involved)
+- [ ] `invarlock verify` on container-backed outputs (if evaluation reports are involved)
 
 ## Docs
 - [ ] User docs updated

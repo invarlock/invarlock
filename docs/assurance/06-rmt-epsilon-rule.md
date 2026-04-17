@@ -89,7 +89,7 @@ larger ε to avoid spurious failures.
 - `rmt.edge_risk_by_family_base.*` and `rmt.edge_risk_by_family.*`.
 - `rmt.epsilon_default` and `rmt.epsilon_by_family.*`.
 - `rmt.status` / `rmt.stable` and `rmt.epsilon_violations` for pass/fail context.
-- `resolved_policy.rmt.{margin,deadband,epsilon_by_family}` — resolved thresholds archived with the attested report bundle.
+- `resolved_policy.rmt.{margin,deadband,epsilon_by_family}` — resolved thresholds archived with the container-backed report bundle.
 
 ## Edge cases
 

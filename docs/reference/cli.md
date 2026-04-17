@@ -33,7 +33,7 @@ invarlock evaluate --allow-network \
   --adapter auto \
   --profile ci
 
-# Validate the attested evaluation bundle
+# Validate the container-backed evaluation bundle
 invarlock verify reports/eval/evaluation.report.json
 
 # Render shareable HTML
@@ -45,19 +45,19 @@ invarlock report explain \
 
 ## Security Defaults
 
-- `evaluate` defaults to `--assurance attested`, which delegates model-loading work
+- `evaluate` defaults to `--execution-mode container`, which delegates model-loading work
   into the runtime container.
-- Use `--assurance trusted-local` only for trusted host-side workflows that intentionally
+- Use `--execution-mode trusted-local` only for trusted local workflows that intentionally
   bypass the container boundary.
-- `verify` expects `runtime.manifest.json` beside attested evaluation outputs
-  and fails closed when required attestation is missing.
+- `verify` expects `runtime.manifest.json` beside container-backed evaluation outputs
+  and fails closed when required runtime provenance is missing.
 - Network access remains opt-in through `evaluate --allow-network`.
 
 ## Task To Command Map
 
 | Task | Command | Output |
 | --- | --- | --- |
-| Compare baseline vs subject | `invarlock evaluate` | `reports/eval/evaluation.report.json` plus `runtime.manifest.json` for attested runs |
+| Compare baseline vs subject | `invarlock evaluate` | `reports/eval/evaluation.report.json` plus `runtime.manifest.json` for container-backed runs |
 | Validate an evaluation report | `invarlock verify` | Exit code plus human or JSON verification output |
 | Render HTML from an evaluation report | `invarlock report html` | HTML file |
 | Explain gate decisions from run reports | `invarlock report explain` | Human-readable explanation |
@@ -83,7 +83,7 @@ invarlock report explain \
 | Command | Purpose |
 | --- | --- |
 | `invarlock evaluate` | Compare baseline and subject checkpoints with deterministic pairing |
-| `invarlock verify` | Verify evaluation reports against schema, pairing, and attestation rules |
+| `invarlock verify` | Verify evaluation reports against schema, pairing, and runtime provenance rules |
 | `invarlock report` | Explain, render, and validate existing report artifacts |
 | `invarlock doctor` | Diagnose environment and configuration issues |
 | `invarlock advanced` | Advanced proof-pack, policy, plugin, and calibration workflows |
@@ -108,10 +108,10 @@ Common options:
 - `--preset`: optional repo preset path
 - `--out`: run-artifact directory
 - `--report-out`: evaluation report directory
-- `--assurance attested|trusted-local`: execution policy for `evaluate`.
-  `attested` keeps model loading inside the runtime container; `trusted-local`
-  allows trusted host execution and produces host-bypass artifacts that should
-  be verified with `verify --assurance trusted-local`.
+- `--execution-mode container|trusted-local`: execution policy for `evaluate`.
+  `container` keeps model loading inside the runtime container; `trusted-local`
+  allows trusted local execution and produces trusted-local artifacts that should
+  be verified with `verify --runtime-provenance trusted-local`.
 - `--edit-config`: optional demo/smoke edit overlay such as `quant_rtn`
 
 Example:
@@ -140,8 +140,8 @@ Common options:
 - `--baseline`: optional baseline report for comparison flows
 - `--tolerance`: float tolerance for recompute checks
 - `--profile`: profile-aware validation mode
-- `--assurance attested|trusted-local`: attestation expectation for the
-  supplied report artifacts
+- `--runtime-provenance container|trusted-local`: runtime provenance policy for
+  the supplied report artifacts
 - `--json`: emit a single JSON envelope
 
 Example:
@@ -278,7 +278,7 @@ These commands emit a single JSON object suitable for CI parsing.
 - Proof-pack, policy, plugin, and calibration workflows live under
   `invarlock advanced ...`.
 - Trusted host execution for the core evaluation path is expressed as
-  `--assurance trusted-local`.
+  `--execution-mode trusted-local`.
 - Internal delegated config execution uses a package-internal config-runner
   module, not a public CLI command.
 - Optional runtime backends are installed with Python extras instead of CLI

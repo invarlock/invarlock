@@ -59,7 +59,7 @@ INVARLOCK_ALLOW_REMOTE_CODE=1 \
 PACK_TUNED_EDIT_PARAMS_FILE=./scripts/proof_packs/tuned_edit_params.json \
   ./scripts/proof_packs/run_pack.sh --suite subset --net 1
 
-# Trusted local host workflow for these repo-only wrappers (skips the attested
+# Trusted local host workflow for these repo-only wrappers (skips the container-backed
 # container path)
 INVARLOCK_ALLOW_REMOTE_CODE=1 \
 INVARLOCK_ALLOW_HOST_EXECUTION=1 \
@@ -96,15 +96,16 @@ Note: clean edits require tuned preset parameters. Either set
 `PACK_TUNED_EDIT_PARAMS_FILE` or place the file at
 `scripts/proof_packs/tuned_edit_params.json`.
 
-The proof-pack shell wrappers do not expose the public core `--assurance` flag
-directly. For trusted local host execution in these repo-only wrappers, set
-`INVARLOCK_ALLOW_HOST_EXECUTION=1` in the environment before calling
-`run_pack.sh` or `run_suite.sh`. Installed-wheel/public workflows should use
-`invarlock evaluate --assurance trusted-local` instead. Otherwise, the underlying
-model-loading commands use the secure-default runtime container path and expect
-an OCI container engine such as `podman` or `docker`, plus a locally built
-`invarlock-runtime:local` image from `make runtime-image`. If both engines are
-installed, set
+The proof-pack shell wrappers do not expose the public core
+`--execution-mode` / `--runtime-provenance` flags directly. For trusted local
+host execution in these repo-only wrappers, set `INVARLOCK_ALLOW_HOST_EXECUTION=1`
+in the environment before calling `run_pack.sh` or `run_suite.sh`.
+Installed-wheel/public workflows should use
+`invarlock evaluate --execution-mode trusted-local` instead. Otherwise, the
+underlying model-loading commands use the secure-default runtime container path
+and expect an OCI container engine such as `podman` or `docker`, plus a locally
+built `invarlock-runtime:local` image from `make runtime-image`. If both engines
+are installed, set
 `INVARLOCK_CONTAINER_ENGINE=podman` to force Podman.
 
 Validated secure-default parity contract for proof-pack wrappers:

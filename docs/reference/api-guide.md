@@ -52,8 +52,8 @@ print("primary metric:", report.metrics.get("primary_metric"))
   `invarlock.reporting.make_report`, then persisted as an
   evaluation bundle with `invarlock.reporting.report_bundle.save_evaluation_bundle`.
 - **Verification**: CLI-side `invarlock verify` enforces
-  `runtime.manifest.json` attestation for attested outputs in addition to schema
-  and pairing checks.
+  `runtime.manifest.json` runtime provenance for container-backed outputs in
+  addition to schema and pairing checks.
 
 ### Responsibility lanes
 

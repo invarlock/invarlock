@@ -76,7 +76,7 @@ def test_check_live_fast_uses_trusted_local_demo_mode(monkeypatch, capsys) -> No
             sys.executable,
             "scripts/verify_live_examples.py",
             "--markdown-execution-mode",
-            "host",
+            "trusted-local",
             "--skip-markdown-model-loading",
             "--skip-notebook-model-loading",
             "--paths",

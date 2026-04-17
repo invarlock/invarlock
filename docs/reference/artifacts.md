@@ -24,7 +24,7 @@ invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/eva
 ```
 
 Model-loading commands use the secure-default runtime container unless a trusted
-`invarlock evaluate --assurance trusted-local` workflow explicitly bypasses it.
+`invarlock evaluate --execution-mode trusted-local` workflow explicitly bypasses it.
 
 ## Concepts
 
@@ -38,7 +38,7 @@ Model-loading commands use the secure-default runtime container unless a trusted
 
 | Command | Writes | What to archive |
 | --- | --- | --- |
-| `invarlock evaluate` | `runs/`, `reports/<name>/evaluation.report.json`, `runtime.manifest.json` | Evaluation report bundle plus attestation for attested runs. |
+| `invarlock evaluate` | `runs/`, `reports/<name>/evaluation.report.json`, `runtime.manifest.json` | Evaluation report bundle plus runtime provenance for container-backed runs. |
 | `invarlock report html` | `reports/<name>/evaluation.html` | Optional (can be rebuilt). |
 
 ## Reference
@@ -73,7 +73,7 @@ reports/
 | Artifact | Why archive | Required for verify |
 | --- | --- | --- |
 | `evaluation.report.json` | Evaluation report snapshot | Yes |
-| `runtime.manifest.json` | Runtime attestation for secure-default outputs | Yes |
+| `runtime.manifest.json` | Runtime provenance for secure-default outputs | Yes |
 | `events.jsonl` | Debugging timeline | No |
 | `evaluation.html` | Human review | No |
 

@@ -23,7 +23,7 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 TEST_REF_RE = re.compile(
-    r"(tests/[A-Za-z0-9_./-]+\.py::[A-Za-z0-9_]+(?:::[A-Za-z0-9_]+)*)"
+    r"(tests/[A-Za-z0-9_./-]+\.py(?:::[A-Za-z0-9_]+(?:::[A-Za-z0-9_]+)*)?)"
 )
 FENCED_CODE_BLOCK_RE = re.compile(r"```.*?```", flags=re.DOTALL)
 INLINE_CODE_RE = re.compile(r"`([^`]+)`")
@@ -439,7 +439,7 @@ def main() -> None:
                         LintError(md_path, f"Cannot parse `{py_path}`: {e.msg}")
                     )
                     continue
-            if not _has_pytest_node(trees[py_path], node_parts):
+            if node_parts and not _has_pytest_node(trees[py_path], node_parts):
                 errors.append(LintError(md_path, f"Missing test: `{ref}`"))
 
     # ---- field-path xrefs ----

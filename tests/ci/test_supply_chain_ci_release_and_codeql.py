@@ -348,7 +348,7 @@ def test_gpt2_smoke_workflow_is_configured() -> None:
 
     env = job["env"]
     assert env["INVARLOCK_ALLOW_NETWORK"] == "1"
-    assert env["INVARLOCK_SMOKE_MODE"] == "attested"
+    assert env["INVARLOCK_SMOKE_MODE"] == "container"
     assert env["INVARLOCK_SMOKE_PROFILE"] == "dev"
     assert env["INVARLOCK_RUNTIME_IMAGE"] == "invarlock-runtime:local"
 
@@ -372,8 +372,8 @@ def test_ci_hf_lockfiles_include_hypothesis_for_property_tests() -> None:
         assert "hypothesis==" in text, f"hypothesis missing from {path}"
 
 
-def test_tiny_attested_smoke_workflow_is_configured() -> None:
-    workflow = _load_workflow(Path(".github/workflows/tiny-attested-smoke.yml"))
+def test_tiny_container_smoke_workflow_is_configured() -> None:
+    workflow = _load_workflow(Path(".github/workflows/tiny-container-smoke.yml"))
     triggers = workflow["on"]
 
     assert triggers["push"]["branches"] == ["staging/next"]
@@ -386,7 +386,7 @@ def test_tiny_attested_smoke_workflow_is_configured() -> None:
 
     env = job["env"]
     assert env["INVARLOCK_ALLOW_NETWORK"] == "1"
-    assert env["INVARLOCK_SMOKE_MODE"] == "attested"
+    assert env["INVARLOCK_SMOKE_MODE"] == "container"
     assert env["INVARLOCK_SMOKE_PROFILE"] == "dev"
     assert env["INVARLOCK_RUNTIME_IMAGE"] == "invarlock-runtime:local"
 
@@ -397,5 +397,5 @@ def test_tiny_attested_smoke_workflow_is_configured() -> None:
     runtime_image = _find_step_by_name(steps, "Build runtime image")
     assert "make runtime-image" in runtime_image["run"]
 
-    smoke = _find_step_by_name(steps, "Run tiny attested smoke campaign")
-    assert "scripts/run_tiny_attested_smoke.sh" in smoke["run"]
+    smoke = _find_step_by_name(steps, "Run tiny container smoke campaign")
+    assert "scripts/run_tiny_container_smoke.sh" in smoke["run"]

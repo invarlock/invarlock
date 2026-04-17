@@ -502,7 +502,7 @@ docs-check: ## Run consolidated docs validation plus curated live examples
 docs-live-fast: ## Live-run the curated deterministic docs and notebook subset
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTHON) scripts/verify_live_examples.py \
-		--markdown-execution-mode host \
+		--markdown-execution-mode trusted-local \
 		--skip-markdown-model-loading \
 		--skip-notebook-model-loading \
 		--paths \
@@ -515,7 +515,7 @@ docs-live-fast: ## Live-run the curated deterministic docs and notebook subset
 docs-live: ## Live-run runnable markdown CLI examples and notebooks
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTHON) scripts/verify_live_examples.py \
-		--markdown-execution-mode host
+		--markdown-execution-mode trusted-local
 
 docs-check-build: ## Build docs strictly and run link checks
 	$(MAKE) ensure-python

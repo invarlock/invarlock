@@ -44,17 +44,17 @@ for portable local smokes. Use `--profile ci` or `--profile release` when you
 need balanced-tier evaluations to clear the standard token-floor gates.
 
 Security-default note: `evaluate` uses the runtime container by default. Use
-`--assurance trusted-local` only for trusted local workflows that intentionally bypass that
+`--execution-mode trusted-local` only for trusted local workflows that intentionally bypass that
 boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.
 
 Smoke asset note: `configs/presets/causal_lm/gpt2_smoke_128.yaml` provides the
 small GPT-2 canary preset used by `scripts/run_gpt2_smoke_campaign.sh` and the
 scheduled/workflow-dispatch GPT-2 smoke workflow. Push gating uses
-`scripts/run_tiny_attested_smoke.sh` and the `Tiny Attested Smoke` workflow
+`scripts/run_tiny_container_smoke.sh` and the `Tiny Container Smoke` workflow
 with `sshleifer/tiny-gpt2` plus a local JSONL fixture. Both smoke paths run
 under the included `dev` profile so they can complete the full `evaluate` →
 `verify` → `report` commands → `proof-pack` path without depending on release-profile
-floors. The tiny push smoke also uses an explicit trusted-local assurance override
+floors. The tiny push smoke also uses an explicit trusted-local execution override
 for proof-pack verification when CI produces an unsigned pack; the default
 package-native verifier behavior remains fail-closed for unsigned packs.
 
@@ -156,9 +156,9 @@ to change proposals or releases when you update calibration.
 1. **Configure** – describe model, dataset, edit, and guard policies in YAML.
 2. **Execute** – run `invarlock evaluate` under a CI or release profile;
    model-loading commands use the runtime container by default unless you pass
-   `--assurance trusted-local`.
+   `--execution-mode trusted-local`.
 3. **Validate** – run `invarlock verify` and render HTML via `invarlock report html`;
-   attested outputs include `runtime.manifest.json` next to
+   container-backed outputs include `runtime.manifest.json` next to
    `evaluation.report.json`.
    Directory inputs to `invarlock report` are only accepted when they contain
    canonical `report.json` or `evaluation.report.json`.

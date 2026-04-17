@@ -45,4 +45,4 @@ downloads, and materially longer runtimes than the curated CI subset.
 
 Notebook examples are trusted-local examples. They are meant to be easy to run
 from a checkout or an installed development environment. They do not replace
-the attested runtime-container path used by the secure-default CLI workflow.
+the runtime-container path used by the secure-default CLI workflow.

@@ -281,7 +281,7 @@ def test_model_evidence_sweep_dry_run_uses_lane_specific_verify_profile_when_omi
             "--slug",
             "gpt2_public",
             "--execution-mode",
-            "host",
+            "trusted-local",
             "--output-root",
             str(output_root),
             "--dry-run",
@@ -361,12 +361,12 @@ def test_model_evidence_sweep_dry_run_emits_commands_and_manifest(
     assert manifest["lanes"][0]["slug"] == "qwen3_8b"
 
 
-def test_model_evidence_sweep_host_mode_emits_trusted_local_assurance(
+def test_model_evidence_sweep_trusted_local_mode_emits_explicit_runtime_flags(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
     script = repo_root / "scripts" / "model_evidence_sweep.py"
-    output_root = tmp_path / "evidence-host"
+    output_root = tmp_path / "evidence-trusted-local"
 
     proc = subprocess.run(
         [
@@ -375,7 +375,7 @@ def test_model_evidence_sweep_host_mode_emits_trusted_local_assurance(
             "--slug",
             "tinyllama_1_1b",
             "--execution-mode",
-            "host",
+            "trusted-local",
             "--output-root",
             str(output_root),
             "--dry-run",
@@ -389,18 +389,18 @@ def test_model_evidence_sweep_host_mode_emits_trusted_local_assurance(
     assert proc.returncode == 0, proc.stderr
     payload = json.loads(proc.stdout)
     assert len(payload) == 1
-    assert payload[0]["execution_mode"] == "host"
+    assert payload[0]["execution_mode"] == "trusted-local"
     assert payload[0]["prefetch"][-1] == "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
     assert payload[0]["prefetch"][1] == "-c"
-    assert "--assurance" in payload[0]["evaluate"]
+    assert "--execution-mode" in payload[0]["evaluate"]
     assert (
-        payload[0]["evaluate"][payload[0]["evaluate"].index("--assurance") + 1]
+        payload[0]["evaluate"][payload[0]["evaluate"].index("--execution-mode") + 1]
         == "trusted-local"
     )
     assert "--allow-host-execution" not in payload[0]["evaluate"]
-    assert "--assurance" in payload[0]["verify"]
+    assert "--runtime-provenance" in payload[0]["verify"]
     assert (
-        payload[0]["verify"][payload[0]["verify"].index("--assurance") + 1]
+        payload[0]["verify"][payload[0]["verify"].index("--runtime-provenance") + 1]
         == "trusted-local"
     )
     preset_idx = payload[0]["evaluate"].index("--preset") + 1
@@ -409,17 +409,17 @@ def test_model_evidence_sweep_host_mode_emits_trusted_local_assurance(
     )
 
     manifest = json.loads((output_root / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["execution_mode"] == "host"
+    assert manifest["execution_mode"] == "trusted-local"
 
 
-def test_model_evidence_sweep_host_mode_prefetches_before_evaluate(
+def test_model_evidence_sweep_trusted_local_mode_prefetches_before_evaluate(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
     script = repo_root / "scripts" / "model_evidence_sweep.py"
     fake_python = tmp_path / "fake-python"
     _write_fake_python(fake_python)
-    output_root = tmp_path / "evidence-host-prefetch"
+    output_root = tmp_path / "evidence-trusted-local-prefetch"
     log_path = tmp_path / "fake-python.log"
 
     env = dict(os.environ)
@@ -432,7 +432,7 @@ def test_model_evidence_sweep_host_mode_prefetches_before_evaluate(
             "--slug",
             "tinyllama_1_1b",
             "--execution-mode",
-            "host",
+            "trusted-local",
             "--output-root",
             str(output_root),
             "--python",
@@ -458,7 +458,7 @@ def test_model_evidence_sweep_retries_evaluate_once_after_sigterm(
     script = repo_root / "scripts" / "model_evidence_sweep.py"
     fake_python = tmp_path / "flaky-fake-python"
     _write_flaky_fake_python(fake_python)
-    output_root = tmp_path / "evidence-host-retry"
+    output_root = tmp_path / "evidence-trusted-local-retry"
     log_path = tmp_path / "fake-python-retry.log"
     state_path = tmp_path / "retry-state"
 
@@ -473,7 +473,7 @@ def test_model_evidence_sweep_retries_evaluate_once_after_sigterm(
             "--slug",
             "tinyllama_1_1b",
             "--execution-mode",
-            "host",
+            "trusted-local",
             "--output-root",
             str(output_root),
             "--python",
@@ -515,7 +515,7 @@ exit 99
         encoding="utf-8",
     )
     fake_python.chmod(fake_python.stat().st_mode | stat.S_IXUSR)
-    output_root = tmp_path / "evidence-host-gated"
+    output_root = tmp_path / "evidence-trusted-local-gated"
 
     proc = subprocess.run(
         [
@@ -526,7 +526,7 @@ exit 99
             "--slug",
             "google_gemma_3_4b_it",
             "--execution-mode",
-            "host",
+            "trusted-local",
             "--output-root",
             str(output_root),
             "--python",
@@ -565,7 +565,7 @@ exit 99
         encoding="utf-8",
     )
     fake_python.chmod(fake_python.stat().st_mode | stat.S_IXUSR)
-    output_root = tmp_path / "evidence-host-remote-code"
+    output_root = tmp_path / "evidence-trusted-local-remote-code"
 
     proc = subprocess.run(
         [
@@ -576,7 +576,7 @@ exit 99
             "--slug",
             "thudm_glm_4_9b_chat",
             "--execution-mode",
-            "host",
+            "trusted-local",
             "--output-root",
             str(output_root),
             "--python",
@@ -629,13 +629,15 @@ def test_run_lane_sets_remote_code_env_for_matching_preset(tmp_path: Path) -> No
     original_run = mod.subprocess.run
     mod.subprocess.run = fake_run
     try:
-        execution_root = mod._execution_root(output_root, execution_mode="host")
+        execution_root = mod._execution_root(
+            output_root, execution_mode="trusted-local"
+        )
         result = mod.run_lane(
             spec,
             python_exe=sys.executable,
             profile=None,
             device="cuda",
-            execution_mode="host",
+            execution_mode="trusted-local",
             output_root=output_root,
             execution_root=execution_root,
             env={"PYTHONPATH": "src"},

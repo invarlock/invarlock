@@ -29,7 +29,7 @@ pip install invarlock
 # Optional: only for evaluate with Hugging Face-backed models
 pip install "invarlock[hf]"
 
-# Repo checkout only: build the local runtime image once for attested runs
+# Repo checkout only: build the local runtime image once for container-backed runs
 make runtime-image
 
 # Podman users can prepare the same image explicitly with Podman
@@ -57,10 +57,10 @@ usable for local smokes. Keep using those presets, but pair them with
 to meet the normal token-floor gates.
 
 `evaluate` uses the secure-default runtime container unless you explicitly pass
-`--assurance trusted-local` for a trusted host-side workflow. Attested runs emit
+`--execution-mode trusted-local` for a trusted host-side workflow. Container-backed runs emit
 `reports/eval/runtime.manifest.json` next to `evaluation.report.json`. For a
 trusted host-side bypass, verify the resulting report with
-`invarlock verify --assurance trusted-local ...`.
+`invarlock verify --runtime-provenance trusted-local ...`.
 
 Proof-pack verification works from an installed wheel and does not require a
 repo checkout:
@@ -72,16 +72,16 @@ invarlock advanced proof-pack verify <pack> --strict
 ### 3. Verify the evaluation report
 
 ```bash
-# Attested/default evaluate output
+# Container/default evaluate output
 invarlock verify reports/eval/evaluation.report.json
 
 # Trusted-local evaluate output
-invarlock verify --assurance trusted-local reports/eval/evaluation.report.json
+invarlock verify --runtime-provenance trusted-local reports/eval/evaluation.report.json
 ```
 
 The verifier re-checks schema, paired math, gate results, and the adjacent
 runtime manifest before you promote results. Use the trusted-local form only
-when the evaluation itself ran with `--assurance trusted-local`.
+when the evaluation itself ran with `--execution-mode trusted-local`.
 
 `invarlock report generate` and `invarlock report explain` expect canonical
 `report.json` inputs. `invarlock report html` expects canonical
@@ -114,8 +114,8 @@ paired evaluation report.
 
 - Enable downloads per command with `--allow-network`.
 - For offline reads after warming caches, use `HF_DATASETS_OFFLINE=1`.
-- `--assurance trusted-local` is the explicit trusted-host bypass for `evaluate`.
-- `verify` expects `runtime.manifest.json` for attested evaluation outputs.
+- `--execution-mode trusted-local` is the explicit trusted-local bypass for `evaluate`.
+- `verify` expects `runtime.manifest.json` for container-backed evaluation outputs.
 - `--profile ci` currently expands causal-LM windows to `240/240`; `release`
   expands them to `400/400`.
 
@@ -154,7 +154,7 @@ remains narrower than the core InvarLock support matrix.
 ### Workflow
 
 - **Evaluate**: compare baseline and subject with deterministic pairing
-- **Verify**: fail closed on malformed or unattested evaluation outputs
+- **Verify**: fail closed on malformed or missing-provenance evaluation outputs
 - **Report**: render HTML or explain gate decisions from existing artifacts
 
 ### Guards

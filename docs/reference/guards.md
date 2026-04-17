@@ -88,7 +88,7 @@ guards:
   policy bundle from `runtime/tiers.yaml`; overrides in config are merged on top.
 - **Measurement contracts**: Spectral and RMT guards record estimator + sampling
   contracts in reports and are enforced by `invarlock verify` in CI/Release,
-  alongside required `runtime.manifest.json` attestation for evaluation outputs.
+  alongside required `runtime.manifest.json` runtime provenance for evaluation outputs.
 
 ### Guard hooks
 

@@ -90,7 +90,7 @@ def test_run_model_evidence_remote_dry_run_respects_skip_sync() -> None:
     assert payload["launches"][0]["gpu"] == "2"
 
 
-def test_run_model_evidence_remote_host_mode_is_forwarded() -> None:
+def test_run_model_evidence_remote_trusted_local_mode_is_forwarded() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     script = repo_root / "scripts" / "run_model_evidence_remote.py"
 
@@ -103,7 +103,7 @@ def test_run_model_evidence_remote_host_mode_is_forwarded() -> None:
             "--gpus",
             "0",
             "--execution-mode",
-            "host",
+            "trusted-local",
             "--dry-run",
         ],
         capture_output=True,
@@ -114,5 +114,5 @@ def test_run_model_evidence_remote_host_mode_is_forwarded() -> None:
 
     assert proc.returncode == 0, proc.stderr
     payload = json.loads(proc.stdout)
-    assert payload["execution_mode"] == "host"
-    assert "--execution-mode host" in payload["launches"][0]["remote_command"]
+    assert payload["execution_mode"] == "trusted-local"
+    assert "--execution-mode trusted-local" in payload["launches"][0]["remote_command"]

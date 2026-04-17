@@ -66,7 +66,7 @@ def test_main_writes_summary_and_invokes_both_surfaces(
             "--output-root",
             str(out_root),
             "--markdown-execution-mode",
-            "host",
+            "trusted-local",
         ]
     )
 
@@ -74,7 +74,7 @@ def test_main_writes_summary_and_invokes_both_surfaces(
     assert len(calls) == 2
     assert calls[0][1].endswith("verify_markdown_bash_blocks.py")
     assert "--execution-mode" in calls[0]
-    assert "host" in calls[0]
+    assert "trusted-local" in calls[0]
     assert calls[1][1].endswith("verify_notebooks_smoke.py")
 
     summary = json.loads((out_root / "summary.json").read_text(encoding="utf-8"))

@@ -1,4 +1,4 @@
-name: Tiny Attested Smoke
+name: Tiny Container Smoke
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: tiny-attested-smoke-${{ github.ref }}
+  group: tiny-container-smoke-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -20,7 +20,7 @@ jobs:
       PYTHONPATH: ${{ github.workspace }}/src
       INVARLOCK_ALLOW_NETWORK: "1"
       INVARLOCK_DEDUP_TEXTS: "1"
-      INVARLOCK_SMOKE_MODE: "attested"
+      INVARLOCK_SMOKE_MODE: "container"
       INVARLOCK_SMOKE_PROFILE: "dev"
       INVARLOCK_RUNTIME_IMAGE: "invarlock-runtime:local"
     steps:
@@ -37,9 +37,9 @@ jobs:
         if: ${{ github.actor != 'nektos/act' }}
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-3.12-tiny-attested-smoke-${{ hashFiles('pyproject.toml', 'requirements/workflows/ci-hf-py312.txt') }}
+          key: ${{ runner.os }}-pip-3.12-tiny-container-smoke-${{ hashFiles('pyproject.toml', 'requirements/workflows/ci-hf-py312.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-3.12-tiny-attested-smoke-
+            ${{ runner.os }}-pip-3.12-tiny-container-smoke-
 
       - name: Install dependencies
         run: |
@@ -49,5 +49,5 @@ jobs:
         run: |
           make runtime-image
 
-      - name: Run tiny attested smoke campaign
-        run: bash scripts/run_tiny_attested_smoke.sh "$RUNNER_TEMP/invarlock-tiny-attested-smoke"
+      - name: Run tiny container smoke campaign
+        run: bash scripts/run_tiny_container_smoke.sh "$RUNNER_TEMP/invarlock-tiny-container-smoke"

@@ -39,7 +39,7 @@ seed_local_runtime_image() {
   fi
 }
 
-if [[ "$MODE" == "attested" && -z "${INVARLOCK_RUNTIME_IMAGE:-}" ]]; then
+if [[ "$MODE" == "container" && -z "${INVARLOCK_RUNTIME_IMAGE:-}" ]]; then
   seed_local_runtime_image
 fi
 
@@ -103,7 +103,7 @@ PY
 }
 
 ensure_current_runtime_image() {
-  if [[ "$MODE" != "attested" ]]; then
+  if [[ "$MODE" != "container" ]]; then
     return 0
   fi
   if [[ -n "${INVARLOCK_RUNTIME_IMAGE:-}" \
@@ -115,12 +115,12 @@ ensure_current_runtime_image() {
     return 0
   fi
   if host_gpu_visible; then
-    echo "[smoke] refreshing local CUDA attested runtime image"
+    echo "[smoke] refreshing local CUDA container runtime image"
     make runtime-image-cuda
     export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"
     return 0
   fi
-  echo "[smoke] refreshing local attested runtime image"
+  echo "[smoke] refreshing local container runtime image"
   make runtime-image
   export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:local"
 }
@@ -169,9 +169,11 @@ echo "[smoke] mode=$MODE profile=$PROFILE"
 echo "[smoke] hf_home=$HF_HOME"
 echo "[smoke] hf_datasets_cache=$HF_DATASETS_CACHE"
 
-ASSURANCE="attested"
+EXECUTION_MODE="container"
+RUNTIME_PROVENANCE="container"
 if [[ "$MODE" == "local" ]]; then
-  ASSURANCE="trusted-local"
+  EXECUTION_MODE="trusted-local"
+  RUNTIME_PROVENANCE="trusted-local"
 fi
 
 "${CLI[@]}" evaluate \
@@ -180,7 +182,7 @@ fi
   --adapter auto \
   --profile "$PROFILE" \
   --preset "$PRESET" \
-  --assurance "$ASSURANCE" \
+  --execution-mode "$EXECUTION_MODE" \
   --out "$SMOKE_RUN_DIR" \
   --report-out "$SMOKE_REPORT_DIR" \
   --timing
@@ -198,7 +200,7 @@ echo "[smoke] baseline_report=$BASELINE_REPORT"
 echo "[smoke] edited_report=$EDITED_REPORT"
 echo "[smoke] evaluation_report=$EVAL_REPORT"
 
-VERIFY_ARGS=(--assurance "$ASSURANCE")
+VERIFY_ARGS=(--runtime-provenance "$RUNTIME_PROVENANCE")
 
 "${CLI[@]}" verify "$EVAL_REPORT" "${VERIFY_ARGS[@]}" --json || VERIFY_RC=$?
 VERIFY_RC="${VERIFY_RC:-0}"

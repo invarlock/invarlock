@@ -38,7 +38,7 @@ invarlock report generate \
   --baseline-run-report runs/baseline/report.json \
   --format report
 
-# Validate an attested report bundle
+# Validate an container-backed report bundle
 invarlock verify reports/eval/evaluation.report.json
 # expects reports/eval/runtime.manifest.json next to the report
 
@@ -122,7 +122,7 @@ Attested evaluations also emit `runtime.manifest.json` next to
 │   ┌────────────────────────────────────────────────────────────────┐    │
 │   │                    invarlock verify                            │    │
 │   │ schema + pairing + ratio math + measurement contracts +        │    │
-│   │ runtime-manifest attestation                                   │    │
+│   │ runtime-manifest provenance                                    │    │
 │   └────────────────────────────────────────────────────────────────┘    │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘

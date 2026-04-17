@@ -20,7 +20,7 @@ jobs:
       PYTHONPATH: ${{ github.workspace }}/src
       INVARLOCK_ALLOW_NETWORK: "1"
       INVARLOCK_DEDUP_TEXTS: "1"
-      INVARLOCK_SMOKE_MODE: "attested"
+      INVARLOCK_SMOKE_MODE: "container"
       INVARLOCK_SMOKE_PROFILE: "dev"
       INVARLOCK_RUNTIME_IMAGE: "invarlock-runtime:local"
     steps:

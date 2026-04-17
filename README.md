@@ -49,7 +49,7 @@ in CI.
 ## Who is this for?
 
 - ML engineers shipping edited model checkpoints, including quantized, pruned, fine-tuned, or otherwise weight-modified variants.
-- MLOps and platform teams building CI gates, attested verification, and reviewable evaluation artifacts.
+- MLOps and platform teams building CI gates, runtime-provenance verification, and reviewable evaluation artifacts.
 - Researchers validating weight-edit, compression, and model-comparison methods with reproducible paired evaluation across text and image-text workflows supported here.
 
 ## How it works
@@ -86,17 +86,18 @@ inside the runtime container and expects an OCI container engine such as
 In a repo checkout, build the local runtime image once with
 `make runtime-image`; InvarLock automatically prefers
 `invarlock-runtime:local` when it is present. Trusted local workflows can opt
-into host execution explicitly with `--assurance trusted-local` on
-`invarlock evaluate`, but the attested verification step below expects
-container execution. The quickstart block below assumes a repo checkout; do
-not skip `make runtime-image` if you want the attested container path.
+into host execution explicitly with `--execution-mode trusted-local` on
+`invarlock evaluate`, but the default verification step below expects a
+container-backed report with sibling runtime provenance. The quickstart block
+below assumes a repo checkout; do not skip `make runtime-image` if you want the
+runtime-container path.
 
 ```bash
-# Repo-checkout quickstart for the attested container path
+# Repo-checkout quickstart for the runtime-container path
 # HF adapter stack (torch/transformers)
 pip install "invarlock[hf]"
 
-# Required in a repo checkout for the attested path; do not skip this step.
+# Required in a repo checkout for the runtime-container path; do not skip this step.
 make runtime-image
 
 # Version + report schema (when available)
@@ -113,7 +114,7 @@ invarlock evaluate --allow-network \
   --report-out reports/eval \
   --quiet
 
-# Validate the attested evaluation report
+# Validate the container-backed evaluation report
 test -f reports/eval/runtime.manifest.json
 invarlock verify --json reports/eval/evaluation.report.json
 
@@ -136,7 +137,7 @@ Baseline: gpt2 -> Subject: gpt2 · Profile: dev
 Status: PASS · Gates: <passed>/<total> passed
 Primary metric ratio: <ratio>
 Output: reports/eval/evaluation.report.json
-Attestation: reports/eval/runtime.manifest.json
+Runtime provenance: reports/eval/runtime.manifest.json
 ```
 
 ## Command Surface
@@ -151,7 +152,7 @@ Attestation: reports/eval/runtime.manifest.json
   `validation_keys`, `console_labels`, and `metric_kinds`.
 - Advanced workflows: `invarlock advanced proof-pack`, `invarlock advanced policy`,
   `invarlock advanced plugins`, and `invarlock advanced calibrate`.
-- Trusted host execution for the core evaluate path uses `--assurance trusted-local`.
+- Trusted host execution for the core evaluate path uses `--execution-mode trusted-local`.
 - Optional adapter/backend installs use normal Python extras such as
   `pip install "invarlock[hf]"` rather than CLI install commands.
 

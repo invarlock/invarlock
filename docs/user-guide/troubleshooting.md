@@ -15,12 +15,12 @@
 # Check environment and configuration
 invarlock doctor --config <config.yaml> --profile ci
 
-# Validate an attested report bundle
+# Validate an container-backed report bundle
 invarlock verify reports/eval/evaluation.report.json --profile ci
 
 # Enable debug output for detailed traces
 INVARLOCK_DEBUG_TRACE=1 \
-  invarlock evaluate --allow-network --assurance trusted-local --baseline gpt2 --subject gpt2 --preset <config.yaml>
+  invarlock evaluate --allow-network --execution-mode trusted-local --baseline gpt2 --subject gpt2 --preset <config.yaml>
 ```
 
 `verify` expects `runtime.manifest.json` next to evaluation outputs.

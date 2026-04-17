@@ -46,7 +46,7 @@ For Compare & evaluate, reuse the same `dataset` block in baseline and subject r
   `padding="max_length"`.
 - **Secure-default execution**: dataset-backed model-loading commands run in the
   runtime container by default; trusted public local execution uses
-  `invarlock evaluate --assurance trusted-local`.
+  `invarlock evaluate --execution-mode trusted-local`.
 - **Dedupe & capacity**: `INVARLOCK_DEDUP_TEXTS=1` removes exact duplicates;
   `INVARLOCK_CAPACITY_FAST=1` speeds up capacity checks for quick runs.
 - **HF cache fallback**: if a local rerun hits a Hugging Face datasets

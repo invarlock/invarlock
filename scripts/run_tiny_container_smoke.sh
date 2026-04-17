@@ -4,9 +4,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 
-WORK_ROOT="${1:-$(mktemp -d -t invarlock_tiny_attested_smoke.XXXXXX)}"
+WORK_ROOT="${1:-$(mktemp -d -t invarlock_tiny_container_smoke.XXXXXX)}"
 MODEL_ID="${INVARLOCK_TINY_SMOKE_MODEL_ID:-sshleifer/tiny-gpt2}"
-MODE="${INVARLOCK_SMOKE_MODE:-attested}"
+MODE="${INVARLOCK_SMOKE_MODE:-container}"
 PROFILE="${INVARLOCK_SMOKE_PROFILE:-dev}"
 SMOKE_DEVICE="${INVARLOCK_SMOKE_DEVICE:-auto}"
 
@@ -35,7 +35,7 @@ seed_local_runtime_image() {
   fi
 }
 
-if [[ "$MODE" == "attested" && -z "${INVARLOCK_RUNTIME_IMAGE:-}" ]]; then
+if [[ "$MODE" == "container" && -z "${INVARLOCK_RUNTIME_IMAGE:-}" ]]; then
   seed_local_runtime_image
 fi
 
@@ -101,7 +101,7 @@ resolve_container_engine() {
 }
 
 ensure_current_runtime_image() {
-  if [[ "$MODE" != "attested" ]]; then
+  if [[ "$MODE" != "container" ]]; then
     return 0
   fi
   if [[ -n "${INVARLOCK_RUNTIME_IMAGE:-}" \
@@ -113,18 +113,18 @@ ensure_current_runtime_image() {
     return 0
   fi
   if host_gpu_visible; then
-    echo "[smoke] refreshing local CUDA attested runtime image"
+    echo "[smoke] refreshing local CUDA container runtime image"
     make runtime-image-cuda
     export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"
     return 0
   fi
-  echo "[smoke] refreshing local attested runtime image"
+  echo "[smoke] refreshing local container runtime image"
   make runtime-image
   export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:local"
 }
 
 seed_runtime_image_digest() {
-  if [[ "$MODE" != "attested" ]]; then
+  if [[ "$MODE" != "container" ]]; then
     return 0
   fi
   if [[ -n "${INVARLOCK_RUNTIME_IMAGE_DIGEST:-}" ]]; then
@@ -225,10 +225,10 @@ if [[ "${INVARLOCK_SMOKE_CACHE_COMPLETE:-0}" == "1" ]]; then
 fi
 
 cat >"$DATA_FILE" <<'EOF'
-{"text":"tiny attested smoke sample one"}
-{"text":"tiny attested smoke sample two"}
-{"text":"tiny attested smoke sample three"}
-{"text":"tiny attested smoke sample four"}
+{"text":"tiny container smoke sample one"}
+{"text":"tiny container smoke sample two"}
+{"text":"tiny container smoke sample three"}
+{"text":"tiny container smoke sample four"}
 EOF
 
 cat >"$PRESET_PATH" <<EOF
@@ -262,9 +262,11 @@ echo "[smoke] device=$SMOKE_DEVICE"
 echo "[smoke] hf_home=$HF_HOME"
 echo "[smoke] hf_hub_cache=$HF_HUB_CACHE"
 
-ASSURANCE="attested"
+EXECUTION_MODE="container"
+RUNTIME_PROVENANCE="container"
 if [[ "$MODE" == "local" ]]; then
-  ASSURANCE="trusted-local"
+  EXECUTION_MODE="trusted-local"
+  RUNTIME_PROVENANCE="trusted-local"
 fi
 
 "${CLI[@]}" evaluate \
@@ -273,7 +275,7 @@ fi
   --adapter hf_causal \
   --profile "$PROFILE" \
   --preset "$PRESET_PATH" \
-  --assurance "$ASSURANCE" \
+  --execution-mode "$EXECUTION_MODE" \
   --device "$SMOKE_DEVICE" \
   --out "$SMOKE_RUN_DIR" \
   --report-out "$SMOKE_REPORT_DIR" \
@@ -292,7 +294,7 @@ echo "[smoke] baseline_report=$BASELINE_REPORT"
 echo "[smoke] edited_report=$EDITED_REPORT"
 echo "[smoke] evaluation_report=$EVAL_REPORT"
 
-VERIFY_ARGS=(--assurance "$ASSURANCE")
+VERIFY_ARGS=(--runtime-provenance "$RUNTIME_PROVENANCE")
 
 "${CLI[@]}" verify "$EVAL_REPORT" "${VERIFY_ARGS[@]}" --profile "$PROFILE" --json || VERIFY_RC=$?
 VERIFY_RC="${VERIFY_RC:-0}"
@@ -308,7 +310,7 @@ mkdir -p "$SMOKE_EXPORT_DIR"
 "${CLI[@]}" report html -i "$EVAL_REPORT" -o "$SMOKE_EXPORT_DIR/evaluation.html"
 "${CLI[@]}" report explain --subject-report "$EDITED_REPORT" --baseline-report "$BASELINE_REPORT"
 
-printf '%s\n' '{"verdict":"PASS","note":"tiny attested smoke campaign"}' > "$WORK_ROOT/final_verdict.json"
+printf '%s\n' '{"verdict":"PASS","note":"tiny container smoke campaign"}' > "$WORK_ROOT/final_verdict.json"
 PROOF_PACK_SIGNING_KEY="$WORK_ROOT/proof_pack_signing_key.pem"
 PROOF_PACK_PUBLIC_KEY="$WORK_ROOT/proof_pack_signing_key.pub.pem"
 

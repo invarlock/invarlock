@@ -4,7 +4,7 @@
 # This lane is intentionally PR-friendly:
 # - broad command-surface coverage
 # - positive-path report/proof-pack/policy/calibration commands
-# - tiny-model evaluate parity across trusted-local and attested execution
+# - tiny-model evaluate parity across trusted-local and container execution
 
 set -euo pipefail
 
@@ -105,9 +105,9 @@ PY
 }
 
 assert_tiny_eval_parity() {
-  local attested_report="$1"
+  local container_report="$1"
   local local_report="$2"
-  ATTESTED_REPORT="$attested_report" LOCAL_REPORT="$local_report" "$PYTHON_BIN" - <<'PY'
+  CONTAINER_REPORT="$container_report" LOCAL_REPORT="$local_report" "$PYTHON_BIN" - <<'PY'
 import json
 import math
 import os
@@ -115,18 +115,18 @@ from pathlib import Path
 
 from invarlock.reporting.report_policy import resolve_tiny_relax_from_report
 
-attested_path = Path(os.environ["ATTESTED_REPORT"])
+container_path = Path(os.environ["CONTAINER_REPORT"])
 local_path = Path(os.environ["LOCAL_REPORT"])
 
-attested = json.loads(attested_path.read_text(encoding="utf-8"))
+container = json.loads(container_path.read_text(encoding="utf-8"))
 local = json.loads(local_path.read_text(encoding="utf-8"))
 
-if not resolve_tiny_relax_from_report(attested):
-    raise SystemExit("attested tiny smoke report is missing tiny_relax provenance")
+if not resolve_tiny_relax_from_report(container):
+    raise SystemExit("container tiny smoke report is missing tiny_relax provenance")
 if not resolve_tiny_relax_from_report(local):
     raise SystemExit("trusted-local tiny smoke report is missing tiny_relax provenance")
 
-attested_validation = attested.get("validation") or {}
+container_validation = container.get("validation") or {}
 local_validation = local.get("validation") or {}
 keys = (
     "primary_metric_acceptable",
@@ -136,21 +136,21 @@ keys = (
     "rmt_stable",
 )
 for key in keys:
-    if attested_validation.get(key) != local_validation.get(key):
+    if container_validation.get(key) != local_validation.get(key):
         raise SystemExit(
-            f"attested/local tiny smoke mismatch for validation.{key}: "
-            f"{attested_validation.get(key)!r} != {local_validation.get(key)!r}"
+            f"container/local tiny smoke mismatch for validation.{key}: "
+            f"{container_validation.get(key)!r} != {local_validation.get(key)!r}"
         )
 
-attested_metric = attested.get("primary_metric") or {}
+container_metric = container.get("primary_metric") or {}
 local_metric = local.get("primary_metric") or {}
-att_ratio = attested_metric.get("ratio_vs_baseline")
+att_ratio = container_metric.get("ratio_vs_baseline")
 local_ratio = local_metric.get("ratio_vs_baseline")
 if isinstance(att_ratio, (int, float)) and isinstance(local_ratio, (int, float)):
     if math.isfinite(att_ratio) and math.isfinite(local_ratio):
         if not math.isclose(float(att_ratio), float(local_ratio), rel_tol=1e-6, abs_tol=1e-6):
             raise SystemExit(
-                "attested/local tiny smoke mismatch for primary_metric.ratio_vs_baseline: "
+                "container/local tiny smoke mismatch for primary_metric.ratio_vs_baseline: "
                 f"{att_ratio!r} != {local_ratio!r}"
             )
 PY
@@ -158,16 +158,16 @@ PY
 
 run_tiny_eval_parity() {
   local label="$1"
-  local attested_report="$2"
+  local container_report="$2"
   local local_report="$3"
   {
     echo "\n==== BEGIN $label ===="
-    echo "[attested_report] $attested_report"
+    echo "[container_report] $container_report"
     echo "[local_report] $local_report"
     echo "[ts] $(ts)"
   } >>"$LOG_FILE"
   set +e
-  assert_tiny_eval_parity "$attested_report" "$local_report" >>"$LOG_FILE" 2>&1
+  assert_tiny_eval_parity "$container_report" "$local_report" >>"$LOG_FILE" 2>&1
   local ec=$?
   set -e
   {
@@ -359,7 +359,7 @@ run "invarlock doctor --json"                    "$CLI doctor --json"
 TMP_DIR="$(mktemp -d -t invarlock_cli_smoke.XXXXXX.dir)"
 printf '%s\n' '{"verdict":"PASS","summary":{"status":"smoke"}}' >"$TMP_DIR/final_verdict.json"
 printf '%s\n' '{"commit":"smoke","branch":"staging/next"}' >"$TMP_DIR/source_repo.json"
-printf '%s\n' '{"platform":"cli-smoke","mode":"attested-fixture"}' >"$TMP_DIR/environment.json"
+printf '%s\n' '{"platform":"cli-smoke","mode":"container-fixture"}' >"$TMP_DIR/environment.json"
 printf '%s\n' '{"models":{"sshleifer/tiny-gpt2":{"revision":"fixture"}}}' >"$TMP_DIR/model_revisions.json"
 printf '%s\n' '{"metrics":{"pm_ratio":{"ratio_limit_base":1.1}}}' >"$TMP_DIR/resolved_policy.json"
 printf '%s\n' '[{"path":"metrics.pm_ratio.ratio_limit_base","value":1.1}]' >"$TMP_DIR/policy_overrides.json"
@@ -653,7 +653,7 @@ OFFLINE_EVAL_ENV="$OFFLINE_ENV INVARLOCK_DEDUP_TEXTS=1 INVARLOCK_TINY_RELAX=1"
 
 if have_adapters_stack; then
   if have_smoke_model_cache; then
-    run_to "invarlock evaluate (offline, local)" "$EVALUATE_TIMEOUT_SECONDS" "$OFFLINE_EVAL_ENV $CLI evaluate --assurance trusted-local --baseline \"$SMOKE_MODEL_ID\" --subject \"$SMOKE_MODEL_ID\" --adapter auto --profile dev --preset \"$SMOKE_PRESET\" --device cpu --out \"$TMP_DIR/report_offline_local\" --report-out \"$TMP_DIR/report_offline_local_out\""
+    run_to "invarlock evaluate (offline, local)" "$EVALUATE_TIMEOUT_SECONDS" "$OFFLINE_EVAL_ENV $CLI evaluate --execution-mode trusted-local --baseline \"$SMOKE_MODEL_ID\" --subject \"$SMOKE_MODEL_ID\" --adapter auto --profile dev --preset \"$SMOKE_PRESET\" --device cpu --out \"$TMP_DIR/report_offline_local\" --report-out \"$TMP_DIR/report_offline_local_out\""
   else
     skip_run "invarlock evaluate (offline, local)" "smoke model cache not available"
   fi
@@ -667,60 +667,60 @@ NET_EVAL_ENV="$NET_ENV INVARLOCK_DEDUP_TEXTS=1 INVARLOCK_TINY_RELAX=1"
 if have_adapters_stack; then
   if have_network_access; then
     if have_docker_daemon; then
-      run_to "invarlock evaluate (network, attested)" "$EVALUATE_TIMEOUT_SECONDS" "$NET_EVAL_ENV $CLI evaluate --allow-network --baseline \"$SMOKE_MODEL_ID\" --subject \"$SMOKE_MODEL_ID\" --adapter auto --profile dev --preset \"$SMOKE_PRESET\" --device cpu --out \"$TMP_DIR/report_net\" --report-out \"$TMP_DIR/report_net_out\""
-      run "invarlock verify (network attested output)" "if [ -f \"$TMP_DIR/report_net_out/evaluation.report.json\" ]; then $CLI verify --json \"$TMP_DIR/report_net_out/evaluation.report.json\"; else echo '[skip] report missing'; fi"
-      run "invarlock report validate (network attested output)" "if [ -f \"$TMP_DIR/report_net_out/evaluation.report.json\" ]; then $CLI report validate \"$TMP_DIR/report_net_out/evaluation.report.json\"; else echo '[skip] report missing'; fi"
-      run_to "invarlock advanced calibrate null-sweep (network, attested)" "$CALIBRATE_NULL_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI advanced calibrate null-sweep --allow-network --config \"$SMOKE_CALIBRATE_NULL_CONFIG\" --out \"$TMP_DIR/calibrate_null\" --profile ci --device cpu --tier balanced --n-seeds 1 --seed-start 42"
-      run_to "invarlock advanced calibrate ve-sweep (network, attested)" "$CALIBRATE_VE_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI advanced calibrate ve-sweep --allow-network --config \"$SMOKE_CALIBRATE_VE_CONFIG\" --out \"$TMP_DIR/calibrate_ve\" --profile ci --device cpu --tier balanced --window 6 --n-seeds 1 --seed-start 42"
+      run_to "invarlock evaluate (network, container)" "$EVALUATE_TIMEOUT_SECONDS" "$NET_EVAL_ENV $CLI evaluate --allow-network --baseline \"$SMOKE_MODEL_ID\" --subject \"$SMOKE_MODEL_ID\" --adapter auto --profile dev --preset \"$SMOKE_PRESET\" --device cpu --out \"$TMP_DIR/report_net\" --report-out \"$TMP_DIR/report_net_out\""
+      run "invarlock verify (network container output)" "if [ -f \"$TMP_DIR/report_net_out/evaluation.report.json\" ]; then $CLI verify --json \"$TMP_DIR/report_net_out/evaluation.report.json\"; else echo '[skip] report missing'; fi"
+      run "invarlock report validate (network container output)" "if [ -f \"$TMP_DIR/report_net_out/evaluation.report.json\" ]; then $CLI report validate \"$TMP_DIR/report_net_out/evaluation.report.json\"; else echo '[skip] report missing'; fi"
+      run_to "invarlock advanced calibrate null-sweep (network, container)" "$CALIBRATE_NULL_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI advanced calibrate null-sweep --allow-network --config \"$SMOKE_CALIBRATE_NULL_CONFIG\" --out \"$TMP_DIR/calibrate_null\" --profile ci --device cpu --tier balanced --n-seeds 1 --seed-start 42"
+      run_to "invarlock advanced calibrate ve-sweep (network, container)" "$CALIBRATE_VE_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI advanced calibrate ve-sweep --allow-network --config \"$SMOKE_CALIBRATE_VE_CONFIG\" --out \"$TMP_DIR/calibrate_ve\" --profile ci --device cpu --tier balanced --window 6 --n-seeds 1 --seed-start 42"
     else
-      skip_run "invarlock evaluate (network, attested)" "docker daemon not available"
-      skip_run "invarlock verify (network attested output)" "docker daemon not available"
-      skip_run "invarlock report validate (network attested output)" "docker daemon not available"
-      skip_run "invarlock advanced calibrate null-sweep (network, attested)" "docker daemon not available"
-      skip_run "invarlock advanced calibrate ve-sweep (network, attested)" "docker daemon not available"
+      skip_run "invarlock evaluate (network, container)" "docker daemon not available"
+      skip_run "invarlock verify (network container output)" "docker daemon not available"
+      skip_run "invarlock report validate (network container output)" "docker daemon not available"
+      skip_run "invarlock advanced calibrate null-sweep (network, container)" "docker daemon not available"
+      skip_run "invarlock advanced calibrate ve-sweep (network, container)" "docker daemon not available"
     fi
-    run_to "invarlock evaluate (network, local)" "$EVALUATE_TIMEOUT_SECONDS" "$NET_EVAL_ENV $CLI evaluate --allow-network --assurance trusted-local --baseline \"$SMOKE_MODEL_ID\" --subject \"$SMOKE_MODEL_ID\" --adapter auto --profile dev --preset \"$SMOKE_PRESET\" --device cpu --out \"$TMP_DIR/report_net_local\" --report-out \"$TMP_DIR/report_net_local_out\""
-    run "invarlock verify (network local output)" "if [ -f \"$TMP_DIR/report_net_local_out/evaluation.report.json\" ]; then $CLI verify --assurance trusted-local --json \"$TMP_DIR/report_net_local_out/evaluation.report.json\"; else echo '[skip] report missing'; fi"
+    run_to "invarlock evaluate (network, local)" "$EVALUATE_TIMEOUT_SECONDS" "$NET_EVAL_ENV $CLI evaluate --allow-network --execution-mode trusted-local --baseline \"$SMOKE_MODEL_ID\" --subject \"$SMOKE_MODEL_ID\" --adapter auto --profile dev --preset \"$SMOKE_PRESET\" --device cpu --out \"$TMP_DIR/report_net_local\" --report-out \"$TMP_DIR/report_net_local_out\""
+    run "invarlock verify (network local output)" "if [ -f \"$TMP_DIR/report_net_local_out/evaluation.report.json\" ]; then $CLI verify --runtime-provenance trusted-local --json \"$TMP_DIR/report_net_local_out/evaluation.report.json\"; else echo '[skip] report missing'; fi"
     run "invarlock report validate (network local output)" "if [ -f \"$TMP_DIR/report_net_local_out/evaluation.report.json\" ]; then $CLI report validate \"$TMP_DIR/report_net_local_out/evaluation.report.json\"; else echo '[skip] report missing'; fi"
     run_to "invarlock advanced calibrate null-sweep (network, host)" "$CALIBRATE_NULL_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI advanced calibrate null-sweep --allow-network --allow-host-execution --config \"$SMOKE_CALIBRATE_NULL_CONFIG\" --out \"$TMP_DIR/calibrate_null_host\" --profile ci --device cpu --tier balanced --n-seeds 1 --seed-start 42"
     run_to "invarlock advanced calibrate ve-sweep (network, host)" "$CALIBRATE_VE_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI advanced calibrate ve-sweep --allow-network --allow-host-execution --config \"$SMOKE_CALIBRATE_VE_CONFIG\" --out \"$TMP_DIR/calibrate_ve_host\" --profile ci --device cpu --tier balanced --window 6 --n-seeds 1 --seed-start 42"
     if have_docker_daemon; then
       if [[ -f "$TMP_DIR/report_net_out/evaluation.report.json" && -f "$TMP_DIR/report_net_local_out/evaluation.report.json" ]]; then
         run_tiny_eval_parity \
-          "invarlock evaluate parity (attested vs local)" \
+          "invarlock evaluate parity (container vs local)" \
           "$TMP_DIR/report_net_out/evaluation.report.json" \
           "$TMP_DIR/report_net_local_out/evaluation.report.json"
       else
-        skip_run "invarlock evaluate parity (attested vs local)" "parity inputs missing"
+        skip_run "invarlock evaluate parity (container vs local)" "parity inputs missing"
       fi
     else
-      skip_run "invarlock evaluate parity (attested vs local)" "docker daemon not available"
+      skip_run "invarlock evaluate parity (container vs local)" "docker daemon not available"
     fi
   else
-    skip_run "invarlock evaluate (network, attested)" "network resolution for huggingface.co unavailable"
-    skip_run "invarlock verify (network attested output)" "network resolution for huggingface.co unavailable"
-    skip_run "invarlock report validate (network attested output)" "network resolution for huggingface.co unavailable"
+    skip_run "invarlock evaluate (network, container)" "network resolution for huggingface.co unavailable"
+    skip_run "invarlock verify (network container output)" "network resolution for huggingface.co unavailable"
+    skip_run "invarlock report validate (network container output)" "network resolution for huggingface.co unavailable"
     skip_run "invarlock evaluate (network, local)" "network resolution for huggingface.co unavailable"
     skip_run "invarlock verify (network local output)" "network resolution for huggingface.co unavailable"
     skip_run "invarlock report validate (network local output)" "network resolution for huggingface.co unavailable"
-    skip_run "invarlock advanced calibrate null-sweep (network, attested)" "network resolution for huggingface.co unavailable"
-    skip_run "invarlock advanced calibrate ve-sweep (network, attested)" "network resolution for huggingface.co unavailable"
+    skip_run "invarlock advanced calibrate null-sweep (network, container)" "network resolution for huggingface.co unavailable"
+    skip_run "invarlock advanced calibrate ve-sweep (network, container)" "network resolution for huggingface.co unavailable"
     skip_run "invarlock advanced calibrate null-sweep (network, host)" "network resolution for huggingface.co unavailable"
     skip_run "invarlock advanced calibrate ve-sweep (network, host)" "network resolution for huggingface.co unavailable"
-    skip_run "invarlock evaluate parity (attested vs local)" "network resolution for huggingface.co unavailable"
+    skip_run "invarlock evaluate parity (container vs local)" "network resolution for huggingface.co unavailable"
   fi
 else
-  skip_run "invarlock evaluate (network, attested)" "adapters stack (torch/transformers) not available"
-  skip_run "invarlock verify (network attested output)" "adapters stack (torch/transformers) not available"
-  skip_run "invarlock report validate (network attested output)" "adapters stack (torch/transformers) not available"
+  skip_run "invarlock evaluate (network, container)" "adapters stack (torch/transformers) not available"
+  skip_run "invarlock verify (network container output)" "adapters stack (torch/transformers) not available"
+  skip_run "invarlock report validate (network container output)" "adapters stack (torch/transformers) not available"
   skip_run "invarlock evaluate (network, local)" "adapters stack (torch/transformers) not available"
   skip_run "invarlock verify (network local output)" "adapters stack (torch/transformers) not available"
   skip_run "invarlock report validate (network local output)" "adapters stack (torch/transformers) not available"
-  skip_run "invarlock advanced calibrate null-sweep (network, attested)" "adapters stack (torch/transformers) not available"
-  skip_run "invarlock advanced calibrate ve-sweep (network, attested)" "adapters stack (torch/transformers) not available"
+  skip_run "invarlock advanced calibrate null-sweep (network, container)" "adapters stack (torch/transformers) not available"
+  skip_run "invarlock advanced calibrate ve-sweep (network, container)" "adapters stack (torch/transformers) not available"
   skip_run "invarlock advanced calibrate null-sweep (network, host)" "adapters stack (torch/transformers) not available"
   skip_run "invarlock advanced calibrate ve-sweep (network, host)" "adapters stack (torch/transformers) not available"
-  skip_run "invarlock evaluate parity (attested vs local)" "adapters stack (torch/transformers) not available"
+  skip_run "invarlock evaluate parity (container vs local)" "adapters stack (torch/transformers) not available"
 fi
 
 echo "[summary] $(ts) total=${TOTAL_COMMANDS} skipped=${SKIPPED_COMMANDS} unexpected_failures=${UNEXPECTED_FAILURES}" | tee -a "$LOG_FILE"

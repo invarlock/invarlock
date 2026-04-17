@@ -118,7 +118,7 @@ def check_live_fast() -> None:
             sys.executable,
             "scripts/verify_live_examples.py",
             "--markdown-execution-mode",
-            "host",
+            "trusted-local",
             "--skip-markdown-model-loading",
             "--skip-notebook-model-loading",
             "--paths",

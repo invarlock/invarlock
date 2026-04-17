@@ -28,7 +28,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TMP = ROOT / "tmp"
-EXECUTION_MODES = ("container", "host")
+EXECUTION_MODES = ("container", "trusted-local")
 HOST_EXECUTION_ENV = "INVARLOCK_ALLOW_HOST_EXECUTION"
 MODEL_LOADING_COMMANDS = {"evaluate", "run", "calibrate"}
 DEFAULT_EVALUATE_SMOKE_PRESET = "configs/presets/causal_lm/gpt2_smoke_128.yaml"
@@ -310,8 +310,12 @@ def _command_tokens(argv: list[str]) -> list[str]:
     return []
 
 
-def _is_assurance_command(command_tokens: list[str]) -> bool:
-    return command_tokens[:1] in (["evaluate"], ["verify"]) or command_tokens[:2] == [
+def _is_evaluate_command(command_tokens: list[str]) -> bool:
+    return command_tokens[:1] == ["evaluate"]
+
+
+def _is_verify_command(command_tokens: list[str]) -> bool:
+    return command_tokens[:1] == ["verify"] or command_tokens[:2] == [
         "report",
         "verify",
     ]
@@ -323,7 +327,7 @@ def _is_model_loading_command(command_tokens: list[str]) -> bool:
     return command_tokens[:2] == ["advanced", "calibrate"]
 
 
-def _should_skip_line_for_host_mode(stripped: str) -> bool:
+def _should_skip_line_for_trusted_local_mode(stripped: str) -> bool:
     if stripped.startswith("make runtime-image") or stripped.startswith(
         "make runtime-smoke"
     ):
@@ -448,7 +452,7 @@ def _rewrite_invarlock_tokens(
         token for token in env_prefix if not token.startswith(f"{HOST_EXECUTION_ENV}=")
     ]
 
-    if execution_mode == "host" and _is_model_loading_command(command_tokens):
+    if execution_mode == "trusted-local" and _is_model_loading_command(command_tokens):
         argv = _rewrite_model_loading_tokens_for_live_smoke(argv)
         command_tokens = _command_tokens(argv)
 
@@ -470,24 +474,57 @@ def _rewrite_invarlock_tokens(
 
     if execution_mode == "container":
         argv = [token for token in argv if token != "--allow-host-execution"]
-        if _is_assurance_command(command_tokens):
+        if _is_evaluate_command(command_tokens):
             argv = _strip_option_with_value(argv, "--assurance")
+            argv = _strip_option_with_value(argv, "--execution-mode")
+        if _is_verify_command(command_tokens):
+            argv = _strip_option_with_value(argv, "--assurance")
+            argv = _strip_option_with_value(argv, "--runtime-provenance")
         if command_tokens[:2] == ["report", "html"] and "--force" not in argv:
             argv = _insert_option_after_command(argv, "--force")
         return env_prefix, argv
 
-    if _is_assurance_command(command_tokens):
+    if _is_evaluate_command(command_tokens):
         argv = _strip_option_with_value(argv, "--assurance")
-        if "--assurance" not in argv:
+        argv = _strip_option_with_value(argv, "--execution-mode")
+        if "--execution-mode" not in argv:
             if argv[:1] == ["invarlock"]:
-                argv = [*argv[:2], "--assurance", "trusted-local", *argv[2:]]
+                argv = [*argv[:2], "--execution-mode", "trusted-local", *argv[2:]]
             elif (
                 len(argv) >= 3
                 and argv[0] in {"python", "python3"}
                 and argv[1] == "-m"
                 and argv[2].startswith("invarlock")
             ):
-                argv = [*argv[:4], "--assurance", "trusted-local", *argv[4:]]
+                argv = [
+                    *argv[:4],
+                    "--execution-mode",
+                    "trusted-local",
+                    *argv[4:],
+                ]
+    elif _is_verify_command(command_tokens):
+        argv = _strip_option_with_value(argv, "--assurance")
+        argv = _strip_option_with_value(argv, "--runtime-provenance")
+        if "--runtime-provenance" not in argv:
+            if argv[:1] == ["invarlock"]:
+                argv = [
+                    *argv[:2],
+                    "--runtime-provenance",
+                    "trusted-local",
+                    *argv[2:],
+                ]
+            elif (
+                len(argv) >= 3
+                and argv[0] in {"python", "python3"}
+                and argv[1] == "-m"
+                and argv[2].startswith("invarlock")
+            ):
+                argv = [
+                    *argv[:4],
+                    "--runtime-provenance",
+                    "trusted-local",
+                    *argv[4:],
+                ]
     elif _is_model_loading_command(command_tokens):
         if "--allow-host-execution" not in argv:
             env_prefix.append(f"{HOST_EXECUTION_ENV}=1")
@@ -516,8 +553,11 @@ def _sanitize_script(
         if stripped.startswith("#"):
             rendered.append(raw)
             continue
-        if execution_mode == "host" and _should_skip_line_for_host_mode(stripped):
-            rendered.append(f"echo '[skip-host] {stripped}'")
+        if (
+            execution_mode == "trusted-local"
+            and _should_skip_line_for_trusted_local_mode(stripped)
+        ):
+            rendered.append(f"echo '[skip-trusted-local] {stripped}'")
             continue
         tokens = stripped.split()
         if len(tokens) >= 2 and tokens[0] == "pip" and tokens[1] == "install":
@@ -570,7 +610,7 @@ def _sanitize_script(
             line = line.rstrip() + " \\"
         rendered.append(line)
     sanitized = "\n".join(rendered).strip() + "\n"
-    if execution_mode == "host" and not skip_model_loading:
+    if execution_mode == "trusted-local" and not skip_model_loading:
         sanitized = _rewrite_live_smoke_script_text(sanitized)
     return sanitized
 
@@ -912,7 +952,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         choices=EXECUTION_MODES,
         help=(
             "Replay markdown commands as secure-default container commands or "
-            "as explicit trusted-host commands."
+            "as explicit trusted-local commands."
         ),
     )
     parser.add_argument(

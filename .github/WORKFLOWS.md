@@ -58,7 +58,7 @@ Key environment variables used across workflows:
 | `INVARLOCK_OMP_THREADS` | OpenMP thread count | System default |
 
 Workflows should keep these privilege toggles scoped to the narrowest possible
-job or step, emit attested outputs, and verify them without bypasses.
+job or step, emit container-backed outputs, and verify them without bypasses.
 
 ## Dependency Update Policy
 

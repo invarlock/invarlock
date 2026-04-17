@@ -15,7 +15,7 @@ security or alignment.
 - Default runtime posture disables outbound network connections unless
   `INVARLOCK_ALLOW_NETWORK=1` is explicitly set.
 - Default runtime posture keeps model-loading commands inside the runtime
-  container unless a trusted public workflow uses `invarlock evaluate --assurance trusted-local`
+  container unless a trusted public workflow uses `invarlock evaluate --execution-mode trusted-local`
   or an advanced/internal workflow explicitly sets `INVARLOCK_ALLOW_HOST_EXECUTION=1`.
 - Evaluation runs use the pairing, windowing, and bootstrap profiles
   described in the assurance docs and configs.
@@ -37,7 +37,7 @@ security or alignment.
 │  ┌───────────────────────────────────────────────────────────────────┐  │
 │  │ RUNTIME LAYER                                                     │  │
 │  │ container execution by default; host execution only with          │  │
-│  │ `evaluate --assurance trusted-local` (public) or advanced/internal host bypass │  │
+│  │ `evaluate --execution-mode trusted-local` (public) or advanced/internal host bypass │  │
 │  └───────────────────────────────────────────────────────────────────┘  │
 │                               │                                         │
 │                               ▼                                         │
@@ -97,7 +97,7 @@ security or alignment.
   to an immutable commit SHA.
 - Strict configuration and report validation (`invarlock doctor`,
   `invarlock verify`) to detect misconfiguration, schema drift, and runtime
-  attestation mismatches.
+  provenance mismatches.
 - report fields for seeds, windowing, dataset/tokenizer hashes, and guard
   telemetry so reviewers can audit the assurance evidence.
 

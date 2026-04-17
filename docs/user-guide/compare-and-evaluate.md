@@ -12,7 +12,7 @@ title: Compare & evaluate (BYOE)
 | **Audience** | Teams and researchers with existing model-edit workflows who want paired evaluation without coupling to a specific edit stack. |
 | **Workflow** | Baseline run → Subject run → report with paired windows. |
 | **Network** | Offline by default; use `evaluate --allow-network` when a run needs model downloads. |
-| **Output** | `evaluation.report.json` + `evaluation_report.md` (+ `runtime.manifest.json` for attested outputs). |
+| **Output** | `evaluation.report.json` + `evaluation_report.md` (+ `runtime.manifest.json` for container-backed outputs). |
 
 InvarLock's primary, most stable path is Compare & evaluate (BYOE): you provide the
 baseline and the subject checkpoints, and InvarLock produces a deterministic
@@ -27,10 +27,10 @@ fine-tuning, or other checkpoint-edit workflows.
   present).
 - Run `invarlock evaluate --baseline <baseline> --subject <subject> --adapter auto`.
 
-By default, `evaluate` runs inside the runtime container. Use `--assurance trusted-local`
+By default, `evaluate` runs inside the runtime container. Use `--execution-mode trusted-local`
 only for trusted local workflows that intentionally run model loading on the
 host. If you choose that trusted local path, verify the resulting report with
-`invarlock verify --assurance trusted-local ...`.
+`invarlock verify --runtime-provenance trusted-local ...`.
 
 Example (GPT‑2, CPU/MPS friendly; requires `invarlock[hf]` or equivalent HF extra):
 
@@ -49,7 +49,7 @@ Outputs:
 
 - JSON report: `reports/eval_smoke/evaluation.report.json`
 - Markdown report: `reports/eval_smoke/evaluation_report.md`
-- Runtime attestation: `reports/eval_smoke/runtime.manifest.json`
+- Runtime provenance: `reports/eval_smoke/runtime.manifest.json`
 
 ## Reuse a baseline report (skip baseline evaluation)
 
@@ -127,7 +127,7 @@ mind:
 - Use the same tokenizer; `invarlock verify` lints tokenizer hash mismatches when
   present.
 
-Determinism, pairing math, provenance, and runtime attestation are surfaced in
+Determinism, pairing math, provenance, and runtime provenance are surfaced in
 reports and `runtime.manifest.json` and revalidated by `invarlock verify`.
 
 ## Related Documentation
