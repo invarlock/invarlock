@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a curated `make docs-live-fast` maintainer lane, a dedicated live
   examples guide, and explicit docs/CI coverage for the runnable markdown and
   notebook surfaces that are expected to stay working over time.
+- Added a dedicated `make packaging-smoke-front-door` maintainer lane that
+  installs a wheel in a fresh venv and exercises the real host-mode
+  `evaluate -> verify -> report html` path from outside the repo tree.
 
 ### Changed
 - Versioned `invarlock-runtime-verify --json` with

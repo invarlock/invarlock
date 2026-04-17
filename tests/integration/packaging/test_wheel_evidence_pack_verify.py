@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import sys
+import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -27,6 +28,7 @@ pytestmark = pytest.mark.integration
 class InstalledWheelEnv:
     repo_root: Path
     env_dir: Path
+    wheel_path: Path
     python_exe: Path
     cli_exe: Path
     runtime_verify_exe: Path
@@ -103,6 +105,7 @@ def _run(
     *,
     cwd: Path | None = None,
     env: dict[str, str] | None = None,
+    timeout: float | None = None,
 ) -> subprocess.CompletedProcess[str]:
     resolved_env = None if env is None else {**os.environ, **env}
     return subprocess.run(
@@ -112,6 +115,7 @@ def _run(
         check=False,
         cwd=cwd,
         env=resolved_env,
+        timeout=timeout,
     )
 
 
@@ -142,6 +146,12 @@ def _install_core_dependencies(repo_root: Path, python_exe: Path) -> None:
         pytest.skip(
             f"Missing pinned core requirements for Python {version[0]}.{version[1]}"
         )
+    _install_requirements_file(repo_root, python_exe, requirements)
+
+
+def _install_requirements_file(
+    repo_root: Path, python_exe: Path, requirements: Path
+) -> None:
     subprocess.run(
         [
             str(python_exe),
@@ -155,6 +165,30 @@ def _install_core_dependencies(repo_root: Path, python_exe: Path) -> None:
         check=True,
         cwd=repo_root,
     )
+
+
+def _ensure_hf_smoke_dependencies(installed_wheel_env: InstalledWheelEnv) -> None:
+    import_check = _run(
+        installed_wheel_env.python_exe,
+        ["-c", "import torch, transformers"],
+        cwd=installed_wheel_env.repo_root,
+    )
+    if import_check.returncode == 0:
+        return
+
+    install = _run(
+        installed_wheel_env.python_exe,
+        [
+            "-m",
+            "pip",
+            "install",
+            "--force-reinstall",
+            f"invarlock[hf] @ {installed_wheel_env.wheel_path.as_uri()}",
+        ],
+        cwd=installed_wheel_env.repo_root,
+        timeout=1800,
+    )
+    assert install.returncode == 0, install.stdout + install.stderr
 
 
 def _sha256_file(path: Path) -> str:
@@ -201,6 +235,40 @@ def _write_runtime_manifest(report_path: Path) -> None:
 def _write_json(path: Path, payload: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _write_jsonl(path: Path, texts: list[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "\n".join(json.dumps({"text": text}) for text in texts) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_local_jsonl_preset(path: Path, data_file: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        textwrap.dedent(
+            f"""
+            dataset:
+              provider:
+                kind: local_jsonl
+              file: {json.dumps(str(data_file))}
+              split: validation
+              seq_len: 16
+              stride: 16
+              preview_n: 2
+              final_n: 2
+              seed: 42
+            guards:
+              order: []
+            eval:
+              metric: {{kind: ppl_causal}}
+              loss: {{type: auto}}
+            """
+        ).lstrip(),
+        encoding="utf-8",
+    )
 
 
 def _write_checksums(pack_dir: Path, rel_paths: list[str]) -> None:
@@ -361,6 +429,7 @@ def installed_wheel_env(tmp_path_factory: pytest.TempPathFactory) -> InstalledWh
     return InstalledWheelEnv(
         repo_root=repo_root,
         env_dir=env_dir,
+        wheel_path=wheel,
         python_exe=python_exe,
         cli_exe=cli_exe,
         runtime_verify_exe=runtime_verify_exe,
@@ -503,6 +572,135 @@ def test_wheel_install_exposes_core_cli_contracts_outside_repo_tree(
     )
     assert public_html.is_file()
     assert "<html" in public_html.read_text(encoding="utf-8").lower()
+
+
+@pytest.mark.skipif(os.getenv("SKIP_BUILD_TESTS") == "1", reason="skip build tests")
+@pytest.mark.slow
+def test_wheel_install_runs_front_door_evaluate_verify_report_html_outside_repo_tree(
+    installed_wheel_env: InstalledWheelEnv, tmp_path: Path
+) -> None:
+    _ensure_hf_smoke_dependencies(installed_wheel_env)
+
+    data_file = tmp_path / "smoke.jsonl"
+    _write_jsonl(
+        data_file,
+        [
+            "installed wheel front door sample one",
+            "installed wheel front door sample two",
+            "installed wheel front door sample three",
+            "installed wheel front door sample four",
+        ],
+    )
+    preset_path = tmp_path / "preset.yaml"
+    _write_local_jsonl_preset(preset_path, data_file)
+
+    hf_home = tmp_path / "hf-home"
+    hf_home.mkdir(parents=True, exist_ok=True)
+    smoke_env = {
+        "HF_HOME": str(hf_home),
+        "HF_DATASETS_CACHE": str(hf_home / "datasets"),
+        "INVARLOCK_ALLOW_NETWORK": "1",
+        "INVARLOCK_DEDUP_TEXTS": "1",
+        "INVARLOCK_TINY_RELAX": "1",
+        "TOKENIZERS_PARALLELISM": "false",
+        "TRANSFORMERS_NO_TORCHVISION": "1",
+    }
+
+    prefetch = _run(
+        installed_wheel_env.python_exe,
+        [
+            "-c",
+            (
+                "from transformers import AutoModelForCausalLM, AutoTokenizer; "
+                "model_id='sshleifer/tiny-gpt2'; "
+                "AutoTokenizer.from_pretrained(model_id, trust_remote_code=False); "
+                "AutoModelForCausalLM.from_pretrained(model_id, trust_remote_code=False)"
+            ),
+        ],
+        cwd=tmp_path,
+        env=smoke_env,
+        timeout=900,
+    )
+    assert prefetch.returncode == 0, prefetch.stdout + prefetch.stderr
+
+    report_dir = tmp_path / "front-door-report"
+    evaluate = _run(
+        installed_wheel_env.cli_exe,
+        [
+            "evaluate",
+            "--allow-network",
+            "--execution-mode",
+            "host",
+            "--baseline",
+            "sshleifer/tiny-gpt2",
+            "--subject",
+            "sshleifer/tiny-gpt2",
+            "--adapter",
+            "auto",
+            "--profile",
+            "dev",
+            "--preset",
+            str(preset_path),
+            "--device",
+            "cpu",
+            "--out",
+            str(tmp_path / "runs"),
+            "--report-out",
+            str(report_dir),
+            "--quiet",
+            "--no-banner",
+            "--no-progress",
+            "--no-color",
+        ],
+        cwd=tmp_path,
+        env=smoke_env,
+        timeout=1800,
+    )
+    assert evaluate.returncode == 0, evaluate.stdout + evaluate.stderr
+
+    report_path = report_dir / "evaluation.report.json"
+    assert report_path.is_file()
+    assert (report_dir / RUNTIME_MANIFEST_FILENAME).is_file()
+    report_payload = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report_payload["schema_version"] == "v1"
+
+    verify = _run(
+        installed_wheel_env.cli_exe,
+        [
+            "verify",
+            "--runtime-provenance",
+            "host",
+            "--json",
+            str(report_path),
+        ],
+        cwd=tmp_path,
+        env=smoke_env,
+        timeout=300,
+    )
+    assert verify.returncode == 0, verify.stdout + verify.stderr
+    verify_payload = json.loads(verify.stdout.strip().splitlines()[-1])
+    assert verify_payload["format_version"] == "verify-v1"
+    assert verify_payload["summary"]["ok"] is True
+
+    html_path = tmp_path / "front-door.html"
+    render_html = _run(
+        installed_wheel_env.cli_exe,
+        [
+            "report",
+            "html",
+            "-i",
+            str(report_path),
+            "-o",
+            str(html_path),
+            "--force",
+        ],
+        cwd=tmp_path,
+        env=smoke_env,
+        timeout=300,
+    )
+    assert render_html.returncode == 0, render_html.stdout + render_html.stderr
+    assert html_path.is_file()
+    assert "<html" in html_path.read_text(encoding="utf-8").lower()
 
 
 @pytest.mark.skipif(os.getenv("SKIP_BUILD_TESTS") == "1", reason="skip build tests")

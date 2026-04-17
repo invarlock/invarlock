@@ -173,6 +173,21 @@ def test_makefile_exposes_actionlint_and_minimal_packaging_smoke_targets() -> No
     assert "--skip-notebook-model-loading" not in docs_live_block
 
 
+def test_makefile_exposes_front_door_packaging_smoke_target() -> None:
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    text = makefile.read_text(encoding="utf-8")
+
+    assert "packaging-smoke-front-door:" in text
+    assert (
+        "tests/integration/packaging/test_wheel_evidence_pack_verify.py::"
+        "test_wheel_install_runs_front_door_evaluate_verify_report_html_outside_repo_tree"
+    ) in text
+    front_door_block = text.split("packaging-smoke-front-door:", 1)[1].split(
+        "model-evidence-list:", 1
+    )[0]
+    assert "INVARLOCK_LIGHT_IMPORT=1" not in front_door_block
+
+
 def test_makefile_exposes_typed_surface_target() -> None:
     makefile = Path(__file__).resolve().parents[2] / "Makefile"
     text = makefile.read_text(encoding="utf-8")
