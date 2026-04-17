@@ -42,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   kept the detached contract bundle as a maintainer-local helper instead of a
   public release artifact, and aligned docs/navigation around the runnable
   notebook and live-example entry points.
+- Tightened the minimal installed-wheel contract smoke so it now covers the
+  standalone core CLI surface (`evaluate --help`, `verify`, `report html`,
+  `invarlock-runtime-verify`), packaged published-basis evidence-path
+  resolution, and evidence-pack verification from outside the repo tree.
 - Refactored the evidence-pack, runtime-security, verify-check, model-profile,
   guard-policy, and orchestration-attempt internals into smaller owner modules
   without changing the public CLI surface.
@@ -64,6 +68,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   maintainer test docs, evidence-pack guidance and verification surfaces, and
   runtime-image error messages no longer describe container-backed manifests as
   "verified" outputs.
+- Fixed standalone-product wording across README, docs, live-example tooling,
+  and evidence-pack summaries so public guidance no longer frames the OSS repo
+  around vague "downstream" consumers or workflows.
 - Fixed the live-example verification path so `make docs-live` now runs the
   true full markdown-plus-notebook lane, while `docs-live-fast` remains the
   deterministic curated subset used by docs checks and CI.
