@@ -60,8 +60,8 @@ INVARLOCK_ALLOW_REMOTE_CODE=1 \
 PACK_TUNED_EDIT_PARAMS_FILE=./scripts/evidence_packs/tuned_edit_params.json \
   ./scripts/evidence_packs/run_pack.sh --suite subset --net 1
 
-# Host-side host workflow for these repo-only wrappers (skips the container-backed
-# container path)
+# Host-side workflow for these repo-only wrappers (skips the default
+# container-backed path)
 INVARLOCK_ALLOW_REMOTE_CODE=1 \
 INVARLOCK_ALLOW_HOST_EXECUTION=1 \
 PACK_TUNED_EDIT_PARAMS_FILE=./scripts/evidence_packs/tuned_edit_params.json \
