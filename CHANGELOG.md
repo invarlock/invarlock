@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `format_version: "runtime-verify-v1"`, moved support-matrix evidence paths
   to logical `public_evidence/published_basis/...` locations, and made
   packaged runtime-profile provenance portable through `runtime/tiers.yaml`.
+- Replaced the public `--assurance attested|trusted-local` CLI with explicit
+  `evaluate --execution-mode container|trusted-local` and
+  `verify --runtime-provenance container|trusted-local`, and aligned the
+  maintained docs/live-example/workflow surfaces to the same terminology.
 - Refreshed maintainer workflow dependency pins across the docs/tooling and
   GitHub Actions surfaces, including `ruff 0.15.11`, updated `actions/cache`,
   `github/codeql-action`,
@@ -35,6 +39,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without changing the public CLI surface.
 
 ### Fixed
+- Fixed runtime-contract docs and assurance hygiene by teaching the assurance
+  xref linter to catch bare `tests/...py` citations, replacing the stale
+  bootstrap citation in the assurance case, and marking the legacy hardcoded
+  `rmt_policy.py` table as a fallback rather than the calibrated source of
+  truth.
 - Fixed the live-example verification path so `make docs-live` now runs the
   true full markdown-plus-notebook lane, while `docs-live-fast` remains the
   deterministic curated subset used by docs checks and CI.
