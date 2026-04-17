@@ -16,9 +16,9 @@ B200-specific validation harness with a suite that can run on any NVIDIA GPU top
 that can fit the selected models.
 
 By default, a proof pack is integrity-checked and report-verified. Treat it as
-proof-grade only when the manifest is signed, the pack is verified in strict
-verification mode, the bundled clean reports retain their `runtime.manifest.json`
-attestation, and the final verdict is PASS.
+strong distributable evidence only when the manifest is signed, the pack is
+verified in strict verification mode, the bundled clean reports retain their
+`runtime.manifest.json` provenance sidecar, and the final verdict is PASS.
 
 Operationally, proof packs are a maintainer smoke test that also emits reusable
 evidence data. The same run should let maintainers catch regressions, let third parties
@@ -90,7 +90,7 @@ invarlock advanced proof-pack verify ./proof_pack_runs/subset_20250101_000000/pr
 
 Each `--report` must be an explicit `evaluation.report.json` file path. The
 builder also requires `runtime.manifest.json` next to each supplied report so
-packaged evidence preserves attestation provenance.
+packaged evidence preserves runtime provenance.
 
 Note: clean edits require tuned preset parameters. Either set
 `PACK_TUNED_EDIT_PARAMS_FILE` or place the file at
@@ -250,14 +250,14 @@ Use `--determinism strict` to disable TF32 and cuDNN benchmarks and align with
 strict InvarLock presets. `--repeats N` reruns a single edit N times and records
 a drift summary in `results/determinism_repeats.json`.
 
-## Signing & Verification (Evidence vs Proof-Grade)
+## Signing & Verification (Evidence vs Strict Signed Verification)
 
 `manifest.json` includes `checksums_sha256_digest` (sha256 of `checksums.sha256`) so a
 signed manifest cryptographically binds the checksums file (and thus all hashed artifacts).
-Newer packs also carry a repo-native attestation block in the same signed manifest:
+Newer packs also carry a signed provenance block in the same manifest:
 `builder`, `subject`, `invocation`, `environment`, and digest-backed `materials`.
 The manifest also records a derived `evidence_level` (`low`/`medium`/`high`) so
-reviewers can triage bundles quickly without replacing the underlying proof-grade checks.
+reviewers can triage bundles quickly without replacing the underlying strict signed checks.
 Package-native signed packs store the detached Ed25519 signature bundle in
 `manifest.signature.json` and record `signing_key_fingerprint` in the manifest
 for audit trails.
@@ -275,7 +275,7 @@ depend on external signature binaries for proof-pack verification.
 Use the package-native subcommands:
 
 - `invarlock advanced proof-pack inspect <dir>`
-  - Summarizes manifest validity, checksum coverage, attestation references, report inventory, and strict-readiness.
+  - Summarizes manifest validity, checksum coverage, signed provenance references, report inventory, and strict-readiness.
   - Does not run nested `invarlock verify`; use this for quick received-artifact triage.
 - `invarlock advanced proof-pack keygen <private-key.pem>`
   - Generates an Ed25519 signing key pair for package-native proof-pack signatures.
@@ -313,4 +313,4 @@ Reviewer checklist:
 - `manifest.json` includes builder, subject, invocation, environment, and
   material digests for the distributed pack
 
-For proof-grade attestation, require all three: signed manifest, strict verification, and PASS final verdict.
+For strong distributable evidence, require all three: signed manifest, strict verification, and PASS final verdict.

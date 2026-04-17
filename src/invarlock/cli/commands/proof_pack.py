@@ -34,7 +34,7 @@ def proof_pack_callback() -> None:
 
 @proof_pack_app.command(
     "verify",
-    help="Verify a proof-pack manifest, checksums, attestation refs, and bundled reports.",
+    help="Verify a proof-pack manifest, checksums, signed provenance refs, and bundled reports.",
 )
 def verify_command(
     pack: str = typer.Argument(..., help="Path to the proof-pack directory."),

@@ -71,7 +71,7 @@ def _render_readme(
     lines.extend(
         [
             "- Error-injection reports are expected-failure evidence and should not be interpreted as clean PASS runs.",
-            "- By default this is evidence-grade packaging. For proof-grade attestation, require a signed manifest, strict verification, and a PASS final verdict.",
+            "- By default this is evidence-grade packaging. For strong distributable evidence, require a signed manifest, strict verification, and a PASS final verdict.",
             "",
             "## Verify",
             "",

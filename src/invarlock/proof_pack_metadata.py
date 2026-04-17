@@ -91,7 +91,7 @@ def _render_proof_pack_readme(
         )
     else:
         lines.append(
-            "- By default this is evidence-grade packaging. For proof-grade attestation, require a signed manifest, strict verification, and a PASS final verdict."
+            "- By default this is evidence-grade packaging. For strong distributable evidence, require a signed manifest, strict verification, and a PASS final verdict."
         )
     if signer_fingerprint:
         lines.append(f"- Signer fingerprint: {signer_fingerprint}")

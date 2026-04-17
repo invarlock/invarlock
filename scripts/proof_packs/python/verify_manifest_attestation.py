@@ -11,7 +11,7 @@ from invarlock.proof_pack import verify_manifest_attestation
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Verify digest-backed proof-pack attestation fields."
+        description="Verify digest-backed proof-pack provenance fields."
     )
     parser.add_argument("pack_dir")
     return parser.parse_args(argv)

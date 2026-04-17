@@ -151,7 +151,7 @@ test_verify_pack_manifest_attestation_accepts_digest_backed_refs() {
 EOF
 
     run pack_verify_manifest_attestation "${pack_dir}"
-    assert_rc "0" "${RUN_RC}" "digest-backed attestation references verify"
+    assert_rc "0" "${RUN_RC}" "digest-backed provenance references verify"
 }
 
 test_verify_pack_manifest_attestation_rejects_digest_mismatch() {
@@ -165,7 +165,7 @@ test_verify_pack_manifest_attestation_rejects_digest_mismatch() {
     printf '%s\n' '{"format":"proof-pack-v1","checksums_sha256":"checksums.sha256","checksums_sha256_digest":"0000000000000000000000000000000000000000000000000000000000000000","subject":{"name":"final_verdict","path":"results/verdicts/final_verdict.json","digest":"sha256:0000000000000000000000000000000000000000000000000000000000000000"}}' > "${pack_dir}/manifest.json"
 
     run pack_verify_manifest_attestation "${pack_dir}"
-    assert_rc "1" "${RUN_RC}" "subject digest mismatch fails attestation verification"
+    assert_rc "1" "${RUN_RC}" "subject digest mismatch fails provenance verification"
     assert_match "digest mismatch" "${RUN_ERR}" "digest mismatch error reported"
 }
 

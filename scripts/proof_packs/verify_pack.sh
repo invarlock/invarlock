@@ -31,7 +31,7 @@ Options:
 
 Notes:
   - Clean reports are re-verified with `invarlock verify` and must satisfy
-    runtime.manifest.json attestation checks.
+    runtime.manifest.json provenance checks.
   - Error-injection reports are also rechecked, but their non-zero verify status
     remains expected and does not fail the pack on its own.
 
@@ -41,7 +41,7 @@ Exit codes:
   3  missing pack or required pack files
   4  manifest format / schema validation failed
   5  signature verification failed
-  6  integrity verification failed (checksum binding, checksums, attestation refs, or strict extra-file checks)
+  6  integrity verification failed (checksum binding, checksums, signed provenance refs, or strict extra-file checks)
   7  report verification failed
 EOF
 }
@@ -157,7 +157,7 @@ pack_verify_manifest_attestation() {
     local out
 
     if ! out="$(_cmd_python "${verifier}" "${pack_dir}" 2>&1)"; then
-        echo "ERROR: manifest.json attestation references failed verification." >&2
+        echo "ERROR: manifest.json provenance references failed verification." >&2
         printf '%s\n' "${out}" >&2
         return 1
     fi

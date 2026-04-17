@@ -11,7 +11,7 @@ pack_usage() {
 Usage: scripts/proof_packs/run_pack.sh [options]
 
 Builds an evidence-grade proof pack from a completed suite run.
-For proof-grade attestation, require a signed manifest, strict verification,
+For strong distributable evidence, require a signed manifest, strict verification,
 and a PASS final verdict.
 
 Verify a completed pack with:
