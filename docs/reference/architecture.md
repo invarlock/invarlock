@@ -144,7 +144,7 @@ by the CLI and non-CLI entrypoints.
 | `run_provenance_contract.py` + `run_report_contract.py` | Run provenance and run-report assembly contracts |
 | `run_report_payload_policy.py` | Deterministic payload shaping for context, metrics, guards, and flags |
 
-### Runtime Attestation Ownership
+### Runtime Provenance Verification Ownership
 
 Runtime provenance uses a single verifier implementation:
 

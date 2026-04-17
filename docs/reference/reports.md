@@ -58,7 +58,7 @@ auto-selected; pass the explicit file path instead.
 
 The markdown report is structured to highlight evaluation outcomes first:
 
-Attested evaluations also emit `runtime.manifest.json` next to
+Container-backed evaluations emit `runtime.manifest.json` next to
 `evaluation.report.json`. Archive and verify them together.
 
 - **Executive Summary**: one-line PASS/FAIL + compact gate table (primary metric, drift, invariants, spectral, RMT, overhead).

@@ -270,7 +270,7 @@ def resolve_runtime_image_digest() -> str | None:
     return digest
 
 
-def _attested_runtime_image_ref(image_ref: str, image_digest: str | None) -> str:
+def _runtime_provenance_image_ref(image_ref: str, image_digest: str | None) -> str:
     if image_ref in {
         RUNTIME_IMAGE_LOCAL_DEFAULT,
         RUNTIME_IMAGE_CUDA_LOCAL_DEFAULT,
@@ -283,7 +283,7 @@ def _attested_runtime_image_ref(image_ref: str, image_digest: str | None) -> str
     if unattested_artifacts_allowed():
         return image_ref
     raise RuntimeError(
-        "Attested runtime manifests require a digest-pinned runtime image; "
+        "Container-backed runtime manifests require a digest-pinned runtime image; "
         f"set {RUNTIME_IMAGE_DIGEST_ENV}, use {RUNTIME_IMAGE_LOCAL_DEFAULT!r}, "
         "or allow unattested artifacts explicitly."
     )

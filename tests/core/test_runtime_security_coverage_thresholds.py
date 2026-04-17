@@ -34,18 +34,18 @@ def test_runtime_flag_value_preserves_unknown_env_under_policy(
         )
 
 
-def test_attested_runtime_image_ref_keeps_digest_and_allows_unattested_override() -> (
+def test_runtime_provenance_image_ref_keeps_digest_and_allows_unattested_override() -> (
     None
 ):
     digest_pinned = "ghcr.io/invarlock/runtime:test@sha256:" + ("a" * 64)
     assert (
-        runtime_security_helpers._attested_runtime_image_ref(digest_pinned, None)
+        runtime_security_helpers._runtime_provenance_image_ref(digest_pinned, None)
         == digest_pinned
     )
 
     with runtime_security.runtime_allowances_scope(allow_unattested_artifacts=True):
         assert (
-            runtime_security_helpers._attested_runtime_image_ref(
+            runtime_security_helpers._runtime_provenance_image_ref(
                 "ghcr.io/invarlock/runtime:test",
                 None,
             )
