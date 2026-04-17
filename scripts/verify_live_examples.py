@@ -23,6 +23,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_ROOT = ROOT / "tmp" / "live_examples"
+DEFAULT_NOTEBOOK_PATHS = (
+    "notebooks/invarlock_compare_evaluate.ipynb",
+    "notebooks/invarlock_custom_datasets.ipynb",
+    "notebooks/invarlock_evaluation_report_deep_dive.ipynb",
+    "notebooks/invarlock_policy_tiers.ipynb",
+    "notebooks/invarlock_python_api.ipynb",
+    "notebooks/invarlock_quickstart_cpu.ipynb",
+)
 
 
 def _default_env() -> dict[str, str]:
@@ -68,10 +76,7 @@ def _resolve_notebook_paths(paths: list[str] | None) -> list[str]:
         return [str(path.relative_to(ROOT)) for path in notebooks]
     if paths:
         return []
-    return [
-        str(path.relative_to(ROOT))
-        for path in sorted((ROOT / "notebooks").glob("*.ipynb"))
-    ]
+    return list(DEFAULT_NOTEBOOK_PATHS)
 
 
 def _run_subprocess(

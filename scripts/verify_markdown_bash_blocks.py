@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Live-run concrete bash code blocks from Markdown docs.
 
-Blocks are executed in file-scoped temporary workspaces copied from the current
+Blocks are executed in file-scoped temporary workspaces staged from the current
 checkout so workflows like:
 
 - build image
@@ -68,15 +68,47 @@ DEMO_RUNTIME_MANIFEST_FIXTURE = (
     ROOT / "tests" / "fixtures" / "runtime_attestation" / "runtime.manifest.json"
 )
 
+WORKSPACE_STAGE_DIRS = {
+    "configs",
+    "contracts",
+    "docs",
+    "public_evidence",
+    "requirements",
+    "runtime",
+    "scripts",
+    "src",
+    "tests",
+}
+WORKSPACE_STAGE_FILES = {
+    ".dockerignore",
+    ".editorconfig",
+    ".gitignore",
+    ".markdownlint.json",
+    ".markdownlintignore",
+    ".python-version",
+    "CHANGELOG.md",
+    "CITATION.cff",
+    "LICENSE",
+    "MANIFEST.in",
+    "Makefile",
+    "README.md",
+    "SECURITY.md",
+    "SUPPORT.md",
+    "mkdocs.yml",
+    "package-lock.json",
+    "package.json",
+    "pyproject.toml",
+    "uv.lock",
+}
 EXCLUDE_TOP_LEVEL_DIRS = {
     "build",
+    ".evaluate_tmp",
     ".git",
     ".mypy_cache",
     ".pytest_cache",
     ".ruff_cache",
     ".venv",
     ".venv-release",
-    ".evaluate_tmp",
     "node_modules",
     "reports",
     "runs",
@@ -221,18 +253,36 @@ def iter_markdown_files(root: Path, *, paths: list[str] | None = None) -> list[P
     return sorted(md_files, key=lambda p: str(p))
 
 
-def _ignore_copytree(_dir: str, names: list[str]) -> set[str]:
-    ignored: set[str] = set()
-    for name in names:
-        if name in EXCLUDE_TOP_LEVEL_DIRS:
-            ignored.add(name)
-    return ignored
+def _should_stage_workspace_entry(path: Path) -> bool:
+    name = path.name
+    if name in EXCLUDE_TOP_LEVEL_DIRS:
+        return False
+    if path.is_dir():
+        return name in WORKSPACE_STAGE_DIRS
+    return name in WORKSPACE_STAGE_FILES
+
+
+def _stage_workspace_entry(source: Path, target: Path) -> None:
+    try:
+        os.symlink(source, target, target_is_directory=source.is_dir())
+        return
+    except OSError:
+        pass
+
+    if source.is_dir():
+        shutil.copytree(source, target, symlinks=True)
+        return
+    shutil.copy2(source, target)
 
 
 def _prepare_workspace(workspace: Path) -> None:
     if workspace.exists():
         shutil.rmtree(workspace)
-    shutil.copytree(ROOT, workspace, ignore=_ignore_copytree)
+    workspace.mkdir(parents=True, exist_ok=True)
+    for source in sorted(ROOT.iterdir(), key=lambda path: path.name):
+        if not _should_stage_workspace_entry(source):
+            continue
+        _stage_workspace_entry(source, workspace / source.name)
 
 
 def _split_env_prefix(tokens: list[str]) -> tuple[list[str], list[str]]:

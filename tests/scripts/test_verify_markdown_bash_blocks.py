@@ -372,6 +372,41 @@ def test_seed_demo_inputs_writes_expected_fixture_files(tmp_path: Path) -> None:
     assert (workspace / "compatibility.json").is_file()
 
 
+def test_prepare_workspace_stages_lightweight_repo_view(tmp_path: Path) -> None:
+    module = _load_script_module()
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    for dirname in ("src", "scripts", "configs", "runtime", "tests"):
+        (repo_root / dirname).mkdir()
+        (repo_root / dirname / "marker.txt").write_text(dirname, encoding="utf-8")
+    (repo_root / "README.md").write_text("# repo\n", encoding="utf-8")
+    (repo_root / "pyproject.toml").write_text(
+        "[project]\nname='demo'\n", encoding="utf-8"
+    )
+    (repo_root / "tmp").mkdir()
+    (repo_root / "tmp" / "generated.txt").write_text("generated\n", encoding="utf-8")
+    (repo_root / "data").mkdir()
+    (repo_root / "data" / "large.bin").write_text("payload\n", encoding="utf-8")
+    (repo_root / ".git").mkdir()
+    (repo_root / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+    module.ROOT = repo_root
+
+    workspace = tmp_path / "workspace"
+    module._prepare_workspace(workspace)
+
+    assert (workspace / "src").is_symlink()
+    assert (workspace / "scripts").is_symlink()
+    assert (workspace / "configs").is_symlink()
+    assert (workspace / "runtime").is_symlink()
+    assert (workspace / "tests").is_symlink()
+    assert (workspace / "README.md").is_symlink()
+    assert (workspace / "pyproject.toml").is_symlink()
+    assert not (workspace / "tmp").exists()
+    assert not (workspace / "data").exists()
+    assert not (workspace / ".git").exists()
+    assert (workspace / "src" / "marker.txt").read_text(encoding="utf-8") == "src"
+
+
 def test_run_blocks_writes_results(tmp_path: Path, monkeypatch) -> None:
     module = _load_script_module()
     repo_root = tmp_path / "repo"

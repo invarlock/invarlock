@@ -123,3 +123,15 @@ def test_main_limits_paths_to_curated_subset(tmp_path: Path, monkeypatch) -> Non
     assert "docs/user-guide/quickstart.md" in calls[0]
     assert "--skip-model-loading" in calls[1]
     assert "notebooks/demo.ipynb" in calls[1]
+
+
+def test_default_notebook_inventory_requires_explicit_classification() -> None:
+    module = _load_script_module()
+    repo_root = Path(__file__).resolve().parents[2]
+    discovered = [
+        str(path.relative_to(repo_root))
+        for path in sorted((repo_root / "notebooks").glob("*.ipynb"))
+    ]
+
+    assert list(module.DEFAULT_NOTEBOOK_PATHS) == discovered
+    assert module._resolve_notebook_paths(None) == discovered
