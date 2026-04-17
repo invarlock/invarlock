@@ -368,7 +368,7 @@ def installed_wheel_env(tmp_path_factory: pytest.TempPathFactory) -> InstalledWh
 
 
 @pytest.mark.skipif(os.getenv("SKIP_BUILD_TESTS") == "1", reason="skip build tests")
-def test_wheel_install_can_verify_evidence_pack_outside_repo_tree(
+def test_wheel_install_exposes_core_cli_contracts_outside_repo_tree(
     installed_wheel_env: InstalledWheelEnv, tmp_path: Path
 ) -> None:
     import_check = _run(
@@ -381,15 +381,27 @@ def test_wheel_install_can_verify_evidence_pack_outside_repo_tree(
     assert installed_wheel_env.env_dir.resolve() in import_path.parents
     assert installed_wheel_env.repo_root.resolve() not in import_path.parents
 
-    minimal_help = _run(
-        installed_wheel_env.python_exe,
-        ["-m", "invarlock", "--help"],
+    root_help = _run(
+        installed_wheel_env.cli_exe,
+        ["--help"],
         cwd=tmp_path,
         env={"INVARLOCK_LIGHT_IMPORT": "1"},
     )
-    assert minimal_help.returncode == 0, minimal_help.stdout + minimal_help.stderr
-    assert "evaluate" in minimal_help.stdout
-    assert "verify" in minimal_help.stdout
+    assert root_help.returncode == 0, root_help.stdout + root_help.stderr
+    assert "evaluate" in root_help.stdout
+    assert "verify" in root_help.stdout
+    assert "report" in root_help.stdout
+
+    evaluate_help = _run(
+        installed_wheel_env.cli_exe,
+        ["evaluate", "--help"],
+        cwd=tmp_path,
+        env={"INVARLOCK_LIGHT_IMPORT": "1"},
+    )
+    assert evaluate_help.returncode == 0, evaluate_help.stdout + evaluate_help.stderr
+    assert "--baseline" in evaluate_help.stdout
+    assert "--subject" in evaluate_help.stdout
+    assert "--report-out" in evaluate_help.stdout
 
     cli_app_import = _run(
         installed_wheel_env.python_exe,
@@ -446,12 +458,16 @@ def test_wheel_install_can_verify_evidence_pack_outside_repo_tree(
             (
                 "import json; "
                 "from importlib import resources; "
-                "root = resources.files('invarlock').joinpath("
-                "'_data', 'public_evidence', 'published_basis'); "
-                "print(json.dumps({"
-                "'gpt2': root.joinpath('gpt2', 'evaluation.report.json').is_file(), "
-                "'bert': root.joinpath('bert', 'evidence_pack_recipe.json').is_file()"
-                "}))"
+                "import invarlock.public_contracts as public_contracts; "
+                "data_root = resources.files('invarlock').joinpath('_data'); "
+                "resolved = {"
+                "lane['lane_id']: {"
+                "key: str(data_root.joinpath(*path.split('/')))"
+                "for key, path in lane.get('evidence', {}).items()"
+                "} "
+                "for lane in public_contracts.published_basis_lanes()"
+                "}; "
+                "print(json.dumps(resolved, sort_keys=True))"
             ),
         ],
         cwd=tmp_path,
@@ -459,10 +475,40 @@ def test_wheel_install_can_verify_evidence_pack_outside_repo_tree(
     assert installed_public_evidence.returncode == 0, (
         installed_public_evidence.stdout + installed_public_evidence.stderr
     )
-    assert json.loads(installed_public_evidence.stdout.strip()) == {
-        "gpt2": True,
-        "bert": True,
-    }
+    resolved_public_evidence = json.loads(installed_public_evidence.stdout.strip())
+    assert resolved_public_evidence
+    for evidence in resolved_public_evidence.values():
+        for path in evidence.values():
+            assert Path(path).is_file(), path
+
+    published_report = Path(
+        resolved_public_evidence["gpt2-causal-hf"]["evaluation_report_fixture"]
+    )
+    public_html = tmp_path / "published-basis.html"
+    render_public_html = _run(
+        installed_wheel_env.cli_exe,
+        [
+            "report",
+            "html",
+            "-i",
+            str(published_report),
+            "-o",
+            str(public_html),
+            "--force",
+        ],
+        cwd=tmp_path,
+    )
+    assert render_public_html.returncode == 0, (
+        render_public_html.stdout + render_public_html.stderr
+    )
+    assert public_html.is_file()
+    assert "<html" in public_html.read_text(encoding="utf-8").lower()
+
+
+@pytest.mark.skipif(os.getenv("SKIP_BUILD_TESTS") == "1", reason="skip build tests")
+def test_wheel_install_can_verify_report_runtime_and_evidence_pack_outside_repo_tree(
+    installed_wheel_env: InstalledWheelEnv, tmp_path: Path
+) -> None:
 
     report_dir = tmp_path / "report"
     report_path = report_dir / "evaluation.report.json"

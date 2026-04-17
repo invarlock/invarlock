@@ -169,6 +169,17 @@ def test_programmatic_docs_mark_python_surface_as_advanced_not_contract_stable()
     assert "CoreRunner.execute and helpers" not in index
 
 
+def test_contract_reference_docs_freeze_versioned_json_and_packaged_public_evidence():
+    text = _read("docs/reference/contracts.md")
+
+    assert 'format_version: "verify-v1"' in text
+    assert 'format_version: "runtime-verify-v1"' in text
+    assert 'format_version: "evidence-pack-verify-v1"' in text
+    assert 'verify.format_version: "verify-v1"' in text
+    assert "public_evidence/published_basis/" in text
+    assert "invarlock/_data/public_evidence/published_basis/" in text
+
+
 def test_byod_end_to_end_example_has_enough_rows_for_requested_windows() -> None:
     text = _read("docs/user-guide/bring-your-own-data.md")
     match = re.search(

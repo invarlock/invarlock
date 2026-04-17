@@ -72,6 +72,15 @@ expose both the strict `support_matrix` contract and the broader
 `model_family_catalog` contract, plus the `validation_keys`, `console_labels`,
 and `metric_kinds` entries from the public contract catalog.
 
+The versioned JSON surfaces are intentionally explicit:
+
+- `invarlock verify --json` emits `format_version: "verify-v1"`
+- `invarlock-runtime-verify --json` emits
+  `format_version: "runtime-verify-v1"`
+- `invarlock advanced evidence-pack verify --json` emits
+  `format_version: "evidence-pack-verify-v1"` and nests the bundled report
+  verification result under `verify.format_version: "verify-v1"`
+
 ## Packaged public contract data
 
 The canonical public contract data ships in two places:
@@ -79,7 +88,14 @@ The canonical public contract data ships in two places:
 - installed wheels, under `invarlock/_data/contracts/*.json`
 - source tags in the repository
 
-If a downstream workflow needs a detached archive, maintainers can still build
+The support-matrix published-basis evidence paths remain logical
+`public_evidence/published_basis/...` references. Installed wheels resolve those
+logical paths from packaged files under
+`invarlock/_data/public_evidence/published_basis/...`, so installed-wheel users
+can render the shipped published-basis `evaluation.report.json` examples and
+load the paired `evidence_pack_recipe.json` data without cloning the repo.
+
+If maintainers need a detached archive, they can still build
 one locally with `scripts/release/make_public_contract_bundle.py`. That helper
 is maintainer-local only and is not part of the public release artifact set.
 It packages:

@@ -30,6 +30,18 @@ def test_invarlock_help_layout_and_exit_codes():
         assert not re.search(rf"^\s*│\s+{re.escape(removed)}\s", out, re.MULTILINE)
 
 
+def test_invarlock_help_promotes_evaluate_verify_report_html_flow():
+    runner = CliRunner()
+    result = runner.invoke(app, ["--help"])
+    assert result.exit_code == 0
+    normalized = " ".join(strip_ansi(result.stdout).split())
+
+    assert (
+        "Then: invarlock verify <REPORT> and invarlock report html -i <REPORT> -o <HTML>"
+        in normalized
+    )
+
+
 def test_invarlock_version_option():
     runner = CliRunner()
     result = runner.invoke(app, ["--version"])

@@ -141,7 +141,11 @@ def test_makefile_exposes_actionlint_and_minimal_packaging_smoke_targets() -> No
     assert "packaging-smoke-minimal:" in text
     assert (
         "tests/integration/packaging/test_wheel_evidence_pack_verify.py::"
-        "test_wheel_install_can_verify_evidence_pack_outside_repo_tree"
+        "test_wheel_install_exposes_core_cli_contracts_outside_repo_tree"
+    ) in text
+    assert (
+        "tests/integration/packaging/test_wheel_evidence_pack_verify.py::"
+        "test_wheel_install_can_verify_report_runtime_and_evidence_pack_outside_repo_tree"
     ) in text
     assert (
         "tests/integration/packaging/test_wheel_evidence_pack_verify.py::"

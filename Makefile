@@ -322,11 +322,12 @@ actionlint:  ## Lint GitHub Actions workflow files
 	}
 	actionlint .github/workflows/*.yml
 
-packaging-smoke-minimal:  ## Smoke the minimal wheel install and evidence-pack verify path
+packaging-smoke-minimal:  ## Smoke the minimal wheel install around the public contract and evidence-pack verify path
 	$(MAKE) ensure-python
 	@PYTHON="$$(if [ -x .venv/bin/python ]; then printf '%s' .venv/bin/python; else printf '%s' "$(PYTHON)"; fi)"; \
 	INVARLOCK_LIGHT_IMPORT=1 PYTHONPATH=src "$$PYTHON" -m pytest -q \
-		tests/integration/packaging/test_wheel_evidence_pack_verify.py::test_wheel_install_can_verify_evidence_pack_outside_repo_tree \
+		tests/integration/packaging/test_wheel_evidence_pack_verify.py::test_wheel_install_exposes_core_cli_contracts_outside_repo_tree \
+		tests/integration/packaging/test_wheel_evidence_pack_verify.py::test_wheel_install_can_verify_report_runtime_and_evidence_pack_outside_repo_tree \
 		tests/integration/packaging/test_wheel_evidence_pack_verify.py::test_wheel_install_verify_rejects_ambiguous_directory_outside_repo_tree \
 		tests/integration/packaging/test_wheel_evidence_pack_verify.py::test_wheel_install_runtime_verify_failure_json_outside_repo_tree \
 		tests/integration/packaging/test_wheel_evidence_pack_verify.py::test_wheel_install_evidence_pack_verify_reports_integrity_failure_outside_repo_tree
