@@ -379,8 +379,8 @@ runtime-smoke-cuda-podman: runtime-smoke  ## Smoke the local CUDA container runt
 
 runtime-verify:  ## Smoke the Python runtime verifier on the fixture bundle
 	PYTHONPATH=src $(PYTHON) -m invarlock.cli.runtime_verify \
-		--report tests/fixtures/runtime_attestation/evaluation.report.json \
-		--manifest tests/fixtures/runtime_attestation/runtime.manifest.json \
+		--report tests/fixtures/runtime_provenance/evaluation.report.json \
+		--manifest tests/fixtures/runtime_provenance/runtime.manifest.json \
 		--json
 
 ##@ CI/Build

@@ -96,7 +96,7 @@ def test_attestation_helpers_cover_reference_and_no_extra_paths(tmp_path: Path) 
         proof_pack_mod._path_within_dir(pack_dir, pack_dir.parent / "outside.json")
         is False
     )
-    assert proof_pack_mod.verify_manifest_attestation(pack_dir) == []
+    assert proof_pack_mod.verify_manifest_provenance(pack_dir) == []
     covered_paths = set(proof_pack_mod._relative_file_paths(pack_dir))
     assert proof_pack_mod._verify_no_extra_files(
         pack_dir, covered_paths=covered_paths, strict=True

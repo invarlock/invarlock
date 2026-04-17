@@ -151,9 +151,9 @@ pack_validate_manifest_schema() {
     return 0
 }
 
-pack_verify_manifest_attestation() {
+pack_verify_manifest_provenance() {
     local pack_dir="$1"
-    local verifier="${SCRIPT_DIR}/python/verify_manifest_attestation.py"
+    local verifier="${SCRIPT_DIR}/python/verify_manifest_provenance.py"
     local out
 
     if ! out="$(_cmd_python "${verifier}" "${pack_dir}" 2>&1)"; then
@@ -384,7 +384,7 @@ pack_verify_pack() {
     if ! pack_verify_checksums "${pack_dir}"; then
         return "${PACK_VERIFY_INTEGRITY}"
     fi
-    if ! pack_verify_manifest_attestation "${pack_dir}"; then
+    if ! pack_verify_manifest_provenance "${pack_dir}"; then
         return "${PACK_VERIFY_INTEGRITY}"
     fi
     if ! pack_verify_no_extra_files "${pack_dir}" "${strict}"; then

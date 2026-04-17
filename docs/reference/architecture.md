@@ -8,7 +8,7 @@
 | **Audience** | Developers extending InvarLock, operators debugging pipelines, security reviewers. |
 | **Core components** | CLI shells, Core/runtime policy layer, Guard chain, Reporting/artifact subsystem. |
 | **Design goals** | Torch-independent core, edit-agnostic guards, deterministic evaluation, explicit artifact contracts, full provenance. |
-| **Source of truth** | `src/invarlock/core/*.py`, `src/invarlock/reporting/*.py`, `src/invarlock/runtime_attestation.py`, `src/invarlock/runtime_verify.py`, `src/invarlock/cli/commands/*.py`, `src/invarlock/cli/run_*.py`, `src/invarlock/guards/*.py`. |
+| **Source of truth** | `src/invarlock/core/*.py`, `src/invarlock/reporting/*.py`, `src/invarlock/runtime_provenance.py`, `src/invarlock/runtime_verify.py`, `src/invarlock/cli/commands/*.py`, `src/invarlock/cli/run_*.py`, `src/invarlock/guards/*.py`. |
 
 See the [Glossary](../assurance/glossary.md) for definitions of terms such as
 the canonical guard chain, policy digest, and measurement contract.
@@ -136,7 +136,7 @@ by the CLI and non-CLI entrypoints.
 | `report_inputs.py` | Canonical report path resolution and JSON-object validation |
 | `doctor_findings.py` | Structured doctor findings and optional report cross-check analysis |
 | `verify_contract.py` | Structured report-verification service used by `verify` and proof-pack flows |
-| `runtime_manifest_verify.py` + `runtime_attestation.py` | Authoritative runtime-manifest verification and runtime-provenance ownership for report verification |
+| `runtime_manifest_verify.py` + `runtime_provenance.py` | Authoritative runtime-manifest verification and runtime-provenance ownership for report verification |
 | `run_policy.py` | Shared run policy helpers such as split choice, PM thresholds, and overhead policy |
 | `run_retry_policy.py` | Retry-attempt summaries and retry state transitions |
 | `run_snapshot_contract.py` + `run_snapshot_policy.py` | Snapshot planning, restore behavior, and retry transitions |
@@ -152,7 +152,7 @@ Runtime provenance uses a single verifier implementation:
   `runtime.manifest.json` plus report-digest binding checks.
 - `runtime_verify.py` and `cli/runtime_verify.py` are the programmatic and CLI
   entrypoints for that verifier.
-- `runtime_attestation.py` calls the same verifier when `invarlock verify`
+- `runtime_provenance.py` calls the same verifier when `invarlock verify`
   enforces runtime provenance on container-backed reports.
 - Product behavior does not depend on finding an external verifier binary on
   `PATH`; verifier semantics are package-native and deterministic across
@@ -364,7 +364,7 @@ verification and programmatic execution.
 | **Tier-based policies** | Calibrated thresholds in `tiers.yaml` for balanced/conservative/aggressive safety profiles. | Policy resolution in `guards/policies.py` |
 | **Deterministic evaluation** | Seed bundle + window pairing schedules ensure reproducible metrics. | `meta.seeds`, `dataset.windows.stats` tracking |
 | **Functional-core / imperative-shell split** | Keep policy, artifact contracts, and verdict computation reusable outside the CLI while CLI modules stay thin. | `core/*.py` + `reporting/*.py` owners called from `cli/commands/*.py` |
-| **Single verifier ownership** | Runtime-manifest verification should not vary with host tooling, so it must use one product implementation. | `core/runtime_manifest_verify.py`, `runtime_verify.py`, `runtime_attestation.py` |
+| **Single verifier ownership** | Runtime-manifest verification should not vary with host tooling, so it must use one product implementation. | `core/runtime_manifest_verify.py`, `runtime_verify.py`, `runtime_provenance.py` |
 | **Plugin architecture** | Entry points for guards, adapters, edits enable extension without core changes. | `importlib.metadata` discovery in `core/registry.py` |
 | **Log-space primary metrics** | Paired ΔlogNLL with BCa bootstrap avoids ratio math bias. | `core/bootstrap.py` implementation |
 

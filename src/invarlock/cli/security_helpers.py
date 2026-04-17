@@ -9,11 +9,11 @@ from typing import Any, cast
 
 import typer
 
-from invarlock.runtime_attestation import (
+from invarlock.runtime_provenance import (
     configure_runtime_security as _configure_runtime_security_core,
 )
-from invarlock.runtime_attestation import (
-    verify_runtime_attestation as _verify_runtime_attestation_core,
+from invarlock.runtime_provenance import (
+    verify_runtime_provenance as _verify_runtime_provenance_core,
 )
 from invarlock.runtime_security import (
     ALLOW_HOST_EXECUTION_ENV,
@@ -90,11 +90,7 @@ def runtime_security_scoped(
 ) -> Callable[..., Any]:
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
-        execution_mode = (
-            str(kwargs.get("execution_mode", kwargs.get("assurance", "")) or "")
-            .strip()
-            .lower()
-        )
+        execution_mode = str(kwargs.get("execution_mode", "") or "").strip().lower()
         trusted_local = execution_mode == "trusted-local"
         with configure_runtime_security(
             allow_network=bool(kwargs.get("allow_network", False)),
@@ -158,12 +154,12 @@ def emit_runtime_manifest(
     )
 
 
-def verify_runtime_attestation(
+def verify_runtime_provenance(
     report_path: str | Path,
     *,
     allow_unattested: bool = False,
 ) -> list[str]:
-    return _verify_runtime_attestation_core(
+    return _verify_runtime_provenance_core(
         report_path,
         allow_unattested=allow_unattested,
     )

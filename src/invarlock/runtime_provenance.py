@@ -18,7 +18,7 @@ from invarlock.runtime_security import (
 from invarlock.runtime_verify import verify_runtime_manifest
 
 
-class RuntimeAttestationIssueCode(StrEnum):
+class RuntimeProvenanceIssueCode(StrEnum):
     MANIFEST_MISSING = "manifest_missing"
     MANIFEST_INVALID = "manifest_invalid"
     EXECUTION_MODE_INVALID = "execution_mode_invalid"
@@ -26,30 +26,30 @@ class RuntimeAttestationIssueCode(StrEnum):
 
 
 @dataclass(frozen=True)
-class RuntimeAttestationIssue:
-    code: RuntimeAttestationIssueCode
+class RuntimeProvenanceIssue:
+    code: RuntimeProvenanceIssueCode
     message: str
     details: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)
-class RuntimeAttestationResult:
+class RuntimeProvenanceResult:
     verified: bool
     skipped: bool
-    issues: tuple[RuntimeAttestationIssue, ...] = ()
+    issues: tuple[RuntimeProvenanceIssue, ...] = ()
 
 
 def _runtime_verifier_failed_result(
     report: Path,
     *,
     messages: tuple[str, ...],
-) -> RuntimeAttestationResult:
-    return RuntimeAttestationResult(
+) -> RuntimeProvenanceResult:
+    return RuntimeProvenanceResult(
         verified=False,
         skipped=False,
         issues=tuple(
-            RuntimeAttestationIssue(
-                code=RuntimeAttestationIssueCode.VERIFIER_FAILED,
+            RuntimeProvenanceIssue(
+                code=RuntimeProvenanceIssueCode.VERIFIER_FAILED,
                 message=message,
                 details={"report": report.name},
             )
@@ -61,10 +61,10 @@ def _runtime_verifier_failed_result(
 def _verify_runtime_manifest(
     report: Path,
     manifest_path: Path,
-) -> RuntimeAttestationResult:
+) -> RuntimeProvenanceResult:
     result = verify_runtime_manifest(report, manifest_path)
     if result.ok:
-        return RuntimeAttestationResult(verified=True, skipped=False)
+        return RuntimeProvenanceResult(verified=True, skipped=False)
     messages = result.errors or (f"Runtime verifier failed for {report.name}.",)
     return _runtime_verifier_failed_result(report, messages=messages)
 
@@ -92,13 +92,13 @@ def configure_runtime_security(
         reset_runtime_allowances(token)
 
 
-def verify_runtime_attestation(
+def verify_runtime_provenance(
     report_path: str | Path,
     *,
     allow_unattested: bool = False,
-) -> RuntimeAttestationResult:
+) -> RuntimeProvenanceResult:
     if allow_unattested or unattested_artifacts_allowed():
-        return RuntimeAttestationResult(verified=False, skipped=True)
+        return RuntimeProvenanceResult(verified=False, skipped=True)
 
     report = Path(report_path)
     load_result = load_runtime_manifest(report)
@@ -106,12 +106,12 @@ def verify_runtime_attestation(
     manifest = load_result.payload
     if manifest is None:
         if load_result.issue_code == RuntimeManifestLoadIssueCode.MISSING:
-            return RuntimeAttestationResult(
+            return RuntimeProvenanceResult(
                 verified=False,
                 skipped=False,
                 issues=(
-                    RuntimeAttestationIssue(
-                        code=RuntimeAttestationIssueCode.MANIFEST_MISSING,
+                    RuntimeProvenanceIssue(
+                        code=RuntimeProvenanceIssueCode.MANIFEST_MISSING,
                         message=f"{manifest_path.name} missing for {report.name}.",
                         details={
                             "report": report.name,
@@ -125,12 +125,12 @@ def verify_runtime_attestation(
             if load_result.issue_message
             else f"{manifest_path.name} is unreadable"
         )
-        return RuntimeAttestationResult(
+        return RuntimeProvenanceResult(
             verified=False,
             skipped=False,
             issues=(
-                RuntimeAttestationIssue(
-                    code=RuntimeAttestationIssueCode.MANIFEST_INVALID,
+                RuntimeProvenanceIssue(
+                    code=RuntimeProvenanceIssueCode.MANIFEST_INVALID,
                     message=f"{manifest_path.name} is invalid for {report.name}: {detail}.",
                     details={
                         "report": report.name,
@@ -146,12 +146,12 @@ def verify_runtime_attestation(
         )
 
     if manifest.get("execution_mode") != "container":
-        return RuntimeAttestationResult(
+        return RuntimeProvenanceResult(
             verified=False,
             skipped=False,
             issues=(
-                RuntimeAttestationIssue(
-                    code=RuntimeAttestationIssueCode.EXECUTION_MODE_INVALID,
+                RuntimeProvenanceIssue(
+                    code=RuntimeProvenanceIssueCode.EXECUTION_MODE_INVALID,
                     message=(
                         f"{manifest_path.name} marks {report.name} as "
                         f"{manifest.get('execution_mode')!r}."
@@ -171,9 +171,9 @@ def verify_runtime_attestation(
 __all__ = [
     "RuntimeManifestLoadIssueCode",
     "RuntimeManifestLoadResult",
-    "RuntimeAttestationIssue",
-    "RuntimeAttestationIssueCode",
-    "RuntimeAttestationResult",
+    "RuntimeProvenanceIssue",
+    "RuntimeProvenanceIssueCode",
+    "RuntimeProvenanceResult",
     "configure_runtime_security",
-    "verify_runtime_attestation",
+    "verify_runtime_provenance",
 ]

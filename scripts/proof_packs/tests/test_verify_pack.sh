@@ -130,7 +130,7 @@ test_verify_pack_manifest_digest_validation_reports_missing_and_empty_fields_dir
     assert_match "checksums_sha256_digest is empty" "${RUN_ERR}" "empty digest error is direct"
 }
 
-test_verify_pack_manifest_attestation_accepts_digest_backed_refs() {
+test_verify_pack_manifest_provenance_accepts_digest_backed_refs() {
     mock_reset
 
     source ./scripts/proof_packs/verify_pack.sh
@@ -150,11 +150,11 @@ test_verify_pack_manifest_attestation_accepts_digest_backed_refs() {
 {"format":"proof-pack-v1","checksums_sha256":"checksums.sha256","checksums_sha256_digest":"0000000000000000000000000000000000000000000000000000000000000000","subject":{"name":"final_verdict","path":"results/verdicts/final_verdict.json","digest":"${subject_digest}"},"invocation":{"config_source":{"path":"metadata/source_repo.json","digest":"${config_digest}"}},"materials":[{"name":"model_revisions","path":"metadata/model_revisions.json","digest":"${materials_digest}"}]}
 EOF
 
-    run pack_verify_manifest_attestation "${pack_dir}"
+    run pack_verify_manifest_provenance "${pack_dir}"
     assert_rc "0" "${RUN_RC}" "digest-backed provenance references verify"
 }
 
-test_verify_pack_manifest_attestation_rejects_digest_mismatch() {
+test_verify_pack_manifest_provenance_rejects_digest_mismatch() {
     mock_reset
 
     source ./scripts/proof_packs/verify_pack.sh
@@ -164,7 +164,7 @@ test_verify_pack_manifest_attestation_rejects_digest_mismatch() {
     echo '{"verdict":"PASS"}' > "${pack_dir}/results/verdicts/final_verdict.json"
     printf '%s\n' '{"format":"proof-pack-v1","checksums_sha256":"checksums.sha256","checksums_sha256_digest":"0000000000000000000000000000000000000000000000000000000000000000","subject":{"name":"final_verdict","path":"results/verdicts/final_verdict.json","digest":"sha256:0000000000000000000000000000000000000000000000000000000000000000"}}' > "${pack_dir}/manifest.json"
 
-    run pack_verify_manifest_attestation "${pack_dir}"
+    run pack_verify_manifest_provenance "${pack_dir}"
     assert_rc "1" "${RUN_RC}" "subject digest mismatch fails provenance verification"
     assert_match "digest mismatch" "${RUN_ERR}" "digest mismatch error reported"
 }
@@ -734,7 +734,7 @@ test_verify_pack_rejects_tampered_payload_when_checksums_bound() {
     assert_rc "6" "${RUN_RC}" "tampered payload must fail checksum verification"
 }
 
-test_verify_pack_returns_integrity_error_when_manifest_attestation_fails() {
+test_verify_pack_returns_integrity_error_when_manifest_provenance_fails() {
     mock_reset
 
     source ./scripts/proof_packs/verify_pack.sh
@@ -748,7 +748,7 @@ test_verify_pack_returns_integrity_error_when_manifest_attestation_fails() {
     pack_verify_signature() { return 0; }
     pack_verify_manifest_binds_checksums() { return 0; }
     pack_verify_checksums() { return 0; }
-    pack_verify_manifest_attestation() { return 1; }
+    pack_verify_manifest_provenance() { return 1; }
     pack_verify_no_extra_files() { return 0; }
     pack_verify_reports() { return 0; }
 

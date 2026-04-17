@@ -59,7 +59,7 @@ def test_subprocess_verifiers_use_timeouts() -> None:
     offenders: list[str] = []
     expectations = {
         REPO_ROOT / "src/invarlock/runtime_security.py": "timeout=",
-        REPO_ROOT / "src/invarlock/runtime_attestation.py": "timeout=",
+        REPO_ROOT / "src/invarlock/runtime_provenance.py": "timeout=",
         REPO_ROOT / "src/invarlock/proof_pack.py": "timeout=",
     }
     for path, required in expectations.items():
@@ -202,8 +202,8 @@ def test_run_execution_consumes_core_timing_summary() -> None:
         assert required in text
 
 
-def test_core_runtime_attestation_is_wrapper_only() -> None:
-    path = REPO_ROOT / "src/invarlock/core/runtime_attestation.py"
+def test_core_runtime_provenance_is_wrapper_only() -> None:
+    path = REPO_ROOT / "src/invarlock/core/runtime_provenance.py"
     tree = ast.parse(_read_text(path), filename=str(path))
 
     imports: list[str] = []

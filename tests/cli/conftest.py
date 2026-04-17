@@ -30,7 +30,7 @@ def _reset_plugin_env(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, 
     yield
 
 
-def _should_auto_attest_verify_test(node: pytest.FixtureRequest) -> bool:
+def _should_auto_seed_runtime_provenance(node: pytest.FixtureRequest) -> bool:
     path = Path(str(node.node.path))
     return (
         path.name.startswith("test_verify")
@@ -103,34 +103,34 @@ def _write_test_runtime_manifest(report_path: Path) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _auto_attest_verify_reports(
+def _auto_seed_verify_runtime_provenance(
     monkeypatch: pytest.MonkeyPatch,
     request: pytest.FixtureRequest,
 ) -> Generator[None, None, None]:
-    if not _should_auto_attest_verify_test(request):
+    if not _should_auto_seed_runtime_provenance(request):
         yield
         return
 
     from invarlock.reporting import verify_contract as verify_mod
 
-    original_verify_runtime_attestation = verify_mod.verify_runtime_attestation
+    original_verify_runtime_provenance = verify_mod.verify_runtime_provenance
 
-    def _verify_runtime_attestation(
+    def _verify_runtime_provenance(
         report_path: str | Path,
         *,
         allow_unattested: bool = False,
     ):
         if not allow_unattested:
             _write_test_runtime_manifest(Path(report_path))
-        return original_verify_runtime_attestation(
+        return original_verify_runtime_provenance(
             report_path,
             allow_unattested=allow_unattested,
         )
 
     monkeypatch.setattr(
         verify_mod,
-        "verify_runtime_attestation",
-        _verify_runtime_attestation,
+        "verify_runtime_provenance",
+        _verify_runtime_provenance,
         raising=True,
     )
     yield

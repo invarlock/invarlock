@@ -238,7 +238,7 @@ def _validate_reference(*, pack_dir: Path, label: str, payload: Any) -> list[str
     return []
 
 
-def verify_manifest_attestation(pack_dir: Path) -> list[str]:
+def verify_manifest_provenance(pack_dir: Path) -> list[str]:
     payload = _load_json(pack_dir / "manifest.json")
     if not isinstance(payload, dict):
         return ["manifest must decode to a JSON object"]

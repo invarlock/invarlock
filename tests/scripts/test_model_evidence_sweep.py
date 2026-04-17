@@ -353,7 +353,7 @@ def test_model_evidence_sweep_dry_run_emits_commands_and_manifest(
         == "configs/presets/causal_lm/qwen3_8b_512.yaml"
     )
     assert "--allow-host-execution" not in payload[0]["evaluate"]
-    assert "--assurance" not in payload[0]["verify"]
+    assert "--runtime-provenance" not in payload[0]["verify"]
 
     manifest = json.loads((output_root / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["suite"] == "current-supported-experimental"

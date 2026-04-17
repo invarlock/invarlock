@@ -368,19 +368,19 @@ def test_validate_reference_allows_empty_path_and_digest_pair(tmp_path: Path) ->
     )
 
 
-def test_verify_manifest_attestation_rejects_non_object_manifest(
+def test_verify_manifest_provenance_rejects_non_object_manifest(
     tmp_path: Path,
 ) -> None:
     pack_dir = tmp_path / "pack"
     pack_dir.mkdir()
     (pack_dir / "manifest.json").write_text("[1, 2, 3]", encoding="utf-8")
 
-    assert proof_pack_mod.verify_manifest_attestation(pack_dir) == [
+    assert proof_pack_mod.verify_manifest_provenance(pack_dir) == [
         "manifest must decode to a JSON object"
     ]
 
 
-def test_verify_manifest_attestation_skips_non_dict_invocation_and_materials(
+def test_verify_manifest_provenance_skips_non_dict_invocation_and_materials(
     tmp_path: Path,
 ) -> None:
     pack_dir = tmp_path / "pack"
@@ -397,7 +397,7 @@ def test_verify_manifest_attestation_skips_non_dict_invocation_and_materials(
         },
     )
 
-    assert proof_pack_mod.verify_manifest_attestation(pack_dir) == []
+    assert proof_pack_mod.verify_manifest_provenance(pack_dir) == []
 
 
 def test_parse_checksums_ignores_blank_lines(tmp_path: Path) -> None:

@@ -28,7 +28,7 @@ _validate_signing_key = proof_pack_integrity_mod.validate_signing_key
 _sha256_bytes = proof_pack_manifest_mod._sha256_bytes
 _sha256_file = proof_pack_manifest_mod._sha256_file
 _validate_material_name = proof_pack_manifest_mod._validate_material_name
-verify_manifest_attestation = proof_pack_manifest_mod.verify_manifest_attestation
+verify_manifest_provenance = proof_pack_manifest_mod.verify_manifest_provenance
 _proof_pack_counts_from_verification = (
     proof_pack_metadata_mod._proof_pack_counts_from_verification
 )
@@ -202,7 +202,7 @@ def inspect_proof_pack(pack_dir: Path) -> ProofPackResult:
         "integrity": {
             "checksums_bound": False,
             "checksums_ok": False,
-            "manifest_attestation_ok": False,
+            "manifest_provenance_ok": False,
             "extra_files": [],
         },
         "issues": issues,
@@ -260,7 +260,7 @@ def inspect_proof_pack(pack_dir: Path) -> ProofPackResult:
 
     bind_errors = _verify_manifest_binds_checksums(pack_dir)
     checksum_errors, covered_paths = _verify_checksums(pack_dir)
-    attestation_errors = verify_manifest_attestation(pack_dir)
+    provenance_errors = verify_manifest_provenance(pack_dir)
     extra_files = sorted(
         set(_relative_file_paths(pack_dir)) - covered_paths - _CONTROL_FILES
     )
@@ -271,7 +271,7 @@ def inspect_proof_pack(pack_dir: Path) -> ProofPackResult:
         )
     issues.extend(bind_errors)
     issues.extend(checksum_errors)
-    issues.extend(attestation_errors)
+    issues.extend(provenance_errors)
 
     payload["artifacts"] = {
         "files": len(_relative_file_paths(pack_dir)),
@@ -280,7 +280,7 @@ def inspect_proof_pack(pack_dir: Path) -> ProofPackResult:
     payload["integrity"] = {
         "checksums_bound": not bind_errors,
         "checksums_ok": not checksum_errors,
-        "manifest_attestation_ok": not attestation_errors,
+        "manifest_provenance_ok": not provenance_errors,
         "extra_files": extra_files,
     }
     verification = manifest.get("verification") if isinstance(manifest, dict) else None
@@ -316,14 +316,14 @@ def inspect_proof_pack(pack_dir: Path) -> ProofPackResult:
         )
     )
     integrity_errors_present = bool(
-        bind_errors or checksum_errors or attestation_errors or extra_files
+        bind_errors or checksum_errors or provenance_errors or extra_files
     )
     payload["ok"] = not integrity_errors_present
     payload["strict_ready"] = (
         signature_present
         and not bind_errors
         and not checksum_errors
-        and not attestation_errors
+        and not provenance_errors
         and not extra_files
     )
     return ProofPackResult(

@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 
-from invarlock.proof_pack import verify_manifest_attestation
+from invarlock.proof_pack import verify_manifest_provenance
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -19,7 +19,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
-    errors = verify_manifest_attestation(Path(args.pack_dir))
+    errors = verify_manifest_provenance(Path(args.pack_dir))
     if errors:
         for error in errors:
             print(error)

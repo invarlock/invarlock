@@ -8,7 +8,7 @@ import invarlock.proof_pack as proof_pack_mod
 from invarlock.proof_pack import (
     ProofPackStatus,
     validate_manifest,
-    verify_manifest_attestation,
+    verify_manifest_provenance,
     verify_proof_pack,
 )
 from invarlock.reporting.verify_contract import VerifyExecutionResult, VerifyOutcome
@@ -131,7 +131,7 @@ def test_proof_pack_manifest_and_attestation_round_trip(tmp_path: Path) -> None:
     )
 
     assert validate_manifest(pack_dir / "manifest.json") == []
-    assert verify_manifest_attestation(pack_dir) == []
+    assert verify_manifest_provenance(pack_dir) == []
 
     result = verify_proof_pack(pack_dir, skip_verify=True)
     payload = result.payload

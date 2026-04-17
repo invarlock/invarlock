@@ -176,7 +176,7 @@ THRESHOLDS = {
     "src/invarlock/core/run_timing_policy.py": 0.95,
     "src/invarlock/core/runner_eval_metrics_multimodal.py": 1.00,
     "src/invarlock/core/runner_eval_metrics_stats.py": 1.00,
-    "src/invarlock/core/runtime_attestation.py": 1.00,
+    "src/invarlock/core/runtime_provenance.py": 1.00,
     "src/invarlock/core/doctor_inventory.py": 0.90,
     "src/invarlock/core/doctor_preflight.py": 0.95,
     "src/invarlock/core/evaluate_contract.py": 0.90,

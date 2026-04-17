@@ -12,7 +12,7 @@ from invarlock.core.exceptions import InvarlockError
 from invarlock.core.exceptions import MetricsError as _MetricsError
 from invarlock.core.exceptions import ValidationError as _ValidationError
 from invarlock.core.provider_parity import enforce_provider_parity
-from invarlock.core.runtime_attestation import verify_runtime_attestation
+from invarlock.core.runtime_provenance import verify_runtime_provenance
 
 from . import verify_check_helpers as _verify_checks
 from . import verify_output as _verify_output
@@ -396,11 +396,11 @@ def _verify_single_report(
             )
 
     errors = _validate_evaluation_report_payload(cert_path, profile=profile)
-    attestation_result = verify_runtime_attestation(
+    provenance_result = verify_runtime_provenance(
         cert_path,
         allow_unattested=bool(allow_unattested_artifacts),
     )
-    errors.extend(issue.message for issue in attestation_result.issues)
+    errors.extend(issue.message for issue in provenance_result.issues)
     if json_mode and any("schema validation failed" in str(e).lower() for e in errors):
         raise _ValidationError(
             code="E601",

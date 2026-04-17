@@ -33,7 +33,7 @@ _sha256_bytes = proof_pack_manifest_mod._sha256_bytes
 _sha256_file = proof_pack_manifest_mod._sha256_file
 _validate_material_name = proof_pack_manifest_mod._validate_material_name
 _validate_reference = proof_pack_manifest_mod._validate_reference
-verify_manifest_attestation = proof_pack_manifest_mod.verify_manifest_attestation
+verify_manifest_provenance = proof_pack_manifest_mod.verify_manifest_provenance
 _proof_pack_counts_from_verification = (
     proof_pack_metadata_mod._proof_pack_counts_from_verification
 )
@@ -465,7 +465,7 @@ def verify_proof_pack(
     errors.extend(_verify_manifest_binds_checksums(pack_dir))
     checksum_errors, covered_paths = _verify_checksums(pack_dir)
     errors.extend(checksum_errors)
-    errors.extend(verify_manifest_attestation(pack_dir))
+    errors.extend(verify_manifest_provenance(pack_dir))
     extra_errors, extra_warnings = _verify_no_extra_files(
         pack_dir, covered_paths=covered_paths, strict=strict
     )
@@ -559,6 +559,6 @@ __all__ = [
     "ProofPackResult",
     "ProofPackStatus",
     "validate_manifest",
-    "verify_manifest_attestation",
+    "verify_manifest_provenance",
     "verify_proof_pack",
 ]

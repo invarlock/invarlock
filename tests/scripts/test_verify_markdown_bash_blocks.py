@@ -316,7 +316,7 @@ def test_seed_demo_inputs_writes_expected_fixture_files(tmp_path: Path) -> None:
     module = _load_script_module()
     fixture_root = tmp_path / "repo"
     (fixture_root / "tests" / "artifacts" / "golden_runs" / "gpt2").mkdir(parents=True)
-    (fixture_root / "tests" / "fixtures" / "runtime_attestation").mkdir(parents=True)
+    (fixture_root / "tests" / "fixtures" / "runtime_provenance").mkdir(parents=True)
     (
         fixture_root
         / "tests"
@@ -332,7 +332,7 @@ def test_seed_demo_inputs_writes_expected_fixture_files(tmp_path: Path) -> None:
         fixture_root
         / "tests"
         / "fixtures"
-        / "runtime_attestation"
+        / "runtime_provenance"
         / "runtime.manifest.json"
     ).write_text(
         '{"format_version":"runtime-manifest-v1"}\n',
@@ -351,7 +351,7 @@ def test_seed_demo_inputs_writes_expected_fixture_files(tmp_path: Path) -> None:
         fixture_root
         / "tests"
         / "fixtures"
-        / "runtime_attestation"
+        / "runtime_provenance"
         / "runtime.manifest.json"
     )
     workspace = tmp_path / "workspace"

@@ -65,7 +65,7 @@ DEMO_EVALUATION_REPORT_FIXTURE = (
     ROOT / "tests" / "artifacts" / "golden_runs" / "gpt2" / "evaluation.report.json"
 )
 DEMO_RUNTIME_MANIFEST_FIXTURE = (
-    ROOT / "tests" / "fixtures" / "runtime_attestation" / "runtime.manifest.json"
+    ROOT / "tests" / "fixtures" / "runtime_provenance" / "runtime.manifest.json"
 )
 
 WORKSPACE_STAGE_DIRS = {
@@ -475,17 +475,14 @@ def _rewrite_invarlock_tokens(
     if execution_mode == "container":
         argv = [token for token in argv if token != "--allow-host-execution"]
         if _is_evaluate_command(command_tokens):
-            argv = _strip_option_with_value(argv, "--assurance")
             argv = _strip_option_with_value(argv, "--execution-mode")
         if _is_verify_command(command_tokens):
-            argv = _strip_option_with_value(argv, "--assurance")
             argv = _strip_option_with_value(argv, "--runtime-provenance")
         if command_tokens[:2] == ["report", "html"] and "--force" not in argv:
             argv = _insert_option_after_command(argv, "--force")
         return env_prefix, argv
 
     if _is_evaluate_command(command_tokens):
-        argv = _strip_option_with_value(argv, "--assurance")
         argv = _strip_option_with_value(argv, "--execution-mode")
         if "--execution-mode" not in argv:
             if argv[:1] == ["invarlock"]:
@@ -503,7 +500,6 @@ def _rewrite_invarlock_tokens(
                     *argv[4:],
                 ]
     elif _is_verify_command(command_tokens):
-        argv = _strip_option_with_value(argv, "--assurance")
         argv = _strip_option_with_value(argv, "--runtime-provenance")
         if "--runtime-provenance" not in argv:
             if argv[:1] == ["invarlock"]:

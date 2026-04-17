@@ -405,7 +405,7 @@ def test_proof_pack_inspect_json_summary(tmp_path: Path) -> None:
     assert payload["reports"]["errors"] == 0
     assert payload["signature"]["present"] is False
     assert payload["integrity"]["checksums_bound"] is True
-    assert payload["integrity"]["manifest_attestation_ok"] is True
+    assert payload["integrity"]["manifest_provenance_ok"] is True
     assert payload["strict_ready"] is False
     assert payload["evidence_level"] == "medium"
     assert any(
