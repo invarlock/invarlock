@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -20,6 +21,15 @@ from invarlock.runtime_security import (
 _VALID_TEST_IMAGE_DIGEST = "sha256:" + ("a" * 64)
 
 pytestmark = pytest.mark.integration
+
+
+@dataclass(frozen=True)
+class InstalledWheelEnv:
+    repo_root: Path
+    env_dir: Path
+    python_exe: Path
+    cli_exe: Path
+    runtime_verify_exe: Path
 
 
 def _select_python(repo_root: Path) -> Path:
@@ -329,36 +339,50 @@ def _build_proof_pack(pack_dir: Path) -> Path:
     return pack_dir
 
 
-@pytest.mark.skipif(os.getenv("SKIP_BUILD_TESTS") == "1", reason="skip build tests")
-def test_wheel_install_can_verify_proof_pack_outside_repo_tree(tmp_path: Path) -> None:
+@pytest.fixture(scope="module")
+def installed_wheel_env(tmp_path_factory: pytest.TempPathFactory) -> InstalledWheelEnv:
     repo_root = Path(__file__).resolve().parents[3]
     selected_python = _select_python(repo_root)
-    wheel = _build_wheel(tmp_path / "dist", selected_python)
-    env_dir, python_exe, cli_exe = _create_venv(tmp_path, selected_python)
+    wheel = _build_wheel(tmp_path_factory.mktemp("wheel-dist"), selected_python)
+    env_root = tmp_path_factory.mktemp("wheel-env")
+    env_dir, python_exe, cli_exe = _create_venv(env_root, selected_python)
     _install_core_dependencies(repo_root, python_exe)
 
     install = _run(
         python_exe,
         ["-m", "pip", "install", "--force-reinstall", "--no-deps", str(wheel)],
-        cwd=tmp_path,
+        cwd=env_root,
     )
     assert install.returncode == 0, install.stdout + install.stderr
 
+    runtime_verify_exe = _sibling_console_script(cli_exe, "invarlock-runtime-verify")
+    assert cli_exe.is_file()
+    assert runtime_verify_exe.is_file()
+    return InstalledWheelEnv(
+        repo_root=repo_root,
+        env_dir=env_dir,
+        python_exe=python_exe,
+        cli_exe=cli_exe,
+        runtime_verify_exe=runtime_verify_exe,
+    )
+
+
+@pytest.mark.skipif(os.getenv("SKIP_BUILD_TESTS") == "1", reason="skip build tests")
+def test_wheel_install_can_verify_proof_pack_outside_repo_tree(
+    installed_wheel_env: InstalledWheelEnv, tmp_path: Path
+) -> None:
     import_check = _run(
-        python_exe,
+        installed_wheel_env.python_exe,
         ["-c", "import invarlock; print(invarlock.__file__)"],
         cwd=tmp_path,
     )
     assert import_check.returncode == 0, import_check.stderr
     import_path = Path(import_check.stdout.strip()).resolve()
-    assert env_dir.resolve() in import_path.parents
-    assert repo_root.resolve() not in import_path.parents
-    assert cli_exe.is_file()
-    runtime_verify_exe = _sibling_console_script(cli_exe, "invarlock-runtime-verify")
-    assert runtime_verify_exe.is_file()
+    assert installed_wheel_env.env_dir.resolve() in import_path.parents
+    assert installed_wheel_env.repo_root.resolve() not in import_path.parents
 
     minimal_help = _run(
-        python_exe,
+        installed_wheel_env.python_exe,
         ["-m", "invarlock", "--help"],
         cwd=tmp_path,
         env={"INVARLOCK_LIGHT_IMPORT": "1"},
@@ -368,14 +392,23 @@ def test_wheel_install_can_verify_proof_pack_outside_repo_tree(tmp_path: Path) -
     assert "verify" in minimal_help.stdout
 
     cli_app_import = _run(
-        python_exe,
+        installed_wheel_env.python_exe,
         [
             "-c",
             (
                 "import json; "
                 "import invarlock.cli.app; "
                 "import invarlock.public_contracts as public_contracts; "
-                "print(json.dumps(sorted(public_contracts.contract_catalog().keys())))"
+                "catalog = sorted(public_contracts.contract_catalog().keys()); "
+                "published_basis = {"
+                "lane['lane_id']: lane['evidence'] "
+                "for lane in public_contracts.load_support_matrix()['lanes'] "
+                "if lane.get('support_tier') == 'published_basis'"
+                "}; "
+                "print(json.dumps({"
+                "'catalog': catalog, "
+                "'published_basis': published_basis"
+                "}, sort_keys=True))"
             ),
         ],
         cwd=tmp_path,
@@ -383,11 +416,21 @@ def test_wheel_install_can_verify_proof_pack_outside_repo_tree(tmp_path: Path) -
     )
     assert cli_app_import.returncode == 0, cli_app_import.stdout + cli_app_import.stderr
     exported_contracts = json.loads(cli_app_import.stdout.strip())
-    assert "metric_kinds" in exported_contracts
-    assert "support_matrix" in exported_contracts
+    assert "metric_kinds" in exported_contracts["catalog"]
+    assert "support_matrix" in exported_contracts["catalog"]
+    assert exported_contracts["published_basis"]
+    for evidence in exported_contracts["published_basis"].values():
+        assert evidence["evaluation_report_fixture"].startswith(
+            "public_evidence/published_basis/"
+        )
+        assert evidence["proof_pack_recipe"].startswith(
+            "public_evidence/published_basis/"
+        )
+        assert "tests/fixtures/" not in evidence["evaluation_report_fixture"]
+        assert "tests/fixtures/" not in evidence["proof_pack_recipe"]
 
     doctor = _run(
-        cli_exe,
+        installed_wheel_env.cli_exe,
         ["doctor", "--json"],
         cwd=tmp_path,
         env={"INVARLOCK_LIGHT_IMPORT": "1"},
@@ -397,7 +440,7 @@ def test_wheel_install_can_verify_proof_pack_outside_repo_tree(tmp_path: Path) -
     assert doctor_payload["format_version"] == "doctor-v1"
 
     installed_public_evidence = _run(
-        python_exe,
+        installed_wheel_env.python_exe,
         [
             "-c",
             (
@@ -427,7 +470,7 @@ def test_wheel_install_can_verify_proof_pack_outside_repo_tree(tmp_path: Path) -
     _write_runtime_manifest(report_path)
 
     verify_report = _run(
-        cli_exe,
+        installed_wheel_env.cli_exe,
         ["verify", "--json", str(report_path)],
         cwd=tmp_path,
     )
@@ -438,7 +481,7 @@ def test_wheel_install_can_verify_proof_pack_outside_repo_tree(tmp_path: Path) -
 
     html_path = tmp_path / "evaluation.html"
     export_html = _run(
-        cli_exe,
+        installed_wheel_env.cli_exe,
         ["report", "html", "-i", str(report_path), "-o", str(html_path)],
         cwd=tmp_path,
     )
@@ -447,7 +490,7 @@ def test_wheel_install_can_verify_proof_pack_outside_repo_tree(tmp_path: Path) -
     assert "<html" in html_path.read_text(encoding="utf-8").lower()
 
     runtime_verify = _run(
-        runtime_verify_exe,
+        installed_wheel_env.runtime_verify_exe,
         [
             "--report",
             str(report_path),
@@ -465,7 +508,7 @@ def test_wheel_install_can_verify_proof_pack_outside_repo_tree(tmp_path: Path) -
     pack_dir = _build_proof_pack(tmp_path / "pack")
 
     verify = _run(
-        cli_exe,
+        installed_wheel_env.cli_exe,
         [
             "advanced",
             "proof-pack",
@@ -481,3 +524,81 @@ def test_wheel_install_can_verify_proof_pack_outside_repo_tree(tmp_path: Path) -
     assert payload["format_version"] == "proof-pack-verify-v1"
     assert payload["ok"] is True
     assert payload["verify"]["format_version"] == "verify-v1"
+
+
+@pytest.mark.skipif(os.getenv("SKIP_BUILD_TESTS") == "1", reason="skip build tests")
+def test_wheel_install_verify_rejects_ambiguous_directory_outside_repo_tree(
+    installed_wheel_env: InstalledWheelEnv, tmp_path: Path
+) -> None:
+    report_dir = tmp_path / "report-dir"
+    report_dir.mkdir()
+    (report_dir / "report.json").write_text("{}", encoding="utf-8")
+    _write_json(report_dir / "evaluation.report.json", _build_attested_report())
+
+    result = _run(
+        installed_wheel_env.cli_exe, ["verify", str(report_dir)], cwd=tmp_path
+    )
+
+    combined = result.stdout + result.stderr
+    normalized = " ".join(combined.split())
+    assert result.returncode == 2, combined
+    assert (
+        "contains both report.json and evaluation.report.json; pass an explicit file path."
+        in normalized
+    )
+
+
+@pytest.mark.skipif(os.getenv("SKIP_BUILD_TESTS") == "1", reason="skip build tests")
+def test_wheel_install_runtime_verify_failure_json_outside_repo_tree(
+    installed_wheel_env: InstalledWheelEnv, tmp_path: Path
+) -> None:
+    report_dir = tmp_path / "report"
+    report_path = report_dir / "evaluation.report.json"
+    _write_json(report_path, _build_attested_report())
+    _write_runtime_manifest(report_path)
+    manifest_path = report_dir / RUNTIME_MANIFEST_FILENAME
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["report"]["sha256"] = "0" * 64
+    _write_json(manifest_path, manifest)
+
+    result = _run(
+        installed_wheel_env.runtime_verify_exe,
+        [
+            "--report",
+            str(report_path),
+            "--manifest",
+            str(manifest_path),
+            "--json",
+        ],
+        cwd=tmp_path,
+    )
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    payload = json.loads(result.stdout.strip().splitlines()[-1])
+    assert payload["format_version"] == "runtime-verify-v1"
+    assert payload["ok"] is False
+    assert any("report digest mismatch" in error for error in payload["errors"])
+
+
+@pytest.mark.skipif(os.getenv("SKIP_BUILD_TESTS") == "1", reason="skip build tests")
+def test_wheel_install_proof_pack_verify_reports_integrity_failure_outside_repo_tree(
+    installed_wheel_env: InstalledWheelEnv, tmp_path: Path
+) -> None:
+    pack_dir = _build_proof_pack(tmp_path / "pack")
+    _write_json(pack_dir / "results" / "final_verdict.json", {"verdict": "TAMPERED"})
+
+    result = _run(
+        installed_wheel_env.cli_exe,
+        ["advanced", "proof-pack", "verify", str(pack_dir), "--json"],
+        cwd=tmp_path,
+        env={"INVARLOCK_ALLOW_UNATTESTED_ARTIFACTS": "1"},
+    )
+
+    assert result.returncode != 0, result.stdout + result.stderr
+    payload = json.loads(result.stdout.strip().splitlines()[-1])
+    assert payload["format_version"] == "proof-pack-verify-v1"
+    assert payload["ok"] is False
+    assert any(
+        "checksum mismatch for results/final_verdict.json" in error
+        for error in payload["errors"]
+    )

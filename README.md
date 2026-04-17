@@ -77,12 +77,12 @@ in CI.
 Colab (CPU-friendly):
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_quickstart_cpu.ipynb)
 
-The minimal install (`pip install invarlock`) is enough for `doctor`,
-`verify`, `report html`, and proof-pack verification from an installed wheel.
-Install `invarlock[hf]` only when you need `evaluate` to load Hugging Face
-models. The secure-default CLI path runs model-loading commands inside the
-runtime container and expects an OCI container engine such as `podman` or
-`docker`.
+The minimal install (`pip install invarlock`) is enough for the public front
+door: `doctor`, `verify`, `report html`, and proof-pack verification from an
+installed wheel. Install `invarlock[hf]` only when you need `evaluate` to load
+Hugging Face models. The secure-default CLI path runs model-loading commands
+inside the runtime container and expects an OCI container engine such as
+`podman` or `docker`.
 In a repo checkout, build the local runtime image once with
 `make runtime-image`; InvarLock automatically prefers
 `invarlock-runtime:local` when it is present. Trusted local workflows can opt
@@ -143,7 +143,7 @@ Attestation: reports/eval/runtime.manifest.json
 
 - Core workflow: `invarlock evaluate` → `invarlock verify` →
   `invarlock report html`.
-- Report inspection and validation: `invarlock report generate`,
+- Follow-on report analysis after the core loop: `invarlock report generate`,
   `invarlock report explain`, and `invarlock report validate`.
 - Environment and release checks: `invarlock doctor` plus the JSON surfaces
   emitted by `doctor --json` and `advanced plugins ... --json`.

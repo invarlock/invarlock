@@ -14,9 +14,10 @@ This guide covers installation, environment setup, and the smallest useful
 InvarLock workflow: compare a baseline against a subject, verify the attested
 report, and render HTML for review. The same top-level loop also underpins the
 included image-text path when you use the explicit multimodal preset and
-provider configuration. The minimal install is enough for `doctor`,
-`verify`, `report generate`, `report explain`, and `report html`; use
-`invarlock[hf]` only when you need `evaluate` to load Hugging Face models.
+provider configuration. The minimal install is enough for `doctor`, `verify`,
+and `report html`; use `invarlock[hf]` only when you need `evaluate` to load
+Hugging Face models. Treat `evaluate -> verify -> report html` as the first
+path to get green before you reach for deeper report-analysis commands.
 
 ## Install InvarLock
 

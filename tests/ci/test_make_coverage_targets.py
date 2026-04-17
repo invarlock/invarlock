@@ -143,6 +143,18 @@ def test_makefile_exposes_actionlint_and_minimal_packaging_smoke_targets() -> No
         "tests/integration/packaging/test_wheel_proof_pack_verify.py::"
         "test_wheel_install_can_verify_proof_pack_outside_repo_tree"
     ) in text
+    assert (
+        "tests/integration/packaging/test_wheel_proof_pack_verify.py::"
+        "test_wheel_install_verify_rejects_ambiguous_directory_outside_repo_tree"
+    ) in text
+    assert (
+        "tests/integration/packaging/test_wheel_proof_pack_verify.py::"
+        "test_wheel_install_runtime_verify_failure_json_outside_repo_tree"
+    ) in text
+    assert (
+        "tests/integration/packaging/test_wheel_proof_pack_verify.py::"
+        "test_wheel_install_proof_pack_verify_reports_integrity_failure_outside_repo_tree"
+    ) in text
     assert "docs-live-fast:" in text
     assert "docs-live:" in text
     assert "scripts/verify_live_examples.py" in text

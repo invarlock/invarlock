@@ -326,7 +326,10 @@ packaging-smoke-minimal:  ## Smoke the minimal wheel install and proof-pack veri
 	$(MAKE) ensure-python
 	@PYTHON="$$(if [ -x .venv/bin/python ]; then printf '%s' .venv/bin/python; else printf '%s' "$(PYTHON)"; fi)"; \
 	INVARLOCK_LIGHT_IMPORT=1 PYTHONPATH=src "$$PYTHON" -m pytest -q \
-		tests/integration/packaging/test_wheel_proof_pack_verify.py::test_wheel_install_can_verify_proof_pack_outside_repo_tree
+		tests/integration/packaging/test_wheel_proof_pack_verify.py::test_wheel_install_can_verify_proof_pack_outside_repo_tree \
+		tests/integration/packaging/test_wheel_proof_pack_verify.py::test_wheel_install_verify_rejects_ambiguous_directory_outside_repo_tree \
+		tests/integration/packaging/test_wheel_proof_pack_verify.py::test_wheel_install_runtime_verify_failure_json_outside_repo_tree \
+		tests/integration/packaging/test_wheel_proof_pack_verify.py::test_wheel_install_proof_pack_verify_reports_integrity_failure_outside_repo_tree
 
 model-evidence-list:  ## Print the maintained shipped-model evidence manifest
 	$(MAKE) ensure-python

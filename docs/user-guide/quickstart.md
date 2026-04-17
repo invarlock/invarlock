@@ -10,12 +10,12 @@
 | **Network** | Use `--allow-network` on `evaluate` when a run needs model or dataset downloads. |
 | **Next step** | [Compare & evaluate](compare-and-evaluate.md) for production use. |
 
-This guide focuses on the public core CLI: `evaluate`, `verify`, `report
-generate`, `report explain`, and `report html`. The default path produces a
-machine-readable evaluation report. The minimal install is enough for
-verification, report rendering, and proof-pack inspection. Add
-`invarlock[hf]` only when you want the evaluate path to load Hugging Face
-models.
+This guide keeps the public front door first: `evaluate`, `verify`, and
+`report html`. The default path produces a machine-readable evaluation report.
+The minimal install is enough for verification, report rendering, and
+proof-pack inspection. Add `invarlock[hf]` only when you want the evaluate path
+to load Hugging Face models. Reach for `report generate` and `report explain`
+after the core path is already green.
 
 If any terms are unfamiliar, see the [Glossary](../assurance/glossary.md).
 
