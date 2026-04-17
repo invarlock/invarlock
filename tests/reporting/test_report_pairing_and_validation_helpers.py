@@ -209,7 +209,7 @@ def test_make_evaluation_report_synthesizes_display_ci_from_ratio_or_defaults(
         assert "ci=" in summary and "width=" in summary
         assert ("ratio=" in summary) is expect_ratio
 
-        # Ensure JSON serialization remains stable for downstream reporters.
+        # Ensure JSON serialization remains stable for later reporters.
         json.dumps(cert, sort_keys=True, default=str)
 
 

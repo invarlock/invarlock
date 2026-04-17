@@ -131,8 +131,8 @@ surfaces live under `invarlock advanced`:
 - `invarlock advanced plugins ...`
 - `invarlock advanced calibrate ...`
 
-Installed wheels also include the evidence-pack verifier, so wheel users can
-inspect bundles without cloning the repository:
+Installed packages also include the evidence-pack verifier, so bundles can be
+inspected without cloning the repository:
 
 ```bash
 invarlock advanced evidence-pack verify <pack> --strict

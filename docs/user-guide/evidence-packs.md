@@ -21,8 +21,9 @@ verified in strict verification mode, the bundled clean reports retain their
 `runtime.manifest.json` provenance sidecar, and the final verdict is PASS.
 
 Operationally, evidence packs are a maintainer smoke test that also emits reusable
-evidence data. The same run should let maintainers catch regressions, let third parties
-verify reported outcomes, and provide structured outputs for later analysis.
+evidence data. The same run should let maintainers catch regressions, let
+received packs be re-verified, and provide structured outputs for later
+analysis.
 
 > Terminology: the evidence-pack suite includes a run-scoped **Preset Derivation**
 > phase (`CALIBRATION_RUN -> GENERATE_PRESET`) that writes
@@ -282,7 +283,7 @@ Use the package-native subcommands:
 - `invarlock advanced evidence-pack build <out> --final-verdict <json> --report <report> [...more --report]`
   - Packages existing JSON artifacts into an evidence pack and pre-verifies the supplied clean reports with `invarlock verify`.
   - Add `--signing-key <private-key.pem>` to produce `manifest.signature.json`.
-  - Intended for wheel users packaging already-produced evidence, not for running the full suite.
+  - Intended for installed-package packaging of already-produced evidence, not for running the full suite.
   - The repo maintainer harness signs by default as well; set `PACK_SIGN_MANIFEST=0` only when you intentionally need an unsigned pack.
 - `invarlock advanced evidence-pack verify <dir>`
 

@@ -66,6 +66,6 @@ python3 -m venv "$tmpdir/venv"
   build/publish begins.
 - The install-surface SBOM describes the installed release surface, not the CI
   tool environment.
-- Public package consumers should rely on PyPI artifacts plus source tags;
+- Public package users should rely on PyPI artifacts plus source tags;
   maintainers can use GitHub Actions run logs and uploaded workflow artifacts
   for deeper audit trails.

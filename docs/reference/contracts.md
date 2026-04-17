@@ -83,35 +83,20 @@ The versioned JSON surfaces are intentionally explicit:
 
 ## Packaged public contract data
 
-The canonical public contract data ships in two places:
+The maintained public contract data ships in two places:
 
 - installed wheels, under `invarlock/_data/contracts/*.json`
 - source tags in the repository
 
+Repo tags and installed wheels are the only maintained public contract
+carriers.
+
 The support-matrix published-basis evidence paths remain logical
 `public_evidence/published_basis/...` references. Installed wheels resolve those
 logical paths from packaged files under
-`invarlock/_data/public_evidence/published_basis/...`, so installed-wheel users
-can render the shipped published-basis `evaluation.report.json` examples and
+`invarlock/_data/public_evidence/published_basis/...`, so installed packages can
+render the shipped published-basis `evaluation.report.json` examples and
 load the paired `evidence_pack_recipe.json` data without cloning the repo.
-
-If maintainers need a detached archive, they can still build
-one locally with `scripts/release/make_public_contract_bundle.py`. That helper
-is maintainer-local only and is not part of the public release artifact set.
-It packages:
-
-- `contracts/*.json`
-- `contract_catalog.json`
-- `runtime/tiers.yaml`
-- `runtime/profiles/*.yaml`
-- `README.txt`
-- `public_contract_bundle_manifest.json`
-
-The manifest uses schema `invarlock/public-contract-bundle-v1` and records the
-release version, tag, repository, commit SHA, and a sha256 inventory for every
-file in the archive. The generated tarball is reproducible for identical inputs
-because archive timestamps are fixed and the manifest does not embed build-clock
-fields.
 
 ## Policy packs
 

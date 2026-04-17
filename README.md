@@ -77,10 +77,11 @@ in CI.
 Colab (CPU-friendly):
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_quickstart_cpu.ipynb)
 
-The minimal install (`pip install invarlock`) is enough for the public front
-door: `doctor`, `verify`, `report html`, and evidence-pack verification from an
-installed wheel. Install `invarlock[hf]` only when you need `evaluate` to load
-Hugging Face models. The default runtime-container path runs model-loading commands
+The public front door is `evaluate -> verify -> report html`. The minimal
+install (`pip install invarlock`) is enough for `doctor`, `verify`,
+`report html`, and evidence-pack verification from an installed package. Install
+`invarlock[hf]` only when you need `evaluate` to load Hugging Face models. The
+default runtime-container path runs model-loading commands
 inside the runtime container and expects an OCI container engine such as
 `podman` or `docker`.
 In a repo checkout, build the local runtime image once with
@@ -167,8 +168,8 @@ Evidence packs bundle reports + verification metadata into a distributable artif
 
 Note: `configs/` and most `scripts/` remain repo resources and are not included in
 wheels. Installed wheels include the public contracts and the
-`invarlock advanced evidence-pack verify` verifier, so wheel users can check
-bundles without cloning the repository.
+`invarlock advanced evidence-pack verify` verifier, so installed packages can
+check bundles without cloning the repository.
 
 ## Installation
 

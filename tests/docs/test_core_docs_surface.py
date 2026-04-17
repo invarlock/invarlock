@@ -171,6 +171,7 @@ def test_programmatic_docs_mark_python_surface_as_advanced_not_contract_stable()
 
 def test_contract_reference_docs_freeze_versioned_json_and_packaged_public_evidence():
     text = _read("docs/reference/contracts.md")
+    normalized = " ".join(text.split())
 
     assert 'format_version: "verify-v1"' in text
     assert 'format_version: "runtime-verify-v1"' in text
@@ -178,6 +179,8 @@ def test_contract_reference_docs_freeze_versioned_json_and_packaged_public_evide
     assert 'verify.format_version: "verify-v1"' in text
     assert "public_evidence/published_basis/" in text
     assert "invarlock/_data/public_evidence/published_basis/" in text
+    assert "maintained public contract carriers" in normalized
+    assert "make_public_contract_bundle.py" not in text
 
 
 def test_byod_end_to_end_example_has_enough_rows_for_requested_windows() -> None:

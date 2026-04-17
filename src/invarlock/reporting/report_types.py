@@ -173,7 +173,7 @@ class RunReport(TypedDict):
     artifacts: Artifacts  # Generated file paths
     flags: Flags  # Status flags
     evaluation_windows: NotRequired[dict[str, Any]]
-    # Optional extras kept for richer downstream processing
+    # Optional extras kept for richer later processing
     guard_overhead: NotRequired[dict[str, Any]]
     provenance: NotRequired[dict[str, Any]]
     context: NotRequired[dict[str, Any]]

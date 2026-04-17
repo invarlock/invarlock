@@ -213,7 +213,7 @@ def _write_checksums(pack_dir: Path, rel_paths: list[str]) -> None:
     )
 
 
-def _build_attested_report() -> dict[str, object]:
+def _build_valid_report() -> dict[str, object]:
     spectral_contract = {
         "estimator": {"type": "power_iter", "iters": 4, "init": "ones"}
     }
@@ -304,7 +304,7 @@ def _build_evidence_pack(pack_dir: Path) -> Path:
     _write_json(source_repo, {"commit": "abc123"})
     _write_json(environment, {"platform": "test"})
     _write_json(materials, {"models": {"org/model": {"revision": "rev1"}}})
-    _write_json(report_path, _build_attested_report())
+    _write_json(report_path, _build_valid_report())
     _write_runtime_manifest(report_path)
 
     covered = [
@@ -512,7 +512,7 @@ def test_wheel_install_can_verify_report_runtime_and_evidence_pack_outside_repo_
 
     report_dir = tmp_path / "report"
     report_path = report_dir / "evaluation.report.json"
-    _write_json(report_path, _build_attested_report())
+    _write_json(report_path, _build_valid_report())
     _write_runtime_manifest(report_path)
 
     verify_report = _run(
@@ -579,7 +579,7 @@ def test_wheel_install_verify_rejects_ambiguous_directory_outside_repo_tree(
     report_dir = tmp_path / "report-dir"
     report_dir.mkdir()
     (report_dir / "report.json").write_text("{}", encoding="utf-8")
-    _write_json(report_dir / "evaluation.report.json", _build_attested_report())
+    _write_json(report_dir / "evaluation.report.json", _build_valid_report())
 
     result = _run(
         installed_wheel_env.cli_exe, ["verify", str(report_dir)], cwd=tmp_path
@@ -600,7 +600,7 @@ def test_wheel_install_runtime_verify_failure_json_outside_repo_tree(
 ) -> None:
     report_dir = tmp_path / "report"
     report_path = report_dir / "evaluation.report.json"
-    _write_json(report_path, _build_attested_report())
+    _write_json(report_path, _build_valid_report())
     _write_runtime_manifest(report_path)
     manifest_path = report_dir / RUNTIME_MANIFEST_FILENAME
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
