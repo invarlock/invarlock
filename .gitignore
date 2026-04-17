@@ -56,9 +56,6 @@ secrets.py
 TODO.md
 test_config.yaml
 sitecustomize.py
-fullLisk.txt
-*.clinerules
-.clinerules
 
 # Local runtime outputs
 /output/
@@ -67,23 +64,13 @@ fullLisk.txt
 # Generated reports, runs, and release artifacts
 /reports/
 /reports_*/
-/reports_report/
 /runs/
 /runs_cfg/
-/demo_*/
-/mock_run/
 /artifacts/
 /guards_evidence.json
 /tmp/
 /tmp_*/
-/.certify_tmp/
 *.log
-
-# Certificates and certify outputs
-/certificates/
-*_certificate/
-cert-*.json
-*.cert
 
 # Pruning results and evaluation outputs
 *_pruning_results/
@@ -92,11 +79,6 @@ test_*/
 *_test_results.json
 *_validation_results.json
 *_run.log
-test_comprehensive_results*.json
-mps_full_stats/
-test_mps_stats/
-optuna_results/
-invarlock_comparison_results/
 
 # Model outputs
 *.pt

@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added wheel-shipped public evidence under
   `invarlock/_data/public_evidence/published_basis/...` together with the
   matching repo-visible `public_evidence/published_basis/...` source copies so
-  downstream users can inspect published-basis artifacts without reaching into
+  users can inspect published-basis artifacts without reaching into
   test fixtures.
 - Added a curated `make docs-live-fast` maintainer lane, a dedicated live
   examples guide, and explicit docs/CI coverage for the runnable markdown and
@@ -39,9 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `github/codeql-action`,
   `google/clusterfuzzlite`, and `actions/attest-build-provenance`.
 - Tightened public docs around the stable CLI/report/contract-read surface,
-  kept the detached contract bundle as a maintainer-local helper instead of a
-  public release artifact, and aligned docs/navigation around the runnable
+  kept repo tags and installed wheels as the maintained public contract
+  carriers, and aligned docs/navigation around the runnable
   notebook and live-example entry points.
+- Removed the detached `make_public_contract_bundle.py` maintainer helper so
+  the public-contract distribution story is now only repo tags plus installed
+  wheels.
 - Tightened the minimal installed-wheel contract smoke so it now covers the
   standalone core CLI surface (`evaluate --help`, `verify`, `report html`,
   `invarlock-runtime-verify`), packaged published-basis evidence-path
@@ -70,7 +73,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "verified" outputs.
 - Fixed standalone-product wording across README, docs, live-example tooling,
   and evidence-pack summaries so public guidance no longer frames the OSS repo
-  around vague "downstream" consumers or workflows.
+  around vague feeder-consumer wording.
+- Fixed maintainer-surface drift by pruning stale `certify`-era ignore rules,
+  dead markdownlint curated paths, and obsolete deep-clean output names from
+  the current repo shape.
 - Fixed the live-example verification path so `make docs-live` now runs the
   true full markdown-plus-notebook lane, while `docs-live-fast` remains the
   deterministic curated subset used by docs checks and CI.
@@ -112,7 +118,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   artifacts without cloning the repository.
 - Added the released
   `invarlock-<version>-public-contract-bundle.tar.gz` asset, including the
-  manifest/schema inventory downstream consumers can verify without cloning the
+  manifest/schema inventory users can verify without cloning the
   repository.
 - Added PR-time supply-chain enforcement with shipped-surface SBOM generation,
   `pip-audit` coverage for the base/`hf`/`advanced` install surfaces,

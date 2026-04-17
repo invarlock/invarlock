@@ -401,8 +401,8 @@ deepclean: ## Remove all generated artifacts, caches, and run outputs (destructi
 		site/ \
 		data/ \
 		node_modules/ \
-		reports/ reports_*/ reports_report/ \
-		runs/ runs_cfg/ run1/ run2/ \
+		reports/ reports_*/ \
+		runs/ runs_cfg/ \
 		pip-wheel-metadata/ \
 		__pycache__/ */__pycache__/ \
 		.pytest_cache/ .mypy_cache/ .ruff_cache/ .pre-commit-cache/ .npm-cache/ .npm-prefix/ \

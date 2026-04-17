@@ -12,7 +12,7 @@ pack_apply_suite() {
     local suite="${1:-${PACK_SUITE:-subset}}"
     case "${suite}" in
         subset)
-            # Single-GPU friendly: one 7B model (fits 24GB consumer GPUs).
+            # Single-GPU friendly: one 7B model (fits 24GB workstation GPUs).
             # License: Apache-2.0 (permissive, business-friendly).
             MODEL_1="mistralai/Mistral-7B-v0.1"
             MODEL_2=""
