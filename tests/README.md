@@ -12,9 +12,9 @@ via `tests/integration/conftest.py`.
 ## Organization
 
 - Keep executable tests under the directory that matches the production owner surface.
-- Final executable owner dirs: `tests/adapters`, `tests/calibration`, `tests/ci`, `tests/cli`, `tests/core`, `tests/docs`, `tests/edits`, `tests/eval`, `tests/fuzzing`, `tests/guards`, `tests/integration`, `tests/lint`, `tests/observability`, `tests/plugins`, `tests/proof_packs`, `tests/reporting`, `tests/runtime`, `tests/scripts`.
+- Final executable owner dirs: `tests/adapters`, `tests/calibration`, `tests/ci`, `tests/cli`, `tests/core`, `tests/docs`, `tests/edits`, `tests/eval`, `tests/fuzzing`, `tests/guards`, `tests/integration`, `tests/lint`, `tests/observability`, `tests/plugins`, `tests/evidence_packs`, `tests/reporting`, `tests/runtime`, `tests/scripts`.
 - Non-executable support and data dirs stay isolated: `tests/_stubs`, `tests/artifacts`, `tests/fixtures`, `tests/schemas`.
-- `tests/artifacts` is the golden-data bucket. Keep stable report fixtures, proof-pack payloads, and other maintainer-owned artifact snapshots there instead of folding them into `tests/fixtures`.
+- `tests/artifacts` is the golden-data bucket. Keep stable report fixtures, evidence-pack payloads, and other maintainer-owned artifact snapshots there instead of folding them into `tests/fixtures`.
 - Nested owner buckets are allowed when they clarify ownership. Current nested buckets:
   - `tests/guards/property`
   - `tests/guards/differential`
@@ -22,7 +22,7 @@ via `tests/integration/conftest.py`.
   - `tests/core`: orchestration, contracts, runner internals, and core policy logic.
   - `tests/cli`: command-line shells, CLI serialization, and command-facing UX behavior.
   - `tests/eval`: metrics, providers, datasets, probes, and evaluation-specific validation.
-  - `tests/reporting`: report generation, normalization, rendering, validation, proof-pack report assembly, and report-facing helper modules.
+  - `tests/reporting`: report generation, normalization, rendering, validation, evidence-pack report assembly, and report-facing helper modules.
   - `tests/runtime`: runtime security, network policy, container/runtime image, and runtime-manifest verification behavior.
   - `tests/guards`: guard math, policies, runtime behavior, and guard-specific extraction logic.
 - Report-generation, report-rendering, and report-validation tests belong in `tests/reporting`, not `tests/eval`, unless the test is explicitly about eval-time metric validation.

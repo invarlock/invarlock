@@ -1,4 +1,4 @@
-Pinned requirements used by GitHub Actions and proof-pack helper installs.
+Pinned requirements used by GitHub Actions and evidence-pack helper installs.
 
 Refresh them with:
 

@@ -1,7 +1,7 @@
 # Preset: Causal LM (decoder-only) on WikiText-2.
 #
 # - Runnable (repo checkout): `invarlock evaluate --preset ... [--profile ci|release|ci_cpu]`
-# - Trusted local path: add `--execution-mode trusted-local`
+# - Host-side path: add `--execution-mode host`
 
 model:
   id: "sshleifer/tiny-gpt2"

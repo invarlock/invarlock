@@ -175,7 +175,7 @@ def test_evaluate_command_local_mode_prefers_local_files_only(monkeypatch, tmp_p
         subject=str(edt),
         adapter="auto",
         profile="ci",
-        execution_mode="trusted-local",
+        execution_mode="host",
         out=str(tmp_path / "runs"),
         report_out=str(tmp_path / "reports"),
         timing=False,
@@ -187,7 +187,7 @@ def test_evaluate_command_local_mode_prefers_local_files_only(monkeypatch, tmp_p
         assert call["prefer_local_files_only"] is True
 
 
-def test_evaluate_command_passes_trusted_local_execution_mode_to_runs(
+def test_evaluate_command_passes_host_mode_execution_mode_to_runs(
     monkeypatch, tmp_path
 ) -> None:
     src = tmp_path / "src_model"
@@ -223,7 +223,7 @@ def test_evaluate_command_passes_trusted_local_execution_mode_to_runs(
         subject=str(edt),
         adapter="auto",
         profile="dev",
-        execution_mode="trusted-local",
+        execution_mode="host",
         out=str(tmp_path / "runs"),
         report_out=str(tmp_path / "reports"),
         timing=False,
@@ -232,7 +232,7 @@ def test_evaluate_command_passes_trusted_local_execution_mode_to_runs(
 
     assert len(captured_runs) == 2
     for call in captured_runs:
-        assert call["allow_unattested_artifacts"] is True
+        assert call["allow_unverified_provenance"] is True
 
 
 def test_evaluate_command_resets_runtime_security_on_success(

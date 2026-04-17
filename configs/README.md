@@ -17,27 +17,27 @@ included in the wheel). Runtime policy is canonical and lives under
 
 ## Examples
 
-These repo-only examples assume a trusted local checkout, so they use
-`invarlock evaluate --execution-mode trusted-local`. If you are running through the secure-default
-runtime-container path, drop `--execution-mode trusted-local`.
+These repo-only examples assume a host-side checkout, so they use
+`invarlock evaluate --execution-mode host`. If you are running through the default
+runtime-container path, drop `--execution-mode host`.
 
 ```bash
 # Baseline vs subject with the repo preset
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --execution-mode trusted-local \
+INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --execution-mode host \
   --baseline sshleifer/tiny-gpt2 --subject sshleifer/tiny-gpt2 --adapter auto \
   --profile ci --tier balanced \
   --preset configs/presets/causal_lm/wikitext2_512.yaml \
   --out runs/baseline --report-out reports/baseline
 
 # Compare & Evaluate (preferred), using an edit overlay
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --execution-mode trusted-local \
+INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --execution-mode host \
   --baseline gpt2 --subject gpt2 --adapter auto \
   --profile dev --tier balanced \
   --preset configs/presets/causal_lm/gpt2_smoke_128.yaml \
   --edit-config configs/overlays/edits/quant_rtn/8bit_attn.yaml
 
 # First-class GPT-2 smoke preset used by the smoke campaign script/CI workflow
-INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --execution-mode trusted-local \
+INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --execution-mode host \
   --baseline gpt2 --subject gpt2 --adapter auto \
   --profile dev \
   --preset configs/presets/causal_lm/gpt2_smoke_128.yaml

@@ -2,7 +2,7 @@
 #
 # This ships the tiny GPT-2 smoke asset used by the repo smoke campaign script
 # and CI workflow.
-# - Runnable (repo checkout): `invarlock evaluate --preset ... --execution-mode trusted-local`
+# - Runnable (repo checkout): `invarlock evaluate --preset ... --execution-mode host`
 
 model:
   id: "gpt2"

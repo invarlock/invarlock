@@ -60,7 +60,7 @@ def test_groups_help_list_subcommands(monkeypatch):
     runner = CliRunner()
     for cmd, expected in (
         ("report", ["generate", "explain", "html", "validate"]),
-        ("advanced", ["proof-pack", "policy", "plugins", "calibrate"]),
+        ("advanced", ["evidence-pack", "policy", "plugins", "calibrate"]),
         ("advanced plugins", ["list", "guards", "edits", "adapters"]),
     ):
         res = runner.invoke(app, [*cmd.split(), "--help"])
@@ -70,10 +70,10 @@ def test_groups_help_list_subcommands(monkeypatch):
             assert token in out
 
 
-def test_proof_pack_build_help_mentions_explicit_report_files(monkeypatch):
+def test_evidence_pack_build_help_mentions_explicit_report_files(monkeypatch):
     app = _load_app(monkeypatch)
     runner = CliRunner()
-    res = runner.invoke(app, ["advanced", "proof-pack", "build", "--help"])
+    res = runner.invoke(app, ["advanced", "evidence-pack", "build", "--help"])
     assert res.exit_code == 0, res.output
     out = strip_ansi(res.stdout)
     assert "evaluation.report.json" in out

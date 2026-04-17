@@ -152,8 +152,8 @@ def load_policy_pack_schema() -> dict[str, Any]:
     return _load_object_contract_or_raise("policy_pack.schema.json")
 
 
-def load_proof_pack_manifest_schema() -> dict[str, Any]:
-    return _load_object_contract_or_raise("proof_pack_manifest.schema.json")
+def load_evidence_pack_manifest_schema() -> dict[str, Any]:
+    return _load_object_contract_or_raise("evidence_pack_manifest.schema.json")
 
 
 def load_runtime_manifest_schema() -> dict[str, Any]:
@@ -240,7 +240,9 @@ def contract_catalog() -> dict[str, Any]:
         "console_labels": contract_reference("console_labels.json"),
         "metric_kinds": contract_reference("metric_kinds.json"),
         "runtime_manifest": contract_reference("runtime_manifest.schema.json"),
-        "proof_pack_manifest": contract_reference("proof_pack_manifest.schema.json"),
+        "evidence_pack_manifest": contract_reference(
+            "evidence_pack_manifest.schema.json"
+        ),
         "policy_pack": contract_reference("policy_pack.schema.json"),
     }
 
@@ -260,7 +262,7 @@ __all__ = [
     "load_model_family_catalog",
     "load_plugin_compatibility",
     "load_policy_pack_schema",
-    "load_proof_pack_manifest_schema",
+    "load_evidence_pack_manifest_schema",
     "load_runtime_manifest_schema",
     "load_support_matrix",
     "published_basis_lanes",

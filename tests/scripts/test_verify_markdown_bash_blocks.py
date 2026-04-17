@@ -89,9 +89,7 @@ def test_sanitize_script_skips_pip_installs() -> None:
     assert "[skip] python -m pip install foo" in rendered
 
 
-def test_sanitize_script_trusted_local_mode_injects_execution_and_verify_modes() -> (
-    None
-):
+def test_sanitize_script_host_mode_injects_execution_and_verify_modes() -> None:
     module = _load_script_module()
     block = module.BashBlock(
         file="README.md",
@@ -103,16 +101,16 @@ def test_sanitize_script_trusted_local_mode_injects_execution_and_verify_modes()
         ),
     )
 
-    rendered = module._sanitize_script(block, execution_mode="trusted-local")
+    rendered = module._sanitize_script(block, execution_mode="host")
 
-    assert "--execution-mode trusted-local" in rendered
-    assert "--runtime-provenance trusted-local" in rendered
+    assert "--execution-mode host" in rendered
+    assert "--runtime-provenance host" in rendered
     assert "INVARLOCK_ALLOW_HOST_EXECUTION=1" not in rendered
-    assert rendered.count("--execution-mode trusted-local") == 1
-    assert rendered.count("--runtime-provenance trusted-local") == 1
+    assert rendered.count("--execution-mode host") == 1
+    assert rendered.count("--runtime-provenance host") == 1
 
 
-def test_sanitize_script_trusted_local_mode_marks_advanced_calibrate_for_host_execution() -> (
+def test_sanitize_script_host_mode_marks_advanced_calibrate_for_host_execution() -> (
     None
 ):
     module = _load_script_module()
@@ -126,13 +124,13 @@ def test_sanitize_script_trusted_local_mode_marks_advanced_calibrate_for_host_ex
         ),
     )
 
-    rendered = module._sanitize_script(block, execution_mode="trusted-local")
+    rendered = module._sanitize_script(block, execution_mode="host")
 
     assert "INVARLOCK_ALLOW_HOST_EXECUTION=1" in rendered
     assert "-m invarlock advanced calibrate null-sweep" in rendered
 
 
-def test_sanitize_script_trusted_local_mode_skips_container_only_lines() -> None:
+def test_sanitize_script_host_mode_skips_container_only_lines() -> None:
     module = _load_script_module()
     block = module.BashBlock(
         file="README.md",
@@ -147,13 +145,13 @@ def test_sanitize_script_trusted_local_mode_skips_container_only_lines() -> None
         ),
     )
 
-    rendered = module._sanitize_script(block, execution_mode="trusted-local")
+    rendered = module._sanitize_script(block, execution_mode="host")
 
-    assert "[skip-trusted-local] make runtime-image" in rendered
-    assert "[skip-trusted-local] make runtime-image-podman" in rendered
-    assert "[skip-trusted-local] make runtime-smoke-podman" in rendered
-    assert "[skip-trusted-local] test -f reports/eval/runtime.manifest.json" in rendered
-    assert "[skip-trusted-local] docker ps" in rendered
+    assert "[skip-host] make runtime-image" in rendered
+    assert "[skip-host] make runtime-image-podman" in rendered
+    assert "[skip-host] make runtime-smoke-podman" in rendered
+    assert "[skip-host] test -f reports/eval/runtime.manifest.json" in rendered
+    assert "[skip-host] docker ps" in rendered
 
 
 def test_sanitize_script_adds_force_to_report_html() -> None:
@@ -165,7 +163,7 @@ def test_sanitize_script_adds_force_to_report_html() -> None:
         text="invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html\n",
     )
 
-    rendered = module._sanitize_script(block, execution_mode="trusted-local")
+    rendered = module._sanitize_script(block, execution_mode="host")
 
     assert "-m invarlock report html --force" in rendered
 
@@ -178,14 +176,14 @@ def test_sanitize_script_container_mode_strips_host_bypass_flags() -> None:
         block_index=1,
         text=(
             "INVARLOCK_ALLOW_HOST_EXECUTION=1 invarlock run -c config.yaml\n"
-            "invarlock verify --runtime-provenance trusted-local reports/eval/evaluation.report.json\n"
+            "invarlock verify --runtime-provenance host reports/eval/evaluation.report.json\n"
         ),
     )
 
     rendered = module._sanitize_script(block, execution_mode="container")
 
     assert "INVARLOCK_ALLOW_HOST_EXECUTION=1" not in rendered
-    assert "--execution-mode trusted-local" not in rendered
+    assert "--execution-mode host" not in rendered
 
 
 def test_sanitize_script_skip_model_loading_skips_full_multiline_command() -> None:
@@ -210,7 +208,7 @@ def test_sanitize_script_skip_model_loading_skips_full_multiline_command() -> No
     assert "-m invarlock verify reports/eval/evaluation.report.json" in rendered
 
 
-def test_sanitize_script_trusted_local_mode_rewrites_heavy_evaluate_inputs_to_smoke_assets() -> (
+def test_sanitize_script_host_mode_rewrites_heavy_evaluate_inputs_to_smoke_assets() -> (
     None
 ):
     module = _load_script_module()
@@ -226,7 +224,7 @@ def test_sanitize_script_trusted_local_mode_rewrites_heavy_evaluate_inputs_to_sm
         ),
     )
 
-    rendered = module._sanitize_script(block, execution_mode="trusted-local")
+    rendered = module._sanitize_script(block, execution_mode="host")
 
     assert "--baseline sshleifer/tiny-gpt2 \\" in rendered
     assert "--subject sshleifer/tiny-gpt2 \\" in rendered
@@ -235,7 +233,7 @@ def test_sanitize_script_trusted_local_mode_rewrites_heavy_evaluate_inputs_to_sm
     assert "--subject distilgpt2" not in rendered
 
 
-def test_sanitize_script_trusted_local_mode_injects_smoke_preset_when_missing() -> None:
+def test_sanitize_script_host_mode_injects_smoke_preset_when_missing() -> None:
     module = _load_script_module()
     block = module.BashBlock(
         file="docs/reference/env-vars.md",
@@ -244,7 +242,7 @@ def test_sanitize_script_trusted_local_mode_injects_smoke_preset_when_missing() 
         text="invarlock evaluate --baseline gpt2 --subject gpt2\n",
     )
 
-    rendered = module._sanitize_script(block, execution_mode="trusted-local")
+    rendered = module._sanitize_script(block, execution_mode="host")
 
     assert "--profile dev" in rendered
     assert "--preset configs/presets/causal_lm/gpt2_smoke_128.yaml" in rendered
@@ -252,7 +250,7 @@ def test_sanitize_script_trusted_local_mode_injects_smoke_preset_when_missing() 
     assert "--subject sshleifer/tiny-gpt2" in rendered
 
 
-def test_sanitize_script_trusted_local_mode_rewrites_calibration_configs_to_smoke_variants() -> (
+def test_sanitize_script_host_mode_rewrites_calibration_configs_to_smoke_variants() -> (
     None
 ):
     module = _load_script_module()
@@ -267,13 +265,13 @@ def test_sanitize_script_trusted_local_mode_rewrites_calibration_configs_to_smok
         ),
     )
 
-    rendered = module._sanitize_script(block, execution_mode="trusted-local")
+    rendered = module._sanitize_script(block, execution_mode="host")
 
     assert "configs/calibration/null_sweep_smoke.yaml" in rendered
     assert "configs/calibration/null_sweep_ci.yaml" not in rendered
 
 
-def test_sanitize_script_trusted_local_mode_rewrites_profiles_and_seed_counts_for_smoke() -> (
+def test_sanitize_script_host_mode_rewrites_profiles_and_seed_counts_for_smoke() -> (
     None
 ):
     module = _load_script_module()
@@ -290,7 +288,7 @@ def test_sanitize_script_trusted_local_mode_rewrites_profiles_and_seed_counts_fo
         ),
     )
 
-    rendered = module._sanitize_script(block, execution_mode="trusted-local")
+    rendered = module._sanitize_script(block, execution_mode="host")
 
     assert "--profile dev" in rendered
     assert "--n-seeds 1" in rendered
@@ -307,7 +305,7 @@ def test_sanitize_script_help_commands_do_not_receive_smoke_profile_injection() 
         text="invarlock advanced calibrate --help\n",
     )
 
-    rendered = module._sanitize_script(block, execution_mode="trusted-local")
+    rendered = module._sanitize_script(block, execution_mode="host")
 
     assert "--profile dev" not in rendered
 

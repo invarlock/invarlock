@@ -4,9 +4,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REQ_DIR="${ROOT_DIR}/requirements"
 WORKFLOW_DIR="${REQ_DIR}/workflows"
-PROOF_PACK_DIR="${REQ_DIR}/proof-packs"
+EVIDENCE_PACK_DIR="${REQ_DIR}/evidence-packs"
 
-mkdir -p "${WORKFLOW_DIR}" "${PROOF_PACK_DIR}"
+mkdir -p "${WORKFLOW_DIR}" "${EVIDENCE_PACK_DIR}"
 
 compile_pyproject() {
   local output="$1"
@@ -115,26 +115,26 @@ compile_pyproject "${WORKFLOW_DIR}/security-ci-py313.txt" \
   --extra security-ci
 
 compile_req_in \
-  "${PROOF_PACK_DIR}/accelerate.in" \
-  "${PROOF_PACK_DIR}/accelerate.txt"
+  "${EVIDENCE_PACK_DIR}/accelerate.in" \
+  "${EVIDENCE_PACK_DIR}/accelerate.txt"
 
 compile_req_in \
-  "${PROOF_PACK_DIR}/flash-attn.in" \
-  "${PROOF_PACK_DIR}/flash-attn.txt" \
+  "${EVIDENCE_PACK_DIR}/flash-attn.in" \
+  "${EVIDENCE_PACK_DIR}/flash-attn.txt" \
   --no-deps
 
 compile_req_in \
-  "${PROOF_PACK_DIR}/huggingface_hub.in" \
-  "${PROOF_PACK_DIR}/huggingface_hub.txt"
+  "${EVIDENCE_PACK_DIR}/huggingface_hub.in" \
+  "${EVIDENCE_PACK_DIR}/huggingface_hub.txt"
 
 compile_req_in \
-  "${PROOF_PACK_DIR}/protobuf.in" \
-  "${PROOF_PACK_DIR}/protobuf.txt"
+  "${EVIDENCE_PACK_DIR}/protobuf.in" \
+  "${EVIDENCE_PACK_DIR}/protobuf.txt"
 
 compile_req_in \
-  "${PROOF_PACK_DIR}/pyyaml.in" \
-  "${PROOF_PACK_DIR}/pyyaml.txt"
+  "${EVIDENCE_PACK_DIR}/pyyaml.in" \
+  "${EVIDENCE_PACK_DIR}/pyyaml.txt"
 
 compile_req_in \
-  "${PROOF_PACK_DIR}/sentencepiece.in" \
-  "${PROOF_PACK_DIR}/sentencepiece.txt"
+  "${EVIDENCE_PACK_DIR}/sentencepiece.in" \
+  "${EVIDENCE_PACK_DIR}/sentencepiece.txt"

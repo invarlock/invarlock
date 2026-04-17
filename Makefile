@@ -30,7 +30,7 @@ COVERAGE_TESTS_RUN := \
 
 COVERAGE_TESTS_VERIFY := \
 	tests/cli/test_verify*.py tests/cli/test_cli_command_help_smoke.py \
-	tests/cli/test_policy_commands.py tests/cli/test_proof_pack_commands.py
+	tests/cli/test_policy_commands.py tests/cli/test_evidence_pack_commands.py
 
 COVERAGE_TESTS_CONFIG := \
 	tests/cli/test_config_failfast.py tests/cli/test_error_codes.py \
@@ -84,7 +84,7 @@ COVERAGE_TESTS_ADAPTERS := \
 	tests/adapters/test_adapters_hf_and_integration.py
 
 COVERAGE_TESTS_RUNTIME := \
-	tests/cli/test_security_default_container_contract.py \
+	tests/cli/test_container_default_contract.py \
 	tests/cli/test_container_delegation.py \
 	tests/runtime/test_network_policy.py \
 	tests/runtime/test_runtime_image_contract.py \
@@ -154,7 +154,7 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/runtime_security_container.py \
 	src/invarlock/runtime_security_manifest.py
 
-TEST_DIR_TARGETS := adapters calibration ci cli core docs edits eval fuzzing guards integration lint observability plugins proof_packs reporting runtime scripts
+TEST_DIR_TARGETS := adapters calibration ci cli core docs edits eval fuzzing guards integration lint observability plugins evidence_packs reporting runtime scripts
 GROUPED_TEST_DIR_TARGETS := $(filter-out integration,$(TEST_DIR_TARGETS))
 
 help:  ## Show this help message
@@ -234,8 +234,8 @@ test-observability: TEST_DIR = observability
 test-observability: ## Run tests/observability
 test-plugins: TEST_DIR = plugins
 test-plugins: ## Run tests/plugins
-test-proof_packs: TEST_DIR = proof_packs
-test-proof_packs: ## Run tests/proof_packs
+test-evidence_packs: TEST_DIR = evidence_packs
+test-evidence_packs: ## Run tests/evidence_packs
 test-reporting: TEST_DIR = reporting
 test-reporting: ## Run tests/reporting
 test-runtime: TEST_DIR = runtime
@@ -258,7 +258,7 @@ test-assurance:  ## Run assurance-related tests only
 		tests/docs/test_claim_surface_consistency.py \
 		tests/docs/test_assurance_xref_linter.py \
 		tests/reporting/test_public_contracts.py \
-		tests/reporting/test_proof_pack_contract.py \
+		tests/reporting/test_evidence_pack_contract.py \
 		tests/reporting/test_policy_pack_contract.py \
 		tests/reporting/test_policy_utils.py::test_compute_policy_digest_matches_assurance_spec
 
@@ -310,7 +310,7 @@ cli-smoke-core:  ## Smoke the simplified core CLI surface
 cli-smoke-advanced:  ## Smoke the advanced CLI namespace
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTHON) -m invarlock advanced --help >/dev/null
-	PYTHONPATH=src $(PYTHON) -m invarlock advanced proof-pack --help >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock advanced evidence-pack --help >/dev/null
 	PYTHONPATH=src $(PYTHON) -m invarlock advanced policy --help >/dev/null
 	PYTHONPATH=src $(PYTHON) -m invarlock advanced plugins --help >/dev/null
 	PYTHONPATH=src $(PYTHON) -m invarlock advanced calibrate --help >/dev/null
@@ -322,14 +322,14 @@ actionlint:  ## Lint GitHub Actions workflow files
 	}
 	actionlint .github/workflows/*.yml
 
-packaging-smoke-minimal:  ## Smoke the minimal wheel install and proof-pack verify path
+packaging-smoke-minimal:  ## Smoke the minimal wheel install and evidence-pack verify path
 	$(MAKE) ensure-python
 	@PYTHON="$$(if [ -x .venv/bin/python ]; then printf '%s' .venv/bin/python; else printf '%s' "$(PYTHON)"; fi)"; \
 	INVARLOCK_LIGHT_IMPORT=1 PYTHONPATH=src "$$PYTHON" -m pytest -q \
-		tests/integration/packaging/test_wheel_proof_pack_verify.py::test_wheel_install_can_verify_proof_pack_outside_repo_tree \
-		tests/integration/packaging/test_wheel_proof_pack_verify.py::test_wheel_install_verify_rejects_ambiguous_directory_outside_repo_tree \
-		tests/integration/packaging/test_wheel_proof_pack_verify.py::test_wheel_install_runtime_verify_failure_json_outside_repo_tree \
-		tests/integration/packaging/test_wheel_proof_pack_verify.py::test_wheel_install_proof_pack_verify_reports_integrity_failure_outside_repo_tree
+		tests/integration/packaging/test_wheel_evidence_pack_verify.py::test_wheel_install_can_verify_evidence_pack_outside_repo_tree \
+		tests/integration/packaging/test_wheel_evidence_pack_verify.py::test_wheel_install_verify_rejects_ambiguous_directory_outside_repo_tree \
+		tests/integration/packaging/test_wheel_evidence_pack_verify.py::test_wheel_install_runtime_verify_failure_json_outside_repo_tree \
+		tests/integration/packaging/test_wheel_evidence_pack_verify.py::test_wheel_install_evidence_pack_verify_reports_integrity_failure_outside_repo_tree
 
 model-evidence-list:  ## Print the maintained shipped-model evidence manifest
 	$(MAKE) ensure-python
@@ -339,7 +339,7 @@ model-evidence-sweep:  ## Run the maintained shipped-model evidence sweep
 	$(MAKE) ensure-python
 	PYTHONPATH=src INVARLOCK_ALLOW_NETWORK=1 $(PYTHON) scripts/model_evidence_sweep.py $(MODEL_EVIDENCE_ARGS)
 
-runtime-image:  ## Build the local container runtime image used for secure-default execution
+runtime-image:  ## Build the local container runtime image used for default execution
 	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ An OCI container engine (Docker or Podman) is required."; exit 1; }
 	@if $(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE) >/dev/null 2>&1; then $(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE) >/dev/null 2>&1 || true; fi
 	$(CONTAINER_ENGINE) build -f runtime/Dockerfile -t $(RUNTIME_IMAGE) .
@@ -347,7 +347,7 @@ runtime-image:  ## Build the local container runtime image used for secure-defau
 runtime-image-podman: CONTAINER_ENGINE=podman
 runtime-image-podman: runtime-image  ## Build the local container runtime image with Podman
 
-runtime-image-cuda:  ## Build the local CUDA container runtime image for GPU-backed secure-default execution
+runtime-image-cuda:  ## Build the local CUDA container runtime image for GPU-backed default execution
 	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ An OCI container engine (Docker or Podman) is required."; exit 1; }
 	@if $(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE_CUDA) >/dev/null 2>&1; then $(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE_CUDA) >/dev/null 2>&1 || true; fi
 	$(CONTAINER_ENGINE) build \
@@ -502,7 +502,7 @@ docs-check: ## Run consolidated docs validation plus curated live examples
 docs-live-fast: ## Live-run the curated deterministic docs and notebook subset
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTHON) scripts/verify_live_examples.py \
-		--markdown-execution-mode trusted-local \
+		--markdown-execution-mode host \
 		--skip-markdown-model-loading \
 		--skip-notebook-model-loading \
 		--paths \
@@ -515,7 +515,7 @@ docs-live-fast: ## Live-run the curated deterministic docs and notebook subset
 docs-live: ## Live-run runnable markdown CLI examples and notebooks
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTHON) scripts/verify_live_examples.py \
-		--markdown-execution-mode trusted-local
+		--markdown-execution-mode host
 
 docs-check-build: ## Build docs strictly and run link checks
 	$(MAKE) ensure-python

@@ -15,7 +15,7 @@ security or alignment.
 - Default runtime posture disables outbound network connections unless
   `INVARLOCK_ALLOW_NETWORK=1` is explicitly set.
 - Default runtime posture keeps model-loading commands inside the runtime
-  container unless a trusted public workflow uses `invarlock evaluate --execution-mode trusted-local`
+  container unless a public host-side workflow uses `invarlock evaluate --execution-mode host`
   or an advanced/internal workflow explicitly sets `INVARLOCK_ALLOW_HOST_EXECUTION=1`.
 - Evaluation runs use the pairing, windowing, and bootstrap profiles
   described in the assurance docs and configs.
@@ -37,7 +37,7 @@ security or alignment.
 │  ┌───────────────────────────────────────────────────────────────────┐  │
 │  │ RUNTIME LAYER                                                     │  │
 │  │ container execution by default; host execution only with          │  │
-│  │ `evaluate --execution-mode trusted-local` (public) or advanced/internal host bypass │  │
+│  │ `evaluate --execution-mode host` (public) or advanced/internal host bypass │  │
 │  └───────────────────────────────────────────────────────────────────┘  │
 │                               │                                         │
 │                               ▼                                         │

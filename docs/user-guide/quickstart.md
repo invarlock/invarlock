@@ -6,14 +6,14 @@
 | --- | --- |
 | **Purpose** | Complete the core evaluation workflow in a few commands. |
 | **Audience** | New users running their first evaluation. |
-| **Requires** | `pip install invarlock` for verify/report/proof-pack flows; add `invarlock[hf]` only for Hugging Face-backed `evaluate`. |
+| **Requires** | `pip install invarlock` for verify/report/evidence-pack flows; add `invarlock[hf]` only for Hugging Face-backed `evaluate`. |
 | **Network** | Use `--allow-network` on `evaluate` when a run needs model or dataset downloads. |
 | **Next step** | [Compare & evaluate](compare-and-evaluate.md) for production use. |
 
 This guide keeps the public front door first: `evaluate`, `verify`, and
 `report html`. The default path produces a machine-readable evaluation report.
 The minimal install is enough for verification, report rendering, and
-proof-pack inspection. Add `invarlock[hf]` only when you want the evaluate path
+evidence-pack inspection. Add `invarlock[hf]` only when you want the evaluate path
 to load Hugging Face models. Reach for `report generate` and `report explain`
 after the core path is already green.
 
@@ -56,17 +56,17 @@ usable for local smokes. Keep using those presets, but pair them with
 `--profile ci` or `--profile release` when you need balanced-tier evaluations
 to meet the normal token-floor gates.
 
-`evaluate` uses the secure-default runtime container unless you explicitly pass
-`--execution-mode trusted-local` for a trusted host-side workflow. Container-backed runs emit
+`evaluate` uses the runtime container by default unless you explicitly pass
+`--execution-mode host` for a host-side workflow. Container-backed runs emit
 `reports/eval/runtime.manifest.json` next to `evaluation.report.json`. For a
-trusted host-side bypass, verify the resulting report with
-`invarlock verify --runtime-provenance trusted-local ...`.
+host-side bypass, verify the resulting report with
+`invarlock verify --runtime-provenance host ...`.
 
-Proof-pack verification works from an installed wheel and does not require a
+Evidence-pack verification works from an installed wheel and does not require a
 repo checkout:
 
 ```bash
-invarlock advanced proof-pack verify <pack> --strict
+invarlock advanced evidence-pack verify <pack> --strict
 ```
 
 ### 3. Verify the evaluation report
@@ -75,13 +75,13 @@ invarlock advanced proof-pack verify <pack> --strict
 # Container/default evaluate output
 invarlock verify reports/eval/evaluation.report.json
 
-# Trusted-local evaluate output
-invarlock verify --runtime-provenance trusted-local reports/eval/evaluation.report.json
+# Host evaluate output
+invarlock verify --runtime-provenance host reports/eval/evaluation.report.json
 ```
 
 The verifier re-checks schema, paired math, gate results, and the adjacent
-runtime manifest before you promote results. Use the trusted-local form only
-when the evaluation itself ran with `--execution-mode trusted-local`.
+runtime manifest before you promote results. Use the host form only
+when the evaluation itself ran with `--execution-mode host`.
 
 `invarlock report generate` and `invarlock report explain` expect canonical
 `report.json` inputs. `invarlock report html` expects canonical
@@ -114,7 +114,7 @@ paired evaluation report.
 
 - Enable downloads per command with `--allow-network`.
 - For offline reads after warming caches, use `HF_DATASETS_OFFLINE=1`.
-- `--execution-mode trusted-local` is the explicit trusted-local bypass for `evaluate`.
+- `--execution-mode host` is the explicit host bypass for `evaluate`.
 - `verify` expects `runtime.manifest.json` for container-backed evaluation outputs.
 - `--profile ci` currently expands causal-LM windows to `240/240`; `release`
   expands them to `400/400`.
@@ -122,7 +122,7 @@ paired evaluation report.
 ## Advanced And Demo Flows
 
 The built-in `quant_rtn` edit ships for demos and smoke tests, but the primary
-onboarding path is the secure-default evaluate flow shown above.
+onboarding path is the default evaluate flow shown above.
 
 ```bash
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
@@ -139,7 +139,7 @@ Advanced commands live under `invarlock advanced`:
 
 ```bash
 invarlock advanced plugins list
-invarlock advanced proof-pack verify <pack> --strict
+invarlock advanced evidence-pack verify <pack> --strict
 invarlock advanced policy --help
 invarlock advanced calibrate --help
 ```

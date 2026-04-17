@@ -417,11 +417,11 @@
         "Qwen/Qwen2.5-32B"
       ],
       "repo_evidence": [
-        "docs/user-guide/proof-packs-internals.md",
-        "scripts/proof_packs/suites.sh",
-        "scripts/proof_packs/lib/validation_suite.sh"
+        "docs/user-guide/evidence-packs-internals.md",
+        "scripts/evidence_packs/suites.sh",
+        "scripts/evidence_packs/lib/validation_suite.sh"
       ],
-      "notes": "Used in proof-pack suites and validation defaults outside the declared Qwen2.5 14B support lane."
+      "notes": "Used in evidence-pack suites and validation defaults outside the declared Qwen2.5 14B support lane."
     },
     {
       "family_id": "qwen1-5-72b",
@@ -431,11 +431,11 @@
       "state": "usage_only",
       "representative_models": ["Qwen/Qwen1.5-72B"],
       "repo_evidence": [
-        "docs/user-guide/proof-packs-internals.md",
-        "scripts/proof_packs/suites.sh",
-        "scripts/proof_packs/lib/validation_suite.sh"
+        "docs/user-guide/evidence-packs-internals.md",
+        "scripts/evidence_packs/suites.sh",
+        "scripts/evidence_packs/lib/validation_suite.sh"
       ],
-      "notes": "Used as a concrete proof-pack checkpoint, but not declared as a public support lane."
+      "notes": "Used as a concrete evidence-pack checkpoint, but not declared as a public support lane."
     },
     {
       "family_id": "yi-34b",
@@ -445,11 +445,11 @@
       "state": "usage_only",
       "representative_models": ["01-ai/Yi-34B"],
       "repo_evidence": [
-        "docs/user-guide/proof-packs-internals.md",
-        "scripts/proof_packs/suites.sh",
-        "scripts/proof_packs/tuned_edit_params.json"
+        "docs/user-guide/evidence-packs-internals.md",
+        "scripts/evidence_packs/suites.sh",
+        "scripts/evidence_packs/tuned_edit_params.json"
       ],
-      "notes": "Used in workshop and full proof-pack suites without a public support lane."
+      "notes": "Used in workshop and full evidence-pack suites without a public support lane."
     },
     {
       "family_id": "mixtral-8x7b",
@@ -459,11 +459,11 @@
       "state": "usage_only",
       "representative_models": ["mistralai/Mixtral-8x7B-v0.1"],
       "repo_evidence": [
-        "docs/user-guide/proof-packs-internals.md",
-        "scripts/proof_packs/suites.sh",
-        "scripts/proof_packs/tuned_edit_params.json"
+        "docs/user-guide/evidence-packs-internals.md",
+        "scripts/evidence_packs/suites.sh",
+        "scripts/evidence_packs/tuned_edit_params.json"
       ],
-      "notes": "Used concretely in proof-pack flows while remaining outside the public support matrix."
+      "notes": "Used concretely in evidence-pack flows while remaining outside the public support matrix."
     }
   ],
   "recommended_additions": [

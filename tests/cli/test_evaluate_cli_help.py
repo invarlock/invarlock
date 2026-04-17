@@ -26,4 +26,4 @@ def test_cli_verify_help_shows_runtime_provenance_choices():
     compact = "".join(stdout.split())
 
     assert "--runtime-provenance" in stdout
-    assert "container|trusted-local" in compact
+    assert "container|host" in compact

@@ -111,8 +111,8 @@ invarlock evaluate --allow-network \
 invarlock report html -i report_bundle/evaluation.report.json -o report_bundle/evaluation.html
 ```
 
-The `invarlock evaluate` step follows the secure-default runtime container path
-unless a trusted local workflow explicitly sets `--execution-mode trusted-local`.
+The `invarlock evaluate` step follows the default runtime-container path
+unless a host-side workflow explicitly sets `--execution-mode host`.
 
 Common pitfalls:
 

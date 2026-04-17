@@ -13,7 +13,7 @@ def test_runtime_bool_helpers_and_execution_mode(monkeypatch) -> None:
     monkeypatch.setenv(runtime_security.ALLOW_NETWORK_ENV, "1")
     monkeypatch.setenv(runtime_security.ALLOW_HOST_EXECUTION_ENV, "0")
     monkeypatch.setenv(runtime_security.ALLOW_REMOTE_CODE_ENV, "yes")
-    monkeypatch.setenv(runtime_security.ALLOW_UNATTESTED_ARTIFACTS_ENV, "true")
+    monkeypatch.setenv(runtime_security.ALLOW_UNVERIFIED_PROVENANCE_ENV, "true")
     monkeypatch.setenv(runtime_security.ALLOW_THIRD_PARTY_PLUGINS_ENV, "1")
     monkeypatch.setenv(runtime_security.CONTAINER_EXECUTION_ENV, "1")
 
@@ -23,7 +23,7 @@ def test_runtime_bool_helpers_and_execution_mode(monkeypatch) -> None:
     assert runtime_security.network_allowed() is True
     assert runtime_security.host_execution_allowed() is False
     assert runtime_security.remote_code_allowed() is True
-    assert runtime_security.unattested_artifacts_allowed() is True
+    assert runtime_security.unverified_provenance_allowed() is True
     assert runtime_security.third_party_plugins_allowed() is True
     assert runtime_security.running_inside_container() is True
     assert runtime_security.current_execution_mode() == "container"
@@ -32,13 +32,13 @@ def test_runtime_bool_helpers_and_execution_mode(monkeypatch) -> None:
         allow_network=True,
         allow_host_execution=True,
         allow_remote_code=True,
-        allow_unattested_artifacts=True,
+        allow_unverified_provenance=True,
         allow_third_party_plugins=True,
     ):
         assert runtime_security.network_allowed() is True
         assert runtime_security.host_execution_allowed() is True
         assert runtime_security.remote_code_allowed() is True
-        assert runtime_security.unattested_artifacts_allowed() is True
+        assert runtime_security.unverified_provenance_allowed() is True
         assert runtime_security.third_party_plugins_allowed() is True
 
 

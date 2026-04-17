@@ -15,7 +15,7 @@ Overview of the core security-related components and defaults.
 
 - `invarlock evaluate`, `invarlock advanced calibrate`, and internal
   config-driven runner flows delegate to the runtime container by default.
-- Use `--execution-mode trusted-local` on `invarlock evaluate` for trusted public local runs, or
+- Use `--execution-mode host` on `invarlock evaluate` for public host-side runs, or
   `INVARLOCK_ALLOW_HOST_EXECUTION=1` / `--allow-host-execution` for advanced
   and internal workflows that intentionally bypass that boundary.
 - Third-party plugin discovery and remote model code execution are separate
@@ -48,7 +48,7 @@ Overview of the core security-related components and defaults.
 
 ## Design principles
 
-- Secure by default (fail safe): network off; strict gates; no secrets in code.
+- Locked-down defaults: network off; strict gates; no secrets in code.
 - Explicit enablement for higher-risk operations (downloads, GPU extras).
 - Deterministic runs with recorded seeds and env flags for auditability.
 

@@ -12,7 +12,7 @@
 ## Quick Start
 
 ```bash
-# Compare baseline and subject on the secure-default runtime path
+# Compare baseline and subject on the default runtime-container path
 invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject gpt2 \
@@ -23,14 +23,15 @@ invarlock evaluate --allow-network \
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
 
-Model-loading commands use the secure-default runtime container unless a trusted
-`invarlock evaluate --execution-mode trusted-local` workflow explicitly bypasses it.
+Model-loading commands use the runtime container by default unless a
+host-side `invarlock evaluate --execution-mode host` workflow explicitly
+bypasses it.
 
 ## Concepts
 
 - `runs/` is scratch space: evaluate emits baseline/subject working artifacts there.
 - `reports/` is evidence: archive `evaluation.report.json` and `runtime.manifest.json`
-  for audit, plus any HTML or proof-pack outputs you distribute.
+  for audit, plus any HTML or evidence-pack outputs you distribute.
 - evaluation bundles reference baseline/subject report artifacts; keep them
   together to preserve pairing and make later review easier.
 
@@ -73,7 +74,7 @@ reports/
 | Artifact | Why archive | Required for verify |
 | --- | --- | --- |
 | `evaluation.report.json` | Evaluation report snapshot | Yes |
-| `runtime.manifest.json` | Runtime provenance for secure-default outputs | Yes |
+| `runtime.manifest.json` | Runtime provenance for container-backed outputs | Yes |
 | `events.jsonl` | Debugging timeline | No |
 | `evaluation.html` | Human review | No |
 

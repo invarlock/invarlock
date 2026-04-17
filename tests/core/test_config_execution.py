@@ -109,7 +109,7 @@ def test_run_from_config_executes_without_delegation_and_writes_manifest(
         allow_network=True,
         allow_remote_code=True,
         allow_third_party_plugins=True,
-        command_name="proof-pack-run",
+        command_name="evidence-pack-run",
         delegate=False,
     )
 
@@ -129,7 +129,7 @@ def test_run_from_config_executes_without_delegation_and_writes_manifest(
     assert manifest_report == report_path
     assert manifest_config == "configs/demo.yaml"
     assert manifest_extra == {
-        "command": "proof-pack-run",
+        "command": "evidence-pack-run",
         "profile": "ci",
         "allow_network": True,
         "allow_remote_code": True,
@@ -137,7 +137,7 @@ def test_run_from_config_executes_without_delegation_and_writes_manifest(
     }
 
 
-def test_run_from_config_propagates_allow_unattested_artifacts(
+def test_run_from_config_propagates_allow_unverified_provenance(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     seen: dict[str, object] = {}
@@ -180,7 +180,7 @@ def test_run_from_config_propagates_allow_unattested_artifacts(
 
     out = config_execution.run_from_config(
         config="configs/demo.yaml",
-        allow_unattested_artifacts=True,
+        allow_unverified_provenance=True,
         delegate=False,
     )
 
@@ -190,14 +190,14 @@ def test_run_from_config_propagates_allow_unattested_artifacts(
         "allow_host_execution": False,
         "allow_third_party_plugins": False,
         "allow_remote_code": False,
-        "allow_unattested_artifacts": True,
+        "allow_unverified_provenance": True,
     }
     assert seen["policy"] == runtime_security.build_runtime_security_policy(
-        allow_unattested_artifacts=True
+        allow_unverified_provenance=True
     )
 
 
-def test_run_from_config_delegates_when_secure_default_requires_container(
+def test_run_from_config_delegates_when_container_default_requires_container(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     seen: dict[str, object] = {}

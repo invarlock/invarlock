@@ -18,7 +18,7 @@ def test_cli_top_level_help_smoke(monkeypatch):
         ["doctor", "--help"],
         ["advanced", "--help"],
         ["advanced", "calibrate", "--help"],
-        ["advanced", "proof-pack", "--help"],
+        ["advanced", "evidence-pack", "--help"],
         ["advanced", "policy", "--help"],
         ["advanced", "plugins", "--help"],
     ):
@@ -30,20 +30,20 @@ def test_command_wrappers_importable():
     from invarlock.cli.commands.calibrate import calibrate_app
     from invarlock.cli.commands.doctor import doctor_command
     from invarlock.cli.commands.evaluate import evaluate_command
+    from invarlock.cli.commands.evidence_pack import (
+        build_command as evidence_pack_build_command,
+    )
+    from invarlock.cli.commands.evidence_pack import (
+        inspect_command as evidence_pack_inspect_command,
+    )
+    from invarlock.cli.commands.evidence_pack import (
+        verify_command as evidence_pack_verify_command,
+    )
     from invarlock.cli.commands.explain_gates import explain_gates_command
     from invarlock.cli.commands.export_html import export_html_command
     from invarlock.cli.commands.plugins import plugins_command
     from invarlock.cli.commands.policy import build_command as policy_build_command
     from invarlock.cli.commands.policy import verify_command as policy_verify_command
-    from invarlock.cli.commands.proof_pack import (
-        build_command as proof_pack_build_command,
-    )
-    from invarlock.cli.commands.proof_pack import (
-        inspect_command as proof_pack_inspect_command,
-    )
-    from invarlock.cli.commands.proof_pack import (
-        verify_command as proof_pack_verify_command,
-    )
     from invarlock.cli.commands.verify import verify_command
     from invarlock.reporting.report_contract import generate_reports
 
@@ -55,9 +55,9 @@ def test_command_wrappers_importable():
         export_html_command,
         policy_build_command,
         policy_verify_command,
-        proof_pack_build_command,
-        proof_pack_inspect_command,
-        proof_pack_verify_command,
+        evidence_pack_build_command,
+        evidence_pack_inspect_command,
+        evidence_pack_verify_command,
         plugins_command,
         verify_command,
         generate_reports,

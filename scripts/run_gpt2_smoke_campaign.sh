@@ -48,7 +48,7 @@ mkdir -p "$WORK_ROOT"
 SMOKE_RUN_DIR="$WORK_ROOT/runs"
 SMOKE_REPORT_DIR="$WORK_ROOT/reports/eval"
 SMOKE_EXPORT_DIR="$WORK_ROOT/exports"
-PROOF_PACK_DIR="$WORK_ROOT/proof_pack"
+EVIDENCE_PACK_DIR="$WORK_ROOT/evidence_pack"
 SMOKE_CACHE_ROOT="$WORK_ROOT/.hf"
 HOST_HF_CACHE_ROOT="${INVARLOCK_SMOKE_HOST_HF_CACHE_ROOT:-${HF_HOME:-${HOME}/.cache/huggingface}}"
 
@@ -172,8 +172,8 @@ echo "[smoke] hf_datasets_cache=$HF_DATASETS_CACHE"
 EXECUTION_MODE="container"
 RUNTIME_PROVENANCE="container"
 if [[ "$MODE" == "local" ]]; then
-  EXECUTION_MODE="trusted-local"
-  RUNTIME_PROVENANCE="trusted-local"
+  EXECUTION_MODE="host"
+  RUNTIME_PROVENANCE="host"
 fi
 
 "${CLI[@]}" evaluate \
@@ -215,31 +215,31 @@ mkdir -p "$SMOKE_EXPORT_DIR"
 "${CLI[@]}" report explain --subject-report "$EDITED_REPORT" --baseline-report "$BASELINE_REPORT"
 
 printf '%s\n' '{"verdict":"PASS","note":"gpt2 smoke campaign"}' > "$WORK_ROOT/final_verdict.json"
-PROOF_PACK_SIGNING_KEY="$WORK_ROOT/proof_pack_signing_key.pem"
-PROOF_PACK_PUBLIC_KEY="$WORK_ROOT/proof_pack_signing_key.pub.pem"
+EVIDENCE_PACK_SIGNING_KEY="$WORK_ROOT/evidence_pack_signing_key.pem"
+EVIDENCE_PACK_PUBLIC_KEY="$WORK_ROOT/evidence_pack_signing_key.pub.pem"
 
 if [[ "$MODE" == "local" ]]; then
-  echo "[smoke] skipping proof-pack build/verify in local mode; emitted artifacts are host-bypass."
+  echo "[smoke] skipping evidence-pack build/verify in local mode; emitted artifacts are host-bypass."
   echo "[smoke] complete"
   exit 0
 fi
 
-"${CLI[@]}" advanced proof-pack keygen "$PROOF_PACK_SIGNING_KEY" \
-  --public-key-out "$PROOF_PACK_PUBLIC_KEY" \
+"${CLI[@]}" advanced evidence-pack keygen "$EVIDENCE_PACK_SIGNING_KEY" \
+  --public-key-out "$EVIDENCE_PACK_PUBLIC_KEY" \
   --json
-"${CLI[@]}" advanced proof-pack build "$PROOF_PACK_DIR" \
+"${CLI[@]}" advanced evidence-pack build "$EVIDENCE_PACK_DIR" \
   --final-verdict "$WORK_ROOT/final_verdict.json" \
   --report "$EVAL_REPORT" \
-  --signing-key "$PROOF_PACK_SIGNING_KEY" \
+  --signing-key "$EVIDENCE_PACK_SIGNING_KEY" \
   --profile "$PROFILE" \
   --json
-"${CLI[@]}" advanced proof-pack inspect "$PROOF_PACK_DIR" --json
-"${CLI[@]}" advanced proof-pack verify "$PROOF_PACK_DIR" --json || PROOF_PACK_VERIFY_RC=$?
-PROOF_PACK_VERIFY_RC="${PROOF_PACK_VERIFY_RC:-0}"
-echo "[smoke] proof_pack_verify_rc=$PROOF_PACK_VERIFY_RC"
-if [[ "$PROOF_PACK_VERIFY_RC" != "0" ]]; then
-  echo "[error] proof-pack verification failed" >&2
-  exit "$PROOF_PACK_VERIFY_RC"
+"${CLI[@]}" advanced evidence-pack inspect "$EVIDENCE_PACK_DIR" --json
+"${CLI[@]}" advanced evidence-pack verify "$EVIDENCE_PACK_DIR" --json || EVIDENCE_PACK_VERIFY_RC=$?
+EVIDENCE_PACK_VERIFY_RC="${EVIDENCE_PACK_VERIFY_RC:-0}"
+echo "[smoke] evidence_pack_verify_rc=$EVIDENCE_PACK_VERIFY_RC"
+if [[ "$EVIDENCE_PACK_VERIFY_RC" != "0" ]]; then
+  echo "[error] evidence-pack verification failed" >&2
+  exit "$EVIDENCE_PACK_VERIFY_RC"
 fi
 
 echo "[smoke] complete"

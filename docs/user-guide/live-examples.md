@@ -17,7 +17,7 @@ Use this lane when you need deterministic proof that the documented
 `evaluate -> verify -> report html` path still works.
 
 For Markdown examples, this lane replays the documented commands in
-trusted-local mode and skips heavyweight model-loading steps while reusing
+host mode and skips heavyweight model-loading steps while reusing
 seeded demo evidence for the downstream `verify` and `report html` steps.
 For the curated notebooks, heavyweight evaluation cells are treated the same
 way so the contract-reading and verification cells still run against stable demo
@@ -43,6 +43,6 @@ downloads, and materially longer runtimes than the curated CI subset.
 
 ## Trust boundary
 
-Notebook examples are trusted-local examples. They are meant to be easy to run
+Notebook examples are host examples. They are meant to be easy to run
 from a checkout or an installed development environment. They do not replace
-the runtime-container path used by the secure-default CLI workflow.
+the runtime-container path used by the default CLI workflow.

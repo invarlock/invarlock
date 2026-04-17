@@ -58,7 +58,7 @@ def test_main_live_fast_only_runs_curated_live_checks(monkeypatch, capsys) -> No
     assert calls == ["live_fast"]
 
 
-def test_check_live_fast_uses_trusted_local_demo_mode(monkeypatch, capsys) -> None:
+def test_check_live_fast_uses_host_mode_demo_mode(monkeypatch, capsys) -> None:
     module = _load_script_module()
     commands: list[list[str]] = []
 
@@ -76,7 +76,7 @@ def test_check_live_fast_uses_trusted_local_demo_mode(monkeypatch, capsys) -> No
             sys.executable,
             "scripts/verify_live_examples.py",
             "--markdown-execution-mode",
-            "trusted-local",
+            "host",
             "--skip-markdown-model-loading",
             "--skip-notebook-model-loading",
             "--paths",

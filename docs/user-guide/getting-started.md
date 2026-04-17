@@ -107,7 +107,7 @@ ambiguous directories are rejected.
 ## Execution Modes
 
 - `evaluate` defaults to the runtime container (`--execution-mode container`).
-- Use `--execution-mode trusted-local` only for trusted host-side workflows that intentionally
+- Use `--execution-mode host` only for host-side workflows that intentionally
   bypass container execution.
 - `verify` expects `runtime.manifest.json` next to container-backed evaluation reports.
 
@@ -118,7 +118,7 @@ ambiguous directories are rejected.
 | **First-time user** | Getting Started → [Quickstart](quickstart.md) → [Compare & evaluate](compare-and-evaluate.md) |
 | **Python developer** | Getting Started → [Primary Metric Smoke](primary-metric-smoke.md) → [API Guide](../reference/api-guide.md) |
 | **Custom data user** | Getting Started → [Bring Your Own Data](bring-your-own-data.md) → [Config Gallery](config-gallery.md) |
-| **Validation engineer** | Getting Started → [Proof Packs](proof-packs.md) → [Proof Packs Internals](proof-packs-internals.md) |
+| **Validation engineer** | Getting Started → [Evidence Packs](evidence-packs.md) → [Evidence Packs Internals](evidence-packs-internals.md) |
 | **Security auditor** | Getting Started → [Threat Model](../security/threat-model.md) → [Best Practices](../security/best-practices.md) |
 
 ## Advanced Workflows
@@ -126,16 +126,16 @@ ambiguous directories are rejected.
 The simplified public CLI keeps the core path at the top level. Non-core
 surfaces live under `invarlock advanced`:
 
-- `invarlock advanced proof-pack ...`
+- `invarlock advanced evidence-pack ...`
 - `invarlock advanced policy ...`
 - `invarlock advanced plugins ...`
 - `invarlock advanced calibrate ...`
 
-Installed wheels also include the proof-pack verifier, so downstream users can
+Installed wheels also include the evidence-pack verifier, so downstream users can
 inspect bundles without cloning the repository:
 
 ```bash
-invarlock advanced proof-pack verify <pack> --strict
+invarlock advanced evidence-pack verify <pack> --strict
 ```
 
 Optional adapter and backend installs use Python extras such as

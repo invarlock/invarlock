@@ -26,7 +26,7 @@ def test_invarlock_help_layout_and_exit_codes():
     # Command names presence (order may vary with Typer versions)
     for name in ("evaluate", "report", "verify", "doctor", "advanced", "version"):
         assert re.search(rf"^\s*│\s+{re.escape(name)}\s", out, re.MULTILINE)
-    for removed in ("proof-pack", "run", "plugins", "policy", "calibrate"):
+    for removed in ("evidence-pack", "run", "plugins", "policy", "calibrate"):
         assert not re.search(rf"^\s*│\s+{re.escape(removed)}\s", out, re.MULTILINE)
 
 
@@ -51,7 +51,7 @@ def test_advanced_group_help_lists_subcommands():
     result = runner.invoke(app, ["advanced", "--help"])
     assert result.exit_code == 0
     out = strip_ansi(result.stdout)
-    for sub in ("proof-pack", "policy", "plugins", "calibrate"):
+    for sub in ("evidence-pack", "policy", "plugins", "calibrate"):
         assert sub in out
 
 

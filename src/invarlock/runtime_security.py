@@ -18,7 +18,7 @@ from invarlock.runtime_security_helpers import (
     ALLOW_NETWORK_ENV,
     ALLOW_REMOTE_CODE_ENV,
     ALLOW_THIRD_PARTY_PLUGINS_ENV,
-    ALLOW_UNATTESTED_ARTIFACTS_ENV,
+    ALLOW_UNVERIFIED_PROVENANCE_ENV,
     CONTAINER_ENGINE_ENV,
     CONTAINER_EXECUTION_ENV,
     RUNTIME_IMAGE_CUDA_LOCAL_DEFAULT,
@@ -56,7 +56,7 @@ from invarlock.runtime_security_helpers import (
     running_inside_container,
     runtime_allowances_scope,
     third_party_plugins_allowed,
-    unattested_artifacts_allowed,
+    unverified_provenance_allowed,
     write_runtime_manifest,
 )
 
@@ -65,7 +65,7 @@ __all__ = [
     "ALLOW_NETWORK_ENV",
     "ALLOW_REMOTE_CODE_ENV",
     "ALLOW_THIRD_PARTY_PLUGINS_ENV",
-    "ALLOW_UNATTESTED_ARTIFACTS_ENV",
+    "ALLOW_UNVERIFIED_PROVENANCE_ENV",
     "ContainerLaunchPlan",
     "RuntimeManifestExecution",
     "RuntimeSecurityPolicy",
@@ -103,6 +103,6 @@ __all__ = [
     "RuntimeManifestLoadResult",
     "running_inside_container",
     "third_party_plugins_allowed",
-    "unattested_artifacts_allowed",
+    "unverified_provenance_allowed",
     "write_runtime_manifest",
 ]

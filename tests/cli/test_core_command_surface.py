@@ -16,7 +16,7 @@ def test_top_level_help_lists_only_core_and_advanced_commands():
     for name in ("evaluate", "report", "verify", "doctor", "advanced", "version"):
         assert re.search(rf"^\s*│\s+{re.escape(name)}\s", out, re.MULTILINE)
 
-    for removed in ("run", "proof-pack", "policy", "plugins", "calibrate"):
+    for removed in ("run", "evidence-pack", "policy", "plugins", "calibrate"):
         assert not re.search(rf"^\s*│\s+{re.escape(removed)}\s", out, re.MULTILINE)
 
 
@@ -25,5 +25,5 @@ def test_advanced_help_lists_advanced_commands():
     assert result.exit_code == 0
     out = strip_ansi(result.stdout)
 
-    for name in ("proof-pack", "policy", "plugins", "calibrate"):
+    for name in ("evidence-pack", "policy", "plugins", "calibrate"):
         assert re.search(rf"^\s*│\s+{re.escape(name)}\s", out, re.MULTILINE)

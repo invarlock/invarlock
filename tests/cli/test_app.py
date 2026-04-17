@@ -54,7 +54,7 @@ def test_cli_help_lists_core_commands():
     assert "evaluate model changes" in output.lower()
     for command in ("evaluate", "report", "verify", "doctor", "advanced", "version"):
         assert re.search(rf"^\s*│\s+{re.escape(command)}\s", output, re.MULTILINE)
-    for removed in ("run", "proof-pack", "policy", "plugins", "calibrate"):
+    for removed in ("run", "evidence-pack", "policy", "plugins", "calibrate"):
         assert not re.search(rf"^\s*│\s+{re.escape(removed)}\s", output, re.MULTILINE)
 
 
@@ -92,12 +92,12 @@ def test_evaluate_cli_forwards_execution_mode(monkeypatch):
             "--subject",
             "subject",
             "--execution-mode",
-            "trusted-local",
+            "host",
         ],
     )
 
     assert result.exit_code == 0, result.output
-    assert seen["execution_mode"] == "trusted-local"
+    assert seen["execution_mode"] == "host"
 
 
 def test_ordered_group_handles_advanced_and_unknown_lazy_subapps():

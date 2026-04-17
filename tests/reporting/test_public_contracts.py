@@ -79,8 +79,8 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     schema = contracts.load_policy_pack_schema()
     assert schema["title"] == "InvarLock Policy Pack"
     assert (
-        contracts.load_proof_pack_manifest_schema()["title"]
-        == "InvarLock Proof Pack Manifest"
+        contracts.load_evidence_pack_manifest_schema()["title"]
+        == "InvarLock Evidence Pack Manifest"
     )
     assert (
         contracts.load_runtime_manifest_schema()["title"]
@@ -116,11 +116,11 @@ def test_support_matrix_published_basis_evidence_uses_public_evidence_paths() ->
         assert evidence["evaluation_report_fixture"].startswith(
             "public_evidence/published_basis/"
         )
-        assert evidence["proof_pack_recipe"].startswith(
+        assert evidence["evidence_pack_recipe"].startswith(
             "public_evidence/published_basis/"
         )
         assert "tests/fixtures/" not in evidence["evaluation_report_fixture"]
-        assert "tests/fixtures/" not in evidence["proof_pack_recipe"]
+        assert "tests/fixtures/" not in evidence["evidence_pack_recipe"]
 
 
 def test_readme_surfaces_public_contract_catalog_entries() -> None:
@@ -375,9 +375,9 @@ def test_public_contract_helpers_raise_when_contracts_are_unavailable(
     with pytest.raises(contracts.ContractLoadError, match="policy_pack.schema.json"):
         contracts.load_policy_pack_schema()
     with pytest.raises(
-        contracts.ContractLoadError, match="proof_pack_manifest.schema.json"
+        contracts.ContractLoadError, match="evidence_pack_manifest.schema.json"
     ):
-        contracts.load_proof_pack_manifest_schema()
+        contracts.load_evidence_pack_manifest_schema()
     with pytest.raises(
         contracts.ContractLoadError, match="runtime_manifest.schema.json"
     ):
@@ -409,7 +409,7 @@ def test_public_contract_helpers_reject_non_mapping_payloads(monkeypatch) -> Non
         "plugin_compatibility.json": ["unexpected"],
         "runtime_manifest.schema.json": ["unexpected"],
         "policy_pack.schema.json": ["unexpected"],
-        "proof_pack_manifest.schema.json": ["unexpected"],
+        "evidence_pack_manifest.schema.json": ["unexpected"],
     }
     monkeypatch.setattr(
         contracts,
@@ -428,9 +428,9 @@ def test_public_contract_helpers_reject_non_mapping_payloads(monkeypatch) -> Non
     with pytest.raises(contracts.ContractLoadError, match="policy_pack.schema.json"):
         contracts.load_policy_pack_schema()
     with pytest.raises(
-        contracts.ContractLoadError, match="proof_pack_manifest.schema.json"
+        contracts.ContractLoadError, match="evidence_pack_manifest.schema.json"
     ):
-        contracts.load_proof_pack_manifest_schema()
+        contracts.load_evidence_pack_manifest_schema()
     with pytest.raises(
         contracts.ContractLoadError, match="runtime_manifest.schema.json"
     ):

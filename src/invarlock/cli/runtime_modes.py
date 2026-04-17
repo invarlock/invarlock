@@ -5,12 +5,12 @@ from enum import StrEnum
 
 class ExecutionMode(StrEnum):
     CONTAINER = "container"
-    TRUSTED_LOCAL = "trusted-local"
+    HOST = "host"
 
 
 class RuntimeProvenanceMode(StrEnum):
     CONTAINER = "container"
-    TRUSTED_LOCAL = "trusted-local"
+    HOST = "host"
 
 
 __all__ = ["ExecutionMode", "RuntimeProvenanceMode"]

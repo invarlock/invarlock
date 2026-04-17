@@ -372,7 +372,7 @@ def _verify_single_report(
     baseline_digest: dict[str, Any] | None,
     tolerance: float,
     profile: str | None,
-    allow_unattested_artifacts: bool,
+    allow_unverified_provenance: bool,
     json_mode: bool,
 ) -> tuple[dict[str, Any], list[str], bool, tuple[VerifyDiagnostic, ...]]:
     cert_obj = _load_evaluation_report(cert_path)
@@ -398,7 +398,7 @@ def _verify_single_report(
     errors = _validate_evaluation_report_payload(cert_path, profile=profile)
     provenance_result = verify_runtime_provenance(
         cert_path,
-        allow_unattested=bool(allow_unattested_artifacts),
+        allow_unverified=bool(allow_unverified_provenance),
     )
     errors.extend(issue.message for issue in provenance_result.issues)
     if json_mode and any("schema validation failed" in str(e).lower() for e in errors):
@@ -461,7 +461,7 @@ def run_verify_reports(
     baseline: Path | None = None,
     tolerance: float = 1e-9,
     profile: str | None = "dev",
-    allow_unattested_artifacts: bool = False,
+    allow_unverified_provenance: bool = False,
     json_mode: bool = False,
 ) -> VerifyExecutionResult:
     """Verify reports and return structured machine + human output."""
@@ -486,7 +486,7 @@ def run_verify_reports(
                 baseline_digest=baseline_digest,
                 tolerance=tol,
                 profile=profile,
-                allow_unattested_artifacts=allow_unattested_artifacts,
+                allow_unverified_provenance=allow_unverified_provenance,
                 json_mode=json_mode,
             )
             loaded_any_report = True
@@ -592,7 +592,7 @@ def verify_reports_contract(
     baseline: Path | None = None,
     tolerance: float = 1e-9,
     profile: str | None = "dev",
-    allow_unattested_artifacts: bool = False,
+    allow_unverified_provenance: bool = False,
     json_mode: bool = False,
 ) -> VerifyExecutionResult:
     """Verify reports and return a structured result without relying on CLI output."""
@@ -601,7 +601,7 @@ def verify_reports_contract(
         baseline=baseline,
         tolerance=tolerance,
         profile=profile,
-        allow_unattested_artifacts=allow_unattested_artifacts,
+        allow_unverified_provenance=allow_unverified_provenance,
         json_mode=json_mode,
     )
 

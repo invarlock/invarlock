@@ -27,10 +27,10 @@ fine-tuning, or other checkpoint-edit workflows.
   present).
 - Run `invarlock evaluate --baseline <baseline> --subject <subject> --adapter auto`.
 
-By default, `evaluate` runs inside the runtime container. Use `--execution-mode trusted-local`
-only for trusted local workflows that intentionally run model loading on the
-host. If you choose that trusted local path, verify the resulting report with
-`invarlock verify --runtime-provenance trusted-local ...`.
+By default, `evaluate` runs inside the runtime container. Use `--execution-mode host`
+only for host-side workflows that intentionally run model loading on the
+host. If you choose that host-side path, verify the resulting report with
+`invarlock verify --runtime-provenance host ...`.
 
 Example (GPT‑2, CPU/MPS friendly; requires `invarlock[hf]` or equivalent HF extra):
 

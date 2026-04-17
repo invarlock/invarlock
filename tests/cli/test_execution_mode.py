@@ -36,7 +36,7 @@ def test_evaluate_rejects_unknown_execution_mode():
     assert result.exit_code == 2
 
 
-def test_evaluate_accepts_trusted_local_without_usage_error():
+def test_evaluate_accepts_host_mode_without_usage_error():
     result = CliRunner().invoke(
         app,
         [
@@ -46,7 +46,7 @@ def test_evaluate_accepts_trusted_local_without_usage_error():
             "--subject",
             "subject",
             "--execution-mode",
-            "trusted-local",
+            "host",
             "--help",
         ],
     )

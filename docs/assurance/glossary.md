@@ -64,8 +64,8 @@ The unedited reference model run used for comparison and gating.
 | **See also** | [Compare & evaluate](../user-guide/compare-and-evaluate.md) |
 
 **Example:** `invarlock evaluate --baseline gpt2 --subject gpt2-quant`
-This follows the secure-default runtime-container path unless a trusted local
-workflow uses `--execution-mode trusted-local`.
+This follows the default runtime-container path unless a host-side
+workflow uses `--execution-mode host`.
 
 ---
 

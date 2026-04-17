@@ -270,8 +270,8 @@ def _delegated_env_pairs(*, cwd: Path) -> tuple[dict[str, str], list[Path]]:
         helpers.ALLOW_THIRD_PARTY_PLUGINS_ENV: (
             "1" if helpers.third_party_plugins_allowed() else "0"
         ),
-        helpers.ALLOW_UNATTESTED_ARTIFACTS_ENV: (
-            "1" if helpers.unattested_artifacts_allowed() else "0"
+        helpers.ALLOW_UNVERIFIED_PROVENANCE_ENV: (
+            "1" if helpers.unverified_provenance_allowed() else "0"
         ),
         helpers.CONTAINER_EXECUTION_ENV: "1",
     }

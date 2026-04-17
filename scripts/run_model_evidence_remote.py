@@ -19,7 +19,7 @@ DEFAULT_REMOTE_VENV_CANDIDATES = (
     "{remote_repo}/.venv/bin/python",
     "/root/venvs/invarlock/bin/python",
 )
-EXECUTION_MODES = ("container", "trusted-local")
+EXECUTION_MODES = ("container", "host")
 
 
 @dataclass(frozen=True)
@@ -102,7 +102,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         choices=EXECUTION_MODES,
         help=(
             "Execution mode passed through to scripts/model_evidence_sweep.py. "
-            "'container' keeps the secure-default path; 'trusted-local' uses the "
+            "'container' keeps the default container path; 'host' uses the "
             "explicit host-bypass matrix."
         ),
     )

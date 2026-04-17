@@ -121,7 +121,7 @@ policy owners.
 | `verify` | Validate report against schema and pairing | Exit code + messages |
 | `report` | Render/compare reports and reports | MD/HTML/JSON artifacts |
 | `doctor` | Environment diagnostics | Health check output |
-| `advanced` | Maintenance workflows such as proof packs, policy packs, plugins, and calibration | Exit code + workflow-specific artifacts |
+| `advanced` | Maintenance workflows such as evidence packs, policy packs, plugins, and calibration | Exit code + workflow-specific artifacts |
 | `version` | Emit package and schema version information | Version string |
 
 ### Core Policy / Contracts (`src/invarlock/core/`, `src/invarlock/reporting/`)
@@ -135,7 +135,7 @@ by the CLI and non-CLI entrypoints.
 | `evaluate_plan.py` | Evaluation result policy, degradation classification, and emitted outcome shaping |
 | `report_inputs.py` | Canonical report path resolution and JSON-object validation |
 | `doctor_findings.py` | Structured doctor findings and optional report cross-check analysis |
-| `verify_contract.py` | Structured report-verification service used by `verify` and proof-pack flows |
+| `verify_contract.py` | Structured report-verification service used by `verify` and evidence-pack flows |
 | `runtime_manifest_verify.py` + `runtime_provenance.py` | Authoritative runtime-manifest verification and runtime-provenance ownership for report verification |
 | `run_policy.py` | Shared run policy helpers such as split choice, PM thresholds, and overhead policy |
 | `run_retry_policy.py` | Retry-attempt summaries and retry state transitions |
@@ -352,7 +352,7 @@ tests. The intended invariants are:
   `invarlock.cli`.
 
 These guardrails keep the CLI as an imperative shell while policy, contracts,
-and verdict computation remain reusable from non-CLI flows such as proof-pack
+and verdict computation remain reusable from non-CLI flows such as evidence-pack
 verification and programmatic execution.
 
 ## Key Design Decisions

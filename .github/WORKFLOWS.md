@@ -51,7 +51,7 @@ Key environment variables used across workflows:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `INVARLOCK_ALLOW_NETWORK` | Enable network access for model downloads | `0` |
-| `INVARLOCK_ALLOW_HOST_EXECUTION` | Permit trusted host-side model-loading commands in workflows that need it | `0` |
+| `INVARLOCK_ALLOW_HOST_EXECUTION` | Permit host-side model-loading commands in workflows that need it | `0` |
 | `INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS` | Permit trusted third-party plugin discovery or management | `0` |
 | `INVARLOCK_ALLOW_REMOTE_CODE` | Permit trusted remote model code execution when a workflow explicitly needs it | `0` |
 | `INVARLOCK_LIGHT_IMPORT` | Light import mode (skip heavy dependencies) | `0` |
@@ -92,7 +92,7 @@ All workflows use Python 3.12+ and Node.js 18 where needed. Ensure your self-hos
 
 ## Running CI Locally with `act`
 
-You can run GitHub Actions workflows locally using [nektos/act](https://github.com/nektos/act), which emulates GitHub's runner environment in Docker containers. This Docker requirement applies to the local `act` helper path, not to InvarLock's general secure-default runtime support.
+You can run GitHub Actions workflows locally using [nektos/act](https://github.com/nektos/act), which emulates GitHub's runner environment in Docker containers. This Docker requirement applies to the local `act` helper path, not to InvarLock's general default runtime-container support.
 
 ### Installation
 

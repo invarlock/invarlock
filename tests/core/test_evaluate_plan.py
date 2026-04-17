@@ -136,17 +136,17 @@ def test_resolve_evaluate_execution_policy_rejects_unknown_mode() -> None:
         )
 
 
-def test_resolve_evaluate_execution_policy_marks_trusted_local_host_enabled() -> None:
+def test_resolve_evaluate_execution_policy_marks_host_mode_host_enabled() -> None:
     policy = resolve_evaluate_execution_policy(
-        execution_mode="trusted-local",
+        execution_mode="host",
         allow_host_execution=False,
     )
 
     assert isinstance(policy, EvaluateExecutionPolicy)
-    assert policy.execution_mode == "trusted-local"
+    assert policy.execution_mode == "host"
     assert policy.allow_host_execution is True
     assert policy.prefer_local_files_only is True
-    assert policy.allow_unattested_artifacts is True
+    assert policy.allow_unverified_provenance is True
 
 
 def test_resolve_evaluate_tmp_dir_uses_explicit_candidate(tmp_path: Path) -> None:

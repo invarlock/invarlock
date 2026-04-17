@@ -7,7 +7,7 @@
 # - Shipped preset counts stay smoke-sized; use `--profile ci|release` for
 #   balanced-tier evaluations that need pass-capable token coverage.
 # - For a smaller bootstrap in CI, create a local `profiles/ci.yaml` and point
-#   `INVARLOCK_CONFIG_ROOT` to it (see docs/user-guide/proof-packs-internals.md).
+#   `INVARLOCK_CONFIG_ROOT` to it (see docs/user-guide/evidence-packs-internals.md).
 #
 # Example smoke test:
 #   INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_CI_PREVIEW=16 INVARLOCK_CI_FINAL=16 \

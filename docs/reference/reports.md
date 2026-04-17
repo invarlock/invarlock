@@ -460,5 +460,5 @@ html = render_report_html(report)
 
 - [CLI Reference](cli.md)
 - [Artifact Layout](artifacts.md)
-- [Assurance Case](../assurance/00-assurance-case.md) — What the report guarantees
+- [Assurance Case](../assurance/00-assurance-case.md) — What the report covers
 - [Reading a report](../user-guide/reading-report.md) — User-oriented guide

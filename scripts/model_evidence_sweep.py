@@ -30,7 +30,7 @@ MODEL_FAMILY_CATALOG_PATH = REPO_ROOT / "contracts" / "model_family_catalog.json
 DEFAULT_SUITE = "current-supported-experimental"
 REPO_MENTIONED_GPU_SUITE = "repo-mentioned-gpu"
 MODEL_CATALOG_GPU_SUITE = "model-catalog-gpu"
-EXECUTION_MODES = ("container", "trusted-local")
+EXECUTION_MODES = ("container", "host")
 RETRYABLE_EVALUATE_RETURNCODES = {-15}
 
 
@@ -447,7 +447,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         choices=EXECUTION_MODES,
         help=(
             "How to execute model-loading commands. 'container' keeps the "
-            "secure-default runtime-container path; 'trusted-local' adds the "
+            "default runtime-container path; 'host' adds the "
             "explicit host-bypass and verify override flags."
         ),
     )
@@ -548,8 +548,8 @@ def build_evaluate_command(
         "--report-out",
         _command_path(lane_root / "report", execution_mode=execution_mode),
     ]
-    if execution_mode == "trusted-local":
-        command.extend(["--execution-mode", "trusted-local"])
+    if execution_mode == "host":
+        command.extend(["--execution-mode", "host"])
     return command
 
 
@@ -602,8 +602,8 @@ def build_verify_command(
         "--json",
         str(report_path),
     ]
-    if execution_mode == "trusted-local":
-        command[4:4] = ["--runtime-provenance", "trusted-local"]
+    if execution_mode == "host":
+        command[4:4] = ["--runtime-provenance", "host"]
     return command
 
 
@@ -711,7 +711,7 @@ def run_lane(
     log_mode = "w"
     eval_returncode: int | None = None
     lane_profile = profile or spec.verify_profile
-    if execution_mode == "trusted-local":
+    if execution_mode == "host":
         prefetch_cmd = build_prefetch_command(spec, python_exe=python_exe)
         with log_path.open(log_mode, encoding="utf-8") as log_file:
             log_file.write("$ " + " ".join(prefetch_cmd) + "\n")
@@ -895,7 +895,7 @@ def run_sweep(args: argparse.Namespace) -> int:
                     report_path=lane_root / "report" / "evaluation.report.json",
                 ),
             }
-            if args.execution_mode == "trusted-local":
+            if args.execution_mode == "host":
                 item["prefetch"] = build_prefetch_command(
                     spec,
                     python_exe=args.python,

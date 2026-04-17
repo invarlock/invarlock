@@ -60,7 +60,7 @@ def test_subprocess_verifiers_use_timeouts() -> None:
     expectations = {
         REPO_ROOT / "src/invarlock/runtime_security.py": "timeout=",
         REPO_ROOT / "src/invarlock/runtime_provenance.py": "timeout=",
-        REPO_ROOT / "src/invarlock/proof_pack.py": "timeout=",
+        REPO_ROOT / "src/invarlock/evidence_pack.py": "timeout=",
     }
     for path, required in expectations.items():
         text = _read_text(path)
@@ -226,7 +226,7 @@ def test_core_runtime_provenance_is_wrapper_only() -> None:
     for snippet in (
         "load_runtime_manifest",
         "runtime_verifier_binary",
-        "unattested_artifacts_allowed",
+        "unverified_provenance_allowed",
     ):
         assert snippet not in text
 

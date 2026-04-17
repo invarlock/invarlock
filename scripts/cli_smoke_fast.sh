@@ -3,8 +3,8 @@
 #
 # This lane is intentionally PR-friendly:
 # - broad command-surface coverage
-# - positive-path report/proof-pack/policy/calibration commands
-# - tiny-model evaluate parity across trusted-local and container execution
+# - positive-path report/evidence-pack/policy/calibration commands
+# - tiny-model evaluate parity across host and container execution
 
 set -euo pipefail
 
@@ -124,7 +124,7 @@ local = json.loads(local_path.read_text(encoding="utf-8"))
 if not resolve_tiny_relax_from_report(container):
     raise SystemExit("container tiny smoke report is missing tiny_relax provenance")
 if not resolve_tiny_relax_from_report(local):
-    raise SystemExit("trusted-local tiny smoke report is missing tiny_relax provenance")
+    raise SystemExit("host tiny smoke report is missing tiny_relax provenance")
 
 container_validation = container.get("validation") or {}
 local_validation = local.get("validation") or {}
@@ -328,11 +328,11 @@ run "invarlock report html --help"    "$CLI report html --help"
 run "invarlock report validate --help" "$CLI report validate --help"
 run "invarlock doctor --help"         "$CLI doctor --help"
 run "invarlock advanced --help"       "$CLI advanced --help"
-run "invarlock advanced proof-pack --help" "$CLI advanced proof-pack --help"
-run "invarlock advanced proof-pack build --help" "$CLI advanced proof-pack build --help"
-run "invarlock advanced proof-pack keygen --help" "$CLI advanced proof-pack keygen --help"
-run "invarlock advanced proof-pack inspect --help" "$CLI advanced proof-pack inspect --help"
-run "invarlock advanced proof-pack verify --help" "$CLI advanced proof-pack verify --help"
+run "invarlock advanced evidence-pack --help" "$CLI advanced evidence-pack --help"
+run "invarlock advanced evidence-pack build --help" "$CLI advanced evidence-pack build --help"
+run "invarlock advanced evidence-pack keygen --help" "$CLI advanced evidence-pack keygen --help"
+run "invarlock advanced evidence-pack inspect --help" "$CLI advanced evidence-pack inspect --help"
+run "invarlock advanced evidence-pack verify --help" "$CLI advanced evidence-pack verify --help"
 run "invarlock advanced policy --help" "$CLI advanced policy --help"
 run "invarlock advanced policy build --help" "$CLI advanced policy build --help"
 run "invarlock advanced policy verify --help" "$CLI advanced policy verify --help"
@@ -364,10 +364,10 @@ printf '%s\n' '{"models":{"sshleifer/tiny-gpt2":{"revision":"fixture"}}}' >"$TMP
 printf '%s\n' '{"metrics":{"pm_ratio":{"ratio_limit_base":1.1}}}' >"$TMP_DIR/resolved_policy.json"
 printf '%s\n' '[{"path":"metrics.pm_ratio.ratio_limit_base","value":1.1}]' >"$TMP_DIR/policy_overrides.json"
 printf '%s\n' '{"support_tiers":["published_basis"]}' >"$TMP_DIR/policy_compatibility.json"
-PROOF_PACK_SIGNING_KEY="$TMP_DIR/proof_pack_signing_key.pem"
-PROOF_PACK_REPORT_DIR="$TMP_DIR/proof_pack_report"
-mkdir -p "$PROOF_PACK_REPORT_DIR"
-PROOF_PACK_REPORT_DIR="$PROOF_PACK_REPORT_DIR" "$PYTHON_BIN" - <<'PY'
+EVIDENCE_PACK_SIGNING_KEY="$TMP_DIR/evidence_pack_signing_key.pem"
+EVIDENCE_PACK_REPORT_DIR="$TMP_DIR/evidence_pack_report"
+mkdir -p "$EVIDENCE_PACK_REPORT_DIR"
+EVIDENCE_PACK_REPORT_DIR="$EVIDENCE_PACK_REPORT_DIR" "$PYTHON_BIN" - <<'PY'
 import hashlib
 import json
 import math
@@ -385,7 +385,7 @@ def sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-report_dir = Path(os.environ["PROOF_PACK_REPORT_DIR"])
+report_dir = Path(os.environ["EVIDENCE_PACK_REPORT_DIR"])
 subject_report_path = report_dir.parent / "runs" / "subject" / "report.json"
 baseline_report_path = report_dir.parent / "runs" / "source" / "report.json"
 subject_report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -402,7 +402,7 @@ rmt_contract = {
 }
 report_payload = {
     "schema_version": "v1",
-    "run_id": "proof-pack-cli-smoke",
+    "run_id": "evidence-pack-cli-smoke",
     "artifacts": {"generated_at": "2024-01-01T00:00:00"},
     "plugins": {},
     "meta": {},
@@ -635,15 +635,15 @@ runtime_manifest = {
 )
 PY
 
-run "invarlock verify --json (fixture report)" "$CLI verify --json --profile ci \"$PROOF_PACK_REPORT_DIR/evaluation.report.json\""
+run "invarlock verify --json (fixture report)" "$CLI verify --json --profile ci \"$EVIDENCE_PACK_REPORT_DIR/evaluation.report.json\""
 run "invarlock report generate (demo run reports)" "$CLI report generate --run \"$TMP_DIR/runs/subject/report.json\" --baseline-run-report \"$TMP_DIR/runs/source/report.json\" --format report -o \"$TMP_DIR/generated_report\""
 run "invarlock report validate (demo generated report)" "$CLI report validate \"$TMP_DIR/generated_report/evaluation.report.json\""
 run "invarlock report html (demo generated report)" "$CLI report html -i \"$TMP_DIR/generated_report/evaluation.report.json\" -o \"$TMP_DIR/generated_report/evaluation.html\" --force"
 run "invarlock report explain (demo run reports)" "$CLI report explain --subject-report \"$TMP_DIR/runs/subject/report.json\" --baseline-report \"$TMP_DIR/runs/source/report.json\""
-run "invarlock advanced proof-pack keygen --json" "$CLI advanced proof-pack keygen \"$PROOF_PACK_SIGNING_KEY\" --json"
-run "invarlock advanced proof-pack build" "$CLI advanced proof-pack build \"$TMP_DIR/proof_pack_cli\" --final-verdict \"$TMP_DIR/final_verdict.json\" --source-repo \"$TMP_DIR/source_repo.json\" --environment \"$TMP_DIR/environment.json\" --material model_revisions=\"$TMP_DIR/model_revisions.json\" --report \"$PROOF_PACK_REPORT_DIR/evaluation.report.json\" --signing-key \"$PROOF_PACK_SIGNING_KEY\" --profile ci --json"
-run "invarlock advanced proof-pack inspect --json" "$CLI advanced proof-pack inspect \"$TMP_DIR/proof_pack_cli\" --json"
-run "invarlock advanced proof-pack verify --json" "$CLI advanced proof-pack verify \"$TMP_DIR/proof_pack_cli\" --json"
+run "invarlock advanced evidence-pack keygen --json" "$CLI advanced evidence-pack keygen \"$EVIDENCE_PACK_SIGNING_KEY\" --json"
+run "invarlock advanced evidence-pack build" "$CLI advanced evidence-pack build \"$TMP_DIR/evidence_pack_cli\" --final-verdict \"$TMP_DIR/final_verdict.json\" --source-repo \"$TMP_DIR/source_repo.json\" --environment \"$TMP_DIR/environment.json\" --material model_revisions=\"$TMP_DIR/model_revisions.json\" --report \"$EVIDENCE_PACK_REPORT_DIR/evaluation.report.json\" --signing-key \"$EVIDENCE_PACK_SIGNING_KEY\" --profile ci --json"
+run "invarlock advanced evidence-pack inspect --json" "$CLI advanced evidence-pack inspect \"$TMP_DIR/evidence_pack_cli\" --json"
+run "invarlock advanced evidence-pack verify --json" "$CLI advanced evidence-pack verify \"$TMP_DIR/evidence_pack_cli\" --json"
 run "invarlock advanced policy build" "$CLI advanced policy build --resolved-policy \"$TMP_DIR/resolved_policy.json\" --overrides \"$TMP_DIR/policy_overrides.json\" --compatibility \"$TMP_DIR/policy_compatibility.json\" --out \"$TMP_DIR/policy-pack.json\" --owner smoke"
 run "invarlock advanced policy verify --json" "$CLI advanced policy verify \"$TMP_DIR/policy-pack.json\" --json"
 
@@ -653,7 +653,7 @@ OFFLINE_EVAL_ENV="$OFFLINE_ENV INVARLOCK_DEDUP_TEXTS=1 INVARLOCK_TINY_RELAX=1"
 
 if have_adapters_stack; then
   if have_smoke_model_cache; then
-    run_to "invarlock evaluate (offline, local)" "$EVALUATE_TIMEOUT_SECONDS" "$OFFLINE_EVAL_ENV $CLI evaluate --execution-mode trusted-local --baseline \"$SMOKE_MODEL_ID\" --subject \"$SMOKE_MODEL_ID\" --adapter auto --profile dev --preset \"$SMOKE_PRESET\" --device cpu --out \"$TMP_DIR/report_offline_local\" --report-out \"$TMP_DIR/report_offline_local_out\""
+    run_to "invarlock evaluate (offline, local)" "$EVALUATE_TIMEOUT_SECONDS" "$OFFLINE_EVAL_ENV $CLI evaluate --execution-mode host --baseline \"$SMOKE_MODEL_ID\" --subject \"$SMOKE_MODEL_ID\" --adapter auto --profile dev --preset \"$SMOKE_PRESET\" --device cpu --out \"$TMP_DIR/report_offline_local\" --report-out \"$TMP_DIR/report_offline_local_out\""
   else
     skip_run "invarlock evaluate (offline, local)" "smoke model cache not available"
   fi
@@ -679,8 +679,8 @@ if have_adapters_stack; then
       skip_run "invarlock advanced calibrate null-sweep (network, container)" "docker daemon not available"
       skip_run "invarlock advanced calibrate ve-sweep (network, container)" "docker daemon not available"
     fi
-    run_to "invarlock evaluate (network, local)" "$EVALUATE_TIMEOUT_SECONDS" "$NET_EVAL_ENV $CLI evaluate --allow-network --execution-mode trusted-local --baseline \"$SMOKE_MODEL_ID\" --subject \"$SMOKE_MODEL_ID\" --adapter auto --profile dev --preset \"$SMOKE_PRESET\" --device cpu --out \"$TMP_DIR/report_net_local\" --report-out \"$TMP_DIR/report_net_local_out\""
-    run "invarlock verify (network local output)" "if [ -f \"$TMP_DIR/report_net_local_out/evaluation.report.json\" ]; then $CLI verify --runtime-provenance trusted-local --json \"$TMP_DIR/report_net_local_out/evaluation.report.json\"; else echo '[skip] report missing'; fi"
+    run_to "invarlock evaluate (network, local)" "$EVALUATE_TIMEOUT_SECONDS" "$NET_EVAL_ENV $CLI evaluate --allow-network --execution-mode host --baseline \"$SMOKE_MODEL_ID\" --subject \"$SMOKE_MODEL_ID\" --adapter auto --profile dev --preset \"$SMOKE_PRESET\" --device cpu --out \"$TMP_DIR/report_net_local\" --report-out \"$TMP_DIR/report_net_local_out\""
+    run "invarlock verify (network local output)" "if [ -f \"$TMP_DIR/report_net_local_out/evaluation.report.json\" ]; then $CLI verify --runtime-provenance host --json \"$TMP_DIR/report_net_local_out/evaluation.report.json\"; else echo '[skip] report missing'; fi"
     run "invarlock report validate (network local output)" "if [ -f \"$TMP_DIR/report_net_local_out/evaluation.report.json\" ]; then $CLI report validate \"$TMP_DIR/report_net_local_out/evaluation.report.json\"; else echo '[skip] report missing'; fi"
     run_to "invarlock advanced calibrate null-sweep (network, host)" "$CALIBRATE_NULL_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI advanced calibrate null-sweep --allow-network --allow-host-execution --config \"$SMOKE_CALIBRATE_NULL_CONFIG\" --out \"$TMP_DIR/calibrate_null_host\" --profile ci --device cpu --tier balanced --n-seeds 1 --seed-start 42"
     run_to "invarlock advanced calibrate ve-sweep (network, host)" "$CALIBRATE_VE_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI advanced calibrate ve-sweep --allow-network --allow-host-execution --config \"$SMOKE_CALIBRATE_VE_CONFIG\" --out \"$TMP_DIR/calibrate_ve_host\" --profile ci --device cpu --tier balanced --window 6 --n-seeds 1 --seed-start 42"

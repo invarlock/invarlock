@@ -63,7 +63,7 @@ def test_gpt2_smoke_campaign_script_is_executable() -> None:
     assert 'export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"' in contents
     assert "prefetching GPT-2 + WikiText-2 into host HF cache" in contents
     assert "evaluation report verification failed" in contents
-    assert "proof-pack verification failed" in contents
+    assert "evidence-pack verification failed" in contents
     assert 'SMOKE_EXPORT_DIR="$WORK_ROOT/exports"' in contents
     assert 'mkdir -p "$SMOKE_EXPORT_DIR"' in contents
     assert (
@@ -111,10 +111,10 @@ def test_tiny_container_smoke_campaign_script_is_executable() -> None:
         '"${CLI[@]}" report html -i "$EVAL_REPORT" -o "$SMOKE_EXPORT_DIR/evaluation.html"'
         in contents
     )
-    assert 'advanced proof-pack keygen "$PROOF_PACK_SIGNING_KEY"' in contents
-    assert '--signing-key "$PROOF_PACK_SIGNING_KEY"' in contents
+    assert 'advanced evidence-pack keygen "$EVIDENCE_PACK_SIGNING_KEY"' in contents
+    assert '--signing-key "$EVIDENCE_PACK_SIGNING_KEY"' in contents
     assert "evaluation report verification failed" in contents
-    assert "proof-pack verification failed" in contents
+    assert "evidence-pack verification failed" in contents
 
 
 def test_cli_smoke_fast_uses_repo_selected_python() -> None:
@@ -143,7 +143,7 @@ def test_cli_smoke_fast_uses_repo_selected_python() -> None:
         'run "invarlock report generate --help" "$CLI report generate --help"'
         in contents
     )
-    assert 'run "invarlock advanced proof-pack keygen --help"' in contents
+    assert 'run "invarlock advanced evidence-pack keygen --help"' in contents
     assert 'run "invarlock doctor --json"' in contents
     assert (
         '--baseline \\"$SMOKE_MODEL_ID\\" --subject \\"$SMOKE_MODEL_ID\\"' in contents

@@ -44,7 +44,7 @@ for portable local smokes. Use `--profile ci` or `--profile release` when you
 need balanced-tier evaluations to clear the standard token-floor gates.
 
 Security-default note: `evaluate` uses the runtime container by default. Use
-`--execution-mode trusted-local` only for trusted local workflows that intentionally bypass that
+`--execution-mode host` only for host-side workflows that intentionally bypass that
 boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.
 
 Smoke asset note: `configs/presets/causal_lm/gpt2_smoke_128.yaml` provides the
@@ -53,9 +53,9 @@ scheduled/workflow-dispatch GPT-2 smoke workflow. Push gating uses
 `scripts/run_tiny_container_smoke.sh` and the `Tiny Container Smoke` workflow
 with `sshleifer/tiny-gpt2` plus a local JSONL fixture. Both smoke paths run
 under the included `dev` profile so they can complete the full `evaluate` →
-`verify` → `report` commands → `proof-pack` path without depending on release-profile
-floors. The tiny push smoke also uses an explicit trusted-local execution override
-for proof-pack verification when CI produces an unsigned pack; the default
+`verify` → `report` commands → `evidence-pack` path without depending on release-profile
+floors. The tiny push smoke also uses an explicit host execution override
+for evidence-pack verification when CI produces an unsigned pack; the default
 package-native verifier behavior remains fail-closed for unsigned packs.
 
 Maintainer smoke note: the repo-wide CLI smoke matrix now lives under
@@ -84,8 +84,8 @@ GPT-2-sized path. Calibration smoke runs in that matrix use
 - [Troubleshooting](user-guide/troubleshooting.md) — Error codes and common fixes
 - [Plugins](user-guide/plugins.md) — Extending adapters and guards
 - [Bring Your Own Data](user-guide/bring-your-own-data.md) — Custom datasets
-- [Proof Packs](user-guide/proof-packs.md) — Validation suite bundles
-- [Proof Packs Internals](user-guide/proof-packs-internals.md) — Suite architecture and preset derivation flow
+- [Evidence Packs](user-guide/evidence-packs.md) — Validation suite bundles
+- [Evidence Packs Internals](user-guide/evidence-packs-internals.md) — Suite architecture and preset derivation flow
 
 ### Reference
 
@@ -156,7 +156,7 @@ to change proposals or releases when you update calibration.
 1. **Configure** – describe model, dataset, edit, and guard policies in YAML.
 2. **Execute** – run `invarlock evaluate` under a CI or release profile;
    model-loading commands use the runtime container by default unless you pass
-   `--execution-mode trusted-local`.
+   `--execution-mode host`.
 3. **Validate** – run `invarlock verify` and render HTML via `invarlock report html`;
    container-backed outputs include `runtime.manifest.json` next to
    `evaluation.report.json`.
@@ -179,14 +179,14 @@ configured acceptance envelopes even when aggressive compression is attempted.
 - Runnable documentation surfaces can be verified locally with
   `make docs-live-fast`, `python scripts/verify_live_examples.py`, or
   `make docs-live`.
-- The curated fast lane replays concrete Markdown CLI snippets in trusted-local
+- The curated fast lane replays concrete Markdown CLI snippets in host
   mode with seeded demo evidence, then smoke-runs the curated notebook subset.
 - For heavyweight notebook cells that would otherwise trigger model downloads or
   full evaluations, the curated lane reuses seeded demo reports and keeps the
   downstream contract-reading and verification steps live.
 - `make docs-live` remains the broader local lane that replays runnable
   Markdown examples and smoke-runs notebooks under `notebooks/`, using the same
-  trusted-local seeded-demo approach for heavyweight model-loading steps.
+  host seeded-demo approach for heavyweight model-loading steps.
 - Artifacts land under `tmp/live_examples/`, including per-command JSONL
   results, notebook stdout/stderr logs, and a machine-readable `summary.json`.
 - Placeholder/template snippets must remain parseable, but only concrete

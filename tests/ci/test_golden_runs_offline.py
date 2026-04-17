@@ -14,11 +14,11 @@ def test_published_basis_lanes_ship_public_evidence_references() -> None:
         evidence = lane.get("evidence", {})
         assert isinstance(evidence, dict)
         report_fixture = evidence.get("evaluation_report_fixture")
-        proof_pack_recipe = evidence.get("proof_pack_recipe")
+        evidence_pack_recipe = evidence.get("evidence_pack_recipe")
         assert isinstance(report_fixture, str) and report_fixture
-        assert isinstance(proof_pack_recipe, str) and proof_pack_recipe
+        assert isinstance(evidence_pack_recipe, str) and evidence_pack_recipe
         assert (REPO_ROOT / report_fixture).is_file(), report_fixture
-        assert (REPO_ROOT / proof_pack_recipe).is_file(), proof_pack_recipe
+        assert (REPO_ROOT / evidence_pack_recipe).is_file(), evidence_pack_recipe
 
 
 def test_packaged_public_evidence_matches_repo_public_evidence() -> None:

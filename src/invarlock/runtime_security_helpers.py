@@ -26,7 +26,7 @@ ALLOW_HOST_EXECUTION_ENV = "INVARLOCK_ALLOW_HOST_EXECUTION"
 ALLOW_NETWORK_ENV = "INVARLOCK_ALLOW_NETWORK"
 ALLOW_REMOTE_CODE_ENV = "INVARLOCK_ALLOW_REMOTE_CODE"
 ALLOW_THIRD_PARTY_PLUGINS_ENV = "INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS"
-ALLOW_UNATTESTED_ARTIFACTS_ENV = "INVARLOCK_ALLOW_UNATTESTED_ARTIFACTS"
+ALLOW_UNVERIFIED_PROVENANCE_ENV = "INVARLOCK_ALLOW_UNVERIFIED_PROVENANCE"
 CONTAINER_EXECUTION_ENV = "INVARLOCK_CONTAINER_EXECUTION"
 CONTAINER_ENGINE_ENV = "INVARLOCK_CONTAINER_ENGINE"
 RUNTIME_IMAGE_ENV = "INVARLOCK_RUNTIME_IMAGE"
@@ -47,7 +47,7 @@ __all__ = [
     "ALLOW_NETWORK_ENV",
     "ALLOW_REMOTE_CODE_ENV",
     "ALLOW_THIRD_PARTY_PLUGINS_ENV",
-    "ALLOW_UNATTESTED_ARTIFACTS_ENV",
+    "ALLOW_UNVERIFIED_PROVENANCE_ENV",
     "ContainerLaunchPlan",
     "RuntimeManifestExecution",
     "RuntimeSecurityPolicy",
@@ -81,7 +81,7 @@ __all__ = [
     "RuntimeManifestLoadResult",
     "running_inside_container",
     "third_party_plugins_allowed",
-    "unattested_artifacts_allowed",
+    "unverified_provenance_allowed",
     "write_runtime_manifest",
 ]
 
@@ -104,7 +104,7 @@ class RuntimeSecurityPolicy:
     allow_host_execution: bool = False
     allow_third_party_plugins: bool = False
     allow_remote_code: bool = False
-    allow_unattested_artifacts: bool = False
+    allow_unverified_provenance: bool = False
 
 
 @dataclass(frozen=True)
@@ -170,7 +170,7 @@ def _runtime_flag_value(name: str) -> str | None:
         ALLOW_HOST_EXECUTION_ENV: policy.allow_host_execution,
         ALLOW_THIRD_PARTY_PLUGINS_ENV: policy.allow_third_party_plugins,
         ALLOW_REMOTE_CODE_ENV: policy.allow_remote_code,
-        ALLOW_UNATTESTED_ARTIFACTS_ENV: policy.allow_unattested_artifacts,
+        ALLOW_UNVERIFIED_PROVENANCE_ENV: policy.allow_unverified_provenance,
     }
     if name not in flag_map:
         return os.environ.get(name)
@@ -219,8 +219,8 @@ def remote_code_allowed() -> bool:
     return _coerce_bool(_runtime_flag_value(ALLOW_REMOTE_CODE_ENV)) is True
 
 
-def unattested_artifacts_allowed() -> bool:
-    return _coerce_bool(_runtime_flag_value(ALLOW_UNATTESTED_ARTIFACTS_ENV)) is True
+def unverified_provenance_allowed() -> bool:
+    return _coerce_bool(_runtime_flag_value(ALLOW_UNVERIFIED_PROVENANCE_ENV)) is True
 
 
 def third_party_plugins_allowed() -> bool:
@@ -280,12 +280,12 @@ def _runtime_provenance_image_ref(image_ref: str, image_digest: str | None) -> s
         return image_ref
     if image_digest:
         return f"{image_ref}@{image_digest}"
-    if unattested_artifacts_allowed():
+    if unverified_provenance_allowed():
         return image_ref
     raise RuntimeError(
         "Container-backed runtime manifests require a digest-pinned runtime image; "
         f"set {RUNTIME_IMAGE_DIGEST_ENV}, use {RUNTIME_IMAGE_LOCAL_DEFAULT!r}, "
-        "or allow unattested artifacts explicitly."
+        "or allow unverified provenance explicitly."
     )
 
 
@@ -391,14 +391,14 @@ def build_runtime_security_policy(
     allow_host_execution: bool = False,
     allow_third_party_plugins: bool = False,
     allow_remote_code: bool = False,
-    allow_unattested_artifacts: bool = False,
+    allow_unverified_provenance: bool = False,
 ) -> RuntimeSecurityPolicy:
     return RuntimeSecurityPolicy(
         allow_network=bool(allow_network),
         allow_host_execution=bool(allow_host_execution),
         allow_third_party_plugins=bool(allow_third_party_plugins),
         allow_remote_code=bool(allow_remote_code),
-        allow_unattested_artifacts=bool(allow_unattested_artifacts),
+        allow_unverified_provenance=bool(allow_unverified_provenance),
     )
 
 
@@ -413,7 +413,7 @@ def _resolve_runtime_security_policy(
     allow_host_execution: bool = False,
     allow_third_party_plugins: bool = False,
     allow_remote_code: bool = False,
-    allow_unattested_artifacts: bool = False,
+    allow_unverified_provenance: bool = False,
 ) -> RuntimeSecurityPolicy:
     if policy is not None:
         return policy
@@ -422,7 +422,7 @@ def _resolve_runtime_security_policy(
         allow_host_execution=allow_host_execution,
         allow_third_party_plugins=allow_third_party_plugins,
         allow_remote_code=allow_remote_code,
-        allow_unattested_artifacts=allow_unattested_artifacts,
+        allow_unverified_provenance=allow_unverified_provenance,
     )
 
 
@@ -447,7 +447,7 @@ def apply_runtime_allowances(
     allow_host_execution: bool = False,
     allow_third_party_plugins: bool = False,
     allow_remote_code: bool = False,
-    allow_unattested_artifacts: bool = False,
+    allow_unverified_provenance: bool = False,
 ) -> Token[RuntimeSecurityPolicy | None]:
     resolved_policy = _resolve_runtime_security_policy(
         policy=policy,
@@ -455,7 +455,7 @@ def apply_runtime_allowances(
         allow_host_execution=allow_host_execution,
         allow_third_party_plugins=allow_third_party_plugins,
         allow_remote_code=allow_remote_code,
-        allow_unattested_artifacts=allow_unattested_artifacts,
+        allow_unverified_provenance=allow_unverified_provenance,
     )
     return _apply_runtime_security_policy(resolved_policy)
 
@@ -481,7 +481,7 @@ def runtime_allowances_scope(
     allow_host_execution: bool = False,
     allow_third_party_plugins: bool = False,
     allow_remote_code: bool = False,
-    allow_unattested_artifacts: bool = False,
+    allow_unverified_provenance: bool = False,
 ) -> Iterator[RuntimeSecurityPolicy]:
     resolved_policy = _resolve_runtime_security_policy(
         policy=policy,
@@ -489,7 +489,7 @@ def runtime_allowances_scope(
         allow_host_execution=allow_host_execution,
         allow_third_party_plugins=allow_third_party_plugins,
         allow_remote_code=allow_remote_code,
-        allow_unattested_artifacts=allow_unattested_artifacts,
+        allow_unverified_provenance=allow_unverified_provenance,
     )
     token = apply_runtime_allowances(policy=resolved_policy)
     try:

@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+REMOVED_HOST_MODE_TOKEN = "trusted" + "-local"
 
 
 def _read(path: str) -> str:
@@ -32,7 +33,7 @@ def test_core_docs_do_not_promote_removed_top_level_commands():
     ]
     banned = [
         "invarlock run",
-        "invarlock proof-pack",
+        "invarlock evidence-pack",
         "invarlock policy",
         "plugins install",
         "plugins uninstall",
@@ -61,7 +62,7 @@ def test_public_compare_examples_use_baseline_subject_terms() -> None:
         assert "--edited " not in text, f"--edited still present in {rel_path}"
 
 
-def test_support_surfaces_use_trusted_local_assurance_for_public_evaluate_examples():
+def test_support_surfaces_use_host_mode_assurance_for_public_evaluate_examples():
     surfaces = [
         "CONTRIBUTING.md",
         "configs/README.md",
@@ -75,8 +76,8 @@ def test_support_surfaces_use_trusted_local_assurance_for_public_evaluate_exampl
 
     for rel_path in surfaces:
         text = _read(rel_path)
-        assert "--execution-mode trusted-local" in text, (
-            f"--execution-mode trusted-local missing from {rel_path}"
+        assert "--execution-mode host" in text, (
+            f"--execution-mode host missing from {rel_path}"
         )
         assert "INVARLOCK_ALLOW_HOST_EXECUTION=1" not in text, (
             f"legacy host-execution env still promoted in {rel_path}"
@@ -104,7 +105,7 @@ def test_support_surfaces_do_not_teach_removed_public_top_level_commands():
             assert needle not in text, f"{needle} still present in {rel_path}"
 
 
-def test_public_security_and_reference_docs_use_trusted_local_assurance_for_public_host_runs():
+def test_public_security_and_reference_docs_use_host_mode_assurance_for_public_host_runs():
     surfaces = [
         "docs/reference/datasets.md",
         "docs/security/best-practices.md",
@@ -115,16 +116,32 @@ def test_public_security_and_reference_docs_use_trusted_local_assurance_for_publ
 
     for rel_path in surfaces:
         text = _read(rel_path)
-        assert "--execution-mode trusted-local" in text, (
-            f"--execution-mode trusted-local missing from {rel_path}"
+        assert "--execution-mode host" in text, (
+            f"--execution-mode host missing from {rel_path}"
         )
 
 
-def test_proof_pack_docs_keep_repo_wrappers_advanced_and_use_current_verify_surface():
-    text = _read("docs/user-guide/proof-packs.md")
+def test_public_docs_do_not_mention_removed_trusted_local_mode() -> None:
+    surfaces = [
+        "README.md",
+        "docs/README.md",
+        "docs/reference/cli.md",
+        "docs/user-guide/quickstart.md",
+        "docs/user-guide/compare-and-evaluate.md",
+    ]
+
+    for rel_path in surfaces:
+        text = _read(rel_path)
+        assert REMOVED_HOST_MODE_TOKEN not in text, (
+            f"removed legacy host-mode term still present in {rel_path}"
+        )
+
+
+def test_evidence_pack_docs_keep_repo_wrappers_advanced_and_use_current_verify_surface():
+    text = _read("docs/user-guide/evidence-packs.md")
     assert "repo-only" in text
-    assert "invarlock advanced proof-pack verify" in text
-    assert "invarlock proof-pack verify" not in text
+    assert "invarlock advanced evidence-pack verify" in text
+    assert "invarlock evidence-pack verify" not in text
     assert "invarlock run" not in text
     assert "--allow-host-execution" not in text
 

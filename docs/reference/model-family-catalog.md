@@ -65,10 +65,10 @@ out of declared support lanes and included preset inventory.
 
 | Family | State | Representative models | Notes |
 | --- | --- | --- | --- |
-| Qwen2.5 family | `usage_only` | `Qwen/Qwen2.5-7B`, `Qwen/Qwen2.5-32B` | Used in proof-pack suites and validation defaults outside the declared Qwen2.5 14B support lane. |
-| Qwen1.5 72B | `usage_only` | `Qwen/Qwen1.5-72B` | Used concretely in proof-pack suites. |
-| Yi 34B | `usage_only` | `01-ai/Yi-34B` | Used in workshop and full proof-pack suites. |
-| Mixtral 8x7B | `usage_only` | `mistralai/Mixtral-8x7B-v0.1` | Used in proof-pack flows without a public support lane. |
+| Qwen2.5 family | `usage_only` | `Qwen/Qwen2.5-7B`, `Qwen/Qwen2.5-32B` | Used in evidence-pack suites and validation defaults outside the declared Qwen2.5 14B support lane. |
+| Qwen1.5 72B | `usage_only` | `Qwen/Qwen1.5-72B` | Used concretely in evidence-pack suites. |
+| Yi 34B | `usage_only` | `01-ai/Yi-34B` | Used in workshop and full evidence-pack suites. |
+| Mixtral 8x7B | `usage_only` | `mistralai/Mixtral-8x7B-v0.1` | Used in evidence-pack flows without a public support lane. |
 
 ## Recommended Additions
 

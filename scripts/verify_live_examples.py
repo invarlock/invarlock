@@ -128,7 +128,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--markdown-execution-mode",
         default="container",
-        choices=("container", "trusted-local"),
+        choices=("container", "host"),
         help=(
             "Execution mode forwarded to verify_markdown_bash_blocks.py for "
             "markdown command replay."

@@ -3,7 +3,7 @@
 ## Overview
 
 This page documents the stable public contracts that InvarLock exposes for
-reports, verification, proof packs, calibration artifacts, and policy packs.
+reports, verification, evidence packs, calibration artifacts, and policy packs.
 These contracts are intended to be consumed as-is by automation, review, and
 auditing workflows.
 
@@ -12,7 +12,7 @@ The public contract surface covers:
 - `evaluation.report.json` semantics and report schema validation
 - `invarlock verify` JSON and exit semantics, including runtime-manifest
   provenance for container-backed outputs via `runtime.manifest.json`
-- proof-pack manifest format and strict verification rules
+- evidence-pack manifest format and strict verification rules
 - plugin ABI compatibility rules
 - adapter capability metadata
 - runtime tiers/profiles and calibration artifact semantics
@@ -27,7 +27,7 @@ The public contract surface covers:
 | Adapter capabilities | `contracts/adapter_capabilities.json` | Snapshot/restore, guard coverage, runtime limits, extras |
 | Plugin compatibility | `contracts/plugin_compatibility.json` | Core ABI policy and failure mode |
 | Runtime manifest | `contracts/runtime_manifest.schema.json` | Runtime provenance schema for `runtime.manifest.json` sidecars |
-| Proof-pack manifest | `contracts/proof_pack_manifest.schema.json` | Portable pack manifest schema for `verify_pack.sh`, including builder/subject/material signed provenance fields |
+| Evidence-pack manifest | `contracts/evidence_pack_manifest.schema.json` | Portable pack manifest schema for `verify_pack.sh`, including builder/subject/material signed provenance fields |
 | Policy pack | `contracts/policy_pack.schema.json` | Build/verify contract for Git-native policy packs |
 | Validation keys | `contracts/validation_keys.json` | Allow-list for report validation flags |
 | Console labels | `contracts/console_labels.json` | Stable report console labels |
@@ -52,16 +52,16 @@ The CLI exposes these contracts directly:
 - `invarlock-runtime-verify --json`
 - `invarlock advanced plugins adapters --json`
 - `invarlock doctor --json`
-- `invarlock advanced proof-pack verify --json`
+- `invarlock advanced evidence-pack verify --json`
 - `invarlock advanced policy build`
 - `invarlock advanced policy verify`
-- `scripts/proof_packs/verify_pack.sh --strict`
+- `scripts/evidence_packs/verify_pack.sh --strict`
 
 The first seven surfaces are available from installed packages. The low-level
 `invarlock-runtime-verify` command is the package-native runtime-manifest
 verifier used for direct report/manifest checks. The repo shell
-verifier remains available for proof-pack workflow maintainers, and pure wheel
-installs can verify packs with `invarlock advanced proof-pack verify`.
+verifier remains available for evidence-pack workflow maintainers, and pure wheel
+installs can verify packs with `invarlock advanced evidence-pack verify`.
 
 Third-party plugins are fail-closed on ABI declaration: adapters, edits, and
 guards must declare `INVARLOCK_CORE_ABI`, and the value must match the exact

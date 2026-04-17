@@ -73,7 +73,7 @@ documented tiers and environments, not a universal guarantee about model safety.
 
 - Every assurance-critical guard links to a short assurance note and an automated test.
 - The report verifier enforces **log‑space math** and **pairing** at runtime.
-- Observability fields make the assurance case auditable in reports and proof packs.
+- Observability fields make the assurance case auditable in reports and evidence packs.
 
 > Tier scope: Balanced and Conservative are the supported published assurance tiers. The Aggressive tier is research‑oriented and not covered by this assurance case. The `none` tier is provided only for dev/demo flows (loosest gates) and is **explicitly outside** the assurance case.
 

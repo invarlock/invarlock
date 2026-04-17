@@ -213,7 +213,7 @@ def _run_baseline_evaluation_phase(
     allow_host_execution: bool,
     allow_third_party_plugins: bool,
     allow_remote_code: bool,
-    allow_unattested_artifacts: bool,
+    allow_unverified_provenance: bool,
     prefer_local_files_only: bool,
     no_color: bool,
     baseline_cfg: dict[str, Any],
@@ -242,7 +242,7 @@ def _run_baseline_evaluation_phase(
         allow_host_execution=allow_host_execution,
         allow_third_party_plugins=allow_third_party_plugins,
         allow_remote_code=allow_remote_code,
-        allow_unattested_artifacts=allow_unattested_artifacts,
+        allow_unverified_provenance=allow_unverified_provenance,
         prefer_local_files_only=prefer_local_files_only,
         no_color=no_color,
         baseline_cfg=baseline_cfg,
@@ -286,7 +286,7 @@ def _run_subject_evaluation_phase(
     allow_host_execution: bool,
     allow_third_party_plugins: bool,
     allow_remote_code: bool,
-    allow_unattested_artifacts: bool,
+    allow_unverified_provenance: bool,
     prefer_local_files_only: bool,
     no_color: bool,
     tmp_dir: Path,
@@ -319,7 +319,7 @@ def _run_subject_evaluation_phase(
         allow_host_execution=allow_host_execution,
         allow_third_party_plugins=allow_third_party_plugins,
         allow_remote_code=allow_remote_code,
-        allow_unattested_artifacts=allow_unattested_artifacts,
+        allow_unverified_provenance=allow_unverified_provenance,
         prefer_local_files_only=prefer_local_files_only,
         no_color=no_color,
         tmp_dir=tmp_dir,
@@ -370,12 +370,12 @@ def evaluate_command(
         )
     except ValueError as exc:
         raise typer.BadParameter(
-            "Execution mode must be one of: container, trusted-local.",
+            "Execution mode must be one of: container, host.",
             param_hint="--execution-mode",
         ) from exc
     allow_host_execution = execution_policy.allow_host_execution
     prefer_local_files_only = execution_policy.prefer_local_files_only
-    allow_unattested_artifacts = execution_policy.allow_unattested_artifacts
+    allow_unverified_provenance = execution_policy.allow_unverified_provenance
     maybe_delegate_model_command()
 
     verbosity = _resolve_verbosity(bool(quiet), bool(verbose))
@@ -476,7 +476,7 @@ def evaluate_command(
         allow_host_execution=allow_host_execution,
         allow_third_party_plugins=allow_third_party_plugins,
         allow_remote_code=allow_remote_code,
-        allow_unattested_artifacts=allow_unattested_artifacts,
+        allow_unverified_provenance=allow_unverified_provenance,
         prefer_local_files_only=prefer_local_files_only,
         no_color=no_color,
         baseline_cfg=baseline_cfg,
@@ -515,7 +515,7 @@ def evaluate_command(
         allow_host_execution=allow_host_execution,
         allow_third_party_plugins=allow_third_party_plugins,
         allow_remote_code=allow_remote_code,
-        allow_unattested_artifacts=allow_unattested_artifacts,
+        allow_unverified_provenance=allow_unverified_provenance,
         prefer_local_files_only=prefer_local_files_only,
         no_color=no_color,
         tmp_dir=tmp_dir,

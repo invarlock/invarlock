@@ -238,7 +238,7 @@ def _evaluate_lazy(
     execution_mode: ExecutionMode = typer.Option(
         ExecutionMode.CONTAINER,
         "--execution-mode",
-        help="Execution mode for evaluation (container|trusted-local).",
+        help="Execution mode for evaluation (container|host).",
         case_sensitive=False,
     ),
     no_color: bool = typer.Option(
@@ -391,7 +391,7 @@ def _verify_typed(
     runtime_provenance: RuntimeProvenanceMode = typer.Option(
         RuntimeProvenanceMode.CONTAINER,
         "--runtime-provenance",
-        help="Runtime provenance mode for verification (container|trusted-local).",
+        help="Runtime provenance mode for verification (container|host).",
     ),
 ):
     from pathlib import Path as _Path

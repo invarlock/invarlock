@@ -17,8 +17,8 @@ nav:
       - Configuration Gallery: user-guide/config-gallery.md
       - Example Reports: user-guide/example-reports.md
       - Reading a Report: user-guide/reading-report.md
-      - Proof Packs: user-guide/proof-packs.md
-      - Proof Pack Internals: user-guide/proof-packs-internals.md
+      - Evidence Packs: user-guide/evidence-packs.md
+      - Evidence Pack Internals: user-guide/evidence-packs-internals.md
       - Troubleshooting: user-guide/troubleshooting.md
   - CLI Reference:
       - CLI Overview: reference/cli.md

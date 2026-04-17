@@ -143,7 +143,7 @@ def test_phase5_split_modules_exist() -> None:
         REPO_ROOT / "src/invarlock/guards/policies_presets.py",
         REPO_ROOT / "src/invarlock/guards/policies_resolution.py",
         REPO_ROOT / "src/invarlock/guards/policies_validation.py",
-        REPO_ROOT / "src/invarlock/proof_pack_support.py",
+        REPO_ROOT / "src/invarlock/evidence_pack_support.py",
     )
 
     missing = [
@@ -243,8 +243,8 @@ def test_phase5_orchestrator_owner_modules_do_not_cross_regrow() -> None:
 def test_phase5_large_modules_do_not_regrow() -> None:
     thresholds = {
         REPO_ROOT / "src/invarlock/model_profile.py": 650,
-        REPO_ROOT / "src/invarlock/proof_pack.py": 650,
-        REPO_ROOT / "src/invarlock/proof_pack_support.py": 650,
+        REPO_ROOT / "src/invarlock/evidence_pack.py": 650,
+        REPO_ROOT / "src/invarlock/evidence_pack_support.py": 650,
         REPO_ROOT / "src/invarlock/runtime_security_helpers.py": 650,
         REPO_ROOT / "src/invarlock/reporting/verify_check_helpers.py": 650,
         REPO_ROOT / "src/invarlock/reporting/verify_check_helpers_impl.py": 650,

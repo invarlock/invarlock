@@ -22,7 +22,7 @@ class EvaluateExecutionPolicy:
     execution_mode: str
     allow_host_execution: bool
     prefer_local_files_only: bool
-    allow_unattested_artifacts: bool
+    allow_unverified_provenance: bool
 
 
 @dataclass(frozen=True)
@@ -69,14 +69,14 @@ def resolve_evaluate_execution_policy(
     allow_host_execution: bool,
 ) -> EvaluateExecutionPolicy:
     normalized_execution_mode = stable_text(execution_mode, "container").strip().lower()
-    trusted_local = normalized_execution_mode == "trusted-local"
-    if normalized_execution_mode not in {"container", "trusted-local"}:
-        raise ValueError("Execution mode must be one of: container, trusted-local.")
+    host_mode = normalized_execution_mode == "host"
+    if normalized_execution_mode not in {"container", "host"}:
+        raise ValueError("Execution mode must be one of: container, host.")
     return EvaluateExecutionPolicy(
         execution_mode=normalized_execution_mode,
-        allow_host_execution=allow_host_execution or trusted_local,
-        prefer_local_files_only=trusted_local,
-        allow_unattested_artifacts=trusted_local,
+        allow_host_execution=allow_host_execution or host_mode,
+        prefer_local_files_only=host_mode,
+        allow_unverified_provenance=host_mode,
     )
 
 

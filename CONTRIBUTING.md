@@ -17,13 +17,13 @@ high-quality PRs that match the repo layout and tooling.
 
 InvarLock runs offline by default. For commands that need downloads
 (models/datasets), enable network explicitly per run. Model-loading commands use
-the runtime container by default; trusted local development outside that
-container should use `--execution-mode trusted-local` on the public `evaluate` path:
+the runtime container by default; host-side development outside that
+container should use `--execution-mode host` on the public `evaluate` path:
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --execution-mode trusted-local --baseline gpt2 --subject distilgpt2 --adapter auto
+INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --execution-mode host --baseline gpt2 --subject distilgpt2 --adapter auto
 # repo preset example:
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --execution-mode trusted-local --baseline gpt2 --subject gpt2 --adapter auto --preset configs/presets/causal_lm/wikitext2_512.yaml --profile ci
+INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --execution-mode host --baseline gpt2 --subject gpt2 --adapter auto --preset configs/presets/causal_lm/wikitext2_512.yaml --profile ci
 ```
 
 ### 1.2 Quick setup (recommended)

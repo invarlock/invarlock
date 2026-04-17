@@ -16,7 +16,7 @@ def test_configure_runtime_security_forwards_allowances(
         allow_host_execution=True,
         allow_third_party_plugins=True,
         allow_remote_code=True,
-        allow_unattested_artifacts=True,
+        allow_unverified_provenance=True,
     )
 
     def _capture(**kwargs: object) -> object:
@@ -38,24 +38,24 @@ def test_configure_runtime_security_forwards_allowances(
         allow_host_execution=True,
         allow_third_party_plugins=True,
         allow_remote_code=True,
-        allow_unattested_artifacts=True,
+        allow_unverified_provenance=True,
     ):
         assert captured == {"policy": policy}
 
     assert resets == [reset_token]
 
 
-def test_verify_runtime_provenance_short_circuits_when_unattested_allowed(
+def test_verify_runtime_provenance_short_circuits_when_unverified_provenance_allowed(
     monkeypatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(provenance, "unattested_artifacts_allowed", lambda: False)
+    monkeypatch.setattr(provenance, "unverified_provenance_allowed", lambda: False)
     result = provenance.verify_runtime_provenance(
-        tmp_path / "report.json", allow_unattested=True
+        tmp_path / "report.json", allow_unverified=True
     )
     assert result.skipped is True
     assert result.issues == ()
 
-    monkeypatch.setattr(provenance, "unattested_artifacts_allowed", lambda: True)
+    monkeypatch.setattr(provenance, "unverified_provenance_allowed", lambda: True)
     result = provenance.verify_runtime_provenance(tmp_path / "report.json")
     assert result.skipped is True
     assert result.issues == ()
@@ -67,7 +67,7 @@ def test_verify_runtime_provenance_handles_missing_manifest(
     report = tmp_path / "report.json"
     manifest = tmp_path / "runtime.manifest.json"
 
-    monkeypatch.setattr(provenance, "unattested_artifacts_allowed", lambda: False)
+    monkeypatch.setattr(provenance, "unverified_provenance_allowed", lambda: False)
     monkeypatch.setattr(
         provenance,
         "load_runtime_manifest",
@@ -93,7 +93,7 @@ def test_verify_runtime_provenance_rejects_non_container_execution_mode(
     report = tmp_path / "report.json"
     manifest = tmp_path / "runtime.manifest.json"
 
-    monkeypatch.setattr(provenance, "unattested_artifacts_allowed", lambda: False)
+    monkeypatch.setattr(provenance, "unverified_provenance_allowed", lambda: False)
     monkeypatch.setattr(
         provenance,
         "load_runtime_manifest",
@@ -115,7 +115,7 @@ def test_verify_runtime_provenance_uses_python_runtime_verifier(
     report = tmp_path / "report.json"
     manifest = tmp_path / "runtime.manifest.json"
 
-    monkeypatch.setattr(provenance, "unattested_artifacts_allowed", lambda: False)
+    monkeypatch.setattr(provenance, "unverified_provenance_allowed", lambda: False)
     monkeypatch.setattr(
         provenance,
         "load_runtime_manifest",
@@ -146,7 +146,7 @@ def test_verify_runtime_provenance_reports_python_verifier_failures(
     report = tmp_path / "report.json"
     manifest = tmp_path / "runtime.manifest.json"
 
-    monkeypatch.setattr(provenance, "unattested_artifacts_allowed", lambda: False)
+    monkeypatch.setattr(provenance, "unverified_provenance_allowed", lambda: False)
     monkeypatch.setattr(
         provenance,
         "load_runtime_manifest",
@@ -180,7 +180,7 @@ def test_verify_runtime_provenance_distinguishes_invalid_manifest(
     report = tmp_path / "report.json"
     manifest = tmp_path / "runtime.manifest.json"
 
-    monkeypatch.setattr(provenance, "unattested_artifacts_allowed", lambda: False)
+    monkeypatch.setattr(provenance, "unverified_provenance_allowed", lambda: False)
     monkeypatch.setattr(
         provenance,
         "load_runtime_manifest",

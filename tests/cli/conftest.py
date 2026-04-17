@@ -34,16 +34,16 @@ def _should_auto_seed_runtime_provenance(node: pytest.FixtureRequest) -> bool:
     path = Path(str(node.node.path))
     return (
         path.name.startswith("test_verify")
-        or path.name == "test_proof_pack_commands.py"
+        or path.name == "test_evidence_pack_commands.py"
     ) and path.name != "test_verify_runtime_provenance.py"
 
 
-def _should_preserve_secure_default_cli_test(node: pytest.FixtureRequest) -> bool:
+def _should_preserve_container_default_cli_test(node: pytest.FixtureRequest) -> bool:
     path = Path(str(node.node.path))
     return path.name in {
         "test_container_delegation.py",
-        "test_security_default_container_contract.py",
-        "test_security_default_model_mounts.py",
+        "test_container_default_contract.py",
+        "test_container_default_model_mounts.py",
     }
 
 
@@ -52,7 +52,7 @@ def _default_cli_host_execution(
     monkeypatch: pytest.MonkeyPatch,
     request: pytest.FixtureRequest,
 ) -> Generator[None, None, None]:
-    if _should_preserve_secure_default_cli_test(request):
+    if _should_preserve_container_default_cli_test(request):
         yield
         return
 
@@ -118,13 +118,13 @@ def _auto_seed_verify_runtime_provenance(
     def _verify_runtime_provenance(
         report_path: str | Path,
         *,
-        allow_unattested: bool = False,
+        allow_unverified: bool = False,
     ):
-        if not allow_unattested:
+        if not allow_unverified:
             _write_test_runtime_manifest(Path(report_path))
         return original_verify_runtime_provenance(
             report_path,
-            allow_unattested=allow_unattested,
+            allow_unverified=allow_unverified,
         )
 
     monkeypatch.setattr(

@@ -14,10 +14,10 @@ Use the steps below to reproduce representative artifacts from this repository v
 
 ## 1. Generate a report Bundle
 
-The command below shows the secure-default runtime-container path. It writes an
-container-backed `runtime.manifest.json` next to `evaluation.report.json`. Trusted
-public host-side workflows use `--execution-mode trusted-local` and should verify the
-resulting report with `invarlock verify --runtime-provenance trusted-local ...`.
+The command below shows the default runtime-container path. It writes a
+container-backed `runtime.manifest.json` next to `evaluation.report.json`.
+Public host-side workflows use `--execution-mode host` and should verify the
+resulting report with `invarlock verify --runtime-provenance host ...`.
 
 ```bash
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
@@ -68,7 +68,7 @@ For audits, collect the following files:
 |------|---------|
 | `runs/<name>/**/report.json` | Execution log, metrics, and guard telemetry |
 | `reports/<name>/evaluation.report.json` | Machine-readable evaluation report |
-| `reports/<name>/runtime.manifest.json` | Runtime provenance for secure-default outputs |
+| `reports/<name>/runtime.manifest.json` | Runtime provenance for container-backed outputs |
 | `reports/<name>/evaluation_report.md` | Human-friendly summary for reviewers |
 
 Reports remain valid only for the same baseline reference, pairing assumptions,

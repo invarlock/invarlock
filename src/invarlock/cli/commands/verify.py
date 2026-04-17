@@ -27,15 +27,15 @@ from .._json import emit as _emit_json
 console = Console()
 
 
-def _allow_unattested_artifacts_for_runtime_provenance(
+def _allow_unverified_provenance_for_runtime_provenance(
     runtime_provenance: str,
 ) -> bool:
     normalized_runtime_provenance = str(runtime_provenance or "").strip().lower()
     if normalized_runtime_provenance == "container":
         return False
-    if normalized_runtime_provenance == "trusted-local":
+    if normalized_runtime_provenance == "host":
         return True
-    raise ValueError("Runtime provenance must be one of: container, trusted-local.")
+    raise ValueError("Runtime provenance must be one of: container, host.")
 
 
 def _render_verify_diagnostic(diagnostic: VerifyDiagnostic) -> None:
@@ -92,8 +92,8 @@ def verify_command(
         baseline=baseline,
         tolerance=tolerance,
         profile=profile,
-        allow_unattested_artifacts=(
-            _allow_unattested_artifacts_for_runtime_provenance(runtime_provenance)
+        allow_unverified_provenance=(
+            _allow_unverified_provenance_for_runtime_provenance(runtime_provenance)
         ),
         json_mode=bool(json_out),
     )

@@ -14,10 +14,10 @@ from invarlock.core.exceptions import ConfigError
 from invarlock.reporting import verify_contract as verify_mod
 
 
-def _attestation_gate_cert() -> dict:
+def _provenance_gate_cert() -> dict:
     return {
         "schema_version": "v1",
-        "run_id": "runtime-attestation-gate",
+        "run_id": "runtime-provenance-gate",
         "artifacts": {"generated_at": "2024-01-01T00:00:00Z"},
         "plugins": {},
         "meta": {},
@@ -60,7 +60,7 @@ def test_verify_fails_closed_without_runtime_manifest(
     monkeypatch,
 ) -> None:
     cert_path = tmp_path / "evaluation.report.json"
-    cert_path.write_text(json.dumps(_attestation_gate_cert()), encoding="utf-8")
+    cert_path.write_text(json.dumps(_provenance_gate_cert()), encoding="utf-8")
     monkeypatch.setattr(
         verify_mod, "_validate_evaluation_report_payload", lambda *args, **kwargs: []
     )
@@ -74,19 +74,19 @@ def test_verify_fails_closed_without_runtime_manifest(
     result = CliRunner().invoke(
         app,
         ["verify", str(cert_path)],
-        env={"INVARLOCK_ALLOW_UNATTESTED_ARTIFACTS": "0"},
+        env={"INVARLOCK_ALLOW_UNVERIFIED_PROVENANCE": "0"},
     )
 
     assert result.exit_code == 1
     assert "runtime.manifest.json missing for" in result.output
 
 
-def test_verify_allows_unattested_override(
+def test_verify_allows_unverified_provenance_override(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
     cert_path = tmp_path / "evaluation.report.json"
-    cert_path.write_text(json.dumps(_attestation_gate_cert()), encoding="utf-8")
+    cert_path.write_text(json.dumps(_provenance_gate_cert()), encoding="utf-8")
     monkeypatch.setattr(
         verify_mod, "_validate_evaluation_report_payload", lambda *args, **kwargs: []
     )
@@ -99,8 +99,8 @@ def test_verify_allows_unattested_override(
 
     result = CliRunner().invoke(
         app,
-        ["verify", "--runtime-provenance", "trusted-local", str(cert_path)],
-        env={"INVARLOCK_ALLOW_UNATTESTED_ARTIFACTS": "0"},
+        ["verify", "--runtime-provenance", "host", str(cert_path)],
+        env={"INVARLOCK_ALLOW_UNVERIFIED_PROVENANCE": "0"},
     )
 
     assert result.exit_code == 0
@@ -112,7 +112,7 @@ def test_verify_command_rejects_invalid_runtime_provenance_value(
 ) -> None:
     with pytest.raises(
         ValueError,
-        match="Runtime provenance must be one of: container, trusted-local.",
+        match="Runtime provenance must be one of: container, host.",
     ):
         verify_command(
             [tmp_path / "evaluation.report.json"],

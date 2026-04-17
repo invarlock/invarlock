@@ -47,7 +47,7 @@ invarlock report explain \
 
 - `evaluate` defaults to `--execution-mode container`, which delegates model-loading work
   into the runtime container.
-- Use `--execution-mode trusted-local` only for trusted local workflows that intentionally
+- Use `--execution-mode host` only for host-side workflows that intentionally
   bypass the container boundary.
 - `verify` expects `runtime.manifest.json` beside container-backed evaluation outputs
   and fails closed when required runtime provenance is missing.
@@ -62,7 +62,7 @@ invarlock report explain \
 | Render HTML from an evaluation report | `invarlock report html` | HTML file |
 | Explain gate decisions from run reports | `invarlock report explain` | Human-readable explanation |
 | Inspect environment health | `invarlock doctor` | Human or JSON diagnostics |
-| Proof-pack, policy, plugin, or calibration workflows | `invarlock advanced ...` | Advanced artifacts and diagnostics |
+| Evidence-pack, policy, plugin, or calibration workflows | `invarlock advanced ...` | Advanced artifacts and diagnostics |
 
 ## Artifact Outputs Matrix
 
@@ -73,7 +73,7 @@ invarlock report explain \
 | `invarlock report html` | No | Yes (`--output`) | Renders HTML from an existing report |
 | `invarlock report explain` | No | No | Reads existing baseline and subject run report JSON files (not evaluation.report.json) |
 | `invarlock doctor` | No | No | Diagnostics only |
-| `invarlock advanced proof-pack` | Depends on subcommand | Depends on subcommand | Advanced evidence packaging |
+| `invarlock advanced evidence-pack` | Depends on subcommand | Depends on subcommand | Advanced evidence packaging |
 | `invarlock advanced policy` | Depends on subcommand | No | Advanced policy-pack tooling |
 | `invarlock advanced plugins` | No | No | Read-only plugin discovery and explanation |
 | `invarlock advanced calibrate` | Yes | Yes | Advanced tier-policy calibration workflows |
@@ -86,7 +86,7 @@ invarlock report explain \
 | `invarlock verify` | Verify evaluation reports against schema, pairing, and runtime provenance rules |
 | `invarlock report` | Explain, render, and validate existing report artifacts |
 | `invarlock doctor` | Diagnose environment and configuration issues |
-| `invarlock advanced` | Advanced proof-pack, policy, plugin, and calibration workflows |
+| `invarlock advanced` | Advanced evidence-pack, policy, plugin, and calibration workflows |
 | `invarlock version` | Show the installed version |
 
 Exit codes: `0=success`, `1=generic failure`, `2=usage/schema/config failure`,
@@ -108,10 +108,10 @@ Common options:
 - `--preset`: optional repo preset path
 - `--out`: run-artifact directory
 - `--report-out`: evaluation report directory
-- `--execution-mode container|trusted-local`: execution policy for `evaluate`.
-  `container` keeps model loading inside the runtime container; `trusted-local`
-  allows trusted local execution and produces trusted-local artifacts that should
-  be verified with `verify --runtime-provenance trusted-local`.
+- `--execution-mode container|host`: execution policy for `evaluate`.
+  `container` keeps model loading inside the runtime container; `host`
+  allows host-side execution and produces host artifacts that should
+  be verified with `verify --runtime-provenance host`.
 - `--edit-config`: optional demo/smoke edit overlay such as `quant_rtn`
 
 Example:
@@ -140,7 +140,7 @@ Common options:
 - `--baseline`: optional baseline report for comparison flows
 - `--tolerance`: float tolerance for recompute checks
 - `--profile`: profile-aware validation mode
-- `--runtime-provenance container|trusted-local`: runtime provenance policy for
+- `--runtime-provenance container|host`: runtime provenance policy for
   the supplied report artifacts
 - `--json`: emit a single JSON envelope
 
@@ -219,8 +219,8 @@ outside the core product contract.
 
 Subcommands:
 
-- `invarlock advanced proof-pack`
-  - Inspect, build, and verify proof-pack evidence bundles
+- `invarlock advanced evidence-pack`
+  - Inspect, build, and verify evidence packs
 - `invarlock advanced policy`
   - Build and verify policy-pack artifacts
 - `invarlock advanced plugins`
@@ -231,7 +231,7 @@ Subcommands:
 Examples:
 
 ```bash
-invarlock advanced proof-pack verify <pack> --strict
+invarlock advanced evidence-pack verify <pack> --strict
 invarlock advanced policy verify policy-pack.json --json
 invarlock advanced plugins list --json
 invarlock advanced calibrate --help
@@ -266,7 +266,7 @@ plugin surfaces.
 
 - `invarlock verify --json`
 - `invarlock advanced plugins list --json`
-- `invarlock advanced proof-pack verify --json`
+- `invarlock advanced evidence-pack verify --json`
 - `invarlock advanced policy verify --json`
 
 These commands emit a single JSON object suitable for CI parsing.
@@ -275,10 +275,10 @@ These commands emit a single JSON object suitable for CI parsing.
 
 - The public top level is `evaluate`, `verify`, `report`, `doctor`,
   `advanced`, and `version`.
-- Proof-pack, policy, plugin, and calibration workflows live under
+- Evidence-pack, policy, plugin, and calibration workflows live under
   `invarlock advanced ...`.
-- Trusted host execution for the core evaluation path is expressed as
-  `--execution-mode trusted-local`.
+- Host execution for the core evaluation path is expressed as
+  `--execution-mode host`.
 - Internal delegated config execution uses a package-internal config-runner
   module, not a public CLI command.
 - Optional runtime backends are installed with Python extras instead of CLI

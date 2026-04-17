@@ -7,7 +7,7 @@ from typer.core import TyperGroup
 
 class AdvancedGroup(TyperGroup):
     def list_commands(self, ctx: click.Context) -> list[str]:
-        return ["proof-pack", "policy", "plugins", "calibrate"]
+        return ["evidence-pack", "policy", "plugins", "calibrate"]
 
     def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
         command = super().get_command(ctx, cmd_name)
@@ -52,10 +52,10 @@ def _load_advanced_subapp(group: TyperGroup, name: str) -> bool:
         group.add_command(command, name=sub_name)
         return True
 
-    if name == "proof-pack":
-        from .proof_pack import proof_pack_app
+    if name == "evidence-pack":
+        from .evidence_pack import evidence_pack_app
 
-        return _register(name, proof_pack_app)
+        return _register(name, evidence_pack_app)
     if name == "policy":
         from .policy import policy_app
 

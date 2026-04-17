@@ -75,7 +75,7 @@ def test_coverage_target_includes_core_cli_surface_and_runtime_security_tests() 
         "tests/cli/test_execution_mode.py",
         "tests/cli/test_removed_command_migrations.py",
         "tests/cli/test_python_m_invarlock.py",
-        "tests/cli/test_security_default_container_contract.py",
+        "tests/cli/test_container_default_contract.py",
         "tests/cli/test_container_delegation.py",
     ):
         assert pattern in text
@@ -140,20 +140,20 @@ def test_makefile_exposes_actionlint_and_minimal_packaging_smoke_targets() -> No
 
     assert "packaging-smoke-minimal:" in text
     assert (
-        "tests/integration/packaging/test_wheel_proof_pack_verify.py::"
-        "test_wheel_install_can_verify_proof_pack_outside_repo_tree"
+        "tests/integration/packaging/test_wheel_evidence_pack_verify.py::"
+        "test_wheel_install_can_verify_evidence_pack_outside_repo_tree"
     ) in text
     assert (
-        "tests/integration/packaging/test_wheel_proof_pack_verify.py::"
+        "tests/integration/packaging/test_wheel_evidence_pack_verify.py::"
         "test_wheel_install_verify_rejects_ambiguous_directory_outside_repo_tree"
     ) in text
     assert (
-        "tests/integration/packaging/test_wheel_proof_pack_verify.py::"
+        "tests/integration/packaging/test_wheel_evidence_pack_verify.py::"
         "test_wheel_install_runtime_verify_failure_json_outside_repo_tree"
     ) in text
     assert (
-        "tests/integration/packaging/test_wheel_proof_pack_verify.py::"
-        "test_wheel_install_proof_pack_verify_reports_integrity_failure_outside_repo_tree"
+        "tests/integration/packaging/test_wheel_evidence_pack_verify.py::"
+        "test_wheel_install_evidence_pack_verify_reports_integrity_failure_outside_repo_tree"
     ) in text
     assert "docs-live-fast:" in text
     assert "docs-live:" in text
@@ -161,10 +161,10 @@ def test_makefile_exposes_actionlint_and_minimal_packaging_smoke_targets() -> No
     docs_live_fast_block = text.split("docs-live-fast:", 1)[1].split("docs-live:", 1)[0]
     docs_live_block = text.split("docs-live:", 1)[1].split("docs-check-build:", 1)[0]
 
-    assert "--markdown-execution-mode trusted-local" in docs_live_fast_block
+    assert "--markdown-execution-mode host" in docs_live_fast_block
     assert "--skip-markdown-model-loading" in docs_live_fast_block
     assert "--skip-notebook-model-loading" in docs_live_fast_block
-    assert "--markdown-execution-mode trusted-local" in docs_live_block
+    assert "--markdown-execution-mode host" in docs_live_block
     assert "--skip-markdown-model-loading" not in docs_live_block
     assert "--skip-notebook-model-loading" not in docs_live_block
 
@@ -221,6 +221,6 @@ def test_coverage_include_does_not_embed_space_prefixed_cli_patterns() -> None:
     assert "src/invarlock/cli/*" in include
     assert "src/invarlock/cli/commands/*" in include
     assert "src/invarlock/public_contracts.py" in include
-    assert "src/invarlock/proof_pack.py" in include
+    assert "src/invarlock/evidence_pack.py" in include
     assert "src/invarlock/runtime_security.py" in include
     assert "invarlock/cli/commands/*" in include

@@ -13,7 +13,7 @@ from invarlock.runtime_security import (
     build_runtime_security_policy,
     load_runtime_manifest,
     reset_runtime_allowances,
-    unattested_artifacts_allowed,
+    unverified_provenance_allowed,
 )
 from invarlock.runtime_verify import verify_runtime_manifest
 
@@ -76,14 +76,14 @@ def configure_runtime_security(
     allow_host_execution: bool = False,
     allow_third_party_plugins: bool = False,
     allow_remote_code: bool = False,
-    allow_unattested_artifacts: bool = False,
+    allow_unverified_provenance: bool = False,
 ) -> Iterator[None]:
     policy = build_runtime_security_policy(
         allow_network=allow_network,
         allow_host_execution=allow_host_execution,
         allow_third_party_plugins=allow_third_party_plugins,
         allow_remote_code=allow_remote_code,
-        allow_unattested_artifacts=allow_unattested_artifacts,
+        allow_unverified_provenance=allow_unverified_provenance,
     )
     token = apply_runtime_allowances(policy=policy)
     try:
@@ -95,9 +95,9 @@ def configure_runtime_security(
 def verify_runtime_provenance(
     report_path: str | Path,
     *,
-    allow_unattested: bool = False,
+    allow_unverified: bool = False,
 ) -> RuntimeProvenanceResult:
-    if allow_unattested or unattested_artifacts_allowed():
+    if allow_unverified or unverified_provenance_allowed():
         return RuntimeProvenanceResult(verified=False, skipped=True)
 
     report = Path(report_path)

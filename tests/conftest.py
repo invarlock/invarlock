@@ -33,7 +33,7 @@ _PATCH_TARGET_MODULES = (
     "invarlock.observability.core",
     "invarlock.observability.health",
     "invarlock.plugins.bitsandbytes",
-    "invarlock.proof_pack",
+    "invarlock.evidence_pack",
     "invarlock.reporting.report_console",
     "invarlock.reporting.report_make",
     "invarlock.reporting.report_telemetry",
@@ -111,7 +111,7 @@ def _restore_invarlock_env():
     # Snapshot environment variables that some tests may mutate without cleanup
     keys = [
         "INVARLOCK_ALLOW_HOST_EXECUTION",
-        "INVARLOCK_ALLOW_UNATTESTED_ARTIFACTS",
+        "INVARLOCK_ALLOW_UNVERIFIED_PROVENANCE",
         "INVARLOCK_ALLOW_NETWORK",
         "INVARLOCK_ALLOW_REMOTE_CODE",
         "INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS",
@@ -148,7 +148,7 @@ def _materialize_patch_targets(request: pytest.FixtureRequest):
 @pytest.fixture(autouse=True)
 def _default_security_bypass_for_local_tests(monkeypatch: pytest.MonkeyPatch):
     # The product is container-first, but the general pytest harness stays on
-    # trusted host execution unless an individual test opts back into the
+    # host execution unless an individual test opts back into the
     # security-default path explicitly.
     monkeypatch.setenv("INVARLOCK_ALLOW_HOST_EXECUTION", "1")
     monkeypatch.setenv("INVARLOCK_RUNTIME_IMAGE_DIGEST", _VALID_TEST_IMAGE_DIGEST)
