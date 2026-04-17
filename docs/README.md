@@ -183,7 +183,7 @@ configured acceptance envelopes even when aggressive compression is attempted.
   mode with seeded demo evidence, then smoke-runs the curated notebook subset.
 - For heavyweight notebook cells that would otherwise trigger model downloads or
   full evaluations, the curated lane reuses seeded demo reports and keeps the
-  downstream contract-reading and verification steps live.
+  later contract-reading and verification steps live.
 - `make docs-live` remains the broader local lane that replays runnable
   Markdown examples and smoke-runs notebooks under `notebooks/`, using the same
   host seeded-demo approach for heavyweight model-loading steps.

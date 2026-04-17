@@ -167,7 +167,7 @@ Evidence packs bundle reports + verification metadata into a distributable artif
 
 Note: `configs/` and most `scripts/` remain repo resources and are not included in
 wheels. Installed wheels include the public contracts and the
-`invarlock advanced evidence-pack verify` verifier, so downstream users can check
+`invarlock advanced evidence-pack verify` verifier, so wheel users can check
 bundles without cloning the repository.
 
 ## Installation

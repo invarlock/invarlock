@@ -22,7 +22,7 @@ verified in strict verification mode, the bundled clean reports retain their
 
 Operationally, evidence packs are a maintainer smoke test that also emits reusable
 evidence data. The same run should let maintainers catch regressions, let third parties
-verify reported outcomes, and provide structured outputs for downstream analysis.
+verify reported outcomes, and provide structured outputs for later analysis.
 
 > Terminology: the evidence-pack suite includes a run-scoped **Preset Derivation**
 > phase (`CALIBRATION_RUN -> GENERATE_PRESET`) that writes

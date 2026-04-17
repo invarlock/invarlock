@@ -62,7 +62,7 @@ def _render_readme(
     ]
     if failed_reports not in (None, 0):
         lines.append(
-            "- Unexpected report verification failures were recorded; inspect results/verification_summary.json before trusting downstream conclusions."
+            "- Unexpected report verification failures were recorded; inspect results/verification_summary.json before trusting final conclusions."
         )
     else:
         lines.append(

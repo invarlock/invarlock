@@ -139,7 +139,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help=(
             "Skip markdown model-loading commands (`evaluate`, `run`, `calibrate`) "
-            "and rely on seeded demo evidence for downstream verify/report replay."
+            "and rely on seeded demo evidence for later verify/report replay."
         ),
     )
     parser.add_argument(
@@ -147,7 +147,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help=(
             "Skip heavyweight notebook model-loading cells and rely on seeded demo "
-            "evidence for downstream verify/report replay."
+            "evidence for later verify/report replay."
         ),
     )
     parser.add_argument(

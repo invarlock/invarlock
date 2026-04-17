@@ -18,7 +18,7 @@ Use this lane when you need deterministic proof that the documented
 
 For Markdown examples, this lane replays the documented commands in
 host mode and skips heavyweight model-loading steps while reusing
-seeded demo evidence for the downstream `verify` and `report html` steps.
+seeded demo evidence for the later `verify` and `report html` steps.
 For the curated notebooks, heavyweight evaluation cells are treated the same
 way so the contract-reading and verification cells still run against stable demo
 reports.

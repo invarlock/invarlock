@@ -442,7 +442,7 @@ html = render_report_html(report)
 ### HTML Export Issues
 
 - **Missing report**: generate one first via `invarlock report --format report`.
-- **HTML missing styles**: omit `--no-embed-css` or apply custom CSS downstream.
+- **HTML missing styles**: omit `--no-embed-css` or apply custom CSS later in your publishing layer.
 
 ---
 

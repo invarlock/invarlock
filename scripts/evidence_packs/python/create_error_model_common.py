@@ -242,7 +242,7 @@ def _shape_mismatch_overlay_safetensors(
 
     output_path.mkdir(parents=True, exist_ok=True)
 
-    # Save tokenizer assets for downstream evaluation.
+    # Save tokenizer assets for later evaluation.
     try:
         tokenizer.save_pretrained(output_path)
     except (OSError, RuntimeError):

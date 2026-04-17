@@ -634,7 +634,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help=(
             "Skip curated heavyweight model-loading cells and reuse seeded demo "
-            "reports for downstream verification steps."
+            "reports for later verification steps."
         ),
     )
     args = parser.parse_args(argv)

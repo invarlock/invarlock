@@ -953,7 +953,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help=(
             "Skip model-loading commands (`evaluate`, `run`, `calibrate`) while "
-            "still replaying downstream verify/report steps against seeded demo data."
+            "still replaying later verify/report steps against seeded demo data."
         ),
     )
     return parser.parse_args(argv)
