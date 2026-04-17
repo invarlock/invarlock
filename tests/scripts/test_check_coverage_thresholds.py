@@ -144,7 +144,7 @@ def test_overrides_take_precedence(tmp_path: Path) -> None:
         )
         < 1e-9
     )
-    assert payload["configured_threshold_files"] == 160
+    assert payload["configured_threshold_files"] == 162
     assert payload["evaluated_files"] == 1
     assert payload["measured_threshold_files"] == 1
     assert "src/invarlock/cli/app.py" in payload["missing_threshold_files"]
@@ -159,7 +159,9 @@ def test_new_core_cli_and_runtime_surface_thresholds_are_enforced(
         xml,
         [
             ("invarlock/cli/app.py", 0.79, 0.95),
-            ("invarlock/cli/commands/evaluate.py", 0.71, 0.95),
+            ("invarlock/cli/runtime_modes.py", 0.79, 0.95),
+            ("invarlock/cli/commands/evaluate.py", 0.79, 0.95),
+            ("invarlock/cli/commands/verify.py", 0.79, 0.95),
             ("invarlock/reporting/report_contract.py", 0.81, 0.90),
             ("invarlock/core/runtime_manifest_verify.py", 0.89, 0.95),
             ("invarlock/runtime_security.py", 0.71, 0.95),
@@ -170,7 +172,9 @@ def test_new_core_cli_and_runtime_surface_thresholds_are_enforced(
 
     assert proc.returncode != 0
     assert "src/invarlock/cli/app.py" in proc.stderr
+    assert "src/invarlock/cli/runtime_modes.py" in proc.stderr
     assert "src/invarlock/cli/commands/evaluate.py" in proc.stderr
+    assert "src/invarlock/cli/commands/verify.py" in proc.stderr
     assert "src/invarlock/reporting/report_contract.py" in proc.stderr
     assert "src/invarlock/core/runtime_manifest_verify.py" in proc.stderr
     assert "src/invarlock/runtime_security.py" in proc.stderr
@@ -209,20 +213,20 @@ def test_summary_reports_measured_vs_configured_threshold_counts(
 
     assert proc.returncode == 0, proc.stderr
     assert (
-        "Coverage OK: 1/160 threshold-listed files had coverage data and met "
+        "Coverage OK: 1/162 threshold-listed files had coverage data and met "
         "per-file thresholds." in proc.stdout
     )
     assert (
-        "159 threshold-listed files were absent from the coverage report."
+        "161 threshold-listed files were absent from the coverage report."
         in proc.stdout
     )
 
     payload = json.loads(json_out.read_text())
     assert payload["status"] == "ok"
-    assert payload["configured_threshold_files"] == 160
+    assert payload["configured_threshold_files"] == 162
     assert payload["evaluated_files"] == 1
     assert payload["measured_threshold_files"] == 1
-    assert len(payload["missing_threshold_files"]) == 159
+    assert len(payload["missing_threshold_files"]) == 161
 
 
 def test_ratchets_selected_files_to_ninety_five_percent(tmp_path: Path) -> None:
@@ -231,7 +235,6 @@ def test_ratchets_selected_files_to_ninety_five_percent(tmp_path: Path) -> None:
     _write_cov_xml(
         xml,
         [
-            ("src/invarlock/cli/commands/evaluate.py", 0.949, 1.0),
             ("src/invarlock/core/determinism_policy.py", 0.949, 1.0),
             ("src/invarlock/core/auto_tuning.py", 0.949, 1.0),
             ("src/invarlock/core/adapter_auto.py", 0.949, 1.0),
@@ -272,7 +275,6 @@ def test_ratchets_selected_files_to_ninety_five_percent(tmp_path: Path) -> None:
 
     assert proc.returncode != 0
     for path in (
-        "src/invarlock/cli/commands/evaluate.py",
         "src/invarlock/core/determinism_policy.py",
         "src/invarlock/core/auto_tuning.py",
         "src/invarlock/core/adapter_auto.py",
@@ -330,6 +332,9 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
             ("src/invarlock/reporting/evidence.py", 0.999, 1.0),
             ("src/invarlock/cli/_json.py", 0.999, 1.0),
             ("src/invarlock/cli/app.py", 0.999, 1.0),
+            ("src/invarlock/cli/runtime_modes.py", 0.999, 1.0),
+            ("src/invarlock/cli/commands/evaluate.py", 0.999, 1.0),
+            ("src/invarlock/cli/commands/verify.py", 0.999, 1.0),
             ("src/invarlock/cli/commands/proof_pack.py", 0.999, 1.0),
             ("src/invarlock/cli/run_artifacts.py", 0.999, 1.0),
             ("src/invarlock/cli/run_overhead.py", 0.999, 1.0),
@@ -414,6 +419,9 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
         "src/invarlock/reporting/evidence.py",
         "src/invarlock/cli/_json.py",
         "src/invarlock/cli/app.py",
+        "src/invarlock/cli/runtime_modes.py",
+        "src/invarlock/cli/commands/evaluate.py",
+        "src/invarlock/cli/commands/verify.py",
         "src/invarlock/cli/commands/proof_pack.py",
         "src/invarlock/cli/run_artifacts.py",
         "src/invarlock/cli/run_overhead.py",

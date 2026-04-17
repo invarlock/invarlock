@@ -3,7 +3,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from invarlock.cli.commands import verify as verify_cmd_mod
 from invarlock.cli.commands.verify import verify_command
+from invarlock.reporting.verify_contract import (
+    VerifyDiagnostic,
+    VerifyExecutionResult,
+    VerifyOutcome,
+)
 
 
 def _write_cert(path: Path, payload: dict) -> Path:
@@ -91,3 +97,25 @@ def test_verify_human_ci_policy_fail(tmp_path: Path, capsys) -> None:
         or "policy_fail" in out
         or "PROVIDER-DIGEST-MISSING" in out
     )
+
+
+def test_verify_human_error_diagnostic_line(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+) -> None:
+    monkeypatch.setattr(
+        verify_cmd_mod,
+        "run_verify_reports",
+        lambda *args, **kwargs: VerifyExecutionResult(
+            outcome=VerifyOutcome.OK,
+            payload={"ok": True},
+            diagnostics=(VerifyDiagnostic(level="error", message="runtime mismatch"),),
+        ),
+        raising=True,
+    )
+
+    verify_command([tmp_path / "ok.json"], baseline=None, profile="dev", json_out=False)
+
+    out = capsys.readouterr().out
+    assert "runtime mismatch" in out

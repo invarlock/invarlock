@@ -102,11 +102,13 @@ THRESHOLDS = {
     # CLI commands
     "src/invarlock/cli/_json.py": 1.00,
     # Simplified public-core CLI surfaces have dedicated branch-focused tests;
-    # keep the hero commands above the default 90% floor.
+    # keep the hero commands and their contract enums branch-complete.
     "src/invarlock/cli/app.py": 1.00,
+    "src/invarlock/cli/runtime_modes.py": 1.00,
     "src/invarlock/core/config_runtime.py": 1.00,
     "src/invarlock/core/metric_provider_resolution.py": 0.95,
-    "src/invarlock/cli/commands/evaluate.py": 0.95,
+    "src/invarlock/cli/commands/evaluate.py": 1.00,
+    "src/invarlock/cli/commands/verify.py": 1.00,
     "src/invarlock/cli/commands/run.py": 1.00,
     "src/invarlock/reporting/report_contract.py": 1.00,
     "src/invarlock/cli/commands/calibrate.py": 0.95,

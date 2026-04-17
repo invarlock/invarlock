@@ -4,9 +4,13 @@ import json
 import math
 from pathlib import Path
 
+import pytest
+import typer
 from typer.testing import CliRunner
 
 from invarlock.cli.app import app
+from invarlock.cli.commands.verify import verify_command
+from invarlock.core.exceptions import ConfigError
 from invarlock.reporting import verify_contract as verify_mod
 
 
@@ -101,3 +105,36 @@ def test_verify_allows_unattested_override(
 
     assert result.exit_code == 0
     assert "VERIFY OK" in result.output
+
+
+def test_verify_command_rejects_invalid_runtime_provenance_value(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(
+        ValueError,
+        match="Runtime provenance must be one of: container, trusted-local.",
+    ):
+        verify_command(
+            [tmp_path / "evaluation.report.json"],
+            runtime_provenance="not-a-real-mode",
+        )
+
+
+def test_verify_json_reports_resolution_for_preload_config_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    cert_path = tmp_path / "evaluation.report.json"
+
+    def _boom(*args, **kwargs):
+        raise ConfigError(code="E201", message="bad cfg")
+
+    monkeypatch.setattr(verify_mod, "_load_evaluation_report", _boom, raising=True)
+
+    with pytest.raises(typer.Exit) as exc_info:
+        verify_command([cert_path], baseline=None, profile="dev", json_out=True)
+
+    assert exc_info.value.exit_code == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["resolution"]["exit_code"] == 2

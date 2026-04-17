@@ -35,7 +35,7 @@ def _should_auto_attest_verify_test(node: pytest.FixtureRequest) -> bool:
     return (
         path.name.startswith("test_verify")
         or path.name == "test_proof_pack_commands.py"
-    ) and path.name != "test_unattested_verify_gate.py"
+    ) and path.name != "test_verify_runtime_provenance.py"
 
 
 def _should_preserve_secure_default_cli_test(node: pytest.FixtureRequest) -> bool:
