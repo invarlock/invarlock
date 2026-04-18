@@ -57,8 +57,9 @@ def auto_sigma_target(
     try:
         spectral_norms = []
         for _name, module in model.named_modules():
-            if hasattr(module, "weight") and module.weight.ndim == 2:
-                sigma = compute_sigma_max_fn(module.weight)
+            weight = getattr(module, "weight", None)
+            if isinstance(weight, torch.Tensor) and weight.ndim == 2:
+                sigma = compute_sigma_max_fn(weight)
                 if _is_real_number(sigma) and sigma > 0:
                     spectral_norms.append(float(sigma))
         if spectral_norms:
@@ -99,8 +100,9 @@ def capture_baseline_sigmas(
         for name, module in module_iter:
             if not should_process_module_fn(name, module, scope):
                 continue
-            if hasattr(module, "weight") and module.weight.ndim == 2:
-                baseline_sigmas[name] = compute_sigma_max_fn(module.weight)
+            weight = getattr(module, "weight", None)
+            if isinstance(weight, torch.Tensor) and weight.ndim == 2:
+                baseline_sigmas[name] = compute_sigma_max_fn(weight)
         return baseline_sigmas
     except (
         ArithmeticError,
@@ -140,16 +142,17 @@ def scan_model_gains(
         for name, module in module_iter:
             results["total_layers"] += 1
             if should_process_module_fn(name, module, scope):
-                if hasattr(module, "weight") and module.weight.ndim == 2:
+                weight = getattr(module, "weight", None)
+                if isinstance(weight, torch.Tensor) and weight.ndim == 2:
                     results["scanned_modules"] += 1
-                    sigma_max = compute_sigma_max_fn(module.weight)
+                    sigma_max = compute_sigma_max_fn(weight)
                     results["spectral_norms"].append(sigma_max)
                     try:
                         results["weight_statistics"][name] = {
-                            "mean": module.weight.mean().item(),
-                            "std": module.weight.std().item(),
-                            "min": module.weight.min().item(),
-                            "max": module.weight.max().item(),
+                            "mean": weight.mean().item(),
+                            "std": weight.std().item(),
+                            "min": weight.min().item(),
+                            "max": weight.max().item(),
                         }
                     except (AttributeError, RuntimeError, TypeError, ValueError):
                         pass

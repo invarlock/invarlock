@@ -22,7 +22,8 @@ _SPECTRAL_CHECK_ERRORS = (
 
 def should_process_module(name: str, module: Any, scope: str) -> bool:
     """Determine if a module should be processed based on scope."""
-    if not hasattr(module, "weight") or module.weight.ndim != 2:
+    weight = getattr(module, "weight", None)
+    if getattr(weight, "ndim", None) != 2:
         return False
     if scope == "all":
         return True
@@ -211,7 +212,8 @@ def compute_family_stats(
 
 def should_check_module(guard: Any, name: str, module: Any) -> bool:
     """Determine if a module should be checked based on the guard scope."""
-    if not hasattr(module, "weight") or module.weight.ndim != 2:
+    weight = getattr(module, "weight", None)
+    if getattr(weight, "ndim", None) != 2:
         return False
     if guard.scope == "all":
         return True
@@ -243,10 +245,11 @@ def detect_spectral_violations(
 
     for name, module in guard._get_scoped_modules(model):
         try:
-            if hasattr(module, "weight") and module.weight.ndim == 2:
+            weight = getattr(module, "weight", None)
+            if getattr(weight, "ndim", None) == 2:
                 sigma_max = metrics.get(name)
                 if sigma_max is None:
-                    sigma_max = compute_sigma_max_fn(module.weight)
+                    sigma_max = compute_sigma_max_fn(weight)
 
                 baseline_sigma = guard.baseline_sigmas.get(name, guard.target_sigma)
                 family = guard.module_family_map.get(name)

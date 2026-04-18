@@ -335,6 +335,10 @@ def _build_signature_transform(
             }
             for record in final_records_in
         ]
+        preview_raw_inputs = [
+            list(record["input_ids"]) for record in temp_preview_records
+        ]
+        final_raw_inputs = [list(record["input_ids"]) for record in temp_final_records]
         apply_mlm_masks_fn(
             temp_preview_records,
             tokenizer=tokenizer,
@@ -353,6 +357,14 @@ def _build_signature_transform(
             original_token_prob=original_token_prob,
             prefix="final",
         )
+        for record, raw_input_ids in zip(
+            temp_preview_records, preview_raw_inputs, strict=False
+        ):
+            record["input_ids"] = raw_input_ids
+        for record, raw_input_ids in zip(
+            temp_final_records, final_raw_inputs, strict=False
+        ):
+            record["input_ids"] = raw_input_ids
         return temp_preview_records + temp_final_records
 
     return _signature_transform

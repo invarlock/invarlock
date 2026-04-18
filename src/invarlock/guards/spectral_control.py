@@ -33,13 +33,12 @@ def apply_weight_rescale(
             if not should_process_module_fn(name, module, scope):
                 continue
             try:
-                if hasattr(module, "weight") and module.weight.ndim == 2:
-                    if hasattr(module.weight, "dtype") and module.weight.dtype in [
-                        torch.int8
-                    ]:
+                weight = getattr(module, "weight", None)
+                if isinstance(weight, torch.Tensor) and weight.ndim == 2:
+                    if hasattr(weight, "dtype") and weight.dtype in [torch.int8]:
                         continue
                     with torch.no_grad():
-                        module.weight.mul_(scale_factor)
+                        weight.mul_(scale_factor)
                         if hasattr(module, "bias") and module.bias is not None:
                             module.bias.mul_(scale_factor)
                     rescaled_modules.append(name)
@@ -96,18 +95,17 @@ def apply_relative_spectral_cap(
             if not should_process_module_fn(name, module, scope):
                 continue
             try:
-                if hasattr(module, "weight") and module.weight.ndim == 2:
-                    if hasattr(module.weight, "dtype") and module.weight.dtype in [
-                        torch.int8
-                    ]:
+                weight = getattr(module, "weight", None)
+                if isinstance(weight, torch.Tensor) and weight.ndim == 2:
+                    if hasattr(weight, "dtype") and weight.dtype in [torch.int8]:
                         continue
-                    current_sigma = compute_sigma_max_fn(module.weight)
+                    current_sigma = compute_sigma_max_fn(weight)
                     baseline_sigma = baseline_sigmas.get(name, current_sigma)
                     max_allowed = baseline_sigma * cap_ratio
                     if current_sigma > max_allowed:
                         scale_factor = max_allowed / current_sigma
                         with torch.no_grad():
-                            module.weight.mul_(scale_factor)
+                            weight.mul_(scale_factor)
                         capped_modules.append(
                             {
                                 "module": name,
