@@ -358,11 +358,30 @@ def _should_skip_line_for_host_mode(stripped: str) -> bool:
         return True
     if stripped.startswith(("docker ", "podman ")):
         return True
+    if "--device mps" in stripped and not _host_supports_mps():
+        return True
     return "runtime.manifest.json" in stripped and (
         stripped.startswith("test -f ")
         or stripped.startswith("[ -f ")
         or stripped.startswith("stat ")
     )
+
+
+def _host_supports_mps() -> bool:
+    if sys.platform != "darwin":
+        return False
+    try:
+        import torch
+    except Exception:
+        return False
+    mps_backend = getattr(getattr(torch, "backends", None), "mps", None)
+    is_available = getattr(mps_backend, "is_available", None)
+    if callable(is_available):
+        try:
+            return bool(is_available())
+        except Exception:
+            return False
+    return False
 
 
 def _rewrite_model_loading_tokens_for_live_smoke(argv: list[str]) -> list[str]:
