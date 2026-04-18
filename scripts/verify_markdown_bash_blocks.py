@@ -657,6 +657,9 @@ def _sanitize_script(
             ):
                 rebuilt = env_prefix + [py, "-m", argv[2], *argv[3:]]
                 line = indent + shlex.join(rebuilt)
+            elif argv[:1] and argv[0] in {"python", "python3"}:
+                rebuilt = env_prefix + [py, *argv[1:]]
+                line = indent + shlex.join(rebuilt)
         if has_trailing_backslash and line != raw:
             line = line.rstrip() + " \\"
         rendered.append(line)

@@ -212,6 +212,23 @@ def test_sanitize_script_host_mode_skips_full_multiline_mps_command(
     assert "--profile dev" not in rendered
 
 
+def test_sanitize_script_rewrites_python_script_invocations_to_selected_python() -> (
+    None
+):
+    module = _load_script_module()
+    block = module.BashBlock(
+        file="docs/reference/device-drift-bands.md",
+        line=1,
+        block_index=1,
+        text="python scripts/check_device_drift.py reports/a.json reports/b.json\n",
+    )
+
+    rendered = module._sanitize_script(block, execution_mode="host")
+
+    assert rendered.startswith(str(module.ROOT / ".venv" / "bin" / "python"))
+    assert "scripts/check_device_drift.py reports/a.json reports/b.json" in rendered
+
+
 def test_sanitize_script_adds_force_to_report_html() -> None:
     module = _load_script_module()
     block = module.BashBlock(
