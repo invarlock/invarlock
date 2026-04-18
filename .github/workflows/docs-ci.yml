@@ -56,6 +56,9 @@ jobs:
       with:
         node-version: '22'
 
+    - name: Install docs lint toolchain
+      run: npm ci
+
     - name: Cache pip
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
       # `act` can clobber PATH after setup-python on some hosts; cache is optional.

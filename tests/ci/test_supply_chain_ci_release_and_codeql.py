@@ -185,9 +185,13 @@ def test_docs_workflow_enforces_docs_lint_on_main_and_staging() -> None:
     assert triggers["pull_request"]["paths"] == expected_paths
 
     steps = workflow["jobs"]["docs-validate"]["steps"]
+    node_step = _find_step_by_name(steps, "Setup Node.js")
+    install_node_step = _find_step_by_name(steps, "Install docs lint toolchain")
     markdown_step = _find_step_by_name(steps, "Lint markdown")
     spell_step = _find_step_by_name(steps, "Spell check")
 
+    assert node_step["with"]["node-version"] == "22"
+    assert install_node_step["run"] == "npm ci"
     assert markdown_step["run"] == "python scripts/docs_lint.py --markdown"
     assert "continue-on-error" not in markdown_step
     assert spell_step["run"] == "python scripts/docs_lint.py --spell"

@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-verify actionlint packaging-smoke-minimal packaging-smoke-front-door ensure-mypy
+.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-verify actionlint packaging-smoke-minimal packaging-smoke-front-door ensure-mypy
 
 PYTHON ?= $(shell bash scripts/select_workspace_python.sh)
 PIP := $(PYTHON) -m pip
@@ -278,7 +278,7 @@ format:  ## Format code
 	$(RUFF) format src/ tests/ scripts/
 	$(RUFF) check --fix src/ tests/ scripts/
 
-verify:  ## Run verification (pytest -q, runtime verifier, lint, format, markdown + spell docs lint)
+verify:  ## Run verification (pytest -q, runtime verifier, lint, format, strict docs lint)
 	@echo "Running verification..."
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTEST) -q
@@ -288,7 +288,7 @@ verify:  ## Run verification (pytest -q, runtime verifier, lint, format, markdow
 	$(MAKE) runtime-verify
 	$(MAKE) verify-ruff
 	$(MAKE) contracts-check
-	$(MAKE) docs-lint
+	$(MAKE) docs-lint-strict
 	@if [ -n "$$VERIFY_DOCS_API" ]; then \
 		$(PYTHON) scripts/validate_docs_api_refs.py; \
 	fi
@@ -501,7 +501,7 @@ ensure-mypy:
 
 ## (verify-ci and verify-release targets removed)
 
-.PHONY: docs-check docs-live docs-live-fast docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell
+.PHONY: docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell
 docs-check: ## Run consolidated docs validation plus curated live examples
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTHON) scripts/docs_check.py --all
@@ -535,6 +535,10 @@ docs-check-links: ## Run docs link checks only
 docs-lint: ## Lint docs (markdown + spell)
 	$(MAKE) ensure-python
 	$(PYTHON) scripts/docs_lint.py --all
+
+docs-lint-strict: ## Lint docs and fail if markdownlint/cspell are unavailable
+	$(MAKE) ensure-python
+	$(PYTHON) scripts/docs_lint.py --all --require-tools
 
 docs-lint-markdown: ## Lint docs markdown style only
 	$(MAKE) ensure-python

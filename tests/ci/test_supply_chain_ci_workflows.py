@@ -617,6 +617,10 @@ def test_ci_verify_full_pins_make_to_setup_python() -> None:
     assert env["PYTHON"] == "python"
 
     steps = verify_full.get("steps", [])
+    setup_node_step = _find_step_by_name(steps, "Set up Node.js")
+    npm_step = _find_step_by_name(steps, "Install docs lint toolchain")
     verify_step = _find_step_by_name(steps, "Full verify")
+    assert setup_node_step["with"]["node-version"] == "22"
+    assert npm_step["run"] == "npm ci"
     assert "make verify" in verify_step["run"]
     assert "mkdocs build --strict" in verify_step["run"]

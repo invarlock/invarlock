@@ -3,6 +3,7 @@
 
 Usage examples:
   python scripts/docs_lint.py --all
+  python scripts/docs_lint.py --all --require-tools
   python scripts/docs_lint.py --markdown
   python scripts/docs_lint.py --spell
 """
@@ -52,7 +53,11 @@ def _local_node_bin(name: str) -> str | None:
     return None
 
 
-def lint_markdown(files: Iterable[str]) -> bool:
+def _tools_required(require_tools: bool) -> bool:
+    return bool(require_tools or os.environ.get("DOCS_LINT_REQUIRE_TOOLS") == "1")
+
+
+def lint_markdown(files: Iterable[str], *, require_tools: bool = False) -> bool:
     files = list(files)
     if not files:
         print("[docs_lint] No markdown files found; skipping markdownlint")
@@ -79,7 +84,7 @@ def lint_markdown(files: Iterable[str]) -> bool:
                     "[docs_lint] markdownlint not installed (install via `npm ci`, "
                     "or set DOCS_LINT_ALLOW_NPX_INSTALL=1 to allow npx fetching)"
                 )
-                if os.environ.get("CI"):
+                if os.environ.get("CI") or _tools_required(require_tools):
                     print(message, file=sys.stderr)
                     raise SystemExit(1)
                 print(f"{message}; skipping", file=sys.stderr)
@@ -98,7 +103,7 @@ def lint_markdown(files: Iterable[str]) -> bool:
 
     if not ml_cmd:
         message = "[docs_lint] markdownlint not available and npx missing"
-        if os.environ.get("CI"):
+        if os.environ.get("CI") or _tools_required(require_tools):
             print(message, file=sys.stderr)
             raise SystemExit(1)
         print(f"{message}; skipping", file=sys.stderr)
@@ -117,7 +122,7 @@ def lint_markdown(files: Iterable[str]) -> bool:
     return True
 
 
-def lint_spell(files: Iterable[str]) -> bool:
+def lint_spell(files: Iterable[str], *, require_tools: bool = False) -> bool:
     files = list(files)
     if not files:
         print("[docs_lint] No markdown files found; skipping cspell")
@@ -140,7 +145,7 @@ def lint_spell(files: Iterable[str]) -> bool:
                     "[docs_lint] cspell not installed (set DOCS_LINT_ALLOW_NPX_INSTALL=1 "
                     "to allow npx fetching)"
                 )
-                if os.environ.get("CI"):
+                if os.environ.get("CI") or _tools_required(require_tools):
                     print(message, file=sys.stderr)
                     raise SystemExit(1)
                 print(f"{message}; skipping", file=sys.stderr)
@@ -150,7 +155,7 @@ def lint_spell(files: Iterable[str]) -> bool:
 
     if not sp_cmd:
         message = "[docs_lint] cspell not available and npx missing"
-        if os.environ.get("CI"):
+        if os.environ.get("CI") or _tools_required(require_tools):
             print(message, file=sys.stderr)
             raise SystemExit(1)
         print(f"{message}; skipping", file=sys.stderr)
@@ -167,16 +172,21 @@ def lint_spell(files: Iterable[str]) -> bool:
     return True
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Docs lint wrapper")
     p.add_argument("--all", action="store_true", help="Run markdownlint and cspell")
     p.add_argument("--markdown", action="store_true", help="Run markdownlint only")
     p.add_argument("--spell", action="store_true", help="Run cspell only")
-    return p.parse_args()
+    p.add_argument(
+        "--require-tools",
+        action="store_true",
+        help="Fail when docs lint tools are unavailable instead of skipping locally.",
+    )
+    return p.parse_args(argv)
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     if not any([args.all, args.markdown, args.spell]):
         print("No lints selected. Use --all or --markdown/--spell.", file=sys.stderr)
         raise SystemExit(2)
@@ -185,9 +195,11 @@ def main() -> None:
     summary: dict[str, bool | None] = {"markdown": None, "spell": None}
     try:
         if args.all or args.markdown:
-            summary["markdown"] = lint_markdown(files)
+            summary["markdown"] = lint_markdown(
+                files, require_tools=bool(args.require_tools)
+            )
         if args.all or args.spell:
-            summary["spell"] = lint_spell(files)
+            summary["spell"] = lint_spell(files, require_tools=bool(args.require_tools))
     except SystemExit as e:
         print(
             json.dumps({"ok": False, "summary": summary, "exit": e.code}),
