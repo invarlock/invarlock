@@ -493,6 +493,30 @@ def test_run_blocks_clears_stale_output_root(tmp_path: Path, monkeypatch) -> Non
     assert not (out_root / "logs" / "stale.log").exists()
 
 
+def test_remove_tree_retries_transient_directory_not_empty(
+    tmp_path: Path, monkeypatch
+) -> None:
+    module = _load_script_module()
+    target = tmp_path / "workspaces"
+    target.mkdir()
+    (target / "stale.txt").write_text("x\n", encoding="utf-8")
+    original_rmtree = module.shutil.rmtree
+    calls = {"count": 0}
+
+    def _flaky_rmtree(path: Path) -> None:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise OSError(66, "Directory not empty")
+        original_rmtree(path)
+
+    monkeypatch.setattr(module.shutil, "rmtree", _flaky_rmtree)
+
+    module._remove_tree(target)
+
+    assert calls["count"] == 2
+    assert not target.exists()
+
+
 def test_run_logged_script_streams_output_to_log_and_console(
     tmp_path: Path, capsys
 ) -> None:

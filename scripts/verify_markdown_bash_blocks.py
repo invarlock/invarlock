@@ -22,6 +22,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -276,9 +277,31 @@ def _stage_workspace_entry(source: Path, target: Path) -> None:
     shutil.copy2(source, target)
 
 
+def _remove_tree(path: Path) -> None:
+    if not path.exists():
+        return
+    if path.is_symlink():
+        path.unlink()
+        return
+
+    last_error: OSError | None = None
+    for _ in range(3):
+        try:
+            shutil.rmtree(path)
+            return
+        except FileNotFoundError:
+            return
+        except OSError as exc:
+            last_error = exc
+            time.sleep(0.05)
+
+    if last_error is not None:
+        raise last_error
+
+
 def _prepare_workspace(workspace: Path) -> None:
     if workspace.exists():
-        shutil.rmtree(workspace)
+        _remove_tree(workspace)
     workspace.mkdir(parents=True, exist_ok=True)
     for source in sorted(ROOT.iterdir(), key=lambda path: path.name):
         if not _should_stage_workspace_entry(source):
@@ -871,7 +894,7 @@ def run_blocks(
     skip_model_loading: bool = False,
 ) -> int:
     if output_root.exists():
-        shutil.rmtree(output_root)
+        _remove_tree(output_root)
     output_root.mkdir(parents=True, exist_ok=True)
     results_path = output_root / "results.jsonl"
     workspace_root = output_root / "workspaces"

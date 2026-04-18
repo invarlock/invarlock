@@ -189,6 +189,125 @@ def _ensure_hf_smoke_dependencies(installed_wheel_env: InstalledWheelEnv) -> Non
     assert install.returncode == 0, install.stdout + install.stderr
 
 
+def _hf_cache_root_is_writable(root: Path) -> bool:
+    datasets_dir = root / "datasets"
+    try:
+        datasets_dir.mkdir(parents=True, exist_ok=True)
+        probe = datasets_dir / ".ivl_wheel_smoke_probe"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+        return True
+    except OSError:
+        return False
+
+
+def _hf_cache_root_candidates() -> list[Path]:
+    candidates: list[Path] = []
+    for value in (
+        os.environ.get("INVARLOCK_SMOKE_HF_HOME"),
+        os.environ.get("HF_HOME"),
+        str(Path.home() / ".cache" / "huggingface"),
+    ):
+        if not value:
+            continue
+        path = Path(value).expanduser()
+        if path not in candidates:
+            candidates.append(path)
+    return candidates
+
+
+def _local_hf_smoke_cache_ready(python_exe: Path, hf_home: Path) -> bool:
+    probe = _run(
+        python_exe,
+        [
+            "-c",
+            (
+                "from transformers import AutoModelForCausalLM, AutoTokenizer; "
+                "model_id='sshleifer/tiny-gpt2'; "
+                "AutoTokenizer.from_pretrained("
+                "model_id, trust_remote_code=False, local_files_only=True"
+                "); "
+                "AutoModelForCausalLM.from_pretrained("
+                "model_id, trust_remote_code=False, local_files_only=True"
+                ")"
+            ),
+        ],
+        env={
+            "HF_HOME": str(hf_home),
+            "HF_HUB_CACHE": str(hf_home / "hub"),
+            "HF_DATASETS_CACHE": str(hf_home / "datasets"),
+            "DISABLE_SAFETENSORS_CONVERSION": "1",
+            "TOKENIZERS_PARALLELISM": "false",
+            "TRANSFORMERS_NO_TORCHVISION": "1",
+        },
+        timeout=300,
+    )
+    return probe.returncode == 0
+
+
+def _resolve_hf_smoke_env(
+    python_exe: Path, tmp_root: Path
+) -> tuple[dict[str, str], bool]:
+    writable_candidate: Path | None = None
+    for candidate in _hf_cache_root_candidates():
+        if not _hf_cache_root_is_writable(candidate):
+            continue
+        if writable_candidate is None:
+            writable_candidate = candidate
+        if _local_hf_smoke_cache_ready(python_exe, candidate):
+            root = candidate
+            return (
+                {
+                    "HF_HOME": str(root),
+                    "HF_HUB_CACHE": str(root / "hub"),
+                    "HF_DATASETS_CACHE": str(root / "datasets"),
+                    "INVARLOCK_ALLOW_NETWORK": "1",
+                    "INVARLOCK_DEDUP_TEXTS": "1",
+                    "INVARLOCK_TINY_RELAX": "1",
+                    "DISABLE_SAFETENSORS_CONVERSION": "1",
+                    "TOKENIZERS_PARALLELISM": "false",
+                    "TRANSFORMERS_NO_TORCHVISION": "1",
+                },
+                True,
+            )
+
+    root = writable_candidate if writable_candidate is not None else tmp_root / ".hf"
+    return (
+        {
+            "HF_HOME": str(root),
+            "HF_HUB_CACHE": str(root / "hub"),
+            "HF_DATASETS_CACHE": str(root / "datasets"),
+            "INVARLOCK_ALLOW_NETWORK": "1",
+            "INVARLOCK_DEDUP_TEXTS": "1",
+            "INVARLOCK_TINY_RELAX": "1",
+            "DISABLE_SAFETENSORS_CONVERSION": "1",
+            "TOKENIZERS_PARALLELISM": "false",
+            "TRANSFORMERS_NO_TORCHVISION": "1",
+        },
+        False,
+    )
+
+
+def _prefetch_hf_smoke_model(
+    python_exe: Path, *, cwd: Path, env: dict[str, str]
+) -> subprocess.CompletedProcess[str]:
+    return _run(
+        python_exe,
+        [
+            "-c",
+            (
+                "from transformers import AutoModelForCausalLM, AutoTokenizer; "
+                "model_id='sshleifer/tiny-gpt2'; "
+                "AutoTokenizer.from_pretrained(model_id, trust_remote_code=False); "
+                "AutoModelForCausalLM.from_pretrained(model_id, trust_remote_code=False)"
+            ),
+        ],
+        cwd=cwd,
+        env=env,
+        timeout=900,
+    )
+
+
 def _sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 

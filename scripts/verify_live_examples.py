@@ -33,14 +33,43 @@ DEFAULT_NOTEBOOK_PATHS = (
 )
 
 
-def _default_env() -> dict[str, str]:
+def _cache_root_is_writable(root: Path) -> bool:
+    datasets_dir = root / "datasets"
+    try:
+        datasets_dir.mkdir(parents=True, exist_ok=True)
+        probe = datasets_dir / ".ivl_live_examples_probe"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+        return True
+    except OSError:
+        return False
+
+
+def _preferred_hf_cache_root() -> Path:
+    configured = os.environ.get("INVARLOCK_SMOKE_HF_HOME") or os.environ.get("HF_HOME")
+    if configured:
+        return Path(configured).expanduser()
+    return Path.home() / ".cache" / "huggingface"
+
+
+def _default_env(*, output_root: Path) -> dict[str, str]:
     env = os.environ.copy()
     pythonpath = str(ROOT / "src")
     if env.get("PYTHONPATH"):
         pythonpath = pythonpath + os.pathsep + env["PYTHONPATH"]
     env["PYTHONPATH"] = pythonpath
+    preferred_hf_home = _preferred_hf_cache_root()
+    hf_home = (
+        preferred_hf_home
+        if _cache_root_is_writable(preferred_hf_home)
+        else output_root / ".hf"
+    )
+    env["HF_HOME"] = str(hf_home)
+    env["HF_HUB_CACHE"] = str(hf_home / "hub")
+    env["HF_DATASETS_CACHE"] = str(hf_home / "datasets")
     env.setdefault("INVARLOCK_ALLOW_NETWORK", "1")
     env.setdefault("INVARLOCK_DEDUP_TEXTS", "1")
+    env.setdefault("DISABLE_SAFETENSORS_CONVERSION", "1")
     env.setdefault("TRANSFORMERS_NO_TORCHVISION", "1")
     env.setdefault("TOKENIZERS_PARALLELISM", "false")
     return env
@@ -181,7 +210,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     output_root = Path(args.output_root).expanduser().resolve()
     output_root.mkdir(parents=True, exist_ok=True)
-    env = _default_env()
+    env = _default_env(output_root=output_root)
 
     summary: dict[str, object] = {
         "generated_at_utc": datetime.now(tz=UTC).isoformat(),

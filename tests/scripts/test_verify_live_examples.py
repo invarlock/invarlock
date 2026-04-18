@@ -145,6 +145,37 @@ def test_default_notebook_inventory_requires_explicit_classification() -> None:
     assert module._resolve_notebook_paths(None) == discovered
 
 
+def test_default_env_reuses_configured_hf_cache_root(
+    tmp_path: Path, monkeypatch
+) -> None:
+    module = _load_script_module()
+    preferred_hf_home = tmp_path / "shared-hf"
+    monkeypatch.setenv("HF_HOME", str(preferred_hf_home))
+    monkeypatch.setattr(module, "_cache_root_is_writable", lambda root: True)
+
+    env = module._default_env(output_root=tmp_path / "artifacts")
+
+    assert env["HF_HOME"] == str(preferred_hf_home)
+    assert env["HF_HUB_CACHE"] == str(preferred_hf_home / "hub")
+    assert env["HF_DATASETS_CACHE"] == str(preferred_hf_home / "datasets")
+    assert env["DISABLE_SAFETENSORS_CONVERSION"] == "1"
+
+
+def test_default_env_falls_back_to_output_cache_when_preferred_root_is_not_writable(
+    tmp_path: Path, monkeypatch
+) -> None:
+    module = _load_script_module()
+    monkeypatch.setenv("HF_HOME", str(tmp_path / "read-only-hf"))
+    monkeypatch.setattr(module, "_cache_root_is_writable", lambda root: False)
+
+    env = module._default_env(output_root=tmp_path / "artifacts")
+
+    assert env["HF_HOME"] == str(tmp_path / "artifacts" / ".hf")
+    assert env["HF_HUB_CACHE"] == str(tmp_path / "artifacts" / ".hf" / "hub")
+    assert env["HF_DATASETS_CACHE"] == str(tmp_path / "artifacts" / ".hf" / "datasets")
+    assert env["DISABLE_SAFETENSORS_CONVERSION"] == "1"
+
+
 def test_run_subprocess_streams_output_to_log_and_console(
     tmp_path: Path, capsys
 ) -> None:
@@ -160,7 +191,7 @@ def test_run_subprocess_streams_output_to_log_and_console(
 
     result = module._run_subprocess(
         [sys.executable, str(script)],
-        env=module._default_env(),
+        env=module._default_env(output_root=tmp_path / "artifacts"),
         log_path=log_path,
     )
 

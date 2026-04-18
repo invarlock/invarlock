@@ -10,6 +10,8 @@ from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
 from tests.integration.packaging._support_installed_wheel import (
     InstalledWheelEnv,
     _ensure_hf_smoke_dependencies,
+    _prefetch_hf_smoke_model,
+    _resolve_hf_smoke_env,
     _run,
     _write_jsonl,
     _write_local_jsonl_preset,
@@ -38,34 +40,17 @@ def test_wheel_install_runs_front_door_evaluate_verify_report_html_outside_repo_
     preset_path = tmp_path / "preset.yaml"
     _write_local_jsonl_preset(preset_path, data_file)
 
-    hf_home = tmp_path / "hf-home"
-    hf_home.mkdir(parents=True, exist_ok=True)
-    smoke_env = {
-        "HF_HOME": str(hf_home),
-        "HF_DATASETS_CACHE": str(hf_home / "datasets"),
-        "INVARLOCK_ALLOW_NETWORK": "1",
-        "INVARLOCK_DEDUP_TEXTS": "1",
-        "INVARLOCK_TINY_RELAX": "1",
-        "TOKENIZERS_PARALLELISM": "false",
-        "TRANSFORMERS_NO_TORCHVISION": "1",
-    }
-
-    prefetch = _run(
-        installed_wheel_env.python_exe,
-        [
-            "-c",
-            (
-                "from transformers import AutoModelForCausalLM, AutoTokenizer; "
-                "model_id='sshleifer/tiny-gpt2'; "
-                "AutoTokenizer.from_pretrained(model_id, trust_remote_code=False); "
-                "AutoModelForCausalLM.from_pretrained(model_id, trust_remote_code=False)"
-            ),
-        ],
-        cwd=tmp_path,
-        env=smoke_env,
-        timeout=900,
+    smoke_env, local_cache_ready = _resolve_hf_smoke_env(
+        installed_wheel_env.python_exe, tmp_path
     )
-    assert prefetch.returncode == 0, prefetch.stdout + prefetch.stderr
+
+    if not local_cache_ready:
+        prefetch = _prefetch_hf_smoke_model(
+            installed_wheel_env.python_exe,
+            cwd=tmp_path,
+            env=smoke_env,
+        )
+        assert prefetch.returncode == 0, prefetch.stdout + prefetch.stderr
 
     report_dir = tmp_path / "front-door-report"
     evaluate = _run(
