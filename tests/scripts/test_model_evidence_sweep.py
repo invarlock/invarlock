@@ -403,6 +403,7 @@ def test_model_evidence_sweep_host_mode_emits_explicit_runtime_flags(
         payload[0]["verify"][payload[0]["verify"].index("--runtime-provenance") + 1]
         == "host"
     )
+    assert payload[0]["verify"][payload[0]["verify"].index("--profile") + 1] == "dev"
     preset_idx = payload[0]["evaluate"].index("--preset") + 1
     assert payload[0]["evaluate"][preset_idx] == str(
         repo_root / "configs/presets/causal_lm/tinyllama_1_1b_512.yaml"
@@ -756,6 +757,34 @@ def test_model_evidence_sweep_returns_failure_when_verify_fails(
     assert result["verify_exit"] == 1
     assert result["ok"] is False
     assert (output_root / "eval" / "tinyllama_1_1b" / "verify.json").is_file()
+
+
+def test_model_evidence_sweep_host_mode_rejects_ci_profile(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence_sweep.py"
+    output_root = tmp_path / "evidence-host-ci"
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--slug",
+            "tinyllama_1_1b",
+            "--execution-mode",
+            "host",
+            "--profile",
+            "ci",
+            "--output-root",
+            str(output_root),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+    )
+
+    assert proc.returncode == 2
+    assert "incompatible with --profile ci/release" in proc.stderr
 
 
 def test_model_evidence_sweep_container_mode_publishes_external_output_root(

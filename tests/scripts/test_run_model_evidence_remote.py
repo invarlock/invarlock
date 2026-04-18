@@ -52,6 +52,7 @@ def test_run_model_evidence_remote_dry_run_emits_tmux_launch_plan(
         "$PYTHON_BIN scripts/model_evidence_sweep.py"
         in payload["launches"][0]["remote_command"]
     )
+    assert "--profile" not in payload["launches"][0]["remote_command"]
     assert "--execution-mode container" in payload["launches"][0]["remote_command"]
     assert "CUDA_VISIBLE_DEVICES=0" in payload["launches"][0]["remote_command"]
     assert "--shard-index 0" in payload["launches"][0]["remote_command"]
@@ -116,3 +117,4 @@ def test_run_model_evidence_remote_host_mode_is_forwarded() -> None:
     payload = json.loads(proc.stdout)
     assert payload["execution_mode"] == "host"
     assert "--execution-mode host" in payload["launches"][0]["remote_command"]
+    assert "--profile" not in payload["launches"][0]["remote_command"]

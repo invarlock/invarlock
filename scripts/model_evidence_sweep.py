@@ -607,6 +607,16 @@ def build_verify_command(
     return command
 
 
+def resolve_lane_profile(
+    *, profile_override: str | None, execution_mode: str, spec: EvidenceLane
+) -> str:
+    if profile_override:
+        return profile_override
+    if execution_mode == "host":
+        return "dev"
+    return spec.verify_profile
+
+
 def runtime_env() -> dict[str, str]:
     env = dict(os.environ)
     env.setdefault("PYTHONPATH", str(REPO_ROOT / "src"))
@@ -691,7 +701,7 @@ def run_lane(
     output_root: Path,
     execution_root: Path,
     python_exe: str,
-    profile: str,
+    profile: str | None,
     device: str,
     execution_mode: str,
     env: dict[str, str],
@@ -710,7 +720,11 @@ def run_lane(
 
     log_mode = "w"
     eval_returncode: int | None = None
-    lane_profile = profile or spec.verify_profile
+    lane_profile = resolve_lane_profile(
+        profile_override=profile,
+        execution_mode=execution_mode,
+        spec=spec,
+    )
     if execution_mode == "host":
         prefetch_cmd = build_prefetch_command(spec, python_exe=python_exe)
         with log_path.open(log_mode, encoding="utf-8") as log_file:
@@ -842,6 +856,14 @@ def run_lane(
 
 
 def run_sweep(args: argparse.Namespace) -> int:
+    if args.execution_mode == "host" and args.profile in {"ci", "release"}:
+        print(
+            "--execution-mode host is incompatible with --profile ci/release; "
+            "omit --profile or use --profile dev for host-side evidence runs.",
+            file=sys.stderr,
+        )
+        return 2
+
     validate_manifest_coverage(CURRENT_SUPPORTED_EXPERIMENTAL_LANES)
     specs = select_specs(
         args.suite,
@@ -883,14 +905,22 @@ def run_sweep(args: argparse.Namespace) -> int:
                 "evaluate": build_evaluate_command(
                     spec,
                     python_exe=args.python,
-                    profile=args.profile or spec.verify_profile,
+                    profile=resolve_lane_profile(
+                        profile_override=args.profile,
+                        execution_mode=args.execution_mode,
+                        spec=spec,
+                    ),
                     device=args.device,
                     execution_mode=args.execution_mode,
                     lane_root=lane_root,
                 ),
                 "verify": build_verify_command(
                     python_exe=args.python,
-                    profile=args.profile or spec.verify_profile,
+                    profile=resolve_lane_profile(
+                        profile_override=args.profile,
+                        execution_mode=args.execution_mode,
+                        spec=spec,
+                    ),
                     execution_mode=args.execution_mode,
                     report_path=lane_root / "report" / "evaluation.report.json",
                 ),

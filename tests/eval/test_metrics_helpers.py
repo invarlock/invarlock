@@ -132,6 +132,20 @@ def test_resource_manager_cleanup(monkeypatch):
     assert called["empty_cache"] is True
 
 
+def test_resource_manager_cleanup_collects_without_cuda(monkeypatch):
+    called = {}
+
+    monkeypatch.setattr(support_mod.torch.cuda, "is_available", lambda: False)
+    monkeypatch.setattr(
+        support_mod.gc, "collect", lambda: called.setdefault("collect", True)
+    )
+
+    manager = ResourceManager(MetricsConfig(use_cache=False, force_cpu=True))
+    manager.cleanup()
+
+    assert called["collect"] is True
+
+
 def test_dependency_manager_missing_modules(monkeypatch):
     # Ensure optional modules are absent
     monkeypatch.delitem(sys.modules, "invarlock.eval.lens2_mi", raising=False)

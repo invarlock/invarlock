@@ -88,8 +88,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--profile",
-        default="ci",
-        help="Verify/evaluate profile passed through to the sweep script.",
+        default=None,
+        help=(
+            "Optional verify/evaluate profile override passed through to the sweep "
+            "script. Defaults to the sweep's lane-specific profile resolution."
+        ),
     )
     parser.add_argument(
         "--device",
@@ -210,7 +213,7 @@ def build_launches(
     suite: str,
     slugs: list[str],
     lane_ids: list[str],
-    profile: str,
+    profile: str | None,
     device: str,
     execution_mode: str,
     gpus: list[str],
@@ -230,8 +233,6 @@ def build_launches(
             "scripts/model_evidence_sweep.py",
             "--suite",
             suite,
-            "--profile",
-            profile,
             "--device",
             device,
             "--execution-mode",
@@ -243,6 +244,8 @@ def build_launches(
             "--shard-count",
             str(shard_count),
         ]
+        if profile:
+            sweep_cmd[4:4] = ["--profile", profile]
         for slug in slugs:
             sweep_cmd.extend(["--slug", slug])
         for lane_id in lane_ids:
