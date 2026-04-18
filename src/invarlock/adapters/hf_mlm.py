@@ -52,12 +52,23 @@ _HF_MLM_CLASS_NAMES = {
     "DistilBertModel",
     "DistilBertForSequenceClassification",
     "DistilBertForMaskedLM",
+    "DebertaV2Model",
+    "DebertaV2ForSequenceClassification",
+    "DebertaV2ForMaskedLM",
     "AlbertModel",
     "AlbertForSequenceClassification",
     "ElectraModel",
     "ElectraForSequenceClassification",
 }
-_HF_MLM_MODEL_TYPES = {"bert", "roberta", "distilbert", "albert", "electra"}
+_HF_MLM_MODEL_TYPES = {
+    "bert",
+    "roberta",
+    "distilbert",
+    "deberta",
+    "deberta-v2",
+    "albert",
+    "electra",
+}
 
 
 def _should_retry_mlm_loader(exc: BaseException) -> bool:
@@ -108,6 +119,8 @@ def _resolve_wrapper_encoder(model: Any) -> Any | None:
         return model.bert.encoder
     if _module_has(model, "roberta") and _module_has(model.roberta, "encoder"):
         return model.roberta.encoder
+    if _module_has(model, "deberta") and _module_has(model.deberta, "encoder"):
+        return model.deberta.encoder
     if _module_has(model, "distilbert") and _module_has(
         model.distilbert, "transformer"
     ):
@@ -132,6 +145,8 @@ def _resolve_embeddings_module(model: Any) -> Any | None:
         return model.bert.embeddings
     if _module_has(model, "roberta") and _module_has(model.roberta, "embeddings"):
         return model.roberta.embeddings
+    if _module_has(model, "deberta") and _module_has(model.deberta, "embeddings"):
+        return model.deberta.embeddings
     if _module_has(model, "distilbert") and _module_has(model.distilbert, "embeddings"):
         return model.distilbert.embeddings
     return None
@@ -176,6 +191,48 @@ def _has_complete_attention_structure(layer: Any) -> bool:
     return all(
         _has_set_attr(layer.attention.self, name) for name in ("query", "key", "value")
     )
+
+
+def _has_distilbert_attention_structure(layer: Any) -> bool:
+    if not (
+        hasattr(layer, "attention")
+        and hasattr(layer, "ffn")
+        and _has_set_attr(layer, "sa_layer_norm")
+        and _has_set_attr(layer, "output_layer_norm")
+    ):
+        return False
+    return all(
+        _has_set_attr(layer.attention, name)
+        for name in ("q_lin", "k_lin", "v_lin", "out_lin")
+    ) and all(_has_set_attr(layer.ffn, name) for name in ("lin1", "lin2"))
+
+
+def _has_deberta_attention_structure(layer: Any) -> bool:
+    if not (
+        hasattr(layer, "attention")
+        and hasattr(layer, "intermediate")
+        and hasattr(layer, "output")
+        and hasattr(layer.attention, "self")
+    ):
+        return False
+    has_qkv = all(
+        _has_set_attr(layer.attention.self, name)
+        for name in ("query_proj", "key_proj", "value_proj")
+    )
+    has_outputs = _has_set_attr(layer.attention, "output") and _has_set_attr(
+        layer.attention.output, "dense"
+    )
+    return bool(has_qkv and has_outputs and _has_set_attr(layer.intermediate, "dense"))
+
+
+def _resolve_mlm_layer_variant(layer: Any) -> str | None:
+    if _has_complete_attention_structure(layer):
+        return "bert"
+    if _has_distilbert_attention_structure(layer):
+        return "distilbert"
+    if _has_deberta_attention_structure(layer):
+        return "deberta-v2"
+    return None
 
 
 def _prediction_head_tied_to_embeddings(
@@ -280,9 +337,26 @@ def _extract_prediction_head_tying(model: Any, config: Any) -> dict[str, str]:
     if _module_has(model, "roberta"):
         bert_model = model.roberta
         base_name = "roberta"
+    elif _module_has(model, "deberta"):
+        bert_model = model.deberta
+        base_name = "deberta"
     elif _module_has(model, "bert"):
         bert_model = model.bert
         base_name = "bert"
+    elif _module_has(model, "distilbert"):
+        projector = getattr(model, "vocab_projector", None)
+        projector_weight = getattr(projector, "weight", None)
+        embeddings = getattr(
+            getattr(model.distilbert, "embeddings", None), "word_embeddings", None
+        )
+        embedding_weight = getattr(embeddings, "weight", None)
+        if projector_weight is not None and projector_weight is embedding_weight:
+            return {
+                "vocab_projector.weight": (
+                    "distilbert.embeddings.word_embeddings.weight"
+                )
+            }
+        return {}
     else:
         return {}
     if not _module_has(bert_model, "embeddings"):
@@ -473,7 +547,7 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
                 except AdapterError:
                     pass
                 else:
-                    if _has_complete_attention_structure(first_layer):
+                    if _resolve_mlm_layer_variant(first_layer) is not None:
                         return True
 
         # Direct HuggingFace BERT model type check
@@ -504,17 +578,11 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
                         return False
 
                     if from_wrapper:
-                        if (
-                            hasattr(layer, "attention")
-                            and hasattr(layer.attention, "self")
-                            and _has_set_attr(layer.attention.self, "query")
-                            and _has_set_attr(layer.attention.self, "key")
-                            and _has_set_attr(layer.attention.self, "value")
-                        ):
+                        if _resolve_mlm_layer_variant(layer) is not None:
                             return True
                         return False
 
-                    if _has_complete_attention_structure(layer):
+                    if _resolve_mlm_layer_variant(layer) is not None:
                         return True
 
         return False
@@ -585,15 +653,35 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
 
         for layer_idx in range(n_layers):
             layer = _resolve_layer_by_index(layers, layer_idx, encoder)
+            layer_variant = _resolve_mlm_layer_variant(layer)
+            if layer_variant is None:
+                raise AdapterError(
+                    code="E202",
+                    message=(
+                        "ADAPTER-STRUCTURE-INVALID: unrecognized HuggingFace BERT model structure"
+                    ),
+                    details={
+                        "model_class": model.__class__.__name__,
+                        "layer_idx": int(layer_idx),
+                    },
+                )
 
             # For BERT, all layers have the same head count
             heads_per_layer.append(n_heads)
 
             # Get MLP intermediate dimension
-            if hasattr(layer.intermediate, "dense") and hasattr(
+            if layer_variant == "bert" and hasattr(layer.intermediate, "dense") and hasattr(
                 layer.intermediate.dense, "weight"
             ):
                 # Linear layer: (out_features, in_features)
+                mlp_dim = layer.intermediate.dense.weight.shape[0]
+            elif layer_variant == "distilbert" and hasattr(layer.ffn, "lin1") and hasattr(
+                layer.ffn.lin1, "weight"
+            ):
+                mlp_dim = layer.ffn.lin1.weight.shape[0]
+            elif layer_variant == "deberta-v2" and hasattr(
+                layer.intermediate, "dense"
+            ) and hasattr(layer.intermediate.dense, "weight"):
                 mlp_dim = layer.intermediate.dense.weight.shape[0]
             else:
                 # Fallback to config
@@ -646,6 +734,10 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
             "device": str(device),
             # HuggingFace specific info
             "hf_model_type": getattr(config, "model_type", model_type),
+            "spec": (
+                _resolve_mlm_layer_variant(_resolve_layer_by_index(layers, 0, encoder))
+                or "bert"
+            ),
             "hf_config_class": config.__class__.__name__
             if hasattr(config, "__class__")
             else "unknown",
@@ -729,16 +821,46 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
 
         try:
             layer = _resolve_layer_by_index(layers, layer_idx, encoder)
-            modules = {
-                "attention.self.query": layer.attention.self.query,  # Query projection
-                "attention.self.key": layer.attention.self.key,  # Key projection
-                "attention.self.value": layer.attention.self.value,  # Value projection
-                "attention.output.dense": layer.attention.output.dense,  # Attention output projection
-                "intermediate.dense": layer.intermediate.dense,  # FFN intermediate
-                "output.dense": layer.output.dense,  # FFN output
-                "attention.output.LayerNorm": layer.attention.output.LayerNorm,  # Attention LayerNorm
-                "output.LayerNorm": layer.output.LayerNorm,  # FFN LayerNorm
-            }
+            layer_variant = _resolve_mlm_layer_variant(layer)
+            if layer_variant == "distilbert":
+                modules = {
+                    "attention.self.query": layer.attention.q_lin,
+                    "attention.self.key": layer.attention.k_lin,
+                    "attention.self.value": layer.attention.v_lin,
+                    "attention.output.dense": layer.attention.out_lin,
+                    "intermediate.dense": layer.ffn.lin1,
+                    "output.dense": layer.ffn.lin2,
+                    "attention.output.LayerNorm": layer.sa_layer_norm,
+                    "output.LayerNorm": layer.output_layer_norm,
+                }
+            elif layer_variant == "deberta-v2":
+                modules = {
+                    "attention.self.query": layer.attention.self.query_proj,
+                    "attention.self.key": layer.attention.self.key_proj,
+                    "attention.self.value": layer.attention.self.value_proj,
+                    "attention.output.dense": layer.attention.output.dense,
+                    "intermediate.dense": layer.intermediate.dense,
+                    "output.dense": layer.output.dense,
+                    "attention.output.LayerNorm": layer.attention.output.LayerNorm,
+                    "output.LayerNorm": layer.output.LayerNorm,
+                }
+            elif layer_variant == "bert":
+                modules = {
+                    "attention.self.query": layer.attention.self.query,
+                    "attention.self.key": layer.attention.self.key,
+                    "attention.self.value": layer.attention.self.value,
+                    "attention.output.dense": layer.attention.output.dense,
+                    "intermediate.dense": layer.intermediate.dense,
+                    "output.dense": layer.output.dense,
+                    "attention.output.LayerNorm": layer.attention.output.LayerNorm,
+                    "output.LayerNorm": layer.output.LayerNorm,
+                }
+            else:
+                raise AdapterError(
+                    code="E202",
+                    message=("ADAPTER-STRUCTURE-INVALID: could not access encoder layer"),
+                    details={"layer_idx": int(layer_idx)},
+                )
         except (AttributeError, KeyError, TypeError) as exc:
             raise AdapterError(
                 code="E202",
