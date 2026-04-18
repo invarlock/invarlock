@@ -226,5 +226,5 @@ def test_custom_datasets_notebook_uses_portable_python_shell_probe() -> None:
     matching = [source for source in cell_sources if "byod_preset.yaml" in source]
     assert matching
     shell_probe = matching[0]
-    assert 'command -v python3 || command -v python' in shell_probe
+    assert "command -v python3 || command -v python" in shell_probe
     assert 'python -c "import yaml' not in shell_probe
