@@ -431,7 +431,9 @@ def test_hf_causal_adapter_returns_opt_layer_modules() -> None:
 
     modules = adapter.get_layer_modules(model, 0)
 
-    assert modules["self_attn.o_proj"] is model.model.decoder.layers[0].self_attn.out_proj
+    assert (
+        modules["self_attn.o_proj"] is model.model.decoder.layers[0].self_attn.out_proj
+    )
     assert modules["mlp.c_fc"] is model.model.decoder.layers[0].fc1
     assert modules["mlp.c_proj"] is model.model.decoder.layers[0].fc2
 

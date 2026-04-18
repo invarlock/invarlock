@@ -670,18 +670,24 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
             heads_per_layer.append(n_heads)
 
             # Get MLP intermediate dimension
-            if layer_variant == "bert" and hasattr(layer.intermediate, "dense") and hasattr(
-                layer.intermediate.dense, "weight"
+            if (
+                layer_variant == "bert"
+                and hasattr(layer.intermediate, "dense")
+                and hasattr(layer.intermediate.dense, "weight")
             ):
                 # Linear layer: (out_features, in_features)
                 mlp_dim = layer.intermediate.dense.weight.shape[0]
-            elif layer_variant == "distilbert" and hasattr(layer.ffn, "lin1") and hasattr(
-                layer.ffn.lin1, "weight"
+            elif (
+                layer_variant == "distilbert"
+                and hasattr(layer.ffn, "lin1")
+                and hasattr(layer.ffn.lin1, "weight")
             ):
                 mlp_dim = layer.ffn.lin1.weight.shape[0]
-            elif layer_variant == "deberta-v2" and hasattr(
-                layer.intermediate, "dense"
-            ) and hasattr(layer.intermediate.dense, "weight"):
+            elif (
+                layer_variant == "deberta-v2"
+                and hasattr(layer.intermediate, "dense")
+                and hasattr(layer.intermediate.dense, "weight")
+            ):
                 mlp_dim = layer.intermediate.dense.weight.shape[0]
             else:
                 # Fallback to config
@@ -858,7 +864,9 @@ class HF_MLM_Adapter(HFAdapterMixin, ModelAdapter):
             else:
                 raise AdapterError(
                     code="E202",
-                    message=("ADAPTER-STRUCTURE-INVALID: could not access encoder layer"),
+                    message=(
+                        "ADAPTER-STRUCTURE-INVALID: could not access encoder layer"
+                    ),
                     details={"layer_idx": int(layer_idx)},
                 )
         except (AttributeError, KeyError, TypeError) as exc:

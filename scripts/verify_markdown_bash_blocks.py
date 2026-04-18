@@ -603,9 +603,7 @@ def _sanitize_script(
                     break
                 probe_index += 1
         if execution_mode == "host" and any(
-            _should_skip_line_for_host_mode(part)
-            for part in continuation_parts
-            if part
+            _should_skip_line_for_host_mode(part) for part in continuation_parts if part
         ):
             rendered.append(f"echo '[skip-host] {stripped}'")
             skipping_continuation = stripped.endswith("\\")

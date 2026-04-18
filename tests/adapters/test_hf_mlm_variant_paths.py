@@ -181,9 +181,17 @@ def test_hf_mlm_adapter_returns_distilbert_layer_modules() -> None:
 
     modules = adapter.get_layer_modules(model, 0)
 
-    assert modules["attention.self.query"] is model.distilbert.transformer.layer[0].attention.q_lin
-    assert modules["intermediate.dense"] is model.distilbert.transformer.layer[0].ffn.lin1
-    assert modules["output.LayerNorm"] is model.distilbert.transformer.layer[0].output_layer_norm
+    assert (
+        modules["attention.self.query"]
+        is model.distilbert.transformer.layer[0].attention.q_lin
+    )
+    assert (
+        modules["intermediate.dense"] is model.distilbert.transformer.layer[0].ffn.lin1
+    )
+    assert (
+        modules["output.LayerNorm"]
+        is model.distilbert.transformer.layer[0].output_layer_norm
+    )
 
 
 def test_hf_mlm_adapter_handles_deberta_v2_layout() -> None:
@@ -210,6 +218,14 @@ def test_hf_mlm_adapter_returns_deberta_v2_layer_modules() -> None:
 
     modules = adapter.get_layer_modules(model, 0)
 
-    assert modules["attention.self.query"] is model.deberta.encoder.layer[0].attention.self.query_proj
-    assert modules["attention.output.dense"] is model.deberta.encoder.layer[0].attention.output.dense
-    assert modules["output.LayerNorm"] is model.deberta.encoder.layer[0].output.LayerNorm
+    assert (
+        modules["attention.self.query"]
+        is model.deberta.encoder.layer[0].attention.self.query_proj
+    )
+    assert (
+        modules["attention.output.dense"]
+        is model.deberta.encoder.layer[0].attention.output.dense
+    )
+    assert (
+        modules["output.LayerNorm"] is model.deberta.encoder.layer[0].output.LayerNorm
+    )
