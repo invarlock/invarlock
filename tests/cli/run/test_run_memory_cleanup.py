@@ -51,3 +51,39 @@ def test_free_model_memory_swallows_cuda_exceptions(monkeypatch):
 
     monkeypatch.setattr(run_runtime, "torch", SimpleNamespace(cuda=FakeCuda()))
     run_runtime.free_model_memory(object())
+
+
+def test_release_process_memory_invokes_cuda_and_malloc_trim(monkeypatch):
+    calls = {"empty_cache": 0, "synchronize": 0, "malloc_trim": 0}
+
+    class FakeCuda:
+        def is_available(self) -> bool:
+            return True
+
+        def empty_cache(self) -> None:
+            calls["empty_cache"] += 1
+
+        def synchronize(self) -> None:
+            calls["synchronize"] += 1
+
+    monkeypatch.setattr(run_runtime, "torch", SimpleNamespace(cuda=FakeCuda()))
+    monkeypatch.setattr(
+        run_runtime,
+        "_malloc_trim",
+        lambda: calls.__setitem__("malloc_trim", calls["malloc_trim"] + 1) or True,
+    )
+
+    run_runtime.release_process_memory()
+
+    assert calls == {"empty_cache": 1, "synchronize": 1, "malloc_trim": 1}
+
+
+def test_release_process_memory_swallows_malloc_trim_exceptions(monkeypatch):
+    monkeypatch.setattr(run_runtime, "torch", None)
+
+    def _boom() -> bool:
+        raise OSError("boom")
+
+    monkeypatch.setattr(run_runtime, "_malloc_trim", _boom)
+
+    run_runtime.release_process_memory()

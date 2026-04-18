@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import builtins
+import gc
+from ctypes import CDLL, c_int, c_size_t
 from types import ModuleType
 from typing import Any
 
@@ -40,6 +42,38 @@ def reset_optional_runtime_caches() -> None:
         torch = _import_optional_module("torch")
 
 
+def _malloc_trim() -> bool:
+    try:
+        libc = CDLL(None)
+        trim = getattr(libc, "malloc_trim", None)
+        if trim is None:
+            return False
+        trim.argtypes = [c_size_t]
+        trim.restype = c_int
+        return bool(trim(0))
+    except (AttributeError, OSError, TypeError, ValueError):
+        return False
+
+
+def release_process_memory() -> None:
+    """Best-effort process-wide memory trim after heavyweight model work."""
+    try:
+        gc.collect()
+    except (RuntimeError, TypeError, ValueError):
+        pass
+    try:
+        torch_mod = get_torch()
+        if torch_mod is not None and torch_mod.cuda.is_available():
+            torch_mod.cuda.empty_cache()
+            torch_mod.cuda.synchronize()
+    except (RuntimeError, TypeError, ValueError, AttributeError):
+        pass
+    try:
+        _malloc_trim()
+    except (RuntimeError, TypeError, ValueError, AttributeError, OSError):
+        pass
+
+
 def detect_model_profile(model_id: str, adapter: str | None = None) -> Any:
     from invarlock.model_profile import detect_model_profile as _detect_model_profile
 
@@ -65,14 +99,8 @@ def free_model_memory(model: object | None) -> None:
     if model is None:
         return
     try:
-        import gc
-
-        torch_mod = get_torch()
         del model
-        gc.collect()
-        if torch_mod is not None and torch_mod.cuda.is_available():
-            torch_mod.cuda.empty_cache()
-            torch_mod.cuda.synchronize()
+        release_process_memory()
     except (ImportError, RuntimeError, TypeError, ValueError, AttributeError):
         # Cleanup should never raise; fallback is to proceed without cache purge.
         return

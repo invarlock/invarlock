@@ -188,6 +188,12 @@ def _print_quiet_summary(
     )
 
 
+def _release_phase_memory() -> None:
+    from .. import run_runtime as run_runtime_mod
+
+    run_runtime_mod.release_process_memory()
+
+
 def _load_yaml(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as fh:
         data = yaml.safe_load(fh) or {}
@@ -492,6 +498,7 @@ def evaluate_command(
         phase_fn=_phase,
         fail_fn=_fail,
     )
+    _release_phase_memory()
 
     edited_report, edited_payload = _run_subject_evaluation_phase(
         baseline_report_path=baseline_report_path,
@@ -524,6 +531,7 @@ def evaluate_command(
         phase_fn=_phase,
         fail_fn=_fail,
     )
+    _release_phase_memory()
 
     _phase(3, 3, "EVALUATION REPORT GENERATION")
 
