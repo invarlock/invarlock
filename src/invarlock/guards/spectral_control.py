@@ -13,6 +13,19 @@ _SPECTRAL_CONTROL_ERRORS = (
 )
 
 
+def _is_matrix_weight(weight: Any) -> bool:
+    if weight is None:
+        return False
+    try:
+        return int(getattr(weight, "ndim", 0) or 0) == 2
+    except (TypeError, ValueError):
+        return False
+
+
+def _is_quantized_weight(weight: Any) -> bool:
+    return getattr(weight, "dtype", None) in {torch.int8, torch.uint8}
+
+
 def apply_weight_rescale(
     model: Any,
     scale_factor: float = 1.0,
@@ -34,14 +47,15 @@ def apply_weight_rescale(
                 continue
             try:
                 weight = getattr(module, "weight", None)
-                if isinstance(weight, torch.Tensor) and weight.ndim == 2:
-                    if hasattr(weight, "dtype") and weight.dtype in [torch.int8]:
-                        continue
-                    with torch.no_grad():
-                        weight.mul_(scale_factor)
-                        if hasattr(module, "bias") and module.bias is not None:
-                            module.bias.mul_(scale_factor)
-                    rescaled_modules.append(name)
+                if not _is_matrix_weight(weight):
+                    continue
+                if _is_quantized_weight(weight):
+                    continue
+                with torch.no_grad():
+                    weight.mul_(scale_factor)
+                    if hasattr(module, "bias") and module.bias is not None:
+                        module.bias.mul_(scale_factor)
+                rescaled_modules.append(name)
             except _SPECTRAL_CONTROL_ERRORS as error:
                 failed_modules.append((name, str(error)))
 
@@ -96,24 +110,25 @@ def apply_relative_spectral_cap(
                 continue
             try:
                 weight = getattr(module, "weight", None)
-                if isinstance(weight, torch.Tensor) and weight.ndim == 2:
-                    if hasattr(weight, "dtype") and weight.dtype in [torch.int8]:
-                        continue
-                    current_sigma = compute_sigma_max_fn(weight)
-                    baseline_sigma = baseline_sigmas.get(name, current_sigma)
-                    max_allowed = baseline_sigma * cap_ratio
-                    if current_sigma > max_allowed:
-                        scale_factor = max_allowed / current_sigma
-                        with torch.no_grad():
-                            weight.mul_(scale_factor)
-                        capped_modules.append(
-                            {
-                                "module": name,
-                                "original_sigma": current_sigma,
-                                "capped_sigma": max_allowed,
-                                "scale_factor": scale_factor,
-                            }
-                        )
+                if not _is_matrix_weight(weight):
+                    continue
+                if _is_quantized_weight(weight):
+                    continue
+                current_sigma = compute_sigma_max_fn(weight)
+                baseline_sigma = baseline_sigmas.get(name, current_sigma)
+                max_allowed = baseline_sigma * cap_ratio
+                if current_sigma > max_allowed:
+                    scale_factor = max_allowed / current_sigma
+                    with torch.no_grad():
+                        weight.mul_(scale_factor)
+                    capped_modules.append(
+                        {
+                            "module": name,
+                            "original_sigma": current_sigma,
+                            "capped_sigma": max_allowed,
+                            "scale_factor": scale_factor,
+                        }
+                    )
             except _SPECTRAL_CONTROL_ERRORS as error:
                 failed_modules.append((name, str(error)))
 
