@@ -15,6 +15,8 @@ from invarlock.core.runner_pairing import (
 
 def test_duplicate_fraction_paths() -> None:
     assert _hash_tokens([]) == b""
+    assert _hash_tokens([1, 2, 3]) == _hash_tokens([1, 2, 3])
+    assert _hash_tokens([1, 2, 3]) != _hash_tokens([3, 2, 1])
     assert duplicate_fraction([]) == 0.0
     assert duplicate_fraction([[]]) == 0.0
     assert duplicate_fraction([[1, 2, 3], [1, 2, 3]]) == pytest.approx(0.5)
