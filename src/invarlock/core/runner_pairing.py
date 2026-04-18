@@ -21,10 +21,36 @@ def _hash_tokens(tokens: Sequence[int]) -> bytes:
     return hashlib.blake2b(token_array.tobytes(), digest_size=16).digest()
 
 
-def duplicate_fraction(seqs: Sequence[Sequence[int]]) -> float:
+def _hash_window_evidence(
+    tokens: Sequence[int],
+    labels: Sequence[int] | None = None,
+) -> bytes:
+    if not tokens:
+        return b""
+    hasher = hashlib.blake2b(digest_size=16)
+    token_array = array("I", (int(token) & 0xFFFFFFFF for token in tokens))
+    hasher.update(token_array.tobytes())
+    if labels is None:
+        hasher.update(b"\x00")
+        return hasher.digest()
+    label_array = array("q", (int(label) for label in labels))
+    hasher.update(b"\x01")
+    hasher.update(label_array.tobytes())
+    return hasher.digest()
+
+
+def duplicate_fraction(
+    seqs: Sequence[Sequence[int]],
+    *,
+    labels: Sequence[Sequence[int]] | None = None,
+) -> float:
     if not seqs:
         return 0.0
-    hashes = [_hash_tokens(seq) for seq in seqs]
+    use_labels = labels is not None and len(labels) == len(seqs)
+    hashes = [
+        _hash_window_evidence(seq, labels[idx] if use_labels else None)
+        for idx, seq in enumerate(seqs)
+    ]
     unique = len(set(hashes))
     return max(0.0, (len(hashes) - unique) / len(hashes))
 
@@ -59,6 +85,8 @@ def compare_with_baseline(
     run_tokens: Sequence[Sequence[int]],
     baseline_section: dict[str, Any] | None,
     split_label: str,
+    *,
+    run_labels: Sequence[Sequence[int]] | None = None,
 ) -> dict[str, Any]:
     stats = {
         "matched": 0,
@@ -83,13 +111,34 @@ def compare_with_baseline(
         stats["reason"] = "invalid_baseline_reference"
         return stats
 
+    base_labels_raw = baseline_section.get("labels")
+    base_labels: list[list[int]] | None = None
+    if isinstance(base_labels_raw, list) and len(base_labels_raw) == len(base_ids):
+        base_labels = []
+        for row in base_labels_raw:
+            try:
+                row_list = list(row) if not isinstance(row, list) else row
+                base_labels.append([int(value) for value in row_list])
+            except _PAIRING_COERCION_ERRORS:
+                base_labels = None
+                break
+
+    use_label_hashes = (
+        base_labels is not None
+        and run_labels is not None
+        and len(run_labels) >= len(run_tokens)
+    )
+
     base_map: dict[int, bytes] = {}
     invalid_baseline_reference = False
-    for base_id, seq in zip(base_ids, base_tokens, strict=False):
+    for index, (base_id, seq) in enumerate(zip(base_ids, base_tokens, strict=False)):
         try:
             base_id_int = int(base_id)
             seq_list = list(seq) if not isinstance(seq, list) else seq
-            base_map[base_id_int] = _hash_tokens(seq_list)
+            base_map[base_id_int] = _hash_window_evidence(
+                seq_list,
+                base_labels[index] if use_label_hashes else None,
+            )
         except _PAIRING_COERCION_ERRORS:
             invalid_baseline_reference = True
             break
@@ -105,14 +154,17 @@ def compare_with_baseline(
     mismatched: list[int] = []
     unexpected: list[int] = []
 
-    for run_id, seq in zip(run_ids, run_tokens, strict=False):
+    for index, (run_id, seq) in enumerate(zip(run_ids, run_tokens, strict=False)):
         try:
             run_id_int = int(run_id)
         except _PAIRING_COERCION_ERRORS:
             unexpected.append(run_id)
             continue
 
-        hashed = _hash_tokens(seq)
+        hashed = _hash_window_evidence(
+            seq,
+            run_labels[index] if use_label_hashes else None,
+        )
         if run_id_int not in base_map:
             unexpected.append(run_id_int)
             continue
@@ -149,8 +201,10 @@ def compute_window_pairing_metrics(
     *,
     preview_window_ids: Sequence[int],
     preview_tokens: Sequence[Sequence[int]],
+    preview_labels: Sequence[Sequence[int]] | None = None,
     final_window_ids: Sequence[int],
     final_tokens: Sequence[Sequence[int]],
+    final_labels: Sequence[Sequence[int]] | None = None,
     pairing_context: dict[str, Any] | None,
     config_context: dict[str, Any] | None,
     preview_batches: int,
@@ -164,10 +218,18 @@ def compute_window_pairing_metrics(
     )
 
     preview_pair_stats = compare_with_baseline(
-        preview_window_ids, preview_tokens, baseline_preview, "preview"
+        preview_window_ids,
+        preview_tokens,
+        baseline_preview,
+        "preview",
+        run_labels=preview_labels,
     )
     final_pair_stats = compare_with_baseline(
-        final_window_ids, final_tokens, baseline_final, "final"
+        final_window_ids,
+        final_tokens,
+        baseline_final,
+        "final",
+        run_labels=final_labels,
     )
 
     total_expected = preview_pair_stats["expected"] + final_pair_stats["expected"]
@@ -179,7 +241,18 @@ def compute_window_pairing_metrics(
     match_fraction = (
         float(total_matched / match_denominator) if match_denominator > 0 else 1.0
     )
-    duplicate_fraction_value = duplicate_fraction([*preview_tokens, *final_tokens])
+    combined_labels: list[Sequence[int]] | None = None
+    if (
+        preview_labels is not None
+        and final_labels is not None
+        and len(preview_labels) == len(preview_tokens)
+        and len(final_labels) == len(final_tokens)
+    ):
+        combined_labels = [*preview_labels, *final_labels]
+    duplicate_fraction_value = duplicate_fraction(
+        [*preview_tokens, *final_tokens],
+        labels=combined_labels,
+    )
     overlap_fraction = overlap_fraction_from_context(config_context)
     overlap_unknown = overlap_fraction is None
     overlap_fraction_value = overlap_fraction if overlap_fraction is not None else 1.0

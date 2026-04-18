@@ -17,6 +17,17 @@ def test_duplicate_fraction_paths() -> None:
     assert duplicate_fraction([[]]) == 0.0
     assert duplicate_fraction([[1, 2, 3], [1, 2, 3]]) == pytest.approx(0.5)
     assert duplicate_fraction([[1, 2, 3], [3, 2, 1]]) == 0.0
+    assert (
+        duplicate_fraction(
+            [[1, 2, 3], [1, 2, 3]],
+            labels=[[-100, 10, -100], [-100, 11, -100]],
+        )
+        == 0.0
+    )
+    assert duplicate_fraction(
+        [[1, 2, 3], [1, 2, 3]],
+        labels=[[-100, 10, -100], [-100, 10, -100]],
+    ) == pytest.approx(0.5)
 
 
 def test_overlap_fraction_from_context_paths() -> None:
@@ -94,6 +105,35 @@ def test_compare_with_baseline_paths() -> None:
     assert unexpected_only["unexpected_ids"] == [6]
     assert unexpected_only["missing_ids"] == []
     assert unexpected_only["reason"].startswith("final_unexpected_ids")
+
+    label_match = compare_with_baseline(
+        [7],
+        [[1, 2, 3]],
+        {
+            "window_ids": [7],
+            "input_ids": [[1, 2, 3]],
+            "labels": [[-100, 10, -100]],
+        },
+        "preview",
+        run_labels=[[-100, 10, -100]],
+    )
+    assert label_match["matched"] == 1
+    assert label_match["reason"] is None
+
+    label_mismatch = compare_with_baseline(
+        [7],
+        [[1, 2, 3]],
+        {
+            "window_ids": [7],
+            "input_ids": [[1, 2, 3]],
+            "labels": [[-100, 10, -100]],
+        },
+        "preview",
+        run_labels=[[-100, 11, -100]],
+    )
+    assert label_mismatch["matched"] == 0
+    assert label_mismatch["mismatched_ids"] == [7]
+    assert label_mismatch["reason"].startswith("preview_token_mismatch")
 
 
 def test_compute_window_pairing_metrics_paths() -> None:
@@ -195,8 +235,10 @@ def test_compute_window_pairing_metrics_paths() -> None:
     zero_expected = compute_window_pairing_metrics(
         preview_window_ids=[],
         preview_tokens=[],
+        preview_labels=[],
         final_window_ids=[],
         final_tokens=[],
+        final_labels=[],
         pairing_context={
             "preview": {"window_ids": [], "input_ids": []},
             "final": {"window_ids": [], "input_ids": []},
@@ -207,6 +249,33 @@ def test_compute_window_pairing_metrics_paths() -> None:
     )
     assert zero_expected["match_fraction"] == 1.0
     assert zero_expected["reason"] is None
+
+    mlm_distinct = compute_window_pairing_metrics(
+        preview_window_ids=[0],
+        preview_tokens=[[1, 2, 3]],
+        preview_labels=[[-100, 10, -100]],
+        final_window_ids=[1],
+        final_tokens=[[1, 2, 3]],
+        final_labels=[[-100, 11, -100]],
+        pairing_context={
+            "preview": {
+                "window_ids": [0],
+                "input_ids": [[1, 2, 3]],
+                "labels": [[-100, 10, -100]],
+            },
+            "final": {
+                "window_ids": [1],
+                "input_ids": [[1, 2, 3]],
+                "labels": [[-100, 11, -100]],
+            },
+        },
+        config_context={"dataset": {"seq_len": 4, "stride": 4}},
+        preview_batches=1,
+        final_batches=1,
+    )
+    assert mlm_distinct["match_fraction"] == 1.0
+    assert mlm_distinct["duplicate_fraction"] == 0.0
+    assert mlm_distinct["reason"] is None
 
 
 def test_assess_bootstrap_coverage_paths() -> None:

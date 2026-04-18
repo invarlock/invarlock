@@ -38,6 +38,42 @@ def test_baseline_harvest_success() -> None:
     assert out["window_plan"] == {"k": 1}
 
 
+def test_baseline_harvest_allows_distinct_mlm_labels_for_identical_inputs() -> None:
+    cfg = _Cfg()
+    pairing = {
+        "preview": {
+            "input_ids": [[101, 103, 102]],
+            "labels": [[-100, 75933, -100]],
+            "window_ids": [1],
+        },
+        "final": {
+            "input_ids": [[101, 103, 102]],
+            "labels": [[-100, 69350, -100]],
+            "window_ids": [2],
+        },
+    }
+    baseline = {
+        "data": {
+            "seq_len": 8,
+            "stride": 8,
+            "dataset": "wikitext2",
+            "split": "validation",
+        }
+    }
+    out = validate_and_harvest_baseline_schedule(
+        cfg,
+        pairing,
+        baseline,
+        tokenizer_hash=None,
+        resolved_loss_type="mlm",
+        baseline_path_str="baseline.json",
+        console=None,
+    )
+    assert out["effective_preview"] == 1
+    assert out["effective_final"] == 1
+    assert out["dataset_meta"]["loss_type"] == "mlm"
+
+
 def test_baseline_harvest_mismatch_raises() -> None:
     cfg = _Cfg()
     pairing = {

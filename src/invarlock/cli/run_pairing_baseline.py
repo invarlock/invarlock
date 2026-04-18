@@ -189,6 +189,23 @@ class _BaselineScheduleValidator:
         token_array = array("I", (int(token) & 0xFFFFFFFF for token in tokens))
         return hashlib.blake2b(token_array.tobytes(), digest_size=16).digest()
 
+    @staticmethod
+    def _hash_window_evidence(
+        tokens: list[int], labels: list[int] | None = None
+    ) -> bytes:
+        if not tokens:
+            return b""
+        hasher = hashlib.blake2b(digest_size=16)
+        token_array = array("I", (int(token) & 0xFFFFFFFF for token in tokens))
+        hasher.update(token_array.tobytes())
+        if labels is None:
+            hasher.update(b"\x00")
+            return hasher.digest()
+        label_array = array("q", (int(label) for label in labels))
+        hasher.update(b"\x01")
+        hasher.update(label_array.tobytes())
+        return hasher.digest()
+
     def _multimodal_arm_check(
         self,
         label: str,
@@ -331,7 +348,7 @@ class _BaselineScheduleValidator:
         self,
         label: str,
         section: dict[str, Any],
-    ) -> tuple[list[int], list[list[int]]]:
+    ) -> tuple[list[int], list[list[int]], list[list[int]] | None]:
         window_ids = section.get("window_ids")
         input_ids = section.get("input_ids")
         masks = section.get("attention_masks")
@@ -396,15 +413,18 @@ class _BaselineScheduleValidator:
                 pass
 
         labels = section.get("labels")
+        label_rows: list[list[int]] | None = None
         if isinstance(labels, list) and labels:
             if len(labels) != len(seqs):
                 self._fail_schedule(f"{label} labels length mismatch")
+            label_rows = []
             for idx, row in enumerate(labels):
                 row_ints = self.tensor_or_list_to_ints_fn(row)
                 if len(row_ints) != len(seqs[idx]):
                     self._fail_schedule(
                         f"{label} labels length mismatch at index {idx}"
                     )
+                label_rows.append(row_ints)
 
         for key in ("masked_token_counts", "actual_token_counts"):
             raw_counts = section.get(key)
@@ -413,15 +433,36 @@ class _BaselineScheduleValidator:
             ):
                 self._fail_schedule(f"{label} {key} length mismatch")
 
-        return ids_int, seqs
+        return ids_int, seqs, label_rows
 
     def _validate_text_hashes(
         self,
         preview_seqs: list[list[int]],
         final_seqs: list[list[int]],
+        *,
+        preview_labels: list[list[int]] | None = None,
+        final_labels: list[list[int]] | None = None,
     ) -> None:
-        preview_hashes = [self._hash_tokens(seq) for seq in preview_seqs]
-        final_hashes = [self._hash_tokens(seq) for seq in final_seqs]
+        use_preview_labels = preview_labels is not None and len(preview_labels) == len(
+            preview_seqs
+        )
+        use_final_labels = final_labels is not None and len(final_labels) == len(
+            final_seqs
+        )
+        preview_hashes = [
+            self._hash_window_evidence(
+                seq,
+                preview_labels[idx] if use_preview_labels else None,
+            )
+            for idx, seq in enumerate(preview_seqs)
+        ]
+        final_hashes = [
+            self._hash_window_evidence(
+                seq,
+                final_labels[idx] if use_final_labels else None,
+            )
+            for idx, seq in enumerate(final_seqs)
+        ]
         if len(set(preview_hashes)) != len(preview_hashes):
             self._fail_schedule("duplicate token sequences detected in preview arm")
         if len(set(final_hashes)) != len(final_hashes):
@@ -457,8 +498,8 @@ class _BaselineScheduleValidator:
         preview: dict[str, Any],
         final: dict[str, Any],
     ) -> None:
-        preview_ids, preview_seqs = self._arm_check("preview", preview)
-        final_ids, final_seqs = self._arm_check("final", final)
+        preview_ids, preview_seqs, preview_labels = self._arm_check("preview", preview)
+        final_ids, final_seqs, final_labels = self._arm_check("final", final)
 
         if len(set(preview_ids)) != len(preview_ids):
             self._fail_schedule("duplicate window_ids detected in preview arm")
@@ -467,7 +508,12 @@ class _BaselineScheduleValidator:
         if set(preview_ids) & set(final_ids):
             self._fail_schedule("window_ids overlap between preview and final arms")
 
-        self._validate_text_hashes(preview_seqs, final_seqs)
+        self._validate_text_hashes(
+            preview_seqs,
+            final_seqs,
+            preview_labels=preview_labels,
+            final_labels=final_labels,
+        )
 
     def _build_text_result(self) -> dict[str, Any]:
         baseline_preview = len(self.pairing_schedule["preview"].get("input_ids") or [])
