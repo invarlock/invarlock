@@ -52,6 +52,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   standalone core CLI surface (`evaluate --help`, `verify`, `report html`,
   `invarlock-runtime-verify`), packaged published-basis evidence-path
   resolution, and evidence-pack verification from outside the repo tree.
+- Split the installed-wheel packaging smoke by behavior so the dedicated
+  front-door `evaluate -> verify -> report html` contract lane now lives in
+  its own packaging test file while preserving the same outside-the-repo
+  installed-wheel coverage.
+- Tightened the docs lint contract so `make verify` now runs a strict
+  `docs-lint-strict` lane that fails when the pinned markdownlint/cspell
+  toolchain is unavailable, while keeping the plain local docs lint entrypoint
+  permissive for day-to-day maintainer use.
 - Refactored the evidence-pack, runtime-security, verify-check, model-profile,
   guard-policy, and orchestration-attempt internals into smaller owner modules
   without changing the public CLI surface.
@@ -74,6 +82,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   maintainer test docs, evidence-pack guidance and verification surfaces, and
   runtime-image error messages no longer describe container-backed manifests as
   "verified" outputs.
+- Fixed the live-example and installed-wheel Hugging Face smoke paths to reuse
+  a writable shared cache before falling back to run-local temp caches, and
+  disabled Transformers safetensors auto-conversion lookups in those smoke
+  environments, which reduces rate-limit sensitivity while preserving
+  deterministic local cleanup.
+- Fixed transient `tmp/live_examples/.../workspaces` cleanup failures so
+  repeated `make docs-live` and markdown smoke runs no longer trip over
+  short-lived directory-not-empty races during workspace teardown.
 - Fixed standalone-product wording across README, docs, live-example tooling,
   and evidence-pack summaries so public guidance no longer frames the OSS repo
   around vague feeder-consumer wording.
@@ -94,6 +110,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cover `doctor`, `verify`, `report html`, `invarlock-runtime-verify`,
   contract catalog loading, and advanced evidence-pack verification from outside
   the repo tree.
+- Fixed duplicated host/container wording in the evidence-pack guide so the
+  host-side repo-wrapper workflow is described cleanly and consistently.
 
 ## [0.7.2] - 2026-04-15
 
