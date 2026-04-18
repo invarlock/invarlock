@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import re
 import shlex
@@ -748,6 +749,32 @@ def _build_demo_evaluation_report(
     return evaluation_report
 
 
+def _demo_window_summary(section: dict[str, object]) -> tuple[float, float, int] | None:
+    loglosses = section.get("logloss")
+    token_counts = section.get("token_counts")
+    if not isinstance(loglosses, list) or not loglosses:
+        return None
+    if not isinstance(token_counts, list) or len(token_counts) != len(loglosses):
+        token_counts = [1] * len(loglosses)
+
+    weighted_total = 0.0
+    total_tokens = 0
+    for logloss, token_count in zip(loglosses, token_counts, strict=False):
+        try:
+            logloss_f = float(logloss)
+            token_count_i = int(token_count)
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(logloss_f) or token_count_i <= 0:
+            return None
+        weighted_total += logloss_f * token_count_i
+        total_tokens += token_count_i
+    if total_tokens <= 0:
+        return None
+    mean_logloss = weighted_total / total_tokens
+    return mean_logloss, math.exp(mean_logloss), total_tokens
+
+
 def _seed_demo_inputs(workspace: Path) -> None:
     evaluation_targets = (
         workspace / "reports" / "eval" / "evaluation.report.json",
@@ -880,6 +907,29 @@ def _seed_demo_inputs(workspace: Path) -> None:
             "rollback_reason": None,
         },
     }
+    baseline_final_summary = _demo_window_summary(
+        baseline_report["evaluation_windows"]["final"]
+    )
+    subject_final_summary = _demo_window_summary(
+        run_report["evaluation_windows"]["final"]
+    )
+    if baseline_final_summary is not None:
+        baseline_mean_logloss, baseline_ppl, baseline_tokens = baseline_final_summary
+        run_report["metrics"]["primary_metric"]["preview"] = baseline_ppl
+        run_report["metrics"]["preview_total_tokens"] = baseline_tokens
+        baseline_report["metrics"]["primary_metric"]["final"] = baseline_ppl
+    else:
+        baseline_mean_logloss = None
+    if subject_final_summary is not None:
+        subject_mean_logloss, subject_ppl, subject_tokens = subject_final_summary
+        run_report["metrics"]["primary_metric"]["final"] = subject_ppl
+        run_report["metrics"]["final_total_tokens"] = subject_tokens
+    else:
+        subject_mean_logloss = None
+    if baseline_mean_logloss is not None and subject_mean_logloss is not None:
+        delta_mean_logloss = subject_mean_logloss - baseline_mean_logloss
+        run_report["metrics"]["paired_delta_summary"]["mean"] = delta_mean_logloss
+        run_report["metrics"]["logloss_delta"] = delta_mean_logloss
     for target in (
         workspace / "runs" / "baseline" / "report.json",
         workspace / "runs" / "source" / "report.json",

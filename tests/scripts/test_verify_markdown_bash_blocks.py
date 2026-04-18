@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import math
 import sys
 from pathlib import Path
 from types import ModuleType
+
+import pytest
 
 
 def _load_script_module() -> ModuleType:
@@ -447,6 +450,31 @@ def test_seed_demo_inputs_writes_expected_fixture_files(tmp_path: Path) -> None:
     ).is_file()
     assert (workspace / "resolved_policy.json").is_file()
     assert (workspace / "compatibility.json").is_file()
+
+
+def test_seed_demo_inputs_writes_self_consistent_demo_report(tmp_path: Path) -> None:
+    module = _load_script_module()
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    module._seed_demo_inputs(workspace)
+
+    report = json.loads(
+        (workspace / "reports" / "eval" / "evaluation.report.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    final_logs = report["evaluation_windows"]["final"]["logloss"]
+    final_counts = report["evaluation_windows"]["final"]["token_counts"]
+    weighted_final = sum(
+        float(logloss) * int(count)
+        for logloss, count in zip(final_logs, final_counts, strict=False)
+    ) / sum(int(count) for count in final_counts)
+
+    assert report["primary_metric"]["final"] == pytest.approx(math.exp(weighted_final))
+    assert report["baseline_ref"]["primary_metric"]["final"] == pytest.approx(
+        math.exp(2.30)
+    )
 
 
 def test_prepare_workspace_stages_lightweight_repo_view(tmp_path: Path) -> None:

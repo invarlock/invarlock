@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import math
 import sys
 from pathlib import Path
 from types import ModuleType
+
+import pytest
 
 
 def _load_script_module() -> ModuleType:
@@ -188,4 +191,18 @@ def test_seed_curated_demo_outputs_writes_expected_reports(tmp_path: Path) -> No
     assert (
         conservative["resolved_policy"]["metrics"]["pm_ratio"]["ratio_limit_base"]
         == 1.05
+    )
+    python_api_report = json.loads(
+        (
+            python_api_run_dir / "reports" / "python_api" / "evaluation.report.json"
+        ).read_text(encoding="utf-8")
+    )
+    final_logs = python_api_report["evaluation_windows"]["final"]["logloss"]
+    final_counts = python_api_report["evaluation_windows"]["final"]["token_counts"]
+    weighted_final = sum(
+        float(logloss) * int(count)
+        for logloss, count in zip(final_logs, final_counts, strict=False)
+    ) / sum(int(count) for count in final_counts)
+    assert python_api_report["primary_metric"]["final"] == pytest.approx(
+        math.exp(weighted_final)
     )
