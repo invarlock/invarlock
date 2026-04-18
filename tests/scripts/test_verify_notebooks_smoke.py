@@ -209,3 +209,22 @@ def test_seed_curated_demo_outputs_writes_expected_reports(tmp_path: Path) -> No
     assert python_api_report["primary_metric"]["ratio_vs_baseline"] == pytest.approx(
         1.0
     )
+
+
+def test_custom_datasets_notebook_uses_portable_python_shell_probe() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    notebook = json.loads(
+        (repo_root / "notebooks" / "invarlock_custom_datasets.ipynb").read_text(
+            encoding="utf-8"
+        )
+    )
+    cell_sources = [
+        "".join(cell.get("source", []))
+        for cell in notebook.get("cells", [])
+        if isinstance(cell, dict)
+    ]
+    matching = [source for source in cell_sources if "byod_preset.yaml" in source]
+    assert matching
+    shell_probe = matching[0]
+    assert 'command -v python3 || command -v python' in shell_probe
+    assert 'python -c "import yaml' not in shell_probe
