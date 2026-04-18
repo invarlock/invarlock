@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -107,3 +108,16 @@ def test_public_docs_use_repo_and_package_native_wording_for_pack_verification()
         text = _read(rel_path)
         for needle in banned:
             assert needle not in text, f"{needle} still present in {rel_path}"
+
+
+def test_docs_node_toolchain_contract_is_explicit_and_ci_aligned() -> None:
+    package_json = json.loads(_read("package.json"))
+    engines = package_json.get("engines", {})
+    assert engines.get("node") == ">=22.18.0"
+
+    npmrc = _read(".npmrc")
+    assert "engine-strict=true" in npmrc
+
+    contributing = _read("CONTRIBUTING.md")
+    assert "Node.js 22.18+ + npm" in contributing
+    assert "npm ci` will fail early on older versions" in contributing
