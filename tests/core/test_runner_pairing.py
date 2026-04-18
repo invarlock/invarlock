@@ -4,6 +4,7 @@ import pytest
 
 from invarlock.core.runner_pairing import (
     BOOTSTRAP_COVERAGE_REQUIREMENTS,
+    _hash_tokens,
     assess_bootstrap_coverage,
     compare_with_baseline,
     compute_window_pairing_metrics,
@@ -13,6 +14,7 @@ from invarlock.core.runner_pairing import (
 
 
 def test_duplicate_fraction_paths() -> None:
+    assert _hash_tokens([]) == b""
     assert duplicate_fraction([]) == 0.0
     assert duplicate_fraction([[]]) == 0.0
     assert duplicate_fraction([[1, 2, 3], [1, 2, 3]]) == pytest.approx(0.5)
@@ -134,6 +136,20 @@ def test_compare_with_baseline_paths() -> None:
     assert label_mismatch["matched"] == 0
     assert label_mismatch["mismatched_ids"] == [7]
     assert label_mismatch["reason"].startswith("preview_token_mismatch")
+
+    malformed_label_row = compare_with_baseline(
+        [7],
+        [[1, 2, 3]],
+        {
+            "window_ids": [7],
+            "input_ids": [[1, 2, 3]],
+            "labels": [object()],
+        },
+        "preview",
+        run_labels=[[-100, 11, -100]],
+    )
+    assert malformed_label_row["matched"] == 1
+    assert malformed_label_row["reason"] is None
 
 
 def test_compute_window_pairing_metrics_paths() -> None:
