@@ -581,7 +581,8 @@ def _sanitize_script(
     rendered: list[str] = []
     py = shlex.quote(sys.executable)
     skipping_continuation = False
-    for raw in block.text.splitlines():
+    block_lines = block.text.splitlines()
+    for line_index, raw in enumerate(block_lines):
         stripped = raw.strip()
         if skipping_continuation:
             skipping_continuation = stripped.endswith("\\")
@@ -592,8 +593,22 @@ def _sanitize_script(
         if stripped.startswith("#"):
             rendered.append(raw)
             continue
-        if execution_mode == "host" and _should_skip_line_for_host_mode(stripped):
+        continuation_parts = [stripped]
+        if stripped.endswith("\\"):
+            probe_index = line_index + 1
+            while probe_index < len(block_lines):
+                continuation = block_lines[probe_index].strip()
+                continuation_parts.append(continuation)
+                if not continuation.endswith("\\"):
+                    break
+                probe_index += 1
+        if execution_mode == "host" and any(
+            _should_skip_line_for_host_mode(part)
+            for part in continuation_parts
+            if part
+        ):
             rendered.append(f"echo '[skip-host] {stripped}'")
+            skipping_continuation = stripped.endswith("\\")
             continue
         tokens = stripped.split()
         if len(tokens) >= 2 and tokens[0] == "pip" and tokens[1] == "install":

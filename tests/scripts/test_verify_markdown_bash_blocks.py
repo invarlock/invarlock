@@ -190,6 +190,28 @@ def test_sanitize_script_host_mode_keeps_mps_commands_when_available(
     assert "--device mps" in rendered
 
 
+def test_sanitize_script_host_mode_skips_full_multiline_mps_command(
+    monkeypatch,
+) -> None:
+    module = _load_script_module()
+    monkeypatch.setattr(module, "_host_supports_mps", lambda: False)
+    block = module.BashBlock(
+        file="docs/reference/device-drift-bands.md",
+        line=1,
+        block_index=1,
+        text=(
+            "invarlock evaluate --baseline gpt2 --subject gpt2 \\\n"
+            "  --device mps \\\n"
+            "  --profile dev\n"
+        ),
+    )
+
+    rendered = module._sanitize_script(block, execution_mode="host")
+
+    assert "[skip-host]" in rendered
+    assert "--profile dev" not in rendered
+
+
 def test_sanitize_script_adds_force_to_report_html() -> None:
     module = _load_script_module()
     block = module.BashBlock(
