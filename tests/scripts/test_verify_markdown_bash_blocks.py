@@ -475,6 +475,7 @@ def test_seed_demo_inputs_writes_self_consistent_demo_report(tmp_path: Path) -> 
     assert report["baseline_ref"]["primary_metric"]["final"] == pytest.approx(
         math.exp(2.30)
     )
+    assert report["primary_metric"]["ratio_vs_baseline"] == pytest.approx(1.0)
 
 
 def test_prepare_workspace_stages_lightweight_repo_view(tmp_path: Path) -> None:

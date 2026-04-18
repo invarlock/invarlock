@@ -296,7 +296,7 @@ def _demo_verify_pass_report() -> dict:
                 "evaluation_windows": {
                     "final": {
                         "window_ids": [1, 2],
-                        "logloss": [2.30, 2.31],
+                        "logloss": [2.30, 2.30],
                         "token_counts": [100, 100],
                     }
                 },
@@ -417,8 +417,8 @@ def _demo_verify_pass_report() -> dict:
         "primary_metric": {
             "kind": "ppl_causal",
             "preview": math.exp(2.30),
-            "final": math.exp(2.305),
-            "ratio_vs_baseline": math.exp(0.005),
+            "final": math.exp(2.30),
+            "ratio_vs_baseline": 1.0,
             "display_ci": [1.0, 1.01],
         },
         "dataset": {

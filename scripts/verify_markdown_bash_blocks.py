@@ -861,7 +861,7 @@ def _seed_demo_inputs(workspace: Path) -> None:
         "evaluation_windows": {
             "final": {
                 "window_ids": [1, 2],
-                "logloss": [2.30, 2.31],
+                "logloss": [2.30, 2.30],
                 "token_counts": [100, 100],
             }
         },

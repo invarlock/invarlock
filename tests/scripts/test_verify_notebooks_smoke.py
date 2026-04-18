@@ -206,3 +206,6 @@ def test_seed_curated_demo_outputs_writes_expected_reports(tmp_path: Path) -> No
     assert python_api_report["primary_metric"]["final"] == pytest.approx(
         math.exp(weighted_final)
     )
+    assert python_api_report["primary_metric"]["ratio_vs_baseline"] == pytest.approx(
+        1.0
+    )
