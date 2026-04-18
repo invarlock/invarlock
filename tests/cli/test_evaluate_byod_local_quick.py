@@ -197,5 +197,30 @@ def test_evaluate_byod_local_quick(tmp_path: Path, monkeypatch) -> None:
     assert (report_dir / "evaluation_report.md").exists()
     assert (report_dir / "manifest.json").exists()
     report = json.loads((report_dir / "evaluation.report.json").read_text("utf-8"))
+    evaluation_windows = report.get("evaluation_windows")
+    assert isinstance(evaluation_windows, dict)
+    final_windows = evaluation_windows.get("final")
+    assert isinstance(final_windows, dict)
+    assert final_windows.get("window_ids") == [2, 3]
+    assert final_windows.get("logloss") == [2.05, 2.15]
+    assert final_windows.get("token_counts") == [16, 16]
     prov = report.get("provenance") or {}
     assert isinstance(prov.get("provider_digest"), dict) and prov["provider_digest"]
+
+    verify_result = CliRunner().invoke(
+        public_cli,
+        [
+            "verify",
+            "--profile",
+            "ci",
+            "--json",
+            str(report_dir / "evaluation.report.json"),
+        ],
+    )
+    verify_payload = json.loads(verify_result.stdout)
+    assert verify_result.exit_code == 1
+    assert verify_payload["results"][0]["recompute"] == {
+        "family": "ppl",
+        "ok": True,
+        "reason": None,
+    }

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from typing import Any
 
 from . import policy_utils as report_policy_utils_mod
@@ -61,6 +62,11 @@ def _build_evaluation_report(
         "validation": validation_filtered,
         "guard_overhead": guard_overhead_section,
         "primary_metric_tail": pm_tail_result,
+        "evaluation_windows": (
+            copy.deepcopy(report_map.get("evaluation_windows", {}))
+            if isinstance(report_map.get("evaluation_windows"), dict)
+            else {}
+        ),
     }
     if edit_name is not None:
         evaluation_report["edit_name"] = edit_name
