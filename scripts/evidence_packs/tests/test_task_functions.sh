@@ -141,6 +141,32 @@ test_large_model_threshold_covers_14b_dense_checkpoints() {
     fi
 }
 
+test_baseline_report_wait_budget_scales_for_heavy_7b_windows() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+
+    run _baseline_report_wait_secs "7" "128" "128"
+    assert_rc "0" "${RUN_RC}" "default wait helper succeeds"
+    assert_eq "240" "${RUN_OUT}" "non-heavy 7B windows keep the short wait budget"
+
+    run _baseline_report_wait_secs "7" "400" "400"
+    assert_rc "0" "${RUN_RC}" "heavy-window wait helper succeeds"
+    assert_eq "1800" "${RUN_OUT}" "heavy 7B windows use the long wait budget"
+
+    export PACK_BASELINE_REPORT_WAIT_SECS_HEAVY_WINDOWS="900"
+    run _baseline_report_wait_secs "7" "400" "400"
+    assert_rc "0" "${RUN_RC}" "heavy-window override succeeds"
+    assert_eq "900" "${RUN_OUT}" "heavy-window override is honored"
+
+    export PACK_BASELINE_REPORT_WAIT_SECS_LARGE="1200"
+    run _baseline_report_wait_secs "14" "400" "400"
+    assert_rc "0" "${RUN_RC}" "large-model wait helper succeeds"
+    assert_eq "1200" "${RUN_OUT}" "large-model override still takes precedence"
+
+    unset PACK_BASELINE_REPORT_WAIT_SECS_HEAVY_WINDOWS PACK_BASELINE_REPORT_WAIT_SECS_LARGE
+}
+
 test_model_size_and_eval_batch_selection() {
     mock_reset
     # shellcheck source=../task_functions.sh
