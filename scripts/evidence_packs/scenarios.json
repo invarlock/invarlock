@@ -71,7 +71,7 @@
       }
     },
     {
-      "id": "svd_rank32_l31_clean",
+      "id": "svd_rank32_clean",
       "suites": [
         "subset",
         "showcase",

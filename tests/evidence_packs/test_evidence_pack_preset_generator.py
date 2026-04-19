@@ -85,3 +85,51 @@ def test_generate_preset_raises_rmt_epsilon_from_observed_clean_growth(
     assert attn_eps > 0.01
     assert attn_eps == derived["guards"]["rmt"]["epsilon_by_family"]["attn"]
     assert derived["_calibration_meta"]["edit_type"] == "magnitude_prune"
+
+
+def test_calibrate_drift_single_ratio_stays_truthful_about_compatibility() -> None:
+    drift = preset_generator.calibrate_drift(
+        [{"primary_metric": {"preview_final_ratio": 1.08}}]
+    )
+
+    assert drift == {
+        "mean": 1.08,
+        "std": 0.0,
+        "min": 1.08,
+        "max": 1.08,
+        "suggested_band": [1.07, 1.09],
+        "band_compatible": False,
+    }
+
+
+def test_generate_preset_single_run_derives_narrow_observed_drift_band(
+    tmp_path: Path,
+) -> None:
+    cal_dir = tmp_path / "calibration"
+    _write_calibration_run(
+        cal_dir,
+        run_name="run_1",
+        attn_growth=0.0,
+        ratio=1.08,
+    )
+
+    preset_file, _stats_path, _derived_files = preset_generator.generate_preset(
+        cal_dir=cal_dir,
+        preset_file=tmp_path / "calibrated_preset_demo.json",
+        model_name="demo-model",
+        model_path="/models/demo",
+        tier="balanced",
+        dataset_provider="wikitext2",
+        seq_len=512,
+        stride=512,
+        preview_n=64,
+        final_n=64,
+        edit_types=["magnitude_prune"],
+    )
+
+    preset = json.loads(preset_file.read_text(encoding="utf-8"))
+
+    assert preset["_calibration_meta"]["drift_mean"] == 1.08
+    assert preset["_calibration_meta"]["drift_band_compatible"] is False
+    assert preset["_calibration_meta"]["suggested_drift_band"] == [1.07, 1.09]
+    assert preset["primary_metric"]["drift_band"] == {"min": 1.07, "max": 1.09}

@@ -14,7 +14,7 @@
         "status": "selected"
       },
       "lowrank_svd": {
-        "edit_dir_name": "svd_rank32_l31_clean",
+        "edit_dir_name": "svd_rank32_clean",
         "rank": 32,
         "reason": "selected_by_evaluate_pass:rank32_ffn_layer31",
         "scope": "ffn@layer=31",
@@ -45,7 +45,7 @@
         "status": "selected"
       },
       "lowrank_svd": {
-        "edit_dir_name": "svd_rank32_l31_clean",
+        "edit_dir_name": "svd_rank32_clean",
         "rank": 32,
         "reason": "selected_by_evaluate_pass:rank32_ffn_layer31",
         "scope": "ffn@layer=31",
@@ -76,10 +76,10 @@
         "status": "selected"
       },
       "lowrank_svd": {
-        "edit_dir_name": "svd_rank32_l27_clean",
+        "edit_dir_name": "svd_rank32_clean",
         "rank": 32,
-        "reason": "selected_by_evaluate_pass:rank32_ffn_layer27",
-        "scope": "ffn@layer=27",
+        "reason": "selected_by_evaluate_pass:rank32_ffn_layer15",
+        "scope": "ffn@layer=15",
         "status": "selected"
       },
       "magnitude_prune": {
@@ -107,7 +107,7 @@
         "status": "selected"
       },
       "lowrank_svd": {
-        "edit_dir_name": "svd_rank32_l31_clean",
+        "edit_dir_name": "svd_rank32_clean",
         "rank": 32,
         "reason": "selected_by_evaluate_pass:rank32_ffn_layer31",
         "scope": "ffn@layer=31",
@@ -138,7 +138,7 @@
         "status": "selected"
       },
       "lowrank_svd": {
-        "edit_dir_name": "svd_rank32_l31_clean",
+        "edit_dir_name": "svd_rank32_clean",
         "rank": 32,
         "reason": "selected_by_evaluate_pass:rank32_ffn_layer31",
         "scope": "ffn@layer=31",
@@ -169,7 +169,7 @@
         "status": "selected"
       },
       "lowrank_svd": {
-        "edit_dir_name": "svd_rank32_l31_clean",
+        "edit_dir_name": "svd_rank32_clean",
         "rank": 32,
         "reason": "selected_by_evaluate_pass:rank32_ffn_layer15",
         "scope": "ffn@layer=15",
@@ -200,7 +200,7 @@
         "status": "selected"
       },
       "lowrank_svd": {
-        "edit_dir_name": "svd_rank32_l31_clean",
+        "edit_dir_name": "svd_rank32_clean",
         "rank": 32,
         "reason": "selected_by_evaluate_pass:rank32_ffn_layer31",
         "scope": "ffn@layer=31",

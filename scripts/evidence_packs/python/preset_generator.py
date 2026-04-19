@@ -409,15 +409,19 @@ def calibrate_drift(recs: list[dict[str, Any]]) -> dict[str, Any]:
             ratios.append(float(ratio))
 
     ratios = [r for r in ratios if math.isfinite(r)]
+    single_run_margin = 0.01
     if len(ratios) < 2:
         base = ratios[0] if ratios else 1.0
+        compatible = 0.95 <= float(base) <= 1.05
+        lo = max(float(base) - single_run_margin, 1e-6)
+        hi = float(base) + single_run_margin
         return {
-            "mean": float(base),
+            "mean": round(float(base), 4),
             "std": 0.0,
-            "min": float(base),
-            "max": float(base),
-            "suggested_band": [0.95, 1.05],
-            "band_compatible": True,
+            "min": round(float(base), 4),
+            "max": round(float(base), 4),
+            "suggested_band": [round(lo, 4), round(hi, 4)],
+            "band_compatible": compatible,
         }
 
     mean = statistics.mean(ratios)

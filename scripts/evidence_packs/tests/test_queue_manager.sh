@@ -1466,7 +1466,7 @@ test_generate_model_tasks_honors_one_sided_state_manifest_without_edit_fallback(
   "schema_version": 1,
   "scenarios": [
     {
-      "id": "svd_rank32_l31_clean",
+      "id": "svd_rank32_clean",
       "generation": {"kind": "edit", "edit_spec": "lowrank_svd:clean:ffn", "version": "clean"}
     }
   ]

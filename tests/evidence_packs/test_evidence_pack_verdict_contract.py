@@ -92,7 +92,7 @@ def test_verdict_contract_clean_pass_catastrophic_fail_errors_detected(
         "quant_4bit_clean",
         "fp8_e5m2_clean",
         "prune_12pct_clean",
-        "svd_rank32_l31_clean",
+        "svd_rank32_clean",
     ):
         _write_cert(
             model_dir / "reports" / edit / "run_1" / "evaluation.report.json",
@@ -351,7 +351,7 @@ def test_verdict_contract_enforces_informational_stress_signal_fraction(
         "quant_4bit_clean",
         "fp8_e5m2_clean",
         "prune_12pct_clean",
-        "svd_rank32_l31_clean",
+        "svd_rank32_clean",
     ):
         _write_cert(
             model_dir / "reports" / edit / "run_1" / "evaluation.report.json",

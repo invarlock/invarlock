@@ -2023,7 +2023,7 @@ test_pack_validation_estimate_planned_storage_honors_one_sided_state_manifest() 
   "schema_version": 1,
   "scenarios": [
     {
-      "id": "svd_rank32_l31_clean",
+      "id": "svd_rank32_clean",
       "generation": {"kind": "edit", "edit_spec": "lowrank_svd:clean:ffn", "version": "clean"}
     }
   ]

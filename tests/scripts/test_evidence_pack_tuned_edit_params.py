@@ -25,13 +25,12 @@ def test_qwen25_7b_tuned_edit_params_cover_clean_edit_matrix() -> None:
         "scope": "ffn",
         "status": "selected",
     }
-    assert qwen25_7b["lowrank_svd"] == {
-        "edit_dir_name": "svd_rank32_l27_clean",
-        "rank": 32,
-        "reason": "selected_by_evaluate_pass:rank32_ffn_layer27",
-        "scope": "ffn@layer=27",
-        "status": "selected",
-    }
+    lowrank_svd = qwen25_7b["lowrank_svd"]
+    assert lowrank_svd["edit_dir_name"] == "svd_rank32_clean"
+    assert lowrank_svd["rank"] == 32
+    assert lowrank_svd["reason"] == "selected_by_evaluate_pass:rank32_ffn_layer15"
+    assert lowrank_svd["scope"] == "ffn@layer=15"
+    assert lowrank_svd["status"] == "selected"
     assert qwen25_7b["magnitude_prune"] == {
         "edit_dir_name": "prune_12pct_clean",
         "reason": "selected_by_evaluate_pass:sparsity120_ffn",
