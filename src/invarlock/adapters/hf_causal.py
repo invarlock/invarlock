@@ -411,7 +411,9 @@ class _MoEDecoderSpec(_CausalSpec):
             and _has_set_attr(expert0, "w2")
         )
         mixtral_gate, mixtral_experts = _mixtral_tensorized_moe_parts(layer)
-        has_tensorized_moe = bool(mixtral_gate is not None and mixtral_experts is not None)
+        has_tensorized_moe = bool(
+            mixtral_gate is not None and mixtral_experts is not None
+        )
         has_norms = _has_set_attr(layer, "input_layernorm") and _has_set_attr(
             layer, "post_attention_layernorm"
         )
@@ -436,7 +438,11 @@ class _MoEDecoderSpec(_CausalSpec):
             if isinstance(intermediate_size, int) and intermediate_size > 0:
                 return int(intermediate_size)
             gate_up_shape = _shape_ints(getattr(mixtral_experts, "gate_up_proj", None))
-            if gate_up_shape is not None and len(gate_up_shape) >= 2 and gate_up_shape[-2] > 0:
+            if (
+                gate_up_shape is not None
+                and len(gate_up_shape) >= 2
+                and gate_up_shape[-2] > 0
+            ):
                 return int(gate_up_shape[-2] // 2)
         return int(mlp_dim)
 
