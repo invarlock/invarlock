@@ -225,7 +225,6 @@ Notes
 | Mistral 7B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
 | Ministral 3 causal LM (text-only eval) | Yes | Yes | Yes | No, repo-included pilot config only |
 | Qwen2 7B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
-| Qwen2.5 7B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
 | Qwen2.5 14B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
 | Qwen3 causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
 | DeepSeek-R1-Distill-Qwen causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
@@ -246,11 +245,13 @@ checkpoints are intentionally excluded from the included support matrix and
 preset inventory, and ungated families without clean pilot lanes remain in the
 model family backlog rather than the support matrix.
 
-In the current `<=14B` text-lane promotion wave, Qwen2.5 7B is the only new
-family that clears the full promotion bar. `published_basis` remains the narrow
-public evidence floor, while `supported_experimental` means the repo ships the
-preset, calibration config, targeted tests, and smoke/evidence path for the
-lane without claiming a published-basis fixture set.
+In the current `<=14B` text-lane promotion wave, no new family clears the full
+promotion bar yet. Qwen2.5 7B now has shipped preset/config/test/smoke
+scaffolding, but the empirical promotion matrix still needs a clean close
+before the lane can move out of usage-only. `published_basis` remains the
+narrow public evidence floor, while `supported_experimental` means the repo
+ships the preset, calibration config, targeted tests, and smoke/evidence path
+for the lane without claiming a published-basis fixture set.
 
 Image-text evaluation uses the built-in
 `hf_multimodal` adapter and the `vision_text` provider. Public support remains

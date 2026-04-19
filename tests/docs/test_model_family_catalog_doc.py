@@ -50,6 +50,6 @@ def test_model_family_catalog_doc_matches_contract_sections() -> None:
         assert entry["decision"] in promotion_text
 
     assert (
-        "| Qwen2.5 7B causal LM | `Qwen/Qwen2.5-7B` | `promote_now` | "
-        "`supported_experimental` |" in promotion_text
+        "| Qwen2.5 7B causal LM | `Qwen/Qwen2.5-7B` | "
+        "`blocked_missing_artifacts` | `usage_only` |" in promotion_text
     )

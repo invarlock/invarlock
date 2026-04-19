@@ -78,20 +78,6 @@
       "notes": "Derived from support_matrix lane qwen2-7b-causal-hf."
     },
     {
-      "family_id": "qwen2-5-7b-causal-lm",
-      "display_name": "Qwen2.5 7B causal LM",
-      "modalities": ["text"],
-      "task_role": "causal_lm",
-      "state": "supported_experimental",
-      "representative_models": ["Qwen/Qwen2.5-7B"],
-      "repo_evidence": [
-        "contracts/support_matrix.json",
-        "configs/presets/causal_lm/qwen2_5_7b_512.yaml",
-        "configs/calibration/null_sweep_qwen2_5_7b.yaml"
-      ],
-      "notes": "Derived from support_matrix lane qwen2-5-7b-causal-hf."
-    },
-    {
       "family_id": "qwen2-5-14b-causal-lm",
       "display_name": "Qwen2.5 14B causal LM",
       "modalities": ["text"],
@@ -270,7 +256,7 @@
         "src/invarlock/core/adapter_auto.py",
         "docs/reference/model-adapters.md"
       ],
-      "notes": "Shared qwen-family heuristics still cover aliases beyond the declared Qwen2, Qwen2.5 7B, Qwen2.5 14B, Qwen3, and Qwen3.5 public lanes, including larger usage-only Qwen2.5 checkpoints."
+      "notes": "Shared qwen-family heuristics still cover aliases beyond the declared Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 public lanes, including usage-only Qwen2.5 checkpoints."
     },
     {
       "family_id": "yi",
@@ -421,6 +407,21 @@
   ],
   "usage_only": [
     {
+      "family_id": "qwen2-5-7b",
+      "display_name": "Qwen2.5 7B",
+      "modalities": ["text"],
+      "task_role": "causal_lm",
+      "state": "usage_only",
+      "representative_models": ["Qwen/Qwen2.5-7B"],
+      "repo_evidence": [
+        "configs/presets/causal_lm/qwen2_5_7b_512.yaml",
+        "configs/calibration/null_sweep_qwen2_5_7b.yaml",
+        "scripts/model_evidence_sweep.py",
+        "scripts/evidence_packs/lib/validation_suite.sh"
+      ],
+      "notes": "Shipped preset/config and smoke scaffolding exist, but the <=14B promotion wave did not close approved calibration/evaluation evidence for a declared public lane."
+    },
+    {
       "family_id": "qwen2-5-32b",
       "display_name": "Qwen2.5 32B",
       "modalities": ["text"],
@@ -432,7 +433,7 @@
         "scripts/evidence_packs/suites.sh",
         "scripts/evidence_packs/lib/validation_suite.sh"
       ],
-      "notes": "Used in evidence-pack suites and validation defaults outside the declared Qwen2.5 7B and Qwen2.5 14B support lanes."
+      "notes": "Used in evidence-pack suites and validation defaults outside the declared Qwen2.5 14B support lane."
     },
     {
       "family_id": "qwen1-5-72b",
@@ -493,15 +494,15 @@
         "candidate_id": "qwen2-5-7b-causal-lm",
         "display_name": "Qwen2.5 7B causal LM",
         "representative_model": "Qwen/Qwen2.5-7B",
-        "current_catalog_state": "supported_experimental",
-        "decision": "promote_now",
+        "current_catalog_state": "usage_only",
+        "decision": "blocked_missing_artifacts",
         "criteria_status": {
           "explicit_adapter_or_profile_recognition": "pass",
           "included_preset": "pass",
           "included_calibration_config": "pass",
           "targeted_tests": "pass",
           "cli_smoke_evidence": "pass",
-          "approved_calibration_or_evaluation_evidence": "pass"
+          "approved_calibration_or_evaluation_evidence": "fail"
         },
         "repo_evidence": [
           "src/invarlock/model_profile.py",
@@ -513,8 +514,10 @@
           "scripts/model_evidence_sweep.py",
           "scripts/evidence_packs/lib/validation_suite.sh"
         ],
-        "missing_artifacts": [],
-        "notes": "This wave promoted the former usage-only Qwen2.5 7B lane into declared `supported_experimental` support after the shipped preset/config, targeted tests, CLI smoke lane, and promotion-wave validation closed."
+        "missing_artifacts": [
+          "approved calibration/evaluation evidence remains open because the reduced promotion matrix finished FAIL: three clean controls drifted, and the SVD clean scenario id did not match the shared scenario manifest."
+        ],
+        "notes": "This wave added shipped preset/config/test/smoke scaffolding for Qwen2.5 7B, but the lane stays usage-only until the clean-control evidence closes and the SVD clean scenario aligns with the shared manifest."
       },
       {
         "candidate_id": "openllama-7b-causal-lm",

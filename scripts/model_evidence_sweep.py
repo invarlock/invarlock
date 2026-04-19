@@ -104,13 +104,6 @@ CURRENT_SUPPORTED_EXPERIMENTAL_LANES: tuple[EvidenceLane, ...] = (
         preset_relpath="configs/presets/causal_lm/qwen2_7b_512.yaml",
     ),
     EvidenceLane(
-        slug="qwen2_5_7b",
-        lane_id="qwen2-5-7b-causal-hf",
-        family="Qwen2.5 7B causal LM",
-        model_id="Qwen/Qwen2.5-7B",
-        preset_relpath="configs/presets/causal_lm/qwen2_5_7b_512.yaml",
-    ),
-    EvidenceLane(
         slug="qwen2_5_14b",
         lane_id="qwen2-5-14b-causal-hf",
         family="Qwen2.5 14B causal LM",

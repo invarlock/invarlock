@@ -70,7 +70,6 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
         "Mistral 7B causal LM",
         "Ministral 3 causal LM (text-only eval)",
         "Qwen2 7B causal LM",
-        "Qwen2.5 7B causal LM",
         "Qwen2.5 14B causal LM",
         "Qwen3 causal LM",
         "DeepSeek-R1-Distill-Qwen causal LM",
@@ -89,7 +88,6 @@ def test_support_matrix_contract_matches_docs_and_cli_json_surfaces() -> None:
         == "supported_experimental"
     )
     assert families["Qwen2 7B causal LM"]["support_tier"] != "published_basis"
-    assert families["Qwen2.5 7B causal LM"]["support_tier"] == "supported_experimental"
     assert families["Qwen2.5 14B causal LM"]["support_tier"] == "supported_experimental"
     assert families["Qwen3 causal LM"]["support_tier"] == "supported_experimental"
     assert (
