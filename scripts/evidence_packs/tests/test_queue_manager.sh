@@ -668,6 +668,44 @@ test_generate_all_tasks_and_update_model_task_memory_branches() {
     update_model_task_memory "${model_name}" "${out_dir}" "org/model"
 }
 
+test_update_model_task_memory_preserves_existing_reservation_floor() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue_manager.sh"
+
+    local out_dir="${TEST_TMPDIR}/out"
+    init_queue "${out_dir}" >/dev/null
+
+    _cmd_python() { echo "96 1"; }
+
+    jq -n '{task_id:"t", task_type:"CALIBRATION_RUN", model_id:"mistralai/Mixtral-8x7B-v0.1", model_name:"mixtral", status:"pending", model_size_gb:480, required_gpus:4, retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{run:1}, priority:85}' \
+        > "${QUEUE_DIR}/pending/t.task"
+
+    mkdir -p "${out_dir}/mixtral"
+    local baseline_path="${TEST_TMPDIR}/baseline"
+    mkdir -p "${baseline_path}"
+    echo "${baseline_path}" > "${out_dir}/mixtral/.baseline_path"
+    echo '{}' > "${baseline_path}/model_profile.json"
+
+    update_model_task_memory "mixtral" "${out_dir}" "mistralai/Mixtral-8x7B-v0.1"
+    assert_eq "480" "$(jq -r '.model_size_gb' "${QUEUE_DIR}/pending/t.task")" "profile refinement keeps stricter memory floor"
+    assert_eq "4" "$(jq -r '.required_gpus' "${QUEUE_DIR}/pending/t.task")" "profile refinement keeps stricter GPU floor"
+}
+
+test_estimate_task_memory_reserves_full_host_for_moe_execution() {
+    mock_reset
+
+    local profile="${TEST_TMPDIR}/profile.json"
+    jq -n '{model_id:"mistralai/Mixtral-8x7B-v0.1", weights_gb:90, hidden_size:4096, num_layers:32, num_heads:32, num_kv_heads:8, dtype_bytes:2}' > "${profile}"
+
+    local result
+    result="$(TASK_TYPE=CALIBRATION_RUN MODEL_ID="mistralai/Mixtral-8x7B-v0.1" PROFILE_PATH="${profile}" GPU_MEMORY_PER_DEVICE=140 NUM_GPUS=4 python3 "${TEST_ROOT}/scripts/evidence_packs/python/estimate_task_memory.py")"
+    assert_eq "421 4" "${result}" "MoE calibration reserves the full 4-GPU host"
+
+    result="$(TASK_TYPE=SETUP_BASELINE MODEL_ID="mistralai/Mixtral-8x7B-v0.1" PROFILE_PATH="${profile}" GPU_MEMORY_PER_DEVICE=140 NUM_GPUS=4 python3 "${TEST_ROOT}/scripts/evidence_packs/python/estimate_task_memory.py")"
+    assert_eq "94 1" "${result}" "MoE baseline setup stays single-GPU sized"
+}
+
 test_with_queue_lock_returns_nonzero_when_lock_acquire_fails() {
     mock_reset
     # shellcheck source=../queue_manager.sh

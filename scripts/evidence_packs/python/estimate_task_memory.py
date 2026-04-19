@@ -68,7 +68,7 @@ def main() -> int:
         "13": (1536, 64),
         "30": (1024, 48),
         "40": (1024, 32),
-        "moe": (1024, 24),
+        "moe": (1024, 8),
         "70": (128, 2),
     }
 
@@ -94,6 +94,8 @@ def main() -> int:
     edit_overhead = float(os.environ.get("EDIT_OVERHEAD_GB", "8"))
     batch_overhead = float(os.environ.get("BATCH_EDIT_OVERHEAD_GB", "8"))
     inv_overhead = float(os.environ.get("INVARLOCK_OVERHEAD_GB", "6"))
+    per_device = int(os.environ.get("GPU_MEMORY_PER_DEVICE", "180"))
+    max_gpus = int(os.environ.get("NUM_GPUS", "8"))
 
     if task_type == "GENERATE_PRESET":
         required = 5.0
@@ -114,8 +116,18 @@ def main() -> int:
     else:
         required = float(weights_gb) + inv_overhead
 
-    per_device = int(os.environ.get("GPU_MEMORY_PER_DEVICE", "180"))
-    max_gpus = int(os.environ.get("NUM_GPUS", "8"))
+    if category == "moe" and task_type in {
+        "CALIBRATION_RUN",
+        "CREATE_EDIT",
+        "CREATE_EDITS_BATCH",
+        "CREATE_ERROR",
+        "evaluate_EDIT",
+        "evaluate_ERROR",
+    }:
+        # MoE calibration/edit/eval can fit by VRAM but still spike host memory
+        # badly enough to require whole-host serialization.
+        required = max(required, float(((max_gpus - 1) * per_device) + 1))
+
     required_mem = int(math.ceil(required))
     required_gpus = max(1, int(math.ceil(required_mem / per_device)))
     if max_gpus > 0:
