@@ -78,6 +78,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bootstrap citation in the assurance case, and marking the legacy hardcoded
   `rmt_policy.py` table as a fallback rather than the calibrated source of
   truth.
+- Fixed the evidence-pack clean-prune contract so the clean pruning lane is now
+  model-tuned under the generic `prune_clean` scenario name, and retuned the
+  Mistral 7B clean prune from 12% to 10% after a real H200 rerun showed that
+  the old setting tripped the RMT clean-pass gate.
 - Fixed remaining public runtime-provenance wording so report/reference docs,
   maintainer test docs, evidence-pack guidance and verification surfaces, and
   runtime-image error messages no longer describe container-backed manifests as

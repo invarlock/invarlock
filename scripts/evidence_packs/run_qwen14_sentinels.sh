@@ -12,7 +12,7 @@ Usage: scripts/evidence_packs/run_qwen14_sentinels.sh --run-dir DIR --model-name
 Runs the maintained Qwen2.5-14B evidence-pack sentinels from an existing evidence-pack
 run directory:
 
-- saved-model direct evaluate sentinels for `quant_4bit_clean` and `prune_12pct_clean`
+- saved-model direct evaluate sentinels for `quant_4bit_clean` and `prune_clean`
 - the promotion-grade public quant smoke (`quant_4bit_clean` + verify)
 
 Options:
@@ -302,16 +302,16 @@ main() {
     fi
 
     if [[ "${mode}" == "all" || "${mode}" == "saved-model" ]]; then
-        local prune_subject="${model_root}/models/prune_12pct_clean"
+        local prune_subject="${model_root}/models/prune_clean"
         local prune_preset=""
         prune_preset="$(resolve_preset_path "${run_dir}" "${model_name}" "magnitude_prune")"
-        require_dir "${prune_subject}" "prune_12pct_clean subject"
+        require_dir "${prune_subject}" "prune_clean subject"
         run_evaluate_sentinel \
             "${baseline_path}" \
             "${baseline_report}" \
             "${prune_subject}" \
             "${prune_preset}" \
-            "${out_dir}/prune_12pct_clean" \
+            "${out_dir}/prune_clean" \
             "${adapter}" \
             "${profile}" \
             "${device}"

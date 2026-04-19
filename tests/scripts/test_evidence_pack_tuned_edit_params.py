@@ -32,7 +32,7 @@ def test_qwen25_7b_tuned_edit_params_cover_clean_edit_matrix() -> None:
     assert lowrank_svd["scope"] == "ffn@layer=15"
     assert lowrank_svd["status"] == "selected"
     assert qwen25_7b["magnitude_prune"] == {
-        "edit_dir_name": "prune_12pct_clean",
+        "edit_dir_name": "prune_clean",
         "reason": "selected_by_evaluate_pass:sparsity120_ffn",
         "scope": "ffn",
         "sparsity": 0.12,
@@ -44,5 +44,22 @@ def test_qwen25_7b_tuned_edit_params_cover_clean_edit_matrix() -> None:
         "group_size": 32,
         "reason": "selected_by_evaluate_pass:bits4_g32_ffn",
         "scope": "ffn",
+        "status": "selected",
+    }
+
+
+def test_mistral_7b_tuned_prune_clean_is_model_specific_and_stable() -> None:
+    payload = json.loads(
+        Path("scripts/evidence_packs/tuned_edit_params.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    mistral_7b = payload["models"]["mistralai/Mistral-7B-v0.1"]
+    assert mistral_7b["magnitude_prune"] == {
+        "edit_dir_name": "prune_clean",
+        "reason": "selected_by_evaluate_pass:sparsity100_ffn",
+        "scope": "ffn",
+        "sparsity": 0.1,
         "status": "selected",
     }

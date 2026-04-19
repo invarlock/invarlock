@@ -87,7 +87,7 @@ test_run_qwen14_sentinels_main_is_sourceable_and_covers_mode_dispatch() {
 
     local run_dir="${TEST_TMPDIR}/run"
     local model_name="qwen__qwen2.5-14b"
-    mkdir -p "${run_dir}/${model_name}/models/quant_4bit_clean" "${run_dir}/${model_name}/models/prune_12pct_clean"
+    mkdir -p "${run_dir}/${model_name}/models/quant_4bit_clean" "${run_dir}/${model_name}/models/prune_clean"
 
     local calls_file="${TEST_TMPDIR}/main.calls"
     require_dir() { return 0; }
@@ -130,7 +130,7 @@ test_run_qwen14_sentinels_main_is_sourceable_and_covers_mode_dispatch() {
     run main --run-dir "${run_dir}" --model-name "${model_name}" --mode saved-model --out "${TEST_TMPDIR}/sentinels"
     assert_rc "0" "${RUN_RC}" "saved-model mode succeeds"
     assert_match "evaluate.*quant_4bit_clean" "$(cat "${calls_file}")" "saved-model mode still runs the quant sentinel"
-    assert_match "evaluate.*prune_12pct_clean.*preset_magnitude_prune\\.yaml.*${TEST_TMPDIR}/sentinels/prune_12pct_clean" "$(cat "${calls_file}")" "saved-model mode runs the prune sentinel"
+    assert_match "evaluate.*prune_clean.*preset_magnitude_prune\\.yaml.*${TEST_TMPDIR}/sentinels/prune_clean" "$(cat "${calls_file}")" "saved-model mode runs the prune sentinel"
 }
 
 test_run_qwen14_sentinels_runs_saved_model_and_public_quant_modes() {
@@ -142,7 +142,7 @@ test_run_qwen14_sentinels_runs_saved_model_and_public_quant_modes() {
     mkdir -p \
         "${model_dir}/models/baseline" \
         "${model_dir}/models/quant_4bit_clean" \
-        "${model_dir}/models/prune_12pct_clean" \
+        "${model_dir}/models/prune_clean" \
         "${model_dir}/baseline_reports/ci_balanced_seq1536_pv48_fn48" \
         "${run_dir}/presets"
     printf '%s\n' "${model_dir}/models/baseline" > "${model_dir}/.baseline_path"
@@ -229,12 +229,12 @@ EOF
     assert_rc "0" "${RUN_RC}" "sentinel script succeeds when reports are written"
     assert_file_exists "${TEST_TMPDIR}/sentinels/quant_4bit_clean/evaluation.report.json" "quant report produced"
     assert_file_exists "${TEST_TMPDIR}/sentinels/quant_4bit_clean/verify.json" "quant verify output captured"
-    assert_file_exists "${TEST_TMPDIR}/sentinels/prune_12pct_clean/evaluation.report.json" "prune report produced"
+    assert_file_exists "${TEST_TMPDIR}/sentinels/prune_clean/evaluation.report.json" "prune report produced"
 
     local calls
     calls="$(cat "${TEST_QWEN14_SENTINEL_CALLS}")"
     assert_match "quant_4bit_clean.*runtime_inputs/calibrated_preset_${model_name}__quant_rtn\\.yaml" "${calls}" "quant sentinel stages the quant-specific preset"
-    assert_match "prune_12pct_clean.*runtime_inputs/calibrated_preset_${model_name}\\.yaml" "${calls}" "prune sentinel stages the base preset"
+    assert_match "prune_clean.*runtime_inputs/calibrated_preset_${model_name}\\.yaml" "${calls}" "prune sentinel stages the base preset"
     assert_match "runtime_inputs/baseline_report\\.json" "${calls}" "sentinel stages the baseline report"
     assert_match "verify.*quant_4bit_clean/evaluation\\.report\\.json" "${calls}" "public quant verify runs"
 

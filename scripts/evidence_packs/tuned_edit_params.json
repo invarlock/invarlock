@@ -21,7 +21,7 @@
         "status": "selected"
       },
       "magnitude_prune": {
-        "edit_dir_name": "prune_12pct_clean",
+        "edit_dir_name": "prune_clean",
         "reason": "selected_by_evaluate_pass:sparsity120_ffn",
         "scope": "ffn",
         "sparsity": 0.12,
@@ -52,7 +52,7 @@
         "status": "selected"
       },
       "magnitude_prune": {
-        "edit_dir_name": "prune_12pct_clean",
+        "edit_dir_name": "prune_clean",
         "reason": "selected_by_evaluate_pass:sparsity120_ffn",
         "scope": "ffn",
         "sparsity": 0.12,
@@ -83,7 +83,7 @@
         "status": "selected"
       },
       "magnitude_prune": {
-        "edit_dir_name": "prune_12pct_clean",
+        "edit_dir_name": "prune_clean",
         "reason": "selected_by_evaluate_pass:sparsity120_ffn",
         "scope": "ffn",
         "sparsity": 0.12,
@@ -114,7 +114,7 @@
         "status": "selected"
       },
       "magnitude_prune": {
-        "edit_dir_name": "prune_12pct_clean",
+        "edit_dir_name": "prune_clean",
         "reason": "selected_by_evaluate_pass:sparsity120_attn",
         "scope": "attn",
         "sparsity": 0.12,
@@ -145,7 +145,7 @@
         "status": "selected"
       },
       "magnitude_prune": {
-        "edit_dir_name": "prune_12pct_clean",
+        "edit_dir_name": "prune_clean",
         "reason": "selected_by_evaluate_pass:sparsity120_ffn",
         "scope": "ffn",
         "sparsity": 0.12,
@@ -176,10 +176,10 @@
         "status": "selected"
       },
       "magnitude_prune": {
-        "edit_dir_name": "prune_12pct_clean",
-        "reason": "selected_by_evaluate_pass:sparsity120_ffn",
+        "edit_dir_name": "prune_clean",
+        "reason": "selected_by_evaluate_pass:sparsity100_ffn",
         "scope": "ffn",
-        "sparsity": 0.12,
+        "sparsity": 0.1,
         "status": "selected"
       },
       "quant_rtn": {
@@ -207,7 +207,7 @@
         "status": "selected"
       },
       "magnitude_prune": {
-        "edit_dir_name": "prune_12pct_clean",
+        "edit_dir_name": "prune_clean",
         "reason": "selected_by_evaluate_pass:sparsity120_ffn",
         "scope": "ffn",
         "sparsity": 0.12,

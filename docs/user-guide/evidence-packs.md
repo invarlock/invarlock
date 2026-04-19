@@ -188,7 +188,7 @@ INVARLOCK_ALLOW_NETWORK=1 \
 What it checks:
 
 - saved-model direct evaluate for `quant_4bit_clean`
-- saved-model direct evaluate for `prune_12pct_clean`
+- saved-model direct evaluate for `prune_clean`
 - the promotion-grade public quant smoke (`quant_4bit_clean` + `invarlock verify`)
 
 Acceptance for these sentinels is load-path completion, not scientific PASS:

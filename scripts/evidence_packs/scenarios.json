@@ -52,7 +52,7 @@
       }
     },
     {
-      "id": "prune_12pct_clean",
+      "id": "prune_clean",
       "suites": [
         "subset",
         "showcase",
