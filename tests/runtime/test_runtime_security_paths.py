@@ -643,6 +643,17 @@ def test_path_env_value_and_delegated_env_pairs_translate_workspace_paths(
     external_tmp = tmp_path / "external-tmp"
     external_tmp.mkdir()
 
+    for env_name in (
+        "INVARLOCK_CONFIG_ROOT",
+        "INVARLOCK_EXPORT_DIR",
+        "HF_HOME",
+        "HF_HUB_CACHE",
+        "HF_DATASETS_CACHE",
+        "TRANSFORMERS_CACHE",
+        "TMP",
+    ):
+        monkeypatch.delenv(env_name, raising=False)
+
     monkeypatch.setenv(runtime_security.ALLOW_NETWORK_ENV, "1")
     monkeypatch.setenv(runtime_security.ALLOW_REMOTE_CODE_ENV, "0")
     monkeypatch.setenv(runtime_security.ALLOW_THIRD_PARTY_PLUGINS_ENV, "1")
