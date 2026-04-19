@@ -44,12 +44,26 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     assert "Qwen2.5 32B" in usage_only
     promotion = family_catalog["promotion_candidates_text_le_14b"]
     assert promotion["format_version"] == "promotion-candidates-text-le-14b-v1"
-    decisions = {
-        item["display_name"]: item["decision"] for item in promotion["candidates"]
+    candidates = {
+        item["display_name"]: item for item in promotion["candidates"]
     }
-    assert decisions["Qwen2.5 7B causal LM"] == "promote_now"
-    assert decisions["Falcon 7B causal LM"] == "blocked_missing_artifacts"
-    assert decisions["Gemma 3 4B IT"] == "explicitly_out_of_scope"
+    assert candidates["Qwen2.5 7B causal LM"]["decision"] == "promote_now"
+    assert (
+        candidates["Qwen2.5 7B causal LM"]["current_catalog_state"]
+        == "supported_experimental"
+    )
+    assert (
+        candidates["Falcon 7B causal LM"]["decision"]
+        == "blocked_missing_artifacts"
+    )
+    assert candidates["Gemma 3 4B IT"]["decision"] == "explicitly_out_of_scope"
+    assert (
+        candidates["Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)"][
+            "decision"
+        ]
+        == "blocked_missing_artifacts"
+    )
+    assert candidates["OPT 1.3B causal LM"]["criteria_status"]["targeted_tests"] == "pass"
     recommended = {
         item["display_name"] for item in family_catalog["recommended_additions"]
     }

@@ -48,3 +48,8 @@ def test_model_family_catalog_doc_matches_contract_sections() -> None:
     promotion_text = _section(doc_text, "<=14B Text Promotion Wave")
     for entry in payload["promotion_candidates_text_le_14b"]["candidates"]:
         assert entry["decision"] in promotion_text
+
+    assert (
+        "| Qwen2.5 7B causal LM | `Qwen/Qwen2.5-7B` | `promote_now` | "
+        "`supported_experimental` |" in promotion_text
+    )
