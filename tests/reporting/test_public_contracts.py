@@ -28,6 +28,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "Mistral 7B causal LM",
         "Ministral 3 causal LM (text-only eval)",
         "Qwen2 7B causal LM",
+        "Qwen2.5 7B causal LM",
         "Qwen2.5 14B causal LM",
         "Qwen3 causal LM",
         "DeepSeek-R1-Distill-Qwen causal LM",
@@ -40,17 +41,23 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     }
     usage_only = {item["display_name"] for item in family_catalog["usage_only"]}
     assert "QwQ 32B reasoning" not in usage_only
-    assert "Qwen2.5 7B" in usage_only
+    assert "Qwen2.5 7B" not in usage_only
     assert "Qwen2.5 32B" in usage_only
     promotion = family_catalog["promotion_candidates_text_le_14b"]
     assert promotion["format_version"] == "promotion-candidates-text-le-14b-v1"
     candidates = {
         item["display_name"]: item for item in promotion["candidates"]
     }
-    assert candidates["Qwen2.5 7B causal LM"]["decision"] == "blocked_missing_artifacts"
+    assert candidates["Qwen2.5 7B causal LM"]["decision"] == "promote_now"
     assert (
         candidates["Qwen2.5 7B causal LM"]["current_catalog_state"]
-        == "usage_only"
+        == "supported_experimental"
+    )
+    assert (
+        candidates["Qwen2.5 7B causal LM"]["criteria_status"][
+            "approved_calibration_or_evaluation_evidence"
+        ]
+        == "pass"
     )
     assert (
         candidates["Falcon 7B causal LM"]["decision"]

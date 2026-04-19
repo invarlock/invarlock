@@ -38,7 +38,7 @@ def test_repo_mentioned_gpu_suite_includes_basis_canaries_and_experimental() -> 
         shard_count=1,
     )
 
-    assert len(specs) == 18
+    assert len(specs) == 19
     slugs = {lane.slug for lane in specs}
     assert {
         "gpt2_public",
@@ -50,6 +50,7 @@ def test_repo_mentioned_gpu_suite_includes_basis_canaries_and_experimental() -> 
         "ministral3_8b",
         "ministral3_14b",
         "qwen2_7b",
+        "qwen2_5_7b",
         "gemma4_e2b",
     }.issubset(slugs)
 
@@ -224,9 +225,10 @@ def test_select_specs_sharding_is_stable() -> None:
 
     assert [lane.slug for lane in shard] == [
         "qwen2_7b",
-        "deepseek_r1_distill_qwen_7b",
-        "olmo2_7b",
-        "gemma4_e2b",
+        "qwen3_8b",
+        "tinyllama_1_1b",
+        "qwen3_5_9b",
+        "ministral3_14b",
     ]
 
 
