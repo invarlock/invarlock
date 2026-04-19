@@ -116,6 +116,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `checksums.sha256` entries use `./...` paths, matching the shell verifier's
   path normalization so packaged `advanced evidence-pack verify --strict`
   accepts clean packs end to end.
+- Fixed large-model evidence-pack baseline-report reuse so generated
+  `config_root/runtime/profiles/ci.yaml` profiles carry
+  `context.run.skip_overhead_check: true`, avoiding unnecessary overhead-probe
+  work during the evaluate stage for large-model runs.
+- Fixed evidence-pack edit targeting across the RTN, FP8, pruning, and
+  low-rank model creators so tensorized MoE expert weights are edited by the
+  intended `all` / `ffn` / `attn` scopes instead of degrading to near-noop
+  router-only changes on Mixtral-style models.
 
 ## [0.7.2] - 2026-04-15
 

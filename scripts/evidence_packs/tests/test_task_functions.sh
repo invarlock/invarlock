@@ -1348,6 +1348,9 @@ EOF
     assert_match "INVARLOCK_STORE_EVAL_WINDOWS=1" "${env_capture}" "baseline run stores eval windows"
     assert_match "INVARLOCK_SKIP_OVERHEAD_CHECK=1" "${env_capture}" "large-model baseline run skips overhead check"
     assert_match "HF_HOME=${HF_HOME}" "${env_capture}" "baseline run preserves inherited HF cache root"
+    local profile_contents
+    profile_contents="$(cat "${baseline_root}/config_root/runtime/profiles/ci.yaml")"
+    assert_match "skip_overhead_check: true" "${profile_contents}" "large-model baseline report profile carries skip_overhead policy"
 }
 
 test_task_baseline_report_helpers_remove_invalid_baseline_report_and_timeout_wait() {

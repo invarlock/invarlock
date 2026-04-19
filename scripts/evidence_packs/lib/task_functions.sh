@@ -509,6 +509,11 @@ _ensure_evaluate_baseline_report() {
 
         local baseline_config_root="${abs_baseline_root}/config_root"
         mkdir -p "${baseline_config_root}/runtime/profiles"
+        local skip_overhead_config_yaml=""
+        if _is_large_model "${model_size}"; then
+            skip_overhead_config_yaml=$'context:\n  run:\n    skip_overhead_check: true'
+            echo "  Large model (${model_size}): context.run.skip_overhead_check=true" >> "${log_file}"
+        fi
         cat > "${baseline_config_root}/runtime/profiles/ci.yaml" << YAML
 model:
   device_map: "auto"
@@ -524,6 +529,7 @@ eval:
   bootstrap:
     replicates: ${bootstrap_replicates}
     alpha: 0.05
+${skip_overhead_config_yaml}
 YAML
 
         local guards_order_csv="${PACK_GUARDS_ORDER:-}"

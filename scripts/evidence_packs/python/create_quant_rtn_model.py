@@ -9,9 +9,11 @@ from pathlib import Path
 import torch
 
 try:
+    from edit_targeting import matches_edit_scope
     from runtime_tools import require_remote_code_opt_in
 except ImportError:  # pragma: no cover - direct module load under pytest
     sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from edit_targeting import matches_edit_scope
     from runtime_tools import require_remote_code_opt_in
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -27,50 +29,7 @@ def _configure_determinism() -> None:
 
 
 def _should_quantize(name: str, scope: str) -> bool:
-    name_lower = name.lower()
-    if scope == "all":
-        return "weight" in name_lower and any(
-            x in name_lower
-            for x in (
-                "linear",
-                "dense",
-                "proj",
-                "fc",
-                "mlp",
-                "attn",
-                "wqkv",
-                "query_key_value",
-            )
-        )
-    if scope == "ffn":
-        return "weight" in name_lower and any(
-            x in name_lower
-            for x in (
-                "mlp",
-                "fc",
-                "dense",
-                "gate",
-                "up_proj",
-                "down_proj",
-                "dense_h_to_4h",
-                "dense_4h_to_h",
-            )
-        )
-    if scope == "attn":
-        return "weight" in name_lower and any(
-            x in name_lower
-            for x in (
-                "attn",
-                "q_proj",
-                "k_proj",
-                "v_proj",
-                "o_proj",
-                "wqkv",
-                "out_proj",
-                "query_key_value",
-            )
-        )
-    return False
+    return matches_edit_scope(name, scope)
 
 
 @torch.no_grad()

@@ -8,9 +8,11 @@ from pathlib import Path
 import torch
 
 try:
+    from edit_targeting import matches_edit_scope
     from runtime_tools import require_remote_code_opt_in
 except ImportError:  # pragma: no cover - direct module load under pytest
     sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from edit_targeting import matches_edit_scope
     from runtime_tools import require_remote_code_opt_in
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -54,39 +56,7 @@ def _extract_layer_index(name: str) -> int | None:
 
 
 def _should_lowrank(name: str, base_scope: str) -> bool:
-    name_lower = name.lower()
-    if base_scope == "all":
-        return "weight" in name_lower and any(
-            x in name_lower
-            for x in ("linear", "proj", "fc", "mlp", "wqkv", "query_key_value")
-        )
-    if base_scope == "ffn":
-        return "weight" in name_lower and any(
-            x in name_lower
-            for x in (
-                "mlp",
-                "fc",
-                "gate",
-                "up_proj",
-                "down_proj",
-                "dense_h_to_4h",
-                "dense_4h_to_h",
-            )
-        )
-    if base_scope == "attn":
-        return "weight" in name_lower and any(
-            x in name_lower
-            for x in (
-                "q_proj",
-                "k_proj",
-                "v_proj",
-                "o_proj",
-                "wqkv",
-                "out_proj",
-                "query_key_value",
-            )
-        )
-    return False
+    return matches_edit_scope(name, base_scope)
 
 
 @torch.no_grad()
