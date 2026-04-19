@@ -668,8 +668,27 @@ estimate_model_memory() {
     esac
 
     local is_large="false"
-    if [[ "${size_bucket}" =~ ^[0-9]+$ && ${size_bucket} -ge 70 ]]; then
+    if [[ "${size_bucket}" == "moe" ]] || [[ "${size_bucket}" =~ ^[0-9]+$ && ${size_bucket} -ge 70 ]]; then
         is_large="true"
+    fi
+
+    # MoE tasks fit on a single H200 by VRAM, but real runs also fan out large
+    # host-RAM allocations during calibration/edit/eval. Reserve the whole box
+    # for those load-bearing tasks so the scheduler serializes them instead of
+    # launching one per GPU and tripping the host OOM killer.
+    if [[ "${size_bucket}" == "moe" ]]; then
+        case "${task_type}" in
+            "SETUP_BASELINE")
+                ;;
+            "CALIBRATION_RUN"|"CREATE_EDIT"|"CREATE_EDITS_BATCH"|"evaluate_EDIT"|"CREATE_ERROR"|"evaluate_ERROR")
+                echo "480"
+                return
+                ;;
+            "GENERATE_PRESET")
+                echo "10"
+                return
+                ;;
+        esac
     fi
 
     # Multiplier by task type

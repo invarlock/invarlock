@@ -1657,8 +1657,8 @@ get_model_invarlock_config() {
             ;;
         "moe")
             # MoE models (Mixtral-8x7B): ~90GB effective
-            # Moderate sequence length, smaller batch due to expert memory
-            echo "1024:512:40:40:24"
+            # Moderate sequence length, conservative batch due to expert memory.
+            echo "1024:512:40:40:8"
             ;;
         "70"|"72")
             # 70-72B models: ~140-144GB, ultra-conservative settings

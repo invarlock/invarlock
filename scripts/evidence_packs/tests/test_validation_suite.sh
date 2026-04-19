@@ -1289,7 +1289,7 @@ test_pack_validation_get_model_invarlock_config_covers_all_case_arms() {
     assert_eq "512:512:64:64:64" "$(get_model_invarlock_config 13)" "13B config"
     assert_eq "1024:512:40:40:48" "$(get_model_invarlock_config 30)" "30B config"
     assert_eq "1024:512:36:36:32" "$(get_model_invarlock_config 40)" "40B config"
-    assert_eq "1024:512:40:40:24" "$(get_model_invarlock_config moe)" "moe config"
+    assert_eq "1024:512:40:40:8" "$(get_model_invarlock_config moe)" "moe config"
     assert_eq "128:64:8:8:2" "$(get_model_invarlock_config 70)" "70B config"
     assert_eq "1024:512:40:40:32" "$(get_model_invarlock_config unknown)" "default config"
 }

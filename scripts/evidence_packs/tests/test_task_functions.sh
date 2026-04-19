@@ -971,7 +971,7 @@ test_task_helpers_cover_fallback_branches() {
     assert_eq "512:512:192:192:64" "$(_get_model_invarlock_config_fallback "13")" "13B config"
     assert_eq "1024:1024:192:192:48" "$(_get_model_invarlock_config_fallback "30")" "30B config"
     assert_eq "1024:1024:192:192:32" "$(_get_model_invarlock_config_fallback "40")" "40B config"
-    assert_eq "1024:1024:192:192:24" "$(_get_model_invarlock_config_fallback "moe")" "moe config"
+    assert_eq "1024:1024:192:192:8" "$(_get_model_invarlock_config_fallback "moe")" "moe config"
     assert_eq "128:128:192:192:2" "$(_get_model_invarlock_config_fallback "70")" "70B config"
     assert_eq "1024:1024:192:192:32" "$(_get_model_invarlock_config_fallback "unknown")" "fallback config"
 

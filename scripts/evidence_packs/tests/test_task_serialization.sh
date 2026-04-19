@@ -631,3 +631,24 @@ test_estimate_model_memory_multiplier_case_arms_large_and_small() {
     assert_match '^[0-9]+$' "$(estimate_model_memory "${small}" "GENERATE_PRESET")" "small GENERATE_PRESET"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${small}" "UNKNOWN")" "small default"
 }
+
+test_estimate_model_memory_serializes_moe_execution_tasks() {
+    mock_reset
+    # shellcheck source=../task_serialization.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+
+    GPU_MEMORY_PER_DEVICE=140 NUM_GPUS=4
+
+    local calibration_mem
+    calibration_mem="$(estimate_model_memory "mistralai/Mixtral-8x7B-v0.1" "CALIBRATION_RUN")"
+    assert_eq "480" "${calibration_mem}" "MoE calibration reserves host-heavy capacity"
+    assert_eq "4" "$(calculate_required_gpus "${calibration_mem}")" "MoE calibration serializes across a 4x H200 host"
+
+    local eval_mem
+    eval_mem="$(estimate_model_memory "mistralai/Mixtral-8x7B-v0.1" "evaluate_EDIT")"
+    assert_eq "480" "${eval_mem}" "MoE edit evaluation reserves host-heavy capacity"
+    assert_eq "4" "$(calculate_required_gpus "${eval_mem}")" "MoE edit evaluation uses full-host reservation"
+
+    assert_eq "99" "$(estimate_model_memory "mistralai/Mixtral-8x7B-v0.1" "SETUP_BASELINE")" "MoE baseline setup stays single-host download sized"
+    assert_eq "1" "$(calculate_required_gpus "$(estimate_model_memory "mistralai/Mixtral-8x7B-v0.1" "SETUP_BASELINE")")" "MoE baseline setup still fits one GPU lane"
+}

@@ -73,7 +73,7 @@ _get_model_invarlock_config_fallback() {
             echo "1024:1024:192:192:32"
             ;;
         "moe")
-            echo "1024:1024:192:192:24"
+            echo "1024:1024:192:192:8"
             ;;
         "70"|"72")
             # Minimal sequence length to cap KV cache, but still meet coverage floors.
