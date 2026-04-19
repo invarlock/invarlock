@@ -143,6 +143,64 @@ class _GptOssForCausalLM(nn.Module):
         self.lm_head.weight = self.model.embed_tokens.weight
 
 
+class _MixtralExperts(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.intermediate_dim = 8
+        self.num_experts = 2
+        self.gate_up_proj = nn.Parameter(torch.empty(2, 16, 4))
+        self.down_proj = nn.Parameter(torch.empty(2, 4, 8))
+
+
+class _MixtralGate(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.weight = nn.Parameter(torch.empty(2, 4))
+
+
+class _MixtralMLP(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.gate = _MixtralGate()
+        self.experts = _MixtralExperts()
+
+
+class _MixtralLayer(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.self_attn = nn.Module()
+        self.self_attn.q_proj = nn.Linear(4, 4, bias=False)
+        self.self_attn.k_proj = nn.Linear(4, 4, bias=False)
+        self.self_attn.v_proj = nn.Linear(4, 4, bias=False)
+        self.self_attn.o_proj = nn.Linear(4, 4, bias=False)
+        self.mlp = _MixtralMLP()
+        self.input_layernorm = nn.LayerNorm(4)
+        self.post_attention_layernorm = nn.LayerNorm(4)
+
+
+class _MixtralModel(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.layers = nn.ModuleList([_MixtralLayer(), _MixtralLayer()])
+        self.embed_tokens = nn.Embedding(16, 4)
+
+
+class _MixtralForCausalLM(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.model = _MixtralModel()
+        self.config = SimpleNamespace(
+            model_type="mixtral",
+            num_hidden_layers=2,
+            num_attention_heads=2,
+            hidden_size=4,
+            intermediate_size=8,
+            vocab_size=16,
+        )
+        self.lm_head = nn.Linear(4, 16, bias=False)
+        self.lm_head.weight = self.model.embed_tokens.weight
+
+
 class _OptLayer(nn.Module):
     def __init__(self) -> None:
         super().__init__()
@@ -407,6 +465,33 @@ def test_hf_causal_adapter_returns_gpt_oss_layer_modules() -> None:
 
     assert modules["self_attn.q_proj"] is model.model.layers[0].self_attn.q_proj
     assert modules["mlp.router"] is model.model.layers[0].mlp.router
+    assert modules["mlp.experts"] is model.model.layers[0].mlp.experts
+
+
+def test_hf_causal_adapter_handles_tensorized_mixtral_layout() -> None:
+    adapter = HF_Causal_Adapter()
+
+    assert adapter.can_handle(_MixtralForCausalLM()) is True
+
+
+def test_hf_causal_adapter_describes_tensorized_mixtral_layout() -> None:
+    adapter = HF_Causal_Adapter()
+    description = adapter.describe(_MixtralForCausalLM())
+
+    assert description["hf_model_type"] == "mixtral"
+    assert description["spec"] == "moe_decoder"
+    assert description["mlp_dims"] == [8, 8]
+
+
+def test_hf_causal_adapter_returns_tensorized_mixtral_layer_modules() -> None:
+    adapter = HF_Causal_Adapter()
+    model = _MixtralForCausalLM()
+
+    modules = adapter.get_layer_modules(model, 0)
+
+    assert modules["self_attn.q_proj"] is model.model.layers[0].self_attn.q_proj
+    assert modules["mlp.router"] is model.model.layers[0].mlp.gate
+    assert modules["mlp.gate"] is model.model.layers[0].mlp.gate
     assert modules["mlp.experts"] is model.model.layers[0].mlp.experts
 
 

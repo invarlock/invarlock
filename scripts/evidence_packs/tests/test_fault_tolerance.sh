@@ -20,6 +20,19 @@ test_classify_error_precedence() {
     assert_eq "unknown" "$(classify_error "${log}")" "unknown"
 }
 
+
+test_classify_error_marks_adapter_structure_invalid_permanent() {
+    mock_reset
+    # shellcheck source=../fault_tolerance.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
+
+    local log="${TEST_TMPDIR}/task.log"
+
+    printf "[INVARLOCK:E202] ADAPTER-STRUCTURE-INVALID: no matching HF causal adapter spec\nclick.exceptions.Exit: 1\n" > "${log}"
+    assert_eq "permanent" "$(classify_error "${log}")" "adapter structure invalid is permanent"
+}
+
+
 test_calculate_backoff_uses_jitter_hook_and_caps() {
     mock_reset
     # shellcheck source=../fault_tolerance.sh

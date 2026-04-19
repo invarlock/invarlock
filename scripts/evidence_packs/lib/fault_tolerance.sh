@@ -93,6 +93,9 @@ detect_permanent_error() {
     fi
 
     local permanent_patterns=(
+        "INVARLOCK:E202"
+        "ADAPTER-STRUCTURE-INVALID"
+        "no matching HF causal adapter spec"
         "Model.*not found"
         "ValueError: .* is not a valid"
         "FileNotFoundError"

@@ -89,6 +89,21 @@ def _shape_ints(value: Any) -> tuple[int, ...] | None:
     return tuple(dims)
 
 
+def _mixtral_tensorized_moe_parts(layer: Any) -> tuple[Any | None, Any | None]:
+    mlp = getattr(layer, "mlp", None)
+    gate = getattr(mlp, "gate", None) if mlp is not None else None
+    experts = getattr(mlp, "experts", None) if mlp is not None else None
+    if gate is None or experts is None:
+        return None, None
+    if not _has_set_attr(gate, "weight"):
+        return None, None
+    if not (
+        _has_set_attr(experts, "gate_up_proj") and _has_set_attr(experts, "down_proj")
+    ):
+        return None, None
+    return gate, experts
+
+
 def _coerce_config_int(value: Any) -> int | None:
     if isinstance(value, bool):
         return None
@@ -390,15 +405,17 @@ class _MoEDecoderSpec(_CausalSpec):
         moe = getattr(layer, "block_sparse_moe", None)
         experts = getattr(moe, "experts", None) if moe is not None else None
         expert0 = _first_item(experts) if experts is not None else None
-        has_moe = bool(
+        has_legacy_moe = bool(
             expert0 is not None
             and _has_set_attr(expert0, "w1")
             and _has_set_attr(expert0, "w2")
         )
+        mixtral_gate, mixtral_experts = _mixtral_tensorized_moe_parts(layer)
+        has_tensorized_moe = bool(mixtral_gate is not None and mixtral_experts is not None)
         has_norms = _has_set_attr(layer, "input_layernorm") and _has_set_attr(
             layer, "post_attention_layernorm"
         )
-        return bool(has_attn and has_moe and has_norms)
+        return bool(has_attn and (has_legacy_moe or has_tensorized_moe) and has_norms)
 
     def infer_mlp_dim(self, layer: Any, config: Any, hidden_size: int) -> int:
         mlp_dim = int(getattr(config, "intermediate_size", hidden_size * 4) or 0)
@@ -409,9 +426,34 @@ class _MoEDecoderSpec(_CausalSpec):
             w1_dim = _weight_shape_dim(getattr(expert0, "w1", None), 0)
             if w1_dim is not None:
                 mlp_dim = w1_dim
+                return int(mlp_dim)
+        _mixtral_gate, mixtral_experts = _mixtral_tensorized_moe_parts(layer)
+        if mixtral_experts is not None:
+            intermediate_dim = getattr(mixtral_experts, "intermediate_dim", None)
+            if isinstance(intermediate_dim, int) and intermediate_dim > 0:
+                return int(intermediate_dim)
+            intermediate_size = getattr(mixtral_experts, "intermediate_size", None)
+            if isinstance(intermediate_size, int) and intermediate_size > 0:
+                return int(intermediate_size)
+            gate_up_shape = _shape_ints(getattr(mixtral_experts, "gate_up_proj", None))
+            if gate_up_shape is not None and len(gate_up_shape) >= 2 and gate_up_shape[-2] > 0:
+                return int(gate_up_shape[-2] // 2)
         return int(mlp_dim)
 
     def layer_modules(self, model: Any, layer: Any) -> dict[str, Any]:
+        mixtral_gate, mixtral_experts = _mixtral_tensorized_moe_parts(layer)
+        if mixtral_gate is not None and mixtral_experts is not None:
+            return {
+                "self_attn.q_proj": layer.self_attn.q_proj,
+                "self_attn.k_proj": layer.self_attn.k_proj,
+                "self_attn.v_proj": layer.self_attn.v_proj,
+                "self_attn.o_proj": layer.self_attn.o_proj,
+                "input_layernorm": layer.input_layernorm,
+                "post_attention_layernorm": layer.post_attention_layernorm,
+                "mlp.router": mixtral_gate,
+                "mlp.gate": mixtral_gate,
+                "mlp.experts": mixtral_experts,
+            }
         moe = layer.block_sparse_moe
         expert0 = _first_item(moe.experts)
         if expert0 is None:
