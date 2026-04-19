@@ -237,13 +237,21 @@ Notes
 
 Published assurance basis covers GPT-2 and BERT profiles. Repo-included
 presets and pilot calibration configs for additional experimental families,
-including Mistral 7B, Ministral 3 text-only, Qwen2 7B, Qwen2.5 14B, Qwen3,
+including Mistral 7B, Ministral 3 text-only, Qwen2 7B, Qwen2.5 7B, Qwen2.5 14B, Qwen3,
 DeepSeek-R1-Distill-Qwen, Phi-4 text-only, Gemma 4 E2B text-only, TinyLlama
 1.1B, OLMo 2, and Qwen3.5, do not become part of the published
 assurance basis until supporting artifacts are attached. Access-gated vendor
 checkpoints are intentionally excluded from the included support matrix and
 preset inventory, and ungated families without clean pilot lanes remain in the
 model family backlog rather than the support matrix.
+
+In the current `<=14B` text-lane promotion wave, no new family clears the full
+promotion bar yet. Qwen2.5 7B now has shipped preset/config/test/smoke
+scaffolding, but the empirical promotion matrix still needs a clean close
+before the lane can move out of usage-only. `published_basis` remains the
+narrow public evidence floor, while `supported_experimental` means the repo
+ships the preset, calibration config, targeted tests, and smoke/evidence path
+for the lane without claiming a published-basis fixture set.
 
 Image-text evaluation uses the built-in
 `hf_multimodal` adapter and the `vision_text` provider. Public support remains

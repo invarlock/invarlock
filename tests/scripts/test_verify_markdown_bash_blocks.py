@@ -228,7 +228,7 @@ def test_sanitize_script_rewrites_python_script_invocations_to_selected_python()
 
     rendered = module._sanitize_script(block, execution_mode="host")
 
-    assert rendered.startswith(str(module.ROOT / ".venv" / "bin" / "python"))
+    assert rendered.startswith(sys.executable)
     assert "scripts/check_device_drift.py reports/a.json reports/b.json" in rendered
 
 

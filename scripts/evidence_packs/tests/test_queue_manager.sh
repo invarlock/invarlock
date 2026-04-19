@@ -541,6 +541,26 @@ test_generate_model_tasks_sanitizes_invalid_calibration_runs() {
     assert_eq "5" "${cal_count}" "invalid calibration runs default to 5"
 }
 
+test_capture_add_task_advances_sequence_without_subshell_loss() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue_manager.sh"
+
+    local out_dir="${TEST_TMPDIR}/out"
+    init_queue "${out_dir}" >/dev/null
+
+    export TASK_SEQUENCE=0
+
+    local t1=""
+    local t2=""
+    capture_add_task t1 "SETUP_BASELINE" "org/model" "model" "14" "none" '{}' "50"
+    capture_add_task t2 "CALIBRATION_RUN" "org/model" "model" "14" "${t1}" '{"run":1}' "50"
+
+    assert_match '_001_' "${t1}" "first captured task uses sequence 001"
+    assert_match '_002_' "${t2}" "second captured task increments sequence"
+    assert_eq "2" "${TASK_SEQUENCE}" "task sequence preserved in parent shell"
+}
+
 test_generate_model_tasks_disables_batch_for_large_memory_and_uses_manifest_fallbacks() {
     mock_reset
     # shellcheck source=../queue_manager.sh
@@ -590,6 +610,65 @@ test_generate_model_tasks_disables_batch_for_large_memory_and_uses_manifest_fall
     # scenarios.json + jq fallback defaults should be used.
     assert_match "quant_rtn:clean:ffn" "${all_calls}" "fallback clean edit spec used"
     assert_match "weight_tying_break" "${all_calls}" "fallback error type used"
+}
+
+test_generate_model_tasks_nonbatch_edit_dependencies_match_create_specs() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue_manager.sh"
+
+    local out_dir="${TEST_TMPDIR}/out"
+    init_queue "${out_dir}" >/dev/null
+
+    estimate_model_memory() { echo "14"; }
+    DRIFT_CALIBRATION_RUNS=1
+    CLEAN_EDIT_RUNS=1
+    STRESS_EDIT_RUNS=1
+    PACK_USE_BATCH_EDITS="false"
+    RUN_ERROR_INJECTION="false"
+    export DRIFT_CALIBRATION_RUNS CLEAN_EDIT_RUNS STRESS_EDIT_RUNS PACK_USE_BATCH_EDITS RUN_ERROR_INJECTION
+
+    mkdir -p "${out_dir}/state"
+    cat > "${out_dir}/state/scenarios.json" <<'EOF'
+{
+  "scenarios": [
+    {"id": "quant_clean", "generation": {"kind": "edit", "edit_spec": "quant_rtn:clean:ffn", "version": "clean"}},
+    {"id": "fp8_clean", "generation": {"kind": "edit", "edit_spec": "fp8_quant:clean:ffn", "version": "clean"}},
+    {"id": "prune_clean", "generation": {"kind": "edit", "edit_spec": "magnitude_prune:clean:ffn", "version": "clean"}},
+    {"id": "svd_clean", "generation": {"kind": "edit", "edit_spec": "lowrank_svd:clean:ffn", "version": "clean"}},
+    {"id": "prune_stress", "generation": {"kind": "edit", "edit_spec": "magnitude_prune:0.5:all", "version": "stress"}},
+    {"id": "svd_stress", "generation": {"kind": "edit", "edit_spec": "lowrank_svd:32:all", "version": "stress"}}
+  ]
+}
+EOF
+
+    generate_model_tasks "1" "org/model" "model" >/dev/null
+
+    local create_count
+    create_count="$(find "${QUEUE_DIR}" -type f -name '*_CREATE_EDIT_*.task' | wc -l | tr -d ' ')"
+    assert_eq "6" "${create_count}" "all requested non-batch create tasks emitted"
+
+    local duplicate_ids
+    duplicate_ids="$(
+        find "${QUEUE_DIR}" -type f -name '*_CREATE_EDIT_*.task' -exec jq -r '.task_id' {} \; \
+            | sort | uniq -d
+    )"
+    assert_eq "" "${duplicate_ids}" "create task ids remain unique"
+
+    while IFS= read -r eval_task; do
+        [[ -n "${eval_task}" ]] || continue
+        local edit_spec
+        local version
+        local create_dep
+        edit_spec="$(jq -r '.params.edit_spec' "${eval_task}")"
+        version="$(jq -r '.params.version' "${eval_task}")"
+        create_dep="$(jq -r '.dependencies[0]' "${eval_task}")"
+        [[ -n "${create_dep}" && "${create_dep}" != "null" ]] || t_fail "missing create dependency for ${eval_task}"
+        local create_task="${QUEUE_DIR}/pending/${create_dep}.task"
+        assert_file_exists "${create_task}" "create dependency task exists for ${edit_spec}"
+        assert_eq "${edit_spec}" "$(jq -r '.params.edit_spec' "${create_task}")" "edit dependency matches edit spec"
+        assert_eq "${version}" "$(jq -r '.params.version' "${create_task}")" "edit dependency matches version"
+    done < <(find "${QUEUE_DIR}" -type f -name '*_evaluate_EDIT_*.task' | sort)
 }
 
 test_generate_evaluate_tasks_sanitizes_cert_runs() {

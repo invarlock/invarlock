@@ -29,6 +29,9 @@ def test_model_family_catalog_doc_matches_contract_sections() -> None:
         "Declared Support": payload["declared_support"],
         "Implemented Coverage": payload["implemented_coverage"],
         "Usage Only": payload["usage_only"],
+        "<=14B Text Promotion Wave": payload["promotion_candidates_text_le_14b"][
+            "candidates"
+        ],
         "Recommended Additions": payload["recommended_additions"],
     }
 
@@ -41,3 +44,12 @@ def test_model_family_catalog_doc_matches_contract_sections() -> None:
     for entry in payload["recommended_additions"]:
         assert entry["priority"] in recommended_text
         assert entry["planned_support_mode"] in recommended_text
+
+    promotion_text = _section(doc_text, "<=14B Text Promotion Wave")
+    for entry in payload["promotion_candidates_text_le_14b"]["candidates"]:
+        assert entry["decision"] in promotion_text
+
+    assert (
+        "| Qwen2.5 7B causal LM | `Qwen/Qwen2.5-7B` | "
+        "`blocked_missing_artifacts` | `usage_only` |" in promotion_text
+    )

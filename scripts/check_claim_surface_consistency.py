@@ -62,6 +62,7 @@ def main() -> int:
             "Published assurance basis covers GPT-2 and BERT profiles.",
             "Mistral 7B",
             "Qwen2 7B",
+            "Qwen2.5 7B",
             "Qwen2.5 14B",
             "pilot calibration configs",
             "Model Family Catalog",
@@ -79,6 +80,7 @@ def main() -> int:
             "support tier",
             "coverage state",
             "Declared Support",
+            "<=14B Text Promotion Wave",
             "Recommended Additions",
         ],
         "docs/assurance/00-assurance-case.md": [
@@ -90,6 +92,7 @@ def main() -> int:
             "Published assurance basis covers GPT-2 and BERT profiles.",
             "Mistral 7B",
             "Qwen2 7B",
+            "Qwen2.5 7B",
             "Qwen2.5 14B",
             "not part of the published",
         ],
@@ -97,6 +100,7 @@ def main() -> int:
             "Published assurance basis covers GPT-2 and BERT profiles.",
             "Mistral 7B",
             "Qwen2 7B",
+            "Qwen2.5 7B",
             "Qwen2.5 14B",
         ],
         "docs/reference/guards.md": [
@@ -104,6 +108,7 @@ def main() -> int:
             "BERT profiles",
             "Mistral 7B",
             "Qwen2 7B",
+            "Qwen2.5 7B",
             "Qwen2.5 14B",
             "published assurance basis",
         ],
@@ -113,6 +118,7 @@ def main() -> int:
             "BERT",
             "Mistral 7B",
             "Qwen2 7B",
+            "Qwen2.5 7B",
             "Qwen2.5 14B",
         ],
         "docs/user-guide/evidence-packs.md": [

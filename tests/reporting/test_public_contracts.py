@@ -19,7 +19,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
 
     family_catalog = contracts.load_model_family_catalog()
     assert family_catalog["format_version"] == "model-family-catalog-v1"
-    assert family_catalog["as_of"] == "2026-04-05"
+    assert family_catalog["as_of"] == "2026-04-19"
     assert family_catalog["declared_support"][0]["display_name"] == "GPT-2 causal LM"
     declared = {item["display_name"] for item in family_catalog["declared_support"]}
     assert declared == {
@@ -40,6 +40,30 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     }
     usage_only = {item["display_name"] for item in family_catalog["usage_only"]}
     assert "QwQ 32B reasoning" not in usage_only
+    assert "Qwen2.5 7B" in usage_only
+    assert "Qwen2.5 32B" in usage_only
+    promotion = family_catalog["promotion_candidates_text_le_14b"]
+    assert promotion["format_version"] == "promotion-candidates-text-le-14b-v1"
+    candidates = {
+        item["display_name"]: item for item in promotion["candidates"]
+    }
+    assert candidates["Qwen2.5 7B causal LM"]["decision"] == "blocked_missing_artifacts"
+    assert (
+        candidates["Qwen2.5 7B causal LM"]["current_catalog_state"]
+        == "usage_only"
+    )
+    assert (
+        candidates["Falcon 7B causal LM"]["decision"]
+        == "blocked_missing_artifacts"
+    )
+    assert candidates["Gemma 3 4B IT"]["decision"] == "explicitly_out_of_scope"
+    assert (
+        candidates["Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)"][
+            "decision"
+        ]
+        == "blocked_missing_artifacts"
+    )
+    assert candidates["OPT 1.3B causal LM"]["criteria_status"]["targeted_tests"] == "pass"
     recommended = {
         item["display_name"] for item in family_catalog["recommended_additions"]
     }
@@ -468,6 +492,7 @@ def test_public_contract_lane_and_adapter_helpers_cover_non_matching_entries(
                 ],
                 "implemented_coverage": [],
                 "usage_only": [],
+                "promotion_candidates_text_le_14b": {"candidates": []},
                 "recommended_additions": [],
             },
             "plugin_compatibility.json": {

@@ -101,6 +101,7 @@ def test_model_catalog_gpu_suite_covers_public_catalog_representative_models() -
         "mistralai_mistral_7b_v0_1",
         "openai_gpt_oss_20b",
         "qwen_qwen2_7b",
+        "qwen_qwen2_5_7b",
         "microsoft_phi_4_reasoning_plus",
         "google_gemma_4_e4b_it",
         "facebook_bart_base",

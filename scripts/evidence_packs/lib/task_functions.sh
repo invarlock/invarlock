@@ -348,6 +348,33 @@ _is_large_model() {
     [[ "${model_size}" =~ 13 || "${model_size}" =~ 14 || "${model_size}" =~ 30 || "${model_size}" =~ 32 || "${model_size}" =~ 34 || "${model_size}" =~ 40 || "${model_size}" =~ 70 || "${model_size}" =~ 72 || "${model_size}" =~ 65 || "${model_size}" =~ 80 || "${model_size}" =~ 90 ]]
 }
 
+_baseline_report_wait_secs() {
+    local model_size="$1"
+    local preview_n="$2"
+    local final_n="$3"
+    local wait_secs="${PACK_BASELINE_REPORT_WAIT_SECS:-240}"
+
+    if _is_large_model "${model_size}"; then
+        wait_secs="${PACK_BASELINE_REPORT_WAIT_SECS_LARGE:-1800}"
+    else
+        local heavy_window_floor="${PACK_BASELINE_REPORT_WAIT_HEAVY_WINDOW_TOTAL_MIN:-800}"
+        if ! [[ "${heavy_window_floor}" =~ ^[0-9]+$ ]] || [[ "${heavy_window_floor}" -lt 1 ]]; then
+            heavy_window_floor=800
+        fi
+        if [[ "${preview_n}" =~ ^[0-9]+$ && "${final_n}" =~ ^[0-9]+$ ]]; then
+            local total_windows=$((preview_n + final_n))
+            if [[ "${total_windows}" -ge "${heavy_window_floor}" ]]; then
+                wait_secs="${PACK_BASELINE_REPORT_WAIT_SECS_HEAVY_WINDOWS:-1800}"
+            fi
+        fi
+    fi
+
+    if ! [[ "${wait_secs}" =~ ^[0-9]+$ ]] || [[ "${wait_secs}" -lt 1 ]]; then
+        wait_secs=240
+    fi
+    echo "${wait_secs}"
+}
+
 # Resolve the concrete InvarLock adapter name for a model path/ID.
 _resolve_invarlock_adapter() {
     local model_id="$1"
@@ -642,15 +669,10 @@ YAML
     fi
 
     local wait_interval="${PACK_BASELINE_REPORT_WAIT_INTERVAL_SECS:-2}"
-    local wait_secs="${PACK_BASELINE_REPORT_WAIT_SECS:-240}"
-    if _is_large_model "${model_size}"; then
-        wait_secs="${PACK_BASELINE_REPORT_WAIT_SECS_LARGE:-1800}"
-    fi
+    local wait_secs=""
+    wait_secs="$(_baseline_report_wait_secs "${model_size}" "${preview_n}" "${final_n}")"
     if ! [[ "${wait_interval}" =~ ^[0-9]+$ ]] || [[ "${wait_interval}" -lt 1 ]]; then
         wait_interval=2
-    fi
-    if ! [[ "${wait_secs}" =~ ^[0-9]+$ ]] || [[ "${wait_secs}" -lt 1 ]]; then
-        wait_secs=240
     fi
     local wait_iters=$((wait_secs / wait_interval))
     if [[ "${wait_iters}" -lt 1 ]]; then
