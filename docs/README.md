@@ -225,6 +225,7 @@ Notes
 | Mistral 7B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
 | Ministral 3 causal LM (text-only eval) | Yes | Yes | Yes | No, repo-included pilot config only |
 | Qwen2 7B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
+| Qwen2.5 7B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
 | Qwen2.5 14B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
 | Qwen3 causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
 | DeepSeek-R1-Distill-Qwen causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
@@ -237,13 +238,19 @@ Notes
 
 Published assurance basis covers GPT-2 and BERT profiles. Repo-included
 presets and pilot calibration configs for additional experimental families,
-including Mistral 7B, Ministral 3 text-only, Qwen2 7B, Qwen2.5 14B, Qwen3,
+including Mistral 7B, Ministral 3 text-only, Qwen2 7B, Qwen2.5 7B, Qwen2.5 14B, Qwen3,
 DeepSeek-R1-Distill-Qwen, Phi-4 text-only, Gemma 4 E2B text-only, TinyLlama
 1.1B, OLMo 2, and Qwen3.5, do not become part of the published
 assurance basis until supporting artifacts are attached. Access-gated vendor
 checkpoints are intentionally excluded from the included support matrix and
 preset inventory, and ungated families without clean pilot lanes remain in the
 model family backlog rather than the support matrix.
+
+In the current `<=14B` text-lane promotion wave, Qwen2.5 7B is the only new
+family that clears the full promotion bar. `published_basis` remains the narrow
+public evidence floor, while `supported_experimental` means the repo ships the
+preset, calibration config, targeted tests, and smoke/evidence path for the
+lane without claiming a published-basis fixture set.
 
 Image-text evaluation uses the built-in
 `hf_multimodal` adapter and the `vision_text` provider. Public support remains

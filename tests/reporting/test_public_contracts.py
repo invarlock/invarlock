@@ -19,7 +19,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
 
     family_catalog = contracts.load_model_family_catalog()
     assert family_catalog["format_version"] == "model-family-catalog-v1"
-    assert family_catalog["as_of"] == "2026-04-05"
+    assert family_catalog["as_of"] == "2026-04-19"
     assert family_catalog["declared_support"][0]["display_name"] == "GPT-2 causal LM"
     declared = {item["display_name"] for item in family_catalog["declared_support"]}
     assert declared == {
@@ -28,6 +28,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "Mistral 7B causal LM",
         "Ministral 3 causal LM (text-only eval)",
         "Qwen2 7B causal LM",
+        "Qwen2.5 7B causal LM",
         "Qwen2.5 14B causal LM",
         "Qwen3 causal LM",
         "DeepSeek-R1-Distill-Qwen causal LM",
@@ -40,6 +41,15 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     }
     usage_only = {item["display_name"] for item in family_catalog["usage_only"]}
     assert "QwQ 32B reasoning" not in usage_only
+    assert "Qwen2.5 32B" in usage_only
+    promotion = family_catalog["promotion_candidates_text_le_14b"]
+    assert promotion["format_version"] == "promotion-candidates-text-le-14b-v1"
+    decisions = {
+        item["display_name"]: item["decision"] for item in promotion["candidates"]
+    }
+    assert decisions["Qwen2.5 7B causal LM"] == "promote_now"
+    assert decisions["Falcon 7B causal LM"] == "blocked_missing_artifacts"
+    assert decisions["Gemma 3 4B IT"] == "explicitly_out_of_scope"
     recommended = {
         item["display_name"] for item in family_catalog["recommended_additions"]
     }
@@ -468,6 +478,7 @@ def test_public_contract_lane_and_adapter_helpers_cover_non_matching_entries(
                 ],
                 "implemented_coverage": [],
                 "usage_only": [],
+                "promotion_candidates_text_le_14b": {"candidates": []},
                 "recommended_additions": [],
             },
             "plugin_compatibility.json": {

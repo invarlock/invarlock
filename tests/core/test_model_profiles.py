@@ -25,6 +25,7 @@ pytest.importorskip("transformers")
         ("mistralai/Mixtral-8x7B-v0.1", "hf_causal", "mixtral", "causal"),
         ("openai/gpt-oss-20b", "hf_causal", "gpt_oss", "causal"),
         ("Qwen/Qwen2-7B", "hf_causal", "qwen", "causal"),
+        ("Qwen/Qwen2.5-7B", "hf_causal", "qwen", "causal"),
         ("Qwen/Qwen2.5-14B", "hf_causal", "qwen", "causal"),
         ("Qwen/Qwen3-8B", "hf_causal", "qwen", "causal"),
         ("Qwen/Qwen3.5-9B", "hf_causal", "qwen", "causal"),

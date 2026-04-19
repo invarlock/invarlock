@@ -1,6 +1,6 @@
 {
   "format_version": "model-family-catalog-v1",
-  "as_of": "2026-04-05",
+  "as_of": "2026-04-19",
   "declared_support": [
     {
       "family_id": "gpt2-causal-lm",
@@ -76,6 +76,20 @@
         "configs/calibration/null_sweep_qwen2_7b.yaml"
       ],
       "notes": "Derived from support_matrix lane qwen2-7b-causal-hf."
+    },
+    {
+      "family_id": "qwen2-5-7b-causal-lm",
+      "display_name": "Qwen2.5 7B causal LM",
+      "modalities": ["text"],
+      "task_role": "causal_lm",
+      "state": "supported_experimental",
+      "representative_models": ["Qwen/Qwen2.5-7B"],
+      "repo_evidence": [
+        "contracts/support_matrix.json",
+        "configs/presets/causal_lm/qwen2_5_7b_512.yaml",
+        "configs/calibration/null_sweep_qwen2_5_7b.yaml"
+      ],
+      "notes": "Derived from support_matrix lane qwen2-5-7b-causal-hf."
     },
     {
       "family_id": "qwen2-5-14b-causal-lm",
@@ -256,7 +270,7 @@
         "src/invarlock/cli/adapter_auto.py",
         "docs/reference/model-adapters.md"
       ],
-      "notes": "Shared qwen-family heuristics still cover aliases beyond the declared Qwen2, Qwen2.5 14B, Qwen3, and Qwen3.5 public lanes, including larger usage-only Qwen2.5 checkpoints."
+      "notes": "Shared qwen-family heuristics still cover aliases beyond the declared Qwen2, Qwen2.5 7B, Qwen2.5 14B, Qwen3, and Qwen3.5 public lanes, including larger usage-only Qwen2.5 checkpoints."
     },
     {
       "family_id": "yi",
@@ -407,21 +421,18 @@
   ],
   "usage_only": [
     {
-      "family_id": "qwen2-5",
-      "display_name": "Qwen2.5 family",
+      "family_id": "qwen2-5-32b",
+      "display_name": "Qwen2.5 32B",
       "modalities": ["text"],
       "task_role": "causal_lm",
       "state": "usage_only",
-      "representative_models": [
-        "Qwen/Qwen2.5-7B",
-        "Qwen/Qwen2.5-32B"
-      ],
+      "representative_models": ["Qwen/Qwen2.5-32B"],
       "repo_evidence": [
         "docs/user-guide/evidence-packs-internals.md",
         "scripts/evidence_packs/suites.sh",
         "scripts/evidence_packs/lib/validation_suite.sh"
       ],
-      "notes": "Used in evidence-pack suites and validation defaults outside the declared Qwen2.5 14B support lane."
+      "notes": "Used in evidence-pack suites and validation defaults outside the declared Qwen2.5 7B and Qwen2.5 14B support lanes."
     },
     {
       "family_id": "qwen1-5-72b",
@@ -466,6 +477,249 @@
       "notes": "Used concretely in evidence-pack flows while remaining outside the public support matrix."
     }
   ],
+  "promotion_candidates_text_le_14b": {
+    "format_version": "promotion-candidates-text-le-14b-v1",
+    "wave_label": "<=14B text-only public promotion wave",
+    "criteria_order": [
+      "explicit_adapter_or_profile_recognition",
+      "included_preset",
+      "included_calibration_config",
+      "targeted_tests",
+      "cli_smoke_evidence",
+      "approved_calibration_or_evaluation_evidence"
+    ],
+    "candidates": [
+      {
+        "candidate_id": "qwen2-5-7b-causal-lm",
+        "display_name": "Qwen2.5 7B causal LM",
+        "representative_model": "Qwen/Qwen2.5-7B",
+        "current_catalog_state": "usage_only",
+        "decision": "promote_now",
+        "criteria_status": {
+          "explicit_adapter_or_profile_recognition": "pass",
+          "included_preset": "pass",
+          "included_calibration_config": "pass",
+          "targeted_tests": "pass",
+          "cli_smoke_evidence": "pass",
+          "approved_calibration_or_evaluation_evidence": "pass"
+        },
+        "repo_evidence": [
+          "src/invarlock/model_profile.py",
+          "configs/presets/causal_lm/qwen2_5_7b_512.yaml",
+          "configs/calibration/null_sweep_qwen2_5_7b.yaml",
+          "tests/core/test_model_profiles.py",
+          "tests/cli/test_preset_causal_presets.py",
+          "tests/scripts/test_model_evidence_sweep.py",
+          "scripts/model_evidence_sweep.py",
+          "scripts/evidence_packs/lib/validation_suite.sh"
+        ],
+        "missing_artifacts": [],
+        "notes": "The usage-only Qwen2.5 7B lane is promoted after the shipped preset/config, targeted tests, CLI smoke lane, and promotion-wave validation closed."
+      },
+      {
+        "candidate_id": "openllama-7b-causal-lm",
+        "display_name": "OpenLLaMA 7B causal LM",
+        "representative_model": "openlm-research/open_llama_7b",
+        "current_catalog_state": "implemented_coverage",
+        "decision": "blocked_missing_artifacts",
+        "criteria_status": {
+          "explicit_adapter_or_profile_recognition": "pass",
+          "included_preset": "fail",
+          "included_calibration_config": "fail",
+          "targeted_tests": "pass",
+          "cli_smoke_evidence": "fail",
+          "approved_calibration_or_evaluation_evidence": "fail"
+        },
+        "repo_evidence": [
+          "src/invarlock/model_profile.py",
+          "src/invarlock/adapters/hf_loading.py",
+          "src/invarlock/cli/adapter_auto.py",
+          "tests/core/test_model_profiles.py"
+        ],
+        "missing_artifacts": [
+          "included preset",
+          "included calibration config",
+          "CLI smoke evidence",
+          "approved calibration/evaluation evidence"
+        ],
+        "notes": "The family is recognized and tested, but it still lacks the shipped lane artifacts and promotion evidence needed for public support."
+      },
+      {
+        "candidate_id": "phi-3-mini-4k-instruct-causal-lm",
+        "display_name": "Phi-3 Mini 4K Instruct causal LM",
+        "representative_model": "microsoft/Phi-3-mini-4k-instruct",
+        "current_catalog_state": "implemented_coverage",
+        "decision": "explicitly_out_of_scope",
+        "criteria_status": {
+          "explicit_adapter_or_profile_recognition": "pass",
+          "included_preset": "fail",
+          "included_calibration_config": "fail",
+          "targeted_tests": "fail",
+          "cli_smoke_evidence": "fail",
+          "approved_calibration_or_evaluation_evidence": "fail"
+        },
+        "repo_evidence": [
+          "src/invarlock/model_profile.py",
+          "src/invarlock/adapters/hf_loading.py",
+          "src/invarlock/cli/adapter_auto.py"
+        ],
+        "missing_artifacts": [],
+        "notes": "The public Phi surface is intentionally held at the shipped Phi-4 text-only lane in this wave rather than widening to another family-specific lane."
+      },
+      {
+        "candidate_id": "gemma-3-4b-it-causal-lm",
+        "display_name": "Gemma 3 4B IT",
+        "representative_model": "google/gemma-3-4b-it",
+        "current_catalog_state": "implemented_coverage",
+        "decision": "explicitly_out_of_scope",
+        "criteria_status": {
+          "explicit_adapter_or_profile_recognition": "pass",
+          "included_preset": "fail",
+          "included_calibration_config": "fail",
+          "targeted_tests": "fail",
+          "cli_smoke_evidence": "fail",
+          "approved_calibration_or_evaluation_evidence": "fail"
+        },
+        "repo_evidence": [
+          "src/invarlock/model_profile.py",
+          "src/invarlock/adapters/hf_loading.py",
+          "src/invarlock/adapters/hf_multimodal.py"
+        ],
+        "missing_artifacts": [],
+        "notes": "Gemma-family expansion beyond the existing text-only Gemma 4 E2B lane stays out of this wave because the broader family remains multimodal/audio-capable."
+      },
+      {
+        "candidate_id": "opt-1-3b-causal-lm",
+        "display_name": "OPT 1.3B causal LM",
+        "representative_model": "facebook/opt-1.3b",
+        "current_catalog_state": "implemented_coverage",
+        "decision": "blocked_missing_artifacts",
+        "criteria_status": {
+          "explicit_adapter_or_profile_recognition": "pass",
+          "included_preset": "fail",
+          "included_calibration_config": "fail",
+          "targeted_tests": "fail",
+          "cli_smoke_evidence": "fail",
+          "approved_calibration_or_evaluation_evidence": "fail"
+        },
+        "repo_evidence": [
+          "src/invarlock/model_profile.py",
+          "src/invarlock/adapters/hf_loading.py",
+          "src/invarlock/cli/adapter_auto.py"
+        ],
+        "missing_artifacts": [
+          "included preset",
+          "included calibration config",
+          "targeted tests",
+          "CLI smoke evidence",
+          "approved calibration/evaluation evidence"
+        ],
+        "notes": "Shared GPT-style recognition exists, but the public lane artifacts and evidence are missing."
+      },
+      {
+        "candidate_id": "falcon-7b-causal-lm",
+        "display_name": "Falcon 7B causal LM",
+        "representative_model": "tiiuae/falcon-7b",
+        "current_catalog_state": "implemented_coverage",
+        "decision": "blocked_missing_artifacts",
+        "criteria_status": {
+          "explicit_adapter_or_profile_recognition": "pass",
+          "included_preset": "fail",
+          "included_calibration_config": "fail",
+          "targeted_tests": "pass",
+          "cli_smoke_evidence": "fail",
+          "approved_calibration_or_evaluation_evidence": "fail"
+        },
+        "repo_evidence": [
+          "src/invarlock/core/adapter_auto.py",
+          "tests/adapters/test_hf_causal_variant_paths.py"
+        ],
+        "missing_artifacts": [
+          "included preset",
+          "included calibration config",
+          "CLI smoke evidence",
+          "approved calibration/evaluation evidence"
+        ],
+        "notes": "Recognition and targeted variant-path tests exist, but the dedicated shipped lane artifacts and evidence are still missing."
+      },
+      {
+        "candidate_id": "glm-4-9b-chat-causal-lm",
+        "display_name": "GLM 4 9B Chat",
+        "representative_model": "THUDM/glm-4-9b-chat",
+        "current_catalog_state": "implemented_coverage",
+        "decision": "blocked_missing_artifacts",
+        "criteria_status": {
+          "explicit_adapter_or_profile_recognition": "pass",
+          "included_preset": "fail",
+          "included_calibration_config": "fail",
+          "targeted_tests": "pass",
+          "cli_smoke_evidence": "fail",
+          "approved_calibration_or_evaluation_evidence": "fail"
+        },
+        "repo_evidence": [
+          "src/invarlock/core/adapter_auto.py",
+          "tests/adapters/test_hf_causal_variant_paths.py"
+        ],
+        "missing_artifacts": [
+          "included preset",
+          "included calibration config",
+          "CLI smoke evidence",
+          "approved calibration/evaluation evidence"
+        ],
+        "notes": "Recognition and targeted variant-path tests exist, but the dedicated shipped lane artifacts and evidence are still missing."
+      },
+      {
+        "candidate_id": "distilbert-base-uncased-mlm",
+        "display_name": "DistilBERT base uncased MLM",
+        "representative_model": "distilbert-base-uncased",
+        "current_catalog_state": "implemented_coverage",
+        "decision": "blocked_missing_artifacts",
+        "criteria_status": {
+          "explicit_adapter_or_profile_recognition": "pass",
+          "included_preset": "fail",
+          "included_calibration_config": "fail",
+          "targeted_tests": "pass",
+          "cli_smoke_evidence": "fail",
+          "approved_calibration_or_evaluation_evidence": "fail"
+        },
+        "repo_evidence": [
+          "src/invarlock/adapters/hf_loading.py",
+          "src/invarlock/cli/adapter_auto.py",
+          "docs/reference/model-adapters.md",
+          "tests/adapters/test_hf_mlm_variant_paths.py"
+        ],
+        "missing_artifacts": [
+          "included preset",
+          "included calibration config",
+          "CLI smoke evidence",
+          "approved calibration/evaluation evidence"
+        ],
+        "notes": "Loader and adapter tests exist, but the broader MLM family still lacks the shipped lane artifacts and promotion evidence."
+      },
+      {
+        "candidate_id": "mbart-large-50-seq2seq",
+        "display_name": "mBART large 50 seq2seq",
+        "representative_model": "facebook/mbart-large-50",
+        "current_catalog_state": "implemented_coverage",
+        "decision": "explicitly_out_of_scope",
+        "criteria_status": {
+          "explicit_adapter_or_profile_recognition": "fail",
+          "included_preset": "fail",
+          "included_calibration_config": "fail",
+          "targeted_tests": "fail",
+          "cli_smoke_evidence": "fail",
+          "approved_calibration_or_evaluation_evidence": "fail"
+        },
+        "repo_evidence": [
+          "src/invarlock/adapters/hf_loading.py",
+          "src/invarlock/cli/adapter_auto.py",
+          "docs/reference/model-adapters.md"
+        ],
+        "missing_artifacts": [],
+        "notes": "Generic seq2seq/community lanes are intentionally excluded from this text-only promotion wave."
+      }
+    ]
+  },
   "recommended_additions": [
     {
       "family_id": "audio-text-evaluation",
