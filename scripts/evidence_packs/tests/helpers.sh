@@ -107,7 +107,7 @@ push_active_python_bin() {
     fi
 
     local active_python=""
-    active_python="$(command -v python 2>/dev/null || true)"
+    active_python="$(command -v python 2>/dev/null || command -v python3 2>/dev/null || true)"
     [[ -n "${active_python}" ]] || t_fail "python executable not found for PYTHON_BIN override"
     export PYTHON_BIN="${active_python}"
 }

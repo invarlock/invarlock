@@ -831,24 +831,27 @@ pack_prepare_calibration_presets() {
     for model_id in "${PACK_MODEL_LIST[@]}"; do
         local model_name
         model_name=$(sanitize_model_name "${model_id}")
-        local src=""
         if [[ -n "${PACK_CALIBRATION_PRESET_FILE:-}" ]]; then
-            src="${PACK_CALIBRATION_PRESET_FILE}"
+            local src="${PACK_CALIBRATION_PRESET_FILE}"
+            local ext="${src##*.}"
+            local dest="${OUTPUT_DIR}/presets/calibrated_preset_${model_name}.${ext}"
+            cp "${src}" "${dest}"
         else
+            local copied_any="false"
             for ext in yaml yml json; do
-                local candidate="${PACK_CALIBRATION_PRESET_DIR}/calibrated_preset_${model_name}.${ext}"
-                if [[ -f "${candidate}" ]]; then
-                    src="${candidate}"
-                    break
-                fi
+                local candidate=""
+                for candidate in \
+                    "${PACK_CALIBRATION_PRESET_DIR}/calibrated_preset_${model_name}.${ext}" \
+                    "${PACK_CALIBRATION_PRESET_DIR}/calibrated_preset_${model_name}"__*.${ext}; do
+                    [[ -f "${candidate}" ]] || continue
+                    cp "${candidate}" "${OUTPUT_DIR}/presets/$(basename "${candidate}")"
+                    copied_any="true"
+                done
             done
+            if [[ "${copied_any}" != "true" ]]; then
+                error_exit "Missing calibration preset for ${model_id} in ${PACK_CALIBRATION_PRESET_DIR:-<unset>}."
+            fi
         fi
-        if [[ -z "${src}" ]]; then
-            error_exit "Missing calibration preset for ${model_id} in ${PACK_CALIBRATION_PRESET_DIR:-<unset>}."
-        fi
-        local ext="${src##*.}"
-        local dest="${OUTPUT_DIR}/presets/calibrated_preset_${model_name}.${ext}"
-        cp "${src}" "${dest}"
     done
 
     PACK_PRESET_READY="true"

@@ -3034,6 +3034,30 @@ test_pack_prepare_calibration_presets_uses_preset_dir_candidates() {
     assert_eq "0" "${DRIFT_CALIBRATION_RUNS}" "DRIFT_CALIBRATION_RUNS disabled when presets reused"
 }
 
+test_pack_prepare_calibration_presets_copies_edit_type_presets_from_dir() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/evidence_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
+
+    PACK_MODEL_LIST=("org/model")
+    local preset_dir="${TEST_TMPDIR}/preset_dir"
+    mkdir -p "${preset_dir}"
+    echo "dataset: {seq_len: 512}" > "${preset_dir}/calibrated_preset_org__model__quant_rtn.yaml"
+    echo '{"dataset":{"seq_len":512}}' > "${preset_dir}/calibrated_preset_org__model__magnitude_prune.json"
+    PACK_CALIBRATION_PRESET_DIR="${preset_dir}"
+    export PACK_CALIBRATION_PRESET_DIR
+    unset PACK_CALIBRATION_PRESET_FILE
+
+    pack_prepare_calibration_presets
+
+    assert_file_exists "${OUTPUT_DIR}/presets/calibrated_preset_org__model__quant_rtn.yaml" "edit-type yaml preset copied from dir"
+    assert_file_exists "${OUTPUT_DIR}/presets/calibrated_preset_org__model__magnitude_prune.json" "edit-type json preset copied from dir"
+    assert_eq "true" "${PACK_PRESET_READY}" "PACK_PRESET_READY set"
+    assert_eq "0" "${DRIFT_CALIBRATION_RUNS}" "DRIFT_CALIBRATION_RUNS disabled when presets reused"
+}
+
 test_pack_prepare_calibration_presets_errors_when_candidate_missing() {
     mock_reset
 

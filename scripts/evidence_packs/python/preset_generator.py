@@ -56,6 +56,20 @@ def _safe_float(value: Any) -> float | None:
         return None
 
 
+def _positive_relative_growth(base: Any, current: Any) -> float | None:
+    base_val = _safe_float(base)
+    current_val = _safe_float(current)
+    if (
+        base_val is None
+        or current_val is None
+        or not math.isfinite(base_val)
+        or not math.isfinite(current_val)
+        or base_val <= 0.0
+    ):
+        return None
+    return max(0.0, (current_val - base_val) / base_val)
+
+
 def _quantile(values: list[float], q: float) -> float | None:
     if not values:
         return None
@@ -293,6 +307,8 @@ def _merge_record(cert: Any, report: Any) -> dict[str, Any] | None:
                 "outliers_per_family",
                 "baseline_outliers_per_family",
                 "families",
+                "edge_risk_by_family_base",
+                "edge_risk_by_family",
             ):
                 val = gmetrics.get(key)
                 if isinstance(val, dict) and val:
@@ -613,6 +629,7 @@ def calibrate_rmt(
     recs: list[dict[str, Any]], *, tier: str
 ) -> tuple[dict[str, Any], dict[str, float]]:
     epsilon_samples: dict[str, list[float]] = defaultdict(list)
+    observed_growths: dict[str, list[float]] = defaultdict(list)
     existing_eps: dict[str, float] = {}
     margin: float | None = None
     deadband: float | None = None
@@ -648,20 +665,46 @@ def calibrate_rmt(
                 if eps_val is not None:
                     epsilon_samples[str(fam)].append(eps_val)
 
-    summary: dict[str, Any] = {"margin": margin, "deadband": deadband}
+        base_risk = rmt.get("edge_risk_by_family_base") or {}
+        current_risk = rmt.get("edge_risk_by_family") or {}
+        if isinstance(base_risk, dict) and isinstance(current_risk, dict):
+            for fam in set(base_risk) | set(current_risk):
+                growth = _positive_relative_growth(
+                    base_risk.get(fam),
+                    current_risk.get(fam),
+                )
+                if growth is not None:
+                    observed_growths[str(fam)].append(growth)
+
+    summary: dict[str, Any] = {
+        "margin": margin,
+        "deadband": deadband,
+        "growth_quantile": _rmt_quantile_for_tier(tier),
+    }
     proposed_eps: dict[str, float] = {}
-    q = _rmt_quantile_for_tier(tier)
-    for fam, samples in epsilon_samples.items():
+    q = summary["growth_quantile"]
+    families_seen = set(epsilon_samples) | set(observed_growths) | set(existing_eps)
+    for fam in families_seen:
+        eps_val = float(existing_eps.get(fam, 0.0))
+
+        samples = epsilon_samples.get(fam, [])
         vals = [x for x in samples if isinstance(x, float) and math.isfinite(x)]
-        if not vals:
-            continue
-        proposed = _quantile(vals, q)
-        if proposed is None:
-            continue
-        eps_val = round(float(proposed), 6)
-        if fam in existing_eps:
-            eps_val = max(eps_val, float(existing_eps[fam]))
-        proposed_eps[fam] = eps_val
+        if vals:
+            proposed = _quantile(vals, q)
+            if proposed is not None:
+                eps_val = max(eps_val, float(proposed))
+
+        growth_samples = observed_growths.get(fam, [])
+        growth_vals = [
+            x for x in growth_samples if isinstance(x, float) and math.isfinite(x)
+        ]
+        if growth_vals:
+            proposed_growth = _quantile(growth_vals, q)
+            if proposed_growth is not None:
+                eps_val = max(eps_val, float(proposed_growth))
+
+        if eps_val > 0.0:
+            proposed_eps[fam] = round(eps_val, 6)
 
     if not proposed_eps:
         proposed_eps = existing_eps

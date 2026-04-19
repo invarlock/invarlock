@@ -1548,7 +1548,57 @@ YAML
     pop_active_python_bin
 }
 
-test_task_evaluate_error_reuses_baseline_report_and_applies_ci_override() {
+test_task_evaluate_error_reuses_baseline_report_for_nonstructural_errors_and_applies_ci_override() {
+    mock_reset
+    push_active_python_bin
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+
+    fixture_write "invarlock.create_cert" ""
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local baseline_dir="${model_output_dir}/models/baseline"
+    local error_dir="${model_output_dir}/models/error_norm_collapse"
+    local log_file="${TEST_TMPDIR}/log.txt"
+    mkdir -p "${baseline_dir}" "${error_dir}" "$(dirname "${log_file}")"
+    echo "{}" > "${baseline_dir}/config.json"
+    echo "{}" > "${error_dir}/config.json"
+    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
+    echo "org/model" > "${model_output_dir}/.model_id"
+    : > "${log_file}"
+
+    _get_invarlock_config() { echo "128:128:1:1:1"; }
+    export INVARLOCK_CERT_MIN_WINDOWS="192"
+
+    local baseline_report="${TEST_TMPDIR}/baseline_report.json"
+    echo '{"evaluation_windows":{"preview":{"window_ids":[1],"input_ids":[[1]]},"final":{"window_ids":[1],"input_ids":[[1]]}},"edit":{"name":"noop"}}' > "${baseline_report}"
+    _ensure_evaluate_baseline_report() { echo "${baseline_report}"; }
+
+    mkdir -p "${out}/presets"
+    echo "{}" > "${out}/presets/calibrated_preset_${model_name}.yaml"
+
+    task_evaluate_error "${model_name}" 0 norm_collapse "${out}" "${log_file}"
+
+    assert_match "CI window override" "$(cat "${log_file}")" "CI window override applied"
+    assert_match "Reusing baseline report" "$(cat "${log_file}")" "baseline report reused"
+    assert_match "Staged baseline report for evaluate runtime" "$(cat "${log_file}")" "baseline report staged into error cert dir"
+    assert_match "Staged preset for evaluate runtime" "$(cat "${log_file}")" "preset staged into error cert dir"
+    assert_match "Normalized staged preset dataset for evaluate runtime: seq=128, stride=128, preview=192, final=192" "$(cat "${log_file}")" "preset dataset normalized for evaluate error"
+    assert_file_exists "${model_output_dir}/reports/errors/norm_collapse/evaluation.report.json" "error cert written"
+    assert_file_exists "${model_output_dir}/reports/errors/norm_collapse/runtime_inputs/baseline_report.json" "staged baseline report exists for evaluate error"
+    assert_file_exists "${model_output_dir}/reports/errors/norm_collapse/runtime_inputs/calibrated_preset_${model_name}.yaml" "staged preset exists for evaluate error"
+    local staged_error_preset_contents
+    staged_error_preset_contents="$(cat "${model_output_dir}/reports/errors/norm_collapse/runtime_inputs/calibrated_preset_${model_name}.yaml")"
+    assert_match "seq_len: 128" "${staged_error_preset_contents}" "staged preset seq_len normalized for evaluate error"
+    assert_match "stride: 128" "${staged_error_preset_contents}" "staged preset stride normalized for evaluate error"
+    assert_match "preview_n: 192" "${staged_error_preset_contents}" "staged preset preview_n normalized for evaluate error"
+    assert_match "final_n: 192" "${staged_error_preset_contents}" "staged preset final_n normalized for evaluate error"
+    pop_active_python_bin
+}
+
+test_task_evaluate_error_skips_baseline_report_reuse_for_structural_errors() {
     mock_reset
     push_active_python_bin
     # shellcheck source=../task_functions.sh
@@ -1574,27 +1624,168 @@ test_task_evaluate_error_reuses_baseline_report_and_applies_ci_override() {
 
     local baseline_report="${TEST_TMPDIR}/baseline_report.json"
     echo '{"evaluation_windows":{"preview":{"window_ids":[1],"input_ids":[[1]]},"final":{"window_ids":[1],"input_ids":[[1]]}},"edit":{"name":"noop"}}' > "${baseline_report}"
-    _ensure_evaluate_baseline_report() { echo "${baseline_report}"; }
+    local ensure_calls="${TEST_TMPDIR}/ensure.calls"
+    _ensure_evaluate_baseline_report() {
+        echo called >> "${ensure_calls}"
+        echo "${baseline_report}"
+    }
 
     mkdir -p "${out}/presets"
     echo "{}" > "${out}/presets/calibrated_preset_${model_name}.yaml"
 
     task_evaluate_error "${model_name}" 0 nan_injection "${out}" "${log_file}"
 
-    assert_match "CI window override" "$(cat "${log_file}")" "CI window override applied"
-    assert_match "Reusing baseline report" "$(cat "${log_file}")" "baseline report reused"
-    assert_match "Staged baseline report for evaluate runtime" "$(cat "${log_file}")" "baseline report staged into error cert dir"
-    assert_match "Staged preset for evaluate runtime" "$(cat "${log_file}")" "preset staged into error cert dir"
-    assert_match "Normalized staged preset dataset for evaluate runtime: seq=128, stride=128, preview=192, final=192" "$(cat "${log_file}")" "preset dataset normalized for evaluate error"
+    local log_text
+    log_text="$(cat "${log_file}")"
+    assert_match "Baseline report reuse disabled for structural error: nan_injection" "${log_text}" "structural error path disables reused baseline report"
+    if [[ -f "${ensure_calls}" ]]; then
+        t_fail "expected structural error path to skip baseline report lookup"
+    fi
+    if [[ "${log_text}" =~ Reusing\ baseline\ report ]]; then
+        t_fail "expected structural error path to omit baseline report reuse"
+    fi
     assert_file_exists "${model_output_dir}/reports/errors/nan_injection/evaluation.report.json" "error cert written"
-    assert_file_exists "${model_output_dir}/reports/errors/nan_injection/runtime_inputs/baseline_report.json" "staged baseline report exists for evaluate error"
-    assert_file_exists "${model_output_dir}/reports/errors/nan_injection/runtime_inputs/calibrated_preset_${model_name}.yaml" "staged preset exists for evaluate error"
-    local staged_error_preset_contents
-    staged_error_preset_contents="$(cat "${model_output_dir}/reports/errors/nan_injection/runtime_inputs/calibrated_preset_${model_name}.yaml")"
-    assert_match "seq_len: 128" "${staged_error_preset_contents}" "staged preset seq_len normalized for evaluate error"
-    assert_match "stride: 128" "${staged_error_preset_contents}" "staged preset stride normalized for evaluate error"
-    assert_match "preview_n: 192" "${staged_error_preset_contents}" "staged preset preview_n normalized for evaluate error"
-    assert_match "final_n: 192" "${staged_error_preset_contents}" "staged preset final_n normalized for evaluate error"
+    if [[ -e "${model_output_dir}/reports/errors/nan_injection/runtime_inputs/baseline_report.json" ]]; then
+        t_fail "expected no staged baseline report for structural error"
+    fi
+    assert_file_exists "${model_output_dir}/reports/errors/nan_injection/runtime_inputs/calibrated_preset_${model_name}.yaml" "staged preset exists for structural error"
+    local calls
+    calls="$(cat "${TEST_TMPDIR}/fixtures/invarlock.calls")"
+    if [[ "${calls}" =~ --baseline-report ]]; then
+        t_fail "expected structural error evaluate call to omit --baseline-report"
+    fi
+    pop_active_python_bin
+}
+
+test_task_evaluate_error_emits_structural_failure_report_when_structural_eval_cannot_write_one() {
+    mock_reset
+    push_active_python_bin
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+
+    fixture_write "invarlock.rc" "1"
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local baseline_dir="${model_output_dir}/models/baseline"
+    local error_dir="${model_output_dir}/models/error_inf_injection"
+    local log_file="${TEST_TMPDIR}/log.txt"
+    mkdir -p "${baseline_dir}" "${error_dir}" "$(dirname "${log_file}")"
+    echo "{}" > "${baseline_dir}/config.json"
+    echo "{}" > "${error_dir}/config.json"
+    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
+    echo "org/model" > "${model_output_dir}/.model_id"
+    : > "${log_file}"
+
+    _get_invarlock_config() { echo "128:128:1:1:1"; }
+    export INVARLOCK_CERT_MIN_WINDOWS="192"
+
+    mkdir -p "${out}/presets"
+    echo "{}" > "${out}/presets/calibrated_preset_${model_name}.yaml"
+
+    local cert_dir="${model_output_dir}/reports/errors/inf_injection"
+    local source_dir="${cert_dir}/source/000000"
+    local edited_dir="${cert_dir}/edited/000000"
+    mkdir -p "${source_dir}" "${edited_dir}"
+    cat > "${source_dir}/report.json" <<'EOF'
+{
+  "run_id": "source-run",
+  "meta": {
+    "model_id": "org/model",
+    "adapter": "hf_causal",
+    "seed": 7,
+    "device": "cpu"
+  },
+  "data": {
+    "dataset": "dummy",
+    "split": "validation",
+    "seq_len": 8,
+    "stride": 8,
+    "preview_n": 2,
+    "final_n": 2
+  },
+  "edit": {
+    "name": "noop",
+    "plan_digest": "x",
+    "deltas": {
+      "params_changed": 0,
+      "layers_modified": 0
+    }
+  },
+  "guards": [],
+  "metrics": {
+    "primary_metric": {
+      "kind": "ppl_causal",
+      "unit": "ppl",
+      "direction": "lower",
+      "aggregation_scope": "token",
+      "paired": true,
+      "gating_basis": "upper",
+      "supports_bootstrap": true,
+      "preview": 9.429,
+      "final": 8.893,
+      "drift_band": {
+        "min": 0.8878,
+        "max": 1.0859
+      }
+    }
+  },
+  "evaluation_windows": {
+    "final": {
+      "window_ids": [1, 2],
+      "logloss": [2.30, 2.31],
+      "token_counts": [100, 100]
+    }
+  },
+  "artifacts": {
+    "events_path": "",
+    "logs_path": "",
+    "checkpoint_path": null
+  },
+  "flags": {
+    "guard_recovered": false,
+    "rollback_reason": null
+  }
+}
+EOF
+    cat > "${source_dir}/runtime.manifest.json" <<'EOF'
+{
+  "manifest_version": 1,
+  "generated_at_utc": "2026-04-19T08:00:00+00:00",
+  "verifier_contract_version": "runtime-manifest-v1",
+  "report": {
+    "path": "/tmp/source.report.json",
+    "filename": "report.json",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "config": {
+    "path": null,
+    "sha256": null,
+    "source": "missing"
+  },
+  "execution_mode": "container",
+  "runtime": {
+    "image_ref": "invarlock-runtime:cuda-local@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "container_execution": true,
+    "allow_network": true,
+    "allow_remote_code": true,
+    "allow_third_party_plugins": false
+  }
+}
+EOF
+    : > "${edited_dir}/events.jsonl"
+
+    task_evaluate_error "${model_name}" 0 inf_injection "${out}" "${log_file}"
+
+    local cert_path="${model_output_dir}/reports/errors/inf_injection/evaluation.report.json"
+    assert_file_exists "${cert_path}" "structural failure report written for structural error"
+    assert_file_exists "${model_output_dir}/reports/errors/inf_injection/runtime.manifest.json" "runtime manifest written for structural failure report"
+    assert_match "synthesized structural-failure evaluation\\.report\\.json for structural error: inf_injection" "$(cat "${log_file}")" "structural failure log emitted"
+    assert_match "evidence-pack-structural-failure-report-v1" "$(cat "${cert_path}")" "structural failure format marker present"
+    assert_match '"primary_metric_acceptable":[[:space:]]*false' "$(cat "${cert_path}")" "structural failure report marks primary metric unacceptable"
+    assert_match "evidence_pack_structural_failure" "$(cat "${model_output_dir}/reports/errors/inf_injection/runtime.manifest.json")" "runtime manifest records structural failure context"
     pop_active_python_bin
 }
 
@@ -2079,6 +2270,53 @@ test_task_baseline_report_helper_exports_remote_code_allowance() {
     assert_eq "1" "$(cat "${env_log}")" "baseline helper exports remote code allowance when enabled"
 }
 
+test_task_calibration_run_exports_remote_code_allowance() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local baseline_dir="${model_output_dir}/models/baseline"
+    local log_file="${TEST_TMPDIR}/log.txt"
+    local env_log="${TEST_TMPDIR}/calibration.env"
+    mkdir -p "${baseline_dir}" "$(dirname "${log_file}")"
+    echo "{}" > "${baseline_dir}/config.json"
+    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
+    echo "mistralai/Mistral-7B-v0.1" > "${model_output_dir}/.model_id"
+    : > "${log_file}"
+
+    _estimate_model_size() { echo "7"; }
+    _get_model_size_from_name() { echo "7"; }
+    _get_invarlock_config() { echo "128:128:1:1:1"; }
+    _plan_effective_ci_schedule() { echo '{"status":"selected"}'; }
+    _apply_effective_ci_schedule() { echo "128:128:1:1"; }
+    pack_remote_code_allowed() { return 0; }
+    _pack_run_from_config() {
+        printf '%s\n' "${INVARLOCK_ALLOW_REMOTE_CODE-}" > "${env_log}"
+        local out_dir=""
+        while [[ $# -gt 0 ]]; do
+            case "${1}" in
+                --out)
+                    out_dir="${2:-}"
+                    shift 2
+                    ;;
+                *)
+                    shift
+                    ;;
+            esac
+        done
+        mkdir -p "${out_dir}"
+        printf '{"report":"ok"}\n' > "${out_dir}/report.json"
+        return 0
+    }
+
+    run task_calibration_run "${model_name}" 0 "1" "42" "${out}" "${log_file}"
+    assert_rc "0" "${RUN_RC}" "calibration run succeeds with remote code enabled"
+    assert_eq "1" "$(cat "${env_log}")" "calibration run exports remote code allowance when enabled"
+}
+
 test_task_evaluate_edit_covers_effective_ci_and_staging_failure_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
@@ -2086,10 +2324,11 @@ test_task_evaluate_edit_covers_effective_ci_and_staging_failure_branches() {
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
-    cat > "${bin_dir}/invarlock" <<'EOF'
+cat > "${bin_dir}/invarlock" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 cert_out=""
+printf '%s\n' "$*" >> "${TEST_TMPDIR}/evaluate_edit.cmd"
 while [[ $# -gt 0 ]]; do
     case "${1}" in
         --report-out|--out)
@@ -2163,6 +2402,8 @@ EOF
     run task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:ffn" clean 6 "${out}" "${log_file}"
     assert_rc "0" "${RUN_RC}" "evaluate_edit succeeds after stage and normalize helpers succeed"
     assert_match "INVARLOCK_ALLOW_REMOTE_CODE=1" "$(cat "${TEST_TMPDIR}/evaluate_edit.env")" "evaluate_edit forwards remote code allowance into the runtime env"
+    assert_match -- "--baseline[[:space:]]+${baseline_dir}" "$(cat "${TEST_TMPDIR}/evaluate_edit.cmd")" "evaluate_edit passes baseline with the current CLI flag"
+    assert_match -- "--subject[[:space:]]+${edit_dir}" "$(cat "${TEST_TMPDIR}/evaluate_edit.cmd")" "evaluate_edit passes subject with the current CLI flag"
 
     PATH="${original_path}"
 }
@@ -2174,10 +2415,11 @@ test_task_evaluate_error_covers_effective_ci_staging_and_probe_remote_code_branc
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
-    cat > "${bin_dir}/invarlock" <<'EOF'
+cat > "${bin_dir}/invarlock" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 cert_out=""
+printf '%s\n' "$*" >> "${TEST_TMPDIR}/evaluate_error.cmd"
 while [[ $# -gt 0 ]]; do
     case "${1}" in
         --report-out|--out)
@@ -2271,6 +2513,8 @@ EOF
     run task_evaluate_error "${model_name}" 0 ve_mlp_scale_skew "${out}" "${log_file}"
     assert_rc "0" "${RUN_RC}" "evaluate_error succeeds for ve probe path"
     assert_match "INVARLOCK_ALLOW_REMOTE_CODE=1" "$(cat "${TEST_TMPDIR}/evaluate_error.env")" "evaluate_error forwards remote code allowance into the runtime env"
+    assert_match -- "--baseline[[:space:]]+${baseline_dir}" "$(cat "${TEST_TMPDIR}/evaluate_error.cmd")" "evaluate_error passes baseline with the current CLI flag"
+    assert_match -- "--subject[[:space:]]+${model_output_dir}/models/error_rmt_norm_noise" "$(cat "${TEST_TMPDIR}/evaluate_error.cmd")" "evaluate_error passes subject with the current CLI flag"
     assert_match "rmt_cross_model_probe\\.py.*--trust-remote-code" "$(cat "${py_calls}")" "rmt probe inherits remote code allowance"
     assert_match "ve_cross_model_probe\\.py.*--trust-remote-code" "$(cat "${py_calls}")" "ve probe inherits remote code allowance"
 

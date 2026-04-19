@@ -8,6 +8,7 @@ from invarlock.cli.config_execution import RuntimeDelegationError, run_from_conf
 from invarlock.cli.runtime_launch_plan import (
     build_current_process_container_launch_plan,
 )
+from invarlock.cli.security_helpers import resolve_shell_runtime_security_policy
 from invarlock.runtime_security import (
     apply_runtime_allowances,
     delegate_python_script_to_container,
@@ -46,19 +47,33 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _delegated_argv(args: argparse.Namespace, argv: list[str]) -> list[str]:
+    delegated = list(argv)
+    if args.device is not None:
+        return delegated
+    if "--device" in delegated or any(
+        token.startswith("--device=") for token in delegated
+    ):
+        return delegated
+    delegated.extend(["--device", "auto"])
+    return delegated
+
+
 def _delegate_if_needed(args: argparse.Namespace, argv: list[str]) -> int | None:
-    apply_runtime_allowances(
+    policy = resolve_shell_runtime_security_policy(
         allow_network=bool(args.allow_network),
         allow_host_execution=bool(args.allow_host_execution),
         allow_third_party_plugins=bool(args.allow_third_party_plugins),
         allow_remote_code=bool(args.allow_remote_code),
     )
+    apply_runtime_allowances(policy=policy)
     if running_inside_container() or host_execution_allowed():
         return None
+    delegated_argv = _delegated_argv(args, argv)
     try:
         return delegate_python_script_to_container(
             Path(__file__),
-            build_current_process_container_launch_plan(argv),
+            build_current_process_container_launch_plan(delegated_argv),
         )
     except RuntimeError as exc:
         print(str(exc), file=sys.stderr)

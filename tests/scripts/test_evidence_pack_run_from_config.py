@@ -51,3 +51,60 @@ def test_delegate_if_needed_builds_container_launch_plan(monkeypatch) -> None:
     assert seen["script_path"] == Path(module.__file__)
     assert seen["plan"] == ("--config", "demo.yaml", "--device", "cuda")
     assert seen["delegated_plan"] == ("--config", "demo.yaml", "--device", "cuda")
+
+
+def test_delegate_if_needed_honors_remote_code_env(monkeypatch) -> None:
+    module = _load_script_module()
+    seen: dict[str, object] = {}
+
+    def _apply_runtime_allowances(**kwargs):
+        seen["policy"] = kwargs.get("policy")
+        return None
+
+    monkeypatch.setattr(module, "apply_runtime_allowances", _apply_runtime_allowances)
+    monkeypatch.setattr(module, "running_inside_container", lambda: False)
+    monkeypatch.setattr(module, "host_execution_allowed", lambda: False)
+    monkeypatch.setattr(
+        module,
+        "build_current_process_container_launch_plan",
+        lambda argv: tuple(argv),
+    )
+    monkeypatch.setattr(
+        module,
+        "delegate_python_script_to_container",
+        lambda script_path, plan: 0,
+    )
+    monkeypatch.setenv("INVARLOCK_ALLOW_REMOTE_CODE", "1")
+
+    args = module._parse_args(["--config", "demo.yaml"])
+    result = module._delegate_if_needed(args, ["--config", "demo.yaml"])
+
+    assert result == 0
+    policy = seen["policy"]
+    assert policy is not None
+    assert policy.allow_remote_code is True
+
+
+def test_delegate_if_needed_defaults_device_auto_for_delegation(monkeypatch) -> None:
+    module = _load_script_module()
+    seen: dict[str, object] = {}
+
+    monkeypatch.setattr(module, "apply_runtime_allowances", lambda **kwargs: None)
+    monkeypatch.setattr(module, "running_inside_container", lambda: False)
+    monkeypatch.setattr(module, "host_execution_allowed", lambda: False)
+    monkeypatch.setattr(
+        module,
+        "build_current_process_container_launch_plan",
+        lambda argv: seen.setdefault("plan", tuple(argv)) or tuple(argv),
+    )
+    monkeypatch.setattr(
+        module,
+        "delegate_python_script_to_container",
+        lambda script_path, plan: 0,
+    )
+
+    args = module._parse_args(["--config", "demo.yaml"])
+    result = module._delegate_if_needed(args, ["--config", "demo.yaml"])
+
+    assert result == 0
+    assert seen["plan"] == ("--config", "demo.yaml", "--device", "auto")

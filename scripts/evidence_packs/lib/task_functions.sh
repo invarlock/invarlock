@@ -1112,6 +1112,9 @@ task_calibration_run() {
     if _is_large_model "${model_size}"; then
         echo "  Large model (${model_size}): SKIP_OVERHEAD_CHECK=1" >> "${log_file}"
     fi
+    if pack_remote_code_allowed; then
+        extra_env+=(INVARLOCK_ALLOW_REMOTE_CODE=1)
+    fi
 
     local config_root_base
     config_root_base="$(cd "${run_dir}" && pwd)"
@@ -1710,9 +1713,9 @@ PRESET_YAML
     (
         cd "${work_dir}" || exit 1
         env "${extra_env[@]}" invarlock evaluate \
-            --source "${abs_baseline_path}" \
+            --baseline "${abs_baseline_path}" \
             "${baseline_report_args[@]}" \
-            --edited "${abs_edit_path}" \
+            --subject "${abs_edit_path}" \
             --edit-label "${edit_label}" \
             --profile "${profile_flag}" \
             --tier "${tier}" \
@@ -1931,6 +1934,30 @@ task_create_error() {
 
 # ============ TASK: evaluate_ERROR ============
 
+error_requires_inline_baseline_eval() {
+    local error_type="$1"
+    case "${error_type}" in
+        nan_injection|inf_injection|shape_mismatch|missing_tensors|weight_tying_break)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+error_supports_structural_failure_report() {
+    local error_type="$1"
+    case "${error_type}" in
+        nan_injection|inf_injection|shape_mismatch|missing_tensors|weight_tying_break)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 # evaluate error-injected model
 # Usage: task_evaluate_error <model_name> <gpu_id> <error_type> <output_dir> <log_file>
 task_evaluate_error() {
@@ -2066,22 +2093,26 @@ task_evaluate_error() {
     bootstrap_replicates="$(_resolve_bootstrap_replicates "${model_size}" "${tier}")"
     local baseline_report_root="${model_output_dir}/baseline_reports/${profile_flag}_${tier}_seq${seq_len}_pv${preview_n}_fn${final_n}"
     local baseline_report_file=""
-    baseline_report_file=$(
-        _ensure_evaluate_baseline_report \
-            "${baseline_report_root}" \
-            "${abs_baseline_path}" \
-            "${profile_flag}" \
-            "${tier}" \
-            "${seq_len}" \
-            "${stride}" \
-            "${preview_n}" \
-            "${final_n}" \
-            "${eval_batch}" \
-            "${bootstrap_replicates}" \
-            "${model_size}" \
-            "${log_file}" \
-            || true
-    )
+    if error_requires_inline_baseline_eval "${error_type}"; then
+        echo "  Baseline report reuse disabled for structural error: ${error_type}" >> "${log_file}"
+    else
+        baseline_report_file=$(
+            _ensure_evaluate_baseline_report \
+                "${baseline_report_root}" \
+                "${abs_baseline_path}" \
+                "${profile_flag}" \
+                "${tier}" \
+                "${seq_len}" \
+                "${stride}" \
+                "${preview_n}" \
+                "${final_n}" \
+                "${eval_batch}" \
+                "${bootstrap_replicates}" \
+                "${model_size}" \
+                "${log_file}" \
+                || true
+        )
+    fi
     local -a baseline_report_args=()
     if [[ -n "${baseline_report_file}" && -f "${baseline_report_file}" ]]; then
         local abs_baseline_report_file
@@ -2185,9 +2216,9 @@ PRESET_YAML
     (
         cd "${work_dir}" || exit 1
         env "${extra_env[@]}" invarlock evaluate \
-            --source "${abs_baseline_path}" \
+            --baseline "${abs_baseline_path}" \
             "${baseline_report_args[@]}" \
-            --edited "${abs_error_path}" \
+            --subject "${abs_error_path}" \
             --profile "${profile_flag}" \
             --tier "${tier}" \
             --out "${cert_dir}" \
@@ -2211,6 +2242,39 @@ PRESET_YAML
             _cmd_python "${SCRIPT_DIR}/../python/evaluation_report_from_report.py" \
                 --report "${report_file}" \
                 --out "${cert_file}" >> "${log_file}" 2>&1 || true
+        fi
+    fi
+
+    if [[ ! -f "${cert_file}" && ${exit_code} -ne 0 ]] && error_supports_structural_failure_report "${error_type}"; then
+        local source_report_file=""
+        local edited_report_file=""
+        local edited_events_file=""
+        local source_runtime_manifest=""
+        source_report_file=$({ find "${cert_dir}/source" -name "report.json" -type f 2>/dev/null || true; } | sort | tail -1)
+        edited_report_file=$({ find "${cert_dir}/edited" -name "report.json" -type f 2>/dev/null || true; } | sort | tail -1)
+        edited_events_file=$({ find "${cert_dir}/edited" -name "events.jsonl" -type f 2>/dev/null || true; } | sort | tail -1)
+        source_runtime_manifest=$({ find "${cert_dir}/source" -name "runtime.manifest.json" -type f 2>/dev/null || true; } | sort | tail -1)
+        local structural_report_args=(
+            "${SCRIPT_DIR}/../python/structural_failure_report.py"
+            --error-type "${error_type}"
+            --out "${cert_file}"
+            --message "invarlock evaluate exited ${exit_code} without evaluation.report.json"
+        )
+        if [[ -n "${source_report_file}" && -f "${source_report_file}" ]]; then
+            structural_report_args+=(--source-report "${source_report_file}")
+        fi
+        if [[ -n "${edited_report_file}" && -f "${edited_report_file}" ]]; then
+            structural_report_args+=(--edited-report "${edited_report_file}")
+        fi
+        if [[ -n "${edited_events_file}" && -f "${edited_events_file}" ]]; then
+            structural_report_args+=(--edited-events "${edited_events_file}")
+        fi
+        if [[ -n "${source_runtime_manifest}" && -f "${source_runtime_manifest}" ]]; then
+            structural_report_args+=(--source-runtime-manifest "${source_runtime_manifest}")
+        fi
+        _cmd_python "${structural_report_args[@]}" >> "${log_file}" 2>&1 || true
+        if [[ -f "${cert_file}" ]]; then
+            echo "  WARNING: synthesized structural-failure evaluation.report.json for structural error: ${error_type}" >> "${log_file}"
         fi
     fi
 
