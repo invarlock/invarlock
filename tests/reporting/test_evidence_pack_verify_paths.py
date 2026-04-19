@@ -104,6 +104,32 @@ def test_provenance_helpers_cover_reference_and_no_extra_paths(tmp_path: Path) -
     assert report_path.is_file()
 
 
+def test_verify_checksums_normalizes_dot_slash_paths(tmp_path: Path) -> None:
+    pack_dir = tmp_path / "pack"
+    _write_pack_scaffold(pack_dir)
+
+    checksums_path = pack_dir / "checksums.sha256"
+    prefixed_lines = []
+    for raw_line in checksums_path.read_text(encoding="utf-8").splitlines():
+        digest, rel_path = raw_line.split("  ", 1)
+        prefixed_lines.append(f"{digest}  ./{rel_path}")
+    checksums_path.write_text("\n".join(prefixed_lines) + "\n", encoding="utf-8")
+
+    manifest = json.loads((pack_dir / "manifest.json").read_text(encoding="utf-8"))
+    manifest["checksums_sha256_digest"] = evidence_pack_mod._sha256_bytes(
+        checksums_path.read_bytes()
+    )
+    _write_json(pack_dir / "manifest.json", manifest)
+
+    checksum_errors, covered_paths = evidence_pack_mod._verify_checksums(pack_dir)
+
+    assert checksum_errors == []
+    assert "results/final_verdict.json" in covered_paths
+    assert evidence_pack_mod._verify_no_extra_files(
+        pack_dir, covered_paths=covered_paths, strict=True
+    ) == ([], [])
+
+
 def test_verify_reports_success_writes_json_and_records_error_injection(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

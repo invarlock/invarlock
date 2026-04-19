@@ -221,12 +221,20 @@ def parse_checksums(pack_dir: Path) -> tuple[list[tuple[str, str]], list[str]]:
     return entries, errors
 
 
+def canonicalize_checksum_path(rel_path: str) -> str:
+    canonical = rel_path.replace("\\", "/")
+    while canonical.startswith("./"):
+        canonical = canonical[2:]
+    return canonical
+
+
 def verify_checksums(pack_dir: Path) -> tuple[list[str], set[str]]:
     entries, errors = parse_checksums(pack_dir)
     covered_paths: set[str] = set()
     for digest, rel_path in entries:
-        covered_paths.add(rel_path)
-        resolved = _normalize_pack_path(pack_dir, rel_path)
+        canonical_rel_path = canonicalize_checksum_path(rel_path)
+        covered_paths.add(canonical_rel_path)
+        resolved = _normalize_pack_path(pack_dir, canonical_rel_path)
         if resolved is None:
             errors.append(f"checksums entry escapes the pack root: {rel_path}")
             continue

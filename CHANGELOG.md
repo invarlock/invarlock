@@ -112,6 +112,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the repo tree.
 - Fixed duplicated host/container wording in the evidence-pack guide so the
   host-side repo-wrapper workflow is described cleanly and consistently.
+- Fixed strict Python evidence-pack verification for real generated packs whose
+  `checksums.sha256` entries use `./...` paths, matching the shell verifier's
+  path normalization so packaged `advanced evidence-pack verify --strict`
+  accepts clean packs end to end.
 
 ## [0.7.2] - 2026-04-15
 
