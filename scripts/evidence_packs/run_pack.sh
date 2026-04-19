@@ -89,6 +89,28 @@ pack_copy_optional() {
     fi
 }
 
+pack_copy_optional_dir() {
+    local src="$1"
+    local dest="$2"
+    if [[ -d "${src}" ]]; then
+        mkdir -p "$(dirname "${dest}")"
+        cp -a "${src}" "${dest}"
+    fi
+}
+
+pack_copy_report_sidecars() {
+    local report_dir="$1"
+    local dest_dir="$2"
+
+    pack_copy_optional "${report_dir}/manifest.json" "${dest_dir}/manifest.json"
+    pack_copy_optional "${report_dir}/runtime.manifest.json" "${dest_dir}/runtime.manifest.json"
+    pack_copy_optional "${report_dir}/evaluation_report.md" "${dest_dir}/evaluation_report.md"
+    pack_copy_optional "${report_dir}/reviewer_summary.txt" "${dest_dir}/reviewer_summary.txt"
+    pack_copy_optional_dir "${report_dir}/runtime_inputs" "${dest_dir}/runtime_inputs"
+    pack_copy_optional_dir "${report_dir}/source" "${dest_dir}/source"
+    pack_copy_optional_dir "${report_dir}/edited" "${dest_dir}/edited"
+}
+
 pack_collect_reports() {
     local run_dir="$1"
     find "${run_dir}" -type f -name "evaluation.report.json" -path "*/reports/*" | sort
@@ -304,7 +326,7 @@ pack_write_checksums() {
                 ./metadata/manifest.json|./metadata/manifest.signature.json|./metadata/checksums.sha256)
                     continue
                     ;;
-                ./.DS_Store|*/.DS_Store|./__MACOSX/*)
+                ./.DS_Store|*/.DS_Store|./._*|*/._*|./__MACOSX/*)
                     continue
                     ;;
             esac
@@ -401,6 +423,7 @@ pack_populate_pack_dir() {
         local dest_dir="${pack_dir}/reports/${rel}"
         mkdir -p "${dest_dir}"
         cp "${report}" "${dest_dir}/evaluation.report.json"
+        pack_copy_report_sidecars "$(dirname "${report}")" "${dest_dir}"
         # Optional sidecar artifacts (used by some detectors; safe to omit when absent).
         pack_copy_optional "$(dirname "${report}")/rmt_probe.json" "${dest_dir}/rmt_probe.json"
         pack_copy_optional "$(dirname "${report}")/ve_probe.json" "${dest_dir}/ve_probe.json"

@@ -438,6 +438,42 @@ test_verify_pack_warns_on_extra_files_in_non_strict_mode() {
     assert_match "extra\\.txt" "${RUN_ERR}" "lists extra file"
 }
 
+test_verify_pack_ignores_macos_transport_artifacts_in_strict_mode() {
+    mock_reset
+
+    source ./scripts/evidence_packs/verify_pack.sh
+    pack_verify_signature_helper() {
+        printf '%s\n' "sha256:$(printf 'a%.0s' {1..64})"
+    }
+    pack_validate_manifest_schema() {
+        return 0
+    }
+    pack_verify_manifest_provenance() {
+        return 0
+    }
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}/__MACOSX"
+    echo "payload" > "${pack_dir}/payload.txt"
+    echo "junk" > "${pack_dir}/._payload.txt"
+    echo "junk" > "${pack_dir}/.DS_Store"
+    echo "junk" > "${pack_dir}/__MACOSX/junk.txt"
+
+    local sha_cmd
+    sha_cmd="$(pack_sha256_cmd)"
+    (
+        cd "${pack_dir}"
+        ${sha_cmd} payload.txt > checksums.sha256
+    )
+
+    local checksums_digest
+    checksums_digest="$(cd "${pack_dir}" && python3 -c 'import hashlib;print(hashlib.sha256(open("checksums.sha256","rb").read()).hexdigest())' < /dev/null)"
+    printf '%s\n' "{\"format\":\"evidence-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
+
+    run pack_verify_pack --pack "${pack_dir}" --skip-verify --strict
+    assert_rc "0" "${RUN_RC}" "strict mode ignores macOS transport artifacts"
+}
+
 test_verify_pack_rejects_manifest_missing_checksums_digest_field() {
     mock_reset
 

@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-verify actionlint packaging-smoke-minimal packaging-smoke-front-door ensure-mypy
+.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync repo-cruft-check model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-verify actionlint packaging-smoke-minimal packaging-smoke-front-door ensure-mypy
 
 PYTHON ?= $(shell bash scripts/select_workspace_python.sh)
 PIP := $(PYTHON) -m pip
@@ -281,6 +281,7 @@ format:  ## Format code
 verify:  ## Run verification (pytest -q, runtime verifier, lint, format, strict docs lint)
 	@echo "Running verification..."
 	$(MAKE) ensure-python
+	$(MAKE) repo-cruft-check
 	PYTHONPATH=src $(PYTEST) -q
 	OMP_NUM_THREADS=1 SKIP_RUFF=1 INVARLOCK_PYTHON="$(PYTHON)" bash scripts/run_smoke_regression.sh
 	$(MAKE) cli-smoke-core
@@ -395,6 +396,7 @@ clean:  ## Clean build artifacts
 	rm -rf build/
 	rm -rf dist/
 	rm -rf *.egg-info/
+	find . -type f \( -name ".DS_Store" -o -name "._*" \) -delete
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 
@@ -417,6 +419,7 @@ deepclean: ## Remove all generated artifacts, caches, and run outputs (destructi
 		.coverage coverage.xml htmlcov/ \
 		test_config.yaml tmp_cfg.yaml \
 		*.pyc *.pyo
+	find . -type f \( -name ".DS_Store" -o -name "._*" \) -delete
 
 docs-serve: ## Serve documentation locally
 	$(MAKE) ensure-python
@@ -466,6 +469,10 @@ ci-matrix:  ## Verify CI matrix
 contracts-check:  ## Ensure packaged contracts match the repo contract source
 	$(MAKE) ensure-python
 	$(PYTHON) scripts/sync_packaged_contracts.py --check
+
+repo-cruft-check:  ## Fail if macOS transport artifacts leaked into repo source paths
+	$(MAKE) ensure-python
+	$(PYTHON) scripts/check_repo_cruft.py
 
 contracts-sync:  ## Copy repo contracts into src/invarlock/_data/contracts
 	$(MAKE) ensure-python

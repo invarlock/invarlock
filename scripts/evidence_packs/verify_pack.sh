@@ -203,8 +203,10 @@ pack_verify_no_extra_files() {
 
         find . -type f -print \
             | sed 's|^\./||' \
-            | grep -v '^\\.DS_Store$' \
-            | grep -v '/\\.DS_Store$' \
+            | grep -v '^\.DS_Store$' \
+            | grep -v '/\.DS_Store$' \
+            | grep -v '^\._' \
+            | grep -v '/\._' \
             | grep -v '^__MACOSX/' \
             | sort -u > "${actual_file}"
     )

@@ -62,6 +62,7 @@ def test_gitignore_keeps_current_output_paths_and_drops_stale_legacy_scratch() -
         "/guards_evidence.json",
         "/tmp/",
         "/tmp_*/",
+        "._*",
     ]
     removed_patterns = [
         "/reports_report/",

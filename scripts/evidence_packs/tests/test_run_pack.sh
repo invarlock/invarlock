@@ -25,6 +25,13 @@ test_run_pack_build_pack_collects_artifacts() {
     echo '{"schema":"evidence_pack_scenarios_v1","schema_version":1,"scenarios":[]}' > "${run_dir}/state/scenarios.json"
     echo '{"org/model":{"quant_rtn":{"bits":4}}}' > "${run_dir}/state/tuned_edit_params.json"
     echo "{}" > "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json"
+    echo "{}" > "${run_dir}/modelA/reports/edit/run_1/manifest.json"
+    echo "{}" > "${run_dir}/modelA/reports/edit/run_1/runtime.manifest.json"
+    echo "# summary" > "${run_dir}/modelA/reports/edit/run_1/evaluation_report.md"
+    echo "reviewer summary" > "${run_dir}/modelA/reports/edit/run_1/reviewer_summary.txt"
+    mkdir -p "${run_dir}/modelA/reports/edit/run_1/runtime_inputs"
+    echo "{}" > "${run_dir}/modelA/reports/edit/run_1/runtime_inputs/baseline_report.json"
+    echo "preset: true" > "${run_dir}/modelA/reports/edit/run_1/runtime_inputs/preset.yaml"
     echo '{"probe":"rmt_cross_model_v1","stable":false}' > "${run_dir}/modelA/reports/edit/run_1/rmt_probe.json"
     echo '{"probe":"ve_probe_v1","signal":true}' > "${run_dir}/modelA/reports/edit/run_1/ve_probe.json"
 
@@ -83,6 +90,12 @@ EOF
     assert_file_exists "${pack_dir}/metadata/model_revisions.json" "revisions copied"
     assert_file_exists "${pack_dir}/metadata/scenarios.json" "scenarios manifest copied"
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/evaluation.report.json" "report copied"
+    assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/manifest.json" "report manifest copied"
+    assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/runtime.manifest.json" "runtime manifest copied"
+    assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/evaluation_report.md" "markdown summary copied"
+    assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/reviewer_summary.txt" "reviewer summary copied"
+    assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/runtime_inputs/baseline_report.json" "runtime inputs copied"
+    assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/runtime_inputs/preset.yaml" "runtime preset copied"
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/rmt_probe.json" "probe sidecar copied"
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/ve_probe.json" "ve probe sidecar copied"
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/verify.json" "verify output captured"
@@ -283,6 +296,9 @@ test_run_pack_build_pack_ignores_error_injection_verify_failures() {
     echo "model,score" > "${run_dir}/analysis/eval_results.csv"
     echo "{}" > "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json"
     echo "{}" > "${run_dir}/modelA/reports/errors/nan_injection/evaluation.report.json"
+    mkdir -p "${run_dir}/modelA/reports/errors/nan_injection/source" "${run_dir}/modelA/reports/errors/nan_injection/edited"
+    echo "{}" > "${run_dir}/modelA/reports/errors/nan_injection/source/report.json"
+    echo "{}" > "${run_dir}/modelA/reports/errors/nan_injection/edited/report.json"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
@@ -336,6 +352,8 @@ EOF
 
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/verify.json" "clean verify output captured"
     assert_file_exists "${pack_dir}/reports/modelA/errors/nan_injection/verify.json" "error injection verify output captured"
+    assert_file_exists "${pack_dir}/reports/modelA/errors/nan_injection/source/report.json" "error source evidence copied"
+    assert_file_exists "${pack_dir}/reports/modelA/errors/nan_injection/edited/report.json" "error edited evidence copied"
     assert_file_exists "${pack_dir}/results/verification_summary.json" "verification summary written"
     run python3 -c 'import json,sys; json.load(open(sys.argv[1], encoding="utf-8"))' "${pack_dir}/results/verification_summary.json"
     assert_rc "0" "${RUN_RC}" "verification summary is valid JSON"
@@ -475,6 +493,7 @@ test_run_pack_checksums_include_files() {
     echo "sig" > "${pack_dir}/metadata/manifest.signature.json"
     echo "x" > "${pack_dir}/metadata/checksums.sha256"
     echo "junk" > "${pack_dir}/.DS_Store"
+    echo "junk" > "${pack_dir}/._results"
     echo "junk" > "${pack_dir}/__MACOSX/junk.txt"
 
     pack_write_checksums "${pack_dir}"
@@ -492,6 +511,9 @@ test_run_pack_checksums_include_files() {
     fi
     if [[ "${checksums}" == *.DS_Store* ]]; then
         t_fail "checksums must ignore .DS_Store artifacts"
+    fi
+    if [[ "${checksums}" == *._results* ]]; then
+        t_fail "checksums must ignore AppleDouble artifacts"
     fi
     if [[ "${checksums}" == *__MACOSX* ]]; then
         t_fail "checksums must ignore __MACOSX artifacts"

@@ -41,6 +41,7 @@ coverage-thresholds.json
 *.swp
 *.swo
 *~
+._*
 .DS_Store
 Thumbs.db
 
