@@ -51,6 +51,7 @@ test_config_generator_run_single_calibration_large_model_emits_log_and_captures_
     assert_file_exists "${run_dir}/baseline_report.json" "baseline report copied"
     assert_match "--config" "$(cat "${run_calls}")" "calibration forwards config path through repo config runner"
     assert_match "--out" "$(cat "${run_calls}")" "calibration forwards output path through repo config runner"
+    assert_match "skip_overhead_check: true" "$(cat "${run_dir}/calibration_config.yaml")" "calibration config carries skip_overhead policy"
 }
 
 test_config_generator_run_invarlock_calibration_logs_moe_and_all_runs_failed() {
@@ -234,6 +235,11 @@ test_config_generator_generate_invarlock_config_writes_to_stdout_when_requested(
     export INVARLOCK_ALLOW_REMOTE_CODE
     out="$(generate_invarlock_config "demo/model" "/dev/stdout" "edit")"
     assert_match 'trust_remote_code: true' "${out}" "remote code emitted only with explicit allow"
+
+    INVARLOCK_SKIP_OVERHEAD_CHECK="1"
+    export INVARLOCK_SKIP_OVERHEAD_CHECK
+    out="$(generate_invarlock_config "demo/model" "/dev/stdout" "edit")"
+    assert_match 'skip_overhead_check: true' "${out}" "skip-overhead policy emitted when requested"
 }
 
 test_config_generator_run_single_calibration_exports_remote_code_allowance() {

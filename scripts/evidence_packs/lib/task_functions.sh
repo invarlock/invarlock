@@ -1108,6 +1108,8 @@ task_calibration_run() {
     fi
 
     echo "  Calibration: enforcing window_overlap_fraction=0.0" >> "${log_file}"
+    echo "  Calibration: context.run.skip_overhead_check=true" >> "${log_file}"
+    local skip_overhead_config_yaml=$'context:\n  run:\n    skip_overhead_check: true'
     local -a extra_env=(INVARLOCK_WINDOW_OVERLAP_FRACTION=0.0 INVARLOCK_SKIP_OVERHEAD_CHECK=1)
     if _is_large_model "${model_size}"; then
         echo "  Large model (${model_size}): SKIP_OVERHEAD_CHECK=1" >> "${log_file}"
@@ -1133,6 +1135,10 @@ eval:
   bootstrap:
     replicates: ${bootstrap_replicates}
     alpha: 0.05
+
+context:
+  run:
+    skip_overhead_check: true
 YAML
 
     extra_env+=("PYTHONPATH=${PACK_REPO_PYTHONPATH}")
@@ -1194,6 +1200,8 @@ eval:
     parallel: true
   batch_size: ${eval_batch}
   window_overlap_fraction: 0.0
+
+${skip_overhead_config_yaml}
 
 auto:
   enabled: true

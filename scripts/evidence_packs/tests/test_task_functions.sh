@@ -2091,6 +2091,8 @@ EOF
     PACK_GUARDS_ORDER="variance"
     task_calibration_run "${model_name}" 0 "1" "42" "${out}" "${log_file}"
     assert_match "variance" "$(cat "${model_output_dir}/reports/calibration/run_1/calibration_config.yaml")" "explicit guard order used"
+    assert_match "skip_overhead_check: true" "$(cat "${model_output_dir}/reports/calibration/run_1/calibration_config.yaml")" "calibration config carries skip_overhead policy"
+    assert_match "skip_overhead_check: true" "$(cat "${model_output_dir}/reports/calibration/run_1/config_root/runtime/profiles/ci.yaml")" "calibration profile carries skip_overhead policy"
     local env_capture
     env_capture="$(cat "${TEST_TMPDIR}/fixtures/python3.env")"
     assert_match "PYTHONPATH=${PACK_REPO_PYTHONPATH}" "${env_capture}" "calibration injects repo pythonpath"

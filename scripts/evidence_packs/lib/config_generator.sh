@@ -47,6 +47,12 @@ generate_invarlock_config() {
 
     # Window overlap control (calibration and eval safety)
     local eval_overlap="${INVARLOCK_WINDOW_OVERLAP_FRACTION:-0.0}"
+    local skip_overhead_config_yaml=""
+    case "${INVARLOCK_SKIP_OVERHEAD_CHECK:-}" in
+        1|true|TRUE|yes|YES|on|ON)
+            skip_overhead_config_yaml=$'context:\n  run:\n    skip_overhead_check: true\n'
+            ;;
+    esac
 
     # Optional: override guard order for the suite (comma-separated list).
     # Default is a lightweight chain to keep calibration tractable on 70B+.
@@ -110,6 +116,7 @@ eval:
   max_pm_ratio: 2.0
   batch_size: ${eval_batch}
 
+${skip_overhead_config_yaml}
 
 auto:
   enabled: true
