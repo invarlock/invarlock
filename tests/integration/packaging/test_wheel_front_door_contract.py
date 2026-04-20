@@ -10,6 +10,7 @@ from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
 from tests.integration.packaging._support_installed_wheel import (
     InstalledWheelEnv,
     _ensure_hf_smoke_dependencies,
+    _output_indicates_network_unavailable,
     _prefetch_hf_smoke_model,
     _resolve_hf_smoke_env,
     _run,
@@ -50,6 +51,12 @@ def test_wheel_install_runs_front_door_evaluate_verify_report_html_outside_repo_
             cwd=tmp_path,
             env=smoke_env,
         )
+        if prefetch.returncode != 0 and _output_indicates_network_unavailable(
+            f"{prefetch.stdout}{prefetch.stderr}"
+        ):
+            pytest.skip(
+                "Network unavailable and no local tiny-gpt2 cache for installed-wheel front-door smoke."
+            )
         assert prefetch.returncode == 0, prefetch.stdout + prefetch.stderr
 
     report_dir = tmp_path / "front-door-report"

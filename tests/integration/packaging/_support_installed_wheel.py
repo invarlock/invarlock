@@ -20,6 +20,25 @@ from invarlock.runtime_security import (
 )
 
 _VALID_TEST_IMAGE_DIGEST = "sha256:" + ("a" * 64)
+_CORE_DEPENDENCY_IMPORTS = (
+    "click",
+    "cryptography",
+    "jsonschema",
+    "markdown",
+    "psutil",
+    "pydantic",
+    "rich",
+    "shellingham",
+    "typer",
+    "yaml",
+)
+_NETWORK_UNAVAILABLE_MARKERS = (
+    "Failed to establish a new connection",
+    "NewConnectionError",
+    "Temporary failure in name resolution",
+    "Name or service not known",
+    "nodename nor servname provided",
+)
 
 
 @dataclass(frozen=True)
@@ -32,11 +51,30 @@ class InstalledWheelEnv:
     runtime_verify_exe: Path
 
 
+def _python_can_build_wheel(python_exe: Path) -> bool:
+    proc = subprocess.run(
+        [
+            str(python_exe),
+            "-c",
+            (
+                "import importlib.util, sys, venv; "
+                "mods=('build', 'pip'); "
+                "raise SystemExit(0 if sys.version_info >= (3, 12) "
+                "and all(importlib.util.find_spec(name) for name in mods) else 1)"
+            ),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return proc.returncode == 0
+
+
 def _select_python(repo_root: Path) -> Path:
     workspace_python = repo_root / (
         ".venv/Scripts/python.exe" if os.name == "nt" else ".venv/bin/python"
     )
-    if workspace_python.exists():
+    if workspace_python.exists() and _python_can_build_wheel(workspace_python):
         return workspace_python
 
     proc = subprocess.run(
@@ -46,12 +84,14 @@ def _select_python(repo_root: Path) -> Path:
         check=False,
     )
     if proc.returncode == 0 and proc.stdout.strip():
-        return Path(proc.stdout.strip())
+        selected = Path(proc.stdout.strip())
+        if _python_can_build_wheel(selected):
+            return selected
 
     current = Path(sys.executable)
-    if current.exists() and sys.version_info >= (3, 12):
+    if current.exists() and _python_can_build_wheel(current):
         return current
-    pytest.skip("Could not locate a Python 3.12+ interpreter for wheel smoke.")
+    pytest.skip("Could not locate a Python 3.12+ interpreter with build support.")
 
 
 def _build_wheel(tmp_path: Path, python_exe: Path) -> Path:
@@ -79,6 +119,7 @@ def _create_venv(tmp_path: Path, python_exe: Path) -> tuple[Path, Path, Path]:
             str(python_exe),
             "-m",
             "venv",
+            "--system-site-packages",
             str(env_dir),
         ],
         check=True,
@@ -133,6 +174,9 @@ def _python_minor_version(python_exe: Path) -> tuple[int, int]:
 
 
 def _install_core_dependencies(repo_root: Path, python_exe: Path) -> None:
+    if _core_dependencies_available(python_exe):
+        return
+
     version = _python_minor_version(python_exe)
     requirements = (
         repo_root
@@ -144,13 +188,23 @@ def _install_core_dependencies(repo_root: Path, python_exe: Path) -> None:
         pytest.skip(
             f"Missing pinned core requirements for Python {version[0]}.{version[1]}"
         )
-    _install_requirements_file(repo_root, python_exe, requirements)
+    install = _install_requirements_file(repo_root, python_exe, requirements)
+    if install.returncode == 0:
+        return
+    combined = f"{install.stdout}{install.stderr}"
+    if _pip_failed_due_to_offline_requirements(combined):
+        pytest.skip(
+            "Network unavailable to install core wheel-smoke dependencies into an isolated venv."
+        )
+    raise AssertionError(
+        f"failed to install pinned core wheel-smoke dependencies\n{combined}"
+    )
 
 
 def _install_requirements_file(
     repo_root: Path, python_exe: Path, requirements: Path
-) -> None:
-    subprocess.run(
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
         [
             str(python_exe),
             "-m",
@@ -160,9 +214,38 @@ def _install_requirements_file(
             "-r",
             str(requirements),
         ],
-        check=True,
+        capture_output=True,
+        text=True,
+        check=False,
         cwd=repo_root,
     )
+
+
+def _core_dependencies_available(python_exe: Path) -> bool:
+    imports = ", ".join(repr(name) for name in _CORE_DEPENDENCY_IMPORTS)
+    proc = subprocess.run(
+        [
+            str(python_exe),
+            "-c",
+            (
+                "import importlib.util; "
+                f"mods=({imports},); "
+                "raise SystemExit(0 if all(importlib.util.find_spec(name) for name in mods) else 1)"
+            ),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return proc.returncode == 0
+
+
+def _pip_failed_due_to_offline_requirements(output: str) -> bool:
+    return _output_indicates_network_unavailable(output)
+
+
+def _output_indicates_network_unavailable(output: str) -> bool:
+    return any(marker in output for marker in _NETWORK_UNAVAILABLE_MARKERS)
 
 
 def _ensure_hf_smoke_dependencies(installed_wheel_env: InstalledWheelEnv) -> None:
@@ -186,7 +269,12 @@ def _ensure_hf_smoke_dependencies(installed_wheel_env: InstalledWheelEnv) -> Non
         cwd=installed_wheel_env.repo_root,
         timeout=1800,
     )
-    assert install.returncode == 0, install.stdout + install.stderr
+    combined = f"{install.stdout}{install.stderr}"
+    if install.returncode != 0 and _output_indicates_network_unavailable(combined):
+        pytest.skip(
+            "Network unavailable to install hf extras into the installed-wheel smoke venv."
+        )
+    assert install.returncode == 0, combined
 
 
 def _hf_cache_root_is_writable(root: Path) -> bool:
