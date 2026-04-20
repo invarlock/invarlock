@@ -30,6 +30,7 @@ MODEL_FAMILY_CATALOG_PATH = REPO_ROOT / "contracts" / "model_family_catalog.json
 DEFAULT_SUITE = "current-supported-experimental"
 REPO_MENTIONED_GPU_SUITE = "repo-mentioned-gpu"
 MODEL_CATALOG_GPU_SUITE = "model-catalog-gpu"
+PROMOTION_CANDIDATE_TEXT_LE_14B_SUITE = "promotion-candidates-text-le-14b"
 EXECUTION_MODES = ("container", "host")
 RETRYABLE_EVALUATE_RETURNCODES = {-15}
 
@@ -220,6 +221,48 @@ CURRENT_PUBLISHED_BASIS_LANES: tuple[EvidenceLane, ...] = (
     ),
 )
 
+PROMOTION_CANDIDATE_TEXT_LE_14B_LANES: tuple[EvidenceLane, ...] = (
+    EvidenceLane(
+        slug="openllama_7b",
+        lane_id="candidate-openllama-7b-causal-hf",
+        family="OpenLLaMA 7B causal LM",
+        model_id="openlm-research/open_llama_7b",
+        preset_relpath="configs/presets/causal_lm/openllama_7b_512.yaml",
+    ),
+    EvidenceLane(
+        slug="opt_1_3b",
+        lane_id="candidate-opt-1-3b-causal-hf",
+        family="OPT 1.3B causal LM",
+        model_id="facebook/opt-1.3b",
+        preset_relpath="configs/presets/causal_lm/opt_1_3b_512.yaml",
+    ),
+    EvidenceLane(
+        slug="falcon_7b",
+        lane_id="candidate-falcon-7b-causal-hf",
+        family="Falcon 7B causal LM",
+        model_id="tiiuae/falcon-7b",
+        preset_relpath="configs/presets/causal_lm/falcon_7b_512.yaml",
+        adapter="auto",
+    ),
+    EvidenceLane(
+        slug="glm4_9b_chat",
+        lane_id="candidate-glm4-9b-chat-causal-hf",
+        family="GLM 4 9B Chat",
+        model_id="THUDM/glm-4-9b-chat",
+        preset_relpath="configs/presets/causal_lm/glm4_9b_chat_512.yaml",
+        adapter="auto",
+    ),
+    EvidenceLane(
+        slug="distilbert_base_uncased",
+        lane_id="candidate-distilbert-base-uncased-mlm-hf",
+        family="Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)",
+        model_id="distilbert-base-uncased",
+        preset_relpath="configs/presets/masked_lm/distilbert_base_uncased_128.yaml",
+        adapter="hf_mlm",
+        verify_profile="dev",
+    ),
+)
+
 DOCUMENTED_SMOKE_CANARY_LANES: tuple[EvidenceLane, ...] = (
     EvidenceLane(
         slug="tiny_gpt2_canary",
@@ -339,6 +382,7 @@ SUITES: dict[str, tuple[EvidenceLane, ...]] = {
         + CURRENT_SUPPORTED_EXPERIMENTAL_LANES
     ),
     MODEL_CATALOG_GPU_SUITE: MODEL_CATALOG_GPU_LANES,
+    PROMOTION_CANDIDATE_TEXT_LE_14B_SUITE: PROMOTION_CANDIDATE_TEXT_LE_14B_LANES,
 }
 
 

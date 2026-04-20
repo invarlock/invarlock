@@ -1,0 +1,47 @@
+# Preset: DistilBERT masked LM on WikiText-2.
+
+model:
+  id: "distilbert-base-uncased"
+  adapter: "hf_mlm"
+  device: "auto"
+
+dataset:
+  provider: "wikitext2"
+  split: "validation"
+  seq_len: 128
+  stride: 128
+  preview_n: 64
+  final_n: 64
+  seed: 42
+
+eval:
+  metric:
+    kind: "ppl_mlm"
+  loss:
+    type: "mlm"
+    mask_prob: 0.15
+    seed: 42
+    random_token_prob: 0.10
+    original_token_prob: 0.10
+
+primary_metric:
+  drift_band:
+    min: 0.90
+    max: 1.20
+
+edit:
+  name: "noop"
+  plan: {}
+
+auto:
+  enabled: true
+  tier: "balanced"
+  probes: 0
+
+guards:
+  order: ["invariants", "spectral", "rmt", "variance", "invariants"]
+
+output:
+  dir: "runs"
+  save_model: false
+  save_report: true

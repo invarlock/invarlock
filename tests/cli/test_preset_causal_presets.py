@@ -112,3 +112,73 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
         if name == "null_sweep_gemma4_e2b.yaml":
             assert data["model"]["attn_implementation"] == "sdpa"
         assert data["primary_metric"]["drift_band"] == expected_drift_band
+
+
+def test_candidate_causal_lm_presets_load() -> None:
+    root = _repo_root()
+    expected_drift_band = {"min": 0.9, "max": 1.2}
+    presets = {
+        "openllama_7b_512.yaml": (
+            "openlm-research/open_llama_7b",
+            "hf_causal",
+        ),
+        "opt_1_3b_512.yaml": (
+            "facebook/opt-1.3b",
+            "hf_causal",
+        ),
+        "falcon_7b_512.yaml": (
+            "tiiuae/falcon-7b",
+            "auto",
+        ),
+        "glm4_9b_chat_512.yaml": (
+            "THUDM/glm-4-9b-chat",
+            "auto",
+        ),
+    }
+    for name, (model_id, adapter) in presets.items():
+        cfg = load_config(root / "configs/presets/causal_lm" / name)
+        assert cfg.require_section("model")["id"] == model_id
+        assert cfg.require_section("model")["adapter"] == adapter
+        assert cfg.data["dataset"]["provider"]["kind"] == "hf_text"
+        assert cfg.data["primary_metric"]["drift_band"] == expected_drift_band
+
+    glm_cfg = load_config(root / "configs/presets/causal_lm" / "glm4_9b_chat_512.yaml")
+    assert glm_cfg.require_section("model")["trust_remote_code"] is True
+
+
+def test_candidate_null_sweep_calibration_configs_reference_models() -> None:
+    root = _repo_root()
+    expected_drift_band = {"min": 0.9, "max": 1.2}
+    configs = {
+        "null_sweep_openllama_7b.yaml": (
+            "openlm-research/open_llama_7b",
+            "hf_causal",
+        ),
+        "null_sweep_opt_1_3b.yaml": (
+            "facebook/opt-1.3b",
+            "hf_causal",
+        ),
+        "null_sweep_falcon_7b.yaml": (
+            "tiiuae/falcon-7b",
+            "auto",
+        ),
+        "null_sweep_glm4_9b_chat.yaml": (
+            "THUDM/glm-4-9b-chat",
+            "auto",
+        ),
+    }
+    for name, (model_id, adapter) in configs.items():
+        data = yaml.safe_load(
+            (root / "configs/calibration" / name).read_text(encoding="utf-8")
+        )
+        assert data["model"]["id"] == model_id
+        assert data["model"]["adapter"] == adapter
+        assert data["dataset"]["provider"]["kind"] == "hf_text"
+        assert data["primary_metric"]["drift_band"] == expected_drift_band
+
+    glm_data = yaml.safe_load(
+        (root / "configs/calibration" / "null_sweep_glm4_9b_chat.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert glm_data["model"]["trust_remote_code"] is True

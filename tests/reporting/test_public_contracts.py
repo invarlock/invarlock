@@ -59,16 +59,13 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         ]
         == "pass"
     )
-    assert (
-        candidates["Falcon 7B causal LM"]["decision"]
-        == "blocked_missing_artifacts"
-    )
+    assert candidates["Falcon 7B causal LM"]["decision"] == "ready_for_full_pack"
     assert candidates["Gemma 3 4B IT"]["decision"] == "explicitly_out_of_scope"
     assert (
         candidates["Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)"][
             "decision"
         ]
-        == "blocked_missing_artifacts"
+        == "ready_for_full_pack"
     )
     assert candidates["OPT 1.3B causal LM"]["criteria_status"]["targeted_tests"] == "pass"
     recommended = {
