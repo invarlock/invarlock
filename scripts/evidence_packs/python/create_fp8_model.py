@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gc
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -9,12 +10,14 @@ import torch
 
 try:
     from edit_targeting import matches_edit_scope
+    from hf_causal_loader import load_causal_model
     from runtime_tools import require_remote_code_opt_in
 except ImportError:  # pragma: no cover - direct module load under pytest
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from edit_targeting import matches_edit_scope
+    from hf_causal_loader import load_causal_model
     from runtime_tools import require_remote_code_opt_in
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoTokenizer
 
 
 def _should_quantize(name: str, scope: str) -> bool:
@@ -45,7 +48,7 @@ def main(argv: list[str]) -> int:
         "device_map": "auto",
         "low_cpu_mem_usage": True,
     }
-    model = AutoModelForCausalLM.from_pretrained(baseline_path, **model_kwargs)
+    model, _ = load_causal_model(baseline_path, **model_kwargs)
     tokenizer = AutoTokenizer.from_pretrained(
         baseline_path, trust_remote_code=trust_remote_code
     )
@@ -91,9 +94,12 @@ def main(argv: list[str]) -> int:
     gc.collect()
     torch.cuda.empty_cache()
 
-    output_path.mkdir(parents=True, exist_ok=True)
-    model.save_pretrained(output_path, safe_serialization=True)
-    tokenizer.save_pretrained(output_path)
+    staging_path = output_path.parent / f".{output_path.name}.tmp"
+    if staging_path.exists():
+        shutil.rmtree(staging_path)
+    staging_path.mkdir(parents=True, exist_ok=True)
+    model.save_pretrained(staging_path, safe_serialization=True)
+    tokenizer.save_pretrained(staging_path)
 
     metadata = {
         "edit_type": "fp8_quant",
@@ -102,7 +108,11 @@ def main(argv: list[str]) -> int:
         "quantized_tensors": quantized_count,
         "avg_relative_error": avg_error,
     }
-    (output_path / "edit_metadata.json").write_text(json.dumps(metadata, indent=2))
+    (staging_path / "edit_metadata.json").write_text(json.dumps(metadata, indent=2))
+
+    if output_path.exists():
+        shutil.rmtree(output_path)
+    staging_path.rename(output_path)
 
     print(f"Saved FP8-quantized model to {output_path}")
     return 0

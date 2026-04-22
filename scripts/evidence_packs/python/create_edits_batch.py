@@ -12,9 +12,11 @@ from typing import Any
 import torch
 
 try:
+    from edit_targeting import matches_edit_scope
     from runtime_tools import require_remote_code_opt_in
 except ImportError:  # pragma: no cover - direct module load under pytest
     sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from edit_targeting import matches_edit_scope
     from runtime_tools import require_remote_code_opt_in
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -223,22 +225,17 @@ def _get_edit_dir_name(parsed_spec: dict[str, object], version: str) -> str:
     return f"{edit_type}_{version}"
 
 
-def _target_modules(scope: str) -> list[str]:
-    if scope == "ffn":
-        return ["mlp", "feed_forward", "ffn"]
-    if scope == "all":
-        return ["q_proj", "k_proj", "v_proj", "o_proj", "mlp", "gate", "up", "down"]
-    return []
+def _matches_scope(name: str, scope: str) -> bool:
+    return matches_edit_scope(name, scope)
 
 
 def _apply_quantization(model: Any, bits: int, group_size: int, scope: str) -> Any:
     edited = copy.deepcopy(model)
-    target_modules = _target_modules(scope)
 
     qmin = -(2 ** (bits - 1))
     qmax = max((2 ** (bits - 1)) - 1, 1)
     for name, param in edited.named_parameters():
-        if not any(target in name.lower() for target in target_modules):
+        if not _matches_scope(name, scope):
             continue
         if param.dim() < 2:
             continue
@@ -265,10 +262,9 @@ def _apply_quantization(model: Any, bits: int, group_size: int, scope: str) -> A
 
 def _apply_pruning(model: Any, ratio: float, scope: str) -> Any:
     edited = copy.deepcopy(model)
-    target_modules = _target_modules(scope)
 
     for name, param in edited.named_parameters():
-        if not any(target in name.lower() for target in target_modules):
+        if not _matches_scope(name, scope):
             continue
         if param.dim() < 2:
             continue
@@ -288,10 +284,9 @@ def _apply_pruning(model: Any, ratio: float, scope: str) -> Any:
 
 def _apply_lowrank(model: Any, rank: int, scope: str) -> Any:
     edited = copy.deepcopy(model)
-    target_modules = _target_modules(scope)
 
     for name, param in edited.named_parameters():
-        if not any(target in name.lower() for target in target_modules):
+        if not _matches_scope(name, scope):
             continue
         if param.dim() != 2:
             continue
@@ -314,11 +309,10 @@ def _fp8_dtype(format_type: str) -> torch.dtype | None:
 
 def _apply_fp8(model: Any, format_type: str, scope: str) -> Any:
     edited = copy.deepcopy(model)
-    target_modules = _target_modules(scope)
     dtype = _fp8_dtype(format_type)
 
     for name, param in edited.named_parameters():
-        if not any(target in name.lower() for target in target_modules):
+        if not _matches_scope(name, scope):
             continue
         if param.dim() < 2:
             continue
@@ -364,6 +358,41 @@ def _clear_memory() -> None:
     torch.cuda.empty_cache()
 
 
+def _artifact_has_weights(edit_path: Path) -> bool:
+    if any(edit_path.glob("*.safetensors")):
+        return True
+    return any(
+        (edit_path / name).is_file()
+        for name in (
+            "model.safetensors",
+            "model.safetensors.index.json",
+            "pytorch_model.bin",
+            "pytorch_model.bin.index.json",
+        )
+    )
+
+
+def _artifact_has_tokenizer(edit_path: Path) -> bool:
+    return any(
+        (edit_path / name).is_file()
+        for name in (
+            "tokenizer.json",
+            "tokenizer_config.json",
+            "tokenizer.model",
+            "special_tokens_map.json",
+        )
+    )
+
+
+def _edit_artifact_complete(edit_path: Path) -> bool:
+    return (
+        edit_path.is_dir()
+        and (edit_path / "config.json").is_file()
+        and _artifact_has_weights(edit_path)
+        and _artifact_has_tokenizer(edit_path)
+    )
+
+
 def _create_edit_artifact(
     *,
     model: Any,
@@ -403,7 +432,7 @@ def _process_spec_entry(
 
     edit_dir_name = _get_edit_dir_name(parsed, version)
     edit_path = model_output_dir / "models" / edit_dir_name
-    if (edit_path / "config.json").exists():
+    if _edit_artifact_complete(edit_path):
         print(f"  Skip (exists): {edit_dir_name}")
         return 1, 0
 

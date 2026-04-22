@@ -8,13 +8,13 @@ from pathlib import Path
 from tests.scripts._support_model_evidence_sweep import load_script_module
 
 
-def test_promotion_candidate_text_suite_covers_prepared_deferred_lanes() -> None:
+def test_promotion_gap_gpu_suite_covers_prepared_deferred_lanes() -> None:
     mod = load_script_module("model_evidence_sweep")
 
     specs = {
         lane.slug: lane
         for lane in mod.select_specs(
-            mod.PROMOTION_CANDIDATE_TEXT_LE_14B_SUITE,
+            mod.PROMOTION_GAP_GPU_SUITE,
             slugs=[],
             lane_ids=[],
             shard_index=0,
@@ -23,27 +23,27 @@ def test_promotion_candidate_text_suite_covers_prepared_deferred_lanes() -> None
     }
 
     assert set(specs) == {
-        "openllama_7b",
-        "opt_1_3b",
-        "falcon_7b",
-        "glm4_9b_chat",
+        "openlm_research_open_llama_7b",
+        "facebook_opt_1_3b",
+        "tiiuae_falcon_7b",
+        "thudm_glm_4_9b_chat",
         "distilbert_base_uncased",
     }
-    assert specs["openllama_7b"].preset_relpath == (
-        "configs/presets/causal_lm/openllama_7b_512.yaml"
+    assert specs["openlm_research_open_llama_7b"].preset_relpath == (
+        "configs/presets/causal_lm/open_llama_7b_512.yaml"
     )
-    assert specs["opt_1_3b"].preset_relpath == (
+    assert specs["facebook_opt_1_3b"].preset_relpath == (
         "configs/presets/causal_lm/opt_1_3b_512.yaml"
     )
-    assert specs["falcon_7b"].adapter == "auto"
-    assert specs["glm4_9b_chat"].adapter == "auto"
+    assert specs["tiiuae_falcon_7b"].adapter == "hf_causal"
+    assert specs["thudm_glm_4_9b_chat"].adapter == "hf_causal"
     assert specs["distilbert_base_uncased"].adapter == "hf_mlm"
     assert specs["distilbert_base_uncased"].preset_relpath == (
         "configs/presets/masked_lm/distilbert_base_uncased_128.yaml"
     )
 
 
-def test_promotion_candidate_text_suite_glm_host_dry_run_uses_lane_preset(
+def test_promotion_gap_gpu_suite_glm_host_dry_run_uses_lane_preset(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
@@ -55,9 +55,9 @@ def test_promotion_candidate_text_suite_glm_host_dry_run_uses_lane_preset(
             sys.executable,
             str(script),
             "--suite",
-            "promotion-candidates-text-le-14b",
+            "promotion-gap-gpu",
             "--slug",
-            "glm4_9b_chat",
+            "thudm_glm_4_9b_chat",
             "--execution-mode",
             "host",
             "--output-root",
@@ -73,7 +73,7 @@ def test_promotion_candidate_text_suite_glm_host_dry_run_uses_lane_preset(
     assert proc.returncode == 0, proc.stderr
     payload = json.loads(proc.stdout)
     assert len(payload) == 1
-    assert payload[0]["slug"] == "glm4_9b_chat"
+    assert payload[0]["slug"] == "thudm_glm_4_9b_chat"
     assert payload[0]["prefetch"][-1] == "THUDM/glm-4-9b-chat"
     preset_idx = payload[0]["evaluate"].index("--preset") + 1
     assert payload[0]["evaluate"][preset_idx] == str(
@@ -82,5 +82,5 @@ def test_promotion_candidate_text_suite_glm_host_dry_run_uses_lane_preset(
     assert "--runtime-provenance" in payload[0]["verify"]
 
     manifest = json.loads((output_root / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["suite"] == "promotion-candidates-text-le-14b"
-    assert manifest["lanes"][0]["slug"] == "glm4_9b_chat"
+    assert manifest["suite"] == "promotion-gap-gpu"
+    assert manifest["lanes"][0]["slug"] == "thudm_glm_4_9b_chat"

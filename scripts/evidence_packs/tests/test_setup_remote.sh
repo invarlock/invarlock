@@ -67,6 +67,73 @@ test_setup_remote_verify_remote_stack_runs_package_native_smoke() {
     local cmd
     cmd="$(cat "${TEST_TMPDIR}/smoke.cmd")"
     assert_match "python /opt/invarlock/scripts/evidence_packs/python/remote_setup_smoke.py" "${cmd}" "remote smoke helper invoked"
+    assert_match "--repo-root /opt/invarlock" "${cmd}" "repo root forwarded to smoke helper"
+}
+
+test_setup_remote_ensure_runtime_image_builds_cuda_local_when_missing() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/setup_remote.sh
+
+    local cmd_log="${TEST_TMPDIR}/runtime-image.log"
+    : > "${cmd_log}"
+
+    pack_activate_venv() { :; }
+    pack_run_cmd() { printf '%s\n' "$*" >> "${cmd_log}"; }
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+
+    cat > "${bin_dir}/docker" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${1:-}" == "image" && "${2:-}" == "inspect" ]]; then
+  exit 1
+fi
+exit 0
+EOF
+    chmod +x "${bin_dir}/docker"
+
+    cat > "${bin_dir}/nvidia-smi" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+    chmod +x "${bin_dir}/nvidia-smi"
+
+    PATH="${bin_dir}:${PATH}"
+    export PATH
+
+    REPO_DIR="${TEST_TMPDIR}/opt-invarlock"
+    mkdir -p "${REPO_DIR}"
+    unset INVARLOCK_RUNTIME_IMAGE
+
+    ensure_runtime_image
+
+    local log_text
+    log_text="$(cat "${cmd_log}")"
+    assert_match "make runtime-image-cuda" "${log_text}" "cuda runtime image build invoked"
+    assert_eq "invarlock-runtime:cuda-local" "${INVARLOCK_RUNTIME_IMAGE}" "cuda runtime image exported"
+}
+
+test_setup_remote_ensure_runtime_image_respects_explicit_override() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/setup_remote.sh
+
+    local cmd_log="${TEST_TMPDIR}/runtime-image.log"
+    : > "${cmd_log}"
+
+    pack_activate_venv() { :; }
+    pack_run_cmd() { printf '%s\n' "$*" >> "${cmd_log}"; }
+
+    INVARLOCK_RUNTIME_IMAGE="ghcr.io/example/custom:latest"
+
+    ensure_runtime_image
+
+    local log_text
+    log_text="$(cat "${cmd_log}")"
+    assert_eq "" "${log_text}" "no runtime image build when explicit override is present"
+    assert_eq "ghcr.io/example/custom:latest" "${INVARLOCK_RUNTIME_IMAGE}" "explicit runtime image preserved"
 }
 
 test_setup_remote_pack_install_pinned_requirement_requires_file() {
@@ -100,6 +167,29 @@ test_setup_remote_post_setup_marks_entrypoints_executable() {
     assert_match "/opt/invarlock/scripts/evidence_packs/run_suite.sh" "${cmd}" "run_suite path"
     assert_match "/opt/invarlock/scripts/evidence_packs/run_pack.sh" "${cmd}" "run_pack path"
     assert_match "/opt/invarlock/scripts/evidence_packs/verify_pack.sh" "${cmd}" "verify_pack path"
+    assert_match "/opt/invarlock/scripts/evidence_packs/run_mini_pack_gate.sh" "${cmd}" "mini gate path"
+}
+
+
+test_setup_remote_ensure_repo_alias_links_canonical_root_when_repo_dir_differs() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/setup_remote.sh
+
+    local cmd_log="${TEST_TMPDIR}/alias.log"
+    : > "${cmd_log}"
+
+    pack_run_cmd() { printf '%s\n' "$*" >> "${cmd_log}"; }
+
+    REPO_DIR="/opt/invarlock-a100"
+    CANONICAL_REPO_ALIAS="/root/invarlock-public"
+
+    ensure_repo_alias
+
+    local log_text
+    log_text="$(cat "${cmd_log}")"
+    assert_match "mkdir -p /root" "${log_text}" "alias parent directory created"
+    assert_match "ln -sfn /opt/invarlock-a100 /root/invarlock-public" "${log_text}" "canonical alias refreshed"
 }
 
 

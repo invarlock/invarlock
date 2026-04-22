@@ -97,6 +97,21 @@ mock_reset() {
     mkdir -p "${TEST_TMPDIR}/fixtures"
 }
 
+mock_python3_stub_enable() {
+    fixture_write "python3.stub" ""
+}
+
+mock_python3_stub_allow_real_script() {
+    local script_name="$1"
+    local path="${TEST_TMPDIR}/fixtures/python3.real_passthrough"
+    mkdir -p "$(dirname "${path}")"
+    printf '%s\n' "${script_name}" >> "${path}"
+}
+
+mock_python3_force_real_cmd_python() {
+    _cmd_python() { command "${TEST_REAL_PYTHON3}" "$@"; }
+}
+
 push_active_python_bin() {
     if [[ -v PYTHON_BIN ]]; then
         TEST_PREV_PYTHON_BIN="${PYTHON_BIN}"

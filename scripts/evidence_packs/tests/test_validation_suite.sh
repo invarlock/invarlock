@@ -238,6 +238,7 @@ test_pack_validation_pack_run_suite_runs_dependency_check_before_preflight_when_
         pack_validate_tuned_edit_params() { :; }
         pack_prepare_calibration_presets() { :; }
         pack_validate_guard_calibration() { :; }
+        pack_validate_runtime_provenance() { calls="${calls}runtime,"; }
 
         calls=""
         check_dependencies() { calls="${calls}check,"; }
@@ -248,7 +249,7 @@ test_pack_validation_pack_run_suite_runs_dependency_check_before_preflight_when_
         printf '%s' "${calls}" > "${calls_file}"
     )
 
-    assert_eq "check,preflight,main," "$(cat "${calls_file}")" "dependency check precedes net preflight"
+    assert_eq "check,runtime,preflight,main," "$(cat "${calls_file}")" "runtime provenance check precedes net preflight"
 }
 
 _make_validation_suite_sandbox() {
@@ -1119,7 +1120,7 @@ test_pack_validation_setup_model_early_returns_for_local_or_cached_paths_and_err
     rm -rf "${OUTPUT_DIR}/models"
     mkdir -p "${OUTPUT_DIR}/models"
 
-    fixture_write "python3.stub" ""
+    mock_python3_stub_enable
     local rc=0
     local out
     set +e
@@ -1301,7 +1302,7 @@ test_pack_validation_create_edited_model_quant_rtn_and_unknown_edit_type_branche
     source ./scripts/evidence_packs/lib/validation_suite.sh
     pack_setup_output_dirs
 
-    fixture_write "python3.stub" ""
+    mock_python3_stub_enable
 
     create_edited_model "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/edited" "quant_rtn" "8" "128" "ffn" "0"
 
@@ -1337,7 +1338,7 @@ test_pack_validation_run_single_calibration_large_model_and_report_copy_branch()
     source ./scripts/evidence_packs/lib/validation_suite.sh
     pack_setup_output_dirs
 
-    fixture_write "python3.stub" ""
+    mock_python3_stub_enable
     fixture_write "python3.create_report" ""
     estimate_model_params() { echo "${MODEL_SIZE_RETURN}"; }
 
@@ -1358,7 +1359,7 @@ test_pack_validation_run_invarlock_calibration_failure_paths_and_labels() {
     source ./scripts/evidence_packs/lib/validation_suite.sh
     pack_setup_output_dirs
 
-    fixture_write "python3.stub" ""
+    mock_python3_stub_enable
 
     estimate_model_params() { echo "${MODEL_SIZE_RETURN}"; }
 
@@ -1380,7 +1381,7 @@ test_pack_validation_run_invarlock_evaluate_preset_optional_and_cert_copy_paths(
     source ./scripts/evidence_packs/lib/validation_suite.sh
     pack_setup_output_dirs
 
-    fixture_write "python3.stub" ""
+    mock_python3_stub_enable
 
     local preset_dir="${TEST_TMPDIR}/presets"
     mkdir -p "${preset_dir}"
@@ -1939,7 +1940,7 @@ test_pack_validation_preflight_models_error_branches() {
     OUTPUT_DIR="${TEST_TMPDIR}/out"
     source ./scripts/evidence_packs/lib/validation_suite.sh
 
-    fixture_write "python3.stub" ""
+    mock_python3_stub_enable
     fixture_write "python3.rc" "0"
 
     local error_log="${TEST_TMPDIR}/error.msg"
@@ -2937,6 +2938,71 @@ JSON
     assert_rc "0" "${RUN_RC}" "tuned edit params validated"
 }
 
+test_pack_validate_tuned_edit_params_rejects_noncanonical_selected_entries() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/validation_suite.sh
+    CLEAN_EDIT_RUNS="1"
+    EDIT_TYPES_CLEAN=("lowrank_svd:clean:ffn")
+    PACK_MODEL_LIST=("Qwen/Qwen3-8B")
+
+    PACK_TUNED_EDIT_PARAMS_FILE="${TEST_TMPDIR}/tuned.json"
+    export PACK_TUNED_EDIT_PARAMS_FILE
+    cat > "${PACK_TUNED_EDIT_PARAMS_FILE}" <<'JSON'
+{
+  "models": {
+    "Qwen/Qwen3-8B": {
+      "lowrank_svd": {
+        "edit_dir_name": "svd_rank32_clean",
+        "rank": 32,
+        "reason": "trial_on_h100:qwen3_8b_rank32_ffn_layer17",
+        "scope": "ffn@layer=17",
+        "status": "selected"
+      }
+    }
+  }
+}
+JSON
+
+    run pack_validate_tuned_edit_params
+    assert_ne "0" "${RUN_RC}" "noncanonical tuned params rejected"
+    assert_match "Noncanonical tuned edit presets" "${RUN_ERR}" "error labels canonical mismatch"
+    assert_match "Qwen/Qwen3-8B:lowrank_svd" "${RUN_ERR}" "error names mismatched model"
+}
+
+test_pack_validate_tuned_edit_params_allows_noncanonical_override_when_opted_in() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/validation_suite.sh
+    CLEAN_EDIT_RUNS="1"
+    EDIT_TYPES_CLEAN=("lowrank_svd:clean:ffn")
+    PACK_MODEL_LIST=("Qwen/Qwen3-8B")
+    PACK_ALLOW_NONCANONICAL_TUNED_EDIT_PARAMS="1"
+    export PACK_ALLOW_NONCANONICAL_TUNED_EDIT_PARAMS
+
+    PACK_TUNED_EDIT_PARAMS_FILE="${TEST_TMPDIR}/tuned.json"
+    export PACK_TUNED_EDIT_PARAMS_FILE
+    cat > "${PACK_TUNED_EDIT_PARAMS_FILE}" <<'JSON'
+{
+  "models": {
+    "Qwen/Qwen3-8B": {
+      "lowrank_svd": {
+        "edit_dir_name": "svd_rank32_clean",
+        "rank": 32,
+        "reason": "trial_on_h100:qwen3_8b_rank32_ffn_layer17",
+        "scope": "ffn@layer=17",
+        "status": "selected"
+      }
+    }
+  }
+}
+JSON
+
+    run pack_validate_tuned_edit_params
+    assert_rc "0" "${RUN_RC}" "explicit noncanonical override succeeds"
+    unset PACK_ALLOW_NONCANONICAL_TUNED_EDIT_PARAMS
+}
+
 test_pack_validate_tuned_edit_params_returns_nonzero_when_python_fails() {
     mock_reset
 
@@ -2949,7 +3015,7 @@ test_pack_validate_tuned_edit_params_returns_nonzero_when_python_fails() {
     export PACK_TUNED_EDIT_PARAMS_FILE
     echo '{"defaults":{"quant_rtn":{"status":"selected"}},"models":{}}' > "${PACK_TUNED_EDIT_PARAMS_FILE}"
 
-    fixture_write "python3.stub" ""
+    mock_python3_stub_enable
     fixture_write "python3.rc" "1"
 
     local rc=0
@@ -3204,6 +3270,45 @@ EOF
     local ids
     ids="$(jq -r '.scenarios[].id' "${OUTPUT_DIR}/state/scenarios.json" | sort | paste -sd ',' -)"
     assert_eq "b" "${ids}" "filters by scenario id after suite filtering"
+}
+
+test_pack_prepare_scenarios_manifest_resume_errors_on_contract_drift() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/evidence_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
+
+    cat > "${OUTPUT_DIR}/state/scenarios.json" <<'EOF'
+{
+  "_meta": {"applied_suite": "subset"},
+  "schema": "evidence_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "a", "category": "clean", "strictness": "must_pass", "generation": {"kind": "edit", "edit_spec": "x", "version": "clean"}}
+  ]
+}
+EOF
+
+    local manifest="${TEST_TMPDIR}/resume-scenarios.json"
+    cat > "${manifest}" <<'EOF'
+{
+  "_meta": {},
+  "schema": "evidence_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "a", "category": "clean", "strictness": "must_pass", "generation": {"kind": "edit", "edit_spec": "x", "version": "clean"}},
+    {"id": "b", "category": "error_injection", "strictness": "informational", "generation": {"kind": "error", "error_type": "b"}, "requirements": {"primary_guard_required": true}}
+  ]
+}
+EOF
+    local PACK_SCENARIOS_MANIFEST_FILE="${manifest}"
+    local RESUME_FLAG="true"
+
+    local rc=0
+    ( pack_prepare_scenarios_manifest ) || rc=$?
+    assert_ne "0" "${rc}" "resume fails closed when scenario contract drift is detected"
+    assert_match "Resume run scenario manifest differs from the current contract" "$(cat "${OUTPUT_DIR}/logs/main.log")" "contract drift is logged"
 }
 
 test_pack_validation_resolve_active_scenarios_manifest_prefers_state_then_repo_source() {

@@ -120,6 +120,10 @@ def test_model_catalog_gpu_suite_maps_family_specific_presets() -> None:
                 "t5_small",
                 "google_gemma_4_e4b_it",
                 "mistralai_mixtral_8x7b_v0_1",
+                "openlm_research_open_llama_7b",
+                "facebook_opt_1_3b",
+                "tiiuae_falcon_7b",
+                "thudm_glm_4_9b_chat",
             ],
             lane_ids=[],
             shard_index=0,
@@ -141,6 +145,94 @@ def test_model_catalog_gpu_suite_maps_family_specific_presets() -> None:
         "configs/presets/causal_lm/wikitext2_512.yaml"
     )
     assert specs["mistralai_mixtral_8x7b_v0_1"].adapter == "auto"
+    assert specs["openlm_research_open_llama_7b"].preset_relpath == (
+        "configs/presets/causal_lm/open_llama_7b_512.yaml"
+    )
+    assert specs["openlm_research_open_llama_7b"].adapter == "hf_causal"
+    assert specs["facebook_opt_1_3b"].preset_relpath == (
+        "configs/presets/causal_lm/opt_1_3b_512.yaml"
+    )
+    assert specs["facebook_opt_1_3b"].adapter == "hf_causal"
+    assert specs["tiiuae_falcon_7b"].preset_relpath == (
+        "configs/presets/causal_lm/falcon_7b_512.yaml"
+    )
+    assert specs["tiiuae_falcon_7b"].adapter == "hf_causal"
+    assert specs["thudm_glm_4_9b_chat"].preset_relpath == (
+        "configs/presets/causal_lm/glm4_9b_chat_512.yaml"
+    )
+    assert specs["thudm_glm_4_9b_chat"].adapter == "hf_causal"
+
+
+def test_promotion_gap_gpu_suite_targets_repo_prepared_blocked_lanes() -> None:
+    mod = load_script_module("model_evidence_sweep")
+
+    specs = mod.select_specs(
+        mod.PROMOTION_GAP_GPU_SUITE,
+        slugs=[],
+        lane_ids=[],
+        shard_index=0,
+        shard_count=1,
+    )
+
+    assert [lane.slug for lane in specs] == [
+        "openlm_research_open_llama_7b",
+        "facebook_opt_1_3b",
+        "tiiuae_falcon_7b",
+        "thudm_glm_4_9b_chat",
+        "distilbert_base_uncased",
+    ]
+    distilbert = specs[-1]
+    assert distilbert.adapter == "hf_mlm"
+    assert distilbert.preset_relpath == (
+        "configs/presets/masked_lm/distilbert_base_uncased_128.yaml"
+    )
+    for lane in specs:
+        assert lane.verify_profile == "dev"
+        assert lane.preset_path.is_file(), lane.preset_relpath
+
+
+def test_model_evidence_sweep_dry_run_supports_promotion_gap_suite_candidates(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence_sweep.py"
+    output_root = tmp_path / "promotion-gap-dry-run"
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--suite",
+            "promotion-gap-gpu",
+            "--execution-mode",
+            "host",
+            "--output-root",
+            str(output_root),
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(proc.stdout)
+    slugs = [entry["slug"] for entry in payload]
+    assert slugs == [
+        "openlm_research_open_llama_7b",
+        "facebook_opt_1_3b",
+        "tiiuae_falcon_7b",
+        "thudm_glm_4_9b_chat",
+        "distilbert_base_uncased",
+    ]
+    distilbert = payload[-1]
+    assert distilbert["evaluate"][distilbert["evaluate"].index("--baseline") + 1] == (
+        "distilbert-base-uncased"
+    )
+    assert distilbert["evaluate"][distilbert["evaluate"].index("--adapter") + 1] == (
+        "hf_mlm"
+    )
 
 
 def test_build_prefetch_command_uses_model_profile_tokenizer_resolution() -> None:

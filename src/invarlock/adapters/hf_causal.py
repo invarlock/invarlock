@@ -791,7 +791,9 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
                     resolve_core_loader_strategy(
                         task="causal",
                         model_id=model_id,
-                        kwargs=kwargs,
+                        # Preserve the direct-submodule fallback even when the
+                        # initial auto path was attempted with trust_remote_code.
+                        kwargs={},
                         allow_direct_submodule=True,
                     )
                     if strategy.strategy == "auto"

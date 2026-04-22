@@ -45,7 +45,9 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     assert "Qwen2.5 32B" in usage_only
     promotion = family_catalog["promotion_candidates_text_le_14b"]
     assert promotion["format_version"] == "promotion-candidates-text-le-14b-v1"
-    candidates = {item["display_name"]: item for item in promotion["candidates"]}
+    candidates = {
+        item["display_name"]: item for item in promotion["candidates"]
+    }
     assert candidates["Qwen2.5 7B causal LM"]["decision"] == "promote_now"
     assert (
         candidates["Qwen2.5 7B causal LM"]["current_catalog_state"]
@@ -57,17 +59,48 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         ]
         == "pass"
     )
-    assert candidates["Falcon 7B causal LM"]["decision"] == "ready_for_full_pack"
+    assert (
+        candidates["Falcon 7B causal LM"]["decision"]
+        == "blocked_missing_artifacts"
+    )
+    for display_name in (
+        "OpenLLaMA 7B causal LM",
+        "OPT 1.3B causal LM",
+        "Falcon 7B causal LM",
+        "GLM 4 9B Chat",
+    ):
+        assert candidates[display_name]["criteria_status"]["included_preset"] == "pass"
+        assert (
+            candidates[display_name]["criteria_status"]["included_calibration_config"]
+            == "pass"
+        )
+        assert candidates[display_name]["criteria_status"]["cli_smoke_evidence"] == "pass"
     assert candidates["Gemma 3 4B IT"]["decision"] == "explicitly_out_of_scope"
     assert (
         candidates["Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)"][
             "decision"
         ]
-        == "ready_for_full_pack"
+        == "blocked_missing_artifacts"
     )
     assert (
-        candidates["OPT 1.3B causal LM"]["criteria_status"]["targeted_tests"] == "pass"
+        candidates["Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)"][
+            "criteria_status"
+        ]["included_preset"]
+        == "pass"
     )
+    assert (
+        candidates["Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)"][
+            "criteria_status"
+        ]["included_calibration_config"]
+        == "pass"
+    )
+    assert (
+        candidates["Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)"][
+            "criteria_status"
+        ]["cli_smoke_evidence"]
+        == "pass"
+    )
+    assert candidates["OPT 1.3B causal LM"]["criteria_status"]["targeted_tests"] == "pass"
     recommended = {
         item["display_name"] for item in family_catalog["recommended_additions"]
     }

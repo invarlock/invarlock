@@ -771,6 +771,30 @@ test_update_model_task_memory_preserves_existing_reservation_floor() {
     assert_eq "4" "$(jq -r '.required_gpus' "${QUEUE_DIR}/pending/t.task")" "profile refinement keeps stricter GPU floor"
 }
 
+test_update_model_task_memory_allows_single_gpu_downsize_after_refinement() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue_manager.sh"
+
+    local out_dir="${TEST_TMPDIR}/out"
+    init_queue "${out_dir}" >/dev/null
+
+    _cmd_python() { echo "44 1"; }
+
+    jq -n '{task_id:"t", task_type:"CALIBRATION_RUN", model_id:"allenai/OLMo-2-1124-7B", model_name:"olmo", status:"ready", model_size_gb:82, required_gpus:1, retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:null, dependencies:[], params:{run:1}, priority:85}' \
+        > "${QUEUE_DIR}/ready/t.task"
+
+    mkdir -p "${out_dir}/olmo"
+    local baseline_path="${TEST_TMPDIR}/baseline"
+    mkdir -p "${baseline_path}"
+    echo "${baseline_path}" > "${out_dir}/olmo/.baseline_path"
+    echo '{}' > "${baseline_path}/model_profile.json"
+
+    update_model_task_memory "olmo" "${out_dir}" "allenai/OLMo-2-1124-7B"
+    assert_eq "44" "$(jq -r '.model_size_gb' "${QUEUE_DIR}/ready/t.task")" "single-GPU tasks can downsize after refined estimate"
+    assert_eq "1" "$(jq -r '.required_gpus' "${QUEUE_DIR}/ready/t.task")" "single-GPU requirement unchanged"
+}
+
 test_estimate_task_memory_reserves_full_host_for_moe_execution() {
     mock_reset
 
@@ -783,6 +807,17 @@ test_estimate_task_memory_reserves_full_host_for_moe_execution() {
 
     result="$(TASK_TYPE=SETUP_BASELINE MODEL_ID="mistralai/Mixtral-8x7B-v0.1" PROFILE_PATH="${profile}" GPU_MEMORY_PER_DEVICE=140 NUM_GPUS=4 python3 "${TEST_ROOT}/scripts/evidence_packs/python/estimate_task_memory.py")"
     assert_eq "94 1" "${result}" "MoE baseline setup stays single-GPU sized"
+}
+
+test_estimate_task_memory_uses_runtime_sized_7b_windows() {
+    mock_reset
+
+    local profile="${TEST_TMPDIR}/profile.json"
+    jq -n '{model_id:"allenai/OLMo-2-1124-7B", weights_gb:14, hidden_size:4096, num_layers:32, num_heads:32, num_kv_heads:32, dtype_bytes:2}' > "${profile}"
+
+    local result
+    result="$(TASK_TYPE=CALIBRATION_RUN MODEL_ID="allenai/OLMo-2-1124-7B" PROFILE_PATH="${profile}" GPU_MEMORY_PER_DEVICE=80 NUM_GPUS=1 python3 "${TEST_ROOT}/scripts/evidence_packs/python/estimate_task_memory.py")"
+    assert_eq "44 1" "${result}" "7B calibration memory estimate stays aligned with runtime-sized windows on 80 GB GPUs"
 }
 
 test_with_queue_lock_returns_nonzero_when_lock_acquire_fails() {
@@ -1371,6 +1406,76 @@ EOF
     assert_match '"error_type":"rmt_norm_noise"' "${create_params}" "error_type retained"
     assert_eq "anisotropy" "$(printf '%s' "${create_params}" | jq -r '.error_env.INVARLOCK_RMT_PROBE_MODE')" "env mode propagated"
     assert_eq "0.75" "$(printf '%s' "${create_params}" | jq -r '.error_env.INVARLOCK_RMT_ANISO_BLEND')" "env blend propagated"
+}
+
+test_generate_model_tasks_applies_model_specific_error_env_overrides() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue_manager.sh"
+
+    local calls="${TEST_TMPDIR}/calls_error_env_override"
+    : > "${calls}"
+    add_task() {
+        local task_type="$1"
+        local params="${6:-}"
+        printf '%s\t%s\n' "${task_type}" "${params}" >> "${calls}"
+        local count
+        count=$(wc -l < "${calls}" | tr -d ' ')
+        echo "t${count}"
+    }
+    estimate_model_memory() { echo "14"; }
+    generate_eval_evaluate_tasks() { :; }
+    local pack_root="${TEST_TMPDIR}/pack_error_env_override"
+    mkdir -p "${pack_root}/lib"
+    SCRIPT_DIR="${pack_root}/lib"
+
+    cat > "${pack_root}/scenarios.json" <<'EOF'
+{
+  "schema": "evidence_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {
+      "id": "quant_4bit_clean",
+      "generation": {"kind": "edit", "edit_spec": "quant_rtn:clean:ffn", "version": "clean"}
+    },
+    {
+      "id": "quant_4bit_stress",
+      "generation": {"kind": "edit", "edit_spec": "quant_rtn:3:32:all", "version": "stress"}
+    },
+    {
+      "id": "rmt_norm_noise",
+      "generation": {
+        "kind": "error",
+        "error_type": "rmt_norm_noise",
+        "env": {
+          "INVARLOCK_RMT_PROBE_MODE": "anisotropy",
+          "INVARLOCK_RMT_ANISO_BLEND": "0.75",
+          "INVARLOCK_RMT_ANISO_MAX_PARAMS": "10"
+        },
+        "env_by_model": {
+          "org/model": {
+            "INVARLOCK_RMT_ANISO_BLEND": "0.60",
+            "INVARLOCK_RMT_ANISO_MAX_PARAMS": "4"
+          }
+        }
+      }
+    }
+  ]
+}
+EOF
+
+    PACK_USE_BATCH_EDITS="true"
+    CLEAN_EDIT_RUNS="1"
+    STRESS_EDIT_RUNS="1"
+    DRIFT_CALIBRATION_RUNS=1
+    RUN_ERROR_INJECTION="true"
+    generate_model_tasks "1" "org/model" "model" >/dev/null
+
+    local create_params
+    create_params="$(awk -F '\t' '$1=="CREATE_ERROR"{print $2; exit}' "${calls}")"
+    assert_eq "anisotropy" "$(printf '%s' "${create_params}" | jq -r '.error_env.INVARLOCK_RMT_PROBE_MODE')" "base env key preserved"
+    assert_eq "0.60" "$(printf '%s' "${create_params}" | jq -r '.error_env.INVARLOCK_RMT_ANISO_BLEND')" "model-specific blend override applied"
+    assert_eq "4" "$(printf '%s' "${create_params}" | jq -r '.error_env.INVARLOCK_RMT_ANISO_MAX_PARAMS')" "model-specific max params override applied"
 }
 
 

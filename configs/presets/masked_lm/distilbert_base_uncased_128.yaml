@@ -1,4 +1,4 @@
-# Preset: DistilBERT masked LM on WikiText-2.
+# Preset: DistilBERT base uncased MLM on WikiText-2.
 
 model:
   id: "distilbert-base-uncased"

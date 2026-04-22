@@ -521,7 +521,7 @@
         "display_name": "OpenLLaMA 7B causal LM",
         "representative_model": "openlm-research/open_llama_7b",
         "current_catalog_state": "implemented_coverage",
-        "decision": "ready_for_full_pack",
+        "decision": "blocked_missing_artifacts",
         "criteria_status": {
           "explicit_adapter_or_profile_recognition": "pass",
           "included_preset": "pass",
@@ -531,18 +531,16 @@
           "approved_calibration_or_evaluation_evidence": "fail"
         },
         "repo_evidence": [
+          "configs/presets/causal_lm/open_llama_7b_512.yaml",
+          "configs/calibration/null_sweep_open_llama_7b.yaml",
           "src/invarlock/model_profile.py",
           "src/invarlock/adapters/hf_loading.py",
           "src/invarlock/core/adapter_auto.py",
-          "configs/presets/causal_lm/openllama_7b_512.yaml",
-          "configs/calibration/null_sweep_openllama_7b.yaml",
           "tests/core/test_model_profiles.py",
-          "tests/cli/test_preset_causal_presets.py",
-          "tests/scripts/test_model_evidence_sweep.py",
-          "scripts/model_evidence_sweep.py"
+          "tests/cli/test_preset_causal_presets.py"
         ],
         "missing_artifacts": ["approved calibration/evaluation evidence"],
-        "notes": "The family now has shipped preset/config/test/smoke scaffolding and is ready for a clean reduced promotion rerun before it can move into declared support."
+        "notes": "The family is recognized and now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing."
       },
       {
         "candidate_id": "phi-3-mini-4k-instruct-causal-lm",
@@ -595,7 +593,7 @@
         "display_name": "OPT 1.3B causal LM",
         "representative_model": "facebook/opt-1.3b",
         "current_catalog_state": "implemented_coverage",
-        "decision": "ready_for_full_pack",
+        "decision": "blocked_missing_artifacts",
         "criteria_status": {
           "explicit_adapter_or_profile_recognition": "pass",
           "included_preset": "pass",
@@ -605,26 +603,24 @@
           "approved_calibration_or_evaluation_evidence": "fail"
         },
         "repo_evidence": [
+          "configs/presets/causal_lm/opt_1_3b_512.yaml",
+          "configs/calibration/null_sweep_opt_1_3b.yaml",
           "src/invarlock/model_profile.py",
           "src/invarlock/adapters/hf_loading.py",
           "src/invarlock/core/adapter_auto.py",
           "tests/adapters/test_hf_causal_variant_paths.py",
           "tests/core/test_model_profile_local_config.py",
-          "configs/presets/causal_lm/opt_1_3b_512.yaml",
-          "configs/calibration/null_sweep_opt_1_3b.yaml",
-          "tests/cli/test_preset_causal_presets.py",
-          "tests/scripts/test_model_evidence_sweep.py",
-          "scripts/model_evidence_sweep.py"
+          "tests/cli/test_preset_causal_presets.py"
         ],
         "missing_artifacts": ["approved calibration/evaluation evidence"],
-        "notes": "Shared GPT-style recognition, shipped lane scaffolding, and a named smoke lane now exist, so the candidate is ready for a reduced promotion rerun."
+        "notes": "Shared GPT-style recognition and targeted tests exist, and the repo now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing."
       },
       {
         "candidate_id": "falcon-7b-causal-lm",
         "display_name": "Falcon 7B causal LM",
         "representative_model": "tiiuae/falcon-7b",
         "current_catalog_state": "implemented_coverage",
-        "decision": "ready_for_full_pack",
+        "decision": "blocked_missing_artifacts",
         "criteria_status": {
           "explicit_adapter_or_profile_recognition": "pass",
           "included_preset": "pass",
@@ -634,23 +630,21 @@
           "approved_calibration_or_evaluation_evidence": "fail"
         },
         "repo_evidence": [
-          "src/invarlock/core/adapter_auto.py",
-          "tests/adapters/test_hf_causal_variant_paths.py",
           "configs/presets/causal_lm/falcon_7b_512.yaml",
           "configs/calibration/null_sweep_falcon_7b.yaml",
-          "tests/cli/test_preset_causal_presets.py",
-          "tests/scripts/test_model_evidence_sweep.py",
-          "scripts/model_evidence_sweep.py"
+          "src/invarlock/core/adapter_auto.py",
+          "tests/adapters/test_hf_causal_variant_paths.py",
+          "tests/cli/test_preset_causal_presets.py"
         ],
         "missing_artifacts": ["approved calibration/evaluation evidence"],
-        "notes": "The auto-routed Falcon lane now has shipped preset/config/test/smoke scaffolding and is ready for a reduced promotion rerun."
+        "notes": "Recognition and targeted variant-path tests exist, and the repo now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing."
       },
       {
         "candidate_id": "glm-4-9b-chat-causal-lm",
         "display_name": "GLM 4 9B Chat",
         "representative_model": "THUDM/glm-4-9b-chat",
         "current_catalog_state": "implemented_coverage",
-        "decision": "ready_for_full_pack",
+        "decision": "blocked_missing_artifacts",
         "criteria_status": {
           "explicit_adapter_or_profile_recognition": "pass",
           "included_preset": "pass",
@@ -660,23 +654,21 @@
           "approved_calibration_or_evaluation_evidence": "fail"
         },
         "repo_evidence": [
-          "src/invarlock/core/adapter_auto.py",
-          "tests/adapters/test_hf_causal_variant_paths.py",
           "configs/presets/causal_lm/glm4_9b_chat_512.yaml",
           "configs/calibration/null_sweep_glm4_9b_chat.yaml",
-          "tests/cli/test_preset_causal_presets.py",
-          "tests/scripts/test_model_evidence_sweep.py",
-          "scripts/model_evidence_sweep.py"
+          "src/invarlock/core/adapter_auto.py",
+          "tests/adapters/test_hf_causal_variant_paths.py",
+          "tests/cli/test_preset_causal_presets.py"
         ],
         "missing_artifacts": ["approved calibration/evaluation evidence"],
-        "notes": "The GLM lane now ships explicit preset/config/test/smoke scaffolding, including the remote-code path, and is ready for a reduced promotion rerun."
+        "notes": "Recognition and targeted variant-path tests exist, and the repo now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing."
       },
       {
         "candidate_id": "broader-bert-like-mlms",
         "display_name": "Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)",
         "representative_model": "distilbert-base-uncased",
         "current_catalog_state": "implemented_coverage",
-        "decision": "ready_for_full_pack",
+        "decision": "blocked_missing_artifacts",
         "criteria_status": {
           "explicit_adapter_or_profile_recognition": "pass",
           "included_preset": "pass",
@@ -686,19 +678,20 @@
           "approved_calibration_or_evaluation_evidence": "fail"
         },
         "repo_evidence": [
+          "configs/presets/masked_lm/distilbert_base_uncased_128.yaml",
+          "configs/calibration/null_sweep_distilbert_base_uncased.yaml",
           "src/invarlock/adapters/hf_loading.py",
           "src/invarlock/core/adapter_auto.py",
           "docs/reference/model-adapters.md",
           "tests/adapters/test_hf_loading_helpers.py",
           "tests/adapters/test_hf_mlm_variant_paths.py",
-          "configs/presets/masked_lm/distilbert_base_uncased_128.yaml",
-          "configs/calibration/null_sweep_distilbert_base_uncased.yaml",
           "tests/cli/test_preset_masked_lm_presets.py",
-          "tests/scripts/test_model_evidence_sweep.py",
-          "scripts/model_evidence_sweep.py"
+          "tests/scripts/test_model_evidence_sweep.py"
         ],
-        "missing_artifacts": ["approved calibration/evaluation evidence"],
-        "notes": "The broader MLM lane now has explicit DistilBERT preset/config/test/smoke scaffolding and is ready for a reduced promotion rerun."
+        "missing_artifacts": [
+          "approved calibration/evaluation evidence"
+        ],
+        "notes": "Loader and adapter tests exist for representative DistilBERT and DeBERTa checkpoints, and the repo now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing."
       },
       {
         "candidate_id": "mbart-large-50-seq2seq",

@@ -10,12 +10,14 @@ import torch
 
 try:
     from edit_targeting import matches_edit_scope
+    from hf_causal_loader import load_causal_model
     from runtime_tools import require_remote_code_opt_in
 except ImportError:  # pragma: no cover - direct module load under pytest
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from edit_targeting import matches_edit_scope
+    from hf_causal_loader import load_causal_model
     from runtime_tools import require_remote_code_opt_in
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoTokenizer
 
 
 def _configure_determinism() -> None:
@@ -91,7 +93,7 @@ def main(argv: list[str]) -> int:
     if flash_available:
         model_kwargs["attn_implementation"] = "flash_attention_2"
 
-    model = AutoModelForCausalLM.from_pretrained(baseline_path, **model_kwargs)
+    model, _ = load_causal_model(baseline_path, **model_kwargs)
 
     print(f"Quantizing to {bits}-bit on GPU (scope={scope})...")
     quantized_count = 0

@@ -208,16 +208,16 @@
       },
       "magnitude_prune": {
         "edit_dir_name": "prune_clean",
-        "reason": "selected_by_supported_experimental_recheck_seed:sparsity100_ffn",
+        "reason": "selected_by_supported_experimental_recheck_retune:sparsity080_ffn",
         "scope": "ffn",
-        "sparsity": 0.1,
+        "sparsity": 0.08,
         "status": "selected"
       },
       "quant_rtn": {
         "bits": 4,
         "edit_dir_name": "quant_4bit_clean",
-        "group_size": 32,
-        "reason": "selected_by_supported_experimental_recheck_seed:bits4_g32_ffn",
+        "group_size": 64,
+        "reason": "selected_by_supported_experimental_recheck_retune:bits4_g64_ffn",
         "scope": "ffn",
         "status": "selected"
       }
@@ -295,8 +295,8 @@
       "lowrank_svd": {
         "edit_dir_name": "svd_rank32_clean",
         "rank": 32,
-        "reason": "selected_by_supported_experimental_recheck_seed:rank32_ffn_layer19",
-        "scope": "ffn@layer=19",
+        "reason": "selected_by_supported_experimental_recheck_retune:rank32_ffn_layer15",
+        "scope": "ffn@layer=15",
         "status": "selected"
       },
       "magnitude_prune": {
@@ -326,8 +326,8 @@
       "lowrank_svd": {
         "edit_dir_name": "svd_rank32_clean",
         "rank": 32,
-        "reason": "selected_by_supported_experimental_recheck_seed:rank32_ffn_layer15",
-        "scope": "ffn@layer=15",
+        "reason": "selected_by_supported_experimental_recheck_retune:rank32_ffn_layer17",
+        "scope": "ffn@layer=17",
         "status": "selected"
       },
       "magnitude_prune": {
@@ -481,8 +481,8 @@
       "lowrank_svd": {
         "edit_dir_name": "svd_rank32_clean",
         "rank": 32,
-        "reason": "selected_by_supported_experimental_recheck_seed:rank32_ffn_layer19",
-        "scope": "ffn@layer=19",
+        "reason": "selected_by_supported_experimental_recheck_retune:rank32_ffn_layer31",
+        "scope": "ffn@layer=31",
         "status": "selected"
       },
       "magnitude_prune": {

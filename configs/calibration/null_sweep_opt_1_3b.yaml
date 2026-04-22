@@ -6,13 +6,8 @@ model:
   device: "auto"
 
 dataset:
-  provider:
-    kind: "hf_text"
-    dataset_name: "wikitext"
-    config_name: "wikitext-103-v1"
-    text_field: "text"
-    max_samples: 10000
-  split: "train"
+  provider: "wikitext2"
+  split: "validation"
   seq_len: 512
   stride: 512
   preview_n: 64

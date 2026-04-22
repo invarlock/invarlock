@@ -65,5 +65,73 @@ def test_remote_setup_smoke_main_succeeds_when_modules_and_cli_are_ready(
 
     monkeypatch.setattr(remote_setup_smoke, "check_modules", lambda modules: [])
     monkeypatch.setattr(remote_setup_smoke, "check_cli", lambda cli_name: None)
+    monkeypatch.setattr(remote_setup_smoke, "check_repo_root", lambda repo_root: None)
+    monkeypatch.setattr(remote_setup_smoke, "check_runtime_provenance", lambda: None)
 
     assert remote_setup_smoke.main([]) == 0
+
+
+def test_remote_setup_smoke_detects_runtime_provenance_gap(monkeypatch) -> None:
+    remote_setup_smoke = _load_remote_setup_smoke()
+
+    monkeypatch.setattr(remote_setup_smoke, "check_modules", lambda modules: [])
+    monkeypatch.setattr(remote_setup_smoke, "check_cli", lambda cli_name: None)
+    monkeypatch.setattr(remote_setup_smoke, "check_repo_root", lambda repo_root: None)
+    monkeypatch.setattr(
+        remote_setup_smoke,
+        "check_runtime_provenance",
+        lambda: "runtime image 'ghcr.io/invarlock/invarlock-runtime:latest' is not provenance-ready",
+    )
+
+    assert remote_setup_smoke.main([]) == 1
+
+
+def test_remote_setup_smoke_only_runtime_provenance_mode_skips_module_and_cli_checks(
+    monkeypatch,
+) -> None:
+    remote_setup_smoke = _load_remote_setup_smoke()
+
+    monkeypatch.setattr(
+        remote_setup_smoke,
+        "check_modules",
+        lambda modules: (_ for _ in ()).throw(AssertionError("module check should be skipped")),
+    )
+    monkeypatch.setattr(
+        remote_setup_smoke,
+        "check_cli",
+        lambda cli_name: (_ for _ in ()).throw(AssertionError("cli check should be skipped")),
+    )
+    monkeypatch.setattr(remote_setup_smoke, "check_runtime_provenance", lambda: None)
+
+    assert remote_setup_smoke.main(["--only-runtime-provenance"]) == 0
+
+
+def test_remote_setup_smoke_repo_root_requires_entrypoints(tmp_path: Path) -> None:
+    remote_setup_smoke = _load_remote_setup_smoke()
+
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    err = remote_setup_smoke.check_repo_root(str(repo_root))
+    assert err is not None
+    assert "missing required entrypoint" in err
+
+
+def test_remote_setup_smoke_main_checks_repo_root(monkeypatch, tmp_path: Path) -> None:
+    remote_setup_smoke = _load_remote_setup_smoke()
+
+    monkeypatch.setattr(remote_setup_smoke, "check_modules", lambda modules: [])
+    monkeypatch.setattr(remote_setup_smoke, "check_cli", lambda cli_name: None)
+    monkeypatch.setattr(remote_setup_smoke, "check_runtime_provenance", lambda: None)
+
+    checked: list[str] = []
+
+    def fake_check_repo_root(repo_root: str) -> str | None:
+        checked.append(repo_root)
+        return None
+
+    monkeypatch.setattr(remote_setup_smoke, "check_repo_root", fake_check_repo_root)
+
+    repo_root = tmp_path / "repo"
+    assert remote_setup_smoke.main(["--repo-root", str(repo_root)]) == 0
+    assert checked == [str(repo_root)]

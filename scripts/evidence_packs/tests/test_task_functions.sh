@@ -172,7 +172,7 @@ test_model_size_and_eval_batch_selection() {
     # shellcheck source=../task_functions.sh
     source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
 
-    fixture_write "python3.stub" ""
+    mock_python3_stub_enable
 
     fixture_write "python3.rc" "0"
 
@@ -266,8 +266,10 @@ test_task_calibration_run_and_generate_preset_cover_overrides_large_model_and_re
     # shellcheck source=../task_functions.sh
     source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
 
-    fixture_write "python3.stub" ""
+    mock_python3_stub_enable
     fixture_write "python3.rc" "0"
+    export PYTHON_BIN="$(command -v python3)"
+    _cmd_python() { command "${PYTHON_BIN}" "$@"; }
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -321,8 +323,9 @@ test_task_create_edit_and_batch_edits_cover_success_failure_and_missing_function
     source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
     stub_resolve_edit_params
 
-    fixture_write "python3.stub" ""
+    mock_python3_stub_enable
     fixture_write "python3.rc" "0"
+    mock_python3_stub_allow_real_script "validate_edit_artifact.py"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -339,11 +342,18 @@ test_task_create_edit_and_batch_edits_cover_success_failure_and_missing_function
         t_fail "expected create_edit to fail without baseline"
     fi
 
-    # Create function stubs that materialize config.json for verification.
-    create_edited_model() { mkdir -p "$2"; echo "{}" > "$2/config.json"; }
-    create_fp8_model() { mkdir -p "$2"; echo "{}" > "$2/config.json"; }
-    create_pruned_model() { mkdir -p "$2"; echo "{}" > "$2/config.json"; }
-    create_lowrank_model() { mkdir -p "$2"; echo "{}" > "$2/config.json"; }
+    _write_complete_edit_artifact() {
+        mkdir -p "$1"
+        echo "{}" > "$1/config.json"
+        echo "weights" > "$1/pytorch_model.bin"
+        echo "{}" > "$1/tokenizer_config.json"
+    }
+
+    # Create function stubs that materialize complete edit artifacts for verification.
+    create_edited_model() { _write_complete_edit_artifact "$2"; }
+    create_fp8_model() { _write_complete_edit_artifact "$2"; }
+    create_pruned_model() { _write_complete_edit_artifact "$2"; }
+    create_lowrank_model() { _write_complete_edit_artifact "$2"; }
 
     task_create_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean "${out}" "${log_file}"
     task_create_edit "${model_name}" 0 "fp8_quant:e4m3fn:ffn" clean "${out}" "${log_file}"
@@ -352,6 +362,22 @@ test_task_create_edit_and_batch_edits_cover_success_failure_and_missing_function
 
     # Existing edit skips.
     task_create_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean "${out}" "${log_file}"
+
+    # Partial artifacts must not be treated as complete.
+    rm -f "${model_output_dir}/models/quant_4bit_clean/pytorch_model.bin"
+    create_edited_model() { _write_complete_edit_artifact "$2"; echo "recreated" > "$2/recreated.marker"; }
+    task_create_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean "${out}" "${log_file}"
+    [[ -f "${model_output_dir}/models/quant_4bit_clean/recreated.marker" ]] || t_fail "expected partial artifact to be recreated"
+
+    # Corrupt safetensors artifacts must not be treated as complete.
+    local corrupt_dir="${model_output_dir}/models/corrupt_safe"
+    mkdir -p "${corrupt_dir}"
+    echo "{}" > "${corrupt_dir}/config.json"
+    echo "{}" > "${corrupt_dir}/tokenizer_config.json"
+    echo "not-a-valid-safetensors-file" > "${corrupt_dir}/model.safetensors"
+    if _edit_artifact_complete "${corrupt_dir}"; then
+        t_fail "expected corrupt safetensors artifact to fail completeness validation"
+    fi
 
     # Missing create_* function branches.
     rm -rf "${model_output_dir}/models/fp8_e4m3fn_clean"

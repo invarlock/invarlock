@@ -345,6 +345,11 @@
               "fail",
               "error"
             ]
+          },
+          {
+            "kind": "validation_flag",
+            "flag": "primary_metric_acceptable",
+            "expected": false
           }
         ]
       }
@@ -402,18 +407,18 @@
       "primary_guard": "spectral",
       "generation": {
         "kind": "error",
-      "error_type": "scale_explosion"
-    },
-    "requirements": {
-      "detectors_any_of": [
-        {
-          "kind": "spectral_caps_applied",
-          "min": 1
-        },
-        {
-          "kind": "validation_flag",
-          "flag": "spectral_stable",
-          "expected": false
+        "error_type": "scale_explosion"
+      },
+      "requirements": {
+        "detectors_any_of": [
+          {
+            "kind": "spectral_caps_applied",
+            "min": 1
+          },
+          {
+            "kind": "validation_flag",
+            "flag": "spectral_stable",
+            "expected": false
           },
           {
             "kind": "validation_flag",
@@ -548,21 +553,29 @@
       "generation": {
         "kind": "error",
         "error_type": "rmt_norm_noise",
-      "env": {
-        "INVARLOCK_RMT_PROBE_MODE": "anisotropy",
-        "INVARLOCK_RMT_ANISO_BLEND": "0.80",
-        "INVARLOCK_RMT_ANISO_ROW_FRAC": "0.20",
-      "INVARLOCK_RMT_ANISO_MAX_ROWS": "192",
-      "INVARLOCK_RMT_ANISO_MAX_PARAMS": "10",
-      "INVARLOCK_RMT_ANISO_TARGET_FAMILY": "ffn",
-      "INVARLOCK_RMT_ANISO_TARGET_PARAMS": "up_proj,gate_proj,down_proj,w1,w2,w3",
-      "INVARLOCK_RMT_ANISO_PRESERVE_ROW_NORMS": "1",
-      "INVARLOCK_RMT_ANISO_JITTER": "0.01",
-      "INVARLOCK_RMT_ANISO_ROW_SELECTION": "random",
-      "INVARLOCK_RMT_ANISO_SEED": "42"
-    }
-  },
-  "requirements": {
+        "env": {
+          "INVARLOCK_RMT_PROBE_MODE": "anisotropy",
+          "INVARLOCK_RMT_ANISO_BLEND": "0.80",
+          "INVARLOCK_RMT_ANISO_ROW_FRAC": "0.20",
+          "INVARLOCK_RMT_ANISO_MAX_ROWS": "192",
+          "INVARLOCK_RMT_ANISO_MAX_PARAMS": "10",
+          "INVARLOCK_RMT_ANISO_TARGET_FAMILY": "ffn",
+          "INVARLOCK_RMT_ANISO_TARGET_PARAMS": "up_proj,gate_proj,down_proj,w1,w2,w3",
+          "INVARLOCK_RMT_ANISO_PRESERVE_ROW_NORMS": "1",
+          "INVARLOCK_RMT_ANISO_JITTER": "0.01",
+          "INVARLOCK_RMT_ANISO_ROW_SELECTION": "random",
+          "INVARLOCK_RMT_ANISO_SEED": "42"
+        },
+        "env_by_model": {
+          "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B": {
+            "INVARLOCK_RMT_ANISO_BLEND": "0.08",
+            "INVARLOCK_RMT_ANISO_ROW_FRAC": "0.015",
+            "INVARLOCK_RMT_ANISO_MAX_ROWS": "4",
+            "INVARLOCK_RMT_ANISO_MAX_PARAMS": "2"
+          }
+        }
+      },
+      "requirements": {
         "primary_guard_required": true,
         "detectors_all_of": [
           {
@@ -591,10 +604,10 @@
             "kind": "validation_flag",
             "flag": "rmt_stable",
             "expected": false
+          }
+        ]
       }
-    ]
-  }
-},
+    },
     {
       "id": "spectral_moderate_scale",
       "suites": [
@@ -619,6 +632,12 @@
           "INVARLOCK_SPECTRAL_MAX_PARAMS": "8",
           "INVARLOCK_SPECTRAL_INCLUDE_QKV": "0",
           "INVARLOCK_SPECTRAL_SEED": "42"
+        },
+        "env_by_model": {
+          "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B": {
+            "INVARLOCK_SPECTRAL_SCALE_FACTOR": "1.003",
+            "INVARLOCK_SPECTRAL_MAX_PARAMS": "1"
+          }
         }
       },
       "requirements": {
@@ -732,17 +751,17 @@
           "INVARLOCK_RMT_PROBE_MODE": "anisotropy",
           "INVARLOCK_RMT_ANISO_BLEND": "1.0",
           "INVARLOCK_RMT_ANISO_ROW_FRAC": "0.35",
-      "INVARLOCK_RMT_ANISO_MAX_ROWS": "512",
-      "INVARLOCK_RMT_ANISO_MAX_PARAMS": "16",
-      "INVARLOCK_RMT_ANISO_TARGET_FAMILY": "ffn",
-      "INVARLOCK_RMT_ANISO_TARGET_PARAMS": "up_proj,gate_proj,down_proj,w1,w2,w3",
-      "INVARLOCK_RMT_ANISO_PRESERVE_ROW_NORMS": "1",
-      "INVARLOCK_RMT_ANISO_JITTER": "0.01",
-      "INVARLOCK_RMT_ANISO_ROW_SELECTION": "random",
-      "INVARLOCK_RMT_ANISO_SEED": "7"
-    }
-  },
-  "requirements": {
+          "INVARLOCK_RMT_ANISO_MAX_ROWS": "512",
+          "INVARLOCK_RMT_ANISO_MAX_PARAMS": "16",
+          "INVARLOCK_RMT_ANISO_TARGET_FAMILY": "ffn",
+          "INVARLOCK_RMT_ANISO_TARGET_PARAMS": "up_proj,gate_proj,down_proj,w1,w2,w3",
+          "INVARLOCK_RMT_ANISO_PRESERVE_ROW_NORMS": "1",
+          "INVARLOCK_RMT_ANISO_JITTER": "0.01",
+          "INVARLOCK_RMT_ANISO_ROW_SELECTION": "random",
+          "INVARLOCK_RMT_ANISO_SEED": "7"
+        }
+      },
+      "requirements": {
         "detectors_any_of": [
           {
             "kind": "rmt_probe",

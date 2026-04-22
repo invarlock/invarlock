@@ -63,16 +63,23 @@ def main() -> int:
 
     category = size_category()
 
+    # Keep scheduler-side memory planning aligned with the runtime config used by
+    # validation_suite.sh:get_model_invarlock_config(). If these diverge, tasks can
+    # be promoted to ready and then become permanently unschedulable on smaller GPUs.
     invarlock_cfg: dict[str, tuple[int, int]] = {
-        "7": (2048, 96),
-        "13": (1536, 64),
+        "7": (512, 96),
+        "13": (512, 64),
         "30": (1024, 48),
         "40": (1024, 32),
         "moe": (1024, 8),
         "70": (128, 2),
     }
 
-    seq_len_invarlock, batch_invarlock = invarlock_cfg.get(category, (1024, 32))
+    default_seq_len, default_batch = invarlock_cfg.get(category, (1024, 32))
+    seq_len_invarlock = parse_batch(os.environ.get("INVARLOCK_SEQ_LEN"), default_seq_len)
+    batch_invarlock = parse_batch(
+        os.environ.get("INVARLOCK_EVAL_BATCH"), default_batch
+    )
 
     def kv_cache_gb(batch: int, seq_len: int) -> float:
         if not all(
