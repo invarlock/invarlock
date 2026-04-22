@@ -1377,11 +1377,14 @@ generate_model_tasks() {
         local error_pairs=()
         if [[ -n "${jq_bin}" && -f "${scenarios_file}" ]]; then
             mapfile -t error_pairs < <(
-                "${jq_bin}" -r '.scenarios[]
+                "${jq_bin}" -r --arg model_id "${model_id}" --arg model_name "${model_name}" '.scenarios[]
                     | select(.generation.kind=="error")
+                    | (.generation.env // {}) as $base_env
+                    | (.generation.env_by_model // {}) as $env_by_model
+                    | (($env_by_model[$model_id] // $env_by_model[$model_name] // {}) ) as $model_env
                     | [
                         (.generation.error_type // ""),
-                        ((.generation.env // {}) | tojson)
+                        (($base_env + $model_env) | tojson)
                       ]
                     | @tsv' "${scenarios_file}"
             )
@@ -1600,18 +1603,23 @@ update_model_task_memory() {
             local required_gpus=""
             read -r required_mem required_gpus <<< "${result}"
 
+            local current_required_gpus=""
+            current_required_gpus=$(get_task_field "${task_file}" "required_gpus" 2>/dev/null || true)
+            local preserve_multi_gpu_floor="false"
+            if [[ "${current_required_gpus}" =~ ^[0-9]+$ ]] && [[ ${current_required_gpus} -gt 1 ]]; then
+                preserve_multi_gpu_floor="true"
+            fi
+
             if [[ -n "${required_mem}" && "${required_mem}" =~ ^[0-9]+$ ]]; then
                 local current_mem=""
                 current_mem=$(get_task_field "${task_file}" "model_size_gb" 2>/dev/null || true)
-                if [[ "${current_mem}" =~ ^[0-9]+$ ]] && [[ ${current_mem} -gt ${required_mem} ]]; then
+                if [[ "${preserve_multi_gpu_floor}" == "true" ]] && [[ "${current_mem}" =~ ^[0-9]+$ ]] && [[ ${current_mem} -gt ${required_mem} ]]; then
                     required_mem="${current_mem}"
                 fi
                 update_task_field "${task_file}" "model_size_gb" "${required_mem}" "true" 2>/dev/null || true
             fi
             if [[ -n "${required_gpus}" && "${required_gpus}" =~ ^[0-9]+$ ]]; then
-                local current_required_gpus=""
-                current_required_gpus=$(get_task_field "${task_file}" "required_gpus" 2>/dev/null || true)
-                if [[ "${current_required_gpus}" =~ ^[0-9]+$ ]] && [[ ${current_required_gpus} -gt ${required_gpus} ]]; then
+                if [[ "${preserve_multi_gpu_floor}" == "true" ]] && [[ "${current_required_gpus}" =~ ^[0-9]+$ ]] && [[ ${current_required_gpus} -gt ${required_gpus} ]]; then
                     required_gpus="${current_required_gpus}"
                 fi
                 update_task_field "${task_file}" "required_gpus" "${required_gpus}" "true" 2>/dev/null || true

@@ -70,6 +70,7 @@ coverage_owner_hint() {
         scripts/evidence_packs/suites.sh) echo "scripts/evidence_packs/tests/test_suites.sh" ;;
         scripts/evidence_packs/run_qwen14_sentinels.sh) echo "scripts/evidence_packs/tests/test_run_qwen14_sentinels.sh" ;;
         scripts/evidence_packs/run_suite.sh) echo "scripts/evidence_packs/tests/test_run_suite.sh" ;;
+        scripts/evidence_packs/run_mini_pack_gate.sh) echo "scripts/evidence_packs/tests/test_run_mini_pack_gate.sh" ;;
         scripts/evidence_packs/run_pack.sh) echo "scripts/evidence_packs/tests/test_run_pack.sh" ;;
         scripts/evidence_packs/verify_pack.sh) echo "scripts/evidence_packs/tests/test_verify_pack.sh" ;;
         *) echo "scripts/evidence_packs/tests/<add_test>.sh" ;;

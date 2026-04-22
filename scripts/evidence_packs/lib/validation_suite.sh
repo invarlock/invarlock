@@ -693,6 +693,7 @@ pack_prepare_scenarios_manifest() {
     if [[ -f "${src}" ]]; then
         mkdir -p "${OUTPUT_DIR}/state"
         local dest="${OUTPUT_DIR}/state/scenarios.json"
+        local rendered="${OUTPUT_DIR}/state/.scenarios.json.rendered.$$"
         local suite="${PACK_SUITE:-subset}"
         local scenario_ids_csv="${PACK_SCENARIO_IDS:-}"
         local jq_filter='def suites_ok($suite): ((.suites? | type) != "array") or ((.suites | length) == 0) or ((.suites | index($suite)) != null); def trim: gsub("^\\s+|\\s+$"; ""); def ids($csv): ($csv | split(",") | map(trim) | map(select(length>0))); ._meta = (._meta | if type=="object" then . else {} end) | ._meta.applied_suite = $suite | (ids($scenario_ids_csv)) as $ids | if ($ids | length) > 0 then ._meta.scenario_ids_filter = $ids else . end | .scenarios = [.scenarios[] | select(suites_ok($suite)) | select(($ids | length) == 0 or (.id as $id | ($ids | index($id)) != null))]'
@@ -700,10 +701,19 @@ pack_prepare_scenarios_manifest() {
         if _pack_validation_has_jq; then
             # Scenarios can optionally declare `suites: ["subset", "full", ...]`.
             # When present, the manifest is filtered to just the active PACK_SUITE.
-            jq --arg suite "${suite}" --arg scenario_ids_csv "${scenario_ids_csv}" "${jq_filter}" "${src}" > "${dest}"
+            jq --arg suite "${suite}" --arg scenario_ids_csv "${scenario_ids_csv}" "${jq_filter}" "${src}" > "${rendered}"
         else
-            cp "${src}" "${dest}"
+            cp "${src}" "${rendered}"
         fi
+
+        if [[ "${RESUME_FLAG:-false}" == "true" && -f "${dest}" ]]; then
+            if ! cmp -s "${dest}" "${rendered}"; then
+                rm -f "${rendered}"
+                error_exit "Resume run scenario manifest differs from the current contract; start a fresh OUTPUT_DIR instead of --resume."
+            fi
+        fi
+
+        mv "${rendered}" "${dest}"
     fi
 }
 
@@ -810,11 +820,27 @@ pack_validate_tuned_edit_params() {
     edit_types_csv=$(printf '%s\n' "${EDIT_TYPES_CLEAN[@]}" | awk -F: '{print $1}' | sort -u | paste -sd "," -)
     local repo_root
     repo_root="$(cd "${_PACK_VALIDATION_LIB_DIR}/../../.." && pwd)"
-    python3 "${repo_root}/scripts/evidence_packs/python/validate_tuned_edit_params.py" \
-        --file "${PACK_TUNED_EDIT_PARAMS_FILE}" \
-        --models "${model_csv}" \
-        --model-names "${model_names_csv}" \
-        --edit-types "${edit_types_csv}" || return 1
+    local canonical_tuned_edit_params_file=""
+    if [[ -f "${repo_root}/scripts/evidence_packs/tuned_edit_params.json" ]]; then
+        canonical_tuned_edit_params_file="${repo_root}/scripts/evidence_packs/tuned_edit_params.json"
+    elif [[ -f "${repo_root}/scripts/evidence_packs/presets/tuned_edit_params.json" ]]; then
+        canonical_tuned_edit_params_file="${repo_root}/scripts/evidence_packs/presets/tuned_edit_params.json"
+    fi
+    local -a validate_args=(
+        "${repo_root}/scripts/evidence_packs/python/validate_tuned_edit_params.py"
+        --file "${PACK_TUNED_EDIT_PARAMS_FILE}"
+        --models "${model_csv}"
+        --model-names "${model_names_csv}"
+        --edit-types "${edit_types_csv}"
+    )
+    if [[ -n "${canonical_tuned_edit_params_file}" ]]; then
+        validate_args+=(--canonical-file "${canonical_tuned_edit_params_file}")
+    fi
+    if [[ "${PACK_ALLOW_NONCANONICAL_TUNED_EDIT_PARAMS:-0}" == "1" ]]; then
+        validate_args+=(--allow-noncanonical)
+    fi
+    python3 "${validate_args[@]}" \
+        || return 1
 }
 
 pack_prepare_calibration_presets() {
@@ -868,6 +894,13 @@ pack_validate_guard_calibration() {
     if [[ ${runs} -le 0 && -z "${PACK_CALIBRATION_PRESET_DIR:-}" && -z "${PACK_CALIBRATION_PRESET_FILE:-}" ]]; then
         error_exit "Guard calibration disabled (DRIFT_CALIBRATION_RUNS=0) without a calibration preset file/dir."
     fi
+}
+
+pack_validate_runtime_provenance() {
+    local repo_root
+    repo_root="$(cd "${_PACK_VALIDATION_LIB_DIR}/../../.." && pwd)"
+    python3 "${repo_root}/scripts/evidence_packs/python/remote_setup_smoke.py" \
+        --only-runtime-provenance || return 1
 }
 
 log() {
@@ -2274,6 +2307,8 @@ pack_run_suite() {
         PACK_DEPENDENCIES_CHECKED=1
         export PACK_DEPENDENCIES_CHECKED
     fi
+
+    pack_validate_runtime_provenance || return 1
 
     if [[ "${PACK_NET}" == "1" ]]; then
         pack_preflight_models "${OUTPUT_DIR}" "${PACK_MODEL_LIST[@]}" || return 1
