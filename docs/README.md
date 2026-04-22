@@ -266,6 +266,11 @@ Model evidence automation lives in
 `scripts/model_evidence_sweep.py`, with tmux-based remote launch support in
 `scripts/run_model_evidence_remote.py` and a nightly/manual runner workflow in
 `.github/workflows/model-evidence-sweep.yml`.
+For repo-prepared-but-not-yet-promoted text and MLM lanes that now have shipped
+preset and calibration configs, use
+`scripts/model_evidence_sweep.py --suite promotion-gap-gpu` to run the narrow
+smoke/evidence path without prematurely adding those lanes to
+`support_matrix.json`.
 For the new Gemma 4 text lane, the repo-maintained local smoke is the included
 manifest dry-run (`scripts/model_evidence_sweep.py --slug gemma4_e2b --dry-run`).
 The image-text path also includes an offline demo preset at

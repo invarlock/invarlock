@@ -17,6 +17,10 @@ def test_causal_lm_family_presets_load() -> None:
     presets = {
         "wikitext2_512.yaml": "sshleifer/tiny-gpt2",
         "mistral_7b_512.yaml": "mistralai/Mistral-7B-v0.1",
+        "open_llama_7b_512.yaml": "openlm-research/open_llama_7b",
+        "opt_1_3b_512.yaml": "facebook/opt-1.3b",
+        "falcon_7b_512.yaml": "tiiuae/falcon-7b",
+        "glm4_9b_chat_512.yaml": "THUDM/glm-4-9b-chat",
         "ministral3_8b_512.yaml": "mistralai/Ministral-3-8B-Instruct-2512-BF16",
         "ministral3_14b_512.yaml": "mistralai/Ministral-3-14B-Instruct-2512-BF16",
         "qwen2_7b_512.yaml": "Qwen/Qwen2-7B",
@@ -73,6 +77,10 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
     expected_drift_band = {"min": 0.9, "max": 1.2}
     configs = {
         "null_sweep_mistral_7b.yaml": "mistralai/Mistral-7B-v0.1",
+        "null_sweep_open_llama_7b.yaml": "openlm-research/open_llama_7b",
+        "null_sweep_opt_1_3b.yaml": "facebook/opt-1.3b",
+        "null_sweep_falcon_7b.yaml": "tiiuae/falcon-7b",
+        "null_sweep_glm4_9b_chat.yaml": "THUDM/glm-4-9b-chat",
         "null_sweep_ministral3_8b.yaml": "mistralai/Ministral-3-8B-Instruct-2512-BF16",
         "null_sweep_ministral3_14b.yaml": "mistralai/Ministral-3-14B-Instruct-2512-BF16",
         "null_sweep_qwen2_7b.yaml": "Qwen/Qwen2-7B",

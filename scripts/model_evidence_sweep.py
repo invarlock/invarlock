@@ -30,6 +30,7 @@ MODEL_FAMILY_CATALOG_PATH = REPO_ROOT / "contracts" / "model_family_catalog.json
 DEFAULT_SUITE = "current-supported-experimental"
 REPO_MENTIONED_GPU_SUITE = "repo-mentioned-gpu"
 MODEL_CATALOG_GPU_SUITE = "model-catalog-gpu"
+PROMOTION_GAP_GPU_SUITE = "promotion-gap-gpu"
 EXECUTION_MODES = ("container", "host")
 RETRYABLE_EVALUATE_RETURNCODES = {-15}
 
@@ -248,6 +249,29 @@ MODEL_FAMILY_CATALOG_SECTIONS = (
     "recommended_additions",
 )
 
+CATALOG_PRESET_OVERRIDES: dict[str, tuple[str, str]] = {
+    "distilbert-base-uncased": (
+        "configs/presets/masked_lm/distilbert_base_uncased_128.yaml",
+        "hf_mlm",
+    ),
+    "openlm-research/open_llama_7b": (
+        "configs/presets/causal_lm/open_llama_7b_512.yaml",
+        "hf_causal",
+    ),
+    "facebook/opt-1.3b": (
+        "configs/presets/causal_lm/opt_1_3b_512.yaml",
+        "hf_causal",
+    ),
+    "tiiuae/falcon-7b": (
+        "configs/presets/causal_lm/falcon_7b_512.yaml",
+        "hf_causal",
+    ),
+    "THUDM/glm-4-9b-chat": (
+        "configs/presets/causal_lm/glm4_9b_chat_512.yaml",
+        "hf_causal",
+    ),
+}
+
 
 def _load_model_family_catalog(
     path: Path = MODEL_FAMILY_CATALOG_PATH,
@@ -267,6 +291,9 @@ def _catalog_slug(model_id: str) -> str:
 
 def _catalog_lane_defaults(model_id: str) -> tuple[str, str]:
     model_lower = model_id.lower()
+    override = CATALOG_PRESET_OVERRIDES.get(model_id)
+    if override is not None:
+        return override
     if any(
         keyword in model_lower
         for keyword in (
@@ -331,6 +358,59 @@ def _build_model_catalog_gpu_lanes(
 
 MODEL_CATALOG_GPU_LANES = _build_model_catalog_gpu_lanes()
 
+
+def _build_promotion_gap_gpu_lanes(
+    payload: dict[str, object] | None = None,
+) -> tuple[EvidenceLane, ...]:
+    catalog = payload or _load_model_family_catalog()
+    section = catalog.get("promotion_candidates_text_le_14b") or {}
+    if not isinstance(section, dict):
+        raise ValueError(
+            "model_family_catalog.promotion_candidates_text_le_14b must be an object"
+        )
+    candidates = section.get("candidates") or []
+    if not isinstance(candidates, list):
+        raise ValueError(
+            "model_family_catalog.promotion_candidates_text_le_14b.candidates must be a list"
+        )
+
+    lanes: list[EvidenceLane] = []
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        if candidate.get("decision") != "blocked_missing_artifacts":
+            continue
+        if candidate.get("current_catalog_state") != "implemented_coverage":
+            continue
+        criteria = candidate.get("criteria_status") or {}
+        if not isinstance(criteria, dict):
+            continue
+        if criteria.get("included_preset") != "pass":
+            continue
+        if criteria.get("included_calibration_config") != "pass":
+            continue
+        model_id = candidate.get("representative_model")
+        if not isinstance(model_id, str) or not model_id:
+            continue
+        family = candidate.get("display_name")
+        family_label = family if isinstance(family, str) and family else model_id
+        preset_relpath, adapter = _catalog_lane_defaults(model_id)
+        lanes.append(
+            EvidenceLane(
+                slug=_catalog_slug(model_id),
+                lane_id=f"promotion-gap::{_catalog_slug(model_id)}",
+                family=family_label,
+                model_id=model_id,
+                preset_relpath=preset_relpath,
+                adapter=adapter,
+                verify_profile="dev",
+            )
+        )
+    return tuple(lanes)
+
+
+PROMOTION_GAP_GPU_LANES = _build_promotion_gap_gpu_lanes()
+
 SUITES: dict[str, tuple[EvidenceLane, ...]] = {
     DEFAULT_SUITE: CURRENT_SUPPORTED_EXPERIMENTAL_LANES,
     REPO_MENTIONED_GPU_SUITE: (
@@ -339,6 +419,7 @@ SUITES: dict[str, tuple[EvidenceLane, ...]] = {
         + CURRENT_SUPPORTED_EXPERIMENTAL_LANES
     ),
     MODEL_CATALOG_GPU_SUITE: MODEL_CATALOG_GPU_LANES,
+    PROMOTION_GAP_GPU_SUITE: PROMOTION_GAP_GPU_LANES,
 }
 
 

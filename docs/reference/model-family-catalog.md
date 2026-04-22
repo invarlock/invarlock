@@ -87,13 +87,13 @@ scope for this pass.
 | Family | Representative model | Decision | Current state | Notes |
 | --- | --- | --- | --- | --- |
 | Qwen2.5 7B causal LM | `Qwen/Qwen2.5-7B` | `promote_now` | `supported_experimental` | The reduced promotion matrix closes on the shipped preset/config/test/smoke path, so the lane moves into declared support. |
-| OpenLLaMA 7B causal LM | `openlm-research/open_llama_7b` | `blocked_missing_artifacts` | `implemented_coverage` | Recognition and targeted tests exist, but the shipped lane artifacts and evidence are missing. |
+| OpenLLaMA 7B causal LM | `openlm-research/open_llama_7b` | `blocked_missing_artifacts` | `implemented_coverage` | Recognition and targeted tests exist, and the repo now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing. |
 | Phi-3 Mini 4K Instruct causal LM | `microsoft/Phi-3-mini-4k-instruct` | `explicitly_out_of_scope` | `implemented_coverage` | This wave keeps the public Phi surface at the shipped Phi-4 text-only lane. |
 | Gemma 3 4B IT | `google/gemma-3-4b-it` | `explicitly_out_of_scope` | `implemented_coverage` | The broader Gemma family remains multimodal/audio-capable, so it stays out of this text-only wave. |
-| OPT 1.3B causal LM | `facebook/opt-1.3b` | `blocked_missing_artifacts` | `implemented_coverage` | Shared GPT-style recognition exists, but the public lane artifacts and evidence are missing. |
-| Falcon 7B causal LM | `tiiuae/falcon-7b` | `blocked_missing_artifacts` | `implemented_coverage` | Recognition and targeted variant-path tests exist, but the public lane artifacts are absent. |
-| GLM 4 9B Chat | `THUDM/glm-4-9b-chat` | `blocked_missing_artifacts` | `implemented_coverage` | Recognition and targeted variant-path tests exist, but the public lane artifacts are absent. |
-| Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA) | `distilbert-base-uncased` | `blocked_missing_artifacts` | `implemented_coverage` | Loader and adapter tests exist for DistilBERT and DeBERTa, but the shipped family lane artifacts are absent. |
+| OPT 1.3B causal LM | `facebook/opt-1.3b` | `blocked_missing_artifacts` | `implemented_coverage` | Shared GPT-style recognition exists, and the repo now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing. |
+| Falcon 7B causal LM | `tiiuae/falcon-7b` | `blocked_missing_artifacts` | `implemented_coverage` | Recognition and targeted variant-path tests exist, and the repo now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing. |
+| GLM 4 9B Chat | `THUDM/glm-4-9b-chat` | `blocked_missing_artifacts` | `implemented_coverage` | Recognition and targeted variant-path tests exist, and the repo now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing. |
+| Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA) | `distilbert-base-uncased` | `blocked_missing_artifacts` | `implemented_coverage` | Loader and adapter tests exist for DistilBERT and DeBERTa, and the repo now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing. |
 | mBART large 50 seq2seq | `facebook/mbart-large-50` | `explicitly_out_of_scope` | `implemented_coverage` | Generic seq2seq/community lanes are excluded from this text-only wave. |
 
 The machine-readable criterion-by-criterion ledger for this wave lives under

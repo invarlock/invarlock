@@ -63,12 +63,42 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         candidates["Falcon 7B causal LM"]["decision"]
         == "blocked_missing_artifacts"
     )
+    for display_name in (
+        "OpenLLaMA 7B causal LM",
+        "OPT 1.3B causal LM",
+        "Falcon 7B causal LM",
+        "GLM 4 9B Chat",
+    ):
+        assert candidates[display_name]["criteria_status"]["included_preset"] == "pass"
+        assert (
+            candidates[display_name]["criteria_status"]["included_calibration_config"]
+            == "pass"
+        )
+        assert candidates[display_name]["criteria_status"]["cli_smoke_evidence"] == "pass"
     assert candidates["Gemma 3 4B IT"]["decision"] == "explicitly_out_of_scope"
     assert (
         candidates["Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)"][
             "decision"
         ]
         == "blocked_missing_artifacts"
+    )
+    assert (
+        candidates["Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)"][
+            "criteria_status"
+        ]["included_preset"]
+        == "pass"
+    )
+    assert (
+        candidates["Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)"][
+            "criteria_status"
+        ]["included_calibration_config"]
+        == "pass"
+    )
+    assert (
+        candidates["Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)"][
+            "criteria_status"
+        ]["cli_smoke_evidence"]
+        == "pass"
     )
     assert candidates["OPT 1.3B causal LM"]["criteria_status"]["targeted_tests"] == "pass"
     recommended = {
