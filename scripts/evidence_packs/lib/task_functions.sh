@@ -1399,7 +1399,7 @@ task_create_edit() {
     local edit_path="${model_output_dir}/models/${edit_dir_name}"
 
     # Check if already exists
-    if [[ -d "${edit_path}" && -f "${edit_path}/config.json" ]]; then
+    if _edit_artifact_complete "${edit_path}"; then
         echo "  Edit ${edit_dir_name} already exists, skipping" >> "${log_file}"
         return 0
     fi
@@ -1413,13 +1413,35 @@ task_create_edit() {
     fi
 
     # Verify creation
-    if [[ -d "${edit_path}" && -f "${edit_path}/config.json" ]]; then
+    if _edit_artifact_complete "${edit_path}"; then
         echo "  Created: ${edit_path}" >> "${log_file}"
         return 0
     else
         echo "  ERROR: Failed to create edit" >> "${log_file}"
         return 1
     fi
+}
+
+_edit_artifact_has_weights() {
+    local edit_path="$1"
+    compgen -G "${edit_path}/*.safetensors" >/dev/null \
+        || [[ -f "${edit_path}/model.safetensors" ]] \
+        || [[ -f "${edit_path}/model.safetensors.index.json" ]] \
+        || [[ -f "${edit_path}/pytorch_model.bin" ]] \
+        || [[ -f "${edit_path}/pytorch_model.bin.index.json" ]]
+}
+
+_edit_artifact_has_tokenizer() {
+    local edit_path="$1"
+    [[ -f "${edit_path}/tokenizer.json" ]] \
+        || [[ -f "${edit_path}/tokenizer_config.json" ]] \
+        || [[ -f "${edit_path}/tokenizer.model" ]] \
+        || [[ -f "${edit_path}/special_tokens_map.json" ]]
+}
+
+_edit_artifact_complete() {
+    local edit_path="$1"
+    _cmd_python "${SCRIPT_DIR}/../python/validate_edit_artifact.py" "${edit_path}" >/dev/null 2>&1
 }
 
 # ============ TASK: CREATE_EDITS_BATCH ============

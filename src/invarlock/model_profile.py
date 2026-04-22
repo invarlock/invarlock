@@ -122,6 +122,16 @@ def _read_local_json_file(path: Path) -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
+def _coerce_special_token_value(value: Any) -> str | None:
+    if isinstance(value, str) and value:
+        return value
+    if isinstance(value, dict):
+        content = value.get("content")
+        if isinstance(content, str) and content:
+            return content
+    return None
+
+
 def _load_local_tokenizer_metadata(model_dir: Path) -> dict[str, str | None]:
     metadata: dict[str, str | None] = {
         "bos_token": None,
@@ -140,8 +150,8 @@ def _load_local_tokenizer_metadata(model_dir: Path) -> dict[str, str | None]:
         if not isinstance(data, dict):
             continue
         for key in tuple(metadata):
-            value = data.get(key)
-            if isinstance(value, str) and value:
+            value = _coerce_special_token_value(data.get(key))
+            if value is not None:
                 metadata[key] = value
     return metadata
 

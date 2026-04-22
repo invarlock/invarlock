@@ -252,7 +252,7 @@ test_handle_oom_task_clamps_batch_and_seq_len_minimums() {
     # shellcheck source=../fault_tolerance.sh
     source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
 
-    fixture_write "python3.stub" ""
+    mock_python3_stub_enable
     fixture_write "python3.rc" "0"
 
     local task="${TEST_TMPDIR}/t.task"
@@ -271,7 +271,7 @@ test_handle_oom_task_sanitizes_non_numeric_batch_and_seq() {
     # shellcheck source=../fault_tolerance.sh
     source "${TEST_ROOT}/scripts/evidence_packs/lib/fault_tolerance.sh"
 
-    fixture_write "python3.stub" ""
+    mock_python3_stub_enable
     fixture_write "python3.rc" "0"
 
     local task="${TEST_TMPDIR}/t.task"

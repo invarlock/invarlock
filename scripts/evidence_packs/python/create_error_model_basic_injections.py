@@ -78,6 +78,15 @@ def _inject_missing_tensors(
         if injected:
             error_info["arch"] = "model_layers"
 
+    if not injected and base is not None:
+        language_model = getattr(base, "language_model", None)
+        if language_model is not None and hasattr(language_model, "layers"):
+            injected, total_layers, kept_layers = _shrink_layer_stack(
+                language_model, "layers"
+            )
+            if injected:
+                error_info["arch"] = "language_model_layers"
+
     if not injected:
         tr = getattr(model, "transformer", None)
         if tr is not None and hasattr(tr, "h"):

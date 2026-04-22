@@ -5,12 +5,18 @@ import json
 import os
 import re
 import shutil
+import sys
 import zlib
 from pathlib import Path
 from typing import Any
 
 import torch
-from transformers import AutoModelForCausalLM
+
+try:
+    from hf_causal_loader import load_causal_model
+except ImportError:  # pragma: no cover - direct module load under pytest
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from hf_causal_loader import load_causal_model
 
 _IMPORT_OR_LOAD_ERRORS = (ImportError, ModuleNotFoundError, OSError, RuntimeError)
 _NUMERIC_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
@@ -301,7 +307,7 @@ def _load_error_model(
     # INVARLOCK_ALLOW_REMOTE_CODE in create_error_model.py before it reaches
     # this shared helper.
     try:
-        model = AutoModelForCausalLM.from_pretrained(
+        model, _ = load_causal_model(
             baseline_path,
             dtype=torch.bfloat16,
             trust_remote_code=trust_remote_code,
@@ -313,7 +319,7 @@ def _load_error_model(
         print(
             f"GPU loading failed ({gpu_err}), falling back to CPU (may be slow for large models)"
         )
-        model = AutoModelForCausalLM.from_pretrained(
+        model, _ = load_causal_model(
             baseline_path,
             dtype=torch.bfloat16,
             trust_remote_code=trust_remote_code,

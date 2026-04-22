@@ -70,6 +70,43 @@ def test_local_profile_config_helpers_tolerate_invalid_utf8(tmp_path: Path) -> N
     }
 
 
+def test_load_local_tokenizer_metadata_reads_added_token_objects(tmp_path: Path) -> None:
+    model_dir = tmp_path / "added-token-local"
+    model_dir.mkdir()
+    payload = {
+        "bos_token": {
+            "__type": "AddedToken",
+            "content": "<bos>",
+        },
+        "eos_token": {
+            "__type": "AddedToken",
+            "content": "<eos>",
+        },
+        "pad_token": {
+            "__type": "AddedToken",
+            "content": "<eos>",
+        },
+        "unk_token": {
+            "__type": "AddedToken",
+            "content": "<unk>",
+        },
+    }
+    (model_dir / "tokenizer_config.json").write_text(
+        json.dumps(payload),
+        encoding="utf-8",
+    )
+
+    assert mp._load_local_tokenizer_metadata(model_dir) == {
+        "bos_token": "<bos>",
+        "cls_token": None,
+        "eos_token": "<eos>",
+        "mask_token": None,
+        "pad_token": "<eos>",
+        "sep_token": None,
+        "unk_token": "<unk>",
+    }
+
+
 def test_local_fast_tokenizer_token_lookup_tolerates_runtime_errors() -> None:
     class _BrokenLookupTokenizer:
         def get_vocab(self) -> dict[str, int]:
@@ -570,3 +607,65 @@ def test_resolve_tokenizer_uses_local_tokenizer_json_fast_path(
     assert len(encoded["input_ids"]) == 6
     assert encoded["input_ids"][:2] == [4, 5]
     assert encoded["attention_mask"] == [1, 1, 0, 0, 0, 0]
+
+
+def test_resolve_tokenizer_local_fast_path_accepts_added_token_metadata(
+    monkeypatch, tmp_path: Path
+) -> None:
+    tokenizers = pytest.importorskip("tokenizers")
+
+    model_dir = tmp_path / "local-fast-added-token"
+    model_dir.mkdir()
+    (model_dir / "config.json").write_text(
+        json.dumps(
+            {
+                "model_type": "gpt2",
+                "architectures": ["GPT2LMHeadModel"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    added = lambda content: {"__type": "AddedToken", "content": content}
+    (model_dir / "tokenizer_config.json").write_text(
+        json.dumps(
+            {
+                "bos_token": added("[BOS]"),
+                "eos_token": added("[EOS]"),
+                "pad_token": added("[PAD]"),
+                "unk_token": added("[UNK]"),
+                "tokenizer_class": "PreTrainedTokenizerFast",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    tokenizer = tokenizers.Tokenizer(
+        tokenizers.models.WordLevel(
+            {
+                "[PAD]": 0,
+                "[UNK]": 1,
+                "[BOS]": 2,
+                "[EOS]": 3,
+                "hello": 4,
+            },
+            unk_token="[UNK]",
+        )
+    )
+    tokenizer.pre_tokenizer = tokenizers.pre_tokenizers.Whitespace()
+    tokenizer.save(str(model_dir / "tokenizer.json"))
+
+    def _unexpected_transformers() -> None:
+        raise AssertionError("transformers tokenizer path should not be used")
+
+    monkeypatch.setattr(
+        mp,
+        "_ensure_transformers_tokenizer_support",
+        _unexpected_transformers,
+    )
+
+    profile = mp.detect_model_profile(str(model_dir), adapter="hf_causal")
+    resolved, _ = mp.resolve_tokenizer(profile)
+
+    assert resolved.pad_token == "[PAD]"
+    assert resolved.eos_token == "[EOS]"
+    assert resolved.pad_token_id == 0

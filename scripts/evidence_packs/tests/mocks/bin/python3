@@ -57,6 +57,19 @@ if [[ -n "${TEST_TMPDIR:-}" && "${1:-}" == */run_from_config.py ]]; then
 fi
 
 if [[ -n "${TEST_TMPDIR:-}" && -f "${TEST_TMPDIR}/fixtures/python3.stub" ]]; then
+    if [[ -f "${TEST_TMPDIR}/fixtures/python3.real_passthrough" && -n "${1:-}" ]]; then
+        while IFS= read -r script_name || [[ -n "${script_name}" ]]; do
+            [[ -n "${script_name}" ]] || continue
+            if [[ "${1}" == "${script_name}" || "${1}" == */"${script_name}" ]]; then
+                if [[ -z "${real_python3}" || ! -x "${real_python3}" ]]; then
+                    echo "ERROR: TEST_REAL_PYTHON3 is not set to an executable path" >&2
+                    exit 127
+                fi
+                exec "${real_python3}" "$@"
+            fi
+        done < "${TEST_TMPDIR}/fixtures/python3.real_passthrough"
+    fi
+
     # Simple fixture-driven stub:
     # - fixtures/python3.stdout (optional)
     # - fixtures/python3.stderr (optional)

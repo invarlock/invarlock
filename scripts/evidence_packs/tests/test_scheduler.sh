@@ -279,7 +279,7 @@ test_scheduler_gpu_memory_and_process_helpers_cover_lines() {
     # shellcheck source=../scheduler.sh
     source "${TEST_ROOT}/scripts/evidence_packs/lib/scheduler.sh"
 
-    fixture_write "python3.stub" ""
+    mock_python3_stub_enable
     fixture_write "python3.rc" "0"
 
     purge_multi_gpu_memory "0,1"

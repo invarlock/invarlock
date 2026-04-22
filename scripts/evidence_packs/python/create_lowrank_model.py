@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gc
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -9,12 +10,14 @@ import torch
 
 try:
     from edit_targeting import matches_edit_scope
+    from hf_causal_loader import load_causal_model
     from runtime_tools import require_remote_code_opt_in
 except ImportError:  # pragma: no cover - direct module load under pytest
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from edit_targeting import matches_edit_scope
+    from hf_causal_loader import load_causal_model
     from runtime_tools import require_remote_code_opt_in
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoTokenizer
 
 
 def _parse_scope(raw_scope: str) -> tuple[str, int | None, int | None]:
@@ -94,7 +97,7 @@ def main(argv: list[str]) -> int:
     tokenizer = AutoTokenizer.from_pretrained(
         baseline_path, trust_remote_code=trust_remote_code
     )
-    model = AutoModelForCausalLM.from_pretrained(
+    model, _ = load_causal_model(
         baseline_path,
         dtype=torch.bfloat16,
         trust_remote_code=trust_remote_code,
@@ -153,9 +156,12 @@ def main(argv: list[str]) -> int:
     gc.collect()
     torch.cuda.empty_cache()
 
-    output_path.mkdir(parents=True, exist_ok=True)
-    tokenizer.save_pretrained(output_path)
-    model.save_pretrained(output_path, safe_serialization=True)
+    staging_path = output_path.parent / f".{output_path.name}.tmp"
+    if staging_path.exists():
+        shutil.rmtree(staging_path)
+    staging_path.mkdir(parents=True, exist_ok=True)
+    tokenizer.save_pretrained(staging_path)
+    model.save_pretrained(staging_path, safe_serialization=True)
 
     metadata = {
         "edit_type": "lowrank_svd",
@@ -164,7 +170,11 @@ def main(argv: list[str]) -> int:
         "modified_matrices": modified_count,
         "avg_energy_retained": avg_energy,
     }
-    (output_path / "edit_metadata.json").write_text(json.dumps(metadata, indent=2))
+    (staging_path / "edit_metadata.json").write_text(json.dumps(metadata, indent=2))
+
+    if output_path.exists():
+        shutil.rmtree(output_path)
+    staging_path.rename(output_path)
 
     del model
     gc.collect()
