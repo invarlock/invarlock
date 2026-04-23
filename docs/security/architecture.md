@@ -18,6 +18,11 @@ Overview of the core security-related components and defaults.
 - Use `--execution-mode host` on `invarlock evaluate` for public host-side runs, or
   `INVARLOCK_ALLOW_HOST_EXECUTION=1` / `--allow-host-execution` for advanced
   and internal workflows that intentionally bypass that boundary.
+- In a repo checkout, `make container-default-smoke` covers the default
+  container-backed `evaluate` path, while
+  `make container-front-door-smoke` covers the fuller
+  `evaluate -> verify -> report html` journey. `make runtime-smoke` only
+  proves the local runtime image can import its core dependencies.
 - Third-party plugin discovery and remote model code execution are separate
   explicit opt-ins (`INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=1`,
   `INVARLOCK_ALLOW_REMOTE_CODE=1`).

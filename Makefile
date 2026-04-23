@@ -378,6 +378,40 @@ runtime-smoke:  ## Smoke the local container runtime image
 runtime-smoke-podman: CONTAINER_ENGINE=podman
 runtime-smoke-podman: runtime-smoke  ## Smoke the local container runtime image with Podman
 
+container-default-smoke: runtime-image  ## Smoke the default container-backed evaluate path end-to-end
+	$(MAKE) ensure-python
+	INVARLOCK_ALLOW_NETWORK=1 \
+	INVARLOCK_CONTAINER_DEFAULT_SMOKE=1 \
+	INVARLOCK_CONTAINER_ENGINE=$(CONTAINER_ENGINE) \
+	INVARLOCK_RUNTIME_IMAGE=$(RUNTIME_IMAGE) \
+	PYTHONPATH=src $(PYTHON) -m pytest -q tests/integration/test_container_default_smoke.py::test_evaluate_container_default_smoke_with_external_runtime_inputs
+
+container-default-smoke-podman: CONTAINER_ENGINE=podman
+container-default-smoke-podman: runtime-image-podman  ## Smoke the default container-backed evaluate path end-to-end with Podman
+	$(MAKE) ensure-python
+	INVARLOCK_ALLOW_NETWORK=1 \
+	INVARLOCK_CONTAINER_DEFAULT_SMOKE=1 \
+	INVARLOCK_CONTAINER_ENGINE=$(CONTAINER_ENGINE) \
+	INVARLOCK_RUNTIME_IMAGE=$(RUNTIME_IMAGE) \
+	PYTHONPATH=src $(PYTHON) -m pytest -q tests/integration/test_container_default_smoke.py::test_evaluate_container_default_smoke_with_external_runtime_inputs
+
+container-front-door-smoke: runtime-image  ## Smoke the default container-backed evaluate -> verify -> report html journey
+	$(MAKE) ensure-python
+	INVARLOCK_ALLOW_NETWORK=1 \
+	INVARLOCK_CONTAINER_DEFAULT_SMOKE=1 \
+	INVARLOCK_CONTAINER_ENGINE=$(CONTAINER_ENGINE) \
+	INVARLOCK_RUNTIME_IMAGE=$(RUNTIME_IMAGE) \
+	PYTHONPATH=src $(PYTHON) -m pytest -q tests/integration/test_container_default_smoke.py::test_container_default_front_door_smoke_runs_evaluate_verify_and_report_html
+
+container-front-door-smoke-podman: CONTAINER_ENGINE=podman
+container-front-door-smoke-podman: runtime-image-podman  ## Smoke the default container-backed evaluate -> verify -> report html journey with Podman
+	$(MAKE) ensure-python
+	INVARLOCK_ALLOW_NETWORK=1 \
+	INVARLOCK_CONTAINER_DEFAULT_SMOKE=1 \
+	INVARLOCK_CONTAINER_ENGINE=$(CONTAINER_ENGINE) \
+	INVARLOCK_RUNTIME_IMAGE=$(RUNTIME_IMAGE) \
+	PYTHONPATH=src $(PYTHON) -m pytest -q tests/integration/test_container_default_smoke.py::test_container_default_front_door_smoke_runs_evaluate_verify_and_report_html
+
 runtime-smoke-cuda: RUNTIME_IMAGE=$(RUNTIME_IMAGE_CUDA)
 runtime-smoke-cuda: runtime-smoke  ## Smoke the local CUDA container runtime image
 

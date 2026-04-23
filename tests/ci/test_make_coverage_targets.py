@@ -188,6 +188,40 @@ def test_makefile_exposes_front_door_packaging_smoke_target() -> None:
     assert "INVARLOCK_LIGHT_IMPORT=1" not in front_door_block
 
 
+def test_makefile_exposes_container_default_smoke_target() -> None:
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    text = makefile.read_text(encoding="utf-8")
+
+    assert "container-default-smoke:" in text
+    assert "container-default-smoke: runtime-image" in text
+    assert "tests/integration/test_container_default_smoke.py" in text
+    target_block = text.split("container-default-smoke:", 1)[1].split(
+        "container-default-smoke-podman:", 1
+    )[0]
+    assert "INVARLOCK_ALLOW_NETWORK=1" in target_block
+    assert "INVARLOCK_CONTAINER_DEFAULT_SMOKE=1" in target_block
+    assert "INVARLOCK_RUNTIME_IMAGE=$(RUNTIME_IMAGE)" in target_block
+    assert "INVARLOCK_CONTAINER_ENGINE=$(CONTAINER_ENGINE)" in target_block
+
+
+def test_makefile_exposes_container_front_door_smoke_target() -> None:
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    text = makefile.read_text(encoding="utf-8")
+
+    assert "container-front-door-smoke:" in text
+    assert "container-front-door-smoke: runtime-image" in text
+    target_block = text.split("container-front-door-smoke:", 1)[1].split(
+        "container-front-door-smoke-podman:", 1
+    )[0]
+    assert "INVARLOCK_ALLOW_NETWORK=1" in target_block
+    assert "INVARLOCK_CONTAINER_DEFAULT_SMOKE=1" in target_block
+    assert "INVARLOCK_RUNTIME_IMAGE=$(RUNTIME_IMAGE)" in target_block
+    assert (
+        "tests/integration/test_container_default_smoke.py::test_container_default_front_door_smoke_runs_evaluate_verify_and_report_html"
+        in target_block
+    )
+
+
 def test_makefile_exposes_typed_surface_target() -> None:
     makefile = Path(__file__).resolve().parents[2] / "Makefile"
     text = makefile.read_text(encoding="utf-8")

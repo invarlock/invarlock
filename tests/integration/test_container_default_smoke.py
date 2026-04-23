@@ -33,14 +33,8 @@ def _require_manual_container_smoke() -> None:
         pytest.skip(f"runtime image {image!r} is not available locally")
 
 
-def test_evaluate_container_default_smoke_with_external_runtime_inputs(
-    tmp_path: Path,
-) -> None:
-    _require_manual_container_smoke()
-    repo_root = Path(__file__).resolve().parents[2]
-
-    data_file = tmp_path / "smoke.jsonl"
-    data_file.write_text(
+def _write_smoke_dataset(path: Path) -> None:
+    path.write_text(
         "\n".join(
             json.dumps({"text": text})
             for text in [
@@ -53,8 +47,10 @@ def test_evaluate_container_default_smoke_with_external_runtime_inputs(
         + "\n",
         encoding="utf-8",
     )
-    preset_path = tmp_path / "preset.yaml"
-    preset_path.write_text(
+
+
+def _write_smoke_preset(path: Path, data_file: Path) -> None:
+    path.write_text(
         textwrap.dedent(
             f"""
             dataset:
@@ -76,8 +72,10 @@ def test_evaluate_container_default_smoke_with_external_runtime_inputs(
         ),
         encoding="utf-8",
     )
-    edit_path = tmp_path / "edit.yaml"
-    edit_path.write_text(
+
+
+def _write_smoke_edit(path: Path) -> None:
+    path.write_text(
         textwrap.dedent(
             """
             edit:
@@ -94,23 +92,48 @@ def test_evaluate_container_default_smoke_with_external_runtime_inputs(
         ),
         encoding="utf-8",
     )
-    config_root = tmp_path / "config-root"
+
+
+def _write_smoke_profile(config_root: Path) -> None:
     (config_root / "runtime" / "profiles").mkdir(parents=True)
     (config_root / "runtime" / "profiles" / "smoke_ext.yaml").write_text(
         "model:\n  device: cpu\n",
         encoding="utf-8",
     )
-    tmpdir = tmp_path / "tmpdir"
-    tmpdir.mkdir()
-    out_dir = tmp_path / "runs"
-    report_dir = tmp_path / "report"
 
+
+def _build_smoke_env(
+    repo_root: Path, config_root: Path, tmpdir: Path
+) -> dict[str, str]:
     env = dict(os.environ)
     env["PYTHONPATH"] = str(repo_root / "src")
     env["INVARLOCK_ALLOW_NETWORK"] = "1"
     env.pop("INVARLOCK_ALLOW_HOST_EXECUTION", None)
     env["INVARLOCK_CONFIG_ROOT"] = str(config_root)
     env["TMPDIR"] = str(tmpdir)
+    return env
+
+
+def test_evaluate_container_default_smoke_with_external_runtime_inputs(
+    tmp_path: Path,
+) -> None:
+    _require_manual_container_smoke()
+    repo_root = Path(__file__).resolve().parents[2]
+
+    data_file = tmp_path / "smoke.jsonl"
+    _write_smoke_dataset(data_file)
+    preset_path = tmp_path / "preset.yaml"
+    _write_smoke_preset(preset_path, data_file)
+    edit_path = tmp_path / "edit.yaml"
+    _write_smoke_edit(edit_path)
+    config_root = tmp_path / "config-root"
+    _write_smoke_profile(config_root)
+    tmpdir = tmp_path / "tmpdir"
+    tmpdir.mkdir()
+    out_dir = tmp_path / "runs"
+    report_dir = tmp_path / "report"
+
+    env = _build_smoke_env(repo_root, config_root, tmpdir)
 
     proc = subprocess.run(
         [
@@ -149,3 +172,112 @@ def test_evaluate_container_default_smoke_with_external_runtime_inputs(
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert (report_dir / "evaluation.report.json").is_file()
     assert (report_dir / runtime_security.RUNTIME_MANIFEST_FILENAME).is_file()
+
+
+def test_container_default_front_door_smoke_runs_evaluate_verify_and_report_html(
+    tmp_path: Path,
+) -> None:
+    _require_manual_container_smoke()
+    repo_root = Path(__file__).resolve().parents[2]
+
+    data_file = tmp_path / "front-door.jsonl"
+    _write_smoke_dataset(data_file)
+    preset_path = tmp_path / "preset.yaml"
+    _write_smoke_preset(preset_path, data_file)
+    config_root = tmp_path / "config-root"
+    _write_smoke_profile(config_root)
+    tmpdir = tmp_path / "tmpdir"
+    tmpdir.mkdir()
+    out_dir = tmp_path / "runs"
+    report_dir = tmp_path / "report"
+    report_path = report_dir / "evaluation.report.json"
+    html_path = tmp_path / "report.html"
+
+    env = _build_smoke_env(repo_root, config_root, tmpdir)
+
+    evaluate = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "invarlock",
+            "evaluate",
+            "--baseline",
+            "sshleifer/tiny-gpt2",
+            "--subject",
+            "sshleifer/tiny-gpt2",
+            "--adapter",
+            "auto",
+            "--preset",
+            str(preset_path),
+            "--profile",
+            "smoke_ext",
+            "--allow-network",
+            "--device",
+            "cpu",
+            "--out",
+            str(out_dir),
+            "--report-out",
+            str(report_dir),
+            "--quiet",
+            "--no-banner",
+            "--no-progress",
+            "--no-color",
+        ],
+        cwd=repo_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=1800,
+    )
+
+    assert evaluate.returncode == 0, evaluate.stdout + evaluate.stderr
+    assert report_path.is_file()
+    assert (report_dir / runtime_security.RUNTIME_MANIFEST_FILENAME).is_file()
+
+    verify = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "invarlock",
+            "verify",
+            "--json",
+            str(report_path),
+        ],
+        cwd=repo_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=300,
+    )
+
+    assert verify.returncode == 0, verify.stdout + verify.stderr
+    verify_payload = json.loads(verify.stdout.strip().splitlines()[-1])
+    assert verify_payload["format_version"] == "verify-v1"
+    assert verify_payload["summary"]["ok"] is True
+
+    render_html = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "invarlock",
+            "report",
+            "html",
+            "-i",
+            str(report_path),
+            "-o",
+            str(html_path),
+            "--force",
+        ],
+        cwd=repo_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=300,
+    )
+
+    assert render_html.returncode == 0, render_html.stdout + render_html.stderr
+    assert html_path.is_file()
+    assert "<html" in html_path.read_text(encoding="utf-8").lower()

@@ -353,8 +353,11 @@ def _is_model_loading_command(command_tokens: list[str]) -> bool:
 
 
 def _should_skip_line_for_host_mode(stripped: str) -> bool:
-    if stripped.startswith("make runtime-image") or stripped.startswith(
-        "make runtime-smoke"
+    if (
+        stripped.startswith("make runtime-image")
+        or stripped.startswith("make runtime-smoke")
+        or stripped.startswith("make container-default-smoke")
+        or stripped.startswith("make container-front-door-smoke")
     ):
         return True
     if stripped.startswith(("docker ", "podman ")):

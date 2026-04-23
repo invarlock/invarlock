@@ -66,6 +66,13 @@ def test_write_script_rewrites_notebook_shell_commands(tmp_path: Path) -> None:
     assert 'stripped.startswith("make runtime-smoke")' in rendered
 
 
+def test_should_skip_shell_line_for_repo_only_container_targets() -> None:
+    module = _load_script_module()
+
+    assert module._should_skip_shell_line("make container-default-smoke")
+    assert module._should_skip_shell_line("make container-front-door-smoke")
+
+
 def test_write_script_can_skip_curated_model_loading_cells(tmp_path: Path) -> None:
     module = _load_script_module()
     nb_path = tmp_path / "invarlock_policy_tiers.ipynb"

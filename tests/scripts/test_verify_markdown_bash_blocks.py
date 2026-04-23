@@ -143,6 +143,8 @@ def test_sanitize_script_host_mode_skips_container_only_lines() -> None:
             "make runtime-image\n"
             "make runtime-image-podman\n"
             "make runtime-smoke-podman\n"
+            "make container-default-smoke\n"
+            "make container-front-door-smoke\n"
             "test -f reports/eval/runtime.manifest.json\n"
             "docker ps\n"
         ),
@@ -153,6 +155,8 @@ def test_sanitize_script_host_mode_skips_container_only_lines() -> None:
     assert "[skip-host] make runtime-image" in rendered
     assert "[skip-host] make runtime-image-podman" in rendered
     assert "[skip-host] make runtime-smoke-podman" in rendered
+    assert "[skip-host] make container-default-smoke" in rendered
+    assert "[skip-host] make container-front-door-smoke" in rendered
     assert "[skip-host] test -f reports/eval/runtime.manifest.json" in rendered
     assert "[skip-host] docker ps" in rendered
 

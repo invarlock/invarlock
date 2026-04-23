@@ -194,8 +194,11 @@ def _convert_cell(
 
 
 def _should_skip_shell_line(stripped: str) -> bool:
-    if stripped.startswith("make runtime-image") or stripped.startswith(
-        "make runtime-smoke"
+    if (
+        stripped.startswith("make runtime-image")
+        or stripped.startswith("make runtime-smoke")
+        or stripped.startswith("make container-default-smoke")
+        or stripped.startswith("make container-front-door-smoke")
     ):
         return True
     if stripped.startswith(("docker ", "podman ")):

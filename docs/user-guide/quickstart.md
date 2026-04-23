@@ -32,6 +32,12 @@ pip install "invarlock[hf]"
 # Repo checkout only: build the local runtime image once for container-backed runs
 make runtime-image
 
+# Repo checkout only: smoke the default container-backed evaluate journey
+make container-default-smoke
+
+# Repo checkout only: smoke the fuller evaluate -> verify -> report html journey
+make container-front-door-smoke
+
 # Podman users can prepare the same image explicitly with Podman
 make runtime-image-podman
 make runtime-smoke-podman
