@@ -52,8 +52,10 @@ ties the runtime contract back to reproducible maths:
 
 - Applies to inference-only evaluation loops; training/edit algorithms may
   introduce additional nondeterminism not covered here.
-- Identical seeds, configs, and backend should yield bit-for-bit identical
-  reports; any divergence is a bug to report.
+- Identical seeds, configs, and backend should yield identical numeric evidence,
+  pairings, hashes, and policy/provenance digests after normalizing volatile
+  artifact paths and timestamps. Raw report files can differ in generated-time
+  metadata and timestamped run directories.
 - Determinism is best-effort on some backends; enforce `|Δ ratio| ≤ 1e-6` when
   regenerating reports on the **same backend** (see
   `tests/reporting/test_report_paired_ci_identity.py::test_paired_ci_identity_holds`).

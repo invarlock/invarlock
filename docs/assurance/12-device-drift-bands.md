@@ -17,7 +17,11 @@ CPU (e.g., ≤ 0.5% MPS, ≤ 1.0% CUDA).
 | MPS    | within ±0.5%           | Apple Accelerate; deterministic seeds supported |
 | CUDA   | within ±1.0%           | Deterministic algorithms; set `CUBLAS_WORKSPACE_CONFIG`, disable TF32 |
 
-Bands were empirically derived on pilot models and are enforced in CI. Actual values may vary slightly by family/precision; verify on your setup.
+Bands were empirically derived on pilot models. The repo ships and tests
+`scripts/check_device_drift.py`; CI enforces the checker behavior on fixtures,
+while real CPU/MPS/CUDA drift enforcement requires CI or release evidence to
+provide comparable reports from those devices. Actual values may vary slightly
+by family/precision; verify on your setup.
 
 ## Determinism & Setup
 

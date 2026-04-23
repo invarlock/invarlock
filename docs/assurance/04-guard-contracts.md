@@ -23,8 +23,8 @@ calibration data that accompany the InvarLock assurance notes.
 
 | Guard | Inputs | Check & Threshold | Failure behavior | Code reference |
 |-------|--------|-------------------|-------------------|----------------|
-| **Invariants** | Model weights, adapter metadata | Structural invariants (non-finite scan, weight tying, embedding dims, layer norms) | Abort edit if violated before evaluation | `invarlock.guards.invariants` |
-| **Spectral** | 2‑D layer weights (FFN, attention proj, embeddings) | Compute $z = \frac{\hat{s} - \mu_f}{\sigma_f}$ where $\hat{s}$ is an **iterative estimate** of $\sigma_{\max}$ under a fixed measurement contract; require `abs(z) ≤ κ_f` calibrated for ≤5% WARN FPR. Optional degeneracy proxies (stable-rank drift, norm collapse) may add WARN/ABORT depending on policy. | WARN when cap applied; abort if cap would exceed `max_caps` (and for configured fatal degeneracy thresholds). | `invarlock.guards.spectral` |
+| **Invariants** | Model weights, adapter metadata | Fatal invariants (non-finite scan, tokenizer alignment) plus structural checks (weight tying, embedding dims, layer norms) | Fatal invariant types block before evaluation; structural drift warns in monitor mode unless strict/block policy is configured | `invarlock.guards.invariants` |
+| **Spectral** | 2‑D layer weights (FFN, attention proj, embeddings) | Compute $z = \frac{\hat{s} - \mu_f}{\sigma_f}$ where $\hat{s}$ is an **iterative estimate** of $\sigma_{\max}$ under a fixed measurement contract; require `abs(z) ≤ κ_f` under the published family caps. Gaussian-tail FPR applies to calibrated high-kappa families; low sentinel caps are operational thresholds. Optional degeneracy proxies (stable-rank drift, norm collapse) may add WARN/ABORT depending on policy. | WARN when cap applied; abort if cap would exceed `max_caps` (and for configured fatal degeneracy thresholds). | `invarlock.guards.spectral` |
 | **RMT** | Token‑weighted activations (sampled) | Compute a per‑module **edge risk score** $r = \hat{\sigma}_{\max}(A') / \sigma_{\mathrm{MP}}(m,n)$ on whitened activations $A'$ under a fixed measurement contract; accept when baseline‑relative growth stays within the calibrated ε-band per family. | report fails on ε‑band violations; catastrophic spikes in the primary metric are gated separately (`spike_threshold` = 2.0× for ppl‑like metrics). | `invarlock.guards.rmt` |
 | **Variance (VE)** | Paired ΔlogNLL with calibration windows | Enable VE only if the predictive CI upper bound ≤ −`min_effect_lognll` **and** mean Δ ≤ −`min_effect_lognll` (Balanced uses one‑sided CI; Conservative uses two‑sided CI). A CI entirely above +`min_effect_lognll` is treated as regression and VE stays off. | VE disabled, guard records reason; edit continues | `invarlock.guards.variance` |
 | **Bootstrap sanity** | Evaluation windows, token counts | Matching window IDs, zero overlap; BCa replicates ≥ requested | Abort evaluation and surface reason | `invarlock.reporting.report_make` |
@@ -47,17 +47,22 @@ mirror those fields under `resolved_policy.*` and `spectral`/`rmt`/`variance` bl
 
 ### Invariants coverage checklist
 
-The invariants guard fails fast when any of the following hold:
+The invariants guard has default fatal checks and policy-controlled structural
+checks. In default monitor mode, only fatal invariant types block the run:
 
 - **Non-finite tensors:** weights, buffers, or activations contain `NaN`/`Inf`.
 - **Tokenizer alignment:** embedding and output projection dimensions disagree
-  with the tokenizer vocabulary or tied-weight expectations.
+  with the tokenizer vocabulary.
+
+The following invariants are still reported, but default to warnings unless the
+guard is configured with strict mode or `on_fail=block`:
+
 - **Weight tying:** adapters that declare tied weights must expose identical
-  tensors for each alias; mismatches trigger an abort.
+  tensors for each alias.
 - **Shape compatibility:** edited modules preserve expected shapes (e.g.,
   attention head dims, FFN hidden widths) before the pipeline runs evaluation.
-- **Checkpoint hygiene:** missing mandatory tensors (layer norms, positional
-  encodings) abort immediately to prevent undefined behavior.
+- **Checkpoint hygiene/evidence gaps:** missing or drifting structural evidence
+  such as LayerNorm or positional-encoding checks is surfaced for audit.
 
 **Deadband (δ)** provides a z-score buffer that suppresses WARN “flicker” when
 values hover near the cap. For example, if the relative change in a module’s
@@ -74,14 +79,21 @@ both the count and the limit under
 
 - Primary metric (canonical gate in report):
   - ppl-like kinds (ppl_causal, ppl_mlm, ppl_seq2seq): require
-    `ratio_vs_baseline ≤ tier_limit` where tier limits are 1.05 (Conservative),
-    1.10 (Balanced), 1.20 (Aggressive). When a ratio CI is present, the upper
-    bound must also be ≤ the same limit. Gate flag: `validation.primary_metric_acceptable`.
-  - accuracy kinds (accuracy, accuracy): gate on Δ accuracy vs baseline
+    `ratio_vs_baseline ≤ tier_limit + hysteresis_ratio` where base tier limits
+    are 1.05 (Conservative), 1.10 (Balanced), 1.20 (Aggressive). The packaged
+    `tiers.yaml` currently publishes `metrics.pm_ratio.hysteresis_ratio = 0.002`
+    to avoid PASS/FAIL flapping at the boundary. When a ratio CI is present,
+    the upper bound must also be ≤ the effective limit. If the run exceeds the
+    base limit but passes only because of hysteresis, the report marks
+    `validation.hysteresis_applied`. Gate flag:
+    `validation.primary_metric_acceptable`.
+  - accuracy kinds (accuracy): gate on Δ accuracy vs baseline
     (percentage points) with minimum coverage. Defaults (policy‑controlled):
     - Balanced: Δ ≥ −1.0 pp and `n_final ≥ 200`
     - Conservative: Δ ≥ −0.5 pp and `n_final ≥ 200`
     - Aggressive: Δ ≥ −2.0 pp and `n_final ≥ 200`
+    `metrics.accuracy.hysteresis_delta_pp` applies the same boundary-stability
+    logic to the accuracy delta floor.
     Thresholds come from the calibrated tier configuration in the packaged
     `tiers.yaml` (see `metrics.accuracy` for each tier) and are surfaced at
     runtime under `resolved_policy.metrics.accuracy`.
@@ -174,8 +186,9 @@ To reproduce a report:
 2. Record dataset/hash/tokenizer metadata (`invarlock report generate --run <run_report.json> --format json` already saves this).
 3. Capture the seed bundle (`meta.seeds`) and policy digests.
 4. Use `invarlock report generate --run <subject_report.json> --baseline-run-report <baseline_report.json> --format report`
-   to regenerate the report; when seeds, config, and backend match, the
-   resulting report is bit-for-bit identical.
+   to regenerate the report; when seeds, config, and backend match, numeric
+   evidence and provenance fields should match after normalizing volatile
+   artifact paths and timestamps.
 
 Explainers for each field live in [`docs/reference/reports.md`](../reference/reports.md).
 
@@ -198,8 +211,10 @@ python scripts/check_device_drift.py \
   --tolerance 0.005
 ```
 
-The regression lives in `tests/integration/scripts/test_device_drift_linter.py` and is wired
-into CI so any drift beyond the documented band fails fast.
+The regression lives in `tests/integration/scripts/test_device_drift_linter.py`
+and is available for CI/release evidence packs. The repository tests the checker
+on fixtures; real device drift fails fast only when CI or release evidence
+provides comparable CPU/MPS/CUDA reports.
 
 If drift exceeds these bands, re-tune VE thresholds or increase window counts.
 

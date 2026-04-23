@@ -275,9 +275,11 @@ def _sample_reports() -> list[dict[str, Any]]:
             "overhead_ratio": 1.01,
             "overhead_percent": 1.0,
             "overhead_threshold": 0.01,
+            "evaluated": True,
+            "skipped": False,
             "diagnostics": {"mode": "sample"},
         },
-        "invariants": {"stable": True},
+        "invariants": {"stable": True, "status": "pass"},
         "policy_digest": {"thresholds_hash": "thresholds", "changed": False},
         "policy_provenance": {
             "policy_digest": "policy-digest",
@@ -306,6 +308,10 @@ def _sample_reports() -> list[dict[str, Any]]:
         },
         "resolved_policy": {
             "metrics": {
+                "pm_ratio": {
+                    "ratio_limit_base": 1.10,
+                    "hysteresis_ratio": 0.002,
+                },
                 "accuracy": {"min_examples_fraction": 0.01},
             },
             "rmt": {
@@ -364,6 +370,7 @@ def _sample_reports() -> list[dict[str, Any]]:
         "telemetry": {"latency_ms_per_tok": 1.0},
         "validation": {
             "guard_overhead_acceptable": True,
+            "hysteresis_applied": False,
             "invariants_pass": True,
             "preview_final_drift_acceptable": True,
             "primary_metric_acceptable": True,

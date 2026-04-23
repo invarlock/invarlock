@@ -21,6 +21,7 @@ _validate_tokenizer_hash = _impl._validate_tokenizer_hash
 _resolve_path = _impl._resolve_path
 _measurement_contract_digest = _impl._measurement_contract_digest
 _validate_measurement_contracts = _impl._validate_measurement_contracts
+_validate_variance_enablement = _impl._validate_variance_enablement
 _apply_profile_lints = _impl._apply_profile_lints
 _validate_evaluation_report_payload = _impl._validate_evaluation_report_payload
 _report_schema = _impl._report_schema
