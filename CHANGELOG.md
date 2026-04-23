@@ -38,6 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fuller maintainer container journey lane for the recommended default
   runtime path, covering `evaluate -> verify -> report html` on the local
   runtime image.
+- Added explicit first-touch CLI inventory coverage for `invarlock --version`,
+  `invarlock report --help`, and the package-native
+  `invarlock-runtime-verify --help` surface across docs, tests, and smoke
+  lanes.
 
 ### Changed
 - Versioned `invarlock-runtime-verify --json` with
@@ -98,6 +102,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Kept tracked `public_evidence` focused on the true shipped
   `published_basis` fixtures; pre-promotion candidate state is now treated as
   contract/workflow data rather than a tracked staged-evidence subtree.
+- Standardized the shared human-readable CLI output layer across `verify`,
+  `report html`, `advanced policy`, `advanced evidence-pack`,
+  `invarlock-runtime-verify`, and the top-level `doctor` findings and health
+  summaries so status lines, warnings, and detail rows render consistently.
+- Refreshed the `evaluate` first-screen banner and the exported HTML report
+  shell with clearer visual hierarchy, stronger context framing, and
+  dark-mode-aware styling without changing the underlying report content.
 
 ### Fixed
 - Fixed runtime-contract docs and assurance hygiene by teaching the assurance

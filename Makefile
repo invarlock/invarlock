@@ -303,10 +303,13 @@ verify-ruff:  ## Run the Ruff checks used by make verify
 cli-smoke-core:  ## Smoke the simplified core CLI surface
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTHON) -m invarlock --help >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock --version >/dev/null
 	PYTHONPATH=src $(PYTHON) -m invarlock evaluate --help >/dev/null
 	PYTHONPATH=src $(PYTHON) -m invarlock verify --help >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock report --help >/dev/null
 	PYTHONPATH=src $(PYTHON) -m invarlock report html --help >/dev/null
 	PYTHONPATH=src $(PYTHON) -m invarlock doctor --json >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock.cli.runtime_verify --help >/dev/null
 
 cli-smoke-advanced:  ## Smoke the advanced CLI namespace
 	$(MAKE) ensure-python

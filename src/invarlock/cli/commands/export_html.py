@@ -13,9 +13,10 @@ import re
 from pathlib import Path
 
 import typer
-from rich.console import Console
 
-console = Console()
+from invarlock.cli import output as cli_output
+
+console = cli_output.make_console()
 _JSON_INPUT_ERRORS = (OSError, UnicodeDecodeError, json.JSONDecodeError)
 _HTML_RENDER_ERRORS = (AttributeError, ImportError, RuntimeError, TypeError)
 _HTML_OUTPUT_ERRORS = (OSError, UnicodeEncodeError)
@@ -51,27 +52,29 @@ def export_html_command(
     """
     in_path = Path(str(input))
     out_path = Path(str(output))
+    emit = cli_output.make_command_event_emitter(console)
 
     if out_path.exists() and not force:
-        console.print(
-            f"[red]❌ Output file already exists. Use --force to overwrite: {out_path}[/red]"
+        emit("FAIL", "Output file already exists")
+        cli_output.print_command_detail(
+            console, f"Use --force to overwrite: {out_path}"
         )
         raise typer.Exit(1)
 
     try:
         payload = _load_html_payload(in_path)
     except _JSON_INPUT_ERRORS as exc:
-        console.print(f"[red]❌ Failed to read input JSON: {exc}[/red]")
+        emit("FAIL", f"Failed to read input JSON: {exc}")
         raise typer.Exit(1) from exc
 
     try:
         html = _render_html_payload(payload)
     except ValueError as exc:
         # Evaluation report validation failed upstream
-        console.print(f"[red]❌ Evaluation report validation failed: {exc}[/red]")
+        emit("FAIL", f"Evaluation report validation failed: {exc}")
         raise typer.Exit(2) from exc
     except _HTML_RENDER_ERRORS as exc:
-        console.print(f"[red]❌ Failed to render HTML: {exc}[/red]")
+        emit("FAIL", f"Failed to render HTML: {exc}")
         raise typer.Exit(1) from exc
 
     if not embed_css:
@@ -83,10 +86,12 @@ def export_html_command(
     try:
         _write_html_payload(out_path, html)
     except _HTML_OUTPUT_ERRORS as exc:
-        console.print(f"[red]❌ Failed to write output file: {exc}[/red]")
+        emit("FAIL", f"Failed to write output file: {exc}")
         raise typer.Exit(1) from exc
 
-    console.print(f"✅ Exported evaluation report HTML → {out_path}")
+    emit("PASS", "Exported evaluation report HTML")
+    cli_output.print_command_detail(console, f"Input: {in_path}")
+    cli_output.print_command_detail(console, f"Output: {out_path}")
 
 
 __all__ = ["export_html_command"]

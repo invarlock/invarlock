@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import TextIO
@@ -12,6 +12,7 @@ from rich.console import Console
 _STYLE_AUDIT = "audit"
 _STYLE_FRIENDLY = "friendly"
 _VALID_STYLES = {_STYLE_AUDIT, _STYLE_FRIENDLY}
+_DEFAULT_HUMAN_PROFILE = "ci"
 
 
 def _safe_console_print(console: Console, *args: object, **kwargs: object) -> None:
@@ -82,6 +83,16 @@ def resolve_output_style(
     )
 
 
+def resolve_human_output_style(*, no_color: bool = False) -> OutputStyle:
+    return resolve_output_style(
+        style=_STYLE_AUDIT,
+        profile=_DEFAULT_HUMAN_PROFILE,
+        progress=False,
+        timing=False,
+        no_color=no_color,
+    )
+
+
 def make_console(
     *,
     file: TextIO | None = None,
@@ -140,6 +151,65 @@ def print_event(
         elif tag_norm in {"METRIC"}:
             console_style = "cyan"
     _safe_console_print(console, line, style=console_style, markup=False)
+
+
+def print_command_event(
+    console: Console,
+    tag: str,
+    message: str,
+    *,
+    no_color: bool = False,
+    emoji: str | None = None,
+    console_style: str | None = None,
+) -> None:
+    print_event(
+        console,
+        tag,
+        message,
+        style=resolve_human_output_style(no_color=no_color),
+        emoji=emoji,
+        console_style=console_style,
+    )
+
+
+def print_command_detail(
+    console: Console,
+    message: str,
+    *,
+    prefix: str = "  ↳",
+    console_style: str | None = "dim",
+) -> None:
+    _safe_console_print(
+        console,
+        f"{prefix} {str(message or '').rstrip()}".rstrip(),
+        style=console_style,
+        markup=False,
+        soft_wrap=True,
+    )
+
+
+def make_command_event_emitter(
+    console: Console,
+    *,
+    no_color: bool = False,
+) -> Callable[..., None]:
+    def _emit(
+        tag: str,
+        message: str,
+        *,
+        emoji: str | None = None,
+        console_style: str | None = None,
+    ) -> None:
+        print_command_event(
+            console,
+            tag,
+            message,
+            no_color=no_color,
+            emoji=emoji,
+            console_style=console_style,
+        )
+
+    return _emit
 
 
 @contextmanager

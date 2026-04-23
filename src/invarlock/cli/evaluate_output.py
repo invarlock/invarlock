@@ -11,7 +11,9 @@ from pathlib import Path
 from typing import Any
 
 import typer
-from rich.console import Console
+from rich.console import Console, Group
+from rich.panel import Panel
+from rich.text import Text
 
 from invarlock import __version__ as INVARLOCK_VERSION
 from invarlock.runtime_security import (
@@ -34,8 +36,17 @@ def _print_header_banner(
 ) -> None:
     title = f"INVARLOCK v{version} · Evaluation Pipeline"
     context = f"Profile: {profile} · Tier: {tier} · Adapter: {adapter}"
-    for line in _render_banner_lines(title, context):
-        console.print(line)
+    console.print(
+        Panel.fit(
+            Group(
+                Text(title, style="bold"),
+                Text(context, style="dim"),
+            ),
+            border_style="cyan",
+            padding=(0, 1),
+            title="Evaluate",
+        )
+    )
 
 
 def _phase_title(index: int, total: int, title: str) -> str:
@@ -144,19 +155,20 @@ def _print_quiet_summary(
     json_load_fn: Any = json.load,
 ) -> None:
     report_path = report_out / "evaluation.report.json"
+    runtime_manifest_path = report_out / "runtime.manifest.json"
     console.print(f"INVARLOCK v{version} · EVALUATE")
     console.print(f"Baseline: {baseline} -> Subject: {subject} · Profile: {profile}")
     if not report_path.exists():
-        console.print(f"Output: {report_out}")
+        console.print(f"Output: {report_out}", soft_wrap=True)
         return
     try:
         with report_path.open("r", encoding="utf-8") as fh:
             evaluation_report = json_load_fn(fh)
     except (json.JSONDecodeError, OSError, TypeError, ValueError):
-        console.print(f"Output: {report_path}")
+        console.print(f"Output: {report_path}", soft_wrap=True)
         return
     if not isinstance(evaluation_report, dict):
-        console.print(f"Output: {report_path}")
+        console.print(f"Output: {report_path}", soft_wrap=True)
         return
     try:
         from invarlock.reporting.report_console import (
@@ -181,4 +193,6 @@ def _print_quiet_summary(
     console.print(f"Status: {status} · Gates: {gate_summary}")
     if pm_ratio != "N/A":
         console.print(f"Primary metric ratio: {pm_ratio}")
-    console.print(f"Output: {report_path}")
+    console.print(f"Output: {report_path}", soft_wrap=True)
+    if runtime_manifest_path.exists():
+        console.print(f"Runtime provenance: {runtime_manifest_path}", soft_wrap=True)

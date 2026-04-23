@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 
 import typer
-from rich.console import Console
 
+from invarlock.cli import output as cli_output
 from invarlock.cli.constants import (
     EVIDENCE_PACK_BUILD_FORMAT_VERSION,
     EVIDENCE_PACK_INSPECT_FORMAT_VERSION,
@@ -20,7 +20,7 @@ from invarlock.evidence_pack import (
     verify_evidence_pack,
 )
 
-console = Console()
+console = cli_output.make_console()
 evidence_pack_app = typer.Typer(
     help="Build, inspect, and verify evidence-pack artifacts.",
     no_args_is_help=True,
@@ -60,6 +60,7 @@ def verify_command(
         help="Execution profile to use for bundled report verification (dev|ci|release).",
     ),
 ) -> None:
+    emit = cli_output.make_command_event_emitter(console)
     result = verify_evidence_pack(
         Path(pack),
         json_out_path=Path(json_file) if json_file else None,
@@ -75,13 +76,22 @@ def verify_command(
     if json_out:
         typer.echo(json.dumps(payload))
     else:
-        for warning in payload["warnings"]:
-            console.print(f"[yellow]WARNING:[/yellow] {warning}")
+        warnings = payload["warnings"]
+        if warnings:
+            emit(
+                "WARN",
+                f"Evidence pack verification reported {len(warnings)} warning(s)",
+            )
+            for warning in warnings:
+                cli_output.print_command_detail(
+                    console, warning, console_style="yellow"
+                )
         if payload["ok"]:
-            console.print("[green]Evidence pack verified[/green]")
+            emit("PASS", "Evidence pack verified")
         else:
+            emit("FAIL", "Evidence pack verification failed")
             for error in payload["errors"]:
-                console.print(f"[red]ERROR:[/red] {error}")
+                cli_output.print_command_detail(console, error, console_style="red")
     raise typer.Exit(result.status.value)
 
 
@@ -103,6 +113,7 @@ def keygen_command(
         False, "--json", help="Emit machine-readable keygen JSON."
     ),
 ) -> None:
+    emit = cli_output.make_command_event_emitter(console)
     private_key_path = Path(private_key_out)
     public_key_path = (
         Path(public_key_out)
@@ -135,13 +146,20 @@ def keygen_command(
         typer.echo(json.dumps(payload))
     else:
         if payload["ok"]:
-            console.print("[green]Evidence pack signing keypair created[/green]")
-            typer.echo(f"Private key: {payload['private_key']}")
-            typer.echo(f"Public key: {payload['public_key']}")
-            typer.echo(f"Fingerprint: {payload['signing_key_fingerprint']}")
+            emit("PASS", "Evidence pack signing keypair created")
+            cli_output.print_command_detail(
+                console, f"Private key: {payload['private_key']}"
+            )
+            cli_output.print_command_detail(
+                console, f"Public key: {payload['public_key']}"
+            )
+            cli_output.print_command_detail(
+                console, f"Fingerprint: {payload['signing_key_fingerprint']}"
+            )
         else:
+            emit("FAIL", "Evidence pack key generation failed")
             for error in payload["errors"]:
-                console.print(f"[red]ERROR:[/red] {error}")
+                cli_output.print_command_detail(console, error, console_style="red")
     raise typer.Exit(exit_code)
 
 
@@ -155,6 +173,7 @@ def inspect_command(
         False, "--json", help="Emit machine-readable inspection JSON."
     ),
 ) -> None:
+    emit = cli_output.make_command_event_emitter(console)
     result = inspect_evidence_pack(Path(pack))
     payload = {
         "format_version": EVIDENCE_PACK_INSPECT_FORMAT_VERSION,
@@ -165,12 +184,15 @@ def inspect_command(
         typer.echo(json.dumps(payload))
     else:
         if payload["ok"]:
-            console.print("[green]Evidence pack inspected[/green]")
+            emit("PASS", "Evidence pack inspected")
             for issue in payload["issues"]:
-                console.print(f"[yellow]ISSUE:[/yellow] {issue}")
+                cli_output.print_command_detail(
+                    console, issue, prefix="  !", console_style="yellow"
+                )
         else:
+            emit("FAIL", "Evidence pack inspection failed")
             for issue in payload["issues"]:
-                console.print(f"[red]ERROR:[/red] {issue}")
+                cli_output.print_command_detail(console, issue, console_style="red")
     raise typer.Exit(result.status.value)
 
 
@@ -227,6 +249,7 @@ def build_command(
         False, "--json", help="Emit machine-readable build JSON."
     ),
 ) -> None:
+    emit = cli_output.make_command_event_emitter(console)
     errors: list[str] = []
     material_specs: list[tuple[str, Path]] = []
     for material in materials:
@@ -250,8 +273,9 @@ def build_command(
         if json_out:
             typer.echo(json.dumps(payload))
         else:
+            emit("FAIL", "Evidence pack build request is invalid")
             for error in errors:
-                console.print(f"[red]ERROR:[/red] {error}")
+                cli_output.print_command_detail(console, error, console_style="red")
         raise typer.Exit(2)
 
     result = build_evidence_pack(
@@ -273,11 +297,17 @@ def build_command(
     if json_out:
         typer.echo(json.dumps(payload))
     else:
-        for warning in payload["warnings"]:
-            console.print(f"[yellow]WARNING:[/yellow] {warning}")
+        warnings = payload["warnings"]
+        if warnings:
+            emit("WARN", f"Evidence pack build reported {len(warnings)} warning(s)")
+            for warning in warnings:
+                cli_output.print_command_detail(
+                    console, warning, console_style="yellow"
+                )
         if payload["ok"]:
-            console.print("[green]Evidence pack built[/green]")
+            emit("PASS", "Evidence pack built")
         else:
+            emit("FAIL", "Evidence pack build failed")
             for error in payload["errors"]:
-                console.print(f"[red]ERROR:[/red] {error}")
+                cli_output.print_command_detail(console, error, console_style="red")
     raise typer.Exit(result.status.value)
