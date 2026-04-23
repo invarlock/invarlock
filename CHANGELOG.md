@@ -8,26 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Added versioned documentation publishing to GitHub Pages so release docs can
-  live under stable paths such as `/0.8.0/` instead of sending installed users
-  to moving `main` blob URLs.
 
 ### Changed
-- Reworked the public onboarding docs around explicit wheel-user, evaluator,
-  and repo-maintainer entry points, and replaced the repeated report filename
-  caveats with a shared artifact model centered on `evaluation.report.json`.
-- Moved the runtime-manifest verifier onto the main CLI under
-  `invarlock advanced runtime-verify` with the same Typer/Rich-style help and
-  output conventions as the rest of the command surface.
-- Made `invarlock report explain` accept `--evaluation-report` and resolve the
-  linked subject/baseline run reports from bundle provenance when available.
-- Promoted the HTML report from a minimal markdown wrapper to a structured
-  browser surface with summary chips and quick-link navigation.
 
 ### Removed
-- Removed the standalone `invarlock-runtime-verify` console script before it
-  became a supported public entry point; use `invarlock advanced
-  runtime-verify` instead.
 
 ### Fixed
 
@@ -41,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   flows, and default container journeys, including `make docs-live-fast`,
   `make packaging-smoke-front-door`, `make container-default-smoke`, and
   `make container-front-door-smoke` plus Podman siblings where applicable.
+- Added versioned documentation publishing to GitHub Pages so release docs can
+  live under stable paths such as `/0.8.0/` instead of sending installed users
+  to moving `main` blob URLs.
 - Added the `Qwen/Qwen2.5-7B` lane to declared `supported_experimental`
   coverage and expanded the maintained model inventory and evidence-sweep
   surfaces for the promoted set.
@@ -68,6 +55,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   made packaged runtime-profile provenance portable through `runtime/tiers.yaml`.
 - Tightened the installed-wheel, docs-lint, and container maintainer gates
   around the supported public CLI and report paths.
+- Refreshed pinned GitHub Actions for Node and uv setup in the CI, docs, and
+  repo-hygiene workflows.
+- Reworked the public onboarding docs around explicit wheel-user, evaluator,
+  and repo-maintainer entry points, and replaced repeated report filename
+  caveats with a shared artifact model centered on `evaluation.report.json`.
+- Moved the runtime-manifest verifier onto the main CLI under
+  `invarlock advanced runtime-verify` with the same Typer/Rich-style help and
+  output conventions as the rest of the command surface.
+- Made `invarlock report explain` accept `--evaluation-report` and resolve the
+  linked subject/baseline run reports from bundle provenance when available.
+- Promoted the HTML report from a minimal markdown wrapper to a structured
+  browser surface with summary chips and quick-link navigation.
 - Expanded the machine-readable model inventory to distinguish declared
   support, implemented coverage, usage-only checkpoints, and
   promotion-candidate inventories, while keeping tracked `public_evidence`
@@ -79,6 +78,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refreshed the `evaluate` first-screen banner and the exported HTML report
   shell with clearer visual hierarchy, stronger context framing, and
   dark-mode-aware styling without changing the underlying report content.
+
+### Removed
+- Removed the standalone `invarlock-runtime-verify` console script before it
+  became a supported public entry point; use `invarlock advanced
+  runtime-verify` instead.
 
 ### Fixed
 - Fixed the evidence-pack clean-prune contract so the clean pruning lane is now
