@@ -6,8 +6,8 @@ from typing import Any
 
 import typer
 import yaml
-from rich.console import Console
 
+from invarlock.cli import output as cli_output
 from invarlock.cli.constants import POLICY_PACK_VERIFY_FORMAT_VERSION
 from invarlock.policy_pack import (
     build_policy_pack,
@@ -16,7 +16,7 @@ from invarlock.policy_pack import (
     write_policy_pack,
 )
 
-console = Console()
+console = cli_output.make_console()
 policy_app = typer.Typer(help="Build and verify policy-pack artifacts.")
 
 
@@ -60,6 +60,7 @@ def build_command(
         None, "--signature", help="Optional approval signature reference."
     ),
 ) -> None:
+    emit = cli_output.make_command_event_emitter(console)
     resolved_payload = _load_structured_input(resolved_policy)
     if not isinstance(resolved_payload, dict):
         raise typer.BadParameter("--resolved-policy must decode to an object")
@@ -88,7 +89,8 @@ def build_command(
     )
     out_path = Path(out)
     write_policy_pack(out_path, pack)
-    console.print(f"Wrote policy pack: {out_path}")
+    emit("PASS", "Wrote policy pack")
+    cli_output.print_command_detail(console, f"Output: {out_path}")
 
 
 @policy_app.command(
@@ -101,6 +103,7 @@ def verify_command(
         False, "--json", help="Emit machine-readable verification JSON."
     ),
 ) -> None:
+    emit = cli_output.make_command_event_emitter(console)
     payload = load_policy_pack(Path(pack))
     errors = verify_policy_pack(payload)
     exit_code = 0 if not errors else 2
@@ -115,8 +118,9 @@ def verify_command(
         typer.echo(json.dumps(result))
     else:
         if errors:
+            emit("FAIL", "Policy pack verification failed")
             for error in errors:
-                console.print(f"[red]ERROR:[/red] {error}")
+                cli_output.print_command_detail(console, error, console_style="red")
         else:
-            console.print("[green]Policy pack verified[/green]")
+            emit("PASS", "Policy pack verified")
     raise typer.Exit(exit_code)

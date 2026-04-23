@@ -6,6 +6,7 @@ from typer.testing import CliRunner
 
 os.environ["INVARLOCK_LIGHT_IMPORT"] = "1"
 from invarlock.cli.app import app
+from invarlock.cli.runtime_verify import build_parser
 
 
 def test_top_level_help_lists_only_core_and_advanced_commands():
@@ -27,3 +28,21 @@ def test_advanced_help_lists_advanced_commands():
 
     for name in ("evidence-pack", "policy", "plugins", "calibrate"):
         assert re.search(rf"^\s*│\s+{re.escape(name)}\s", out, re.MULTILINE)
+
+
+def test_report_help_lists_report_subcommands() -> None:
+    result = CliRunner().invoke(app, ["report", "--help"])
+    assert result.exit_code == 0
+    out = strip_ansi(result.stdout)
+
+    for name in ("generate", "explain", "html", "validate"):
+        assert re.search(rf"^\s*│\s+{re.escape(name)}\s", out, re.MULTILINE)
+
+
+def test_runtime_verify_parser_help_lists_required_flags() -> None:
+    out = build_parser().format_help()
+
+    assert "runtime.manifest.json companion" in out
+    assert "--report" in out
+    assert "--manifest" in out
+    assert "--json" in out

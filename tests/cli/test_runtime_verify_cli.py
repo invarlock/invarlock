@@ -70,6 +70,8 @@ def test_runtime_verify_cli_plain_failure(
     output = capsys.readouterr().out
 
     assert exit_code == 1
-    assert f"FAIL {tmp_path / 'evaluation.report.json'}" in output
+    assert "Runtime manifest verification failed" in output
+    assert str(tmp_path / "evaluation.report.json") in output
+    assert str(tmp_path / "runtime.manifest.json") in output
     assert "bad digest" in output
     assert "missing runtime" in output

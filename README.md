@@ -143,12 +143,15 @@ Runtime provenance: reports/eval/runtime.manifest.json
 
 ## Command Surface
 
+- First touch in a fresh install: `invarlock --help`, `invarlock --version`,
+  `invarlock report --help`, and `invarlock advanced --help`.
 - Core workflow: `invarlock evaluate` → `invarlock verify` →
   `invarlock report html`.
 - Follow-on report analysis after the core loop: `invarlock report generate`,
   `invarlock report explain`, and `invarlock report validate`.
 - Environment and release checks: `invarlock doctor` plus the JSON surfaces
   emitted by `doctor --json` and `advanced plugins ... --json`.
+- Package-native companion verifier: `invarlock-runtime-verify --report <evaluation.report.json> --manifest <runtime.manifest.json>`.
 - The public contract catalog exposed by those JSON surfaces includes
   `validation_keys`, `console_labels`, and `metric_kinds`.
 - Advanced workflows: `invarlock advanced evidence-pack`, `invarlock advanced policy`,
