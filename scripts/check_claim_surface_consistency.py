@@ -80,7 +80,7 @@ def main() -> int:
             "support tier",
             "coverage state",
             "Declared Support",
-            "<=14B Text Promotion Wave",
+            "<=14B Text Candidate Inventory",
             "Recommended Additions",
         ],
         "docs/assurance/00-assurance-case.md": [

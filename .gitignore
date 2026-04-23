@@ -68,6 +68,7 @@ sitecustomize.py
 /runs/
 /runs_cfg/
 /artifacts/
+/public_evidence/implemented_coverage/
 /guards_evidence.json
 /tmp/
 /tmp_*/
@@ -90,6 +91,7 @@ step_*/
 # Documentation and frontend build outputs
 /site/
 /node_modules/
+/docs/operations/
 /.npm-cache/
 /.npm-prefix/
 npm-debug.log*

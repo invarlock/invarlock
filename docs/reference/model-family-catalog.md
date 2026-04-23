@@ -71,33 +71,31 @@ out of declared support lanes and included preset inventory.
 | Yi 34B | `usage_only` | `01-ai/Yi-34B` | Used in workshop and full evidence-pack suites. |
 | Mixtral 8x7B | `usage_only` | `mistralai/Mixtral-8x7B-v0.1` | Used in evidence-pack flows without a public support lane. |
 
-## <=14B Text Promotion Wave
+## <=14B Text Candidate Inventory
 
-This wave audits ungated text-only Hugging Face families at `<=14B` that are
-visible in repo coverage but still sit outside declared support. Promotion
-still requires the full six-part bar: explicit recognition, a shipped preset,
-a shipped calibration config, targeted tests, CLI smoke evidence, and approved
-calibration/evaluation evidence.
+This section summarizes the contract-tracked `<=14B` text and MLM candidates
+that sit outside, adjacent to, or have recently graduated into declared
+support.
 
-Qwen2.5 7B cleared the full promotion bar in this wave and now moves into
-declared support as `supported_experimental`. The remaining `<=14B` text
-families are either missing shipped lane artifacts or intentionally kept out of
-scope for this pass.
+It is a catalog view, not a run ledger. Exact criterion-by-criterion status and
+decision codes live under `promotion_candidates_text_le_14b` in
+`contracts/model_family_catalog.json`.
 
-| Family | Representative model | Decision | Current state | Notes |
+| Family | Representative model | Promotion status | Catalog location | Notes |
 | --- | --- | --- | --- | --- |
-| Qwen2.5 7B causal LM | `Qwen/Qwen2.5-7B` | `promote_now` | `supported_experimental` | The reduced promotion matrix closes on the shipped preset/config/test/smoke path, so the lane moves into declared support. |
-| OpenLLaMA 7B causal LM | `openlm-research/open_llama_7b` | `blocked_missing_artifacts` | `implemented_coverage` | Recognition and targeted tests exist, and the repo now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing. |
-| Phi-3 Mini 4K Instruct causal LM | `microsoft/Phi-3-mini-4k-instruct` | `explicitly_out_of_scope` | `implemented_coverage` | This wave keeps the public Phi surface at the shipped Phi-4 text-only lane. |
-| Gemma 3 4B IT | `google/gemma-3-4b-it` | `explicitly_out_of_scope` | `implemented_coverage` | The broader Gemma family remains multimodal/audio-capable, so it stays out of this text-only wave. |
-| OPT 1.3B causal LM | `facebook/opt-1.3b` | `blocked_missing_artifacts` | `implemented_coverage` | Shared GPT-style recognition exists, and the repo now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing. |
-| Falcon 7B causal LM | `tiiuae/falcon-7b` | `blocked_missing_artifacts` | `implemented_coverage` | Recognition and targeted variant-path tests exist, and the repo now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing. |
-| GLM 4 9B Chat | `THUDM/glm-4-9b-chat` | `blocked_missing_artifacts` | `implemented_coverage` | Recognition and targeted variant-path tests exist, and the repo now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing. |
-| Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA) | `distilbert-base-uncased` | `blocked_missing_artifacts` | `implemented_coverage` | Loader and adapter tests exist for DistilBERT and DeBERTa, and the repo now ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing. |
-| mBART large 50 seq2seq | `facebook/mbart-large-50` | `explicitly_out_of_scope` | `implemented_coverage` | Generic seq2seq/community lanes are excluded from this text-only wave. |
+| Qwen2.5 7B causal LM | `Qwen/Qwen2.5-7B` | `promote_now` | `supported_experimental` | This candidate already graduated into declared support and remains listed here because the contract tracks the reviewed candidate set. |
+| OpenLLaMA 7B causal LM | `openlm-research/open_llama_7b` | `blocked_missing_artifacts` | `implemented_coverage` | Recognition and targeted tests exist, and the repo ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing. |
+| Phi-3 Mini 4K Instruct causal LM | `microsoft/Phi-3-mini-4k-instruct` | `explicitly_out_of_scope` | `implemented_coverage` | The current declared Phi support surface remains the shipped Phi-4 text-only lane. |
+| Gemma 3 4B IT | `google/gemma-3-4b-it` | `explicitly_out_of_scope` | `implemented_coverage` | The broader Gemma family remains multimodal/audio-capable, so this text-only candidate is not part of the tracked promotion set. |
+| OPT 1.3B causal LM | `facebook/opt-1.3b` | `blocked_missing_artifacts` | `implemented_coverage` | Shared GPT-style recognition exists, and the repo ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing. |
+| Falcon 7B causal LM | `tiiuae/falcon-7b` | `blocked_missing_artifacts` | `implemented_coverage` | Recognition and targeted variant-path tests exist, and the repo ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing. |
+| GLM 4 9B Chat | `THUDM/glm-4-9b-chat` | `blocked_missing_artifacts` | `implemented_coverage` | Recognition and targeted variant-path tests exist, and the repo ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing. |
+| Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA) | `distilbert-base-uncased` | `blocked_missing_artifacts` | `implemented_coverage` | Loader and adapter tests exist for DistilBERT and DeBERTa, and the repo ships a lane preset plus calibration config with dry-run sweep coverage, but approved calibration/evaluation evidence is still missing. |
+| mBART large 50 seq2seq | `facebook/mbart-large-50` | `explicitly_out_of_scope` | `implemented_coverage` | Generic seq2seq and community lanes remain outside this tracked candidate set. |
 
-The machine-readable criterion-by-criterion ledger for this wave lives under
-`promotion_candidates_text_le_14b` in `contracts/model_family_catalog.json`.
+The machine-readable criterion-by-criterion ledger for this candidate set lives
+under `promotion_candidates_text_le_14b` in
+`contracts/model_family_catalog.json`.
 
 ## Recommended Additions
 
