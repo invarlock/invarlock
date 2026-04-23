@@ -19,6 +19,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a dedicated `make packaging-smoke-front-door` maintainer lane that
   installs a wheel in a fresh venv and exercises the real host-mode
   `evaluate -> verify -> report html` path from outside the repo tree.
+- Added the `Qwen/Qwen2.5-7B` lane to declared
+  `supported_experimental` support and expanded the shipped
+  supported-experimental inventory across the support matrix, model-family
+  catalog, and maintained evidence-sweep surfaces.
+- Added repo-ready deferred candidate surfaces for `openlm-research/open_llama_7b`,
+  `facebook/opt-1.3b`, `tiiuae/falcon-7b`, `THUDM/glm-4-9b-chat`, and
+  `distilbert-base-uncased`, including shipped presets/calibration configs,
+  tuned reduced-pack parameters, dry-run sweep coverage, and targeted tests.
+- Added a bounded `scripts/evidence_packs/run_mini_pack_gate.sh` maintainer
+  lane plus remote setup/smoke coverage for narrower recovery and promotion
+  checks on evidence-pack hosts.
+- Added `make container-default-smoke` (and a Podman sibling) as the
+  maintainer user-journey lane for the recommended default
+  container-backed `evaluate` path, instead of relying only on the lighter
+  runtime-image import smoke.
+- Added `make container-front-door-smoke` (and a Podman sibling) as the
+  fuller maintainer container journey lane for the recommended default
+  runtime path, covering `evaluate -> verify -> report html` on the local
+  runtime image.
 
 ### Changed
 - Versioned `invarlock-runtime-verify --json` with
@@ -71,6 +90,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renamed the internal runtime bypass override from `unattested` language to
   `unverified provenance`, including the environment variable,
   helper APIs, and related test coverage.
+- Expanded the machine-readable model inventory in
+  `contracts/model_family_catalog.json` and the maintained evidence-sweep
+  suites so the repo distinguishes declared support, broader implemented
+  coverage, usage-only checkpoints, and promotion-candidate inventories for
+  smaller text and MLM families.
+- Kept tracked `public_evidence` focused on the true shipped
+  `published_basis` fixtures; pre-promotion candidate state is now treated as
+  contract/workflow data rather than a tracked staged-evidence subtree.
 
 ### Fixed
 - Fixed runtime-contract docs and assurance hygiene by teaching the assurance
@@ -94,6 +121,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed transient `tmp/live_examples/.../workspaces` cleanup failures so
   repeated `make docs-live` and markdown smoke runs no longer trip over
   short-lived directory-not-empty races during workspace teardown.
+- Fixed packaging-smoke Python selection so the installed-wheel lanes now ask
+  the shared workspace selector for interpreters that satisfy the same
+  wheel-build requirement used by the helper, instead of stopping early on a
+  repo `.venv` that is version-correct but was previously screened by the
+  wrong capability check.
 - Fixed standalone-product wording across README, docs, live-example tooling,
   and evidence-pack summaries so public guidance no longer frames the OSS repo
   around vague feeder-consumer wording.
@@ -128,6 +160,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   low-rank model creators so tensorized MoE expert weights are edited by the
   intended `all` / `ffn` / `attn` scopes instead of degrading to near-noop
   router-only changes on Mixtral-style models.
+- Fixed evidence-pack artifact creation and reuse around FP8, pruning,
+  quantized, and low-rank edit outputs by making artifact writes atomic,
+  validating edit completeness before reuse, and adding a shared HF causal
+  loader fallback for Ministral-style and other non-standard causal
+  checkpoints.
+- Fixed evidence-pack remote recovery and mini-pack execution on recheck hosts
+  by honoring model-specific queue overrides, normalizing remote repo aliases,
+  tightening scenario-manifest drift checks, and hardening resume/setup smoke
+  coverage.
+- Fixed the shell-harness `python3` stub contract so shell tests that need real
+  helper-script execution must now opt in explicitly instead of silently
+  bypassing new Python-side validation paths.
 
 ## [0.7.2] - 2026-04-15
 
