@@ -179,6 +179,17 @@ def test_docs_workflow_enforces_docs_lint_on_main_and_staging() -> None:
         "README.md",
         "CONTRIBUTING.md",
         "mkdocs.yml",
+        "Makefile",
+        "notebooks/**",
+        "package.json",
+        "package-lock.json",
+        "requirements/workflows/docs-ci-py313.txt",
+        "scripts/docs_check.py",
+        "scripts/docs_lint.py",
+        "scripts/validate_docs_api_refs.py",
+        "scripts/verify_live_examples.py",
+        "scripts/verify_markdown_bash_blocks.py",
+        "scripts/verify_notebooks_smoke.py",
         ".github/workflows/docs-ci.yml",
     ]
     assert triggers["push"]["paths"] == expected_paths
