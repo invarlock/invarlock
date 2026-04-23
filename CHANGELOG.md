@@ -101,7 +101,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refreshed the security-sensitive dependency set used by the validated
   workflow surfaces, including `pytest 9.0.3`, `pillow 12.2.0`, and
   `cryptography 46.0.7`.
-- Resolved code-scanning findings in the evidence-sweep and evidence-pack helper
+- Resolved code-scanning findings in the evidence-sweep and proof-pack helper
   scripts, removed unreachable CLI example logic, and completed the remaining
   ruff cleanup needed for the repository verification gate.
 
@@ -109,7 +109,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Clarified the minimal-install onboarding path and the exact
-  `verify`/`report`/evidence-pack command inputs so wheel-only users can validate
+  `verify`/`report`/proof-pack command inputs so wheel-only users can validate
   artifacts without cloning the repository.
 - Added the released
   `invarlock-<version>-public-contract-bundle.tar.gz` asset, including the
@@ -165,7 +165,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   new assurance model, supply-chain gates, fail-closed report validation, and
   light-import-safe module boundaries.
 - Documented the standalone public contract bundle and the minimal-install
-  verify/report/evidence-pack onboarding path.
+  verify/report/proof-pack onboarding path.
 - Clarified secure-default runtime docs and user-facing guidance to describe an
   OCI container engine requirement first, keep Podman/Docker examples explicit,
   and scope Docker-only language to the local `act` workflow.
@@ -213,7 +213,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reporting, and test owners.
 
 ### Changed
-- Refactored large runtime, reporting, evidence-pack, and test owners into
+- Refactored large runtime, reporting, proof-pack, and test owners into
   smaller modules with tighter shell/core boundaries and clearer ownership.
 - Reorganized the test suite around behavior-based file placement, `_support_*`
   helper modules, and split previously monolithic core/CLI/reporting tests into
@@ -260,7 +260,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `hf_multimodal` adapter, the `vision_text` dataset provider, multimodal
   pairing/provenance wiring, and a Gemma 4 image-text preset plus local demo
   fixtures.
-- Added evidence-pack evidence levels and reviewer summaries to generated
+- Added proof-pack evidence levels and reviewer summaries to generated
   manifests and report outputs so artifact bundles surface review context more
   directly.
 - Added targeted regression coverage for Gemma 4 loading/profile resolution,
@@ -278,7 +278,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Hardened shipped smoke and evidence-sweep helpers around tiny/GPT-2 bootstrap,
   tokenizer loading, smoke follow-ups, markdown example rewriting, and trusted-
   local verification so local and CI command surfaces stay aligned.
-- Tightened evidence-pack remote-setup and shell-harness checks and kept the
+- Tightened proof-pack remote-setup and shell-harness checks and kept the
   support/evidence docs in sync with the post-`v0.5.1` assurance model.
 - Hardened reporting, evaluation, orchestration, and guard helper contracts
   around numeric coercion, fallback validation, retry signaling, iterator
@@ -293,7 +293,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refreshed CLI/reference/user-guide pages, shipped preset comments, and
   notebooks to teach the new assurance UX and the current host verify
   pattern consistently.
-- Documented the evidence-pack reviewer-summary surface and the writable dataset
+- Documented the proof-pack reviewer-summary surface and the writable dataset
   cache fallback path in the relevant reference and user-guide pages.
 - Updated support and dataset docs to document the Gemma 4 E2B pilot lane and
   the new `vision_text` image-text evaluation flow.
@@ -330,27 +330,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   catches are explicitly classified and linted instead of drifting silently.
 - Expanded the coverage-enforcement inventory to include newly split
   implementation owners and helper surfaces as first-class critical files.
-- Added package-native Ed25519 evidence-pack manifest signing, verification, and
-  key-generation flows so signed evidence-pack verification no longer depends on
+- Added package-native Ed25519 proof-pack manifest signing, verification, and
+  key-generation flows so signed proof-pack verification no longer depends on
   host `gpg` tooling.
-- Added stricter evidence-pack remote-setup smoke coverage and higher-level
+- Added stricter proof-pack remote-setup smoke coverage and higher-level
   harness checks around package installation, source provenance, and remote
   validation preflights.
 
 ### Changed
 - Drove a repo-wide hardening and architecture cleanup pass across trust-
-  critical evaluation, runtime provenance, evidence-pack verification,
+  critical evaluation, runtime provenance, proof-pack verification,
   determinism, registry, invariants, run orchestration, and reporting flows.
 - Continued the shell/core split so CLI shells hand policy and owner logic to
   typed core and reporting helpers instead of owning fallback decisions.
 - Decomposed the largest owner modules across runtime security, run
   orchestration, run execution, report building, verification checks, and
-  evidence-pack handling into smaller implementation files with stronger guardrail
+  proof-pack handling into smaller implementation files with stronger guardrail
   coverage.
 - Converged runtime-manifest verification onto a single package-native Python
   path so product provenance, `invarlock-runtime-verify`, and
   `make runtime-verify` all exercise the same verifier implementation.
-- Reworked evidence-pack signing and verification around the same package-native
+- Reworked proof-pack signing and verification around the same package-native
   Ed25519 manifest-signature contract used by the installed CLI and shell
   harnesses.
 - Hardened container smoke and tiny-matrix flows so they rebuild the local
@@ -391,20 +391,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the repo-local Rust runtime verifier crate and the
   `INVARLOCK_RUNTIME_VERIFIER` product override so runtime provenance now has
   a single package-native verifier path.
-- Removed the evidence-pack `gpg` signing and verification path in favor of the
+- Removed the proof-pack `gpg` signing and verification path in favor of the
   package-native Ed25519 manifest-signature flow.
 
 ### Fixed
 - Delegated and containerized evaluation reports now emit container execution
   provenance into their runtime manifests.
-- Runtime provenance and evidence-pack verification now fail closed by default on
+- Runtime provenance and proof-pack verification now fail closed by default on
   artifacts without verified provenance, mutable runtime-image refs without digests, and
-  unsigned or unverifiable evidence-pack manifests unless the explicit unverified-provenance
+  unsigned or unverifiable proof-pack manifests unless the explicit unverified-provenance
   override is set.
 - Runtime provenance now uses the packaged Python runtime-manifest verifier
   directly, removing path-dependent behavior from product verification.
 - Tiny container smoke exports now write to host-writable paths, and unsigned
-  evidence-pack smoke runs use an explicit unverified-provenance override instead of
+  proof-pack smoke runs use an explicit unverified-provenance override instead of
   implicitly depending on legacy behavior.
 - Narrowed active-path broad exception fallbacks across core, guards, and CLI
   flows, and removed the remaining trust-critical broad catches.
@@ -413,7 +413,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tighter repo gates.
 - Fixed release publishing and recovery paths around existing tags and
   dist-only uploads.
-- Evidence-pack maintainer packaging now fails closed when Git-backed source
+- Proof-pack maintainer packaging now fails closed when Git-backed source
   provenance cannot be collected, and explicit `--device cuda` delegation now
   rejects hosts without visible NVIDIA runtime support instead of silently
   dropping GPU passthrough.
@@ -421,7 +421,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runs install the CPU-only torch stack deterministically, reuse writable HF
   caches, and no longer depend on stale local runtime images or host `PATH`
   quirks.
-- Restored 100% evidence-pack shell-harness coverage and fixed warning-path shell
+- Restored 100% proof-pack shell-harness coverage and fixed warning-path shell
   helpers that had been swallowing finalize, evaluate, or verify failures.
 
 ## [0.5.0] - 2026-03-25
@@ -431,19 +431,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   auditing release artifacts without network access.
 - Added public model-family and runtime-manifest contracts, packaged contract
   artifacts in wheels, and contract-sync automation for shipped distributions.
-- Added stronger evidence-pack manifest and provenance tooling, package-native
-  evidence-pack verification, and new evidence-pack `inspect` / `build` command
+- Added stronger proof-pack manifest and provenance tooling, package-native
+  proof-pack verification, and new proof-pack `inspect` / `build` command
   flows for packaged verification artifacts.
 - Added replacement-model support lanes, pilot presets, and automated model
   evidence-sweep tooling/workflows for maintaining shipped support claims.
 
 ### Changed
 - Simplified the public CLI contract around `evaluate`, `verify`, `report`,
-  `doctor`, and `advanced`; evidence-pack, policy, plugin, and calibration flows
+  `doctor`, and `advanced`; proof-pack, policy, plugin, and calibration flows
   now live under the `advanced` namespace, and core trusted-host evaluation now
   uses `--mode local`.
-- Replaced the hidden evidence-pack `_run` shim with a repo-only Python config
-  runner backed by a shared internal config-execution API, so evidence-pack and
+- Replaced the hidden proof-pack `_run` shim with a repo-only Python config
+  runner backed by a shared internal config-execution API, so proof-pack and
   calibration internals no longer depend on a shadow CLI command surface.
 - Tightened evaluate/verify isolation so generated configs stay invocation
   local and policy/coverage recomputation remains aligned with current runs.
@@ -456,7 +456,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactored grouped `make test-*` targets to share a single recipe body, and
   `make verify` now includes `make runtime-verify` so the Rust runtime-manifest
   verifier is exercised as part of the main verification gate.
-- Pinned workflow and evidence-pack helper dependencies into checked-in
+- Pinned workflow and proof-pack helper dependencies into checked-in
   requirements files, and updated CI/release automation to run against the
   configured `setup-python` interpreter with tighter permission scopes.
 - Hardened the exhaustive CLI smoke runner, expanded active eval coverage
@@ -480,17 +480,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   namespace, and added migration notes for the simplified CLI surface.
 - Added a release-verification guide covering the new offline bundle flow and
   refreshed related security best-practice references.
-- Clarified evidence-pack wheel-boundary, scenario, and verification guidance, and
+- Clarified proof-pack wheel-boundary, scenario, and verification guidance, and
   refreshed related CLI, contracts, and adapter reference material.
-- Documented the maintained Qwen2.5-14B evidence-pack sentinels, fresh-worktree
-  remote guidance, and the new secure-default evidence-pack bulk-run defaults.
+- Documented the maintained Qwen2.5-14B proof-pack sentinels, fresh-worktree
+  remote guidance, and the new secure-default proof-pack bulk-run defaults.
 - Updated report-reading/reference docs to match the streamlined Executive
   Summary-first Markdown report layout.
 - Added live execution verification for runnable Markdown examples in the
   maintainer docs workflow, documented the new `docs-live` path plus
   runtime-image prerequisites for repo quickstarts, and kept hosted docs CI on
   the non-live validation path.
-- Documented evidence-pack wheel verification and the nongated replacement backlog
+- Documented proof-pack wheel verification and the nongated replacement backlog
   lanes used for evidence-backed model support planning.
 
 ### Removed
@@ -502,15 +502,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   safer remote-code defaults, plugin catalog/install surfaces, and
   release-profile overhead enforcement.
 - Fixed the CLI runtime-verifier test shim to use the active test interpreter,
-  which keeps nested verify/evidence-pack provenance tests aligned with the
+  which keeps nested verify/proof-pack provenance tests aligned with the
   installed Python environment.
 - Tightened core profiling, security, typing, report-type validation, and local
   model-profile resolution behavior.
-- Evidence-pack scenario, staging, and shell execution flows now honor one-sided
+- Proof-pack scenario, staging, and shell execution flows now honor one-sided
   manifests, pin helper installs, normalize sparse YAML/JSON staged presets,
   use the active Python interpreter, keep no-`jq` paths deterministic, and
   remain portable across hosts.
-- Evidence-pack remote/bulk-run and replay flows now fail fast on missing
+- Proof-pack remote/bulk-run and replay flows now fail fast on missing
   `INVARLOCK_ALLOW_REMOTE_CODE`, default to eager attention plus copied
   baselines for secure-default remote runs, keep bounded queues authoritative,
   log the effective runtime mode, reuse generated checkpoints, and keep
@@ -532,7 +532,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Repaired local runtime evaluation and security-default quickstart flows so
   repo checkouts prefer a locally built runtime image, respect the runtime
   container entrypoint, and document the current `plugins list` CLI form.
-- Fixed remote-evidence launcher Python discovery and aligned evidence-pack nested
+- Fixed remote-evidence launcher Python discovery and aligned proof-pack nested
   verification expectations with the packaged verifier behavior.
 - Hardened ClusterFuzzLite/runtime security integration and policy-pack digest
   verification in fail-closed paths.
@@ -548,7 +548,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Published stable public contracts for support matrices, adapter capabilities,
-  plugin compatibility, evidence-pack manifests, and policy packs, along with new
+  plugin compatibility, proof-pack manifests, and policy packs, along with new
   CLI policy tooling and shipped public evidence fixtures for published-basis
   lanes.
 - Added dataset and RMT provenance to evaluation reports and expanded
@@ -566,7 +566,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   outputs and shipped fixtures.
 - Docs-only CI now runs on `staging/next` and `main`, with markdown and
   spellcheck lint enforced as blocking checks instead of advisory-only steps.
-- Removed legacy CLI/reporting/config surfaces and dropped legacy evidence-pack
+- Removed legacy CLI/reporting/config surfaces and dropped legacy proof-pack
   layout compatibility.
 
 - Added docs spellcheck tooling and pinned repo formatter/build tooling for
@@ -574,7 +574,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bumped GitHub `actions/cache` to v5.
 
 - Renamed and tightened assurance notes, narrowed the public claim surface, and
-  expanded reference docs for contracts, calibration, evidence packs, and policy
+  expanded reference docs for contracts, calibration, proof packs, and policy
   provenance.
 - Refreshed README and test/example wording to match the stabilized
   evaluate/report/verify contract and current repo structure.
@@ -589,7 +589,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Repaired the trusted-publishing workflow pin, enabled idempotent reruns for
   existing version uploads, and updated GitHub Release bundling to accept the
   current Sigstore JSON signing artifacts used by the `v0.4.0` pipeline.
-- Hardened evidence-pack verification to reject stray JSON outputs, use portable
+- Hardened proof-pack verification to reject stray JSON outputs, use portable
   UTC helpers, and keep pack verification behavior fail-closed.
 - Preserved tiny-relax provenance, MLM telemetry, and verify drift parity
   across reporting and CLI flows, and skipped overhead gating during
@@ -632,8 +632,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Plugin detection flow updated to detect AWQ support through the lightweight `awq` module path.
 - Spectral guard handling updated to treat `gate_proj` as an FFN projection in gating paths.
 
-- Release notes and metadata updated for `v0.3.11`.
-
 ### Fixed
 - CLI plugin listing avoids importing AWQ at discovery time.
 - Reporting schema accepts nullable dataset window seeds and structured `system_overhead` payloads.
@@ -642,23 +640,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.10] - 2026-02-08
 
 ### Added
-- Evidence packs: new guard showcase suite and expanded scenario coverage (scenario filtering/errors-only mode, suite-scoped scenarios, and model override support).
-- Evidence packs: new demo/probing artifacts (verdict tables generator, VE `ve_probe` sidecar, and additional RMT/spectral/variance showcase injections).
+- Proof packs: new guard showcase suite and expanded scenario coverage (scenario filtering/errors-only mode, suite-scoped scenarios, and model override support).
+- Proof packs: new demo/probing artifacts (verdict tables generator, VE `ve_probe` sidecar, and additional RMT/spectral/variance showcase injections).
 - CI: add Python 3.12 smoke and scheduled weekly verification.
 
 ### Changed
 - CI: make release/CI verification more reproducible (deterministic `verify-full`) and improve local `act` ergonomics.
 - Docs CI: allow on-demand runs via `workflow_dispatch`.
-- Evidence packs: strengthen “evidence signal” outputs and tighten fail-closed behavior for verdict/task failures.
+- Proof packs: strengthen “evidence signal” outputs and tighten fail-closed behavior for verdict/task failures.
 
-- Evidence packs: harden dependency preflight and net-enabled install behavior (require `huggingface_hub` where needed; ensure `accelerate` is available).
+- Proof packs: harden dependency preflight and net-enabled install behavior (require `huggingface_hub` where needed; ensure `accelerate` is available).
 
 - Docs: fix markdown link fragments.
-- Evidence packs: clarify evidence vs proof-grade posture and document new artifacts (intervention summary + VE probe sidecar).
+- Proof packs: clarify evidence vs proof-grade posture and document new artifacts (intervention summary + VE probe sidecar).
 
 ### Fixed
 - Guards/variance and VE: improve Mixture-of-Experts compatibility (fused expert weight layouts, broader VE layer discovery, and Mixtral `block_sparse_moe` support) and harden variance defaults/probes.
-- Evidence packs: improve reliability and determinism of demos (retuned injections/detectors, more robust packaging of probe sidecars, and safer behavior when reports exist but evaluation exits nonzero).
+- Proof packs: improve reliability and determinism of demos (retuned injections/detectors, more robust packaging of probe sidecars, and safer behavior when reports exist but evaluation exits nonzero).
 - Assurance: close verification/baseline evidence gaps and tighten audit coverage.
 - CLI/eval/tests: stabilize CI help-smoke output, accept extra `load_dataset` kwargs, and allow warn-only determinism.
 
@@ -668,6 +666,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - README: refresh above-the-fold header layout, including a banner-sized logo lockup and centered badges.
 - Branding: make the README logo lockup more logomark-dominant and add a dark-mode logo variant.
 - Branding: logomark-only avatar asset (`docs/assets/invarlock-mark.svg`) for GitHub profile usage.
+- Documentation CI can now be run on demand via `workflow_dispatch`.
 
 ### Fixed
 - CI: update workflow test paths after the report/certificate rename.
@@ -675,7 +674,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI: `invarlock report explain` drift gate now prints the resolved drift band (no hard-coded threshold).
 - CLI: align `invarlock report` “ARTIFACTS” block so artifact paths start in the same column.
 - Observability: CPU health check no longer fails when platform CPU count is unavailable.
-- Evidence packs: config generator can emit configs to stdout without relying on `/dev/stdout`.
+- Proof packs: config generator can emit configs to stdout without relying on `/dev/stdout`.
 - Tests: stabilize the end-to-end pipeline memory management integration test with a PyTorch warm-up.
 - Tests: build-wheel packaging test uses `build --no-isolation` to avoid network in offline environments.
 - Tests: import-safety venv integration test skips cleanly when network is unavailable.
@@ -685,7 +684,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - CLI: `--version` / `-V` flag (alias of `invarlock version`) to print the InvarLock version (plus report schema version when available).
 - `invarlock evaluate` summary now includes total runtime and confidence interval.
-- Evidence packs: `verify_pack.sh --strict` (or `PACK_STRICT_MODE=1`) to fail closed on missing/invalid GPG signatures and unexpected pack contents.
+- Proof packs: `verify_pack.sh --strict` (or `PACK_STRICT_MODE=1`) to fail closed on missing/invalid GPG signatures and unexpected pack contents.
 
 ### Changed
 - **Breaking:** Rename “certificate” → “report” across artifacts, docs, scripts, notebooks, and Python API surfaces.
@@ -693,7 +692,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Config: reject legacy HF v4 load keys `model.torch_dtype`, `model.load_in_8bit`, and `model.load_in_4bit`; use `model.dtype` and/or `model.quantization_config`.
 - Evaluation report bundle filenames updated (JSON: `evaluation.report.json`, Markdown: `evaluation_report.md`).
 - Presets: bump default WikiText-2 dataset seed for the causal LM preset from `42` → `43`.
-- Evidence packs: `manifest.json` records `checksums_sha256_digest` (sha256 of `checksums.sha256`) and may record `signing_key_fingerprint` when signed.
+- Proof packs: `manifest.json` records `checksums_sha256_digest` (sha256 of `checksums.sha256`) and may record `signing_key_fingerprint` when signed.
 
 - Require `transformers>=5.0.0` and `huggingface_hub>=1.0.0`.
 
@@ -707,28 +706,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Adapters: snapshot config serialization no longer emits deprecated attributes.
 - Scripts: CLI example validator ignores internal tool dirs and supports external paths.
 - CLI: keep `invarlock calibrate` import-safe so docs/example validation can run without torch installed.
-- Evidence packs: fix `verify_pack.sh` cert discovery to verify `certs/**/evaluation.report.json`.
-- Evidence packs: close a tamper-evidence gap by binding `checksums.sha256` to the signed manifest (and enforcing “no extra files” in strict verification).
+- Proof packs: fix `verify_pack.sh` cert discovery to verify `certs/**/evaluation.report.json`.
+- Proof packs: close a tamper-evidence gap by binding `checksums.sha256` to the signed manifest (and enforcing “no extra files” in strict verification).
 
 ## [0.3.7] - 2026-01-22
 
 ### Added
 - Role-based HuggingFace adapters with updated auto-routing (replaces model-name adapters).
-- Evidence packs: v2 pack layout, scenarios manifest, and assurance verdict generation.
-- CLI flags: `invarlock run --edit-label` and `invarlock evaluate --baseline-report`.
+- Proof packs: v2 pack layout, scenarios manifest, and assurance verdict generation.
+- CLI flags: `invarlock run --edit-label` and `invarlock certify --baseline-report`.
 - CI notebook smoke runner (`scripts/verify_notebooks_smoke.py`).
+- Task-metric overrides, richer telemetry snapshots/reports, and CLI
+  progress/NO_COLOR output refinements for longer-running evaluation flows.
 
 ### Changed
-- Evidence pack workflows hardened: baseline-report reuse, calibrate-only behavior, tuned-params hygiene, and improved task sizing/memory planning.
-- report reporting refreshed: revamped report markdown, enhanced HTML output + glossary, and “Safety report” renamed to “Evaluation report”.
+- Proof-pack workflows hardened: baseline-report reuse, calibrate-only behavior, tuned-params hygiene, and improved task sizing/memory planning.
+- Evaluation certificate rendering was refreshed with revamped Markdown output,
+  richer HTML/glossary support, and the rename from “Safety Certificate” to
+  “Evaluation Certificate”.
 - Presets/overlays updated for new adapter roles and additional model families.
 - CI: bump `actions/download-artifact` to v7; remove the legacy B200 backend validation harness.
 
-- Expanded and consolidated guides across CLI, configs, datasets, guards, evidence packs, and notebooks.
+- Expanded and consolidated guides across CLI, configs, datasets, guards, proof packs, and notebooks.
 
 ### Fixed
 - Adapters: Mixtral support, improved auto-detection, and hardened causal describe/weight tying.
-- Evidence packs: enforce CI floor constraints, mitigate OOM/missing-tensors cases, and make verification more resilient.
+- Proof packs: enforce CI floor constraints, mitigate OOM/missing-tensors cases, and make verification more resilient.
 - Reporting/eval: avoid duplicate synthetic samples and preserve primary-metric drift band handling.
 
 ## [0.3.6] - 2026-01-13
@@ -737,8 +740,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Measurement contracts for guard estimators (approximation-only, GPU/MPS-first) recorded in reports and enforced by `invarlock verify --profile ci|release`.
 - Evidence pack suite workflow split: `scripts/evidence_packs/run_suite.sh --calibrate-only` (stop after preset generation) and `--run-only` (resume remaining tasks).
 - Evidence pack suite knob for controlled experiments: `PACK_GUARDS_ORDER`.
+- Added the primary-metric tail gate end to end, including runner evaluation,
+  report rendering, and `explain-gates` visibility.
 
 ### Changed
+- Runtime configuration was made canonical and expanded beyond `ci` / `release`
+  presets so profile-driven runs, overlays, and preset paths stay aligned.
 - B200 calibration configs now default to `guards.order: [invariants, variance, invariants]` (drops spectral/rmt) to avoid CPU-bound SVD (`torch.linalg.svdvals` / MKL `sgesdd`) dominating wall time and making GPUs appear idle during calibration.
 - B200 calibrated presets now include `guards.order`, and only include `guards.spectral` / `guards.rmt` sections when those guards are enabled (run a smaller follow-up calibration pass if you need spectral caps or an RMT ε).
 - B200 bootstrap defaults HuggingFace caches under `${OUTPUT_DIR}/.hf` (override with `HF_HOME` / `HF_HUB_CACHE` / `HF_DATASETS_CACHE`) to avoid small `/root` partitions on GPU nodes.
@@ -746,6 +753,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bump katex from 0.16.25 to 0.16.27.
 - Bump markdownlint-cli2 from 0.19.1 to 0.20.0.
+
+### Fixed
+- Fixed calibration and drift-stat edge cases so single-sample statistics and
+  no-overlap calibration runs no longer crash under narrow data conditions.
+- Fixed B200 scheduling and evaluation reliability on constrained GPU hosts,
+  including single-GPU runs, restored edit evaluation flow, and corrected
+  metric parsing for generated reports.
+- Fixed degraded primary-metric and certificate handling so pairing
+  mismatches, non-finite metrics, and degraded verdicts surface correctly
+  through the generated artifacts.
 
 ## [0.3.5] - 2026-01-02
 
