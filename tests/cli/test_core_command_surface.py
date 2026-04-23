@@ -2,11 +2,12 @@ import os
 import re
 
 from click.termui import strip_ansi
+from click.testing import CliRunner as ClickRunner
 from typer.testing import CliRunner
 
 os.environ["INVARLOCK_LIGHT_IMPORT"] = "1"
 from invarlock.cli.app import app
-from invarlock.cli.runtime_verify import build_parser
+from invarlock.cli.runtime_verify import runtime_verify_app
 
 
 def test_top_level_help_lists_only_core_and_advanced_commands():
@@ -26,7 +27,7 @@ def test_advanced_help_lists_advanced_commands():
     assert result.exit_code == 0
     out = strip_ansi(result.stdout)
 
-    for name in ("evidence-pack", "policy", "plugins", "calibrate"):
+    for name in ("evidence-pack", "policy", "plugins", "calibrate", "runtime-verify"):
         assert re.search(rf"^\s*│\s+{re.escape(name)}\s", out, re.MULTILINE)
 
 
@@ -39,9 +40,11 @@ def test_report_help_lists_report_subcommands() -> None:
         assert re.search(rf"^\s*│\s+{re.escape(name)}\s", out, re.MULTILINE)
 
 
-def test_runtime_verify_parser_help_lists_required_flags() -> None:
-    out = build_parser().format_help()
-
+def test_runtime_verify_help_lists_required_flags() -> None:
+    result = ClickRunner().invoke(runtime_verify_app, ["--help"])
+    assert result.exit_code == 0
+    out = strip_ansi(result.stdout)
+    assert "COMMAND [ARGS]..." not in out
     assert "runtime.manifest.json companion" in out
     assert "--report" in out
     assert "--manifest" in out

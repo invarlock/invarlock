@@ -185,7 +185,6 @@ def test_ensure_hf_smoke_dependencies_skips_on_offline_extra_install(
         wheel_path=tmp_path / "dist" / "invarlock.whl",
         python_exe=tmp_path / "venv" / "bin" / "python",
         cli_exe=tmp_path / "venv" / "bin" / "invarlock",
-        runtime_verify_exe=tmp_path / "venv" / "bin" / "invarlock-runtime-verify",
     )
     calls = iter(
         [

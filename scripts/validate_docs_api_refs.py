@@ -99,6 +99,11 @@ def iter_refs(paths: Iterable[Path]) -> list[Ref]:
                 after = line[end] if end < len(line) else ""
                 if before in {'"', "'"} and after in {'"', "'"}:
                     continue
+                # Skip domain names that appear inside URLs, for example
+                # https://invarlock.github.io/... in release docs links.
+                url_context = line[max(0, start - 12) : min(len(line), end + 4)]
+                if "://" in url_context:
+                    continue
                 results.append(Ref(file=str(path), line=i, text=sym))
     return results
 

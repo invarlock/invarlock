@@ -7,7 +7,7 @@
 | **Purpose** | Command-line interface for evaluation, verification, reporting, and advanced maintenance flows. |
 | **Audience** | Operators running InvarLock from a terminal or CI. |
 | **Primary commands** | `evaluate`, `verify`, `report`, `doctor`, `advanced`, `version`. |
-| **Companion entrypoint** | `invarlock-runtime-verify` for direct runtime manifest checks. |
+| **Runtime verifier** | `invarlock advanced runtime-verify` for direct runtime manifest checks. |
 | **Requires** | `invarlock[hf]` for model-loading workflows; extra backends are installed via Python extras. |
 | **Network** | Offline by default; use `evaluate --allow-network` when a run needs model or dataset downloads. |
 | **Source of truth** | `src/invarlock/cli/app.py`, `src/invarlock/cli/commands/*.py`, `src/invarlock/cli/runtime_verify.py`. |
@@ -33,7 +33,7 @@ fresh install or wheel-only environment:
 | `invarlock report --help` | Shows the report subcommands without requiring run artifacts |
 | `invarlock advanced --help` | Lists the advanced maintenance namespace before drilling into subcommands |
 | `invarlock advanced calibrate --help` | Establishes that calibration lives under `advanced` rather than the core loop |
-| `invarlock-runtime-verify --help` | Wheel-native runtime-manifest verification companion for existing report bundles |
+| `invarlock advanced runtime-verify --help` | Wheel-native runtime-manifest verification for existing report bundles |
 
 ## Quick Start
 
@@ -53,9 +53,7 @@ invarlock verify reports/eval/evaluation.report.json
 
 # Render shareable HTML
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
-invarlock report explain \
-  --subject-report runs/subject/report.json \
-  --baseline-report runs/source/report.json
+invarlock report explain --evaluation-report reports/eval/evaluation.report.json
 ```
 
 ## Security Defaults
@@ -75,7 +73,7 @@ invarlock report explain \
 | Compare baseline vs subject | `invarlock evaluate` | `reports/eval/evaluation.report.json` plus `runtime.manifest.json` for container-backed runs |
 | Validate an evaluation report | `invarlock verify` | Exit code plus human or JSON verification output |
 | Render HTML from an evaluation report | `invarlock report html` | HTML file |
-| Explain gate decisions from run reports | `invarlock report explain` | Human-readable explanation |
+| Explain gate decisions from an evaluation bundle or explicit run reports | `invarlock report explain` | Human-readable explanation |
 | Inspect environment health | `invarlock doctor` | Human or JSON diagnostics |
 | Evidence-pack, policy, plugin, or calibration workflows | `invarlock advanced ...` | Advanced artifacts and diagnostics |
 
@@ -86,7 +84,7 @@ invarlock report explain \
 | `invarlock evaluate` | Yes (`--out`, default `runs/`) | Yes (`--report-out`, default `reports/eval`) | Produces the paired evaluation report bundle |
 | `invarlock verify` | No | No | Reads existing evaluation report JSON |
 | `invarlock report html` | No | Yes (`--output`) | Renders HTML from an existing report |
-| `invarlock report explain` | No | No | Reads existing baseline and subject run report JSON files (not evaluation.report.json) |
+| `invarlock report explain` | No | No | Prefers `evaluation.report.json`, then auto-resolves linked run reports; also accepts explicit `--subject-report` and `--baseline-report` |
 | `invarlock doctor` | No | No | Diagnostics only |
 | `invarlock advanced evidence-pack` | Depends on subcommand | Depends on subcommand | Advanced evidence packaging |
 | `invarlock advanced policy` | Depends on subcommand | No | Advanced policy-pack tooling |
@@ -103,7 +101,7 @@ invarlock report explain \
 | `invarlock doctor` | Diagnose environment and configuration issues |
 | `invarlock advanced` | Advanced evidence-pack, policy, plugin, and calibration workflows |
 | `invarlock version` | Show the installed version |
-| `invarlock-runtime-verify` | Verify an evaluation report against its sibling `runtime.manifest.json` |
+| `invarlock advanced runtime-verify` | Verify an evaluation report against its sibling `runtime.manifest.json` |
 
 Exit codes: `0=success`, `1=generic failure`, `2=usage/schema/config failure`,
 `3=hard abort` for profile-aware fail-closed paths.
@@ -135,10 +133,9 @@ Example:
 ```bash
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline gpt2 \
-  --subject /path/to/edited \
+  --subject distilgpt2 \
   --adapter auto \
   --profile ci \
-  --preset configs/presets/causal_lm/wikitext2_512.yaml \
   --report-out reports/eval
 ```
 
@@ -180,16 +177,17 @@ Core subcommands:
   - Render an evaluation report to HTML
   - Options: `-i/--input`, `-o/--output`, `--embed-css`, `--force`
 - `invarlock report explain`
-  - Explain gate decisions from run reports, not the generated evaluation bundle
-  - Explain gates and primary-metric behavior for a subject report versus a
-    baseline report
-  - Options: `--subject-report`, `--baseline-report`
+  - Explain gates and primary-metric behavior from the preferred evaluation
+    bundle input, or from explicit subject/baseline run reports when needed
+  - Options: `--evaluation-report`, `--subject-report`, `--baseline-report`
 - `invarlock report validate`
   - Validate a report JSON against the v1 schema
 - Directory inputs are command-specific:
   - `report generate` and `report explain` accept directories containing
     canonical `report.json`
   - `report html` and `report validate` accept directories containing
+    canonical `evaluation.report.json`
+  - `report explain --evaluation-report` accepts directories containing
     canonical `evaluation.report.json`
   - `verify` accepts directories containing canonical `evaluation.report.json`
     and optional baselines containing canonical `report.json` or
@@ -201,9 +199,10 @@ Example:
 
 ```bash
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
+invarlock report explain --evaluation-report reports/eval/evaluation.report.json
 invarlock report explain \
   --subject-report runs/subject/report.json \
-  --baseline-report runs/source/report.json
+  --baseline-report runs/baseline/report.json
 ```
 
 ## `invarlock doctor`
@@ -275,12 +274,12 @@ pip install "invarlock[awq,gptq]"
 
 Plugin install and uninstall commands are not part of the CLI surface.
 
-## `invarlock-runtime-verify`
+## `invarlock advanced runtime-verify`
 
 Purpose: package-native runtime provenance verification for an existing
 evaluation report and its sibling runtime manifest.
 
-Arguments:
+Common options:
 
 - `--report`: path to `evaluation.report.json`
 - `--manifest`: path to `runtime.manifest.json`
@@ -289,7 +288,7 @@ Arguments:
 Example:
 
 ```bash
-invarlock-runtime-verify \
+invarlock advanced runtime-verify \
   --report reports/eval/evaluation.report.json \
   --manifest reports/eval/runtime.manifest.json
 ```

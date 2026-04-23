@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
-from enum import IntEnum
 from pathlib import Path
 from typing import Any
 
@@ -43,22 +41,8 @@ _derive_evidence_pack_evidence_level = (
 _render_evidence_pack_readme = evidence_pack_metadata_mod._render_evidence_pack_readme
 _CONTROL_FILES = evidence_pack_integrity_mod.CONTROL_FILES
 MANIFEST_SIGNATURE_FILENAME = evidence_pack_integrity_mod.MANIFEST_SIGNATURE_FILENAME
-
-
-class EvidencePackStatus(IntEnum):
-    OK = 0
-    USAGE = 2
-    MISSING = 3
-    FORMAT = 4
-    SIGNATURE = 5
-    INTEGRITY = 6
-    REPORTS = 7
-
-
-@dataclass(frozen=True)
-class EvidencePackResult:
-    payload: dict[str, Any]
-    status: EvidencePackStatus
+EvidencePackStatus = evidence_pack_support_mod.EvidencePackStatus
+EvidencePackResult = evidence_pack_support_mod.EvidencePackResult
 
 
 def _jsonschema_validation_error_types() -> tuple[type[BaseException], ...]:

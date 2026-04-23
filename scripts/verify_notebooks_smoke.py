@@ -84,6 +84,13 @@ _POLICY_TIER_RATIO_LIMITS = {
 }
 
 
+def _preferred_invarlock_python() -> str:
+    workspace_python = ROOT / ".venv" / "bin" / "python"
+    if workspace_python.is_file():
+        return str(workspace_python)
+    return sys.executable
+
+
 def _demo_window_summary(section: dict[str, object]) -> tuple[float, float, int] | None:
     loglosses = section.get("logloss")
     token_counts = section.get("token_counts")
@@ -540,9 +547,14 @@ def write_script(
             "import sys",
             "",
             "",
+            f"REPO_INVARLOCK_PYTHON = {_preferred_invarlock_python()!r}",
             f"HOST_EXECUTION_ENV = {HOST_EXECUTION_ENV!r}",
             f"_INVARLOCK_PREFIX = re.compile({_INVARLOCK_PREFIX.pattern!r})",
             f"_PY_INVARLOCK_PREFIX = re.compile({_PY_INVARLOCK_PREFIX.pattern!r})",
+            "",
+            "",
+            "def _resolve_invarlock_python() -> str:",
+            "    return REPO_INVARLOCK_PYTHON if os.path.isfile(REPO_INVARLOCK_PYTHON) else sys.executable",
             "",
             "",
             "def _normalize_shell_line(line: str) -> str:",
@@ -564,7 +576,7 @@ def write_script(
             "    ):",
             "        return f\"echo '[skip-host] {stripped}'\"",
             "",
-            "    py = shlex.quote(sys.executable)",
+            "    py = shlex.quote(_resolve_invarlock_python())",
             "",
             "    def _replace(match: re.Match[str]) -> str:",
             '        indent = match.group("indent")',

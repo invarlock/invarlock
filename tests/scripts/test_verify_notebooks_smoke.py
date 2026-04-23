@@ -53,7 +53,8 @@ def test_write_script_rewrites_notebook_shell_commands(tmp_path: Path) -> None:
     module.write_script(nb_path=nb_path, out_py=out_py, skip_pip=True)
 
     rendered = out_py.read_text(encoding="utf-8")
-    assert "sys.executable" in rendered
+    assert "REPO_INVARLOCK_PYTHON" in rendered
+    assert "def _resolve_invarlock_python() -> str:" in rendered
     assert 'replacement = f"{indent}{env_prefix}{py} -m invarlock"' in rendered
     assert "return f\"echo '[skip-host] {stripped}'\"" in rendered
     assert "_run_bash('invarlock doctor --json || true')" in rendered

@@ -48,7 +48,6 @@ class InstalledWheelEnv:
     wheel_path: Path
     python_exe: Path
     cli_exe: Path
-    runtime_verify_exe: Path
 
 
 def _python_can_build_wheel(python_exe: Path) -> bool:
@@ -144,11 +143,6 @@ def _create_venv(tmp_path: Path, python_exe: Path) -> tuple[Path, Path, Path]:
         venv_python = env_dir / "bin" / "python"
         cli_exe = env_dir / "bin" / "invarlock"
     return env_dir, venv_python, cli_exe
-
-
-def _sibling_console_script(cli_exe: Path, name: str) -> Path:
-    suffix = cli_exe.suffix if cli_exe.suffix else ""
-    return cli_exe.with_name(f"{name}{suffix}")
 
 
 def _run(
@@ -641,14 +635,11 @@ def installed_wheel_env(tmp_path_factory: pytest.TempPathFactory) -> InstalledWh
     )
     assert install.returncode == 0, install.stdout + install.stderr
 
-    runtime_verify_exe = _sibling_console_script(cli_exe, "invarlock-runtime-verify")
     assert cli_exe.is_file()
-    assert runtime_verify_exe.is_file()
     return InstalledWheelEnv(
         repo_root=repo_root,
         env_dir=env_dir,
         wheel_path=wheel,
         python_exe=python_exe,
         cli_exe=cli_exe,
-        runtime_verify_exe=runtime_verify_exe,
     )

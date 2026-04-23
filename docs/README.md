@@ -19,13 +19,15 @@ running paired evaluation on text workflows plus the included image-text path.
 3. **[Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)** – baseline ↔ subject paired evaluation with guardchain.
 4. **[Primary Metric Smoke](user-guide/primary-metric-smoke.md)** – tiny examples for ppl/accuracy kinds.
 
-### Quick Examples
+### Choose Your Path
+
+- **Wheel user / reviewer**: start with [Quickstart](user-guide/quickstart.md) if you already have an `evaluation.report.json` bundle and want to verify, explain, or render it.
+- **Evaluator**: start with [Getting Started](user-guide/getting-started.md) if you need to run `invarlock evaluate` and produce a fresh evaluation bundle.
+- **Repo maintainer**: use the same user guides first, then reach for repo-only smokes, `configs/`, and local runtime-image flows after the core path is green.
+
+### Quick Example
 
 ```bash
-# Core-only install (no torch/transformers): CLI + config tools
-pip install invarlock
-
-# HF/torch stack for adapter-based flows
 pip install "invarlock[hf]"
 
 # Compare & evaluate (BYOE checkpoints)
@@ -39,33 +41,9 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
 Tip: enable Hub downloads per command when fetching models/datasets:
 `invarlock evaluate --allow-network ...`
 
-Preset sizing note: most repo presets keep small `preview_n` / `final_n` values
-for portable local smokes. Use `--profile ci` or `--profile release` when you
-need balanced-tier evaluations to clear the standard token-floor gates.
-
 Security-default note: `evaluate` uses the runtime container by default. Use
 `--execution-mode host` only for host-side workflows that intentionally bypass that
 boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.
-
-Smoke asset note: `configs/presets/causal_lm/gpt2_smoke_128.yaml` provides the
-small GPT-2 canary preset used by `scripts/run_gpt2_smoke_campaign.sh` and the
-scheduled/workflow-dispatch GPT-2 smoke workflow. Push gating uses
-`scripts/run_tiny_container_smoke.sh` and the `Tiny Container Smoke` workflow
-with `sshleifer/tiny-gpt2` plus a local JSONL fixture. Both smoke paths run
-under the included `dev` profile so they can complete the full `evaluate` →
-`verify` → `report` commands → `evidence-pack` path without depending on release-profile
-floors. The tiny push smoke also uses an explicit host execution override
-for evidence-pack verification when CI produces an unsigned pack; the default
-package-native verifier behavior remains fail-closed for unsigned packs.
-
-Maintainer smoke note: the repo-wide CLI smoke matrix now lives under
-`scripts/cli_exhaustive_smoke.sh`, which dispatches three lanes:
-`scripts/cli_smoke_fast.sh` for broad command-surface and positive-path tiny
-flows, `scripts/cli_smoke_negative.sh` for malformed / policy-fail /
-fail-closed categories, and `scripts/cli_smoke_realistic.sh` for the slower
-GPT-2-sized path. Calibration smoke runs in that matrix use
-`configs/calibration/null_sweep_smoke.yaml` and
-`configs/calibration/rmt_ve_sweep_smoke.yaml`.
 
 ---
 
@@ -148,7 +126,7 @@ to change proposals or releases when you update calibration.
 
 ### Governance
 
-- [Contribution Guidelines](https://github.com/invarlock/invarlock/blob/main/CONTRIBUTING.md)
+- [Contribution Guidelines](https://github.com/invarlock/invarlock/blob/v0.8.0/CONTRIBUTING.md)
 
 ---
 
@@ -369,4 +347,4 @@ Run with `RUN=1` to execute the matrix.
 [CLI Reference](reference/cli.md) ·
 [Primary Metric Smoke](user-guide/primary-metric-smoke.md) ·
 [Example Reports](user-guide/example-reports.md) ·
-[Contributing](https://github.com/invarlock/invarlock/blob/main/CONTRIBUTING.md)
+[Contributing](https://github.com/invarlock/invarlock/blob/v0.8.0/CONTRIBUTING.md)

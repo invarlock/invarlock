@@ -186,8 +186,10 @@ def test_wheel_install_can_verify_report_runtime_and_evidence_pack_outside_repo_
     assert "<html" in html_path.read_text(encoding="utf-8").lower()
 
     runtime_verify = _run(
-        installed_wheel_env.runtime_verify_exe,
+        installed_wheel_env.cli_exe,
         [
+            "advanced",
+            "runtime-verify",
             "--report",
             str(report_path),
             "--manifest",
@@ -258,8 +260,10 @@ def test_wheel_install_runtime_verify_failure_json_outside_repo_tree(
     _write_json(manifest_path, manifest)
 
     result = _run(
-        installed_wheel_env.runtime_verify_exe,
+        installed_wheel_env.cli_exe,
         [
+            "advanced",
+            "runtime-verify",
             "--report",
             str(report_path),
             "--manifest",

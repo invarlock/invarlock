@@ -1,20 +1,20 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from enum import IntEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from invarlock import evidence_pack_integrity as evidence_pack_integrity_mod
 from invarlock import evidence_pack_manifest as evidence_pack_manifest_mod
 from invarlock import evidence_pack_metadata as evidence_pack_metadata_mod
 from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
 
-if TYPE_CHECKING:
-    from invarlock.evidence_pack import EvidencePackResult
-
 EVIDENCE_PACK_FORMAT = evidence_pack_manifest_mod.EVIDENCE_PACK_FORMAT
 _load_json = evidence_pack_manifest_mod._load_json
 _load_json_object = evidence_pack_manifest_mod._load_json_object
 _manual_validate_manifest = evidence_pack_manifest_mod._manual_validate_manifest
+validate_manifest = evidence_pack_manifest_mod.validate_manifest
 _relative_file_paths = evidence_pack_integrity_mod.relative_file_paths
 _write_checksums_file = evidence_pack_integrity_mod.write_checksums_file
 _copy_file = evidence_pack_integrity_mod.copy_file
@@ -37,6 +37,22 @@ _derive_evidence_pack_evidence_level = (
 )
 _CONTROL_FILES = evidence_pack_integrity_mod.CONTROL_FILES
 MANIFEST_SIGNATURE_FILENAME = evidence_pack_integrity_mod.MANIFEST_SIGNATURE_FILENAME
+
+
+class EvidencePackStatus(IntEnum):
+    OK = 0
+    USAGE = 2
+    MISSING = 3
+    FORMAT = 4
+    SIGNATURE = 5
+    INTEGRITY = 6
+    REPORTS = 7
+
+
+@dataclass(frozen=True)
+class EvidencePackResult:
+    payload: dict[str, Any]
+    status: EvidencePackStatus
 
 
 def _collect_build_evidence_pack_errors(
@@ -189,12 +205,6 @@ def _build_evidence_pack_manifest(
 
 
 def inspect_evidence_pack(pack_dir: Path) -> EvidencePackResult:
-    from invarlock.evidence_pack import (
-        EvidencePackResult,
-        EvidencePackStatus,
-        validate_manifest,
-    )
-
     issues: list[str] = []
     payload: dict[str, Any] = {
         "pack": str(pack_dir),

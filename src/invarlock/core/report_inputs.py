@@ -65,6 +65,15 @@ class ReportInputError(ValueError):
                 f"Expected an evaluation report payload, not a run report artifact: "
                 f"{self.path} ({self.detail})"
             )
+        if self.reason == "missing_linked_run_reports":
+            detail = (
+                self.detail
+                or "report provenance does not record both linked run report paths"
+            )
+            return (
+                "Evaluation report bundle does not expose both linked run reports: "
+                f"{self.path} ({detail})"
+            )
         return f"Invalid report input: {self.path}"
 
 
@@ -181,6 +190,77 @@ def load_evaluation_report_input_json(
     return resolved, payload
 
 
+def _resolve_linked_report_path(
+    path_value: object,
+    *,
+    base_dir: Path,
+    bundle_path: Path,
+) -> Path:
+    if not isinstance(path_value, str) or not path_value.strip():
+        raise ReportInputError(
+            "missing_linked_run_reports",
+            bundle_path,
+            detail="expected provenance.edited.report_path and provenance.baseline.report_path",
+        )
+    candidate = Path(path_value).expanduser()
+    if not candidate.is_absolute():
+        candidate = base_dir / candidate
+    resolved = candidate.resolve()
+    if not resolved.exists():
+        raise ReportInputError("not_found", resolved)
+    if not resolved.is_file():
+        raise ReportInputError("non_regular", resolved)
+    return resolved
+
+
+def resolve_run_reports_from_evaluation_input(
+    path_value: str | Path,
+    *,
+    allow_canonical_directory: bool = True,
+) -> tuple[Path, Path, Path]:
+    """Resolve linked subject and baseline run reports from an evaluation bundle."""
+
+    evaluation_path, payload = load_evaluation_report_input_json(
+        path_value,
+        allow_canonical_directory=allow_canonical_directory,
+    )
+    provenance = payload.get("provenance")
+    if not isinstance(provenance, dict):
+        raise ReportInputError(
+            "missing_linked_run_reports",
+            evaluation_path,
+            detail="missing provenance block",
+        )
+    edited = provenance.get("edited")
+    baseline = provenance.get("baseline")
+    if not isinstance(edited, dict) or not isinstance(baseline, dict):
+        raise ReportInputError(
+            "missing_linked_run_reports",
+            evaluation_path,
+            detail="missing provenance.edited or provenance.baseline block",
+        )
+    base_dir = evaluation_path.parent
+    subject_report_path = _resolve_linked_report_path(
+        edited.get("report_path"),
+        base_dir=base_dir,
+        bundle_path=evaluation_path,
+    )
+    baseline_report_path = _resolve_linked_report_path(
+        baseline.get("report_path"),
+        base_dir=base_dir,
+        bundle_path=evaluation_path,
+    )
+    load_run_report_input_json(
+        subject_report_path,
+        allow_canonical_directory=False,
+    )
+    load_run_report_input_json(
+        baseline_report_path,
+        allow_canonical_directory=False,
+    )
+    return evaluation_path, subject_report_path, baseline_report_path
+
+
 __all__ = [
     "CANONICAL_REPORT_FILENAMES",
     "EVALUATION_REPORT_FILENAME",
@@ -189,5 +269,6 @@ __all__ = [
     "load_evaluation_report_input_json",
     "load_report_input_json",
     "load_run_report_input_json",
+    "resolve_run_reports_from_evaluation_input",
     "resolve_report_input_path",
 ]

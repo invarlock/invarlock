@@ -10,6 +10,7 @@ from invarlock.core.report_inputs import (
     ReportInputError,
     load_report_input_json,
     resolve_report_input_path,
+    resolve_run_reports_from_evaluation_input,
 )
 
 
@@ -175,3 +176,114 @@ def test_resolve_report_input_path_rejects_non_regular_fifo(tmp_path: Path) -> N
 
     with pytest.raises(ReportInputError, match="not a regular report file"):
         resolve_report_input_path(fifo)
+
+
+def _write_run_report(path: Path) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "meta": {"seed": 1},
+                "data": {},
+                "edit": {},
+                "guards": [],
+                "metrics": {"primary_metric": {"kind": "ppl_causal", "final": 1.0}},
+                "artifacts": {},
+                "flags": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_resolve_run_reports_from_evaluation_input_rejects_missing_provenance_block(
+    tmp_path: Path,
+) -> None:
+    evaluation_path = tmp_path / "evaluation.report.json"
+    evaluation_path.write_text(
+        json.dumps({"schema_version": "v1", "validation": {}, "provenance": None}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ReportInputError, match="missing provenance block"):
+        resolve_run_reports_from_evaluation_input(evaluation_path)
+
+
+def test_resolve_run_reports_from_evaluation_input_rejects_blank_linked_path(
+    tmp_path: Path,
+) -> None:
+    baseline_report = tmp_path / "baseline-report.json"
+    _write_run_report(baseline_report)
+    evaluation_path = tmp_path / "evaluation.report.json"
+    evaluation_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "v1",
+                "validation": {},
+                "provenance": {
+                    "edited": {"report_path": "   "},
+                    "baseline": {"report_path": str(baseline_report)},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ReportInputError,
+        match="expected provenance.edited.report_path and provenance.baseline.report_path",
+    ):
+        resolve_run_reports_from_evaluation_input(evaluation_path)
+
+
+def test_resolve_run_reports_from_evaluation_input_rejects_missing_linked_report_file(
+    tmp_path: Path,
+) -> None:
+    baseline_report = tmp_path / "baseline-report.json"
+    _write_run_report(baseline_report)
+    missing_report = tmp_path / "missing-report.json"
+    evaluation_path = tmp_path / "evaluation.report.json"
+    evaluation_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "v1",
+                "validation": {},
+                "provenance": {
+                    "edited": {"report_path": str(missing_report)},
+                    "baseline": {"report_path": str(baseline_report)},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ReportInputError, match=f"Path not found: {missing_report}"):
+        resolve_run_reports_from_evaluation_input(evaluation_path)
+
+
+def test_resolve_run_reports_from_evaluation_input_rejects_directory_linked_path(
+    tmp_path: Path,
+) -> None:
+    baseline_report = tmp_path / "baseline-report.json"
+    _write_run_report(baseline_report)
+    report_dir = tmp_path / "subject-dir"
+    report_dir.mkdir()
+    evaluation_path = tmp_path / "evaluation.report.json"
+    evaluation_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "v1",
+                "validation": {},
+                "provenance": {
+                    "edited": {"report_path": str(report_dir)},
+                    "baseline": {"report_path": str(baseline_report)},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ReportInputError,
+        match=f"Path is not a regular report file: {report_dir}",
+    ):
+        resolve_run_reports_from_evaluation_input(evaluation_path)

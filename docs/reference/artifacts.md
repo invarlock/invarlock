@@ -16,16 +16,19 @@
 invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject gpt2 \
-  --preset configs/presets/causal_lm/wikitext2_512.yaml \
   --report-out reports/eval
 
 # Render HTML from the emitted evaluation bundle
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
+invarlock report explain --evaluation-report reports/eval/evaluation.report.json
 ```
 
 Model-loading commands use the runtime container by default unless a
 host-side `invarlock evaluate --execution-mode host` workflow explicitly
 bypasses it.
+
+Repo-owned presets under `configs/` remain available for maintainers, but the
+quick-start path above stays wheel-compatible by using direct flags only.
 
 ## Concepts
 
