@@ -107,6 +107,15 @@ go install github.com/nektos/act@latest
 ```
 
 **Prerequisites**: Docker must be running for this documented `act` flow.
+`make workflow-lint` also requires the CI-pinned `actionlint` binary:
+
+```bash
+go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+```
+
+`make security` runs SBOM generation and `pip-audit` in an isolated `uv`
+security toolchain so it does not add supply-chain tools to the project
+virtual environment.
 
 ### Quick Start
 
@@ -125,6 +134,9 @@ make ci-local-job JOB=supply-chain
 
 # Run pre-commit workflow
 make ci-local-precommit
+
+# Run direct supply-chain security checks
+make security
 
 # Verbose output for debugging
 make ci-local-verbose

@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `make container-front-door-smoke` plus Podman siblings where applicable.
 - Added `make workflow-lint` as a compatibility alias for the GitHub Actions
   workflow lint gate.
+- Added `make security` for local supply-chain SBOM and `pip-audit` checks
+  through an isolated `uv` security toolchain.
 - Added versioned documentation publishing to GitHub Pages so release docs can
   live under stable paths such as `/0.8.0/` instead of sending installed users
   to moving `main` blob URLs.
@@ -118,6 +120,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed release-hygiene drift by marking user-visible Makefile helper targets
   phony, documenting every active `pip-audit` allowlist entry, and aligning the
   workflow docs with the Node.js 22.18+ toolchain contract.
+- Fixed local release-gate ergonomics by documenting the CI-pinned `actionlint`
+  install command used by `make workflow-lint`.
 
 ## [0.7.2] - 2026-04-15
 

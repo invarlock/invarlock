@@ -137,6 +137,7 @@ def test_makefile_exposes_actionlint_and_minimal_packaging_smoke_targets() -> No
     assert "actionlint:" in text
     assert "workflow-lint: actionlint" in text
     assert "command -v actionlint" in text
+    assert "go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7" in text
     assert "actionlint .github/workflows/*.yml" in text
 
     assert "packaging-smoke-minimal:" in text
@@ -260,12 +261,28 @@ def test_makefile_exposes_lockfile_sync_target() -> None:
     assert "UV_NO_CACHE=1 uv lock --check" in text
 
 
+def test_makefile_exposes_isolated_security_gate() -> None:
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    text = makefile.read_text(encoding="utf-8")
+
+    assert "SECURITY_ARTIFACT_DIR ?= artifacts/supply-chain" in text
+    assert "SECURITY_RUN ?= uv run --isolated --locked --extra security-ci" in text
+    assert ".PHONY: security supply-chain-security" in text
+    assert "security: supply-chain-security" in text
+    assert "command -v uv" in text
+    assert "scripts/generate_sbom.sh --scope tool-environment" in text
+    assert "$(SECURITY_ARTIFACT_DIR)/sbom.json" in text
+    assert "python scripts/security/run_pip_audit.py" in text
+
+
 def test_makefile_marks_release_helper_targets_phony() -> None:
     makefile = Path(__file__).resolve().parents[2] / "Makefile"
     text = makefile.read_text(encoding="utf-8")
 
     for target in (
         "workflow-lint",
+        "security",
+        "supply-chain-security",
         "container-default-smoke",
         "container-default-smoke-podman",
         "container-front-door-smoke",

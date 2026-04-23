@@ -322,6 +322,22 @@ def test_ruff_toolchain_pins_are_aligned() -> None:
         assert f"ruff=={ruff_version} \\" in text
 
 
+def test_security_workflow_lxml_pin_is_remediated() -> None:
+    for lockfile in (
+        Path("requirements/workflows/security-ci-py313.txt"),
+        Path("requirements/workflows/release-security-py313.txt"),
+    ):
+        text = lockfile.read_text(encoding="utf-8")
+        match = re.search(r"^lxml==(?P<version>\d+\.\d+\.\d+) \\", text, re.MULTILINE)
+        assert match is not None
+        assert match.group("version") == "6.1.0"
+        assert "lxml==6.0.2" not in text
+
+    uv_lock = Path("uv.lock").read_text(encoding="utf-8")
+    assert 'name = "lxml"\nversion = "6.1.0"' in uv_lock
+    assert 'name = "lxml"\nversion = "6.0.2"' not in uv_lock
+
+
 def test_codeowners_protect_security_control_surfaces() -> None:
     codeowners = Path(".github/CODEOWNERS").read_text(encoding="utf-8")
 

@@ -18,6 +18,8 @@ RUNTIME_IMAGE_CUDA ?= invarlock-runtime:cuda-local
 RUNTIME_IMAGE_CUDA_REQUIREMENTS ?= requirements/workflows/runtime-image-py312-cu128.txt
 RUNTIME_IMAGE_CUDA_INDEX_URL ?= https://download.pytorch.org/whl/cu128
 RUNTIME_IMAGE_DIGEST ?= sha256:local-runtime-image
+SECURITY_ARTIFACT_DIR ?= artifacts/supply-chain
+SECURITY_RUN ?= uv run --isolated --locked --extra security-ci
 COVERAGE_POLICY := $(PYTHON) scripts/coverage_policy.py
 
 # Keep repo-wide coverage practical while still exercising the CLI command
@@ -331,12 +333,24 @@ cli-smoke-advanced:  ## Smoke the advanced CLI namespace
 
 actionlint:  ## Lint GitHub Actions workflow files
 	@command -v actionlint >/dev/null 2>&1 || { \
-		echo "❌ actionlint is required but not installed; add it to PATH first."; \
+		echo "❌ actionlint is required but not installed; install the CI-pinned tool with:"; \
+		echo "   go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7"; \
 		exit 1; \
 	}
 	actionlint .github/workflows/*.yml
 
 workflow-lint: actionlint  ## Compatibility alias for GitHub Actions workflow linting
+
+.PHONY: security supply-chain-security
+security: supply-chain-security  ## Run the local supply-chain security gate
+
+supply-chain-security:  ## Run SBOM generation and pip-audit in an isolated uv security toolchain
+	@command -v uv >/dev/null 2>&1 || { \
+		echo "❌ uv is required to run the isolated security toolchain."; \
+		exit 1; \
+	}
+	$(SECURITY_RUN) bash -c 'scripts/generate_sbom.sh --scope tool-environment --python "$$(command -v python)" "$(SECURITY_ARTIFACT_DIR)/sbom.json"'
+	$(SECURITY_RUN) python scripts/security/run_pip_audit.py
 
 packaging-smoke-minimal:  ## Smoke the minimal wheel install around the public contract and evidence-pack verify path
 	$(MAKE) ensure-python
