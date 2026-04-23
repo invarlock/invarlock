@@ -1,5 +1,6 @@
 import json
 import re
+import tomllib
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -277,17 +278,48 @@ def test_generate_sbom_script_exists():
 def test_pip_audit_allowlist_is_owned_and_time_boxed() -> None:
     allowlist_path = Path("scripts/security/pip_audit_allowlist.json")
     payload = json.loads(allowlist_path.read_text(encoding="utf-8"))
+    allowlist_doc = Path("docs/security/pip-audit-allowlist.md").read_text(
+        encoding="utf-8"
+    )
 
     assert payload["owner"] == "security-maintainers"
     assert payload["entries"]
 
-    entry = payload["entries"][0]
-    assert entry["advisory"] == "GHSA-4xh5-x5gv-qwph"
-    assert entry["owner"] == "security-maintainers"
-    expires = date.fromisoformat(entry["expires"])
-    assert 0 <= (expires - date.today()).days <= 30
-    assert entry["tracking_issue"] == "https://github.com/pypa/pip/issues/13607"
-    assert "reason" in entry
+    expected_tracking = {
+        "GHSA-4xh5-x5gv-qwph": "https://github.com/pypa/pip/issues/13607",
+        "CVE-2026-1703": "https://github.com/pypa/pip/issues/13641",
+    }
+    assert {entry["advisory"] for entry in payload["entries"]} == set(expected_tracking)
+
+    for entry in payload["entries"]:
+        advisory = entry["advisory"]
+        assert entry["owner"] == "security-maintainers"
+        expires = date.fromisoformat(entry["expires"])
+        assert 0 <= (expires - date.today()).days <= 30
+        assert entry["tracking_issue"] == expected_tracking[advisory]
+        assert "reason" in entry
+        assert f"`{advisory}`" in allowlist_doc
+        assert entry["expires"] in allowlist_doc
+        assert entry["tracking_issue"] in allowlist_doc
+
+
+def test_ruff_toolchain_pins_are_aligned() -> None:
+    pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+    ci_deps = pyproject["project"]["optional-dependencies"]["ci"]
+    ruff_pin = next(dep for dep in ci_deps if dep.startswith("ruff=="))
+    ruff_version = ruff_pin.removeprefix("ruff==")
+
+    precommit_config = Path(".pre-commit-config.yaml").read_text(encoding="utf-8")
+    assert f"rev: v{ruff_version}" in precommit_config
+
+    for lockfile in (
+        Path("requirements/workflows/ci-hf-py312.txt"),
+        Path("requirements/workflows/ci-hf-py313.txt"),
+        Path("requirements/workflows/docs-ci-py313.txt"),
+        Path("requirements/workflows/assurance-ci-py313.txt"),
+    ):
+        text = lockfile.read_text(encoding="utf-8")
+        assert f"ruff=={ruff_version} \\" in text
 
 
 def test_codeowners_protect_security_control_surfaces() -> None:

@@ -135,6 +135,7 @@ def test_makefile_exposes_actionlint_and_minimal_packaging_smoke_targets() -> No
     text = makefile.read_text(encoding="utf-8")
 
     assert "actionlint:" in text
+    assert "workflow-lint: actionlint" in text
     assert "command -v actionlint" in text
     assert "actionlint .github/workflows/*.yml" in text
 
@@ -192,6 +193,7 @@ def test_makefile_exposes_container_default_smoke_target() -> None:
     makefile = Path(__file__).resolve().parents[2] / "Makefile"
     text = makefile.read_text(encoding="utf-8")
 
+    assert ".PHONY: container-default-smoke container-default-smoke-podman" in text
     assert "container-default-smoke:" in text
     assert "container-default-smoke: runtime-image" in text
     assert "tests/integration/test_container_default_smoke.py" in text
@@ -208,6 +210,7 @@ def test_makefile_exposes_container_front_door_smoke_target() -> None:
     makefile = Path(__file__).resolve().parents[2] / "Makefile"
     text = makefile.read_text(encoding="utf-8")
 
+    assert "container-front-door-smoke container-front-door-smoke-podman" in text
     assert "container-front-door-smoke:" in text
     assert "container-front-door-smoke: runtime-image" in text
     target_block = text.split("container-front-door-smoke:", 1)[1].split(
@@ -255,6 +258,27 @@ def test_makefile_exposes_lockfile_sync_target() -> None:
 
     assert "lock-sync:" in text
     assert "UV_NO_CACHE=1 uv lock --check" in text
+
+
+def test_makefile_marks_release_helper_targets_phony() -> None:
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    text = makefile.read_text(encoding="utf-8")
+
+    for target in (
+        "workflow-lint",
+        "container-default-smoke",
+        "container-default-smoke-podman",
+        "container-front-door-smoke",
+        "container-front-door-smoke-podman",
+        "ci-matrix",
+        "eval-loop",
+        "ci-local-precommit",
+        "ci-local-verbose",
+    ):
+        assert target in text
+
+    assert ".PHONY: ci-matrix eval-loop" in text
+    assert ".PHONY: ci-local-precommit ci-local-verbose" in text
 
 
 def test_makefile_prefers_workspace_python_selector_for_local_targets() -> None:

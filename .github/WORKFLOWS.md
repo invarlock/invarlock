@@ -88,7 +88,7 @@ If workflows fail with "config file not found" errors, check that the referenced
 
 ### Python/Node.js Version
 
-All workflows use Python 3.12+ and Node.js 18 where needed. Ensure your self-hosted runners have these versions available.
+All workflows use Python 3.12+ and Node.js 22.18+ where needed. Ensure your self-hosted runners have these versions available.
 
 ## Running CI Locally with `act`
 

@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync repo-cruft-check model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-verify actionlint packaging-smoke-minimal packaging-smoke-front-door ensure-mypy
+.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync repo-cruft-check model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-verify actionlint workflow-lint packaging-smoke-minimal packaging-smoke-front-door ensure-mypy
 
 PYTHON ?= $(shell bash scripts/select_workspace_python.sh)
 PIP := $(PYTHON) -m pip
@@ -336,6 +336,8 @@ actionlint:  ## Lint GitHub Actions workflow files
 	}
 	actionlint .github/workflows/*.yml
 
+workflow-lint: actionlint  ## Compatibility alias for GitHub Actions workflow linting
+
 packaging-smoke-minimal:  ## Smoke the minimal wheel install around the public contract and evidence-pack verify path
 	$(MAKE) ensure-python
 	@PYTHON="$$(if [ -x .venv/bin/python ]; then printf '%s' .venv/bin/python; else printf '%s' "$(PYTHON)"; fi)"; \
@@ -391,6 +393,7 @@ runtime-smoke:  ## Smoke the local container runtime image
 runtime-smoke-podman: CONTAINER_ENGINE=podman
 runtime-smoke-podman: runtime-smoke  ## Smoke the local container runtime image with Podman
 
+.PHONY: container-default-smoke container-default-smoke-podman container-front-door-smoke container-front-door-smoke-podman
 container-default-smoke: runtime-image  ## Smoke the default container-backed evaluate path end-to-end
 	$(MAKE) ensure-python
 	INVARLOCK_ALLOW_NETWORK=1 \
@@ -497,6 +500,7 @@ docs-ci:  ## Build documentation and run link checker
 ## (Consolidated) Single docs-serve target defined above
 
 ##@ Evaluation
+.PHONY: ci-matrix eval-loop
 eval-loop:  ## Run automated evaluation loop (baseline + quant8 quickstart)
 	@echo "Running automated evaluation workflow..."
 	@rm -rf runs/eval_loop reports/eval/eval_loop
@@ -629,6 +633,7 @@ ci-local-dry:  ## Dry-run CI locally (no execution, just shows plan)
 	@command -v act >/dev/null 2>&1 || { echo "❌ 'act' not found. Install: brew install act"; exit 1; }
 	act push --dryrun
 
+.PHONY: ci-local-precommit ci-local-verbose
 ci-local-precommit:  ## Run pre-commit workflow locally
 	@command -v act >/dev/null 2>&1 || { echo "❌ 'act' not found. Install: brew install act"; exit 1; }
 	act push --workflows .github/workflows/pre-commit.yml

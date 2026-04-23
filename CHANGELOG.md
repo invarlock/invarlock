@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   flows, and default container journeys, including `make docs-live-fast`,
   `make packaging-smoke-front-door`, `make container-default-smoke`, and
   `make container-front-door-smoke` plus Podman siblings where applicable.
+- Added `make workflow-lint` as a compatibility alias for the GitHub Actions
+  workflow lint gate.
 - Added versioned documentation publishing to GitHub Pages so release docs can
   live under stable paths such as `/0.8.0/` instead of sending installed users
   to moving `main` blob URLs.
@@ -57,6 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   around the supported public CLI and report paths.
 - Refreshed pinned GitHub Actions for Node and uv setup in the CI, docs, and
   repo-hygiene workflows.
+- Aligned Ruff pins across `pyproject.toml`, workflow lockfiles, and the
+  pre-commit hook so local and CI lint formatting use the same Ruff release.
 - Reworked the public onboarding docs around explicit wheel-user, evaluator,
   and repo-maintainer entry points, and replaced repeated report filename
   caveats with a shared artifact model centered on `evaluation.report.json`.
@@ -111,6 +115,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed shell-harness and maintainer-surface drift by tightening the `python3`
   stub contract, pruning stale ignore/lint/deep-clean paths, and cleaning up
   remaining public runtime-provenance wording and standalone-product phrasing.
+- Fixed release-hygiene drift by marking user-visible Makefile helper targets
+  phony, documenting every active `pip-audit` allowlist entry, and aligning the
+  workflow docs with the Node.js 22.18+ toolchain contract.
 
 ## [0.7.2] - 2026-04-15
 

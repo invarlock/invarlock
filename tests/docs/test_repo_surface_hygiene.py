@@ -122,3 +122,7 @@ def test_docs_node_toolchain_contract_is_explicit_and_ci_aligned() -> None:
     contributing = _read("CONTRIBUTING.md")
     assert "Node.js 22.18+ + npm" in contributing
     assert "npm ci` will fail early on older versions" in contributing
+
+    workflows_doc = _read(".github/WORKFLOWS.md")
+    assert "Node.js 22.18+" in workflows_doc
+    assert "Node.js 18" not in workflows_doc
