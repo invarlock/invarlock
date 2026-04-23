@@ -896,9 +896,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - BNB 8-bit model loading error when subject is a saved quantized checkpoint
 - Empty sample handling in variance guard (`_safe_mean()` helper)
 
+## Pre-public and import history
+
+The published release history begins at `v0.2.0`, but the repository does not contain a tagged `v0.1.0`. Git history shows two separate `feat: initial public import` roots on December 1, 2025: `v0.2.0` is a standalone one-commit public snapshot, while the continuing release line that leads to `v0.3.0` and later starts from a separate public-import root. Earlier internal development therefore exists only as pre-public foundation and is not represented here as a published semver release.
+
 ## [0.2.0] - 2025-12-01
 
-First public release on GitHub and PyPI.
+First public GitHub and PyPI release snapshot.
 
 ### Added
 - Core compare & evaluate pipeline and guard chain for edit‑agnostic robustness reports.
@@ -907,5 +911,4 @@ First public release on GitHub and PyPI.
 - Initial documentation set: quickstart, user guides, and CLI reference.
 
 ### Changed
-- 0.2.0 is the first public version of the InvarLock framework.
 - Until 1.0.0, **minor** releases (0.x.y → 0.(x+1).0) may include breaking changes. Refer to the README and CLI help for the current surface and behavior.
