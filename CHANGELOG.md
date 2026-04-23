@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a bounded `scripts/evidence_packs/run_mini_pack_gate.sh` maintainer
   lane plus remote setup/smoke coverage for narrower evidence-pack recovery
   and promotion checks.
+- Added explicit first-touch CLI inventory coverage for `invarlock --version`,
+  `invarlock report --help`, and the package-native
+  `invarlock-runtime-verify --help` surface across docs, tests, and smoke
+  lanes.
 
 ### Changed
 - Replaced the old assurance toggle with explicit
@@ -54,6 +58,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   support, implemented coverage, usage-only checkpoints, and
   promotion-candidate inventories, while keeping tracked `public_evidence`
   limited to shipped published-basis fixtures.
+- Standardized the shared human-readable CLI output layer across `verify`,
+  `report html`, `advanced policy`, `advanced evidence-pack`,
+  `invarlock-runtime-verify`, and the top-level `doctor` findings and health
+  summaries so status lines, warnings, and detail rows render consistently.
+- Refreshed the `evaluate` first-screen banner and the exported HTML report
+  shell with clearer visual hierarchy, stronger context framing, and
+  dark-mode-aware styling without changing the underlying report content.
 
 ### Fixed
 - Fixed the evidence-pack clean-prune contract so the clean pruning lane is now

@@ -280,7 +280,7 @@ def test_evidence_pack_verify_human_success(monkeypatch, tmp_path: Path) -> None
     )
 
     assert result.exit_code == 0, result.output
-    assert "WARNING:" in result.output
+    assert "warning(s)" in result.output
     assert "Evidence pack verified" in result.output
 
 
@@ -310,7 +310,7 @@ def test_evidence_pack_verify_human_failure_renders_errors(
     )
 
     assert result.exit_code == 6, result.output
-    assert "ERROR:" in result.output
+    assert "Evidence pack verification failed" in result.output
     assert "bad pack" in result.output
 
 
@@ -382,7 +382,7 @@ def test_evidence_pack_verify_human_failure(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 3
-    assert "ERROR:" in result.output
+    assert "Evidence pack verification failed" in result.output
     assert "Pack directory not found" in result.output
 
 
@@ -436,7 +436,7 @@ def test_evidence_pack_inspect_human_success_and_failure(
     )
     assert result.exit_code == 0, result.output
     assert "Evidence pack inspected" in result.output
-    assert "ISSUE:" in result.output
+    assert "unsigned" in result.output
 
     monkeypatch.setattr(
         "invarlock.cli.commands.evidence_pack.inspect_evidence_pack",
@@ -454,7 +454,7 @@ def test_evidence_pack_inspect_human_success_and_failure(
         app, ["advanced", "evidence-pack", "inspect", str(pack_dir)]
     )
     assert result.exit_code == 4, result.output
-    assert "ERROR:" in result.output
+    assert "Evidence pack inspection failed" in result.output
     assert "missing manifest" in result.output
 
 
@@ -617,6 +617,7 @@ def test_evidence_pack_keygen_console_paths_cover_success_and_existing_key(
         ["advanced", "evidence-pack", "keygen", str(private_key)],
     )
     assert existing.exit_code == 2, existing.output
+    assert "Evidence pack key generation failed" in existing.output
     assert "private key output already exists" in existing.output
 
 
@@ -722,7 +723,7 @@ def test_evidence_pack_build_human_success_and_failure(
         ],
     )
     assert result.exit_code == 0, result.output
-    assert "WARNING:" in result.output
+    assert "warning(s)" in result.output
     assert "Evidence pack built" in result.output
 
     monkeypatch.setattr(
@@ -755,5 +756,5 @@ def test_evidence_pack_build_human_success_and_failure(
         ],
     )
     assert result.exit_code == 7, result.output
-    assert "ERROR:" in result.output
+    assert "Evidence pack build failed" in result.output
     assert "build failed" in result.output

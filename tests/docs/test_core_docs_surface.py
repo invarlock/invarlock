@@ -25,6 +25,21 @@ def test_core_docs_promote_evaluate_verify_report_html():
         assert "report html" in text
 
 
+def test_readme_and_cli_reference_cover_first_touch_and_companion_cli_surfaces():
+    readme = _read("README.md")
+    cli_ref = _read("docs/reference/cli.md")
+
+    assert "invarlock --help" in readme
+    assert "invarlock --version" in readme
+    assert "invarlock report --help" in readme
+    assert "invarlock advanced --help" in readme
+    assert "invarlock-runtime-verify" in readme
+
+    assert "First-Touch Surfaces" in cli_ref
+    assert "invarlock advanced calibrate --help" in cli_ref
+    assert "invarlock-runtime-verify --help" in cli_ref
+
+
 def test_core_docs_do_not_promote_removed_top_level_commands():
     surfaces = [
         "README.md",

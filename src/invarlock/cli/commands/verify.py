@@ -12,8 +12,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from rich.console import Console
-
 from invarlock.exit_codes import resolve_command_exit_code
 
 from ...reporting.verify_contract import (
@@ -22,9 +20,10 @@ from ...reporting.verify_contract import (
     VerifyOutcome,
     run_verify_reports,
 )
+from .. import output as cli_output
 from .._json import emit as _emit_json
 
-console = Console()
+console = cli_output.make_console()
 
 
 def _allow_unverified_provenance_for_runtime_provenance(
@@ -42,21 +41,21 @@ def _render_verify_diagnostic(diagnostic: VerifyDiagnostic) -> None:
     level = str(diagnostic.level or "").lower()
     message = diagnostic.message
     if level == "pass":
-        console.print(f"[green]PASS[/green] {message}")
+        cli_output.print_command_event(console, "PASS", message)
         return
     if level == "fail":
-        console.print(f"[red]FAIL[/red] {message}")
+        cli_output.print_command_event(console, "FAIL", message)
         return
     if level == "detail":
-        console.print(f"  ↳ {message}")
+        cli_output.print_command_detail(console, message)
         return
     if level == "warning":
-        console.print(f"[yellow]⚠️  {message}[/yellow]")
+        cli_output.print_command_event(console, "WARN", message)
         return
     if level == "error":
-        console.print(f"[red]❌ {message}[/red]")
+        cli_output.print_command_event(console, "FAIL", message)
         return
-    console.print(message)
+    cli_output.print_command_detail(console, message, prefix="  ·")
 
 
 def _verify_exit_code(

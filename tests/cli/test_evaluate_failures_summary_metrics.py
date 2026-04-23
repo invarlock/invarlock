@@ -323,9 +323,11 @@ def test_evaluate_yaml_tmp_dir_and_successful_quiet_summary(
     report_out = tmp_path / "reports"
     report_out.mkdir()
     report_path = report_out / "evaluation.report.json"
+    runtime_manifest = report_out / "runtime.manifest.json"
     report_path.write_text(
         json.dumps({"primary_metric": {"ratio_vs_baseline": 0.99}}), encoding="utf-8"
     )
+    runtime_manifest.write_text("{}", encoding="utf-8")
     monkeypatch.setattr(
         "invarlock.reporting.report_console.compute_console_validation_block",
         lambda _report: {
@@ -343,6 +345,7 @@ def test_evaluate_yaml_tmp_dir_and_successful_quiet_summary(
     joined = console.joined()
     assert "Status: PASS · Gates: 1/2 passed" in joined
     assert "Primary metric ratio: 0.990" in joined
+    assert f"Runtime provenance: {runtime_manifest}" in joined
 
 
 def test_evaluate_prints_timing_summary_when_requested(

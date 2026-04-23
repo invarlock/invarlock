@@ -7,9 +7,10 @@
 | **Purpose** | Command-line interface for evaluation, verification, reporting, and advanced maintenance flows. |
 | **Audience** | Operators running InvarLock from a terminal or CI. |
 | **Primary commands** | `evaluate`, `verify`, `report`, `doctor`, `advanced`, `version`. |
+| **Companion entrypoint** | `invarlock-runtime-verify` for direct runtime manifest checks. |
 | **Requires** | `invarlock[hf]` for model-loading workflows; extra backends are installed via Python extras. |
 | **Network** | Offline by default; use `evaluate --allow-network` when a run needs model or dataset downloads. |
-| **Source of truth** | `src/invarlock/cli/app.py`, `src/invarlock/cli/commands/*.py`. |
+| **Source of truth** | `src/invarlock/cli/app.py`, `src/invarlock/cli/commands/*.py`, `src/invarlock/cli/runtime_verify.py`. |
 
 Most users only need a narrow top-level surface:
 
@@ -19,6 +20,20 @@ Most users only need a narrow top-level surface:
 
 Everything else is either diagnostics (`doctor`) or explicitly advanced
 (`invarlock advanced ...`).
+
+## First-Touch Surfaces
+
+These entrypoints are the ones users hit first when orienting themselves in a
+fresh install or wheel-only environment:
+
+| Surface | Why it matters |
+| --- | --- |
+| `invarlock --help` | Top-level discovery of the supported public command set |
+| `invarlock --version` | Confirms the installed package and schema pairing |
+| `invarlock report --help` | Shows the report subcommands without requiring run artifacts |
+| `invarlock advanced --help` | Lists the advanced maintenance namespace before drilling into subcommands |
+| `invarlock advanced calibrate --help` | Establishes that calibration lives under `advanced` rather than the core loop |
+| `invarlock-runtime-verify --help` | Wheel-native runtime-manifest verification companion for existing report bundles |
 
 ## Quick Start
 
@@ -88,6 +103,7 @@ invarlock report explain \
 | `invarlock doctor` | Diagnose environment and configuration issues |
 | `invarlock advanced` | Advanced evidence-pack, policy, plugin, and calibration workflows |
 | `invarlock version` | Show the installed version |
+| `invarlock-runtime-verify` | Verify an evaluation report against its sibling `runtime.manifest.json` |
 
 Exit codes: `0=success`, `1=generic failure`, `2=usage/schema/config failure`,
 `3=hard abort` for profile-aware fail-closed paths.
@@ -258,6 +274,25 @@ pip install "invarlock[awq,gptq]"
 ```
 
 Plugin install and uninstall commands are not part of the CLI surface.
+
+## `invarlock-runtime-verify`
+
+Purpose: package-native runtime provenance verification for an existing
+evaluation report and its sibling runtime manifest.
+
+Arguments:
+
+- `--report`: path to `evaluation.report.json`
+- `--manifest`: path to `runtime.manifest.json`
+- `--json`: emit a machine-readable `runtime-verify-v1` envelope
+
+Example:
+
+```bash
+invarlock-runtime-verify \
+  --report reports/eval/evaluation.report.json \
+  --manifest reports/eval/runtime.manifest.json
+```
 
 ## JSON Output
 
