@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-04-23
+
 ### Added
 - Added wheel-shipped public evidence under
   `invarlock/_data/public_evidence/published_basis/...` together with the
@@ -126,6 +128,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wheel-build requirement used by the helper, instead of stopping early on a
   repo `.venv` that is version-correct but was previously screened by the
   wrong capability check.
+- Fixed docs-only CI parity for curated live examples by aligning the docs
+  dependency set with the seeded report/verify path and making markdown demo
+  report generation fall back cleanly when the full reporting stack is not
+  installed.
 - Fixed standalone-product wording across README, docs, live-example tooling,
   and evidence-pack summaries so public guidance no longer frames the OSS repo
   around vague feeder-consumer wording.
@@ -133,11 +139,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dead markdownlint curated paths, and obsolete deep-clean output names from
   the current repo shape.
 - Fixed the live-example verification path so `make docs-live` now runs the
-  markdown and notebook lanes with streamed progress output, stages
+  true full markdown-plus-notebook lane with streamed progress output, stages
   `.github/` into the lightweight markdown workspaces for repo-shape checks,
   and clears stale live-example output before reruns so interrupted sessions
-  do not corrupt later `results.jsonl` reads.
-  true full markdown-plus-notebook lane, while `docs-live-fast` remains the
+  do not corrupt later `results.jsonl` reads; `docs-live-fast` remains the
   deterministic curated subset used by docs checks and CI.
 - Fixed host-mode docs replay and notebook smoke execution to normalize heavy
   examples onto smoke-sized assets, keep the BYOD example runnable, and keep
@@ -169,6 +174,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by honoring model-specific queue overrides, normalizing remote repo aliases,
   tightening scenario-manifest drift checks, and hardening resume/setup smoke
   coverage.
+- Fixed the `evidence_pack` / `evidence_pack_support` module boundary so the
+  helper surface no longer relies on a cyclic runtime import that CodeQL flags
+  as an unsafe import-order dependency.
 - Fixed the shell-harness `python3` stub contract so shell tests that need real
   helper-script execution must now opt in explicitly instead of silently
   bypassing new Python-side validation paths.
