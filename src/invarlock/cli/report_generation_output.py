@@ -28,6 +28,10 @@ _REPORT_RENDER_ERRORS = (
 _REPORT_INNER_ERRORS = _REPORT_RENDER_ERRORS + (ValueError,)
 
 
+def _section_as_mapping(section: Any) -> dict[str, Any]:
+    return dict(section) if isinstance(section, dict) else {}
+
+
 def _telemetry_output_enabled() -> bool:
     from invarlock.reporting.report_telemetry import telemetry_output_enabled
 
@@ -187,14 +191,14 @@ def render_generation_result(
             if schema_version:
                 console.print(_format_kv_line("Schema Version", str(schema_version)))
 
-            run_id = evaluation_report.get("run_id") or (
-                (result.primary_report.get("meta", {}) or {}).get("run_id")
-            )
+            primary_meta = _section_as_mapping(result.primary_report.get("meta", {}))
+            primary_edit = _section_as_mapping(result.primary_report.get("edit", {}))
+            run_id = evaluation_report.get("run_id") or primary_meta.get("run_id")
             if run_id:
                 console.print(_format_kv_line("Run ID", str(run_id)))
 
-            model_id = (result.primary_report.get("meta", {}) or {}).get("model_id")
-            edit_name = (result.primary_report.get("edit", {}) or {}).get("name")
+            model_id = primary_meta.get("model_id")
+            edit_name = primary_edit.get("name")
             if model_id:
                 console.print(_format_kv_line("Model", str(model_id)))
             if edit_name:

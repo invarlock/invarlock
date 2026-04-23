@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from importlib.metadata import PackageNotFoundError
+from typing import TypedDict
 
 import click
 import typer
@@ -17,15 +18,24 @@ _RUNTIME_VERIFY_HELP = (
 )
 
 
+class RuntimeVerifyPayload(TypedDict):
+    format_version: str
+    ok: bool
+    errors: list[str]
+    report: str
+    manifest: str
+
+
 def _emit_version(console: Console) -> None:
+    package_version: Callable[[str], str] | None
     try:
-        from importlib.metadata import version as _package_version
+        from importlib.metadata import version as package_version
     except (ImportError, ModuleNotFoundError, PackageNotFoundError):
-        _package_version = None
+        package_version = None
     resolved = None
-    if _package_version is not None:
+    if package_version is not None:
         try:
-            resolved = _package_version("invarlock")
+            resolved = package_version("invarlock")
         except PackageNotFoundError:
             resolved = None
     if not resolved:
@@ -39,7 +49,7 @@ def _emit_version(console: Console) -> None:
     console.print("InvarLock runtime verifier version unknown")
 
 
-def _runtime_verify_payload(*, report: str, manifest: str) -> dict[str, object]:
+def _runtime_verify_payload(*, report: str, manifest: str) -> RuntimeVerifyPayload:
     result = verify_runtime_manifest(report, manifest)
     return {
         "format_version": RUNTIME_VERIFY_FORMAT_VERSION,

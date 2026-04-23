@@ -88,14 +88,20 @@ def enforce_validation_gate(metrics: dict[str, Any], gate: dict[str, Any]) -> No
 
     try:
         ratio = metrics.get("primary_metric_ratio")
-        if _is_non_bool_number(ratio) and math.isfinite(float(ratio)):
+        if (
+            isinstance(ratio, int | float)
+            and not isinstance(ratio, bool)
+            and math.isfinite(float(ratio))
+        ):
+            ratio_f = float(ratio)
             limit = float(gate.get("max_ppl_degradation", 1.0))
             # ppl-like ratio: degradation ~ ratio-1; gate on allowed extra
-            if ratio - 1.0 > limit:
+            degradation = ratio_f - 1.0
+            if degradation > limit:
                 violations.append(
                     {
                         "type": "primary_metric_degradation",
-                        "actual": float(ratio - 1.0),
+                        "actual": degradation,
                         "limit": limit,
                     }
                 )

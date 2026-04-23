@@ -122,6 +122,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   workflow docs with the Node.js 22.18+ toolchain contract.
 - Fixed local release-gate ergonomics by documenting the CI-pinned `actionlint`
   install command used by `make workflow-lint`.
+- Fixed typed-surface drift across pairing, dataset-plan, guard-policy,
+  runtime-verifier, report-generation, and observability helper surfaces so
+  the full `make lint` gate passes cleanly on the release branch.
 
 ## [0.7.2] - 2026-04-15
 

@@ -19,6 +19,22 @@ _OBSERVABILITY_PROBE_ERRORS = (
     ValueError,
 )
 
+__all__ = [
+    "MetricType",
+    "MetricValue",
+    "Counter",
+    "Gauge",
+    "Histogram",
+    "Timer",
+    "TimerContext",
+    "MetricsRegistry",
+    "create_operation_metrics",
+    "create_resource_metrics",
+    "reset_peak_memory_stats",
+    "capture_memory_snapshot",
+    "summarize_memory_snapshots",
+]
+
 
 class MetricType(Enum):
     """Types of metrics supported."""

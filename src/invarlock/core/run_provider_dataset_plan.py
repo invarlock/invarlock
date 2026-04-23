@@ -317,7 +317,7 @@ def _build_signature_transform(
         preview_records_in: list[dict[str, Any]],
         final_records_in: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
-        temp_preview_records = [
+        temp_preview_records: list[dict[str, Any]] = [
             {
                 "input_ids": list(record["input_ids"]),
                 "attention_mask": list(record["attention_mask"]),
@@ -326,7 +326,7 @@ def _build_signature_transform(
             }
             for record in preview_records_in
         ]
-        temp_final_records = [
+        temp_final_records: list[dict[str, Any]] = [
             {
                 "input_ids": list(record["input_ids"]),
                 "attention_mask": list(record["attention_mask"]),

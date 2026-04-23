@@ -47,8 +47,12 @@ def duplicate_fraction(
     if not seqs:
         return 0.0
     use_labels = labels is not None and len(labels) == len(seqs)
+    labels_for_hash = labels if use_labels else None
     hashes = [
-        _hash_window_evidence(seq, labels[idx] if use_labels else None)
+        _hash_window_evidence(
+            seq,
+            labels_for_hash[idx] if labels_for_hash is not None else None,
+        )
         for idx, seq in enumerate(seqs)
     ]
     unique = len(set(hashes))
@@ -128,6 +132,8 @@ def compare_with_baseline(
         and run_labels is not None
         and len(run_labels) >= len(run_tokens)
     )
+    base_labels_for_hash = base_labels if use_label_hashes else None
+    run_labels_for_hash = run_labels if use_label_hashes else None
 
     base_map: dict[int, bytes] = {}
     invalid_baseline_reference = False
@@ -137,7 +143,11 @@ def compare_with_baseline(
             seq_list = list(seq) if not isinstance(seq, list) else seq
             base_map[base_id_int] = _hash_window_evidence(
                 seq_list,
-                base_labels[index] if use_label_hashes else None,
+                (
+                    base_labels_for_hash[index]
+                    if base_labels_for_hash is not None
+                    else None
+                ),
             )
         except _PAIRING_COERCION_ERRORS:
             invalid_baseline_reference = True
@@ -163,7 +173,7 @@ def compare_with_baseline(
 
         hashed = _hash_window_evidence(
             seq,
-            run_labels[index] if use_label_hashes else None,
+            run_labels_for_hash[index] if run_labels_for_hash is not None else None,
         )
         if run_id_int not in base_map:
             unexpected.append(run_id_int)

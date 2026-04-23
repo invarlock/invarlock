@@ -7,4 +7,5 @@ from .core import *  # noqa: F401,F403
 from .exporters import *  # noqa: F401,F403
 from .health import *  # noqa: F401,F403
 from .metrics import *  # noqa: F401,F403
-from .utils import *  # noqa: F401,F403
+from .metrics import Timer as MetricsTimer
+from .utils import *  # type: ignore[assignment] # noqa: F401,F403

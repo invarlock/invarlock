@@ -294,7 +294,9 @@ def enrich_run_report_metrics(
             )
         )
         if metric_kind_resolved:
-            metric_kind_resolved = normalize_metric_kind(metric_kind_resolved)
+            metric_kind_normalized = normalize_metric_kind(metric_kind_resolved)
+            if metric_kind_normalized is None:
+                raise TypeError("metric kind could not be normalized")
             from invarlock.eval.primary_metric import compute_primary_metric_from_report
 
             baseline_report = (
@@ -304,7 +306,7 @@ def enrich_run_report_metrics(
             )
             primary_metric = compute_primary_metric_from_report(
                 report,
-                kind=metric_kind_resolved,
+                kind=metric_kind_normalized,
                 baseline=baseline_report,
             )
             core_primary_metric = None
