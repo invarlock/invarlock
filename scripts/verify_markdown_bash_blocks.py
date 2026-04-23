@@ -352,6 +352,10 @@ def _is_model_loading_command(command_tokens: list[str]) -> bool:
     return command_tokens[:2] == ["advanced", "calibrate"]
 
 
+def _is_optional_environment_command(command_tokens: list[str]) -> bool:
+    return command_tokens[:1] == ["doctor"]
+
+
 def _should_skip_line_for_host_mode(stripped: str) -> bool:
     if (
         stripped.startswith("make runtime-image")
@@ -643,7 +647,10 @@ def _sanitize_script(
         if parsed_tokens:
             env_prefix, argv = _split_env_prefix(parsed_tokens)
             command_tokens = _command_tokens(argv)
-            if skip_model_loading and _is_model_loading_command(command_tokens):
+            if skip_model_loading and (
+                _is_model_loading_command(command_tokens)
+                or _is_optional_environment_command(command_tokens)
+            ):
                 rendered.append(f"echo '[skip-model-loading] {stripped}'")
                 skipping_continuation = has_trailing_backslash
                 continue

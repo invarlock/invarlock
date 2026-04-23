@@ -290,6 +290,21 @@ def test_sanitize_script_skip_model_loading_skips_full_multiline_command() -> No
     assert "-m invarlock verify reports/eval/evaluation.report.json" in rendered
 
 
+def test_sanitize_script_skip_model_loading_skips_doctor_health_check() -> None:
+    module = _load_script_module()
+    block = module.BashBlock(
+        file="docs/user-guide/quickstart.md",
+        line=1,
+        block_index=1,
+        text="invarlock doctor\n",
+    )
+
+    rendered = module._sanitize_script(block, skip_model_loading=True)
+
+    assert "[skip-model-loading] invarlock doctor" in rendered
+    assert " -m invarlock doctor" not in rendered
+
+
 def test_sanitize_script_host_mode_rewrites_heavy_evaluate_inputs_to_smoke_assets() -> (
     None
 ):
