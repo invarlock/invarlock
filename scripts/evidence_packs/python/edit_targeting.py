@@ -50,9 +50,7 @@ _EXCLUDED_PATH_SEGMENTS = frozenset(
 
 def _path_segments(name: str) -> tuple[str, ...]:
     return tuple(
-        segment
-        for segment in re.split(r"[^a-z0-9_]+", name.lower())
-        if segment
+        segment for segment in re.split(r"[^a-z0-9_]+", name.lower()) if segment
     )
 
 

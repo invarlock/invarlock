@@ -171,9 +171,7 @@ def _remote_python(
     candidate_paths: list[str] = []
     for template in DEFAULT_REMOTE_VENV_CANDIDATES:
         if "{remote_repo}" in template:
-            candidate_paths.append(
-                template.format(remote_repo=remote_repo.rstrip("/"))
-            )
+            candidate_paths.append(template.format(remote_repo=remote_repo.rstrip("/")))
         else:
             candidate_paths.append(template)
     display_candidates = [

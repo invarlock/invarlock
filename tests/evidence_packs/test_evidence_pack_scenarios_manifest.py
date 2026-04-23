@@ -132,7 +132,9 @@ def test_optional_model_specific_error_env_overrides_have_valid_shape() -> None:
                 )
 
 
-def test_deepseek_error_probe_overrides_are_present_and_narrower_than_defaults() -> None:
+def test_deepseek_error_probe_overrides_are_present_and_narrower_than_defaults() -> (
+    None
+):
     scenarios = _load_scenarios()
     by_id = {str(item.get("id")): item for item in scenarios}
     model_id = "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"

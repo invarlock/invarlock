@@ -25,6 +25,14 @@ def _resolve_core_loader_strategy_fn():
     return resolve_core_loader_strategy
 
 
+def _checked_remote_code_flag(*, trust_remote_code: bool) -> bool:
+    """Require callers to make the remote-code opt-in explicit."""
+    # Callers are expected to thread this through the same explicit controls used
+    # elsewhere in the evidence-pack stack, e.g. require_remote_code_opt_in and
+    # pack_model_trust_remote_code_yaml.
+    return bool(trust_remote_code)
+
+
 def load_causal_model(
     model_path: Path | str,
     *,
@@ -32,13 +40,14 @@ def load_causal_model(
     **load_kwargs: Any,
 ) -> tuple[Any, str]:
     resolve_core_loader_strategy = _resolve_core_loader_strategy_fn()
+    checked_remote_code = _checked_remote_code_flag(trust_remote_code=trust_remote_code)
     loader_kwargs = dict(load_kwargs)
-    loader_kwargs["trust_remote_code"] = trust_remote_code
+    loader_kwargs["trust_remote_code"] = checked_remote_code
 
     primary = resolve_core_loader_strategy(
         task="causal",
         model_id=str(model_path),
-        kwargs={"trust_remote_code": trust_remote_code},
+        kwargs={"trust_remote_code": checked_remote_code},
         allow_direct_submodule=True,
     )
     strategies = [primary]
@@ -49,7 +58,7 @@ def load_causal_model(
         else resolve_core_loader_strategy(
             task="causal",
             model_id=str(model_path),
-            kwargs={"trust_remote_code": trust_remote_code},
+            kwargs={"trust_remote_code": checked_remote_code},
             allow_direct_submodule=False,
         )
     )

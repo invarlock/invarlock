@@ -55,6 +55,34 @@ def test_select_python_skips_workspace_python_without_build_support(
     assert selected == fallback_python
 
 
+def test_select_python_requests_build_capable_selector(
+    monkeypatch, tmp_path: Path
+) -> None:
+    repo_root = tmp_path
+    workspace_python = repo_root / ".venv" / "bin" / "python"
+    workspace_python.parent.mkdir(parents=True)
+    workspace_python.write_text("", encoding="utf-8")
+    fallback_python = tmp_path / "python-ok"
+    fallback_python.write_text("", encoding="utf-8")
+
+    monkeypatch.setattr(support, "_python_can_build_wheel", lambda python_exe: False)
+
+    def fake_run(*args, **kwargs):
+        assert kwargs["env"]["INVARLOCK_SELECT_PYTHON_REQUIRE_MODULES"] == "build"
+        return subprocess.CompletedProcess(
+            args=args[0],
+            returncode=0,
+            stdout=f"{fallback_python}\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(support.subprocess, "run", fake_run)
+
+    selected = support._select_python(repo_root)
+
+    assert selected == fallback_python
+
+
 def test_create_venv_uses_system_site_packages(
     monkeypatch,
     tmp_path: Path,

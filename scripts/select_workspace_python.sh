@@ -14,6 +14,21 @@ is_python_312_plus() {
   "$candidate" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)' >/dev/null 2>&1
 }
 
+supports_required_modules() {
+  local candidate="$1"
+  if [[ -z "${INVARLOCK_SELECT_PYTHON_REQUIRE_MODULES:-}" ]]; then
+    return 0
+  fi
+  "$candidate" -c 'from importlib import metadata as md, util; import os; modules=[m for m in os.environ.get("INVARLOCK_SELECT_PYTHON_REQUIRE_MODULES", "").split(",") if m];
+def _has_module(name):
+    try:
+        md.version(name)
+        return True
+    except md.PackageNotFoundError:
+        return util.find_spec(name) is not None
+raise SystemExit(0 if all(_has_module(name) for name in modules) else 1)' >/dev/null 2>&1
+}
+
 resolve_command() {
   local candidate="$1"
   if [[ -x "$candidate" ]]; then
@@ -31,7 +46,7 @@ print_if_version_matches() {
   local candidate resolved
   candidate="$1"
   resolved="$(resolve_command "$candidate")" || return 1
-  if is_python_312 "$resolved"; then
+  if is_python_312 "$resolved" && supports_required_modules "$resolved"; then
     printf '%s\n' "$resolved"
     exit 0
   fi
@@ -42,7 +57,7 @@ print_if_supported() {
   local candidate resolved
   candidate="$1"
   resolved="$(resolve_command "$candidate")" || return 1
-  if is_python_312_plus "$resolved"; then
+  if is_python_312_plus "$resolved" && supports_required_modules "$resolved"; then
     printf '%s\n' "$resolved"
     exit 0
   fi

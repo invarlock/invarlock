@@ -80,7 +80,9 @@ def test_remote_setup_smoke_detects_runtime_provenance_gap(monkeypatch) -> None:
     monkeypatch.setattr(
         remote_setup_smoke,
         "check_runtime_provenance",
-        lambda: "runtime image 'ghcr.io/invarlock/invarlock-runtime:latest' is not provenance-ready",
+        lambda: (
+            "runtime image 'ghcr.io/invarlock/invarlock-runtime:latest' is not provenance-ready"
+        ),
     )
 
     assert remote_setup_smoke.main([]) == 1
@@ -94,12 +96,16 @@ def test_remote_setup_smoke_only_runtime_provenance_mode_skips_module_and_cli_ch
     monkeypatch.setattr(
         remote_setup_smoke,
         "check_modules",
-        lambda modules: (_ for _ in ()).throw(AssertionError("module check should be skipped")),
+        lambda modules: (_ for _ in ()).throw(
+            AssertionError("module check should be skipped")
+        ),
     )
     monkeypatch.setattr(
         remote_setup_smoke,
         "check_cli",
-        lambda cli_name: (_ for _ in ()).throw(AssertionError("cli check should be skipped")),
+        lambda cli_name: (_ for _ in ()).throw(
+            AssertionError("cli check should be skipped")
+        ),
     )
     monkeypatch.setattr(remote_setup_smoke, "check_runtime_provenance", lambda: None)
 

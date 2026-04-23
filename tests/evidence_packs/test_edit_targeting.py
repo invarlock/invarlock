@@ -83,10 +83,10 @@ def test_targeting_excludes_multimodal_vision_paths_but_keeps_language_paths(
     matcher = getattr(module, matcher_name)
 
     assert (
-        matcher("model.vision_tower.transformer.layers.0.feed_forward.up_proj.weight", "ffn")
+        matcher(
+            "model.vision_tower.transformer.layers.0.feed_forward.up_proj.weight", "ffn"
+        )
         is False
     )
     assert matcher("model.multi_modal_projector.linear.weight", "all") is False
-    assert (
-        matcher("model.language_model.layers.0.mlp.up_proj.weight", "ffn") is True
-    )
+    assert matcher("model.language_model.layers.0.mlp.up_proj.weight", "ffn") is True

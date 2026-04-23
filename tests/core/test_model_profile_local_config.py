@@ -70,7 +70,9 @@ def test_local_profile_config_helpers_tolerate_invalid_utf8(tmp_path: Path) -> N
     }
 
 
-def test_load_local_tokenizer_metadata_reads_added_token_objects(tmp_path: Path) -> None:
+def test_load_local_tokenizer_metadata_reads_added_token_objects(
+    tmp_path: Path,
+) -> None:
     model_dir = tmp_path / "added-token-local"
     model_dir.mkdir()
     payload = {
@@ -625,7 +627,10 @@ def test_resolve_tokenizer_local_fast_path_accepts_added_token_metadata(
         ),
         encoding="utf-8",
     )
-    added = lambda content: {"__type": "AddedToken", "content": content}
+
+    def added(content: str) -> dict[str, str]:
+        return {"__type": "AddedToken", "content": content}
+
     (model_dir / "tokenizer_config.json").write_text(
         json.dumps(
             {

@@ -150,6 +150,7 @@ def test_candidate_causal_lm_presets_load() -> None:
         assert cfg.data["dataset"]["provider"] == "wikitext2"
         assert cfg.data["primary_metric"]["drift_band"] == expected_drift_band
 
+
 def test_candidate_null_sweep_calibration_configs_reference_models() -> None:
     root = _repo_root()
     expected_drift_band = {"min": 0.9, "max": 1.2}

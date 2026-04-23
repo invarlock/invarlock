@@ -50,7 +50,9 @@ def _validate_index_shards(edit_path: Path, index_path: Path) -> bool:
         shard_path = edit_path / shard_name
         if not shard_path.is_file():
             return False
-        if shard_path.suffix == ".safetensors" and not _validate_safetensors(shard_path):
+        if shard_path.suffix == ".safetensors" and not _validate_safetensors(
+            shard_path
+        ):
             return False
     return True
 

@@ -76,10 +76,10 @@ def main() -> int:
     }
 
     default_seq_len, default_batch = invarlock_cfg.get(category, (1024, 32))
-    seq_len_invarlock = parse_batch(os.environ.get("INVARLOCK_SEQ_LEN"), default_seq_len)
-    batch_invarlock = parse_batch(
-        os.environ.get("INVARLOCK_EVAL_BATCH"), default_batch
+    seq_len_invarlock = parse_batch(
+        os.environ.get("INVARLOCK_SEQ_LEN"), default_seq_len
     )
+    batch_invarlock = parse_batch(os.environ.get("INVARLOCK_EVAL_BATCH"), default_batch)
 
     def kv_cache_gb(batch: int, seq_len: int) -> float:
         if not all(

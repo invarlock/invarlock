@@ -145,12 +145,11 @@ def check_repo_root(repo_root: str) -> str | None:
     for relpath in REPO_ENTRYPOINTS:
         candidate = root / relpath
         if not candidate.is_file():
-            return f"repo root {repo_root!r} is missing required entrypoint {relpath!r}."
-        if not os.access(candidate, os.X_OK):
             return (
-                f"repo root {repo_root!r} has non-executable entrypoint "
-                f"{relpath!r}."
+                f"repo root {repo_root!r} is missing required entrypoint {relpath!r}."
             )
+        if not os.access(candidate, os.X_OK):
+            return f"repo root {repo_root!r} has non-executable entrypoint {relpath!r}."
     return None
 
 

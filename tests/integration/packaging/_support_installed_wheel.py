@@ -57,15 +57,23 @@ def _python_can_build_wheel(python_exe: Path) -> bool:
             str(python_exe),
             "-c",
             (
-                "import importlib.util, sys, venv; "
-                "mods=('build', 'pip'); "
+                "from importlib import metadata as md, util\n"
+                "import sys, venv\n"
+                "mods=('build',)\n"
+                "def has_mod(name):\n"
+                "    try:\n"
+                "        md.version(name)\n"
+                "        return True\n"
+                "    except md.PackageNotFoundError:\n"
+                "        return util.find_spec(name) is not None\n"
                 "raise SystemExit(0 if sys.version_info >= (3, 12) "
-                "and all(importlib.util.find_spec(name) for name in mods) else 1)"
+                "and all(has_mod(name) for name in mods) else 1)"
             ),
         ],
         capture_output=True,
         text=True,
         check=False,
+        cwd=python_exe.parent,
     )
     return proc.returncode == 0
 
@@ -77,11 +85,16 @@ def _select_python(repo_root: Path) -> Path:
     if workspace_python.exists() and _python_can_build_wheel(workspace_python):
         return workspace_python
 
+    selector_env = {
+        **os.environ,
+        "INVARLOCK_SELECT_PYTHON_REQUIRE_MODULES": "build",
+    }
     proc = subprocess.run(
         ["/bin/bash", str(repo_root / "scripts" / "select_workspace_python.sh")],
         capture_output=True,
         text=True,
         check=False,
+        env=selector_env,
     )
     if proc.returncode == 0 and proc.stdout.strip():
         selected = Path(proc.stdout.strip())

@@ -99,7 +99,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.canonical_file:
         canonical_path = Path(args.canonical_file)
         if not canonical_path.is_file():
-            raise SystemExit(f"Canonical tuned edit preset file not found: {canonical_path}")
+            raise SystemExit(
+                f"Canonical tuned edit preset file not found: {canonical_path}"
+            )
         canonical = _load_json(canonical_path)
         if not isinstance(canonical, dict):
             raise SystemExit(
