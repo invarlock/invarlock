@@ -42,9 +42,9 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/invarlock/invarlock"
 Repository = "https://github.com/invarlock/invarlock"
-Documentation = "https://github.com/invarlock/invarlock/blob/main/docs/README.md"
+Documentation = "https://invarlock.github.io/invarlock/0.8.0/"
 Issues = "https://github.com/invarlock/invarlock/issues"
-Changelog = "https://github.com/invarlock/invarlock/blob/main/CHANGELOG.md"
+Changelog = "https://github.com/invarlock/invarlock/blob/v0.8.0/CHANGELOG.md"
 
 [project.optional-dependencies]
 # Core torch dependencies for adapters
@@ -252,7 +252,6 @@ hf_bnb = "invarlock.plugins.hf_bnb_adapter:HF_BNB_Adapter"
 # Console scripts
 [project.scripts]
 invarlock = "invarlock.cli.app:app"
-invarlock-runtime-verify = "invarlock.cli.runtime_verify:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

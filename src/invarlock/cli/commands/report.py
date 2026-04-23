@@ -8,30 +8,33 @@ generating, explaining, validating, and rendering report artifacts.
 
 from __future__ import annotations
 
-import math
-from time import perf_counter
 from typing import TYPE_CHECKING, Any, NoReturn
 
 import typer
 from rich.console import Console
 
+from invarlock.cli import report_generation_output as report_output_mod
 from invarlock.cli.output import print_event, resolve_output_style
 from invarlock.core.report_inputs import (
     ReportInputError,
     load_evaluation_report_input_json,
     load_run_report_input_json,
+    resolve_run_reports_from_evaluation_input,
 )
 
 if TYPE_CHECKING:
     from invarlock.reporting.report_contract import ReportGenerationResult
 
 console = Console()
+SECTION_WIDTH = report_output_mod.SECTION_WIDTH
+perf_counter = report_output_mod.perf_counter
+_ORIG_ARTIFACT_ENTRIES = report_output_mod._artifact_entries
+_ORIG_FMT_CI_95 = report_output_mod._fmt_ci_95
+_ORIG_FMT_METRIC_VALUE = report_output_mod._fmt_metric_value
+_ORIG_FORMAT_SECTION_TITLE = report_output_mod._format_section_title
+_ORIG_TELEMETRY_OUTPUT_ENABLED = report_output_mod._telemetry_output_enabled
+_ORIG_TELEMETRY_SUMMARY_LINE = report_output_mod._telemetry_summary_line
 
-SECTION_WIDTH = 67
-KV_LABEL_WIDTH = 16
-GATE_LABEL_WIDTH = 32
-ARTIFACT_LABEL_WIDTH = 18
-_SUMMARY_FORMAT_ERRORS = (TypeError, ValueError)
 _REPORT_RENDER_ERRORS = (
     AttributeError,
     KeyError,
@@ -49,16 +52,11 @@ def _generate_reports(**kwargs: Any) -> ReportGenerationResult:
     return generate_reports(**kwargs)
 
 
-def _telemetry_output_enabled() -> bool:
-    from invarlock.reporting.report_telemetry import telemetry_output_enabled
-
-    return telemetry_output_enabled()
-
-
-def _telemetry_summary_line(evaluation_report: dict[str, Any]) -> str | None:
-    from invarlock.reporting.report_telemetry import telemetry_summary_line
-
-    return telemetry_summary_line(evaluation_report)
+def _normalize_option(value: Any) -> str | None:
+    if isinstance(value, typer.models.OptionInfo) or value is None:
+        return None
+    text = str(value).strip()
+    return text or None
 
 
 def _raise_report_input_failure(message: str, *, no_color: bool = False) -> NoReturn:
@@ -79,83 +77,29 @@ def _raise_report_input_failure(message: str, *, no_color: bool = False) -> NoRe
 
 
 def _format_section_title(title: str, *, suffix: str | None = None) -> str:
-    if not suffix:
-        return title
-    combined = f"{title} {suffix}"
-    if len(combined) > SECTION_WIDTH:
-        return combined
-    pad = max(1, SECTION_WIDTH - len(title) - len(suffix))
-    return f"{title}{' ' * pad}{suffix}"
-
-
-def _print_section_header(
-    console: Console, title: str, *, suffix: str | None = None
-) -> None:
-    bar = "═" * SECTION_WIDTH
-    console.print(bar)
-    console.print(_format_section_title(title, suffix=suffix))
-    console.print(bar)
-
-
-def _format_kv_line(label: str, value: str, *, width: int = KV_LABEL_WIDTH) -> str:
-    return f"  {label:<{width}}: {value}"
-
-
-def _format_status(ok: bool) -> str:
-    return "PASS" if ok else "FAIL"
+    return _ORIG_FORMAT_SECTION_TITLE(title, suffix=suffix)
 
 
 def _fmt_metric_value(value: Any) -> str:
-    try:
-        val = float(value)
-    except (TypeError, ValueError):
-        return "N/A"
-    if not math.isfinite(val):
-        return "N/A"
-    return f"{val:.3f}"
+    return _ORIG_FMT_METRIC_VALUE(value)
 
 
 def _fmt_ci_95(ci: Any) -> str | None:
-    if isinstance(ci, (list, tuple)) and len(ci) == 2:
-        try:
-            lo = float(ci[0])
-            hi = float(ci[1])
-        except (TypeError, ValueError):
-            return None
-        if math.isfinite(lo) and math.isfinite(hi):
-            return f"[{lo:.3f}, {hi:.3f}]"
-    return None
+    return _ORIG_FMT_CI_95(ci)
 
 
 def _artifact_entries(
     saved_files: dict[str, str], output_dir: str
 ) -> list[tuple[str, str]]:
-    order = [
-        ("report", "Evaluation Report (JSON)"),
-        ("report_md", "Evaluation Report (MD)"),
-        ("json", "JSON"),
-        ("markdown", "Markdown"),
-        ("html", "HTML"),
-    ]
-    entries: list[tuple[str, str]] = [("Output", output_dir)]
-    used: set[str] = set()
-    for key, label in order:
-        if key in saved_files:
-            entries.append((label, str(saved_files[key])))
-            used.add(key)
-    for key in sorted(saved_files.keys()):
-        if key in used:
-            continue
-        entries.append((key.upper(), str(saved_files[key])))
-    return entries
+    return _ORIG_ARTIFACT_ENTRIES(saved_files, output_dir)
 
 
-# Group with callback so `invarlock report` still generates reports
-report_app = typer.Typer(
-    help="Operations on run reports and evaluation reports (generate, explain, html, validate).",
-    invoke_without_command=False,
-    no_args_is_help=False,
-)
+def _telemetry_output_enabled() -> bool:
+    return _ORIG_TELEMETRY_OUTPUT_ENABLED()
+
+
+def _telemetry_summary_line(evaluation_report: dict[str, Any]) -> str | None:
+    return _ORIG_TELEMETRY_SUMMARY_LINE(evaluation_report)
 
 
 def _render_generation_result(
@@ -167,175 +111,39 @@ def _render_generation_result(
     summary_subject_seconds: float | None = None,
     summary_report_start: float | None = None,
 ) -> None:
+    report_output_mod.print_event = print_event
+    report_output_mod.perf_counter = perf_counter
+    report_output_mod._artifact_entries = _artifact_entries
+    report_output_mod._fmt_metric_value = _fmt_metric_value
+    report_output_mod._fmt_ci_95 = _fmt_ci_95
+    report_output_mod._format_section_title = _format_section_title
+    report_output_mod._telemetry_output_enabled = _telemetry_output_enabled
+    report_output_mod._telemetry_summary_line = _telemetry_summary_line
     try:
-        output_style = resolve_output_style(
-            style=str(style),
-            profile="ci",
-            progress=False,
-            timing=False,
-            no_color=no_color,
-        )
-
-        def _event(tag: str, message: str, *, emoji: str | None = None) -> None:
-            print_event(console, tag, message, style=output_style, emoji=emoji)
-
-        output_dir = result.output_dir
-        saved_files = result.saved_files
-
-        # Show results
-        _event("PASS", "Reports generated successfully.", emoji="✅")
-
-        if "report" in result.formats and result.evaluation_report:
-            try:
-                evaluation_report = result.evaluation_report
-                if _telemetry_output_enabled():
-                    summary_line = _telemetry_summary_line(evaluation_report)
-                    if summary_line:
-                        console.print(summary_line, markup=False)
-                block = result.validation_block or {"overall_pass": False, "rows": []}
-                overall_pass = bool(block.get("overall_pass"))
-                status_text = _format_status(overall_pass)
-
-                console.print("")
-                summary_suffix: str | None = None
-                if summary_report_start is not None:
-                    try:
-                        base = (
-                            float(summary_baseline_seconds)
-                            if summary_baseline_seconds is not None
-                            else 0.0
-                        )
-                        subject = (
-                            float(summary_subject_seconds)
-                            if summary_subject_seconds is not None
-                            else 0.0
-                        )
-                        report_elapsed = max(
-                            0.0, float(perf_counter() - float(summary_report_start))
-                        )
-                        summary_suffix = f"[{(base + subject + report_elapsed):.2f}s]"
-                    except _SUMMARY_FORMAT_ERRORS:
-                        summary_suffix = None
-                _print_section_header(
-                    console,
-                    "EVALUATION REPORT SUMMARY",
-                    suffix=summary_suffix,
-                )
-                console.print(_format_kv_line("Status", status_text))
-
-                schema_version = evaluation_report.get("schema_version")
-                if schema_version:
-                    console.print(
-                        _format_kv_line("Schema Version", str(schema_version))
-                    )
-
-                run_id = evaluation_report.get("run_id") or (
-                    (result.primary_report.get("meta", {}) or {}).get("run_id")
-                )
-                if run_id:
-                    console.print(_format_kv_line("Run ID", str(run_id)))
-
-                model_id = (result.primary_report.get("meta", {}) or {}).get("model_id")
-                edit_name = (result.primary_report.get("edit", {}) or {}).get("name")
-                if model_id:
-                    console.print(_format_kv_line("Model", str(model_id)))
-                if edit_name:
-                    console.print(_format_kv_line("Edit", str(edit_name)))
-
-                pm = (
-                    (evaluation_report.get("primary_metric") or {})
-                    if isinstance(evaluation_report, dict)
-                    else {}
-                )
-                if not pm:
-                    pm = (result.primary_report.get("metrics", {}) or {}).get(
-                        "primary_metric", {}
-                    )
-                console.print("  PRIMARY METRIC")
-                pm_entries: list[tuple[str, str]] = []
-                if isinstance(pm, dict) and pm:
-                    kind = str(pm.get("kind") or "primary")
-                    pm_entries.append(("Kind", kind))
-                    preview = pm.get("preview")
-                    if preview is not None:
-                        pm_entries.append(("Preview", _fmt_metric_value(preview)))
-                    final = pm.get("final")
-                    if final is not None:
-                        pm_entries.append(("Final", _fmt_metric_value(final)))
-                    ratio = pm.get("ratio_vs_baseline")
-                    if ratio is not None:
-                        pm_entries.append(("Ratio", _fmt_metric_value(ratio)))
-                    dci = pm.get("display_ci")
-                    ci_95 = _fmt_ci_95(dci)
-                    if ci_95 is not None:
-                        pm_entries.append(("CI (95%)", ci_95))
-                if not pm_entries:
-                    pm_entries.append(("Status", "Unavailable"))
-                for idx, (label, value) in enumerate(pm_entries):
-                    branch = "└─" if idx == len(pm_entries) - 1 else "├─"
-                    console.print(f"  {branch} {label:<14} {value}")
-
-                console.print("  VALIDATION GATES")
-                rows = block.get("rows", [])
-                if isinstance(rows, list) and rows:
-                    for idx, row in enumerate(rows):
-                        label = str(row.get("label") or "Unknown")
-                        ok = bool(row.get("ok"))
-                        status = _format_status(ok)
-                        mark = "✓" if ok else "✗"
-                        branch = "└─" if idx == len(rows) - 1 else "├─"
-                        console.print(
-                            f"  {branch} {label:<{GATE_LABEL_WIDTH}} {mark} {status}"
-                        )
-                else:
-                    console.print(f"  └─ {'No validation rows':<{GATE_LABEL_WIDTH}} -")
-
-                console.print("  ARTIFACTS")
-                entries = _artifact_entries(saved_files, str(output_dir))
-                artifact_label_width = max(
-                    ARTIFACT_LABEL_WIDTH,
-                    max((len(label) for label, _ in entries), default=0),
-                )
-                for idx, (label, value) in enumerate(entries):
-                    branch = "└─" if idx == len(entries) - 1 else "├─"
-                    console.print(f"  {branch} {label:<{artifact_label_width}} {value}")
-                console.print("═" * SECTION_WIDTH)
-
-                # In CLI report flow, do not hard-exit on validation failure; just display status.
-                # CI gating should be handled by dedicated verify commands.
-
-            except _REPORT_RENDER_ERRORS as e:
-                _event("WARN", f"Evaluation report validation error: {e}", emoji="⚠️")
-                # Exit non-zero on evaluation report generation error
-                raise typer.Exit(1) from e
-        else:
-            console.print(_format_kv_line("Output", str(output_dir)))
-            for label, value in _artifact_entries(saved_files, str(output_dir))[1:]:
-                console.print(
-                    _format_kv_line(label, str(value), width=ARTIFACT_LABEL_WIDTH)
-                )
-
-    except ReportInputError as e:
-        _raise_report_input_failure(str(e), no_color=no_color)
-    except ValueError as e:
-        _raise_report_input_failure(str(e), no_color=no_color)
-    except typer.Exit:
-        raise
-    except _REPORT_RENDER_ERRORS as e:
-        print_event(
+        report_output_mod.render_generation_result(
             console,
-            "FAIL",
-            f"Report generation failed: {e}",
-            style=resolve_output_style(
-                style="audit",
-                profile="ci",
-                progress=False,
-                timing=False,
-                no_color=False,
-            ),
-            emoji="❌",
+            result=result,
+            style=style,
+            no_color=no_color,
+            summary_baseline_seconds=summary_baseline_seconds,
+            summary_subject_seconds=summary_subject_seconds,
+            summary_report_start=summary_report_start,
         )
-        raise typer.Exit(1) from e
+    except ReportInputError as exc:
+        _raise_report_input_failure(str(exc), no_color=no_color)
+    except ValueError as exc:
+        _raise_report_input_failure(str(exc), no_color=no_color)
+
+
+# Group with callback so `invarlock report` still generates reports
+report_app = typer.Typer(
+    help=(
+        "Operations on evaluation bundles and run reports "
+        "(generate, explain, html, validate)."
+    ),
+    invoke_without_command=False,
+    no_args_is_help=False,
+)
 
 
 def report_callback(
@@ -496,33 +304,91 @@ def _load_run_report(path: str) -> dict:
 
 @report_app.command(
     name="explain",
-    help="Explain gate decisions for subject and baseline run reports.",
+    help=(
+        "Explain gate decisions from an evaluation bundle or from explicit "
+        "subject/baseline run reports."
+    ),
 )
 def report_explain(
-    subject_report: str = typer.Option(
-        ...,
+    evaluation_report: str | None = typer.Option(
+        None,
+        "--evaluation-report",
+        help=(
+            "Path to evaluation report JSON file or directory containing "
+            "canonical evaluation.report.json. Preferred reviewer input; "
+            "auto-resolves linked subject and baseline run reports from provenance."
+        ),
+    ),
+    subject_report: str | None = typer.Option(
+        None,
         "--subject-report",
         help=(
             "Path to subject run report JSON file or directory containing "
-            "canonical report.json"
+            "canonical report.json. Use with --baseline-report when you want to "
+            "explain directly from run artifacts."
         ),
     ),
-    baseline_report: str = typer.Option(
-        ...,
+    baseline_report: str | None = typer.Option(
+        None,
         "--baseline-report",
         help=(
             "Path to baseline run report JSON file or directory containing "
-            "canonical report.json"
+            "canonical report.json. Optional when --evaluation-report is supplied."
         ),
     ),
 ):  # pragma: no cover - thin wrapper
-    """Explain gate decisions for a subject run report vs baseline run report."""
+    """Explain gate decisions for evaluation bundles or explicit run reports."""
     from .explain_gates import explain_gates_command as _explain
 
+    output_style = resolve_output_style(
+        style="audit",
+        profile="ci",
+        progress=False,
+        timing=False,
+        no_color=False,
+    )
+    evaluation_report = _normalize_option(evaluation_report)
+    subject_report = _normalize_option(subject_report)
+    baseline_report = _normalize_option(baseline_report)
+
     try:
-        report_path, _report_payload = load_run_report_input_json(subject_report)
-        baseline_path, _baseline_payload = load_run_report_input_json(baseline_report)
+        if evaluation_report:
+            if subject_report or baseline_report:
+                raise typer.BadParameter(
+                    "Use either --evaluation-report or the --subject-report/--baseline-report pair, not both."
+                )
+            (
+                evaluation_path,
+                report_path,
+                baseline_path,
+            ) = resolve_run_reports_from_evaluation_input(evaluation_report)
+            print_event(
+                console,
+                "INFO",
+                (
+                    "Resolved linked run reports from evaluation bundle provenance: "
+                    f"{evaluation_path}"
+                ),
+                style=output_style,
+            )
+        else:
+            if not subject_report or not baseline_report:
+                raise typer.BadParameter(
+                    "Pass --evaluation-report or both --subject-report and --baseline-report."
+                )
+            report_path, _report_payload = load_run_report_input_json(subject_report)
+            baseline_path, _baseline_payload = load_run_report_input_json(
+                baseline_report
+            )
     except ReportInputError as exc:
+        detail = str(exc)
+        if exc.reason == "expected_run_payload":
+            detail += (
+                " Use --evaluation-report <evaluation.report.json> to "
+                "auto-resolve the linked run reports."
+            )
+        _raise_report_input_failure(detail)
+    except typer.BadParameter as exc:
         _raise_report_input_failure(str(exc))
     return _explain(
         subject_report=str(report_path),

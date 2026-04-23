@@ -309,7 +309,6 @@ cli-smoke-core:  ## Smoke the simplified core CLI surface
 	PYTHONPATH=src $(PYTHON) -m invarlock report --help >/dev/null
 	PYTHONPATH=src $(PYTHON) -m invarlock report html --help >/dev/null
 	PYTHONPATH=src $(PYTHON) -m invarlock doctor --json >/dev/null
-	PYTHONPATH=src $(PYTHON) -m invarlock.cli.runtime_verify --help >/dev/null
 
 cli-smoke-advanced:  ## Smoke the advanced CLI namespace
 	$(MAKE) ensure-python
@@ -318,6 +317,7 @@ cli-smoke-advanced:  ## Smoke the advanced CLI namespace
 	PYTHONPATH=src $(PYTHON) -m invarlock advanced policy --help >/dev/null
 	PYTHONPATH=src $(PYTHON) -m invarlock advanced plugins --help >/dev/null
 	PYTHONPATH=src $(PYTHON) -m invarlock advanced calibrate --help >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock advanced runtime-verify --help >/dev/null
 
 actionlint:  ## Lint GitHub Actions workflow files
 	@command -v actionlint >/dev/null 2>&1 || { \
@@ -423,7 +423,7 @@ runtime-smoke-cuda-podman: RUNTIME_IMAGE=$(RUNTIME_IMAGE_CUDA)
 runtime-smoke-cuda-podman: runtime-smoke  ## Smoke the local CUDA container runtime image with Podman
 
 runtime-verify:  ## Smoke the Python runtime verifier on the fixture bundle
-	PYTHONPATH=src $(PYTHON) -m invarlock.cli.runtime_verify \
+	PYTHONPATH=src $(PYTHON) -m invarlock advanced runtime-verify \
 		--report tests/fixtures/runtime_provenance/evaluation.report.json \
 		--manifest tests/fixtures/runtime_provenance/runtime.manifest.json \
 		--json

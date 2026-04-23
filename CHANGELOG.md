@@ -8,10 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added versioned documentation publishing to GitHub Pages so release docs can
+  live under stable paths such as `/0.8.0/` instead of sending installed users
+  to moving `main` blob URLs.
 
 ### Changed
+- Reworked the public onboarding docs around explicit wheel-user, evaluator,
+  and repo-maintainer entry points, and replaced the repeated report filename
+  caveats with a shared artifact model centered on `evaluation.report.json`.
+- Moved the runtime-manifest verifier onto the main CLI under
+  `invarlock advanced runtime-verify` with the same Typer/Rich-style help and
+  output conventions as the rest of the command surface.
+- Made `invarlock report explain` accept `--evaluation-report` and resolve the
+  linked subject/baseline run reports from bundle provenance when available.
+- Promoted the HTML report from a minimal markdown wrapper to a structured
+  browser surface with summary chips and quick-link navigation.
 
 ### Removed
+- Removed the standalone `invarlock-runtime-verify` console script before it
+  became a supported public entry point; use `invarlock advanced
+  runtime-verify` instead.
 
 ### Fixed
 
@@ -36,9 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lane plus remote setup/smoke coverage for narrower evidence-pack recovery
   and promotion checks.
 - Added explicit first-touch CLI inventory coverage for `invarlock --version`,
-  `invarlock report --help`, and the package-native
-  `invarlock-runtime-verify --help` surface across docs, tests, and smoke
-  lanes.
+  `invarlock report --help`, and the package-native `invarlock advanced
+  runtime-verify --help` surface across docs, tests, and smoke lanes.
 
 ### Changed
 - Replaced the old assurance toggle with explicit
@@ -48,10 +63,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renamed the public and maintainer bundle surface from proof packs to
   evidence packs across the CLI, contracts, docs, notebooks, scripts, and
   packaged public-evidence recipes.
-- Versioned `invarlock-runtime-verify --json` as `runtime-verify-v1`, moved
-  shipped evidence paths to logical `public_evidence/published_basis/...`
-  locations, and made packaged runtime-profile provenance portable through
-  `runtime/tiers.yaml`.
+- Versioned runtime-manifest verifier JSON as `runtime-verify-v1`, moved shipped
+  evidence paths to logical `public_evidence/published_basis/...` locations, and
+  made packaged runtime-profile provenance portable through `runtime/tiers.yaml`.
 - Tightened the installed-wheel, docs-lint, and container maintainer gates
   around the supported public CLI and report paths.
 - Expanded the machine-readable model inventory to distinguish declared
@@ -60,7 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   limited to shipped published-basis fixtures.
 - Standardized the shared human-readable CLI output layer across `verify`,
   `report html`, `advanced policy`, `advanced evidence-pack`,
-  `invarlock-runtime-verify`, and the top-level `doctor` findings and health
+  `advanced runtime-verify`, and the top-level `doctor` findings and health
   summaries so status lines, warnings, and detail rows render consistently.
 - Refreshed the `evaluate` first-screen banner and the exported HTML report
   shell with clearer visual hierarchy, stronger context framing, and
@@ -77,7 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stabilizing rerun cleanup/output handling.
 - Fixed minimal wheel and advanced evidence-pack verification coverage so
   installed distributions keep covering `doctor`, `verify`, `report html`,
-  `invarlock-runtime-verify`, packaged contract loading, and strict
+  `advanced runtime-verify`, packaged contract loading, and strict
   evidence-pack verification outside the repo tree.
 - Fixed evidence-pack correctness and recovery across MoE edit targeting,
   strict checksum path normalization, large-model baseline-report reuse,
@@ -359,7 +373,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   proof-pack handling into smaller implementation files with stronger guardrail
   coverage.
 - Converged runtime-manifest verification onto a single package-native Python
-  path so product provenance, `invarlock-runtime-verify`, and
+  path so product provenance, `advanced runtime-verify`, and
   `make runtime-verify` all exercise the same verifier implementation.
 - Reworked proof-pack signing and verification around the same package-native
   Ed25519 manifest-signature contract used by the installed CLI and shell

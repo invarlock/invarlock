@@ -85,3 +85,5 @@ def test_html_exporter_prefers_markdown_when_available():
     else:
         assert "<table" in html
         assert "badge" in html
+        assert "report-outline" in html
+        assert "summary-strip" in html

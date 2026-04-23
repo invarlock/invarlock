@@ -32,7 +32,7 @@ only for host-side workflows that intentionally run model loading on the
 host. If you choose that host-side path, verify the resulting report with
 `invarlock verify --runtime-provenance host ...`.
 
-Example (GPT‑2, CPU/MPS friendly; requires `invarlock[hf]` or equivalent HF extra):
+Example (wheel-first, GPT‑2, CPU/MPS friendly; requires `invarlock[hf]` or equivalent HF extra):
 
 ```bash
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
@@ -40,10 +40,13 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --subject /path/to/your/edited-model \
   --adapter auto \
   --profile ci \
-  --preset configs/presets/causal_lm/wikitext2_512.yaml \
   --out runs/eval_smoke \
   --report-out reports/eval_smoke
 ```
+
+Repo maintainers who want a repo-owned preset can replace the flag-only example
+above with `--preset configs/presets/...`, but that preset path is not shipped
+in wheel installs.
 
 Outputs:
 
@@ -73,7 +76,6 @@ INVARLOCK_STORE_EVAL_WINDOWS=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allo
   --adapter auto \
   --profile ci \
   --tier balanced \
-  --preset configs/presets/causal_lm/wikitext2_512.yaml \
   --out runs/baseline_once \
   --report-out reports/eval_baseline_once
 
@@ -86,7 +88,6 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --adapter auto \
   --profile ci \
   --tier balanced \
-  --preset configs/presets/causal_lm/wikitext2_512.yaml \
   --out runs/eval_subject_1 \
   --report-out reports/eval_subject_1
 ```
@@ -99,8 +100,9 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   - Window counts (preview/final) must match.
   - Tokenizer hash should match; the verify command fails if both hashes are present and differ.
 
-Use the same preset (`--preset`), and keep `seq_len=stride` for deterministic
-non-overlapping windows.
+Use the same dataset/evaluation configuration on both sides, whether that means
+repeating the same explicit flags or reusing the same preset (`--preset`), and
+keep `seq_len=stride` for deterministic non-overlapping windows.
 
 ## Why Compare & evaluate?
 

@@ -12,12 +12,34 @@
 InvarLock emits both machine-readable reports and human-friendly summaries.
 Use the steps below to reproduce representative artifacts from this repository version.
 
+## Read The Bundle First
+
+For most reviewers, the primary artifact is `evaluation.report.json`, not the
+lower-level run reports. Use it as the front door:
+
+```bash
+invarlock verify reports/quant8_demo/evaluation.report.json
+invarlock report html -i reports/quant8_demo/evaluation.report.json -o reports/quant8_demo/evaluation.html
+invarlock report explain --evaluation-report reports/quant8_demo/evaluation.report.json
+```
+
+Artifact model:
+
+| Artifact | What it contains | Typical next step |
+| --- | --- | --- |
+| `evaluation.report.json` | Paired evaluation outcome, validation block, policy/provenance summary | `verify`, `report html`, `report explain --evaluation-report` |
+| `report.json` | One run's raw metrics, guard telemetry, and execution artifacts | `report generate`, explicit `report explain --subject-report ... --baseline-report ...` |
+
 ## 1. Generate a report Bundle
 
 The command below shows the default runtime-container path. It writes a
 container-backed `runtime.manifest.json` next to `evaluation.report.json`.
 Public host-side workflows use `--execution-mode host` and should verify the
 resulting report with `invarlock verify --runtime-provenance host ...`.
+This reproduction uses repo-owned preset and overlay files so it matches the
+example artifacts checked into this repository version; wheel-only installs
+should start with [Getting Started](getting-started.md) for the first evaluation
+run, then come back here once they already have an evaluation bundle.
 
 ```bash
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
@@ -61,6 +83,16 @@ The markdown report mirrors the report content but highlights:
 - Checklist of gates (PASS/FAIL) suitable for change-control review
 
 ## 3. Shareable Attachments
+
+HTML report chrome:
+
+```text
+Header -> Summary chips -> Quick links rail -> Canonical report body
+```
+
+That layout is intentional: reviewers should be able to confirm overall status,
+jump directly to the gate or provenance section they care about, and still read
+the unchanged canonical report content underneath.
 
 For audits, collect the following files:
 

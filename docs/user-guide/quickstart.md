@@ -29,38 +29,24 @@ pip install invarlock
 # Optional: only for evaluate with Hugging Face-backed models
 pip install "invarlock[hf]"
 
-# Repo checkout only: build the local runtime image once for container-backed runs
-make runtime-image
-
-# Repo checkout only: smoke the default container-backed evaluate journey
-make container-default-smoke
-
-# Repo checkout only: smoke the fuller evaluate -> verify -> report html journey
-make container-front-door-smoke
-
-# Podman users can prepare the same image explicitly with Podman
-make runtime-image-podman
-make runtime-smoke-podman
-
 invarlock doctor
 ```
+
+Wheel-only review path:
+`invarlock verify /path/to/evaluation.report.json`,
+`invarlock report html -i /path/to/evaluation.report.json -o /path/to/evaluation.html`,
+and `invarlock report explain --evaluation-report /path/to/evaluation.report.json`.
 
 ### 2. Evaluate a baseline against a subject
 
 ```bash
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline gpt2 \
-  --subject /path/to/edited \
+  --subject distilgpt2 \
   --adapter auto \
   --profile ci \
-  --preset configs/presets/causal_lm/wikitext2_512.yaml \
   --report-out reports/eval
 ```
-
-Repo presets usually ship with small YAML window counts so the same files stay
-usable for local smokes. Keep using those presets, but pair them with
-`--profile ci` or `--profile release` when you need balanced-tier evaluations
-to meet the normal token-floor gates.
 
 `evaluate` uses the runtime container by default unless you explicitly pass
 `--execution-mode host` for a host-side workflow. Container-backed runs emit
@@ -89,10 +75,12 @@ The verifier re-checks schema, paired math, gate results, and the adjacent
 runtime manifest before you promote results. Use the host form only
 when the evaluation itself ran with `--execution-mode host`.
 
-`invarlock report generate` and `invarlock report explain` expect canonical
-`report.json` inputs. `invarlock report html` expects canonical
-`evaluation.report.json`. Directory inputs are command-specific and ambiguous
-directories are rejected.
+Artifact model:
+
+| Artifact | Produced by | Primary consumers |
+| --- | --- | --- |
+| `evaluation.report.json` | `invarlock evaluate`, `invarlock report generate --format report` | `invarlock verify`, `invarlock report html`, `invarlock report validate`, `invarlock report explain --evaluation-report`, `invarlock advanced runtime-verify` |
+| `report.json` | Baseline/subject run directories under `runs/...` | `invarlock report generate`, `invarlock report explain --subject-report ... --baseline-report ...` |
 
 ### 4. Render shareable HTML
 
@@ -100,21 +88,13 @@ directories are rejected.
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
 
-Directory inputs are command-specific: `invarlock report explain` expects a
-directory containing canonical `report.json`, while `invarlock report html`
-expects a directory containing canonical `evaluation.report.json`.
+Optional: explain gate decisions directly from the evaluation bundle with
+`invarlock report explain --evaluation-report reports/eval/evaluation.report.json`
+when the bundle provenance still points to accessible baseline and subject
+`report.json` files.
 
-Optional: explain gate decisions directly from the run reports.
-
-```bash
-invarlock report explain \
-  --subject-report runs/subject/report.json \
-  --baseline-report runs/source/report.json
-```
-
-`invarlock report explain` expects run reports (`report.json`), not the
-generated `evaluation.report.json` bundle. Use `invarlock verify` for the
-paired evaluation report.
+If you only have the run reports, the lower-level form remains:
+`invarlock report explain --subject-report runs/subject/report.json --baseline-report runs/source/report.json`.
 
 ## Execution Notes
 
@@ -154,6 +134,17 @@ Use Python extras such as `pip install "invarlock[awq,gptq]"` when you need
 optional backends. On Python 3.13+ stacks, `gptq` may still require a vendor
 wheel or a supported older interpreter because upstream `auto-gptq` packaging
 remains narrower than the core InvarLock support matrix.
+
+## Repo Maintainer Path
+
+If you are working from a repository checkout and want the local image-backed
+smoke flows, build the runtime image after the basic front door works:
+
+`make runtime-image`, `make container-default-smoke`, and
+`make container-front-door-smoke`.
+
+Podman users can prepare the same image explicitly with:
+`make runtime-image-podman` and `make runtime-smoke-podman`.
 
 ## Core Concepts
 

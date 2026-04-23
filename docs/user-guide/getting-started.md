@@ -12,12 +12,13 @@
 
 This guide covers installation, environment setup, and the smallest useful
 InvarLock workflow: compare a baseline against a subject, verify the
-container-backed report, and render HTML for review. The same top-level loop also underpins the
-included image-text path when you use the explicit multimodal preset and
-provider configuration. The minimal install is enough for `doctor`, `verify`,
-and `report html`; use `invarlock[hf]` only when you need `evaluate` to load
-Hugging Face models. Treat `evaluate -> verify -> report html` as the first
-path to get green before you reach for deeper report-analysis commands.
+container-backed report, and render HTML for review. The same top-level loop
+also underpins the included image-text path when you use the explicit
+multimodal preset and provider configuration. The minimal install is enough for
+`doctor`, `verify`, and `report html`; use `invarlock[hf]` only when you need
+`evaluate` to load Hugging Face models. Treat `evaluate -> verify -> report html`
+as the first path to get green before you reach for deeper report-analysis
+commands.
 
 ## Install InvarLock
 
@@ -77,17 +78,15 @@ container and emits `runtime.manifest.json` beside the evaluation report.
 ```bash
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline gpt2 \
-  --subject /path/to/edited \
+  --subject distilgpt2 \
   --adapter auto \
   --profile ci \
-  --preset configs/presets/causal_lm/wikitext2_512.yaml \
   --report-out reports/eval
 ```
 
-Most repo presets keep small YAML window counts for smoke portability. The
-pass-capable path is to keep those presets and run them with `--profile ci` or
-`--profile release`, which override `preview_n` / `final_n` to the packaged
-runtime defaults.
+Repo maintainers can still add `--preset configs/...` when they intentionally
+want a repo-owned preset, but the wheel-first onboarding path should start with
+direct flags and the built-in adapter defaults.
 
 ## Verify And Render
 
@@ -99,10 +98,12 @@ invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/eva
 These commands validate the paired math, schema, and runtime provenance, then
 render a shareable HTML artifact from the same report.
 
-`report generate` and `report explain` take canonical `report.json` inputs,
-while `report html` takes canonical `evaluation.report.json`. Pass exact file
-paths for deterministic results; directory inputs are command-specific and
-ambiguous directories are rejected.
+Artifact model:
+
+| Artifact | Produced by | Primary consumers |
+| --- | --- | --- |
+| `evaluation.report.json` | `invarlock evaluate`, `invarlock report generate --format report` | `invarlock verify`, `invarlock report html`, `invarlock report validate`, `invarlock report explain --evaluation-report`, `invarlock advanced runtime-verify` |
+| `report.json` | Baseline/subject run directories under `runs/...` | `invarlock report generate`, `invarlock report explain --subject-report ... --baseline-report ...` |
 
 ## Execution Modes
 

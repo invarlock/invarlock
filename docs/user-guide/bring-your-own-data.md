@@ -82,7 +82,7 @@ printf '%s\n' \
   '{"text":"offline local jsonl sample"}' \
   '{"text":"evaluation smoke row"}' > /tmp/byod.jsonl
 
-# 2) Write config (start from configs/presets/causal_lm/wikitext2_512.yaml and adjust dataset to your BYOD)
+# 2) Write a minimal BYOD config from scratch
 cat > byod.yaml <<'YAML'
 model:
   id: gpt2

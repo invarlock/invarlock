@@ -49,7 +49,7 @@ plugins ... --json`.
 The CLI exposes these contracts directly:
 
 - `invarlock verify --json`
-- `invarlock-runtime-verify --json`
+- `invarlock advanced runtime-verify --json`
 - `invarlock advanced plugins adapters --json`
 - `invarlock doctor --json`
 - `invarlock advanced evidence-pack verify --json`
@@ -58,10 +58,11 @@ The CLI exposes these contracts directly:
 - `scripts/evidence_packs/verify_pack.sh --strict`
 
 The first seven surfaces are available from installed packages. The low-level
-`invarlock-runtime-verify` command is the package-native runtime-manifest
-verifier used for direct report/manifest checks. The repo shell
-verifier remains available for evidence-pack workflow maintainers, and pure wheel
-installs can verify packs with `invarlock advanced evidence-pack verify`.
+`invarlock advanced runtime-verify` command is the package-native
+runtime-manifest verifier used for direct report/manifest checks. The repo
+shell verifier remains available for evidence-pack workflow maintainers, and
+pure wheel installs can verify packs with `invarlock advanced evidence-pack
+verify`.
 
 Third-party plugins are fail-closed on ABI declaration: adapters, edits, and
 guards must declare `INVARLOCK_CORE_ABI`, and the value must match the exact
@@ -75,7 +76,7 @@ and `metric_kinds` entries from the public contract catalog.
 The versioned JSON surfaces are intentionally explicit:
 
 - `invarlock verify --json` emits `format_version: "verify-v1"`
-- `invarlock-runtime-verify --json` emits
+- `invarlock advanced runtime-verify --json` emits
   `format_version: "runtime-verify-v1"`
 - `invarlock advanced evidence-pack verify --json` emits
   `format_version: "evidence-pack-verify-v1"` and nests the bundled report
