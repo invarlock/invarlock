@@ -40,6 +40,7 @@ _validate_counts = _verify_checks._validate_counts
 _validate_drift_band = _verify_checks._validate_drift_band
 _validate_tokenizer_hash = _verify_checks._validate_tokenizer_hash
 _validate_measurement_contracts = _verify_checks._validate_measurement_contracts
+_validate_variance_enablement = _verify_checks._validate_variance_enablement
 _apply_profile_lints = _verify_checks._apply_profile_lints
 _report_schema = _verify_checks._report_schema
 validate_report = _verify_checks.validate_report
@@ -110,6 +111,7 @@ def _validate_evaluation_report_payload(
         validate_primary_metric_policy_fn=_validate_primary_metric_policy,
         apply_profile_lints_fn=_apply_profile_lints,
         validate_tokenizer_hash_fn=_validate_tokenizer_hash,
+        validate_variance_enablement_fn=_validate_variance_enablement,
         validate_measurement_contracts_fn=_validate_measurement_contracts,
     )
 

@@ -254,13 +254,23 @@ test-assurance:  ## Run assurance-related tests only
 		tests/ci/test_golden_runs_offline.py \
 		tests/ci/test_support_matrix_consistency.py \
 		tests/adapters/test_adapter_capability_contract.py \
+		tests/core/test_bootstrap.py::test_compute_paired_delta_and_ratio_ci_consistency \
+		tests/core/test_runner_pairing.py::test_assess_bootstrap_coverage_paths \
+		tests/guards/test_invariants_guard.py::test_invariants_guard_detects_non_finite_weights \
 		tests/eval/test_assurance_contracts.py \
+		tests/eval/test_metrics_masked_lm.py \
+		tests/edits/test_quant_rtn.py \
+		tests/cli/test_verify.py::test_verify_command_passes \
 		tests/docs/test_claim_surface_consistency.py \
 		tests/docs/test_assurance_xref_linter.py \
+		tests/reporting/test_report_paired_ci_identity.py::test_paired_ci_identity_holds \
+		tests/reporting/test_report_pairing_and_validation_helpers.py::test_enforce_pairing_and_coverage_path_matrix \
+		tests/reporting/test_report_policy_edges.py::test_ppl_hysteresis_applied_near_threshold \
 		tests/reporting/test_public_contracts.py \
 		tests/reporting/test_evidence_pack_contract.py \
 		tests/reporting/test_policy_pack_contract.py \
-		tests/reporting/test_policy_utils.py::test_compute_policy_digest_matches_assurance_spec
+		tests/reporting/test_policy_utils.py::test_compute_policy_digest_matches_assurance_spec \
+		tests/reporting/test_reporting_regression_matrix.py::test_validate_variance_enablement_rejects_missing_gate_provenance
 
 lint:  ## Run linting
 	$(MAKE) ensure-ruff
