@@ -10,166 +10,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.8.0] - 2026-04-23
 
 ### Added
-- Added wheel-shipped public evidence under
-  `invarlock/_data/public_evidence/published_basis/...` together with the
-  matching repo-visible `public_evidence/published_basis/...` source copies so
-  users can inspect published-basis artifacts without reaching into
-  test fixtures.
-- Added a curated `make docs-live-fast` maintainer lane, a dedicated live
-  examples guide, and explicit docs/CI coverage for the runnable markdown and
-  notebook surfaces that are expected to stay working over time.
-- Added a dedicated `make packaging-smoke-front-door` maintainer lane that
-  installs a wheel in a fresh venv and exercises the real host-mode
-  `evaluate -> verify -> report html` path from outside the repo tree.
-- Added the `Qwen/Qwen2.5-7B` lane to declared
-  `supported_experimental` support and expanded the shipped
-  supported-experimental inventory across the support matrix, model-family
-  catalog, and maintained evidence-sweep surfaces.
-- Added repo-ready deferred candidate surfaces for `openlm-research/open_llama_7b`,
-  `facebook/opt-1.3b`, `tiiuae/falcon-7b`, `THUDM/glm-4-9b-chat`, and
-  `distilbert-base-uncased`, including shipped presets/calibration configs,
-  tuned reduced-pack parameters, dry-run sweep coverage, and targeted tests.
+- Added shipped public evidence under
+  `invarlock/_data/public_evidence/published_basis/...` together with matching
+  repo-visible `public_evidence/published_basis/...` source copies.
+- Added maintainer smoke lanes for runnable docs, installed-wheel front-door
+  flows, and default container journeys, including `make docs-live-fast`,
+  `make packaging-smoke-front-door`, `make container-default-smoke`, and
+  `make container-front-door-smoke` plus Podman siblings where applicable.
+- Added the `Qwen/Qwen2.5-7B` lane to declared `supported_experimental`
+  coverage and expanded the maintained model inventory and evidence-sweep
+  surfaces for the promoted set.
+- Added repo-ready deferred candidate surfaces for `open_llama_7b`,
+  `opt-1.3b`, `falcon-7b`, `glm-4-9b-chat`, and `distilbert-base-uncased`,
+  including shipped presets/calibration configs, tuned reduced-pack
+  parameters, and targeted sweep/test coverage.
 - Added a bounded `scripts/evidence_packs/run_mini_pack_gate.sh` maintainer
-  lane plus remote setup/smoke coverage for narrower recovery and promotion
-  checks on evidence-pack hosts.
-- Added `make container-default-smoke` (and a Podman sibling) as the
-  maintainer user-journey lane for the recommended default
-  container-backed `evaluate` path, instead of relying only on the lighter
-  runtime-image import smoke.
-- Added `make container-front-door-smoke` (and a Podman sibling) as the
-  fuller maintainer container journey lane for the recommended default
-  runtime path, covering `evaluate -> verify -> report html` on the local
-  runtime image.
+  lane plus remote setup/smoke coverage for narrower evidence-pack recovery
+  and promotion checks.
 
 ### Changed
-- Versioned `invarlock-runtime-verify --json` with
-  `format_version: "runtime-verify-v1"`, moved support-matrix evidence paths
-  to logical `public_evidence/published_basis/...` locations, and made
-  packaged runtime-profile provenance portable through `runtime/tiers.yaml`.
 - Replaced the old assurance toggle with explicit
   `evaluate --execution-mode container|host` and
   `verify --runtime-provenance container|host`, and aligned the
   maintained docs/live-example/workflow surfaces to the same terminology.
 - Renamed the public and maintainer bundle surface from proof packs to
-  evidence packs across the advanced CLI namespace, contract schemas, packaged
-  public-evidence recipes, scripts, docs, notebooks, Makefile targets, and
-  owner-aligned test suites.
-- Promoted the runtime-provenance CLI contract files
-  (`cli/runtime_modes.py`, `cli/commands/evaluate.py`, and
-  `cli/commands/verify.py`) to explicit `coverage-enforce` 100% thresholds and
-  aligned the verify coverage lane with behavior-named `test_verify*` suites.
-- Refreshed maintainer workflow dependency pins across the docs/tooling and
-  GitHub Actions surfaces, including `ruff 0.15.11`, updated `actions/cache`,
-  `github/codeql-action`,
-  `google/clusterfuzzlite`, and `actions/attest-build-provenance`.
-- Tightened public docs around the stable CLI/report/contract-read surface,
-  kept repo tags and installed wheels as the maintained public contract
-  carriers, and aligned docs/navigation around the runnable
-  notebook and live-example entry points.
-- Removed the detached `make_public_contract_bundle.py` maintainer helper so
-  the public-contract distribution story is now only repo tags plus installed
-  wheels.
-- Tightened the minimal installed-wheel contract smoke so it now covers the
-  standalone core CLI surface (`evaluate --help`, `verify`, `report html`,
-  `invarlock-runtime-verify`), packaged published-basis evidence-path
-  resolution, and evidence-pack verification from outside the repo tree.
-- Split the installed-wheel packaging smoke by behavior so the dedicated
-  front-door `evaluate -> verify -> report html` contract lane now lives in
-  its own packaging test file while preserving the same outside-the-repo
-  installed-wheel coverage.
-- Tightened the docs lint contract so `make verify` now runs a strict
-  `docs-lint-strict` lane that fails when the pinned markdownlint/cspell
-  toolchain is unavailable, while keeping the plain local docs lint entrypoint
-  permissive for day-to-day maintainer use.
-- Refactored the evidence-pack, runtime-security, verify-check, model-profile,
-  guard-policy, and orchestration-attempt internals into smaller owner modules
-  without changing the public CLI surface.
-- Renamed the internal runtime-provenance and evidence-pack provenance helper
-  families to remove the remaining old naming, switched evidence-pack
-  inspect integrity payloads to `manifest_provenance_ok`, moved runtime
-  verification fixtures under `tests/fixtures/runtime_provenance`, and dropped
-  the last `--assurance` rewrite path from the markdown live-example sanitizer.
-- Renamed the internal runtime bypass override from `unattested` language to
-  `unverified provenance`, including the environment variable,
-  helper APIs, and related test coverage.
-- Expanded the machine-readable model inventory in
-  `contracts/model_family_catalog.json` and the maintained evidence-sweep
-  suites so the repo distinguishes declared support, broader implemented
-  coverage, usage-only checkpoints, and promotion-candidate inventories for
-  smaller text and MLM families.
-- Kept tracked `public_evidence` focused on the true shipped
-  `published_basis` fixtures; pre-promotion candidate state is now treated as
-  contract/workflow data rather than a tracked staged-evidence subtree.
+  evidence packs across the CLI, contracts, docs, notebooks, scripts, and
+  packaged public-evidence recipes.
+- Versioned `invarlock-runtime-verify --json` as `runtime-verify-v1`, moved
+  shipped evidence paths to logical `public_evidence/published_basis/...`
+  locations, and made packaged runtime-profile provenance portable through
+  `runtime/tiers.yaml`.
+- Tightened the installed-wheel, docs-lint, and container maintainer gates
+  around the supported public CLI and report paths.
+- Expanded the machine-readable model inventory to distinguish declared
+  support, implemented coverage, usage-only checkpoints, and
+  promotion-candidate inventories, while keeping tracked `public_evidence`
+  limited to shipped published-basis fixtures.
 
 ### Fixed
-- Fixed runtime-contract docs and assurance hygiene by teaching the assurance
-  xref linter to catch bare `tests/...py` citations, replacing the stale
-  bootstrap citation in the assurance case, and marking the legacy hardcoded
-  `rmt_policy.py` table as a fallback rather than the calibrated source of
-  truth.
 - Fixed the evidence-pack clean-prune contract so the clean pruning lane is now
   model-tuned under the generic `prune_clean` scenario name, and retuned the
   Mistral 7B clean prune from 12% to 10% after a real H200 rerun showed that
   the old setting tripped the RMT clean-pass gate.
-- Fixed remaining public runtime-provenance wording so report/reference docs,
-  maintainer test docs, evidence-pack guidance and verification surfaces, and
-  runtime-image error messages no longer describe container-backed manifests as
-  "verified" outputs.
-- Fixed the live-example and installed-wheel Hugging Face smoke paths to reuse
-  a writable shared cache before falling back to run-local temp caches, and
-  disabled Transformers safetensors auto-conversion lookups in those smoke
-  environments, which reduces rate-limit sensitivity while preserving
-  deterministic local cleanup.
-- Fixed transient `tmp/live_examples/.../workspaces` cleanup failures so
-  repeated `make docs-live` and markdown smoke runs no longer trip over
-  short-lived directory-not-empty races during workspace teardown.
-- Fixed packaging-smoke Python selection so the installed-wheel lanes now ask
-  the shared workspace selector for interpreters that satisfy the same
-  wheel-build requirement used by the helper, instead of stopping early on a
-  repo `.venv` that is version-correct but was previously screened by the
-  wrong capability check.
-- Fixed docs-only CI parity for curated live examples by aligning the docs
-  dependency set with the seeded report/verify path and making markdown demo
-  report generation fall back cleanly when the full reporting stack is not
-  installed.
-- Fixed standalone-product wording across README, docs, live-example tooling,
-  and evidence-pack summaries so public guidance no longer frames the OSS repo
-  around vague feeder-consumer wording.
-- Fixed maintainer-surface drift by pruning stale `certify`-era ignore rules,
-  dead markdownlint curated paths, and obsolete deep-clean output names from
-  the current repo shape.
-- Fixed the live-example verification path so `make docs-live` now runs the
-  true full markdown-plus-notebook lane with streamed progress output, stages
-  `.github/` into the lightweight markdown workspaces for repo-shape checks,
-  and clears stale live-example output before reruns so interrupted sessions
-  do not corrupt later `results.jsonl` reads; `docs-live-fast` remains the
-  deterministic curated subset used by docs checks and CI.
-- Fixed host-mode docs replay and notebook smoke execution to normalize heavy
-  examples onto smoke-sized assets, keep the BYOD example runnable, and keep
-  public runtime-tier references on the logical `runtime/tiers.yaml` path.
-- Fixed minimal wheel-smoke coverage so installed distributions continue to
-  cover `doctor`, `verify`, `report html`, `invarlock-runtime-verify`,
-  contract catalog loading, and advanced evidence-pack verification from outside
-  the repo tree.
-- Fixed duplicated host/container wording in the evidence-pack guide so the
-  host-side repo-wrapper workflow is described cleanly and consistently.
-- Fixed strict Python evidence-pack verification for real generated packs whose
-  `checksums.sha256` entries use `./...` paths, matching the shell verifier's
-  path normalization so packaged `advanced evidence-pack verify --strict`
-  accepts clean packs end to end.
-- Fixed large-model evidence-pack baseline-report reuse so generated
-  `config_root/runtime/profiles/ci.yaml` profiles carry
-  `context.run.skip_overhead_check: true`, avoiding unnecessary overhead-probe
-  work during the evaluate stage for large-model runs.
-- Fixed evidence-pack edit targeting across the RTN, FP8, pruning, and
-  low-rank model creators so tensorized MoE expert weights are edited by the
-  intended `all` / `ffn` / `attn` scopes instead of degrading to near-noop
-  router-only changes on Mixtral-style models.
-- Fixed evidence-pack artifact creation and reuse around FP8, pruning,
-  quantized, and low-rank edit outputs by making artifact writes atomic,
-  validating edit completeness before reuse, and adding a shared HF causal
-  loader fallback for Ministral-style and other non-standard causal
-  checkpoints.
+- Fixed live-example and installed-wheel smoke reliability by reusing writable
+  Hugging Face caches, normalizing host-mode docs replay onto smoke-sized
+  assets, tightening Python selection, aligning docs-only CI dependencies, and
+  stabilizing rerun cleanup/output handling.
+- Fixed minimal wheel and advanced evidence-pack verification coverage so
+  installed distributions keep covering `doctor`, `verify`, `report html`,
+  `invarlock-runtime-verify`, packaged contract loading, and strict
+  evidence-pack verification outside the repo tree.
+- Fixed evidence-pack correctness and recovery across MoE edit targeting,
+  strict checksum path normalization, large-model baseline-report reuse,
+  atomic artifact creation/reuse, and shared causal-model loading for
+  non-standard causal checkpoints.
 - Fixed evidence-pack remote recovery and mini-pack execution on recheck hosts
   by honoring model-specific queue overrides, normalizing remote repo aliases,
   tightening scenario-manifest drift checks, and hardening resume/setup smoke
@@ -177,9 +71,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed the `evidence_pack` / `evidence_pack_support` module boundary so the
   helper surface no longer relies on a cyclic runtime import that CodeQL flags
   as an unsafe import-order dependency.
-- Fixed the shell-harness `python3` stub contract so shell tests that need real
-  helper-script execution must now opt in explicitly instead of silently
-  bypassing new Python-side validation paths.
+- Fixed shell-harness and maintainer-surface drift by tightening the `python3`
+  stub contract, pruning stale ignore/lint/deep-clean paths, and cleaning up
+  remaining public runtime-provenance wording and standalone-product phrasing.
 
 ## [0.7.2] - 2026-04-15
 
