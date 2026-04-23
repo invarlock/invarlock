@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+### Changed
+
+### Removed
+
+### Fixed
+
 ## [0.8.0] - 2026-04-23
 
 ### Added
@@ -136,6 +144,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   light-import-safe while concrete heavy implementations live behind their
   owning modules.
 
+- Removed test/scientific-only packages from the base runtime where they were
+  not required, moved MI-probe dependencies behind narrower extras, and
+  refreshed workflow lockfiles to match the tightened CI and release surfaces,
+  including `aiohttp==3.13.5` and `linkchecker==10.6.0` on the shipped docs
+  and security paths.
+- Pinned typed and packaging workflow lockfiles to include `mypy==1.20.0` and
+  `wheel==0.46.3` so the new typed-surface and minimal wheel-install gates run
+  under the shipped CI surface instead of relying on implicit tool installs.
+- Bumped docs spell-check tooling from `cspell` `9.7.0` to `10.0.0`.
+- Added pinned CI/release workflow tooling for `actionlint` `v1.7.7` and
+  `gitleaks` `v8.30.0` as part of the new fail-closed workflow and
+  supply-chain gates.
+- Bumped the release publish action to `pypa/gh-action-pypi-publish`
+  `1.14.0`.
+- Raised the docs CI Node runtime from `18` to `22` so the refreshed
+  spell-check toolchain remains on a supported engine.
+
+- Refreshed workflow, security, CLI, config, and contract docs to match the
+  new assurance model, supply-chain gates, fail-closed report validation, and
+  light-import-safe module boundaries.
+- Documented the standalone public contract bundle and the minimal-install
+  verify/report/evidence-pack onboarding path.
+- Clarified secure-default runtime docs and user-facing guidance to describe an
+  OCI container engine requirement first, keep Podman/Docker examples explicit,
+  and scope Docker-only language to the local `act` workflow.
+
 ### Fixed
 - Fixed accuracy-confidence labeling so accuracy metrics evaluate confidence
   width in true percentage points, while non-accuracy ratio metrics keep their
@@ -166,34 +200,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   supply-chain path; GPTQ remains available on the narrower Linux stacks that
   upstream packaging currently supports.
 
-### Dependencies
-- Removed test/scientific-only packages from the base runtime where they were
-  not required, moved MI-probe dependencies behind narrower extras, and
-  refreshed workflow lockfiles to match the tightened CI and release surfaces,
-  including `aiohttp==3.13.5` and `linkchecker==10.6.0` on the shipped docs
-  and security paths.
-- Pinned typed and packaging workflow lockfiles to include `mypy==1.20.0` and
-  `wheel==0.46.3` so the new typed-surface and minimal wheel-install gates run
-  under the shipped CI surface instead of relying on implicit tool installs.
-- Bumped docs spell-check tooling from `cspell` `9.7.0` to `10.0.0`.
-- Added pinned CI/release workflow tooling for `actionlint` `v1.7.7` and
-  `gitleaks` `v8.30.0` as part of the new fail-closed workflow and
-  supply-chain gates.
-- Bumped the release publish action to `pypa/gh-action-pypi-publish`
-  `1.14.0`.
-- Raised the docs CI Node runtime from `18` to `22` so the refreshed
-  spell-check toolchain remains on a supported engine.
-
-### Documentation
-- Refreshed workflow, security, CLI, config, and contract docs to match the
-  new assurance model, supply-chain gates, fail-closed report validation, and
-  light-import-safe module boundaries.
-- Documented the standalone public contract bundle and the minimal-install
-  verify/report/evidence-pack onboarding path.
-- Clarified secure-default runtime docs and user-facing guidance to describe an
-  OCI container engine requirement first, keep Podman/Docker examples explicit,
-  and scope Docker-only language to the local `act` workflow.
-
 ## [0.7.0] - 2026-04-09
 
 ### Added
@@ -216,6 +222,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Python, dedicated smoke configs, and lane-oriented scripts instead of the
   earlier monolithic CLI smoke harness.
 
+- Bumped workflow and dev-security dependencies including `cryptography` to
+  `46.0.7`, `ruff` to `0.15.9`, `katex` to `0.16.45`, and refreshed the pinned
+  CodeQL action state and Dependabot handling.
+- Added a `cu128` runtime-image lockfile for the CUDA container runtime path.
+
+- Refreshed maintainer and user docs around profile-driven token floors, smoke
+  strategy, calibration surfaces, and the current host / container
+  operating model.
+
 ### Fixed
 - Fixed `quant_rtn` and report-generation fail-closed behavior so noop edits,
   failed subject runs, malformed primary-metric outputs, and invalid baseline
@@ -234,17 +249,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reduced repo-wide static debt by removing remaining source `type: ignore`
   suppressions, narrowing broad exception fallbacks, and hardening
   observability, eval, calibration, and adapter boundary paths.
-
-### Dependencies
-- Bumped workflow and dev-security dependencies including `cryptography` to
-  `46.0.7`, `ruff` to `0.15.9`, `katex` to `0.16.45`, and refreshed the pinned
-  CodeQL action state and Dependabot handling.
-- Added a `cu128` runtime-image lockfile for the CUDA container runtime path.
-
-### Documentation
-- Refreshed maintainer and user docs around profile-driven token floors, smoke
-  strategy, calibration surfaces, and the current host / container
-  operating model.
 
 ## [0.6.0] - 2026-04-04
 
@@ -280,6 +284,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   around numeric coercion, fallback validation, retry signaling, iterator
   handling, and config isolation, with expanded targeted regression coverage.
 
+- Bumped workflow `aiohttp` from `3.13.3` to `3.13.4` and pinned runtime/fuzz
+  builder inputs more strictly for deterministic post-release smoke and
+  packaging behavior.
+- Updated Hugging Face runtime requirements and locks to `transformers==5.5.0`
+  for Gemma 4 support.
+
+- Refreshed CLI/reference/user-guide pages, shipped preset comments, and
+  notebooks to teach the new assurance UX and the current host verify
+  pattern consistently.
+- Documented the evidence-pack reviewer-summary surface and the writable dataset
+  cache fallback path in the relevant reference and user-guide pages.
+- Updated support and dataset docs to document the Gemma 4 E2B pilot lane and
+  the new `vision_text` image-text evaluation flow.
+
 ### Fixed
 - Fixed Gemma 4 causal and multimodal loading paths so text and image-text
   runs resolve through the intended adapters, stay on the supported
@@ -299,22 +317,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed host evaluation and verification ergonomics so local host runs,
   report verification, and docs/notebook examples all use the same explicit
   assurance vocabulary.
-
-### Dependencies
-- Bumped workflow `aiohttp` from `3.13.3` to `3.13.4` and pinned runtime/fuzz
-  builder inputs more strictly for deterministic post-release smoke and
-  packaging behavior.
-- Updated Hugging Face runtime requirements and locks to `transformers==5.5.0`
-  for Gemma 4 support.
-
-### Documentation
-- Refreshed CLI/reference/user-guide pages, shipped preset comments, and
-  notebooks to teach the new assurance UX and the current host verify
-  pattern consistently.
-- Documented the evidence-pack reviewer-summary surface and the writable dataset
-  cache fallback path in the relevant reference and user-guide pages.
-- Updated support and dataset docs to document the Gemma 4 E2B pilot lane and
-  the new `vision_text` image-text evaluation flow.
 
 ## [0.5.1] - 2026-04-02
 
@@ -358,6 +360,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ratcheted refactored split owners to stricter 95% and 100% per-file coverage
   thresholds where the current suite supports it.
 
+- Patched vulnerable workflow locks and tightened smoke-workflow dependency and
+  asset caching behavior for more deterministic CI execution.
+- Updated verification and coverage gates so the packaged verifier and the
+  newly split owner modules are exercised directly in local and CI runs.
+- Bumped workflow and release security pins including `cryptography` to
+  `46.0.6`, `pygments` to `2.20.0`, and the Sigstore GitHub Action used by the
+  release workflow.
+- Bumped `aiohttp` from `3.13.3` to `3.13.4` in workflow requirement locks and
+  landed the corresponding Dependabot-equivalent fix on `staging/next`.
+
+- Refreshed docs to match the post-`v0.5.0` architecture and operations model,
+  including the shell/core redesign, current evaluate contract, and updated
+  report-artifact guidance.
+- Added remediation closeout records from the refactor program and updated the
+  maintainer smoke notes to distinguish the push-gated tiny container smoke from
+  the heavier GPT-2 canary workflow.
+- Documented the Python-only runtime-verifier contract and removed the obsolete
+  external-verifier environment-variable guidance.
+- Updated the architecture/security references so runtime provenance
+  ownership now explicitly points at the package-native verifier instead of an
+  external-binary model.
+
+### Removed
+- Removed remaining compatibility surfaces that no longer fit the stabilized
+  architecture, including legacy command shims, reporting facades, owner-layer
+  patch-sync wrappers, the retired legacy RMT module, stale lazy export
+  placeholders, and other shell-leaking or test-only indirections that had
+  survived earlier migrations.
+- Removed the repo-local Rust runtime verifier crate and the
+  `INVARLOCK_RUNTIME_VERIFIER` product override so runtime provenance now has
+  a single package-native verifier path.
+- Removed the evidence-pack `gpg` signing and verification path in favor of the
+  package-native Ed25519 manifest-signature flow.
+
 ### Fixed
 - Delegated and containerized evaluation reports now emit container execution
   provenance into their runtime manifests.
@@ -388,43 +424,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Restored 100% evidence-pack shell-harness coverage and fixed warning-path shell
   helpers that had been swallowing finalize, evaluate, or verify failures.
 
-### Removed
-- Removed remaining compatibility surfaces that no longer fit the stabilized
-  architecture, including legacy command shims, reporting facades, owner-layer
-  patch-sync wrappers, the retired legacy RMT module, stale lazy export
-  placeholders, and other shell-leaking or test-only indirections that had
-  survived earlier migrations.
-- Removed the repo-local Rust runtime verifier crate and the
-  `INVARLOCK_RUNTIME_VERIFIER` product override so runtime provenance now has
-  a single package-native verifier path.
-- Removed the evidence-pack `gpg` signing and verification path in favor of the
-  package-native Ed25519 manifest-signature flow.
-
-### Dependencies
-- Patched vulnerable workflow locks and tightened smoke-workflow dependency and
-  asset caching behavior for more deterministic CI execution.
-- Updated verification and coverage gates so the packaged verifier and the
-  newly split owner modules are exercised directly in local and CI runs.
-- Bumped workflow and release security pins including `cryptography` to
-  `46.0.6`, `pygments` to `2.20.0`, and the Sigstore GitHub Action used by the
-  release workflow.
-- Bumped `aiohttp` from `3.13.3` to `3.13.4` in workflow requirement locks and
-  landed the corresponding Dependabot-equivalent fix on `staging/next`.
-
-### Documentation
-- Refreshed docs to match the post-`v0.5.0` architecture and operations model,
-  including the shell/core redesign, current evaluate contract, and updated
-  report-artifact guidance.
-- Added remediation closeout records from the refactor program and updated the
-  maintainer smoke notes to distinguish the push-gated tiny container smoke from
-  the heavier GPT-2 canary workflow.
-- Documented the Python-only runtime-verifier contract and removed the obsolete
-  external-verifier environment-variable guidance.
-- Updated the architecture/security references so runtime provenance
-  ownership now explicitly points at the package-native verifier instead of an
-  external-binary model.
-
 ## [0.5.0] - 2026-03-25
+
 ### Added
 - Added an offline release-verification bundle generator and reference docs for
   auditing release artifacts without network access.
@@ -466,6 +467,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplified the human-readable Markdown evaluation report by folding the
   dashboard into a single Executive Summary section and removing the
   hand-maintained contents block.
+
+- Bumped `ruff` from `0.15.6` to `0.15.7`.
+- Bumped `actions/cache` from `5.0.3` to `5.0.4`.
+- Bumped `actions/download-artifact` from `7` to `8`.
+- Bumped `actions/upload-artifact` from `5` to `7`.
+- Bumped `katex` from `0.16.28` to `0.16.38`.
+- Bumped `flatted` from `3.4.1` to `3.4.2`.
+
+- Rewrote the public onboarding flow around `evaluate` → `verify` →
+  `report html`, moved advanced command guidance behind the `advanced`
+  namespace, and added migration notes for the simplified CLI surface.
+- Added a release-verification guide covering the new offline bundle flow and
+  refreshed related security best-practice references.
+- Clarified evidence-pack wheel-boundary, scenario, and verification guidance, and
+  refreshed related CLI, contracts, and adapter reference material.
+- Documented the maintained Qwen2.5-14B evidence-pack sentinels, fresh-worktree
+  remote guidance, and the new secure-default evidence-pack bulk-run defaults.
+- Updated report-reading/reference docs to match the streamlined Executive
+  Summary-first Markdown report layout.
+- Added live execution verification for runnable Markdown examples in the
+  maintainer docs workflow, documented the new `docs-live` path plus
+  runtime-image prerequisites for repo quickstarts, and kept hosted docs CI on
+  the non-live validation path.
+- Documented evidence-pack wheel verification and the nongated replacement backlog
+  lanes used for evidence-backed model support planning.
+
+### Removed
+- Removed the `QwQ-32B` model lane from the repo, including its maintained
+  catalog/support references and its shipped preset and calibration configs.
 
 ### Fixed
 - Hardened CLI backend, doctor, plugin, and verification checks, including
@@ -514,37 +544,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `artifacts.generated_at`, and suppressed empty window-plan placeholders in
   first-screen summaries.
 
-### Removed
-- Removed the `QwQ-32B` model lane from the repo, including its maintained
-  catalog/support references and its shipped preset and calibration configs.
-
-### Dependencies
-- Bumped `ruff` from `0.15.6` to `0.15.7`.
-- Bumped `actions/cache` from `5.0.3` to `5.0.4`.
-- Bumped `actions/download-artifact` from `7` to `8`.
-- Bumped `actions/upload-artifact` from `5` to `7`.
-- Bumped `katex` from `0.16.28` to `0.16.38`.
-- Bumped `flatted` from `3.4.1` to `3.4.2`.
-
-### Documentation
-- Rewrote the public onboarding flow around `evaluate` → `verify` →
-  `report html`, moved advanced command guidance behind the `advanced`
-  namespace, and added migration notes for the simplified CLI surface.
-- Added a release-verification guide covering the new offline bundle flow and
-  refreshed related security best-practice references.
-- Clarified evidence-pack wheel-boundary, scenario, and verification guidance, and
-  refreshed related CLI, contracts, and adapter reference material.
-- Documented the maintained Qwen2.5-14B evidence-pack sentinels, fresh-worktree
-  remote guidance, and the new secure-default evidence-pack bulk-run defaults.
-- Updated report-reading/reference docs to match the streamlined Executive
-  Summary-first Markdown report layout.
-- Added live execution verification for runnable Markdown examples in the
-  maintainer docs workflow, documented the new `docs-live` path plus
-  runtime-image prerequisites for repo quickstarts, and kept hosted docs CI on
-  the non-live validation path.
-- Documented evidence-pack wheel verification and the nongated replacement backlog
-  lanes used for evidence-backed model support planning.
-
 ## [0.4.0] - 2026-03-14
 
 ### Added
@@ -570,6 +569,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed legacy CLI/reporting/config surfaces and dropped legacy evidence-pack
   layout compatibility.
 
+- Added docs spellcheck tooling and pinned repo formatter/build tooling for
+  reproducible local and CI verification.
+- Bumped GitHub `actions/cache` to v5.
+
+- Renamed and tightened assurance notes, narrowed the public claim surface, and
+  expanded reference docs for contracts, calibration, evidence packs, and policy
+  provenance.
+- Refreshed README and test/example wording to match the stabilized
+  evaluate/report/verify contract and current repo structure.
+- Updated public docs to describe the canonical five-stage guard chain,
+  including the terminal invariants pass shown by current CLI output.
+
 ### Fixed
 - Enforced verify-policy parity and preserved guard-contract parity when runs
   reuse or compare baseline evidence.
@@ -588,20 +599,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cleared the remaining CodeQL backlog and completed the current OpenSSF
   hardening pass.
 
-### Dependencies
-- Added docs spellcheck tooling and pinned repo formatter/build tooling for
-  reproducible local and CI verification.
-- Bumped GitHub `actions/cache` to v5.
-
-### Documentation
-- Renamed and tightened assurance notes, narrowed the public claim surface, and
-  expanded reference docs for contracts, calibration, evidence packs, and policy
-  provenance.
-- Refreshed README and test/example wording to match the stabilized
-  evaluate/report/verify contract and current repo structure.
-- Updated public docs to describe the canonical five-stage guard chain,
-  including the terminal invariants pass shown by current CLI output.
-
 ## [0.3.12] - 2026-02-27
 
 ### Added
@@ -612,6 +609,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tightened exception-hygiene handling across `run`, `report`, and `doctor` command paths.
 - Repository housekeeping now excludes research pipeline artifacts from tracked source files.
 
+- Bumped `katex` from `0.16.27` to `0.16.28`.
+- Bumped `markdownlint-cli2` from `0.20.0` to `0.21.0`.
+
+- Replaced remaining certification wording with evaluation terminology in docs.
+- Clarified calibration policy/preset guidance and aligned ASCII diagram connector formatting.
+
 ### Fixed
 - Hardened config include resolution and plugin subprocess path handling in CLI flows.
 - Normalized doctor/plugin command exit semantics for stable profile-specific failure behavior.
@@ -619,14 +622,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Hardened overhead/tiny-relax guard handling and config/profile gate-control enforcement.
 - Made observability alerting import-safe when `requests` is unavailable.
 - Hardened docs command runner security checks and enforced pip-audit execution.
-
-### Dependencies
-- Bumped `katex` from `0.16.27` to `0.16.28`.
-- Bumped `markdownlint-cli2` from `0.20.0` to `0.21.0`.
-
-### Documentation
-- Replaced remaining certification wording with evaluation terminology in docs.
-- Clarified calibration policy/preset guidance and aligned ASCII diagram connector formatting.
 
 ## [0.3.11] - 2026-02-12
 
@@ -637,13 +632,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Plugin detection flow updated to detect AWQ support through the lightweight `awq` module path.
 - Spectral guard handling updated to treat `gate_proj` as an FFN projection in gating paths.
 
+- Release notes and metadata updated for `v0.3.11`.
+
 ### Fixed
 - CLI plugin listing avoids importing AWQ at discovery time.
 - Reporting schema accepts nullable dataset window seeds and structured `system_overhead` payloads.
 - Quantization RTN outlier clipping path is hardened for fp16-safe behavior.
-
-### Documentation
-- Release notes and metadata updated for `v0.3.11`.
 
 ## [0.3.10] - 2026-02-08
 
@@ -657,20 +651,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docs CI: allow on-demand runs via `workflow_dispatch`.
 - Evidence packs: strengthen “evidence signal” outputs and tighten fail-closed behavior for verdict/task failures.
 
+- Evidence packs: harden dependency preflight and net-enabled install behavior (require `huggingface_hub` where needed; ensure `accelerate` is available).
+
+- Docs: fix markdown link fragments.
+- Evidence packs: clarify evidence vs proof-grade posture and document new artifacts (intervention summary + VE probe sidecar).
+
 ### Fixed
 - Guards/variance and VE: improve Mixture-of-Experts compatibility (fused expert weight layouts, broader VE layer discovery, and Mixtral `block_sparse_moe` support) and harden variance defaults/probes.
 - Evidence packs: improve reliability and determinism of demos (retuned injections/detectors, more robust packaging of probe sidecars, and safer behavior when reports exist but evaluation exits nonzero).
 - Assurance: close verification/baseline evidence gaps and tighten audit coverage.
 - CLI/eval/tests: stabilize CI help-smoke output, accept extra `load_dataset` kwargs, and allow warn-only determinism.
 
-### Dependencies
-- Evidence packs: harden dependency preflight and net-enabled install behavior (require `huggingface_hub` where needed; ensure `accelerate` is available).
-
-### Documentation
-- Docs: fix markdown link fragments.
-- Evidence packs: clarify evidence vs proof-grade posture and document new artifacts (intervention summary + VE probe sidecar).
-
 ## [0.3.9] - 2026-02-03
+
+### Changed
+- README: refresh above-the-fold header layout, including a banner-sized logo lockup and centered badges.
+- Branding: make the README logo lockup more logomark-dominant and add a dark-mode logo variant.
+- Branding: logomark-only avatar asset (`docs/assets/invarlock-mark.svg`) for GitHub profile usage.
 
 ### Fixed
 - CI: update workflow test paths after the report/certificate rename.
@@ -682,11 +679,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tests: stabilize the end-to-end pipeline memory management integration test with a PyTorch warm-up.
 - Tests: build-wheel packaging test uses `build --no-isolation` to avoid network in offline environments.
 - Tests: import-safety venv integration test skips cleanly when network is unavailable.
-
-### Documentation
-- README: refresh above-the-fold header layout, including a banner-sized logo lockup and centered badges.
-- Branding: make the README logo lockup more logomark-dominant and add a dark-mode logo variant.
-- Branding: logomark-only avatar asset (`docs/assets/invarlock-mark.svg`) for GitHub profile usage.
 
 ## [0.3.8] - 2026-02-02
 
@@ -703,6 +695,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Presets: bump default WikiText-2 dataset seed for the causal LM preset from `42` → `43`.
 - Evidence packs: `manifest.json` records `checksums_sha256_digest` (sha256 of `checksums.sha256`) and may record `signing_key_fingerprint` when signed.
 
+- Require `transformers>=5.0.0` and `huggingface_hub>=1.0.0`.
+
+- Update guides and notebooks for evaluation reports and renamed commands/pages.
+- README: add logo, community links, citation snippet, limitations, and quickstart output excerpt.
+- Drop legacy Transformers v4 config key documentation and fix minor formatting/typos.
+
 ### Fixed
 - HuggingFace/Transformers v5 compatibility: migrate load contracts and use `dtype=` where required.
 - Reduce noisy HuggingFace/Transformers warnings in `ci`/`release` CLI output.
@@ -711,14 +709,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI: keep `invarlock calibrate` import-safe so docs/example validation can run without torch installed.
 - Evidence packs: fix `verify_pack.sh` cert discovery to verify `certs/**/evaluation.report.json`.
 - Evidence packs: close a tamper-evidence gap by binding `checksums.sha256` to the signed manifest (and enforcing “no extra files” in strict verification).
-
-### Dependencies
-- Require `transformers>=5.0.0` and `huggingface_hub>=1.0.0`.
-
-### Documentation
-- Update guides and notebooks for evaluation reports and renamed commands/pages.
-- README: add logo, community links, citation snippet, limitations, and quickstart output excerpt.
-- Drop legacy Transformers v4 config key documentation and fix minor formatting/typos.
 
 ## [0.3.7] - 2026-01-22
 
@@ -734,13 +724,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Presets/overlays updated for new adapter roles and additional model families.
 - CI: bump `actions/download-artifact` to v7; remove the legacy B200 backend validation harness.
 
+- Expanded and consolidated guides across CLI, configs, datasets, guards, evidence packs, and notebooks.
+
 ### Fixed
 - Adapters: Mixtral support, improved auto-detection, and hardened causal describe/weight tying.
 - Evidence packs: enforce CI floor constraints, mitigate OOM/missing-tensors cases, and make verification more resilient.
 - Reporting/eval: avoid duplicate synthetic samples and preserve primary-metric drift band handling.
-
-### Documentation
-- Expanded and consolidated guides across CLI, configs, datasets, guards, evidence packs, and notebooks.
 
 ## [0.3.6] - 2026-01-13
 
@@ -755,7 +744,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - B200 bootstrap defaults HuggingFace caches under `${OUTPUT_DIR}/.hf` (override with `HF_HOME` / `HF_HUB_CACHE` / `HF_DATASETS_CACHE`) to avoid small `/root` partitions on GPU nodes.
 - `invarlock evaluate` now honors `guards.order` when provided by `--preset` (instead of always forcing `["invariants", "spectral", "rmt", "variance", "invariants"]`), so evaluate matches the calibration preset’s intended guard set.
 
-### Dependencies
 - Bump katex from 0.16.25 to 0.16.27.
 - Bump markdownlint-cli2 from 0.19.1 to 0.20.0.
 
@@ -772,14 +760,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - B200 generated configs default to `guards.order: [invariants, rmt, variance]` to avoid slow CPU SVD during calibration; spectral caps are not produced unless you re-enable spectral calibration separately.
 - B200 bootstrap defaults HuggingFace caches under `${WORK_DIR}/hf_home` to avoid small `/root` partitions on GPU nodes.
 
-### Fixed
-- B200 harness: treat 30B+ models as “large” for overhead-skip heuristics to avoid double-loading stalls.
+- Updated CLI/dataset/env-var references for the new difficulty scorer and removal of `INVARLOCK_SCORES_BATCH_SIZE`.
 
 ### Removed
 - `INVARLOCK_SCORES_BATCH_SIZE` (the WikiText‑2 difficulty scorer no longer batches on device).
 
-### Documentation
-- Updated CLI/dataset/env-var references for the new difficulty scorer and removal of `INVARLOCK_SCORES_BATCH_SIZE`.
+### Fixed
+- B200 harness: treat 30B+ models as “large” for overhead-skip heuristics to avoid double-loading stalls.
 
 ## [0.3.4] - 2025-12-28
 
@@ -791,7 +778,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/Release baseline pairing is fail-closed: `invarlock run --baseline ...` now requires valid `evaluation_windows` evidence and enforces dataset/tokenizer/masking parity.
 - CI/Release report generation now requires `paired_windows` evidence and rejects non-perfect window pairing.
 
-### Documentation
 - Updated artifacts, CLI, and environment variable references for snapshot fallback and baseline pairing requirements.
 
 ## [0.3.3] - 2025-12-21
@@ -813,14 +799,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - B200 validation workflow upgraded to v2.1.0 with dynamic scheduling, GPU lock management,
   and expanded task orchestration scripts.
 
+- Expanded B200 validation guide with v2.1.0 workflow details and scheduler/queue notes.
+- Assurance docs, CLI guidance, and environment variable references refreshed for new behavior.
+
 ### Fixed
 - Calibration data slicing now supports iterables with optional materialization and clearer errors.
 - Sequence hashing now includes per-sequence lengths to avoid ambiguous digests.
 - Variance guard predictive gating improves min-effect and regression reasoning.
-
-### Documentation
-- Expanded B200 validation guide with v2.1.0 workflow details and scheduler/queue notes.
-- Assurance docs, CLI guidance, and environment variable references refreshed for new behavior.
 
 ## [0.3.2] - 2025-12-14
 
@@ -834,17 +819,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Guard policies and tier runtime configuration updated to support calibration and determinism flows.
 - CLI commands (`run`, `verify`, `doctor`, `explain-gates`) extended with calibration and reporting surfaces.
 
+- Expanded assurance docs for calibration, guard contracts, determinism, and BCA/bootstrap methods.
+
 ### Fixed
 - Additional edge cases in report reporting, policy utilities, and guard analysis covered and hardened via new tests.
 
-### Documentation
-- Expanded assurance docs for calibration, guard contracts, determinism, and BCA/bootstrap methods.
-
 ## [0.3.1] - 2025-12-10
-
-### Fixed
-- **Memory leak in run.py reload fallback** - GPU memory is now freed before reloading models, preventing OOM on 70B+ runs.
-- **B200 validation script bugs** - Fixed preset path resolution, model size detection, and error propagation in dynamic scheduling workers.
 
 ### Added
 - **INVARLOCK_SKIP_OVERHEAD_CHECK env var** - Skip guard overhead measurement even with ci/release profiles for large models.
@@ -856,6 +836,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 - `INVARLOCK_TINY_RELAX` for PM acceptance - prefer `INVARLOCK_PM_ACCEPTANCE_MAX` and presets instead.
+
+### Fixed
+- **Memory leak in run.py reload fallback** - GPU memory is now freed before reloading models, preventing OOM on 70B+ runs.
+- **B200 validation script bugs** - Fixed preset path resolution, model size detection, and error propagation in dynamic scheduling workers.
 
 ## [0.3.0] - 2025-12-05
 
@@ -885,16 +869,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `hf_awq_adapter.py`: Uses `_safe_to_device()` with AWQ capabilities
 - `hf_gptq_adapter.py`: Uses `_safe_to_device()` with GPTQ capabilities
 
-### Fixed
-- BNB 8-bit model loading error when subject is a saved quantized checkpoint
-- Empty sample handling in variance guard (`_safe_mean()` helper)
-
-### Documentation
 - Added quantized adapter section to `docs/reference/model-adapters.md`
   - BNB adapter usage and pre-quantized detection
   - AWQ adapter (Python 3.12 compatible)
   - GPTQ adapter (requires Python 3.10/3.11)
   - Quantization auto-detection flow
+
+### Fixed
+- BNB 8-bit model loading error when subject is a saved quantized checkpoint
+- Empty sample handling in variance guard (`_safe_mean()` helper)
 
 ## [0.2.0] - 2025-12-01
 
@@ -906,6 +889,6 @@ First public release on GitHub and PyPI.
 - Torch‑optional core install with optional extras (e.g., `invarlock[hf]`, `invarlock[adapters]`).
 - Initial documentation set: quickstart, user guides, and CLI reference.
 
-### Notes
+### Changed
 - 0.2.0 is the first public version of the InvarLock framework.
 - Until 1.0.0, **minor** releases (0.x.y → 0.(x+1).0) may include breaking changes. Refer to the README and CLI help for the current surface and behavior.
