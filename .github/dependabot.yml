@@ -48,6 +48,29 @@ updates:
         update-types:
           - "patch"
 
+  # uv lockfile updates for the repo root. Requirements subdirectories are
+  # managed by the pip entry above; excluding them prevents Dependabot's uv
+  # grapher from treating requirements-only folders as standalone uv projects.
+  - package-ecosystem: "uv"
+    directory: "/"
+    target-branch: "staging/next"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Toronto"
+    open-pull-requests-limit: 5
+    exclude-paths:
+      - "requirements/**"
+    reviewers:
+      - "invarlock/invarlock-maintainers"
+    labels:
+      - "dependencies"
+      - "python"
+      - "uv"
+    commit-message:
+      prefix: "chore(deps)"
+
   # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
