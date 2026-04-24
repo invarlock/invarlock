@@ -331,6 +331,18 @@ def test_dependabot_tracks_codeql_action_updates() -> None:
     assert "github/codeql-action" not in ignored
 
 
+def test_dependabot_uv_graph_is_scoped_to_root_project() -> None:
+    config = yaml.safe_load(Path(".github/dependabot.yml").read_text(encoding="utf-8"))
+
+    uv_update = next(
+        update for update in config["updates"] if update["package-ecosystem"] == "uv"
+    )
+
+    assert uv_update["directory"] == "/"
+    assert uv_update["target-branch"] == "staging/next"
+    assert "requirements/**" in uv_update["exclude-paths"]
+
+
 def test_codeql_config_scopes_analysis_to_shipped_python():
     config_path = Path(".github/codeql/codeql-config.yml")
     assert config_path.exists(), "CodeQL config file missing"
