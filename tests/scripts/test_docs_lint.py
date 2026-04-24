@@ -34,6 +34,8 @@ def test_main_skips_missing_tools_without_require_tools(
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(module.shutil, "which", lambda name: None)
     monkeypatch.setattr(module, "_local_node_bin", lambda name: None)
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("DOCS_LINT_REQUIRE_TOOLS", raising=False)
 
     module.main(["--all"])
 
@@ -41,6 +43,25 @@ def test_main_skips_missing_tools_without_require_tools(
     payload = json.loads(captured.out.strip().splitlines()[-1])
     assert payload == {"ok": True, "summary": {"markdown": False, "spell": False}}
     assert "skipping" in captured.err
+
+
+def test_main_requires_tools_in_ci(tmp_path: Path, monkeypatch, capsys) -> None:
+    module = _load_script_module()
+    _write_docs_tree(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(module.shutil, "which", lambda name: None)
+    monkeypatch.setattr(module, "_local_node_bin", lambda name: None)
+    monkeypatch.setenv("CI", "1")
+
+    with pytest.raises(SystemExit) as excinfo:
+        module.main(["--all"])
+
+    assert excinfo.value.code == 1
+    captured = capsys.readouterr()
+    payload = json.loads(captured.err.strip().splitlines()[-1])
+    assert payload["ok"] is False
+    assert payload["summary"] == {"markdown": None, "spell": None}
+    assert payload["exit"] == 1
 
 
 def test_main_requires_tools_when_requested(
