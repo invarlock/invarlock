@@ -28,7 +28,7 @@ self-hosted-runner:
 - **`codeql.yml`** - CodeQL static analysis (SAST) for security vulnerabilities
 - **`supply-chain-pr.yml`** - PR-time supply-chain checks (install-surface SBOM, `pip-audit` on base/`hf`/`advanced` shipped surfaces, `gitleaks` history-scan JSON/SARIF artifacts)
 - **`dependabot-main-guard.yml`** - Blocks direct Dependabot PRs to `main`; maintainers must land equivalent dependency fixes on `staging/next` first
-- **`dependabot.yml`** (config file) - Automated dependency updates (Python, uv, GitHub Actions, npm)
+- **`dependabot.yml`** (config file) - Automated dependency updates (Python, GitHub Actions, npm)
 
 See also: [`SECURITY.md`](../SECURITY.md) for vulnerability reporting policy.
 
@@ -64,7 +64,6 @@ job or step, emit container-backed outputs, and verify them without bypasses.
 
 - Dependabot version-update PRs target `staging/next`.
 - Dependabot security-update PRs still originate against the default branch (`main`) because GitHub security updates do not honor `target-branch`.
-- uv lockfile updates are scoped to the repository root and exclude `requirements/**`; workflow and evidence-pack requirement pins are managed through the Python/pip update path instead.
 - The `dependabot-main-guard.yml` workflow intentionally fails direct Dependabot PRs to `main`.
 - Maintainers must land the equivalent dependency fix on `staging/next`, validate it there, and let it reach `main` through the normal promotion/release flow.
 - `github/codeql-action` is tracked by Dependabot again; maintainers should review the resulting PRs like any other security-sensitive workflow change.
