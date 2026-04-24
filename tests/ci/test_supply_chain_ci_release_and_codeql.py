@@ -331,16 +331,12 @@ def test_dependabot_tracks_codeql_action_updates() -> None:
     assert "github/codeql-action" not in ignored
 
 
-def test_dependabot_uv_graph_is_scoped_to_root_project() -> None:
+def test_dependabot_does_not_enable_routine_uv_version_updates() -> None:
     config = yaml.safe_load(Path(".github/dependabot.yml").read_text(encoding="utf-8"))
 
-    uv_update = next(
-        update for update in config["updates"] if update["package-ecosystem"] == "uv"
-    )
+    ecosystems = {update["package-ecosystem"] for update in config["updates"]}
 
-    assert uv_update["directory"] == "/"
-    assert uv_update["target-branch"] == "staging/next"
-    assert "requirements/**" in uv_update["exclude-paths"]
+    assert "uv" not in ecosystems
 
 
 def test_codeql_config_scopes_analysis_to_shipped_python():
