@@ -11,12 +11,14 @@
 | **Next step** | [Quickstart](quickstart.md) for copy-paste commands. |
 
 This guide covers installation, environment setup, and the smallest useful
-InvarLock workflow: compare a baseline against a subject, verify the attested
-report, and render HTML for review. The same top-level loop also underpins the
-included image-text path when you use the explicit multimodal preset and
-provider configuration. The minimal install is enough for `doctor`,
-`verify`, `report generate`, `report explain`, and `report html`; use
-`invarlock[hf]` only when you need `evaluate` to load Hugging Face models.
+InvarLock workflow: compare a baseline against a subject, verify the
+container-backed report, and render HTML for review. The same top-level loop
+also underpins the included image-text path when you use the explicit
+multimodal preset and provider configuration. The minimal install is enough for
+`doctor`, `verify`, and `report html`; use `invarlock[hf]` only when you need
+`evaluate` to load Hugging Face models. Treat `evaluate -> verify -> report html`
+as the first path to get green before you reach for deeper report-analysis
+commands.
 
 ## Install InvarLock
 
@@ -70,24 +72,21 @@ For offline use, pre-download assets and enforce offline reads with
 
 ## First Evaluation
 
-The default `evaluate` path is attested: model-loading steps run inside the
-runtime container and emit `runtime.manifest.json` beside the evaluation
-report.
+The default `evaluate` path runs model-loading steps inside the runtime
+container and emits `runtime.manifest.json` beside the evaluation report.
 
 ```bash
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline gpt2 \
-  --subject /path/to/edited \
+  --subject distilgpt2 \
   --adapter auto \
   --profile ci \
-  --preset configs/presets/causal_lm/wikitext2_512.yaml \
   --report-out reports/eval
 ```
 
-Most repo presets keep small YAML window counts for smoke portability. The
-pass-capable path is to keep those presets and run them with `--profile ci` or
-`--profile release`, which override `preview_n` / `final_n` to the packaged
-runtime defaults.
+Repo maintainers can still add `--preset configs/...` when they intentionally
+want a repo-owned preset, but the wheel-first onboarding path should start with
+direct flags and the built-in adapter defaults.
 
 ## Verify And Render
 
@@ -96,20 +95,22 @@ invarlock verify reports/eval/evaluation.report.json
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
 
-These commands validate the paired math, schema, and runtime attestation, then
+These commands validate the paired math, schema, and runtime provenance, then
 render a shareable HTML artifact from the same report.
 
-`report generate` and `report explain` take canonical `report.json` inputs,
-while `report html` takes canonical `evaluation.report.json`. Pass exact file
-paths for deterministic results; directory inputs are command-specific and
-ambiguous directories are rejected.
+Artifact model:
+
+| Artifact | Produced by | Primary consumers |
+| --- | --- | --- |
+| `evaluation.report.json` | `invarlock evaluate`, `invarlock report generate --format report` | `invarlock verify`, `invarlock report html`, `invarlock report validate`, `invarlock report explain --evaluation-report`, `invarlock advanced runtime-verify` |
+| `report.json` | Baseline/subject run directories under `runs/...` | `invarlock report generate`, `invarlock report explain --subject-report ... --baseline-report ...` |
 
 ## Execution Modes
 
-- `evaluate` defaults to the runtime container (`--assurance attested`).
-- Use `--assurance trusted-local` only for trusted host-side workflows that intentionally
+- `evaluate` defaults to the runtime container (`--execution-mode container`).
+- Use `--execution-mode host` only for host-side workflows that intentionally
   bypass container execution.
-- `verify` expects `runtime.manifest.json` next to attested evaluation reports.
+- `verify` expects `runtime.manifest.json` next to container-backed evaluation reports.
 
 ## Learning Paths
 
@@ -118,7 +119,7 @@ ambiguous directories are rejected.
 | **First-time user** | Getting Started → [Quickstart](quickstart.md) → [Compare & evaluate](compare-and-evaluate.md) |
 | **Python developer** | Getting Started → [Primary Metric Smoke](primary-metric-smoke.md) → [API Guide](../reference/api-guide.md) |
 | **Custom data user** | Getting Started → [Bring Your Own Data](bring-your-own-data.md) → [Config Gallery](config-gallery.md) |
-| **Validation engineer** | Getting Started → [Proof Packs](proof-packs.md) → [Proof Packs Internals](proof-packs-internals.md) |
+| **Validation engineer** | Getting Started → [Evidence Packs](evidence-packs.md) → [Evidence Packs Internals](evidence-packs-internals.md) |
 | **Security auditor** | Getting Started → [Threat Model](../security/threat-model.md) → [Best Practices](../security/best-practices.md) |
 
 ## Advanced Workflows
@@ -126,16 +127,16 @@ ambiguous directories are rejected.
 The simplified public CLI keeps the core path at the top level. Non-core
 surfaces live under `invarlock advanced`:
 
-- `invarlock advanced proof-pack ...`
+- `invarlock advanced evidence-pack ...`
 - `invarlock advanced policy ...`
 - `invarlock advanced plugins ...`
 - `invarlock advanced calibrate ...`
 
-Installed wheels also include the proof-pack verifier, so downstream users can
-inspect bundles without cloning the repository:
+Installed packages also include the evidence-pack verifier, so bundles can be
+inspected without cloning the repository:
 
 ```bash
-invarlock advanced proof-pack verify <pack> --strict
+invarlock advanced evidence-pack verify <pack> --strict
 ```
 
 Optional adapter and backend installs use Python extras such as

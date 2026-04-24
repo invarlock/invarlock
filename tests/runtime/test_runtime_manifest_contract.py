@@ -38,7 +38,7 @@ def test_runtime_manifest_fixture_matches_public_contract() -> None:
             Path.cwd()
             / "tests"
             / "fixtures"
-            / "runtime_attestation"
+            / "runtime_provenance"
             / "runtime.manifest.json"
         ).read_text(encoding="utf-8")
     )

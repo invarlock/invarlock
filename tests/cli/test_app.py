@@ -54,7 +54,7 @@ def test_cli_help_lists_core_commands():
     assert "evaluate model changes" in output.lower()
     for command in ("evaluate", "report", "verify", "doctor", "advanced", "version"):
         assert re.search(rf"^\s*│\s+{re.escape(command)}\s", output, re.MULTILINE)
-    for removed in ("run", "proof-pack", "policy", "plugins", "calibrate"):
+    for removed in ("run", "evidence-pack", "policy", "plugins", "calibrate"):
         assert not re.search(rf"^\s*│\s+{re.escape(removed)}\s", output, re.MULTILINE)
 
 
@@ -71,7 +71,7 @@ def test_cli_version_flag_exits_through_root_callback():
     emit_version.assert_called_once_with()
 
 
-def test_evaluate_cli_forwards_assurance(monkeypatch):
+def test_evaluate_cli_forwards_execution_mode(monkeypatch):
     seen: dict[str, object] = {}
 
     def fake_evaluate_command(**kwargs):
@@ -91,13 +91,13 @@ def test_evaluate_cli_forwards_assurance(monkeypatch):
             "baseline",
             "--subject",
             "subject",
-            "--assurance",
-            "trusted-local",
+            "--execution-mode",
+            "host",
         ],
     )
 
     assert result.exit_code == 0, result.output
-    assert seen["assurance"] == "trusted-local"
+    assert seen["execution_mode"] == "host"
 
 
 def test_ordered_group_handles_advanced_and_unknown_lazy_subapps():

@@ -16,8 +16,8 @@
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "evidence": {
-        "evaluation_report_fixture": "tests/fixtures/published_basis/gpt2/evaluation.report.json",
-        "proof_pack_recipe": "tests/fixtures/published_basis/gpt2/proof_pack_recipe.json"
+        "evaluation_report_fixture": "public_evidence/published_basis/gpt2/evaluation.report.json",
+        "evidence_pack_recipe": "public_evidence/published_basis/gpt2/evidence_pack_recipe.json"
       }
     },
     {
@@ -30,8 +30,8 @@
       "docs_label": "Yes",
       "provenance_source": "docs/README.md#support-matrix",
       "evidence": {
-        "evaluation_report_fixture": "tests/fixtures/published_basis/bert/evaluation.report.json",
-        "proof_pack_recipe": "tests/fixtures/published_basis/bert/proof_pack_recipe.json"
+        "evaluation_report_fixture": "public_evidence/published_basis/bert/evaluation.report.json",
+        "evidence_pack_recipe": "public_evidence/published_basis/bert/evidence_pack_recipe.json"
       }
     },
     {
@@ -57,6 +57,16 @@
     {
       "lane_id": "qwen2-7b-causal-hf",
       "family": "Qwen2 7B causal LM",
+      "runtime": "huggingface-pytorch",
+      "adapter": "hf_causal",
+      "support_tier": "supported_experimental",
+      "evidence_status": "repo_included_pilot_config",
+      "docs_label": "No, repo-included pilot config only",
+      "provenance_source": "docs/README.md#support-matrix"
+    },
+    {
+      "lane_id": "qwen2-5-7b-causal-hf",
+      "family": "Qwen2.5 7B causal LM",
       "runtime": "huggingface-pytorch",
       "adapter": "hf_causal",
       "support_tier": "supported_experimental",

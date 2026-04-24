@@ -2,7 +2,7 @@
 Deterministic paired bootstrap helpers (eval layer).
 
 These thin wrappers delegate to core bootstrap implementations and keep the
-evaluation namespace stable for metric V1 consumers.
+evaluation namespace stable for metric V1 callers.
 """
 
 from __future__ import annotations

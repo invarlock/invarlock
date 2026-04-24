@@ -35,18 +35,26 @@ def test_sitecustomize_not_in_wheel(tmp_path):
 
 
 @pytest.mark.skipif(os.getenv("SKIP_BUILD_TESTS") == "1", reason="skip build tests")
-def test_proof_pack_repo_assets_not_in_wheel(tmp_path):
+def test_evidence_pack_repo_assets_not_in_wheel(tmp_path):
     wheel = _build_wheel(tmp_path)
     with zipfile.ZipFile(wheel) as z:
         names = z.namelist()
         assert "invarlock/public_contracts.py" in names
-        assert "invarlock/_data/contracts/proof_pack_manifest.schema.json" in names
+        assert "invarlock/_data/contracts/evidence_pack_manifest.schema.json" in names
         assert "invarlock/_data/contracts/policy_pack.schema.json" in names
         assert "invarlock/_data/contracts/runtime_manifest.schema.json" in names
         assert "invarlock/_data/contracts/support_matrix.json" in names
         assert "invarlock/_data/contracts/model_family_catalog.json" in names
+        assert (
+            "invarlock/_data/public_evidence/published_basis/gpt2/evaluation.report.json"
+            in names
+        )
+        assert (
+            "invarlock/_data/public_evidence/published_basis/bert/evidence_pack_recipe.json"
+            in names
+        )
         assert not any(name.startswith("contracts/") for name in names)
-        assert not any(name.startswith("scripts/proof_packs/") for name in names)
+        assert not any(name.startswith("scripts/evidence_packs/") for name in names)
         assert "invarlock/core/config_dependencies.py" not in names
         assert "invarlock/core/run_orchestrator_execute_prepare.py" not in names
 

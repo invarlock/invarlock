@@ -2,8 +2,10 @@
 
 > **Plain language:** We measure how much the GuardChain adds to the primary metric
 > using the exact same windows and seeds (paired schedule), then gate against a small budget
-> (≤ 1%). If overhead exceeds the budget or provenance is missing, the
-> report fails.
+> (≤ 1%) when the overhead ratio is evaluated. Report generation soft-passes
+> unavailable ratios as `evaluated=false` for tiny/noisy runs; release
+> verification requires evaluated overhead evidence unless the run explicitly
+> records an overhead skip.
 
 ## Claim
 
@@ -45,6 +47,15 @@ Fail conditions (gate evaluated):
 - If the ratio cannot be computed, the check is marked `evaluated=false` and
   soft-passes (reported in `guard_overhead.diagnostics`) to avoid spurious failures
   in tiny runs.
+
+Release verifier behavior:
+
+- `--profile release` requires a `guard_overhead` section unless the run records
+  an explicit skip (`guard_overhead.skipped=true` or `mode: skipped`).
+- If release overhead is not skipped, `guard_overhead.evaluated` must be `true`
+  and `guard_overhead.overhead_ratio` must be present. Missing or unevaluated
+  overhead is a release evidence failure even though report generation can
+  soft-pass the unavailable ratio.
 
 ## Observability & Provenance
 

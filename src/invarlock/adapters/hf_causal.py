@@ -89,6 +89,21 @@ def _shape_ints(value: Any) -> tuple[int, ...] | None:
     return tuple(dims)
 
 
+def _mixtral_tensorized_moe_parts(layer: Any) -> tuple[Any | None, Any | None]:
+    mlp = getattr(layer, "mlp", None)
+    gate = getattr(mlp, "gate", None) if mlp is not None else None
+    experts = getattr(mlp, "experts", None) if mlp is not None else None
+    if gate is None or experts is None:
+        return None, None
+    if not _has_set_attr(gate, "weight"):
+        return None, None
+    if not (
+        _has_set_attr(experts, "gate_up_proj") and _has_set_attr(experts, "down_proj")
+    ):
+        return None, None
+    return gate, experts
+
+
 def _coerce_config_int(value: Any) -> int | None:
     if isinstance(value, bool):
         return None
@@ -278,6 +293,59 @@ class _PhiDecoderSpec(_CausalSpec):
         return _DenseDecoderSpec().tying_map(model, base)
 
 
+class _GlmDecoderSpec(_CausalSpec):
+    spec_name = "glm_decoder"
+
+    def matches(self, model: Any, base: Any, layers: Any) -> bool:
+        layer = _first_item(layers)
+        if layer is None:
+            return False
+        has_attn = (
+            hasattr(layer, "self_attn")
+            and _has_set_attr(layer.self_attn, "q_proj")
+            and _has_set_attr(layer.self_attn, "k_proj")
+            and _has_set_attr(layer.self_attn, "v_proj")
+            and _has_set_attr(layer.self_attn, "o_proj")
+        )
+        has_mlp = (
+            hasattr(layer, "mlp")
+            and _has_set_attr(layer.mlp, "gate_up_proj")
+            and _has_set_attr(layer.mlp, "down_proj")
+        )
+        has_norms = _has_set_attr(layer, "input_layernorm") and _has_set_attr(
+            layer, "post_attention_layernorm"
+        )
+        return bool(has_attn and has_mlp and has_norms)
+
+    def infer_mlp_dim(self, layer: Any, config: Any, hidden_size: int) -> int:
+        mlp_dim = int(getattr(config, "intermediate_size", hidden_size * 4) or 0)
+        down_proj = getattr(getattr(layer, "mlp", None), "down_proj", None)
+        down_proj_dim = _weight_shape_dim(down_proj, 1)
+        if down_proj_dim is not None:
+            mlp_dim = down_proj_dim
+        return int(mlp_dim)
+
+    def layer_modules(self, model: Any, layer: Any) -> dict[str, Any]:
+        return {
+            "self_attn.q_proj": layer.self_attn.q_proj,
+            "self_attn.k_proj": layer.self_attn.k_proj,
+            "self_attn.v_proj": layer.self_attn.v_proj,
+            "self_attn.o_proj": layer.self_attn.o_proj,
+            "mlp.gate_up_proj": layer.mlp.gate_up_proj,
+            "mlp.down_proj": layer.mlp.down_proj,
+            "input_layernorm": layer.input_layernorm,
+            "post_attention_layernorm": layer.post_attention_layernorm,
+        }
+
+    def tying_map(self, model: Any, base: Any) -> dict[str, str]:
+        tying: dict[str, str] = {}
+        lm_head_weight = getattr(getattr(model, "lm_head", None), "weight", None)
+        embed_weight = getattr(getattr(base, "embed_tokens", None), "weight", None)
+        if lm_head_weight is not None and lm_head_weight is embed_weight:
+            tying["lm_head.weight"] = "model.embed_tokens.weight"
+        return tying
+
+
 class _Qwen35LinearDecoderSpec(_CausalSpec):
     spec_name = "qwen35_linear_decoder"
 
@@ -337,15 +405,19 @@ class _MoEDecoderSpec(_CausalSpec):
         moe = getattr(layer, "block_sparse_moe", None)
         experts = getattr(moe, "experts", None) if moe is not None else None
         expert0 = _first_item(experts) if experts is not None else None
-        has_moe = bool(
+        has_legacy_moe = bool(
             expert0 is not None
             and _has_set_attr(expert0, "w1")
             and _has_set_attr(expert0, "w2")
         )
+        mixtral_gate, mixtral_experts = _mixtral_tensorized_moe_parts(layer)
+        has_tensorized_moe = bool(
+            mixtral_gate is not None and mixtral_experts is not None
+        )
         has_norms = _has_set_attr(layer, "input_layernorm") and _has_set_attr(
             layer, "post_attention_layernorm"
         )
-        return bool(has_attn and has_moe and has_norms)
+        return bool(has_attn and (has_legacy_moe or has_tensorized_moe) and has_norms)
 
     def infer_mlp_dim(self, layer: Any, config: Any, hidden_size: int) -> int:
         mlp_dim = int(getattr(config, "intermediate_size", hidden_size * 4) or 0)
@@ -356,9 +428,38 @@ class _MoEDecoderSpec(_CausalSpec):
             w1_dim = _weight_shape_dim(getattr(expert0, "w1", None), 0)
             if w1_dim is not None:
                 mlp_dim = w1_dim
+                return int(mlp_dim)
+        _mixtral_gate, mixtral_experts = _mixtral_tensorized_moe_parts(layer)
+        if mixtral_experts is not None:
+            intermediate_dim = getattr(mixtral_experts, "intermediate_dim", None)
+            if isinstance(intermediate_dim, int) and intermediate_dim > 0:
+                return int(intermediate_dim)
+            intermediate_size = getattr(mixtral_experts, "intermediate_size", None)
+            if isinstance(intermediate_size, int) and intermediate_size > 0:
+                return int(intermediate_size)
+            gate_up_shape = _shape_ints(getattr(mixtral_experts, "gate_up_proj", None))
+            if (
+                gate_up_shape is not None
+                and len(gate_up_shape) >= 2
+                and gate_up_shape[-2] > 0
+            ):
+                return int(gate_up_shape[-2] // 2)
         return int(mlp_dim)
 
     def layer_modules(self, model: Any, layer: Any) -> dict[str, Any]:
+        mixtral_gate, mixtral_experts = _mixtral_tensorized_moe_parts(layer)
+        if mixtral_gate is not None and mixtral_experts is not None:
+            return {
+                "self_attn.q_proj": layer.self_attn.q_proj,
+                "self_attn.k_proj": layer.self_attn.k_proj,
+                "self_attn.v_proj": layer.self_attn.v_proj,
+                "self_attn.o_proj": layer.self_attn.o_proj,
+                "input_layernorm": layer.input_layernorm,
+                "post_attention_layernorm": layer.post_attention_layernorm,
+                "mlp.router": mixtral_gate,
+                "mlp.gate": mixtral_gate,
+                "mlp.experts": mixtral_experts,
+            }
         moe = layer.block_sparse_moe
         expert0 = _first_item(moe.experts)
         if expert0 is None:
@@ -442,6 +543,170 @@ class _GptOssMoEDecoderSpec(_CausalSpec):
         return _DenseDecoderSpec().tying_map(model, base)
 
 
+class _NeoXDecoderSpec(_CausalSpec):
+    spec_name = "neox_decoder"
+
+    def matches(self, model: Any, base: Any, layers: Any) -> bool:
+        layer = _first_item(layers)
+        if layer is None:
+            return False
+        has_attn = (
+            hasattr(layer, "attention")
+            and _has_set_attr(layer.attention, "query_key_value")
+            and _has_set_attr(layer.attention, "dense")
+        )
+        has_mlp = (
+            hasattr(layer, "mlp")
+            and _has_set_attr(layer.mlp, "dense_h_to_4h")
+            and _has_set_attr(layer.mlp, "dense_4h_to_h")
+        )
+        has_norms = _has_set_attr(layer, "input_layernorm") and _has_set_attr(
+            layer, "post_attention_layernorm"
+        )
+        return bool(has_attn and has_mlp and has_norms)
+
+    def infer_mlp_dim(self, layer: Any, config: Any, hidden_size: int) -> int:
+        mlp_dim = int(getattr(config, "intermediate_size", hidden_size * 4) or 0)
+        dense_h_to_4h = getattr(getattr(layer, "mlp", None), "dense_h_to_4h", None)
+        dense_dim = _weight_shape_dim(dense_h_to_4h, 0)
+        if dense_dim is not None:
+            mlp_dim = dense_dim
+        return int(mlp_dim)
+
+    def layer_modules(self, model: Any, layer: Any) -> dict[str, Any]:
+        return {
+            "attention.query_key_value": layer.attention.query_key_value,
+            "attention.dense": layer.attention.dense,
+            "attn.c_attn": layer.attention.query_key_value,
+            "attn.c_proj": layer.attention.dense,
+            "mlp.dense_h_to_4h": layer.mlp.dense_h_to_4h,
+            "mlp.dense_4h_to_h": layer.mlp.dense_4h_to_h,
+            "mlp.c_fc": layer.mlp.dense_h_to_4h,
+            "mlp.c_proj": layer.mlp.dense_4h_to_h,
+            "input_layernorm": layer.input_layernorm,
+            "post_attention_layernorm": layer.post_attention_layernorm,
+        }
+
+    def tying_map(self, model: Any, base: Any) -> dict[str, str]:
+        tying: dict[str, str] = {}
+        lm_head_weight = getattr(getattr(model, "embed_out", None), "weight", None)
+        embed_weight = getattr(getattr(base, "embed_in", None), "weight", None)
+        if lm_head_weight is not None and lm_head_weight is embed_weight:
+            tying["embed_out.weight"] = "gpt_neox.embed_in.weight"
+        return tying
+
+
+class _FalconDecoderSpec(_CausalSpec):
+    spec_name = "falcon_decoder"
+
+    def matches(self, model: Any, base: Any, layers: Any) -> bool:
+        layer = _first_item(layers)
+        if layer is None:
+            return False
+        has_attn = (
+            hasattr(layer, "self_attention")
+            and _has_set_attr(layer.self_attention, "query_key_value")
+            and _has_set_attr(layer.self_attention, "dense")
+        )
+        has_mlp = (
+            hasattr(layer, "mlp")
+            and _has_set_attr(layer.mlp, "dense_h_to_4h")
+            and _has_set_attr(layer.mlp, "dense_4h_to_h")
+        )
+        return bool(has_attn and has_mlp and _has_set_attr(layer, "input_layernorm"))
+
+    def infer_mlp_dim(self, layer: Any, config: Any, hidden_size: int) -> int:
+        mlp_dim = int(getattr(config, "hidden_size", hidden_size) * 4)
+        dense_h_to_4h = getattr(getattr(layer, "mlp", None), "dense_h_to_4h", None)
+        dense_dim = _weight_shape_dim(dense_h_to_4h, 0)
+        if dense_dim is not None:
+            mlp_dim = dense_dim
+        return int(mlp_dim)
+
+    def layer_modules(self, model: Any, layer: Any) -> dict[str, Any]:
+        return {
+            "self_attention.query_key_value": layer.self_attention.query_key_value,
+            "self_attention.dense": layer.self_attention.dense,
+            "attn.c_attn": layer.self_attention.query_key_value,
+            "attn.c_proj": layer.self_attention.dense,
+            "mlp.dense_h_to_4h": layer.mlp.dense_h_to_4h,
+            "mlp.dense_4h_to_h": layer.mlp.dense_4h_to_h,
+            "mlp.c_fc": layer.mlp.dense_h_to_4h,
+            "mlp.c_proj": layer.mlp.dense_4h_to_h,
+            "input_layernorm": layer.input_layernorm,
+        }
+
+    def tying_map(self, model: Any, base: Any) -> dict[str, str]:
+        tying: dict[str, str] = {}
+        lm_head_weight = getattr(getattr(model, "lm_head", None), "weight", None)
+        embed_weight = getattr(getattr(base, "word_embeddings", None), "weight", None)
+        if lm_head_weight is not None and lm_head_weight is embed_weight:
+            tying["lm_head.weight"] = "transformer.word_embeddings.weight"
+        return tying
+
+
+class _OptDecoderSpec(_CausalSpec):
+    spec_name = "opt_decoder"
+
+    def matches(self, model: Any, base: Any, layers: Any) -> bool:
+        layer = _first_item(layers)
+        if layer is None:
+            return False
+        has_attn = (
+            hasattr(layer, "self_attn")
+            and _has_set_attr(layer.self_attn, "q_proj")
+            and _has_set_attr(layer.self_attn, "k_proj")
+            and _has_set_attr(layer.self_attn, "v_proj")
+            and _has_set_attr(layer.self_attn, "out_proj")
+        )
+        has_mlp = _has_set_attr(layer, "fc1") and _has_set_attr(layer, "fc2")
+        has_norms = _has_set_attr(layer, "self_attn_layer_norm") and _has_set_attr(
+            layer, "final_layer_norm"
+        )
+        return bool(has_attn and has_mlp and has_norms)
+
+    def infer_mlp_dim(self, layer: Any, config: Any, hidden_size: int) -> int:
+        mlp_dim = int(
+            getattr(
+                config,
+                "ffn_dim",
+                getattr(config, "intermediate_size", hidden_size * 4),
+            )
+            or 0
+        )
+        fc1_dim = _weight_shape_dim(getattr(layer, "fc1", None), 0)
+        if fc1_dim is not None:
+            mlp_dim = fc1_dim
+        return int(mlp_dim)
+
+    def layer_modules(self, model: Any, layer: Any) -> dict[str, Any]:
+        return {
+            "self_attn.q_proj": layer.self_attn.q_proj,
+            "self_attn.k_proj": layer.self_attn.k_proj,
+            "self_attn.v_proj": layer.self_attn.v_proj,
+            "self_attn.out_proj": layer.self_attn.out_proj,
+            "self_attn.o_proj": layer.self_attn.out_proj,
+            "attn.c_proj": layer.self_attn.out_proj,
+            "mlp.fc1": layer.fc1,
+            "mlp.fc2": layer.fc2,
+            "mlp.c_fc": layer.fc1,
+            "mlp.c_proj": layer.fc2,
+            "input_layernorm": layer.self_attn_layer_norm,
+            "self_attn_layer_norm": layer.self_attn_layer_norm,
+            "post_attention_layernorm": layer.final_layer_norm,
+            "final_layer_norm": layer.final_layer_norm,
+        }
+
+    def tying_map(self, model: Any, base: Any) -> dict[str, str]:
+        tying: dict[str, str] = {}
+        lm_head_weight = getattr(getattr(model, "lm_head", None), "weight", None)
+        decoder = getattr(getattr(model, "model", None), "decoder", None)
+        embed_weight = getattr(getattr(decoder, "embed_tokens", None), "weight", None)
+        if lm_head_weight is not None and lm_head_weight is embed_weight:
+            tying["lm_head.weight"] = "model.decoder.embed_tokens.weight"
+        return tying
+
+
 class _GPT2LikeDecoderSpec(_CausalSpec):
     spec_name = "gpt2_like"
 
@@ -491,7 +756,11 @@ _SPECS: list[_CausalSpec] = [
     _MoEDecoderSpec(),
     _GptOssMoEDecoderSpec(),
     _PhiDecoderSpec(),
+    _GlmDecoderSpec(),
     _Qwen35LinearDecoderSpec(),
+    _NeoXDecoderSpec(),
+    _FalconDecoderSpec(),
+    _OptDecoderSpec(),
     _DenseDecoderSpec(),
     _GPT2LikeDecoderSpec(),
 ]
@@ -522,7 +791,9 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
                     resolve_core_loader_strategy(
                         task="causal",
                         model_id=model_id,
-                        kwargs=kwargs,
+                        # Preserve the direct-submodule fallback even when the
+                        # initial auto path was attempted with trust_remote_code.
+                        kwargs={},
                         allow_direct_submodule=True,
                     )
                     if strategy.strategy == "auto"
@@ -594,12 +865,18 @@ class HF_Causal_Adapter(HFAdapterMixin, ModelAdapter):
 
     def _unwrap(self, model: Any) -> tuple[Any, Any, Any]:
         config = getattr(model, "config", None)
+        if hasattr(model, "model") and hasattr(model.model, "decoder"):
+            decoder = getattr(model.model, "decoder", None)
+            if decoder is not None and hasattr(decoder, "layers"):
+                return decoder, decoder.layers, config
         if hasattr(model, "model") and hasattr(model.model, "language_model"):
             language_model = getattr(model.model, "language_model", None)
             if language_model is not None and hasattr(language_model, "layers"):
                 return language_model, language_model.layers, config
         if hasattr(model, "model") and hasattr(model.model, "layers"):
             return model.model, model.model.layers, config
+        if hasattr(model, "gpt_neox") and hasattr(model.gpt_neox, "layers"):
+            return model.gpt_neox, model.gpt_neox.layers, config
         if hasattr(model, "transformer") and hasattr(model.transformer, "h"):
             return model.transformer, model.transformer.h, config
         if hasattr(model, "layers"):

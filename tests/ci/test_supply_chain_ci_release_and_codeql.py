@@ -99,6 +99,7 @@ def test_ci_pr_assurance_gates_are_required_jobs() -> None:
     workflow = _load_workflow(Path(".github/workflows/ci.yml"))
     triggers = workflow["on"]
 
+    assert triggers["push"]["branches"] == ["main", "release/v*"]
     assert "paths-ignore" not in triggers["push"]
     assert triggers["pull_request"] is None
 
@@ -171,27 +172,65 @@ def test_docs_workflow_enforces_docs_lint_on_main_and_staging() -> None:
     workflow = _load_workflow(Path(".github/workflows/docs-ci.yml"))
     triggers = workflow["on"]
 
-    assert triggers["push"]["branches"] == ["main", "staging/next"]
-    assert triggers["pull_request"]["branches"] == ["main", "develop", "staging/next"]
+    assert triggers["push"]["branches"] == ["main", "staging/next", "release/v*"]
+    assert triggers["pull_request"]["branches"] == [
+        "main",
+        "develop",
+        "staging/next",
+        "release/v*",
+    ]
 
     expected_paths = [
         "docs/**",
         "README.md",
         "CONTRIBUTING.md",
         "mkdocs.yml",
+        "Makefile",
+        "notebooks/**",
+        "package.json",
+        "package-lock.json",
+        "requirements/workflows/docs-ci-py313.txt",
+        "scripts/check_claim_surface_consistency.py",
+        "scripts/check_cli_completeness.py",
+        "scripts/check_config_schema_sync.py",
+        "scripts/check_docs_links.py",
+        "scripts/check_guard_completeness.py",
+        "scripts/check_internal_links.py",
+        "scripts/check_version_consistency.py",
+        "scripts/docs_check.py",
+        "scripts/docs_lint.py",
+        "scripts/lint_assurance_xrefs.py",
+        "scripts/test_cli_examples.py",
+        "scripts/validate_doc_references.py",
+        "scripts/validate_docs_api_refs.py",
+        "scripts/validate_python_examples.py",
+        "scripts/validate_yaml_examples.py",
+        "scripts/verify_live_examples.py",
+        "scripts/verify_markdown_bash_blocks.py",
+        "scripts/verify_notebooks_smoke.py",
         ".github/workflows/docs-ci.yml",
     ]
     assert triggers["push"]["paths"] == expected_paths
     assert triggers["pull_request"]["paths"] == expected_paths
 
     steps = workflow["jobs"]["docs-validate"]["steps"]
+    node_step = _find_step_by_name(steps, "Setup Node.js")
+    install_node_step = _find_step_by_name(steps, "Install docs lint toolchain")
     markdown_step = _find_step_by_name(steps, "Lint markdown")
     spell_step = _find_step_by_name(steps, "Spell check")
+    upload_step = _find_step_by_name(steps, "Upload build artifacts")
+    step_names = [step.get("name") for step in steps]
 
+    assert node_step["with"]["node-version"] == "22"
+    assert install_node_step["run"] == "npm ci"
     assert markdown_step["run"] == "python scripts/docs_lint.py --markdown"
     assert "continue-on-error" not in markdown_step
     assert spell_step["run"] == "python scripts/docs_lint.py --spell"
     assert "continue-on-error" not in spell_step
+    assert upload_step["with"]["path"] == "site/"
+    assert step_names.index("Upload build artifacts") < step_names.index(
+        "Ensure clean working tree"
+    )
 
     link_step = _find_step_by_name(
         workflow["jobs"]["check-external-links"]["steps"],
@@ -238,6 +277,13 @@ def test_readme_mentions_probes_extra() -> None:
 
 def test_codeql_workflow_uses_repo_config():
     workflow = _load_workflow(Path(".github/workflows/codeql.yml"))
+    triggers = workflow["on"]
+    assert triggers["push"]["branches"] == ["main", "staging/next", "release/v*"]
+    assert triggers["pull_request"]["branches"] == [
+        "main",
+        "staging/next",
+        "release/v*",
+    ]
     assert workflow["permissions"] == {
         "contents": "read",
         "actions": "read",
@@ -259,7 +305,7 @@ def test_codeql_workflow_uses_repo_config():
     analyze_step = _find_step_by_uses_prefix(
         analyze["steps"], "github/codeql-action/analyze@"
     )
-    expected_pin = "c10b8064de6f491fea524254123dbe5e09572f13"
+    expected_pin = "95e58e9a2cdfd71adc6e0353d5c52f41a045d225"
 
     assert init_step["uses"] == f"github/codeql-action/init@{expected_pin}"
     assert autobuild_step["uses"] == f"github/codeql-action/autobuild@{expected_pin}"
@@ -348,7 +394,7 @@ def test_gpt2_smoke_workflow_is_configured() -> None:
 
     env = job["env"]
     assert env["INVARLOCK_ALLOW_NETWORK"] == "1"
-    assert env["INVARLOCK_SMOKE_MODE"] == "attested"
+    assert env["INVARLOCK_SMOKE_MODE"] == "container"
     assert env["INVARLOCK_SMOKE_PROFILE"] == "dev"
     assert env["INVARLOCK_RUNTIME_IMAGE"] == "invarlock-runtime:local"
 
@@ -372,11 +418,11 @@ def test_ci_hf_lockfiles_include_hypothesis_for_property_tests() -> None:
         assert "hypothesis==" in text, f"hypothesis missing from {path}"
 
 
-def test_tiny_attested_smoke_workflow_is_configured() -> None:
-    workflow = _load_workflow(Path(".github/workflows/tiny-attested-smoke.yml"))
+def test_tiny_container_smoke_workflow_is_configured() -> None:
+    workflow = _load_workflow(Path(".github/workflows/tiny-container-smoke.yml"))
     triggers = workflow["on"]
 
-    assert triggers["push"]["branches"] == ["staging/next"]
+    assert triggers["push"]["branches"] == ["staging/next", "release/v*"]
     assert "workflow_dispatch" in triggers
     assert workflow["permissions"] == {"contents": "read"}
 
@@ -386,7 +432,7 @@ def test_tiny_attested_smoke_workflow_is_configured() -> None:
 
     env = job["env"]
     assert env["INVARLOCK_ALLOW_NETWORK"] == "1"
-    assert env["INVARLOCK_SMOKE_MODE"] == "attested"
+    assert env["INVARLOCK_SMOKE_MODE"] == "container"
     assert env["INVARLOCK_SMOKE_PROFILE"] == "dev"
     assert env["INVARLOCK_RUNTIME_IMAGE"] == "invarlock-runtime:local"
 
@@ -397,5 +443,5 @@ def test_tiny_attested_smoke_workflow_is_configured() -> None:
     runtime_image = _find_step_by_name(steps, "Build runtime image")
     assert "make runtime-image" in runtime_image["run"]
 
-    smoke = _find_step_by_name(steps, "Run tiny attested smoke campaign")
-    assert "scripts/run_tiny_attested_smoke.sh" in smoke["run"]
+    smoke = _find_step_by_name(steps, "Run tiny container smoke campaign")
+    assert "scripts/run_tiny_container_smoke.sh" in smoke["run"]

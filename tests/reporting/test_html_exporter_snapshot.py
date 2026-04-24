@@ -85,3 +85,33 @@ def test_html_exporter_prefers_markdown_when_available():
     else:
         assert "<table" in html
         assert "badge" in html
+        assert "report-outline" in html
+        assert "summary-strip" in html
+
+
+def test_html_exporter_escapes_report_controlled_html_payloads():
+    from invarlock.reporting.html import render_report_html
+
+    cert = make_report(_mk_report(), _mk_report())
+    cert["plugins"] = {
+        "adapter": {
+            "name": '<script>alert("adapter")</script>',
+            "module": "safe.module",
+            "version": "1.0",
+        },
+        "guards": [
+            {
+                "name": '<img src=x onerror="alert(1)">',
+                "module": "safe.guard",
+            }
+        ],
+    }
+
+    html = render_report_html(cert)
+    lowered = html.lower()
+
+    assert "<script" not in lowered
+    assert "</script" not in lowered
+    assert "<img" not in lowered
+    assert "&lt;script&gt;" in lowered
+    assert "&lt;img" in lowered

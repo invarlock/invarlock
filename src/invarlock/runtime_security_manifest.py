@@ -53,7 +53,7 @@ def write_runtime_manifest(
         },
         "execution_mode": runtime_execution.execution_mode,
         "runtime": {
-            "image_ref": helpers._attested_runtime_image_ref(
+            "image_ref": helpers._runtime_provenance_image_ref(
                 runtime_execution.image_ref,
                 runtime_execution.image_digest,
             ),

@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-verify actionlint packaging-smoke-minimal ensure-mypy
+.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync repo-cruft-check model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-verify actionlint workflow-lint packaging-smoke-minimal packaging-smoke-front-door ensure-mypy
 
 PYTHON ?= $(shell bash scripts/select_workspace_python.sh)
 PIP := $(PYTHON) -m pip
@@ -18,6 +18,8 @@ RUNTIME_IMAGE_CUDA ?= invarlock-runtime:cuda-local
 RUNTIME_IMAGE_CUDA_REQUIREMENTS ?= requirements/workflows/runtime-image-py312-cu128.txt
 RUNTIME_IMAGE_CUDA_INDEX_URL ?= https://download.pytorch.org/whl/cu128
 RUNTIME_IMAGE_DIGEST ?= sha256:local-runtime-image
+SECURITY_ARTIFACT_DIR ?= artifacts/supply-chain
+SECURITY_RUN ?= uv run --isolated --locked --extra security-ci
 COVERAGE_POLICY := $(PYTHON) scripts/coverage_policy.py
 
 # Keep repo-wide coverage practical while still exercising the CLI command
@@ -30,7 +32,7 @@ COVERAGE_TESTS_RUN := \
 
 COVERAGE_TESTS_VERIFY := \
 	tests/cli/test_verify*.py tests/cli/test_cli_command_help_smoke.py \
-	tests/cli/test_policy_commands.py tests/cli/test_proof_pack_commands.py
+	tests/cli/test_policy_commands.py tests/cli/test_evidence_pack_commands.py
 
 COVERAGE_TESTS_CONFIG := \
 	tests/cli/test_config_failfast.py tests/cli/test_error_codes.py \
@@ -84,7 +86,7 @@ COVERAGE_TESTS_ADAPTERS := \
 	tests/adapters/test_adapters_hf_and_integration.py
 
 COVERAGE_TESTS_RUNTIME := \
-	tests/cli/test_security_default_container_contract.py \
+	tests/cli/test_container_default_contract.py \
 	tests/cli/test_container_delegation.py \
 	tests/runtime/test_network_policy.py \
 	tests/runtime/test_runtime_image_contract.py \
@@ -154,7 +156,7 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/runtime_security_container.py \
 	src/invarlock/runtime_security_manifest.py
 
-TEST_DIR_TARGETS := adapters calibration ci cli core docs edits eval fuzzing guards integration lint observability plugins proof_packs reporting runtime scripts
+TEST_DIR_TARGETS := adapters calibration ci cli core docs edits eval fuzzing guards integration lint observability plugins evidence_packs reporting runtime scripts
 GROUPED_TEST_DIR_TARGETS := $(filter-out integration,$(TEST_DIR_TARGETS))
 
 help:  ## Show this help message
@@ -234,8 +236,8 @@ test-observability: TEST_DIR = observability
 test-observability: ## Run tests/observability
 test-plugins: TEST_DIR = plugins
 test-plugins: ## Run tests/plugins
-test-proof_packs: TEST_DIR = proof_packs
-test-proof_packs: ## Run tests/proof_packs
+test-evidence_packs: TEST_DIR = evidence_packs
+test-evidence_packs: ## Run tests/evidence_packs
 test-reporting: TEST_DIR = reporting
 test-reporting: ## Run tests/reporting
 test-runtime: TEST_DIR = runtime
@@ -254,13 +256,23 @@ test-assurance:  ## Run assurance-related tests only
 		tests/ci/test_golden_runs_offline.py \
 		tests/ci/test_support_matrix_consistency.py \
 		tests/adapters/test_adapter_capability_contract.py \
+		tests/core/test_bootstrap.py::test_compute_paired_delta_and_ratio_ci_consistency \
+		tests/core/test_runner_pairing.py::test_assess_bootstrap_coverage_paths \
+		tests/guards/test_invariants_guard.py::test_invariants_guard_detects_non_finite_weights \
 		tests/eval/test_assurance_contracts.py \
+		tests/eval/test_metrics_masked_lm.py \
+		tests/edits/test_quant_rtn.py \
+		tests/cli/test_verify.py::test_verify_command_passes \
 		tests/docs/test_claim_surface_consistency.py \
 		tests/docs/test_assurance_xref_linter.py \
+		tests/reporting/test_report_paired_ci_identity.py::test_paired_ci_identity_holds \
+		tests/reporting/test_report_pairing_and_validation_helpers.py::test_enforce_pairing_and_coverage_path_matrix \
+		tests/reporting/test_report_policy_edges.py::test_ppl_hysteresis_applied_near_threshold \
 		tests/reporting/test_public_contracts.py \
-		tests/reporting/test_proof_pack_contract.py \
+		tests/reporting/test_evidence_pack_contract.py \
 		tests/reporting/test_policy_pack_contract.py \
-		tests/reporting/test_policy_utils.py::test_compute_policy_digest_matches_assurance_spec
+		tests/reporting/test_policy_utils.py::test_compute_policy_digest_matches_assurance_spec \
+		tests/reporting/test_reporting_regression_matrix.py::test_validate_variance_enablement_rejects_missing_gate_provenance
 
 lint:  ## Run linting
 	$(MAKE) ensure-ruff
@@ -278,9 +290,10 @@ format:  ## Format code
 	$(RUFF) format src/ tests/ scripts/
 	$(RUFF) check --fix src/ tests/ scripts/
 
-verify:  ## Run verification (pytest -q, runtime verifier, lint, format, markdown + spell docs lint)
+verify:  ## Run verification (pytest -q, runtime verifier, lint, format, strict docs lint)
 	@echo "Running verification..."
 	$(MAKE) ensure-python
+	$(MAKE) repo-cruft-check
 	PYTHONPATH=src $(PYTEST) -q
 	OMP_NUM_THREADS=1 SKIP_RUFF=1 INVARLOCK_PYTHON="$(PYTHON)" bash scripts/run_smoke_regression.sh
 	$(MAKE) cli-smoke-core
@@ -288,7 +301,7 @@ verify:  ## Run verification (pytest -q, runtime verifier, lint, format, markdow
 	$(MAKE) runtime-verify
 	$(MAKE) verify-ruff
 	$(MAKE) contracts-check
-	$(MAKE) docs-lint
+	$(MAKE) docs-lint-strict
 	@if [ -n "$$VERIFY_DOCS_API" ]; then \
 		$(PYTHON) scripts/validate_docs_api_refs.py; \
 	fi
@@ -302,31 +315,58 @@ verify-ruff:  ## Run the Ruff checks used by make verify
 cli-smoke-core:  ## Smoke the simplified core CLI surface
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTHON) -m invarlock --help >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock --version >/dev/null
 	PYTHONPATH=src $(PYTHON) -m invarlock evaluate --help >/dev/null
 	PYTHONPATH=src $(PYTHON) -m invarlock verify --help >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock report --help >/dev/null
 	PYTHONPATH=src $(PYTHON) -m invarlock report html --help >/dev/null
 	PYTHONPATH=src $(PYTHON) -m invarlock doctor --json >/dev/null
 
 cli-smoke-advanced:  ## Smoke the advanced CLI namespace
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTHON) -m invarlock advanced --help >/dev/null
-	PYTHONPATH=src $(PYTHON) -m invarlock advanced proof-pack --help >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock advanced evidence-pack --help >/dev/null
 	PYTHONPATH=src $(PYTHON) -m invarlock advanced policy --help >/dev/null
 	PYTHONPATH=src $(PYTHON) -m invarlock advanced plugins --help >/dev/null
 	PYTHONPATH=src $(PYTHON) -m invarlock advanced calibrate --help >/dev/null
+	PYTHONPATH=src $(PYTHON) -m invarlock advanced runtime-verify --help >/dev/null
 
 actionlint:  ## Lint GitHub Actions workflow files
 	@command -v actionlint >/dev/null 2>&1 || { \
-		echo "❌ actionlint is required but not installed; add it to PATH first."; \
+		echo "❌ actionlint is required but not installed; install the CI-pinned tool with:"; \
+		echo "   go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7"; \
 		exit 1; \
 	}
 	actionlint .github/workflows/*.yml
 
-packaging-smoke-minimal:  ## Smoke the minimal wheel install and proof-pack verify path
+workflow-lint: actionlint  ## Compatibility alias for GitHub Actions workflow linting
+
+.PHONY: security supply-chain-security
+security: supply-chain-security  ## Run the local supply-chain security gate
+
+supply-chain-security:  ## Run SBOM generation and pip-audit in an isolated uv security toolchain
+	@command -v uv >/dev/null 2>&1 || { \
+		echo "❌ uv is required to run the isolated security toolchain."; \
+		exit 1; \
+	}
+	$(SECURITY_RUN) bash -c 'scripts/generate_sbom.sh --scope tool-environment --python "$$(command -v python)" "$(SECURITY_ARTIFACT_DIR)/sbom.json"'
+	$(SECURITY_RUN) python scripts/security/run_pip_audit.py
+
+packaging-smoke-minimal:  ## Smoke the minimal wheel install around the public contract and evidence-pack verify path
 	$(MAKE) ensure-python
 	@PYTHON="$$(if [ -x .venv/bin/python ]; then printf '%s' .venv/bin/python; else printf '%s' "$(PYTHON)"; fi)"; \
 	INVARLOCK_LIGHT_IMPORT=1 PYTHONPATH=src "$$PYTHON" -m pytest -q \
-		tests/integration/packaging/test_wheel_proof_pack_verify.py::test_wheel_install_can_verify_proof_pack_outside_repo_tree
+		tests/integration/packaging/test_wheel_evidence_pack_verify.py::test_wheel_install_exposes_core_cli_contracts_outside_repo_tree \
+		tests/integration/packaging/test_wheel_evidence_pack_verify.py::test_wheel_install_can_verify_report_runtime_and_evidence_pack_outside_repo_tree \
+		tests/integration/packaging/test_wheel_evidence_pack_verify.py::test_wheel_install_verify_rejects_ambiguous_directory_outside_repo_tree \
+		tests/integration/packaging/test_wheel_evidence_pack_verify.py::test_wheel_install_runtime_verify_failure_json_outside_repo_tree \
+		tests/integration/packaging/test_wheel_evidence_pack_verify.py::test_wheel_install_evidence_pack_verify_reports_integrity_failure_outside_repo_tree
+
+packaging-smoke-front-door:  ## Smoke installed-wheel evaluate -> verify -> report html from outside the repo tree
+	$(MAKE) ensure-python
+	@PYTHON="$$(if [ -x .venv/bin/python ]; then printf '%s' .venv/bin/python; else printf '%s' "$(PYTHON)"; fi)"; \
+	PYTHONPATH=src "$$PYTHON" -m pytest -q \
+		tests/integration/packaging/test_wheel_front_door_contract.py::test_wheel_install_runs_front_door_evaluate_verify_report_html_outside_repo_tree
 
 model-evidence-list:  ## Print the maintained shipped-model evidence manifest
 	$(MAKE) ensure-python
@@ -336,7 +376,7 @@ model-evidence-sweep:  ## Run the maintained shipped-model evidence sweep
 	$(MAKE) ensure-python
 	PYTHONPATH=src INVARLOCK_ALLOW_NETWORK=1 $(PYTHON) scripts/model_evidence_sweep.py $(MODEL_EVIDENCE_ARGS)
 
-runtime-image:  ## Build the local container runtime image used for secure-default execution
+runtime-image:  ## Build the local container runtime image used for default execution
 	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ An OCI container engine (Docker or Podman) is required."; exit 1; }
 	@if $(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE) >/dev/null 2>&1; then $(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE) >/dev/null 2>&1 || true; fi
 	$(CONTAINER_ENGINE) build -f runtime/Dockerfile -t $(RUNTIME_IMAGE) .
@@ -344,7 +384,7 @@ runtime-image:  ## Build the local container runtime image used for secure-defau
 runtime-image-podman: CONTAINER_ENGINE=podman
 runtime-image-podman: runtime-image  ## Build the local container runtime image with Podman
 
-runtime-image-cuda:  ## Build the local CUDA container runtime image for GPU-backed secure-default execution
+runtime-image-cuda:  ## Build the local CUDA container runtime image for GPU-backed default execution
 	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ An OCI container engine (Docker or Podman) is required."; exit 1; }
 	@if $(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE_CUDA) >/dev/null 2>&1; then $(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE_CUDA) >/dev/null 2>&1 || true; fi
 	$(CONTAINER_ENGINE) build \
@@ -367,6 +407,41 @@ runtime-smoke:  ## Smoke the local container runtime image
 runtime-smoke-podman: CONTAINER_ENGINE=podman
 runtime-smoke-podman: runtime-smoke  ## Smoke the local container runtime image with Podman
 
+.PHONY: container-default-smoke container-default-smoke-podman container-front-door-smoke container-front-door-smoke-podman
+container-default-smoke: runtime-image  ## Smoke the default container-backed evaluate path end-to-end
+	$(MAKE) ensure-python
+	INVARLOCK_ALLOW_NETWORK=1 \
+	INVARLOCK_CONTAINER_DEFAULT_SMOKE=1 \
+	INVARLOCK_CONTAINER_ENGINE=$(CONTAINER_ENGINE) \
+	INVARLOCK_RUNTIME_IMAGE=$(RUNTIME_IMAGE) \
+	PYTHONPATH=src $(PYTHON) -m pytest -q tests/integration/test_container_default_smoke.py::test_evaluate_container_default_smoke_with_external_runtime_inputs
+
+container-default-smoke-podman: CONTAINER_ENGINE=podman
+container-default-smoke-podman: runtime-image-podman  ## Smoke the default container-backed evaluate path end-to-end with Podman
+	$(MAKE) ensure-python
+	INVARLOCK_ALLOW_NETWORK=1 \
+	INVARLOCK_CONTAINER_DEFAULT_SMOKE=1 \
+	INVARLOCK_CONTAINER_ENGINE=$(CONTAINER_ENGINE) \
+	INVARLOCK_RUNTIME_IMAGE=$(RUNTIME_IMAGE) \
+	PYTHONPATH=src $(PYTHON) -m pytest -q tests/integration/test_container_default_smoke.py::test_evaluate_container_default_smoke_with_external_runtime_inputs
+
+container-front-door-smoke: runtime-image  ## Smoke the default container-backed evaluate -> verify -> report html journey
+	$(MAKE) ensure-python
+	INVARLOCK_ALLOW_NETWORK=1 \
+	INVARLOCK_CONTAINER_DEFAULT_SMOKE=1 \
+	INVARLOCK_CONTAINER_ENGINE=$(CONTAINER_ENGINE) \
+	INVARLOCK_RUNTIME_IMAGE=$(RUNTIME_IMAGE) \
+	PYTHONPATH=src $(PYTHON) -m pytest -q tests/integration/test_container_default_smoke.py::test_container_default_front_door_smoke_runs_evaluate_verify_and_report_html
+
+container-front-door-smoke-podman: CONTAINER_ENGINE=podman
+container-front-door-smoke-podman: runtime-image-podman  ## Smoke the default container-backed evaluate -> verify -> report html journey with Podman
+	$(MAKE) ensure-python
+	INVARLOCK_ALLOW_NETWORK=1 \
+	INVARLOCK_CONTAINER_DEFAULT_SMOKE=1 \
+	INVARLOCK_CONTAINER_ENGINE=$(CONTAINER_ENGINE) \
+	INVARLOCK_RUNTIME_IMAGE=$(RUNTIME_IMAGE) \
+	PYTHONPATH=src $(PYTHON) -m pytest -q tests/integration/test_container_default_smoke.py::test_container_default_front_door_smoke_runs_evaluate_verify_and_report_html
+
 runtime-smoke-cuda: RUNTIME_IMAGE=$(RUNTIME_IMAGE_CUDA)
 runtime-smoke-cuda: runtime-smoke  ## Smoke the local CUDA container runtime image
 
@@ -375,9 +450,9 @@ runtime-smoke-cuda-podman: RUNTIME_IMAGE=$(RUNTIME_IMAGE_CUDA)
 runtime-smoke-cuda-podman: runtime-smoke  ## Smoke the local CUDA container runtime image with Podman
 
 runtime-verify:  ## Smoke the Python runtime verifier on the fixture bundle
-	PYTHONPATH=src $(PYTHON) -m invarlock.cli.runtime_verify \
-		--report tests/fixtures/runtime_attestation/evaluation.report.json \
-		--manifest tests/fixtures/runtime_attestation/runtime.manifest.json \
+	PYTHONPATH=src $(PYTHON) -m invarlock advanced runtime-verify \
+		--report tests/fixtures/runtime_provenance/evaluation.report.json \
+		--manifest tests/fixtures/runtime_provenance/runtime.manifest.json \
 		--json
 
 ##@ CI/Build
@@ -385,6 +460,7 @@ clean:  ## Clean build artifacts
 	rm -rf build/
 	rm -rf dist/
 	rm -rf *.egg-info/
+	find . -type f \( -name ".DS_Store" -o -name "._*" \) -delete
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 
@@ -397,8 +473,8 @@ deepclean: ## Remove all generated artifacts, caches, and run outputs (destructi
 		site/ \
 		data/ \
 		node_modules/ \
-		reports/ reports_*/ reports_report/ \
-		runs/ runs_cfg/ run1/ run2/ \
+		reports/ reports_*/ \
+		runs/ runs_cfg/ \
 		pip-wheel-metadata/ \
 		__pycache__/ */__pycache__/ \
 		.pytest_cache/ .mypy_cache/ .ruff_cache/ .pre-commit-cache/ .npm-cache/ .npm-prefix/ \
@@ -407,6 +483,7 @@ deepclean: ## Remove all generated artifacts, caches, and run outputs (destructi
 		.coverage coverage.xml htmlcov/ \
 		test_config.yaml tmp_cfg.yaml \
 		*.pyc *.pyo
+	find . -type f \( -name ".DS_Store" -o -name "._*" \) -delete
 
 docs-serve: ## Serve documentation locally
 	$(MAKE) ensure-python
@@ -437,6 +514,7 @@ docs-ci:  ## Build documentation and run link checker
 ## (Consolidated) Single docs-serve target defined above
 
 ##@ Evaluation
+.PHONY: ci-matrix eval-loop
 eval-loop:  ## Run automated evaluation loop (baseline + quant8 quickstart)
 	@echo "Running automated evaluation workflow..."
 	@rm -rf runs/eval_loop reports/eval/eval_loop
@@ -456,6 +534,10 @@ ci-matrix:  ## Verify CI matrix
 contracts-check:  ## Ensure packaged contracts match the repo contract source
 	$(MAKE) ensure-python
 	$(PYTHON) scripts/sync_packaged_contracts.py --check
+
+repo-cruft-check:  ## Fail if macOS transport artifacts leaked into repo source paths
+	$(MAKE) ensure-python
+	$(PYTHON) scripts/check_repo_cruft.py
 
 contracts-sync:  ## Copy repo contracts into src/invarlock/_data/contracts
 	$(MAKE) ensure-python
@@ -491,14 +573,28 @@ ensure-mypy:
 
 ## (verify-ci and verify-release targets removed)
 
-.PHONY: docs-check docs-live docs-lint docs-check-build docs-check-links docs-lint-markdown docs-lint-spell
-docs-check: ## Run consolidated docs validation (build, links, refs, examples, consistency)
+.PHONY: docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell
+docs-check: ## Run consolidated docs validation plus curated live examples
 	$(MAKE) ensure-python
 	PYTHONPATH=src $(PYTHON) scripts/docs_check.py --all
 
+docs-live-fast: ## Live-run the curated deterministic docs and notebook subset
+	$(MAKE) ensure-python
+	PYTHONPATH=src $(PYTHON) scripts/verify_live_examples.py \
+		--markdown-execution-mode host \
+		--skip-markdown-model-loading \
+		--skip-notebook-model-loading \
+		--paths \
+		README.md \
+		docs/user-guide/getting-started.md \
+		docs/user-guide/quickstart.md \
+		notebooks/invarlock_python_api.ipynb \
+		notebooks/invarlock_policy_tiers.ipynb
+
 docs-live: ## Live-run runnable markdown CLI examples and notebooks
 	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTHON) scripts/verify_live_examples.py
+	PYTHONPATH=src $(PYTHON) scripts/verify_live_examples.py \
+		--markdown-execution-mode host
 
 docs-check-build: ## Build docs strictly and run link checks
 	$(MAKE) ensure-python
@@ -511,6 +607,10 @@ docs-check-links: ## Run docs link checks only
 docs-lint: ## Lint docs (markdown + spell)
 	$(MAKE) ensure-python
 	$(PYTHON) scripts/docs_lint.py --all
+
+docs-lint-strict: ## Lint docs and fail if markdownlint/cspell are unavailable
+	$(MAKE) ensure-python
+	$(PYTHON) scripts/docs_lint.py --all --require-tools
 
 docs-lint-markdown: ## Lint docs markdown style only
 	$(MAKE) ensure-python
@@ -532,7 +632,7 @@ config-check: ## Verify config includes and adapter availability
 ci-local:  ## Run all CI workflows locally (requires act; this helper currently assumes Docker)
 	@command -v act >/dev/null 2>&1 || { echo "❌ 'act' not found. Install: brew install act"; exit 1; }
 	@command -v docker >/dev/null 2>&1 || { echo "❌ Docker is required for this local act helper. Start Docker Desktop first."; exit 1; }
-	act push --job tests-docs --env INVARLOCK_LIGHT_IMPORT=1 --env INVARLOCK_DISABLE_PLUGIN_DISCOVERY=1
+	act push --job tests-docs --env INVARLOCK_LIGHT_IMPORT=1 --env INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=0
 
 ci-local-list:  ## List available workflows and jobs
 	@command -v act >/dev/null 2>&1 || { echo "❌ 'act' not found. Install: brew install act"; exit 1; }
@@ -547,6 +647,7 @@ ci-local-dry:  ## Dry-run CI locally (no execution, just shows plan)
 	@command -v act >/dev/null 2>&1 || { echo "❌ 'act' not found. Install: brew install act"; exit 1; }
 	act push --dryrun
 
+.PHONY: ci-local-precommit ci-local-verbose
 ci-local-precommit:  ## Run pre-commit workflow locally
 	@command -v act >/dev/null 2>&1 || { echo "❌ 'act' not found. Install: brew install act"; exit 1; }
 	act push --workflows .github/workflows/pre-commit.yml

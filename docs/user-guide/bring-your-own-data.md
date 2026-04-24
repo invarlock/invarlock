@@ -75,10 +75,30 @@ eval:
 ## End-to-end example (local JSONL)
 
 ```bash
-# 1) Create a small JSONL
-printf '{"text":"hello world"}\n{"text":"custom data"}\n' > /tmp/byod.jsonl
+# 1) Create a small JSONL with at least preview_n + final_n rows
+printf '%s\n' \
+  '{"text":"hello world"}' \
+  '{"text":"custom data"}' \
+  '{"text":"offline local jsonl sample"}' \
+  '{"text":"evaluation smoke row"}' > /tmp/byod.jsonl
 
-# 2) Write config (start from configs/presets/causal_lm/wikitext2_512.yaml and adjust dataset to your BYOD)
+# 2) Write a minimal BYOD config from scratch
+cat > byod.yaml <<'YAML'
+model:
+  id: gpt2
+  adapter: hf_causal
+dataset:
+  provider: local_jsonl
+  file: /tmp/byod.jsonl
+  text_field: text
+  seq_len: 32
+  stride: 32
+  preview_n: 2
+  final_n: 2
+eval:
+  metric: { kind: ppl_causal }
+YAML
+
 # 3) Compare baseline and subject directly
 invarlock evaluate --allow-network \
   --baseline gpt2 \
@@ -91,8 +111,8 @@ invarlock evaluate --allow-network \
 invarlock report html -i report_bundle/evaluation.report.json -o report_bundle/evaluation.html
 ```
 
-The `invarlock evaluate` step follows the secure-default runtime container path
-unless a trusted local workflow explicitly sets `--assurance trusted-local`.
+The `invarlock evaluate` step follows the default runtime-container path
+unless a host-side workflow explicitly sets `--execution-mode host`.
 
 Common pitfalls:
 

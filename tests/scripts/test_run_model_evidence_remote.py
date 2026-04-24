@@ -38,9 +38,19 @@ def test_run_model_evidence_remote_dry_run_emits_tmux_launch_plan(
     payload = json.loads(proc.stdout)
     assert payload["host"] == "root@example.test"
     assert payload["gpus"] == ["0", "1"]
+    assert payload["remote_repo"] == "/root/invarlock-public"
+    assert payload["remote_repo_candidates"] == [
+        "/root/invarlock-public",
+        "/root/invarlock-public-a100",
+    ]
     assert payload["remote_python"] == "auto"
     assert payload["execution_mode"] == "container"
+    assert (
+        "/root/invarlock-public-a100/.venv/bin/python"
+        in payload["remote_python_candidates"]
+    )
     assert "/root/venvs/invarlock/bin/python" in payload["remote_python_candidates"]
+    assert 'REPO_DIR=""' in payload["sync_command"]
     assert "git checkout staging/next" in payload["sync_command"]
     assert (
         "$PYTHON_BIN scripts/sync_packaged_contracts.py --check"
@@ -52,6 +62,8 @@ def test_run_model_evidence_remote_dry_run_emits_tmux_launch_plan(
         "$PYTHON_BIN scripts/model_evidence_sweep.py"
         in payload["launches"][0]["remote_command"]
     )
+    assert "cd $REPO_DIR" in payload["launches"][0]["remote_command"]
+    assert "--profile" not in payload["launches"][0]["remote_command"]
     assert "--execution-mode container" in payload["launches"][0]["remote_command"]
     assert "CUDA_VISIBLE_DEVICES=0" in payload["launches"][0]["remote_command"]
     assert "--shard-index 0" in payload["launches"][0]["remote_command"]
@@ -116,3 +128,37 @@ def test_run_model_evidence_remote_host_mode_is_forwarded() -> None:
     payload = json.loads(proc.stdout)
     assert payload["execution_mode"] == "host"
     assert "--execution-mode host" in payload["launches"][0]["remote_command"]
+    assert "--profile" not in payload["launches"][0]["remote_command"]
+
+
+def test_run_model_evidence_remote_dry_run_respects_explicit_remote_repo() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "run_model_evidence_remote.py"
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--host",
+            "root@example.test",
+            "--gpus",
+            "0",
+            "--remote-repo",
+            "/srv/invarlock-custom",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(proc.stdout)
+    assert payload["remote_repo_candidates"] == [
+        "/srv/invarlock-custom",
+        "/root/invarlock-public-a100",
+    ]
+    assert (
+        "/srv/invarlock-custom/.venv/bin/python" in payload["remote_python_candidates"]
+    )

@@ -1,9 +1,4 @@
-"""
-InvarLock CLI Doctor Command
-========================
-
-Handles the 'invarlock doctor' command for health checks.
-"""
+"""InvarLock doctor CLI command."""
 
 import importlib
 import importlib.util
@@ -50,6 +45,7 @@ from invarlock.public_contracts import (
     load_support_matrix,
 )
 
+from .. import output as cli_output
 from ..backend_runtime import bitsandbytes_runtime_available
 from ..constants import DOCTOR_FORMAT_VERSION
 from ..security_helpers import resolve_shell_runtime_security_policy
@@ -66,12 +62,8 @@ NON_FATAL_EXCEPTIONS = (
     ModuleNotFoundError,
 )
 
-console = Console()
+console = cli_output.make_console()
 LOGGER = logging.getLogger(__name__)
-
-
-def _find_spec_safe(module_name: str) -> object | None:
-    return find_spec_safe(module_name, find_spec_fn=importlib.util.find_spec)
 
 
 def _doctor_env_flag(name: str, *, environ: dict[str, str] | None = None) -> bool:
@@ -89,11 +81,7 @@ def _doctor_third_party_plugins_enabled() -> bool:
 
 
 def _doctor_output_prefix(severity: str) -> str:
-    return (
-        "ERROR:"
-        if severity == "error"
-        else ("WARNING:" if severity == "warning" else "NOTE:")
-    )
+    return {"error": "ERROR:", "warning": "WARNING:"}.get(severity, "NOTE:")
 
 
 def _doctor_print_message(
@@ -171,10 +159,12 @@ def _doctor_check_core_components(json_out: bool) -> bool:
         from invarlock.core.registry import get_registry  # noqa: F401
     except ImportError as exc:
         if not json_out:
-            console.print(f"[red]❌ Core components missing: {exc}[/red]")
+            cli_output.print_command_event(
+                console, "FAIL", f"Core components missing: {exc}"
+            )
         return False
     if not json_out:
-        console.print("[green]✅ Core components available[/green]")
+        cli_output.print_command_event(console, "PASS", "Core components available")
     return True
 
 
@@ -189,16 +179,18 @@ def _doctor_check_torch_runtime(json_out: bool) -> tuple[bool, bool]:
         )
     except ImportError:
         if not json_out:
-            console.print("[red]❌ PyTorch not available[/red]")
-            console.print("Install with: pip install torch")
+            cli_output.print_command_event(console, "FAIL", "PyTorch not available")
+            cli_output.print_command_detail(console, "Install with: pip install torch")
         return False, False
 
     torch_version = runtime_facts.version
     if not json_out:
         if torch_version:
-            console.print(f"[green]✅ PyTorch {torch_version}[/green]")
+            cli_output.print_command_event(console, "PASS", f"PyTorch {torch_version}")
         else:
-            console.print("[yellow]⚠️  PyTorch present but version unavailable[/yellow]")
+            cli_output.print_command_event(
+                console, "WARN", "PyTorch present but version unavailable"
+            )
 
         console.print("\nDevice Information")
     for device_name, info in runtime_facts.device_info.items():
@@ -383,9 +375,7 @@ def _doctor_apply_tiny_relax(
 def _doctor_format_backend_version(
     backend: str | None, version: str | None
 ) -> tuple[str, str]:
-    display_backend = backend or "—"
-    display_version = f"=={version}" if backend and version else "—"
-    return display_backend, display_version
+    return backend or "—", f"=={version}" if backend and version else "—"
 
 
 def _doctor_inventory_status_action(row: Any) -> str:
@@ -401,13 +391,11 @@ def _doctor_inventory_status_action(row: Any) -> str:
 
 
 def _doctor_dataset_network_label(network_mode: str) -> str:
-    if network_mode == "cache":
-        return "Cache/Net"
-    if network_mode == "yes":
-        return "Yes"
-    if network_mode == "no":
-        return "No"
-    return "Unknown"
+    return {
+        "cache": "Cache/Net",
+        "yes": "Yes",
+        "no": "No",
+    }.get(network_mode, "Unknown")
 
 
 def _doctor_render_registry(
@@ -447,7 +435,9 @@ def _doctor_render_registry(
             registry,
             has_cuda=bool(has_cuda),
             is_linux=_platform.system().lower() == "linux",
-            find_spec_safe=_find_spec_safe,
+            find_spec_safe=lambda module_name: find_spec_safe(
+                module_name, find_spec_fn=importlib.util.find_spec
+            ),
             bitsandbytes_runtime_ready=bnb_runtime_ready,
         )
         if adapter_rows:
@@ -562,11 +552,7 @@ def doctor_command(
     subject_report: str | None = None,
     strict: bool = False,
 ):
-    """
-    Perform health checks on InvarLock installation.
-
-    Checks PyTorch, device availability, memory, and optional extras.
-    """
+    """Perform health checks on InvarLock installation."""
 
     accumulator = DoctorAccumulator()
     console_obj = _doctor_prepare_console(json_out)
@@ -719,12 +705,15 @@ def doctor_command(
     else:
         console.print("\n" + "=" * 50)
         if exit_code == 0:
-            console.print(
-                "[green]✅ InvarLock installation is healthy (exit code 0)[/green]"
+            cli_output.print_command_event(
+                console, "PASS", "InvarLock installation is healthy (exit code 0)"
             )
         else:
-            console.print("[red]❌ InvarLock installation has issues[/red]")
-            console.print(
-                "Run: pip install invarlock[all] to install missing dependencies"
+            cli_output.print_command_event(
+                console, "FAIL", "InvarLock installation has issues"
+            )
+            cli_output.print_command_detail(
+                console,
+                "Run: pip install invarlock[all] to install missing dependencies",
             )
         raise typer.Exit(exit_code)

@@ -3,7 +3,7 @@
 ## Overview
 
 This page documents the stable public contracts that InvarLock exposes for
-reports, verification, proof packs, calibration artifacts, and policy packs.
+reports, verification, evidence packs, calibration artifacts, and policy packs.
 These contracts are intended to be consumed as-is by automation, review, and
 auditing workflows.
 
@@ -11,8 +11,8 @@ The public contract surface covers:
 
 - `evaluation.report.json` semantics and report schema validation
 - `invarlock verify` JSON and exit semantics, including runtime-manifest
-  attestation for attested outputs via `runtime.manifest.json`
-- proof-pack manifest format and strict verification rules
+  provenance for container-backed outputs via `runtime.manifest.json`
+- evidence-pack manifest format and strict verification rules
 - plugin ABI compatibility rules
 - adapter capability metadata
 - runtime tiers/profiles and calibration artifact semantics
@@ -26,8 +26,8 @@ The public contract surface covers:
 | Model family catalog | `contracts/model_family_catalog.json` | Broader inventory for declared support, code-level coverage, usage-only checkpoints, and recommended additions |
 | Adapter capabilities | `contracts/adapter_capabilities.json` | Snapshot/restore, guard coverage, runtime limits, extras |
 | Plugin compatibility | `contracts/plugin_compatibility.json` | Core ABI policy and failure mode |
-| Runtime manifest | `contracts/runtime_manifest.schema.json` | Runtime attestation schema for `runtime.manifest.json` sidecars |
-| Proof-pack manifest | `contracts/proof_pack_manifest.schema.json` | Portable pack manifest schema for `verify_pack.sh`, including builder/subject/material attestation fields |
+| Runtime manifest | `contracts/runtime_manifest.schema.json` | Runtime provenance schema for `runtime.manifest.json` sidecars |
+| Evidence-pack manifest | `contracts/evidence_pack_manifest.schema.json` | Portable pack manifest schema for `verify_pack.sh`, including builder/subject/material signed provenance fields |
 | Policy pack | `contracts/policy_pack.schema.json` | Build/verify contract for Git-native policy packs |
 | Validation keys | `contracts/validation_keys.json` | Allow-list for report validation flags |
 | Console labels | `contracts/console_labels.json` | Stable report console labels |
@@ -49,19 +49,20 @@ plugins ... --json`.
 The CLI exposes these contracts directly:
 
 - `invarlock verify --json`
-- `invarlock-runtime-verify --json`
+- `invarlock advanced runtime-verify --json`
 - `invarlock advanced plugins adapters --json`
 - `invarlock doctor --json`
-- `invarlock advanced proof-pack verify --json`
+- `invarlock advanced evidence-pack verify --json`
 - `invarlock advanced policy build`
 - `invarlock advanced policy verify`
-- `scripts/proof_packs/verify_pack.sh --strict`
+- `scripts/evidence_packs/verify_pack.sh --strict`
 
 The first seven surfaces are available from installed packages. The low-level
-`invarlock-runtime-verify` command is the package-native runtime-manifest
-verifier used for direct report/manifest checks. The repo shell
-verifier remains available for proof-pack workflow maintainers, and pure wheel
-installs can verify packs with `invarlock advanced proof-pack verify`.
+`invarlock advanced runtime-verify` command is the package-native
+runtime-manifest verifier used for direct report/manifest checks. The repo
+shell verifier remains available for evidence-pack workflow maintainers, and
+pure wheel installs can verify packs with `invarlock advanced evidence-pack
+verify`.
 
 Third-party plugins are fail-closed on ABI declaration: adapters, edits, and
 guards must declare `INVARLOCK_CORE_ABI`, and the value must match the exact
@@ -72,29 +73,31 @@ expose both the strict `support_matrix` contract and the broader
 `model_family_catalog` contract, plus the `validation_keys`, `console_labels`,
 and `metric_kinds` entries from the public contract catalog.
 
+The versioned JSON surfaces are intentionally explicit:
+
+- `invarlock verify --json` emits `format_version: "verify-v1"`
+- `invarlock advanced runtime-verify --json` emits
+  `format_version: "runtime-verify-v1"`
+- `invarlock advanced evidence-pack verify --json` emits
+  `format_version: "evidence-pack-verify-v1"` and nests the bundled report
+  verification result under `verify.format_version: "verify-v1"`
+
 ## Packaged public contract data
 
-The canonical public contract data ships in two places:
+The maintained public contract data ships in two places:
 
 - installed wheels, under `invarlock/_data/contracts/*.json`
 - source tags in the repository
 
-If a downstream workflow needs a detached archive, maintainers can still build
-one locally with `scripts/release/make_public_contract_bundle.py`. That helper
-packages:
+Repo tags and installed wheels are the only maintained public contract
+carriers.
 
-- `contracts/*.json`
-- `contract_catalog.json`
-- `runtime/tiers.yaml`
-- `runtime/profiles/*.yaml`
-- `README.txt`
-- `public_contract_bundle_manifest.json`
-
-The manifest uses schema `invarlock/public-contract-bundle-v1` and records the
-release version, tag, repository, commit SHA, and a sha256 inventory for every
-file in the archive. The generated tarball is reproducible for identical inputs
-because archive timestamps are fixed and the manifest does not embed build-clock
-fields.
+The support-matrix published-basis evidence paths remain logical
+`public_evidence/published_basis/...` references. Installed wheels resolve those
+logical paths from packaged files under
+`invarlock/_data/public_evidence/published_basis/...`, so installed packages can
+render the shipped published-basis `evaluation.report.json` examples and
+load the paired `evidence_pack_recipe.json` data without cloning the repo.
 
 ## Policy packs
 

@@ -47,7 +47,7 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 
 ### Programming Against InvarLock
 
-1. [API Guide](api-guide.md) — `CoreRunner.execute` and helpers
+1. [API Guide](api-guide.md) — Advanced/non-stable Python integration surface
 2. [Programmatic Quickstart](programmatic-quickstart.md) — Minimal examples
 3. [Architecture](architecture.md) — System layers and data flow
 4. [Model Family Catalog](model-family-catalog.md) — Support inventory and backlog
@@ -59,7 +59,7 @@ configuration, CLI, APIs, guards, and supporting infrastructure.
 1. [Environment Variables](env-vars.md) — Runtime configuration
 2. [Artifact Layout](artifacts.md) — Evidence retention
 3. [Observability](observability.md) — Health checking and telemetry
-4. [CLI Reference](cli.md) — Advanced namespaces such as `proof-pack`, `policy`, and `plugins`
+4. [CLI Reference](cli.md) — Advanced namespaces such as `evidence-pack`, `policy`, and `plugins`
 
 ## Related Documentation
 

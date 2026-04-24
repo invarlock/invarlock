@@ -17,12 +17,16 @@ CPU (e.g., ≤ 0.5% MPS, ≤ 1.0% CUDA).
 | MPS    | within ±0.5%           | Apple Accelerate; deterministic seeds supported |
 | CUDA   | within ±1.0%           | Deterministic algorithms; set `CUBLAS_WORKSPACE_CONFIG`, disable TF32 |
 
-Bands were empirically derived on pilot models and are enforced in CI. Actual values may vary slightly by family/precision; verify on your setup.
+Bands were empirically derived on pilot models. The repo ships and tests
+`scripts/check_device_drift.py`; CI enforces the checker behavior on fixtures,
+while real CPU/MPS/CUDA drift enforcement requires CI or release evidence to
+provide comparable reports from those devices. Actual values may vary slightly
+by family/precision; verify on your setup.
 
 ## Determinism & Setup
 
 - Enable framework determinism (PyTorch deterministic algorithms; disable TF32 where applicable).
-- Record seed bundle and device in the attested report bundle: `meta.seeds.*`, `meta.device`.
+- Record seed bundle and device in the container-backed report bundle: `meta.seeds.*`, `meta.device`.
 - Use identical window plans (paired, non‑overlapping) and the same resolved policy/digest.
 
 ## Reproducible Check

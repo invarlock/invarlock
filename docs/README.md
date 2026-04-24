@@ -19,13 +19,15 @@ running paired evaluation on text workflows plus the included image-text path.
 3. **[Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)** – baseline ↔ subject paired evaluation with guardchain.
 4. **[Primary Metric Smoke](user-guide/primary-metric-smoke.md)** – tiny examples for ppl/accuracy kinds.
 
-### Quick Examples
+### Choose Your Path
+
+- **Wheel user / reviewer**: start with [Quickstart](user-guide/quickstart.md) if you already have an `evaluation.report.json` bundle and want to verify, explain, or render it.
+- **Evaluator**: start with [Getting Started](user-guide/getting-started.md) if you need to run `invarlock evaluate` and produce a fresh evaluation bundle.
+- **Repo maintainer**: use the same user guides first, then reach for repo-only smokes, `configs/`, and local runtime-image flows after the core path is green.
+
+### Quick Example
 
 ```bash
-# Core-only install (no torch/transformers): CLI + config tools
-pip install invarlock
-
-# HF/torch stack for adapter-based flows
 pip install "invarlock[hf]"
 
 # Compare & evaluate (BYOE checkpoints)
@@ -39,33 +41,9 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
 Tip: enable Hub downloads per command when fetching models/datasets:
 `invarlock evaluate --allow-network ...`
 
-Preset sizing note: most repo presets keep small `preview_n` / `final_n` values
-for portable local smokes. Use `--profile ci` or `--profile release` when you
-need balanced-tier evaluations to clear the standard token-floor gates.
-
 Security-default note: `evaluate` uses the runtime container by default. Use
-`--assurance trusted-local` only for trusted local workflows that intentionally bypass that
+`--execution-mode host` only for host-side workflows that intentionally bypass that
 boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.
-
-Smoke asset note: `configs/presets/causal_lm/gpt2_smoke_128.yaml` provides the
-small GPT-2 canary preset used by `scripts/run_gpt2_smoke_campaign.sh` and the
-scheduled/workflow-dispatch GPT-2 smoke workflow. Push gating uses
-`scripts/run_tiny_attested_smoke.sh` and the `Tiny Attested Smoke` workflow
-with `sshleifer/tiny-gpt2` plus a local JSONL fixture. Both smoke paths run
-under the included `dev` profile so they can complete the full `evaluate` →
-`verify` → `report` commands → `proof-pack` path without depending on release-profile
-floors. The tiny push smoke also uses an explicit trusted-local assurance override
-for proof-pack verification when CI produces an unsigned pack; the default
-package-native verifier behavior remains fail-closed for unsigned packs.
-
-Maintainer smoke note: the repo-wide CLI smoke matrix now lives under
-`scripts/cli_exhaustive_smoke.sh`, which dispatches three lanes:
-`scripts/cli_smoke_fast.sh` for broad command-surface and positive-path tiny
-flows, `scripts/cli_smoke_negative.sh` for malformed / policy-fail /
-fail-closed categories, and `scripts/cli_smoke_realistic.sh` for the slower
-GPT-2-sized path. Calibration smoke runs in that matrix use
-`configs/calibration/null_sweep_smoke.yaml` and
-`configs/calibration/rmt_ve_sweep_smoke.yaml`.
 
 ---
 
@@ -77,14 +55,15 @@ GPT-2-sized path. Calibration smoke runs in that matrix use
 - [Quickstart](user-guide/quickstart.md)
 - [Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)
 - [Primary Metric Smoke](user-guide/primary-metric-smoke.md)
+- [Live Examples](user-guide/live-examples.md)
 - [Configuration Gallery](user-guide/config-gallery.md)
 - [Example Reports](user-guide/example-reports.md)
 - [Reading a report](user-guide/reading-report.md)
 - [Troubleshooting](user-guide/troubleshooting.md) — Error codes and common fixes
 - [Plugins](user-guide/plugins.md) — Extending adapters and guards
 - [Bring Your Own Data](user-guide/bring-your-own-data.md) — Custom datasets
-- [Proof Packs](user-guide/proof-packs.md) — Validation suite bundles
-- [Proof Packs Internals](user-guide/proof-packs-internals.md) — Suite architecture and preset derivation flow
+- [Evidence Packs](user-guide/evidence-packs.md) — Validation suite bundles
+- [Evidence Packs Internals](user-guide/evidence-packs-internals.md) — Suite architecture and preset derivation flow
 
 ### Reference
 
@@ -104,7 +83,8 @@ GPT-2-sized path. Calibration smoke runs in that matrix use
 - [Programmatic Quickstart](reference/programmatic-quickstart.md)
 - [Environment Variables](reference/env-vars.md)
 
-<!-- Runbooks intentionally omitted from this public docs index. -->
+Maintainer-only runbooks may exist locally and are intentionally omitted from
+this public docs index.
 
 <!-- Design docs intentionally omitted from this public docs index. -->
 
@@ -146,7 +126,7 @@ to change proposals or releases when you update calibration.
 
 ### Governance
 
-- [Contribution Guidelines](https://github.com/invarlock/invarlock/blob/main/CONTRIBUTING.md)
+- [Contribution Guidelines](https://github.com/invarlock/invarlock/blob/v0.8.0/CONTRIBUTING.md)
 
 ---
 
@@ -155,9 +135,9 @@ to change proposals or releases when you update calibration.
 1. **Configure** – describe model, dataset, edit, and guard policies in YAML.
 2. **Execute** – run `invarlock evaluate` under a CI or release profile;
    model-loading commands use the runtime container by default unless you pass
-   `--assurance trusted-local`.
+   `--execution-mode host`.
 3. **Validate** – run `invarlock verify` and render HTML via `invarlock report html`;
-   attested outputs include `runtime.manifest.json` next to
+   container-backed outputs include `runtime.manifest.json` next to
    `evaluation.report.json`.
    Directory inputs to `invarlock report` are only accepted when they contain
    canonical `report.json` or `evaluation.report.json`.
@@ -170,15 +150,28 @@ configured acceptance envelopes even when aggressive compression is attempted.
 
 ## Live Example Verification
 
+- Curated CI-safe live examples are gated by `make docs-live-fast` and cover
+  `README.md`, `docs/user-guide/getting-started.md`,
+  `docs/user-guide/quickstart.md`,
+  `notebooks/invarlock_python_api.ipynb`, and
+  `notebooks/invarlock_policy_tiers.ipynb`.
 - Runnable documentation surfaces can be verified locally with
-  `python scripts/verify_live_examples.py` or `make docs-live`.
-- This live check executes concrete Markdown CLI snippets through the active
-  checkout and smoke-runs notebooks under `notebooks/`.
+  `make docs-live-fast`, `python scripts/verify_live_examples.py`, or
+  `make docs-live`.
+- The curated fast lane replays concrete Markdown CLI snippets in host
+  mode with seeded demo evidence, then smoke-runs the curated notebook subset.
+- For heavyweight notebook cells that would otherwise trigger model downloads or
+  full evaluations, the curated lane reuses seeded demo reports and keeps the
+  later contract-reading and verification steps live.
+- `make docs-live` remains the broader local lane that replays runnable
+  Markdown examples and smoke-runs notebooks under `notebooks/`, using the same
+  host seeded-demo approach for heavyweight model-loading steps.
 - Artifacts land under `tmp/live_examples/`, including per-command JSONL
   results, notebook stdout/stderr logs, and a machine-readable `summary.json`.
 - Placeholder/template snippets must remain parseable, but only concrete
   runnable examples should be treated as copy-paste-ready.
-- This verifier is local-only and is not enforced in GitHub Actions.
+- GitHub Actions enforce the curated deterministic subset; the full verifier
+  remains a local or long-gate lane.
 
 ---
 
@@ -211,6 +204,7 @@ Notes
 | Mistral 7B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
 | Ministral 3 causal LM (text-only eval) | Yes | Yes | Yes | No, repo-included pilot config only |
 | Qwen2 7B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
+| Qwen2.5 7B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
 | Qwen2.5 14B causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
 | Qwen3 causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
 | DeepSeek-R1-Distill-Qwen causal LM | Yes | Yes | Yes | No, repo-included pilot config only |
@@ -223,13 +217,18 @@ Notes
 
 Published assurance basis covers GPT-2 and BERT profiles. Repo-included
 presets and pilot calibration configs for additional experimental families,
-including Mistral 7B, Ministral 3 text-only, Qwen2 7B, Qwen2.5 14B, Qwen3,
+including Mistral 7B, Ministral 3 text-only, Qwen2 7B, Qwen2.5 7B, Qwen2.5 14B, Qwen3,
 DeepSeek-R1-Distill-Qwen, Phi-4 text-only, Gemma 4 E2B text-only, TinyLlama
 1.1B, OLMo 2, and Qwen3.5, do not become part of the published
 assurance basis until supporting artifacts are attached. Access-gated vendor
 checkpoints are intentionally excluded from the included support matrix and
 preset inventory, and ungated families without clean pilot lanes remain in the
 model family backlog rather than the support matrix.
+
+`published_basis` remains the narrow public evidence floor, while
+`supported_experimental` means the repo ships the preset, calibration config,
+targeted tests, and smoke/evidence path for the lane without claiming a
+published-basis fixture set.
 
 Image-text evaluation uses the built-in
 `hf_multimodal` adapter and the `vision_text` provider. Public support remains
@@ -244,6 +243,8 @@ Model evidence automation lives in
 `scripts/model_evidence_sweep.py`, with tmux-based remote launch support in
 `scripts/run_model_evidence_remote.py` and a nightly/manual runner workflow in
 `.github/workflows/model-evidence-sweep.yml`.
+Repo-prepared-but-not-yet-promoted lanes are tracked in
+`contracts/model_family_catalog.json`.
 For the new Gemma 4 text lane, the repo-maintained local smoke is the included
 manifest dry-run (`scripts/model_evidence_sweep.py --slug gemma4_e2b --dry-run`).
 The image-text path also includes an offline demo preset at
@@ -346,4 +347,4 @@ Run with `RUN=1` to execute the matrix.
 [CLI Reference](reference/cli.md) ·
 [Primary Metric Smoke](user-guide/primary-metric-smoke.md) ·
 [Example Reports](user-guide/example-reports.md) ·
-[Contributing](https://github.com/invarlock/invarlock/blob/main/CONTRIBUTING.md)
+[Contributing](https://github.com/invarlock/invarlock/blob/v0.8.0/CONTRIBUTING.md)

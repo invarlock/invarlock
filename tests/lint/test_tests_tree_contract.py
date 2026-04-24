@@ -20,7 +20,7 @@ EXPECTED_EXECUTABLE_DIRS = {
     "lint",
     "observability",
     "plugins",
-    "proof_packs",
+    "evidence_packs",
     "reporting",
     "runtime",
     "scripts",

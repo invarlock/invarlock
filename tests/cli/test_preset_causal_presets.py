@@ -17,9 +17,14 @@ def test_causal_lm_family_presets_load() -> None:
     presets = {
         "wikitext2_512.yaml": "sshleifer/tiny-gpt2",
         "mistral_7b_512.yaml": "mistralai/Mistral-7B-v0.1",
+        "open_llama_7b_512.yaml": "openlm-research/open_llama_7b",
+        "opt_1_3b_512.yaml": "facebook/opt-1.3b",
+        "falcon_7b_512.yaml": "tiiuae/falcon-7b",
+        "glm4_9b_chat_512.yaml": "THUDM/glm-4-9b-chat",
         "ministral3_8b_512.yaml": "mistralai/Ministral-3-8B-Instruct-2512-BF16",
         "ministral3_14b_512.yaml": "mistralai/Ministral-3-14B-Instruct-2512-BF16",
         "qwen2_7b_512.yaml": "Qwen/Qwen2-7B",
+        "qwen2_5_7b_512.yaml": "Qwen/Qwen2.5-7B",
         "qwen2_5_14b_512.yaml": "Qwen/Qwen2.5-14B",
         "qwen3_8b_512.yaml": "Qwen/Qwen3-8B",
         "deepseek_r1_distill_qwen_7b_512.yaml": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
@@ -38,6 +43,7 @@ def test_causal_lm_family_presets_load() -> None:
         "olmo2_13b_512.yaml": "hf_text",
         "olmo2_7b_512.yaml": "hf_text",
         "phi4_reasoning_plus_512.yaml": "hf_text",
+        "qwen2_5_7b_512.yaml": "hf_text",
         "qwen2_5_14b_512.yaml": "hf_text",
         "qwen2_7b_512.yaml": "hf_text",
         "qwen3_5_9b_512.yaml": "hf_text",
@@ -71,9 +77,14 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
     expected_drift_band = {"min": 0.9, "max": 1.2}
     configs = {
         "null_sweep_mistral_7b.yaml": "mistralai/Mistral-7B-v0.1",
+        "null_sweep_open_llama_7b.yaml": "openlm-research/open_llama_7b",
+        "null_sweep_opt_1_3b.yaml": "facebook/opt-1.3b",
+        "null_sweep_falcon_7b.yaml": "tiiuae/falcon-7b",
+        "null_sweep_glm4_9b_chat.yaml": "THUDM/glm-4-9b-chat",
         "null_sweep_ministral3_8b.yaml": "mistralai/Ministral-3-8B-Instruct-2512-BF16",
         "null_sweep_ministral3_14b.yaml": "mistralai/Ministral-3-14B-Instruct-2512-BF16",
         "null_sweep_qwen2_7b.yaml": "Qwen/Qwen2-7B",
+        "null_sweep_qwen2_5_7b.yaml": "Qwen/Qwen2.5-7B",
         "null_sweep_qwen2_5_14b.yaml": "Qwen/Qwen2.5-14B",
         "null_sweep_qwen3_8b.yaml": "Qwen/Qwen3-8B",
         "null_sweep_deepseek_r1_distill_qwen_7b.yaml": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
@@ -99,6 +110,7 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
             "null_sweep_olmo2_13b.yaml",
             "null_sweep_olmo2_7b.yaml",
             "null_sweep_phi4_reasoning_plus.yaml",
+            "null_sweep_qwen2_5_7b.yaml",
             "null_sweep_qwen2_5_14b.yaml",
             "null_sweep_qwen2_7b.yaml",
             "null_sweep_qwen3_5_9b.yaml",
@@ -107,4 +119,64 @@ def test_null_sweep_calibration_configs_reference_models() -> None:
             assert data["dataset"]["provider"]["kind"] == "hf_text"
         if name == "null_sweep_gemma4_e2b.yaml":
             assert data["model"]["attn_implementation"] == "sdpa"
+        assert data["primary_metric"]["drift_band"] == expected_drift_band
+
+
+def test_candidate_causal_lm_presets_load() -> None:
+    root = _repo_root()
+    expected_drift_band = {"min": 0.9, "max": 1.2}
+    presets = {
+        "open_llama_7b_512.yaml": (
+            "openlm-research/open_llama_7b",
+            "hf_causal",
+        ),
+        "opt_1_3b_512.yaml": (
+            "facebook/opt-1.3b",
+            "hf_causal",
+        ),
+        "falcon_7b_512.yaml": (
+            "tiiuae/falcon-7b",
+            "hf_causal",
+        ),
+        "glm4_9b_chat_512.yaml": (
+            "THUDM/glm-4-9b-chat",
+            "hf_causal",
+        ),
+    }
+    for name, (model_id, adapter) in presets.items():
+        cfg = load_config(root / "configs/presets/causal_lm" / name)
+        assert cfg.require_section("model")["id"] == model_id
+        assert cfg.require_section("model")["adapter"] == adapter
+        assert cfg.data["dataset"]["provider"] == "wikitext2"
+        assert cfg.data["primary_metric"]["drift_band"] == expected_drift_band
+
+
+def test_candidate_null_sweep_calibration_configs_reference_models() -> None:
+    root = _repo_root()
+    expected_drift_band = {"min": 0.9, "max": 1.2}
+    configs = {
+        "null_sweep_open_llama_7b.yaml": (
+            "openlm-research/open_llama_7b",
+            "hf_causal",
+        ),
+        "null_sweep_opt_1_3b.yaml": (
+            "facebook/opt-1.3b",
+            "hf_causal",
+        ),
+        "null_sweep_falcon_7b.yaml": (
+            "tiiuae/falcon-7b",
+            "hf_causal",
+        ),
+        "null_sweep_glm4_9b_chat.yaml": (
+            "THUDM/glm-4-9b-chat",
+            "hf_causal",
+        ),
+    }
+    for name, (model_id, adapter) in configs.items():
+        data = yaml.safe_load(
+            (root / "configs/calibration" / name).read_text(encoding="utf-8")
+        )
+        assert data["model"]["id"] == model_id
+        assert data["model"]["adapter"] == adapter
+        assert data["dataset"]["provider"] == "wikitext2"
         assert data["primary_metric"]["drift_band"] == expected_drift_band

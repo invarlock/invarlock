@@ -259,7 +259,7 @@ def normalize_run_report(report: Mapping[str, Any] | RunReport) -> RunReport:
     if isinstance(ew, dict):
         out["evaluation_windows"] = ew
 
-    # keep guard_overhead if provided (for quality_overhead derivation downstream)
+    # keep guard_overhead if provided (for later quality_overhead derivation)
     go = src.get("guard_overhead")
     if isinstance(go, Mapping):
         out["guard_overhead"] = dict(go)

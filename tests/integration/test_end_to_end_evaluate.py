@@ -37,13 +37,6 @@ def test_small_workflow_configs_present() -> None:
         # Presets carry tier context via profile; auto tier may not be set at top-level
 
 
-def test_eval_script_is_executable() -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "eval_once.sh"
-    assert script_path.exists(), "Expected scripts/eval_once.sh to exist"
-    assert os.access(script_path, os.X_OK), "eval_once.sh should be executable"
-
-
 def test_gpt2_smoke_campaign_script_is_executable() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     script_path = repo_root / "scripts" / "run_gpt2_smoke_campaign.sh"
@@ -63,14 +56,14 @@ def test_gpt2_smoke_campaign_script_is_executable() -> None:
     assert "INVARLOCK_SMOKE_CACHE_COMPLETE" in contents
     assert "prefetch_hf_assets_on_host" in contents
     assert "ensure_current_runtime_image" in contents
-    assert 'echo "[smoke] refreshing local attested runtime image"' in contents
-    assert 'echo "[smoke] refreshing local CUDA attested runtime image"' in contents
+    assert 'echo "[smoke] refreshing local container runtime image"' in contents
+    assert 'echo "[smoke] refreshing local CUDA container runtime image"' in contents
     assert "make runtime-image" in contents
     assert "make runtime-image-cuda" in contents
     assert 'export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"' in contents
     assert "prefetching GPT-2 + WikiText-2 into host HF cache" in contents
     assert "evaluation report verification failed" in contents
-    assert "proof-pack verification failed" in contents
+    assert "evidence-pack verification failed" in contents
     assert 'SMOKE_EXPORT_DIR="$WORK_ROOT/exports"' in contents
     assert 'mkdir -p "$SMOKE_EXPORT_DIR"' in contents
     assert (
@@ -83,12 +76,12 @@ def test_gpt2_smoke_campaign_script_is_executable() -> None:
     )
 
 
-def test_tiny_attested_smoke_campaign_script_is_executable() -> None:
+def test_tiny_container_smoke_campaign_script_is_executable() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "run_tiny_attested_smoke.sh"
-    assert script_path.exists(), "Expected scripts/run_tiny_attested_smoke.sh to exist"
+    script_path = repo_root / "scripts" / "run_tiny_container_smoke.sh"
+    assert script_path.exists(), "Expected scripts/run_tiny_container_smoke.sh to exist"
     assert os.access(script_path, os.X_OK), (
-        "run_tiny_attested_smoke.sh should be executable"
+        "run_tiny_container_smoke.sh should be executable"
     )
     contents = script_path.read_text(encoding="utf-8")
     assert (
@@ -100,8 +93,8 @@ def test_tiny_attested_smoke_campaign_script_is_executable() -> None:
     assert "tiny_relax: true" in contents
     assert "prefetch_tiny_model_on_host" in contents
     assert "ensure_current_runtime_image" in contents
-    assert 'echo "[smoke] refreshing local attested runtime image"' in contents
-    assert 'echo "[smoke] refreshing local CUDA attested runtime image"' in contents
+    assert 'echo "[smoke] refreshing local container runtime image"' in contents
+    assert 'echo "[smoke] refreshing local CUDA container runtime image"' in contents
     assert "make runtime-image" in contents
     assert "make runtime-image-cuda" in contents
     assert "INVARLOCK_RUNTIME_IMAGE_DIGEST" in contents
@@ -118,10 +111,10 @@ def test_tiny_attested_smoke_campaign_script_is_executable() -> None:
         '"${CLI[@]}" report html -i "$EVAL_REPORT" -o "$SMOKE_EXPORT_DIR/evaluation.html"'
         in contents
     )
-    assert 'advanced proof-pack keygen "$PROOF_PACK_SIGNING_KEY"' in contents
-    assert '--signing-key "$PROOF_PACK_SIGNING_KEY"' in contents
+    assert 'advanced evidence-pack keygen "$EVIDENCE_PACK_SIGNING_KEY"' in contents
+    assert '--signing-key "$EVIDENCE_PACK_SIGNING_KEY"' in contents
     assert "evaluation report verification failed" in contents
-    assert "proof-pack verification failed" in contents
+    assert "evidence-pack verification failed" in contents
 
 
 def test_cli_smoke_fast_uses_repo_selected_python() -> None:
@@ -150,7 +143,7 @@ def test_cli_smoke_fast_uses_repo_selected_python() -> None:
         'run "invarlock report generate --help" "$CLI report generate --help"'
         in contents
     )
-    assert 'run "invarlock advanced proof-pack keygen --help"' in contents
+    assert 'run "invarlock advanced evidence-pack keygen --help"' in contents
     assert 'run "invarlock doctor --json"' in contents
     assert (
         '--baseline \\"$SMOKE_MODEL_ID\\" --subject \\"$SMOKE_MODEL_ID\\"' in contents

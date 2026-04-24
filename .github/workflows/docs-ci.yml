@@ -4,21 +4,67 @@ on:
   # Cost optimization: main branch docs build is already in ci.yml
   # This workflow handles docs-only validation on integration/release branches.
   push:
-    branches: [ main, staging/next ]
+    branches: [ main, staging/next, 'release/v*' ]
     paths:
       - 'docs/**'
       - 'README.md'
       - 'CONTRIBUTING.md'
       - 'mkdocs.yml'
+      - 'Makefile'
+      - 'notebooks/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'requirements/workflows/docs-ci-py313.txt'
+      - 'scripts/check_claim_surface_consistency.py'
+      - 'scripts/check_cli_completeness.py'
+      - 'scripts/check_config_schema_sync.py'
+      - 'scripts/check_docs_links.py'
+      - 'scripts/check_guard_completeness.py'
+      - 'scripts/check_internal_links.py'
+      - 'scripts/check_version_consistency.py'
+      - 'scripts/docs_check.py'
+      - 'scripts/docs_lint.py'
+      - 'scripts/lint_assurance_xrefs.py'
+      - 'scripts/test_cli_examples.py'
+      - 'scripts/validate_doc_references.py'
+      - 'scripts/validate_docs_api_refs.py'
+      - 'scripts/validate_python_examples.py'
+      - 'scripts/validate_yaml_examples.py'
+      - 'scripts/verify_live_examples.py'
+      - 'scripts/verify_markdown_bash_blocks.py'
+      - 'scripts/verify_notebooks_smoke.py'
       - '.github/workflows/docs-ci.yml'
   workflow_dispatch:
   pull_request:
-    branches: [ main, develop, staging/next ]
+    branches: [ main, develop, staging/next, 'release/v*' ]
     paths:
       - 'docs/**'
       - 'README.md'
       - 'CONTRIBUTING.md'
       - 'mkdocs.yml'
+      - 'Makefile'
+      - 'notebooks/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'requirements/workflows/docs-ci-py313.txt'
+      - 'scripts/check_claim_surface_consistency.py'
+      - 'scripts/check_cli_completeness.py'
+      - 'scripts/check_config_schema_sync.py'
+      - 'scripts/check_docs_links.py'
+      - 'scripts/check_guard_completeness.py'
+      - 'scripts/check_internal_links.py'
+      - 'scripts/check_version_consistency.py'
+      - 'scripts/docs_check.py'
+      - 'scripts/docs_lint.py'
+      - 'scripts/lint_assurance_xrefs.py'
+      - 'scripts/test_cli_examples.py'
+      - 'scripts/validate_doc_references.py'
+      - 'scripts/validate_docs_api_refs.py'
+      - 'scripts/validate_python_examples.py'
+      - 'scripts/validate_yaml_examples.py'
+      - 'scripts/verify_live_examples.py'
+      - 'scripts/verify_markdown_bash_blocks.py'
+      - 'scripts/verify_notebooks_smoke.py'
       - '.github/workflows/docs-ci.yml'
   schedule:
     # Run weekly to check external links
@@ -52,12 +98,15 @@ jobs:
         python-version: '3.13'
 
     - name: Setup Node.js
-      uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
       with:
         node-version: '22'
 
+    - name: Install docs lint toolchain
+      run: npm ci
+
     - name: Cache pip
-      uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
       # `act` can clobber PATH after setup-python on some hosts; cache is optional.
       if: ${{ !env.ACT }}
       with:
@@ -83,6 +132,9 @@ jobs:
     - name: Check consistency
       run: python scripts/docs_check.py --consistency
 
+    - name: Run curated live examples
+      run: make docs-live-fast
+
     - name: Check for secrets
       run: |
         if grep -r -E "sk-[a-zA-Z0-9]{48}" docs/; then
@@ -105,11 +157,6 @@ jobs:
         echo "Documentation site size: ${SITE_SIZE}MB"
         if [ "${SITE_SIZE}" -gt 50 ]; then echo "Warning: Site > 50MB"; exit 1; fi
 
-    - name: Ensure clean working tree
-      run: |
-        rm -rf site
-        git diff --exit-code
-
     - name: Upload build artifacts
       if: github.event_name == 'pull_request'
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -117,6 +164,11 @@ jobs:
         name: docs-build
         path: site/
         retention-days: 3
+
+    - name: Ensure clean working tree
+      run: |
+        rm -rf site
+        git diff --exit-code
 
   # External links only on schedule (avoids rate limiting)
   check-external-links:

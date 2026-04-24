@@ -15,6 +15,7 @@ class SpectralPolicy(TypedDict, total=False):
     family_caps: dict[str, dict[str, float]]
     ignore_preview_inflation: bool
     max_caps: int
+    max_spectral_norm: float | None
     multiple_testing: dict[str, Any]
 
 

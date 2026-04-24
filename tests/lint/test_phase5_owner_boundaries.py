@@ -119,6 +119,8 @@ def test_phase5_split_modules_exist() -> None:
         REPO_ROOT / "src/invarlock/reporting/report_make_inputs.py",
         REPO_ROOT / "src/invarlock/reporting/report_make_assembly.py",
         REPO_ROOT / "src/invarlock/reporting/report_make_output.py",
+        REPO_ROOT / "src/invarlock/reporting/verify_check_helpers_metrics.py",
+        REPO_ROOT / "src/invarlock/reporting/verify_check_helpers_consistency.py",
         REPO_ROOT / "src/invarlock/runtime_security_container.py",
         REPO_ROOT / "src/invarlock/runtime_security_manifest.py",
         REPO_ROOT / "src/invarlock/cli/evaluate_output.py",
@@ -132,7 +134,16 @@ def test_phase5_split_modules_exist() -> None:
         REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_events.py",
         REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_outcome.py",
         REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_pipeline.py",
+        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_attempts_emit.py",
+        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_attempts_export.py",
+        REPO_ROOT
+        / "src/invarlock/core/run_orchestrator_execute_attempts_processing.py",
+        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_attempts_loop.py",
         REPO_ROOT / "src/invarlock/core/builtin_plugin_catalog.py",
+        REPO_ROOT / "src/invarlock/guards/policies_presets.py",
+        REPO_ROOT / "src/invarlock/guards/policies_resolution.py",
+        REPO_ROOT / "src/invarlock/guards/policies_validation.py",
+        REPO_ROOT / "src/invarlock/evidence_pack_support.py",
     )
 
     missing = [
@@ -231,14 +242,29 @@ def test_phase5_orchestrator_owner_modules_do_not_cross_regrow() -> None:
 
 def test_phase5_large_modules_do_not_regrow() -> None:
     thresholds = {
-        REPO_ROOT / "src/invarlock/model_profile.py": 975,
-        REPO_ROOT / "src/invarlock/proof_pack.py": 920,
-        REPO_ROOT / "src/invarlock/runtime_security_helpers.py": 920,
-        REPO_ROOT / "src/invarlock/reporting/verify_check_helpers.py": 910,
+        REPO_ROOT / "src/invarlock/model_profile.py": 650,
+        REPO_ROOT / "src/invarlock/evidence_pack.py": 650,
+        REPO_ROOT / "src/invarlock/evidence_pack_support.py": 650,
+        REPO_ROOT / "src/invarlock/runtime_security_helpers.py": 650,
+        REPO_ROOT / "src/invarlock/reporting/verify_check_helpers.py": 650,
+        REPO_ROOT / "src/invarlock/reporting/verify_check_helpers_impl.py": 650,
+        REPO_ROOT / "src/invarlock/reporting/verify_check_helpers_metrics.py": 650,
+        REPO_ROOT / "src/invarlock/reporting/verify_check_helpers_consistency.py": 650,
         REPO_ROOT / "src/invarlock/adapters/hf_mixin.py": 910,
         REPO_ROOT / "src/invarlock/cli/commands/plugins.py": 910,
-        REPO_ROOT / "src/invarlock/guards/policies.py": 910,
-        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_attempts.py": 890,
+        REPO_ROOT / "src/invarlock/guards/policies.py": 650,
+        REPO_ROOT / "src/invarlock/guards/policies_impl.py": 650,
+        REPO_ROOT / "src/invarlock/guards/policies_presets.py": 650,
+        REPO_ROOT / "src/invarlock/guards/policies_resolution.py": 650,
+        REPO_ROOT / "src/invarlock/guards/policies_validation.py": 650,
+        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_attempts.py": 650,
+        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_attempts_impl.py": 650,
+        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_attempts_emit.py": 650,
+        REPO_ROOT
+        / "src/invarlock/core/run_orchestrator_execute_attempts_export.py": 650,
+        REPO_ROOT
+        / "src/invarlock/core/run_orchestrator_execute_attempts_processing.py": 650,
+        REPO_ROOT / "src/invarlock/core/run_orchestrator_execute_attempts_loop.py": 650,
         REPO_ROOT / "src/invarlock/eval/primary_metric.py": 850,
         REPO_ROOT / "src/invarlock/reporting/report_primary_metric_analysis.py": 840,
         REPO_ROOT / "src/invarlock/cli/commands/doctor.py": 730,

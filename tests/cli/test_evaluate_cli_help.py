@@ -16,14 +16,14 @@ def test_cli_evaluate_help():
     assert "--baseline" in stdout and "--subject" in stdout
     assert "--baseline-report" in stdout
     assert "--edit-label" in stdout
-    assert "--assurance" in stdout
+    assert "--execution-mode" in stdout
 
 
-def test_cli_verify_help_shows_assurance_choices():
+def test_cli_verify_help_shows_runtime_provenance_choices():
     result = runner.invoke(app, ["verify", "--help"], env={"COLUMNS": "240"})
     assert result.exit_code == 0
     stdout = strip_ansi(result.stdout)
     compact = "".join(stdout.split())
 
-    assert "--assurance" in stdout
-    assert "attested|trusted-local" in compact
+    assert "--runtime-provenance" in stdout
+    assert "container|host" in compact

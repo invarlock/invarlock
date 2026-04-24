@@ -14,6 +14,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_REMOTE_REPO = "/root/invarlock-public"
+DEFAULT_REMOTE_REPO_FALLBACKS = ("/root/invarlock-public-a100",)
 DEFAULT_SUITE = "current-supported-experimental"
 DEFAULT_REMOTE_VENV_CANDIDATES = (
     "{remote_repo}/.venv/bin/python",
@@ -42,6 +43,10 @@ class RemoteLaunch:
             "remote_command": self.remote_command,
             "ssh_command": self.ssh_command,
         }
+
+
+def _shell_path(arg: str) -> str:
+    return arg if arg.startswith("$") else shlex.quote(arg)
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -88,8 +93,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--profile",
-        default="ci",
-        help="Verify/evaluate profile passed through to the sweep script.",
+        default=None,
+        help=(
+            "Optional verify/evaluate profile override passed through to the sweep "
+            "script. Defaults to the sweep's lane-specific profile resolution."
+        ),
     )
     parser.add_argument(
         "--device",
@@ -102,7 +110,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         choices=EXECUTION_MODES,
         help=(
             "Execution mode passed through to scripts/model_evidence_sweep.py. "
-            "'container' keeps the secure-default path; 'host' uses the "
+            "'container' keeps the default container path; 'host' uses the "
             "explicit host-bypass matrix."
         ),
     )
@@ -134,15 +142,44 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _remote_repo(remote_repo: str) -> tuple[str, list[str], list[str]]:
+    candidate_paths: list[str] = []
+    for candidate in (remote_repo, *DEFAULT_REMOTE_REPO_FALLBACKS):
+        if candidate and candidate not in candidate_paths:
+            candidate_paths.append(candidate)
+
+    if len(candidate_paths) == 1:
+        return remote_repo, [], candidate_paths
+
+    setup = [
+        'REPO_DIR=""',
+        "for candidate in "
+        + " ".join(shlex.quote(path) for path in candidate_paths)
+        + '; do if [ -d "$candidate/.git" ]; then REPO_DIR="$candidate"; break; fi; done',
+        f'if [ -z "$REPO_DIR" ]; then REPO_DIR={shlex.quote(remote_repo)}; fi',
+    ]
+    return "$REPO_DIR", setup, candidate_paths
+
+
 def _remote_python(
-    remote_repo: str, remote_python: str | None
+    remote_repo: str,
+    remote_repo_candidates: list[str],
+    remote_python: str | None,
 ) -> tuple[str, list[str], list[str]]:
     if remote_python:
         return remote_python, [], [remote_python]
-    candidate_paths = [
-        template.format(remote_repo=remote_repo.rstrip("/"))
-        for template in DEFAULT_REMOTE_VENV_CANDIDATES
+    candidate_paths: list[str] = []
+    for template in DEFAULT_REMOTE_VENV_CANDIDATES:
+        if "{remote_repo}" in template:
+            candidate_paths.append(template.format(remote_repo=remote_repo.rstrip("/")))
+        else:
+            candidate_paths.append(template)
+    display_candidates = [
+        f"{candidate.rstrip('/')}/.venv/bin/python"
+        for candidate in remote_repo_candidates
     ]
+    display_candidates.append("/root/venvs/invarlock/bin/python")
+    display_candidates = list(dict.fromkeys(display_candidates))
     setup = [
         'PYTHON_BIN=""',
         "for candidate in "
@@ -152,7 +189,7 @@ def _remote_python(
         'if [ -z "$PYTHON_BIN" ] && command -v python3 >/dev/null 2>&1; then PYTHON_BIN="$(command -v python3)"; fi',
         'if [ -z "$PYTHON_BIN" ]; then echo "No remote Python runtime found" >&2; exit 127; fi',
     ]
-    return "$PYTHON_BIN", setup, candidate_paths
+    return "$PYTHON_BIN", setup, display_candidates
 
 
 def _stamp(value: str | None) -> str:
@@ -185,11 +222,13 @@ def build_sync_command(
     remote_repo: str,
     branch: str,
     remote_python: str,
+    repo_setup: list[str],
     python_setup: list[str],
 ) -> str:
     return " && ".join(
         [
-            f"cd {shlex.quote(remote_repo)}",
+            *repo_setup,
+            f"cd {_shell_path(remote_repo)}",
             "git fetch origin",
             f"git checkout {shlex.quote(branch)}",
             f"git pull --ff-only origin {shlex.quote(branch)}",
@@ -210,12 +249,13 @@ def build_launches(
     suite: str,
     slugs: list[str],
     lane_ids: list[str],
-    profile: str,
+    profile: str | None,
     device: str,
     execution_mode: str,
     gpus: list[str],
     session_prefix: str,
     stamp: str,
+    repo_setup: list[str],
     python_setup: list[str],
 ) -> list[RemoteLaunch]:
     launches: list[RemoteLaunch] = []
@@ -230,8 +270,6 @@ def build_launches(
             "scripts/model_evidence_sweep.py",
             "--suite",
             suite,
-            "--profile",
-            profile,
             "--device",
             device,
             "--execution-mode",
@@ -243,6 +281,8 @@ def build_launches(
             "--shard-count",
             str(shard_count),
         ]
+        if profile:
+            sweep_cmd[4:4] = ["--profile", profile]
         for slug in slugs:
             sweep_cmd.extend(["--slug", slug])
         for lane_id in lane_ids:
@@ -250,7 +290,8 @@ def build_launches(
 
         inner_command = " && ".join(
             [
-                f"cd {shlex.quote(remote_repo)}",
+                *repo_setup,
+                f"cd {_shell_path(remote_repo)}",
                 f"mkdir -p {shlex.quote(shard_output_root)}",
                 *python_setup,
                 (
@@ -302,9 +343,9 @@ def _monitor_commands(host: str, launches: list[RemoteLaunch]) -> dict[str, obje
 
 def run_remote(args: argparse.Namespace) -> int:
     stamp = _stamp(args.stamp)
-    remote_repo = args.remote_repo
+    remote_repo, repo_setup, remote_repo_candidates = _remote_repo(args.remote_repo)
     remote_python, python_setup, remote_python_candidates = _remote_python(
-        remote_repo, args.remote_python
+        remote_repo, remote_repo_candidates, args.remote_python
     )
     remote_output_root = args.remote_output_root or _default_remote_output_root(stamp)
     gpus = _parse_gpus(args.gpus)
@@ -315,6 +356,7 @@ def run_remote(args: argparse.Namespace) -> int:
             remote_repo=remote_repo,
             branch=args.branch,
             remote_python=remote_python,
+            repo_setup=repo_setup,
             python_setup=python_setup,
         )
 
@@ -332,12 +374,14 @@ def run_remote(args: argparse.Namespace) -> int:
         gpus=gpus,
         session_prefix=args.session_prefix,
         stamp=stamp,
+        repo_setup=repo_setup,
         python_setup=python_setup,
     )
     payload = {
         "host": args.host,
         "branch": args.branch,
-        "remote_repo": remote_repo,
+        "remote_repo": args.remote_repo,
+        "remote_repo_candidates": remote_repo_candidates,
         "remote_python": args.remote_python or "auto",
         "remote_python_candidates": remote_python_candidates,
         "remote_output_root": remote_output_root,

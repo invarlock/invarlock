@@ -1,0 +1,80 @@
+{
+  "schema_version": "v1",
+  "run_id": "bert-published-basis-fixture",
+  "artifacts": {},
+  "plugins": {
+    "adapters": [
+      {
+        "name": "hf_mlm"
+      }
+    ],
+    "edits": [],
+    "guards": []
+  },
+  "meta": {
+    "model_id": "prajjwal1/bert-tiny",
+    "adapter": "hf_mlm",
+    "profile": "release"
+  },
+  "dataset": {
+    "provider": "hf_text",
+    "seq_len": 128,
+    "windows": {
+      "preview": 8,
+      "final": 8,
+      "stats": {
+        "coverage": {
+          "preview": {
+            "used": 8
+          },
+          "final": {
+            "used": 8
+          }
+        },
+        "paired_windows": 8,
+        "window_match_fraction": 1.0,
+        "window_overlap_fraction": 1.0
+      }
+    }
+  },
+  "primary_metric": {
+    "kind": "ppl_mlm",
+    "preview": 8.4,
+    "final": 8.4,
+    "ratio_vs_baseline": 1.0,
+    "display_ci": [
+      1.0,
+      1.0
+    ],
+    "gating_basis": "ratio"
+  },
+  "validation": {
+    "primary_metric_acceptable": true,
+    "preview_final_drift_acceptable": true,
+    "invariants_pass": true,
+    "spectral_stable": true,
+    "rmt_stable": true
+  },
+  "resolved_policy": {
+    "metrics": {
+      "pm_ratio": {
+        "ratio_limit_base": 1.1,
+        "min_tokens": 128,
+        "min_token_fraction": 0.0,
+        "hysteresis_ratio": 0.0
+      }
+    }
+  },
+  "policy_digest": {
+    "policy_version": "policy-v1",
+    "tier_policy_name": "balanced",
+    "thresholds_hash": "3f1ee6570fcf3a12",
+    "changed": false
+  },
+  "provenance": {
+    "provider_digest": {
+      "tokenizer_sha256": "bert-tokenizer-fixture",
+      "masking_sha256": "bert-mask-fixture"
+    }
+  }
+}

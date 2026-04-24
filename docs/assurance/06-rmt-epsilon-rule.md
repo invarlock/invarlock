@@ -59,7 +59,7 @@ inside `src/invarlock/guards/rmt.py`.
 - Conservative uses the same per-family ε defaults:
   $\epsilon_f = \{0.01, 0.01, 0.01, 0.01\}$.
   Values are recorded in the packaged `tiers.yaml`
-  (`invarlock._data.runtime/tiers.yaml`) and surfaced in reports. Provide
+  (`runtime/tiers.yaml`) and surfaced in reports. Provide
   overrides via `INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml` when needed.
 
 *Example:* with `r_base = 1.20` and ε = 0.01, the guard allows
@@ -89,7 +89,7 @@ larger ε to avoid spurious failures.
 - `rmt.edge_risk_by_family_base.*` and `rmt.edge_risk_by_family.*`.
 - `rmt.epsilon_default` and `rmt.epsilon_by_family.*`.
 - `rmt.status` / `rmt.stable` and `rmt.epsilon_violations` for pass/fail context.
-- `resolved_policy.rmt.{margin,deadband,epsilon_by_family}` — resolved thresholds archived with the attested report bundle.
+- `resolved_policy.rmt.{margin,deadband,epsilon_by_family}` — resolved thresholds archived with the container-backed report bundle.
 
 ## Edge cases
 

@@ -23,7 +23,7 @@ labels: bug
 
 ### Actual Behavior / Logs
 
-<!-- Include relevant logs: `events.jsonl`, stack traces, or attested report snippets. -->
+<!-- Include relevant logs: `events.jsonl`, stack traces, or container-backed report snippets. -->
 
 ### Additional Context
 

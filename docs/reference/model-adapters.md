@@ -29,8 +29,8 @@ invarlock evaluate --allow-network \
   --adapter auto
 ```
 
-The CLI example above uses the secure-default runtime container. Add
-`--assurance trusted-local` only for trusted local compare/evaluate workflows that
+The CLI example above uses the runtime container by default. Add
+`--execution-mode host` only for host-side compare/evaluate workflows that
 intentionally bypass that boundary.
 
 ```python
@@ -43,7 +43,7 @@ print(adapter.describe(model)["model_type"])
 
 > Adapter availability is broader than the published assurance basis. GPT-2 and
 > BERT back the published calibrated basis; repo-included pilot configs
-> for Mistral 7B, Ministral 3 text-only, Qwen2 7B, Qwen2.5 14B, and additional experimental families are for
+> for Mistral 7B, Ministral 3 text-only, Qwen2 7B, Qwen2.5 7B, Qwen2.5 14B, and additional experimental families are for
 > experimentation until supporting artifacts are attached. See the Model Family
 > Catalog for the authoritative family-by-family inventory.
 

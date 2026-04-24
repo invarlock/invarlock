@@ -51,14 +51,14 @@ Key environment variables used across workflows:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `INVARLOCK_ALLOW_NETWORK` | Enable network access for model downloads | `0` |
-| `INVARLOCK_ALLOW_HOST_EXECUTION` | Permit trusted host-side model-loading commands in workflows that need it | `0` |
+| `INVARLOCK_ALLOW_HOST_EXECUTION` | Permit host-side model-loading commands in workflows that need it | `0` |
 | `INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS` | Permit trusted third-party plugin discovery or management | `0` |
 | `INVARLOCK_ALLOW_REMOTE_CODE` | Permit trusted remote model code execution when a workflow explicitly needs it | `0` |
 | `INVARLOCK_LIGHT_IMPORT` | Light import mode (skip heavy dependencies) | `0` |
 | `INVARLOCK_OMP_THREADS` | OpenMP thread count | System default |
 
 Workflows should keep these privilege toggles scoped to the narrowest possible
-job or step, emit attested outputs, and verify them without bypasses.
+job or step, emit container-backed outputs, and verify them without bypasses.
 
 ## Dependency Update Policy
 
@@ -88,11 +88,11 @@ If workflows fail with "config file not found" errors, check that the referenced
 
 ### Python/Node.js Version
 
-All workflows use Python 3.12+ and Node.js 18 where needed. Ensure your self-hosted runners have these versions available.
+All workflows use Python 3.12+ and Node.js 22.18+ where needed. Ensure your self-hosted runners have these versions available.
 
 ## Running CI Locally with `act`
 
-You can run GitHub Actions workflows locally using [nektos/act](https://github.com/nektos/act), which emulates GitHub's runner environment in Docker containers. This Docker requirement applies to the local `act` helper path, not to InvarLock's general secure-default runtime support.
+You can run GitHub Actions workflows locally using [nektos/act](https://github.com/nektos/act), which emulates GitHub's runner environment in Docker containers. This Docker requirement applies to the local `act` helper path, not to InvarLock's general default runtime-container support.
 
 ### Installation
 
@@ -107,6 +107,15 @@ go install github.com/nektos/act@latest
 ```
 
 **Prerequisites**: Docker must be running for this documented `act` flow.
+`make workflow-lint` also requires the CI-pinned `actionlint` binary:
+
+```bash
+go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+```
+
+`make security` runs SBOM generation and `pip-audit` in an isolated `uv`
+security toolchain so it does not add supply-chain tools to the project
+virtual environment.
 
 ### Quick Start
 
@@ -125,6 +134,9 @@ make ci-local-job JOB=supply-chain
 
 # Run pre-commit workflow
 make ci-local-precommit
+
+# Run direct supply-chain security checks
+make security
 
 # Verbose output for debugging
 make ci-local-verbose

@@ -70,9 +70,9 @@ or z = z₀.₉₇₅ for two-sided (Conservative), then set min_effect ≈ z ×
 
 ## Runtime Contract (report)
 
-- report records `variance.predictive_gate` with `{evaluated,passed,reason,delta_ci,mean_delta}` and `variance.ab_test.provenance` stating window IDs and seed for A/B.
+- report records `variance.predictive_gate` with `{evaluated,passed,reason,delta_ci,mean_delta}` and `variance.ab_test` with `{seed,windows_used,provenance}`; provenance states the window IDs for A/B.
 - Tier knobs for sidedness and min-effect are recorded under `resolved_policy.variance.{predictive_one_sided,min_effect_lognll}`.
-- Lints reject enablement if CI contains 0 or if provenance is missing.
+- Report verifier lints reject `variance.enabled = true` when the predictive gate did not pass, the predictive CI contains 0 or misses the `min_effect_lognll` threshold, the mean Δ misses the same threshold, or A/B seed/window provenance is missing.
 
 ## Observability
 

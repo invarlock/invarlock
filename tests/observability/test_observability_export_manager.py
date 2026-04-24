@@ -225,6 +225,22 @@ class TestExportManager:
         assert summary["total_errors"] == 0
         assert summary["success_rate"] == 1.0
 
+    def test_get_summary_success_rate_uses_total_attempts(self):
+        """Aggregate success rate should not go negative when exporters fail."""
+        from invarlock.observability.exporters import ExportManager, JSONExporter
+
+        manager = ExportManager()
+        exporter = JSONExporter()
+        exporter.export_count = 0
+        exporter.error_count = 1
+        manager.add_exporter(exporter)
+
+        summary = manager.get_summary()
+
+        assert summary["total_exports"] == 0
+        assert summary["total_errors"] == 1
+        assert summary["success_rate"] == 0.0
+
     def test_start_stop_background_export(self):
         """Test starting and stopping background export."""
         from invarlock.observability.exporters import ExportManager

@@ -7,14 +7,32 @@
 | **Purpose** | Understand and interpret InvarLock v1 reports. |
 | **Audience** | Reviewers validating evaluation evidence. |
 | **Key sections** | Executive Summary, Quality Gates, Primary Metric, Provenance, Measurement contracts. |
-| **Validation** | Use `invarlock verify <evaluation.report.json>` to check schema, pairing, and required runtime attestation via `runtime.manifest.json`. |
+| **Validation** | Use `invarlock verify <evaluation.report.json>` to check schema, pairing, and required runtime provenance via `runtime.manifest.json`. |
 | **Source of truth** | [reports](../reference/reports.md) for full schema. |
 
 This guide highlights the key sections of a v1 report and how to
 interpret them.
 
+Browser-first reading order for the HTML export:
+
+```text
+1. Summary chips
+2. Quick links rail
+3. Executive Summary
+4. Quality Gates
+5. Provenance / Policy details
+```
+
+The HTML shell is intentionally thin. It adds navigation and orientation, but
+the evidence still comes from the same canonical report body and should be
+re-checked with `invarlock verify`.
+
 - Executive Summary
   - First-screen summary of overall PASS/FAIL plus the compact gate table (primary metric, drift, invariants, guards, overhead when evaluated).
+- Summary chips (HTML shell)
+  - Browser-only overview of overall status, primary-metric kind, and whether the bundle still links back to both run reports for `report explain --evaluation-report`.
+- Quick links rail (HTML shell)
+  - Browser-only navigation for jumping to Executive Summary, gates, provenance, and appendix sections without scrolling through the whole report.
 - Primary Metric row
   - Shows the task‑appropriate metric (ppl_* or accuracy), its point estimates,
     and paired CI. The ratio/Δpp vs baseline drives the gate.

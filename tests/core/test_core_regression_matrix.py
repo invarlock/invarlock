@@ -598,7 +598,7 @@ def test_run_payload_snapshot_and_runtime_helpers_cover_remaining_paths(
     report_path.write_text("{}", encoding="utf-8")
     manifest_path = tmp_path / "runtime.manifest.json"
     manifest_payload = json.loads(
-        Path("tests/fixtures/runtime_attestation/runtime.manifest.json").read_text(
+        Path("tests/fixtures/runtime_provenance/runtime.manifest.json").read_text(
             encoding="utf-8"
         )
     )

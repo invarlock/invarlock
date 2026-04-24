@@ -2,7 +2,7 @@
 
 InvarLock relies on several open-source projects, datasets, and reference model weights. This document
 summarizes the direct Python dependencies declared in [`pyproject.toml`](./pyproject.toml), common
-optional extras used by adapter, evaluation, proof-pack, and observability flows, and a representative
+optional extras used by adapter, evaluation, evidence-pack, and observability flows, and a representative
 set of third-party assets referenced by public docs, presets, and smoke scripts in this repository
 revision.
 
@@ -17,7 +17,7 @@ redistributed artifact.
 | typer | [fastapi/typer](https://github.com/fastapi/typer) | MIT | CLI framework |
 | click | [pallets/click](https://github.com/pallets/click) | BSD 3-Clause | CLI command parsing and option handling |
 | shellingham | [sarugaku/shellingham](https://github.com/sarugaku/shellingham) | ISC | Shell detection used by CLI helpers |
-| cryptography | [pyca/cryptography](https://github.com/pyca/cryptography) | Apache-2.0 OR BSD-3-Clause | Signature and key handling for proof-pack integrity verification |
+| cryptography | [pyca/cryptography](https://github.com/pyca/cryptography) | Apache-2.0 OR BSD-3-Clause | Signature and key handling for evidence-pack integrity verification |
 | pandas | [pandas-dev/pandas](https://github.com/pandas-dev/pandas) | BSD 3-Clause | Tabular result processing and export helpers |
 | scikit-learn | [scikit-learn/scikit-learn](https://github.com/scikit-learn/scikit-learn) | BSD 3-Clause | Metrics and auxiliary ML utilities |
 | pydantic | [pydantic/pydantic](https://github.com/pydantic/pydantic) | MIT | Structured config and validation helpers |
@@ -32,7 +32,7 @@ redistributed artifact.
 ## Optional Runtime Extras
 
 This table focuses on the runtime-oriented optional dependencies used by
-adapter, evaluation, proof-pack, and observability flows. It intentionally
+adapter, evaluation, evidence-pack, and observability flows. It intentionally
 excludes dev- and CI-only extras such as `pytest`, `ruff`, `mkdocs`, and
 release tooling.
 

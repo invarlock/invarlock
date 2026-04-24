@@ -40,7 +40,7 @@ def test_apply_runtime_allowances_and_delegate_container_command(monkeypatch) ->
         allow_host_execution=True,
         allow_third_party_plugins=True,
         allow_remote_code=True,
-        allow_unattested_artifacts=True,
+        allow_unverified_provenance=True,
     )
 
     runtime_security.apply_runtime_allowances(
@@ -48,14 +48,14 @@ def test_apply_runtime_allowances_and_delegate_container_command(monkeypatch) ->
         allow_host_execution=False,
         allow_third_party_plugins=False,
         allow_remote_code=False,
-        allow_unattested_artifacts=False,
+        allow_unverified_provenance=False,
     )
 
     assert seen == [True, False]
     assert runtime_security.network_allowed() is False
     assert runtime_security.host_execution_allowed() is False
     assert runtime_security.remote_code_allowed() is False
-    assert runtime_security.unattested_artifacts_allowed() is False
+    assert runtime_security.unverified_provenance_allowed() is False
     assert runtime_security.third_party_plugins_allowed() is False
 
     monkeypatch.setattr(
@@ -126,7 +126,7 @@ def test_build_container_python_command_uses_python_entrypoint_for_repo_script(
 ) -> None:
     repo_root = tmp_path / "repo"
     script_path = (
-        repo_root / "scripts" / "proof_packs" / "python" / "run_from_config.py"
+        repo_root / "scripts" / "evidence_packs" / "python" / "run_from_config.py"
     )
     script_path.parent.mkdir(parents=True, exist_ok=True)
     script_path.write_text("# stub\n", encoding="utf-8")
@@ -209,7 +209,7 @@ def test_build_container_python_command_uses_python_entrypoint_for_repo_script(
     assert "PYTHONPATH=/workspace/src" in command
     assert "EXTRA=1" in command
     assert "ghcr.io/invarlock/runtime:test" in command
-    assert "/workspace/scripts/proof_packs/python/run_from_config.py" in command
+    assert "/workspace/scripts/evidence_packs/python/run_from_config.py" in command
 
 
 def test_build_container_python_command_adds_cwd_host_mirror(
@@ -375,7 +375,7 @@ def test_delegate_python_script_to_container_uses_python_builder(monkeypatch) ->
 
     assert (
         runtime_security.delegate_python_script_to_container(
-            "scripts/proof_packs/python/run_from_config.py",
+            "scripts/evidence_packs/python/run_from_config.py",
             _plan(["--config", "demo.yaml"]),
         )
         == 9
@@ -400,7 +400,7 @@ def test_delegate_python_script_to_container_passes_timeout(monkeypatch) -> None
 
     assert (
         runtime_security.delegate_python_script_to_container(
-            "scripts/proof_packs/python/run_from_config.py",
+            "scripts/evidence_packs/python/run_from_config.py",
             _plan(["--config", "demo.yaml"]),
         )
         == 9
@@ -450,7 +450,7 @@ def test_delegate_python_script_to_container_surfaces_timeout(
 
     with pytest.raises(RuntimeError, match="timed out"):
         runtime_security.delegate_python_script_to_container(
-            "scripts/proof_packs/python/run_from_config.py",
+            "scripts/evidence_packs/python/run_from_config.py",
             _plan(["--config", "demo.yaml"]),
         )
 
@@ -597,7 +597,7 @@ def test_build_container_python_command_leaves_external_script_as_host_path(
 
     assert "--network" not in command
     assert str(script_path.resolve()) in command
-    assert "/workspace/scripts/proof_packs/python/run_from_config.py" not in command
+    assert "/workspace/scripts/evidence_packs/python/run_from_config.py" not in command
 
 
 def test_build_container_command_raises_when_no_engine_is_available(
@@ -639,7 +639,7 @@ def test_build_container_command_uses_launch_plan_and_deduplicates_mounts(
     monkeypatch.setattr(
         runtime_security_helpers,
         "resolve_runtime_image_digest",
-        lambda: "sha256:attested",
+        lambda: "sha256:container",
         raising=True,
     )
     monkeypatch.setattr(

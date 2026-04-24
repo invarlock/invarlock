@@ -6,7 +6,7 @@ concurrency:
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'release/v*' ]
     # Allow supply-chain job to run on release tags too.
     tags: [ 'v*' ]
   pull_request:
@@ -46,7 +46,7 @@ jobs:
           python-version: "3.13"
 
       - name: Cache pip
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
         # `act` can clobber PATH after setup-python on some hosts; cache is optional.
         if: ${{ github.actor != 'nektos/act' }}
         with:
@@ -97,6 +97,9 @@ jobs:
         run: |
           mkdocs build --strict
 
+      - name: Run curated live examples
+        run: make docs-live-fast
+
   # Minimum-supported Python (3.12) smoke (small subset).
   tests-min-py312:
     if: ${{ github.event_name != 'schedule' }}
@@ -115,7 +118,7 @@ jobs:
           python-version: "3.12"
 
       - name: Cache pip
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
         # `act` can clobber PATH after setup-python on some hosts; cache is optional.
         if: ${{ github.actor != 'nektos/act' }}
         with:
@@ -156,7 +159,7 @@ jobs:
           python-version: "3.13"
 
       - name: Cache pip
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
         if: ${{ github.actor != 'nektos/act' }}
         with:
           path: ~/.cache/pip
@@ -188,7 +191,7 @@ jobs:
           python-version: "3.13"
 
       - name: Cache pip
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
         if: ${{ github.actor != 'nektos/act' }}
         with:
           path: ~/.cache/pip
@@ -220,8 +223,13 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "22"
+
       - name: Cache pip
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
         # `act` can clobber PATH after setup-python on some hosts; cache is optional.
         if: ${{ github.actor != 'nektos/act' }}
         with:
@@ -232,6 +240,9 @@ jobs:
 
       - name: Install (core + hf + verify tools)
         run: python -m pip install --require-hashes -r requirements/workflows/ci-hf-py313.txt
+
+      - name: Install docs lint toolchain
+        run: npm ci
 
       - name: Full verify
         run: |

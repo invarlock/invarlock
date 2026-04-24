@@ -7,7 +7,7 @@ from typer.core import TyperGroup
 
 class AdvancedGroup(TyperGroup):
     def list_commands(self, ctx: click.Context) -> list[str]:
-        return ["proof-pack", "policy", "plugins", "calibrate"]
+        return ["evidence-pack", "policy", "plugins", "calibrate", "runtime-verify"]
 
     def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
         command = super().get_command(ctx, cmd_name)
@@ -52,10 +52,15 @@ def _load_advanced_subapp(group: TyperGroup, name: str) -> bool:
         group.add_command(command, name=sub_name)
         return True
 
-    if name == "proof-pack":
-        from .proof_pack import proof_pack_app
+    def _register_command(sub_name: str, command: click.Command) -> bool:
+        command.name = sub_name
+        group.add_command(command, name=sub_name)
+        return True
 
-        return _register(name, proof_pack_app)
+    if name == "evidence-pack":
+        from .evidence_pack import evidence_pack_app
+
+        return _register(name, evidence_pack_app)
     if name == "policy":
         from .policy import policy_app
 
@@ -71,4 +76,8 @@ def _load_advanced_subapp(group: TyperGroup, name: str) -> bool:
             missing = getattr(exc, "name", "") or "optional runtime"
             return _register(name, _missing_dependency_subapp(name, missing))
         return _register(name, calibrate_app)
+    if name == "runtime-verify":
+        from invarlock.cli.runtime_verify import runtime_verify_app
+
+        return _register_command(name, runtime_verify_app)
     return False

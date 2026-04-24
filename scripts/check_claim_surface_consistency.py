@@ -7,6 +7,8 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+REMOVED_README_GUARANTEE_LABEL = "Statistical " + "guarantees"
+REMOVED_REPORT_GUARANTEE_LABEL = "What the report " + "guarantees"
 
 
 def _read(rel_path: str) -> str:
@@ -60,6 +62,7 @@ def main() -> int:
             "Published assurance basis covers GPT-2 and BERT profiles.",
             "Mistral 7B",
             "Qwen2 7B",
+            "Qwen2.5 7B",
             "Qwen2.5 14B",
             "pilot calibration configs",
             "Model Family Catalog",
@@ -77,6 +80,7 @@ def main() -> int:
             "support tier",
             "coverage state",
             "Declared Support",
+            "<=14B Text Candidate Inventory",
             "Recommended Additions",
         ],
         "docs/assurance/00-assurance-case.md": [
@@ -88,6 +92,7 @@ def main() -> int:
             "Published assurance basis covers GPT-2 and BERT profiles.",
             "Mistral 7B",
             "Qwen2 7B",
+            "Qwen2.5 7B",
             "Qwen2.5 14B",
             "not part of the published",
         ],
@@ -95,6 +100,7 @@ def main() -> int:
             "Published assurance basis covers GPT-2 and BERT profiles.",
             "Mistral 7B",
             "Qwen2 7B",
+            "Qwen2.5 7B",
             "Qwen2.5 14B",
         ],
         "docs/reference/guards.md": [
@@ -102,6 +108,7 @@ def main() -> int:
             "BERT profiles",
             "Mistral 7B",
             "Qwen2 7B",
+            "Qwen2.5 7B",
             "Qwen2.5 14B",
             "published assurance basis",
         ],
@@ -111,25 +118,27 @@ def main() -> int:
             "BERT",
             "Mistral 7B",
             "Qwen2 7B",
+            "Qwen2.5 7B",
             "Qwen2.5 14B",
         ],
-        "docs/user-guide/proof-packs.md": [
+        "docs/user-guide/evidence-packs.md": [
             "signed manifest",
             "strict verification",
             "PASS final verdict",
         ],
-        "scripts/proof_packs/run_pack.sh": [
+        "scripts/evidence_packs/run_pack.sh": [
             "signed manifest",
             "strict verification",
             "PASS final verdict",
         ],
-        "scripts/proof_packs/tests/test_run_pack.sh": [
+        "scripts/evidence_packs/tests/test_run_pack.sh": [
             "signed manifest, strict verification, and a PASS final verdict",
         ],
         "Makefile": ["eval-loop:"],
     }
 
     banned_by_file = {
+        "README.md": [REMOVED_README_GUARANTEE_LABEL],
         "docs/user-guide/quickstart.md": ["machine-readable safety report"],
         "docs/user-guide/getting-started.md": [
             "make cert-loop",
@@ -152,7 +161,7 @@ def main() -> int:
         "docs/README.md": ["Safety Case", "safety claim"],
         "docs/reference/index.md": ["Safety claims and proofs"],
         "docs/reference/architecture.md": ["Safety Case Overview"],
-        "docs/reference/reports.md": ["Safety Case"],
+        "docs/reference/reports.md": ["Safety Case", REMOVED_REPORT_GUARANTEE_LABEL],
         "docs/user-guide/reading-report.md": ["[Safety Case]"],
         "docs/user-guide/primary-metric-smoke.md": ["Evaluation Math Proof"],
         "docs/assurance/00-assurance-case.md": [
@@ -161,7 +170,7 @@ def main() -> int:
             "safety tiers",
         ],
         "Makefile": ["cert-loop:"],
-        "scripts/proof_packs/lib/task_functions.sh": ["Certification for "],
+        "scripts/evidence_packs/lib/task_functions.sh": ["Certification for "],
     }
 
     for rel_path, required_snippets in required_by_file.items():

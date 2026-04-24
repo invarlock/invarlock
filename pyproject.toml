@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "invarlock"
-version = "0.7.2"
+version = "0.8.0"
 description = "Edit‑agnostic robustness evaluation reports for weight edits (InvarLock framework)"
 authors = [{ name = "InvarLock Team", email = "oss@invarlock.dev" }]
 maintainers = [{ name = "InvarLock Maintainers", email = "support@invarlock.dev" }]
@@ -42,9 +42,9 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/invarlock/invarlock"
 Repository = "https://github.com/invarlock/invarlock"
-Documentation = "https://github.com/invarlock/invarlock/tree/main/docs"
+Documentation = "https://invarlock.github.io/invarlock/0.8.0/"
 Issues = "https://github.com/invarlock/invarlock/issues"
-Changelog = "https://github.com/invarlock/invarlock/blob/main/CHANGELOG.md"
+Changelog = "https://github.com/invarlock/invarlock/blob/v0.8.0/CHANGELOG.md"
 
 [project.optional-dependencies]
 # Core torch dependencies for adapters
@@ -125,7 +125,7 @@ gpu = [
   "safetensors>=0.4.0",
 ]
 
-# Convenience install for advanced proof-pack/policy/plugins/calibration workflows.
+# Convenience install for advanced evidence-pack/policy/plugins/calibration workflows.
 advanced = [
   "torch>=2.1.0",
   "transformers>=5.5.0",
@@ -174,7 +174,7 @@ all = [
 dev = [
   "pytest>=7.0",
   "pytest-cov>=4.0",
-  "ruff==0.15.10",
+  "ruff==0.15.11",
   "black>=23.0",
   "mypy>=1.0",
   "hypothesis>=6.98",
@@ -186,6 +186,7 @@ dev = [
   "matplotlib>=3.7",
   "bitsandbytes>=0.41",
   "build>=0.10.0",
+  "wheel>=0.46.0",
   "requests>=2.33.0",
   "twine>=4.0.0",
 ]
@@ -194,7 +195,7 @@ ci = [
   "pytest>=7.0",
   "pytest-cov>=4.0",
   "hypothesis>=6.98",
-  "ruff==0.15.10",
+  "ruff==0.15.11",
   "mypy>=1.0",
   "mkdocs>=1.5",
   "mkdocs-material>=9.5",
@@ -206,6 +207,7 @@ ci = [
 
 docs-ci = [
   "linkchecker>=10.5",
+  "numpy>=1.24",
   "requests>=2.33.0",
 ]
 
@@ -250,7 +252,6 @@ hf_bnb = "invarlock.plugins.hf_bnb_adapter:HF_BNB_Adapter"
 # Console scripts
 [project.scripts]
 invarlock = "invarlock.cli.app:app"
-invarlock-runtime-verify = "invarlock.cli.runtime_verify:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -259,6 +260,7 @@ where = ["src"]
 "*" = ["py.typed"]
 "invarlock" = [
   "_data/contracts/*.json",
+  "_data/public_evidence/published_basis/*/*.json",
 ]
 "invarlock._data.runtime" = [
   "profiles/*.yaml",
@@ -455,7 +457,7 @@ module = [
     "invarlock.cli.commands.export_html",
     "invarlock.cli.commands.plugins",
     "invarlock.cli.commands.policy",
-    "invarlock.cli.commands.proof_pack",
+    "invarlock.cli.commands.evidence_pack",
     "invarlock.cli.commands.report",
     "invarlock.cli.commands.run",
     "invarlock.cli.config_execution",

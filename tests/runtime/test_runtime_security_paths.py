@@ -122,7 +122,7 @@ def test_apply_runtime_allowances_can_disable_prior_allowances(
         allow_host_execution=True,
         allow_remote_code=True,
         allow_third_party_plugins=True,
-        allow_unattested_artifacts=True,
+        allow_unverified_provenance=True,
     )
 
     try:
@@ -130,20 +130,20 @@ def test_apply_runtime_allowances_can_disable_prior_allowances(
         assert runtime_security.host_execution_allowed() is True
         assert runtime_security.remote_code_allowed() is True
         assert runtime_security.third_party_plugins_allowed() is True
-        assert runtime_security.unattested_artifacts_allowed() is True
+        assert runtime_security.unverified_provenance_allowed() is True
 
         runtime_security.apply_runtime_allowances(
             allow_network=False,
             allow_host_execution=False,
             allow_remote_code=False,
             allow_third_party_plugins=False,
-            allow_unattested_artifacts=False,
+            allow_unverified_provenance=False,
         )
         assert runtime_security.network_allowed() is False
         assert runtime_security.host_execution_allowed() is False
         assert runtime_security.remote_code_allowed() is False
         assert runtime_security.third_party_plugins_allowed() is False
-        assert runtime_security.unattested_artifacts_allowed() is False
+        assert runtime_security.unverified_provenance_allowed() is False
     finally:
         runtime_security.reset_runtime_allowances(token)
 
@@ -156,7 +156,7 @@ def test_build_runtime_security_policy_applies_request_scoped_policy(
         allow_host_execution=True,
         allow_third_party_plugins=True,
         allow_remote_code=True,
-        allow_unattested_artifacts=True,
+        allow_unverified_provenance=True,
     )
 
     assert policy == runtime_security.RuntimeSecurityPolicy(
@@ -164,14 +164,14 @@ def test_build_runtime_security_policy_applies_request_scoped_policy(
         allow_host_execution=True,
         allow_third_party_plugins=True,
         allow_remote_code=True,
-        allow_unattested_artifacts=True,
+        allow_unverified_provenance=True,
     )
 
     monkeypatch.delenv(runtime_security.ALLOW_NETWORK_ENV, raising=False)
     monkeypatch.delenv(runtime_security.ALLOW_HOST_EXECUTION_ENV, raising=False)
     monkeypatch.delenv(runtime_security.ALLOW_REMOTE_CODE_ENV, raising=False)
     monkeypatch.delenv(runtime_security.ALLOW_THIRD_PARTY_PLUGINS_ENV, raising=False)
-    monkeypatch.delenv(runtime_security.ALLOW_UNATTESTED_ARTIFACTS_ENV, raising=False)
+    monkeypatch.delenv(runtime_security.ALLOW_UNVERIFIED_PROVENANCE_ENV, raising=False)
     try:
         runtime_security.apply_runtime_allowances(policy=policy)
 
@@ -179,7 +179,7 @@ def test_build_runtime_security_policy_applies_request_scoped_policy(
         assert runtime_security.host_execution_allowed() is True
         assert runtime_security.remote_code_allowed() is True
         assert runtime_security.third_party_plugins_allowed() is True
-        assert runtime_security.unattested_artifacts_allowed() is True
+        assert runtime_security.unverified_provenance_allowed() is True
     finally:
         runtime_security.reset_runtime_allowances()
 
@@ -643,10 +643,21 @@ def test_path_env_value_and_delegated_env_pairs_translate_workspace_paths(
     external_tmp = tmp_path / "external-tmp"
     external_tmp.mkdir()
 
+    for env_name in (
+        "INVARLOCK_CONFIG_ROOT",
+        "INVARLOCK_EXPORT_DIR",
+        "HF_HOME",
+        "HF_HUB_CACHE",
+        "HF_DATASETS_CACHE",
+        "TRANSFORMERS_CACHE",
+        "TMP",
+    ):
+        monkeypatch.delenv(env_name, raising=False)
+
     monkeypatch.setenv(runtime_security.ALLOW_NETWORK_ENV, "1")
     monkeypatch.setenv(runtime_security.ALLOW_REMOTE_CODE_ENV, "0")
     monkeypatch.setenv(runtime_security.ALLOW_THIRD_PARTY_PLUGINS_ENV, "1")
-    monkeypatch.setenv(runtime_security.ALLOW_UNATTESTED_ARTIFACTS_ENV, "0")
+    monkeypatch.setenv(runtime_security.ALLOW_UNVERIFIED_PROVENANCE_ENV, "0")
     monkeypatch.setenv("INVARLOCK_SNAPSHOT_MODE", "audit")
     monkeypatch.setenv("INVARLOCK_EVALUATE_TMP_DIR", str(inside_tmp))
     monkeypatch.setenv("TMPDIR", str(external_tmp))
@@ -656,7 +667,7 @@ def test_path_env_value_and_delegated_env_pairs_translate_workspace_paths(
         allow_network=True,
         allow_remote_code=True,
         allow_third_party_plugins=False,
-        allow_unattested_artifacts=True,
+        allow_unverified_provenance=True,
     ):
         translated_inside, inside_mounts = (
             runtime_security_helpers._path_env_value_for_container(
@@ -679,7 +690,7 @@ def test_path_env_value_and_delegated_env_pairs_translate_workspace_paths(
         assert env_pairs[runtime_security.ALLOW_NETWORK_ENV] == "1"
         assert env_pairs[runtime_security.ALLOW_REMOTE_CODE_ENV] == "1"
         assert env_pairs[runtime_security.ALLOW_THIRD_PARTY_PLUGINS_ENV] == "0"
-        assert env_pairs[runtime_security.ALLOW_UNATTESTED_ARTIFACTS_ENV] == "1"
+        assert env_pairs[runtime_security.ALLOW_UNVERIFIED_PROVENANCE_ENV] == "1"
         assert env_pairs["INVARLOCK_SNAPSHOT_MODE"] == "audit"
         assert env_pairs["INVARLOCK_EVALUATE_TMP_DIR"] == "/workspace/tmp-cache"
         assert env_pairs["TMPDIR"] == str(external_tmp.resolve())

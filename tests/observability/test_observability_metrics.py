@@ -38,6 +38,15 @@ class TestMetricType:
         assert MetricType.TIMER.value == "timer"
 
 
+def test_observability_namespace_keeps_timer_surfaces_distinct() -> None:
+    import invarlock.observability as observability
+    from invarlock.observability import metrics, utils
+
+    assert observability.Timer is utils.Timer
+    assert observability.MetricsTimer is metrics.Timer
+    assert "Timer" in metrics.__all__
+
+
 # =============================================================================
 # MetricValue Tests
 # =============================================================================

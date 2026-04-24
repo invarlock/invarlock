@@ -14,6 +14,7 @@ from invarlock.core.run_provider_dataset_plan import (
     _section_dict,
     _section_value,
 )
+from invarlock.eval.window_planning import resolve_effective_windows
 from tests.core._support_run_provider_dataset_plan import (
     _DummyTokenizer,
     _ProviderConfig,
@@ -218,7 +219,72 @@ def test_build_signature_transform_handles_disabled_and_clone_paths() -> None:
     assert calls == ["preview", "final"]
     assert preview_records[0]["input_ids"] == [1, 2]
     assert final_records[0]["input_ids"] == [3, 4]
+    assert transformed[0]["input_ids"] == [1, 2]
+    assert transformed[1]["input_ids"] == [3, 4]
     assert transformed[0]["labels"] == [99]
     assert transformed[1]["labels"] == [99]
     assert transformed[0]["window_id"] == "preview::0"
     assert transformed[1]["window_id"] == "final::0"
+
+
+def test_build_signature_transform_preserves_raw_window_identity_for_mlm_dedupe() -> (
+    None
+):
+    class _Provider:
+        def windows(
+            self, *, preview_n: int, final_n: int, **_: object
+        ) -> tuple[SimpleNamespace, SimpleNamespace]:
+            preview_ids = [
+                [100 + idx, 101 + idx, 102 + idx] for idx in range(preview_n)
+            ]
+            final_ids = [[200 + idx, 201 + idx, 202 + idx] for idx in range(final_n)]
+            if preview_n >= 20 and final_n >= 20:
+                final_ids[-1] = list(preview_ids[0])
+            masks = [[1, 1, 1] for _ in range(preview_n)]
+            return (
+                SimpleNamespace(input_ids=preview_ids, attention_masks=masks),
+                SimpleNamespace(
+                    input_ids=final_ids,
+                    attention_masks=[[1, 1, 1] for _ in range(final_n)],
+                ),
+            )
+
+    def _apply_masks(
+        records: list[dict[str, object]],
+        *,
+        prefix: str,
+        **_: object,
+    ) -> tuple[int, list[int]]:
+        marker = -1 if prefix == "preview" else -2
+        records[-1]["input_ids"][0] = marker
+        records[-1]["labels"] = [7, -100, -100]
+        return 1, [1] + [0] * (len(records) - 1)
+
+    transform = _build_signature_transform(
+        use_mlm=True,
+        tokenizer=_DummyTokenizer(),
+        mask_prob=0.15,
+        mask_seed=43,
+        random_token_prob=0.1,
+        original_token_prob=0.1,
+        apply_mlm_masks_fn=_apply_masks,
+    )
+
+    result = resolve_effective_windows(
+        data_provider=_Provider(),
+        tokenizer=_DummyTokenizer(),
+        seq_len=8,
+        stride=8,
+        preview_n=20,
+        final_n=20,
+        seed=43,
+        split="validation",
+        requested_preview=20,
+        requested_final=20,
+        profile="dev",
+        signature_transform=transform,
+    )
+
+    assert result["actual_preview"] == 15
+    assert result["actual_final"] == 15
+    assert result["dedupe_adjustments"] == [{"deficit": 1, "proposed_per_arm": 15}]

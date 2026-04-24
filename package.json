@@ -1,4 +1,7 @@
 {
+  "engines": {
+    "node": ">=22.18.0"
+  },
   "devDependencies": {
     "cspell": "^10.0.0",
     "markdownlint-cli2": "^0.21.0"

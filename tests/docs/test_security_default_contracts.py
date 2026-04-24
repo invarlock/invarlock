@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+REMOVED_HOST_MODE_TOKEN = "trusted" + "-local"
 PUBLIC_BOUNDARY_PATTERNS = (
     re.compile(r"\baiware\b", re.IGNORECASE),
     re.compile(r"\bplatform repo\b", re.IGNORECASE),
@@ -74,7 +75,7 @@ def _has_verify_example(blocks: Iterable[str]) -> bool:
     return any("invarlock verify" in block for block in blocks)
 
 
-def test_markdown_surfaces_with_verify_examples_explain_attestation() -> None:
+def test_markdown_surfaces_with_verify_examples_explain_provenance() -> None:
     missing: list[str] = []
     for path in _iter_markdown_surfaces():
         text = path.read_text(encoding="utf-8")
@@ -101,8 +102,8 @@ def test_markdown_surfaces_with_model_loading_examples_explain_execution_context
         if any(
             marker in text
             for marker in (
-                "--assurance trusted-local",
-                "--assurance attested",
+                "--execution-mode host",
+                "--execution-mode container",
                 "--allow-host-execution",
                 "INVARLOCK_ALLOW_HOST_EXECUTION=1",
                 "runtime container",
@@ -113,20 +114,24 @@ def test_markdown_surfaces_with_model_loading_examples_explain_execution_context
         missing.append(str(path.relative_to(REPO_ROOT)))
 
     assert not missing, (
-        "Markdown surfaces with model-loading examples must explain secure-default container execution or explicit host bypass: "
+        "Markdown surfaces with model-loading examples must explain default runtime-container execution or explicit host bypass: "
         + ", ".join(missing)
     )
 
 
 def test_deprecated_plugin_disable_env_is_absent_from_repo_surfaces() -> None:
     hits: list[str] = []
-    for root in (
+    scan_roots = [
         REPO_ROOT / ".github",
         REPO_ROOT / "docs",
         REPO_ROOT / "scripts",
         REPO_ROOT / "src" / "invarlock",
-    ):
-        for path in sorted(root.rglob("*")):
+        REPO_ROOT / "CONTRIBUTING.md",
+        REPO_ROOT / "Makefile",
+    ]
+    for root in scan_roots:
+        paths = [root] if root.is_file() else sorted(root.rglob("*"))
+        for path in paths:
             if not path.is_file():
                 continue
             try:
@@ -143,7 +148,57 @@ def test_deprecated_plugin_disable_env_is_absent_from_repo_surfaces() -> None:
     )
 
 
-def test_public_docs_and_workflows_do_not_teach_unattested_verify_bypass() -> None:
+def test_repo_surfaces_do_not_use_removed_trusted_local_mode() -> None:
+    hits: list[str] = []
+    scan_roots = [
+        REPO_ROOT / ".github",
+        REPO_ROOT / "configs",
+        REPO_ROOT / "docs",
+        REPO_ROOT / "notebooks",
+        REPO_ROOT / "scripts",
+        REPO_ROOT / "src" / "invarlock",
+        REPO_ROOT / "CONTRIBUTING.md",
+        REPO_ROOT / "Makefile",
+        REPO_ROOT / "README.md",
+    ]
+    for root in scan_roots:
+        paths = [root] if root.is_file() else sorted(root.rglob("*"))
+        for path in paths:
+            if not path.is_file():
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                continue
+            if REMOVED_HOST_MODE_TOKEN not in text:
+                continue
+            hits.append(str(path.relative_to(REPO_ROOT)))
+
+    assert not hits, (
+        "Removed host-mode legacy term must not appear in repo surfaces: "
+        + ", ".join(hits)
+    )
+
+
+def test_public_docs_use_logical_runtime_tiers_path() -> None:
+    hits: list[str] = []
+    for path in _iter_docs():
+        text = path.read_text(encoding="utf-8")
+        if (
+            "invarlock._data.runtime/tiers.yaml" in text
+            or "src/invarlock/_data/runtime/tiers.yaml" in text
+        ):
+            hits.append(str(path.relative_to(REPO_ROOT)))
+
+    assert not hits, (
+        "Public docs must refer to runtime tiers via logical runtime/tiers.yaml path: "
+        + ", ".join(hits)
+    )
+
+
+def test_public_docs_and_workflows_do_not_teach_unverified_provenance_verify_bypass() -> (
+    None
+):
     hits: list[str] = []
     for root in (REPO_ROOT / ".github", REPO_ROOT / "docs"):
         for path in sorted(root.rglob("*")):
@@ -154,23 +209,23 @@ def test_public_docs_and_workflows_do_not_teach_unattested_verify_bypass() -> No
             except UnicodeDecodeError:
                 continue
             if (
-                "--allow-unattested-artifacts" in text
-                or "INVARLOCK_ALLOW_UNATTESTED_ARTIFACTS" in text
+                "--allow-unverified-provenance" in text
+                or "INVARLOCK_ALLOW_UNVERIFIED_PROVENANCE" in text
             ):
                 hits.append(str(path.relative_to(REPO_ROOT)))
 
     assert not hits, (
-        "Public docs and workflows must not teach unattested verify bypasses: "
+        "Public docs and workflows must not teach unverified-provenance verify bypasses: "
         + ", ".join(hits)
     )
 
 
-def test_public_docs_do_not_teach_cert_terminology_for_proof_packs() -> None:
+def test_public_docs_do_not_teach_cert_terminology_for_evidence_packs() -> None:
     hits: list[str] = []
     option_pattern = re.compile(r"(?<![A-Za-z0-9_-])--cert(?![A-Za-z0-9_-])")
     for path in _iter_docs():
         text = path.read_text(encoding="utf-8")
-        if "proof-pack" not in text:
+        if "evidence-pack" not in text:
             continue
         if option_pattern.search(text) or any(
             marker in text
@@ -184,7 +239,7 @@ def test_public_docs_do_not_teach_cert_terminology_for_proof_packs() -> None:
             hits.append(str(path.relative_to(REPO_ROOT)))
 
     assert not hits, (
-        "Public proof-pack docs must use report terminology instead of cert terminology: "
+        "Public evidence-pack docs must use report terminology instead of cert terminology: "
         + ", ".join(hits)
     )
 
@@ -203,9 +258,9 @@ def test_public_surfaces_do_not_use_repo_boundary_language() -> None:
     )
 
 
-def test_proof_pack_remote_code_requests_are_explicit() -> None:
+def test_evidence_pack_remote_code_requests_are_explicit() -> None:
     bad: list[str] = []
-    for path in sorted((REPO_ROOT / "scripts" / "proof_packs").rglob("*")):
+    for path in sorted((REPO_ROOT / "scripts" / "evidence_packs").rglob("*")):
         if not path.is_file() or path.suffix not in {".py", ".sh"}:
             continue
         if "/tests/" in str(path):
@@ -226,7 +281,7 @@ def test_proof_pack_remote_code_requests_are_explicit() -> None:
         bad.append(str(path.relative_to(REPO_ROOT)))
 
     assert not bad, (
-        "Proof-pack helpers must wire remote code through explicit opt-in controls: "
+        "Evidence-pack helpers must wire remote code through explicit opt-in controls: "
         + ", ".join(bad)
     )
 
@@ -247,8 +302,8 @@ def test_notebooks_with_model_loading_examples_explain_execution_context() -> No
         if any(
             marker in text
             for marker in (
-                "--assurance trusted-local",
-                "--assurance attested",
+                "--execution-mode host",
+                "--execution-mode container",
                 "--allow-host-execution",
                 "INVARLOCK_ALLOW_HOST_EXECUTION=1",
                 "runtime container",
@@ -259,12 +314,12 @@ def test_notebooks_with_model_loading_examples_explain_execution_context() -> No
         missing.append(str(path.relative_to(REPO_ROOT)))
 
     assert not missing, (
-        "Notebooks with model-loading examples must explain secure-default container execution or explicit host bypass: "
+        "Notebooks with model-loading examples must explain default runtime-container execution or explicit host bypass: "
         + ", ".join(missing)
     )
 
 
-def test_notebooks_with_verify_examples_explain_attestation_or_bypass() -> None:
+def test_notebooks_with_verify_examples_explain_runtime_context_or_bypass() -> None:
     missing_manifest_context: list[str] = []
     missing_bypass_context: list[str] = []
     for path in _iter_notebooks():
@@ -273,7 +328,7 @@ def test_notebooks_with_verify_examples_explain_attestation_or_bypass() -> None:
             continue
         if "runtime.manifest.json" not in text:
             missing_manifest_context.append(str(path.relative_to(REPO_ROOT)))
-        if "invarlock verify --assurance trusted-local" in text:
+        if "invarlock verify --runtime-provenance host" in text:
             continue
         if "runtime container" in text or "runtime-container" in text:
             continue
@@ -284,6 +339,6 @@ def test_notebooks_with_verify_examples_explain_attestation_or_bypass() -> None:
         + ", ".join(missing_manifest_context)
     )
     assert not missing_bypass_context, (
-        "Notebook verify examples must either use the explicit trusted-local assurance mode or explain the runtime-container path: "
+        "Notebook verify examples must either use the explicit host runtime-provenance mode or explain the runtime-container path: "
         + ", ".join(missing_bypass_context)
     )

@@ -64,12 +64,12 @@ ensure_current_runtime_image() {
     return 0
   fi
   if [[ -e /dev/nvidiactl || -n "$(command -v nvidia-smi 2>/dev/null)" ]]; then
-    echo "[smoke] refreshing local CUDA attested runtime image"
+    echo "[smoke] refreshing local CUDA container runtime image"
     make runtime-image-cuda
     export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"
     return 0
   fi
-  echo "[smoke] refreshing local attested runtime image"
+  echo "[smoke] refreshing local container runtime image"
   make runtime-image
   export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:local"
 }

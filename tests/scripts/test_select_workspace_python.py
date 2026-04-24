@@ -5,14 +5,18 @@ import subprocess
 from pathlib import Path
 
 
-def _write_fake_python(path: Path, version: str) -> None:
+def _write_fake_python(
+    path: Path, version: str, *, available_modules: tuple[str, ...] = ()
+) -> None:
     major, minor, patch = version.split(".")
+    modules_csv = ",".join(sorted(available_modules))
     script = f"""#!/bin/bash
 set -euo pipefail
 
 major={major}
 minor={minor}
 patch={patch}
+available_modules_csv="{modules_csv}"
 
 if [[ "${{1:-}}" == "-c" ]]; then
   code="${{2:-}}"
@@ -23,6 +27,15 @@ if [[ "${{1:-}}" == "-c" ]]; then
   if [[ "$code" == *"sys.version_info >= (3, 12)"* ]]; then
     [[ "$major" -gt 3 || ( "$major" -eq 3 && "$minor" -ge 12 ) ]]
     exit $?
+  fi
+  if [[ "$code" == *"INVARLOCK_SELECT_PYTHON_REQUIRE_MODULES"* ]]; then
+    required_modules_csv="${{INVARLOCK_SELECT_PYTHON_REQUIRE_MODULES:-}}"
+    IFS=',' read -r -a required_modules <<< "$required_modules_csv"
+    for module in "${{required_modules[@]}}"; do
+      [[ -z "$module" ]] && continue
+      [[ ",$available_modules_csv," == *",$module,"* ]] || exit 1
+    done
+    exit 0
   fi
 fi
 
@@ -100,6 +113,47 @@ def test_select_workspace_python_prefers_repo_venv(tmp_path: Path) -> None:
 
     assert proc.returncode == 0, proc.stderr
     assert proc.stdout.strip() == str(venv_bin / "python")
+
+
+def test_select_workspace_python_skips_repo_venv_when_required_modules_are_missing(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    fake_repo = tmp_path / "repo"
+    scripts_dir = fake_repo / "scripts"
+    venv_bin = fake_repo / ".venv" / "bin"
+    bin_dir = tmp_path / "bin"
+    scripts_dir.mkdir(parents=True)
+    venv_bin.mkdir(parents=True)
+    bin_dir.mkdir()
+
+    _copy_executable(
+        repo_root / "scripts" / "select_workspace_python.sh",
+        scripts_dir / "select_workspace_python.sh",
+    )
+    _write_fake_python(venv_bin / "python", "3.12.7", available_modules=())
+    _write_fake_python(
+        bin_dir / "python3.12",
+        "3.12.9",
+        available_modules=("build",),
+    )
+
+    env = {
+        "HOME": str(tmp_path),
+        "PATH": str(bin_dir),
+        "INVARLOCK_SELECT_PYTHON_REQUIRE_MODULES": "build",
+    }
+    proc = subprocess.run(
+        ["/bin/bash", str(scripts_dir / "select_workspace_python.sh")],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=fake_repo,
+        env=env,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.strip() == str(bin_dir / "python3.12")
 
 
 def test_select_workspace_python_prefers_active_supported_python_on_github_actions(

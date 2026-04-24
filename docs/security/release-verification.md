@@ -1,7 +1,7 @@
 # Release Verification
 
 This page covers verification of published InvarLock package artifacts and
-source tags. It does **not** describe proof-pack verification. Proof packs
+source tags. It does **not** describe evidence-pack verification. Evidence packs
 remain the mechanism for evaluation evidence; release verification is about the
 published wheel/sdist pair and the tagged source tree that produced them.
 
@@ -59,13 +59,13 @@ python3 -m venv "$tmpdir/venv"
 
 ## Notes
 
-- Release verification and proof-pack verification are intentionally separate.
+- Release verification and evidence-pack verification are intentionally separate.
 - Manual release dispatch rejects malformed, missing, or non-tag release refs
   before build/publish begins.
 - Release tag resolution peels annotated tags to immutable commit SHAs before
   build/publish begins.
 - The install-surface SBOM describes the installed release surface, not the CI
   tool environment.
-- Public package consumers should rely on PyPI artifacts plus source tags;
+- Public package users should rely on PyPI artifacts plus source tags;
   maintainers can use GitHub Actions run logs and uploaded workflow artifacts
   for deeper audit trails.

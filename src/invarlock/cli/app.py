@@ -19,7 +19,7 @@ import typer
 from rich.console import Console
 from typer.core import TyperGroup
 
-from invarlock.cli.assurance import AssuranceMode
+from invarlock.cli.runtime_modes import ExecutionMode, RuntimeProvenanceMode
 from invarlock.core.report_inputs import (
     ReportInputError,
     resolve_report_input_path,
@@ -235,10 +235,10 @@ def _evaluate_lazy(
     progress: bool = typer.Option(
         True, "--progress/--no-progress", help="Show progress done messages"
     ),
-    assurance: AssuranceMode = typer.Option(
-        AssuranceMode.ATTESTED,
-        "--assurance",
-        help="Assurance level for evaluation (attested|trusted-local).",
+    execution_mode: ExecutionMode = typer.Option(
+        ExecutionMode.CONTAINER,
+        "--execution-mode",
+        help="Execution mode for evaluation (container|host).",
         case_sensitive=False,
     ),
     no_color: bool = typer.Option(
@@ -271,7 +271,7 @@ def _evaluate_lazy(
         style=style,
         timing=timing,
         progress=progress,
-        assurance=assurance.value,
+        execution_mode=execution_mode.value,
         no_color=no_color,
         allow_network=allow_network,
     )
@@ -388,10 +388,10 @@ def _verify_typed(
         "--json",
         help="Emit machine-readable JSON (suppresses human-readable output)",
     ),
-    assurance: AssuranceMode = typer.Option(
-        AssuranceMode.ATTESTED,
-        "--assurance",
-        help="Assurance level for verification (attested|trusted-local).",
+    runtime_provenance: RuntimeProvenanceMode = typer.Option(
+        RuntimeProvenanceMode.CONTAINER,
+        "--runtime-provenance",
+        help="Runtime provenance mode for verification (container|host).",
     ),
 ):
     from pathlib import Path as _Path
@@ -417,7 +417,7 @@ def _verify_typed(
         tolerance=tolerance,
         profile=profile,
         json_out=json_out,
-        assurance=assurance.value,
+        runtime_provenance=runtime_provenance.value,
     )
 
 

@@ -40,7 +40,7 @@ from ...core.evaluate_contract import (
 from ...core.evaluate_plan import (
     build_evaluate_command_plan,
     normalize_model_id,
-    resolve_evaluate_assurance_policy,
+    resolve_evaluate_execution_policy,
     resolve_evaluate_tmp_dir,
 )
 from ...core.exceptions import ConfigError, MetricsError, ValidationError
@@ -133,13 +133,13 @@ def _format_ratio(value: Any) -> str:
 
 def _evaluation_report_manifest_execution(
     *,
-    assurance: str,
+    execution_mode: str,
     allow_network: bool,
     allow_remote_code: bool,
     allow_third_party_plugins: bool,
 ) -> RuntimeManifestExecution | None:
     return _evaluation_report_manifest_execution_impl(
-        assurance=assurance,
+        execution_mode=execution_mode,
         allow_network=allow_network,
         allow_remote_code=allow_remote_code,
         allow_third_party_plugins=allow_third_party_plugins,
@@ -188,6 +188,12 @@ def _print_quiet_summary(
     )
 
 
+def _release_phase_memory() -> None:
+    from .. import run_runtime as run_runtime_mod
+
+    run_runtime_mod.release_process_memory()
+
+
 def _load_yaml(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as fh:
         data = yaml.safe_load(fh) or {}
@@ -213,7 +219,7 @@ def _run_baseline_evaluation_phase(
     allow_host_execution: bool,
     allow_third_party_plugins: bool,
     allow_remote_code: bool,
-    allow_unattested_artifacts: bool,
+    allow_unverified_provenance: bool,
     prefer_local_files_only: bool,
     no_color: bool,
     baseline_cfg: dict[str, Any],
@@ -242,7 +248,7 @@ def _run_baseline_evaluation_phase(
         allow_host_execution=allow_host_execution,
         allow_third_party_plugins=allow_third_party_plugins,
         allow_remote_code=allow_remote_code,
-        allow_unattested_artifacts=allow_unattested_artifacts,
+        allow_unverified_provenance=allow_unverified_provenance,
         prefer_local_files_only=prefer_local_files_only,
         no_color=no_color,
         baseline_cfg=baseline_cfg,
@@ -286,7 +292,7 @@ def _run_subject_evaluation_phase(
     allow_host_execution: bool,
     allow_third_party_plugins: bool,
     allow_remote_code: bool,
-    allow_unattested_artifacts: bool,
+    allow_unverified_provenance: bool,
     prefer_local_files_only: bool,
     no_color: bool,
     tmp_dir: Path,
@@ -319,7 +325,7 @@ def _run_subject_evaluation_phase(
         allow_host_execution=allow_host_execution,
         allow_third_party_plugins=allow_third_party_plugins,
         allow_remote_code=allow_remote_code,
-        allow_unattested_artifacts=allow_unattested_artifacts,
+        allow_unverified_provenance=allow_unverified_provenance,
         prefer_local_files_only=prefer_local_files_only,
         no_color=no_color,
         tmp_dir=tmp_dir,
@@ -355,7 +361,7 @@ def evaluate_command(
     style: str = "audit",
     timing: bool = False,
     progress: bool = True,
-    assurance: str = "attested",
+    execution_mode: str = "container",
     allow_network: bool = False,
     allow_host_execution: bool = False,
     allow_third_party_plugins: bool = False,
@@ -364,18 +370,18 @@ def evaluate_command(
 ):
     """Evaluate two checkpoints (baseline vs subject) with pinned windows."""
     try:
-        execution_policy = resolve_evaluate_assurance_policy(
-            assurance=assurance,
+        execution_policy = resolve_evaluate_execution_policy(
+            execution_mode=execution_mode,
             allow_host_execution=allow_host_execution,
         )
     except ValueError as exc:
         raise typer.BadParameter(
-            "Assurance level must be one of: attested, trusted-local.",
-            param_hint="--assurance",
+            "Execution mode must be one of: container, host.",
+            param_hint="--execution-mode",
         ) from exc
     allow_host_execution = execution_policy.allow_host_execution
     prefer_local_files_only = execution_policy.prefer_local_files_only
-    allow_unattested_artifacts = execution_policy.allow_unattested_artifacts
+    allow_unverified_provenance = execution_policy.allow_unverified_provenance
     maybe_delegate_model_command()
 
     verbosity = _resolve_verbosity(bool(quiet), bool(verbose))
@@ -476,7 +482,7 @@ def evaluate_command(
         allow_host_execution=allow_host_execution,
         allow_third_party_plugins=allow_third_party_plugins,
         allow_remote_code=allow_remote_code,
-        allow_unattested_artifacts=allow_unattested_artifacts,
+        allow_unverified_provenance=allow_unverified_provenance,
         prefer_local_files_only=prefer_local_files_only,
         no_color=no_color,
         baseline_cfg=baseline_cfg,
@@ -492,6 +498,7 @@ def evaluate_command(
         phase_fn=_phase,
         fail_fn=_fail,
     )
+    _release_phase_memory()
 
     edited_report, edited_payload = _run_subject_evaluation_phase(
         baseline_report_path=baseline_report_path,
@@ -515,7 +522,7 @@ def evaluate_command(
         allow_host_execution=allow_host_execution,
         allow_third_party_plugins=allow_third_party_plugins,
         allow_remote_code=allow_remote_code,
-        allow_unattested_artifacts=allow_unattested_artifacts,
+        allow_unverified_provenance=allow_unverified_provenance,
         prefer_local_files_only=prefer_local_files_only,
         no_color=no_color,
         tmp_dir=tmp_dir,
@@ -524,6 +531,7 @@ def evaluate_command(
         phase_fn=_phase,
         fail_fn=_fail,
     )
+    _release_phase_memory()
 
     _phase(3, 3, "EVALUATION REPORT GENERATION")
 
@@ -564,16 +572,16 @@ def evaluate_command(
                 "allow_network": allow_network,
                 "allow_remote_code": allow_remote_code,
                 "allow_third_party_plugins": allow_third_party_plugins,
-                "assurance": assurance,
+                "execution_mode": execution_mode,
             },
             extra={
                 "command": "evaluate",
                 "profile": profile_name,
                 "tier": tier_name,
-                "assurance": assurance,
+                "execution_mode": execution_mode,
             },
             execution=_evaluation_report_manifest_execution(
-                assurance=assurance,
+                execution_mode=execution_mode,
                 allow_network=allow_network,
                 allow_remote_code=allow_remote_code,
                 allow_third_party_plugins=allow_third_party_plugins,

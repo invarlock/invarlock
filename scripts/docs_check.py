@@ -18,6 +18,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+CURATED_LIVE_EXAMPLE_PATHS = (
+    "README.md",
+    "docs/user-guide/getting-started.md",
+    "docs/user-guide/quickstart.md",
+    "notebooks/invarlock_python_api.ipynb",
+    "notebooks/invarlock_policy_tiers.ipynb",
+)
+
 
 def run(cmd: list[str]) -> tuple[int, str]:
     proc = subprocess.Popen(
@@ -104,7 +112,25 @@ def check_live() -> None:
         raise SystemExit(code)
 
 
-def parse_args() -> argparse.Namespace:
+def check_live_fast() -> None:
+    code, out = run(
+        [
+            sys.executable,
+            "scripts/verify_live_examples.py",
+            "--markdown-execution-mode",
+            "host",
+            "--skip-markdown-model-loading",
+            "--skip-notebook-model-loading",
+            "--paths",
+            *CURATED_LIVE_EXAMPLE_PATHS,
+        ]
+    )
+    print(out, end="")
+    if code != 0:
+        raise SystemExit(code)
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Consolidated docs checks")
     p.add_argument("--all", action="store_true", help="Run all checks")
     p.add_argument("--build", action="store_true", help="Build MkDocs strictly")
@@ -127,11 +153,16 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Live-run runnable markdown CLI examples and notebooks",
     )
-    return p.parse_args()
+    p.add_argument(
+        "--live-fast",
+        action="store_true",
+        help="Run the curated deterministic live-example subset",
+    )
+    return p.parse_args(argv)
 
 
-def main() -> None:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
     if not any(
         [
             args.all,
@@ -141,6 +172,7 @@ def main() -> None:
             args.examples,
             args.consistency,
             args.live,
+            args.live_fast,
         ]
     ):
         print("No checks selected. Use --all or individual flags.", file=sys.stderr)
@@ -152,6 +184,7 @@ def main() -> None:
         "refs": None,
         "examples": None,
         "consistency": None,
+        "live_fast": None,
         "live": None,
     }
 
@@ -171,6 +204,9 @@ def main() -> None:
         if args.all or args.consistency:
             check_consistency()
             summary["consistency"] = True
+        if args.all or args.live_fast:
+            check_live_fast()
+            summary["live_fast"] = True
         if args.live:
             check_live()
             summary["live"] = True

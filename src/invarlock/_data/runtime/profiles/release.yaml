@@ -19,5 +19,5 @@ eval:
 
 context:
   policy_snapshot:
-    tiers_file: src/invarlock/_data/runtime/tiers.yaml
+    tiers_file: runtime/tiers.yaml
     profile: release

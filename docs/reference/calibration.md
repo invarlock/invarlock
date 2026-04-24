@@ -2,8 +2,8 @@
 
 > Scope note: this page covers **Tier Policy Tuning** via `invarlock advanced calibrate ...`.
 > It outputs `tiers_patch_*.yaml` recommendations for `runtime/tiers.yaml`.
-> For proof-pack run-scoped preset derivation (`CALIBRATION_RUN -> GENERATE_PRESET`),
-> see [Proof Pack Internals](../user-guide/proof-packs-internals.md).
+> For evidence-pack run-scoped preset derivation (`CALIBRATION_RUN -> GENERATE_PRESET`),
+> see [Evidence Pack Internals](../user-guide/evidence-packs-internals.md).
 
 ## Overview
 
@@ -24,8 +24,8 @@ coverage and operational validation, not for published calibration evidence.
 
 ## Quick Start
 
-The commands below use the secure-default runtime container. Add
-`--allow-host-execution` only for trusted local calibration workflows that
+The commands below use the runtime container by default. Add
+`--allow-host-execution` only for host-side calibration workflows that
 intentionally bypass that boundary.
 
 ```bash
@@ -79,7 +79,7 @@ invarlock advanced calibrate ve-sweep \
 
 Published assurance basis covers GPT-2 and BERT profiles. The repo
 also includes pilot calibration configs for additional families such as Mistral 7B,
-Qwen2 7B, and Qwen2.5 14B under `configs/calibration/`, but those configs are
+Qwen2 7B, Qwen2.5 7B, and Qwen2.5 14B under `configs/calibration/`, but those configs are
 not part of the published assurance basis until supporting artifacts are
 attached.
 

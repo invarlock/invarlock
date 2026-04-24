@@ -631,15 +631,15 @@ def test_edit_runtime_does_not_expose_shell_emit_controls() -> None:
     assert not offenders, "\n".join(offenders)
 
 
-def test_runtime_attestation_does_not_embed_cli_flag_guidance() -> None:
-    path = REPO_ROOT / "src/invarlock/runtime_attestation.py"
+def test_runtime_provenance_does_not_embed_cli_flag_guidance() -> None:
+    path = REPO_ROOT / "src/invarlock/runtime_provenance.py"
     text = _read_text(path)
     offenders = []
     for snippet in (
-        "--allow-unattested-artifacts",
-        "pass --allow-unattested-artifacts",
-        "--assurance trusted-local",
-        "pass --assurance trusted-local",
+        "--allow-unverified-provenance",
+        "pass --allow-unverified-provenance",
+        "--execution-mode host",
+        "pass --execution-mode host",
     ):
         if snippet in text:
             offenders.append(snippet)
@@ -649,10 +649,10 @@ def test_runtime_attestation_does_not_embed_cli_flag_guidance() -> None:
 
 def test_runtime_security_policy_surface_is_typed_and_request_scoped() -> None:
     security_path = REPO_ROOT / "src/invarlock/runtime_security.py"
-    attestation_path = REPO_ROOT / "src/invarlock/runtime_attestation.py"
+    provenance_path = REPO_ROOT / "src/invarlock/runtime_provenance.py"
 
     security_text = _read_text(security_path)
-    attestation_text = _read_text(attestation_path)
+    provenance_text = _read_text(provenance_path)
 
     for snippet in (
         "class RuntimeSecurityPolicy",
@@ -673,7 +673,7 @@ def test_runtime_security_policy_surface_is_typed_and_request_scoped() -> None:
         "build_runtime_security_policy(",
         "apply_runtime_allowances(policy=policy)",
     ):
-        assert snippet in attestation_text
+        assert snippet in provenance_text
 
 
 def test_core_run_paths_do_not_read_shell_env_for_execution_policy() -> None:
@@ -716,8 +716,8 @@ def test_report_tiny_relax_is_provenance_only() -> None:
     assert not offenders, "\n".join(offenders)
 
 
-def test_proof_pack_verify_results_use_typed_outcomes() -> None:
-    path = REPO_ROOT / "src/invarlock/proof_pack.py"
+def test_evidence_pack_verify_results_use_typed_outcomes() -> None:
+    path = REPO_ROOT / "src/invarlock/evidence_pack.py"
     text = _read_text(path)
     offenders = []
     for snippet in (

@@ -15,9 +15,14 @@ Overview of the core security-related components and defaults.
 
 - `invarlock evaluate`, `invarlock advanced calibrate`, and internal
   config-driven runner flows delegate to the runtime container by default.
-- Use `--assurance trusted-local` on `invarlock evaluate` for trusted public local runs, or
+- Use `--execution-mode host` on `invarlock evaluate` for public host-side runs, or
   `INVARLOCK_ALLOW_HOST_EXECUTION=1` / `--allow-host-execution` for advanced
   and internal workflows that intentionally bypass that boundary.
+- In a repo checkout, `make container-default-smoke` covers the default
+  container-backed `evaluate` path, while
+  `make container-front-door-smoke` covers the fuller
+  `evaluate -> verify -> report html` journey. `make runtime-smoke` only
+  proves the local runtime image can import its core dependencies.
 - Third-party plugin discovery and remote model code execution are separate
   explicit opt-ins (`INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=1`,
   `INVARLOCK_ALLOW_REMOTE_CODE=1`).
@@ -31,13 +36,13 @@ Overview of the core security-related components and defaults.
 ## report verification
 
 - `invarlock verify` re-checks schema, pairing math (Δlog → ratio),
-  drift/overhead gates, and runtime attestation via `runtime.manifest.json`.
-- `invarlock-runtime-verify` is the low-level package-native CLI for direct
+  drift/overhead gates, and runtime provenance via `runtime.manifest.json`.
+- `invarlock advanced runtime-verify` is the low-level package-native CLI for direct
   report/manifest checks, and it uses the same Python verifier implementation
-  as runtime attestation.
-- Product attestation does not depend on an external verifier binary or
+  as runtime provenance.
+- Product runtime-provenance verification does not depend on an external verifier binary or
   `PATH` lookup, so verifier behavior stays stable across installs.
-- Use it before promotion or downstream automation to prevent policy regressions.
+- Use it before promotion or later automation to prevent policy regressions.
 
 ## Supply chain (reference)
 
@@ -48,7 +53,7 @@ Overview of the core security-related components and defaults.
 
 ## Design principles
 
-- Secure by default (fail safe): network off; strict gates; no secrets in code.
+- Locked-down defaults: network off; strict gates; no secrets in code.
 - Explicit enablement for higher-risk operations (downloads, GPU extras).
 - Deterministic runs with recorded seeds and env flags for auditability.
 

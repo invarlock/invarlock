@@ -4,6 +4,11 @@
 > (1) the **pilot numbers** we measured for GPT-2 small and BERT base (Nov 2025) that underpin the **Balanced** and **Conservative** tiers; and
 > (2) the **exact recipe** to recalibrate from scratch on your setup (weight-based Spectral κ, activation-based RMT ε, VE min-effect, and window sizing).
 > Every knob is surfaced in run reports and reports so reviewers can audit or recompute.
+> The public evidence floor is the packaged `published_basis` fixture set:
+> `src/invarlock/_data/public_evidence/published_basis/gpt2/evaluation.report.json`,
+> `src/invarlock/_data/public_evidence/published_basis/gpt2/evidence_pack_recipe.json`,
+> `src/invarlock/_data/public_evidence/published_basis/bert/evaluation.report.json`,
+> and `src/invarlock/_data/public_evidence/published_basis/bert/evidence_pack_recipe.json`.
 >
 > For a key-by-key explanation of every value in the packaged tier file
 > (`runtime/tiers.yaml`), see [Tier Policy Catalog](../reference/tier-policy-catalog.md).
@@ -28,10 +33,12 @@
 - Release evidence must meet the requested counts; runs that under‑cover preview/final windows or bootstrap replicates fail evaluation in CI/Release profiles (see Coverage & Pairing Plan).
 
 **Spectral calibration provenance.** Aggregated null-run stats are derived from
-calibration runs. Local tooling can parse evaluation report JSON files (glob pattern
-`**/evaluation.report.json`) to extract per-family z-scores and compute summary statistics
-(mean, stdev, quantiles). Persist results in CSV format for reproducibility and
-attach calibration reports to change proposals.
+calibration runs. The repo ships the public published-basis reports and recipes
+under `src/invarlock/_data/public_evidence/published_basis/{gpt2,bert}/`.
+Local tooling can parse evaluation report JSON files (glob pattern
+`**/evaluation.report.json`) to extract per-family z-scores and compute summary
+statistics (mean, stdev, quantiles). Persist results in CSV format with hashes
+for reproducibility and attach calibration reports to change proposals.
 
 ---
 

@@ -8,7 +8,7 @@
 | **Audience** | CLI users authoring presets or overrides. |
 | **Source of truth** | `src/invarlock/core/config_runtime.py`, `src/invarlock/core/config_loader.py`, runtime profiles under `invarlock/_data/runtime`. |
 | **Network** | Offline by default; use `evaluate --allow-network` when a preset-driven run needs downloads. |
-| **Execution** | Model-loading commands run in the runtime container by default; trusted local `invarlock evaluate` runs use `--assurance trusted-local`, while advanced/internal flows may use `INVARLOCK_ALLOW_HOST_EXECUTION=1` or `--allow-host-execution`. |
+| **Execution** | Model-loading commands run in the runtime container by default; host-side `invarlock evaluate` runs use `--execution-mode host`, while advanced/internal flows may use `INVARLOCK_ALLOW_HOST_EXECUTION=1` or `--allow-host-execution`. |
 
 ## Quick Start
 

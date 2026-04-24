@@ -55,13 +55,13 @@ THRESHOLDS = {
     "src/invarlock/reporting/report_schema.py": 1.00,
     "src/invarlock/public_contracts.py": 1.00,
     "src/invarlock/policy_pack.py": 1.00,
-    # Advanced proof-pack packaging/inspection coverage now exercises the
+    # Advanced evidence-pack packaging/inspection coverage now exercises the
     # command shell branch-completely; keep the command surface held there.
-    "src/invarlock/proof_pack.py": 1.00,
+    "src/invarlock/evidence_pack.py": 1.00,
     "src/invarlock/reporting/evidence.py": 1.00,
     "src/invarlock/reporting/verify_output.py": 1.00,
     "src/invarlock/cli/commands/policy.py": 1.00,
-    "src/invarlock/cli/commands/proof_pack.py": 1.00,
+    "src/invarlock/cli/commands/evidence_pack.py": 1.00,
     "src/invarlock/core/runner_lifecycle.py": 1.00,
     "src/invarlock/core/runner_pairing.py": 1.00,
     "src/invarlock/core/runner_services.py": 1.00,
@@ -102,11 +102,13 @@ THRESHOLDS = {
     # CLI commands
     "src/invarlock/cli/_json.py": 1.00,
     # Simplified public-core CLI surfaces have dedicated branch-focused tests;
-    # keep the hero commands above the default 90% floor.
+    # keep the hero commands and their contract enums branch-complete.
     "src/invarlock/cli/app.py": 1.00,
+    "src/invarlock/cli/runtime_modes.py": 1.00,
     "src/invarlock/core/config_runtime.py": 1.00,
     "src/invarlock/core/metric_provider_resolution.py": 0.95,
-    "src/invarlock/cli/commands/evaluate.py": 0.95,
+    "src/invarlock/cli/commands/evaluate.py": 1.00,
+    "src/invarlock/cli/commands/verify.py": 1.00,
     "src/invarlock/cli/commands/run.py": 1.00,
     "src/invarlock/reporting/report_contract.py": 1.00,
     "src/invarlock/cli/commands/calibrate.py": 0.95,
@@ -116,8 +118,8 @@ THRESHOLDS = {
     "src/invarlock/runtime_security.py": 1.00,
     "src/invarlock/runtime_security_helpers.py": 1.00,
     "src/invarlock/adapters/hf_multimodal.py": 1.00,
-    "src/invarlock/proof_pack_integrity.py": 0.95,
-    "src/invarlock/proof_pack_manifest.py": 0.95,
+    "src/invarlock/evidence_pack_integrity.py": 0.95,
+    "src/invarlock/evidence_pack_manifest.py": 0.95,
     # PR-4 split modules
     "src/invarlock/cli/run_artifacts.py": 1.00,
     "src/invarlock/cli/run_config.py": 0.95,
@@ -174,7 +176,7 @@ THRESHOLDS = {
     "src/invarlock/core/run_timing_policy.py": 0.95,
     "src/invarlock/core/runner_eval_metrics_multimodal.py": 1.00,
     "src/invarlock/core/runner_eval_metrics_stats.py": 1.00,
-    "src/invarlock/core/runtime_attestation.py": 1.00,
+    "src/invarlock/core/runtime_provenance.py": 1.00,
     "src/invarlock/core/doctor_inventory.py": 0.90,
     "src/invarlock/core/doctor_preflight.py": 0.95,
     "src/invarlock/core/evaluate_contract.py": 0.90,
@@ -190,7 +192,7 @@ THRESHOLDS = {
     "src/invarlock/guards/tier_config.py": 0.95,
     "src/invarlock/guards/variance_types.py": 1.00,
     "src/invarlock/cli/run_pairing_baseline.py": 0.90,
-    "src/invarlock/proof_pack_metadata.py": 1.00,
+    "src/invarlock/evidence_pack_metadata.py": 1.00,
 }
 
 # Default floors (applied only to core classification; non-core modules are not
@@ -263,9 +265,9 @@ CORE_FILES = (
     # Public contract helpers
     "src/invarlock/public_contracts.py",
     "src/invarlock/policy_pack.py",
-    "src/invarlock/proof_pack.py",
+    "src/invarlock/evidence_pack.py",
     "src/invarlock/runtime_verify.py",
-    "src/invarlock/cli/commands/proof_pack.py",
+    "src/invarlock/cli/commands/evidence_pack.py",
     "src/invarlock/runtime_security.py",
     "src/invarlock/cli/run_config.py",
     "src/invarlock/cli/run_pairing.py",
@@ -290,10 +292,10 @@ COVERAGE_INCLUDE_PATTERNS = (
     "src/invarlock/config.py",
     "src/invarlock/public_contracts.py",
     "src/invarlock/policy_pack.py",
-    "src/invarlock/proof_pack.py",
-    "src/invarlock/proof_pack_integrity.py",
-    "src/invarlock/proof_pack_manifest.py",
-    "src/invarlock/proof_pack_metadata.py",
+    "src/invarlock/evidence_pack.py",
+    "src/invarlock/evidence_pack_integrity.py",
+    "src/invarlock/evidence_pack_manifest.py",
+    "src/invarlock/evidence_pack_metadata.py",
     "src/invarlock/runtime_security.py",
     "src/invarlock/runtime_security_helpers.py",
     "src/invarlock/runtime_verify.py",
@@ -310,10 +312,10 @@ COVERAGE_INCLUDE_PATTERNS = (
     "invarlock/config.py",
     "invarlock/public_contracts.py",
     "invarlock/policy_pack.py",
-    "invarlock/proof_pack.py",
-    "invarlock/proof_pack_integrity.py",
-    "invarlock/proof_pack_manifest.py",
-    "invarlock/proof_pack_metadata.py",
+    "invarlock/evidence_pack.py",
+    "invarlock/evidence_pack_integrity.py",
+    "invarlock/evidence_pack_manifest.py",
+    "invarlock/evidence_pack_metadata.py",
     "invarlock/runtime_security.py",
     "invarlock/runtime_security_helpers.py",
     "invarlock/runtime_verify.py",

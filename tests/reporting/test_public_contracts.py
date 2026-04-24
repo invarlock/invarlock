@@ -19,7 +19,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
 
     family_catalog = contracts.load_model_family_catalog()
     assert family_catalog["format_version"] == "model-family-catalog-v1"
-    assert family_catalog["as_of"] == "2026-04-05"
+    assert family_catalog["as_of"] == "2026-04-19"
     assert family_catalog["declared_support"][0]["display_name"] == "GPT-2 causal LM"
     declared = {item["display_name"] for item in family_catalog["declared_support"]}
     assert declared == {
@@ -28,6 +28,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         "Mistral 7B causal LM",
         "Ministral 3 causal LM (text-only eval)",
         "Qwen2 7B causal LM",
+        "Qwen2.5 7B causal LM",
         "Qwen2.5 14B causal LM",
         "Qwen3 causal LM",
         "DeepSeek-R1-Distill-Qwen causal LM",
@@ -40,6 +41,65 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     }
     usage_only = {item["display_name"] for item in family_catalog["usage_only"]}
     assert "QwQ 32B reasoning" not in usage_only
+    assert "Qwen2.5 7B" not in usage_only
+    assert "Qwen2.5 32B" in usage_only
+    promotion = family_catalog["promotion_candidates_text_le_14b"]
+    assert promotion["format_version"] == "promotion-candidates-text-le-14b-v1"
+    candidates = {item["display_name"]: item for item in promotion["candidates"]}
+    assert candidates["Qwen2.5 7B causal LM"]["decision"] == "promote_now"
+    assert (
+        candidates["Qwen2.5 7B causal LM"]["current_catalog_state"]
+        == "supported_experimental"
+    )
+    assert (
+        candidates["Qwen2.5 7B causal LM"]["criteria_status"][
+            "approved_calibration_or_evaluation_evidence"
+        ]
+        == "pass"
+    )
+    assert candidates["Falcon 7B causal LM"]["decision"] == "blocked_missing_artifacts"
+    for display_name in (
+        "OpenLLaMA 7B causal LM",
+        "OPT 1.3B causal LM",
+        "Falcon 7B causal LM",
+        "GLM 4 9B Chat",
+    ):
+        assert candidates[display_name]["criteria_status"]["included_preset"] == "pass"
+        assert (
+            candidates[display_name]["criteria_status"]["included_calibration_config"]
+            == "pass"
+        )
+        assert (
+            candidates[display_name]["criteria_status"]["cli_smoke_evidence"] == "pass"
+        )
+    assert candidates["Gemma 3 4B IT"]["decision"] == "explicitly_out_of_scope"
+    assert (
+        candidates["Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)"][
+            "decision"
+        ]
+        == "blocked_missing_artifacts"
+    )
+    assert (
+        candidates["Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)"][
+            "criteria_status"
+        ]["included_preset"]
+        == "pass"
+    )
+    assert (
+        candidates["Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)"][
+            "criteria_status"
+        ]["included_calibration_config"]
+        == "pass"
+    )
+    assert (
+        candidates["Broader BERT-like MLMs (DistilBERT/ALBERT/DeBERTa/ELECTRA)"][
+            "criteria_status"
+        ]["cli_smoke_evidence"]
+        == "pass"
+    )
+    assert (
+        candidates["OPT 1.3B causal LM"]["criteria_status"]["targeted_tests"] == "pass"
+    )
     recommended = {
         item["display_name"] for item in family_catalog["recommended_additions"]
     }
@@ -79,8 +139,8 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     schema = contracts.load_policy_pack_schema()
     assert schema["title"] == "InvarLock Policy Pack"
     assert (
-        contracts.load_proof_pack_manifest_schema()["title"]
-        == "InvarLock Proof Pack Manifest"
+        contracts.load_evidence_pack_manifest_schema()["title"]
+        == "InvarLock Evidence Pack Manifest"
     )
     assert (
         contracts.load_runtime_manifest_schema()["title"]
@@ -99,6 +159,28 @@ def test_public_contract_paths_are_repo_relative() -> None:
     assert Path(
         contracts.contract_reference("support_matrix.json")["path"]
     ).as_posix() == ("contracts/support_matrix.json")
+
+
+def test_support_matrix_published_basis_evidence_uses_public_evidence_paths() -> None:
+    support_matrix = contracts.load_support_matrix()
+
+    published_basis = [
+        lane
+        for lane in support_matrix["lanes"]
+        if lane.get("support_tier") == "published_basis"
+    ]
+    assert published_basis
+
+    for lane in published_basis:
+        evidence = lane.get("evidence", {})
+        assert evidence["evaluation_report_fixture"].startswith(
+            "public_evidence/published_basis/"
+        )
+        assert evidence["evidence_pack_recipe"].startswith(
+            "public_evidence/published_basis/"
+        )
+        assert "tests/fixtures/" not in evidence["evaluation_report_fixture"]
+        assert "tests/fixtures/" not in evidence["evidence_pack_recipe"]
 
 
 def test_readme_surfaces_public_contract_catalog_entries() -> None:
@@ -353,9 +435,9 @@ def test_public_contract_helpers_raise_when_contracts_are_unavailable(
     with pytest.raises(contracts.ContractLoadError, match="policy_pack.schema.json"):
         contracts.load_policy_pack_schema()
     with pytest.raises(
-        contracts.ContractLoadError, match="proof_pack_manifest.schema.json"
+        contracts.ContractLoadError, match="evidence_pack_manifest.schema.json"
     ):
-        contracts.load_proof_pack_manifest_schema()
+        contracts.load_evidence_pack_manifest_schema()
     with pytest.raises(
         contracts.ContractLoadError, match="runtime_manifest.schema.json"
     ):
@@ -387,7 +469,7 @@ def test_public_contract_helpers_reject_non_mapping_payloads(monkeypatch) -> Non
         "plugin_compatibility.json": ["unexpected"],
         "runtime_manifest.schema.json": ["unexpected"],
         "policy_pack.schema.json": ["unexpected"],
-        "proof_pack_manifest.schema.json": ["unexpected"],
+        "evidence_pack_manifest.schema.json": ["unexpected"],
     }
     monkeypatch.setattr(
         contracts,
@@ -406,9 +488,9 @@ def test_public_contract_helpers_reject_non_mapping_payloads(monkeypatch) -> Non
     with pytest.raises(contracts.ContractLoadError, match="policy_pack.schema.json"):
         contracts.load_policy_pack_schema()
     with pytest.raises(
-        contracts.ContractLoadError, match="proof_pack_manifest.schema.json"
+        contracts.ContractLoadError, match="evidence_pack_manifest.schema.json"
     ):
-        contracts.load_proof_pack_manifest_schema()
+        contracts.load_evidence_pack_manifest_schema()
     with pytest.raises(
         contracts.ContractLoadError, match="runtime_manifest.schema.json"
     ):
@@ -446,6 +528,7 @@ def test_public_contract_lane_and_adapter_helpers_cover_non_matching_entries(
                 ],
                 "implemented_coverage": [],
                 "usage_only": [],
+                "promotion_candidates_text_le_14b": {"candidates": []},
                 "recommended_additions": [],
             },
             "plugin_compatibility.json": {

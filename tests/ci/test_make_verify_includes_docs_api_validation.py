@@ -33,3 +33,13 @@ def test_verify_target_runs_docs_api_refs_check() -> None:
     assert "scripts/validate_docs_api_refs.py" in block, (
         "verify target should include docs API refs validation (optionally gated)"
     )
+
+
+def test_verify_target_runs_repo_cruft_check() -> None:
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    data = makefile.read_text(encoding="utf-8")
+    block = _get_make_target_block(data, "verify")
+    assert block is not None, "verify target not found in Makefile"
+    assert "$(MAKE) repo-cruft-check" in block, (
+        "verify target should fail fast on macOS transport artifacts"
+    )

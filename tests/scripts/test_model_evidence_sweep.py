@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import importlib.util
 import json
 import os
 import stat
@@ -10,102 +9,15 @@ from pathlib import Path
 
 import pytest
 
-
-def _load_script_module(script_name: str):
-    repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / f"{script_name}.py"
-    spec = importlib.util.spec_from_file_location(script_name, script_path)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[script_name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-def _write_fake_python(path: Path) -> None:
-    script = """#!/bin/bash
-set -euo pipefail
-
-if [[ -n "${FAKE_PYTHON_LOG:-}" ]]; then
-  printf '%s\\n' "$*" >> "$FAKE_PYTHON_LOG"
-fi
-
-if [[ "${1:-}" == "-c" ]]; then
-  exit 0
-fi
-
-if [[ "${1:-}" == "-m" && "${2:-}" == "invarlock" && "${3:-}" == "evaluate" ]]; then
-  report_dir=""
-  while [[ $# -gt 0 ]]; do
-    if [[ "$1" == "--report-out" ]]; then
-      report_dir="$2"
-      shift 2
-      continue
-    fi
-    shift
-  done
-  mkdir -p "$report_dir"
-  printf '{"ok": true}\\n' > "$report_dir/evaluation.report.json"
-  exit 0
-fi
-
-if [[ "${1:-}" == "-m" && "${2:-}" == "invarlock" && "${3:-}" == "verify" ]]; then
-  printf '{"status":"fail"}\\n'
-  exit 1
-fi
-
-printf 'unexpected invocation: %s\\n' "$*" >&2
-exit 99
-"""
-    path.write_text(script, encoding="utf-8")
-    path.chmod(path.stat().st_mode | stat.S_IXUSR)
-
-
-def _write_flaky_fake_python(path: Path) -> None:
-    script = """#!/bin/bash
-set -euo pipefail
-
-if [[ -n "${FAKE_PYTHON_LOG:-}" ]]; then
-  printf '%s\\n' "$*" >> "$FAKE_PYTHON_LOG"
-fi
-
-if [[ "${1:-}" == "-c" ]]; then
-  exit 0
-fi
-
-if [[ "${1:-}" == "-m" && "${2:-}" == "invarlock" && "${3:-}" == "evaluate" ]]; then
-  if [[ ! -f "${FAKE_PYTHON_STATE:-}" ]]; then
-    : > "${FAKE_PYTHON_STATE:-}"
-    kill -TERM $$
-  fi
-  report_dir=""
-  while [[ $# -gt 0 ]]; do
-    if [[ "$1" == "--report-out" ]]; then
-      report_dir="$2"
-      shift 2
-      continue
-    fi
-    shift
-  done
-  mkdir -p "$report_dir"
-  printf '{"ok": true}\\n' > "$report_dir/evaluation.report.json"
-  exit 0
-fi
-
-if [[ "${1:-}" == "-m" && "${2:-}" == "invarlock" && "${3:-}" == "verify" ]]; then
-  printf '{"status":"ok"}\\n'
-  exit 0
-fi
-
-printf 'unexpected invocation: %s\\n' "$*" >&2
-exit 99
-"""
-    path.write_text(script, encoding="utf-8")
-    path.chmod(path.stat().st_mode | stat.S_IXUSR)
+from tests.scripts._support_model_evidence_sweep import (
+    load_script_module,
+    write_fake_python,
+    write_flaky_fake_python,
+)
 
 
 def test_manifest_lane_ids_match_supported_experimental_support_matrix() -> None:
-    mod = _load_script_module("model_evidence_sweep")
+    mod = load_script_module("model_evidence_sweep")
 
     expected = mod.supported_experimental_lane_ids()
     actual = mod.manifest_lane_ids(mod.CURRENT_SUPPORTED_EXPERIMENTAL_LANES)
@@ -116,7 +28,7 @@ def test_manifest_lane_ids_match_supported_experimental_support_matrix() -> None
 
 
 def test_repo_mentioned_gpu_suite_includes_basis_canaries_and_experimental() -> None:
-    mod = _load_script_module("model_evidence_sweep")
+    mod = load_script_module("model_evidence_sweep")
 
     specs = mod.select_specs(
         mod.REPO_MENTIONED_GPU_SUITE,
@@ -126,7 +38,7 @@ def test_repo_mentioned_gpu_suite_includes_basis_canaries_and_experimental() -> 
         shard_count=1,
     )
 
-    assert len(specs) == 18
+    assert len(specs) == 19
     slugs = {lane.slug for lane in specs}
     assert {
         "gpt2_public",
@@ -138,6 +50,7 @@ def test_repo_mentioned_gpu_suite_includes_basis_canaries_and_experimental() -> 
         "ministral3_8b",
         "ministral3_14b",
         "qwen2_7b",
+        "qwen2_5_7b",
         "gemma4_e2b",
     }.issubset(slugs)
 
@@ -145,7 +58,7 @@ def test_repo_mentioned_gpu_suite_includes_basis_canaries_and_experimental() -> 
 def test_repo_mentioned_gpu_basis_lanes_use_lane_specific_profiles_and_presets() -> (
     None
 ):
-    mod = _load_script_module("model_evidence_sweep")
+    mod = load_script_module("model_evidence_sweep")
     basis = {
         lane.slug: lane
         for lane in mod.select_specs(
@@ -170,7 +83,7 @@ def test_repo_mentioned_gpu_basis_lanes_use_lane_specific_profiles_and_presets()
 
 
 def test_model_catalog_gpu_suite_covers_public_catalog_representative_models() -> None:
-    mod = _load_script_module("model_evidence_sweep")
+    mod = load_script_module("model_evidence_sweep")
 
     specs = mod.select_specs(
         mod.MODEL_CATALOG_GPU_SUITE,
@@ -189,6 +102,7 @@ def test_model_catalog_gpu_suite_covers_public_catalog_representative_models() -
         "mistralai_mistral_7b_v0_1",
         "openai_gpt_oss_20b",
         "qwen_qwen2_7b",
+        "qwen_qwen2_5_7b",
         "microsoft_phi_4_reasoning_plus",
         "google_gemma_4_e4b_it",
         "facebook_bart_base",
@@ -196,7 +110,7 @@ def test_model_catalog_gpu_suite_covers_public_catalog_representative_models() -
 
 
 def test_model_catalog_gpu_suite_maps_family_specific_presets() -> None:
-    mod = _load_script_module("model_evidence_sweep")
+    mod = load_script_module("model_evidence_sweep")
     specs = {
         lane.slug: lane
         for lane in mod.select_specs(
@@ -206,6 +120,10 @@ def test_model_catalog_gpu_suite_maps_family_specific_presets() -> None:
                 "t5_small",
                 "google_gemma_4_e4b_it",
                 "mistralai_mixtral_8x7b_v0_1",
+                "openlm_research_open_llama_7b",
+                "facebook_opt_1_3b",
+                "tiiuae_falcon_7b",
+                "thudm_glm_4_9b_chat",
             ],
             lane_ids=[],
             shard_index=0,
@@ -227,10 +145,98 @@ def test_model_catalog_gpu_suite_maps_family_specific_presets() -> None:
         "configs/presets/causal_lm/wikitext2_512.yaml"
     )
     assert specs["mistralai_mixtral_8x7b_v0_1"].adapter == "auto"
+    assert specs["openlm_research_open_llama_7b"].preset_relpath == (
+        "configs/presets/causal_lm/open_llama_7b_512.yaml"
+    )
+    assert specs["openlm_research_open_llama_7b"].adapter == "hf_causal"
+    assert specs["facebook_opt_1_3b"].preset_relpath == (
+        "configs/presets/causal_lm/opt_1_3b_512.yaml"
+    )
+    assert specs["facebook_opt_1_3b"].adapter == "hf_causal"
+    assert specs["tiiuae_falcon_7b"].preset_relpath == (
+        "configs/presets/causal_lm/falcon_7b_512.yaml"
+    )
+    assert specs["tiiuae_falcon_7b"].adapter == "hf_causal"
+    assert specs["thudm_glm_4_9b_chat"].preset_relpath == (
+        "configs/presets/causal_lm/glm4_9b_chat_512.yaml"
+    )
+    assert specs["thudm_glm_4_9b_chat"].adapter == "hf_causal"
+
+
+def test_promotion_gap_gpu_suite_targets_repo_prepared_blocked_lanes() -> None:
+    mod = load_script_module("model_evidence_sweep")
+
+    specs = mod.select_specs(
+        mod.PROMOTION_GAP_GPU_SUITE,
+        slugs=[],
+        lane_ids=[],
+        shard_index=0,
+        shard_count=1,
+    )
+
+    assert [lane.slug for lane in specs] == [
+        "openlm_research_open_llama_7b",
+        "facebook_opt_1_3b",
+        "tiiuae_falcon_7b",
+        "thudm_glm_4_9b_chat",
+        "distilbert_base_uncased",
+    ]
+    distilbert = specs[-1]
+    assert distilbert.adapter == "hf_mlm"
+    assert distilbert.preset_relpath == (
+        "configs/presets/masked_lm/distilbert_base_uncased_128.yaml"
+    )
+    for lane in specs:
+        assert lane.verify_profile == "dev"
+        assert lane.preset_path.is_file(), lane.preset_relpath
+
+
+def test_model_evidence_sweep_dry_run_supports_promotion_gap_suite_candidates(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence_sweep.py"
+    output_root = tmp_path / "promotion-gap-dry-run"
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--suite",
+            "promotion-gap-gpu",
+            "--execution-mode",
+            "host",
+            "--output-root",
+            str(output_root),
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(proc.stdout)
+    slugs = [entry["slug"] for entry in payload]
+    assert slugs == [
+        "openlm_research_open_llama_7b",
+        "facebook_opt_1_3b",
+        "tiiuae_falcon_7b",
+        "thudm_glm_4_9b_chat",
+        "distilbert_base_uncased",
+    ]
+    distilbert = payload[-1]
+    assert distilbert["evaluate"][distilbert["evaluate"].index("--baseline") + 1] == (
+        "distilbert-base-uncased"
+    )
+    assert distilbert["evaluate"][distilbert["evaluate"].index("--adapter") + 1] == (
+        "hf_mlm"
+    )
 
 
 def test_build_prefetch_command_uses_model_profile_tokenizer_resolution() -> None:
-    mod = _load_script_module("model_evidence_sweep")
+    mod = load_script_module("model_evidence_sweep")
     spec = next(
         lane
         for lane in mod.SUITES[mod.REPO_MENTIONED_GPU_SUITE]
@@ -246,23 +252,6 @@ def test_build_prefetch_command_uses_model_profile_tokenizer_resolution() -> Non
     assert "AutoModel" not in command[2]
     assert "AutoTokenizer" not in command[2]
     assert command[3] == "prajjwal1/bert-tiny"
-
-
-def test_lane_requires_remote_code_uses_preset_model_flag() -> None:
-    mod = _load_script_module("model_evidence_sweep")
-    phi4 = next(
-        lane
-        for lane in mod.SUITES[mod.REPO_MENTIONED_GPU_SUITE]
-        if lane.slug == "phi4_reasoning_plus"
-    )
-    qwen = next(
-        lane
-        for lane in mod.SUITES[mod.REPO_MENTIONED_GPU_SUITE]
-        if lane.slug == "qwen2_7b"
-    )
-
-    assert mod.lane_requires_remote_code(phi4) is True
-    assert mod.lane_requires_remote_code(qwen) is False
 
 
 def test_model_evidence_sweep_dry_run_uses_lane_specific_verify_profile_when_omitted(
@@ -299,7 +288,7 @@ def test_model_evidence_sweep_dry_run_uses_lane_specific_verify_profile_when_omi
 
 
 def test_select_specs_sharding_is_stable() -> None:
-    mod = _load_script_module("model_evidence_sweep")
+    mod = load_script_module("model_evidence_sweep")
 
     shard = mod.select_specs(
         mod.DEFAULT_SUITE,
@@ -311,9 +300,10 @@ def test_select_specs_sharding_is_stable() -> None:
 
     assert [lane.slug for lane in shard] == [
         "qwen2_7b",
-        "deepseek_r1_distill_qwen_7b",
-        "olmo2_7b",
-        "gemma4_e2b",
+        "qwen3_8b",
+        "tinyllama_1_1b",
+        "qwen3_5_9b",
+        "ministral3_14b",
     ]
 
 
@@ -353,7 +343,7 @@ def test_model_evidence_sweep_dry_run_emits_commands_and_manifest(
         == "configs/presets/causal_lm/qwen3_8b_512.yaml"
     )
     assert "--allow-host-execution" not in payload[0]["evaluate"]
-    assert "--assurance" not in payload[0]["verify"]
+    assert "--runtime-provenance" not in payload[0]["verify"]
 
     manifest = json.loads((output_root / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["suite"] == "current-supported-experimental"
@@ -361,7 +351,7 @@ def test_model_evidence_sweep_dry_run_emits_commands_and_manifest(
     assert manifest["lanes"][0]["slug"] == "qwen3_8b"
 
 
-def test_model_evidence_sweep_host_mode_emits_trusted_local_assurance(
+def test_model_evidence_sweep_host_mode_emits_explicit_runtime_flags(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
@@ -392,17 +382,18 @@ def test_model_evidence_sweep_host_mode_emits_trusted_local_assurance(
     assert payload[0]["execution_mode"] == "host"
     assert payload[0]["prefetch"][-1] == "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
     assert payload[0]["prefetch"][1] == "-c"
-    assert "--assurance" in payload[0]["evaluate"]
+    assert "--execution-mode" in payload[0]["evaluate"]
     assert (
-        payload[0]["evaluate"][payload[0]["evaluate"].index("--assurance") + 1]
-        == "trusted-local"
+        payload[0]["evaluate"][payload[0]["evaluate"].index("--execution-mode") + 1]
+        == "host"
     )
     assert "--allow-host-execution" not in payload[0]["evaluate"]
-    assert "--assurance" in payload[0]["verify"]
+    assert "--runtime-provenance" in payload[0]["verify"]
     assert (
-        payload[0]["verify"][payload[0]["verify"].index("--assurance") + 1]
-        == "trusted-local"
+        payload[0]["verify"][payload[0]["verify"].index("--runtime-provenance") + 1]
+        == "host"
     )
+    assert payload[0]["verify"][payload[0]["verify"].index("--profile") + 1] == "dev"
     preset_idx = payload[0]["evaluate"].index("--preset") + 1
     assert payload[0]["evaluate"][preset_idx] == str(
         repo_root / "configs/presets/causal_lm/tinyllama_1_1b_512.yaml"
@@ -418,7 +409,7 @@ def test_model_evidence_sweep_host_mode_prefetches_before_evaluate(
     repo_root = Path(__file__).resolve().parents[2]
     script = repo_root / "scripts" / "model_evidence_sweep.py"
     fake_python = tmp_path / "fake-python"
-    _write_fake_python(fake_python)
+    write_fake_python(fake_python)
     output_root = tmp_path / "evidence-host-prefetch"
     log_path = tmp_path / "fake-python.log"
 
@@ -457,7 +448,7 @@ def test_model_evidence_sweep_retries_evaluate_once_after_sigterm(
     repo_root = Path(__file__).resolve().parents[2]
     script = repo_root / "scripts" / "model_evidence_sweep.py"
     fake_python = tmp_path / "flaky-fake-python"
-    _write_flaky_fake_python(fake_python)
+    write_flaky_fake_python(fake_python)
     output_root = tmp_path / "evidence-host-retry"
     log_path = tmp_path / "fake-python-retry.log"
     state_path = tmp_path / "retry-state"
@@ -546,113 +537,10 @@ exit 99
     assert "status=skipped detail=gated_repo" in status_log
 
 
-def test_model_evidence_sweep_marks_remote_code_prefetch_as_skipped(
-    tmp_path: Path,
-) -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "scripts" / "model_evidence_sweep.py"
-    fake_python = tmp_path / "remote-code-fake-python"
-    fake_python.write_text(
-        """#!/bin/bash
-set -euo pipefail
-if [[ "${1:-}" == "-c" ]]; then
-  echo "Loading this model requires you to execute custom code. Please set trust_remote_code=True." >&2
-  exit 1
-fi
-echo "unexpected invocation" >&2
-exit 99
-""",
-        encoding="utf-8",
-    )
-    fake_python.chmod(fake_python.stat().st_mode | stat.S_IXUSR)
-    output_root = tmp_path / "evidence-host-remote-code"
-
-    proc = subprocess.run(
-        [
-            sys.executable,
-            str(script),
-            "--suite",
-            "model-catalog-gpu",
-            "--slug",
-            "thudm_glm_4_9b_chat",
-            "--execution-mode",
-            "host",
-            "--output-root",
-            str(output_root),
-            "--python",
-            str(fake_python),
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-        cwd=repo_root,
-    )
-
-    assert proc.returncode == 0, proc.stderr
-    summary_tsv = (output_root / "summary.tsv").read_text(encoding="utf-8")
-    assert "skipped\tremote_code_required" in summary_tsv
-
-
-def test_run_lane_sets_remote_code_env_for_matching_preset(tmp_path: Path) -> None:
-    mod = _load_script_module("model_evidence_sweep")
-    spec = next(
-        lane
-        for lane in mod.SUITES[mod.REPO_MENTIONED_GPU_SUITE]
-        if lane.slug == "phi4_reasoning_plus"
-    )
-    output_root = tmp_path / "evidence-remote-code"
-    calls: list[tuple[list[str], str | None]] = []
-    real_completed = subprocess.CompletedProcess
-
-    def fake_run(
-        cmd: list[str],
-        *,
-        cwd: Path,
-        env: dict[str, str],
-        stdout,
-        stderr,
-        text: bool,
-        check: bool,
-    ):
-        calls.append((cmd, env.get("INVARLOCK_ALLOW_REMOTE_CODE")))
-        if "-c" in cmd:
-            return real_completed(cmd, 0)
-        if cmd[:3] == [sys.executable, "-m", "invarlock"] and "evaluate" in cmd:
-            report_dir = Path(cmd[cmd.index("--report-out") + 1])
-            report_dir.mkdir(parents=True, exist_ok=True)
-            (report_dir / "evaluation.report.json").write_text("{}", encoding="utf-8")
-            return real_completed(cmd, 0)
-        if cmd[:3] == [sys.executable, "-m", "invarlock"] and "verify" in cmd:
-            return real_completed(cmd, 0)
-        raise AssertionError(f"unexpected command: {cmd}")
-
-    original_run = mod.subprocess.run
-    mod.subprocess.run = fake_run
-    try:
-        execution_root = mod._execution_root(output_root, execution_mode="host")
-        result = mod.run_lane(
-            spec,
-            python_exe=sys.executable,
-            profile=None,
-            device="cuda",
-            execution_mode="host",
-            output_root=output_root,
-            execution_root=execution_root,
-            env={"PYTHONPATH": "src"},
-        )
-    finally:
-        mod.subprocess.run = original_run
-
-    assert result.evaluate_exit == 0
-    assert result.verify_exit == 0
-    assert calls
-    assert all(flag == "1" for _cmd, flag in calls)
-
-
 def test_build_evaluate_command_uses_container_safe_repo_relative_paths(
     tmp_path: Path,
 ) -> None:
-    mod = _load_script_module("model_evidence_sweep")
+    mod = load_script_module("model_evidence_sweep")
     spec = next(
         lane
         for lane in mod.CURRENT_SUPPORTED_EXPERIMENTAL_LANES
@@ -685,10 +573,10 @@ def test_build_evaluate_command_uses_container_safe_repo_relative_paths(
     )
 
 
-def test_runtime_env_preserves_security_default_runtime_overrides(
+def test_runtime_env_preserves_container_default_runtime_overrides(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    mod = _load_script_module("model_evidence_sweep")
+    mod = load_script_module("model_evidence_sweep")
     config_root = tmp_path / "config-root"
     config_root.mkdir()
     hf_home = tmp_path / "hf-home"
@@ -725,7 +613,7 @@ def test_model_evidence_sweep_returns_failure_when_verify_fails(
     repo_root = Path(__file__).resolve().parents[2]
     script = repo_root / "scripts" / "model_evidence_sweep.py"
     fake_python = tmp_path / "fake-python"
-    _write_fake_python(fake_python)
+    write_fake_python(fake_python)
     output_root = tmp_path / "evidence"
 
     proc = subprocess.run(
@@ -758,13 +646,41 @@ def test_model_evidence_sweep_returns_failure_when_verify_fails(
     assert (output_root / "eval" / "tinyllama_1_1b" / "verify.json").is_file()
 
 
+def test_model_evidence_sweep_host_mode_rejects_ci_profile(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence_sweep.py"
+    output_root = tmp_path / "evidence-host-ci"
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--slug",
+            "tinyllama_1_1b",
+            "--execution-mode",
+            "host",
+            "--profile",
+            "ci",
+            "--output-root",
+            str(output_root),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+    )
+
+    assert proc.returncode == 2
+    assert "incompatible with --profile ci/release" in proc.stderr
+
+
 def test_model_evidence_sweep_container_mode_publishes_external_output_root(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
     script = repo_root / "scripts" / "model_evidence_sweep.py"
     fake_python = tmp_path / "fake-python"
-    _write_fake_python(fake_python)
+    write_fake_python(fake_python)
     output_root = tmp_path / "external-container-evidence"
 
     proc = subprocess.run(

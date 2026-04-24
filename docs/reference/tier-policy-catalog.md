@@ -7,7 +7,7 @@
 | **Purpose** | Explain each policy key in `tiers.yaml` and its rationale. |
 | **Audience** | Operators auditing tier defaults and guard thresholds. |
 | **Supported tiers** | `balanced`, `conservative` (aggressive is research-only). |
-| **Source of truth** | `src/invarlock/_data/runtime/tiers.yaml` (override via `INVARLOCK_CONFIG_ROOT`). |
+| **Source of truth** | Packaged `runtime/tiers.yaml` (override via `INVARLOCK_CONFIG_ROOT`). |
 
 ## Quick Start
 
@@ -72,7 +72,7 @@ resolved from tier policies (tiers.yaml + defaults) and surfaced under
 
 ### Location
 
-- Packaged default: `src/invarlock/_data/runtime/tiers.yaml`
+- Packaged default: `runtime/tiers.yaml`
 - Override: set `INVARLOCK_CONFIG_ROOT` and provide `runtime/tiers.yaml` under it
   (see `docs/reference/env-vars.md`).
 

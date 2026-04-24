@@ -18,11 +18,11 @@ DEFAULT_EVALUATE_GUARDS_ORDER = [
 
 
 @dataclass(frozen=True)
-class EvaluateAssurancePolicy:
-    assurance: str
+class EvaluateExecutionPolicy:
+    execution_mode: str
     allow_host_execution: bool
     prefer_local_files_only: bool
-    allow_unattested_artifacts: bool
+    allow_unverified_provenance: bool
 
 
 @dataclass(frozen=True)
@@ -63,20 +63,20 @@ def stable_text(value: object, fallback: str = "") -> str:
         return fallback
 
 
-def resolve_evaluate_assurance_policy(
+def resolve_evaluate_execution_policy(
     *,
-    assurance: str,
+    execution_mode: str,
     allow_host_execution: bool,
-) -> EvaluateAssurancePolicy:
-    normalized_assurance = stable_text(assurance, "attested").strip().lower()
-    trusted_local = normalized_assurance == "trusted-local"
-    if normalized_assurance not in {"attested", "trusted-local"}:
-        raise ValueError("Assurance level must be one of: attested, trusted-local.")
-    return EvaluateAssurancePolicy(
-        assurance=normalized_assurance,
-        allow_host_execution=allow_host_execution or trusted_local,
-        prefer_local_files_only=trusted_local,
-        allow_unattested_artifacts=trusted_local,
+) -> EvaluateExecutionPolicy:
+    normalized_execution_mode = stable_text(execution_mode, "container").strip().lower()
+    host_mode = normalized_execution_mode == "host"
+    if normalized_execution_mode not in {"container", "host"}:
+        raise ValueError("Execution mode must be one of: container, host.")
+    return EvaluateExecutionPolicy(
+        execution_mode=normalized_execution_mode,
+        allow_host_execution=allow_host_execution or host_mode,
+        prefer_local_files_only=host_mode,
+        allow_unverified_provenance=host_mode,
     )
 
 
@@ -344,7 +344,7 @@ def build_evaluate_command_plan(
 
 __all__ = [
     "DEFAULT_EVALUATE_GUARDS_ORDER",
-    "EvaluateAssurancePolicy",
+    "EvaluateExecutionPolicy",
     "EvaluateCommandPlan",
     "build_baseline_run_config",
     "build_evaluate_command_plan",
@@ -356,7 +356,7 @@ __all__ = [
     "determine_subject_label",
     "load_evaluate_preset_data",
     "normalize_model_id",
-    "resolve_evaluate_assurance_policy",
+    "resolve_evaluate_execution_policy",
     "resolve_evaluate_tmp_dir",
     "resolve_guards_order",
     "sanitize_preset_data_for_evaluate",

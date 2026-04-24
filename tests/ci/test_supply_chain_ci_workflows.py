@@ -1,5 +1,6 @@
 import json
 import re
+import tomllib
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -140,7 +141,7 @@ def test_repo_hygiene_checks_uv_lock_sync() -> None:
 
     uv_step = _find_step_by_name(steps, "Set up uv")
     assert (
-        uv_step["uses"] == "astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57"
+        uv_step["uses"] == "astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b"
     )
     assert uv_step["with"]["version"] == "0.10.10"
 
@@ -277,17 +278,64 @@ def test_generate_sbom_script_exists():
 def test_pip_audit_allowlist_is_owned_and_time_boxed() -> None:
     allowlist_path = Path("scripts/security/pip_audit_allowlist.json")
     payload = json.loads(allowlist_path.read_text(encoding="utf-8"))
+    allowlist_doc = Path("docs/security/pip-audit-allowlist.md").read_text(
+        encoding="utf-8"
+    )
 
     assert payload["owner"] == "security-maintainers"
     assert payload["entries"]
 
-    entry = payload["entries"][0]
-    assert entry["advisory"] == "GHSA-4xh5-x5gv-qwph"
-    assert entry["owner"] == "security-maintainers"
-    expires = date.fromisoformat(entry["expires"])
-    assert 0 <= (expires - date.today()).days <= 30
-    assert entry["tracking_issue"] == "https://github.com/pypa/pip/issues/13607"
-    assert "reason" in entry
+    expected_tracking = {
+        "GHSA-4xh5-x5gv-qwph": "https://github.com/pypa/pip/issues/13607",
+        "CVE-2026-1703": "https://github.com/pypa/pip/issues/13641",
+    }
+    assert {entry["advisory"] for entry in payload["entries"]} == set(expected_tracking)
+
+    for entry in payload["entries"]:
+        advisory = entry["advisory"]
+        assert entry["owner"] == "security-maintainers"
+        expires = date.fromisoformat(entry["expires"])
+        assert 0 <= (expires - date.today()).days <= 30
+        assert entry["tracking_issue"] == expected_tracking[advisory]
+        assert "reason" in entry
+        assert f"`{advisory}`" in allowlist_doc
+        assert entry["expires"] in allowlist_doc
+        assert entry["tracking_issue"] in allowlist_doc
+
+
+def test_ruff_toolchain_pins_are_aligned() -> None:
+    pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+    ci_deps = pyproject["project"]["optional-dependencies"]["ci"]
+    ruff_pin = next(dep for dep in ci_deps if dep.startswith("ruff=="))
+    ruff_version = ruff_pin.removeprefix("ruff==")
+
+    precommit_config = Path(".pre-commit-config.yaml").read_text(encoding="utf-8")
+    assert f"rev: v{ruff_version}" in precommit_config
+
+    for lockfile in (
+        Path("requirements/workflows/ci-hf-py312.txt"),
+        Path("requirements/workflows/ci-hf-py313.txt"),
+        Path("requirements/workflows/docs-ci-py313.txt"),
+        Path("requirements/workflows/assurance-ci-py313.txt"),
+    ):
+        text = lockfile.read_text(encoding="utf-8")
+        assert f"ruff=={ruff_version} \\" in text
+
+
+def test_security_workflow_lxml_pin_is_remediated() -> None:
+    for lockfile in (
+        Path("requirements/workflows/security-ci-py313.txt"),
+        Path("requirements/workflows/release-security-py313.txt"),
+    ):
+        text = lockfile.read_text(encoding="utf-8")
+        match = re.search(r"^lxml==(?P<version>\d+\.\d+\.\d+) \\", text, re.MULTILINE)
+        assert match is not None
+        assert match.group("version") == "6.1.0"
+        assert "lxml==6.0.2" not in text
+
+    uv_lock = Path("uv.lock").read_text(encoding="utf-8")
+    assert 'name = "lxml"\nversion = "6.1.0"' in uv_lock
+    assert 'name = "lxml"\nversion = "6.0.2"' not in uv_lock
 
 
 def test_codeowners_protect_security_control_surfaces() -> None:
@@ -617,6 +665,10 @@ def test_ci_verify_full_pins_make_to_setup_python() -> None:
     assert env["PYTHON"] == "python"
 
     steps = verify_full.get("steps", [])
+    setup_node_step = _find_step_by_name(steps, "Set up Node.js")
+    npm_step = _find_step_by_name(steps, "Install docs lint toolchain")
     verify_step = _find_step_by_name(steps, "Full verify")
+    assert setup_node_step["with"]["node-version"] == "22"
+    assert npm_step["run"] == "npm ci"
     assert "make verify" in verify_step["run"]
     assert "mkdocs build --strict" in verify_step["run"]

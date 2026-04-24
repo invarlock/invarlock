@@ -13,17 +13,17 @@ high-quality PRs that match the repo layout and tooling.
 - **Python 3.12+** (required)
 - **Git**
 - **PyTorch / extras** are pulled in via optional dependencies when needed
-- **Node.js + npm** (recommended for docs linting: markdownlint/cspell via `npx`)
+- **Node.js 22.18+ + npm** (required for docs linting: markdownlint/cspell via local installs or `npx`)
 
 InvarLock runs offline by default. For commands that need downloads
 (models/datasets), enable network explicitly per run. Model-loading commands use
-the runtime container by default; trusted local development outside that
-container should use `--assurance trusted-local` on the public `evaluate` path:
+the runtime container by default; host-side development outside that
+container should use `--execution-mode host` on the public `evaluate` path:
 
 ```bash
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --assurance trusted-local --baseline gpt2 --subject distilgpt2 --adapter auto
+INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --execution-mode host --baseline gpt2 --subject distilgpt2 --adapter auto
 # repo preset example:
-INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --assurance trusted-local --baseline gpt2 --subject gpt2 --adapter auto --preset configs/presets/causal_lm/wikitext2_512.yaml --profile ci
+INVARLOCK_ALLOW_NETWORK=1 invarlock evaluate --execution-mode host --baseline gpt2 --subject gpt2 --adapter auto --preset configs/presets/causal_lm/wikitext2_512.yaml --profile ci
 ```
 
 ### 1.2 Quick setup (recommended)
@@ -38,8 +38,8 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 # Editable install + dev tooling (pytest, ruff, mypy, mkdocs, etc.)
 make dev-install
 
-# Optional: install Node-based linters via npm if you work on docs a lot
-# (markdownlint/cspell; docs_lint will also use npx if available)
+# Optional if you are not touching docs: install the Node-based linters on demand.
+# The repo requires Node 22.18+ for these tools and `npm ci` will fail early on older versions.
 npm install --save-dev markdownlint-cli2 cspell
 
 # Pre-commit hooks (lint/format on commit)
@@ -171,7 +171,7 @@ Common patterns:
 
 ```bash
 # Fast local run (no integration/slow/manual)
-INVARLOCK_LIGHT_IMPORT=1 INVARLOCK_DISABLE_PLUGIN_DISCOVERY=1 \
+INVARLOCK_LIGHT_IMPORT=1 INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=0 \
 pytest -q -m "not integration and not slow and not manual" tests
 
 # Same lane via Makefile
@@ -306,7 +306,8 @@ Common commands:
 ```bash
 make docs           # mkdocs build --strict
 make docs-serve     # mkdocs serve -a 127.0.0.1:8000
-make docs-check     # consolidated docs validation (build, links, refs, examples, consistency)
+make docs-check     # consolidated docs validation plus curated live examples
+make docs-live-fast # curated deterministic live docs/notebook subset
 make docs-lint      # markdown + spell lint (via scripts/docs_lint.py)
 ```
 
@@ -323,6 +324,7 @@ make docs-lint-spell      # cspell only
 
 `python scripts/docs_lint.py` wraps common linters:
 
+- Requires Node 22.18+.
 - Uses `markdownlint`, `markdownlint-cli2`, or `npx markdownlint-cli*`
 - Uses `cspell` or `npx cspell`
 

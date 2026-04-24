@@ -14,6 +14,25 @@ def _is_real_number(value: Any) -> bool:
     return isinstance(value, int | float) and not isinstance(value, bool)
 
 
+def _is_matrix_weight(weight: Any) -> bool:
+    if weight is None:
+        return False
+    try:
+        return int(getattr(weight, "ndim", 0) or 0) == 2
+    except (TypeError, ValueError):
+        return False
+
+
+def _is_quantized_weight(weight: Any) -> bool:
+    return getattr(weight, "dtype", None) in {torch.int8, torch.uint8}
+
+
+def _scalarize_stat(value: Any) -> float:
+    if hasattr(value, "item"):
+        value = value.item()
+    return float(value)
+
+
 def compute_sigma_max(
     weight_matrix: Any,
     *,
@@ -57,10 +76,12 @@ def auto_sigma_target(
     try:
         spectral_norms = []
         for _name, module in model.named_modules():
-            if hasattr(module, "weight") and module.weight.ndim == 2:
-                sigma = compute_sigma_max_fn(module.weight)
-                if _is_real_number(sigma) and sigma > 0:
-                    spectral_norms.append(float(sigma))
+            weight = getattr(module, "weight", None)
+            if not _is_matrix_weight(weight) or _is_quantized_weight(weight):
+                continue
+            sigma = compute_sigma_max_fn(weight)
+            if _is_real_number(sigma) and sigma > 0:
+                spectral_norms.append(float(sigma))
         if spectral_norms:
             try:
                 return float(np.percentile(spectral_norms, percentile * 100))
@@ -99,8 +120,10 @@ def capture_baseline_sigmas(
         for name, module in module_iter:
             if not should_process_module_fn(name, module, scope):
                 continue
-            if hasattr(module, "weight") and module.weight.ndim == 2:
-                baseline_sigmas[name] = compute_sigma_max_fn(module.weight)
+            weight = getattr(module, "weight", None)
+            if not _is_matrix_weight(weight) or _is_quantized_weight(weight):
+                continue
+            baseline_sigmas[name] = compute_sigma_max_fn(weight)
         return baseline_sigmas
     except (
         ArithmeticError,
@@ -140,19 +163,21 @@ def scan_model_gains(
         for name, module in module_iter:
             results["total_layers"] += 1
             if should_process_module_fn(name, module, scope):
-                if hasattr(module, "weight") and module.weight.ndim == 2:
-                    results["scanned_modules"] += 1
-                    sigma_max = compute_sigma_max_fn(module.weight)
-                    results["spectral_norms"].append(sigma_max)
-                    try:
-                        results["weight_statistics"][name] = {
-                            "mean": module.weight.mean().item(),
-                            "std": module.weight.std().item(),
-                            "min": module.weight.min().item(),
-                            "max": module.weight.max().item(),
-                        }
-                    except (AttributeError, RuntimeError, TypeError, ValueError):
-                        pass
+                weight = getattr(module, "weight", None)
+                if not _is_matrix_weight(weight) or _is_quantized_weight(weight):
+                    continue
+                results["scanned_modules"] += 1
+                sigma_max = compute_sigma_max_fn(weight)
+                results["spectral_norms"].append(sigma_max)
+                try:
+                    results["weight_statistics"][name] = {
+                        "mean": _scalarize_stat(weight.mean()),
+                        "std": _scalarize_stat(weight.std()),
+                        "min": _scalarize_stat(weight.min()),
+                        "max": _scalarize_stat(weight.max()),
+                    }
+                except (AttributeError, RuntimeError, TypeError, ValueError):
+                    pass
 
         if results["spectral_norms"]:
             results["mean_spectral_norm"] = np.mean(results["spectral_norms"])

@@ -9,18 +9,18 @@ from typing import Any, cast
 
 import typer
 
-from invarlock.runtime_attestation import (
+from invarlock.runtime_provenance import (
     configure_runtime_security as _configure_runtime_security_core,
 )
-from invarlock.runtime_attestation import (
-    verify_runtime_attestation as _verify_runtime_attestation_core,
+from invarlock.runtime_provenance import (
+    verify_runtime_provenance as _verify_runtime_provenance_core,
 )
 from invarlock.runtime_security import (
     ALLOW_HOST_EXECUTION_ENV,
     ALLOW_NETWORK_ENV,
     ALLOW_REMOTE_CODE_ENV,
     ALLOW_THIRD_PARTY_PLUGINS_ENV,
-    ALLOW_UNATTESTED_ARTIFACTS_ENV,
+    ALLOW_UNVERIFIED_PROVENANCE_ENV,
     RuntimeManifestExecution,
     RuntimeSecurityPolicy,
     build_runtime_security_policy,
@@ -42,7 +42,7 @@ def resolve_shell_runtime_security_policy(
     allow_host_execution: bool = False,
     allow_third_party_plugins: bool = False,
     allow_remote_code: bool = False,
-    allow_unattested_artifacts: bool = False,
+    allow_unverified_provenance: bool = False,
 ) -> RuntimeSecurityPolicy:
     policy = current_runtime_security_policy()
     if policy is not None:
@@ -54,8 +54,8 @@ def resolve_shell_runtime_security_policy(
         allow_third_party_plugins=allow_third_party_plugins
         or _env_truthy(ALLOW_THIRD_PARTY_PLUGINS_ENV),
         allow_remote_code=allow_remote_code or _env_truthy(ALLOW_REMOTE_CODE_ENV),
-        allow_unattested_artifacts=allow_unattested_artifacts
-        or _env_truthy(ALLOW_UNATTESTED_ARTIFACTS_ENV),
+        allow_unverified_provenance=allow_unverified_provenance
+        or _env_truthy(ALLOW_UNVERIFIED_PROVENANCE_ENV),
     )
 
 
@@ -66,21 +66,21 @@ def configure_runtime_security(
     allow_host_execution: bool = False,
     allow_third_party_plugins: bool = False,
     allow_remote_code: bool = False,
-    allow_unattested_artifacts: bool = False,
+    allow_unverified_provenance: bool = False,
 ) -> Iterator[None]:
     policy = resolve_shell_runtime_security_policy(
         allow_network=allow_network,
         allow_host_execution=allow_host_execution,
         allow_third_party_plugins=allow_third_party_plugins,
         allow_remote_code=allow_remote_code,
-        allow_unattested_artifacts=allow_unattested_artifacts,
+        allow_unverified_provenance=allow_unverified_provenance,
     )
     with _configure_runtime_security_core(
         allow_network=policy.allow_network,
         allow_host_execution=policy.allow_host_execution,
         allow_third_party_plugins=policy.allow_third_party_plugins,
         allow_remote_code=policy.allow_remote_code,
-        allow_unattested_artifacts=policy.allow_unattested_artifacts,
+        allow_unverified_provenance=policy.allow_unverified_provenance,
     ):
         yield
 
@@ -90,20 +90,20 @@ def runtime_security_scoped(
 ) -> Callable[..., Any]:
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
-        assurance = str(kwargs.get("assurance", "") or "").strip().lower()
-        trusted_local = assurance == "trusted-local"
+        execution_mode = str(kwargs.get("execution_mode", "") or "").strip().lower()
+        host_mode = execution_mode == "host"
         with configure_runtime_security(
             allow_network=bool(kwargs.get("allow_network", False)),
             allow_host_execution=bool(kwargs.get("allow_host_execution", False))
-            or trusted_local,
+            or host_mode,
             allow_third_party_plugins=bool(
                 kwargs.get("allow_third_party_plugins", False)
             ),
             allow_remote_code=bool(kwargs.get("allow_remote_code", False)),
-            allow_unattested_artifacts=bool(
-                kwargs.get("allow_unattested_artifacts", False)
+            allow_unverified_provenance=bool(
+                kwargs.get("allow_unverified_provenance", False)
             )
-            or trusted_local,
+            or host_mode,
         ):
             return func(*args, **kwargs)
 
@@ -154,12 +154,12 @@ def emit_runtime_manifest(
     )
 
 
-def verify_runtime_attestation(
+def verify_runtime_provenance(
     report_path: str | Path,
     *,
-    allow_unattested: bool = False,
+    allow_unverified: bool = False,
 ) -> list[str]:
-    return _verify_runtime_attestation_core(
+    return _verify_runtime_provenance_core(
         report_path,
-        allow_unattested=allow_unattested,
+        allow_unverified=allow_unverified,
     )

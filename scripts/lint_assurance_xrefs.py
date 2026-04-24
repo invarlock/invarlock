@@ -23,7 +23,7 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 TEST_REF_RE = re.compile(
-    r"(tests/[A-Za-z0-9_./-]+\.py::[A-Za-z0-9_]+(?:::[A-Za-z0-9_]+)*)"
+    r"(tests/[A-Za-z0-9_./-]+\.py(?:::[A-Za-z0-9_]+(?:::[A-Za-z0-9_]+)*)?)"
 )
 FENCED_CODE_BLOCK_RE = re.compile(r"```.*?```", flags=re.DOTALL)
 INLINE_CODE_RE = re.compile(r"`([^`]+)`")
@@ -275,9 +275,11 @@ def _sample_reports() -> list[dict[str, Any]]:
             "overhead_ratio": 1.01,
             "overhead_percent": 1.0,
             "overhead_threshold": 0.01,
+            "evaluated": True,
+            "skipped": False,
             "diagnostics": {"mode": "sample"},
         },
-        "invariants": {"stable": True},
+        "invariants": {"stable": True, "status": "pass"},
         "policy_digest": {"thresholds_hash": "thresholds", "changed": False},
         "policy_provenance": {
             "policy_digest": "policy-digest",
@@ -306,6 +308,10 @@ def _sample_reports() -> list[dict[str, Any]]:
         },
         "resolved_policy": {
             "metrics": {
+                "pm_ratio": {
+                    "ratio_limit_base": 1.10,
+                    "hysteresis_ratio": 0.002,
+                },
                 "accuracy": {"min_examples_fraction": 0.01},
             },
             "rmt": {
@@ -364,6 +370,7 @@ def _sample_reports() -> list[dict[str, Any]]:
         "telemetry": {"latency_ms_per_tok": 1.0},
         "validation": {
             "guard_overhead_acceptable": True,
+            "hysteresis_applied": False,
             "invariants_pass": True,
             "preview_final_drift_acceptable": True,
             "primary_metric_acceptable": True,
@@ -439,7 +446,7 @@ def main() -> None:
                         LintError(md_path, f"Cannot parse `{py_path}`: {e.msg}")
                     )
                     continue
-            if not _has_pytest_node(trees[py_path], node_parts):
+            if node_parts and not _has_pytest_node(trees[py_path], node_parts):
                 errors.append(LintError(md_path, f"Missing test: `{ref}`"))
 
     # ---- field-path xrefs ----

@@ -6,7 +6,7 @@
 | --- | --- |
 | **Purpose** | Programmatic interface for running the InvarLock pipeline and generating reports. |
 | **Audience** | Python callers building scripted workflows or integrations. |
-| **Supported surface** | `CoreRunner.execute`, `RunConfig`, `ModelAdapter`, `ModelEdit`, `Guard`, and direct reporting helpers. |
+| **Supported surface** | Stable contract surfaces remain CLI/report/contract-read paths; `CoreRunner.execute`, `RunConfig`, `ModelAdapter`, `ModelEdit`, `Guard`, and direct reporting helpers are advanced/non-stable. |
 | **Requires** | `invarlock[adapters]` for HF adapters, `invarlock[edits]` for built-in edits, `invarlock[guards]` for guard math, `invarlock[eval]` for dataset providers. |
 | **Network** | Offline by default; CLI runs use `evaluate --allow-network`, while Python callers set `INVARLOCK_ALLOW_NETWORK=1` to download models or datasets. |
 | **Inputs** | Model instance, adapter, edit, guard list, `RunConfig`, optional calibration data. |
@@ -52,8 +52,8 @@ print("primary metric:", report.metrics.get("primary_metric"))
   `invarlock.reporting.make_report`, then persisted as an
   evaluation bundle with `invarlock.reporting.report_bundle.save_evaluation_bundle`.
 - **Verification**: CLI-side `invarlock verify` enforces
-  `runtime.manifest.json` attestation for attested outputs in addition to schema
-  and pairing checks.
+  `runtime.manifest.json` runtime provenance for container-backed outputs in
+  addition to schema and pairing checks.
 
 ### Responsibility lanes
 
@@ -72,7 +72,8 @@ Note: CoreRunner coordinates each lane.
 
 ### CoreRunner.execute
 
-`CoreRunner.execute` is the only supported entry point for programmatic runs.
+`CoreRunner.execute` is the primary entry point for advanced/non-stable
+programmatic runs.
 
 ```python
 report = CoreRunner().execute(

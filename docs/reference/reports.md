@@ -38,9 +38,12 @@ invarlock report generate \
   --baseline-run-report runs/baseline/report.json \
   --format report
 
-# Validate an attested report bundle
+# Validate an container-backed report bundle
 invarlock verify reports/eval/evaluation.report.json
 # expects reports/eval/runtime.manifest.json next to the report
+
+# Explain a bundle directly from report provenance
+invarlock report explain --evaluation-report reports/eval/evaluation.report.json
 
 # Inspect telemetry fields
 jq '.telemetry' reports/eval/evaluation.report.json
@@ -49,17 +52,25 @@ jq '.telemetry' reports/eval/evaluation.report.json
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
 
-When you pass a directory to `invarlock report generate`, it must contain a
-canonical `report.json`. `invarlock report html` and `invarlock verify`
-expect canonical `evaluation.report.json`. Other report-like filenames are not
-auto-selected; pass the explicit file path instead.
+Artifact model:
+
+| Artifact | Produced by | Primary consumers |
+| --- | --- | --- |
+| `evaluation.report.json` | `invarlock evaluate`, `invarlock report generate --format report` | `invarlock verify`, `invarlock report html`, `invarlock report validate`, `invarlock report explain --evaluation-report`, `invarlock advanced runtime-verify` |
+| `report.json` | Baseline/subject run directories under `runs/...` | `invarlock report generate`, `invarlock report explain --subject-report ... --baseline-report ...` |
 
 ## report Layout
 
 The markdown report is structured to highlight evaluation outcomes first:
 
-Attested evaluations also emit `runtime.manifest.json` next to
+Container-backed evaluations emit `runtime.manifest.json` next to
 `evaluation.report.json`. Archive and verify them together.
+
+The HTML export keeps that same body content but adds a browser shell with:
+
+- summary chips for the overall status, primary-metric kind, and linked-run readiness
+- quick links for the major report sections
+- anchored section headings so reviews can deep-link directly into the report
 
 - **Executive Summary**: one-line PASS/FAIL + compact gate table (primary metric, drift, invariants, spectral, RMT, overhead).
 - **Quality Gates**: table of canonical gating checks with measured values.
@@ -122,7 +133,7 @@ Attested evaluations also emit `runtime.manifest.json` next to
 │   ┌────────────────────────────────────────────────────────────────┐    │
 │   │                    invarlock verify                            │    │
 │   │ schema + pairing + ratio math + measurement contracts +        │    │
-│   │ runtime-manifest attestation                                   │    │
+│   │ runtime-manifest provenance                                    │    │
 │   └────────────────────────────────────────────────────────────────┘    │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -442,7 +453,7 @@ html = render_report_html(report)
 ### HTML Export Issues
 
 - **Missing report**: generate one first via `invarlock report --format report`.
-- **HTML missing styles**: omit `--no-embed-css` or apply custom CSS downstream.
+- **HTML missing styles**: omit `--no-embed-css` or apply custom CSS later in your publishing layer.
 
 ---
 
@@ -460,5 +471,5 @@ html = render_report_html(report)
 
 - [CLI Reference](cli.md)
 - [Artifact Layout](artifacts.md)
-- [Assurance Case](../assurance/00-assurance-case.md) — What the report guarantees
+- [Assurance Case](../assurance/00-assurance-case.md) — What the report covers
 - [Reading a report](../user-guide/reading-report.md) — User-oriented guide

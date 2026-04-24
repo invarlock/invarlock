@@ -23,7 +23,7 @@ def test_runtime_security_facade_exposes_only_public_surface() -> None:
         "ALLOW_NETWORK_ENV",
         "ALLOW_REMOTE_CODE_ENV",
         "ALLOW_THIRD_PARTY_PLUGINS_ENV",
-        "ALLOW_UNATTESTED_ARTIFACTS_ENV",
+        "ALLOW_UNVERIFIED_PROVENANCE_ENV",
         "CONTAINER_ENGINE_ENV",
         "CONTAINER_EXECUTION_ENV",
         "ContainerLaunchPlan",
@@ -61,7 +61,7 @@ def test_runtime_security_facade_exposes_only_public_surface() -> None:
         "running_inside_container",
         "runtime_allowances_scope",
         "third_party_plugins_allowed",
-        "unattested_artifacts_allowed",
+        "unverified_provenance_allowed",
         "write_runtime_manifest",
     }
 

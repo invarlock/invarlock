@@ -10,9 +10,12 @@ import pytest
 
 # NOTE: import VarianceGuard only if it's part of the public surface;
 # otherwise, drive it via evaluation_report inputs in an integration test.
+from invarlock.core.auto_tuning import get_tier_policies
 from invarlock.core.runner_pairing import BOOTSTRAP_COVERAGE_REQUIREMENTS
+from invarlock.guards.spectral import SpectralGuard
 from invarlock.guards.variance import VarianceGuard
 from invarlock.reporting.guards_rmt import _extract_rmt_analysis
+from invarlock.reporting.guards_spectral import _extract_spectral_analysis
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import create_empty_report
 
@@ -326,12 +329,93 @@ def test_infeasible_lowrank_cap_rejected():
 
 
 def test_spectral_fpr_matches_tail_probabilities():
+    policies = get_tier_policies()
+    balanced = policies["balanced"]["spectral"]
+    conservative = policies["conservative"]["spectral"]
+    expected_balanced_caps = {
+        "ffn": 3.849,
+        "attn": 3.018,
+        "embed": 1.05,
+        "other": 0.0,
+    }
+    expected_conservative_caps = {
+        "ffn": 3.849,
+        "attn": 2.6,
+        "embed": 2.8,
+        "other": 2.8,
+    }
+
+    assert balanced["multiple_testing"] == {"method": "bh", "alpha": 0.05, "m": 4}
+    assert conservative["multiple_testing"] == {
+        "method": "bonferroni",
+        "alpha": 0.000625,
+        "m": 4,
+    }
+    assert balanced["scope"] == "all"
+    assert conservative["scope"] == "ffn"
+    assert balanced["max_caps"] == 5
+    assert conservative["max_caps"] == 3
+
+    for family, expected in expected_balanced_caps.items():
+        assert balanced["family_caps"][family]["kappa"] == pytest.approx(expected)
+    for family, expected in expected_conservative_caps.items():
+        assert conservative["family_caps"][family]["kappa"] == pytest.approx(expected)
+
+    guard = SpectralGuard(**balanced)
+    assert guard.multiple_testing == balanced["multiple_testing"]
+    for family, expected in expected_balanced_caps.items():
+        assert guard.family_caps[family]["kappa"] == pytest.approx(expected)
+
+    report = {
+        "meta": {"auto": {"tier": "balanced"}},
+        "guards": [
+            {
+                "name": "spectral",
+                "policy": balanced,
+                "metrics": {
+                    "caps_applied": 0,
+                    "family_caps": balanced["family_caps"],
+                    "families": {
+                        family: {"kappa": cap["kappa"], "violations": 0}
+                        for family, cap in balanced["family_caps"].items()
+                    },
+                    "multiple_testing": balanced["multiple_testing"],
+                },
+            }
+        ],
+        "metrics": {},
+    }
+    spectral = _extract_spectral_analysis(report, {})
+    assert spectral["multiple_testing"]["method"] == "bh"
+    assert spectral["multiple_testing"]["alpha"] == pytest.approx(0.05)
+    for family, expected in expected_balanced_caps.items():
+        assert spectral["family_caps"][family]["kappa"] == pytest.approx(expected)
+
     rng = np.random.default_rng(123)
-    kappa = 2.5
     samples = rng.standard_normal(200_000)
-    empirical = np.mean(np.abs(samples) >= kappa)
-    theoretical = 2 * (1.0 - 0.5 * (1.0 + math.erf(kappa / math.sqrt(2))))
-    assert abs(empirical - theoretical) < 0.01
+    tail_by_balanced_family = {}
+    kappas = {
+        "reference": 2.5,
+        **{
+            f"balanced_{family}": cap["kappa"]
+            for family, cap in balanced["family_caps"].items()
+        },
+        **{
+            f"conservative_{family}": cap["kappa"]
+            for family, cap in conservative["family_caps"].items()
+        },
+    }
+    for label, kappa in kappas.items():
+        empirical = np.mean(np.abs(samples) >= kappa)
+        theoretical = 2 * (1.0 - 0.5 * (1.0 + math.erf(kappa / math.sqrt(2))))
+        assert abs(empirical - theoretical) < 0.01
+        if label.startswith("balanced_"):
+            tail_by_balanced_family[label.removeprefix("balanced_")] = theoretical
+
+    assert tail_by_balanced_family["ffn"] < balanced["multiple_testing"]["alpha"]
+    assert tail_by_balanced_family["attn"] < balanced["multiple_testing"]["alpha"]
+    assert tail_by_balanced_family["embed"] > balanced["multiple_testing"]["alpha"]
+    assert tail_by_balanced_family["other"] == pytest.approx(1.0)
 
 
 def test_rmt_epsilon_rule_acceptance_band():

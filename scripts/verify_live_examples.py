@@ -23,16 +23,53 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_ROOT = ROOT / "tmp" / "live_examples"
+DEFAULT_NOTEBOOK_PATHS = (
+    "notebooks/invarlock_compare_evaluate.ipynb",
+    "notebooks/invarlock_custom_datasets.ipynb",
+    "notebooks/invarlock_evaluation_report_deep_dive.ipynb",
+    "notebooks/invarlock_policy_tiers.ipynb",
+    "notebooks/invarlock_python_api.ipynb",
+    "notebooks/invarlock_quickstart_cpu.ipynb",
+)
 
 
-def _default_env() -> dict[str, str]:
+def _cache_root_is_writable(root: Path) -> bool:
+    datasets_dir = root / "datasets"
+    try:
+        datasets_dir.mkdir(parents=True, exist_ok=True)
+        probe = datasets_dir / ".ivl_live_examples_probe"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+        return True
+    except OSError:
+        return False
+
+
+def _preferred_hf_cache_root() -> Path:
+    configured = os.environ.get("INVARLOCK_SMOKE_HF_HOME") or os.environ.get("HF_HOME")
+    if configured:
+        return Path(configured).expanduser()
+    return Path.home() / ".cache" / "huggingface"
+
+
+def _default_env(*, output_root: Path) -> dict[str, str]:
     env = os.environ.copy()
     pythonpath = str(ROOT / "src")
     if env.get("PYTHONPATH"):
         pythonpath = pythonpath + os.pathsep + env["PYTHONPATH"]
     env["PYTHONPATH"] = pythonpath
+    preferred_hf_home = _preferred_hf_cache_root()
+    hf_home = (
+        preferred_hf_home
+        if _cache_root_is_writable(preferred_hf_home)
+        else output_root / ".hf"
+    )
+    env["HF_HOME"] = str(hf_home)
+    env["HF_HUB_CACHE"] = str(hf_home / "hub")
+    env["HF_DATASETS_CACHE"] = str(hf_home / "datasets")
     env.setdefault("INVARLOCK_ALLOW_NETWORK", "1")
     env.setdefault("INVARLOCK_DEDUP_TEXTS", "1")
+    env.setdefault("DISABLE_SAFETENSORS_CONVERSION", "1")
     env.setdefault("TRANSFORMERS_NO_TORCHVISION", "1")
     env.setdefault("TOKENIZERS_PARALLELISM", "false")
     return env
@@ -68,10 +105,7 @@ def _resolve_notebook_paths(paths: list[str] | None) -> list[str]:
         return [str(path.relative_to(ROOT)) for path in notebooks]
     if paths:
         return []
-    return [
-        str(path.relative_to(ROOT))
-        for path in sorted((ROOT / "notebooks").glob("*.ipynb"))
-    ]
+    return list(DEFAULT_NOTEBOOK_PATHS)
 
 
 def _run_subprocess(
@@ -81,23 +115,26 @@ def _run_subprocess(
     log_path: Path,
 ) -> dict[str, object]:
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    completed = subprocess.run(
-        cmd,
-        cwd=str(ROOT),
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    log_path.write_text(
-        (completed.stdout or "")
-        + ("\n" if completed.stdout and completed.stderr else "")
-        + (completed.stderr or ""),
-        encoding="utf-8",
-    )
+    print(f"[live] Running: {' '.join(cmd)}", flush=True)
+    with log_path.open("w", encoding="utf-8") as log_file:
+        process = subprocess.Popen(
+            cmd,
+            cwd=str(ROOT),
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+        assert process.stdout is not None
+        for line in process.stdout:
+            log_file.write(line)
+            print(line, end="")
+        returncode = process.wait()
+    print(f"[live] Finished rc={returncode}: {' '.join(cmd)}", flush=True)
     return {
         "command": cmd,
-        "returncode": int(completed.returncode),
+        "returncode": int(returncode),
         "log_path": str(log_path.relative_to(ROOT)),
     }
 
@@ -130,6 +167,22 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--skip-markdown-model-loading",
+        action="store_true",
+        help=(
+            "Skip markdown model-loading commands (`evaluate`, `run`, `calibrate`) "
+            "and rely on seeded demo evidence for later verify/report replay."
+        ),
+    )
+    parser.add_argument(
+        "--skip-notebook-model-loading",
+        action="store_true",
+        help=(
+            "Skip heavyweight notebook model-loading cells and rely on seeded demo "
+            "evidence for later verify/report replay."
+        ),
+    )
+    parser.add_argument(
         "--skip-notebooks",
         action="store_true",
         help="Skip notebook execution.",
@@ -157,7 +210,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     output_root = Path(args.output_root).expanduser().resolve()
     output_root.mkdir(parents=True, exist_ok=True)
-    env = _default_env()
+    env = _default_env(output_root=output_root)
 
     summary: dict[str, object] = {
         "generated_at_utc": datetime.now(tz=UTC).isoformat(),
@@ -179,6 +232,8 @@ def main(argv: list[str] | None = None) -> int:
         ]
         if markdown_paths:
             markdown_cmd.extend(["--paths", *markdown_paths])
+        if args.skip_markdown_model_loading:
+            markdown_cmd.append("--skip-model-loading")
         markdown_result = _run_subprocess(
             markdown_cmd,
             env=env,
@@ -200,6 +255,8 @@ def main(argv: list[str] | None = None) -> int:
         ]
         if args.run_notebook_pip:
             notebook_cmd.append("--run-pip")
+        if args.skip_notebook_model_loading:
+            notebook_cmd.append("--skip-model-loading")
         notebook_cmd.extend(notebook_paths)
         notebook_result = _run_subprocess(
             notebook_cmd,

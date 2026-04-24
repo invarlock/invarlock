@@ -122,6 +122,33 @@ class TestExportedMetric:
         assert 'test_metric{env="prod",region="us-east"}' in prometheus_text
         assert "42.0" in prometheus_text
 
+    def test_to_prometheus_format_escapes_and_normalizes_untrusted_fields(self):
+        """Prometheus exposition should not allow malformed labels or line injection."""
+        from invarlock.observability.exporters import ExportedMetric
+
+        metric = ExportedMetric(
+            name="9.bad metric\ninjected_total",
+            value=7,
+            timestamp=1.0,
+            labels={
+                "bad-label": 'prod"\nnext\\path',
+                "2zone": "us-east",
+            },
+            metric_type="counter\nmalformed",
+            help_text="line one\n# TYPE injected counter",
+        )
+
+        prometheus_text = metric.to_prometheus_format()
+
+        assert (
+            "# HELP _9_bad_metric_injected_total line one\\n# TYPE injected counter"
+            in (prometheus_text)
+        )
+        assert "# TYPE _9_bad_metric_injected_total gauge" in prometheus_text
+        assert 'bad_label="prod\\"\\nnext\\\\path"' in prometheus_text
+        assert '_2zone="us-east"' in prometheus_text
+        assert "\ninjected_total" not in prometheus_text
+
     def test_to_prometheus_format_no_labels(self):
         """Test Prometheus format without labels."""
         from invarlock.observability.exporters import ExportedMetric
@@ -176,6 +203,7 @@ class TestMetricsExporter:
         assert exporter.last_export_time == 0.0
         assert exporter.export_count == 0
         assert exporter.error_count == 0
+        assert exporter.get_stats()["success_rate"] == 0.0
 
     def test_get_stats(self):
         """Test getting exporter statistics."""
@@ -191,7 +219,17 @@ class TestMetricsExporter:
         assert stats["enabled"] is True
         assert stats["export_count"] == 10
         assert stats["error_count"] == 2
-        assert stats["success_rate"] == 0.8
+        assert stats["success_rate"] == 10 / 12
+
+    def test_get_stats_success_rate_uses_total_attempts(self):
+        """Exporter success rate should stay in the [0, 1] range after failures."""
+        from invarlock.observability.exporters import JSONExporter
+
+        exporter = JSONExporter()
+        exporter.export_count = 0
+        exporter.error_count = 1
+
+        assert exporter.get_stats()["success_rate"] == 0.0
 
 
 @pytest.mark.unit
@@ -280,6 +318,23 @@ class TestPrometheusExporter:
         call_url = mock_post.call_args[0][0]
         assert "gateway:9091" in call_url
         assert "invarlock" in call_url
+
+    @patch("requests.post")
+    def test_push_to_gateway_escapes_path_segments(self, mock_post):
+        """Pushgateway job and instance names should not rewrite the URL path."""
+        from invarlock.observability.exporters import ExportedMetric, PrometheusExporter
+
+        mock_post.return_value.status_code = 200
+        exporter = PrometheusExporter(
+            gateway_url="http://gateway:9091",
+            job_name="job/name",
+            instance="host one",
+        )
+
+        assert exporter.export([ExportedMetric(name="test", value=1.0, timestamp=1.0)])
+
+        call_url = mock_post.call_args[0][0]
+        assert "/metrics/job/job%2Fname/instance/host%20one" in call_url
 
     @patch("requests.post")
     def test_push_to_gateway_failure(self, mock_post):

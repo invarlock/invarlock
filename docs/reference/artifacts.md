@@ -12,25 +12,29 @@
 ## Quick Start
 
 ```bash
-# Compare baseline and subject on the secure-default runtime path
+# Compare baseline and subject on the default runtime-container path
 invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject gpt2 \
-  --preset configs/presets/causal_lm/wikitext2_512.yaml \
   --report-out reports/eval
 
 # Render HTML from the emitted evaluation bundle
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
+invarlock report explain --evaluation-report reports/eval/evaluation.report.json
 ```
 
-Model-loading commands use the secure-default runtime container unless a trusted
-`invarlock evaluate --assurance trusted-local` workflow explicitly bypasses it.
+Model-loading commands use the runtime container by default unless a
+host-side `invarlock evaluate --execution-mode host` workflow explicitly
+bypasses it.
+
+Repo-owned presets under `configs/` remain available for maintainers, but the
+quick-start path above stays wheel-compatible by using direct flags only.
 
 ## Concepts
 
 - `runs/` is scratch space: evaluate emits baseline/subject working artifacts there.
 - `reports/` is evidence: archive `evaluation.report.json` and `runtime.manifest.json`
-  for audit, plus any HTML or proof-pack outputs you distribute.
+  for audit, plus any HTML or evidence-pack outputs you distribute.
 - evaluation bundles reference baseline/subject report artifacts; keep them
   together to preserve pairing and make later review easier.
 
@@ -38,7 +42,7 @@ Model-loading commands use the secure-default runtime container unless a trusted
 
 | Command | Writes | What to archive |
 | --- | --- | --- |
-| `invarlock evaluate` | `runs/`, `reports/<name>/evaluation.report.json`, `runtime.manifest.json` | Evaluation report bundle plus attestation for attested runs. |
+| `invarlock evaluate` | `runs/`, `reports/<name>/evaluation.report.json`, `runtime.manifest.json` | Evaluation report bundle plus runtime provenance for container-backed runs. |
 | `invarlock report html` | `reports/<name>/evaluation.html` | Optional (can be rebuilt). |
 
 ## Reference
@@ -73,7 +77,7 @@ reports/
 | Artifact | Why archive | Required for verify |
 | --- | --- | --- |
 | `evaluation.report.json` | Evaluation report snapshot | Yes |
-| `runtime.manifest.json` | Runtime attestation for secure-default outputs | Yes |
+| `runtime.manifest.json` | Runtime provenance for container-backed outputs | Yes |
 | `events.jsonl` | Debugging timeline | No |
 | `evaluation.html` | Human review | No |
 

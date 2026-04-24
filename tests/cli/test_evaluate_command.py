@@ -166,6 +166,51 @@ def test_evaluate_reuses_baseline_report_skipping_baseline_run(monkeypatch, tmp_
     assert Path(rep["baseline"]).resolve() == baseline_report.resolve()
 
 
+def test_evaluate_releases_phase_memory_between_runs(monkeypatch, tmp_path):
+    src = tmp_path / "src_model"
+    edt = tmp_path / "edt_model"
+    src.mkdir()
+    edt.mkdir()
+    (src / "config.json").write_text(
+        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
+        encoding="utf-8",
+    )
+    (edt / "config.json").write_text(
+        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
+        encoding="utf-8",
+    )
+
+    import invarlock.cli.commands.run as run_mod
+    from invarlock.cli.commands import evaluate as mod
+
+    releases: list[str] = []
+
+    monkeypatch.setattr(
+        run_mod,
+        "run_command",
+        lambda **kwargs: str(_stub_run(Path(kwargs["out"]))),
+        raising=False,
+    )
+    monkeypatch.setattr(mod, "generate_reports", lambda **kwargs: None, raising=False)
+    monkeypatch.setattr(
+        mod,
+        "_release_phase_memory",
+        lambda: releases.append("release"),
+        raising=False,
+    )
+
+    evaluate_command(
+        baseline=str(src),
+        subject=str(edt),
+        adapter="auto",
+        profile="ci",
+        out=str(tmp_path / "runs"),
+        report_out=str(tmp_path / "reports"),
+    )
+
+    assert releases == ["release", "release"]
+
+
 def test_evaluate_baseline_report_requires_windows(monkeypatch, tmp_path):
     src = tmp_path / "src_model"
     edt = tmp_path / "edt_model"
@@ -332,7 +377,7 @@ def test_evaluate_quiet_summary_emits_status(monkeypatch, tmp_path, capsys):
     assert "Output:" in out
 
 
-def test_evaluate_attested_bundle_manifest_inherits_container_execution(
+def test_evaluate_container_bundle_manifest_inherits_container_execution(
     monkeypatch, tmp_path
 ):
     src = tmp_path / "src_model"
@@ -391,7 +436,7 @@ def test_evaluate_attested_bundle_manifest_inherits_container_execution(
         subject=str(edt),
         adapter="auto",
         profile="dev",
-        assurance="attested",
+        execution_mode="container",
         out=str(tmp_path / "runs"),
         report_out=str(tmp_path / "reports"),
     )

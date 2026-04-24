@@ -21,7 +21,7 @@ EXPECTED_TEST_DIR_TARGETS = {
     "lint",
     "observability",
     "plugins",
-    "proof_packs",
+    "evidence_packs",
     "reporting",
     "runtime",
     "scripts",

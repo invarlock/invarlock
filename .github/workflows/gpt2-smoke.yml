@@ -20,7 +20,7 @@ jobs:
       PYTHONPATH: ${{ github.workspace }}/src
       INVARLOCK_ALLOW_NETWORK: "1"
       INVARLOCK_DEDUP_TEXTS: "1"
-      INVARLOCK_SMOKE_MODE: "attested"
+      INVARLOCK_SMOKE_MODE: "container"
       INVARLOCK_SMOKE_PROFILE: "dev"
       INVARLOCK_RUNTIME_IMAGE: "invarlock-runtime:local"
     steps:
@@ -33,7 +33,7 @@ jobs:
           python-version: "3.12"
 
       - name: Cache pip
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
         if: ${{ github.actor != 'nektos/act' }}
         with:
           path: ~/.cache/pip

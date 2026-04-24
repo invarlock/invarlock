@@ -6,7 +6,7 @@
 | --- | --- |
 | **Purpose** | Minimal Python example for running InvarLock without the CLI. |
 | **Audience** | Developers running small scripted experiments. |
-| **Supported surface** | `CoreRunner.execute` and adapters/guards/edits from core packages. |
+| **Supported surface** | Stable contract surfaces remain CLI/report/contract-read paths; `CoreRunner.execute` is an advanced/non-stable integration surface. |
 | **Requires** | `invarlock[adapters]` for HF adapters; `invarlock[edits]` for built-in edits; `invarlock[guards]` for guard math. |
 | **Network** | Offline by default; CLI runs use `evaluate --allow-network`, while programmatic callers set `INVARLOCK_ALLOW_NETWORK=1` for downloads. |
 
@@ -33,9 +33,12 @@ print("status:", report.status)
 
 ## Concepts
 
-- Prefer the CLI for full workflows (pairing, reports, reproducibility).
+- Prefer the CLI for stable workflows (pairing, reports, reproducibility).
 - Programmatic runs follow the same pipeline phases and produce a
   `RunReport` object.
+- Treat `CoreRunner.execute` and surrounding orchestration helpers as an
+  advanced/non-stable Python lane that can evolve faster than the CLI/report
+  contracts.
 - Pass `calibration_data` to `CoreRunner.execute` for real primary-metric values.
 - CLI workflows use `evaluate --allow-network`; programmatic runs set
   `INVARLOCK_ALLOW_NETWORK=1` when using remote model IDs.

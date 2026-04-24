@@ -12,7 +12,7 @@ from invarlock.core.exceptions import InvarlockError
 from invarlock.core.exceptions import MetricsError as _MetricsError
 from invarlock.core.exceptions import ValidationError as _ValidationError
 from invarlock.core.provider_parity import enforce_provider_parity
-from invarlock.core.runtime_attestation import verify_runtime_attestation
+from invarlock.core.runtime_provenance import verify_runtime_provenance
 
 from . import verify_check_helpers as _verify_checks
 from . import verify_output as _verify_output
@@ -40,6 +40,7 @@ _validate_counts = _verify_checks._validate_counts
 _validate_drift_band = _verify_checks._validate_drift_band
 _validate_tokenizer_hash = _verify_checks._validate_tokenizer_hash
 _validate_measurement_contracts = _verify_checks._validate_measurement_contracts
+_validate_variance_enablement = _verify_checks._validate_variance_enablement
 _apply_profile_lints = _verify_checks._apply_profile_lints
 _report_schema = _verify_checks._report_schema
 validate_report = _verify_checks.validate_report
@@ -110,6 +111,7 @@ def _validate_evaluation_report_payload(
         validate_primary_metric_policy_fn=_validate_primary_metric_policy,
         apply_profile_lints_fn=_apply_profile_lints,
         validate_tokenizer_hash_fn=_validate_tokenizer_hash,
+        validate_variance_enablement_fn=_validate_variance_enablement,
         validate_measurement_contracts_fn=_validate_measurement_contracts,
     )
 
@@ -372,7 +374,7 @@ def _verify_single_report(
     baseline_digest: dict[str, Any] | None,
     tolerance: float,
     profile: str | None,
-    allow_unattested_artifacts: bool,
+    allow_unverified_provenance: bool,
     json_mode: bool,
 ) -> tuple[dict[str, Any], list[str], bool, tuple[VerifyDiagnostic, ...]]:
     cert_obj = _load_evaluation_report(cert_path)
@@ -396,11 +398,11 @@ def _verify_single_report(
             )
 
     errors = _validate_evaluation_report_payload(cert_path, profile=profile)
-    attestation_result = verify_runtime_attestation(
+    provenance_result = verify_runtime_provenance(
         cert_path,
-        allow_unattested=bool(allow_unattested_artifacts),
+        allow_unverified=bool(allow_unverified_provenance),
     )
-    errors.extend(issue.message for issue in attestation_result.issues)
+    errors.extend(issue.message for issue in provenance_result.issues)
     if json_mode and any("schema validation failed" in str(e).lower() for e in errors):
         raise _ValidationError(
             code="E601",
@@ -461,7 +463,7 @@ def run_verify_reports(
     baseline: Path | None = None,
     tolerance: float = 1e-9,
     profile: str | None = "dev",
-    allow_unattested_artifacts: bool = False,
+    allow_unverified_provenance: bool = False,
     json_mode: bool = False,
 ) -> VerifyExecutionResult:
     """Verify reports and return structured machine + human output."""
@@ -486,7 +488,7 @@ def run_verify_reports(
                 baseline_digest=baseline_digest,
                 tolerance=tol,
                 profile=profile,
-                allow_unattested_artifacts=allow_unattested_artifacts,
+                allow_unverified_provenance=allow_unverified_provenance,
                 json_mode=json_mode,
             )
             loaded_any_report = True
@@ -592,7 +594,7 @@ def verify_reports_contract(
     baseline: Path | None = None,
     tolerance: float = 1e-9,
     profile: str | None = "dev",
-    allow_unattested_artifacts: bool = False,
+    allow_unverified_provenance: bool = False,
     json_mode: bool = False,
 ) -> VerifyExecutionResult:
     """Verify reports and return a structured result without relying on CLI output."""
@@ -601,7 +603,7 @@ def verify_reports_contract(
         baseline=baseline,
         tolerance=tolerance,
         profile=profile,
-        allow_unattested_artifacts=allow_unattested_artifacts,
+        allow_unverified_provenance=allow_unverified_provenance,
         json_mode=json_mode,
     )
 

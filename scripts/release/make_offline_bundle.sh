@@ -300,6 +300,6 @@ manifest_path = root / "release_manifest.json"
 manifest_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
 
-( cd "${STAGING_DIR}" && tar -czf "${BUNDLE_TARBALL}" "${BUNDLE_NAME}" )
+( cd "${STAGING_DIR}" && COPYFILE_DISABLE=1 tar -czf "${BUNDLE_TARBALL}" "${BUNDLE_NAME}" )
 
 echo "Offline release bundle written to ${BUNDLE_TARBALL}"

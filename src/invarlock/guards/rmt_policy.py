@@ -137,7 +137,15 @@ def compute_epsilon_violations(guard: Any) -> list[dict[str, Any]]:
 
 
 def get_rmt_policy(name: str = "balanced") -> RMTPolicyDict:
-    policies = {
+    """Return the in-module fallback policy set.
+
+    The calibrated source of truth used by the runtime is
+    `invarlock.guards.policies_resolution.get_rmt_policy(..., use_yaml=True)`,
+    which overlays values from `runtime/tiers.yaml`. These hardcoded values are
+    kept only as a defensive fallback for direct imports of this module.
+    """
+
+    fallback_policies = {
         "conservative": RMTPolicyDict(
             q="auto",
             deadband=0.05,
@@ -164,15 +172,15 @@ def get_rmt_policy(name: str = "balanced") -> RMTPolicyDict:
         ),
     }
 
-    if name not in policies:
-        available = list(policies.keys())
+    if name not in fallback_policies:
+        available = list(fallback_policies.keys())
         raise GuardError(
             code="E502",
             message="POLICY-NOT-FOUND",
             details={"name": name, "available": available},
         )
 
-    return policies[name]
+    return fallback_policies[name]
 
 
 def create_custom_rmt_policy(

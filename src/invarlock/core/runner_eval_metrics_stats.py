@@ -194,8 +194,10 @@ def _evaluate_pairing_and_coverage(
     pairing_metrics = compute_window_pairing_metrics_fn(
         preview_window_ids=slices.preview_window_ids,
         preview_tokens=slices.preview_tokens,
+        preview_labels=getattr(slices, "preview_labels", None),
         final_window_ids=slices.final_window_ids,
         final_tokens=slices.final_tokens,
+        final_labels=getattr(slices, "final_labels", None),
         pairing_context=runtime.pairing_context
         if isinstance(runtime.pairing_context, dict)
         else None,

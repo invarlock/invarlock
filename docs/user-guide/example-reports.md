@@ -6,18 +6,40 @@
 | --- | --- |
 | **Purpose** | Show how to generate and interpret InvarLock reports. |
 | **Audience** | Users learning the evaluation workflow. |
-| **Outputs** | `evaluation.report.json`, `evaluation_report.md`, `report.json`, and `runtime.manifest.json` for attested outputs. |
+| **Outputs** | `evaluation.report.json`, `evaluation_report.md`, `report.json`, and `runtime.manifest.json` for container-backed outputs. |
 | **Requires** | `invarlock[hf]` for HF adapter workflows. |
 
 InvarLock emits both machine-readable reports and human-friendly summaries.
 Use the steps below to reproduce representative artifacts from this repository version.
 
+## Read The Bundle First
+
+For most reviewers, the primary artifact is `evaluation.report.json`, not the
+lower-level run reports. Use it as the front door:
+
+```bash
+invarlock verify reports/quant8_demo/evaluation.report.json
+invarlock report html -i reports/quant8_demo/evaluation.report.json -o reports/quant8_demo/evaluation.html
+invarlock report explain --evaluation-report reports/quant8_demo/evaluation.report.json
+```
+
+Artifact model:
+
+| Artifact | What it contains | Typical next step |
+| --- | --- | --- |
+| `evaluation.report.json` | Paired evaluation outcome, validation block, policy/provenance summary | `verify`, `report html`, `report explain --evaluation-report` |
+| `report.json` | One run's raw metrics, guard telemetry, and execution artifacts | `report generate`, explicit `report explain --subject-report ... --baseline-report ...` |
+
 ## 1. Generate a report Bundle
 
-The command below shows the secure-default runtime-container path. It writes an
-attested `runtime.manifest.json` next to `evaluation.report.json`. Trusted
-public host-side workflows use `--assurance trusted-local` and should verify the
-resulting report with `invarlock verify --assurance trusted-local ...`.
+The command below shows the default runtime-container path. It writes a
+container-backed `runtime.manifest.json` next to `evaluation.report.json`.
+Public host-side workflows use `--execution-mode host` and should verify the
+resulting report with `invarlock verify --runtime-provenance host ...`.
+This reproduction uses repo-owned preset and overlay files so it matches the
+example artifacts checked into this repository version; wheel-only installs
+should start with [Getting Started](getting-started.md) for the first evaluation
+run, then come back here once they already have an evaluation bundle.
 
 ```bash
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
@@ -62,13 +84,23 @@ The markdown report mirrors the report content but highlights:
 
 ## 3. Shareable Attachments
 
+HTML report chrome:
+
+```text
+Header -> Summary chips -> Quick links rail -> Canonical report body
+```
+
+That layout is intentional: reviewers should be able to confirm overall status,
+jump directly to the gate or provenance section they care about, and still read
+the unchanged canonical report content underneath.
+
 For audits, collect the following files:
 
 | File | Purpose |
 |------|---------|
 | `runs/<name>/**/report.json` | Execution log, metrics, and guard telemetry |
 | `reports/<name>/evaluation.report.json` | Machine-readable evaluation report |
-| `reports/<name>/runtime.manifest.json` | Runtime attestation for secure-default outputs |
+| `reports/<name>/runtime.manifest.json` | Runtime provenance for container-backed outputs |
 | `reports/<name>/evaluation_report.md` | Human-friendly summary for reviewers |
 
 Reports remain valid only for the same baseline reference, pairing assumptions,

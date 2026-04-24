@@ -34,18 +34,18 @@ def test_runtime_flag_value_preserves_unknown_env_under_policy(
         )
 
 
-def test_attested_runtime_image_ref_keeps_digest_and_allows_unattested_override() -> (
+def test_runtime_provenance_image_ref_keeps_digest_and_allows_unverified_provenance_override() -> (
     None
 ):
     digest_pinned = "ghcr.io/invarlock/runtime:test@sha256:" + ("a" * 64)
     assert (
-        runtime_security_helpers._attested_runtime_image_ref(digest_pinned, None)
+        runtime_security_helpers._runtime_provenance_image_ref(digest_pinned, None)
         == digest_pinned
     )
 
-    with runtime_security.runtime_allowances_scope(allow_unattested_artifacts=True):
+    with runtime_security.runtime_allowances_scope(allow_unverified_provenance=True):
         assert (
-            runtime_security_helpers._attested_runtime_image_ref(
+            runtime_security_helpers._runtime_provenance_image_ref(
                 "ghcr.io/invarlock/runtime:test",
                 None,
             )
@@ -222,7 +222,7 @@ def test_delegate_python_script_to_container_surfaces_timeout(
 
     with pytest.raises(RuntimeError, match="timed out"):
         runtime_security.delegate_python_script_to_container(
-            "scripts/proof_packs/python/run_from_config.py",
+            "scripts/evidence_packs/python/run_from_config.py",
             _plan(["--config", "demo.yaml"]),
         )
 
@@ -249,7 +249,7 @@ def test_build_container_command_skips_network_none_when_network_allowed(
     monkeypatch.setattr(
         runtime_security_helpers,
         "resolve_runtime_image_digest",
-        lambda: "sha256:attested",
+        lambda: "sha256:container",
         raising=True,
     )
     monkeypatch.setattr(

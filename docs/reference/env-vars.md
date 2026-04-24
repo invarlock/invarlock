@@ -147,9 +147,9 @@ Strictness/tiny-relax/overhead-skip are also config/profile policy:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `INVARLOCK_ALLOW_HOST_EXECUTION` | unset | Advanced/internal host-execution override. Prefer `invarlock evaluate --assurance trusted-local` for the public compare/evaluate path. |
+| `INVARLOCK_ALLOW_HOST_EXECUTION` | unset | Advanced/internal host-execution override. Prefer `invarlock evaluate --execution-mode host` for the public compare/evaluate path. |
 | `INVARLOCK_CONTAINER_EXECUTION` | unset | Internal recursion guard marking runtime-container execution. |
-| `INVARLOCK_CONTAINER_ENGINE` | unset | Force the OCI engine used for secure-default container execution (`podman` or `docker`). |
+| `INVARLOCK_CONTAINER_ENGINE` | unset | Force the OCI engine used for default runtime-container execution (`podman` or `docker`). |
 | `INVARLOCK_RUNTIME_IMAGE` | unset | Override the OCI image used for containerized model execution. |
 | `INVARLOCK_RUNTIME_IMAGE_DIGEST` | unset | Supply the immutable digest recorded into `runtime.manifest.json`. |
 

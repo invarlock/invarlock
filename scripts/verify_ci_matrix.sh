@@ -47,7 +47,13 @@ fi
 
 # Core edit availability check reduced to quant only
 echo "🔧 Checking core edit availability..."
-if rg -n "class RTNQuantEdit" src/invarlock/edits/quant_rtn.py >/dev/null 2>&1; then
+if command -v rg >/dev/null 2>&1; then
+    EDIT_CHECK='rg -n "class RTNQuantEdit" src/invarlock/edits/quant_rtn.py'
+else
+    EDIT_CHECK='grep -n "class RTNQuantEdit" src/invarlock/edits/quant_rtn.py'
+fi
+
+if eval "$EDIT_CHECK" >/dev/null 2>&1; then
     echo "  ✅ quant_rtn"
 else
     echo "  ❌ quant_rtn missing"

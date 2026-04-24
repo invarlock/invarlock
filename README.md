@@ -17,7 +17,7 @@
   <a href="https://pypi.org/project/invarlock/">
     <img alt="PyPI" src="https://badge.fury.io/py/invarlock.svg" />
   </a>
-  <a href="https://github.com/invarlock/invarlock/blob/main/docs/user-guide/quickstart.md">
+  <a href="https://invarlock.github.io/invarlock/0.8.0/">
     <img alt="Docs" src="https://img.shields.io/badge/docs-quickstart-blue.svg" />
   </a>
   <a href="LICENSE">
@@ -41,15 +41,15 @@ in CI.
 ## Why InvarLock?
 
 - **Quality gates for edited checkpoints**: catch regressions before deployment.
-- **Statistical guarantees**: paired primary metrics with confidence intervals.
+- **Paired statistical evidence**: primary metrics with confidence intervals.
 - **Auditable evidence**: deterministic pairing metadata + policy digests in `evaluation.report.json`.
-- **CI/CD-friendly**: stable exit codes, `--json` outputs, and portable “proof packs”.
+- **CI/CD-friendly**: stable exit codes, `--json` outputs, and portable “evidence packs”.
 - **Offline-first**: network is disabled by default; enable downloads per command.
 
 ## Who is this for?
 
 - ML engineers shipping edited model checkpoints, including quantized, pruned, fine-tuned, or otherwise weight-modified variants.
-- MLOps and platform teams building CI gates, attested verification, and reviewable evaluation artifacts.
+- MLOps and platform teams building CI gates, runtime-provenance verification, and reviewable evaluation artifacts.
 - Researchers validating weight-edit, compression, and model-comparison methods with reproducible paired evaluation across text and image-text workflows supported here.
 
 ## How it works
@@ -75,36 +75,30 @@ in CI.
 ## Quick start
 
 Colab (CPU-friendly):
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/main/notebooks/invarlock_quickstart_cpu.ipynb)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/v0.8.0/notebooks/invarlock_quickstart_cpu.ipynb)
 
-The minimal install (`pip install invarlock`) is enough for `doctor`,
-`verify`, `report html`, and proof-pack verification from an installed wheel.
-Install `invarlock[hf]` only when you need `evaluate` to load Hugging Face
-models. The secure-default CLI path runs model-loading commands inside the
-runtime container and expects an OCI container engine such as `podman` or
-`docker`.
-In a repo checkout, build the local runtime image once with
-`make runtime-image`; InvarLock automatically prefers
-`invarlock-runtime:local` when it is present. Trusted local workflows can opt
-into host execution explicitly with `--assurance trusted-local` on
-`invarlock evaluate`, but the attested verification step below expects
-container execution. The quickstart block below assumes a repo checkout; do
-not skip `make runtime-image` if you want the attested container path.
+The public front door is `evaluate -> verify -> report html`, but the repo now
+splits onboarding by user type:
+
+- **Wheel user / reviewer**: install `invarlock`, inspect an existing
+  `evaluation.report.json`, and render HTML without cloning the repository.
+- **Evaluator**: install `invarlock[hf]` when you want `evaluate` to load
+  Hugging Face models and emit a fresh evaluation bundle.
+- **Repo maintainer**: clone the repo and build the local runtime image when you
+  need maintainer smokes, repo presets, or local container-image iteration.
+
+The default `evaluate` path runs model-loading commands inside the runtime
+container and expects an OCI engine such as `podman` or `docker`. Host-side
+workflows can opt into `--execution-mode host`, but the default verification
+path below expects a container-backed report with sibling runtime provenance.
 
 ```bash
-# Repo-checkout quickstart for the attested container path
-# HF adapter stack (torch/transformers)
+# Evaluator path: create a fresh bundle
 pip install "invarlock[hf]"
 
-# Required in a repo checkout for the attested path; do not skip this step.
-make runtime-image
-
-# Version + report schema (when available)
 invarlock --version
 
 # Compare baseline vs subject (downloads require explicit network enable)
-# Secure-default execution uses the runtime container and writes
-# reports/eval/runtime.manifest.json next to evaluation.report.json.
 invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject  distilgpt2 \
@@ -113,7 +107,7 @@ invarlock evaluate --allow-network \
   --report-out reports/eval \
   --quiet
 
-# Validate the attested evaluation report
+# Validate the container-backed evaluation report
 test -f reports/eval/runtime.manifest.json
 invarlock verify --json reports/eval/evaluation.report.json
 
@@ -121,12 +115,20 @@ invarlock verify --json reports/eval/evaluation.report.json
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
 ```
 
-If you pass a directory to `invarlock report generate` or
-`invarlock report explain`, it must contain canonical `report.json`.
-`invarlock report html` expects canonical `evaluation.report.json`.
-`invarlock verify` accepts directories with canonical report files, but a
-directory containing both `report.json` and `evaluation.report.json` is
-ambiguous and rejected; pass the exact file path instead.
+Wheel-only review path:
+`pip install invarlock`, `invarlock doctor`,
+`invarlock verify /path/to/evaluation.report.json`, and
+`invarlock report html -i /path/to/evaluation.report.json -o /path/to/evaluation.html`.
+
+Repo maintainers can build the local runtime image once with `make runtime-image`;
+InvarLock automatically prefers `invarlock-runtime:local` when it is present.
+
+Artifact model:
+
+| Artifact | Produced by | Primary consumers |
+| --- | --- | --- |
+| `evaluation.report.json` | `invarlock evaluate`, `invarlock report generate --format report` | `invarlock verify`, `invarlock report html`, `invarlock report validate`, `invarlock report explain --evaluation-report`, `invarlock advanced runtime-verify` |
+| `report.json` | Baseline/subject run directories under `runs/...` | `invarlock report generate`, `invarlock report explain --subject-report ... --baseline-report ...` |
 
 Example output (abridged; counts vary by profile/config):
 
@@ -136,38 +138,42 @@ Baseline: gpt2 -> Subject: gpt2 · Profile: dev
 Status: PASS · Gates: <passed>/<total> passed
 Primary metric ratio: <ratio>
 Output: reports/eval/evaluation.report.json
-Attestation: reports/eval/runtime.manifest.json
+Runtime provenance: reports/eval/runtime.manifest.json
 ```
 
 ## Command Surface
 
+- First touch in a fresh install: `invarlock --help`, `invarlock --version`,
+  `invarlock report --help`, and `invarlock advanced --help`.
 - Core workflow: `invarlock evaluate` → `invarlock verify` →
   `invarlock report html`.
-- Report inspection and validation: `invarlock report generate`,
+- Follow-on report analysis after the core loop: `invarlock report generate`,
   `invarlock report explain`, and `invarlock report validate`.
 - Environment and release checks: `invarlock doctor` plus the JSON surfaces
   emitted by `doctor --json` and `advanced plugins ... --json`.
+- Runtime-manifest verifier: `invarlock advanced runtime-verify --report <evaluation.report.json> --manifest <runtime.manifest.json>`.
 - The public contract catalog exposed by those JSON surfaces includes
   `validation_keys`, `console_labels`, and `metric_kinds`.
-- Advanced workflows: `invarlock advanced proof-pack`, `invarlock advanced policy`,
-  `invarlock advanced plugins`, and `invarlock advanced calibrate`.
-- Trusted host execution for the core evaluate path uses `--assurance trusted-local`.
+- Advanced workflows: `invarlock advanced evidence-pack`, `invarlock advanced policy`,
+  `invarlock advanced plugins`, `invarlock advanced calibrate`, and
+  `invarlock advanced runtime-verify`.
+- Host execution for the core evaluate path uses `--execution-mode host`.
 - Optional adapter/backend installs use normal Python extras such as
   `pip install "invarlock[hf]"` rather than CLI install commands.
 
-## Proof packs (portable evidence bundles)
+## Evidence packs (portable evidence bundles)
 
-Proof packs bundle reports + verification metadata into a distributable artifact.
+Evidence packs bundle reports + verification metadata into a distributable artifact.
 
-- Guide: <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/proof-packs.md>
+- Guide: <https://invarlock.github.io/invarlock/0.8.0/user-guide/evidence-packs/>
 - Verify from an installed wheel:
-  `invarlock advanced proof-pack verify <dir> --strict`
-- Repo harness alternative: `scripts/proof_packs/verify_pack.sh --pack <dir> --strict`
+  `invarlock advanced evidence-pack verify <dir> --strict`
+- Repo harness alternative: `scripts/evidence_packs/verify_pack.sh --pack <dir> --strict`
 
 Note: `configs/` and most `scripts/` remain repo resources and are not included in
 wheels. Installed wheels include the public contracts and the
-`invarlock advanced proof-pack verify` verifier, so downstream users can check
-bundles without cloning the repository.
+`invarlock advanced evidence-pack verify` verifier, so installed packages can
+check bundles without cloning the repository.
 
 ## Installation
 
@@ -183,21 +189,23 @@ Optional extras: `invarlock[probes]`, `invarlock[gpu]`, `invarlock[awq,gptq]`.
 On Python 3.13+ stacks, `gptq` may still require a vendor wheel or a
 supported older interpreter because upstream `auto-gptq` packaging is narrower
 than the core InvarLock support matrix. Full setup:
-<https://github.com/invarlock/invarlock/blob/main/docs/user-guide/getting-started.md>.
+<https://invarlock.github.io/invarlock/0.8.0/user-guide/getting-started/>.
 
 The minimal install covers the core verification and reporting flows. Add
 `invarlock[hf]` only for model-loading evaluate runs, and use the installed
-wheel's proof-pack verifier when you need to inspect a bundle without cloning
+wheel's evidence-pack verifier when you need to inspect a bundle without cloning
 the repository.
 
 ## Documentation
 
-- Quickstart: <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/quickstart.md>
-- Compare & evaluate (BYOE): <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/compare-and-evaluate.md>
-- Reading a report: <https://github.com/invarlock/invarlock/blob/main/docs/user-guide/reading-report.md>
-- CLI reference: <https://github.com/invarlock/invarlock/blob/main/docs/reference/cli.md>
-- Assurance case: <https://github.com/invarlock/invarlock/blob/main/docs/assurance/00-assurance-case.md>
-- Threat model: <https://github.com/invarlock/invarlock/blob/main/docs/security/threat-model.md>
+- Docs home: <https://invarlock.github.io/invarlock/0.8.0/>
+- Quickstart: <https://invarlock.github.io/invarlock/0.8.0/user-guide/quickstart/>
+- Compare & evaluate (BYOE): <https://invarlock.github.io/invarlock/0.8.0/user-guide/compare-and-evaluate/>
+- Reading a report: <https://invarlock.github.io/invarlock/0.8.0/user-guide/reading-report/>
+- CLI reference: <https://invarlock.github.io/invarlock/0.8.0/reference/cli/>
+- Assurance case: <https://invarlock.github.io/invarlock/0.8.0/assurance/00-assurance-case/>
+  (repo source: `docs/assurance/00-assurance-case.md`)
+- Threat model: <https://invarlock.github.io/invarlock/0.8.0/security/threat-model/>
 
 ## Community
 
@@ -245,7 +253,7 @@ For guidance on where to ask questions, how to report bugs, and what to expect i
 
 ## Contributing
 
-- Contributing guide: <https://github.com/invarlock/invarlock/blob/main/CONTRIBUTING.md>
+- Contributing guide: <https://github.com/invarlock/invarlock/blob/v0.8.0/CONTRIBUTING.md>
 - Fast local checks (repo clone):
   - `make` targets auto-select Python 3.12+, preferring an active 3.12 env, `python3.12`, then the Conda env `invarlock-py312` when present.
   - `make dev-install`

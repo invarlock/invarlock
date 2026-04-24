@@ -28,6 +28,8 @@ def test_ci_adds_actionlint_and_packaging_smoke_gates() -> None:
         in actionlint_step["run"]
     )
     assert "make actionlint" in actionlint_step["run"]
+    docs_live_fast_step = _find_step_by_name(docs_steps, "Run curated live examples")
+    assert docs_live_fast_step["run"] == "make docs-live-fast"
 
     min_py312 = workflow["jobs"]["tests-min-py312"]
     min_steps = min_py312["steps"]
@@ -38,8 +40,12 @@ def test_ci_adds_actionlint_and_packaging_smoke_gates() -> None:
 def test_ci_verify_full_runs_explicit_closure_gates() -> None:
     workflow = _load_workflow(Path(".github/workflows/ci.yml"))
     verify_full = workflow["jobs"]["verify-full"]
+    node_step = _find_step_by_name(verify_full["steps"], "Set up Node.js")
+    npm_step = _find_step_by_name(verify_full["steps"], "Install docs lint toolchain")
     verify_step = _find_step_by_name(verify_full["steps"], "Full verify")
 
+    assert node_step["with"]["node-version"] == "22"
+    assert npm_step["run"] == "npm ci"
     assert "make verify" in verify_step["run"]
     assert "make actionlint" in verify_step["run"]
     assert "make packaging-smoke-minimal" in verify_step["run"]
