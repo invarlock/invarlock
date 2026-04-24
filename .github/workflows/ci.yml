@@ -6,7 +6,7 @@ concurrency:
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'release/v*' ]
     # Allow supply-chain job to run on release tags too.
     tags: [ 'v*' ]
   pull_request:

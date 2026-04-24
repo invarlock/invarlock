@@ -120,6 +120,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed release-hygiene drift by marking user-visible Makefile helper targets
   phony, documenting every active `pip-audit` allowlist entry, and aligning the
   workflow docs with the Node.js 22.18+ toolchain contract.
+- Fixed release-branch workflow coverage so `release/v*` pushes run the normal
+  CI, CodeQL, docs-validation, and tiny container smoke gates before tagging,
+  while preserving PR docs artifacts before cleanup.
+- Fixed report and observability export hardening by escaping report-derived
+  HTML before browser rendering, normalizing Prometheus exposition output and
+  Pushgateway path segments, and computing exporter success rates from total
+  attempts.
 - Fixed local release-gate ergonomics by documenting the CI-pinned `actionlint`
   install command used by `make workflow-lint`.
 - Fixed typed-surface drift across pairing, dataset-plan, guard-policy,

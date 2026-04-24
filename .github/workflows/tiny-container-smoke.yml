@@ -2,7 +2,7 @@ name: Tiny Container Smoke
 
 on:
   push:
-    branches: [ staging/next ]
+    branches: [ staging/next, 'release/v*' ]
   workflow_dispatch:
 
 concurrency:

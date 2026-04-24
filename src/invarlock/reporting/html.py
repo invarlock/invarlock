@@ -40,6 +40,12 @@ def _apply_status_badges(html_body: str) -> str:
     return updated
 
 
+def _escape_raw_html(md: str) -> str:
+    """Disable raw HTML passthrough while preserving normal Markdown syntax."""
+
+    return escape(md, quote=False)
+
+
 def _strip_tags(value: str) -> str:
     text = _TAG_RE.sub(" ", value)
     return " ".join(text.split()).strip()
@@ -123,7 +129,7 @@ def render_report_html(evaluation_report: dict[str, Any]) -> str:
         body = f'<div class="report-body"><pre class="invarlock-md">{escape(md)}</pre></div>'
     else:
         html_body = markdown_module.markdown(
-            md,
+            _escape_raw_html(md),
             extensions=["tables", "fenced_code", "toc"],
             extension_configs={"toc": {"permalink": False}},
         )

@@ -4,11 +4,13 @@ Metrics exporters for various monitoring systems.
 
 import json
 import logging
+import re
 import threading
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import quote
 
 from invarlock.core.exceptions import ObservabilityError
 
@@ -22,6 +24,38 @@ _EXPORTER_ERRORS = (
     TypeError,
     ValueError,
 )
+_PROMETHEUS_NAME_RE = re.compile(r"[^a-zA-Z0-9_:]")
+_PROMETHEUS_NAME_START_RE = re.compile(r"^[a-zA-Z_:]")
+_PROMETHEUS_TYPES = {"counter", "gauge", "histogram", "summary", "untyped"}
+
+
+def _prometheus_name(value: object, *, fallback: str) -> str:
+    normalized = _PROMETHEUS_NAME_RE.sub("_", str(value).strip())
+    if not normalized:
+        return fallback
+    if not _PROMETHEUS_NAME_START_RE.match(normalized[0]):
+        normalized = f"_{normalized}"
+    return normalized
+
+
+def _prometheus_label_value(value: object) -> str:
+    return str(value).replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
+
+
+def _prometheus_help_text(value: object) -> str:
+    return str(value).replace("\\", "\\\\").replace("\n", "\\n")
+
+
+def _prometheus_metric_type(value: object) -> str:
+    metric_type = str(value).strip().lower()
+    return metric_type if metric_type in _PROMETHEUS_TYPES else "gauge"
+
+
+def _success_rate(successes: int, errors: int) -> float:
+    attempts = max(0, int(successes)) + max(0, int(errors))
+    if attempts == 0:
+        return 0.0
+    return max(0.0, min(1.0, max(0, int(successes)) / attempts))
 
 
 @dataclass
@@ -38,22 +72,29 @@ class ExportedMetric:
     def to_prometheus_format(self) -> str:
         """Convert to Prometheus exposition format."""
         lines = []
+        metric_name = _prometheus_name(self.name, fallback="invarlock_metric")
+        metric_type = _prometheus_metric_type(self.metric_type)
 
         # Add help text
         if self.help_text:
-            lines.append(f"# HELP {self.name} {self.help_text}")
+            lines.append(
+                f"# HELP {metric_name} {_prometheus_help_text(self.help_text)}"
+            )
 
         # Add type
-        lines.append(f"# TYPE {self.name} {self.metric_type}")
+        lines.append(f"# TYPE {metric_name} {metric_type}")
 
         # Format labels
         if self.labels:
-            label_str = ",".join([f'{k}="{v}"' for k, v in self.labels.items()])
-            metric_line = (
-                f"{self.name}{{{label_str}}} {self.value} {int(self.timestamp * 1000)}"
+            label_str = ",".join(
+                [
+                    f'{_prometheus_name(k, fallback="label")}="{_prometheus_label_value(v)}"'
+                    for k, v in self.labels.items()
+                ]
             )
+            metric_line = f"{metric_name}{{{label_str}}} {self.value} {int(self.timestamp * 1000)}"
         else:
-            metric_line = f"{self.name} {self.value} {int(self.timestamp * 1000)}"
+            metric_line = f"{metric_name} {self.value} {int(self.timestamp * 1000)}"
 
         lines.append(metric_line)
         return "\n".join(lines)
@@ -94,8 +135,7 @@ class MetricsExporter(ABC):
             "last_export_time": self.last_export_time,
             "export_count": self.export_count,
             "error_count": self.error_count,
-            "success_rate": (self.export_count - self.error_count)
-            / max(1, self.export_count),
+            "success_rate": _success_rate(self.export_count, self.error_count),
         }
 
 
@@ -143,7 +183,9 @@ class PrometheusExporter(MetricsExporter):
         prometheus_data = "\n".join([m.to_prometheus_format() for m in metrics])
 
         # Push to gateway
-        url = f"{self.gateway_url}/metrics/job/{self.job_name}/instance/{self.instance}"
+        job_name = quote(str(self.job_name), safe="")
+        instance = quote(str(self.instance), safe="")
+        url = f"{self.gateway_url}/metrics/job/{job_name}/instance/{instance}"
 
         response = requests.post(
             url,
@@ -540,7 +582,7 @@ class ExportManager:
             "enabled_exporters": len([e for e in self.exporters.values() if e.enabled]),
             "total_exports": total_exports,
             "total_errors": total_errors,
-            "success_rate": (total_exports - total_errors) / max(1, total_exports),
+            "success_rate": _success_rate(total_exports, total_errors),
             "queue_size": queue_size,
             "background_running": self._running,
             "export_interval": self.export_interval,
