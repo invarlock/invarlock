@@ -17,6 +17,13 @@ from tests.integration.packaging._support_installed_wheel import (
 
 pytestmark = pytest.mark.integration
 
+_HELP_ENV = {
+    "COLUMNS": "160",
+    "INVARLOCK_LIGHT_IMPORT": "1",
+    "NO_COLOR": "1",
+    "TERM": "dumb",
+}
+
 
 @pytest.mark.skipif(os.getenv("SKIP_BUILD_TESTS") == "1", reason="skip build tests")
 def test_wheel_install_exposes_core_cli_contracts_outside_repo_tree(
@@ -36,7 +43,7 @@ def test_wheel_install_exposes_core_cli_contracts_outside_repo_tree(
         installed_wheel_env.cli_exe,
         ["--help"],
         cwd=tmp_path,
-        env={"INVARLOCK_LIGHT_IMPORT": "1"},
+        env=_HELP_ENV,
     )
     assert root_help.returncode == 0, root_help.stdout + root_help.stderr
     assert "evaluate" in root_help.stdout
@@ -47,7 +54,7 @@ def test_wheel_install_exposes_core_cli_contracts_outside_repo_tree(
         installed_wheel_env.cli_exe,
         ["evaluate", "--help"],
         cwd=tmp_path,
-        env={"INVARLOCK_LIGHT_IMPORT": "1"},
+        env=_HELP_ENV,
     )
     assert evaluate_help.returncode == 0, evaluate_help.stdout + evaluate_help.stderr
     assert "--baseline" in evaluate_help.stdout
