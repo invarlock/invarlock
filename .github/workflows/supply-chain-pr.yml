@@ -66,11 +66,15 @@ jobs:
       - name: Generate install-surface SBOM
         run: bash scripts/generate_sbom.sh --scope install-surface --python "${{ steps.install_surface.outputs.python }}" artifacts/supply-chain/sbom.json
 
+      - name: Remove install-surface venv
+        run: rm -rf .artifact-venv
+
       - name: Create HF surface venv
         id: hf_surface
         shell: bash
         run: |
           set -euo pipefail
+          export PIP_NO_CACHE_DIR=1
           rm -rf .hf-venv
           python -m venv .hf-venv
           . .hf-venv/bin/activate
@@ -87,11 +91,15 @@ jobs:
       - name: Run HF surface pip-audit
         run: python scripts/security/run_pip_audit.py --path "${{ steps.hf_surface.outputs.site_packages }}"
 
+      - name: Remove HF surface venv
+        run: rm -rf .hf-venv
+
       - name: Create advanced surface venv
         id: advanced_surface
         shell: bash
         run: |
           set -euo pipefail
+          export PIP_NO_CACHE_DIR=1
           rm -rf .advanced-venv
           python -m venv .advanced-venv
           . .advanced-venv/bin/activate
