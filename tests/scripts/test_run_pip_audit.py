@@ -70,3 +70,17 @@ def test_load_allowlist_rejects_non_github_tracking_url(tmp_path: Path) -> None:
 
     with pytest.raises(SystemExit, match="must link to a GitHub tracking issue"):
         module._load_allowlist(allowlist)
+
+
+def test_load_allowlist_accepts_empty_entries(tmp_path: Path) -> None:
+    module = _load_script_module()
+    allowlist = tmp_path / "allowlist.json"
+    allowlist.write_text(
+        json.dumps({"owner": "security-maintainers", "entries": []}),
+        encoding="utf-8",
+    )
+
+    owner, entries = module._load_allowlist(allowlist)
+
+    assert owner == "security-maintainers"
+    assert entries == []

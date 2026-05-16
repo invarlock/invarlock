@@ -5,12 +5,11 @@ The CI supply-chain jobs run `pip-audit` through
 enforcement. The JSON source of truth is
 `scripts/security/pip_audit_allowlist.json`.
 
-The current exceptions are:
+There are no active exceptions.
 
 | Vulnerability ID      | Package | Expires      | Tracking Issue | Reason |
 | --------------------- | ------- | ------------ | -------------- | ------ |
-| `GHSA-4xh5-x5gv-qwph` | `pip`   | `2026-05-11` | [pip#13607](https://github.com/pypa/pip/issues/13607) | Temporary exception while the installer dependency chain is being refreshed and the upstream pip issue remains under review. |
-| `CVE-2026-1703` | `pip` | `2026-05-11` | [pip#13641](https://github.com/pypa/pip/issues/13641) | Temporary exception for runner-provided pip 25.3 in ephemeral CI virtual environments until the pip 26.0 remediation is available throughout the hosted workflow surface. |
+| _None_ | _None_ | _N/A_ | _N/A_ | _N/A_ |
 
 All other findings must be remediated prior to release. Update this table and
 the JSON allowlist entry whenever the allowlist changes.

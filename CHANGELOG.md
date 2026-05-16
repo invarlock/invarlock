@@ -9,11 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added a CVE audit lane that inventories locked dependency surfaces,
+  cross-checks exact package versions against OSV advisories, and emits
+  JSON/Markdown reports for release review.
+- Added a `make dist-check` packaging gate that builds wheel/sdist artifacts
+  and runs `twine check` before release.
+
 ### Changed
 
 ### Removed
 
 ### Fixed
+
+- Remediated `pip` and `urllib3` CVEs across the uv and workflow lock
+  surfaces, cleared the stale `pip-audit` allowlist, and aligned the
+  supply-chain workflow contract tests with the current disk-cleanup steps.
 
 ## [0.8.0] - 2026-04-23
 

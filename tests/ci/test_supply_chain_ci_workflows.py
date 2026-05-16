@@ -173,8 +173,10 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
         "Create install-surface venv",
         "Run pip-audit",
         "Generate install-surface SBOM",
+        "Remove install-surface venv",
         "Create HF surface venv",
         "Run HF surface pip-audit",
+        "Remove HF surface venv",
         "Create advanced surface venv",
         "Run advanced surface pip-audit",
         "Run gitleaks history scan",
@@ -214,6 +216,9 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
     )
     assert "artifacts/supply-chain/sbom.json" in sbom_step["run"]
 
+    install_cleanup_step = _find_step_by_name(steps, "Remove install-surface venv")
+    assert "rm -rf .artifact-venv" in install_cleanup_step["run"]
+
     audit_step = _find_step_by_name(steps, "Run pip-audit")
     assert "python scripts/security/run_pip_audit.py --path" in audit_step["run"]
     assert "${{ steps.install_surface.outputs.site_packages }}" in audit_step["run"]
@@ -229,6 +234,9 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
     hf_audit_step = _find_step_by_name(steps, "Run HF surface pip-audit")
     assert "python scripts/security/run_pip_audit.py --path" in hf_audit_step["run"]
     assert "${{ steps.hf_surface.outputs.site_packages }}" in hf_audit_step["run"]
+
+    hf_cleanup_step = _find_step_by_name(steps, "Remove HF surface venv")
+    assert "rm -rf .hf-venv" in hf_cleanup_step["run"]
 
     advanced_venv_step = _find_step_by_name(steps, "Create advanced surface venv")
     assert advanced_venv_step["id"] == "advanced_surface"
@@ -283,20 +291,19 @@ def test_pip_audit_allowlist_is_owned_and_time_boxed() -> None:
     )
 
     assert payload["owner"] == "security-maintainers"
-    assert payload["entries"]
-
-    expected_tracking = {
-        "GHSA-4xh5-x5gv-qwph": "https://github.com/pypa/pip/issues/13607",
-        "CVE-2026-1703": "https://github.com/pypa/pip/issues/13641",
-    }
-    assert {entry["advisory"] for entry in payload["entries"]} == set(expected_tracking)
+    assert isinstance(payload["entries"], list)
+    if not payload["entries"]:
+        assert "There are no active exceptions." in allowlist_doc
 
     for entry in payload["entries"]:
         advisory = entry["advisory"]
         assert entry["owner"] == "security-maintainers"
         expires = date.fromisoformat(entry["expires"])
         assert 0 <= (expires - date.today()).days <= 30
-        assert entry["tracking_issue"] == expected_tracking[advisory]
+        assert re.fullmatch(
+            r"https://github\.com/[^/]+/[^/]+/issues/[1-9]\d*",
+            entry["tracking_issue"],
+        )
         assert "reason" in entry
         assert f"`{advisory}`" in allowlist_doc
         assert entry["expires"] in allowlist_doc
