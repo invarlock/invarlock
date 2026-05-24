@@ -64,7 +64,9 @@ verified runtime-provenance result, not as a successful command exit alone.
 | Report field | Required strict value |
 | --- | --- |
 | `mode` | `strict` |
-| `verdict` | `pass` |
+| `verdict` | `pending_verifier` in generated reports; verifier success is required for acceptance |
+| `report_local_verdict` | `pass` |
+| `verified_assurance_verdict` | `pending` in generated reports |
 | `claim_set` | `invarlock-weight-edit-regression-v1` |
 | `canonical_guard_chain_enforced` | `true` |
 | `fallback_fields_used` | `false` |
@@ -81,7 +83,9 @@ The verifier JSON result must then include
 {
   "assurance": {
     "mode": "strict",
-    "verdict": "pass",
+    "verdict": "pending_verifier",
+    "report_local_verdict": "pass",
+    "verified_assurance_verdict": "pending",
     "claim_set": "invarlock-weight-edit-regression-v1",
     "canonical_guard_chain_enforced": true,
     "fallback_fields_used": false,

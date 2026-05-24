@@ -17,7 +17,11 @@ from invarlock.core.assurance_contract import (
 
 def _strict_report() -> dict:
     return {
-        "context": {"profile": "ci", "assurance": {"mode": "strict"}},
+        "context": {
+            "profile": "ci",
+            "assurance": {"mode": "strict"},
+            "runtime": {"execution_mode": "container"},
+        },
         "auto": {"tier": "balanced"},
         "guards": [{"name": name} for name in CANONICAL_GUARD_CHAIN],
         "spectral": {"supported": True},
@@ -39,7 +43,9 @@ def test_build_assurance_section_passes_for_canonical_strict_report() -> None:
     assert section["runtime_provenance_verified"] is False
     assert section["runtime_provenance_declared"] == "container"
     assert section["runtime_provenance_verification_status"] == "pending"
-    assert section["verdict"] == "pass"
+    assert section["verdict"] == "pending_verifier"
+    assert section["report_local_verdict"] == "pass"
+    assert section["verified_assurance_verdict"] == "pending"
     assert section["blocking_reasons"] == []
 
 
@@ -109,6 +115,39 @@ def test_strict_report_policy_accepts_pending_report_when_verifier_confirms() ->
     assert errors == []
 
 
+def test_build_assurance_section_uses_unknown_runtime_when_not_declared() -> None:
+    report = _strict_report()
+    report["context"].pop("runtime")
+
+    section = build_assurance_section(report)
+
+    assert section["runtime_provenance_declared"] == "unknown"
+    assert section["verdict"] == "fail"
+    assert (
+        "strict assurance requires verified container provenance."
+        in section["blocking_reasons"]
+    )
+
+
+def test_build_assurance_section_derives_runtime_from_context() -> None:
+    report = _strict_report()
+    report["context"]["runtime"] = {"execution_mode": " HOST "}
+
+    section = build_assurance_section(report, mode="off")
+
+    assert section["runtime_provenance_declared"] == "host"
+
+
+def test_build_assurance_section_derives_runtime_from_provenance_runtime() -> None:
+    report = _strict_report()
+    report.pop("context")
+    report["provenance"] = {"runtime": {"execution_mode": "container"}}
+
+    section = build_assurance_section(report, mode="strict")
+
+    assert section["runtime_provenance_declared"] == "container"
+
+
 def test_strict_report_policy_rejects_pending_report_when_verifier_fails() -> None:
     report = _strict_report()
     report["assurance"] = build_assurance_section(report)
@@ -134,6 +173,20 @@ def test_strict_report_policy_rejects_missing_guard_evidence() -> None:
     )
 
     assert "strict assurance missing rmt guard evidence." in errors
+
+
+def test_strict_report_policy_rejects_failed_report_local_pending_verdict() -> None:
+    report = _strict_report()
+    report["assurance"] = build_assurance_section(report)
+    report["assurance"]["report_local_verdict"] = "fail"
+
+    errors = strict_report_policy_errors(
+        report,
+        require_strict=True,
+        runtime_provenance_verified=True,
+    )
+
+    assert "strict assurance report-local verdict must be pass." in errors
 
 
 def test_strict_report_policy_rejects_structured_report_build_events() -> None:
@@ -238,19 +291,31 @@ def test_observed_guard_chain_resolution_prefers_valid_sources() -> None:
 
 def test_build_assurance_section_reads_tier_fallbacks() -> None:
     base = {
-        "context": {"profile": "release", "auto": {"tier": "conservative"}},
+        "context": {
+            "profile": "release",
+            "auto": {"tier": "conservative"},
+            "runtime": {"execution_mode": "container"},
+        },
         "plugins": {"guards": list(CANONICAL_GUARD_CHAIN)},
     }
     assert build_assurance_section(base, mode="strict")["tier"] == "conservative"
 
     report = {
-        "context": {"profile": "release", "tier": "balanced"},
+        "context": {
+            "profile": "release",
+            "tier": "balanced",
+            "runtime": {"execution_mode": "container"},
+        },
         "plugins": {"guards": list(CANONICAL_GUARD_CHAIN)},
     }
     assert build_assurance_section(report, mode="strict")["tier"] == "balanced"
 
     report = {
-        "context": {"profile": "release", "tier": 7},
+        "context": {
+            "profile": "release",
+            "tier": 7,
+            "runtime": {"execution_mode": "container"},
+        },
         "plugins": {"guards": list(CANONICAL_GUARD_CHAIN)},
     }
     section = build_assurance_section(report, mode="strict")
@@ -260,7 +325,10 @@ def test_build_assurance_section_reads_tier_fallbacks() -> None:
     )
 
     report = {
-        "context": {"profile": "release"},
+        "context": {
+            "profile": "release",
+            "runtime": {"execution_mode": "container"},
+        },
         "auto": {"tier": "balanced"},
         "plugins": {"guards": list(CANONICAL_GUARD_CHAIN)},
         "spectral": {
@@ -271,7 +339,7 @@ def test_build_assurance_section_reads_tier_fallbacks() -> None:
     }
     section = build_assurance_section(report, mode="strict")
     assert section["tier"] == "balanced"
-    assert section["verdict"] == "pass"
+    assert section["verdict"] == "pending_verifier"
 
 
 def test_strict_report_policy_collects_report_level_failures() -> None:
@@ -299,7 +367,7 @@ def test_strict_report_policy_collects_report_level_failures() -> None:
 
     assert "strict assurance report has unknown claim_set." in errors
     assert "strict assurance report mode must be strict." in errors
-    assert "strict assurance verdict must be pass." in errors
+    assert "strict assurance verdict must be pass or pending_verifier." in errors
     assert "strict assurance requires canonical_guard_chain_enforced=true." in errors
     assert "explicit blocker" in errors
     assert "variance is degraded/monitor-only under strict assurance." in errors

@@ -579,7 +579,10 @@ def _build_strict_report() -> dict[str, object]:
     report["plugins"] = {"guards": guard_chain}
     report["guards"] = [{"name": name} for name in guard_chain]
     report["meta"] = {"profile": "ci"}
-    report["context"] = {"profile": "ci"}
+    report["context"] = {
+        "profile": "ci",
+        "runtime": {"execution_mode": "container"},
+    }
     report["auto"] = {"tier": "balanced"}
     report["provenance"] = {"provider_digest": {"ids_sha256": "subject-ids"}}
     report["report_build"] = {
@@ -610,7 +613,9 @@ def _build_strict_report() -> dict[str, object]:
         "runtime_provenance_verified": False,
         "runtime_provenance_declared": "container",
         "runtime_provenance_verification_status": "pending",
-        "verdict": "pass",
+        "verdict": "pending_verifier",
+        "report_local_verdict": "pass",
+        "verified_assurance_verdict": "pending",
         "blocking_reasons": [],
     }
     return report

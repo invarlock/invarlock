@@ -80,7 +80,12 @@ def test_finalize_evaluation_report_handles_non_dict_tiny_relax_sections(
         "provenance": [],
         "primary_metric": [],
         "meta": [],
-        "context": {"profile": "ci", "assurance": {"mode": "strict"}},
+        "context": {
+            "profile": "ci",
+            "assurance": {"mode": "strict"},
+            "tier": "balanced",
+            "runtime": {"execution_mode": "container"},
+        },
         "guards": [
             {"name": "invariants"},
             {"name": "spectral"},
@@ -100,6 +105,7 @@ def test_finalize_evaluation_report_handles_non_dict_tiny_relax_sections(
     assert evaluation_report["assurance"]["runtime_provenance_verification_status"] == (
         "pending"
     )
+    assert evaluation_report["assurance"]["verdict"] == "pending_verifier"
 
 
 def test_finalize_evaluation_report_handles_existing_tiny_relax_flag(
@@ -110,9 +116,11 @@ def test_finalize_evaluation_report_handles_existing_tiny_relax_flag(
         "provenance": {"flags": ["tiny_relax"]},
         "primary_metric": {},
         "meta": {},
+        "context": {"runtime": {"execution_mode": "host"}},
     }
 
     diagnostics = _finalize_report(evaluation_report, monkeypatch)
 
     assert diagnostics == []
     assert evaluation_report["provenance"]["flags"] == ["tiny_relax"]
+    assert evaluation_report["assurance"]["runtime_provenance_declared"] == "host"

@@ -3,7 +3,10 @@ from __future__ import annotations
 import copy
 from typing import Any
 
-from invarlock.core.assurance_contract import build_assurance_section
+from invarlock.core.assurance_contract import (
+    build_assurance_section,
+    resolve_report_runtime_provenance_declared,
+)
 
 from . import policy_utils as report_policy_utils_mod
 from . import report_build_evidence as report_build_evidence_mod
@@ -209,7 +212,9 @@ def _finalize_evaluation_report(
             evaluation_report,
             fallback_fields_used=fallback_fields_used,
             runtime_provenance_verified=None,
-            runtime_provenance_declared="container",
+            runtime_provenance_declared=resolve_report_runtime_provenance_declared(
+                evaluation_report
+            ),
             runtime_provenance_verification_status="pending",
         )
     except non_fatal_exceptions:
