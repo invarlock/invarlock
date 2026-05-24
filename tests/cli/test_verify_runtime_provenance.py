@@ -68,7 +68,10 @@ def _strict_provenance_gate_cert() -> dict:
     payload = _provenance_gate_cert()
     payload["plugins"] = {"guards": list(CANONICAL_GUARD_CHAIN)}
     payload["guards"] = [{"name": name} for name in CANONICAL_GUARD_CHAIN]
-    payload["context"] = {"profile": "ci"}
+    payload["context"] = {
+        "profile": "ci",
+        "runtime": {"execution_mode": "container"},
+    }
     payload["auto"] = {"tier": "balanced"}
     payload["meta"] = {"profile": "ci"}
     payload["spectral"] = {"supported": True, "status": "pass"}
@@ -88,7 +91,9 @@ def _strict_provenance_gate_cert() -> dict:
         "runtime_provenance_verified": False,
         "runtime_provenance_declared": "container",
         "runtime_provenance_verification_status": "pending",
-        "verdict": "pass",
+        "verdict": "pending_verifier",
+        "report_local_verdict": "pass",
+        "verified_assurance_verdict": "pending",
         "blocking_reasons": [],
     }
     return payload

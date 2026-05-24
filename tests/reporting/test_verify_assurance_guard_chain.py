@@ -24,7 +24,10 @@ def _report(guard_chain: list[str]) -> dict:
         "variance": {"supported": True, "status": "pass"},
         "invariants": {"supported": True, "status": "pass"},
         "meta": {"profile": "ci"},
-        "context": {"profile": "ci"},
+        "context": {
+            "profile": "ci",
+            "runtime": {"execution_mode": "container"},
+        },
         "auto": {"tier": "balanced"},
         "provenance": {"provider_digest": {"ids_sha256": "subject-ids"}},
         "dataset": {
@@ -74,7 +77,9 @@ def _report(guard_chain: list[str]) -> dict:
             "runtime_provenance_verified": False,
             "runtime_provenance_declared": "container",
             "runtime_provenance_verification_status": "pending",
-            "verdict": "pass",
+            "verdict": "pending_verifier",
+            "report_local_verdict": "pass",
+            "verified_assurance_verdict": "pending",
             "blocking_reasons": [],
         },
     }
@@ -283,6 +288,40 @@ def test_verify_assurance_strict_rejects_missing_top_level_guard_evidence(
     assert result.outcome == VerifyOutcome.POLICY_FAIL
     diagnostics = "\n".join(item.message for item in result.diagnostics)
     assert "missing rmt guard evidence" in diagnostics
+
+
+def test_verify_assurance_strict_rejects_empty_spectral_guard_evidence(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _verified_runtime(monkeypatch)
+    payload = _report(list(CANONICAL_GUARD_CHAIN))
+    payload["spectral"] = {}
+    report_path = tmp_path / "evaluation.report.json"
+    _write_report(report_path, payload)
+
+    result = _run_strict(report_path)
+
+    assert result.outcome == VerifyOutcome.POLICY_FAIL
+    diagnostics = "\n".join(item.message for item in result.diagnostics)
+    assert "missing spectral guard evidence" in diagnostics
+
+
+def test_verify_assurance_strict_rejects_empty_invariants_guard_evidence(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _verified_runtime(monkeypatch)
+    payload = _report(list(CANONICAL_GUARD_CHAIN))
+    payload["invariants"] = {}
+    report_path = tmp_path / "evaluation.report.json"
+    _write_report(report_path, payload)
+
+    result = _run_strict(report_path)
+
+    assert result.outcome == VerifyOutcome.POLICY_FAIL
+    diagnostics = "\n".join(item.message for item in result.diagnostics)
+    assert "missing invariants guard evidence" in diagnostics
 
 
 def test_verify_assurance_strict_rejects_missing_second_invariants_pass(

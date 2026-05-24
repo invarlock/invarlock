@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from invarlock.reporting.report_build_evidence import (
@@ -56,3 +58,26 @@ def test_report_build_has_evidence_events_detects_events() -> None:
     )
 
     assert report_build_has_evidence_events(report) is True
+
+
+def test_primary_metric_repair_paths_record_structured_evidence() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    primary_metric_utils = (
+        repo_root / "src" / "invarlock" / "reporting" / "primary_metric_utils.py"
+    ).read_text(encoding="utf-8")
+    report_enrichment = (
+        repo_root / "src" / "invarlock" / "reporting" / "report_enrichment.py"
+    ).read_text(encoding="utf-8")
+
+    for required in (
+        'field="primary_metric.ratio_vs_baseline"',
+        'field="primary_metric.display_ci"',
+        'field="primary_metric"',
+        'category="fallback_fields"',
+        'category="synthesized_fields"',
+        'category="repaired_fields"',
+    ):
+        assert required in primary_metric_utils
+
+    assert "record_report_build_event(" in report_enrichment
+    assert 'field="primary_metric.display_ci"' in report_enrichment

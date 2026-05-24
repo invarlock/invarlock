@@ -30,6 +30,8 @@ class AssuranceVerdict:
     profile: str
     tier: str
     verdict: str
+    report_local_verdict: str
+    verified_assurance_verdict: str
     blocking_reasons: tuple[str, ...]
     canonical_guard_chain_enforced: bool
     fallback_fields_used: bool
@@ -53,6 +55,8 @@ class AssuranceVerdict:
                 self.runtime_provenance_verification_status
             ),
             "verdict": self.verdict,
+            "report_local_verdict": self.report_local_verdict,
+            "verified_assurance_verdict": self.verified_assurance_verdict,
             "blocking_reasons": list(self.blocking_reasons),
         }
 
@@ -193,13 +197,39 @@ def _report_build_has_evidence_events(report: dict[str, Any]) -> bool:
     return False
 
 
+def resolve_report_runtime_provenance_declared(
+    report: dict[str, Any], *, default: str = "unknown"
+) -> str:
+    context = report.get("context")
+    candidates: list[Any] = []
+    if isinstance(context, dict):
+        runtime = context.get("runtime")
+        if isinstance(runtime, dict):
+            candidates.append(runtime.get("execution_mode"))
+            candidates.append(runtime.get("runtime_provenance_declared"))
+        candidates.append(context.get("execution_mode"))
+    provenance = report.get("provenance")
+    if isinstance(provenance, dict):
+        runtime = provenance.get("runtime")
+        if isinstance(runtime, dict):
+            candidates.append(runtime.get("execution_mode"))
+        candidates.append(provenance.get("execution_mode"))
+    meta = report.get("meta")
+    if isinstance(meta, dict):
+        candidates.append(meta.get("execution_mode"))
+    for candidate in candidates:
+        if isinstance(candidate, str) and candidate.strip():
+            return candidate.strip().lower()
+    return default
+
+
 def build_assurance_section(
     report: dict[str, Any],
     *,
     mode: str | None = None,
     fallback_fields_used: bool = False,
     runtime_provenance_verified: bool | None = None,
-    runtime_provenance_declared: str = "container",
+    runtime_provenance_declared: str | None = None,
     runtime_provenance_verification_status: str | None = None,
 ) -> dict[str, Any]:
     assurance_mode = normalize_assurance_mode(
@@ -211,6 +241,11 @@ def build_assurance_section(
     )
     profile = _report_profile(report)
     tier = _report_tier(report)
+    declared_provenance = (
+        str(runtime_provenance_declared).strip().lower()
+        if runtime_provenance_declared is not None
+        else resolve_report_runtime_provenance_declared(report)
+    )
     provenance_status = runtime_provenance_verification_status or (
         "verified" if runtime_provenance_verified is True else "pending"
     )
@@ -223,7 +258,7 @@ def build_assurance_section(
                 profile=profile,
                 tier=tier,
                 guards_order=observed,
-                execution_mode=runtime_provenance_declared,
+                execution_mode=declared_provenance,
                 allow_unverified_provenance=False,
             )
         )
@@ -239,16 +274,28 @@ def build_assurance_section(
                     reasons.append(
                         f"{guard_name} unsupported for strict assurance: {reason}."
                     )
+    report_local_verdict = "pass" if not reasons else "fail"
+    if reasons:
+        verdict = "fail"
+        verified_assurance_verdict = "fail"
+    elif assurance_mode == "strict" and provenance_status == "pending":
+        verdict = "pending_verifier"
+        verified_assurance_verdict = "pending"
+    else:
+        verdict = "pass"
+        verified_assurance_verdict = "pass"
     return AssuranceVerdict(
         mode=assurance_mode,
         profile=profile,
         tier=tier,
-        verdict="pass" if not reasons else "fail",
+        verdict=verdict,
+        report_local_verdict=report_local_verdict,
+        verified_assurance_verdict=verified_assurance_verdict,
         blocking_reasons=tuple(reasons),
         canonical_guard_chain_enforced=is_canonical_guard_chain(observed),
         fallback_fields_used=bool(fallback_fields_used),
         runtime_provenance_verified=provenance_verified,
-        runtime_provenance_declared=str(runtime_provenance_declared or ""),
+        runtime_provenance_declared=declared_provenance,
         runtime_provenance_verification_status=str(provenance_status or ""),
     ).as_report_section(observed_guard_chain=observed)
 
@@ -271,8 +318,15 @@ def strict_report_policy_errors(
             errors.append("strict assurance report has unknown claim_set.")
         if assurance.get("mode") != "strict":
             errors.append("strict assurance report mode must be strict.")
-        if assurance.get("verdict") != "pass":
-            errors.append("strict assurance verdict must be pass.")
+        verdict = assurance.get("verdict")
+        if verdict not in {"pass", "pending_verifier"}:
+            errors.append("strict assurance verdict must be pass or pending_verifier.")
+        if (
+            verdict == "pending_verifier"
+            and runtime_provenance_verified is True
+            and assurance.get("report_local_verdict") not in {None, "pass"}
+        ):
+            errors.append("strict assurance report-local verdict must be pass.")
         if assurance.get("canonical_guard_chain_enforced") is not True:
             errors.append(
                 "strict assurance requires canonical_guard_chain_enforced=true."
@@ -298,7 +352,7 @@ def strict_report_policy_errors(
         errors.append("strict assurance requires verified runtime provenance.")
     for guard_name in ("spectral", "rmt", "variance", "invariants"):
         block = report.get(guard_name)
-        if not isinstance(block, dict):
+        if not isinstance(block, dict) or not block:
             errors.append(f"strict assurance missing {guard_name} guard evidence.")
             continue
         if block.get("supported") is False and block.get("assurance_blocking") is True:
@@ -340,6 +394,7 @@ __all__ = [
     "normalize_verify_assurance_mode",
     "observed_guard_chain_from_report",
     "resolve_report_assurance_mode",
+    "resolve_report_runtime_provenance_declared",
     "strict_evaluate_policy_errors",
     "strict_report_policy_errors",
 ]

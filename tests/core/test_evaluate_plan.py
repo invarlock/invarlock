@@ -127,6 +127,7 @@ def test_build_baseline_run_config_injects_evaluate_context() -> None:
         "profile": "dev",
         "tier": "balanced",
         "assurance": {"mode": "off"},
+        "runtime": {"execution_mode": "unknown"},
     }
     assert cfg["assurance"] == {"mode": "off"}
 
@@ -150,6 +151,7 @@ def test_build_subject_edit_run_config_normalizes_placeholders_and_guards() -> N
         "profile": "ci",
         "tier": "balanced",
         "assurance": {"mode": "off"},
+        "runtime": {"execution_mode": "unknown"},
     }
     assert cfg["guards"] == {"order": ["invariants", "variance"]}
 

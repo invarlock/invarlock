@@ -204,6 +204,7 @@ def build_baseline_run_config(
     tier: str,
     guards_order: list[str],
     assurance_mode: str = "off",
+    execution_mode: str = "unknown",
 ) -> dict[str, Any]:
     return deep_merge_dicts(
         preset_data,
@@ -220,6 +221,11 @@ def build_baseline_run_config(
                 "profile": profile,
                 "tier": tier,
                 "assurance": {"mode": assurance_mode},
+                "runtime": {
+                    "execution_mode": stable_text(execution_mode, "unknown")
+                    .strip()
+                    .lower()
+                },
             },
             "assurance": {"mode": assurance_mode},
         },
@@ -236,6 +242,7 @@ def build_subject_noop_run_config(
     tier: str,
     guards_order: list[str],
     assurance_mode: str = "off",
+    execution_mode: str = "unknown",
 ) -> dict[str, Any]:
     return build_baseline_run_config(
         preset_data,
@@ -246,6 +253,7 @@ def build_subject_noop_run_config(
         tier=tier,
         guards_order=guards_order,
         assurance_mode=assurance_mode,
+        execution_mode=execution_mode,
     )
 
 
@@ -260,6 +268,7 @@ def build_subject_edit_run_config(
     tier: str,
     guards_order: list[str],
     assurance_mode: str = "off",
+    execution_mode: str = "unknown",
 ) -> dict[str, Any]:
     cfg_loaded = deepcopy(loaded_edit_config)
     model_block = dict(cfg_loaded.get("model") or {})
@@ -282,6 +291,11 @@ def build_subject_edit_run_config(
                 "profile": profile,
                 "tier": tier,
                 "assurance": {"mode": assurance_mode},
+                "runtime": {
+                    "execution_mode": stable_text(execution_mode, "unknown")
+                    .strip()
+                    .lower()
+                },
             },
             "assurance": {"mode": assurance_mode},
         },
@@ -359,6 +373,7 @@ def build_evaluate_command_plan(
         tier=tier_name,
         guards_order=guards_order,
         assurance_mode=normalized_assurance_mode,
+        execution_mode=execution_mode,
     )
     return EvaluateCommandPlan(
         profile_name=profile_name,

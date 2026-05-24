@@ -61,10 +61,14 @@ contents.
 ## Report Verdict
 
 - [ ] Top-level `assurance.mode` is `strict`.
-- [ ] `assurance.verdict` is `pass`.
+- [ ] Generated report has `assurance.verdict` set to `pending_verifier`.
+- [ ] Generated report has `assurance.report_local_verdict` set to `pass`.
+- [ ] Generated report has `assurance.verified_assurance_verdict` set to `pending`.
 - [ ] `assurance.fallback_fields_used` is `false`.
-- [ ] `assurance.runtime_provenance_verified` is `true`.
+- [ ] `assurance.runtime_provenance_verified` is `false` before verifier confirmation.
 - [ ] `assurance.blocking_reasons` is empty.
+- [ ] `invarlock verify --assurance strict` exits successfully and reports
+  `verification.runtime_provenance.status = verified`.
 
 ## Related Documentation
 

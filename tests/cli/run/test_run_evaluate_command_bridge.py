@@ -5,8 +5,11 @@ from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
+import yaml
 
 from invarlock.cli.commands.evaluate import evaluate_command
+from invarlock.core.assurance_contract import CANONICAL_GUARD_CHAIN
+from invarlock.reporting.verify_contract import VerifyOutcome, run_verify_reports
 
 
 def _stub_run(out_dir: Path) -> Path:
@@ -18,6 +21,111 @@ def _stub_run(out_dir: Path) -> Path:
         "metrics": {"primary_metric": {"preview": 1.0, "final": 1.0}},
         "data": {"preview_n": 1, "final_n": 1},
     }
+    report_path = ts_dir / "report.json"
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+    return report_path
+
+
+def _strict_stub_report(*, model_id: str, edit_name: str, context: dict) -> dict:
+    windows = {
+        "preview": {
+            "window_ids": [1, 2],
+            "input_ids": [[1, 2, 3], [4, 5, 6]],
+            "logloss": [0.6931471805599453, 0.6931471805599453],
+            "token_counts": [10, 10],
+        },
+        "final": {
+            "window_ids": [3, 4],
+            "input_ids": [[7, 8, 9], [10, 11, 12]],
+            "logloss": [0.6931471805599453, 0.6931471805599453],
+            "token_counts": [10, 10],
+        },
+    }
+    invariant_metrics = {
+        "checks_performed": 1,
+        "violations_found": 0,
+        "fatal_violations": 0,
+        "warning_violations": 0,
+    }
+    measurement_contract = {"kind": "activation_edge_risk", "version": "test-v1"}
+    return {
+        "meta": {
+            "model_id": model_id,
+            "adapter": "hf_causal",
+            "device": "cpu",
+            "seed": 7,
+            "seeds": {"python": 7, "numpy": 7, "torch": 7},
+            "auto": {"tier": "balanced"},
+            "tokenizer_hash": "strict-tokenizer",
+        },
+        "context": dict(context),
+        "edit": {"name": edit_name, "deltas": {"params_changed": 0}},
+        "data": {
+            "dataset": "strict-local-jsonl",
+            "split": "validation",
+            "seq_len": 8,
+            "stride": 8,
+            "preview_n": 2,
+            "final_n": 2,
+            "tokenizer_hash": "strict-tokenizer",
+        },
+        "metrics": {
+            "primary_metric": {
+                "kind": "ppl_causal",
+                "preview": 2.0,
+                "final": 2.0,
+                "ratio_vs_baseline": 1.0,
+                "ci": [0.0, 0.0],
+                "display_ci": [1.0, 1.0],
+            },
+            "bootstrap": {"replicates": 200, "alpha": 0.05, "method": "percentile"},
+        },
+        "evaluation_windows": windows,
+        "provenance": {"provider_digest": {"ids_sha256": "strict-provider-ids"}},
+        "artifacts": {},
+        "guards": [
+            {"name": "invariants", "metrics": invariant_metrics},
+            {
+                "name": "spectral",
+                "metrics": {
+                    "stable": True,
+                    "caps_applied": 0,
+                    "modules_checked": 1,
+                    "families": {"linear": {"violations": 0}},
+                    "measurement_contract": {"kind": "spectral", "version": "test-v1"},
+                },
+            },
+            {
+                "name": "rmt",
+                "metrics": {
+                    "stable": True,
+                    "edge_risk_by_family_base": {"linear": 1.0},
+                    "edge_risk_by_family": {"linear": 1.0},
+                    "measurement_contract": measurement_contract,
+                },
+            },
+            {"name": "variance", "metrics": {"ve_enabled": False, "gain": 0.0}},
+            {"name": "invariants", "metrics": invariant_metrics},
+        ],
+    }
+
+
+def _write_strict_stub_run(out_dir: Path, config_path: str, *, call_index: int) -> Path:
+    cfg = yaml.safe_load(Path(config_path).read_text(encoding="utf-8"))
+    context = cfg.get("context") if isinstance(cfg, dict) else {}
+    if not isinstance(context, dict):
+        context = {}
+    ts_dir = out_dir / f"20250101_00000{call_index}"
+    ts_dir.mkdir(parents=True, exist_ok=True)
+    report = _strict_stub_report(
+        model_id=str(cfg.get("model", {}).get("id", "stub"))
+        if isinstance(cfg, dict)
+        else "stub",
+        edit_name=str(cfg.get("edit", {}).get("name", "noop"))
+        if isinstance(cfg, dict)
+        else "noop",
+        context=context,
+    )
     report_path = ts_dir / "report.json"
     report_path.write_text(json.dumps(report), encoding="utf-8")
     return report_path
@@ -66,6 +174,91 @@ def test_evaluate_command_smoke_for_bridge(monkeypatch, tmp_path) -> None:
 
     assert calls["runs"] == 2
     assert calls["reports"] == 1
+
+
+def test_evaluate_command_strict_path_generates_verifiable_pending_report(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    src = tmp_path / "src_model"
+    edt = tmp_path / "edt_model"
+    src.mkdir()
+    edt.mkdir()
+    (src / "config.json").write_text(
+        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
+        encoding="utf-8",
+    )
+    (edt / "config.json").write_text(
+        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
+        encoding="utf-8",
+    )
+
+    import invarlock.cli.commands.run as run_mod
+    import invarlock.cli.evaluate_output as evaluate_output_mod
+    from invarlock.cli.commands import evaluate as eval_mod
+
+    calls = {"runs": 0}
+
+    def fake_run(**kwargs):  # noqa: ANN001
+        calls["runs"] += 1
+        return str(
+            _write_strict_stub_run(
+                Path(kwargs["out"]),
+                str(kwargs["config"]),
+                call_index=calls["runs"],
+            )
+        )
+
+    monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
+    monkeypatch.setattr(eval_mod, "maybe_delegate_model_command", lambda: None)
+    monkeypatch.setattr(
+        evaluate_output_mod,
+        "resolve_runtime_image",
+        lambda: "invarlock-runtime:test",
+    )
+    monkeypatch.setattr(
+        evaluate_output_mod,
+        "resolve_runtime_image_digest",
+        lambda: "sha256:" + "1" * 64,
+    )
+
+    report_dir = tmp_path / "reports"
+    evaluate_command(
+        baseline=str(src),
+        subject=str(edt),
+        adapter="auto",
+        profile="ci",
+        tier="balanced",
+        out=str(tmp_path / "runs"),
+        report_out=str(report_dir),
+        timing=False,
+        progress=False,
+    )
+
+    report_path = report_dir / "evaluation.report.json"
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+
+    assert calls["runs"] == 2
+    assert payload["assurance"]["mode"] == "strict"
+    assert payload["assurance"]["verdict"] == "pending_verifier"
+    assert payload["assurance"]["report_local_verdict"] == "pass"
+    assert payload["assurance"]["verified_assurance_verdict"] == "pending"
+    assert payload["assurance"]["guard_chain_observed"] == list(CANONICAL_GUARD_CHAIN)
+    assert payload["assurance"]["runtime_provenance_verification_status"] == "pending"
+    assert payload["assurance"]["runtime_provenance_declared"] == "container"
+    assert payload["report_build"] == {
+        "synthesized_fields": [],
+        "repaired_fields": [],
+        "fallback_fields": [],
+    }
+
+    result = run_verify_reports(
+        [report_path],
+        profile="ci",
+        assurance_mode="strict",
+    )
+
+    assert result.outcome == VerifyOutcome.OK
 
 
 def test_evaluate_command_reuses_baseline_report_for_bridge(monkeypatch, tmp_path):

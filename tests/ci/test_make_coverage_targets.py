@@ -319,6 +319,8 @@ def test_makefile_marks_release_helper_targets_phony() -> None:
         "container-default-smoke-podman",
         "container-front-door-smoke",
         "container-front-door-smoke-podman",
+        "release-evidence-check",
+        "guard-validation-smoke",
         "ci-matrix",
         "eval-loop",
         "ci-local-precommit",

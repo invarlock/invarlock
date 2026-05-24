@@ -61,6 +61,7 @@ nav:
       - Policy Provenance & Digest: assurance/11-policy-provenance.md
       - Device Drift Bands: assurance/12-device-drift-bands.md
       - GPU/MPS-First Guards: assurance/13-gpu-mps-first-guards.md
+      - Guard Validation Smoke: assurance/14-guard-validation-smoke.md
   - Security:
       - Best Practices: security/best-practices.md
       - Release Verification: security/release-verification.md
