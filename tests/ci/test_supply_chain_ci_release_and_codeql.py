@@ -305,7 +305,7 @@ def test_codeql_workflow_uses_repo_config():
     analyze_step = _find_step_by_uses_prefix(
         analyze["steps"], "github/codeql-action/analyze@"
     )
-    expected_pin = "9e0d7b8d1a6c6b02b598c7194d07d8eb43a17368"
+    expected_pin = "7211b7c8077ea37d8641b6271f6a365a22a5fbfa"
 
     assert init_step["uses"] == f"github/codeql-action/init@{expected_pin}"
     assert autobuild_step["uses"] == f"github/codeql-action/autobuild@{expected_pin}"
