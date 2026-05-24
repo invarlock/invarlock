@@ -43,9 +43,29 @@ Release reviewers should treat the smoke as a floor. Empirical artifacts for
 real model families still belong in the release evidence bundle when a release
 claims new or expanded guard calibration.
 
+## Non-Synthetic Evidence Paths
+
+The repo also ships real-run evidence machinery that is separate from this
+synthetic smoke:
+
+- `make model-evidence-sweep` runs maintained shipped-model lanes through
+  `scripts/model_evidence_sweep.py`.
+- `scripts/run_model_evidence_remote.py` launches the same sweep on remote GPU
+  hosts.
+- `invarlock advanced calibrate null-sweep` and
+  `invarlock advanced calibrate ve-sweep` emit empirical calibration artifacts.
+- `scripts/evidence_packs/run_pack.sh` and `run_suite.sh` package maintainer
+  evidence from real model/checkpoint runs.
+
+Use `make empirical-guard-evidence-check` to validate a portable empirical
+guard-evidence manifest when real evidence is attached for release review.
+That checker does not replace `make guard-validation-smoke`; it validates the
+separate non-synthetic artifact bundle.
+
 ## Related Documentation
 
 - [Spectral False-Positive Control](05-spectral-fpr-derivation.md)
 - [RMT Epsilon Rule](06-rmt-epsilon-rule.md)
 - [VE Predictive Gate](07-ve-gate-power.md)
 - [Guard Contracts and Primer](04-guard-contracts.md)
+- [Empirical Guard Evidence](17-empirical-guard-evidence.md)

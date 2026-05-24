@@ -62,6 +62,7 @@ nav:
       - Device Drift Bands: assurance/12-device-drift-bands.md
       - GPU/MPS-First Guards: assurance/13-gpu-mps-first-guards.md
       - Guard Validation Smoke: assurance/16-guard-validation-smoke.md
+      - Empirical Guard Evidence: assurance/17-empirical-guard-evidence.md
   - Security:
       - Best Practices: security/best-practices.md
       - Release Verification: security/release-verification.md

@@ -106,6 +106,8 @@ this public docs index.
 - [Policy Provenance & Digest](assurance/11-policy-provenance.md)
 - [Device Drift Bands](assurance/12-device-drift-bands.md)
 - [GPU/MPS-First Guards (Decision Memo)](assurance/13-gpu-mps-first-guards.md)
+- [Guard Validation Smoke](assurance/16-guard-validation-smoke.md)
+- [Empirical Guard Evidence](assurance/17-empirical-guard-evidence.md)
 
 Note: Every assurance claim is backed by automated tests and cross-referenced in
 the docs. See Guard Contracts → Coverage Reference
