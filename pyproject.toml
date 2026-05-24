@@ -533,7 +533,7 @@ filterwarnings = [
 
 [tool.coverage.run]
 branch = true
-source = ["src"]
+source = ["src", "scripts/release"]
 omit = [
     "*/tests/*",
     "*/test_*",
@@ -545,6 +545,7 @@ omit = [
 show_missing = true
 precision = 2
 include = [
+    "scripts/release/*.py",
     "src/invarlock/eval/*",
     "src/invarlock/guards/*",
     "src/invarlock/calibration/*",

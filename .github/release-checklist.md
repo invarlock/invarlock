@@ -11,6 +11,7 @@ release evidence and operator gates rather than the stable user contract.
 - [ ] `make dist-check`
 - [ ] `make security`
 - [ ] `make container-front-door-smoke` or the matching Podman target
+- [ ] `make guard-validation-smoke`
 - [ ] `make release-evidence-check`
 
 ## Required Evidence
@@ -24,8 +25,12 @@ release evidence and operator gates rather than the stable user contract.
 - [ ] Strict example report exists at
   `artifacts/release/strict/evaluation.report.json`.
 - [ ] Strict verifier output exists at `artifacts/release/strict/verify.json`.
+- [ ] Guard-validation smoke JSON exists at
+  `artifacts/guard-validation/guard-validation-smoke.json`.
+- [ ] Guard-validation smoke Markdown exists at
+  `artifacts/guard-validation/guard-validation-smoke.md`.
 - [ ] Offline release bundle was generated with
-  `scripts/release/make_offline_bundle.sh`.
+  `scripts/release/make_offline_bundle.sh` under `artifacts/release/offline/`.
 
 ## Reviewer Notes
 

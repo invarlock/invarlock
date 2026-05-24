@@ -20,6 +20,9 @@ The command writes:
 - `artifacts/guard-validation/guard-validation-smoke.json`
 - `artifacts/guard-validation/guard-validation-smoke.md`
 
+Release evidence validation requires both artifacts through
+`make release-evidence-check`.
+
 The smoke estimates synthetic type-I error and power for the spectral, RMT, and
 variance guard surfaces across several calibration-window counts. It is useful
 for checking that the release evidence path exists and stays deterministic.
