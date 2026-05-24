@@ -64,6 +64,8 @@ def test_wheel_install_runs_front_door_evaluate_verify_report_html_outside_repo_
         installed_wheel_env.cli_exe,
         [
             "evaluate",
+            "--assurance",
+            "off",
             "--allow-network",
             "--execution-mode",
             "host",

@@ -6,15 +6,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .assurance_contract import (
+    CANONICAL_GUARD_CHAIN,
+    normalize_assurance_mode,
+    strict_evaluate_policy_errors,
+)
+
 _TEXT_NORMALIZATION_ERRORS = (RuntimeError, TypeError, ValueError)
 
-DEFAULT_EVALUATE_GUARDS_ORDER = [
-    "invariants",
-    "spectral",
-    "rmt",
-    "variance",
-    "invariants",
-]
+DEFAULT_EVALUATE_GUARDS_ORDER = list(CANONICAL_GUARD_CHAIN)
 
 
 @dataclass(frozen=True)
@@ -40,6 +40,7 @@ class EvaluateCommandPlan:
     baseline_label: str
     subject_label: str | None
     tmp_dir: Path
+    assurance_mode: str
 
 
 def normalize_model_id(model_id: str, adapter_name: str) -> str:
@@ -137,6 +138,7 @@ def resolve_guards_order(
     preset_data: dict[str, Any],
     *,
     default_order: list[str] | None = None,
+    require_canonical: bool = False,
 ) -> list[str]:
     guards_block = preset_data.get("guards")
     preset_order = guards_block.get("order") if isinstance(guards_block, dict) else None
@@ -145,6 +147,8 @@ def resolve_guards_order(
         and preset_order
         and all(isinstance(item, str) for item in preset_order)
     ):
+        if require_canonical and list(preset_order) != DEFAULT_EVALUATE_GUARDS_ORDER:
+            raise ValueError("Strict assurance requires the canonical guard chain.")
         return list(preset_order)
     return list(default_order or DEFAULT_EVALUATE_GUARDS_ORDER)
 
@@ -199,6 +203,7 @@ def build_baseline_run_config(
     profile: str,
     tier: str,
     guards_order: list[str],
+    assurance_mode: str = "off",
 ) -> dict[str, Any]:
     return deep_merge_dicts(
         preset_data,
@@ -211,7 +216,12 @@ def build_baseline_run_config(
             "eval": {},
             "guards": {"order": guards_order},
             "output": {"dir": output_dir},
-            "context": {"profile": profile, "tier": tier},
+            "context": {
+                "profile": profile,
+                "tier": tier,
+                "assurance": {"mode": assurance_mode},
+            },
+            "assurance": {"mode": assurance_mode},
         },
     )
 
@@ -225,6 +235,7 @@ def build_subject_noop_run_config(
     profile: str,
     tier: str,
     guards_order: list[str],
+    assurance_mode: str = "off",
 ) -> dict[str, Any]:
     return build_baseline_run_config(
         preset_data,
@@ -234,6 +245,7 @@ def build_subject_noop_run_config(
         profile=profile,
         tier=tier,
         guards_order=guards_order,
+        assurance_mode=assurance_mode,
     )
 
 
@@ -247,6 +259,7 @@ def build_subject_edit_run_config(
     profile: str,
     tier: str,
     guards_order: list[str],
+    assurance_mode: str = "off",
 ) -> dict[str, Any]:
     cfg_loaded = deepcopy(loaded_edit_config)
     model_block = dict(cfg_loaded.get("model") or {})
@@ -265,7 +278,12 @@ def build_subject_edit_run_config(
         deep_merge_dicts(preset_data, cfg_loaded),
         {
             "output": {"dir": output_dir},
-            "context": {"profile": profile, "tier": tier},
+            "context": {
+                "profile": profile,
+                "tier": tier,
+                "assurance": {"mode": assurance_mode},
+            },
+            "assurance": {"mode": assurance_mode},
         },
     )
     guards_block = merged.get("guards")
@@ -278,6 +296,10 @@ def build_subject_edit_run_config(
         and all(isinstance(item, str) for item in guards_order_cfg)
     ):
         merged = deep_merge_dicts(merged, {"guards": {"order": guards_order}})
+    elif (
+        assurance_mode == "strict" and guards_order_cfg != DEFAULT_EVALUATE_GUARDS_ORDER
+    ):
+        raise ValueError("Strict assurance requires the canonical guard chain.")
     return merged
 
 
@@ -295,9 +317,13 @@ def build_evaluate_command_plan(
     resolve_auto_adapter_fn: Any,
     load_yaml_fn: Any,
     tmp_dir_candidate: str | None = None,
+    assurance_mode: str = "strict",
+    execution_mode: str = "container",
+    allow_unverified_provenance: bool = False,
 ) -> EvaluateCommandPlan:
     profile_name = stable_text(profile, "dev")
     tier_name = stable_text(tier, "balanced")
+    normalized_assurance_mode = normalize_assurance_mode(assurance_mode)
     adapter_name = adapter
     adapter_auto = str(adapter).strip().lower() in {"auto", "auto_hf"}
     if adapter_auto:
@@ -308,7 +334,20 @@ def build_evaluate_command_plan(
         preset=preset,
         load_yaml_fn=load_yaml_fn,
     )
-    guards_order = resolve_guards_order(preset_data)
+    guards_order = resolve_guards_order(
+        preset_data,
+        require_canonical=normalized_assurance_mode == "strict",
+    )
+    assurance_errors = strict_evaluate_policy_errors(
+        assurance_mode=normalized_assurance_mode,
+        profile=profile_name,
+        tier=tier_name,
+        guards_order=guards_order,
+        execution_mode=execution_mode,
+        allow_unverified_provenance=allow_unverified_provenance,
+    )
+    if assurance_errors:
+        raise ValueError("; ".join(assurance_errors))
     normalized_source_model_id = normalize_model_id(baseline_model_id, adapter_name)
     normalized_subject_model_id = normalize_model_id(subject_model_id, adapter_name)
     baseline_config = build_baseline_run_config(
@@ -319,6 +358,7 @@ def build_evaluate_command_plan(
         profile=profile_name,
         tier=tier_name,
         guards_order=guards_order,
+        assurance_mode=normalized_assurance_mode,
     )
     return EvaluateCommandPlan(
         profile_name=profile_name,
@@ -339,6 +379,7 @@ def build_evaluate_command_plan(
             subject_model_id=normalized_subject_model_id,
         ),
         tmp_dir=resolve_evaluate_tmp_dir(tmp_dir_candidate),
+        assurance_mode=normalized_assurance_mode,
     )
 
 

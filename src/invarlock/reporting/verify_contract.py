@@ -7,6 +7,11 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from invarlock.core.assurance_contract import (
+    normalize_verify_assurance_mode,
+    resolve_report_assurance_mode,
+    strict_report_policy_errors,
+)
 from invarlock.core.error_encoding import encode_error as _encode_error
 from invarlock.core.exceptions import InvarlockError
 from invarlock.core.exceptions import MetricsError as _MetricsError
@@ -375,6 +380,7 @@ def _verify_single_report(
     tolerance: float,
     profile: str | None,
     allow_unverified_provenance: bool,
+    assurance_mode: str,
     json_mode: bool,
 ) -> tuple[dict[str, Any], list[str], bool, tuple[VerifyDiagnostic, ...]]:
     cert_obj = _load_evaluation_report(cert_path)
@@ -403,6 +409,21 @@ def _verify_single_report(
         allow_unverified=bool(allow_unverified_provenance),
     )
     errors.extend(issue.message for issue in provenance_result.issues)
+    report_assurance_mode = resolve_report_assurance_mode(cert_obj)
+    require_strict_assurance = assurance_mode == "strict" or (
+        assurance_mode == "report" and report_assurance_mode == "strict"
+    )
+    if assurance_mode == "strict" and report_assurance_mode != "strict":
+        errors.append(
+            "verify --assurance strict requires report assurance.mode=strict."
+        )
+    errors.extend(
+        strict_report_policy_errors(
+            cert_obj,
+            require_strict=require_strict_assurance,
+            runtime_provenance_verified=not provenance_result.issues,
+        )
+    )
     if json_mode and any("schema validation failed" in str(e).lower() for e in errors):
         raise _ValidationError(
             code="E601",
@@ -465,12 +486,14 @@ def run_verify_reports(
     profile: str | None = "dev",
     allow_unverified_provenance: bool = False,
     json_mode: bool = False,
+    assurance_mode: str = "report",
 ) -> VerifyExecutionResult:
     """Verify reports and return structured machine + human output."""
 
     overall_ok = True
     diagnostics: list[VerifyDiagnostic] = []
     tol = _resolve_tolerance(tolerance)
+    normalized_assurance_mode = normalize_verify_assurance_mode(assurance_mode)
     baseline_digest = _load_baseline_digest(baseline)
     malformed_any = False
     loaded_any_report = False
@@ -489,6 +512,7 @@ def run_verify_reports(
                 tolerance=tol,
                 profile=profile,
                 allow_unverified_provenance=allow_unverified_provenance,
+                assurance_mode=normalized_assurance_mode,
                 json_mode=json_mode,
             )
             loaded_any_report = True
@@ -596,6 +620,7 @@ def verify_reports_contract(
     profile: str | None = "dev",
     allow_unverified_provenance: bool = False,
     json_mode: bool = False,
+    assurance_mode: str = "report",
 ) -> VerifyExecutionResult:
     """Verify reports and return a structured result without relying on CLI output."""
     return run_verify_reports(
@@ -605,6 +630,7 @@ def verify_reports_contract(
         profile=profile,
         allow_unverified_provenance=allow_unverified_provenance,
         json_mode=json_mode,
+        assurance_mode=assurance_mode,
     )
 
 

@@ -57,6 +57,8 @@ def test_evaluate_hf_id_normalization_and_preset_fallback(monkeypatch, tmp_path:
             "auto",
             "--profile",
             "dev",
+            "--assurance",
+            "off",
             "--out",
             str(tmp_path / "runs"),
             "--report-out",
