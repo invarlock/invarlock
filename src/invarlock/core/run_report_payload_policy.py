@@ -313,7 +313,14 @@ def build_guard_entries(core_guards: Mapping[str, Any] | None) -> list[dict[str,
             "violations": guard_result.get("violations", []),
             "details": guard_result.get("details", {}),
         }
-        for extra_key in ("final_z_scores", "module_family_map"):
+        for extra_key in (
+            "final_z_scores",
+            "module_family_map",
+            "supported",
+            "reason",
+            "assurance_blocking",
+            "status",
+        ):
             if extra_key in guard_result:
                 guard_entry[extra_key] = guard_result[extra_key]
         entries.append(guard_entry)

@@ -61,6 +61,7 @@ def test_evaluate_command_smoke_for_bridge(monkeypatch, tmp_path) -> None:
         report_out=str(tmp_path / "reports"),
         timing=False,
         progress=False,
+        assurance="off",
     )
 
     assert calls["runs"] == 2
@@ -132,6 +133,7 @@ def test_evaluate_command_reuses_baseline_report_for_bridge(monkeypatch, tmp_pat
         report_out=str(tmp_path / "reports"),
         timing=False,
         progress=False,
+        assurance="off",
     )
 
     assert len(calls["runs"]) == 1
@@ -180,6 +182,7 @@ def test_evaluate_command_local_mode_prefers_local_files_only(monkeypatch, tmp_p
         report_out=str(tmp_path / "reports"),
         timing=False,
         progress=False,
+        assurance="off",
     )
 
     assert len(captured_runs) == 2
@@ -228,6 +231,7 @@ def test_evaluate_command_passes_host_mode_execution_mode_to_runs(
         report_out=str(tmp_path / "reports"),
         timing=False,
         progress=False,
+        assurance="off",
     )
 
     assert len(captured_runs) == 2
@@ -289,6 +293,7 @@ def test_evaluate_command_resets_runtime_security_on_success(
         timing=False,
         progress=False,
         allow_network=True,
+        assurance="off",
     )
 
     assert state["configured"]["allow_network"] is True
@@ -351,6 +356,7 @@ def test_evaluate_command_resets_runtime_security_on_raise(
             timing=False,
             progress=False,
             allow_network=True,
+            assurance="off",
         )
 
     assert state["configured"]["allow_network"] is True
@@ -397,6 +403,7 @@ def test_evaluate_command_passes_concrete_run_defaults(monkeypatch, tmp_path) ->
         report_out=str(tmp_path / "reports"),
         timing=False,
         progress=False,
+        assurance="off",
     )
 
     assert len(captured_runs) == 2

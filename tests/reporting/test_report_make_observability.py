@@ -91,6 +91,60 @@ def test_make_evaluation_report_marks_broken_profile_provenance_unhealthy(
     assert evaluation_report["validation"]["primary_metric_acceptable"] is False
 
 
+def test_make_report_assurance_ignores_diagnostic_code_text_for_fallback_fields(
+    monkeypatch,
+) -> None:
+    report, baseline = _rich_run_report()
+    report = deepcopy(report)
+    baseline = deepcopy(baseline)
+    report["metrics"]["primary_metric"]["display_ci"] = [
+        0.9900498337491681,
+        1.0202013400267558,
+    ]
+
+    class _BrokenMeta(dict):
+        def get(self, key, default=None):  # noqa: ANN001
+            if key == "env_flags":
+                raise RuntimeError("env-flags-bad")
+            return super().get(key, default)
+
+    report["meta"] = _BrokenMeta(report["meta"])
+    monkeypatch.setattr(
+        report_normalization_mod,
+        "normalize_and_validate_run_report",
+        lambda payload: payload,
+        raising=True,
+    )
+
+    evaluation_report = make_report(report, baseline)
+
+    codes = {
+        entry.get("code")
+        for entry in evaluation_report.get("meta", {}).get("build_diagnostics", [])
+        if isinstance(entry, dict)
+    }
+    assert "meta.env_flags_unavailable" in codes
+    assert evaluation_report["report_build"] == {
+        "synthesized_fields": [],
+        "repaired_fields": [],
+        "fallback_fields": [],
+    }
+    assert evaluation_report["assurance"]["fallback_fields_used"] is False
+
+
+def test_make_report_assurance_flags_structured_primary_metric_events() -> None:
+    report, baseline = _rich_run_report()
+    report = deepcopy(report)
+    baseline = deepcopy(baseline)
+    report["metrics"]["primary_metric"]["display_ci"] = [True, False]
+
+    evaluation_report = make_report(report, baseline)
+
+    events = evaluation_report["report_build"]["repaired_fields"]
+    assert any(event["field"] == "primary_metric.display_ci" for event in events)
+    assert evaluation_report["assurance"]["fallback_fields_used"] is True
+
+
 def test_make_evaluation_report_marks_broken_env_flag_provenance_unhealthy(
     monkeypatch,
 ) -> None:

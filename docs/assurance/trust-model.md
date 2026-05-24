@@ -55,19 +55,25 @@ A strict pass does not mean:
 
 ## Report Statuses
 
-Strict reports include a top-level `assurance` section. Reviewers should treat
-that section as the central verdict and should not infer assurance status from
-a successful command exit alone.
+Strict reports include a top-level `assurance` section. Generated reports record
+the intended strict claim and leave runtime provenance verification pending
+until `invarlock verify` checks the sibling `runtime.manifest.json`. Reviewers
+should treat a strict pass as the combination of report-local strict shape and a
+verified runtime-provenance result, not as a successful command exit alone.
 
-| Field | Required strict value |
+| Report field | Required strict value |
 | --- | --- |
 | `mode` | `strict` |
 | `verdict` | `pass` |
 | `claim_set` | `invarlock-weight-edit-regression-v1` |
 | `canonical_guard_chain_enforced` | `true` |
 | `fallback_fields_used` | `false` |
-| `runtime_provenance_verified` | `true` |
+| `runtime_provenance_verified` | `false` in generated reports; verifier confirms separately |
+| `runtime_provenance_verification_status` | `pending` in generated reports |
 | `blocking_reasons` | empty list |
+
+The verifier JSON result must then include
+`verification.runtime_provenance.status = verified`.
 
 ### Example (report fragment)
 
@@ -79,9 +85,29 @@ a successful command exit alone.
     "claim_set": "invarlock-weight-edit-regression-v1",
     "canonical_guard_chain_enforced": true,
     "fallback_fields_used": false,
-    "runtime_provenance_verified": true,
+    "runtime_provenance_verified": false,
+    "runtime_provenance_verification_status": "pending",
     "blocking_reasons": []
   }
+}
+```
+
+### Example (verifier fragment)
+
+```json
+{
+  "results": [
+    {
+      "verification": {
+        "runtime_provenance": {
+          "status": "verified",
+          "verified": true,
+          "skipped": false,
+          "issues": []
+        }
+      }
+    }
+  ]
 }
 ```
 

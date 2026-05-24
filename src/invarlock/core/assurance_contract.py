@@ -17,6 +17,11 @@ ASSURANCE_MODES = {"strict", "off"}
 VERIFY_ASSURANCE_MODES = {"report", "strict", "off"}
 STRICT_ASSURANCE_PROFILES = {"ci", "release"}
 STRICT_ASSURANCE_TIERS = {"balanced", "conservative"}
+REPORT_BUILD_EVENT_CATEGORIES = (
+    "synthesized_fields",
+    "repaired_fields",
+    "fallback_fields",
+)
 
 
 @dataclass(frozen=True)
@@ -29,6 +34,8 @@ class AssuranceVerdict:
     canonical_guard_chain_enforced: bool
     fallback_fields_used: bool
     runtime_provenance_verified: bool
+    runtime_provenance_declared: str
+    runtime_provenance_verification_status: str
 
     def as_report_section(self, *, observed_guard_chain: list[str]) -> dict[str, Any]:
         return {
@@ -41,6 +48,10 @@ class AssuranceVerdict:
             "canonical_guard_chain_enforced": self.canonical_guard_chain_enforced,
             "fallback_fields_used": self.fallback_fields_used,
             "runtime_provenance_verified": self.runtime_provenance_verified,
+            "runtime_provenance_declared": self.runtime_provenance_declared,
+            "runtime_provenance_verification_status": (
+                self.runtime_provenance_verification_status
+            ),
             "verdict": self.verdict,
             "blocking_reasons": list(self.blocking_reasons),
         }
@@ -136,29 +147,50 @@ def observed_guard_chain_from_report(report: dict[str, Any]) -> list[str]:
 
 def _report_profile(report: dict[str, Any]) -> str:
     assurance = report.get("assurance")
-    if isinstance(assurance, dict) and isinstance(assurance.get("profile"), str):
-        return assurance["profile"].strip().lower()
+    assurance_profile = (
+        assurance.get("profile") if isinstance(assurance, dict) else None
+    )
+    if isinstance(assurance_profile, str):
+        return assurance_profile.strip().lower()
     context = report.get("context")
-    if isinstance(context, dict) and isinstance(context.get("profile"), str):
-        return context["profile"].strip().lower()
+    context_profile = context.get("profile") if isinstance(context, dict) else None
+    if isinstance(context_profile, str):
+        return context_profile.strip().lower()
     return ""
 
 
 def _report_tier(report: dict[str, Any]) -> str:
     assurance = report.get("assurance")
-    if isinstance(assurance, dict) and isinstance(assurance.get("tier"), str):
-        return assurance["tier"].strip().lower()
+    assurance_tier = assurance.get("tier") if isinstance(assurance, dict) else None
+    if isinstance(assurance_tier, str):
+        return assurance_tier.strip().lower()
     auto = report.get("auto")
-    if isinstance(auto, dict) and isinstance(auto.get("tier"), str):
-        return auto["tier"].strip().lower()
+    auto_tier = auto.get("tier") if isinstance(auto, dict) else None
+    if isinstance(auto_tier, str):
+        return auto_tier.strip().lower()
     context = report.get("context")
     if isinstance(context, dict):
         auto_context = context.get("auto")
-        if isinstance(auto_context, dict) and isinstance(auto_context.get("tier"), str):
-            return auto_context["tier"].strip().lower()
-        if isinstance(context.get("tier"), str):
-            return context["tier"].strip().lower()
+        auto_context_tier = (
+            auto_context.get("tier") if isinstance(auto_context, dict) else None
+        )
+        if isinstance(auto_context_tier, str):
+            return auto_context_tier.strip().lower()
+        context_tier = context.get("tier")
+        if isinstance(context_tier, str):
+            return context_tier.strip().lower()
     return ""
+
+
+def _report_build_has_evidence_events(report: dict[str, Any]) -> bool:
+    section = report.get("report_build")
+    if not isinstance(section, dict):
+        return False
+    for category in REPORT_BUILD_EVENT_CATEGORIES:
+        events = section.get(category)
+        if isinstance(events, list) and bool(events):
+            return True
+    return False
 
 
 def build_assurance_section(
@@ -166,14 +198,23 @@ def build_assurance_section(
     *,
     mode: str | None = None,
     fallback_fields_used: bool = False,
-    runtime_provenance_verified: bool = True,
+    runtime_provenance_verified: bool | None = None,
+    runtime_provenance_declared: str = "container",
+    runtime_provenance_verification_status: str | None = None,
 ) -> dict[str, Any]:
     assurance_mode = normalize_assurance_mode(
         mode or resolve_report_assurance_mode(report), default="off"
     )
     observed = observed_guard_chain_from_report(report)
+    fallback_fields_used = bool(
+        fallback_fields_used or _report_build_has_evidence_events(report)
+    )
     profile = _report_profile(report)
     tier = _report_tier(report)
+    provenance_status = runtime_provenance_verification_status or (
+        "verified" if runtime_provenance_verified is True else "pending"
+    )
+    provenance_verified = runtime_provenance_verified is True
     reasons: list[str] = []
     if assurance_mode == "strict":
         reasons.extend(
@@ -182,12 +223,14 @@ def build_assurance_section(
                 profile=profile,
                 tier=tier,
                 guards_order=observed,
-                execution_mode="container",
-                allow_unverified_provenance=not runtime_provenance_verified,
+                execution_mode=runtime_provenance_declared,
+                allow_unverified_provenance=False,
             )
         )
         if fallback_fields_used:
             reasons.append("strict assurance forbids synthesized or repaired fields.")
+        if provenance_status not in {"pending", "verified"}:
+            reasons.append("strict assurance requires verified runtime provenance.")
         for guard_name in ("spectral", "rmt", "variance", "invariants"):
             block = report.get(guard_name)
             if isinstance(block, dict) and block.get("supported") is False:
@@ -204,7 +247,9 @@ def build_assurance_section(
         blocking_reasons=tuple(reasons),
         canonical_guard_chain_enforced=is_canonical_guard_chain(observed),
         fallback_fields_used=bool(fallback_fields_used),
-        runtime_provenance_verified=bool(runtime_provenance_verified),
+        runtime_provenance_verified=provenance_verified,
+        runtime_provenance_declared=str(runtime_provenance_declared or ""),
+        runtime_provenance_verification_status=str(provenance_status or ""),
     ).as_report_section(observed_guard_chain=observed)
 
 
@@ -234,8 +279,6 @@ def strict_report_policy_errors(
             )
         if assurance.get("fallback_fields_used") is True:
             errors.append("strict assurance forbids synthesized or repaired fields.")
-        if assurance.get("runtime_provenance_verified") is not True:
-            errors.append("strict assurance requires verified runtime provenance.")
         blocking = assurance.get("blocking_reasons")
         if isinstance(blocking, list) and blocking:
             errors.extend(str(item) for item in blocking)
@@ -249,27 +292,26 @@ def strict_report_policy_errors(
         errors.append("strict assurance requires canonical guard chain evidence.")
     if fallback_fields_used is True:
         errors.append("strict assurance forbids synthesized or repaired fields.")
+    if _report_build_has_evidence_events(report):
+        errors.append("strict assurance forbids synthesized or repaired fields.")
     if runtime_provenance_verified is False:
         errors.append("strict assurance requires verified runtime provenance.")
     for guard_name in ("spectral", "rmt", "variance", "invariants"):
         block = report.get(guard_name)
-        if isinstance(block, dict):
-            if (
-                block.get("supported") is False
-                and block.get("assurance_blocking") is True
-            ):
-                reason = block.get("reason") or "unsupported"
-                errors.append(
-                    f"{guard_name} unsupported for strict assurance: {reason}."
-                )
-            if str(block.get("status", "")).lower() in {
-                "degraded",
-                "monitor_only",
-                "monitor-only",
-            }:
-                errors.append(
-                    f"{guard_name} is degraded/monitor-only under strict assurance."
-                )
+        if not isinstance(block, dict):
+            errors.append(f"strict assurance missing {guard_name} guard evidence.")
+            continue
+        if block.get("supported") is False and block.get("assurance_blocking") is True:
+            reason = block.get("reason") or "unsupported"
+            errors.append(f"{guard_name} unsupported for strict assurance: {reason}.")
+        if str(block.get("status", "")).lower() in {
+            "degraded",
+            "monitor_only",
+            "monitor-only",
+        }:
+            errors.append(
+                f"{guard_name} is degraded/monitor-only under strict assurance."
+            )
     return _dedupe(errors)
 
 

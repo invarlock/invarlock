@@ -36,8 +36,27 @@ def test_build_assurance_section_passes_for_canonical_strict_report() -> None:
     assert section["claim_set"] == ASSURANCE_CLAIM_SET
     assert section["guard_chain_observed"] == list(CANONICAL_GUARD_CHAIN)
     assert section["canonical_guard_chain_enforced"] is True
+    assert section["runtime_provenance_verified"] is False
+    assert section["runtime_provenance_declared"] == "container"
+    assert section["runtime_provenance_verification_status"] == "pending"
     assert section["verdict"] == "pass"
     assert section["blocking_reasons"] == []
+
+
+def test_build_assurance_section_rejects_invalid_runtime_status() -> None:
+    report = _strict_report()
+
+    section = build_assurance_section(
+        report,
+        runtime_provenance_verification_status="failed",
+    )
+
+    assert section["runtime_provenance_verification_status"] == "failed"
+    assert section["verdict"] == "fail"
+    assert (
+        "strict assurance requires verified runtime provenance."
+        in section["blocking_reasons"]
+    )
 
 
 def test_strict_report_policy_rejects_wrong_guard_chain() -> None:
@@ -71,6 +90,69 @@ def test_strict_report_policy_rejects_fallback_fields() -> None:
         report,
         fallback_fields_used=True,
     )
+
+    errors = strict_report_policy_errors(report, require_strict=True)
+
+    assert any("repaired fields" in error for error in errors)
+
+
+def test_strict_report_policy_accepts_pending_report_when_verifier_confirms() -> None:
+    report = _strict_report()
+    report["assurance"] = build_assurance_section(report)
+
+    errors = strict_report_policy_errors(
+        report,
+        require_strict=True,
+        runtime_provenance_verified=True,
+    )
+
+    assert errors == []
+
+
+def test_strict_report_policy_rejects_pending_report_when_verifier_fails() -> None:
+    report = _strict_report()
+    report["assurance"] = build_assurance_section(report)
+
+    errors = strict_report_policy_errors(
+        report,
+        require_strict=True,
+        runtime_provenance_verified=False,
+    )
+
+    assert "strict assurance requires verified runtime provenance." in errors
+
+
+def test_strict_report_policy_rejects_missing_guard_evidence() -> None:
+    report = _strict_report()
+    report.pop("rmt")
+    report["assurance"] = build_assurance_section(report)
+
+    errors = strict_report_policy_errors(
+        report,
+        require_strict=True,
+        runtime_provenance_verified=True,
+    )
+
+    assert "strict assurance missing rmt guard evidence." in errors
+
+
+def test_strict_report_policy_rejects_structured_report_build_events() -> None:
+    report = _strict_report()
+    report["report_build"] = {
+        "synthesized_fields": [
+            {
+                "field": "primary_metric.display_ci",
+                "reason": "default_estimated_interval",
+                "source": "test",
+            }
+        ],
+        "repaired_fields": [],
+        "fallback_fields": [],
+    }
+    report["assurance"] = build_assurance_section(report)
+
+    assert report["assurance"]["fallback_fields_used"] is True
+    assert report["assurance"]["verdict"] == "fail"
 
     errors = strict_report_policy_errors(report, require_strict=True)
 

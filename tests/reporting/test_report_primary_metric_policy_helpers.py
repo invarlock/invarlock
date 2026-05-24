@@ -67,13 +67,25 @@ def test_enforce_ratio_ci_alignment_skips_non_finite_bounds():
 
 def test_enforce_display_ci_alignment_backfills_ci_and_display_ci_in_dev():
     pm = {"kind": "ppl_causal"}
+    evaluation_report = {"primary_metric": pm}
     pm_policy.enforce_display_ci_alignment(
-        "paired_baseline", pm, (0.0, 0.1), window_plan_profile="dev"
+        "paired_baseline",
+        pm,
+        (0.0, 0.1),
+        window_plan_profile="dev",
+        evaluation_report=evaluation_report,
     )
     assert pm["ci"] == [0.0, 0.1]
     assert pm["display_ci"] == [
         pytest.approx(math.exp(0.0)),
         pytest.approx(math.exp(0.1)),
+    ]
+    assert [
+        event["field"]
+        for event in evaluation_report["report_build"]["synthesized_fields"]
+    ] == [
+        "primary_metric.ci",
+        "primary_metric.display_ci",
     ]
 
 
@@ -137,12 +149,24 @@ def test_enforce_display_ci_alignment_raises_on_missing_display_ci_in_ci_profile
 
 def test_enforce_display_ci_alignment_dev_overwrites_mismatch():
     pm = {"kind": "ppl_causal", "ci": (0.0, 0.1), "display_ci": [1.5, 1.6]}
+    evaluation_report = {"primary_metric": pm}
     pm_policy.enforce_display_ci_alignment(
-        "paired_baseline", pm, (0.0, 0.1), window_plan_profile="dev"
+        "paired_baseline",
+        pm,
+        (0.0, 0.1),
+        window_plan_profile="dev",
+        evaluation_report=evaluation_report,
     )
     assert pm["display_ci"] == [
         pytest.approx(math.exp(0.0)),
         pytest.approx(math.exp(0.1)),
+    ]
+    assert evaluation_report["report_build"]["repaired_fields"] == [
+        {
+            "field": "primary_metric.display_ci",
+            "reason": "overwrote_mismatched_logspace_projection",
+            "source": "report_primary_metric_policy.enforce_display_ci_alignment",
+        }
     ]
 
 

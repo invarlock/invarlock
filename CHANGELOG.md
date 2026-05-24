@@ -14,13 +14,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `invarlock-weight-edit-regression-v1` claim set. This release introduces the
   current strict assurance contract described in the trust-model and checklist
   docs.
-- Added adversarial verifier coverage for strict guard-chain enforcement and
-  missing strict assurance claims.
+- Added structured report-build evidence for synthesized, repaired, and
+  fallback fields so strict assurance rejects non-original report evidence
+  without relying on diagnostic string matching.
+- Added adversarial verifier coverage for strict guard-chain enforcement,
+  runtime provenance failures, mutated report fields, missing strict assurance
+  claims, and unsupported guard-status shapes.
 - Added strict paired-length checking for paired delta log-loss computation,
   with truncation available only through explicit non-strict opt-in.
 - Added trust-model, strict assurance checklist, failure examples, alternatives
-  comparison, runtime provenance guide, one-run lifecycle, and v0.9.0 release
-  checklist documentation.
+  comparison, runtime provenance guide, and one-run lifecycle documentation.
+- Added an installed-wheel strict verification smoke that verifies a strict
+  assurance report bundle and renders HTML outside the repository tree.
 - Added a CVE audit lane that inventories locked dependency surfaces,
   cross-checks exact package versions against OSV advisories, and emits
   JSON/Markdown reports for release review.
@@ -31,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Default `evaluate` assurance posture is now fail-closed strict mode for
   assurance evidence generation.
+- Generated reports now distinguish declared runtime provenance from verifier
+  confirmation; `verify` records the actual runtime-provenance verification
+  result in its output.
 - Consolidated open dependency/security PR content into this branch: CodeQL
   action SHA refresh, Ruff 0.15.13, `idna>=3.15`, and
   `pymdown-extensions>=10.21.3`.
@@ -41,11 +49,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Removed transient release-hardening and release-checklist pages from the
+  published docs tree so durable docs stay focused on current repository
+  behavior and stable user-facing contracts.
+
 ### Fixed
 
 - Fixed the strict assurance trust boundary so host/unverified provenance,
   custom guard order, dev/aggressive profiles, unsupported blocking statuses,
   fallback fields, and missing guard evidence cannot pass as strict assurance.
+- Fixed the curated assurance test lane so it runs the strict assurance
+  contract, verifier guard-chain, and strict paired-metric regression tests.
 - Remediated `pip` and `urllib3` CVEs across the uv and workflow lock
   surfaces, cleared the stale `pip-audit` allowlist, and aligned the
   supply-chain workflow contract tests with the current disk-cleanup steps.

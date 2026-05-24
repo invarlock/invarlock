@@ -46,6 +46,7 @@ def test_evaluate_rejects_baseline_report_directory_even_with_report_json(
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
+            assurance="off",
         )
 
     assert exc.value.exit_code == 2
@@ -81,6 +82,7 @@ def test_evaluate_rejects_baseline_report_directory_without_report_json(
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
+            assurance="off",
         )
 
     assert exc.value.exit_code == 2
@@ -198,6 +200,7 @@ def test_evaluate_baseline_report_rejects_non_regular_file(
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
+            assurance="off",
         )
 
     assert exc.value.exit_code == 2
@@ -256,6 +259,7 @@ def test_evaluate_supplied_baseline_report_path_must_exist(
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
+            assurance="off",
         )
 
     assert exc.value.exit_code == 2
@@ -279,6 +283,7 @@ def test_evaluate_supplied_baseline_report_directory_requires_a_report_file(
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
+            assurance="off",
         )
 
     assert exc.value.exit_code == 2
@@ -316,6 +321,7 @@ def test_evaluate_baseline_report_accepts_non_mapping_meta_and_context(
         out=str(Path("runs")),
         report_out=str(Path("reports")),
         profile="dev",
+        assurance="off",
     )
 
     assert len(run_calls) == 1
