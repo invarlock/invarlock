@@ -12,6 +12,7 @@ from collections.abc import Sequence
 # coverage policy for shells, pure helpers, and tensor/mutation helpers.
 THRESHOLDS = {
     # Release evidence tooling
+    "scripts/release/check_empirical_guard_evidence.py": 0.95,
     "scripts/release/check_release_evidence.py": 0.95,
     # Evaluation & reporting
     "src/invarlock/eval/data.py": 1.00,
@@ -221,6 +222,7 @@ CORE_PREFIXES = (
 # Individual core files outside of the broad prefixes.
 CORE_FILES = (
     # Release evidence tooling
+    "scripts/release/check_empirical_guard_evidence.py",
     "scripts/release/check_release_evidence.py",
     # Evaluation & reporting (key entry points)
     "src/invarlock/eval/data.py",

@@ -13,6 +13,8 @@ release evidence and operator gates rather than the stable user contract.
 - [ ] `make container-front-door-smoke` or the matching Podman target
 - [ ] `make guard-validation-smoke`
 - [ ] `make release-evidence-check`
+- [ ] `make empirical-guard-evidence-check` when the release claims new or
+  expanded guard calibration, model-family calibration, or support promotion.
 
 ## Required Evidence
 
@@ -31,6 +33,9 @@ release evidence and operator gates rather than the stable user contract.
   `artifacts/guard-validation/guard-validation-smoke.md`.
 - [ ] Offline release bundle was generated with
   `scripts/release/make_offline_bundle.sh` under `artifacts/release/offline/`.
+- [ ] Empirical guard-evidence manifest exists at
+  `artifacts/guard-validation/empirical/manifest.json` when empirical guard
+  evidence is required by the release claim.
 
 ## Reviewer Notes
 

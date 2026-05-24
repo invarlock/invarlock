@@ -183,6 +183,7 @@ def test_release_checklist_exists_outside_published_docs_tree() -> None:
         "make container-front-door-smoke",
         "make guard-validation-smoke",
         "make release-evidence-check",
+        "make empirical-guard-evidence-check",
         "wheel-sdist-hashes.txt",
         "runtime-image-digest.txt",
         "strict/evaluation.report.json",
@@ -190,6 +191,7 @@ def test_release_checklist_exists_outside_published_docs_tree() -> None:
         "guard-validation-smoke.json",
         "guard-validation-smoke.md",
         "artifacts/release/offline",
+        "artifacts/guard-validation/empirical/manifest.json",
     ):
         assert required in text
 
