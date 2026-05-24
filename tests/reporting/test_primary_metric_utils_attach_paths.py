@@ -151,6 +151,13 @@ def test_attach_primary_metric_classification_fallback(monkeypatch):
     assert pm["final"] == pytest.approx(0.8)
     assert pm["display_ci"] == [pm["final"], pm["final"]]
     assert pm["ratio_vs_baseline"] == pytest.approx(10.0)
+    assert evaluation_report["report_build"]["fallback_fields"] == [
+        {
+            "field": "primary_metric",
+            "reason": "computed_from_classification_metrics",
+            "source": "primary_metric_utils._attach_classification_primary_metric_fallback",
+        }
+    ]
 
 
 def test_attach_primary_metric_uses_report_windows(monkeypatch):
@@ -179,6 +186,12 @@ def test_attach_primary_metric_uses_report_windows(monkeypatch):
         "final": 1.23,
         "display_ci": [1.23, 1.23],
     }
+    assert evaluation_report["report_build"]["fallback_fields"][0]["field"] == (
+        "primary_metric"
+    )
+    assert evaluation_report["report_build"]["synthesized_fields"][0]["field"] == (
+        "primary_metric.display_ci"
+    )
 
 
 def test_attach_primary_metric_from_windows_uses_seq2seq_kind(monkeypatch):
@@ -208,6 +221,9 @@ def test_attach_primary_metric_from_windows_uses_seq2seq_kind(monkeypatch):
         "kind": "ppl_seq2seq",
         "final": 1.23,
     }
+    assert evaluation_report["report_build"]["fallback_fields"][0]["reason"] == (
+        "computed_from_evaluation_windows"
+    )
 
 
 def test_attach_primary_metric_display_ci_fallback(monkeypatch):
@@ -231,6 +247,13 @@ def test_attach_primary_metric_display_ci_fallback(monkeypatch):
     )
 
     assert evaluation_report["primary_metric"]["display_ci"] == [1.2, 1.2]
+    assert evaluation_report["report_build"]["synthesized_fields"] == [
+        {
+            "field": "primary_metric.display_ci",
+            "reason": "coerced_from_point_estimate",
+            "source": "primary_metric_utils._ensure_primary_metric_display_ci",
+        }
+    ]
 
 
 def test_attach_primary_metric_display_ci_defaults_and_marks_estimated():
@@ -240,6 +263,9 @@ def test_attach_primary_metric_display_ci_defaults_and_marks_estimated():
 
     assert evaluation_report["primary_metric"]["display_ci"] == [1.0, 1.0]
     assert evaluation_report["primary_metric"]["estimated"] is True
+    assert evaluation_report["report_build"]["synthesized_fields"][0]["reason"] == (
+        "default_estimated_interval"
+    )
 
 
 def test_attach_primary_metric_marks_nonfinite_as_degraded():
@@ -360,6 +386,18 @@ def test_attach_primary_metric_recomputes_ratio_without_marking_degraded():
     assert pm["ratio_vs_baseline"] == pytest.approx(1.2)
     assert pm["degraded"] is False
     assert "degraded_reason" not in pm
+    assert evaluation_report["report_build"]["synthesized_fields"] == [
+        {
+            "field": "primary_metric.ratio_vs_baseline",
+            "reason": "computed_from_final_and_baseline_final",
+            "source": "primary_metric_utils._attach_primary_metric_from_report",
+        },
+        {
+            "field": "primary_metric.display_ci",
+            "reason": "computed_from_primary_metric_point_or_ci",
+            "source": "primary_metric_utils._attach_primary_metric_from_report",
+        },
+    ]
 
 
 def test_finalize_primary_metric_snapshot_marks_primary_metric_invalid():
@@ -537,6 +575,13 @@ def test_attach_primary_metric_replaces_bool_display_ci_with_numeric_fallback() 
 
     pm = evaluation_report["primary_metric"]
     assert pm["display_ci"] == [2.0, 2.0]
+    assert evaluation_report["report_build"]["repaired_fields"] == [
+        {
+            "field": "primary_metric.display_ci",
+            "reason": "coerced_from_point_estimate",
+            "source": "primary_metric_utils._ensure_primary_metric_display_ci",
+        }
+    ]
 
 
 def test_attach_primary_metric_classification_fallback_ignores_bool_baseline(

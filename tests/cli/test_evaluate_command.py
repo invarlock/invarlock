@@ -436,6 +436,7 @@ def test_evaluate_container_bundle_manifest_inherits_container_execution(
         subject=str(edt),
         adapter="auto",
         profile="dev",
+        assurance="off",
         execution_mode="container",
         out=str(tmp_path / "runs"),
         report_out=str(tmp_path / "reports"),
@@ -483,6 +484,29 @@ def test_evaluate_fails_when_edited_report_payload_is_not_an_object(
             out=str(tmp_path / "runs"),
             report_out=str(tmp_path / "reports"),
             profile="dev",
+            assurance="off",
         )
 
     assert exc.value.exit_code == 1
+
+
+def test_evaluate_command_defaults_to_strict_assurance(monkeypatch, tmp_path, capsys):
+    src = tmp_path / "src_model"
+    edt = tmp_path / "edt_model"
+    src.mkdir()
+    edt.mkdir()
+    (src / "config.json").write_text("{}", encoding="utf-8")
+    (edt / "config.json").write_text("{}", encoding="utf-8")
+
+    with pytest.raises(click.exceptions.Exit) as exc:
+        evaluate_command(
+            baseline=str(src),
+            subject=str(edt),
+            adapter="hf_causal",
+            profile="dev",
+            out=str(tmp_path / "runs"),
+            report_out=str(tmp_path / "reports"),
+        )
+
+    assert exc.value.exit_code == 2
+    assert "strict assurance requires profile ci or release" in capsys.readouterr().out

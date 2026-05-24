@@ -124,9 +124,13 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/adapters/auto.py \
 	src/invarlock/core/config_loader.py \
 	src/invarlock/core/config_runtime.py \
+	src/invarlock/core/assurance_contract.py \
+	src/invarlock/core/bootstrap.py \
+	src/invarlock/core/evaluate_plan.py \
 	src/invarlock/core/metric_kind_contract.py \
 	src/invarlock/core/metric_provider_resolution.py \
 	src/invarlock/core/registry.py \
+	src/invarlock/core/runner_eval_metrics_stats.py \
 	src/invarlock/core/runner_eval_metrics_multimodal.py \
 	src/invarlock/core/builtin_plugin_catalog.py \
 	src/invarlock/core/run_orchestrator_execute_seed.py \
@@ -149,9 +153,13 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/cli/runtime_verify.py \
 	src/invarlock/eval/probes/mi.py \
 	src/invarlock/reporting/report_confidence.py \
+	src/invarlock/reporting/report_build_evidence.py \
+	src/invarlock/reporting/report_make_output.py \
+	src/invarlock/reporting/report_primary_metric_policy.py \
 	src/invarlock/reporting/report_schema.py \
 	src/invarlock/reporting/report_types.py \
 	src/invarlock/reporting/verify_check_helpers.py \
+	src/invarlock/reporting/verify_contract.py \
 	src/invarlock/runtime_security.py \
 	src/invarlock/runtime_security_helpers.py \
 	src/invarlock/runtime_security_container.py \
@@ -258,8 +266,12 @@ test-assurance:  ## Run assurance-related tests only
 		tests/ci/test_support_matrix_consistency.py \
 		tests/adapters/test_adapter_capability_contract.py \
 		tests/core/test_bootstrap.py::test_compute_paired_delta_and_ratio_ci_consistency \
+		tests/core/test_bootstrap.py::test_paired_delta_log_ci_property_strict_identity \
+		tests/core/test_bootstrap.py::test_paired_delta_log_ci_property_rejects_mismatched_lengths \
+		tests/core/test_assurance_contract.py \
 		tests/core/test_runner_pairing.py::test_assess_bootstrap_coverage_paths \
 		tests/guards/test_invariants_guard.py::test_invariants_guard_detects_non_finite_weights \
+		tests/guards/test_unsupported_assurance_shape.py \
 		tests/eval/test_assurance_contracts.py \
 		tests/eval/test_metrics_masked_lm.py \
 		tests/edits/test_quant_rtn.py \
@@ -269,6 +281,7 @@ test-assurance:  ## Run assurance-related tests only
 		tests/reporting/test_report_paired_ci_identity.py::test_paired_ci_identity_holds \
 		tests/reporting/test_report_pairing_and_validation_helpers.py::test_enforce_pairing_and_coverage_path_matrix \
 		tests/reporting/test_report_policy_edges.py::test_ppl_hysteresis_applied_near_threshold \
+		tests/reporting/test_verify_assurance_guard_chain.py \
 		tests/reporting/test_public_contracts.py \
 		tests/reporting/test_evidence_pack_contract.py \
 		tests/reporting/test_policy_pack_contract.py \
@@ -376,6 +389,7 @@ packaging-smoke-front-door:  ## Smoke installed-wheel evaluate -> verify -> repo
 	$(MAKE) ensure-python
 	@PYTHON="$$(if [ -x .venv/bin/python ]; then printf '%s' .venv/bin/python; else printf '%s' "$(PYTHON)"; fi)"; \
 	PYTHONPATH=src "$$PYTHON" -m pytest -q \
+		tests/integration/packaging/test_wheel_front_door_contract.py::test_wheel_install_verifies_strict_report_bundle_outside_repo_tree \
 		tests/integration/packaging/test_wheel_front_door_contract.py::test_wheel_install_runs_front_door_evaluate_verify_report_html_outside_repo_tree
 
 model-evidence-list:  ## Print the maintained shipped-model evidence manifest

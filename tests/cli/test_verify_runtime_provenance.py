@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -10,8 +11,16 @@ from typer.testing import CliRunner
 
 from invarlock.cli.app import app
 from invarlock.cli.commands.verify import verify_command
+from invarlock.core.assurance_contract import ASSURANCE_CLAIM_SET, CANONICAL_GUARD_CHAIN
 from invarlock.core.exceptions import ConfigError
 from invarlock.reporting import verify_contract as verify_mod
+from invarlock.runtime_security import (
+    RUNTIME_MANIFEST_FILENAME,
+    RUNTIME_MANIFEST_VERSION,
+    RUNTIME_VERIFIER_CONTRACT_VERSION,
+)
+
+_VALID_TEST_IMAGE_DIGEST = "sha256:" + ("a" * 64)
 
 
 def _provenance_gate_cert() -> dict:
@@ -53,6 +62,66 @@ def _provenance_gate_cert() -> dict:
             "rmt_stable": True,
         },
     }
+
+
+def _strict_provenance_gate_cert() -> dict:
+    payload = _provenance_gate_cert()
+    payload["plugins"] = {"guards": list(CANONICAL_GUARD_CHAIN)}
+    payload["guards"] = [{"name": name} for name in CANONICAL_GUARD_CHAIN]
+    payload["context"] = {"profile": "ci"}
+    payload["auto"] = {"tier": "balanced"}
+    payload["meta"] = {"profile": "ci"}
+    payload["spectral"] = {"supported": True, "status": "pass"}
+    payload["rmt"] = {"supported": True, "status": "pass"}
+    payload["variance"] = {"supported": True, "status": "pass"}
+    payload["invariants"] = {"supported": True, "status": "pass"}
+    payload["primary_metric"]["ci"] = [0.0, 0.0]
+    payload["assurance"] = {
+        "mode": "strict",
+        "profile": "ci",
+        "tier": "balanced",
+        "claim_set": ASSURANCE_CLAIM_SET,
+        "canonical_guard_chain": list(CANONICAL_GUARD_CHAIN),
+        "guard_chain_observed": list(CANONICAL_GUARD_CHAIN),
+        "canonical_guard_chain_enforced": True,
+        "fallback_fields_used": False,
+        "runtime_provenance_verified": False,
+        "runtime_provenance_declared": "container",
+        "runtime_provenance_verification_status": "pending",
+        "verdict": "pass",
+        "blocking_reasons": [],
+    }
+    return payload
+
+
+def _write_runtime_manifest(
+    report_path: Path, *, execution_mode: str = "container"
+) -> Path:
+    payload = {
+        "manifest_version": RUNTIME_MANIFEST_VERSION,
+        "generated_at_utc": "2026-05-24T00:00:00+00:00",
+        "verifier_contract_version": RUNTIME_VERIFIER_CONTRACT_VERSION,
+        "report": {
+            "path": str(report_path.resolve()),
+            "filename": report_path.name,
+            "sha256": hashlib.sha256(report_path.read_bytes()).hexdigest(),
+        },
+        "config": {"path": None, "sha256": None, "source": "missing"},
+        "execution_mode": execution_mode,
+        "runtime": {
+            "image_ref": "ghcr.io/invarlock/invarlock-runtime:test",
+            "image_digest": _VALID_TEST_IMAGE_DIGEST,
+            "container_execution": execution_mode == "container",
+            "allow_network": False,
+            "allow_remote_code": False,
+            "allow_third_party_plugins": False,
+        },
+    }
+    path = report_path.parent / RUNTIME_MANIFEST_FILENAME
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return path
 
 
 def test_verify_fails_closed_without_runtime_manifest(
@@ -105,6 +174,150 @@ def test_verify_allows_unverified_provenance_override(
 
     assert result.exit_code == 0
     assert "VERIFY OK" in result.output
+
+
+def test_strict_verify_accepts_pending_report_with_valid_runtime_manifest(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    cert_path = tmp_path / "evaluation.report.json"
+    cert_path.write_text(json.dumps(_strict_provenance_gate_cert()), encoding="utf-8")
+    _write_runtime_manifest(cert_path)
+    monkeypatch.setattr(
+        verify_mod, "_validate_evaluation_report_payload", lambda *args, **kwargs: []
+    )
+
+    result = CliRunner().invoke(
+        app,
+        ["verify", "--assurance", "strict", str(cert_path)],
+        env={"INVARLOCK_ALLOW_UNVERIFIED_PROVENANCE": "0"},
+    )
+
+    assert result.exit_code == 0
+    assert "VERIFY OK" in result.output
+
+
+def test_verify_json_reports_runtime_provenance_status(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    cert_path = tmp_path / "evaluation.report.json"
+    cert_path.write_text(json.dumps(_strict_provenance_gate_cert()), encoding="utf-8")
+    _write_runtime_manifest(cert_path)
+    monkeypatch.setattr(
+        verify_mod, "_validate_evaluation_report_payload", lambda *args, **kwargs: []
+    )
+
+    result = CliRunner().invoke(
+        app,
+        ["verify", "--assurance", "strict", "--json", str(cert_path)],
+        env={"INVARLOCK_ALLOW_UNVERIFIED_PROVENANCE": "0"},
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    verification = payload["results"][0]["verification"]
+    assert verification["runtime_provenance"]["status"] == "verified"
+    assert verification["runtime_provenance"]["verified"] is True
+    assert verification["runtime_provenance"]["issues"] == []
+
+
+def test_strict_verify_rejects_host_runtime_provenance_override(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    cert_path = tmp_path / "evaluation.report.json"
+    cert_path.write_text(json.dumps(_strict_provenance_gate_cert()), encoding="utf-8")
+    monkeypatch.setattr(
+        verify_mod, "_validate_evaluation_report_payload", lambda *args, **kwargs: []
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "verify",
+            "--assurance",
+            "strict",
+            "--runtime-provenance",
+            "host",
+            str(cert_path),
+        ],
+        env={"INVARLOCK_ALLOW_UNVERIFIED_PROVENANCE": "0"},
+    )
+
+    assert result.exit_code == 1
+    assert "verified runtime provenance" in result.output
+
+
+def test_strict_verify_rejects_host_runtime_manifest(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    cert_path = tmp_path / "evaluation.report.json"
+    cert_path.write_text(json.dumps(_strict_provenance_gate_cert()), encoding="utf-8")
+    _write_runtime_manifest(cert_path, execution_mode="host")
+    monkeypatch.setattr(
+        verify_mod, "_validate_evaluation_report_payload", lambda *args, **kwargs: []
+    )
+
+    result = CliRunner().invoke(
+        app,
+        ["verify", "--assurance", "strict", str(cert_path)],
+        env={"INVARLOCK_ALLOW_UNVERIFIED_PROVENANCE": "0"},
+    )
+
+    assert result.exit_code == 1
+    assert "marks evaluation.report.json as 'host'" in result.output
+    assert "verified runtime provenance" in result.output
+
+
+def test_strict_verify_rejects_invalid_runtime_manifest(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    cert_path = tmp_path / "evaluation.report.json"
+    cert_path.write_text(json.dumps(_strict_provenance_gate_cert()), encoding="utf-8")
+    (tmp_path / RUNTIME_MANIFEST_FILENAME).write_text("{not-json", encoding="utf-8")
+    monkeypatch.setattr(
+        verify_mod, "_validate_evaluation_report_payload", lambda *args, **kwargs: []
+    )
+
+    result = CliRunner().invoke(
+        app,
+        ["verify", "--assurance", "strict", str(cert_path)],
+        env={"INVARLOCK_ALLOW_UNVERIFIED_PROVENANCE": "0"},
+    )
+
+    assert result.exit_code == 1
+    assert "runtime.manifest.json is invalid" in result.output
+    assert "verified runtime provenance" in result.output
+
+
+def test_strict_verify_rejects_runtime_manifest_digest_mismatch(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    cert_path = tmp_path / "evaluation.report.json"
+    cert_path.write_text(json.dumps(_strict_provenance_gate_cert()), encoding="utf-8")
+    manifest_path = _write_runtime_manifest(cert_path)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["report"]["sha256"] = "0" * 64
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        verify_mod, "_validate_evaluation_report_payload", lambda *args, **kwargs: []
+    )
+
+    result = CliRunner().invoke(
+        app,
+        ["verify", "--assurance", "strict", str(cert_path)],
+        env={"INVARLOCK_ALLOW_UNVERIFIED_PROVENANCE": "0"},
+    )
+
+    assert result.exit_code == 1
+    assert "report digest mismatch" in result.output
+    assert "verified runtime provenance" in result.output
 
 
 def test_verify_command_rejects_invalid_runtime_provenance_value(

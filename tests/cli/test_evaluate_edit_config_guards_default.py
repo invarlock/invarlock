@@ -83,4 +83,5 @@ def test_evaluate_edit_config_includes_guard_order(tmp_path: Path, monkeypatch):
         edit_config=str(edit_cfg),
         banner=False,
         quiet=True,
+        assurance="off",
     )
