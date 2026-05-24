@@ -84,15 +84,35 @@ def _compute_bootstrap_delta_stats(
         and slices.final_log_losses
         and slices.preview_log_losses
     ):
-        delta_log_ci = compute_paired_delta_log_ci_fn(
-            slices.final_log_losses,
-            slices.preview_log_losses,
-            weights=paired_weights,
-            method=runtime.delta_method,
-            replicates=runtime.bootstrap_replicates,
-            alpha=runtime.bootstrap_alpha,
-            seed=runtime.bootstrap_seed + 97,
-        )
+        try:
+            delta_log_ci = compute_paired_delta_log_ci_fn(
+                slices.final_log_losses,
+                slices.preview_log_losses,
+                weights=paired_weights,
+                method=runtime.delta_method,
+                replicates=runtime.bootstrap_replicates,
+                alpha=runtime.bootstrap_alpha,
+                seed=runtime.bootstrap_seed + 97,
+                strict_lengths=True,
+            )
+        except ValueError as exc:
+            pm_invalid = True
+            runner._log_event(
+                "eval",
+                "paired_delta_strict_length_error",
+                LogLevel.ERROR,
+                {"reason": str(exc)},
+            )
+            delta_log_ci = compute_paired_delta_log_ci_fn(
+                slices.final_log_losses,
+                slices.preview_log_losses,
+                weights=paired_weights,
+                method=runtime.delta_method,
+                replicates=runtime.bootstrap_replicates,
+                alpha=runtime.bootstrap_alpha,
+                seed=runtime.bootstrap_seed + 97,
+                strict_lengths=False,
+            )
         ratio_ci = logspace_to_ratio_ci_fn(delta_log_ci)
         expected_ratio_ci = tuple(math.exp(bound) for bound in delta_log_ci)
         if any(

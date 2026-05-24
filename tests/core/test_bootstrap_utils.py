@@ -89,6 +89,36 @@ def test_weight_helpers_cover_invalid_inputs_and_zero_total_path():
     assert mean == pytest.approx(2.0)
 
 
+def test_strict_weight_helpers_raise_on_invalid_inputs_and_zero_pairs():
+    with pytest.raises(ValueError, match="1-dimensional"):
+        B._normalize_weights_strict([[1.0], [2.0]], 2)
+    with pytest.raises(ValueError, match="finite"):
+        B._normalize_weights_strict([1.0, float("nan")], 2)
+    with pytest.raises(ValueError, match="non-negative"):
+        B._normalize_weights_strict([1.0, -1.0], 2)
+    with pytest.raises(ValueError, match="positive sum"):
+        B._normalize_weights_strict([0.0, 0.0], 2)
+
+
+def test_compute_paired_delta_log_ci_returns_zero_for_empty_trimmed_pairs(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    arrays = iter(
+        [
+            np.asarray([], dtype=float),
+            np.asarray([], dtype=float),
+        ]
+    )
+    monkeypatch.setattr(B, "_ensure_array", lambda _samples: next(arrays))
+
+    lo, hi = B.compute_paired_delta_log_ci(
+        [],
+        [],
+        strict_lengths=False,
+    )
+    assert (lo, hi) == (0.0, 0.0)
+
+
 def test_weighted_bootstrap_helpers_cover_small_n_and_validation_errors():
     rng = np.random.default_rng(0)
     lo, hi = B._bca_interval_weighted(
@@ -148,5 +178,6 @@ def test_weighted_bootstrap_bca_handles_single_dominant_weight_and_short_weights
         replicates=10,
         alpha=0.1,
         seed=0,
+        strict_lengths=False,
     )
     assert lo2 <= hi2
