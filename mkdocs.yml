@@ -68,10 +68,6 @@ nav:
       - Architecture: security/architecture.md
       - Runtime Provenance Guide: security/runtime-provenance-guide.md
       - Pip Audit Allowlist: security/pip-audit-allowlist.md
-  - Release:
-      - v0.9.0 Assurance Hardening Plan: release/v0.9.0-assurance-hardening-plan.md
-      - v0.9.0 Checklist: release/v0.9.0-release-checklist.md
-
 theme:
   name: material
   language: en
