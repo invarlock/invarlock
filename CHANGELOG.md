@@ -31,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   JSON/Markdown reports for release review.
 - Added a `make dist-check` packaging gate that builds wheel/sdist artifacts
   and runs `twine check` before release.
+- Added a maintainer release-evidence checklist and `make release-evidence-check`
+  gate for wheel/sdist hashes, SBOMs, runtime image digests, and strict example
+  report bundles.
+- Added a deterministic `make guard-validation-smoke` maintainer gate and
+  assurance note for synthetic spectral/RMT/variance validation evidence.
 
 ### Changed
 
@@ -39,6 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Generated reports now distinguish declared runtime provenance from verifier
   confirmation; `verify` records the actual runtime-provenance verification
   result in its output.
+- Strict generated reports now use a pending-verifier top-level verdict until
+  runtime provenance is checked by `verify`, while preserving a separate
+  report-local verdict.
 - Consolidated open dependency/security PR content into this branch: CodeQL
   action SHA refresh, Ruff 0.15.13, `idna>=3.15`, and
   `pymdown-extensions>=10.21.3`.
