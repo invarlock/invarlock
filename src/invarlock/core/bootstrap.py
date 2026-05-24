@@ -57,6 +57,24 @@ def _normalize_weights(weights: Iterable[float] | None, n: int) -> np.ndarray | 
     return arr / total
 
 
+def _normalize_weights_strict(weights: Iterable[float], n: int) -> np.ndarray | None:
+    arr = np.asarray(list(weights), dtype=float)
+    if arr.ndim != 1:
+        raise ValueError("weights must be 1-dimensional")
+    if arr.size != n:
+        raise ValueError("weights length must match paired samples")
+    if not np.all(np.isfinite(arr)):
+        raise ValueError("weights must be finite")
+    if np.any(arr < 0):
+        raise ValueError("weights must be non-negative")
+    total = float(arr.sum())
+    if total <= 0.0:
+        raise ValueError("weights must have a positive sum")
+    if np.allclose(arr, arr[0]):
+        return None
+    return arr / total
+
+
 def _weighted_mean(samples: np.ndarray, weights: np.ndarray) -> float:
     total = float(weights.sum())
     if total <= 0.0:
@@ -293,6 +311,7 @@ def compute_paired_delta_log_ci(
     replicates: int = 1000,
     alpha: float = 0.05,
     seed: int = 0,
+    strict_lengths: bool = True,
 ) -> tuple[float, float]:
     """
     Compute a confidence interval over the paired mean delta of log-loss.
@@ -312,15 +331,20 @@ def compute_paired_delta_log_ci(
     final_arr = _ensure_array(final_logloss)
     base_arr = _ensure_array(baseline_logloss)
     if final_arr.size != base_arr.size:
+        if strict_lengths:
+            raise ValueError("final_logloss and baseline_logloss lengths must match")
         size = min(final_arr.size, base_arr.size)
         final_arr = final_arr[:size]
         base_arr = base_arr[:size]
     weight_arr = None
     if weights is not None:
-        weight_list = list(weights)
-        if len(weight_list) >= final_arr.size:
-            weight_list = weight_list[: final_arr.size]
-        weight_arr = _normalize_weights(weight_list, final_arr.size)
+        if strict_lengths:
+            weight_arr = _normalize_weights_strict(weights, final_arr.size)
+        else:
+            weight_list = list(weights)
+            if len(weight_list) >= final_arr.size:
+                weight_list = weight_list[: final_arr.size]
+            weight_arr = _normalize_weights(weight_list, final_arr.size)
     if final_arr.size == 0:
         return 0.0, 0.0
 

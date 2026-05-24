@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from invarlock.core.assurance_contract import normalize_verify_assurance_mode
 from invarlock.exit_codes import resolve_command_exit_code
 
 from ...reporting.verify_contract import (
@@ -79,6 +80,7 @@ def verify_command(
     profile: str | None = "dev",
     json_out: bool = False,
     runtime_provenance: str = "container",
+    assurance: str = "report",
 ) -> None:
     """
     Verify evaluation report integrity.
@@ -95,6 +97,7 @@ def verify_command(
             _allow_unverified_provenance_for_runtime_provenance(runtime_provenance)
         ),
         json_mode=bool(json_out),
+        assurance_mode=normalize_verify_assurance_mode(assurance),
     )
     exit_code = _verify_exit_code(result, profile=profile)
     if not json_out:

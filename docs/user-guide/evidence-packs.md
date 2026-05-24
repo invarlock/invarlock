@@ -124,8 +124,11 @@ Validated container-path parity contract for evidence-pack wrappers:
 
 Bulk evidence-pack entrypoints default to `SKIP_FLASH_ATTN=true` and
 `PACK_BASELINE_STORAGE_MODE=snapshot_copy`. That is the safe default for remote
-default runtime-container runs. Only opt back into flash-attn builds or
-`snapshot_symlink` baselines when you intentionally want the extra complexity.
+default runtime-container runs. The pinned flash-attn installer is not shipped
+in the current dependency surface because the audited package has an unpatched deserialization
+advisory; keep eager attention unless your environment owner separately accepts
+and pins a remediated build. Only opt back into `snapshot_symlink` baselines
+when you intentionally want the extra complexity.
 
 ## How It Works
 
@@ -307,11 +310,56 @@ Use the package-native subcommands:
 
 Reviewer checklist:
 
-- `invarlock advanced evidence-pack verify <dir> --strict` returns `0`
-- `jq -e . <dir>/manifest.json` succeeds
-- `sha256sum -c <dir>/checksums.sha256` succeeds
-- `jq -e . <dir>/manifest.signature.json` succeeds when the pack is published as signed evidence
-- `manifest.json` includes builder, subject, invocation, environment, and
+- [ ] `invarlock advanced evidence-pack verify <dir> --strict` returns `0`
+- [ ] `jq -e . <dir>/manifest.json` succeeds
+- [ ] `sha256sum -c <dir>/checksums.sha256` succeeds
+- [ ] `jq -e . <dir>/manifest.signature.json` succeeds when the pack is
+  published as signed evidence
+- [ ] `manifest.json` includes builder, subject, invocation, environment, and
   material digests for the distributed pack
 
-For strong distributable evidence, require all three: signed manifest, strict verification, and PASS final verdict.
+For strong distributable evidence, require all three: signed manifest, strict
+verification, and PASS final verdict.
+
+## Troubleshooting
+
+- **Missing tuned-edit parameters**: clean edits require tuned preset
+  parameters. Either set `PACK_TUNED_EDIT_PARAMS_FILE` or place the file at
+  `scripts/evidence_packs/tuned_edit_params.json`.
+- **Container engine not found**: install Podman or Docker and a locally built
+  `invarlock-runtime:local` image (`make runtime-image`); pick one explicitly
+  with `INVARLOCK_CONTAINER_ENGINE=podman` or `INVARLOCK_CONTAINER_ENGINE=docker`.
+- **Disk preflight fails**: increase free space to at least `MIN_FREE_DISK_GB`
+  (200 GB by default) or relocate `OUTPUT_DIR` / the HF cache to a separate
+  volume.
+- **Missing remote-code opt-in**: bulk evidence-pack runs require
+  `INVARLOCK_ALLOW_REMOTE_CODE=1`; the entrypoint fails fast before queue
+  creation when that opt-in is missing.
+- **Unsigned pack rejected**: `verify` fails closed without
+  `manifest.signature.json`. Either re-sign with
+  `invarlock advanced evidence-pack keygen` + `--signing-key`, or accept that
+  the bundle is not assurance-grade.
+- **YAML `!include` outside config dir**: set
+  `INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1` or move the included file under
+  the config directory.
+
+## Observability
+
+- `manifest.json` records `checksums_sha256_digest`, builder, subject,
+  invocation, environment, material digests, and a derived `evidence_level`.
+- `manifest.signature.json` records the detached Ed25519 signature when the
+  pack is signed.
+- `results/final_verdict.json` and per-model summary JSON files surface the
+  scenario verdicts that drove the pack-level pass/fail.
+- `reports/**/runtime.manifest.json` sidecars preserve runtime provenance for
+  every clean report in the pack.
+
+## Related Documentation
+
+- [Evidence Pack Internals](evidence-packs-internals.md) — task graph, scheduler flow, and artifacts
+- [CLI Reference](../reference/cli.md) — `invarlock advanced evidence-pack` subcommands
+- [Public Contracts](../reference/contracts.md) — manifest schema and JSON output envelopes
+- [Runtime Provenance Guide](../security/runtime-provenance-guide.md) — manifest requirements for strict bundles
+- [Trust Model](../assurance/trust-model.md) — what strict assurance does and does not mean
+- [Tier Policy Tuning CLI](../reference/calibration.md) — global tier policy calibration
+- [Threat Model](../security/threat-model.md) — security assumptions for distributable evidence

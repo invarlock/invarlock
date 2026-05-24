@@ -91,6 +91,8 @@ this public docs index.
 ### Assurance
 
 - [Assurance Case](assurance/00-assurance-case.md)
+- [Trust Model](assurance/trust-model.md)
+- [Strict Assurance Checklist](assurance/strict-assurance-checklist.md)
 - [Evaluation Math Derivation](assurance/01-eval-math-derivation.md)
 - [Coverage & Pairing Plan](assurance/02-coverage-and-pairing.md)
 - [BCa Bootstrap (Paired Δlog)](assurance/03-bca-bootstrap.md)
@@ -122,11 +124,12 @@ to change proposals or releases when you update calibration.
 - [Security Architecture](security/architecture.md) — Components and defaults
 - [Best Practices](security/best-practices.md) — Operational recommendations
 - [Release Verification](security/release-verification.md) — Verification of published package artifacts and source tags
+- [Runtime Provenance Guide](security/runtime-provenance-guide.md) — Manifest requirements for strict assurance
 - [pip-audit Allowlist](security/pip-audit-allowlist.md)
 
 ### Governance
 
-- [Contribution Guidelines](https://github.com/invarlock/invarlock/blob/v0.8.0/CONTRIBUTING.md)
+- [Contribution Guidelines](https://github.com/invarlock/invarlock/blob/v0.9.0/CONTRIBUTING.md)
 
 ---
 
@@ -347,4 +350,4 @@ Run with `RUN=1` to execute the matrix.
 [CLI Reference](reference/cli.md) ·
 [Primary Metric Smoke](user-guide/primary-metric-smoke.md) ·
 [Example Reports](user-guide/example-reports.md) ·
-[Contributing](https://github.com/invarlock/invarlock/blob/v0.8.0/CONTRIBUTING.md)
+[Contributing](https://github.com/invarlock/invarlock/blob/v0.9.0/CONTRIBUTING.md)

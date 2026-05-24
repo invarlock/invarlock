@@ -295,6 +295,7 @@ class _PPLCausal(PrimaryMetric):
             replicates=reps_eff,
             alpha=alpha,
             seed=seed_eff,
+            strict_lengths=False,
         )
         if pair_weights and len(pair_weights) >= min(len(subj_vals), len(base_vals)):
             sw = 0.0

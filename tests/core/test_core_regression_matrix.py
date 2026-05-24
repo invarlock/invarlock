@@ -49,7 +49,8 @@ def test_compute_paired_delta_log_ci_returns_zero_for_empty_trimmed_pairs(
     )
     monkeypatch.setattr(bootstrap_mod, "_ensure_array", lambda _samples: next(arrays))
 
-    assert bootstrap_mod.compute_paired_delta_log_ci([1.0], [2.0]) == (0.0, 0.0)
+    with pytest.raises(ValueError, match="lengths must match"):
+        bootstrap_mod.compute_paired_delta_log_ci([1.0], [2.0])
 
 
 @dataclass

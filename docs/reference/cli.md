@@ -46,10 +46,11 @@ invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject distilgpt2 \
   --adapter auto \
-  --profile ci
+  --profile ci \
+  --assurance strict
 
 # Validate the container-backed evaluation bundle
-invarlock verify reports/eval/evaluation.report.json
+invarlock verify --assurance strict reports/eval/evaluation.report.json
 
 # Render shareable HTML
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
@@ -60,10 +61,17 @@ invarlock report explain --evaluation-report reports/eval/evaluation.report.json
 
 - `evaluate` defaults to `--execution-mode container`, which delegates model-loading work
   into the runtime container.
+- `evaluate` defaults to `--assurance strict`, which requires CI/release profile,
+  balanced/conservative tier, canonical guard order, complete evidence, and
+  verified runtime provenance.
 - Use `--execution-mode host` only for host-side workflows that intentionally
-  bypass the container boundary.
+  bypass the container boundary. Host mode is non-assurance unless
+  `--assurance off` is explicit.
 - `verify` expects `runtime.manifest.json` beside container-backed evaluation outputs
   and fails closed when required runtime provenance is missing.
+- `verify --assurance report` is the default: strict is enforced when the report
+  claims strict. Use `verify --assurance strict` to require strict on every
+  report input.
 - Network access remains opt-in through `evaluate --allow-network`.
 
 ## Task To Command Map
@@ -126,6 +134,9 @@ Common options:
   `container` keeps model loading inside the runtime container; `host`
   allows host-side execution and produces host artifacts that should
   be verified with `verify --runtime-provenance host`.
+- `--assurance strict|off`: strict is the default assurance contract;
+  off is for exploratory/dev reports that must not be treated as assurance
+  evidence.
 - `--edit-config`: optional demo/smoke edit overlay such as `quant_rtn`
 
 Example:
@@ -153,6 +164,9 @@ Common options:
 - `--baseline`: optional baseline report for comparison flows
 - `--tolerance`: float tolerance for recompute checks
 - `--profile`: profile-aware validation mode
+- `--assurance report|strict|off`: `report` enforces strict only for reports
+  claiming strict; `strict` requires every input to claim and pass strict;
+  `off` skips strict assurance policy checks.
 - `--runtime-provenance container|host`: runtime provenance policy for
   the supplied report artifacts
 - `--json`: emit a single JSON envelope
@@ -323,5 +337,10 @@ These commands emit a single JSON object suitable for CI parsing.
 - [Getting Started](../user-guide/getting-started.md)
 - [Quickstart](../user-guide/quickstart.md)
 - [Compare & evaluate (BYOE)](../user-guide/compare-and-evaluate.md)
-- [reports](reports.md)
+- [Reports Reference](reports.md) — Schema, telemetry, and HTML export
+- [Configuration Schema](config-schema.md)
+- [Environment Variables](env-vars.md)
 - [Public Contracts](contracts.md)
+- [Troubleshooting](../user-guide/troubleshooting.md) — Error codes and recovery
+- [Runtime Provenance Guide](../security/runtime-provenance-guide.md)
+- [One Run Lifecycle](one-run-lifecycle.md) — Stage map for a single run

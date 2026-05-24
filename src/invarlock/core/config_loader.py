@@ -220,11 +220,17 @@ def load_config(path: str | Path) -> InvarLockConfig:
             "edit.kind is not supported; use edit.name with a canonical edit plugin name."
         )
 
-    if raw.get("assurance") is not None:
-        raise ValueError(
-            "assurance.* is not supported; configure measurement contracts under guards.* "
-            "(e.g., guards.spectral.estimator, guards.rmt.activation.sampling)."
-        )
+    assurance_block = raw.get("assurance")
+    if assurance_block is not None:
+        if not isinstance(assurance_block, dict):
+            raise ValueError("assurance must be a mapping when present")
+        if set(assurance_block) - {"mode"}:
+            unsupported = ", ".join(sorted(set(assurance_block) - {"mode"}))
+            raise ValueError(f"Unsupported assurance keys: {unsupported}")
+        mode = str(assurance_block.get("mode", "strict")).strip().lower()
+        if mode not in {"strict", "off"}:
+            raise ValueError("assurance.mode must be one of: strict, off")
+        assurance_block["mode"] = mode
 
     guards_block = raw.get("guards")
     if isinstance(guards_block, dict):

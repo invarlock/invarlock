@@ -138,6 +138,7 @@ def _run_subject_evaluation_phase(
     profile_name: str,
     tier_name: str,
     guards_order: Any,
+    assurance_mode: str,
     subject_label: str | None,
     edit_config: str | None,
     edit_label: str | None,
@@ -204,6 +205,7 @@ def _run_subject_evaluation_phase(
             profile=profile_name,
             tier=tier_name,
             guards_order=guards_order,
+            assurance_mode=assurance_mode,
         )
 
         edited_merged_yaml = tmp_dir / "edited_merged.yaml"
@@ -260,6 +262,7 @@ def _run_subject_evaluation_phase(
             profile=profile_name,
             tier=tier_name,
             guards_order=guards_order,
+            assurance_mode=assurance_mode,
         )
         edited_yaml = tmp_dir / "edited_noop.yaml"
         dump_yaml_fn(edited_yaml, edited_cfg)

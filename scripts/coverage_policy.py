@@ -88,6 +88,7 @@ THRESHOLDS = {
     "src/invarlock/guards/policies.py": 1.00,
     # Core orchestration & runtime
     "src/invarlock/core/registry.py": 1.00,
+    "src/invarlock/core/assurance_contract.py": 1.00,
     "src/invarlock/core/bootstrap.py": 1.00,
     "src/invarlock/core/contracts.py": 1.00,
     "src/invarlock/core/auto_tuning.py": 0.95,

@@ -3,6 +3,8 @@ from __future__ import annotations
 import copy
 from typing import Any
 
+from invarlock.core.assurance_contract import build_assurance_section
+
 from . import policy_utils as report_policy_utils_mod
 from . import report_confidence as report_confidence_mod
 from . import report_enrichment as report_enrichment_mod
@@ -58,10 +60,20 @@ def _build_evaluation_report(
         "policy_provenance": policy_provenance,
         "provenance": provenance,
         "plugins": plugin_provenance,
+        "guards": (
+            copy.deepcopy(report_map.get("guards", []))
+            if isinstance(report_map.get("guards"), list)
+            else []
+        ),
         "artifacts": artifacts_payload,
         "validation": validation_filtered,
         "guard_overhead": guard_overhead_section,
         "primary_metric_tail": pm_tail_result,
+        "context": (
+            copy.deepcopy(report_map.get("context", {}))
+            if isinstance(report_map.get("context"), dict)
+            else {}
+        ),
         "evaluation_windows": (
             copy.deepcopy(report_map.get("evaluation_windows", {}))
             if isinstance(report_map.get("evaluation_windows"), dict)
@@ -183,3 +195,23 @@ def _finalize_evaluation_report(
         meta_section = evaluation_report.setdefault("meta", {})
         if isinstance(meta_section, dict):
             meta_section["build_diagnostics"] = build_diagnostics
+    try:
+        fallback_fields_used = any(
+            isinstance(item, dict)
+            and (
+                "fallback" in str(item.get("code", "")).lower()
+                or "repair" in str(item.get("code", "")).lower()
+                or "unavailable" in str(item.get("code", "")).lower()
+            )
+            for item in build_diagnostics
+        )
+        evaluation_report["assurance"] = build_assurance_section(
+            evaluation_report,
+            fallback_fields_used=fallback_fields_used,
+            runtime_provenance_verified=True,
+        )
+    except non_fatal_exceptions:
+        record_blocking_diagnostic(
+            code="assurance.section_unavailable",
+            message="Assurance verdict metadata could not be attached to the evaluation report.",
+        )
