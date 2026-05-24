@@ -91,8 +91,8 @@ this public docs index.
 ### Assurance
 
 - [Assurance Case](assurance/00-assurance-case.md)
-- [Trust Model](assurance/trust-model.md)
-- [Strict Assurance Checklist](assurance/strict-assurance-checklist.md)
+- [Trust Model](assurance/14-trust-model.md)
+- [Strict Assurance Checklist](assurance/15-strict-assurance-checklist.md)
 - [Evaluation Math Derivation](assurance/01-eval-math-derivation.md)
 - [Coverage & Pairing Plan](assurance/02-coverage-and-pairing.md)
 - [BCa Bootstrap (Paired Δlog)](assurance/03-bca-bootstrap.md)

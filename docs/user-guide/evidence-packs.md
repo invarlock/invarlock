@@ -360,6 +360,6 @@ verification, and PASS final verdict.
 - [CLI Reference](../reference/cli.md) — `invarlock advanced evidence-pack` subcommands
 - [Public Contracts](../reference/contracts.md) — manifest schema and JSON output envelopes
 - [Runtime Provenance Guide](../security/runtime-provenance-guide.md) — manifest requirements for strict bundles
-- [Trust Model](../assurance/trust-model.md) — what strict assurance does and does not mean
+- [Trust Model](../assurance/14-trust-model.md) — what strict assurance does and does not mean
 - [Tier Policy Tuning CLI](../reference/calibration.md) — global tier policy calibration
 - [Threat Model](../security/threat-model.md) — security assumptions for distributable evidence

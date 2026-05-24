@@ -54,6 +54,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Durable assurance and reference docs now describe the current strict contract
   without patch-release dating; v0.9.0-specific wording is kept to release
   notes and release checklists.
+- Assurance documentation filenames now use numbered prefixes consistently,
+  except for the glossary.
 
 ### Removed
 

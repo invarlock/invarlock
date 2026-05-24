@@ -125,7 +125,7 @@ assurance. Common non-strict shapes are catalogued in
 ## Related Documentation
 
 - [Assurance Case Overview](00-assurance-case.md)
-- [Strict Assurance Checklist](strict-assurance-checklist.md) — Reviewer checklist
+- [Strict Assurance Checklist](15-strict-assurance-checklist.md) — Reviewer checklist
 - [Reports Reference](../reference/reports.md) — Full v1 schema
 - [Runtime Provenance Guide](../security/runtime-provenance-guide.md) — Manifest requirements
 - [Failure Examples](../user-guide/failure-examples.md) — Common non-pass shapes

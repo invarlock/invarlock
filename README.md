@@ -45,7 +45,7 @@ in CI.
 - **Auditable evidence**: deterministic pairing metadata + policy digests in `evaluation.report.json`.
 - **CI/CD-friendly**: stable exit codes, `--json` outputs, and portable “evidence packs”.
 - **Offline-first**: network is disabled by default; enable downloads per command.
-- **Explicit assurance boundary**: the [trust model](docs/assurance/trust-model.md) states what a strict pass means and what it does not mean.
+- **Explicit assurance boundary**: the [trust model](docs/assurance/14-trust-model.md) states what a strict pass means and what it does not mean.
 
 ## Who is this for?
 
