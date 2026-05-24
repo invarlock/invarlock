@@ -8,7 +8,7 @@
 | **Audience** | Operators debugging `evaluate`, `verify`, and report-review outcomes. |
 | **Contract scope** | Examples target current strict assurance behavior and report v1 fields. |
 | **Related** | [Troubleshooting](troubleshooting.md) covers numbered error codes (`E001`–`E601`). |
-| **Source of truth** | `src/invarlock/reporting/verify_contract.py`, `src/invarlock/core/assurance_contract.py`, `docs/assurance/trust-model.md`. |
+| **Source of truth** | `src/invarlock/reporting/verify_contract.py`, `src/invarlock/core/assurance_contract.py`, `docs/assurance/14-trust-model.md`. |
 
 These examples show how to read common non-pass outcomes. They are intentionally
 small and focus on report and verifier behavior. For numbered pipeline error
@@ -97,8 +97,8 @@ evidence.
 
 ## Related Documentation
 
-- [Trust Model](../assurance/trust-model.md)
-- [Strict Assurance Checklist](../assurance/strict-assurance-checklist.md)
+- [Trust Model](../assurance/14-trust-model.md)
+- [Strict Assurance Checklist](../assurance/15-strict-assurance-checklist.md)
 - [Reading a Report](reading-report.md)
 - [Troubleshooting](troubleshooting.md)
 - [Runtime Provenance Guide](../security/runtime-provenance-guide.md)

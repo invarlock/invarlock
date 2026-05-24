@@ -67,8 +67,8 @@ Before accepting release evidence:
 - [Threat Model](threat-model.md)
 - [Security Architecture](architecture.md)
 - [Security Best Practices](best-practices.md)
-- [Trust Model](../assurance/trust-model.md)
-- [Strict Assurance Checklist](../assurance/strict-assurance-checklist.md)
+- [Trust Model](../assurance/14-trust-model.md)
+- [Strict Assurance Checklist](../assurance/15-strict-assurance-checklist.md)
 - [Reports Reference](../reference/reports.md)
 - [CLI Reference](../reference/cli.md) — `verify` and `advanced runtime-verify`
 - [Public Contracts](../reference/contracts.md) — manifest schema location

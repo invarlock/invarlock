@@ -7,7 +7,7 @@
 | **Purpose** | Reviewer checklist for accepting strict assurance evidence. |
 | **Audience** | Maintainers, release reviewers, CI gate owners. |
 | **Contract scope** | Current strict assurance behavior, claim set `invarlock-weight-edit-regression-v1`, report v1. |
-| **Source of truth** | `src/invarlock/core/assurance_contract.py`, `src/invarlock/reporting/verify_contract.py`, `docs/assurance/trust-model.md`. |
+| **Source of truth** | `src/invarlock/core/assurance_contract.py`, `src/invarlock/reporting/verify_contract.py`, `docs/assurance/14-trust-model.md`. |
 
 Use this checklist before accepting a strict report as assurance evidence.
 When a checkbox cannot be ticked, see [Failure Examples](../user-guide/failure-examples.md)
@@ -72,7 +72,7 @@ contents.
 
 ## Related Documentation
 
-- [Trust Model](trust-model.md) — What a strict pass does and does not mean
+- [Trust Model](14-trust-model.md) — What a strict pass does and does not mean
 - [Assurance Case Overview](00-assurance-case.md) — Claims, evidence, and tests
 - [Runtime Provenance Guide](../security/runtime-provenance-guide.md) — Manifest requirements
 - [Failure Examples](../user-guide/failure-examples.md) — Common non-pass shapes

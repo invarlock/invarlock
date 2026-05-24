@@ -7,7 +7,7 @@
 | **Purpose** | Position InvarLock against adjacent evaluation, MLOps, and compression tools. |
 | **Audience** | Prospective users, evaluators, maintainers writing integration guidance. |
 | **Scope** | Current project positioning; not a vendor compatibility contract. |
-| **Source of truth** | `docs/assurance/trust-model.md`, `docs/reference/reports.md`, `docs/reference/guards.md`. |
+| **Source of truth** | `docs/assurance/14-trust-model.md`, `docs/reference/reports.md`, `docs/reference/guards.md`. |
 
 InvarLock is not a general model benchmark harness or MLOps monitoring system.
 It is a paired, verifier-friendly regression assurance workflow for edited
@@ -52,8 +52,8 @@ weights.
 
 ## Related Documentation
 
-- [Trust Model](../assurance/trust-model.md) — What a strict pass does and does not mean
-- [Strict Assurance Checklist](../assurance/strict-assurance-checklist.md) — Reviewer acceptance criteria
+- [Trust Model](../assurance/14-trust-model.md) — What a strict pass does and does not mean
+- [Strict Assurance Checklist](../assurance/15-strict-assurance-checklist.md) — Reviewer acceptance criteria
 - [Reports Reference](reports.md) — Schema, telemetry, and HTML export
 - [Guards Reference](guards.md) — Configuration and evidence
 - [Model Family Catalog](model-family-catalog.md) — Authoritative support inventory
