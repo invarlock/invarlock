@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@95e58e9a2cdfd71adc6e0353d5c52f41a045d225
+        uses: github/codeql-action/init@9e0d7b8d1a6c6b02b598c7194d07d8eb43a17368
         with:
           languages: python
           # Use extended security queries for more thorough analysis
@@ -43,10 +43,10 @@ jobs:
       # Autobuild attempts to build any compiled languages (not needed for Python)
       # but helps CodeQL understand the codebase structure
       - name: Autobuild
-        uses: github/codeql-action/autobuild@95e58e9a2cdfd71adc6e0353d5c52f41a045d225
+        uses: github/codeql-action/autobuild@9e0d7b8d1a6c6b02b598c7194d07d8eb43a17368
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@95e58e9a2cdfd71adc6e0353d5c52f41a045d225
+        uses: github/codeql-action/analyze@9e0d7b8d1a6c6b02b598c7194d07d8eb43a17368
         with:
           category: "/language:python"
           # Upload SARIF results to GitHub Security tab
