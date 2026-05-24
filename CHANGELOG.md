@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   report bundles.
 - Added a deterministic `make guard-validation-smoke` maintainer gate and
   assurance note for synthetic spectral/RMT/variance validation evidence.
+- Hardened `make release-evidence-check` so it validates artifact contents,
+  strict report semantics, verifier provenance status, guard-validation smoke
+  artifacts, and offline release bundles instead of only checking file
+  existence.
 
 ### Changed
 

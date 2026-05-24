@@ -11,6 +11,8 @@ from collections.abc import Sequence
 # precedence over the global/core floors below and encode the split-aware
 # coverage policy for shells, pure helpers, and tensor/mutation helpers.
 THRESHOLDS = {
+    # Release evidence tooling
+    "scripts/release/check_release_evidence.py": 0.95,
     # Evaluation & reporting
     "src/invarlock/eval/data.py": 1.00,
     "src/invarlock/eval/bootstrap.py": 1.00,
@@ -218,6 +220,8 @@ CORE_PREFIXES = (
 
 # Individual core files outside of the broad prefixes.
 CORE_FILES = (
+    # Release evidence tooling
+    "scripts/release/check_release_evidence.py",
     # Evaluation & reporting (key entry points)
     "src/invarlock/eval/data.py",
     "src/invarlock/eval/bootstrap.py",
@@ -286,6 +290,7 @@ CORE_FILES = (
 COVERAGE_MODULE_FLAGS = ("--cov",)
 
 COVERAGE_INCLUDE_PATTERNS = (
+    "scripts/release/*.py",
     "src/invarlock/eval/*",
     "src/invarlock/guards/*",
     "src/invarlock/calibration/*",
