@@ -9,6 +9,7 @@ import pytest
 from tests.integration.packaging._support_installed_wheel import (
     InstalledWheelEnv,
     _build_evidence_pack,
+    _build_strict_report,
     _build_valid_report,
     _run,
     _write_json,
@@ -191,6 +192,52 @@ def test_wheel_install_can_verify_report_runtime_and_evidence_pack_outside_repo_
     assert export_html.returncode == 0, export_html.stdout + export_html.stderr
     assert html_path.is_file()
     assert "<html" in html_path.read_text(encoding="utf-8").lower()
+
+    strict_report_dir = tmp_path / "strict-report"
+    strict_report_path = strict_report_dir / "evaluation.report.json"
+    _write_json(strict_report_path, _build_strict_report())
+    _write_runtime_manifest(strict_report_path)
+
+    verify_strict_report = _run(
+        installed_wheel_env.cli_exe,
+        [
+            "verify",
+            "--assurance",
+            "strict",
+            "--profile",
+            "ci",
+            "--json",
+            str(strict_report_path),
+        ],
+        cwd=tmp_path,
+    )
+    assert verify_strict_report.returncode == 0, (
+        verify_strict_report.stdout + verify_strict_report.stderr
+    )
+    strict_verify_payload = json.loads(
+        verify_strict_report.stdout.strip().splitlines()[-1]
+    )
+    assert strict_verify_payload["format_version"] == "verify-v1"
+    assert strict_verify_payload["summary"]["ok"] is True
+
+    strict_html_path = tmp_path / "strict-evaluation.html"
+    render_strict_html = _run(
+        installed_wheel_env.cli_exe,
+        [
+            "report",
+            "html",
+            "-i",
+            str(strict_report_path),
+            "-o",
+            str(strict_html_path),
+        ],
+        cwd=tmp_path,
+    )
+    assert render_strict_html.returncode == 0, (
+        render_strict_html.stdout + render_strict_html.stderr
+    )
+    assert strict_html_path.is_file()
+    assert "<html" in strict_html_path.read_text(encoding="utf-8").lower()
 
     runtime_verify = _run(
         installed_wheel_env.cli_exe,
