@@ -17,6 +17,7 @@
     "checkpointing",
     "gptq",
     "conftest",
+    "Deepchecks",
     "deadband",
     "docstrings",
     "Docstrings",

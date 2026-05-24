@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added strict assurance mode for `evaluate` and `verify`, including a central
+  top-level report verdict for the
+  `invarlock-weight-edit-regression-v1` claim set. This release introduces the
+  current strict assurance contract described in the trust-model and checklist
+  docs.
+- Added adversarial verifier coverage for strict guard-chain enforcement and
+  missing strict assurance claims.
+- Added strict paired-length checking for paired delta log-loss computation,
+  with truncation available only through explicit non-strict opt-in.
+- Added trust-model, strict assurance checklist, failure examples, alternatives
+  comparison, runtime provenance guide, one-run lifecycle, and v0.9.0 release
+  checklist documentation.
 - Added a CVE audit lane that inventories locked dependency surfaces,
   cross-checks exact package versions against OSV advisories, and emits
   JSON/Markdown reports for release review.
@@ -17,10 +29,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Default `evaluate` assurance posture is now fail-closed strict mode for
+  assurance evidence generation.
+- Consolidated open dependency/security PR content into this branch: CodeQL
+  action SHA refresh, Ruff 0.15.13, `idna>=3.15`, and
+  `pymdown-extensions>=10.21.3`.
+- Version metadata, docs links, and citation metadata now target v0.9.0.
+- Durable assurance and reference docs now describe the current strict contract
+  without patch-release dating; v0.9.0-specific wording is kept to release
+  notes and release checklists.
+
 ### Removed
 
 ### Fixed
 
+- Fixed the strict assurance trust boundary so host/unverified provenance,
+  custom guard order, dev/aggressive profiles, unsupported blocking statuses,
+  fallback fields, and missing guard evidence cannot pass as strict assurance.
 - Remediated `pip` and `urllib3` CVEs across the uv and workflow lock
   surfaces, cleared the stale `pip-audit` allowlist, and aligned the
   supply-chain workflow contract tests with the current disk-cleanup steps.
