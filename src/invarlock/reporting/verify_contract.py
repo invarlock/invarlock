@@ -347,6 +347,14 @@ def _append_recompute_errors(
                 message="Cannot recompute basis: evaluation_windows.final missing or incomplete (dev mode).",
             ),
         )
+    window_ids = fin.get("window_ids")
+    if isinstance(window_ids, list):
+        if len(window_ids) != len(ll):
+            errors.append(
+                "evaluation_windows.final.window_ids length differs from logloss/token_counts."
+            )
+        if len(window_ids) != len({str(item) for item in window_ids}):
+            errors.append("evaluation_windows.final.window_ids contains duplicates.")
     try:
         num = sum(float(a) * float(b) for a, b in zip(ll, wc, strict=False))
         den = sum(float(b) for b in wc)
@@ -372,6 +380,35 @@ def _append_recompute_errors(
     return ()
 
 
+def _runtime_provenance_verification_payload(
+    provenance_result: Any,
+) -> dict[str, Any]:
+    if bool(getattr(provenance_result, "verified", False)):
+        status = "verified"
+    elif bool(getattr(provenance_result, "skipped", False)):
+        status = "skipped"
+    else:
+        status = "failed"
+    issues = []
+    for issue in getattr(provenance_result, "issues", ()) or ():
+        code = getattr(issue, "code", "")
+        issues.append(
+            {
+                "code": getattr(code, "value", str(code)),
+                "message": str(getattr(issue, "message", "")),
+                "details": getattr(issue, "details", None) or {},
+            }
+        )
+    return {
+        "runtime_provenance": {
+            "status": status,
+            "verified": bool(getattr(provenance_result, "verified", False)),
+            "skipped": bool(getattr(provenance_result, "skipped", False)),
+            "issues": issues,
+        }
+    }
+
+
 def _verify_single_report(
     cert_path: Path,
     *,
@@ -382,7 +419,13 @@ def _verify_single_report(
     allow_unverified_provenance: bool,
     assurance_mode: str,
     json_mode: bool,
-) -> tuple[dict[str, Any], list[str], bool, tuple[VerifyDiagnostic, ...]]:
+) -> tuple[
+    dict[str, Any],
+    list[str],
+    bool,
+    tuple[VerifyDiagnostic, ...],
+    dict[str, Any],
+]:
     cert_obj = _load_evaluation_report(cert_path)
     prof = _resolve_profile_name(profile)
     prov = cert_obj.get("provenance") if isinstance(cert_obj, dict) else None
@@ -408,6 +451,7 @@ def _verify_single_report(
         cert_path,
         allow_unverified=bool(allow_unverified_provenance),
     )
+    verification_payload = _runtime_provenance_verification_payload(provenance_result)
     errors.extend(issue.message for issue in provenance_result.issues)
     report_assurance_mode = resolve_report_assurance_mode(cert_obj)
     require_strict_assurance = assurance_mode == "strict" or (
@@ -421,7 +465,7 @@ def _verify_single_report(
         strict_report_policy_errors(
             cert_obj,
             require_strict=require_strict_assurance,
-            runtime_provenance_verified=not provenance_result.issues,
+            runtime_provenance_verified=provenance_result.verified,
         )
     )
     if json_mode and any("schema validation failed" in str(e).lower() for e in errors):
@@ -458,12 +502,24 @@ def _verify_single_report(
 
     diagnostics: tuple[VerifyDiagnostic, ...] = ()
     if json_mode:
-        return cert_obj, errors, malformed, diagnostics + recompute_diagnostics
+        return (
+            cert_obj,
+            errors,
+            malformed,
+            diagnostics + recompute_diagnostics,
+            verification_payload,
+        )
     if errors:
         diagnostics = (VerifyDiagnostic(level="fail", message=str(cert_path)),) + tuple(
             VerifyDiagnostic(level="detail", message=str(err)) for err in errors
         )
-        return cert_obj, errors, malformed, diagnostics + recompute_diagnostics
+        return (
+            cert_obj,
+            errors,
+            malformed,
+            diagnostics + recompute_diagnostics,
+            verification_payload,
+        )
     try:
         diagnostics = (
             VerifyDiagnostic(level="pass", message=str(cert_path)),
@@ -475,7 +531,13 @@ def _verify_single_report(
         )
     except _VERIFY_RECOVERABLE_EXCEPTIONS:
         diagnostics = (VerifyDiagnostic(level="pass", message=str(cert_path)),)
-    return cert_obj, errors, malformed, diagnostics + recompute_diagnostics
+    return (
+        cert_obj,
+        errors,
+        malformed,
+        diagnostics + recompute_diagnostics,
+        verification_payload,
+    )
 
 
 def run_verify_reports(
@@ -497,6 +559,7 @@ def run_verify_reports(
     baseline_digest = _load_baseline_digest(baseline)
     malformed_any = False
     loaded_any_report = False
+    verification_by_path: dict[str, dict[str, Any]] = {}
     try:
         for cert_path in reports:
             if not loaded_any_report:
@@ -505,7 +568,13 @@ def run_verify_reports(
                     loaded_any_report = True
                 except _VERIFY_RECOVERABLE_EXCEPTIONS:
                     pass
-            cert_obj, errors, is_malformed, report_diagnostics = _verify_single_report(
+            (
+                cert_obj,
+                errors,
+                is_malformed,
+                report_diagnostics,
+                verification_payload,
+            ) = _verify_single_report(
                 cert_path,
                 baseline=baseline,
                 baseline_digest=baseline_digest,
@@ -515,6 +584,7 @@ def run_verify_reports(
                 assurance_mode=normalized_assurance_mode,
                 json_mode=json_mode,
             )
+            verification_by_path[str(cert_path)] = verification_payload
             loaded_any_report = True
             if errors:
                 overall_ok = False
@@ -528,6 +598,7 @@ def run_verify_reports(
                 reason="malformed" if malformed_any else "policy_fail",
                 tolerance=tol,
                 load_report_fn=_load_evaluation_report,
+                verification_by_path=verification_by_path,
             )
             return VerifyExecutionResult(
                 outcome=(
@@ -545,6 +616,7 @@ def run_verify_reports(
             reason="ok",
             tolerance=tol,
             load_report_fn=_load_evaluation_report,
+            verification_by_path=verification_by_path,
         )
         if not json_mode:
             try:

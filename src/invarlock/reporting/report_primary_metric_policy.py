@@ -5,6 +5,7 @@ from typing import Any
 
 from invarlock.core.metric_kind_contract import is_ppl_metric_kind
 from invarlock.core.runner_pairing import BOOTSTRAP_COVERAGE_REQUIREMENTS
+from invarlock.reporting.report_build_evidence import record_report_build_event
 
 _NON_FATAL_EXCEPTIONS = (
     AttributeError,
@@ -145,6 +146,8 @@ def enforce_display_ci_alignment(
     primary_metric: Any,
     logloss_delta_ci: Any,
     window_plan_profile: str | None,
+    *,
+    evaluation_report: dict[str, Any] | None = None,
 ) -> None:
     if ratio_ci_source != "paired_baseline":
         return
@@ -179,6 +182,14 @@ def enforce_display_ci_alignment(
                 float(logloss_delta_ci[0]),
                 float(logloss_delta_ci[1]),
             ]
+            if evaluation_report is not None:
+                record_report_build_event(
+                    evaluation_report,
+                    category="synthesized_fields",
+                    field="primary_metric.ci",
+                    reason="backfilled_from_logloss_delta_ci",
+                    source="report_primary_metric_policy.enforce_display_ci_alignment",
+                )
             ci = primary_metric["ci"]
         else:
             profile = (window_plan_profile or "dev").lower()
@@ -197,6 +208,14 @@ def enforce_display_ci_alignment(
                 "primary_metric.display_ci missing for ppl-like metric under paired baseline."
             )
         primary_metric["display_ci"] = [expected[0], expected[1]]
+        if evaluation_report is not None:
+            record_report_build_event(
+                evaluation_report,
+                category="synthesized_fields",
+                field="primary_metric.display_ci",
+                reason="backfilled_from_logspace_ci",
+                source="report_primary_metric_policy.enforce_display_ci_alignment",
+            )
         return
 
     assert isinstance(display_ci, tuple | list)
@@ -209,6 +228,14 @@ def enforce_display_ci_alignment(
                     "primary_metric.display_ci mismatch: bounds do not match exp(ci)."
                 )
             primary_metric["display_ci"] = [expected[0], expected[1]]
+            if evaluation_report is not None:
+                record_report_build_event(
+                    evaluation_report,
+                    category="repaired_fields",
+                    field="primary_metric.display_ci",
+                    reason="overwrote_mismatched_logspace_projection",
+                    source="report_primary_metric_policy.enforce_display_ci_alignment",
+                )
             break
 
 

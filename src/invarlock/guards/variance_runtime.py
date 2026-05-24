@@ -87,6 +87,21 @@ def validate_guard(
         }
         for message in errors
     )
+    reason = (
+        "no_variance_targets"
+        if any("no target modules found" in str(message).lower() for message in errors)
+        else None
+    )
+    extras = (
+        {
+            "supported": False,
+            "reason": reason,
+            "assurance_blocking": True,
+            "status": "unsupported",
+        }
+        if reason is not None
+        else None
+    )
     return GuardValidationResult(
         passed=bool(passed),
         decision=decision,
@@ -95,6 +110,7 @@ def validate_guard(
         policy=dict(details.get("policy", guard._policy.copy()) or {}),
         details=dict(details),
         violations=violations,
+        extras=extras,
     )
 
 

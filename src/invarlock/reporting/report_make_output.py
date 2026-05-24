@@ -6,6 +6,7 @@ from typing import Any
 from invarlock.core.assurance_contract import build_assurance_section
 
 from . import policy_utils as report_policy_utils_mod
+from . import report_build_evidence as report_build_evidence_mod
 from . import report_confidence as report_confidence_mod
 from . import report_enrichment as report_enrichment_mod
 from . import report_overhead as report_overhead_mod
@@ -82,6 +83,7 @@ def _build_evaluation_report(
     }
     if edit_name is not None:
         evaluation_report["edit_name"] = edit_name
+    report_build_evidence_mod.ensure_report_build_evidence(evaluation_report)
     return evaluation_report
 
 
@@ -183,6 +185,7 @@ def _finalize_evaluation_report(
         evaluation_report.get("primary_metric"),
         ppl_analysis.get("logloss_delta_ci"),
         window_plan_profile,
+        evaluation_report=evaluation_report,
     )
     report_enrichment_mod.ensure_primary_metric_display_ci(evaluation_report)
     report_enrichment_mod.attach_telemetry_summary_line(
@@ -196,19 +199,18 @@ def _finalize_evaluation_report(
         if isinstance(meta_section, dict):
             meta_section["build_diagnostics"] = build_diagnostics
     try:
-        fallback_fields_used = any(
-            isinstance(item, dict)
-            and (
-                "fallback" in str(item.get("code", "")).lower()
-                or "repair" in str(item.get("code", "")).lower()
-                or "unavailable" in str(item.get("code", "")).lower()
+        report_build_evidence_mod.ensure_report_build_evidence(evaluation_report)
+        fallback_fields_used = (
+            report_build_evidence_mod.report_build_has_evidence_events(
+                evaluation_report
             )
-            for item in build_diagnostics
         )
         evaluation_report["assurance"] = build_assurance_section(
             evaluation_report,
             fallback_fields_used=fallback_fields_used,
-            runtime_provenance_verified=True,
+            runtime_provenance_verified=None,
+            runtime_provenance_declared="container",
+            runtime_provenance_verification_status="pending",
         )
     except non_fatal_exceptions:
         record_blocking_diagnostic(

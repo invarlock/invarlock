@@ -88,6 +88,10 @@ def _normalize_guard_result(raw: Any) -> dict[str, Any]:
         "module_family_map",
         "baseline_metrics",
         "final_metrics",
+        "supported",
+        "reason",
+        "assurance_blocking",
+        "status",
     ):
         if extra_key in raw:
             normalized[extra_key] = raw[extra_key]

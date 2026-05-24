@@ -368,7 +368,7 @@ def evaluate_command(
     allow_host_execution: bool = False,
     allow_third_party_plugins: bool = False,
     allow_remote_code: bool = False,
-    assurance: str = "off",
+    assurance: str = "strict",
     no_color: bool = False,
 ):
     """Evaluate two checkpoints (baseline vs subject) with pinned windows."""
