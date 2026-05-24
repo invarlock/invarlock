@@ -104,7 +104,7 @@ def test_tiny_container_smoke_campaign_script_is_executable() -> None:
     assert "runtime_verify_diagnostics" in contents
     assert "assert_semantic_pass" in contents
     assert "resolve_tiny_relax_from_report" in contents
-    assert '--profile "$PROFILE" --json' in contents
+    assert '--profile "$PROFILE" --assurance off --json' in contents
     assert '--device "$SMOKE_DEVICE"' in contents
     assert 'mkdir -p "$SMOKE_EXPORT_DIR"' in contents
     assert (

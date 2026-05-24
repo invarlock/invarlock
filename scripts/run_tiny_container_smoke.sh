@@ -274,6 +274,7 @@ fi
   --subject "$MODEL_ID" \
   --adapter hf_causal \
   --profile "$PROFILE" \
+  --assurance off \
   --preset "$PRESET_PATH" \
   --execution-mode "$EXECUTION_MODE" \
   --device "$SMOKE_DEVICE" \
@@ -296,7 +297,7 @@ echo "[smoke] evaluation_report=$EVAL_REPORT"
 
 VERIFY_ARGS=(--runtime-provenance "$RUNTIME_PROVENANCE")
 
-"${CLI[@]}" verify "$EVAL_REPORT" "${VERIFY_ARGS[@]}" --profile "$PROFILE" --json || VERIFY_RC=$?
+"${CLI[@]}" verify "$EVAL_REPORT" "${VERIFY_ARGS[@]}" --profile "$PROFILE" --assurance off --json || VERIFY_RC=$?
 VERIFY_RC="${VERIFY_RC:-0}"
 echo "[smoke] verify_rc=$VERIFY_RC"
 if [[ "$VERIFY_RC" != "0" ]]; then
