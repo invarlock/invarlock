@@ -8,6 +8,14 @@ WORK_ROOT="${1:-$(mktemp -d -t invarlock_gpt2_smoke.XXXXXX)}"
 PRESET="${INVARLOCK_GPT2_SMOKE_PRESET:-$REPO_ROOT/configs/presets/causal_lm/gpt2_smoke_128.yaml}"
 MODE="${INVARLOCK_SMOKE_MODE:-local}"
 PROFILE="${INVARLOCK_SMOKE_PROFILE:-dev}"
+ASSURANCE="${INVARLOCK_SMOKE_ASSURANCE:-}"
+
+if [[ -z "$ASSURANCE" ]]; then
+  ASSURANCE="off"
+  if [[ "$MODE" == "container" && ( "$PROFILE" == "ci" || "$PROFILE" == "release" ) ]]; then
+    ASSURANCE="strict"
+  fi
+fi
 
 if [[ ! -f "$PRESET" ]]; then
   echo "[error] GPT-2 smoke preset not found: $PRESET" >&2
@@ -165,7 +173,7 @@ fi
 
 echo "[smoke] work_root=$WORK_ROOT"
 echo "[smoke] preset=$PRESET"
-echo "[smoke] mode=$MODE profile=$PROFILE"
+echo "[smoke] mode=$MODE profile=$PROFILE assurance=$ASSURANCE"
 echo "[smoke] hf_home=$HF_HOME"
 echo "[smoke] hf_datasets_cache=$HF_DATASETS_CACHE"
 
@@ -183,6 +191,7 @@ fi
   --profile "$PROFILE" \
   --preset "$PRESET" \
   --execution-mode "$EXECUTION_MODE" \
+  --assurance "$ASSURANCE" \
   --out "$SMOKE_RUN_DIR" \
   --report-out "$SMOKE_REPORT_DIR" \
   --timing
