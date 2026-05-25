@@ -129,6 +129,7 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/core/assurance_contract.py \
 	src/invarlock/core/bootstrap.py \
 	src/invarlock/core/evaluate_plan.py \
+	src/invarlock/core/guard_evidence.py \
 	src/invarlock/core/metric_kind_contract.py \
 	src/invarlock/core/metric_provider_resolution.py \
 	src/invarlock/core/registry.py \
@@ -158,6 +159,7 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/cli/commands/verify.py \
 	src/invarlock/cli/runtime_verify.py \
 	src/invarlock/eval/probes/mi.py \
+	src/invarlock/reporting/evaluation_report_builder.py \
 	src/invarlock/reporting/report_confidence.py \
 	src/invarlock/reporting/report_build_evidence.py \
 	src/invarlock/reporting/report_make_output.py \

@@ -103,9 +103,11 @@ def test_coverage_policy_is_shared_with_makefile_and_expanded_surface() -> None:
     assert "src/invarlock/observability/" in policy.CORE_PREFIXES
     assert "src/invarlock/config.py" in policy.CORE_FILES
     assert "src/invarlock/adapters/auto.py" in policy.CORE_FILES
+    assert "scripts/release/evidence_contracts.py" in policy.CORE_FILES
     assert "scripts/release/check_empirical_guard_evidence.py" in policy.CORE_FILES
     assert "scripts/release/check_release_evidence.py" in policy.CORE_FILES
     assert "src/invarlock/reporting/report_build_evidence.py" in policy.CORE_FILES
+    assert "src/invarlock/reporting/evaluation_report_builder.py" in policy.CORE_FILES
     assert "src/invarlock/reporting/report_make_output.py" in policy.CORE_FILES
     assert (
         "src/invarlock/reporting/report_primary_metric_policy.py" in policy.CORE_FILES
