@@ -66,6 +66,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Config-driven run execution now uses `ConfigExecutionRequest` as the
   canonical request object across public command plumbing, internal delegated
   execution, and container-launch argv serialization.
+- GPT-2 smoke campaigns can now run a quantized subject via
+  `INVARLOCK_SMOKE_QUANTIZED=1` or an explicit `INVARLOCK_SMOKE_EDIT_CONFIG`
+  overlay, while preserving the no-op smoke default.
 
 ### Removed
 

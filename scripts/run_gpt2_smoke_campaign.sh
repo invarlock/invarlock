@@ -6,9 +6,11 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 
 WORK_ROOT="${1:-$(mktemp -d -t invarlock_gpt2_smoke.XXXXXX)}"
 PRESET="${INVARLOCK_GPT2_SMOKE_PRESET:-$REPO_ROOT/configs/presets/causal_lm/gpt2_smoke_128.yaml}"
+DEFAULT_QUANT_EDIT_CONFIG="$REPO_ROOT/configs/overlays/edits/quant_rtn/8bit_full.yaml"
 MODE="${INVARLOCK_SMOKE_MODE:-local}"
 PROFILE="${INVARLOCK_SMOKE_PROFILE:-dev}"
 ASSURANCE="${INVARLOCK_SMOKE_ASSURANCE:-}"
+EDIT_CONFIG="${INVARLOCK_SMOKE_EDIT_CONFIG:-}"
 
 if [[ -z "$ASSURANCE" ]]; then
   ASSURANCE="off"
@@ -17,8 +19,25 @@ if [[ -z "$ASSURANCE" ]]; then
   fi
 fi
 
+case "${INVARLOCK_SMOKE_QUANTIZED:-0}" in
+  1|true|TRUE|yes|YES)
+    if [[ -z "$EDIT_CONFIG" ]]; then
+      EDIT_CONFIG="$DEFAULT_QUANT_EDIT_CONFIG"
+    fi
+    ;;
+esac
+
+if [[ -n "$EDIT_CONFIG" && "$EDIT_CONFIG" != /* ]]; then
+  EDIT_CONFIG="$REPO_ROOT/$EDIT_CONFIG"
+fi
+
 if [[ ! -f "$PRESET" ]]; then
   echo "[error] GPT-2 smoke preset not found: $PRESET" >&2
+  exit 2
+fi
+
+if [[ -n "$EDIT_CONFIG" && ! -f "$EDIT_CONFIG" ]]; then
+  echo "[error] GPT-2 smoke edit config not found: $EDIT_CONFIG" >&2
   exit 2
 fi
 
@@ -174,6 +193,11 @@ fi
 echo "[smoke] work_root=$WORK_ROOT"
 echo "[smoke] preset=$PRESET"
 echo "[smoke] mode=$MODE profile=$PROFILE assurance=$ASSURANCE"
+if [[ -n "$EDIT_CONFIG" ]]; then
+  echo "[smoke] edit_config=$EDIT_CONFIG"
+else
+  echo "[smoke] edit_config=noop"
+fi
 echo "[smoke] hf_home=$HF_HOME"
 echo "[smoke] hf_datasets_cache=$HF_DATASETS_CACHE"
 
@@ -184,12 +208,18 @@ if [[ "$MODE" == "local" ]]; then
   RUNTIME_PROVENANCE="host"
 fi
 
+EDIT_ARGS=()
+if [[ -n "$EDIT_CONFIG" ]]; then
+  EDIT_ARGS=(--edit-config "$EDIT_CONFIG")
+fi
+
 "${CLI[@]}" evaluate \
   --baseline gpt2 \
   --subject gpt2 \
   --adapter auto \
   --profile "$PROFILE" \
   --preset "$PRESET" \
+  "${EDIT_ARGS[@]}" \
   --execution-mode "$EXECUTION_MODE" \
   --assurance "$ASSURANCE" \
   --out "$SMOKE_RUN_DIR" \
