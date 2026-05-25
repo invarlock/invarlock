@@ -88,6 +88,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   floating-point dequantized storage, canonical plan digests include meaningful
   edit parameters and selected targets, and the edit emits per-module and
   aggregate quantization-error metrics.
+- `quant_rtn` plan digests now exclude runtime-local parameter object IDs and
+  distinguish selected modules from physically quantized modules when tied
+  weights are deduplicated.
 
 ### Removed
 
