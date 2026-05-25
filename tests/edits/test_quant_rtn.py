@@ -335,6 +335,9 @@ def test_quant_rtn_preview_reports_simulation_memory_fields() -> None:
     assert plan["quantization_mode"] == "rtn_dequantized_weight_edit"
     assert plan["plan_digest"].startswith("sha256:")
     assert plan["selected_modules"] == plan["physically_quantized_modules"]
+    assert "parameter_id" not in plan["target_selection"][0]
+    assert "parameter_id" not in plan["quantization_stats"]["module_stats"][0]
+    assert plan["runtime_debug"]["target_parameter_ids"][0]["parameter_id"]
 
 
 def test_quant_rtn_can_edit_and_limit_targets() -> None:
@@ -342,6 +345,20 @@ def test_quant_rtn_can_edit_and_limit_targets() -> None:
     assert edit.can_edit({"n_layer": 1, "total_params": 1001}) is True
     assert edit.can_edit({"n_layer": 1, "total_params": 100}) is False
     assert edit.can_edit({"total_params": 1001}) is False
+    assert edit.can_edit(
+        {
+            "n_layer": 1,
+            "total_params": 1001,
+            "module_names": ["transformer.h.0.mlp.c_fc"],
+        }
+    )
+    assert not edit.can_edit(
+        {
+            "n_layer": 1,
+            "total_params": 1001,
+            "module_names": ["transformer.wte"],
+        }
+    )
 
     targets = [
         _target(str(index), torch.nn.Linear(2, 2, bias=False)) for index in range(3)
@@ -453,7 +470,9 @@ def test_quant_rtn_apply_emits_error_metrics_and_target_metadata() -> None:
     assert module_entry["actual_storage_format"] == "float_dequantized"
     assert module_entry["packed_quantized_storage"] is False
     assert module_entry["selection_reason"] == "scope_all_min_params"
-    assert module_entry["parameter_id"]
+    assert "parameter_id" not in module_entry
+    assert "parameter_id" not in result["plan"]["target_selection"][0]
+    assert result["plan"]["runtime_debug"]["target_parameter_ids"][0]["parameter_id"]
     assert result["plan"]["target_selection"][0]["weight_shape"] == [16, 16]
 
 
@@ -476,7 +495,8 @@ def test_quant_rtn_deduplicates_tied_weights() -> None:
     assert result["plan"]["selected_modules"] == ["a", "b"]
     assert result["plan"]["physically_quantized_modules"] == ["a"]
     assert result["plan"]["deduplicated_modules"] == ["b"]
-    assert len(result["plan"]["deduplicated_parameter_ids"]) == 1
+    assert "deduplicated_parameter_ids" not in result["plan"]
+    assert len(result["plan"]["runtime_debug"]["deduplicated_parameter_ids"]) == 1
     assert result["plan"]["tied_parameter_groups"] == [["a", "b"]]
 
 

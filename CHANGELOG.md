@@ -58,9 +58,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reports distinguish theoretical packed-memory estimates from actual
   floating-point dequantized storage, canonical plan digests include meaningful
   edit parameters and selected targets, runtime-local parameter object IDs are
-  excluded from plan digests, tied weights distinguish selected modules from
-  physically quantized modules, and the edit emits per-module and aggregate
-  quantization-error metrics.
+  kept under `runtime_debug` instead of normal report metadata, tied weights
+  distinguish selected modules from physically quantized modules, and the edit
+  emits per-module and aggregate quantization-error metrics.
 
 ### Removed
 

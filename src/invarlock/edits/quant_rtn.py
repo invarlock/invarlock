@@ -183,7 +183,6 @@ class RTNQuantPlan:
             "params",
             "selection_reason",
             "matched_pattern",
-            "tied_group_index",
         )
         return {key: entry[key] for key in stable_keys if key in entry}
 
@@ -200,9 +199,13 @@ class TargetModule:
     module_type: str
 
     def as_report_payload(self) -> dict[str, Any]:
-        payload = self.stable_report_payload()
-        payload["parameter_id"] = str(self.parameter_id)
-        return payload
+        return self.stable_report_payload()
+
+    def runtime_debug_payload(self) -> dict[str, Any]:
+        return {
+            "module_name": self.name,
+            "parameter_id": str(self.parameter_id),
+        }
 
     def stable_report_payload(self) -> dict[str, Any]:
         weight = getattr(self.module, "weight", None)
@@ -461,14 +464,50 @@ class RTNQuantEdit(ModelEdit):
 
     def can_edit(self, model_desc: dict[str, Any]) -> bool:
         """Check if RTN dequantized simulation can be applied to this model."""
-        # Basic requirements for quantization
         required_keys = ["n_layer", "total_params"]
         has_requirements = all(key in model_desc for key in required_keys)
+        if not has_requirements or model_desc.get("total_params", 0) <= 1000:
+            return False
 
-        # Need sufficient model size for meaningful quantization
-        if has_requirements and model_desc.get("total_params", 0) > 1000:
+        module_names = self._module_names_from_model_desc(model_desc)
+        if module_names:
+            return self._has_matching_module_name(module_names)
+        return True
+
+    def _has_matching_module_name(self, module_names: list[str]) -> bool:
+        if self.scope == "all":
             return True
-        return False
+
+        selector = QuantTargetSelector(
+            scope=self.scope,
+            module_selectors=self.module_selectors,
+        )
+        patterns = (
+            selector._selector_patterns_for_scope()
+            + selector._default_patterns_for_scope()
+        )
+        if not patterns:
+            return False
+        return any(
+            pattern in module_name.lower()
+            for module_name in module_names
+            for pattern in patterns
+        )
+
+    @staticmethod
+    def _module_names_from_model_desc(model_desc: Mapping[str, Any]) -> list[str]:
+        for key in ("module_names", "target_modules", "modules", "named_modules"):
+            raw_value = model_desc.get(key)
+            if isinstance(raw_value, Mapping):
+                candidates = raw_value.keys()
+            elif isinstance(raw_value, list | tuple | set):
+                candidates = raw_value
+            else:
+                continue
+            names = [str(item) for item in candidates if isinstance(item, str) and item]
+            if names:
+                return names
+        return []
 
     def _base_plan(self) -> RTNQuantPlan:
         return RTNQuantPlan(
@@ -546,6 +585,11 @@ class RTNQuantEdit(ModelEdit):
                 "physically_quantized_modules": target_names,
                 "quantization_stats": quant_stats,
                 "tied_parameter_groups": self._get_weight_tying_groups(model),
+                "runtime_debug": {
+                    "target_parameter_ids": [
+                        target.runtime_debug_payload() for target in target_modules
+                    ],
+                },
             }
         )
 
@@ -674,7 +718,6 @@ class RTNQuantEdit(ModelEdit):
             quant_result["module_name"] = target.name
             quant_result["selection_reason"] = target.selection_reason
             quant_result["matched_pattern"] = target.matched_pattern
-            quant_result["parameter_id"] = str(target.parameter_id)
             quant_result["module_type"] = target.module_type
             quantization_results.append(quant_result)
             total_params_quantized += quant_result["params_quantized"]
@@ -711,7 +754,6 @@ class RTNQuantEdit(ModelEdit):
                 "error_metrics": result.get("error_metrics", {}),
                 "selection_reason": result.get("selection_reason"),
                 "matched_pattern": result.get("matched_pattern"),
-                "parameter_id": result.get("parameter_id"),
                 "module_type": result.get("module_type"),
                 "actual_storage_dtype": result.get("actual_storage_dtype"),
                 "actual_storage_format": "float_dequantized",
@@ -741,11 +783,16 @@ class RTNQuantEdit(ModelEdit):
                     target_selection=target_selection,
                 ),
                 "tied_parameter_groups": tied_parameter_groups,
-                "deduplicated_parameter_ids": deduplicated_parameter_ids,
                 "deduplicated_modules": deduplicated_modules,
                 "aggregate_error_metrics": self._aggregate_error_metrics(
                     quantization_results
                 ),
+                "runtime_debug": {
+                    "target_parameter_ids": [
+                        target.runtime_debug_payload() for target in target_modules
+                    ],
+                    "deduplicated_parameter_ids": deduplicated_parameter_ids,
+                },
             }
         )
         edit_plan.update(
@@ -835,7 +882,6 @@ class RTNQuantEdit(ModelEdit):
                 "weight_std": float(weight.std()),
                 "selection_reason": target.selection_reason,
                 "matched_pattern": target.matched_pattern,
-                "parameter_id": str(target.parameter_id),
                 "module_type": target.module_type,
             }
 
