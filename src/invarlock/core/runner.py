@@ -76,6 +76,20 @@ _RUNNER_EXECUTION_ERRORS = (
 )
 
 
+def _profile_from_context(context: dict[str, Any] | None) -> str | None:
+    if not isinstance(context, dict):
+        return None
+    raw_profile = context.get("profile")
+    if isinstance(raw_profile, str) and raw_profile.strip():
+        return raw_profile.strip().lower()
+    runtime_context = context.get("runtime")
+    if isinstance(runtime_context, dict):
+        raw_runtime_profile = runtime_context.get("profile")
+        if isinstance(raw_runtime_profile, str) and raw_runtime_profile.strip():
+            return raw_runtime_profile.strip().lower()
+    return None
+
+
 class CoreRunner:
     """
     Core pipeline execution orchestrator.
@@ -122,6 +136,11 @@ class CoreRunner:
         timings: dict[str, float] = {}
         guard_timings: dict[str, float] = {}
         memory_snapshots: list[dict[str, Any]] = []
+        if edit_runtime is None:
+            edit_runtime = EditRuntime(
+                profile=_profile_from_context(config.context),
+                verbose=bool(config.verbose),
+            )
         total_start = time.perf_counter()
 
         try:

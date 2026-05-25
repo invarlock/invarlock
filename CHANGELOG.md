@@ -76,6 +76,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deduplicate the same physical parameters as apply, theoretical packed-memory
   estimates use unique parameters, and plan digests distinguish stable tied
   module groups without using runtime-local object IDs.
+- Fixed `quant_rtn` report-plan naming so selected module names and physically
+  quantized module names are no longer duplicated under ambiguous aliases, and
+  runtime-local debug IDs are omitted from CI/release edit results unless
+  verbose/debug output is explicitly requested.
 - Fixed the strict assurance trust boundary so host/unverified provenance,
   custom guard order, dev/aggressive profiles, unsupported blocking statuses,
   fallback fields, and missing guard evidence cannot pass as strict assurance.

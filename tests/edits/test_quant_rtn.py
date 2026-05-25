@@ -217,11 +217,12 @@ def test_quant_rtn_apply_accepts_per_channel_and_module_selectors() -> None:
         "attention": ["attn.c_attn"],
         "ffn": ["mlp.c_fc"],
     }
-    assert result["plan"]["selected_modules"] == result["plan"]["target_modules"]
     assert (
-        result["plan"]["physically_quantized_modules"]
-        == result["plan"]["modules_quantized"]
+        result["plan"]["selected_modules"]
+        == result["plan"]["physically_quantized_modules"]
     )
+    assert "target_modules" not in result["plan"]
+    assert "modules_quantized" not in result["plan"]
     assert result["plan_digest"].startswith("sha256:")
     assert "estimated_memory_saved_bytes" not in result["plan"]
 
@@ -426,8 +427,8 @@ def test_quant_rtn_plan_digest_changes_with_meaningful_fields() -> None:
     base = RTNQuantPlan(scope="attn", clamp_ratio=0.0)
     changed = RTNQuantPlan(scope="attn", clamp_ratio=0.01)
 
-    assert base.digest(target_modules=["a"]) != changed.digest(target_modules=["a"])
-    assert base.digest(target_modules=["a"]) != base.digest(target_modules=["b"])
+    assert base.digest(selected_modules=["a"]) != changed.digest(selected_modules=["a"])
+    assert base.digest(selected_modules=["a"]) != base.digest(selected_modules=["b"])
 
 
 def test_quant_rtn_plan_digest_excludes_runtime_parameter_ids() -> None:
@@ -495,7 +496,7 @@ def test_quant_rtn_apply_emits_error_metrics_and_target_metadata() -> None:
     edit = RTNQuantEdit(scope="all", max_modules=1)
 
     result = edit.apply(model, adapter, plan={"scope": "all", "max_modules": 1})
-    module_name = result["plan"]["modules_quantized"][0]
+    module_name = result["plan"]["physically_quantized_modules"][0]
     module_entry = result["deltas"]["bitwidth_map"][module_name]
 
     assert result["plan"]["aggregate_error_metrics"]["rmse"] >= 0.0
@@ -507,6 +508,41 @@ def test_quant_rtn_apply_emits_error_metrics_and_target_metadata() -> None:
     assert "parameter_id" not in result["plan"]["target_selection"][0]
     assert result["plan"]["runtime_debug"]["target_parameter_ids"][0]["parameter_id"]
     assert result["plan"]["target_selection"][0]["weight_shape"] == [16, 16]
+
+
+def test_quant_rtn_runtime_debug_respects_profile() -> None:
+    model_release = torch.nn.Linear(16, 16, bias=False)
+    model_dev = torch.nn.Linear(16, 16, bias=False)
+    model_verbose = torch.nn.Linear(16, 16, bias=False)
+    adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
+    edit = RTNQuantEdit(scope="all", max_modules=1)
+
+    release_result = edit.apply(
+        model_release,
+        adapter,
+        plan={"scope": "all", "max_modules": 1},
+        runtime=EditRuntime(profile="release"),
+    )
+    dev_result = edit.apply(
+        model_dev,
+        adapter,
+        plan={"scope": "all", "max_modules": 1},
+        runtime=EditRuntime(profile="dev"),
+    )
+    verbose_result = edit.apply(
+        model_verbose,
+        adapter,
+        plan={"scope": "all", "max_modules": 1},
+        runtime=EditRuntime(profile="release", verbose=True),
+    )
+
+    assert "runtime_debug" not in release_result["plan"]
+    assert dev_result["plan"]["runtime_debug"]["target_parameter_ids"][0][
+        "parameter_id"
+    ]
+    assert verbose_result["plan"]["runtime_debug"]["target_parameter_ids"][0][
+        "parameter_id"
+    ]
 
 
 def test_quant_rtn_deduplicates_tied_weights() -> None:

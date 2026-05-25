@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 
 from invarlock.core.api import ModelAdapter, RunConfig, RunReport
-from invarlock.core.runner import CoreRunner
+from invarlock.core.runner import CoreRunner, _profile_from_context
 
 
 class DummyAdapter(ModelAdapter):
@@ -70,6 +70,20 @@ def _minimal_calibration(n: int) -> list[dict[str, Any]]:
     return [
         {"input_ids": [1, 2, 3], "attention_mask": [1, 1, 1]} for _ in range(max(1, n))
     ]
+
+
+@pytest.mark.parametrize(
+    ("context", "expected"),
+    [
+        (None, None),
+        ({}, None),
+        ({"profile": " CI "}, "ci"),
+        ({"runtime": {"profile": " Release "}}, "release"),
+        ({"profile": " ", "runtime": {"profile": ""}}, None),
+    ],
+)
+def test_profile_from_context(context, expected):
+    assert _profile_from_context(context) == expected
 
 
 # Intentionally avoid ratio CI mismatch raise path here, as it can expose

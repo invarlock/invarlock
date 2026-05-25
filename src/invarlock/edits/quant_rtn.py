@@ -129,7 +129,7 @@ class RTNQuantPlan:
     def as_report_payload(
         self,
         *,
-        target_modules: list[str] | None = None,
+        selected_modules: list[str] | None = None,
         target_selection: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -150,8 +150,8 @@ class RTNQuantPlan:
             payload["max_modules"] = self.max_modules
         if self.module_selectors:
             payload["module_selectors"] = dict(self.module_selectors)
-        if target_modules is not None:
-            payload["target_modules"] = list(target_modules)
+        if selected_modules is not None:
+            payload["selected_modules"] = list(selected_modules)
         if target_selection is not None:
             payload["target_selection"] = list(target_selection)
         return payload
@@ -159,7 +159,7 @@ class RTNQuantPlan:
     def digest(
         self,
         *,
-        target_modules: list[str] | None = None,
+        selected_modules: list[str] | None = None,
         target_selection: list[dict[str, Any]] | None = None,
     ) -> str:
         stable_target_selection = (
@@ -169,7 +169,7 @@ class RTNQuantPlan:
         )
         return _canonical_json_digest(
             self.as_report_payload(
-                target_modules=target_modules,
+                selected_modules=selected_modules,
                 target_selection=stable_target_selection,
             )
         )
@@ -467,7 +467,12 @@ class RTNQuantEdit(ModelEdit):
         self.module_selectors = self._normalize_module_selectors(module_selectors)
 
     def can_edit(self, model_desc: dict[str, Any]) -> bool:
-        """Check if RTN dequantized simulation can be applied to this model."""
+        """
+        Coarse metadata-only compatibility check.
+
+        The actual model-object selection remains fail-closed in apply(), which
+        raises when the configured scope matches no editable target modules.
+        """
         required_keys = ["n_layer", "total_params"]
         has_requirements = all(key in model_desc for key in required_keys)
         if not has_requirements or model_desc.get("total_params", 0) <= 1000:
@@ -583,25 +588,24 @@ class RTNQuantEdit(ModelEdit):
 
         # Create quantization plan
         target_names = [target.name for target in target_modules]
-        modules_quantized = [target.name for target in physically_quantized_targets]
+        physical_module_names = [target.name for target in physically_quantized_targets]
         target_selection = self._target_report_payloads(
             target_modules,
             tied_parameter_groups=tied_parameter_groups,
         )
         plan = active_plan.as_report_payload(
-            target_modules=target_names,
+            selected_modules=target_names,
             target_selection=target_selection,
         )
         plan.update(
             {
                 "plan_digest": active_plan.digest(
-                    target_modules=target_names,
+                    selected_modules=target_names,
                     target_selection=target_selection,
                 ),
-                "selected_modules": target_names,
-                "physically_quantized_modules": modules_quantized,
+                "physically_quantized_modules": physical_module_names,
                 "total_modules_selected": len(target_names),
-                "total_modules_quantized": len(modules_quantized),
+                "total_modules_quantized": len(physical_module_names),
                 "total_params_quantized": int(target_params),
                 "deduplicated_modules": deduplicated_modules,
                 "quantization_stats": quant_stats,
@@ -668,7 +672,6 @@ class RTNQuantEdit(ModelEdit):
         Returns:
             Dictionary with application results
         """
-        del runtime
         plan_data = dict(plan or {})
         active_plan = RTNQuantPlan.from_payload(plan_data, defaults=self._base_plan())
 
@@ -790,19 +793,19 @@ class RTNQuantEdit(ModelEdit):
 
         # Store edit plan for evaluation report generation
         selected_modules = [target.name for target in target_modules]
-        modules_quantized = [r["module_name"] for r in quantization_results]
+        physical_module_names = [r["module_name"] for r in quantization_results]
         target_selection = self._target_report_payloads(
             target_modules,
             tied_parameter_groups=tied_parameter_groups,
         )
         edit_plan = active_plan.as_report_payload(
-            target_modules=selected_modules,
+            selected_modules=selected_modules,
             target_selection=target_selection,
         )
         edit_plan.update(
             {
                 "plan_digest": active_plan.digest(
-                    target_modules=selected_modules,
+                    selected_modules=selected_modules,
                     target_selection=target_selection,
                 ),
                 "tied_parameter_groups": tied_parameter_groups,
@@ -810,22 +813,19 @@ class RTNQuantEdit(ModelEdit):
                 "aggregate_error_metrics": self._aggregate_error_metrics(
                     quantization_results
                 ),
-                "runtime_debug": {
-                    "target_parameter_ids": [
-                        target.runtime_debug_payload() for target in target_modules
-                    ],
-                    "deduplicated_parameter_ids": deduplicated_parameter_ids,
-                },
             }
         )
+        if self._include_runtime_debug(runtime):
+            edit_plan["runtime_debug"] = self._runtime_debug_payload(
+                target_modules,
+                deduplicated_parameter_ids=deduplicated_parameter_ids,
+            )
         edit_plan.update(
             {
                 "total_modules_selected": len(selected_modules),
-                "total_modules_quantized": len(modules_quantized),
+                "total_modules_quantized": len(physical_module_names),
                 "total_params_quantized": total_params_quantized,
-                "selected_modules": selected_modules,
-                "physically_quantized_modules": modules_quantized,
-                "modules_quantized": modules_quantized,
+                "physically_quantized_modules": physical_module_names,
             }
         )
 
@@ -848,6 +848,30 @@ class RTNQuantEdit(ModelEdit):
             "model_desc": adapter.describe(model)
             if hasattr(adapter, "describe")
             else {},
+        }
+
+    @staticmethod
+    def _include_runtime_debug(runtime: EditRuntime | None) -> bool:
+        if runtime is None:
+            return True
+        if runtime.include_runtime_debug is not None:
+            return bool(runtime.include_runtime_debug)
+        if runtime.verbose:
+            return True
+        profile = str(runtime.profile or "").strip().lower()
+        return profile in {"", "dev"}
+
+    @staticmethod
+    def _runtime_debug_payload(
+        target_modules: list[TargetModule],
+        *,
+        deduplicated_parameter_ids: list[str],
+    ) -> dict[str, Any]:
+        return {
+            "target_parameter_ids": [
+                target.runtime_debug_payload() for target in target_modules
+            ],
+            "deduplicated_parameter_ids": deduplicated_parameter_ids,
         }
 
     @staticmethod
