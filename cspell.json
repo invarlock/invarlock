@@ -127,6 +127,8 @@
     "exploitability",
     "backdoored",
     "safetensors",
-    "lockfiles"
+    "lockfiles",
+    "dequantize",
+    "dequantized"
   ]
 }

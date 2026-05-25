@@ -1,7 +1,8 @@
 # InvarLock Documentation
 
-InvarLock is edit-agnostic (BYOE). A small built-in quantization demo
-(`quant_rtn`, 8-bit) exists for advanced smoke and demo workflows. See
+InvarLock is edit-agnostic (BYOE). A small built-in RTN dequantized
+weight-edit simulation (`quant_rtn`, 8-bit) exists for advanced smoke and demo
+workflows. See
 [Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md).
 
 Welcome to the documentation hub for InvarLock (Edit‑agnostic robustness reports for weight edits).

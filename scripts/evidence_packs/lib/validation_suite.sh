@@ -276,7 +276,7 @@ EDIT_SCOPE="${EDIT_SCOPE:-ffn}"
 # Edit Types to test (4 types × 2 versions each)
 # Clean specs use tuned edit presets; use "clean" sentinel.
 EDIT_TYPES_CLEAN=(
-    "quant_rtn:clean:ffn"        # Clean RTN (calibrated bits/group_size on FFN)
+    "quant_rtn:clean:ffn"        # Clean external RTN simulation artifact (calibrated bits/group_size on FFN)
     "fp8_quant:clean:ffn"        # Clean FP8 (calibrated format on FFN)
     "magnitude_prune:clean:ffn"  # Clean pruning (calibrated sparsity on FFN)
     "lowrank_svd:clean:ffn"      # Clean low-rank (calibrated rank on FFN)

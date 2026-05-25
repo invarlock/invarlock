@@ -27,7 +27,7 @@ COVERAGE_POLICY := $(PYTHON) scripts/coverage_policy.py
 # Keep repo-wide coverage practical while still exercising the CLI command
 # surface that would otherwise pull the project floor below the real trust core.
 COVERAGE_TESTS_CORE := \
-	tests/core tests/guards tests/reporting tests/calibration tests/scripts
+	tests/core tests/guards tests/reporting tests/calibration tests/scripts tests/edits
 
 COVERAGE_TESTS_RUN := \
 	tests/cli/run

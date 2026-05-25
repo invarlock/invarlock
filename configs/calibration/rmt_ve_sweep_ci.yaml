@@ -1,5 +1,6 @@
-# Calibration config: RTN quantization edit for RMT ε and VE min-effect calibration
-# Use this to gather guard statistics with an actual model modification.
+# Calibration config: RTN dequantized weight-edit simulation for RMT epsilon
+# and VE min-effect calibration. Use this to gather guard statistics with an
+# actual floating-point model modification.
 
 model:
   id: "gpt2"                  # Small model for calibration sweeps
@@ -20,7 +21,6 @@ edit:
   plan:
     bitwidth: 8
     per_channel: true
-    group_size: 128
     clamp_ratio: 0.0
     scope: "ffn"        # Must match variance guard's default scope (ffn)
     max_modules: 4

@@ -1,4 +1,4 @@
-# Edit overlay: RTN quantization, 8-bit, attention-only scope.
+# Edit overlay: RTN dequantized weight-edit simulation, 8-bit, attention-only scope.
 #
 # Intended for `invarlock evaluate --edit-config ...` (merged with a preset),
 # or manual merge into a full run config.
@@ -8,7 +8,6 @@ edit:
   plan:
     bitwidth: 8
     per_channel: true
-    group_size: 128
     clamp_ratio: 0.005
     scope: "attn"
     max_modules: 12

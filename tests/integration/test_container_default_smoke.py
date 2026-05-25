@@ -83,7 +83,6 @@ def _write_smoke_edit(path: Path) -> None:
               plan:
                 bitwidth: 8
                 per_channel: true
-                group_size: 128
                 clamp_ratio: 0.005
                 scope: attn
                 max_modules: 12

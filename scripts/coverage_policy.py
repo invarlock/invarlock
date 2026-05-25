@@ -80,6 +80,7 @@ THRESHOLDS = {
     "src/invarlock/guards/spectral_selection.py": 1.00,
     "src/invarlock/guards/spectral_analysis.py": 1.00,
     # Numerical / mutation / tensor-processing helpers.
+    "src/invarlock/edits/quant_rtn.py": 0.95,
     "src/invarlock/core/runner_context.py": 0.95,
     "src/invarlock/core/runner_eval_phase.py": 1.00,
     "src/invarlock/core/runner_latency.py": 1.00,
@@ -263,6 +264,7 @@ CORE_FILES = (
     "src/invarlock/reporting/report_primary_metric_policy.py",
     "src/invarlock/reporting/primary_metric_utils.py",
     "src/invarlock/reporting/utils.py",
+    "src/invarlock/edits/quant_rtn.py",
     # Critical CLI commands
     "src/invarlock/cli/commands/run.py",
     "src/invarlock/cli/commands/evaluate.py",
@@ -300,6 +302,7 @@ COVERAGE_INCLUDE_PATTERNS = (
     "src/invarlock/eval/*",
     "src/invarlock/guards/*",
     "src/invarlock/calibration/*",
+    "src/invarlock/edits/quant_rtn.py",
     "src/invarlock/cli/*",
     "src/invarlock/cli/commands/*",
     "src/invarlock/core/*",
@@ -320,6 +323,7 @@ COVERAGE_INCLUDE_PATTERNS = (
     "invarlock/eval/*",
     "invarlock/guards/*",
     "invarlock/calibration/*",
+    "invarlock/edits/quant_rtn.py",
     "invarlock/cli/*",
     "invarlock/cli/commands/*",
     "invarlock/core/*",

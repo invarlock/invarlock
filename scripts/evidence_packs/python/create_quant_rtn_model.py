@@ -95,7 +95,10 @@ def main(argv: list[str]) -> int:
 
     model, _ = load_causal_model(baseline_path, **model_kwargs)
 
-    print(f"Quantizing to {bits}-bit on GPU (scope={scope})...")
+    print(
+        "Applying RTN quantize/dequantize simulation "
+        f"to {bits}-bit on GPU (scope={scope}, group_size={group_size})..."
+    )
     quantized_count = 0
     total_model_params = sum(p.numel() for p in model.parameters())
     edited_params = 0
@@ -126,6 +129,12 @@ def main(argv: list[str]) -> int:
 
     metadata = {
         "edit_type": "quant_rtn",
+        "quantization_mode": "rtn_dequantized_external_subject_simulation",
+        "storage_format": "float_dequantized",
+        "actual_storage_format": "float_dequantized",
+        "packed_quantized_storage": False,
+        "runtime_memory_reduction": False,
+        "deployment_backend": None,
         "bits": bits,
         "group_size": group_size,
         "scope": scope,

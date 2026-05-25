@@ -75,6 +75,50 @@ def test_extract_edit_metadata_uses_config_plan_fallback():
     assert metadata["ranking"] == "l2"
 
 
+def test_extract_edit_metadata_uses_direct_config_fallback():
+    report = {
+        "edit": {
+            "config": {
+                "quantization_mode": "rtn_dequantized_weight_edit",
+                "storage_format": "float_dequantized",
+                "packed_quantized_storage": False,
+                "runtime_memory_reduction": False,
+                "scope": "all",
+            },
+            "deltas": {"params_changed": 1},
+            "name": "quant_rtn",
+        }
+    }
+    metadata = report_edit_summary_mod.extract_edit_metadata(report, {})
+
+    assert metadata["plan"]["quantization_mode"] == "rtn_dequantized_weight_edit"
+    assert metadata["plan"]["storage_format"] == "float_dequantized"
+    assert metadata["scope"] == "all"
+
+
+def test_extract_edit_metadata_preserves_quant_rtn_plan_payload():
+    report = {
+        "edit": {
+            "plan": {
+                "quantization_mode": "rtn_dequantized_weight_edit",
+                "storage_format": "float_dequantized",
+                "packed_quantized_storage": False,
+                "runtime_memory_reduction": False,
+                "scope": "attn",
+            },
+            "deltas": {"params_changed": 1},
+            "name": "quant_rtn",
+            "plan_digest": "sha256:abc",
+        }
+    }
+
+    metadata = report_edit_summary_mod.extract_edit_metadata(report, {})
+
+    assert metadata["plan"]["quantization_mode"] == "rtn_dequantized_weight_edit"
+    assert metadata["plan"]["packed_quantized_storage"] is False
+    assert metadata["scope"] == "attn"
+
+
 def test_compute_report_digest_returns_none_for_non_dict():
     assert provenance_mod.compute_report_digest(None) is None
 

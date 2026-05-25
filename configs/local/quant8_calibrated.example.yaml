@@ -1,7 +1,8 @@
 # Example local preset (copy/rename before editing).
 #
-# This is a full run config for an edited (quant_rtn) run and is meant to be
-# paired against a baseline report via `invarlock evaluate --baseline-report ...`.
+# This is a full run config for an edited (quant_rtn simulation) run and is
+# meant to be paired against a baseline report via `invarlock evaluate
+# --baseline-report ...`.
 
 model:
   id: "sshleifer/tiny-gpt2"
@@ -28,7 +29,6 @@ edit:
   plan:
     bitwidth: 8
     per_channel: true
-    group_size: 128
     clamp_ratio: 0.005
     scope: "attn"
     max_modules: 12

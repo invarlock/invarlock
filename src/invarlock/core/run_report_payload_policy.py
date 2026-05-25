@@ -144,19 +144,23 @@ def build_edit_payload(
         edit_deltas = core_edit.get("deltas", {})
         if not isinstance(edit_deltas, Mapping):
             edit_deltas = {}
+        report_deltas = copy.deepcopy(dict(edit_deltas))
+        report_deltas.setdefault("params_changed", edit_deltas.get("params_changed", 0))
+        report_deltas.setdefault("sparsity", edit_deltas.get("sparsity"))
+        report_deltas.setdefault("bitwidth_map", edit_deltas.get("bitwidth_map"))
+        report_deltas.setdefault(
+            "layers_modified", edit_deltas.get("layers_modified", 0)
+        )
         report_edit.update(
             {
                 "name": edit_name,
                 "plan_digest": core_edit.get("plan_digest", str(hash(str(core_edit)))),
-                "deltas": {
-                    "params_changed": edit_deltas.get("params_changed", 0),
-                    "sparsity": edit_deltas.get("sparsity"),
-                    "bitwidth_map": edit_deltas.get("bitwidth_map"),
-                    "layers_modified": edit_deltas.get("layers_modified", 0),
-                },
+                "deltas": report_deltas,
             }
         )
         for key in (
+            "plan",
+            "config",
             "algorithm",
             "algorithm_version",
             "implementation",
