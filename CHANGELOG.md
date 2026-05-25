@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-05-25
+
 ### Added
 
 - Added strict assurance mode for `evaluate` and `verify`, including the
@@ -36,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   confirmation, preserve a separate report-local verdict, and record the actual
   runtime-provenance verification result in `verify` output.
 - Consolidated open dependency/security PR content into this branch: CodeQL
-  action SHA refresh, Ruff 0.15.13, `idna>=3.15`, and
+  action SHA refresh, Ruff 0.15.14, `idna>=3.15`, and
   `pymdown-extensions>=10.21.3`.
 - Durable assurance and reference docs now describe the current strict contract
   without patch-release dating, and assurance documentation filenames now use
