@@ -392,7 +392,7 @@ def test_verify_assurance_strict_rejects_degraded_guard(
 
     assert result.outcome == VerifyOutcome.POLICY_FAIL
     diagnostics = "\n".join(item.message for item in result.diagnostics)
-    assert "degraded/monitor-only" in diagnostics
+    assert "rmt status degraded is not strict-assurance passing." in diagnostics
 
 
 def test_verify_assurance_strict_rejects_tokenizer_mismatch(
