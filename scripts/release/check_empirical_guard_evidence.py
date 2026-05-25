@@ -21,6 +21,8 @@ from evidence_contracts import (  # noqa: E402
     resolve_artifact,
 )
 
+_MANIFEST_OBJECT_ERROR = "empirical guard evidence manifest must be a JSON object."
+
 
 def _load_json(path: Path, label: str, failures: list[str]) -> object | None:
     return load_json(path, label, failures)
@@ -85,7 +87,8 @@ def check_empirical_guard_evidence(*, root: Path) -> list[str]:
     failures: list[str] = []
     manifest = EmpiricalGuardEvidenceManifest.load(root=root, failures=failures)
     if manifest.payload is None:
-        failures.append("empirical guard evidence manifest must be a JSON object.")
+        if _MANIFEST_OBJECT_ERROR not in failures:
+            failures.append(_MANIFEST_OBJECT_ERROR)
         return failures
     failures.extend(manifest.validate())
     return failures

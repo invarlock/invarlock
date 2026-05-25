@@ -370,7 +370,7 @@ def test_strict_report_policy_collects_report_level_failures() -> None:
     assert "strict assurance verdict must be pass or pending_verifier." in errors
     assert "strict assurance requires canonical_guard_chain_enforced=true." in errors
     assert "explicit blocker" in errors
-    assert "variance is degraded/monitor-only under strict assurance." in errors
+    assert "variance status monitor-only is not strict-assurance passing." in errors
 
 
 def test_strict_report_policy_returns_empty_when_not_required() -> None:

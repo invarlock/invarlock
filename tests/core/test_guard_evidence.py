@@ -52,3 +52,19 @@ def test_guard_evidence_clean_pass_has_no_blocking_reason() -> None:
     assert entry["final_z_scores"] == {"linear": 0.1}
     assert entry["module_family_map"] == {"layer": "linear"}
     assert evidence.strict_blocking_reasons() == ()
+
+
+def test_guard_evidence_blocks_monitor_only_status_spellings() -> None:
+    hyphenated = GuardEvidence.from_report_block("variance", {"status": "monitor-only"})
+    underscored = GuardEvidence.from_report_block(
+        "variance", {"status": "monitor_only"}
+    )
+
+    assert hyphenated is not None
+    assert underscored is not None
+    assert "variance status monitor-only is not strict-assurance passing." in (
+        hyphenated.strict_blocking_reasons()
+    )
+    assert "variance status monitor_only is not strict-assurance passing." in (
+        underscored.strict_blocking_reasons()
+    )

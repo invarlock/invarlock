@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from invarlock.core.guard_evidence import GuardEvidence
+
 CANONICAL_GUARD_CHAIN = (
     "invariants",
     "spectral",
@@ -197,6 +199,13 @@ def _report_build_has_evidence_events(report: dict[str, Any]) -> bool:
     return False
 
 
+def _strict_guard_blocking_reasons(guard_name: str, block: Any) -> tuple[str, ...]:
+    evidence = GuardEvidence.from_report_block(guard_name, block)
+    if evidence is None:
+        return ()
+    return evidence.strict_blocking_reasons()
+
+
 def resolve_report_runtime_provenance_declared(
     report: dict[str, Any], *, default: str = "unknown"
 ) -> str:
@@ -267,13 +276,9 @@ def build_assurance_section(
         if provenance_status not in {"pending", "verified"}:
             reasons.append("strict assurance requires verified runtime provenance.")
         for guard_name in ("spectral", "rmt", "variance", "invariants"):
-            block = report.get(guard_name)
-            if isinstance(block, dict) and block.get("supported") is False:
-                if block.get("assurance_blocking") is True:
-                    reason = block.get("reason") or "unsupported"
-                    reasons.append(
-                        f"{guard_name} unsupported for strict assurance: {reason}."
-                    )
+            reasons.extend(
+                _strict_guard_blocking_reasons(guard_name, report.get(guard_name))
+            )
     report_local_verdict = "pass" if not reasons else "fail"
     if reasons:
         verdict = "fail"
@@ -355,17 +360,7 @@ def strict_report_policy_errors(
         if not isinstance(block, dict) or not block:
             errors.append(f"strict assurance missing {guard_name} guard evidence.")
             continue
-        if block.get("supported") is False and block.get("assurance_blocking") is True:
-            reason = block.get("reason") or "unsupported"
-            errors.append(f"{guard_name} unsupported for strict assurance: {reason}.")
-        if str(block.get("status", "")).lower() in {
-            "degraded",
-            "monitor_only",
-            "monitor-only",
-        }:
-            errors.append(
-                f"{guard_name} is degraded/monitor-only under strict assurance."
-            )
+        errors.extend(_strict_guard_blocking_reasons(guard_name, block))
     return _dedupe(errors)
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 
@@ -47,6 +47,19 @@ class GuardEvidence:
             status=result.get("status"),
         )
 
+    @classmethod
+    def from_report_block(cls, name: str, block: Any) -> GuardEvidence | None:
+        evidence = cls.from_result(name, block)
+        if evidence is None:
+            return None
+        if (
+            isinstance(block, dict)
+            and "decision" not in block
+            and "passed" not in block
+        ):
+            return replace(evidence, decision="")
+        return evidence
+
     def as_report_entry(self) -> dict[str, Any]:
         entry = {
             "name": self.name,
@@ -76,7 +89,11 @@ class GuardEvidence:
         if self.supported is False and self.assurance_blocking is True:
             reason = self.reason or "unsupported"
             reasons.append(f"{self.name} unsupported for strict assurance: {reason}.")
-        if str(self.status or "").strip().lower() in {"degraded", "monitor-only"}:
+        if str(self.status or "").strip().lower() in {
+            "degraded",
+            "monitor-only",
+            "monitor_only",
+        }:
             reasons.append(
                 f"{self.name} status {self.status} is not strict-assurance passing."
             )

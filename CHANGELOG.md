@@ -76,6 +76,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   evidence, and report-finalization paths now use typed request/result or
   manifest objects at their main trust boundaries, reducing duplicated
   ad hoc validation and serialization logic.
+- Strict guard blocking checks now reuse the canonical guard-evidence
+  normalizer and empirical guard-evidence manifest validation now avoids
+  duplicate non-object diagnostics.
 
 ### Removed
 

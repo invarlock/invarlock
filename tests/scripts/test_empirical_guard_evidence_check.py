@@ -449,6 +449,12 @@ def test_empirical_guard_evidence_contract_non_object_manifest(
     assert manifest.payload is None
     assert failures == ["empirical guard evidence manifest must be a JSON object."]
 
+    module = _checker_module()
+    check_failures = module.check_empirical_guard_evidence(root=root)
+    assert check_failures == [
+        "empirical guard evidence manifest must be a JSON object."
+    ]
+
 
 def test_empirical_guard_evidence_check_rejects_malformed_manifest(
     tmp_path: Path,
