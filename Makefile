@@ -72,6 +72,7 @@ COVERAGE_TESTS_CLI_COMMANDS := \
 
 COVERAGE_TESTS_CLI_HELPERS := \
 	tests/cli/test_adapter_auto*.py tests/cli/test_no_color.py \
+	tests/cli/test_config_execution_request_roundtrip.py \
 	tests/cli/test_internal_config_run.py tests/cli/test_json_helpers.py \
 	tests/cli/test_runtime_launch_plan_contract.py \
 	tests/cli/test_overhead_extraction.py
@@ -147,9 +148,13 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/cli/__main__.py \
 	src/invarlock/cli/_json.py \
 	src/invarlock/cli/app.py \
+	src/invarlock/cli/config_execution.py \
 	src/invarlock/cli/evaluate_output.py \
 	src/invarlock/cli/evaluate_phases.py \
+	src/invarlock/cli/internal_config_run.py \
+	src/invarlock/cli/runtime_launch_plan.py \
 	src/invarlock/cli/commands/evaluate.py \
+	src/invarlock/cli/commands/run.py \
 	src/invarlock/cli/commands/verify.py \
 	src/invarlock/cli/runtime_verify.py \
 	src/invarlock/eval/probes/mi.py \
