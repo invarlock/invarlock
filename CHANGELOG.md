@@ -9,88 +9,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added strict assurance mode for `evaluate` and `verify`, including a central
-  top-level report verdict for the
-  `invarlock-weight-edit-regression-v1` claim set. This release introduces the
-  current strict assurance contract described in the trust-model and checklist
-  docs.
-- Added structured report-build evidence for synthesized, repaired, and
-  fallback fields so strict assurance rejects non-original report evidence
-  without relying on diagnostic string matching.
+- Added strict assurance mode for `evaluate` and `verify`, including the
+  `invarlock-weight-edit-regression-v1` claim set, central report verdicts,
+  strict paired-length checking, and structured report-build evidence for
+  synthesized, repaired, and fallback fields.
 - Added adversarial verifier coverage for strict guard-chain enforcement,
   runtime provenance failures, mutated report fields, missing strict assurance
-  claims, and unsupported guard-status shapes.
-- Added strict paired-length checking for paired delta log-loss computation,
-  with truncation available only through explicit non-strict opt-in.
+  claims, unsupported guard-status shapes, and installed-wheel strict
+  verification/report rendering outside the repository tree.
 - Added trust-model, strict assurance checklist, failure examples, alternatives
-  comparison, runtime provenance guide, and one-run lifecycle documentation.
-- Added an installed-wheel strict verification smoke that verifies a strict
-  assurance report bundle and renders HTML outside the repository tree.
-- Added a CVE audit lane that inventories locked dependency surfaces,
-  cross-checks exact package versions against OSV advisories, and emits
-  JSON/Markdown reports for release review.
-- Added a `make dist-check` packaging gate that builds wheel/sdist artifacts
-  and runs `twine check` before release.
-- Added a maintainer release-evidence checklist and `make release-evidence-check`
-  gate for wheel/sdist hashes, SBOMs, runtime image digests, and strict example
-  report bundles.
-- Added a deterministic `make guard-validation-smoke` maintainer gate and
-  assurance note for synthetic spectral/RMT/variance validation evidence.
-- Added an empirical guard-evidence checker and assurance note for validating
-  non-synthetic model-evidence, calibration, and evidence-pack artifacts when a
-  release claims expanded guard calibration.
-- Hardened `make release-evidence-check` so it validates artifact contents,
-  strict report semantics, verifier provenance status, guard-validation smoke
-  artifacts, and offline release bundles instead of only checking file
-  existence.
+  comparison, runtime provenance guide, one-run lifecycle, guard-validation
+  smoke, and empirical guard-evidence documentation.
+- Added maintainer release and evidence gates: CVE audit reporting,
+  `make dist-check`, content-validating `make release-evidence-check`,
+  `make guard-validation-smoke`, release-evidence checklist coverage,
+  wheel/sdist hash checks, SBOM checks, runtime image digest checks, strict
+  example report bundle checks, and offline bundle validation.
 
 ### Changed
 
 - Default `evaluate` assurance posture is now fail-closed strict mode for
-  assurance evidence generation.
+  assurance evidence generation, and strict generated reports now use a
+  pending-verifier top-level verdict until runtime provenance is checked by
+  `verify`.
 - Generated reports now distinguish declared runtime provenance from verifier
-  confirmation; `verify` records the actual runtime-provenance verification
-  result in its output.
-- Strict generated reports now use a pending-verifier top-level verdict until
-  runtime provenance is checked by `verify`, while preserving a separate
-  report-local verdict.
+  confirmation, preserve a separate report-local verdict, and record the actual
+  runtime-provenance verification result in `verify` output.
 - Consolidated open dependency/security PR content into this branch: CodeQL
   action SHA refresh, Ruff 0.15.13, `idna>=3.15`, and
   `pymdown-extensions>=10.21.3`.
 - Version metadata, docs links, and citation metadata now target v0.9.0.
 - Durable assurance and reference docs now describe the current strict contract
-  without patch-release dating; v0.9.0-specific wording is kept to release
-  notes and release checklists.
-- Assurance documentation filenames now use numbered prefixes consistently,
-  except for the glossary.
+  without patch-release dating, and assurance documentation filenames now use
+  numbered prefixes consistently except for the glossary.
 - Config-driven run execution now uses `ConfigExecutionRequest` as the
   canonical request object across public command plumbing, internal delegated
-  execution, and container-launch argv serialization.
-- `ConfigExecutionRequest` now generates delegated argparse and internal argv
-  serialization from the same request field specs, removing the remaining
-  duplicated config-run option plumbing.
+  execution, delegated argparse, and container-launch argv serialization.
 - GPT-2 smoke coverage now uses a user-journey runner with local, container,
   strict report-bundle, configurable no-op, quantized-subject, custom-edit,
   evidence-pack, and expected verifier-failure journeys, plus a final results
-  table.
-- GPT-2 user-journey smoke now exposes `INVARLOCK_SMOKE_DEVICE` so GPU-capable
-  hosts can run live journeys on CUDA and older GPU hosts can force CPU when
-  the pinned PyTorch wheel does not support the local compute capability.
+  table and `INVARLOCK_SMOKE_DEVICE` control for CUDA/CPU hosts.
 - Release, empirical guard-evidence, verifier, runtime-provenance, guard
   evidence, and report-finalization paths now use typed request/result or
   manifest objects at their main trust boundaries, reducing duplicated
-  ad hoc validation and serialization logic.
-- Strict guard blocking checks now reuse the canonical guard-evidence
-  normalizer and empirical guard-evidence manifest validation now avoids
-  duplicate non-object diagnostics.
+  ad hoc validation and serialization logic; strict guard blocking checks now
+  reuse the canonical guard-evidence normalizer.
 - `quant_rtn` is now explicitly an RTN quantize/dequantize simulation edit:
   reports distinguish theoretical packed-memory estimates from actual
   floating-point dequantized storage, canonical plan digests include meaningful
-  edit parameters and selected targets, and the edit emits per-module and
-  aggregate quantization-error metrics.
-- `quant_rtn` plan digests now exclude runtime-local parameter object IDs and
-  distinguish selected modules from physically quantized modules when tied
-  weights are deduplicated.
+  edit parameters and selected targets, runtime-local parameter object IDs are
+  excluded from plan digests, tied weights distinguish selected modules from
+  physically quantized modules, and the edit emits per-module and aggregate
+  quantization-error metrics.
 
 ### Removed
 
@@ -108,6 +78,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fallback fields, and missing guard evidence cannot pass as strict assurance.
 - Fixed the curated assurance test lane so it runs the strict assurance
   contract, verifier guard-chain, and strict paired-metric regression tests.
+- Fixed empirical guard-evidence manifest validation so non-object diagnostics
+  are reported once.
 - Remediated `pip` and `urllib3` CVEs across the uv and workflow lock
   surfaces, cleared the stale `pip-audit` allowlist, and aligned the
   supply-chain workflow contract tests with the current disk-cleanup steps.
