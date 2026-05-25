@@ -19,9 +19,11 @@ from typing import Any
 import yaml
 
 try:
+    import model_evidence_commands as evidence_commands
     from model_evidence_sweep_output import write_manifest, write_summary
 except ImportError:  # pragma: no cover - direct module load under pytest
     sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import model_evidence_commands as evidence_commands
     from model_evidence_sweep_output import write_manifest, write_summary
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -613,47 +615,19 @@ def build_evaluate_command(
     execution_mode: str,
     lane_root: Path,
 ) -> list[str]:
-    command = [
-        python_exe,
-        "-m",
-        "invarlock",
-        "evaluate",
-        "--baseline",
-        spec.model_id,
-        "--subject",
-        spec.model_id,
-        "--adapter",
-        spec.adapter,
-        "--preset",
-        spec.preset_arg(execution_mode=execution_mode),
-        "--profile",
-        profile,
-        "--allow-network",
-        "--device",
-        device,
-        "--out",
-        _command_path(lane_root / "runs", execution_mode=execution_mode),
-        "--report-out",
-        _command_path(lane_root / "report", execution_mode=execution_mode),
-    ]
-    if execution_mode == "host":
-        command.extend(["--execution-mode", "host"])
-    return command
+    return evidence_commands.build_evaluate_command(
+        spec,
+        python_exe=python_exe,
+        profile=profile,
+        device=device,
+        execution_mode=execution_mode,
+        lane_root=lane_root,
+        repo_root=REPO_ROOT,
+    )
 
 
 def _prefetch_adapter_name(spec: EvidenceLane) -> str:
-    adapter_name = spec.adapter
-    if adapter_name in {"auto", "auto_hf"}:
-        preset = spec.preset_relpath.lower()
-        lane = spec.lane_id.lower()
-        model_id = spec.model_id.lower()
-        if "masked_lm" in preset or "masked" in lane or "bert" in model_id:
-            adapter_name = "hf_mlm"
-        elif "seq2seq" in preset or "t5" in model_id:
-            adapter_name = "hf_seq2seq"
-        else:
-            adapter_name = "hf_causal"
-    return adapter_name
+    return evidence_commands.prefetch_adapter_name(spec)
 
 
 def build_prefetch_command(
@@ -661,16 +635,7 @@ def build_prefetch_command(
     *,
     python_exe: str,
 ) -> list[str]:
-    adapter_name = _prefetch_adapter_name(spec)
-    prefetch_code = (
-        "from huggingface_hub import snapshot_download; "
-        "from invarlock.model_profile import detect_model_profile; "
-        "import sys; "
-        "model_id = sys.argv[1]; "
-        f"detect_model_profile(model_id, adapter={adapter_name!r}).make_tokenizer(); "
-        "snapshot_download(model_id)"
-    )
-    return [python_exe, "-c", prefetch_code, spec.model_id]
+    return evidence_commands.build_prefetch_command(spec, python_exe=python_exe)
 
 
 def build_verify_command(
@@ -680,29 +645,22 @@ def build_verify_command(
     execution_mode: str,
     report_path: Path,
 ) -> list[str]:
-    command = [
-        python_exe,
-        "-m",
-        "invarlock",
-        "verify",
-        "--profile",
-        profile,
-        "--json",
-        str(report_path),
-    ]
-    if execution_mode == "host":
-        command[4:4] = ["--runtime-provenance", "host"]
-    return command
+    return evidence_commands.build_verify_command(
+        python_exe=python_exe,
+        profile=profile,
+        execution_mode=execution_mode,
+        report_path=report_path,
+    )
 
 
 def resolve_lane_profile(
     *, profile_override: str | None, execution_mode: str, spec: EvidenceLane
 ) -> str:
-    if profile_override:
-        return profile_override
-    if execution_mode == "host":
-        return "dev"
-    return spec.verify_profile
+    return evidence_commands.resolve_lane_profile(
+        profile_override=profile_override,
+        execution_mode=execution_mode,
+        spec=spec,
+    )
 
 
 def runtime_env() -> dict[str, str]:
@@ -730,9 +688,11 @@ def _execution_root(output_root: Path, *, execution_mode: str) -> Path:
 
 
 def _command_path(path: Path, *, execution_mode: str) -> str:
-    if execution_mode == "container" and _is_within_repo(path):
-        return path.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
-    return str(path)
+    return evidence_commands.command_path(
+        path,
+        execution_mode=execution_mode,
+        repo_root=REPO_ROOT,
+    )
 
 
 def _publish_lane_artifacts(source: Path, destination: Path) -> None:
@@ -849,9 +809,11 @@ def run_lane(
                 evaluate_exit=prefetch_proc.returncode,
                 verify_exit=None,
                 report_path=str(published_report_path),
-                verify_path=str(published_verify_path)
-                if published_verify_path.is_file()
-                else None,
+                verify_path=(
+                    str(published_verify_path)
+                    if published_verify_path.is_file()
+                    else None
+                ),
                 status=status,
                 detail=detail,
             )
@@ -935,9 +897,9 @@ def run_lane(
         evaluate_exit=eval_returncode,
         verify_exit=verify_exit,
         report_path=str(published_report_path),
-        verify_path=str(published_verify_path)
-        if published_verify_path.is_file()
-        else None,
+        verify_path=(
+            str(published_verify_path) if published_verify_path.is_file() else None
+        ),
         status=status,
         detail=detail,
     )

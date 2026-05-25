@@ -60,7 +60,7 @@ def test_gpt2_user_journey_smoke_script_is_executable() -> None:
     assert 'EDIT_CONFIG="${INVARLOCK_SMOKE_EDIT_CONFIG:-}"' in contents
     assert 'JOURNEYS_RAW="${INVARLOCK_SMOKE_JOURNEYS:-$DEFAULT_JOURNEYS}"' in contents
     assert "INVARLOCK_SMOKE_QUANTIZED" in contents
-    assert 'assurance=$ASSURANCE' in contents
+    assert "assurance=$ASSURANCE" in contents
     assert '--assurance "$ASSURANCE"' in contents
     assert 'record_result "$journey/verify-rejects"' in contents
     assert "GPT-2 User Journey Smoke Results" in contents

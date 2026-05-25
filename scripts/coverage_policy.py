@@ -12,6 +12,7 @@ from collections.abc import Sequence
 # coverage policy for shells, pure helpers, and tensor/mutation helpers.
 THRESHOLDS = {
     # Release evidence tooling
+    "scripts/release/evidence_contracts.py": 0.95,
     "scripts/release/check_empirical_guard_evidence.py": 0.95,
     "scripts/release/check_release_evidence.py": 0.95,
     # Evaluation & reporting
@@ -49,6 +50,7 @@ THRESHOLDS = {
     "src/invarlock/reporting/report_types.py": 1.00,
     "src/invarlock/reporting/dataset_hashing.py": 1.00,
     "src/invarlock/reporting/report_build_evidence.py": 1.00,
+    "src/invarlock/reporting/evaluation_report_builder.py": 1.00,
     "src/invarlock/reporting/report_make_output.py": 0.95,
     "src/invarlock/reporting/report_primary_metric_policy.py": 0.95,
     "src/invarlock/reporting/primary_metric_utils.py": 0.90,
@@ -222,6 +224,7 @@ CORE_PREFIXES = (
 # Individual core files outside of the broad prefixes.
 CORE_FILES = (
     # Release evidence tooling
+    "scripts/release/evidence_contracts.py",
     "scripts/release/check_empirical_guard_evidence.py",
     "scripts/release/check_release_evidence.py",
     # Evaluation & reporting (key entry points)
@@ -255,6 +258,7 @@ CORE_FILES = (
     "src/invarlock/reporting/dataset_hashing.py",
     "src/invarlock/reporting/report_schema.py",
     "src/invarlock/reporting/report_build_evidence.py",
+    "src/invarlock/reporting/evaluation_report_builder.py",
     "src/invarlock/reporting/report_make_output.py",
     "src/invarlock/reporting/report_primary_metric_policy.py",
     "src/invarlock/reporting/primary_metric_utils.py",

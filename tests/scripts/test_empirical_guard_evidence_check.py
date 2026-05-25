@@ -330,6 +330,125 @@ def test_empirical_guard_evidence_check_rejects_required_field_edges(
     module._validate_guard_rows(root, {"guard_rows": "bad"}, failures)
     assert any("guard_rows must be a non-empty list" in item for item in failures)
 
+    failures.clear()
+    module._validate_source_commands(
+        {"source_commands": ["scripts/model_evidence_sweep.py --dry-run"]},
+        failures,
+    )
+    assert failures == []
+
+    failures.clear()
+    module._validate_model_family_rows(root, {"model_family_rows": "bad"}, failures)
+    assert any(
+        "model_family_rows must be a non-empty list" in item for item in failures
+    )
+
+
+def test_empirical_guard_evidence_legacy_wrapper_paths(tmp_path: Path) -> None:
+    root = tmp_path / "empirical"
+    root.mkdir()
+    artifact = root / "artifact.json"
+    artifact.write_text('{"ok": true}', encoding="utf-8")
+    module = _checker_module()
+    failures: list[str] = []
+
+    assert module._load_json(artifact, "artifact", failures) == {"ok": True}
+    assert module._resolve_artifact(root, "artifact.json", "row", failures) == artifact
+
+    module._validate_guard_rows(
+        root,
+        {
+            "guard_rows": [
+                None,
+                {
+                    "guard": "spectral",
+                    "evidence_kind": "calibration_null_sweep",
+                    "status": "empirical",
+                    "model_family": "gpt2",
+                    "artifact": "artifact.json",
+                },
+            ]
+        },
+        failures,
+    )
+    assert any("guard_rows[0] must be an object" in item for item in failures)
+    assert any("missing guard rows: rmt, variance" in item for item in failures)
+
+    failures.clear()
+    module._validate_guard_rows(
+        root,
+        {
+            "guard_rows": [
+                {
+                    "guard": "spectral",
+                    "evidence_kind": "calibration_null_sweep",
+                    "status": "empirical",
+                    "model_family": "gpt2",
+                    "artifact": "artifact.json",
+                },
+                {
+                    "guard": "rmt",
+                    "evidence_kind": "model_evidence_sweep",
+                    "status": "empirical",
+                    "model_family": "gpt2",
+                    "artifact": "artifact.json",
+                },
+                {
+                    "guard": "variance",
+                    "evidence_kind": "calibration_ve_sweep",
+                    "status": "empirical",
+                    "model_family": "gpt2",
+                    "artifact": "artifact.json",
+                },
+            ]
+        },
+        failures,
+    )
+    assert failures == []
+
+    failures.clear()
+    module._validate_model_family_rows(
+        root,
+        {
+            "model_family_rows": [
+                None,
+                {
+                    "model_family": "gpt2",
+                    "status": "observed",
+                    "artifact": "artifact.json",
+                },
+            ]
+        },
+        failures,
+    )
+    assert failures == ["model_family_rows[0] must be an object."]
+
+    from evidence_contracts import EmpiricalGuardEvidenceManifest
+
+    payload_none = EmpiricalGuardEvidenceManifest(root=root, payload=None)
+    assert any("must be a JSON object" in item for item in payload_none.validate())
+    none_failures: list[str] = []
+    payload_none._validate_source_commands(none_failures)
+    payload_none._validate_guard_rows(none_failures)
+    payload_none._validate_model_family_rows(none_failures)
+    assert none_failures == []
+
+
+def test_empirical_guard_evidence_contract_non_object_manifest(
+    tmp_path: Path,
+) -> None:
+    from evidence_contracts import EmpiricalGuardEvidenceManifest
+
+    root = tmp_path / "empirical"
+    root.mkdir()
+    (root / "manifest.json").write_text("[]", encoding="utf-8")
+    failures: list[str] = []
+
+    manifest = EmpiricalGuardEvidenceManifest.load(root=root, failures=failures)
+
+    assert manifest.payload is None
+    assert failures == ["empirical guard evidence manifest must be a JSON object."]
+
 
 def test_empirical_guard_evidence_check_rejects_malformed_manifest(
     tmp_path: Path,

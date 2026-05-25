@@ -72,6 +72,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GPT-2 smoke coverage now uses a user-journey runner with configurable
   no-op, quantized-subject, and expected verifier-failure journeys plus a final
   results table.
+- Release, empirical guard-evidence, verifier, runtime-provenance, guard
+  evidence, and report-finalization paths now use typed request/result or
+  manifest objects at their main trust boundaries, reducing duplicated
+  ad hoc validation and serialization logic.
 
 ### Removed
 

@@ -420,6 +420,179 @@ def test_release_evidence_check_rejects_malformed_hash_and_json_edges(
     assert any("has no valid entries" in item for item in failures)
 
 
+def test_release_evidence_legacy_wrapper_paths(tmp_path: Path) -> None:
+    module = _release_checker_module(_repo_root())
+    failures: list[str] = []
+    root = tmp_path / "root"
+    root.mkdir()
+    artifact = root / "artifact.whl"
+    artifact.write_text("wheel", encoding="utf-8")
+
+    assert module._existing_globs(root, ("*.whl",)) == [artifact]
+    assert module._dist_artifacts(root) == [artifact]
+    assert module._sha256(artifact) == _sha256(artifact)
+    assert module._load_json(tmp_path / "missing.json", "missing", failures) is None
+    assert any("missing missing" in item for item in failures)
+
+    failures.clear()
+    module._require_file(artifact, "artifact", failures)
+    module._require_any(root, ("*.whl",), "wheel", failures)
+    assert failures == []
+
+    failures.clear()
+    missing_hashes = tmp_path / "missing-hashes.txt"
+    module._validate_dist_hashes(
+        dist_root=root,
+        hash_path=missing_hashes,
+        failures=failures,
+    )
+    assert failures == []
+
+    failures.clear()
+    empty_dist = tmp_path / "empty-dist"
+    empty_dist.mkdir()
+    hashes = tmp_path / "hashes.txt"
+    hashes.write_text("", encoding="utf-8")
+    module._validate_dist_hashes(
+        dist_root=empty_dist,
+        hash_path=hashes,
+        failures=failures,
+    )
+    assert failures == []
+
+    failures.clear()
+    module._validate_runtime_digest(tmp_path / "missing-digest.txt", failures)
+    assert failures == []
+
+    failures.clear()
+    bad_guard_json = tmp_path / "guard.json"
+    bad_guard_json.write_text("[]", encoding="utf-8")
+    empty_md = tmp_path / "guard.md"
+    empty_md.write_text("", encoding="utf-8")
+    module._validate_guard_validation(
+        json_path=bad_guard_json,
+        markdown_path=empty_md,
+        failures=failures,
+    )
+    assert any(
+        "guard-validation JSON must be a JSON object" in item for item in failures
+    )
+    assert any(
+        "guard-validation markdown must not be empty" in item for item in failures
+    )
+
+    failures.clear()
+    bad_sbom = tmp_path / "sbom.json"
+    bad_sbom.write_text("[]", encoding="utf-8")
+    module._validate_sbom(bad_sbom, failures)
+    assert failures == ["SBOM must be a JSON object."]
+
+    failures.clear()
+    good_sbom = tmp_path / "good-sbom.json"
+    good_sbom.write_text('{"bomFormat": "CycloneDX"}', encoding="utf-8")
+    module._validate_sbom(good_sbom, failures)
+    assert failures == []
+
+    failures.clear()
+    from evidence_contracts import DistHashManifest
+
+    DistHashManifest({}).validate_artifacts(dist_root=root, failures=failures)
+    assert failures == ["wheel/sdist hashes file has no valid entries."]
+
+    failures.clear()
+    empty_dist_root = tmp_path / "no-artifacts"
+    empty_dist_root.mkdir()
+    DistHashManifest({}).validate_artifacts(
+        dist_root=empty_dist_root,
+        failures=failures,
+    )
+    assert failures == []
+
+
+def test_release_evidence_contract_edge_paths(tmp_path: Path) -> None:
+    from evidence_contracts import ReleaseEvidenceManifest
+
+    dist = tmp_path / "dist"
+    release = tmp_path / "release"
+    guard_dir = tmp_path / "guard"
+    offline = tmp_path / "offline"
+    dist.mkdir()
+    (dist / "invarlock-0.9.0-py3-none-any.whl").write_text("wheel", encoding="utf-8")
+    (dist / "invarlock-0.9.0.tar.gz").write_text("sdist", encoding="utf-8")
+    (release / "strict").mkdir(parents=True)
+    (release / "wheel-sdist-hashes.txt").write_text("", encoding="utf-8")
+    (release / "runtime-image-digest.txt").write_text(
+        "sha256:" + "1" * 64,
+        encoding="utf-8",
+    )
+    (release / "strict" / "evaluation.report.json").write_text(
+        json.dumps(
+            {
+                "assurance": {
+                    "mode": "strict",
+                    "verdict": "pending_verifier",
+                    "fallback_fields_used": False,
+                },
+                "report_build": {
+                    "synthesized_fields": [],
+                    "repaired_fields": [],
+                    "fallback_fields": [],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (release / "strict" / "verify.json").write_text(
+        json.dumps(
+            {
+                "summary": {"ok": True},
+                "results": [
+                    {
+                        "id": "evaluation.report.json",
+                        "verification": {
+                            "runtime_provenance": {
+                                "status": "verified",
+                                "verified": True,
+                            }
+                        },
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    sbom = tmp_path / "sbom.json"
+    sbom.write_text("[]", encoding="utf-8")
+    guard_dir.mkdir()
+    (guard_dir / "guard-validation-smoke.json").write_text(
+        json.dumps(
+            {
+                "schema": "invarlock/guard-validation-smoke-v1",
+                "rate_rows": [
+                    {"guard": "spectral"},
+                    {"guard": "rmt"},
+                    {"guard": "variance"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (guard_dir / "guard-validation-smoke.md").write_text("ok", encoding="utf-8")
+    _write_offline_bundle(offline)
+
+    failures = ReleaseEvidenceManifest(
+        release_root=release,
+        dist_root=dist,
+        sbom_path=sbom,
+        guard_validation_json=guard_dir / "guard-validation-smoke.json",
+        guard_validation_markdown=guard_dir / "guard-validation-smoke.md",
+        offline_bundle_dir=offline,
+    ).validate()
+
+    assert any("hashes file has no valid entries" in item for item in failures)
+    assert "SBOM must be a JSON object." in failures
+
+
 def test_release_evidence_check_rejects_report_and_verify_shape_edges(
     tmp_path: Path,
 ) -> None:

@@ -3,11 +3,6 @@ from __future__ import annotations
 import copy
 from typing import Any
 
-from invarlock.core.assurance_contract import (
-    build_assurance_section,
-    resolve_report_runtime_provenance_declared,
-)
-
 from . import policy_utils as report_policy_utils_mod
 from . import report_build_evidence as report_build_evidence_mod
 from . import report_confidence as report_confidence_mod
@@ -16,6 +11,7 @@ from . import report_overhead as report_overhead_mod
 from . import report_primary_metric_policy as report_primary_metric_policy_mod
 from . import report_provenance as report_provenance_mod
 from . import report_schema as report_schema_mod
+from .evaluation_report_builder import EvaluationReportBuilder
 from .report_types import RunReport
 
 
@@ -202,21 +198,7 @@ def _finalize_evaluation_report(
         if isinstance(meta_section, dict):
             meta_section["build_diagnostics"] = build_diagnostics
     try:
-        report_build_evidence_mod.ensure_report_build_evidence(evaluation_report)
-        fallback_fields_used = (
-            report_build_evidence_mod.report_build_has_evidence_events(
-                evaluation_report
-            )
-        )
-        evaluation_report["assurance"] = build_assurance_section(
-            evaluation_report,
-            fallback_fields_used=fallback_fields_used,
-            runtime_provenance_verified=None,
-            runtime_provenance_declared=resolve_report_runtime_provenance_declared(
-                evaluation_report
-            ),
-            runtime_provenance_verification_status="pending",
-        )
+        EvaluationReportBuilder(evaluation_report).finalize_assurance()
     except non_fatal_exceptions:
         record_blocking_diagnostic(
             code="assurance.section_unavailable",
