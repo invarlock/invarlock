@@ -166,6 +166,13 @@ Notes:
 Each model runs 8 edit experiments (4 types × 2 versions) plus optional error
 injection tests.
 
+Evidence-pack `quant_rtn` scenarios are generated as external subject
+artifacts: the helper applies RTN quantize/dequantize simulation and saves
+floating-point dequantized weights. Those scenarios may use `bits` and
+`group_size` to shape the generated artifact, but they are not the built-in
+`edit.name: quant_rtn` plugin plan and they do not produce packed runtime
+quantization.
+
 ### Clean edits (tuned)
 
 Clean edits use tuned parameters supplied via `PACK_TUNED_EDIT_PARAMS_FILE`.
@@ -174,7 +181,7 @@ parameters at runtime.
 
 | Edit Type | Parameters | Scope |
 | --- | --- | --- |
-| Quantization RTN | tuned (`bitwidth`, `group_size`) from tuned params file | FFN only |
+| RTN dequantized external-subject simulation | tuned (`bits`, `group_size`) from tuned params file | FFN only |
 | FP8 Quantization | tuned (`format`) from tuned params file | FFN only |
 | Magnitude Pruning | tuned (`prune_level`) from tuned params file | FFN only |
 | Low-Rank SVD | tuned (`rank`) from tuned params file | FFN only |
@@ -193,7 +200,7 @@ without manufacturing clean false positives.
 
 | Edit Type | Parameters | Scope |
 | --- | --- | --- |
-| Quantization RTN | `quant_rtn:8:all` (8-bit) | All layers |
+| RTN dequantized external-subject simulation | `quant_rtn:8:all` (8-bit) | All layers |
 | FP8 Quantization | `fp8_quant:e5m2:all` | All layers |
 | Magnitude Pruning | `magnitude_prune:0.5:all` (50% sparsity) | All layers |
 | Low-Rank SVD | `lowrank_svd:32:all` (rank 32) | All layers |

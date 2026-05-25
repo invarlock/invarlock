@@ -16,6 +16,7 @@ nav:
       - Plugin Workflow: user-guide/plugins.md
       - Configuration Gallery: user-guide/config-gallery.md
       - Example Reports: user-guide/example-reports.md
+      - Failure Examples: user-guide/failure-examples.md
       - Reading a Report: user-guide/reading-report.md
       - Evidence Packs: user-guide/evidence-packs.md
       - Evidence Pack Internals: user-guide/evidence-packs-internals.md
@@ -25,6 +26,7 @@ nav:
   - Reference:
       - Index: reference/index.md
       - Architecture: reference/architecture.md
+      - One Run Lifecycle: reference/one-run-lifecycle.md
       - API Guide: reference/api-guide.md
       - Programmatic Quickstart: reference/programmatic-quickstart.md
       - Guards: reference/guards.md
@@ -39,8 +41,11 @@ nav:
       - Artifact Layout: reference/artifacts.md
       - Observability: reference/observability.md
       - Calibration: reference/calibration.md
+      - Alternatives Comparison: reference/alternatives-comparison.md
   - Assurance:
       - Assurance Case: assurance/00-assurance-case.md
+      - Trust Model: assurance/14-trust-model.md
+      - Strict Assurance Checklist: assurance/15-strict-assurance-checklist.md
       - Glossary: assurance/glossary.md
       # Merged into Evaluation Math
       - Evaluation Math Derivation: assurance/01-eval-math-derivation.md
@@ -56,13 +61,15 @@ nav:
       - Policy Provenance & Digest: assurance/11-policy-provenance.md
       - Device Drift Bands: assurance/12-device-drift-bands.md
       - GPU/MPS-First Guards: assurance/13-gpu-mps-first-guards.md
+      - Guard Validation Smoke: assurance/16-guard-validation-smoke.md
+      - Empirical Guard Evidence: assurance/17-empirical-guard-evidence.md
   - Security:
       - Best Practices: security/best-practices.md
       - Release Verification: security/release-verification.md
       - Threat Model: security/threat-model.md
       - Architecture: security/architecture.md
+      - Runtime Provenance Guide: security/runtime-provenance-guide.md
       - Pip Audit Allowlist: security/pip-audit-allowlist.md
-
 theme:
   name: material
   language: en

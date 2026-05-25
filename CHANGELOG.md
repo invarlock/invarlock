@@ -7,13 +7,91 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-05-25
+
 ### Added
+
+- Added strict assurance mode for `evaluate` and `verify`, including the
+  `invarlock-weight-edit-regression-v1` claim set, central report verdicts,
+  strict paired-length checking, and structured report-build evidence for
+  synthesized, repaired, and fallback fields.
+- Added adversarial verifier coverage for strict guard-chain enforcement,
+  runtime provenance failures, mutated report fields, missing strict assurance
+  claims, unsupported guard-status shapes, and installed-wheel strict
+  verification/report rendering outside the repository tree.
+- Added trust-model, strict assurance checklist, failure examples, alternatives
+  comparison, runtime provenance guide, one-run lifecycle, guard-validation
+  smoke, and empirical guard-evidence documentation.
+- Added maintainer release and evidence gates: CVE audit reporting,
+  `make dist-check`, content-validating `make release-evidence-check`,
+  `make guard-validation-smoke`, release-evidence checklist coverage,
+  wheel/sdist hash checks, SBOM checks, runtime image digest checks, strict
+  example report bundle checks, and offline bundle validation.
 
 ### Changed
 
+- Default `evaluate` assurance posture is now fail-closed strict mode for
+  assurance evidence generation, and strict generated reports now use a
+  pending-verifier top-level verdict until runtime provenance is checked by
+  `verify`.
+- Generated reports now distinguish declared runtime provenance from verifier
+  confirmation, preserve a separate report-local verdict, and record the actual
+  runtime-provenance verification result in `verify` output.
+- Consolidated open dependency/security PR content into this branch: CodeQL
+  action SHA refresh, Ruff 0.15.14, `idna>=3.15`, and
+  `pymdown-extensions>=10.21.3`.
+- Durable assurance and reference docs now describe the current strict contract
+  without patch-release dating, and assurance documentation filenames now use
+  numbered prefixes consistently except for the glossary.
+- Config-driven run execution now uses `ConfigExecutionRequest` as the
+  canonical request object across public command plumbing, internal delegated
+  execution, delegated argparse, and container-launch argv serialization.
+- GPT-2 smoke coverage now uses a user-journey runner with local, container,
+  strict report-bundle, configurable no-op, quantized-subject, custom-edit,
+  evidence-pack, and expected verifier-failure journeys, plus a final results
+  table and `INVARLOCK_SMOKE_DEVICE` control for CUDA/CPU hosts.
+- Release, empirical guard-evidence, verifier, runtime-provenance, guard
+  evidence, and report-finalization paths now use typed request/result or
+  manifest objects at their main trust boundaries, reducing duplicated
+  ad hoc validation and serialization logic; strict guard blocking checks now
+  reuse the canonical guard-evidence normalizer.
+- `quant_rtn` is now explicitly an RTN quantize/dequantize simulation edit:
+  reports distinguish theoretical packed-memory estimates from actual
+  floating-point dequantized storage, canonical plan digests include meaningful
+  edit parameters and selected targets, runtime-local parameter object IDs are
+  kept under `runtime_debug` instead of normal report metadata, tied weights
+  distinguish selected modules from physically quantized modules, and the edit
+  emits per-module and aggregate quantization-error metrics.
+
 ### Removed
 
+- Removed transient release-hardening and release-checklist pages from the
+  published docs tree so durable docs stay focused on current repository
+  behavior and stable user-facing contracts.
+
 ### Fixed
+
+- Removed ambiguous `group_size`/4-bit paths from the built-in `quant_rtn`
+  edit contract and sample overlays; real packed quantized artifacts should use
+  adapter-backed or external subject workflows instead of this simulation edit.
+- Fixed `quant_rtn` preview and digest metadata for tied weights so previews
+  deduplicate the same physical parameters as apply, theoretical packed-memory
+  estimates use unique parameters, and plan digests distinguish stable tied
+  module groups without using runtime-local object IDs.
+- Fixed `quant_rtn` report-plan naming so selected module names and physically
+  quantized module names are no longer duplicated under ambiguous aliases, and
+  runtime-local debug IDs are omitted from CI/release edit results unless
+  verbose/debug output is explicitly requested.
+- Fixed the strict assurance trust boundary so host/unverified provenance,
+  custom guard order, dev/aggressive profiles, unsupported blocking statuses,
+  fallback fields, and missing guard evidence cannot pass as strict assurance.
+- Fixed the curated assurance test lane so it runs the strict assurance
+  contract, verifier guard-chain, and strict paired-metric regression tests.
+- Fixed empirical guard-evidence manifest validation so non-object diagnostics
+  are reported once.
+- Remediated `pip` and `urllib3` CVEs across the uv and workflow lock
+  surfaces, cleared the stale `pip-audit` allowlist, and aligned the
+  supply-chain workflow contract tests with the current disk-cleanup steps.
 
 ## [0.8.0] - 2026-04-23
 

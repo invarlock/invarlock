@@ -119,11 +119,6 @@ compile_req_in \
   "${EVIDENCE_PACK_DIR}/accelerate.txt"
 
 compile_req_in \
-  "${EVIDENCE_PACK_DIR}/flash-attn.in" \
-  "${EVIDENCE_PACK_DIR}/flash-attn.txt" \
-  --no-deps
-
-compile_req_in \
   "${EVIDENCE_PACK_DIR}/huggingface_hub.in" \
   "${EVIDENCE_PACK_DIR}/huggingface_hub.txt"
 

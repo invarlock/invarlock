@@ -39,6 +39,62 @@ class RuntimeProvenanceResult:
     issues: tuple[RuntimeProvenanceIssue, ...] = ()
 
 
+@dataclass(frozen=True)
+class RuntimeProvenanceVerdict:
+    declared_mode: str
+    status: str
+    verified: bool
+    skipped: bool
+    issues: tuple[RuntimeProvenanceIssue, ...] = ()
+
+    @property
+    def strict_blocking(self) -> bool:
+        return not self.verified
+
+    @classmethod
+    def from_result(
+        cls,
+        result: RuntimeProvenanceResult,
+        *,
+        declared_mode: str = "unknown",
+    ) -> RuntimeProvenanceVerdict:
+        if result.verified:
+            status = "verified"
+        elif result.skipped:
+            status = "skipped"
+        else:
+            status = "failed"
+        return cls(
+            declared_mode=declared_mode,
+            status=status,
+            verified=result.verified,
+            skipped=result.skipped,
+            issues=result.issues,
+        )
+
+    def as_verification_payload(self) -> dict[str, object]:
+        issues = []
+        for issue in self.issues:
+            code = issue.code
+            issues.append(
+                {
+                    "code": code.value,
+                    "message": issue.message,
+                    "details": issue.details or {},
+                }
+            )
+        return {
+            "runtime_provenance": {
+                "declared_mode": self.declared_mode,
+                "status": self.status,
+                "verified": self.verified,
+                "skipped": self.skipped,
+                "strict_blocking": self.strict_blocking,
+                "issues": issues,
+            }
+        }
+
+
 def _runtime_verifier_failed_result(
     report: Path,
     *,
@@ -174,6 +230,7 @@ __all__ = [
     "RuntimeProvenanceIssue",
     "RuntimeProvenanceIssueCode",
     "RuntimeProvenanceResult",
+    "RuntimeProvenanceVerdict",
     "configure_runtime_security",
     "verify_runtime_provenance",
 ]

@@ -9,16 +9,62 @@ import pytest
 from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
 from tests.integration.packaging._support_installed_wheel import (
     InstalledWheelEnv,
+    _build_strict_report,
     _ensure_hf_smoke_dependencies,
     _output_indicates_network_unavailable,
     _prefetch_hf_smoke_model,
     _resolve_hf_smoke_env,
     _run,
+    _write_json,
     _write_jsonl,
     _write_local_jsonl_preset,
+    _write_runtime_manifest,
 )
 
 pytestmark = pytest.mark.integration
+
+
+@pytest.mark.skipif(os.getenv("SKIP_BUILD_TESTS") == "1", reason="skip build tests")
+def test_wheel_install_verifies_strict_report_bundle_outside_repo_tree(
+    installed_wheel_env: InstalledWheelEnv, tmp_path: Path
+) -> None:
+    report_dir = tmp_path / "strict-fixture"
+    report_path = report_dir / "evaluation.report.json"
+    _write_json(report_path, _build_strict_report())
+    _write_runtime_manifest(report_path)
+
+    verify = _run(
+        installed_wheel_env.cli_exe,
+        [
+            "verify",
+            "--assurance",
+            "strict",
+            "--profile",
+            "ci",
+            str(report_path),
+        ],
+        cwd=tmp_path,
+    )
+    assert verify.returncode == 0, verify.stdout + verify.stderr
+    assert "VERIFY OK" in verify.stdout
+
+    html_path = tmp_path / "strict-fixture.html"
+    render_html = _run(
+        installed_wheel_env.cli_exe,
+        [
+            "report",
+            "html",
+            "-i",
+            str(report_path),
+            "-o",
+            str(html_path),
+            "--force",
+        ],
+        cwd=tmp_path,
+    )
+    assert render_html.returncode == 0, render_html.stdout + render_html.stderr
+    assert html_path.is_file()
+    assert "<html" in html_path.read_text(encoding="utf-8").lower()
 
 
 @pytest.mark.skipif(os.getenv("SKIP_BUILD_TESTS") == "1", reason="skip build tests")
@@ -64,6 +110,8 @@ def test_wheel_install_runs_front_door_evaluate_verify_report_html_outside_repo_
         installed_wheel_env.cli_exe,
         [
             "evaluate",
+            "--assurance",
+            "off",
             "--allow-network",
             "--execution-mode",
             "host",

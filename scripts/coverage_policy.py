@@ -11,6 +11,10 @@ from collections.abc import Sequence
 # precedence over the global/core floors below and encode the split-aware
 # coverage policy for shells, pure helpers, and tensor/mutation helpers.
 THRESHOLDS = {
+    # Release evidence tooling
+    "scripts/release/evidence_contracts.py": 0.95,
+    "scripts/release/check_empirical_guard_evidence.py": 0.95,
+    "scripts/release/check_release_evidence.py": 0.95,
     # Evaluation & reporting
     "src/invarlock/eval/data.py": 1.00,
     "src/invarlock/eval/bootstrap.py": 1.00,
@@ -45,6 +49,10 @@ THRESHOLDS = {
     # Reporting types
     "src/invarlock/reporting/report_types.py": 1.00,
     "src/invarlock/reporting/dataset_hashing.py": 1.00,
+    "src/invarlock/reporting/report_build_evidence.py": 1.00,
+    "src/invarlock/reporting/evaluation_report_builder.py": 1.00,
+    "src/invarlock/reporting/report_make_output.py": 0.95,
+    "src/invarlock/reporting/report_primary_metric_policy.py": 0.95,
     "src/invarlock/reporting/primary_metric_utils.py": 0.90,
     "src/invarlock/reporting/utils.py": 1.00,
     # Shell modules: lifecycle/orchestration shells should stay branch-complete.
@@ -72,6 +80,7 @@ THRESHOLDS = {
     "src/invarlock/guards/spectral_selection.py": 1.00,
     "src/invarlock/guards/spectral_analysis.py": 1.00,
     # Numerical / mutation / tensor-processing helpers.
+    "src/invarlock/edits/quant_rtn.py": 0.95,
     "src/invarlock/core/runner_context.py": 0.95,
     "src/invarlock/core/runner_eval_phase.py": 1.00,
     "src/invarlock/core/runner_latency.py": 1.00,
@@ -88,6 +97,7 @@ THRESHOLDS = {
     "src/invarlock/guards/policies.py": 1.00,
     # Core orchestration & runtime
     "src/invarlock/core/registry.py": 1.00,
+    "src/invarlock/core/assurance_contract.py": 1.00,
     "src/invarlock/core/bootstrap.py": 1.00,
     "src/invarlock/core/contracts.py": 1.00,
     "src/invarlock/core/auto_tuning.py": 0.95,
@@ -214,6 +224,10 @@ CORE_PREFIXES = (
 
 # Individual core files outside of the broad prefixes.
 CORE_FILES = (
+    # Release evidence tooling
+    "scripts/release/evidence_contracts.py",
+    "scripts/release/check_empirical_guard_evidence.py",
+    "scripts/release/check_release_evidence.py",
     # Evaluation & reporting (key entry points)
     "src/invarlock/eval/data.py",
     "src/invarlock/eval/bootstrap.py",
@@ -244,8 +258,13 @@ CORE_FILES = (
     "src/invarlock/reporting/report_types.py",
     "src/invarlock/reporting/dataset_hashing.py",
     "src/invarlock/reporting/report_schema.py",
+    "src/invarlock/reporting/report_build_evidence.py",
+    "src/invarlock/reporting/evaluation_report_builder.py",
+    "src/invarlock/reporting/report_make_output.py",
+    "src/invarlock/reporting/report_primary_metric_policy.py",
     "src/invarlock/reporting/primary_metric_utils.py",
     "src/invarlock/reporting/utils.py",
+    "src/invarlock/edits/quant_rtn.py",
     # Critical CLI commands
     "src/invarlock/cli/commands/run.py",
     "src/invarlock/cli/commands/evaluate.py",
@@ -279,9 +298,11 @@ CORE_FILES = (
 COVERAGE_MODULE_FLAGS = ("--cov",)
 
 COVERAGE_INCLUDE_PATTERNS = (
+    "scripts/release/*.py",
     "src/invarlock/eval/*",
     "src/invarlock/guards/*",
     "src/invarlock/calibration/*",
+    "src/invarlock/edits/quant_rtn.py",
     "src/invarlock/cli/*",
     "src/invarlock/cli/commands/*",
     "src/invarlock/core/*",
@@ -302,6 +323,7 @@ COVERAGE_INCLUDE_PATTERNS = (
     "invarlock/eval/*",
     "invarlock/guards/*",
     "invarlock/calibration/*",
+    "invarlock/edits/quant_rtn.py",
     "invarlock/cli/*",
     "invarlock/cli/commands/*",
     "invarlock/core/*",

@@ -98,10 +98,20 @@ def test_coverage_policy_is_shared_with_makefile_and_expanded_surface() -> None:
     assert "COVERAGE_MODULES := \\" in text
     assert "\t$(shell $(COVERAGE_POLICY) coverage-modules)" in text
     assert "COVERAGE_INCLUDE := $(shell $(COVERAGE_POLICY) coverage-include)" in text
+    assert "empirical-guard-evidence-check:" in text
 
     assert "src/invarlock/observability/" in policy.CORE_PREFIXES
     assert "src/invarlock/config.py" in policy.CORE_FILES
     assert "src/invarlock/adapters/auto.py" in policy.CORE_FILES
+    assert "scripts/release/evidence_contracts.py" in policy.CORE_FILES
+    assert "scripts/release/check_empirical_guard_evidence.py" in policy.CORE_FILES
+    assert "scripts/release/check_release_evidence.py" in policy.CORE_FILES
+    assert "src/invarlock/reporting/report_build_evidence.py" in policy.CORE_FILES
+    assert "src/invarlock/reporting/evaluation_report_builder.py" in policy.CORE_FILES
+    assert "src/invarlock/reporting/report_make_output.py" in policy.CORE_FILES
+    assert (
+        "src/invarlock/reporting/report_primary_metric_policy.py" in policy.CORE_FILES
+    )
 
     assert policy.COVERAGE_MODULE_FLAGS == ("--cov",)
 
@@ -113,6 +123,7 @@ def test_coverage_policy_is_shared_with_makefile_and_expanded_surface() -> None:
         "src/invarlock/observability/*",
         "src/invarlock/config.py",
         "src/invarlock/adapters/auto.py",
+        "scripts/release/*.py",
         "invarlock/observability/*",
         "invarlock/config.py",
         "invarlock/adapters/auto.py",
@@ -182,12 +193,31 @@ def test_makefile_exposes_front_door_packaging_smoke_target() -> None:
     assert "packaging-smoke-front-door:" in text
     assert (
         "tests/integration/packaging/test_wheel_front_door_contract.py::"
+        "test_wheel_install_verifies_strict_report_bundle_outside_repo_tree"
+    ) in text
+    assert (
+        "tests/integration/packaging/test_wheel_front_door_contract.py::"
         "test_wheel_install_runs_front_door_evaluate_verify_report_html_outside_repo_tree"
     ) in text
     front_door_block = text.split("packaging-smoke-front-door:", 1)[1].split(
         "model-evidence-list:", 1
     )[0]
     assert "INVARLOCK_LIGHT_IMPORT=1" not in front_door_block
+
+
+def test_makefile_assurance_lane_includes_strict_assurance_tests() -> None:
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    text = makefile.read_text(encoding="utf-8")
+    target_block = text.split("test-assurance:", 1)[1].split("\n\n", 1)[0]
+
+    for expected in (
+        "tests/core/test_assurance_contract.py",
+        "tests/reporting/test_verify_assurance_guard_chain.py",
+        "tests/core/test_bootstrap.py::test_paired_delta_log_ci_property_strict_identity",
+        "tests/core/test_bootstrap.py::test_paired_delta_log_ci_property_rejects_mismatched_lengths",
+        "tests/guards/test_unsupported_assurance_shape.py",
+    ):
+        assert expected in target_block
 
 
 def test_makefile_exposes_container_default_smoke_target() -> None:
@@ -235,9 +265,13 @@ def test_makefile_exposes_typed_surface_target() -> None:
         "src/invarlock/observability/metrics.py",
         "src/invarlock/config.py",
         "src/invarlock/adapters/auto.py",
+        "src/invarlock/core/assurance_contract.py",
+        "src/invarlock/core/bootstrap.py",
         "src/invarlock/core/builtin_plugin_catalog.py",
         "src/invarlock/core/config_loader.py",
+        "src/invarlock/core/evaluate_plan.py",
         "src/invarlock/core/metric_provider_resolution.py",
+        "src/invarlock/core/runner_eval_metrics_stats.py",
         "src/invarlock/core/run_orchestrator_execute_seed.py",
         "src/invarlock/core/run_orchestrator_execute_environment.py",
         "src/invarlock/core/run_orchestrator_execute_dataset.py",
@@ -247,7 +281,11 @@ def test_makefile_exposes_typed_surface_target() -> None:
         "src/invarlock/cli/app.py",
         "src/invarlock/cli/runtime_verify.py",
         "src/invarlock/eval/probes/mi.py",
+        "src/invarlock/reporting/report_build_evidence.py",
+        "src/invarlock/reporting/report_make_output.py",
+        "src/invarlock/reporting/report_primary_metric_policy.py",
         "src/invarlock/reporting/report_schema.py",
+        "src/invarlock/reporting/verify_contract.py",
         "src/invarlock/runtime_security_helpers.py",
     ):
         assert path in text
@@ -287,6 +325,8 @@ def test_makefile_marks_release_helper_targets_phony() -> None:
         "container-default-smoke-podman",
         "container-front-door-smoke",
         "container-front-door-smoke-podman",
+        "release-evidence-check",
+        "guard-validation-smoke",
         "ci-matrix",
         "eval-loop",
         "ci-local-precommit",

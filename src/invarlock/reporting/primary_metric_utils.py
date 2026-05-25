@@ -4,6 +4,7 @@ import copy
 import math
 from typing import Any
 
+from .report_build_evidence import record_report_build_event
 from .utils import _coerce_interval, _weighted_mean
 
 _NON_FATAL_EXCEPTIONS = (
@@ -28,6 +29,14 @@ def _coerce_finite_float(value: Any) -> float | None:
 
 def _is_non_bool_finite_number(value: Any) -> bool:
     return _coerce_finite_float(value) is not None
+
+
+def _is_finite_numeric_interval(value: Any) -> bool:
+    return (
+        isinstance(value, (list, tuple))
+        and len(value) == 2
+        and all(_is_non_bool_finite_number(item) for item in value)
+    )
 
 
 def _resolve_degraded_reason(
@@ -190,10 +199,11 @@ def _finalize_primary_metric_snapshot(
                     pm_copy["display_ci"] = [math.exp(lo), math.exp(hi)]
             except _NON_FATAL_EXCEPTIONS:
                 pass
-        if (
-            not isinstance(pm_copy.get("display_ci"), (list, tuple))
-            and final_value is not None
-        ):
+        try:
+            display_candidate = pm_copy.get("display_ci")
+        except _NON_FATAL_EXCEPTIONS:
+            display_candidate = None
+        if not isinstance(display_candidate, (list, tuple)) and final_value is not None:
             pm_copy["display_ci"] = [final_value, final_value]
     except _NON_FATAL_EXCEPTIONS:
         pass
@@ -214,6 +224,13 @@ def _attach_primary_metric_from_report(
             metrics_map.get("primary_metric") if isinstance(metrics_map, dict) else None
         )
         if isinstance(pm, dict) and pm:
+            original_ratio = _coerce_finite_float(pm.get("ratio_vs_baseline"))
+            original_display_present = "display_ci" in pm
+            try:
+                original_display_value = pm.get("display_ci")
+            except _NON_FATAL_EXCEPTIONS:
+                original_display_value = None
+            original_display_valid = _is_finite_numeric_interval(original_display_value)
             evaluation_report["primary_metric"] = _finalize_primary_metric_snapshot(
                 copy.deepcopy(pm),
                 report=report,
@@ -221,6 +238,49 @@ def _attach_primary_metric_from_report(
                 baseline_ref=baseline_ref,
                 ppl_analysis=ppl_analysis,
             )
+            final_primary_metric = evaluation_report["primary_metric"]
+            final_ratio = _coerce_finite_float(
+                final_primary_metric.get("ratio_vs_baseline")
+            )
+            try:
+                final_display_value = (
+                    final_primary_metric["display_ci"]
+                    if isinstance(final_primary_metric, dict)
+                    and "display_ci" in final_primary_metric
+                    else None
+                )
+            except _NON_FATAL_EXCEPTIONS:
+                final_display_value = None
+            if original_ratio is None and final_ratio is not None:
+                record_report_build_event(
+                    evaluation_report,
+                    category="synthesized_fields",
+                    field="primary_metric.ratio_vs_baseline",
+                    reason="computed_from_final_and_baseline_final",
+                    source="primary_metric_utils._attach_primary_metric_from_report",
+                )
+            if not original_display_present and _is_finite_numeric_interval(
+                final_display_value
+            ):
+                record_report_build_event(
+                    evaluation_report,
+                    category="synthesized_fields",
+                    field="primary_metric.display_ci",
+                    reason="computed_from_primary_metric_point_or_ci",
+                    source="primary_metric_utils._attach_primary_metric_from_report",
+                )
+            if (
+                original_display_present
+                and not original_display_valid
+                and _is_finite_numeric_interval(final_display_value)
+            ):
+                record_report_build_event(
+                    evaluation_report,
+                    category="repaired_fields",
+                    field="primary_metric.display_ci",
+                    reason="replaced_invalid_interval",
+                    source="primary_metric_utils._attach_primary_metric_from_report",
+                )
     except _NON_FATAL_EXCEPTIONS:
         pass
 
@@ -261,6 +321,13 @@ def _attach_primary_metric_from_windows(
             continue
         if isinstance(pm_block, dict) and pm_block:
             evaluation_report["primary_metric"] = pm_block
+            record_report_build_event(
+                evaluation_report,
+                category="fallback_fields",
+                field="primary_metric",
+                reason="computed_from_evaluation_windows",
+                source="primary_metric_utils._attach_primary_metric_from_windows",
+            )
             return
 
 
@@ -346,6 +413,13 @@ def _attach_classification_primary_metric_fallback(
         except _NON_FATAL_EXCEPTIONS:
             pass
         evaluation_report["primary_metric"] = acc_pm
+        record_report_build_event(
+            evaluation_report,
+            category="fallback_fields",
+            field="primary_metric",
+            reason="computed_from_classification_metrics",
+            source="primary_metric_utils._attach_classification_primary_metric_fallback",
+        )
     except _NON_FATAL_EXCEPTIONS:
         pass
 
@@ -360,6 +434,7 @@ def _ensure_primary_metric_display_ci(evaluation_report: dict[str, Any]) -> None
         if not (isinstance(pm, dict) and pm):
             return
         disp = pm.get("display_ci")
+        had_display_ci = "display_ci" in pm
         if (
             isinstance(disp, (list, tuple))
             and len(disp) == 2
@@ -374,9 +449,23 @@ def _ensure_primary_metric_display_ci(evaluation_report: dict[str, Any]) -> None
                 break
         if isinstance(point, float):
             pm["display_ci"] = [point, point]
+            record_report_build_event(
+                evaluation_report,
+                category="repaired_fields" if had_display_ci else "synthesized_fields",
+                field="primary_metric.display_ci",
+                reason="coerced_from_point_estimate",
+                source="primary_metric_utils._ensure_primary_metric_display_ci",
+            )
         else:
             pm["display_ci"] = [1.0, 1.0]
             pm.setdefault("estimated", True)
+            record_report_build_event(
+                evaluation_report,
+                category="repaired_fields" if had_display_ci else "synthesized_fields",
+                field="primary_metric.display_ci",
+                reason="default_estimated_interval",
+                source="primary_metric_utils._ensure_primary_metric_display_ci",
+            )
     except _NON_FATAL_EXCEPTIONS:
         pass
 

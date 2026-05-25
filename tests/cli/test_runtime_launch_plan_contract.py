@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
 import invarlock.cli.runtime_launch_plan as runtime_launch_plan
+from invarlock.cli.config_execution import ConfigExecutionRequest
 from invarlock.runtime_security import ContainerLaunchPlan
 
 
@@ -88,17 +88,6 @@ def test_runtime_launch_plan_helper_functions_cover_device_and_flag_parsing(
     assert (
         runtime_launch_plan._needs_gpu_passthrough(["evaluate", "--device", "cuda"])
         is False
-    )
-
-    options: list[str] = []
-    runtime_launch_plan._append_option(options, "--config", None)
-    runtime_launch_plan._append_bool_flag(options, "--progress", False)
-    assert options == []
-    runtime_launch_plan._append_option(options, "--config", "cfg.yaml")
-    runtime_launch_plan._append_bool_flag(options, "--progress", True)
-    assert options == ["--config", "cfg.yaml", "--progress"]
-    assert runtime_launch_plan._command_name_string(("advanced", "calibrate")) == (
-        "advanced calibrate"
     )
 
 
@@ -236,7 +225,7 @@ def test_normalize_delegated_argv_rewrites_paths_and_builders(
     assert list(current_process_plan.argv) == ["evaluate", "--help"]
     assert recorded["argv"] == ["evaluate", "--help"]
 
-    request = SimpleNamespace(
+    request = ConfigExecutionRequest(
         config="cfg.yaml",
         device="cuda",
         profile="ci",
@@ -245,7 +234,7 @@ def test_normalize_delegated_argv_rewrites_paths_and_builders(
         edit_label="nightly",
         tier="strict",
         metric_kind="ppl_causal",
-        probes="all",
+        probes=4,
         until_pass=True,
         max_attempts=5,
         timeout=120,
@@ -282,17 +271,17 @@ def test_normalize_delegated_argv_rewrites_paths_and_builders(
         "--metric-kind",
         "ppl_causal",
         "--probes",
-        "all",
-        "--until-pass",
+        "4",
         "--max-attempts",
         "5",
         "--timeout",
         "120",
         "--baseline",
         "baseline",
-        "--no-cleanup",
         "--style",
         "audit",
+        "--until-pass",
+        "--no-cleanup",
         "--progress",
         "--timing",
         "--telemetry",
@@ -300,15 +289,19 @@ def test_normalize_delegated_argv_rewrites_paths_and_builders(
         "--prefer-local-files-only",
     ]
 
-    request.max_attempts = 3
-    request.until_pass = False
-    request.device = None
-    request.no_cleanup = False
-    request.progress = False
-    request.timing = False
-    request.telemetry = False
-    request.no_color = False
-    request.prefer_local_files_only = False
+    request = ConfigExecutionRequest(
+        config="cfg.yaml",
+        profile="ci",
+        out="report-dir",
+        edit="quant",
+        edit_label="nightly",
+        tier="strict",
+        metric_kind="ppl_causal",
+        probes=4,
+        timeout=120,
+        baseline="baseline",
+        style="audit",
+    )
     request_plan_default = runtime_launch_plan.build_request_container_launch_plan(
         "run",
         request,

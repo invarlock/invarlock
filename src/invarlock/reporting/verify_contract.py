@@ -7,12 +7,21 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from invarlock.core.assurance_contract import (
+    normalize_verify_assurance_mode,
+    resolve_report_assurance_mode,
+    resolve_report_runtime_provenance_declared,
+    strict_report_policy_errors,
+)
 from invarlock.core.error_encoding import encode_error as _encode_error
 from invarlock.core.exceptions import InvarlockError
 from invarlock.core.exceptions import MetricsError as _MetricsError
 from invarlock.core.exceptions import ValidationError as _ValidationError
 from invarlock.core.provider_parity import enforce_provider_parity
-from invarlock.core.runtime_provenance import verify_runtime_provenance
+from invarlock.core.runtime_provenance import (
+    RuntimeProvenanceVerdict,
+    verify_runtime_provenance,
+)
 
 from . import verify_check_helpers as _verify_checks
 from . import verify_output as _verify_output
@@ -67,6 +76,56 @@ class VerifyExecutionResult:
     diagnostics: tuple[VerifyDiagnostic, ...]
     error: Exception | None = None
     include_resolution: bool = False
+
+
+@dataclass(frozen=True)
+class VerifyRequest:
+    reports: tuple[Path, ...]
+    baseline: Path | None = None
+    tolerance: float = 1e-9
+    profile: str | None = "dev"
+    allow_unverified_provenance: bool = False
+    json_mode: bool = False
+    assurance_mode: str = "report"
+
+    @classmethod
+    def from_args(
+        cls,
+        reports: list[Path],
+        *,
+        baseline: Path | None = None,
+        tolerance: float = 1e-9,
+        profile: str | None = "dev",
+        allow_unverified_provenance: bool = False,
+        json_mode: bool = False,
+        assurance_mode: str = "report",
+    ) -> VerifyRequest:
+        return cls(
+            reports=tuple(reports),
+            baseline=baseline,
+            tolerance=tolerance,
+            profile=profile,
+            allow_unverified_provenance=allow_unverified_provenance,
+            json_mode=json_mode,
+            assurance_mode=assurance_mode,
+        )
+
+    @property
+    def normalized_tolerance(self) -> float:
+        return _resolve_tolerance(self.tolerance)
+
+    @property
+    def normalized_assurance_mode(self) -> str:
+        return normalize_verify_assurance_mode(self.assurance_mode)
+
+
+@dataclass(frozen=True)
+class VerifyReportResult:
+    report: dict[str, Any]
+    errors: tuple[str, ...]
+    malformed: bool
+    diagnostics: tuple[VerifyDiagnostic, ...]
+    verification: dict[str, Any]
 
 
 def _validate_report_schema_strict(report: dict[str, Any]) -> bool:
@@ -342,6 +401,14 @@ def _append_recompute_errors(
                 message="Cannot recompute basis: evaluation_windows.final missing or incomplete (dev mode).",
             ),
         )
+    window_ids = fin.get("window_ids")
+    if isinstance(window_ids, list):
+        if len(window_ids) != len(ll):
+            errors.append(
+                "evaluation_windows.final.window_ids length differs from logloss/token_counts."
+            )
+        if len(window_ids) != len({str(item) for item in window_ids}):
+            errors.append("evaluation_windows.final.window_ids contains duplicates.")
     try:
         num = sum(float(a) * float(b) for a, b in zip(ll, wc, strict=False))
         den = sum(float(b) for b in wc)
@@ -367,6 +434,18 @@ def _append_recompute_errors(
     return ()
 
 
+def _runtime_provenance_verification_payload(
+    provenance_result: Any,
+    *,
+    declared_mode: str = "unknown",
+) -> dict[str, Any]:
+    verdict = RuntimeProvenanceVerdict.from_result(
+        provenance_result,
+        declared_mode=declared_mode,
+    )
+    return verdict.as_verification_payload()
+
+
 def _verify_single_report(
     cert_path: Path,
     *,
@@ -375,8 +454,9 @@ def _verify_single_report(
     tolerance: float,
     profile: str | None,
     allow_unverified_provenance: bool,
+    assurance_mode: str,
     json_mode: bool,
-) -> tuple[dict[str, Any], list[str], bool, tuple[VerifyDiagnostic, ...]]:
+) -> VerifyReportResult:
     cert_obj = _load_evaluation_report(cert_path)
     prof = _resolve_profile_name(profile)
     prov = cert_obj.get("provenance") if isinstance(cert_obj, dict) else None
@@ -402,7 +482,26 @@ def _verify_single_report(
         cert_path,
         allow_unverified=bool(allow_unverified_provenance),
     )
+    verification_payload = _runtime_provenance_verification_payload(
+        provenance_result,
+        declared_mode=resolve_report_runtime_provenance_declared(cert_obj),
+    )
     errors.extend(issue.message for issue in provenance_result.issues)
+    report_assurance_mode = resolve_report_assurance_mode(cert_obj)
+    require_strict_assurance = assurance_mode == "strict" or (
+        assurance_mode == "report" and report_assurance_mode == "strict"
+    )
+    if assurance_mode == "strict" and report_assurance_mode != "strict":
+        errors.append(
+            "verify --assurance strict requires report assurance.mode=strict."
+        )
+    errors.extend(
+        strict_report_policy_errors(
+            cert_obj,
+            require_strict=require_strict_assurance,
+            runtime_provenance_verified=provenance_result.verified,
+        )
+    )
     if json_mode and any("schema validation failed" in str(e).lower() for e in errors):
         raise _ValidationError(
             code="E601",
@@ -437,12 +536,24 @@ def _verify_single_report(
 
     diagnostics: tuple[VerifyDiagnostic, ...] = ()
     if json_mode:
-        return cert_obj, errors, malformed, diagnostics + recompute_diagnostics
+        return VerifyReportResult(
+            report=cert_obj,
+            errors=tuple(errors),
+            malformed=malformed,
+            diagnostics=diagnostics + recompute_diagnostics,
+            verification=verification_payload,
+        )
     if errors:
         diagnostics = (VerifyDiagnostic(level="fail", message=str(cert_path)),) + tuple(
             VerifyDiagnostic(level="detail", message=str(err)) for err in errors
         )
-        return cert_obj, errors, malformed, diagnostics + recompute_diagnostics
+        return VerifyReportResult(
+            report=cert_obj,
+            errors=tuple(errors),
+            malformed=malformed,
+            diagnostics=diagnostics + recompute_diagnostics,
+            verification=verification_payload,
+        )
     try:
         diagnostics = (
             VerifyDiagnostic(level="pass", message=str(cert_path)),
@@ -454,26 +565,25 @@ def _verify_single_report(
         )
     except _VERIFY_RECOVERABLE_EXCEPTIONS:
         diagnostics = (VerifyDiagnostic(level="pass", message=str(cert_path)),)
-    return cert_obj, errors, malformed, diagnostics + recompute_diagnostics
+    return VerifyReportResult(
+        report=cert_obj,
+        errors=tuple(errors),
+        malformed=malformed,
+        diagnostics=diagnostics + recompute_diagnostics,
+        verification=verification_payload,
+    )
 
 
-def run_verify_reports(
-    reports: list[Path],
-    *,
-    baseline: Path | None = None,
-    tolerance: float = 1e-9,
-    profile: str | None = "dev",
-    allow_unverified_provenance: bool = False,
-    json_mode: bool = False,
-) -> VerifyExecutionResult:
-    """Verify reports and return structured machine + human output."""
-
+def _run_verify_request(request: VerifyRequest) -> VerifyExecutionResult:
     overall_ok = True
     diagnostics: list[VerifyDiagnostic] = []
-    tol = _resolve_tolerance(tolerance)
-    baseline_digest = _load_baseline_digest(baseline)
+    tol = request.normalized_tolerance
+    normalized_assurance_mode = request.normalized_assurance_mode
+    baseline_digest = _load_baseline_digest(request.baseline)
     malformed_any = False
     loaded_any_report = False
+    verification_by_path: dict[str, dict[str, Any]] = {}
+    reports = list(request.reports)
     try:
         for cert_path in reports:
             if not loaded_any_report:
@@ -482,20 +592,22 @@ def run_verify_reports(
                     loaded_any_report = True
                 except _VERIFY_RECOVERABLE_EXCEPTIONS:
                     pass
-            cert_obj, errors, is_malformed, report_diagnostics = _verify_single_report(
+            report_result = _verify_single_report(
                 cert_path,
-                baseline=baseline,
+                baseline=request.baseline,
                 baseline_digest=baseline_digest,
                 tolerance=tol,
-                profile=profile,
-                allow_unverified_provenance=allow_unverified_provenance,
-                json_mode=json_mode,
+                profile=request.profile,
+                allow_unverified_provenance=request.allow_unverified_provenance,
+                assurance_mode=normalized_assurance_mode,
+                json_mode=request.json_mode,
             )
+            verification_by_path[str(cert_path)] = report_result.verification
             loaded_any_report = True
-            if errors:
+            if report_result.errors:
                 overall_ok = False
-            malformed_any = malformed_any or is_malformed
-            diagnostics.extend(report_diagnostics)
+            malformed_any = malformed_any or report_result.malformed
+            diagnostics.extend(report_result.diagnostics)
 
         if not overall_ok:
             payload = _verify_output.build_verify_json_payload(
@@ -504,6 +616,7 @@ def run_verify_reports(
                 reason="malformed" if malformed_any else "policy_fail",
                 tolerance=tol,
                 load_report_fn=_load_evaluation_report,
+                verification_by_path=verification_by_path,
             )
             return VerifyExecutionResult(
                 outcome=(
@@ -521,8 +634,9 @@ def run_verify_reports(
             reason="ok",
             tolerance=tol,
             load_report_fn=_load_evaluation_report,
+            verification_by_path=verification_by_path,
         )
-        if not json_mode:
+        if not request.json_mode:
             try:
                 last = _load_evaluation_report(reports[-1]) if reports else {}
                 diagnostics.append(
@@ -545,7 +659,7 @@ def run_verify_reports(
             reason="malformed" if isinstance(ce, _ValidationError) else "policy_fail",
             encoded_error=_encode_error(ce),
         )
-        if not json_mode:
+        if not request.json_mode:
             diagnostics.append(VerifyDiagnostic(level="error", message=str(ce)))
         return VerifyExecutionResult(
             outcome=(
@@ -561,12 +675,12 @@ def run_verify_reports(
     except _VERIFY_RECOVERABLE_EXCEPTIONS as e:
         payload = _verify_output.build_verify_error_payload(
             reports[0] if reports else None,
-            reason="malformed"
-            if isinstance(e, json.JSONDecodeError)
-            else "policy_fail",
+            reason=(
+                "malformed" if isinstance(e, json.JSONDecodeError) else "policy_fail"
+            ),
             encoded_error=_encode_error(e),
         )
-        if not json_mode:
+        if not request.json_mode:
             diagnostics.append(
                 VerifyDiagnostic(
                     level="error",
@@ -588,6 +702,30 @@ def run_verify_reports(
         )
 
 
+def run_verify_reports(
+    reports: list[Path],
+    *,
+    baseline: Path | None = None,
+    tolerance: float = 1e-9,
+    profile: str | None = "dev",
+    allow_unverified_provenance: bool = False,
+    json_mode: bool = False,
+    assurance_mode: str = "report",
+) -> VerifyExecutionResult:
+    """Verify reports and return structured machine + human output."""
+
+    request = VerifyRequest.from_args(
+        reports,
+        baseline=baseline,
+        tolerance=tolerance,
+        profile=profile,
+        allow_unverified_provenance=allow_unverified_provenance,
+        json_mode=json_mode,
+        assurance_mode=assurance_mode,
+    )
+    return _run_verify_request(request)
+
+
 def verify_reports_contract(
     reports: list[Path],
     *,
@@ -596,6 +734,7 @@ def verify_reports_contract(
     profile: str | None = "dev",
     allow_unverified_provenance: bool = False,
     json_mode: bool = False,
+    assurance_mode: str = "report",
 ) -> VerifyExecutionResult:
     """Verify reports and return a structured result without relying on CLI output."""
     return run_verify_reports(
@@ -605,6 +744,7 @@ def verify_reports_contract(
         profile=profile,
         allow_unverified_provenance=allow_unverified_provenance,
         json_mode=json_mode,
+        assurance_mode=assurance_mode,
     )
 
 
@@ -612,6 +752,8 @@ __all__ = [
     "VerifyDiagnostic",
     "VerifyExecutionResult",
     "VerifyOutcome",
+    "VerifyReportResult",
+    "VerifyRequest",
     "run_verify_reports",
     "verify_reports_contract",
 ]

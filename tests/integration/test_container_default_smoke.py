@@ -83,7 +83,6 @@ def _write_smoke_edit(path: Path) -> None:
               plan:
                 bitwidth: 8
                 per_channel: true
-                group_size: 128
                 clamp_ratio: 0.005
                 scope: attn
                 max_modules: 12
@@ -153,6 +152,8 @@ def test_evaluate_container_default_smoke_with_external_runtime_inputs(
             str(edit_path),
             "--profile",
             "smoke_ext",
+            "--assurance",
+            "off",
             "--allow-network",
             "--device",
             "cpu",
@@ -211,6 +212,8 @@ def test_container_default_front_door_smoke_runs_evaluate_verify_and_report_html
             str(preset_path),
             "--profile",
             "smoke_ext",
+            "--assurance",
+            "off",
             "--allow-network",
             "--device",
             "cpu",
@@ -233,7 +236,10 @@ def test_container_default_front_door_smoke_runs_evaluate_verify_and_report_html
 
     assert evaluate.returncode == 0, evaluate.stdout + evaluate.stderr
     assert report_path.is_file()
-    assert (report_dir / runtime_security.RUNTIME_MANIFEST_FILENAME).is_file()
+    manifest_path = report_dir / runtime_security.RUNTIME_MANIFEST_FILENAME
+    assert manifest_path.is_file()
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest.get("execution_mode") == "container"
 
     verify = subprocess.run(
         [
@@ -241,6 +247,8 @@ def test_container_default_front_door_smoke_runs_evaluate_verify_and_report_html
             "-m",
             "invarlock",
             "verify",
+            "--assurance",
+            "off",
             "--json",
             str(report_path),
         ],

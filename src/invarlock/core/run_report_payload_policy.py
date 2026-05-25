@@ -5,6 +5,8 @@ from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 
+from invarlock.core.guard_evidence import GuardEvidence
+
 
 def build_run_report_context(
     *,
@@ -142,19 +144,23 @@ def build_edit_payload(
         edit_deltas = core_edit.get("deltas", {})
         if not isinstance(edit_deltas, Mapping):
             edit_deltas = {}
+        report_deltas = copy.deepcopy(dict(edit_deltas))
+        report_deltas.setdefault("params_changed", edit_deltas.get("params_changed", 0))
+        report_deltas.setdefault("sparsity", edit_deltas.get("sparsity"))
+        report_deltas.setdefault("bitwidth_map", edit_deltas.get("bitwidth_map"))
+        report_deltas.setdefault(
+            "layers_modified", edit_deltas.get("layers_modified", 0)
+        )
         report_edit.update(
             {
                 "name": edit_name,
                 "plan_digest": core_edit.get("plan_digest", str(hash(str(core_edit)))),
-                "deltas": {
-                    "params_changed": edit_deltas.get("params_changed", 0),
-                    "sparsity": edit_deltas.get("sparsity"),
-                    "bitwidth_map": edit_deltas.get("bitwidth_map"),
-                    "layers_modified": edit_deltas.get("layers_modified", 0),
-                },
+                "deltas": report_deltas,
             }
         )
         for key in (
+            "plan",
+            "config",
             "algorithm",
             "algorithm_version",
             "implementation",
@@ -298,25 +304,9 @@ def build_guard_entries(core_guards: Mapping[str, Any] | None) -> list[dict[str,
     entries: list[dict[str, Any]] = []
 
     for guard_name, guard_result in core_guards.items():
-        if not isinstance(guard_result, Mapping):
-            continue
-        decision = guard_result.get("decision")
-        if not isinstance(decision, str) or not decision:
-            decision = "allow" if bool(guard_result.get("passed", False)) else "block"
-        guard_entry = {
-            "name": guard_name,
-            "passed": guard_result.get("passed"),
-            "decision": decision,
-            "policy": guard_result.get("policy", {}),
-            "metrics": guard_result.get("metrics", {}),
-            "diagnostics": guard_result.get("diagnostics", []),
-            "violations": guard_result.get("violations", []),
-            "details": guard_result.get("details", {}),
-        }
-        for extra_key in ("final_z_scores", "module_family_map"):
-            if extra_key in guard_result:
-                guard_entry[extra_key] = guard_result[extra_key]
-        entries.append(guard_entry)
+        evidence = GuardEvidence.from_result(guard_name, guard_result)
+        if evidence is not None:
+            entries.append(evidence.as_report_entry())
     return entries
 
 

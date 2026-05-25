@@ -35,12 +35,25 @@ def test_unknown_bootstrap_method_raises():
         compute_logloss_ci([1.0, 1.1, 0.9], method="unknown", replicates=10)
 
 
-def test_paired_delta_size_mismatch_slices_to_minimum():
-    # Different lengths: function should slice to common length rather than error
+def test_paired_delta_size_mismatch_rejected_by_default():
+    final = [1.0, 1.05, 0.98]
+    baseline = [1.02, 1.01]
+    with pytest.raises(ValueError, match="lengths must match"):
+        compute_paired_delta_log_ci(
+            final, baseline, method="percentile", replicates=50, seed=7
+        )
+
+
+def test_paired_delta_size_mismatch_can_opt_into_truncation():
     final = [1.0, 1.05, 0.98]
     baseline = [1.02, 1.01]
     lo, hi = compute_paired_delta_log_ci(
-        final, baseline, method="percentile", replicates=50, seed=7
+        final,
+        baseline,
+        method="percentile",
+        replicates=50,
+        seed=7,
+        strict_lengths=False,
     )
     assert isinstance(lo, float) and isinstance(hi, float)
     assert lo <= hi

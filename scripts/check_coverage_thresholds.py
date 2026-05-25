@@ -80,6 +80,7 @@ def _collect_branch_rates(root: ET.Element) -> dict[str, float]:
         Path("src/invarlock/calibration"),
         Path("src/invarlock/guards"),
         Path("src/invarlock/eval"),
+        Path("scripts/release"),
         Path("scripts"),
     ]
 

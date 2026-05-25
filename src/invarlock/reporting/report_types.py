@@ -77,6 +77,8 @@ class EditInfo(TypedDict):
     name: str  # Edit type (e.g., "quant_rtn")
     plan_digest: str  # Hash of the edit plan for reproducibility
     deltas: EditDeltas  # Computed parameter changes
+    plan: NotRequired[dict[str, Any]]
+    config: NotRequired[dict[str, Any]]
 
 
 class EditDeltas(TypedDict):
@@ -86,6 +88,10 @@ class EditDeltas(TypedDict):
     sparsity: float | None  # Overall sparsity ratio (if applicable)
     bitwidth_map: dict[str, Any] | None  # Bitwidth changes (if applicable)
     layers_modified: int  # Number of layers that were changed
+    quantization_mode: NotRequired[str]
+    storage_format: NotRequired[str]
+    packed_quantized_storage: NotRequired[bool]
+    runtime_memory_reduction: NotRequired[bool]
 
 
 class GuardReport(TypedDict):

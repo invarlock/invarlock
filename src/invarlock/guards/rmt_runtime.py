@@ -260,12 +260,28 @@ def validate_rmt_guard(
                 dict(item) if isinstance(item, dict) else {"message": str(item)}
                 for item in result.violations
             ]
+        metrics = dict(result.metrics)
+        extras: dict[str, Any] = {}
+        if metrics.get("activation_required") is True and not metrics.get(
+            "activation_ready",
+            False,
+        ):
+            extras = {
+                "supported": False,
+                "reason": str(
+                    metrics.get("activation_reason")
+                    or "activation_edge_risk_unavailable"
+                ),
+                "assurance_blocking": True,
+                "status": "unsupported",
+            }
         return GuardValidationResult(
             passed=bool(result.passed),
             decision=str(result.decision),
-            metrics=dict(result.metrics),
+            metrics=metrics,
             diagnostics=_typed_diagnostics(violations_list),
             violations=tuple(violations_list),
+            extras=extras,
         )
     violations = [
         {
@@ -275,6 +291,20 @@ def validate_rmt_guard(
         }
         for item in result.get("errors", [])
     ]
+    metrics = dict(result.get("metrics", {}))
+    extras: dict[str, Any] = {}
+    if metrics.get("activation_required") is True and not metrics.get(
+        "activation_ready",
+        False,
+    ):
+        extras = {
+            "supported": False,
+            "reason": str(
+                metrics.get("activation_reason") or "activation_edge_risk_unavailable"
+            ),
+            "assurance_blocking": True,
+            "status": "unsupported",
+        }
     return GuardValidationResult(
         passed=bool(result.get("passed", False)),
         decision=str(
@@ -283,9 +313,10 @@ def validate_rmt_guard(
                 "allow" if result.get("passed", False) else "block",
             )
         ),
-        metrics=dict(result.get("metrics", {})),
+        metrics=metrics,
         diagnostics=_typed_diagnostics(violations),
         violations=tuple(violations),
+        extras=extras,
     )
 
 
@@ -303,6 +334,24 @@ def finalize_rmt_guard(
     _ = adapter
 
     if not guard.prepared:
+        finalize_time = time.time() - start_time
+        metrics = {
+            "prepared": False,
+            "finalize_time": finalize_time,
+        }
+        violation_type = "preparation"
+        error_message = "RMT guard not properly prepared"
+        if guard._require_activation and guard._activation_required_failed:
+            reason = guard._activation_required_reason or "activation_required"
+            violation_type = "activation_required"
+            error_message = "Activation edge-risk analysis required but unavailable"
+            metrics.update(
+                {
+                    "activation_required": True,
+                    "activation_ready": False,
+                    "activation_reason": reason,
+                }
+            )
         if has_guard_outcome:
             return guard_outcome_type(
                 name=guard.name,
@@ -310,24 +359,18 @@ def finalize_rmt_guard(
                 decision="block",
                 violations=[
                     {
-                        "type": "preparation",
+                        "type": violation_type,
                         "severity": "error",
-                        "message": "RMT guard not properly prepared",
+                        "message": error_message,
                         "module_name": None,
                     }
                 ],
-                metrics={
-                    "prepared": False,
-                    "finalize_time": time.time() - start_time,
-                },
+                metrics=metrics,
             )
         return {
             "passed": False,
-            "metrics": {
-                "prepared": False,
-                "finalize_time": time.time() - start_time,
-            },
-            "errors": ["RMT guard not properly prepared"],
+            "metrics": metrics,
+            "errors": [error_message],
         }
 
     if guard._require_activation and guard._activation_required_failed:

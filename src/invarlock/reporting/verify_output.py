@@ -161,6 +161,7 @@ def build_verify_json_result_item(
     ok: bool,
     reason: str,
     tolerance: float,
+    verification: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     primary_metric = (
         cert_obj.get("primary_metric", {}) if isinstance(cert_obj, dict) else {}
@@ -181,7 +182,7 @@ def build_verify_json_result_item(
         primary_metric=primary_metric,
         tolerance=tolerance,
     )
-    return {
+    item = {
         "id": str(cert_path),
         "schema_version": "v1",
         "kind": kind,
@@ -191,6 +192,9 @@ def build_verify_json_result_item(
         "ci": ci_out,
         "recompute": recompute,
     }
+    if verification:
+        item["verification"] = verification
+    return item
 
 
 def build_verify_json_payload(
@@ -200,6 +204,7 @@ def build_verify_json_payload(
     reason: str,
     tolerance: float,
     load_report_fn: Callable[[Path], dict[str, Any]],
+    verification_by_path: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     results: list[dict[str, Any]] = []
     for cert_path in reports:
@@ -214,6 +219,7 @@ def build_verify_json_payload(
                 ok=ok,
                 reason=reason,
                 tolerance=tolerance,
+                verification=(verification_by_path or {}).get(str(cert_path)),
             )
         )
 

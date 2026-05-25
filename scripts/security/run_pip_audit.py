@@ -34,9 +34,9 @@ def _load_allowlist(path: Path) -> tuple[str, list[AllowlistEntry]]:
     if not owner:
         raise SystemExit(f"Allowlist owner missing in {path}")
 
-    raw_entries = payload.get("entries")
-    if not isinstance(raw_entries, list) or not raw_entries:
-        raise SystemExit(f"Allowlist entries missing in {path}")
+    raw_entries = payload.get("entries", [])
+    if not isinstance(raw_entries, list):
+        raise SystemExit(f"Allowlist entries in {path} must be a list")
 
     today = date.today()
     entries: list[AllowlistEntry] = []

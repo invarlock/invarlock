@@ -36,6 +36,7 @@ def test_evaluate_requires_explicit_runner_report_path(monkeypatch, tmp_path: Pa
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
+            assurance="off",
         )
 
     assert exc.value.exit_code == 1
@@ -62,6 +63,7 @@ def test_evaluate_requires_existing_runner_report_path(monkeypatch, tmp_path: Pa
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
+            assurance="off",
         )
 
     assert exc.value.exit_code == 1
@@ -87,6 +89,7 @@ def test_evaluate_requires_file_runner_report_path(monkeypatch, tmp_path: Path):
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
+            assurance="off",
         )
 
     assert exc.value.exit_code == 1
@@ -120,6 +123,7 @@ def test_evaluate_missing_preset_exits(monkeypatch, tmp_path: Path):
             subject=str(edt),
             preset=str(tmp_path / "no_such_preset.yaml"),
             out=str(tmp_path / "runs"),
+            assurance="off",
         )
 
 
@@ -161,6 +165,7 @@ def test_evaluate_uses_inline_preset_when_repo_preset_missing(monkeypatch, tmp_p
         out=str(runs),
         report_out=str(Path("certs")),
         profile="dev",
+        assurance="off",
     )
 
     cfg_candidates = list((Path("tmp") / ".evaluate").rglob("baseline_noop.yaml"))
@@ -220,6 +225,7 @@ def test_evaluate_edit_config_successfully_merges_subject(monkeypatch, tmp_path)
         out=str(Path("runs")),
         report_out=str(Path("certs")),
         profile="dev",
+        assurance="off",
     )
 
     merged_candidates = list((Path("tmp") / ".evaluate").rglob("edited_merged.yaml"))
@@ -260,6 +266,7 @@ def test_evaluate_uses_returned_run_report_path_over_directory_scan(
         out=str(Path("runs")),
         report_out=str(Path("reports")),
         profile="dev",
+        assurance="off",
     )
 
     assert len(report_calls) == 1
@@ -296,6 +303,7 @@ def test_evaluate_edit_config_invalid_yaml_exits(monkeypatch, tmp_path):
             adapter="hf_causal",
             edit_config=str(edit_cfg),
             out=str(Path("runs")),
+            assurance="off",
         )
 
 
@@ -311,6 +319,7 @@ def test_evaluate_missing_baseline_report_exits(monkeypatch, tmp_path: Path):
             subject=str(edt),
             adapter="hf_causal",
             out=str(tmp_path / "runs"),
+            assurance="off",
         )
 
 
@@ -334,6 +343,7 @@ def test_evaluate_missing_edited_report_exits(monkeypatch, tmp_path: Path):
             subject=str(edt),
             adapter="hf_causal",
             out=str(runs),
+            assurance="off",
         )
 
 
@@ -347,7 +357,7 @@ def test_evaluate_failed_edited_run_report_exits_before_report_generation(
         tmp_path / "edited.json",
         {
             "status": "failed",
-            "error": "[INVARLOCK:E321] RTN quantization matched no target modules.",
+            "error": "[INVARLOCK:E321] RTN dequantized simulation matched no target modules.",
         },
     )
     report_calls: list[dict[str, object]] = []
@@ -374,6 +384,7 @@ def test_evaluate_failed_edited_run_report_exits_before_report_generation(
             adapter="hf_causal",
             out=str(Path("runs")),
             profile="dev",
+            assurance="off",
         )
 
     assert exc.value.exit_code == 1
@@ -401,6 +412,7 @@ def test_evaluate_edit_config_missing_exits(monkeypatch, tmp_path: Path):
             adapter="hf_causal",
             edit_config=str(tmp_path / "missing_edit.yaml"),
             out=str(tmp_path / "runs"),
+            assurance="off",
         )
 
 
@@ -441,6 +453,7 @@ def test_evaluate_happy_path_with_preset_and_auto_adapter(monkeypatch, tmp_path:
             preset=str(preset),
             out=str(runs),
             report_out=str(certs),
+            assurance="off",
         )
 
     assert calls["runs"] == 2 and calls["reports"] == 1
@@ -452,6 +465,7 @@ def test_evaluate_rejects_invalid_execution_mode() -> None:
             baseline="baseline",
             subject="subject",
             execution_mode="invalid",
+            assurance="off",
         )
 
 
@@ -484,6 +498,7 @@ def test_evaluate_quiet_mode_disables_progress_and_timing(
         quiet=True,
         timing=True,
         progress=True,
+        assurance="off",
     )
 
     assert len(run_calls) == 2
@@ -532,6 +547,7 @@ def test_evaluate_edit_config_preserves_explicit_adapter_and_guard_order(
         out=str(Path("runs")),
         report_out=str(Path("reports")),
         profile="dev",
+        assurance="off",
     )
 
     merged_candidates = list((Path("tmp") / ".evaluate").rglob("edited_merged.yaml"))
@@ -569,6 +585,7 @@ def test_evaluate_edit_label_is_forwarded_to_subject_run(
         report_out=str(Path("reports")),
         profile="dev",
         edit_label="quantized-subject",
+        assurance="off",
     )
 
     assert len(run_calls) == 2
@@ -611,6 +628,7 @@ def test_evaluate_filters_report_kwargs_to_supported_signature(
         out=str(Path("runs")),
         report_out=str(Path("reports")),
         profile="dev",
+        assurance="off",
     )
 
     assert report_calls == [
@@ -653,6 +671,7 @@ def test_evaluate_invalid_preset_guard_order_falls_back_to_default(
         out=str(Path("runs")),
         report_out=str(Path("reports")),
         profile="dev",
+        assurance="off",
     )
 
     baseline_candidates = list((Path("tmp") / ".evaluate").rglob("baseline_noop.yaml"))

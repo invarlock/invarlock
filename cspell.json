@@ -17,6 +17,7 @@
     "checkpointing",
     "gptq",
     "conftest",
+    "Deepchecks",
     "deadband",
     "docstrings",
     "Docstrings",
@@ -126,6 +127,8 @@
     "exploitability",
     "backdoored",
     "safetensors",
-    "lockfiles"
+    "lockfiles",
+    "dequantize",
+    "dequantized"
   ]
 }

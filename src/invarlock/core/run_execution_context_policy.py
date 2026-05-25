@@ -143,6 +143,9 @@ def build_run_context_payload(
     extra_context = to_serialisable_dict_fn(_section_dict(cfg, "context"))
     if isinstance(extra_context, dict):
         run_context.update(extra_context)
+    assurance_section = to_serialisable_dict_fn(_section_dict(cfg, "assurance"))
+    if isinstance(assurance_section, dict) and assurance_section:
+        run_context["assurance"] = assurance_section
     eval_context = run_context.get("eval")
     if isinstance(eval_context, dict):
         loss_context = eval_context.setdefault("loss", {})

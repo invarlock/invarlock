@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from invarlock.core.assurance_contract import ASSURANCE_CLAIM_SET, CANONICAL_GUARD_CHAIN
 from invarlock.reporting import verify_contract as verify_mod
 from invarlock.runtime_security import (
     RUNTIME_MANIFEST_FILENAME,
@@ -570,6 +571,54 @@ def _build_valid_report() -> dict[str, object]:
             }
         },
     }
+
+
+def _build_strict_report() -> dict[str, object]:
+    report = _build_valid_report()
+    guard_chain = list(CANONICAL_GUARD_CHAIN)
+    report["plugins"] = {"guards": guard_chain}
+    report["guards"] = [{"name": name} for name in guard_chain]
+    report["meta"] = {"profile": "ci"}
+    report["context"] = {
+        "profile": "ci",
+        "runtime": {"execution_mode": "container"},
+    }
+    report["auto"] = {"tier": "balanced"}
+    report["provenance"] = {"provider_digest": {"ids_sha256": "subject-ids"}}
+    report["report_build"] = {
+        "synthesized_fields": [],
+        "repaired_fields": [],
+        "fallback_fields": [],
+    }
+    primary_metric = report["primary_metric"]
+    if isinstance(primary_metric, dict):
+        primary_metric["ci"] = [0.0, 0.0]
+    spectral = report["spectral"]
+    if isinstance(spectral, dict):
+        spectral.update({"supported": True, "status": "pass"})
+    rmt = report["rmt"]
+    if isinstance(rmt, dict):
+        rmt.update({"supported": True, "status": "pass"})
+    report["variance"] = {"supported": True, "status": "pass"}
+    report["invariants"] = {"supported": True, "status": "pass"}
+    report["assurance"] = {
+        "mode": "strict",
+        "profile": "ci",
+        "tier": "balanced",
+        "claim_set": ASSURANCE_CLAIM_SET,
+        "canonical_guard_chain": guard_chain,
+        "guard_chain_observed": guard_chain,
+        "canonical_guard_chain_enforced": True,
+        "fallback_fields_used": False,
+        "runtime_provenance_verified": False,
+        "runtime_provenance_declared": "container",
+        "runtime_provenance_verification_status": "pending",
+        "verdict": "pending_verifier",
+        "report_local_verdict": "pass",
+        "verified_assurance_verdict": "pending",
+        "blocking_reasons": [],
+    }
+    return report
 
 
 def _build_evidence_pack(pack_dir: Path) -> Path:

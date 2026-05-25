@@ -109,6 +109,7 @@ def _assert_baseline_report_validation_exit(
             report_out=str(Path("reports")),
             profile=profile,
             tier=tier,
+            assurance="off",
         )
 
     return exc.value

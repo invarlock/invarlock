@@ -241,6 +241,11 @@ def _evaluate_lazy(
         help="Execution mode for evaluation (container|host).",
         case_sensitive=False,
     ),
+    assurance: str = typer.Option(
+        "strict",
+        "--assurance",
+        help="Assurance mode for evaluation (strict|off).",
+    ),
     no_color: bool = typer.Option(
         False, "--no-color", help="Disable ANSI colors (respects NO_COLOR=1)"
     ),
@@ -272,6 +277,7 @@ def _evaluate_lazy(
         timing=timing,
         progress=progress,
         execution_mode=execution_mode.value,
+        assurance=assurance,
         no_color=no_color,
         allow_network=allow_network,
     )
@@ -393,6 +399,11 @@ def _verify_typed(
         "--runtime-provenance",
         help="Runtime provenance mode for verification (container|host).",
     ),
+    assurance: str = typer.Option(
+        "report",
+        "--assurance",
+        help="Assurance verification mode (report|strict|off).",
+    ),
 ):
     from pathlib import Path as _Path
 
@@ -418,6 +429,7 @@ def _verify_typed(
         profile=profile,
         json_out=json_out,
         runtime_provenance=runtime_provenance.value,
+        assurance=assurance,
     )
 
 

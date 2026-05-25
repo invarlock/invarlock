@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "invarlock"
-version = "0.8.0"
+version = "0.9.0"
 description = "Edit‑agnostic robustness evaluation reports for weight edits (InvarLock framework)"
 authors = [{ name = "InvarLock Team", email = "oss@invarlock.dev" }]
 maintainers = [{ name = "InvarLock Maintainers", email = "support@invarlock.dev" }]
@@ -38,18 +38,19 @@ dependencies = [
     "markdown>=3.5",
     "psutil>=5.9",
     "jsonschema>=4.0",
+    "idna>=3.15",
 ]
 [project.urls]
 Homepage = "https://github.com/invarlock/invarlock"
 Repository = "https://github.com/invarlock/invarlock"
-Documentation = "https://invarlock.github.io/invarlock/0.8.0/"
+Documentation = "https://invarlock.github.io/invarlock/0.9.0/"
 Issues = "https://github.com/invarlock/invarlock/issues"
-Changelog = "https://github.com/invarlock/invarlock/blob/v0.8.0/CHANGELOG.md"
+Changelog = "https://github.com/invarlock/invarlock/blob/v0.9.0/CHANGELOG.md"
 
 [project.optional-dependencies]
 # Core torch dependencies for adapters
 adapters = [
-  "torch>=2.1.0",
+  "torch>=2.11.0",
   "transformers>=5.5.0",
   "safetensors>=0.4.0",
   "protobuf>=4.25",
@@ -60,7 +61,7 @@ adapters = [
 
 # Hugging Face workflow (adapters + evaluation stack)
 hf = [
-  "torch>=2.1.0",
+  "torch>=2.11.0",
   "accelerate>=0.26.0",
   "transformers>=5.5.0",
   "safetensors>=0.4.0",
@@ -78,18 +79,18 @@ hf = [
 
 # Full guards functionality
 guards = [
-  "torch>=2.1.0",
+  "torch>=2.11.0",
   "numpy>=1.24",
 ]
 
 # Edit functionality
 edits = [
-  "torch>=2.1.0",
+  "torch>=2.11.0",
 ]
 
 # Evaluation functionality
 eval = [
-  "torch>=2.1.0",
+  "torch>=2.11.0",
   "datasets>=3.0",
   "requests>=2.33.0",
 ]
@@ -101,7 +102,7 @@ probes = [
 
 # External edit integrations
 gptq = [
-  "torch>=2.1.0",
+  "torch>=2.11.0",
   "auto-gptq>=0.7.0; platform_system == \"Linux\" and python_version < \"3.13\"",
   "triton>=2.3.0; platform_system == \"Linux\"",
   "transformers>=5.5.0",
@@ -110,7 +111,7 @@ gptq = [
 
 
 awq = [
-  "torch>=2.1.0",
+  "torch>=2.11.0",
   "autoawq>=0.2.0; platform_system == \"Linux\"",
   "transformers>=5.5.0",
   "safetensors>=0.4.0",
@@ -119,7 +120,7 @@ awq = [
 
 # GPU helper stack (optional extras for CUDA/MPS optimisations)
 gpu = [
-  "torch>=2.1.0",
+  "torch>=2.11.0",
   "accelerate>=0.27",
   "bitsandbytes>=0.41",
   "safetensors>=0.4.0",
@@ -127,7 +128,7 @@ gpu = [
 
 # Convenience install for advanced evidence-pack/policy/plugins/calibration workflows.
 advanced = [
-  "torch>=2.1.0",
+  "torch>=2.11.0",
   "transformers>=5.5.0",
   "protobuf>=4.25",
   "sentencepiece>=0.2.1",
@@ -150,7 +151,7 @@ advanced = [
 
 # Complete installation with all features
 all = [
-  "torch>=2.1.0",
+  "torch>=2.11.0",
   "transformers>=5.5.0",
   "protobuf>=4.25",
   "sentencepiece>=0.2.1",
@@ -174,7 +175,7 @@ all = [
 dev = [
   "pytest>=7.0",
   "pytest-cov>=4.0",
-  "ruff==0.15.11",
+  "ruff==0.15.14",
   "black>=23.0",
   "mypy>=1.0",
   "hypothesis>=6.98",
@@ -195,11 +196,12 @@ ci = [
   "pytest>=7.0",
   "pytest-cov>=4.0",
   "hypothesis>=6.98",
-  "ruff==0.15.11",
+  "ruff==0.15.14",
   "mypy>=1.0",
   "mkdocs>=1.5",
   "mkdocs-material>=9.5",
   "mkdocs-mermaid2-plugin>=1.1",
+  "pymdown-extensions>=10.21.3",
   "build>=0.10.0",
   "wheel>=0.46.0",
   "requests>=2.33.0",
@@ -209,6 +211,7 @@ docs-ci = [
   "linkchecker>=10.5",
   "numpy>=1.24",
   "requests>=2.33.0",
+  "pymdown-extensions>=10.21.3",
 ]
 
 precommit-ci = [
@@ -530,7 +533,7 @@ filterwarnings = [
 
 [tool.coverage.run]
 branch = true
-source = ["src"]
+source = ["src", "scripts/release"]
 omit = [
     "*/tests/*",
     "*/test_*",
@@ -542,6 +545,7 @@ omit = [
 show_missing = true
 precision = 2
 include = [
+    "scripts/release/*.py",
     "src/invarlock/eval/*",
     "src/invarlock/guards/*",
     "src/invarlock/calibration/*",

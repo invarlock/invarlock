@@ -34,7 +34,6 @@ def test_evaluate_edit_config_includes_guard_order(tmp_path: Path, monkeypatch):
                 "  plan:",
                 "    bitwidth: 8",
                 "    per_channel: true",
-                "    group_size: 128",
                 "    clamp_ratio: 0.005",
                 "    scope: attn",
                 "",
@@ -83,4 +82,5 @@ def test_evaluate_edit_config_includes_guard_order(tmp_path: Path, monkeypatch):
         edit_config=str(edit_cfg),
         banner=False,
         quiet=True,
+        assurance="off",
     )

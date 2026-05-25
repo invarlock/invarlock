@@ -152,7 +152,14 @@ def test_attach_primary_metric_recovers_when_display_ci_lookup_raises() -> None:
 
     pm = evaluation_report["primary_metric"]
     assert pm["final"] == 2.0
-    assert "display_ci" not in pm
+    assert pm["display_ci"] == [2.0, 2.0]
+    assert evaluation_report["report_build"]["synthesized_fields"] == [
+        {
+            "field": "primary_metric.display_ci",
+            "reason": "computed_from_primary_metric_point_or_ci",
+            "source": "primary_metric_utils._attach_primary_metric_from_report",
+        }
+    ]
 
 
 def test_attach_primary_metric_classification_without_baseline(monkeypatch):

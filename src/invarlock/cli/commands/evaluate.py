@@ -280,6 +280,7 @@ def _run_subject_evaluation_phase(
     profile_name: str,
     tier_name: str,
     guards_order: Any,
+    assurance_mode: str,
     subject_label: str | None,
     edit_config: str | None,
     edit_label: str | None,
@@ -288,6 +289,7 @@ def _run_subject_evaluation_phase(
     timings: dict[str, float],
     verbosity: int,
     progress: bool,
+    execution_mode: str,
     allow_network: bool,
     allow_host_execution: bool,
     allow_third_party_plugins: bool,
@@ -313,6 +315,7 @@ def _run_subject_evaluation_phase(
         profile_name=profile_name,
         tier_name=tier_name,
         guards_order=guards_order,
+        assurance_mode=assurance_mode,
         subject_label=subject_label,
         edit_config=edit_config,
         edit_label=edit_label,
@@ -321,6 +324,7 @@ def _run_subject_evaluation_phase(
         timings=timings,
         verbosity=verbosity,
         progress=progress,
+        execution_mode=execution_mode,
         allow_network=allow_network,
         allow_host_execution=allow_host_execution,
         allow_third_party_plugins=allow_third_party_plugins,
@@ -366,6 +370,7 @@ def evaluate_command(
     allow_host_execution: bool = False,
     allow_third_party_plugins: bool = False,
     allow_remote_code: bool = False,
+    assurance: str = "strict",
     no_color: bool = False,
 ):
     """Evaluate two checkpoints (baseline vs subject) with pinned windows."""
@@ -438,9 +443,14 @@ def evaluate_command(
             resolve_auto_adapter_fn=resolve_auto_adapter,
             load_yaml_fn=_load_yaml,
             tmp_dir_candidate=os.environ.get("INVARLOCK_EVALUATE_TMP_DIR"),
+            assurance_mode=assurance,
+            execution_mode=execution_mode,
+            allow_unverified_provenance=allow_unverified_provenance,
         )
     except FileNotFoundError as exc:
         _fail(f"Preset not found: {exc}", exit_code=2)
+    except ValueError as exc:
+        _fail(str(exc), exit_code=2)
     profile_name = plan.profile_name
     tier_name = plan.tier_name
     eff_adapter = plan.adapter_name
@@ -469,6 +479,7 @@ def evaluate_command(
     baseline_cfg = plan.baseline_config
     baseline_label = plan.baseline_label
     subject_label = plan.subject_label
+    assurance_mode = plan.assurance_mode
     tmp_dir = plan.tmp_dir
 
     baseline_report_path = _run_baseline_evaluation_phase(
@@ -510,6 +521,7 @@ def evaluate_command(
         profile_name=profile_name,
         tier_name=tier_name,
         guards_order=guards_order,
+        assurance_mode=assurance_mode,
         subject_label=subject_label,
         edit_config=edit_config,
         edit_label=edit_label,
@@ -518,6 +530,7 @@ def evaluate_command(
         timings=timings,
         verbosity=verbosity,
         progress=progress,
+        execution_mode=execution_mode,
         allow_network=allow_network,
         allow_host_execution=allow_host_execution,
         allow_third_party_plugins=allow_third_party_plugins,
@@ -573,12 +586,14 @@ def evaluate_command(
                 "allow_remote_code": allow_remote_code,
                 "allow_third_party_plugins": allow_third_party_plugins,
                 "execution_mode": execution_mode,
+                "assurance": assurance_mode,
             },
             extra={
                 "command": "evaluate",
                 "profile": profile_name,
                 "tier": tier_name,
                 "execution_mode": execution_mode,
+                "assurance": assurance_mode,
             },
             execution=_evaluation_report_manifest_execution(
                 execution_mode=execution_mode,

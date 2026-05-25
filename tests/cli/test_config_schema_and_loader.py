@@ -151,10 +151,48 @@ def test_load_config_rejects_legacy_edit_kind(tmp_path: Path) -> None:
         load_config(cfg_path)
 
 
-def test_load_config_rejects_legacy_assurance_block(tmp_path: Path) -> None:
-    cfg_path = tmp_path / "legacy_assurance.yaml"
+def test_load_config_accepts_strict_assurance_block(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "strict_assurance.yaml"
     cfg_path.write_text("assurance: {mode: strict}\n", encoding="utf-8")
-    with pytest.raises(ValueError, match=r"assurance\.\* is not supported"):
+    cfg = load_config(cfg_path)
+    assert cfg.model_dump()["assurance"] == {"mode": "strict"}
+
+
+def test_load_config_rejects_non_mapping_assurance_block(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "bad_assurance_type.yaml"
+    cfg_path.write_text("assurance: strict\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="assurance must be a mapping"):
+        load_config(cfg_path)
+
+
+def test_load_config_rejects_invalid_assurance_mode(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "bad_assurance_mode.yaml"
+    cfg_path.write_text("assurance: {mode: permissive}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match=r"assurance\.mode must be one of"):
+        load_config(cfg_path)
+
+
+def test_load_runtime_yaml_ignores_packaged_resource_file_race(monkeypatch) -> None:
+    class _RaceResource:
+        def joinpath(self, _part: str) -> "_RaceResource":
+            return self
+
+        def is_file(self) -> bool:
+            return True
+
+        def read_text(self, *, encoding: str) -> str:
+            assert encoding == "utf-8"
+            raise FileNotFoundError("resource disappeared")
+
+    monkeypatch.setattr(loader_mod._ires, "files", lambda _pkg: _RaceResource())
+
+    assert loader_mod._load_runtime_yaml("tiers.yaml") is None
+
+
+def test_load_config_rejects_unknown_assurance_keys(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "bad_assurance.yaml"
+    cfg_path.write_text("assurance: {mode: strict, roadmap: true}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="Unsupported assurance keys"):
         load_config(cfg_path)
 
 

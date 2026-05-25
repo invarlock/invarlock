@@ -173,8 +173,10 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
         "Create install-surface venv",
         "Run pip-audit",
         "Generate install-surface SBOM",
+        "Remove install-surface venv",
         "Create HF surface venv",
         "Run HF surface pip-audit",
+        "Remove HF surface venv",
         "Create advanced surface venv",
         "Run advanced surface pip-audit",
         "Run gitleaks history scan",
@@ -205,6 +207,10 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
     venv_step = _find_step_by_name(steps, "Create install-surface venv")
     assert venv_step["id"] == "install_surface"
     assert "python -m venv .artifact-venv" in venv_step["run"]
+    assert (
+        "python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap-py313.txt"
+        in venv_step["run"]
+    )
     assert "python -m pip install dist/*.whl" in venv_step["run"]
     assert "site_packages=" in venv_step["run"]
 
@@ -214,12 +220,19 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
     )
     assert "artifacts/supply-chain/sbom.json" in sbom_step["run"]
 
+    install_cleanup_step = _find_step_by_name(steps, "Remove install-surface venv")
+    assert "rm -rf .artifact-venv" in install_cleanup_step["run"]
+
     audit_step = _find_step_by_name(steps, "Run pip-audit")
     assert "python scripts/security/run_pip_audit.py --path" in audit_step["run"]
     assert "${{ steps.install_surface.outputs.site_packages }}" in audit_step["run"]
 
     hf_venv_step = _find_step_by_name(steps, "Create HF surface venv")
     assert hf_venv_step["id"] == "hf_surface"
+    assert (
+        "python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap-py313.txt"
+        in hf_venv_step["run"]
+    )
     assert "python -m pip install dist/*.whl --no-deps" in hf_venv_step["run"]
     assert (
         "python -m pip install --require-hashes -r requirements/workflows/hf-py313.txt"
@@ -230,8 +243,15 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
     assert "python scripts/security/run_pip_audit.py --path" in hf_audit_step["run"]
     assert "${{ steps.hf_surface.outputs.site_packages }}" in hf_audit_step["run"]
 
+    hf_cleanup_step = _find_step_by_name(steps, "Remove HF surface venv")
+    assert "rm -rf .hf-venv" in hf_cleanup_step["run"]
+
     advanced_venv_step = _find_step_by_name(steps, "Create advanced surface venv")
     assert advanced_venv_step["id"] == "advanced_surface"
+    assert (
+        "python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap-py313.txt"
+        in advanced_venv_step["run"]
+    )
     assert "python -m pip install dist/*.whl --no-deps" in advanced_venv_step["run"]
     assert (
         "python -m pip install --require-hashes -r requirements/workflows/advanced-py313.txt"
@@ -283,20 +303,19 @@ def test_pip_audit_allowlist_is_owned_and_time_boxed() -> None:
     )
 
     assert payload["owner"] == "security-maintainers"
-    assert payload["entries"]
-
-    expected_tracking = {
-        "GHSA-4xh5-x5gv-qwph": "https://github.com/pypa/pip/issues/13607",
-        "CVE-2026-1703": "https://github.com/pypa/pip/issues/13641",
-    }
-    assert {entry["advisory"] for entry in payload["entries"]} == set(expected_tracking)
+    assert isinstance(payload["entries"], list)
+    if not payload["entries"]:
+        assert "There are no active exceptions." in allowlist_doc
 
     for entry in payload["entries"]:
         advisory = entry["advisory"]
         assert entry["owner"] == "security-maintainers"
         expires = date.fromisoformat(entry["expires"])
         assert 0 <= (expires - date.today()).days <= 30
-        assert entry["tracking_issue"] == expected_tracking[advisory]
+        assert re.fullmatch(
+            r"https://github\.com/[^/]+/[^/]+/issues/[1-9]\d*",
+            entry["tracking_issue"],
+        )
         assert "reason" in entry
         assert f"`{advisory}`" in allowlist_doc
         assert entry["expires"] in allowlist_doc
@@ -351,6 +370,7 @@ def test_codeowners_protect_security_control_surfaces() -> None:
         ".github/dependabot.yml",
         "docs/security/",
         "requirements/workflows/*security*.txt",
+        "requirements/workflows/pip-bootstrap-py313.txt",
         "scripts/security/",
     ):
         assert required_entry in codeowners
@@ -561,6 +581,10 @@ def test_release_workflow_builds_and_publishes_tag_only_artifacts():
     assert "--report-format sarif" in gitleaks_scan["run"]
 
     smoke_step = _find_step_by_name(build_steps, "Install smoke from wheel")
+    assert (
+        "python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap-py313.txt"
+        in smoke_step["run"]
+    )
     assert "python -m pip install dist/*.whl" in smoke_step["run"]
     assert "invarlock --help" in smoke_step["run"]
     assert 'python -c "import invarlock.cli.app"' in smoke_step["run"]
@@ -578,6 +602,10 @@ def test_release_workflow_builds_and_publishes_tag_only_artifacts():
     )
     assert install_surface_step["id"] == "install_surface"
     assert "python -m venv .artifact-venv" in install_surface_step["run"]
+    assert (
+        "python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap-py313.txt"
+        in install_surface_step["run"]
+    )
     assert "python -m pip install dist/*.whl" in install_surface_step["run"]
 
     audit_step = _find_step_by_name(build_steps, "Run release pip-audit")

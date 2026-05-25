@@ -153,6 +153,7 @@ jobs:
           digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
           print(f"Wheel digest verified: {digest}")
           PY
+          python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap-py313.txt
           python -m pip install dist/*.whl
           invarlock --help
           python -c "import invarlock.cli.app"
@@ -164,6 +165,7 @@ jobs:
           rm -rf .artifact-venv
           python -m venv .artifact-venv
           . .artifact-venv/bin/activate
+          python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap-py313.txt
           python -m pip install dist/*.whl
           site_packages="$(python - <<'PY'
           import site
@@ -330,6 +332,7 @@ jobs:
         run: |
           python -m venv .venv
           . .venv/bin/activate
+          python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap-py313.txt
           python -m pip install wheelhouse/*.whl
           invarlock --help
           python -c "import invarlock.cli.app"

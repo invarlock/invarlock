@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import typer
 
-from invarlock.cli.config_execution import RuntimeDelegationError, run_from_config
+from invarlock.cli.config_execution import (
+    ConfigExecutionRequest,
+    RuntimeDelegationError,
+    run_request,
+)
 
 
 def run_command(
@@ -42,7 +46,7 @@ def run_command(
     allow_unverified_provenance = bool(allow_unverified_provenance)
     prefer_local_files_only = bool(prefer_local_files_only)
     try:
-        return run_from_config(
+        request = ConfigExecutionRequest.from_kwargs(
             config=config,
             device=device,
             profile=profile,
@@ -68,8 +72,8 @@ def run_command(
             allow_remote_code=allow_remote_code,
             allow_unverified_provenance=allow_unverified_provenance,
             prefer_local_files_only=prefer_local_files_only,
-            command_name="run",
         )
+        return run_request(request, command_name="run")
     except RuntimeDelegationError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(1) from exc

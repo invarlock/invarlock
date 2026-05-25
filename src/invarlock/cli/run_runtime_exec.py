@@ -188,7 +188,10 @@ def run_bare_control(
     bare_context = copy.deepcopy(run_config.context)
     bare_context.setdefault("validation", {})["guard_overhead_mode"] = "bare"
     bare_config.context = bare_context
-    edit_runtime = EditRuntime()
+    edit_runtime = EditRuntime(
+        profile=profile_normalized,
+        verbose=bool(getattr(run_config, "verbose", False)),
+    )
 
     private_model_loaded = False
     bare_target_model = None
@@ -364,7 +367,10 @@ def execute_guarded_run(
         if snapshot_provenance is not None:
             snapshot_provenance["reload_path_used"] = True
 
-    edit_runtime = EditRuntime()
+    edit_runtime = EditRuntime(
+        profile=profile_normalized,
+        verbose=bool(getattr(run_config, "verbose", False)),
+    )
 
     with suppress_noisy_warnings(
         profile_normalized,

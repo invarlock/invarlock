@@ -305,7 +305,7 @@ def test_codeql_workflow_uses_repo_config():
     analyze_step = _find_step_by_uses_prefix(
         analyze["steps"], "github/codeql-action/analyze@"
     )
-    expected_pin = "95e58e9a2cdfd71adc6e0353d5c52f41a045d225"
+    expected_pin = "7211b7c8077ea37d8641b6271f6a365a22a5fbfa"
 
     assert init_step["uses"] == f"github/codeql-action/init@{expected_pin}"
     assert autobuild_step["uses"] == f"github/codeql-action/autobuild@{expected_pin}"
@@ -404,6 +404,10 @@ def test_gpt2_smoke_workflow_is_configured() -> None:
     assert env["INVARLOCK_ALLOW_NETWORK"] == "1"
     assert env["INVARLOCK_SMOKE_MODE"] == "container"
     assert env["INVARLOCK_SMOKE_PROFILE"] == "dev"
+    assert (
+        env["INVARLOCK_SMOKE_JOURNEYS"]
+        == "strict-bundle,noop,quantized,edited,negative"
+    )
     assert env["INVARLOCK_RUNTIME_IMAGE"] == "invarlock-runtime:local"
 
     steps = job["steps"]
@@ -413,8 +417,8 @@ def test_gpt2_smoke_workflow_is_configured() -> None:
     runtime_image = _find_step_by_name(steps, "Build runtime image")
     assert "make runtime-image" in runtime_image["run"]
 
-    smoke = _find_step_by_name(steps, "Run GPT-2 smoke campaign")
-    assert "scripts/run_gpt2_smoke_campaign.sh" in smoke["run"]
+    smoke = _find_step_by_name(steps, "Run GPT-2 user journey smoke")
+    assert "scripts/run_gpt2_user_journey_smoke.sh" in smoke["run"]
 
 
 def test_ci_hf_lockfiles_include_hypothesis_for_property_tests() -> None:

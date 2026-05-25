@@ -4,12 +4,14 @@ import copy
 from typing import Any
 
 from . import policy_utils as report_policy_utils_mod
+from . import report_build_evidence as report_build_evidence_mod
 from . import report_confidence as report_confidence_mod
 from . import report_enrichment as report_enrichment_mod
 from . import report_overhead as report_overhead_mod
 from . import report_primary_metric_policy as report_primary_metric_policy_mod
 from . import report_provenance as report_provenance_mod
 from . import report_schema as report_schema_mod
+from .evaluation_report_builder import EvaluationReportBuilder
 from .report_types import RunReport
 
 
@@ -58,10 +60,20 @@ def _build_evaluation_report(
         "policy_provenance": policy_provenance,
         "provenance": provenance,
         "plugins": plugin_provenance,
+        "guards": (
+            copy.deepcopy(report_map.get("guards", []))
+            if isinstance(report_map.get("guards"), list)
+            else []
+        ),
         "artifacts": artifacts_payload,
         "validation": validation_filtered,
         "guard_overhead": guard_overhead_section,
         "primary_metric_tail": pm_tail_result,
+        "context": (
+            copy.deepcopy(report_map.get("context", {}))
+            if isinstance(report_map.get("context"), dict)
+            else {}
+        ),
         "evaluation_windows": (
             copy.deepcopy(report_map.get("evaluation_windows", {}))
             if isinstance(report_map.get("evaluation_windows"), dict)
@@ -70,6 +82,7 @@ def _build_evaluation_report(
     }
     if edit_name is not None:
         evaluation_report["edit_name"] = edit_name
+    report_build_evidence_mod.ensure_report_build_evidence(evaluation_report)
     return evaluation_report
 
 
@@ -171,6 +184,7 @@ def _finalize_evaluation_report(
         evaluation_report.get("primary_metric"),
         ppl_analysis.get("logloss_delta_ci"),
         window_plan_profile,
+        evaluation_report=evaluation_report,
     )
     report_enrichment_mod.ensure_primary_metric_display_ci(evaluation_report)
     report_enrichment_mod.attach_telemetry_summary_line(
@@ -183,3 +197,10 @@ def _finalize_evaluation_report(
         meta_section = evaluation_report.setdefault("meta", {})
         if isinstance(meta_section, dict):
             meta_section["build_diagnostics"] = build_diagnostics
+    try:
+        EvaluationReportBuilder(evaluation_report).finalize_assurance()
+    except non_fatal_exceptions:
+        record_blocking_diagnostic(
+            code="assurance.section_unavailable",
+            message="Assurance verdict metadata could not be attached to the evaluation report.",
+        )

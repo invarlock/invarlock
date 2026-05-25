@@ -45,8 +45,9 @@ output:
 - **Programmatic access**: `load_config()` returns an explicit mapping-backed
   `InvarLockConfig`. Use `cfg["model"]["id"]` or
   `cfg.require_section("model")["id"]`; attribute-style access is unsupported.
-- **Unsupported keys**: `edit.kind`, `edit.parameters`, `assurance.*`, and
-  `guards.{spectral,rmt}.mode` are rejected to keep the config surface explicit.
+- **Unsupported keys**: `edit.kind`, `edit.parameters`, unknown
+  `assurance.*` keys, and `guards.{spectral,rmt}.mode` are rejected to keep the
+  config surface explicit.
 
 **Precedence (highest → lowest)**
 
@@ -117,13 +118,16 @@ Supported providers: `wikitext2`, `synthetic`, `hf_text`, `local_jsonl`,
 
 ### Edit (built-in quant_rtn)
 
+`quant_rtn` is a deterministic RTN quantize/dequantize simulation. It writes
+floating-point dequantized weights back into the model; use quantized adapters
+or external subject artifacts for deployable packed quantization backends.
+
 ```yaml
 edit:
   name: quant_rtn
   plan:
     bitwidth: 8
     per_channel: true
-    group_size: 128
     clamp_ratio: 0.005
     scope: attn
     max_modules: 12
@@ -166,7 +170,12 @@ guards:
 ### Context (snapshot controls)
 
 ```yaml
+assurance:
+  mode: strict   # strict|off
+
 context:
+  assurance:
+    mode: strict
   run:
     strict_guard_prepare: true
     strict_eval: true
@@ -182,6 +191,11 @@ context:
     disk_free_margin_ratio: 1.2
     temp_dir: /tmp
 ```
+
+`assurance.mode: strict` is the current fail-closed assurance path. Strict mode
+requires CI/release profile, balanced/conservative tier, canonical guard order,
+complete guard evidence, strict paired metric evidence, and verified runtime
+provenance. `assurance.mode: off` is for exploratory/dev reports only.
 
 ### Output
 
@@ -199,7 +213,7 @@ output:
 eval:
   max_pm_ratio: 1.5
   metric:
-    kind: auto            # auto|ppl_causal|ppl_mlm|ppl_seq2seq|accuracy|accuracy
+    kind: auto            # auto|ppl_causal|ppl_mlm|ppl_seq2seq|accuracy
     reps: 2000
     ci_level: 0.95
 ```
@@ -207,7 +221,7 @@ eval:
 ## Troubleshooting
 
 - **Unsupported keys rejected**: remove `edit.kind`, `edit.parameters`,
-  `assurance.*`, or guard `mode` keys.
+  unknown `assurance.*` keys, or guard `mode` keys.
 - **Provider not found**: verify `dataset.provider` and install `invarlock[eval]`.
 - **Preset drift**: run `python scripts/check_config_schema_sync.py` after edits.
 
@@ -221,5 +235,9 @@ eval:
 
 - [CLI Reference](cli.md)
 - [Dataset Providers](datasets.md)
+- [Guards](guards.md)
+- [Model Adapters](model-adapters.md)
 - [Tier Policy Catalog](tier-policy-catalog.md)
 - [Environment Variables](env-vars.md)
+- [Config Gallery](../user-guide/config-gallery.md) — Worked YAML examples
+- [Reports Reference](reports.md) — Where config values surface in the report

@@ -101,6 +101,10 @@ class ModelEdit(ABC):
 class EditRuntime:
     """Optional typed execution context for edit operations."""
 
+    profile: str | None = None
+    verbose: bool = False
+    include_runtime_debug: bool | None = None
+
 
 @runtime_checkable
 class EditLike(Protocol):

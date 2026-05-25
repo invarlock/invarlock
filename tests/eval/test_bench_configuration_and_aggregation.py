@@ -152,7 +152,7 @@ class TestConfigurationManager:
         plan = ConfigurationManager._get_edit_plan("quant_rtn", "ci")
         assert plan["bitwidth"] == 8
         assert plan["per_channel"] is True
-        assert plan["group_size"] == 128
+        assert "group_size" not in plan
         assert plan["scope"] == "ffn"
 
     # lowrank_svd and structured plans are purged

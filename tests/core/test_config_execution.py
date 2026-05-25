@@ -124,6 +124,9 @@ def test_run_from_config_executes_without_delegation_and_writes_manifest(
         profile="ci",
         out="runs/demo",
         tier="balanced",
+        allow_network=True,
+        allow_third_party_plugins=True,
+        allow_remote_code=True,
     )
     manifest_report, manifest_config, manifest_extra = seen["manifest"]
     assert manifest_report == report_path

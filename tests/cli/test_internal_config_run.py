@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import invarlock.cli.internal_config_run as internal_config_run
+from invarlock.cli.config_execution import ConfigExecutionRequest
 
 
 def test_internal_config_run_forwards_args_without_redelegating(monkeypatch) -> None:
@@ -8,8 +9,8 @@ def test_internal_config_run_forwards_args_without_redelegating(monkeypatch) -> 
 
     monkeypatch.setattr(
         internal_config_run,
-        "run_from_config",
-        lambda **kwargs: seen.update(kwargs),
+        "run_request",
+        lambda request, **kwargs: seen.update({"request": request, **kwargs}),
         raising=True,
     )
 
@@ -55,26 +56,28 @@ def test_internal_config_run_forwards_args_without_redelegating(monkeypatch) -> 
 
     assert exit_code == 0
     assert seen == {
-        "config": "configs/demo.yaml",
-        "device": "auto",
-        "profile": "ci",
-        "out": "runs/demo",
-        "edit": "quant_rtn",
-        "edit_label": "nightly",
-        "tier": "balanced",
-        "metric_kind": "ppl_causal",
-        "probes": 4,
-        "until_pass": True,
-        "max_attempts": 5,
-        "timeout": 120,
-        "baseline": "baseline.json",
-        "no_cleanup": True,
-        "style": "audit",
-        "progress": True,
-        "timing": True,
-        "telemetry": True,
-        "no_color": True,
-        "prefer_local_files_only": True,
+        "request": ConfigExecutionRequest(
+            config="configs/demo.yaml",
+            device="auto",
+            profile="ci",
+            out="runs/demo",
+            edit="quant_rtn",
+            edit_label="nightly",
+            tier="balanced",
+            metric_kind="ppl_causal",
+            probes=4,
+            until_pass=True,
+            max_attempts=5,
+            timeout=120,
+            baseline="baseline.json",
+            no_cleanup=True,
+            style="audit",
+            progress=True,
+            timing=True,
+            telemetry=True,
+            no_color=True,
+            prefer_local_files_only=True,
+        ),
         "command_name": "advanced calibrate null-sweep",
         "delegate": False,
     }

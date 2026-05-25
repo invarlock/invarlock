@@ -18,10 +18,10 @@
         64,
         114,
         124,
-        188,
-        250,
-        306,
-        316
+        190,
+        254,
+        312,
+        322
       ],
       "bucket": "acceptable",
       "rationale": "Phase-shell wrappers preserve buffered child output, normalize CLI exit codes, and isolate heterogeneous failures while orchestration and report-contract helpers still raise mixed exception types."

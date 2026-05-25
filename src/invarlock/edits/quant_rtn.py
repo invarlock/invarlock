@@ -1,24 +1,23 @@
 """
-InvarLock – RTN Quantization Edit Plugin
-====================================
+InvarLock RTN dequantized weight-edit simulation.
 
-Pure PyTorch Round-To-Nearest (RTN) weight-only quantization with no external dependencies.
-Implements per-channel symmetric quantization with optional group size and outlier clipping.
-
-Features:
-- 8-bit weight quantization (INT8 RTN demo edit)
-- Per-channel symmetric quantization (zero-point = 0)
-- Configurable scope (FFN, attention, or all linear layers)
-- Deterministic behavior with seed control
-- GuardChain integration with quantization-aware policies
+The built-in ``quant_rtn`` edit is intentionally a deterministic numerical
+weight perturbation, not a deployable quantization backend. It computes
+round-to-nearest INT8 values, dequantizes them, and writes floating-point
+weights back into the model so the assurance pipeline has a self-contained edit
+primitive for demos, smokes, calibration, and regression gates.
 
 Follows the ModelEdit protocol through the RTNQuantEdit class only.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 import random
-from typing import Any
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from typing import Any, Literal
 
 import numpy as np
 import torch
@@ -36,16 +35,323 @@ from invarlock.core.exceptions import EditError
 
 INVARLOCK_CORE_ABI = CORE_ABI
 
-__all__ = ["RTNQuantEdit"]
+__all__ = ["RTNQuantEdit", "RTNQuantPlan", "QuantTargetSelector", "TargetModule"]
+
+
+SUPPORTED_PLAN_KEYS = {
+    "bitwidth",
+    "clamp_ratio",
+    "scope",
+    "seed",
+    "max_modules",
+    "module_selectors",
+    "per_channel",
+}
+
+
+def _canonical_json_digest(payload: Mapping[str, Any]) -> str:
+    encoded = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    ).encode("utf-8")
+    return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+
+@dataclass(frozen=True)
+class RTNQuantPlan:
+    """Canonical plan for the built-in dequantized RTN simulation edit."""
+
+    bitwidth: int = 8
+    per_channel: bool = True
+    clamp_ratio: float = 0.0
+    scope: Literal["ffn", "attn", "all"] = "ffn"
+    seed: int = 42
+    max_modules: int | None = None
+    module_selectors: dict[str, list[str]] = field(default_factory=dict)
+
+    @classmethod
+    def from_payload(
+        cls,
+        payload: Mapping[str, Any] | None,
+        *,
+        defaults: RTNQuantPlan | None = None,
+    ) -> RTNQuantPlan:
+        data = dict(payload or {})
+        unexpected = sorted((set(data) - SUPPORTED_PLAN_KEYS) - {"group_size"})
+        if "group_size" in data:
+            unexpected.append("group_size")
+        if unexpected:
+            raise ValueError("Unsupported RTN plan fields: " + ", ".join(unexpected))
+
+        base = defaults or cls()
+        raw_max_modules = data.get("max_modules", base.max_modules)
+        max_modules = None
+        if raw_max_modules is not None:
+            if not isinstance(raw_max_modules, int | float):
+                raise ValueError("RTNQuantEdit expects max_modules to be numeric.")
+            max_modules = int(raw_max_modules)
+
+        plan = cls(
+            bitwidth=int(data.get("bitwidth", base.bitwidth)),
+            per_channel=RTNQuantEdit._normalize_per_channel_option(
+                data.get("per_channel", base.per_channel),
+                default=base.per_channel,
+            ),
+            clamp_ratio=float(data.get("clamp_ratio", base.clamp_ratio)),
+            scope=str(data.get("scope", base.scope)),  # type: ignore[arg-type]
+            seed=int(data.get("seed", base.seed)),
+            max_modules=max_modules,
+            module_selectors=RTNQuantEdit._normalize_module_selectors(
+                data.get("module_selectors", base.module_selectors)
+            ),
+        )
+        plan.validate()
+        return plan
+
+    def validate(self) -> None:
+        if self.bitwidth != 8:
+            raise ValueError(
+                f"RTNQuantEdit only supports 8-bit quantization (got bitwidth={self.bitwidth})"
+            )
+        if not self.per_channel:
+            raise ValueError("RTNQuantEdit only supports per_channel=True.")
+        if not (0.0 <= self.clamp_ratio <= 0.5):
+            raise ValueError(
+                f"Clamp ratio must be between 0.0 and 0.5, got {self.clamp_ratio}"
+            )
+        if self.scope not in {"ffn", "attn", "all"}:
+            raise ValueError(f"Scope must be 'ffn', 'attn', or 'all', got {self.scope}")
+        if self.max_modules is not None and self.max_modules <= 0:
+            raise ValueError("RTNQuantEdit expects max_modules to be positive.")
+
+    def as_report_payload(
+        self,
+        *,
+        selected_modules: list[str] | None = None,
+        target_selection: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "operation": "rtn_quantize_dequantize_weight_edit",
+            "quantization_mode": "rtn_dequantized_weight_edit",
+            "storage_format": "float_dequantized",
+            "actual_storage_format": "float_dequantized",
+            "packed_quantized_storage": False,
+            "runtime_memory_reduction": False,
+            "deployment_backend": None,
+            "bitwidth": self.bitwidth,
+            "per_channel": self.per_channel,
+            "clamp_ratio": self.clamp_ratio,
+            "scope": self.scope,
+            "seed": self.seed,
+        }
+        if self.max_modules is not None:
+            payload["max_modules"] = self.max_modules
+        if self.module_selectors:
+            payload["module_selectors"] = dict(self.module_selectors)
+        if selected_modules is not None:
+            payload["selected_modules"] = list(selected_modules)
+        if target_selection is not None:
+            payload["target_selection"] = list(target_selection)
+        return payload
+
+    def digest(
+        self,
+        *,
+        selected_modules: list[str] | None = None,
+        target_selection: list[dict[str, Any]] | None = None,
+    ) -> str:
+        stable_target_selection = (
+            [self._stable_target_entry(entry) for entry in target_selection]
+            if target_selection is not None
+            else None
+        )
+        return _canonical_json_digest(
+            self.as_report_payload(
+                selected_modules=selected_modules,
+                target_selection=stable_target_selection,
+            )
+        )
+
+    @staticmethod
+    def _stable_target_entry(entry: Mapping[str, Any]) -> dict[str, Any]:
+        stable_keys = (
+            "module_name",
+            "module_type",
+            "weight_shape",
+            "params",
+            "selection_reason",
+            "matched_pattern",
+            "tied_group_key",
+            "tied_group_modules",
+        )
+        return {key: entry[key] for key in stable_keys if key in entry}
+
+
+@dataclass(frozen=True)
+class TargetModule:
+    """Resolved module target plus the reason it was selected."""
+
+    name: str
+    module: nn.Module
+    selection_reason: str
+    matched_pattern: str | None
+    parameter_id: int
+    module_type: str
+
+    def as_report_payload(self) -> dict[str, Any]:
+        return self.stable_report_payload()
+
+    def runtime_debug_payload(self) -> dict[str, Any]:
+        return {
+            "module_name": self.name,
+            "parameter_id": str(self.parameter_id),
+        }
+
+    def stable_report_payload(self) -> dict[str, Any]:
+        weight = getattr(self.module, "weight", None)
+        weight_shape = list(weight.shape) if weight is not None else []
+        params = int(weight.numel()) if weight is not None else 0
+        return {
+            "module_name": self.name,
+            "selection_reason": self.selection_reason,
+            "matched_pattern": self.matched_pattern,
+            "module_type": self.module_type,
+            "weight_shape": weight_shape,
+            "params": params,
+        }
+
+
+@dataclass(frozen=True)
+class QuantTargetSelector:
+    """Select RTN simulation targets and explain each match."""
+
+    scope: str
+    module_selectors: dict[str, list[str]] = field(default_factory=dict)
+    min_params: int = 100
+
+    def select(self, model: nn.Module) -> list[TargetModule]:
+        target_modules: list[TargetModule] = []
+        user_patterns = self._selector_patterns_for_scope()
+        default_patterns = self._default_patterns_for_scope()
+
+        for name, module in model.named_modules():
+            if not self._is_supported_module(module):
+                continue
+            weight = getattr(module, "weight", None)
+            if weight is None:
+                continue
+
+            should_include = False
+            selection_reason = ""
+            matched_pattern: str | None = None
+            lowered = name.lower()
+
+            for pattern in user_patterns:
+                if pattern in lowered:
+                    should_include = True
+                    selection_reason = "model_profile_selector"
+                    matched_pattern = pattern
+                    break
+
+            if not should_include and self.scope in {"ffn", "attn"}:
+                for pattern in default_patterns:
+                    if pattern in lowered:
+                        should_include = True
+                        selection_reason = "name_heuristic"
+                        matched_pattern = pattern
+                        break
+
+            if (
+                not should_include
+                and self.scope == "all"
+                and weight.numel() >= self.min_params
+            ):
+                should_include = True
+                selection_reason = "scope_all_min_params"
+
+            if should_include:
+                target_modules.append(
+                    TargetModule(
+                        name=name,
+                        module=module,
+                        selection_reason=selection_reason,
+                        matched_pattern=matched_pattern,
+                        parameter_id=id(weight),
+                        module_type=(
+                            f"{module.__class__.__module__}.{module.__class__.__name__}"
+                        ),
+                    )
+                )
+
+        return target_modules
+
+    @staticmethod
+    def _is_supported_module(module: nn.Module) -> bool:
+        if isinstance(module, nn.Linear | nn.Conv1d):
+            return True
+        try:
+            from transformers.pytorch_utils import Conv1D
+
+            return isinstance(module, Conv1D)
+        except ImportError:
+            return False
+
+    def _selector_patterns_for_scope(self) -> tuple[str, ...]:
+        if not self.module_selectors:
+            return ()
+        if self.scope == "ffn":
+            keys = ("ffn", "feed_forward")
+        elif self.scope == "attn":
+            keys = ("attn", "attention")
+        else:
+            keys = tuple(self.module_selectors.keys())
+        patterns: list[str] = []
+        seen: set[str] = set()
+        for key in keys:
+            for value in self.module_selectors.get(key, []):
+                normalized = str(value).strip().lower()
+                if normalized and normalized not in seen:
+                    patterns.append(normalized)
+                    seen.add(normalized)
+        return tuple(patterns)
+
+    def _default_patterns_for_scope(self) -> tuple[str, ...]:
+        if self.scope == "ffn":
+            return (
+                "mlp.c_fc",
+                "mlp.c_proj",
+                "feed_forward",
+                "fc1",
+                "fc2",
+                "mlp",
+                "ffn",
+                "intermediate.dense",
+                "output.dense",
+            )
+        if self.scope == "attn":
+            return (
+                "attn.c_attn",
+                "attn.c_proj",
+                "attention",
+                "q_proj",
+                "k_proj",
+                "v_proj",
+                "o_proj",
+                "attn",
+            )
+        return ()
 
 
 class RTNQuantEdit(ModelEdit):
     """
-    ModelEdit implementation for RTN (Round-To-Nearest) weight-only quantization.
+    ModelEdit implementation for RTN dequantized weight-edit simulation.
 
-    This built-in edit is intentionally minimal and calibrated for INT8 only.
-    It performs symmetric per-channel quantization with configurable scope and
-    deterministic operation.
+    This built-in edit is intentionally calibrated for INT8 simulation only. It
+    computes symmetric per-channel quantization values, dequantizes them, and
+    writes floating-point weights back into the model. It does not pack weights,
+    lower runtime memory, or produce a deployable INT8 artifact.
     """
 
     name = "quant_rtn"
@@ -85,6 +391,8 @@ class RTNQuantEdit(ModelEdit):
                     for item in values
                     if isinstance(item, str) and str(item).strip()
                 ]
+                if isinstance(values, set):
+                    cleaned = sorted(cleaned)
             else:
                 cleaned = []
             if cleaned:
@@ -95,19 +403,24 @@ class RTNQuantEdit(ModelEdit):
     def _validate_options(
         *,
         bitwidth: int,
+        per_channel: bool,
+        group_size: int | None,
         clamp_ratio: float,
         scope: str,
+        max_modules: int | None = None,
     ) -> None:
-        if bitwidth != 8:
+        if group_size is not None:
             raise ValueError(
-                f"RTNQuantEdit only supports 8-bit quantization (got bitwidth={bitwidth})"
+                "RTNQuantEdit is an 8-bit dequantized simulation edit; "
+                "group_size is unsupported."
             )
-        if not (0.0 <= clamp_ratio <= 0.5):
-            raise ValueError(
-                f"Clamp ratio must be between 0.0 and 0.5, got {clamp_ratio}"
-            )
-        if scope not in ["ffn", "attn", "all"]:
-            raise ValueError(f"Scope must be 'ffn', 'attn', or 'all', got {scope}")
+        RTNQuantPlan(
+            bitwidth=bitwidth,
+            per_channel=per_channel,
+            clamp_ratio=clamp_ratio,
+            scope=scope,  # type: ignore[arg-type]
+            max_modules=max_modules,
+        ).validate()
 
     def __init__(
         self,
@@ -122,26 +435,30 @@ class RTNQuantEdit(ModelEdit):
         module_selectors: dict[str, list[str]] | None = None,
     ):
         """
-        Initialize RTN quantization edit.
+        Initialize RTN dequantized simulation edit.
 
         Args:
-            bitwidth: Quantization bitwidth (INT8 only for built-in edit)
+            bitwidth: Quantization bitwidth (INT8 only for built-in simulation)
             per_channel: Always True for per-channel quantization
-            group_size: Reserved for future use (ignored for INT8 demo edit)
+            group_size: Unsupported; real grouped quantization belongs to backend
+                adapters or separate backend-scoped edits
             clamp_ratio: Outlier clipping ratio (0.0 = no clipping)
             scope: Target scope ("ffn", "attn", "all")
             seed: Random seed for deterministic behavior
             guard_chain: Optional GuardChain for safety checks
         """
+        per_channel = self._normalize_per_channel_option(per_channel, default=True)
         self._validate_options(
             bitwidth=bitwidth,
+            per_channel=per_channel,
+            group_size=group_size,
             clamp_ratio=clamp_ratio,
             scope=scope,
+            max_modules=max_modules,
         )
 
         self.bitwidth = bitwidth
-        self.per_channel = self._normalize_per_channel_option(per_channel, default=True)
-        self.group_size = group_size
+        self.per_channel = per_channel
         self.clamp_ratio = clamp_ratio
         self.scope = scope
         self.seed = seed
@@ -149,25 +466,87 @@ class RTNQuantEdit(ModelEdit):
         self.max_modules = max_modules
         self.module_selectors = self._normalize_module_selectors(module_selectors)
 
-        # group_size is currently reserved for potential future variants; it is
-        # ignored for the built-in INT8 demo edit.
-
     def can_edit(self, model_desc: dict[str, Any]) -> bool:
-        """Check if RTN quantization can be applied to this model."""
-        # Basic requirements for quantization
+        """
+        Coarse metadata-only compatibility check.
+
+        The actual model-object selection remains fail-closed in apply(), which
+        raises when the configured scope matches no editable target modules.
+        """
         required_keys = ["n_layer", "total_params"]
         has_requirements = all(key in model_desc for key in required_keys)
+        if not has_requirements or model_desc.get("total_params", 0) <= 1000:
+            return False
 
-        # Need sufficient model size for meaningful quantization
-        if has_requirements and model_desc.get("total_params", 0) > 1000:
+        module_names = self._module_names_from_model_desc(model_desc)
+        if module_names:
+            return self._has_matching_module_name(module_names)
+        return True
+
+    def _has_matching_module_name(self, module_names: list[str]) -> bool:
+        if self.scope == "all":
             return True
-        return False
+
+        selector = QuantTargetSelector(
+            scope=self.scope,
+            module_selectors=self.module_selectors,
+        )
+        patterns = (
+            selector._selector_patterns_for_scope()
+            + selector._default_patterns_for_scope()
+        )
+        if not patterns:
+            return False
+        return any(
+            pattern in module_name.lower()
+            for module_name in module_names
+            for pattern in patterns
+        )
+
+    @staticmethod
+    def _module_names_from_model_desc(model_desc: Mapping[str, Any]) -> list[str]:
+        for key in ("module_names", "target_modules", "modules", "named_modules"):
+            raw_value = model_desc.get(key)
+            if isinstance(raw_value, Mapping):
+                candidates = raw_value.keys()
+            elif isinstance(raw_value, list | tuple | set):
+                candidates = raw_value
+            else:
+                continue
+            names = [str(item) for item in candidates if isinstance(item, str) and item]
+            if names:
+                return names
+        return []
+
+    def _base_plan(self) -> RTNQuantPlan:
+        return RTNQuantPlan(
+            bitwidth=self.bitwidth,
+            per_channel=self.per_channel,
+            clamp_ratio=self.clamp_ratio,
+            scope=self.scope,  # type: ignore[arg-type]
+            seed=self.seed,
+            max_modules=self.max_modules,
+            module_selectors=dict(self.module_selectors),
+        )
+
+    @staticmethod
+    def _limit_targets(
+        target_modules: list[TargetModule], max_modules: int | None
+    ) -> tuple[list[TargetModule], int]:
+        total_identified = len(target_modules)
+        if (
+            isinstance(max_modules, int)
+            and max_modules > 0
+            and max_modules < total_identified
+        ):
+            return target_modules[:max_modules], total_identified
+        return target_modules, total_identified
 
     def preview(
         self, model: nn.Module, adapter: ModelAdapter, calib: CalibrationData
     ) -> dict:
         """
-        Preview RTN quantization without modifying the model.
+        Preview RTN dequantized simulation without modifying the model.
 
         Args:
             model: The model to preview quantization on
@@ -185,45 +564,60 @@ class RTNQuantEdit(ModelEdit):
         # Get model description
         model_desc = adapter.describe(model)
 
-        # Identify target modules
-        target_modules = self._identify_target_modules(model)
-        total_identified = len(target_modules)
+        active_plan = self._base_plan()
+        target_modules, total_identified = self._limit_targets(
+            self._select_target_modules(model),
+            active_plan.max_modules,
+        )
 
-        if (
-            isinstance(self.max_modules, int)
-            and self.max_modules > 0
-            and self.max_modules < total_identified
-        ):
-            target_modules = target_modules[: self.max_modules]
+        tied_parameter_groups = self._get_weight_tying_groups(model)
+        (
+            physically_quantized_targets,
+            deduplicated_modules,
+            deduplicated_parameter_ids,
+        ) = self._deduplicate_targets_by_parameter(target_modules)
 
-        # Compute quantization statistics
-        quant_stats = self._compute_quantization_stats(target_modules)
+        # Compute quantization statistics for unique physical parameters.
+        quant_stats = self._compute_quantization_stats(physically_quantized_targets)
 
         # Estimate parameter changes
         total_params = sum(p.numel() for p in model.parameters())
-        target_params = sum(module.weight.numel() for _, module in target_modules)
+        target_params = sum(
+            target.module.weight.numel() for target in physically_quantized_targets
+        )
 
         # Create quantization plan
-        plan = {
-            "operation": "rtn_quantization",
-            "bitwidth": self.bitwidth,
-            "per_channel": self.per_channel,
-            "group_size": self.group_size if self.bitwidth == 4 else None,
-            "clamp_ratio": self.clamp_ratio,
-            "scope": self.scope,
-            "seed": self.seed,
-            "target_modules": [name for name, _ in target_modules],
-            "quantization_stats": quant_stats,
-            "anti_tying_map": self._get_weight_tying_map(model),
-        }
-        if self.module_selectors:
-            plan["module_selectors"] = dict(self.module_selectors)
-        if (
-            isinstance(self.max_modules, int)
-            and self.max_modules > 0
-            and self.max_modules < total_identified
-        ):
-            plan["max_modules"] = self.max_modules
+        target_names = [target.name for target in target_modules]
+        physical_module_names = [target.name for target in physically_quantized_targets]
+        target_selection = self._target_report_payloads(
+            target_modules,
+            tied_parameter_groups=tied_parameter_groups,
+        )
+        plan = active_plan.as_report_payload(
+            selected_modules=target_names,
+            target_selection=target_selection,
+        )
+        plan.update(
+            {
+                "plan_digest": active_plan.digest(
+                    selected_modules=target_names,
+                    target_selection=target_selection,
+                ),
+                "physically_quantized_modules": physical_module_names,
+                "total_modules_selected": len(target_names),
+                "total_modules_quantized": len(physical_module_names),
+                "total_params_quantized": int(target_params),
+                "deduplicated_modules": deduplicated_modules,
+                "quantization_stats": quant_stats,
+                "tied_parameter_groups": tied_parameter_groups,
+                "runtime_debug": {
+                    "target_parameter_ids": [
+                        target.runtime_debug_payload() for target in target_modules
+                    ],
+                    "deduplicated_parameter_ids": deduplicated_parameter_ids,
+                },
+            }
+        )
 
         # Estimate sparsity (RTN doesn't create structural sparsity)
         estimated_sparsity = {
@@ -234,14 +628,7 @@ class RTNQuantEdit(ModelEdit):
 
         # Preview metrics
         bits_per_param = self.bitwidth
-        if self.bitwidth == 4 and self.group_size:
-            # Account for scale storage
-            scales_per_group = target_params / self.group_size
-            bits_per_param = 4 + (
-                32 * scales_per_group / target_params
-            )  # 32-bit scales
-
-        memory_reduction_estimate = target_params * (32 - bits_per_param) / 8  # bytes
+        theoretical_memory_saved = target_params * (32 - bits_per_param) / 8
 
         preview_metrics = {
             "preview_duration": 0.0,
@@ -249,10 +636,14 @@ class RTNQuantEdit(ModelEdit):
             "total_params": int(total_params),
             "coverage_ratio": target_params / total_params if total_params > 0 else 0.0,
             "target_modules_count": len(target_modules),
-            "estimated_memory_saved_bytes": int(memory_reduction_estimate),
-            "estimated_bits_per_param": bits_per_param,
+            "target_modules_quantized_count": len(physically_quantized_targets),
+            "theoretical_packed_memory_saved_bytes": int(theoretical_memory_saved),
+            "theoretical_packed_bits_per_param": bits_per_param,
+            "actual_storage_format": "float_dequantized",
+            "packed_quantized_storage": False,
+            "runtime_memory_reduction": False,
             "will_use_clipping": self.clamp_ratio > 0.0,
-            "will_use_grouping": self.bitwidth == 4 and self.group_size is not None,
+            "will_use_grouping": False,
         }
 
         return {
@@ -270,7 +661,7 @@ class RTNQuantEdit(ModelEdit):
         runtime: EditRuntime | None = None,
     ) -> dict[str, Any]:
         """
-        Apply RTN quantization to the model.
+        Apply RTN dequantized simulation to the model.
 
         Args:
             model: The model to edit (modified in-place)
@@ -281,88 +672,45 @@ class RTNQuantEdit(ModelEdit):
         Returns:
             Dictionary with application results
         """
-        del runtime
         plan_data = dict(plan or {})
-        supported_keys = {
-            "bitwidth",
-            "group_size",
-            "clamp_ratio",
-            "scope",
-            "seed",
-            "max_modules",
-            "module_selectors",
-            "per_channel",
-        }
-        unexpected = sorted(set(plan_data) - supported_keys)
-        if unexpected:
-            raise ValueError("Unsupported RTN plan fields: " + ", ".join(unexpected))
-
-        raw_bitwidth = plan_data.get("bitwidth", self.bitwidth)
-        bitwidth = int(raw_bitwidth)
-        group_size = plan_data.get("group_size", self.group_size)
-        clamp_ratio = float(plan_data.get("clamp_ratio", self.clamp_ratio))
-        scope = str(plan_data.get("scope", self.scope))
-        seed = int(plan_data.get("seed", self.seed))
-        per_channel = self._normalize_per_channel_option(
-            plan_data.get("per_channel", self.per_channel),
-            default=self.per_channel,
-        )
-        if not per_channel:
-            raise ValueError("RTNQuantEdit only supports per_channel=True.")
-        module_selectors = self._normalize_module_selectors(
-            plan_data.get("module_selectors", self.module_selectors)
-        )
-        raw_max_modules = plan_data.get("max_modules", self.max_modules)
-        max_modules = (
-            int(raw_max_modules)
-            if isinstance(raw_max_modules, int | float) and int(raw_max_modules) > 0
-            else None
-        )
-
-        self._validate_options(
-            bitwidth=bitwidth,
-            clamp_ratio=clamp_ratio,
-            scope=scope,
-        )
+        active_plan = RTNQuantPlan.from_payload(plan_data, defaults=self._base_plan())
 
         active_edit = RTNQuantEdit(
-            bitwidth=bitwidth,
-            per_channel=per_channel,
-            group_size=group_size,
-            clamp_ratio=clamp_ratio,
-            scope=scope,
-            seed=seed,
+            bitwidth=active_plan.bitwidth,
+            per_channel=active_plan.per_channel,
+            clamp_ratio=active_plan.clamp_ratio,
+            scope=active_plan.scope,
+            seed=active_plan.seed,
             guard_chain=self.guard_chain,
-            max_modules=max_modules,
-            module_selectors=module_selectors,
+            max_modules=active_plan.max_modules,
+            module_selectors=active_plan.module_selectors,
         )
 
         # Set deterministic seed
-        torch.manual_seed(seed)
-        random.seed(seed)
-        np.random.seed(seed)
+        torch.manual_seed(active_plan.seed)
+        random.seed(active_plan.seed)
+        np.random.seed(active_plan.seed)
 
-        target_modules = active_edit._identify_target_modules(model)
-        total_identified = len(target_modules)
-        if max_modules is not None:
-            if max_modules < total_identified:
-                target_modules = target_modules[:max_modules]
+        target_modules, total_identified = self._limit_targets(
+            active_edit._select_target_modules(model),
+            active_plan.max_modules,
+        )
         if not target_modules:
             raise EditError(
                 code="E321",
                 message=(
-                    "RTN quantization matched no target modules for the current "
+                    "RTN dequantized simulation matched no target modules for the current "
                     "model and scope."
                 ),
                 details={
-                    "scope": scope,
-                    "bitwidth": bitwidth,
-                    "max_modules": max_modules,
+                    "scope": active_plan.scope,
+                    "bitwidth": active_plan.bitwidth,
+                    "max_modules": active_plan.max_modules,
                     "identified_modules": total_identified,
                 },
             )
 
-        tying_map = active_edit._get_weight_tying_map(model)
+        tied_parameter_groups = active_edit._get_weight_tying_groups(model)
 
         # Execute GuardChain before edit (if provided)
         guard_results = {}
@@ -373,31 +721,37 @@ class RTNQuantEdit(ModelEdit):
 
             active_edit.guard_chain.before_edit_all(model)
 
-        # Apply quantization to each target module
+        (
+            physically_quantized_targets,
+            deduplicated_modules,
+            deduplicated_parameter_ids,
+        ) = active_edit._deduplicate_targets_by_parameter(target_modules)
+
+        # Apply quantization to each unique physical target parameter
         quantization_results = []
         total_params_quantized = 0
 
-        for module_name, module in target_modules:
-            # Apply RTN quantization
-            quant_result = self._apply_rtn_quantization(
-                module,
-                bitwidth,
-                group_size,
-                clamp_ratio,
-                tying_map.get(module_name),
+        for target in physically_quantized_targets:
+            quant_result = active_edit._apply_rtn_quantization(
+                target.module,
+                active_plan.bitwidth,
+                active_plan.clamp_ratio,
             )
 
-            quant_result["module_name"] = module_name
+            quant_result["module_name"] = target.name
+            quant_result["selection_reason"] = target.selection_reason
+            quant_result["matched_pattern"] = target.matched_pattern
+            quant_result["module_type"] = target.module_type
             quantization_results.append(quant_result)
             total_params_quantized += quant_result["params_quantized"]
         if not quantization_results or total_params_quantized <= 0:
             raise EditError(
                 code="E322",
-                message="RTN quantization completed without changing any parameters.",
+                message="RTN dequantized simulation completed without changing any parameters.",
                 details={
-                    "scope": scope,
-                    "bitwidth": bitwidth,
-                    "max_modules": max_modules,
+                    "scope": active_plan.scope,
+                    "bitwidth": active_plan.bitwidth,
+                    "max_modules": active_plan.max_modules,
                     "identified_modules": total_identified,
                 },
             )
@@ -417,10 +771,17 @@ class RTNQuantEdit(ModelEdit):
         bitwidth_map = {}
         for result in quantization_results:
             bitwidth_map[result["module_name"]] = {
-                "bitwidth": bitwidth,
-                "group_size": group_size if bitwidth == 4 else None,
+                "bitwidth": active_plan.bitwidth,
                 "params": result["params_quantized"],
                 "scale_stats": result.get("scale_stats", {}),
+                "error_metrics": result.get("error_metrics", {}),
+                "selection_reason": result.get("selection_reason"),
+                "matched_pattern": result.get("matched_pattern"),
+                "module_type": result.get("module_type"),
+                "actual_storage_dtype": result.get("actual_storage_dtype"),
+                "actual_storage_format": "float_dequantized",
+                "packed_quantized_storage": False,
+                "runtime_memory_reduction": False,
             }
 
         # Identify modified layers
@@ -431,37 +792,86 @@ class RTNQuantEdit(ModelEdit):
                 modified_layers.append(layer_name)
 
         # Store edit plan for evaluation report generation
-        modules_quantized = [r["module_name"] for r in quantization_results]
-
-        edit_plan = {
-            "bitwidth": bitwidth,
-            "scope": scope,
-            "group_size": group_size,
-            "clamp_ratio": clamp_ratio,
-            "seed": seed,
-            "per_channel": per_channel,
-            "total_modules_quantized": len(modules_quantized),
-            "total_params_quantized": total_params_quantized,
-            "modules_quantized": modules_quantized,
-        }
-        if module_selectors:
-            edit_plan["module_selectors"] = module_selectors
+        selected_modules = [target.name for target in target_modules]
+        physical_module_names = [r["module_name"] for r in quantization_results]
+        target_selection = self._target_report_payloads(
+            target_modules,
+            tied_parameter_groups=tied_parameter_groups,
+        )
+        edit_plan = active_plan.as_report_payload(
+            selected_modules=selected_modules,
+            target_selection=target_selection,
+        )
+        edit_plan.update(
+            {
+                "plan_digest": active_plan.digest(
+                    selected_modules=selected_modules,
+                    target_selection=target_selection,
+                ),
+                "tied_parameter_groups": tied_parameter_groups,
+                "deduplicated_modules": deduplicated_modules,
+                "aggregate_error_metrics": self._aggregate_error_metrics(
+                    quantization_results
+                ),
+            }
+        )
+        if self._include_runtime_debug(runtime):
+            edit_plan["runtime_debug"] = self._runtime_debug_payload(
+                target_modules,
+                deduplicated_parameter_ids=deduplicated_parameter_ids,
+            )
+        edit_plan.update(
+            {
+                "total_modules_selected": len(selected_modules),
+                "total_modules_quantized": len(physical_module_names),
+                "total_params_quantized": total_params_quantized,
+                "physically_quantized_modules": physical_module_names,
+            }
+        )
 
         # Return in the standard format expected by the framework
         return {
             "name": self.name,
-            "plan_digest": f"rtn_quantization_{bitwidth}bit_{scope}",
+            "plan_digest": edit_plan["plan_digest"],
             "plan": edit_plan,  # Include the plan for evaluation report generation
             "deltas": {
                 "params_changed": total_params_quantized,
                 "sparsity": None,  # Quantization doesn't create sparsity
                 "bitwidth_map": bitwidth_map,
                 "layers_modified": len(modified_layers),
+                "quantization_mode": "rtn_dequantized_weight_edit",
+                "storage_format": "float_dequantized",
+                "packed_quantized_storage": False,
+                "runtime_memory_reduction": False,
             },
-            "config": plan_data,
+            "config": active_plan.as_report_payload(),
             "model_desc": adapter.describe(model)
             if hasattr(adapter, "describe")
             else {},
+        }
+
+    @staticmethod
+    def _include_runtime_debug(runtime: EditRuntime | None) -> bool:
+        if runtime is None:
+            return True
+        if runtime.include_runtime_debug is not None:
+            return bool(runtime.include_runtime_debug)
+        if runtime.verbose:
+            return True
+        profile = str(runtime.profile or "").strip().lower()
+        return profile in {"", "dev"}
+
+    @staticmethod
+    def _runtime_debug_payload(
+        target_modules: list[TargetModule],
+        *,
+        deduplicated_parameter_ids: list[str],
+    ) -> dict[str, Any]:
+        return {
+            "target_parameter_ids": [
+                target.runtime_debug_payload() for target in target_modules
+            ],
+            "deduplicated_parameter_ids": deduplicated_parameter_ids,
         }
 
     @staticmethod
@@ -478,124 +888,80 @@ class RTNQuantEdit(ModelEdit):
                 return f"layer_{layer_num}"
         return None
 
-    def _identify_target_modules(self, model: nn.Module) -> list[tuple[str, nn.Module]]:
-        """Identify target modules based on scope configuration."""
-        target_modules = []
-        selector_patterns = self._selector_patterns_for_scope()
+    def _select_target_modules(self, model: nn.Module) -> list[TargetModule]:
+        """Identify target modules and keep selection metadata."""
+        return QuantTargetSelector(
+            scope=self.scope,
+            module_selectors=self.module_selectors,
+        ).select(model)
 
-        for name, module in model.named_modules():
-            # Check for both Linear and Conv1D (GPT-2 uses Conv1D)
-            if not isinstance(module, nn.Linear | nn.Conv1d):
-                # Import Conv1D from transformers if available
-                try:
-                    from transformers.pytorch_utils import Conv1D
-
-                    if not isinstance(module, Conv1D):
-                        continue
-                except ImportError:
-                    continue
-
-            # Check scope
-            should_include = False
-            if self.scope == "ffn":
-                # FFN layers - be more permissive with pattern matching
-                ffn_patterns = [
-                    "mlp.c_fc",
-                    "mlp.c_proj",
-                    "feed_forward",
-                    "fc1",
-                    "fc2",
-                    "mlp",
-                    "ffn",
-                    "intermediate.dense",
-                    "output.dense",
-                ]
-                if any(
-                    pattern in name.lower()
-                    for pattern in tuple(ffn_patterns) + tuple(selector_patterns)
-                ):
-                    should_include = True
-            elif self.scope == "attn":
-                # Attention layers - be more permissive with pattern matching
-                attn_patterns = [
-                    "attn.c_attn",
-                    "attn.c_proj",
-                    "attention",
-                    "q_proj",
-                    "k_proj",
-                    "v_proj",
-                    "o_proj",
-                    "attn",
-                ]
-                if any(
-                    pattern in name.lower()
-                    for pattern in tuple(attn_patterns) + tuple(selector_patterns)
-                ):
-                    should_include = True
-            elif self.scope == "all":
-                # All linear layers above a minimum size threshold
-                if module.weight.numel() >= 100:  # Minimum parameter threshold
-                    should_include = True
-
-            if should_include:
-                target_modules.append((name, module))
-
-        return target_modules
-
-    def _selector_patterns_for_scope(self) -> tuple[str, ...]:
-        if not self.module_selectors:
-            return ()
-        if self.scope == "ffn":
-            keys = ("ffn", "feed_forward")
-        elif self.scope == "attn":
-            keys = ("attn", "attention")
-        else:
-            keys = tuple(self.module_selectors.keys())
-        patterns: list[str] = []
-        seen: set[str] = set()
-        for key in keys:
-            for value in self.module_selectors.get(key, []):
-                normalized = str(value).strip().lower()
-                if normalized and normalized not in seen:
-                    patterns.append(normalized)
-                    seen.add(normalized)
-        return tuple(patterns)
-
-    def _get_module_by_name(self, model: nn.Module, name: str) -> nn.Module | None:
-        """Get module by dotted name."""
-        try:
-            parts = name.split(".")
-            module = model
-            for part in parts:
-                module = getattr(module, part)
-            return module
-        except AttributeError:
-            return None
-
-    def _get_weight_tying_map(self, model: nn.Module) -> dict[str, list[str]]:
-        """Identify weight tying relationships for preservation."""
-        tying_map = {}
-
-        # Common tying patterns (e.g., lm_head and wte sharing weights)
+    def _get_weight_tying_groups(self, model: nn.Module) -> list[list[str]]:
         weight_to_modules: dict[int, list[str]] = {}
 
         for name, module in model.named_modules():
             if hasattr(module, "weight") and module.weight is not None:
-                weight_id = id(module.weight)
-                if weight_id not in weight_to_modules:
-                    weight_to_modules[weight_id] = []
-                weight_to_modules[weight_id].append(name)
+                weight_to_modules.setdefault(id(module.weight), []).append(name)
 
-        # Create tying map
-        for _weight_id, module_names in weight_to_modules.items():
-            if len(module_names) > 1:
-                for name in module_names:
-                    tying_map[name] = [n for n in module_names if n != name]
+        return [
+            sorted(module_names)
+            for module_names in weight_to_modules.values()
+            if len(module_names) > 1
+        ]
 
-        return tying_map
+    @staticmethod
+    def _tied_group_lookup(tied_parameter_groups: list[list[str]]) -> dict[str, str]:
+        lookup: dict[str, str] = {}
+        for group in tied_parameter_groups:
+            stable_group = sorted(str(name) for name in group)
+            if len(stable_group) < 2:
+                continue
+            group_key = "|".join(stable_group)
+            for name in stable_group:
+                lookup[name] = group_key
+        return lookup
+
+    def _target_report_payloads(
+        self,
+        target_modules: list[TargetModule],
+        *,
+        tied_parameter_groups: list[list[str]],
+    ) -> list[dict[str, Any]]:
+        tied_lookup = self._tied_group_lookup(tied_parameter_groups)
+        payloads: list[dict[str, Any]] = []
+        for target in target_modules:
+            payload = target.as_report_payload()
+            tied_group_key = tied_lookup.get(target.name)
+            if tied_group_key:
+                payload["tied_group_key"] = tied_group_key
+                payload["tied_group_modules"] = tied_group_key.split("|")
+            payloads.append(payload)
+        return payloads
+
+    @staticmethod
+    def _deduplicate_targets_by_parameter(
+        target_modules: list[TargetModule],
+    ) -> tuple[list[TargetModule], list[str], list[str]]:
+        physically_quantized_targets: list[TargetModule] = []
+        deduplicated_modules: list[str] = []
+        deduplicated_parameter_ids: list[str] = []
+        seen_parameter_ids: set[int] = set()
+
+        for target in target_modules:
+            if target.parameter_id in seen_parameter_ids:
+                deduplicated_modules.append(target.name)
+                deduplicated_parameter_ids.append(str(target.parameter_id))
+                continue
+            seen_parameter_ids.add(target.parameter_id)
+            physically_quantized_targets.append(target)
+
+        return (
+            physically_quantized_targets,
+            deduplicated_modules,
+            deduplicated_parameter_ids,
+        )
 
     def _compute_quantization_stats(
-        self, target_modules: list[tuple[str, nn.Module]]
+        self, target_modules: list[TargetModule]
     ) -> dict[str, Any]:
         """Compute statistics about what will be quantized."""
         stats = {
@@ -604,15 +970,18 @@ class RTNQuantEdit(ModelEdit):
             "module_stats": [],
         }
 
-        for name, module in target_modules:
-            weight = module.weight
+        for target in target_modules:
+            weight = target.module.weight.detach()
             module_stat = {
-                "name": name,
+                "name": target.name,
                 "shape": list(weight.shape),
-                "params": weight.numel(),
+                "params": int(weight.numel()),
                 "weight_range": [float(weight.min()), float(weight.max())],
                 "weight_mean": float(weight.mean()),
                 "weight_std": float(weight.std()),
+                "selection_reason": target.selection_reason,
+                "matched_pattern": target.matched_pattern,
+                "module_type": target.module_type,
             }
 
             # Compute per-channel statistics
@@ -639,67 +1008,97 @@ class RTNQuantEdit(ModelEdit):
         self,
         module: nn.Module,
         bitwidth: int,
-        group_size: int | None,
         clamp_ratio: float,
-        tied_modules: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Apply RTN quantization to a single module."""
-        weight = module.weight.data
+        """Apply RTN quantize/dequantize simulation to a single module."""
+        weight = module.weight
+        original_weight = weight.detach().clone()
         original_shape = weight.shape
         params_quantized = weight.numel()
-
-        # Flatten weight for processing
-        if len(weight.shape) == 1:
-            # Handle bias or 1D weights
-            weight_2d = weight.unsqueeze(0)
-            is_1d = True
-        else:
-            weight_2d = weight.view(weight.shape[0], -1)  # [out_channels, in_features]
-            is_1d = False
+        weight_2d, restore_weight = self._weight_to_channel_matrix(module, weight)
+        pre_clip_weight = weight_2d
 
         # Apply outlier clipping if requested
         if clamp_ratio > 0.0:
             weight_2d = self._apply_outlier_clipping(weight_2d, clamp_ratio)
+            clipped_fraction = float((weight_2d != pre_clip_weight).float().mean())
+        else:
+            clipped_fraction = 0.0
 
         # Compute quantization parameters
         qmin = -(2 ** (bitwidth - 1))
         qmax = 2 ** (bitwidth - 1) - 1
 
-        if bitwidth == 4 and group_size is not None:
-            # Group-wise quantization for 4-bit
-            quantized_weight, scales, scale_stats = self._quantize_grouped(
-                weight_2d, qmin, qmax, group_size
-            )
-        else:
-            # Per-channel quantization
-            quantized_weight, scales, scale_stats = self._quantize_per_channel(
-                weight_2d, qmin, qmax
-            )
+        quantized_weight_2d, _scales, scale_stats = self._quantize_per_channel(
+            weight_2d, qmin, qmax
+        )
+        quantized_weight = restore_weight(quantized_weight_2d).reshape(original_shape)
+        quantized_weight = quantized_weight.to(dtype=weight.dtype, device=weight.device)
 
-        # Reshape back to original shape
-        if is_1d:
-            quantized_weight = quantized_weight.squeeze(0)
-        else:
-            quantized_weight = quantized_weight.view(original_shape)
+        with torch.no_grad():
+            module.weight.copy_(quantized_weight)
 
-        # Write back to module (preserving tying if needed)
-        module.weight.data.copy_(quantized_weight)
-
-        # Handle tied weights
-        if tied_modules:
-            for _tied_name in tied_modules:
-                # In a real implementation, we'd update tied modules here
-                # For now, just log
-                pass
+        error_metrics = self._quantization_error_metrics(
+            original_weight,
+            quantized_weight,
+            clipped_fraction=clipped_fraction,
+            quant_code_edge_fraction=float(
+                scale_stats.get(
+                    "quant_code_edge_fraction",
+                    scale_stats.get("saturation_fraction", 0.0),
+                )
+            ),
+        )
 
         return {
             "params_quantized": params_quantized,
             "original_shape": original_shape,
             "bitwidth": bitwidth,
-            "group_size": group_size,
             "scale_stats": scale_stats,
             "clamp_applied": clamp_ratio > 0.0,
+            "error_metrics": error_metrics,
+            "actual_storage_dtype": str(module.weight.dtype).replace("torch.", ""),
+            "actual_storage_format": "float_dequantized",
+            "packed_quantized_storage": False,
+            "runtime_memory_reduction": False,
         }
+
+    @staticmethod
+    def _is_transformers_conv1d(module: nn.Module) -> bool:
+        return (
+            module.__class__.__name__ == "Conv1D"
+            and module.__class__.__module__ == "transformers.pytorch_utils"
+        )
+
+    def _weight_to_channel_matrix(
+        self, module: nn.Module, weight: torch.Tensor
+    ) -> tuple[torch.Tensor, Any]:
+        if self._is_transformers_conv1d(module):
+            # Hugging Face GPT-style Conv1D stores weights as [in_features,
+            # out_features]. Per-channel simulation is therefore over columns,
+            # represented as rows after transpose.
+            matrix = weight.detach().transpose(0, 1).contiguous()
+
+            def restore(value: torch.Tensor) -> torch.Tensor:
+                return value.transpose(0, 1).contiguous()
+
+            return matrix, restore
+
+        if len(weight.shape) == 1:
+            matrix = weight.detach().unsqueeze(0)
+
+            def restore(value: torch.Tensor) -> torch.Tensor:
+                return value.squeeze(0)
+
+            return matrix, restore
+
+        original_shape = weight.shape
+        matrix = weight.detach().reshape(weight.shape[0], -1)
+
+        def restore(value: torch.Tensor) -> torch.Tensor:
+            return value.reshape(original_shape)
+
+        return matrix, restore
 
     def _apply_outlier_clipping(
         self, weight: torch.Tensor, clamp_ratio: float
@@ -745,76 +1144,111 @@ class RTNQuantEdit(ModelEdit):
         # Quantize
         weight_scaled = weight / scales
         weight_quantized = torch.clamp(torch.round(weight_scaled), qmin, qmax)
+        quant_code_edge_fraction = float(
+            ((weight_quantized <= qmin) | (weight_quantized >= qmax)).float().mean()
+        )
 
         # Dequantize (write back as float)
         weight_dequantized = weight_quantized * scales
 
         # Compute statistics
         scale_stats = {
+            "channel_count": int(scales.numel()),
             "scale_mean": float(scales.mean()),
             "scale_std": float(scales.std()),
             "scale_min": float(scales.min()),
             "scale_max": float(scales.max()),
             "zero_scales": int((scales <= eps).sum()),
+            "quant_code_edge_fraction": quant_code_edge_fraction,
+            # Compatibility alias: this is the fraction of values that landed
+            # on the min/max quantization code, not proof of runtime overflow.
+            "saturation_fraction": quant_code_edge_fraction,
         }
 
         return weight_dequantized, scales.squeeze(), scale_stats
 
-    def _quantize_grouped(
-        self, weight: torch.Tensor, qmin: int, qmax: int, group_size: int
-    ) -> tuple[torch.Tensor, torch.Tensor, dict[str, Any]]:
-        """Apply group-wise quantization for 4-bit mode."""
-        out_channels, in_features = weight.shape
-
-        # Pad input features to be divisible by group_size
-        pad_size = (group_size - (in_features % group_size)) % group_size
-        if pad_size > 0:
-            weight_padded = torch.cat(
-                [weight, torch.zeros(out_channels, pad_size, device=weight.device)],
-                dim=1,
-            )
+    @staticmethod
+    def _quantization_error_metrics(
+        original: torch.Tensor,
+        edited: torch.Tensor,
+        *,
+        clipped_fraction: float,
+        quant_code_edge_fraction: float,
+    ) -> dict[str, float]:
+        original_f32 = original.detach().float().reshape(-1)
+        edited_f32 = edited.detach().float().reshape(-1)
+        diff = edited_f32 - original_f32
+        abs_diff = diff.abs()
+        rmse = (
+            torch.sqrt(torch.mean(diff * diff)) if diff.numel() else torch.tensor(0.0)
+        )
+        original_rms = (
+            torch.sqrt(torch.mean(original_f32 * original_f32))
+            if original_f32.numel()
+            else torch.tensor(0.0)
+        )
+        denom = torch.clamp(original_rms, min=1e-12)
+        original_norm = torch.linalg.vector_norm(original_f32)
+        edited_norm = torch.linalg.vector_norm(edited_f32)
+        if float(original_norm) <= 1e-12 and float(edited_norm) <= 1e-12:
+            cosine_similarity = 1.0
+        elif float(original_norm) <= 1e-12 or float(edited_norm) <= 1e-12:
+            cosine_similarity = 0.0
         else:
-            weight_padded = weight
+            cosine_similarity = float(
+                torch.dot(original_f32, edited_f32) / (original_norm * edited_norm)
+            )
 
-        padded_in_features = weight_padded.shape[1]
-        num_groups = padded_in_features // group_size
-
-        # Reshape for group processing
-        weight_grouped = weight_padded.view(out_channels, num_groups, group_size)
-
-        # Compute per-group scales
-        group_absmax = weight_grouped.abs().max(dim=2, keepdim=True)[
-            0
-        ]  # [out_channels, num_groups, 1]
-
-        # Avoid division by zero
-        eps = 1e-8
-        group_absmax = torch.clamp(group_absmax, min=eps)
-
-        # Symmetric quantization scale
-        scales = group_absmax / qmax
-
-        # Quantize
-        weight_scaled = weight_grouped / scales
-        weight_quantized = torch.clamp(torch.round(weight_scaled), qmin, qmax)
-
-        # Dequantize
-        weight_dequantized = weight_quantized * scales
-
-        # Reshape back and remove padding
-        weight_dequantized = weight_dequantized.view(out_channels, padded_in_features)
-        if pad_size > 0:
-            weight_dequantized = weight_dequantized[:, :-pad_size]
-
-        # Compute statistics
-        scale_stats = {
-            "scale_mean": float(scales.mean()),
-            "scale_std": float(scales.std()),
-            "scale_min": float(scales.min()),
-            "scale_max": float(scales.max()),
-            "num_groups": num_groups,
-            "group_size": group_size,
-            "zero_scales": int((scales <= eps).sum()),
+        return {
+            "mean_abs_error": float(abs_diff.mean()) if abs_diff.numel() else 0.0,
+            "max_abs_error": float(abs_diff.max()) if abs_diff.numel() else 0.0,
+            "rmse": float(rmse),
+            "relative_rmse": float(rmse / denom),
+            "cosine_similarity": cosine_similarity,
+            "quant_code_edge_fraction": float(quant_code_edge_fraction),
+            # Compatibility alias for existing report consumers.
+            "saturation_fraction": float(quant_code_edge_fraction),
+            "clipped_fraction": float(clipped_fraction),
         }
 
-        return weight_dequantized, scales.view(-1), scale_stats
+    @staticmethod
+    def _aggregate_error_metrics(results: list[dict[str, Any]]) -> dict[str, float]:
+        metric_pairs = [
+            (
+                item.get("error_metrics", {}),
+                max(int(item.get("params_quantized", 0)), 0),
+            )
+            for item in results
+            if isinstance(item.get("error_metrics"), dict)
+        ]
+        if not metric_pairs:
+            return {}
+        metrics = [pair[0] for pair in metric_pairs]
+        weighted_params = [pair[1] for pair in metric_pairs]
+        total_params = sum(weighted_params)
+        aggregate: dict[str, float] = {}
+        keys = (
+            "mean_abs_error",
+            "max_abs_error",
+            "rmse",
+            "relative_rmse",
+            "cosine_similarity",
+            "quant_code_edge_fraction",
+            "saturation_fraction",
+            "clipped_fraction",
+        )
+        for key in keys:
+            values = [float(metric.get(key, 0.0)) for metric in metrics]
+            if key == "max_abs_error":
+                aggregate[key] = max(values)
+            elif total_params > 0:
+                aggregate[key] = (
+                    sum(
+                        value * weight
+                        for value, weight in zip(values, weighted_params, strict=True)
+                    )
+                    / total_params
+                )
+            else:
+                aggregate[key] = sum(values) / len(values)
+        return aggregate

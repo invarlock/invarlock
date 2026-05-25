@@ -3,6 +3,8 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from .report_build_evidence import record_report_build_event
+
 _NON_FATAL_EXCEPTIONS = (
     AttributeError,
     KeyError,
@@ -311,6 +313,7 @@ def ensure_primary_metric_display_ci(evaluation_report: dict[str, Any]) -> None:
         )
         if isinstance(pm, dict) and pm:
             disp = pm.get("display_ci")
+            had_display_ci = "display_ci" in pm
             if (
                 isinstance(disp, list | tuple)
                 and len(disp) == 2
@@ -326,9 +329,31 @@ def ensure_primary_metric_display_ci(evaluation_report: dict[str, Any]) -> None:
                         break
                 if isinstance(point, float):
                     pm["display_ci"] = [point, point]
+                    record_report_build_event(
+                        evaluation_report,
+                        category=(
+                            "repaired_fields"
+                            if had_display_ci
+                            else "synthesized_fields"
+                        ),
+                        field="primary_metric.display_ci",
+                        reason="coerced_from_point_estimate",
+                        source="report_enrichment.ensure_primary_metric_display_ci",
+                    )
                 else:
                     pm["display_ci"] = [1.0, 1.0]
                     pm.setdefault("estimated", True)
+                    record_report_build_event(
+                        evaluation_report,
+                        category=(
+                            "repaired_fields"
+                            if had_display_ci
+                            else "synthesized_fields"
+                        ),
+                        field="primary_metric.display_ci",
+                        reason="default_estimated_interval",
+                        source="report_enrichment.ensure_primary_metric_display_ci",
+                    )
     except _NON_FATAL_EXCEPTIONS:
         pass
 

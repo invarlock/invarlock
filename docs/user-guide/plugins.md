@@ -1,7 +1,8 @@
 # Plugin Workflow: Adapters and Guards
 
 InvarLock's plugin system extends model loading and guard capabilities. Plugins do
-not add additional edit algorithms beyond the built‑in RTN quantization.
+not add additional edit algorithms beyond the built-in RTN dequantized
+simulation edit.
 
 ## Overview
 

@@ -1,11 +1,10 @@
-# Edit overlay: RTN quantization, 8-bit, full-model scope.
+# Edit overlay: RTN dequantized weight-edit simulation, 8-bit, full-model scope.
 
 edit:
   name: "quant_rtn"
   plan:
     bitwidth: 8
     per_channel: true
-    group_size: 128
     clamp_ratio: 0.005
     scope: "all"
     max_modules: 12

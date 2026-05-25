@@ -41,6 +41,7 @@ def test_evaluate_quiet_mode_replays_baseline_child_output_on_typer_exit(
             report_out=str(Path("reports")),
             profile="dev",
             quiet=True,
+            assurance="off",
         )
 
     assert exc.value.exit_code == 3
@@ -78,6 +79,7 @@ def test_evaluate_quiet_mode_replays_edited_child_output_on_typer_exit(
             profile="dev",
             quiet=True,
             edit_config=str(edit_config),
+            assurance="off",
         )
 
     assert exc.value.exit_code == 4
@@ -112,6 +114,7 @@ def test_evaluate_quiet_mode_replays_noop_child_output_on_runtime_error(
             report_out=str(Path("reports")),
             profile="dev",
             quiet=True,
+            assurance="off",
         )
 
     assert "subject child output" in console.joined()
@@ -146,6 +149,7 @@ def test_evaluate_nonquiet_edit_child_typer_exit_skips_buffer_replay(
             report_out=str(Path("reports")),
             profile="dev",
             edit_config=str(edit_config),
+            assurance="off",
         )
 
     assert exc.value.exit_code == 4
@@ -180,6 +184,7 @@ def test_evaluate_quiet_mode_replays_noop_child_output_on_typer_exit(
             report_out=str(Path("reports")),
             profile="dev",
             quiet=True,
+            assurance="off",
         )
 
     assert exc.value.exit_code == 5
@@ -212,6 +217,7 @@ def test_evaluate_nonquiet_noop_child_runtime_error_skips_buffer_replay(
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
+            assurance="off",
         )
 
     assert "nonquiet subject child output" not in console.joined()
@@ -243,6 +249,7 @@ def test_evaluate_nonquiet_subject_typer_exit_reaches_no_buffer_replay_branch(
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
+            assurance="off",
         )
 
     assert exc.value.exit_code == 6
@@ -273,6 +280,7 @@ def test_evaluate_quiet_mode_replays_baseline_child_output_on_failure(
             report_out=str(Path("reports")),
             profile="dev",
             quiet=True,
+            assurance="off",
         )
 
     assert "baseline child output" in console.joined()
@@ -312,6 +320,7 @@ def test_evaluate_quiet_mode_replays_edit_config_child_output_on_failure(
             report_out=str(Path("reports")),
             profile="dev",
             quiet=True,
+            assurance="off",
         )
 
     assert "edited child output" in console.joined()
@@ -345,6 +354,7 @@ def test_evaluate_quiet_mode_replays_noop_subject_output_on_failure(
             report_out=str(Path("reports")),
             profile="dev",
             quiet=True,
+            assurance="off",
         )
 
     assert "noop subject output" in console.joined()
@@ -383,6 +393,7 @@ def test_evaluate_quiet_mode_report_failure_bubbles_without_child_replay(
             report_out=str(Path("reports")),
             profile="dev",
             quiet=True,
+            assurance="off",
         )
 
     assert "report child output" not in console.joined()
@@ -419,6 +430,7 @@ def test_evaluate_non_quiet_edit_config_failure_does_not_replay_buffer(
             report_out=str(Path("reports")),
             profile="dev",
             quiet=False,
+            assurance="off",
         )
 
     assert "edited child output" not in console.joined()
@@ -457,6 +469,7 @@ def test_evaluate_non_quiet_report_failure_bubbles_without_child_replay(
             report_out=str(Path("reports")),
             profile="dev",
             quiet=False,
+            assurance="off",
         )
 
     assert "report child output" not in console.joined()

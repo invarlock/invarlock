@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync repo-cruft-check model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-verify actionlint workflow-lint packaging-smoke-minimal packaging-smoke-front-door ensure-mypy
+.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync repo-cruft-check model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-verify actionlint workflow-lint packaging-smoke-minimal packaging-smoke-front-door ensure-mypy cve-audit dist-check release-evidence-check guard-validation-smoke empirical-guard-evidence-check
 
 PYTHON ?= $(shell bash scripts/select_workspace_python.sh)
 PIP := $(PYTHON) -m pip
@@ -12,6 +12,7 @@ COVERAGE := $(PYTHON) -m coverage
 MKDOCS := $(PYTHON) -m mkdocs
 PRE_COMMIT := $(PYTHON) -m pre_commit
 MODEL_EVIDENCE_ARGS ?=
+EMPIRICAL_GUARD_EVIDENCE_ROOT ?= artifacts/guard-validation/empirical
 CONTAINER_ENGINE ?= $(shell if command -v docker >/dev/null 2>&1; then echo docker; elif command -v podman >/dev/null 2>&1; then echo podman; fi)
 RUNTIME_IMAGE ?= invarlock-runtime:local
 RUNTIME_IMAGE_CUDA ?= invarlock-runtime:cuda-local
@@ -20,12 +21,13 @@ RUNTIME_IMAGE_CUDA_INDEX_URL ?= https://download.pytorch.org/whl/cu128
 RUNTIME_IMAGE_DIGEST ?= sha256:local-runtime-image
 SECURITY_ARTIFACT_DIR ?= artifacts/supply-chain
 SECURITY_RUN ?= uv run --isolated --locked --extra security-ci
+DIST_RUN ?= uv run --isolated --locked --extra release-ci
 COVERAGE_POLICY := $(PYTHON) scripts/coverage_policy.py
 
 # Keep repo-wide coverage practical while still exercising the CLI command
 # surface that would otherwise pull the project floor below the real trust core.
 COVERAGE_TESTS_CORE := \
-	tests/core tests/guards tests/reporting tests/calibration tests/scripts
+	tests/core tests/guards tests/reporting tests/calibration tests/scripts tests/edits
 
 COVERAGE_TESTS_RUN := \
 	tests/cli/run
@@ -70,6 +72,7 @@ COVERAGE_TESTS_CLI_COMMANDS := \
 
 COVERAGE_TESTS_CLI_HELPERS := \
 	tests/cli/test_adapter_auto*.py tests/cli/test_no_color.py \
+	tests/cli/test_config_execution_request_roundtrip.py \
 	tests/cli/test_internal_config_run.py tests/cli/test_json_helpers.py \
 	tests/cli/test_runtime_launch_plan_contract.py \
 	tests/cli/test_overhead_extraction.py
@@ -123,9 +126,14 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/adapters/auto.py \
 	src/invarlock/core/config_loader.py \
 	src/invarlock/core/config_runtime.py \
+	src/invarlock/core/assurance_contract.py \
+	src/invarlock/core/bootstrap.py \
+	src/invarlock/core/evaluate_plan.py \
+	src/invarlock/core/guard_evidence.py \
 	src/invarlock/core/metric_kind_contract.py \
 	src/invarlock/core/metric_provider_resolution.py \
 	src/invarlock/core/registry.py \
+	src/invarlock/core/runner_eval_metrics_stats.py \
 	src/invarlock/core/runner_eval_metrics_multimodal.py \
 	src/invarlock/core/builtin_plugin_catalog.py \
 	src/invarlock/core/run_orchestrator_execute_seed.py \
@@ -141,16 +149,25 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/cli/__main__.py \
 	src/invarlock/cli/_json.py \
 	src/invarlock/cli/app.py \
+	src/invarlock/cli/config_execution.py \
 	src/invarlock/cli/evaluate_output.py \
 	src/invarlock/cli/evaluate_phases.py \
+	src/invarlock/cli/internal_config_run.py \
+	src/invarlock/cli/runtime_launch_plan.py \
 	src/invarlock/cli/commands/evaluate.py \
+	src/invarlock/cli/commands/run.py \
 	src/invarlock/cli/commands/verify.py \
 	src/invarlock/cli/runtime_verify.py \
 	src/invarlock/eval/probes/mi.py \
+	src/invarlock/reporting/evaluation_report_builder.py \
 	src/invarlock/reporting/report_confidence.py \
+	src/invarlock/reporting/report_build_evidence.py \
+	src/invarlock/reporting/report_make_output.py \
+	src/invarlock/reporting/report_primary_metric_policy.py \
 	src/invarlock/reporting/report_schema.py \
 	src/invarlock/reporting/report_types.py \
 	src/invarlock/reporting/verify_check_helpers.py \
+	src/invarlock/reporting/verify_contract.py \
 	src/invarlock/runtime_security.py \
 	src/invarlock/runtime_security_helpers.py \
 	src/invarlock/runtime_security_container.py \
@@ -257,8 +274,12 @@ test-assurance:  ## Run assurance-related tests only
 		tests/ci/test_support_matrix_consistency.py \
 		tests/adapters/test_adapter_capability_contract.py \
 		tests/core/test_bootstrap.py::test_compute_paired_delta_and_ratio_ci_consistency \
+		tests/core/test_bootstrap.py::test_paired_delta_log_ci_property_strict_identity \
+		tests/core/test_bootstrap.py::test_paired_delta_log_ci_property_rejects_mismatched_lengths \
+		tests/core/test_assurance_contract.py \
 		tests/core/test_runner_pairing.py::test_assess_bootstrap_coverage_paths \
 		tests/guards/test_invariants_guard.py::test_invariants_guard_detects_non_finite_weights \
+		tests/guards/test_unsupported_assurance_shape.py \
 		tests/eval/test_assurance_contracts.py \
 		tests/eval/test_metrics_masked_lm.py \
 		tests/edits/test_quant_rtn.py \
@@ -268,6 +289,7 @@ test-assurance:  ## Run assurance-related tests only
 		tests/reporting/test_report_paired_ci_identity.py::test_paired_ci_identity_holds \
 		tests/reporting/test_report_pairing_and_validation_helpers.py::test_enforce_pairing_and_coverage_path_matrix \
 		tests/reporting/test_report_policy_edges.py::test_ppl_hysteresis_applied_near_threshold \
+		tests/reporting/test_verify_assurance_guard_chain.py \
 		tests/reporting/test_public_contracts.py \
 		tests/reporting/test_evidence_pack_contract.py \
 		tests/reporting/test_policy_pack_contract.py \
@@ -341,8 +363,8 @@ actionlint:  ## Lint GitHub Actions workflow files
 
 workflow-lint: actionlint  ## Compatibility alias for GitHub Actions workflow linting
 
-.PHONY: security supply-chain-security
-security: supply-chain-security  ## Run the local supply-chain security gate
+.PHONY: security supply-chain-security cve-audit
+security: supply-chain-security cve-audit  ## Run the local supply-chain security gate
 
 supply-chain-security:  ## Run SBOM generation and pip-audit in an isolated uv security toolchain
 	@command -v uv >/dev/null 2>&1 || { \
@@ -351,6 +373,15 @@ supply-chain-security:  ## Run SBOM generation and pip-audit in an isolated uv s
 	}
 	$(SECURITY_RUN) bash -c 'scripts/generate_sbom.sh --scope tool-environment --python "$$(command -v python)" "$(SECURITY_ARTIFACT_DIR)/sbom.json"'
 	$(SECURITY_RUN) python scripts/security/run_pip_audit.py
+
+cve-audit:  ## Audit locked dependency versions against OSV advisories
+	@command -v uv >/dev/null 2>&1 || { \
+		echo "❌ uv is required to run the isolated security toolchain."; \
+		exit 1; \
+	}
+	$(SECURITY_RUN) python scripts/security/cve_audit.py \
+		--out-json "$(SECURITY_ARTIFACT_DIR)/cve-audit.json" \
+		--out-md "$(SECURITY_ARTIFACT_DIR)/cve-audit.md"
 
 packaging-smoke-minimal:  ## Smoke the minimal wheel install around the public contract and evidence-pack verify path
 	$(MAKE) ensure-python
@@ -366,6 +397,7 @@ packaging-smoke-front-door:  ## Smoke installed-wheel evaluate -> verify -> repo
 	$(MAKE) ensure-python
 	@PYTHON="$$(if [ -x .venv/bin/python ]; then printf '%s' .venv/bin/python; else printf '%s' "$(PYTHON)"; fi)"; \
 	PYTHONPATH=src "$$PYTHON" -m pytest -q \
+		tests/integration/packaging/test_wheel_front_door_contract.py::test_wheel_install_verifies_strict_report_bundle_outside_repo_tree \
 		tests/integration/packaging/test_wheel_front_door_contract.py::test_wheel_install_runs_front_door_evaluate_verify_report_html_outside_repo_tree
 
 model-evidence-list:  ## Print the maintained shipped-model evidence manifest
@@ -456,6 +488,27 @@ runtime-verify:  ## Smoke the Python runtime verifier on the fixture bundle
 		--json
 
 ##@ CI/Build
+dist-check:  ## Build wheel/sdist and validate distribution metadata
+	$(MAKE) ensure-python
+	rm -rf build/ dist/
+	$(DIST_RUN) python -m build
+	$(DIST_RUN) python -m twine check dist/*
+
+release-evidence-check:  ## Validate required local release evidence artifacts
+	$(MAKE) ensure-python
+	$(PYTHON) scripts/release/check_release_evidence.py \
+		--root artifacts/release \
+		--dist dist \
+		--sbom $(SECURITY_ARTIFACT_DIR)/sbom.json
+
+guard-validation-smoke:  ## Run deterministic synthetic guard-validation smoke
+	$(MAKE) ensure-python
+	$(PYTHON) scripts/guard_validation_smoke.py --output-dir artifacts/guard-validation
+
+empirical-guard-evidence-check:  ## Validate non-synthetic guard-evidence artifacts when present for release review
+	$(MAKE) ensure-python
+	$(PYTHON) scripts/release/check_empirical_guard_evidence.py --root "$(EMPIRICAL_GUARD_EVIDENCE_ROOT)"
+
 clean:  ## Clean build artifacts
 	rm -rf build/
 	rm -rf dist/
