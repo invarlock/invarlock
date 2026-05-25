@@ -115,6 +115,11 @@ def test_quant_rtn_normalizers_cover_string_and_invalid_inputs() -> None:
     )
     assert selectors == {"attention": ["attn.c_attn"], "ffn": ["mlp.c_fc"]}
 
+    set_selectors = RTNQuantEdit._normalize_module_selectors(
+        {"ffn": {"mlp.c_proj", "mlp.c_fc"}}
+    )
+    assert set_selectors == {"ffn": ["mlp.c_fc", "mlp.c_proj"]}
+
 
 def test_quant_rtn_module_has_no_functional_apply_shim() -> None:
     assert "apply" not in quant_rtn_mod.__dict__
@@ -456,6 +461,34 @@ def test_quant_rtn_plan_digest_reproducible_for_same_model_structure() -> None:
     assert first_result["plan_digest"] == second_result["plan_digest"]
 
 
+def test_quant_rtn_plan_digest_changes_for_tied_weight_structure() -> None:
+    class UntiedModel(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.a = torch.nn.Linear(16, 16, bias=False)
+            self.b = torch.nn.Linear(16, 16, bias=False)
+
+    class TiedModel(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.a = torch.nn.Linear(16, 16, bias=False)
+            self.b = torch.nn.Linear(16, 16, bias=False)
+            self.b.weight = self.a.weight
+
+    adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
+    edit = RTNQuantEdit(scope="all")
+
+    untied_result = edit.apply(UntiedModel(), adapter, plan={"scope": "all"})
+    tied_result = edit.apply(TiedModel(), adapter, plan={"scope": "all"})
+
+    assert untied_result["plan"]["selected_modules"] == ["a", "b"]
+    assert tied_result["plan"]["selected_modules"] == ["a", "b"]
+    assert untied_result["plan"]["plan_digest"] != tied_result["plan"]["plan_digest"]
+    tied_entries = tied_result["plan"]["target_selection"]
+    assert tied_entries[0]["tied_group_key"] == "a|b"
+    assert tied_entries[1]["tied_group_modules"] == ["a", "b"]
+
+
 def test_quant_rtn_apply_emits_error_metrics_and_target_metadata() -> None:
     model = torch.nn.Linear(16, 16, bias=False)
     adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
@@ -498,6 +531,40 @@ def test_quant_rtn_deduplicates_tied_weights() -> None:
     assert "deduplicated_parameter_ids" not in result["plan"]
     assert len(result["plan"]["runtime_debug"]["deduplicated_parameter_ids"]) == 1
     assert result["plan"]["tied_parameter_groups"] == [["a", "b"]]
+
+
+def test_quant_rtn_preview_deduplicates_tied_weights_like_apply() -> None:
+    class TiedModel(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.a = torch.nn.Linear(16, 16, bias=False)
+            self.b = torch.nn.Linear(16, 16, bias=False)
+            self.b.weight = self.a.weight
+
+    model = TiedModel()
+    adapter = type(
+        "Adapter",
+        (),
+        {"describe": lambda _self, _m: {"n_layer": 1, "total_params": 256}},
+    )()
+    edit = RTNQuantEdit(scope="all")
+
+    preview = edit.preview(model, adapter, None)
+    plan = preview["plan"]
+    metrics = preview["preview_metrics"]
+
+    assert plan["selected_modules"] == ["a", "b"]
+    assert plan["physically_quantized_modules"] == ["a"]
+    assert plan["total_modules_selected"] == 2
+    assert plan["total_modules_quantized"] == 1
+    assert plan["total_params_quantized"] == 256
+    assert plan["deduplicated_modules"] == ["b"]
+    assert plan["tied_parameter_groups"] == [["a", "b"]]
+    assert plan["target_selection"][0]["tied_group_key"] == "a|b"
+    assert metrics["target_params"] == 256
+    assert metrics["target_modules_count"] == 2
+    assert metrics["target_modules_quantized_count"] == 1
+    assert metrics["theoretical_packed_memory_saved_bytes"] == 768
 
 
 def test_quant_rtn_apply_runs_guard_chain_hooks() -> None:

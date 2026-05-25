@@ -72,6 +72,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed ambiguous `group_size`/4-bit paths from the built-in `quant_rtn`
   edit contract and sample overlays; real packed quantized artifacts should use
   adapter-backed or external subject workflows instead of this simulation edit.
+- Fixed `quant_rtn` preview and digest metadata for tied weights so previews
+  deduplicate the same physical parameters as apply, theoretical packed-memory
+  estimates use unique parameters, and plan digests distinguish stable tied
+  module groups without using runtime-local object IDs.
 - Fixed the strict assurance trust boundary so host/unverified provenance,
   custom guard order, dev/aggressive profiles, unsupported blocking statuses,
   fallback fields, and missing guard evidence cannot pass as strict assurance.

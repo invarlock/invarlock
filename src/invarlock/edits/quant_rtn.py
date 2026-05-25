@@ -183,6 +183,8 @@ class RTNQuantPlan:
             "params",
             "selection_reason",
             "matched_pattern",
+            "tied_group_key",
+            "tied_group_modules",
         )
         return {key: entry[key] for key in stable_keys if key in entry}
 
@@ -389,6 +391,8 @@ class RTNQuantEdit(ModelEdit):
                     for item in values
                     if isinstance(item, str) and str(item).strip()
                 ]
+                if isinstance(values, set):
+                    cleaned = sorted(cleaned)
             else:
                 cleaned = []
             if cleaned:
@@ -561,16 +565,29 @@ class RTNQuantEdit(ModelEdit):
             active_plan.max_modules,
         )
 
-        # Compute quantization statistics
-        quant_stats = self._compute_quantization_stats(target_modules)
+        tied_parameter_groups = self._get_weight_tying_groups(model)
+        (
+            physically_quantized_targets,
+            deduplicated_modules,
+            deduplicated_parameter_ids,
+        ) = self._deduplicate_targets_by_parameter(target_modules)
+
+        # Compute quantization statistics for unique physical parameters.
+        quant_stats = self._compute_quantization_stats(physically_quantized_targets)
 
         # Estimate parameter changes
         total_params = sum(p.numel() for p in model.parameters())
-        target_params = sum(target.module.weight.numel() for target in target_modules)
+        target_params = sum(
+            target.module.weight.numel() for target in physically_quantized_targets
+        )
 
         # Create quantization plan
         target_names = [target.name for target in target_modules]
-        target_selection = [target.as_report_payload() for target in target_modules]
+        modules_quantized = [target.name for target in physically_quantized_targets]
+        target_selection = self._target_report_payloads(
+            target_modules,
+            tied_parameter_groups=tied_parameter_groups,
+        )
         plan = active_plan.as_report_payload(
             target_modules=target_names,
             target_selection=target_selection,
@@ -582,13 +599,18 @@ class RTNQuantEdit(ModelEdit):
                     target_selection=target_selection,
                 ),
                 "selected_modules": target_names,
-                "physically_quantized_modules": target_names,
+                "physically_quantized_modules": modules_quantized,
+                "total_modules_selected": len(target_names),
+                "total_modules_quantized": len(modules_quantized),
+                "total_params_quantized": int(target_params),
+                "deduplicated_modules": deduplicated_modules,
                 "quantization_stats": quant_stats,
-                "tied_parameter_groups": self._get_weight_tying_groups(model),
+                "tied_parameter_groups": tied_parameter_groups,
                 "runtime_debug": {
                     "target_parameter_ids": [
                         target.runtime_debug_payload() for target in target_modules
                     ],
+                    "deduplicated_parameter_ids": deduplicated_parameter_ids,
                 },
             }
         )
@@ -610,6 +632,7 @@ class RTNQuantEdit(ModelEdit):
             "total_params": int(total_params),
             "coverage_ratio": target_params / total_params if total_params > 0 else 0.0,
             "target_modules_count": len(target_modules),
+            "target_modules_quantized_count": len(physically_quantized_targets),
             "theoretical_packed_memory_saved_bytes": int(theoretical_memory_saved),
             "theoretical_packed_bits_per_param": bits_per_param,
             "actual_storage_format": "float_dequantized",
@@ -695,20 +718,17 @@ class RTNQuantEdit(ModelEdit):
 
             active_edit.guard_chain.before_edit_all(model)
 
-        # Apply quantization to each target module
+        (
+            physically_quantized_targets,
+            deduplicated_modules,
+            deduplicated_parameter_ids,
+        ) = active_edit._deduplicate_targets_by_parameter(target_modules)
+
+        # Apply quantization to each unique physical target parameter
         quantization_results = []
         total_params_quantized = 0
-        deduplicated_parameter_ids: list[str] = []
-        deduplicated_modules: list[str] = []
-        seen_parameter_ids: set[int] = set()
 
-        for target in target_modules:
-            if target.parameter_id in seen_parameter_ids:
-                deduplicated_parameter_ids.append(str(target.parameter_id))
-                deduplicated_modules.append(target.name)
-                continue
-            seen_parameter_ids.add(target.parameter_id)
-
+        for target in physically_quantized_targets:
             quant_result = active_edit._apply_rtn_quantization(
                 target.module,
                 active_plan.bitwidth,
@@ -771,7 +791,10 @@ class RTNQuantEdit(ModelEdit):
         # Store edit plan for evaluation report generation
         selected_modules = [target.name for target in target_modules]
         modules_quantized = [r["module_name"] for r in quantization_results]
-        target_selection = [target.as_report_payload() for target in target_modules]
+        target_selection = self._target_report_payloads(
+            target_modules,
+            tied_parameter_groups=tied_parameter_groups,
+        )
         edit_plan = active_plan.as_report_payload(
             target_modules=selected_modules,
             target_selection=target_selection,
@@ -861,6 +884,58 @@ class RTNQuantEdit(ModelEdit):
             if len(module_names) > 1
         ]
 
+    @staticmethod
+    def _tied_group_lookup(tied_parameter_groups: list[list[str]]) -> dict[str, str]:
+        lookup: dict[str, str] = {}
+        for group in tied_parameter_groups:
+            stable_group = sorted(str(name) for name in group)
+            if len(stable_group) < 2:
+                continue
+            group_key = "|".join(stable_group)
+            for name in stable_group:
+                lookup[name] = group_key
+        return lookup
+
+    def _target_report_payloads(
+        self,
+        target_modules: list[TargetModule],
+        *,
+        tied_parameter_groups: list[list[str]],
+    ) -> list[dict[str, Any]]:
+        tied_lookup = self._tied_group_lookup(tied_parameter_groups)
+        payloads: list[dict[str, Any]] = []
+        for target in target_modules:
+            payload = target.as_report_payload()
+            tied_group_key = tied_lookup.get(target.name)
+            if tied_group_key:
+                payload["tied_group_key"] = tied_group_key
+                payload["tied_group_modules"] = tied_group_key.split("|")
+            payloads.append(payload)
+        return payloads
+
+    @staticmethod
+    def _deduplicate_targets_by_parameter(
+        target_modules: list[TargetModule],
+    ) -> tuple[list[TargetModule], list[str], list[str]]:
+        physically_quantized_targets: list[TargetModule] = []
+        deduplicated_modules: list[str] = []
+        deduplicated_parameter_ids: list[str] = []
+        seen_parameter_ids: set[int] = set()
+
+        for target in target_modules:
+            if target.parameter_id in seen_parameter_ids:
+                deduplicated_modules.append(target.name)
+                deduplicated_parameter_ids.append(str(target.parameter_id))
+                continue
+            seen_parameter_ids.add(target.parameter_id)
+            physically_quantized_targets.append(target)
+
+        return (
+            physically_quantized_targets,
+            deduplicated_modules,
+            deduplicated_parameter_ids,
+        )
+
     def _compute_quantization_stats(
         self, target_modules: list[TargetModule]
     ) -> dict[str, Any]:
@@ -872,11 +947,11 @@ class RTNQuantEdit(ModelEdit):
         }
 
         for target in target_modules:
-            weight = target.module.weight
+            weight = target.module.weight.detach()
             module_stat = {
                 "name": target.name,
                 "shape": list(weight.shape),
-                "params": weight.numel(),
+                "params": int(weight.numel()),
                 "weight_range": [float(weight.min()), float(weight.max())],
                 "weight_mean": float(weight.mean()),
                 "weight_std": float(weight.std()),
