@@ -162,12 +162,30 @@ class RTNQuantPlan:
         target_modules: list[str] | None = None,
         target_selection: list[dict[str, Any]] | None = None,
     ) -> str:
+        stable_target_selection = (
+            [self._stable_target_entry(entry) for entry in target_selection]
+            if target_selection is not None
+            else None
+        )
         return _canonical_json_digest(
             self.as_report_payload(
                 target_modules=target_modules,
-                target_selection=target_selection,
+                target_selection=stable_target_selection,
             )
         )
+
+    @staticmethod
+    def _stable_target_entry(entry: Mapping[str, Any]) -> dict[str, Any]:
+        stable_keys = (
+            "module_name",
+            "module_type",
+            "weight_shape",
+            "params",
+            "selection_reason",
+            "matched_pattern",
+            "tied_group_index",
+        )
+        return {key: entry[key] for key in stable_keys if key in entry}
 
 
 @dataclass(frozen=True)
@@ -182,12 +200,21 @@ class TargetModule:
     module_type: str
 
     def as_report_payload(self) -> dict[str, Any]:
+        payload = self.stable_report_payload()
+        payload["parameter_id"] = str(self.parameter_id)
+        return payload
+
+    def stable_report_payload(self) -> dict[str, Any]:
+        weight = getattr(self.module, "weight", None)
+        weight_shape = list(weight.shape) if weight is not None else []
+        params = int(weight.numel()) if weight is not None else 0
         return {
             "module_name": self.name,
             "selection_reason": self.selection_reason,
             "matched_pattern": self.matched_pattern,
-            "parameter_id": str(self.parameter_id),
             "module_type": self.module_type,
+            "weight_shape": weight_shape,
+            "params": params,
         }
 
 
@@ -515,6 +542,8 @@ class RTNQuantEdit(ModelEdit):
                     target_modules=target_names,
                     target_selection=target_selection,
                 ),
+                "selected_modules": target_names,
+                "physically_quantized_modules": target_names,
                 "quantization_stats": quant_stats,
                 "tied_parameter_groups": self._get_weight_tying_groups(model),
             }
@@ -698,16 +727,17 @@ class RTNQuantEdit(ModelEdit):
                 modified_layers.append(layer_name)
 
         # Store edit plan for evaluation report generation
+        selected_modules = [target.name for target in target_modules]
         modules_quantized = [r["module_name"] for r in quantization_results]
         target_selection = [target.as_report_payload() for target in target_modules]
         edit_plan = active_plan.as_report_payload(
-            target_modules=modules_quantized,
+            target_modules=selected_modules,
             target_selection=target_selection,
         )
         edit_plan.update(
             {
                 "plan_digest": active_plan.digest(
-                    target_modules=modules_quantized,
+                    target_modules=selected_modules,
                     target_selection=target_selection,
                 ),
                 "tied_parameter_groups": tied_parameter_groups,
@@ -720,8 +750,11 @@ class RTNQuantEdit(ModelEdit):
         )
         edit_plan.update(
             {
+                "total_modules_selected": len(selected_modules),
                 "total_modules_quantized": len(modules_quantized),
                 "total_params_quantized": total_params_quantized,
+                "selected_modules": selected_modules,
+                "physically_quantized_modules": modules_quantized,
                 "modules_quantized": modules_quantized,
             }
         )
@@ -864,7 +897,12 @@ class RTNQuantEdit(ModelEdit):
             original_weight,
             quantized_weight,
             clipped_fraction=clipped_fraction,
-            saturation_fraction=float(scale_stats.get("saturation_fraction", 0.0)),
+            quant_code_edge_fraction=float(
+                scale_stats.get(
+                    "quant_code_edge_fraction",
+                    scale_stats.get("saturation_fraction", 0.0),
+                )
+            ),
         )
 
         return {
@@ -961,7 +999,7 @@ class RTNQuantEdit(ModelEdit):
         # Quantize
         weight_scaled = weight / scales
         weight_quantized = torch.clamp(torch.round(weight_scaled), qmin, qmax)
-        saturation_fraction = float(
+        quant_code_edge_fraction = float(
             ((weight_quantized <= qmin) | (weight_quantized >= qmax)).float().mean()
         )
 
@@ -976,7 +1014,10 @@ class RTNQuantEdit(ModelEdit):
             "scale_min": float(scales.min()),
             "scale_max": float(scales.max()),
             "zero_scales": int((scales <= eps).sum()),
-            "saturation_fraction": saturation_fraction,
+            "quant_code_edge_fraction": quant_code_edge_fraction,
+            # Compatibility alias: this is the fraction of values that landed
+            # on the min/max quantization code, not proof of runtime overflow.
+            "saturation_fraction": quant_code_edge_fraction,
         }
 
         return weight_dequantized, scales.squeeze(), scale_stats
@@ -987,7 +1028,7 @@ class RTNQuantEdit(ModelEdit):
         edited: torch.Tensor,
         *,
         clipped_fraction: float,
-        saturation_fraction: float,
+        quant_code_edge_fraction: float,
     ) -> dict[str, float]:
         original_f32 = original.detach().float().reshape(-1)
         edited_f32 = edited.detach().float().reshape(-1)
@@ -1019,7 +1060,9 @@ class RTNQuantEdit(ModelEdit):
             "rmse": float(rmse),
             "relative_rmse": float(rmse / denom),
             "cosine_similarity": cosine_similarity,
-            "saturation_fraction": float(saturation_fraction),
+            "quant_code_edge_fraction": float(quant_code_edge_fraction),
+            # Compatibility alias for existing report consumers.
+            "saturation_fraction": float(quant_code_edge_fraction),
             "clipped_fraction": float(clipped_fraction),
         }
 
@@ -1045,6 +1088,7 @@ class RTNQuantEdit(ModelEdit):
             "rmse",
             "relative_rmse",
             "cosine_similarity",
+            "quant_code_edge_fraction",
             "saturation_fraction",
             "clipped_fraction",
         )

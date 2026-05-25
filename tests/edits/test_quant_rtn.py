@@ -212,6 +212,11 @@ def test_quant_rtn_apply_accepts_per_channel_and_module_selectors() -> None:
         "attention": ["attn.c_attn"],
         "ffn": ["mlp.c_fc"],
     }
+    assert result["plan"]["selected_modules"] == result["plan"]["target_modules"]
+    assert (
+        result["plan"]["physically_quantized_modules"]
+        == result["plan"]["modules_quantized"]
+    )
     assert result["plan_digest"].startswith("sha256:")
     assert "estimated_memory_saved_bytes" not in result["plan"]
 
@@ -329,6 +334,7 @@ def test_quant_rtn_preview_reports_simulation_memory_fields() -> None:
     assert "estimated_memory_saved_bytes" not in metrics
     assert plan["quantization_mode"] == "rtn_dequantized_weight_edit"
     assert plan["plan_digest"].startswith("sha256:")
+    assert plan["selected_modules"] == plan["physically_quantized_modules"]
 
 
 def test_quant_rtn_can_edit_and_limit_targets() -> None:
@@ -402,6 +408,37 @@ def test_quant_rtn_plan_digest_changes_with_meaningful_fields() -> None:
     assert base.digest(target_modules=["a"]) != base.digest(target_modules=["b"])
 
 
+def test_quant_rtn_plan_digest_excludes_runtime_parameter_ids() -> None:
+    plan = RTNQuantPlan(scope="all")
+    target_a = {
+        "module_name": "mlp.c_fc",
+        "module_type": "torch.nn.modules.linear.Linear",
+        "weight_shape": [16, 16],
+        "params": 256,
+        "selection_reason": "scope_all_min_params",
+        "matched_pattern": None,
+        "parameter_id": "1234",
+    }
+    target_b = dict(target_a)
+    target_b["parameter_id"] = "9876"
+
+    assert plan.digest(target_selection=[target_a]) == plan.digest(
+        target_selection=[target_b]
+    )
+
+
+def test_quant_rtn_plan_digest_reproducible_for_same_model_structure() -> None:
+    adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
+    first = torch.nn.Linear(16, 16, bias=False)
+    second = torch.nn.Linear(16, 16, bias=False)
+    edit = RTNQuantEdit(scope="all", max_modules=1)
+
+    first_result = edit.apply(first, adapter, plan={"scope": "all", "max_modules": 1})
+    second_result = edit.apply(second, adapter, plan={"scope": "all", "max_modules": 1})
+
+    assert first_result["plan_digest"] == second_result["plan_digest"]
+
+
 def test_quant_rtn_apply_emits_error_metrics_and_target_metadata() -> None:
     model = torch.nn.Linear(16, 16, bias=False)
     adapter = type("Adapter", (), {"describe": lambda _self, _m: {"n_layer": 1}})()
@@ -417,6 +454,7 @@ def test_quant_rtn_apply_emits_error_metrics_and_target_metadata() -> None:
     assert module_entry["packed_quantized_storage"] is False
     assert module_entry["selection_reason"] == "scope_all_min_params"
     assert module_entry["parameter_id"]
+    assert result["plan"]["target_selection"][0]["weight_shape"] == [16, 16]
 
 
 def test_quant_rtn_deduplicates_tied_weights() -> None:
@@ -434,6 +472,9 @@ def test_quant_rtn_deduplicates_tied_weights() -> None:
     result = edit.apply(model, adapter, plan={"scope": "all"})
 
     assert result["plan"]["total_modules_quantized"] == 1
+    assert result["plan"]["total_modules_selected"] == 2
+    assert result["plan"]["selected_modules"] == ["a", "b"]
+    assert result["plan"]["physically_quantized_modules"] == ["a"]
     assert result["plan"]["deduplicated_modules"] == ["b"]
     assert len(result["plan"]["deduplicated_parameter_ids"]) == 1
     assert result["plan"]["tied_parameter_groups"] == [["a", "b"]]
@@ -556,24 +597,25 @@ def test_quant_rtn_outlier_clipping_and_error_metric_edges() -> None:
         torch.zeros(4),
         torch.zeros(4),
         clipped_fraction=0.0,
-        saturation_fraction=0.0,
+        quant_code_edge_fraction=0.0,
     )
     one_zero = RTNQuantEdit._quantization_error_metrics(
         torch.ones(4),
         torch.zeros(4),
         clipped_fraction=0.0,
-        saturation_fraction=0.0,
+        quant_code_edge_fraction=0.0,
     )
     empty = RTNQuantEdit._quantization_error_metrics(
         torch.empty(0),
         torch.empty(0),
         clipped_fraction=0.0,
-        saturation_fraction=0.0,
+        quant_code_edge_fraction=0.0,
     )
 
     assert both_zero["cosine_similarity"] == 1.0
     assert one_zero["cosine_similarity"] == 0.0
     assert empty["mean_abs_error"] == 0.0
+    assert both_zero["quant_code_edge_fraction"] == 0.0
 
 
 def test_quant_rtn_aggregate_error_metric_edges() -> None:
@@ -588,6 +630,7 @@ def test_quant_rtn_aggregate_error_metric_edges() -> None:
                     "rmse": 0.3,
                     "relative_rmse": 0.4,
                     "cosine_similarity": 0.5,
+                    "quant_code_edge_fraction": 0.6,
                     "saturation_fraction": 0.6,
                     "clipped_fraction": 0.7,
                 },
@@ -597,3 +640,4 @@ def test_quant_rtn_aggregate_error_metric_edges() -> None:
 
     assert aggregate["mean_abs_error"] == 0.1
     assert aggregate["max_abs_error"] == 0.2
+    assert aggregate["quant_code_edge_fraction"] == 0.6
