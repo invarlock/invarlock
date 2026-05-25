@@ -50,6 +50,7 @@ jobs:
           rm -rf .artifact-venv
           python -m venv .artifact-venv
           . .artifact-venv/bin/activate
+          python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap-py313.txt
           python -m pip install dist/*.whl
           site_packages="$(python - <<'PY'
           import site
@@ -78,6 +79,7 @@ jobs:
           rm -rf .hf-venv
           python -m venv .hf-venv
           . .hf-venv/bin/activate
+          python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap-py313.txt
           python -m pip install dist/*.whl --no-deps
           python -m pip install --require-hashes -r requirements/workflows/hf-py313.txt
           site_packages="$(python - <<'PY'
@@ -103,6 +105,7 @@ jobs:
           rm -rf .advanced-venv
           python -m venv .advanced-venv
           . .advanced-venv/bin/activate
+          python -m pip install --upgrade --require-hashes -r requirements/workflows/pip-bootstrap-py313.txt
           python -m pip install dist/*.whl --no-deps
           python -m pip install --require-hashes -r requirements/workflows/advanced-py313.txt
           site_packages="$(python - <<'PY'

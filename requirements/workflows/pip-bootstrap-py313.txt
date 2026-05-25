@@ -1,0 +1,6 @@
+# Minimal hashed bootstrap pin for temporary workflow venvs audited by pip-audit.
+# Hashes match the pip stanza in release-security-py313.txt.
+pip==26.1.1 \
+    --hash=sha256:99cb1c2899893b075ff56e4ed0af55669a955b49ad7fb8d8603ecdaf4ed653fb \
+    --hash=sha256:d36762751d156a4ee895de8af39aa0abeeeb577f93a2eca6ab62467bbf0f8a78
+    # via pip-bootstrap
