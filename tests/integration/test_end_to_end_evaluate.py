@@ -56,11 +56,38 @@ def test_gpt2_user_journey_smoke_script_is_executable() -> None:
     assert 'CLI=("$PYTHON_BIN" -m invarlock)' in contents
     assert "command -v invarlock" not in contents
     assert "INVARLOCK_SMOKE_CACHE_COMPLETE" in contents
+    assert 'MODE="${INVARLOCK_SMOKE_MODE:-all}"' in contents
+    assert 'PROFILE="dev"' in contents
     assert 'ASSURANCE="${INVARLOCK_SMOKE_ASSURANCE:-}"' in contents
     assert 'EDIT_CONFIG="${INVARLOCK_SMOKE_EDIT_CONFIG:-}"' in contents
+    assert (
+        'QUANT_EDIT_CONFIG="${INVARLOCK_SMOKE_QUANT_EDIT_CONFIG:-${EDIT_CONFIG:-$DEFAULT_QUANT_EDIT_CONFIG}}"'
+        in contents
+    )
+    assert (
+        'CUSTOM_EDIT_CONFIG="${INVARLOCK_SMOKE_CUSTOM_EDIT_CONFIG:-${EDIT_CONFIG:-$DEFAULT_QUANT_EDIT_CONFIG}}"'
+        in contents
+    )
+    assert 'SMOKE_DEVICE="${INVARLOCK_SMOKE_DEVICE:-auto}"' in contents
     assert 'JOURNEYS_RAW="${INVARLOCK_SMOKE_JOURNEYS:-$DEFAULT_JOURNEYS}"' in contents
     assert "INVARLOCK_SMOKE_QUANTIZED" in contents
+    assert 'DEFAULT_JOURNEYS="strict-bundle,noop,quantized,edited,negative"' in contents
+    assert "write_strict_bundle_fixture" in contents
+    assert "run_strict_bundle_journey" in contents
+    assert (
+        '"${CLI[@]}" verify "$eval_report" --assurance strict --profile ci --json'
+        in contents
+    )
+    assert "run_all_mode_journeys" in contents
+    assert "append_child_results" in contents
+    assert 'run_child_suite "container" "container"' in contents
+    assert "INVARLOCK_SMOKE_CONTAINER_PROFILE" in contents
+    assert "INVARLOCK_SMOKE_CONTAINER_ASSURANCE" in contents
+    assert "INVARLOCK_SMOKE_CONTAINER_JOURNEYS" in contents
+    assert 'INVARLOCK_SMOKE_DEVICE="$SMOKE_DEVICE"' in contents
     assert "assurance=$ASSURANCE" in contents
+    assert "device=$SMOKE_DEVICE" in contents
+    assert '--device "$SMOKE_DEVICE"' in contents
     assert '--assurance "$ASSURANCE"' in contents
     assert 'record_result "$journey/verify-rejects"' in contents
     assert "GPT-2 User Journey Smoke Results" in contents

@@ -404,7 +404,10 @@ def test_gpt2_smoke_workflow_is_configured() -> None:
     assert env["INVARLOCK_ALLOW_NETWORK"] == "1"
     assert env["INVARLOCK_SMOKE_MODE"] == "container"
     assert env["INVARLOCK_SMOKE_PROFILE"] == "dev"
-    assert env["INVARLOCK_SMOKE_JOURNEYS"] == "noop,quantized,negative"
+    assert (
+        env["INVARLOCK_SMOKE_JOURNEYS"]
+        == "strict-bundle,noop,quantized,edited,negative"
+    )
     assert env["INVARLOCK_RUNTIME_IMAGE"] == "invarlock-runtime:local"
 
     steps = job["steps"]
