@@ -7,11 +7,24 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 WORK_ROOT="${1:-$(mktemp -d -t invarlock_gpt2_user_journey.XXXXXX)}"
 PRESET="${INVARLOCK_GPT2_SMOKE_PRESET:-$REPO_ROOT/configs/presets/causal_lm/gpt2_smoke_128.yaml}"
 DEFAULT_QUANT_EDIT_CONFIG="$REPO_ROOT/configs/overlays/edits/quant_rtn/8bit_full.yaml"
-MODE="${INVARLOCK_SMOKE_MODE:-local}"
-PROFILE="${INVARLOCK_SMOKE_PROFILE:-dev}"
+MODE="${INVARLOCK_SMOKE_MODE:-all}"
+if [[ -n "${INVARLOCK_SMOKE_PROFILE:-}" ]]; then
+  PROFILE="$INVARLOCK_SMOKE_PROFILE"
+elif [[ "$MODE" == "container" ]]; then
+  PROFILE="dev"
+else
+  PROFILE="dev"
+fi
 ASSURANCE="${INVARLOCK_SMOKE_ASSURANCE:-}"
 EDIT_CONFIG="${INVARLOCK_SMOKE_EDIT_CONFIG:-}"
-DEFAULT_JOURNEYS="noop,quantized,negative"
+QUANT_EDIT_CONFIG="${INVARLOCK_SMOKE_QUANT_EDIT_CONFIG:-${EDIT_CONFIG:-$DEFAULT_QUANT_EDIT_CONFIG}}"
+CUSTOM_EDIT_CONFIG="${INVARLOCK_SMOKE_CUSTOM_EDIT_CONFIG:-${EDIT_CONFIG:-$DEFAULT_QUANT_EDIT_CONFIG}}"
+SMOKE_DEVICE="${INVARLOCK_SMOKE_DEVICE:-auto}"
+if [[ "$MODE" == "container" ]]; then
+  DEFAULT_JOURNEYS="strict-bundle,noop,quantized,edited,negative"
+else
+  DEFAULT_JOURNEYS="noop,quantized,negative"
+fi
 
 case "${INVARLOCK_SMOKE_QUANTIZED:-0}" in
   1|true|TRUE|yes|YES)
@@ -31,6 +44,12 @@ fi
 if [[ -n "$EDIT_CONFIG" && "$EDIT_CONFIG" != /* ]]; then
   EDIT_CONFIG="$REPO_ROOT/$EDIT_CONFIG"
 fi
+if [[ -n "$QUANT_EDIT_CONFIG" && "$QUANT_EDIT_CONFIG" != /* ]]; then
+  QUANT_EDIT_CONFIG="$REPO_ROOT/$QUANT_EDIT_CONFIG"
+fi
+if [[ -n "$CUSTOM_EDIT_CONFIG" && "$CUSTOM_EDIT_CONFIG" != /* ]]; then
+  CUSTOM_EDIT_CONFIG="$REPO_ROOT/$CUSTOM_EDIT_CONFIG"
+fi
 
 if [[ ! -f "$PRESET" ]]; then
   echo "[error] GPT-2 smoke preset not found: $PRESET" >&2
@@ -39,6 +58,14 @@ fi
 
 if [[ -n "$EDIT_CONFIG" && ! -f "$EDIT_CONFIG" ]]; then
   echo "[error] GPT-2 smoke edit config not found: $EDIT_CONFIG" >&2
+  exit 2
+fi
+if [[ -n "$QUANT_EDIT_CONFIG" && ! -f "$QUANT_EDIT_CONFIG" ]]; then
+  echo "[error] GPT-2 smoke quant edit config not found: $QUANT_EDIT_CONFIG" >&2
+  exit 2
+fi
+if [[ -n "$CUSTOM_EDIT_CONFIG" && ! -f "$CUSTOM_EDIT_CONFIG" ]]; then
+  echo "[error] GPT-2 smoke custom edit config not found: $CUSTOM_EDIT_CONFIG" >&2
   exit 2
 fi
 
@@ -90,7 +117,7 @@ host_gpu_visible() {
 }
 
 seed_local_runtime_image() {
-  if host_gpu_visible && docker image inspect invarlock-runtime:cuda-local >/dev/null 2>&1; then
+  if [[ "$SMOKE_DEVICE" != "cpu" ]] && host_gpu_visible && docker image inspect invarlock-runtime:cuda-local >/dev/null 2>&1; then
     export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"
     return 0
   fi
@@ -184,7 +211,7 @@ ensure_current_runtime_image() {
   if ! command -v docker >/dev/null 2>&1 || ! command -v make >/dev/null 2>&1; then
     return 0
   fi
-  if host_gpu_visible; then
+  if [[ "$SMOKE_DEVICE" != "cpu" ]] && host_gpu_visible; then
     echo "[smoke] refreshing local CUDA container runtime image"
     make runtime-image-cuda
     export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"
@@ -373,6 +400,7 @@ run_eval_journey() {
     --adapter auto \
     --profile "$PROFILE" \
     --preset "$PRESET" \
+    --device "$SMOKE_DEVICE" \
     "${edit_args[@]}" \
     --execution-mode "$EXECUTION_MODE" \
     --assurance "$ASSURANCE" \
@@ -509,6 +537,328 @@ PY
   echo "==== END journey:$journey ===="
 }
 
+write_strict_bundle_fixture() {
+  local eval_report="$1"
+
+  "$PYTHON_BIN" - "$eval_report" <<'PY'
+import hashlib
+import json
+import math
+import sys
+from pathlib import Path
+
+from invarlock.core.assurance_contract import (
+    ASSURANCE_CLAIM_SET,
+    CANONICAL_GUARD_CHAIN,
+)
+from invarlock.reporting import verify_contract as verify_mod
+from invarlock.runtime_security import RUNTIME_VERIFIER_CONTRACT_VERSION
+
+report_path = Path(sys.argv[1])
+report_path.parent.mkdir(parents=True, exist_ok=True)
+
+spectral_contract = {"estimator": {"type": "power_iter", "iters": 4, "init": "ones"}}
+rmt_contract = {
+    "estimator": {"type": "power_iter", "iters": 3, "init": "ones"},
+    "activation_sampling": {
+        "windows": {"count": 8, "indices_policy": "evenly_spaced"}
+    },
+}
+guard_chain = list(CANONICAL_GUARD_CHAIN)
+report = {
+    "schema_version": "v1",
+    "run_id": "evidence-pack-wheel-smoke",
+    "artifacts": {"generated_at": "2024-01-01T00:00:00"},
+    "plugins": {"guards": guard_chain},
+    "guards": [{"name": name} for name in guard_chain],
+    "meta": {"profile": "ci"},
+    "context": {
+        "profile": "ci",
+        "runtime": {"execution_mode": "container"},
+    },
+    "auto": {"tier": "balanced"},
+    "dataset": {
+        "provider": "unit",
+        "seq_len": 8,
+        "windows": {
+            "preview": 2,
+            "final": 2,
+            "stats": {
+                "window_match_fraction": 1.0,
+                "window_overlap_fraction": 0.0,
+                "coverage": {"preview": {"used": 2}, "final": {"used": 2}},
+                "paired_windows": 2,
+            },
+        },
+    },
+    "validation": {
+        "primary_metric_acceptable": True,
+        "preview_final_drift_acceptable": True,
+        "invariants_pass": True,
+        "spectral_stable": True,
+        "rmt_stable": True,
+    },
+    "baseline_ref": {
+        "run_id": "baseline-run",
+        "model_id": "model",
+        "primary_metric": {"kind": "ppl_causal", "final": 10.0},
+    },
+    "provenance": {"provider_digest": {"ids_sha256": "subject-ids"}},
+    "artifacts_extra": {},
+    "report_build": {
+        "synthesized_fields": [],
+        "repaired_fields": [],
+        "fallback_fields": [],
+    },
+    "primary_metric": {
+        "kind": "ppl_causal",
+        "final": 10.0,
+        "preview": 10.0,
+        "ratio_vs_baseline": 1.0,
+        "ci": [0.0, 0.0],
+        "display_ci": [1.0, 1.0],
+    },
+    "spectral": {
+        "evaluated": True,
+        "supported": True,
+        "status": "pass",
+        "measurement_contract": spectral_contract,
+        "measurement_contract_hash": verify_mod._measurement_contract_digest(
+            spectral_contract
+        ),
+        "measurement_contract_match": True,
+    },
+    "rmt": {
+        "evaluated": True,
+        "supported": True,
+        "status": "pass",
+        "measurement_contract": rmt_contract,
+        "measurement_contract_hash": verify_mod._measurement_contract_digest(
+            rmt_contract
+        ),
+        "measurement_contract_match": True,
+    },
+    "variance": {"supported": True, "status": "pass"},
+    "invariants": {"supported": True, "status": "pass"},
+    "resolved_policy": {
+        "spectral": {"measurement_contract": spectral_contract},
+        "rmt": {"measurement_contract": rmt_contract},
+    },
+    "evaluation_windows": {
+        "final": {
+            "logloss": [math.log(10.0)],
+            "token_counts": [1],
+        }
+    },
+    "assurance": {
+        "mode": "strict",
+        "profile": "ci",
+        "tier": "balanced",
+        "claim_set": ASSURANCE_CLAIM_SET,
+        "canonical_guard_chain": guard_chain,
+        "guard_chain_observed": guard_chain,
+        "canonical_guard_chain_enforced": True,
+        "fallback_fields_used": False,
+        "runtime_provenance_verified": False,
+        "runtime_provenance_declared": "container",
+        "runtime_provenance_verification_status": "pending",
+        "verdict": "pending_verifier",
+        "report_local_verdict": "pass",
+        "verified_assurance_verdict": "pending",
+        "blocking_reasons": [],
+    },
+}
+
+report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+report_sha = hashlib.sha256(report_path.read_bytes()).hexdigest()
+manifest = {
+    "manifest_version": 1,
+    "generated_at_utc": "2026-05-25T00:00:00+00:00",
+    "verifier_contract_version": RUNTIME_VERIFIER_CONTRACT_VERSION,
+    "execution_mode": "container",
+    "report": {
+        "filename": report_path.name,
+        "path": report_path.as_posix(),
+        "sha256": report_sha,
+    },
+    "config": {
+        "path": None,
+        "sha256": None,
+        "source": "missing",
+    },
+    "runtime": {
+        "container_execution": True,
+        "image_digest": "sha256:" + ("a" * 64),
+        "image_ref": "invarlock-runtime:local",
+        "allow_network": False,
+        "allow_remote_code": False,
+        "allow_third_party_plugins": False,
+    },
+}
+(report_path.parent / "runtime.manifest.json").write_text(
+    json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+    encoding="utf-8",
+)
+PY
+}
+
+run_strict_bundle_journey() {
+  local journey="strict-bundle"
+  local journey_root="$WORK_ROOT/journeys/$journey"
+  local eval_report="$journey_root/evaluation.report.json"
+  local verify_json="$journey_root/verify.json"
+  local export_dir="$journey_root/exports"
+
+  mkdir -p "$journey_root" "$export_dir"
+
+  echo ""
+  echo "==== BEGIN journey:$journey ===="
+  echo "[journey] expectation=strict report bundle verifies runtime provenance"
+  write_strict_bundle_fixture "$eval_report"
+
+  local rc=0
+  set +e
+  "${CLI[@]}" verify "$eval_report" --assurance strict --profile ci --json > "$verify_json"
+  rc=$?
+  set -e
+  cat "$verify_json"
+  if [[ "$rc" -ne 0 ]]; then
+    record_result "$journey/verify" "strict report bundle verifies" "FAIL" "verify_rc=$rc reason=$(verify_reason "$verify_json")" "$(metric_summary "$eval_report")" "$eval_report" "strict verification failed"
+    echo "==== END journey:$journey ===="
+    return 0
+  fi
+
+  if ! "${CLI[@]}" report validate "$eval_report"; then
+    record_result "$journey/report-validate" "schema validates" "FAIL" "ok" "$(metric_summary "$eval_report")" "$eval_report" "schema validation failed"
+    echo "==== END journey:$journey ===="
+    return 0
+  fi
+
+  if ! "${CLI[@]}" report html -i "$eval_report" -o "$export_dir/evaluation.html" --force; then
+    record_result "$journey/report-html" "HTML renders" "FAIL" "ok" "$(metric_summary "$eval_report")" "$export_dir/evaluation.html" "HTML render failed"
+    echo "==== END journey:$journey ===="
+    return 0
+  fi
+
+  record_result "$journey/verify-report" "strict report bundle verifies" "PASS" "ok" "$(metric_summary "$eval_report")" "$export_dir/evaluation.html" "verify strict -> validate -> html"
+  run_evidence_pack_journey "$journey" "$eval_report" "$journey_root"
+  echo "==== END journey:$journey ===="
+}
+
+append_child_results() {
+  local suite="$1"
+  local child_root="$2"
+  local final_verdict="$child_root/final_verdict.json"
+
+  if [[ ! -f "$final_verdict" ]]; then
+    record_result "$suite" "child smoke emits final verdict" "FAIL" "missing_final_verdict" "-" "$child_root" "no final verdict"
+    return 0
+  fi
+
+  "$PYTHON_BIN" - "$RESULTS_TSV" "$final_verdict" "$suite" <<'PY'
+import csv
+import json
+import sys
+
+results_path, final_verdict_path, suite = sys.argv[1:4]
+columns = ["journey", "expectation", "status", "verify", "metric", "artifact", "note"]
+payload = json.loads(open(final_verdict_path, encoding="utf-8").read())
+rows = payload.get("journeys", [])
+with open(results_path, "a", encoding="utf-8", newline="") as handle:
+    writer = csv.DictWriter(
+        handle, fieldnames=columns, delimiter="\t", lineterminator="\n"
+    )
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        out = {column: str(row.get(column, "") or "") for column in columns}
+        out["journey"] = f"{suite}/{out['journey']}" if out["journey"] else suite
+        writer.writerow(out)
+PY
+}
+
+run_child_suite() {
+  local suite="$1"
+  local child_mode="$2"
+  local child_profile="$3"
+  local child_assurance="$4"
+  local child_journeys="$5"
+  local child_root="$WORK_ROOT/$suite"
+  local rc=0
+
+  echo ""
+  echo "==== BEGIN suite:$suite ===="
+  echo "[suite] mode=$child_mode profile=$child_profile assurance=$child_assurance journeys=$child_journeys"
+  set +e
+  INVARLOCK_SMOKE_MODE="$child_mode" \
+    INVARLOCK_SMOKE_PROFILE="$child_profile" \
+    INVARLOCK_SMOKE_ASSURANCE="$child_assurance" \
+    INVARLOCK_SMOKE_JOURNEYS="$child_journeys" \
+    INVARLOCK_SMOKE_QUANT_EDIT_CONFIG="$QUANT_EDIT_CONFIG" \
+    INVARLOCK_SMOKE_CUSTOM_EDIT_CONFIG="$CUSTOM_EDIT_CONFIG" \
+    INVARLOCK_SMOKE_DEVICE="$SMOKE_DEVICE" \
+    INVARLOCK_GPT2_SMOKE_PRESET="$PRESET" \
+    bash "$SCRIPT_DIR/run_gpt2_user_journey_smoke.sh" "$child_root"
+  rc=$?
+  append_child_results "$suite" "$child_root"
+  echo "[suite] exit_code=$rc"
+  echo "==== END suite:$suite ===="
+  return "$rc"
+}
+
+run_all_mode_journeys() {
+  local default_local_journeys="noop,quantized,negative"
+  local default_container_journeys="strict-bundle,noop,quantized,edited,negative"
+  case "${INVARLOCK_SMOKE_QUANTIZED:-0}" in
+    1|true|TRUE|yes|YES)
+      default_local_journeys="quantized,negative"
+      default_container_journeys="quantized,negative"
+      ;;
+  esac
+  local local_journeys="${INVARLOCK_SMOKE_LOCAL_JOURNEYS:-${INVARLOCK_SMOKE_JOURNEYS:-$default_local_journeys}}"
+  local container_journeys="${INVARLOCK_SMOKE_CONTAINER_JOURNEYS:-${INVARLOCK_SMOKE_JOURNEYS:-$default_container_journeys}}"
+  local failed_suites=0
+  local rc=0
+
+  echo "[smoke] work_root=$WORK_ROOT"
+  echo "[smoke] preset=$PRESET"
+  echo "[smoke] mode=all"
+  echo "[smoke] local_journeys=$local_journeys"
+  echo "[smoke] container_journeys=$container_journeys"
+
+  set +e
+  run_child_suite "local" "local" "${INVARLOCK_SMOKE_LOCAL_PROFILE:-dev}" "${INVARLOCK_SMOKE_LOCAL_ASSURANCE:-off}" "$local_journeys"
+  rc=$?
+  set -e
+  if [[ "$rc" -ne 0 ]]; then
+    failed_suites=$((failed_suites + 1))
+  fi
+
+  set +e
+  run_child_suite "container" "container" "${INVARLOCK_SMOKE_CONTAINER_PROFILE:-dev}" "${INVARLOCK_SMOKE_CONTAINER_ASSURANCE:-off}" "$container_journeys"
+  rc=$?
+  set -e
+  if [[ "$rc" -ne 0 ]]; then
+    failed_suites=$((failed_suites + 1))
+  fi
+
+  FAILED_JOURNEYS="$failed_suites"
+  print_results_table
+  write_final_verdict
+  echo "[smoke] results=$RESULTS_TSV"
+  echo "[smoke] final_verdict=$WORK_ROOT/final_verdict.json"
+  echo "[smoke] complete"
+
+  if [[ "$failed_suites" -ne 0 ]]; then
+    exit 1
+  fi
+  exit 0
+}
+
+if [[ "$MODE" == "all" ]]; then
+  run_all_mode_journeys
+fi
+
 if [[ "$MODE" == "container" && -z "${INVARLOCK_RUNTIME_IMAGE:-}" ]]; then
   seed_local_runtime_image
 fi
@@ -540,6 +890,9 @@ echo "[smoke] work_root=$WORK_ROOT"
 echo "[smoke] preset=$PRESET"
 echo "[smoke] journeys=$JOURNEYS_RAW"
 echo "[smoke] mode=$MODE profile=$PROFILE assurance=$ASSURANCE"
+echo "[smoke] device=$SMOKE_DEVICE"
+echo "[smoke] quant_edit_config=$QUANT_EDIT_CONFIG"
+echo "[smoke] custom_edit_config=$CUSTOM_EDIT_CONFIG"
 echo "[smoke] hf_home=$HF_HOME"
 echo "[smoke] hf_datasets_cache=$HF_DATASETS_CACHE"
 
@@ -548,11 +901,14 @@ for journey in "${JOURNEYS[@]}"; do
   journey="${journey//[[:space:]]/}"
   [[ -n "$journey" ]] || continue
   case "$journey" in
+    strict-bundle|strict)
+      run_strict_bundle_journey
+      ;;
     noop)
       run_eval_journey "noop" "" "baseline gpt2 vs no-op gpt2 should pass"
       ;;
     quantized)
-      quant_edit_config="${EDIT_CONFIG:-$DEFAULT_QUANT_EDIT_CONFIG}"
+      quant_edit_config="$QUANT_EDIT_CONFIG"
       if [[ ! -f "$quant_edit_config" ]]; then
         record_result "quantized/evaluate" "quantized subject should run" "FAIL" "missing_edit_config" "-" "$quant_edit_config" "edit config missing"
       else
@@ -560,17 +916,18 @@ for journey in "${JOURNEYS[@]}"; do
       fi
       ;;
     edited|custom-edit)
-      if [[ -z "$EDIT_CONFIG" ]]; then
-        record_result "$journey/evaluate" "custom edited subject should run" "FAIL" "missing_edit_config" "-" "$WORK_ROOT" "set INVARLOCK_SMOKE_EDIT_CONFIG"
+      custom_edit_config="$CUSTOM_EDIT_CONFIG"
+      if [[ ! -f "$custom_edit_config" ]]; then
+        record_result "$journey/evaluate" "custom edited subject should run" "FAIL" "missing_edit_config" "-" "$custom_edit_config" "edit config missing"
       else
-        run_eval_journey "$journey" "$EDIT_CONFIG" "baseline gpt2 vs configured edited subject should verify"
+        run_eval_journey "$journey" "$custom_edit_config" "baseline gpt2 vs configured edited subject should verify"
       fi
       ;;
     negative|failure)
       run_negative_journey
       ;;
     *)
-      record_result "$journey" "known journey token" "FAIL" "unknown_journey" "-" "$WORK_ROOT" "supported: noop,quantized,edited,negative"
+      record_result "$journey" "known journey token" "FAIL" "unknown_journey" "-" "$WORK_ROOT" "supported: strict-bundle,noop,quantized,edited,negative"
       ;;
   esac
 done
