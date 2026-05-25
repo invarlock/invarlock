@@ -63,6 +63,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   notes and release checklists.
 - Assurance documentation filenames now use numbered prefixes consistently,
   except for the glossary.
+- Config-driven run execution now uses `ConfigExecutionRequest` as the
+  canonical request object across public command plumbing, internal delegated
+  execution, and container-launch argv serialization.
 
 ### Removed
 

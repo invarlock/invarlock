@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING
 
 from invarlock.runtime_security import ContainerLaunchPlan
 from invarlock.runtime_security_helpers import (
@@ -13,6 +13,9 @@ from invarlock.runtime_security_helpers import (
     _normalize_local_model_path_for_container,
     _normalize_output_path_for_container,
 )
+
+if TYPE_CHECKING:  # pragma: no cover
+    from invarlock.cli.config_execution import ConfigExecutionRequest
 
 _CONFIG_SCAN_ARG_FLAGS = {"--config", "-c", "--preset", "--edit-config"}
 _CONFIG_PATH_ARG_FLAGS = _CONFIG_SCAN_ARG_FLAGS | {"--baseline-report"}
@@ -206,40 +209,12 @@ def _command_name_string(command_name: str | Iterable[str]) -> str:
 
 def build_request_container_launch_plan(
     command_name: str | Iterable[str],
-    request: Any,
+    request: ConfigExecutionRequest,
 ) -> ContainerLaunchPlan:
-    delegated_argv: list[str] = []
-    _append_option(
-        delegated_argv,
-        "--invoked-command",
-        _command_name_string(command_name),
+    return normalize_delegated_argv(
+        request.to_internal_argv(command_name),
+        cwd=Path.cwd().resolve(),
     )
-    _append_option(delegated_argv, "--config", request.config)
-    _append_option(delegated_argv, "--device", request.device or "auto")
-    _append_option(delegated_argv, "--profile", request.profile)
-    _append_option(delegated_argv, "--out", request.out)
-    _append_option(delegated_argv, "--edit", request.edit)
-    _append_option(delegated_argv, "--edit-label", request.edit_label)
-    _append_option(delegated_argv, "--tier", request.tier)
-    _append_option(delegated_argv, "--metric-kind", request.metric_kind)
-    _append_option(delegated_argv, "--probes", request.probes)
-    _append_bool_flag(delegated_argv, "--until-pass", bool(request.until_pass))
-    if int(request.max_attempts) != 3:
-        _append_option(delegated_argv, "--max-attempts", request.max_attempts)
-    _append_option(delegated_argv, "--timeout", request.timeout)
-    _append_option(delegated_argv, "--baseline", request.baseline)
-    _append_bool_flag(delegated_argv, "--no-cleanup", bool(request.no_cleanup))
-    _append_option(delegated_argv, "--style", request.style)
-    _append_bool_flag(delegated_argv, "--progress", bool(request.progress))
-    _append_bool_flag(delegated_argv, "--timing", bool(request.timing))
-    _append_bool_flag(delegated_argv, "--telemetry", bool(request.telemetry))
-    _append_bool_flag(delegated_argv, "--no-color", bool(request.no_color))
-    _append_bool_flag(
-        delegated_argv,
-        "--prefer-local-files-only",
-        bool(request.prefer_local_files_only),
-    )
-    return normalize_delegated_argv(delegated_argv, cwd=Path.cwd().resolve())
 
 
 __all__ = [
