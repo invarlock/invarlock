@@ -404,6 +404,7 @@ def test_gpt2_smoke_workflow_is_configured() -> None:
     assert env["INVARLOCK_ALLOW_NETWORK"] == "1"
     assert env["INVARLOCK_SMOKE_MODE"] == "container"
     assert env["INVARLOCK_SMOKE_PROFILE"] == "dev"
+    assert env["INVARLOCK_SMOKE_JOURNEYS"] == "noop,quantized,negative"
     assert env["INVARLOCK_RUNTIME_IMAGE"] == "invarlock-runtime:local"
 
     steps = job["steps"]
@@ -413,8 +414,8 @@ def test_gpt2_smoke_workflow_is_configured() -> None:
     runtime_image = _find_step_by_name(steps, "Build runtime image")
     assert "make runtime-image" in runtime_image["run"]
 
-    smoke = _find_step_by_name(steps, "Run GPT-2 smoke campaign")
-    assert "scripts/run_gpt2_smoke_campaign.sh" in smoke["run"]
+    smoke = _find_step_by_name(steps, "Run GPT-2 user journey smoke")
+    assert "scripts/run_gpt2_user_journey_smoke.sh" in smoke["run"]
 
 
 def test_ci_hf_lockfiles_include_hypothesis_for_property_tests() -> None:

@@ -37,12 +37,14 @@ def test_small_workflow_configs_present() -> None:
         # Presets carry tier context via profile; auto tier may not be set at top-level
 
 
-def test_gpt2_smoke_campaign_script_is_executable() -> None:
+def test_gpt2_user_journey_smoke_script_is_executable() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "run_gpt2_smoke_campaign.sh"
-    assert script_path.exists(), "Expected scripts/run_gpt2_smoke_campaign.sh to exist"
+    script_path = repo_root / "scripts" / "run_gpt2_user_journey_smoke.sh"
+    assert script_path.exists(), (
+        "Expected scripts/run_gpt2_user_journey_smoke.sh to exist"
+    )
     assert os.access(script_path, os.X_OK), (
-        "run_gpt2_smoke_campaign.sh should be executable"
+        "run_gpt2_user_journey_smoke.sh should be executable"
     )
     contents = script_path.read_text(encoding="utf-8")
     assert (
@@ -56,12 +58,13 @@ def test_gpt2_smoke_campaign_script_is_executable() -> None:
     assert "INVARLOCK_SMOKE_CACHE_COMPLETE" in contents
     assert 'ASSURANCE="${INVARLOCK_SMOKE_ASSURANCE:-}"' in contents
     assert 'EDIT_CONFIG="${INVARLOCK_SMOKE_EDIT_CONFIG:-}"' in contents
+    assert 'JOURNEYS_RAW="${INVARLOCK_SMOKE_JOURNEYS:-$DEFAULT_JOURNEYS}"' in contents
     assert "INVARLOCK_SMOKE_QUANTIZED" in contents
-    assert 'EDIT_ARGS=(--edit-config "$EDIT_CONFIG")' in contents
     assert 'assurance=$ASSURANCE' in contents
-    assert 'edit_config=$EDIT_CONFIG' in contents
     assert '--assurance "$ASSURANCE"' in contents
-    assert '"${EDIT_ARGS[@]}"' in contents
+    assert 'record_result "$journey/verify-rejects"' in contents
+    assert "GPT-2 User Journey Smoke Results" in contents
+    assert "journey-results.tsv" in contents
     assert "prefetch_hf_assets_on_host" in contents
     assert "ensure_current_runtime_image" in contents
     assert 'echo "[smoke] refreshing local container runtime image"' in contents
@@ -70,17 +73,11 @@ def test_gpt2_smoke_campaign_script_is_executable() -> None:
     assert "make runtime-image-cuda" in contents
     assert 'export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"' in contents
     assert "prefetching GPT-2 + WikiText-2 into host HF cache" in contents
-    assert "evaluation report verification failed" in contents
-    assert "evidence-pack verification failed" in contents
-    assert 'SMOKE_EXPORT_DIR="$WORK_ROOT/exports"' in contents
-    assert 'mkdir -p "$SMOKE_EXPORT_DIR"' in contents
+    assert "run_evidence_pack_journey" in contents
+    assert "verify rejects mutated report" in contents
     assert (
-        '"${CLI[@]}" report html -i "$EVAL_REPORT" -o "$SMOKE_EXPORT_DIR/evaluation.html"'
+        '"${CLI[@]}" report html -i "$eval_report" -o "$export_dir/evaluation.html" --force'
         in contents
-    )
-    assert (
-        '"${CLI[@]}" report html -i "$EVAL_REPORT" -o "$SMOKE_REPORT_DIR/evaluation.html"'
-        not in contents
     )
 
 
@@ -191,7 +188,7 @@ def test_cli_smoke_negative_exercises_failure_categories() -> None:
     )
 
 
-def test_cli_smoke_realistic_wraps_gpt2_campaign() -> None:
+def test_cli_smoke_realistic_wraps_gpt2_user_journey_smoke() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     script_path = repo_root / "scripts" / "cli_smoke_realistic.sh"
     assert script_path.exists(), "Expected scripts/cli_smoke_realistic.sh to exist"
@@ -201,7 +198,8 @@ def test_cli_smoke_realistic_wraps_gpt2_campaign() -> None:
 
     contents = script_path.read_text(encoding="utf-8")
     assert 'MODE="${INVARLOCK_REALISTIC_SMOKE_MODE:-local}"' in contents
-    assert "run_gpt2_smoke_campaign.sh" in contents
+    assert 'JOURNEYS="${INVARLOCK_REALISTIC_SMOKE_JOURNEYS:-noop,negative}"' in contents
+    assert "run_gpt2_user_journey_smoke.sh" in contents
     assert "lane=realistic exit_code=$RC" in contents
 
 
