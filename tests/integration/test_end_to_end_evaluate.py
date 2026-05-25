@@ -55,8 +55,13 @@ def test_gpt2_smoke_campaign_script_is_executable() -> None:
     assert "command -v invarlock" not in contents
     assert "INVARLOCK_SMOKE_CACHE_COMPLETE" in contents
     assert 'ASSURANCE="${INVARLOCK_SMOKE_ASSURANCE:-}"' in contents
+    assert 'EDIT_CONFIG="${INVARLOCK_SMOKE_EDIT_CONFIG:-}"' in contents
+    assert "INVARLOCK_SMOKE_QUANTIZED" in contents
+    assert 'EDIT_ARGS=(--edit-config "$EDIT_CONFIG")' in contents
     assert 'assurance=$ASSURANCE' in contents
+    assert 'edit_config=$EDIT_CONFIG' in contents
     assert '--assurance "$ASSURANCE"' in contents
+    assert '"${EDIT_ARGS[@]}"' in contents
     assert "prefetch_hf_assets_on_host" in contents
     assert "ensure_current_runtime_image" in contents
     assert 'echo "[smoke] refreshing local container runtime image"' in contents
