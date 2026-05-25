@@ -83,6 +83,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Strict guard blocking checks now reuse the canonical guard-evidence
   normalizer and empirical guard-evidence manifest validation now avoids
   duplicate non-object diagnostics.
+- `quant_rtn` is now explicitly an RTN quantize/dequantize simulation edit:
+  reports distinguish theoretical packed-memory estimates from actual
+  floating-point dequantized storage, canonical plan digests include meaningful
+  edit parameters and selected targets, and the edit emits per-module and
+  aggregate quantization-error metrics.
 
 ### Removed
 
@@ -92,6 +97,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Removed ambiguous `group_size`/4-bit paths from the built-in `quant_rtn`
+  edit contract and sample overlays; real packed quantized artifacts should use
+  adapter-backed or external subject workflows instead of this simulation edit.
 - Fixed the strict assurance trust boundary so host/unverified provenance,
   custom guard order, dev/aggressive profiles, unsupported blocking statuses,
   fallback fields, and missing guard evidence cannot pass as strict assurance.

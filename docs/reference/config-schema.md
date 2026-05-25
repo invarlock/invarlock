@@ -118,13 +118,16 @@ Supported providers: `wikitext2`, `synthetic`, `hf_text`, `local_jsonl`,
 
 ### Edit (built-in quant_rtn)
 
+`quant_rtn` is a deterministic RTN quantize/dequantize simulation. It writes
+floating-point dequantized weights back into the model; use quantized adapters
+or external subject artifacts for deployable packed quantization backends.
+
 ```yaml
 edit:
   name: quant_rtn
   plan:
     bitwidth: 8
     per_channel: true
-    group_size: 128
     clamp_ratio: 0.005
     scope: attn
     max_modules: 12

@@ -357,7 +357,7 @@ def test_evaluate_failed_edited_run_report_exits_before_report_generation(
         tmp_path / "edited.json",
         {
             "status": "failed",
-            "error": "[INVARLOCK:E321] RTN quantization matched no target modules.",
+            "error": "[INVARLOCK:E321] RTN dequantized simulation matched no target modules.",
         },
     )
     report_calls: list[dict[str, object]] = []

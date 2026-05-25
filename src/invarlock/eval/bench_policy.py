@@ -142,7 +142,6 @@ class ConfigurationManager:
             "quant_rtn": {
                 "bitwidth": 8,
                 "per_channel": True,
-                "group_size": 128,
                 "clamp_ratio": 0.0,
                 "scope": "ffn",
             },

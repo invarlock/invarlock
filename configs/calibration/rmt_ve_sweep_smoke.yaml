@@ -25,7 +25,6 @@ edit:
   plan:
     bitwidth: 8
     per_channel: true
-    group_size: 128
     clamp_ratio: 0.0
     scope: "ffn"
     max_modules: 2

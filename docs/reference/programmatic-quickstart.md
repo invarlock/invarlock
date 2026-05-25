@@ -22,7 +22,7 @@ from invarlock.guards.invariants import InvariantsGuard
 adapter = HF_Auto_Adapter()
 model = adapter.load_model("gpt2", device="auto")
 
-edit = RTNQuantEdit(bitwidth=8, per_channel=True, group_size=128, clamp_ratio=0.005)
+edit = RTNQuantEdit(bitwidth=8, per_channel=True, clamp_ratio=0.005)
 guards = [InvariantsGuard()]
 
 config = RunConfig(device="auto")

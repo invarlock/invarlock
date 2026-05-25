@@ -503,6 +503,8 @@ def extract_edit_metadata(
             config_plan = config_section.get("plan")
             if isinstance(config_plan, dict):
                 plan_dict = copy.deepcopy(config_plan)
+            else:
+                plan_dict = copy.deepcopy(config_section)
 
     scope = plan_dict.get("scope") or edit_section.get("scope")
     ranking = plan_dict.get("ranking") or edit_section.get("ranking") or ""
@@ -557,6 +559,9 @@ def extract_edit_metadata(
         "plan_digest": str(edit_section.get("plan_digest") or ""),
         "mask_digest": str(edit_section.get("mask_digest") or ""),
     }
+
+    if plan_dict:
+        edit_metadata["plan"] = copy.deepcopy(plan_dict)
 
     if not budgets:
         edit_metadata.pop("budgets")

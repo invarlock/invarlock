@@ -71,7 +71,7 @@ def test_execute_run_request_halts_before_report_assembly_when_guarded_run_fails
                     context={},
                     evaluation_windows={},
                     status="failed",
-                    error="[INVARLOCK:E321] RTN quantization matched no target modules.",
+                    error="[INVARLOCK:E321] RTN dequantized simulation matched no target modules.",
                 ),
                 object(),
             ),
@@ -105,7 +105,7 @@ def test_execute_run_request_halts_before_report_assembly_when_guarded_run_fails
     assert outcome.failure is not None
     assert (
         outcome.failure.summary
-        == "[INVARLOCK:E321] RTN quantization matched no target modules."
+        == "[INVARLOCK:E321] RTN dequantized simulation matched no target modules."
     )
     assert failure_codes == ["pipeline_failed"]
     assert assemble_calls == []

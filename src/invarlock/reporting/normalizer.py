@@ -110,21 +110,34 @@ def normalize_run_report(report: Mapping[str, Any] | RunReport) -> RunReport:
     edit_in = _as_mapping(src.get("edit"))
     deltas_in = _as_mapping(edit_in.get("deltas"))
     spars_val = deltas_in.get("sparsity")
-    deltas = EditDeltas(
-        params_changed=int(deltas_in.get("params_changed", 0) or 0),
-        sparsity=(float(spars_val) if isinstance(spars_val, int | float) else None),
-        bitwidth_map=(
-            deltas_in.get("bitwidth_map")
-            if isinstance(deltas_in.get("bitwidth_map"), dict)
-            else None
-        ),
-        layers_modified=int(deltas_in.get("layers_modified", 0) or 0),
+    deltas_dict: dict[str, Any] = dict(deltas_in)
+    deltas_dict.update(
+        {
+            "params_changed": int(deltas_in.get("params_changed", 0) or 0),
+            "sparsity": (
+                float(spars_val) if isinstance(spars_val, int | float) else None
+            ),
+            "bitwidth_map": (
+                deltas_in.get("bitwidth_map")
+                if isinstance(deltas_in.get("bitwidth_map"), dict)
+                else None
+            ),
+            "layers_modified": int(deltas_in.get("layers_modified", 0) or 0),
+        }
     )
-    edit = EditInfo(
-        name=_str(edit_in.get("name")),
-        plan_digest=_str(edit_in.get("plan_digest")),
-        deltas=deltas,
-    )
+    edit_dict: dict[str, Any] = {
+        "name": _str(edit_in.get("name")),
+        "plan_digest": _str(edit_in.get("plan_digest")),
+        "deltas": cast(EditDeltas, deltas_dict),
+    }
+    for key, value in edit_in.items():
+        if key in {"name", "plan_digest", "deltas"}:
+            continue
+        if isinstance(value, Mapping):
+            edit_dict[key] = dict(value)
+        else:
+            edit_dict[key] = value
+    edit = cast(EditInfo, edit_dict)
 
     # ---- guards ----
     guards_in = src.get("guards")

@@ -37,7 +37,7 @@ invarlock advanced calibrate null-sweep \
   --tier balanced --tier conservative \
   --n-seeds 10
 
-# Run VE sweep (quant_rtn edit) to calibrate min_effect_lognll
+# Run VE sweep (quant_rtn simulation edit) to calibrate min_effect_lognll
 invarlock advanced calibrate ve-sweep \
   --allow-network \
   --config configs/calibration/rmt_ve_sweep_ci.yaml \
@@ -67,7 +67,8 @@ invarlock advanced calibrate ve-sweep \
   for threshold recommendations.
 - **Null sweep**: Uses a no-op edit to measure baseline spectral behavior and
   derive false-positive-controlled κ caps and α levels.
-- **VE sweep**: Uses a real edit (e.g., `quant_rtn`) to measure variance guard
+- **VE sweep**: Uses a real model modification (e.g., `quant_rtn`
+  quantize/dequantize simulation) to measure variance guard
   predictive gate behavior and recommend `min_effect_lognll`.
 - **Artifacts**: Each sweep emits JSON (machine), CSV (spreadsheet), Markdown
   (human), and a `tiers_patch_*.yaml` recommendation file.

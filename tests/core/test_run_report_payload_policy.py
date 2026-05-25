@@ -141,6 +141,34 @@ def test_build_edit_payload_applies_core_deltas_and_label_override() -> None:
     assert context_edit == {"name": "demo", "params_changed": 4, "layers_modified": 2}
 
 
+def test_build_edit_payload_preserves_plan_and_extended_deltas() -> None:
+    edit_payload, context_edit = build_edit_payload(
+        core_edit={
+            "plan_digest": "sha256:abc",
+            "plan": {
+                "quantization_mode": "rtn_dequantized_weight_edit",
+                "packed_quantized_storage": False,
+            },
+            "deltas": {
+                "params_changed": 4,
+                "layers_modified": 1,
+                "storage_format": "float_dequantized",
+                "runtime_memory_reduction": False,
+            },
+        },
+        edit_name="quant_rtn",
+    )
+
+    assert edit_payload["plan"]["quantization_mode"] == "rtn_dequantized_weight_edit"
+    assert edit_payload["deltas"]["storage_format"] == "float_dequantized"
+    assert edit_payload["deltas"]["runtime_memory_reduction"] is False
+    assert context_edit == {
+        "name": "quant_rtn",
+        "params_changed": 4,
+        "layers_modified": 1,
+    }
+
+
 def test_merge_core_timing_metrics_coerces_numeric_and_preserves_bad_values() -> None:
     merged = merge_core_timing_metrics(
         {"prepare": 0.1},
