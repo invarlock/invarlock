@@ -175,7 +175,7 @@ all = [
 dev = [
   "pytest>=7.0",
   "pytest-cov>=4.0",
-  "ruff==0.15.13",
+  "ruff==0.15.14",
   "black>=23.0",
   "mypy>=1.0",
   "hypothesis>=6.98",
@@ -196,7 +196,7 @@ ci = [
   "pytest>=7.0",
   "pytest-cov>=4.0",
   "hypothesis>=6.98",
-  "ruff==0.15.13",
+  "ruff==0.15.14",
   "mypy>=1.0",
   "mkdocs>=1.5",
   "mkdocs-material>=9.5",
