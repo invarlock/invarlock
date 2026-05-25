@@ -38,7 +38,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Consolidated open dependency/security PR content into this branch: CodeQL
   action SHA refresh, Ruff 0.15.13, `idna>=3.15`, and
   `pymdown-extensions>=10.21.3`.
-- Version metadata, docs links, and citation metadata now target v0.9.0.
 - Durable assurance and reference docs now describe the current strict contract
   without patch-release dating, and assurance documentation filenames now use
   numbered prefixes consistently except for the glossary.
