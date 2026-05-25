@@ -66,6 +66,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Config-driven run execution now uses `ConfigExecutionRequest` as the
   canonical request object across public command plumbing, internal delegated
   execution, and container-launch argv serialization.
+- `ConfigExecutionRequest` now generates delegated argparse and internal argv
+  serialization from the same request field specs, removing the remaining
+  duplicated config-run option plumbing.
 - GPT-2 smoke coverage now uses a user-journey runner with configurable
   no-op, quantized-subject, and expected verifier-failure journeys plus a final
   results table.

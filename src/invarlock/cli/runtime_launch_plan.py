@@ -186,27 +186,6 @@ def build_current_process_container_launch_plan(
     return normalize_delegated_argv(delegated_argv, cwd=Path.cwd().resolve())
 
 
-def _append_option(argv: list[str], flag: str, value: object | None) -> None:
-    if value is None:
-        return
-    argv.extend([flag, str(value)])
-
-
-def _append_bool_flag(argv: list[str], flag: str, enabled: bool) -> None:
-    if enabled:
-        argv.append(flag)
-
-
-def _command_name_tokens(command_name: str | Iterable[str]) -> list[str]:
-    if isinstance(command_name, str):
-        return [command_name]
-    return [str(token) for token in command_name]
-
-
-def _command_name_string(command_name: str | Iterable[str]) -> str:
-    return " ".join(_command_name_tokens(command_name))
-
-
 def build_request_container_launch_plan(
     command_name: str | Iterable[str],
     request: ConfigExecutionRequest,

@@ -90,18 +90,6 @@ def test_runtime_launch_plan_helper_functions_cover_device_and_flag_parsing(
         is False
     )
 
-    options: list[str] = []
-    runtime_launch_plan._append_option(options, "--config", None)
-    runtime_launch_plan._append_bool_flag(options, "--progress", False)
-    assert options == []
-    runtime_launch_plan._append_option(options, "--config", "cfg.yaml")
-    runtime_launch_plan._append_bool_flag(options, "--progress", True)
-    assert options == ["--config", "cfg.yaml", "--progress"]
-    assert runtime_launch_plan._command_name_string("run") == "run"
-    assert runtime_launch_plan._command_name_string(("advanced", "calibrate")) == (
-        "advanced calibrate"
-    )
-
 
 def test_normalize_delegated_argv_rejects_explicit_cuda_without_nvidia_visibility(
     monkeypatch: pytest.MonkeyPatch,
@@ -284,16 +272,16 @@ def test_normalize_delegated_argv_rewrites_paths_and_builders(
         "ppl_causal",
         "--probes",
         "4",
-        "--until-pass",
         "--max-attempts",
         "5",
         "--timeout",
         "120",
         "--baseline",
         "baseline",
-        "--no-cleanup",
         "--style",
         "audit",
+        "--until-pass",
+        "--no-cleanup",
         "--progress",
         "--timing",
         "--telemetry",

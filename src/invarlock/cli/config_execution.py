@@ -66,6 +66,12 @@ class ConfigExecutionRequest:
         ("baseline", "--baseline"),
         ("style", "--style"),
     )
+    VALUE_ARG_KWARGS: ClassVar[dict[str, dict[str, Any]]] = {
+        "config": {"aliases": ("-c",), "required": True},
+        "probes": {"type": int},
+        "max_attempts": {"type": int, "default": 3},
+        "timeout": {"type": int},
+    }
     BOOL_ARG_SPECS: ClassVar[tuple[tuple[str, str], ...]] = (
         ("until_pass", "--until-pass"),
         ("no_cleanup", "--no-cleanup"),
@@ -82,6 +88,8 @@ class ConfigExecutionRequest:
         "allow_remote_code",
         "allow_unverified_provenance",
     )
+    INTERNAL_ARG_DEFAULTS: ClassVar[dict[str, object]] = {"device": "auto"}
+    INTERNAL_OMIT_DEFAULTS: ClassVar[dict[str, object]] = {"max_attempts": 3}
 
     @classmethod
     def field_names(cls) -> tuple[str, ...]:
@@ -100,19 +108,10 @@ class ConfigExecutionRequest:
 
     @classmethod
     def add_argparse_arguments(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("--config", "-c", required=True)
-        parser.add_argument("--device")
-        parser.add_argument("--profile")
-        parser.add_argument("--out")
-        parser.add_argument("--edit")
-        parser.add_argument("--edit-label")
-        parser.add_argument("--tier")
-        parser.add_argument("--metric-kind")
-        parser.add_argument("--probes", type=int)
-        parser.add_argument("--max-attempts", type=int, default=3)
-        parser.add_argument("--timeout", type=int)
-        parser.add_argument("--baseline")
-        parser.add_argument("--style")
+        for attr, flag in cls.VALUE_ARG_SPECS:
+            kwargs = dict(cls.VALUE_ARG_KWARGS.get(attr, {}))
+            aliases = tuple(kwargs.pop("aliases", ()))
+            parser.add_argument(flag, *aliases, dest=attr, **kwargs)
         for attr, flag in cls.BOOL_ARG_SPECS:
             parser.add_argument(flag, dest=attr, action="store_true")
 
@@ -133,31 +132,17 @@ class ConfigExecutionRequest:
     def to_internal_argv(self, command_name: str | Iterable[str]) -> list[str]:
         argv: list[str] = []
         _append_option(argv, "--invoked-command", _command_name_string(command_name))
-        _append_option(argv, "--config", self.config)
-        _append_option(argv, "--device", self.device or "auto")
-        _append_option(argv, "--profile", self.profile)
-        _append_option(argv, "--out", self.out)
-        _append_option(argv, "--edit", self.edit)
-        _append_option(argv, "--edit-label", self.edit_label)
-        _append_option(argv, "--tier", self.tier)
-        _append_option(argv, "--metric-kind", self.metric_kind)
-        _append_option(argv, "--probes", self.probes)
-        _append_bool_flag(argv, "--until-pass", self.until_pass)
-        if int(self.max_attempts) != 3:
-            _append_option(argv, "--max-attempts", self.max_attempts)
-        _append_option(argv, "--timeout", self.timeout)
-        _append_option(argv, "--baseline", self.baseline)
-        _append_bool_flag(argv, "--no-cleanup", self.no_cleanup)
-        _append_option(argv, "--style", self.style)
-        _append_bool_flag(argv, "--progress", self.progress)
-        _append_bool_flag(argv, "--timing", self.timing)
-        _append_bool_flag(argv, "--telemetry", self.telemetry)
-        _append_bool_flag(argv, "--no-color", self.no_color)
-        _append_bool_flag(
-            argv,
-            "--prefer-local-files-only",
-            self.prefer_local_files_only,
-        )
+        for attr, flag in self.VALUE_ARG_SPECS:
+            value = getattr(self, attr)
+            if value is None and attr in self.INTERNAL_ARG_DEFAULTS:
+                value = self.INTERNAL_ARG_DEFAULTS[attr]
+            if attr in self.INTERNAL_OMIT_DEFAULTS:
+                default = self.INTERNAL_OMIT_DEFAULTS[attr]
+                if value is None or str(value) == str(default):
+                    continue
+            _append_option(argv, flag, value)
+        for attr, flag in self.BOOL_ARG_SPECS:
+            _append_bool_flag(argv, flag, getattr(self, attr))
         return argv
 
 
