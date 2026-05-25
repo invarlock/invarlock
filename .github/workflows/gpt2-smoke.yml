@@ -22,6 +22,7 @@ jobs:
       INVARLOCK_DEDUP_TEXTS: "1"
       INVARLOCK_SMOKE_MODE: "container"
       INVARLOCK_SMOKE_PROFILE: "dev"
+      INVARLOCK_SMOKE_JOURNEYS: "noop,quantized,negative"
       INVARLOCK_RUNTIME_IMAGE: "invarlock-runtime:local"
     steps:
       - name: Checkout
@@ -49,5 +50,5 @@ jobs:
         run: |
           make runtime-image
 
-      - name: Run GPT-2 smoke campaign
-        run: bash scripts/run_gpt2_smoke_campaign.sh "$RUNNER_TEMP/invarlock-gpt2-smoke"
+      - name: Run GPT-2 user journey smoke
+        run: bash scripts/run_gpt2_user_journey_smoke.sh "$RUNNER_TEMP/invarlock-gpt2-smoke"
