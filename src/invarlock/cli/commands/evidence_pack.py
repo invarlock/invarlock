@@ -64,7 +64,7 @@ def verify_command(
         "--report-assurance",
         help=(
             "Nested report assurance mode: report honors each report, strict "
-            "requires strict assurance, off skips nested report verification."
+            "requires strict assurance, off verifies reports with assurance disabled."
         ),
     ),
 ) -> None:

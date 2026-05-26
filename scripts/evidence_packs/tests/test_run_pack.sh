@@ -247,6 +247,28 @@ test_run_pack_release_review_rejects_dev_verify_profile() {
     unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
 }
 
+test_run_pack_release_review_rejects_weak_report_assurance() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    PACK_RELEASE_REVIEW=1
+    PACK_REQUIRE_PASS=1
+    PACK_VERIFY_PROFILE=ci
+    PACK_REPORT_ASSURANCE=report
+    PACK_SIGN_MANIFEST=1
+    PACK_REQUIRE_RUNTIME_MANIFESTS=1
+    export PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
+    export PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+
+    run pack_validate_release_review_settings
+    assert_rc "1" "${RUN_RC}" "release-review rejects weak report assurance"
+    assert_match "PACK_REPORT_ASSURANCE=strict" "${RUN_ERR}" "strict report assurance is required"
+
+    unset PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
+    unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+}
+
 test_run_pack_release_review_cli_preserves_and_rejects_explicit_dev_profile() {
     mock_reset
 

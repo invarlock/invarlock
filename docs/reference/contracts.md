@@ -55,7 +55,7 @@ The CLI exposes these contracts directly:
 - `invarlock advanced evidence-pack verify --json`
 - `invarlock advanced policy build`
 - `invarlock advanced policy verify`
-- `scripts/evidence_packs/verify_pack.sh --strict --report-assurance strict`
+- `scripts/evidence_packs/verify_pack.sh --pack <dir> --strict --report-assurance strict`
 
 The first seven surfaces are available from installed packages. The low-level
 `invarlock advanced runtime-verify` command is the package-native

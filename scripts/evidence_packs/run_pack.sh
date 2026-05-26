@@ -358,8 +358,8 @@ pack_validate_release_review_settings() {
         echo "ERROR: release-review mode rejects PACK_VERIFY_PROFILE=dev." >&2
         return 1
     fi
-    if [[ -z "${PACK_REPORT_ASSURANCE:-}" || "${PACK_REPORT_ASSURANCE}" == "off" ]]; then
-        echo "ERROR: release-review mode requires explicit report assurance." >&2
+    if [[ "${PACK_REPORT_ASSURANCE:-}" != "strict" ]]; then
+        echo "ERROR: release-review mode requires PACK_REPORT_ASSURANCE=strict." >&2
         return 1
     fi
 }
