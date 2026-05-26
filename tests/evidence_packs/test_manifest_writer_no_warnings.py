@@ -85,6 +85,57 @@ def test_write_source_repo_metadata_fails_closed_without_git(tmp_path: Path) -> 
     assert not out_path.exists()
 
 
+def test_write_source_repo_metadata_uses_explicit_snapshot_marker_without_git(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = (
+        repo_root
+        / "scripts"
+        / "evidence_packs"
+        / "python"
+        / "write_source_repo_metadata.py"
+    )
+    out_path = tmp_path / "source_repo.json"
+    marker_path = tmp_path / "GPU_RUN_SOURCE.txt"
+    marker_path.write_text(
+        "\n".join(
+            [
+                "source_commit=26ca525bb9769f948c636c3ed9e7fcf0c2370daf",
+                "source_branch=staging/next",
+                "source_describe=staging-next-test",
+                "source_uri=https://example.invalid/invarlock.git",
+                "source_dirty=false",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    empty_path = tmp_path / "empty-bin"
+    empty_path.mkdir()
+
+    proc = subprocess.run(
+        [sys.executable, str(script), "--out", str(out_path)],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+        env={
+            **os.environ,
+            "PATH": str(empty_path),
+            "INVARLOCK_SOURCE_REPO_MARKER": str(marker_path),
+        },
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(out_path.read_text(encoding="utf-8"))
+    assert payload["commit"] == "26ca525bb9769f948c636c3ed9e7fcf0c2370daf"
+    assert payload["branch"] == "staging/next"
+    assert payload["describe"] == "staging-next-test"
+    assert payload["dirty"] is False
+    assert payload["metadata_source"] == str(marker_path)
+
+
 def test_manifest_writer_uses_existing_source_repo_metadata_without_git(
     tmp_path: Path,
 ) -> None:

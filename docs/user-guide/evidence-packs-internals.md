@@ -622,9 +622,15 @@ Maintainer evidence-pack packaging also treats source provenance as fail-closed:
 
 - `run_pack.sh` writes `metadata/source_repo.json` from the active Git checkout.
 - If `git` is unavailable or the repository metadata cannot be collected, pack
-  creation stops instead of silently emitting partial provenance.
+  creation stops instead of silently emitting partial provenance unless an
+  explicit snapshot marker is present.
+- Detached artifact-tree runs may provide `GPU_RUN_SOURCE.txt` in the repository
+  root, or point `INVARLOCK_SOURCE_REPO_MARKER` at an equivalent key-value file.
+  The marker must include `source_commit=<40-hex-commit>` and may include
+  `source_branch`, `source_describe`, `source_uri`, and `source_dirty`.
 - If you need to package from a detached artifact tree, write a complete
-  `metadata/source_repo.json` first rather than relying on fallback inference.
+  `metadata/source_repo.json` first or provide that explicit snapshot marker
+  rather than relying on fallback inference.
 
 ## Remote setup helper
 
