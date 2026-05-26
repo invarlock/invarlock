@@ -9,6 +9,23 @@ pack_test_sign_manifest() {
         >/dev/null
 }
 
+test_run_pack_collect_reports_ignores_hidden_pack_staging_dirs() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    local run_dir="${TEST_TMPDIR}/run"
+    mkdir -p "${run_dir}/modelA/reports/edit/run_1"
+    mkdir -p "${run_dir}/.evidence_pack.tmp.stale/reports/modelA/edit/run_1"
+    echo "{}" > "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json"
+    echo "{}" > "${run_dir}/.evidence_pack.tmp.stale/reports/modelA/edit/run_1/evaluation.report.json"
+
+    local reports
+    reports="$(pack_collect_reports "${run_dir}")"
+
+    assert_eq "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json" "${reports}" "stale hidden pack staging reports are ignored"
+}
+
 test_run_pack_build_pack_collects_artifacts() {
     mock_reset
 

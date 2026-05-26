@@ -124,7 +124,9 @@ pack_copy_report_sidecars() {
 
 pack_collect_reports() {
     local run_dir="$1"
-    find "${run_dir}" -type f -name "evaluation.report.json" -path "*/reports/*" | sort
+    find "${run_dir}" \
+        -type d -name ".*.tmp.*" -prune \
+        -o -type f -name "evaluation.report.json" -path "*/reports/*" -print | sort
 }
 
 pack_report_rel_path() {
