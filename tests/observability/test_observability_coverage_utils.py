@@ -158,6 +158,33 @@ def test_utils_false_paths_and_custom_logger(monkeypatch):
         fail_once()
     assert sleeps == []
 
+    callback_contexts = []
+
+    @utils.timing_decorator(auto_log=True, callback=callback_contexts.append)
+    def timed_value():
+        return "ok"
+
+    assert timed_value() == "ok"
+    assert callback_contexts
+
+    monkeypatch.setattr(utils.torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(utils.torch.cuda, "device_count", lambda: 1)
+    monkeypatch.setattr(utils.torch.cuda, "get_device_name", lambda index: "cuda-test")
+    utils.torch.version.cuda = "12.8"
+    info_cuda = utils.get_system_info()
+    assert info_cuda["gpu"]["gpu_available"] is True
+    assert info_cuda["gpu"]["gpu_names"] == ["cuda-test"]
+
+    assert utils.format_bytes(1024**6) == "1024.0 PB"
+    assert utils.safe_divide("bad", 2, default=-1) == -1
+
+    @utils.retry_with_backoff(max_attempts=0, base_delay=0.01)
+    def never_called():
+        return "unreachable"
+
+    with pytest.raises(RuntimeError, match="Failed after all retry attempts"):
+        never_called()
+
     class Recorder:
         def __init__(self) -> None:
             self.messages: list[str] = []

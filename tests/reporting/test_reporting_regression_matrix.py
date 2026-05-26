@@ -559,6 +559,27 @@ def test_verify_helpers_and_contract_cover_profile_parse_and_recompute_edges(
             json_mode=False,
         )
 
+    basis_errors: list[str] = []
+    assert (
+        verify_contract_mod._append_recompute_errors(  # noqa: SLF001
+            basis_errors,
+            cert_obj={
+                "primary_metric": {
+                    "kind": "ppl_causal",
+                    "analysis_point_final": 0.0,
+                },
+                "evaluation_windows": {
+                    "final": {"logloss": [1.0], "token_counts": [1]}
+                },
+            },
+            prof="dev",
+            tol=1e-9,
+            json_mode=True,
+        )
+        == ()
+    )
+    assert any("Basis mismatch" in error for error in basis_errors)
+
 
 def test_validate_variance_enablement_rejects_missing_gate_provenance() -> None:
     report = {

@@ -3,6 +3,7 @@
 from unittest.mock import Mock, patch
 
 import numpy as np
+import pytest
 import torch
 import torch.nn as nn
 
@@ -496,3 +497,68 @@ class TestMIRealExecutionCoverage:
             assert scores[0].shape == (6,)
             assert torch.any(scores[0] == 0.0)
             assert torch.any(scores[0] > 0.0)
+
+
+def test_lazy_mutual_info_regression_reports_missing_sklearn(monkeypatch):
+    import builtins
+
+    real_import = builtins.__import__
+
+    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "sklearn.feature_selection":
+            raise ImportError("missing sklearn")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+
+    with pytest.raises(ModuleNotFoundError, match="scikit-learn"):
+        mi_mod.mutual_info_regression([[0.0]], [0.0])
+
+
+def test_lazy_mutual_info_regression_delegates_to_sklearn(monkeypatch):
+    import builtins
+
+    real_import = builtins.__import__
+
+    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "sklearn.feature_selection":
+            return Mock(mutual_info_regression=lambda *_args, **_kwargs: [0.75])
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+
+    assert mi_mod.mutual_info_regression([[0.0]], [0.0]) == [0.75]
+
+
+def test_mi_hook_ignores_non_tensor_activation_outputs():
+    class NonTensorFC(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.weight = nn.Parameter(torch.randn(3, 3))
+
+        def forward(self, x):
+            return {"activation": x}
+
+    class Model(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.config = Mock(n_layer=1)
+            block = nn.Module()
+            block.mlp = nn.Module()
+            block.mlp.c_fc = NonTensorFC()
+            self.transformer = nn.Module()
+            self.transformer.h = nn.ModuleList([block])
+            self.dummy_param = nn.Parameter(torch.randn(1))
+
+        def forward(self, input_ids):
+            self.transformer.h[0].mlp.c_fc(torch.randn(*input_ids.shape, 3))
+            return Mock(logits=torch.randn(*input_ids.shape, 10))
+
+    scores = mi_mod.compute_neuron_mi_scores(
+        Model(),
+        [{"input_ids": torch.tensor([[1, 2, 3]])}],
+        oracle_windows=1,
+    )
+
+    assert len(scores) == 1
+    assert torch.equal(scores[0], torch.zeros(3))

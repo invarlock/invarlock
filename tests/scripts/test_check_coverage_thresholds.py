@@ -121,7 +121,8 @@ def test_checker_uses_canonical_coverage_policy_module(monkeypatch) -> None:
 
 
 def test_overrides_take_precedence(tmp_path: Path) -> None:
-    # Explicit overrides should win over a stricter core-floor flag.
+    # Explicit critical-file overrides now require branch-complete coverage and
+    # win over a looser core-floor flag.
     xml = tmp_path / "cov.xml"
     json_out = tmp_path / "out.json"
     _write_cov_xml(
@@ -132,19 +133,18 @@ def test_overrides_take_precedence(tmp_path: Path) -> None:
     assert "src/invarlock/reporting/run_report_formatters.py" in proc.stderr
 
     _write_cov_xml(
-        xml, [("src/invarlock/reporting/run_report_formatters.py", 0.95, 0.90)]
+        xml, [("src/invarlock/reporting/run_report_formatters.py", 1.0, 1.0)]
     )
     proc = _run_checker(xml, json_out, extra_args=["--core-floor", "0.95"])
 
-    # Should pass with the explicit 95% override applied
+    # Should pass with the explicit 100% override applied.
     assert proc.returncode == 0, proc.stderr
     payload = json.loads(json_out.read_text())
     assert payload["status"] == "ok"
     files = {f["path"]: f for f in payload["files"]}
     assert (
         abs(
-            files["src/invarlock/reporting/run_report_formatters.py"]["threshold"]
-            - 0.95
+            files["src/invarlock/reporting/run_report_formatters.py"]["threshold"] - 1.0
         )
         < 1e-9
     )

@@ -103,6 +103,8 @@ def test_quant_rtn_normalizers_cover_string_and_invalid_inputs() -> None:
     assert RTNQuantEdit._normalize_per_channel_option("off", default=True) is False
     with pytest.raises(ValueError, match="per_channel"):
         RTNQuantEdit._normalize_per_channel_option("sometimes")
+    with pytest.raises(ValueError, match="per_channel"):
+        RTNQuantEdit._normalize_per_channel_option(1)
 
     selectors = RTNQuantEdit._normalize_module_selectors(
         {
@@ -365,6 +367,10 @@ def test_quant_rtn_can_edit_and_limit_targets() -> None:
             "module_names": ["transformer.wte"],
         }
     )
+    assert RTNQuantEdit(scope="all")._has_matching_module_name(["transformer.wte"])
+    assert RTNQuantEdit._module_names_from_model_desc(
+        {"module_names": {}, "target_modules": ["mlp.c_fc"]}
+    ) == ["mlp.c_fc"]
 
     targets = [
         _target(str(index), torch.nn.Linear(2, 2, bias=False)) for index in range(3)

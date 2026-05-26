@@ -5,6 +5,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 
 def _repo_root() -> Path:
@@ -432,6 +433,88 @@ def test_empirical_guard_evidence_legacy_wrapper_paths(tmp_path: Path) -> None:
     payload_none._validate_guard_rows(none_failures)
     payload_none._validate_model_family_rows(none_failures)
     assert none_failures == []
+
+
+def test_empirical_guard_evidence_wrapper_counts_invalid_dict_rows(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "empirical"
+    root.mkdir()
+    artifact = root / "artifact.json"
+    artifact.write_text('{"ok": true}', encoding="utf-8")
+    module = _checker_module()
+    failures: list[str] = []
+
+    module._validate_guard_rows(
+        root,
+        {
+            "guard_rows": [
+                {
+                    "guard": "spectral",
+                    "evidence_kind": "calibration_null_sweep",
+                    "status": "fallback",
+                    "model_family": "gpt2",
+                    "artifact": "artifact.json",
+                }
+            ]
+        },
+        failures,
+    )
+
+    assert any("guard_rows[0].status must be empirical" in item for item in failures)
+    assert any("missing guard rows" in item for item in failures)
+
+
+def test_empirical_guard_evidence_contract_empty_guard_rows(tmp_path: Path) -> None:
+    from evidence_contracts import EmpiricalGuardEvidenceManifest
+
+    manifest = EmpiricalGuardEvidenceManifest(
+        root=tmp_path,
+        payload={
+            "schema": "invarlock/empirical-guard-evidence-v1",
+            "source_commands": ["scripts/model_evidence_sweep.py"],
+            "guard_rows": [],
+            "model_family_rows": [{"model_family": "gpt2", "status": "observed"}],
+        },
+    )
+
+    failures = manifest.validate()
+
+    assert "empirical evidence guard_rows must be a non-empty list." in failures
+
+
+def test_offline_bundle_manifest_handles_unreadable_member(monkeypatch, tmp_path: Path):
+    import evidence_contracts
+    from evidence_contracts import OfflineBundleManifest
+
+    class FakeTar:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_exc):
+            return False
+
+        def getmembers(self):
+            return [
+                SimpleNamespace(
+                    name="release_manifest.json",
+                    isfile=lambda: True,
+                )
+            ]
+
+        def extractfile(self, _member):
+            return None
+
+    monkeypatch.setattr(evidence_contracts.tarfile, "open", lambda *_a, **_k: FakeTar())
+    failures: list[str] = []
+
+    manifest = OfflineBundleManifest.load_from_tarball(
+        tmp_path / "offline.tar.gz",
+        failures,
+    )
+
+    assert manifest.payload is None
+    assert any("manifest unreadable" in failure for failure in failures)
 
 
 def test_empirical_guard_evidence_contract_non_object_manifest(

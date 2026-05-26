@@ -78,6 +78,32 @@ def test_validate_uses_dict_finalize_path() -> None:
     result = guard.validate(model=None, adapter=None, context={})
 
     assert result["passed"] is False
+
+
+def test_validate_rmt_guard_dict_path_marks_activation_required_unsupported() -> None:
+    guard = SimpleNamespace(
+        finalize=lambda *_args: {
+            "passed": False,
+            "decision": "block",
+            "metrics": {
+                "activation_required": True,
+                "activation_ready": False,
+                "activation_reason": "activation_required",
+            },
+            "errors": ["boom"],
+        }
+    )
+
+    result = runtime_helpers.validate_rmt_guard(
+        guard, model=None, adapter=None, context={}
+    )
+
+    assert result.extras == {
+        "supported": False,
+        "reason": "activation_required",
+        "assurance_blocking": True,
+        "status": "unsupported",
+    }
     assert result["decision"] == "block"
     assert result["violations"] == [
         {"type": "rmt_error", "severity": "error", "message": "boom"}
