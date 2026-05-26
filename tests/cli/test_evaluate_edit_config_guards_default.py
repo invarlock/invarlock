@@ -73,7 +73,8 @@ def test_evaluate_edit_config_includes_guard_order(tmp_path: Path, monkeypatch):
     evaluate_mod.evaluate_command(
         baseline="gpt2",
         subject="gpt2",
-        adapter="hf_causal",
+        baseline_adapter="hf_causal",
+        subject_adapter="hf_causal",
         profile="dev",
         tier="balanced",
         preset=str(preset),

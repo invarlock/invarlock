@@ -22,6 +22,7 @@ def save_evaluation_bundle(
     output_dir: str | Path,
     evaluation_report: dict[str, Any],
     source_run_path: str | Path | None = None,
+    render_optional: bool = True,
 ) -> dict[str, Path]:
     """Persist a prebuilt evaluation bundle and related manifest artifacts."""
     if not validate_report(evaluation_report):
@@ -37,10 +38,12 @@ def save_evaluation_bundle(
     report_json_path.write_text(report_json, encoding="utf-8")
     saved_files["report"] = report_json_path
 
-    report_md = render_report_markdown(evaluation_report)
-    report_md_path = output_path / "evaluation_report.md"
-    report_md_path.write_text(report_md, encoding="utf-8")
-    saved_files["report_md"] = report_md_path
+    report_md_path: Path | None = None
+    if render_optional:
+        report_md = render_report_markdown(evaluation_report)
+        report_md_path = output_path / "evaluation_report.md"
+        report_md_path.write_text(report_md, encoding="utf-8")
+        saved_files["report_md"] = report_md_path
 
     if source_run_path is not None:
         try:
@@ -96,14 +99,15 @@ def save_evaluation_bundle(
         if backend_inventory_path is not None:
             saved_files["backend_inventory"] = backend_inventory_path
 
-    write_report_manifest(
-        report=run_report,
-        output_path=output_path,
-        evaluation_report=evaluation_report,
-        report_json_path=report_json_path,
-        report_md_path=report_md_path,
-        saved_files=saved_files,
-    )
+    if render_optional and report_md_path is not None:
+        write_report_manifest(
+            report=run_report,
+            output_path=output_path,
+            evaluation_report=evaluation_report,
+            report_json_path=report_json_path,
+            report_md_path=report_md_path,
+            saved_files=saved_files,
+        )
 
     return saved_files
 

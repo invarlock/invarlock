@@ -165,6 +165,7 @@ def generate_reports(
     compare: str | None = None,
     baseline: str | None = None,
     output: str | None = None,
+    render_optional: bool = True,
 ) -> ReportGenerationResult:
     primary_report = load_report_payload(run)
     compare_report = load_report_payload(compare) if compare else None
@@ -228,6 +229,7 @@ def generate_reports(
                 output_dir=output_dir,
                 evaluation_report=evaluation_report,
                 source_run_path=run,
+                render_optional=render_optional,
             )
         )
 

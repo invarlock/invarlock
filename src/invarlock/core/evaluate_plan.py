@@ -29,8 +29,11 @@ class EvaluateExecutionPolicy:
 class EvaluateCommandPlan:
     profile_name: str
     tier_name: str
-    adapter_name: str
+    baseline_adapter_name: str
+    subject_adapter_name: str
     adapter_auto: bool
+    baseline_adapter_auto: bool
+    subject_adapter_auto: bool
     preset_path: Path
     preset_data: dict[str, Any]
     guards_order: list[str]
@@ -335,7 +338,6 @@ def build_evaluate_command_plan(
     *,
     baseline_model_id: str,
     subject_model_id: str,
-    adapter: str,
     profile: object,
     tier: object,
     preset: str | None,
@@ -344,6 +346,8 @@ def build_evaluate_command_plan(
     edit_label: str | None,
     resolve_auto_adapter_fn: Any,
     load_yaml_fn: Any,
+    baseline_adapter: str = "auto",
+    subject_adapter: str = "auto",
     tmp_dir_candidate: str | None = None,
     assurance_mode: str = "strict",
     execution_mode: str = "container",
@@ -352,13 +356,26 @@ def build_evaluate_command_plan(
     profile_name = stable_text(profile, "dev")
     tier_name = stable_text(tier, "balanced")
     normalized_assurance_mode = normalize_assurance_mode(assurance_mode)
-    adapter_name = adapter
-    adapter_auto = str(adapter).strip().lower() in {"auto", "auto_hf"}
-    if adapter_auto:
-        adapter_name = resolve_auto_adapter_fn(baseline_model_id)
+
+    def _resolve_side_adapter(raw_adapter: str, model_id: str) -> tuple[str, bool]:
+        raw_adapter_name = stable_text(raw_adapter, "auto")
+        is_auto = raw_adapter_name.strip().lower() in {"auto", "auto_hf"}
+        if is_auto:
+            return str(resolve_auto_adapter_fn(model_id)), True
+        return raw_adapter_name, False
+
+    baseline_adapter_name, baseline_adapter_auto = _resolve_side_adapter(
+        baseline_adapter,
+        baseline_model_id,
+    )
+    subject_adapter_name, subject_adapter_auto = _resolve_side_adapter(
+        subject_adapter,
+        subject_model_id,
+    )
+    adapter_auto = baseline_adapter_auto or subject_adapter_auto
 
     preset_path, preset_data = load_evaluate_preset_data(
-        adapter_name=str(adapter_name),
+        adapter_name=str(subject_adapter_name),
         preset=preset,
         load_yaml_fn=load_yaml_fn,
     )
@@ -376,12 +393,16 @@ def build_evaluate_command_plan(
     )
     if assurance_errors:
         raise ValueError("; ".join(assurance_errors))
-    normalized_source_model_id = normalize_model_id(baseline_model_id, adapter_name)
-    normalized_subject_model_id = normalize_model_id(subject_model_id, adapter_name)
+    normalized_source_model_id = normalize_model_id(
+        baseline_model_id, baseline_adapter_name
+    )
+    normalized_subject_model_id = normalize_model_id(
+        subject_model_id, subject_adapter_name
+    )
     baseline_config = build_baseline_run_config(
         preset_data,
         model_id=normalized_source_model_id,
-        adapter_name=str(adapter_name),
+        adapter_name=str(baseline_adapter_name),
         output_dir=str(Path(out) / "source"),
         profile=profile_name,
         tier=tier_name,
@@ -392,8 +413,11 @@ def build_evaluate_command_plan(
     return EvaluateCommandPlan(
         profile_name=profile_name,
         tier_name=tier_name,
-        adapter_name=str(adapter_name),
+        baseline_adapter_name=str(baseline_adapter_name),
+        subject_adapter_name=str(subject_adapter_name),
         adapter_auto=adapter_auto,
+        baseline_adapter_auto=baseline_adapter_auto,
+        subject_adapter_auto=subject_adapter_auto,
         preset_path=preset_path,
         preset_data=preset_data,
         guards_order=guards_order,

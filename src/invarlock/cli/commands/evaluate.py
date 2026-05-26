@@ -350,7 +350,8 @@ def evaluate_command(
     baseline: str,
     subject: str,
     baseline_report: str | None = None,
-    adapter: str = "auto",
+    baseline_adapter: str = "auto",
+    subject_adapter: str = "auto",
     device: str | None = None,
     profile: str = "ci",
     tier: str = "balanced",
@@ -364,6 +365,7 @@ def evaluate_command(
     banner: bool = True,
     style: str = "audit",
     timing: bool = False,
+    timing_json: str | None = None,
     progress: bool = True,
     execution_mode: str = "container",
     allow_network: bool = False,
@@ -371,6 +373,7 @@ def evaluate_command(
     allow_third_party_plugins: bool = False,
     allow_remote_code: bool = False,
     assurance: str = "strict",
+    defer_report_rendering: bool = False,
     no_color: bool = False,
 ):
     """Evaluate two checkpoints (baseline vs subject) with pinned windows."""
@@ -405,7 +408,7 @@ def evaluate_command(
     console = cli_output.make_console(no_color=not output_style.color)
     timings: dict[str, float] = {}
     total_start: float | None = (
-        cli_output.perf_counter() if output_style.timing else None
+        cli_output.perf_counter() if output_style.timing or timing_json else None
     )
 
     def _info(message: str, *, tag: str = "INFO", emoji: str | None = None) -> None:
@@ -433,7 +436,8 @@ def evaluate_command(
         plan = build_evaluate_command_plan(
             baseline_model_id=src_id,
             subject_model_id=edt_id,
-            adapter=adapter,
+            baseline_adapter=baseline_adapter,
+            subject_adapter=subject_adapter,
             profile=profile,
             tier=tier,
             preset=preset,
@@ -453,8 +457,14 @@ def evaluate_command(
         _fail(str(exc), exit_code=2)
     profile_name = plan.profile_name
     tier_name = plan.tier_name
-    eff_adapter = plan.adapter_name
+    baseline_eff_adapter = plan.baseline_adapter_name
+    subject_eff_adapter = plan.subject_adapter_name
     adapter_auto = plan.adapter_auto
+    adapter_display = (
+        subject_eff_adapter
+        if baseline_eff_adapter == subject_eff_adapter
+        else f"{baseline_eff_adapter}->{subject_eff_adapter}"
+    )
 
     show_banner = bool(banner) and verbosity >= VERBOSITY_DEFAULT
     if show_banner:
@@ -463,12 +473,15 @@ def evaluate_command(
             version=INVARLOCK_VERSION,
             profile=profile_name,
             tier=tier_name,
-            adapter=str(eff_adapter),
+            adapter=str(adapter_display),
         )
         console.print("")
 
     if adapter_auto:
-        _debug(f"Adapter:auto -> {eff_adapter}")
+        _debug(
+            "Adapter:auto -> "
+            f"baseline={baseline_eff_adapter}, subject={subject_eff_adapter}"
+        )
 
     # Choose preset. If none provided and repo preset is missing (pip install
     # scenario), fall back to a minimal built-in universal preset so the
@@ -486,7 +499,7 @@ def evaluate_command(
         baseline_report=baseline_report,
         profile_name=profile_name,
         tier_name=tier_name,
-        eff_adapter=str(eff_adapter),
+        eff_adapter=str(baseline_eff_adapter),
         out=out,
         device=device,
         allow_network=allow_network,
@@ -515,7 +528,7 @@ def evaluate_command(
         baseline_report_path=baseline_report_path,
         preset_data=preset_data,
         norm_edt_id=norm_edt_id,
-        eff_adapter=str(eff_adapter),
+        eff_adapter=str(subject_eff_adapter),
         out=out,
         device=device,
         profile_name=profile_name,
@@ -560,12 +573,15 @@ def evaluate_command(
             emoji="📜",
         ):
             try:
-                generate_reports(
-                    run=str(edited_report),
-                    format="report",
-                    baseline=str(baseline_report_path),
-                    output=str(report_out),
-                )
+                report_kwargs = {
+                    "run": str(edited_report),
+                    "format": "report",
+                    "baseline": str(baseline_report_path),
+                    "output": str(report_out),
+                }
+                if defer_report_rendering:
+                    report_kwargs["render_optional"] = False
+                generate_reports(**report_kwargs)
             except (ConfigError, MetricsError, ValidationError) as exc:
                 _fail(str(getattr(exc, "message", exc)), exit_code=1)
         emit_runtime_manifest(
@@ -574,7 +590,8 @@ def evaluate_command(
                 "command": "evaluate",
                 "baseline": baseline,
                 "subject": subject,
-                "adapter": adapter,
+                "baseline_adapter": baseline_eff_adapter,
+                "subject_adapter": subject_eff_adapter,
                 "profile": profile_name,
                 "tier": tier_name,
                 "preset": preset,
@@ -587,6 +604,7 @@ def evaluate_command(
                 "allow_third_party_plugins": allow_third_party_plugins,
                 "execution_mode": execution_mode,
                 "assurance": assurance_mode,
+                "defer_report_rendering": bool(defer_report_rendering),
             },
             extra={
                 "command": "evaluate",
@@ -624,15 +642,15 @@ def evaluate_command(
             raise typer.Exit(resolve_command_exit_code(outcome.error, profile=profile))
 
     _emit_evaluation_report()
+    if total_start is not None:
+        timings["total"] = max(0.0, float(cli_output.perf_counter() - total_start))
+    else:
+        timings["total"] = (
+            float(timings.get("baseline", 0.0))
+            + float(timings.get("subject", 0.0))
+            + float(timings.get("evaluation_report", 0.0))
+        )
     if timing:
-        if total_start is not None:
-            timings["total"] = max(0.0, float(cli_output.perf_counter() - total_start))
-        else:
-            timings["total"] = (
-                float(timings.get("baseline", 0.0))
-                + float(timings.get("subject", 0.0))
-                + float(timings.get("evaluation_report", 0.0))
-            )
         cli_output.print_timing_summary(
             console,
             timings,
@@ -643,6 +661,25 @@ def evaluate_command(
                 ("Evaluation Report", "evaluation_report"),
                 ("Total", "total"),
             ],
+        )
+    if timing_json:
+        timing_payload = {
+            "schema": "invarlock/evaluate-timing-v1",
+            "baseline": baseline,
+            "subject": subject,
+            "baseline_adapter": str(baseline_eff_adapter),
+            "subject_adapter": str(subject_eff_adapter),
+            "profile": profile_name,
+            "tier": tier_name,
+            "baseline_report_reused": bool(baseline_report),
+            "defer_report_rendering": bool(defer_report_rendering),
+            "timings_seconds": {key: float(value) for key, value in timings.items()},
+        }
+        timing_path = Path(timing_json)
+        timing_path.parent.mkdir(parents=True, exist_ok=True)
+        timing_path.write_text(
+            json.dumps(timing_payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
         )
     if verbosity == VERBOSITY_QUIET:
         _print_quiet_summary(

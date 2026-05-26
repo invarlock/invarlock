@@ -314,6 +314,7 @@ def test_report_command_reuses_saved_subject_env_flags_for_generated_report(
         output_dir="reports_run.json",
         evaluation_report=mock_make_report.return_value,
         source_run_path="run.json",
+        render_optional=True,
     )
 
 

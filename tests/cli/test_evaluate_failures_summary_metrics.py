@@ -43,7 +43,8 @@ def test_evaluate_ci_profile_invalid_json_exits(monkeypatch, tmp_path):
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(Path("runs")),
             profile="ci",
             assurance="off",
@@ -88,7 +89,8 @@ def test_evaluate_ci_nonfinite_primary_metric_exits(monkeypatch, tmp_path):
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(Path("runs")),
             profile="ci",
             assurance="off",
@@ -142,7 +144,8 @@ def test_evaluate_ci_nonfinite_primary_metric_skips_report_generation(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(Path("runs")),
             profile="ci",
             assurance="off",
@@ -196,7 +199,8 @@ def test_evaluate_ci_nonfinite_primary_metric_handles_float_cast_failure(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(Path("runs")),
             profile="ci",
             assurance="off",
@@ -400,7 +404,8 @@ def test_evaluate_prints_timing_summary_when_requested(
     mod.evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="hf_causal",
+        baseline_adapter="hf_causal",
+        subject_adapter="hf_causal",
         out=str(Path("runs")),
         report_out=str(Path("reports")),
         profile="dev",
@@ -462,7 +467,8 @@ def test_evaluate_degraded_primary_metric_exits_without_report_generation(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="release",
@@ -523,7 +529,8 @@ def test_evaluate_verbose_mode_prints_debug_lines(monkeypatch, tmp_path: Path) -
     mod.evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="auto",
+        baseline_adapter="auto",
+        subject_adapter="auto",
         out=str(Path("runs")),
         report_out=str(Path("reports")),
         profile="dev",
@@ -533,7 +540,7 @@ def test_evaluate_verbose_mode_prints_debug_lines(monkeypatch, tmp_path: Path) -
     )
 
     joined = console.joined()
-    assert "Adapter:auto -> hf_causal" in joined
+    assert "Adapter:auto -> baseline=hf_causal, subject=hf_causal" in joined
     assert "Baseline report:" in joined
     assert "Edited report:" in joined
 
@@ -583,7 +590,8 @@ def test_evaluate_profile_str_failure_falls_back_to_non_ci(
     mod.evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="hf_causal",
+        baseline_adapter="hf_causal",
+        subject_adapter="hf_causal",
         out=str(Path("runs")),
         report_out=str(Path("reports")),
         profile=profile,
@@ -633,7 +641,8 @@ def test_evaluate_stable_text_uses_fallback_when_stringification_raises(
     mod.evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="hf_causal",
+        baseline_adapter="hf_causal",
+        subject_adapter="hf_causal",
         out=str(Path("runs")),
         report_out=str(Path("reports")),
         profile=profile,
@@ -671,7 +680,8 @@ def test_evaluate_report_validation_failure_exits_cleanly(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
             profile="dev",
@@ -730,7 +740,8 @@ def test_evaluate_timing_summary_uses_accumulated_total_when_style_disables_timi
     mod.evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="hf_causal",
+        baseline_adapter="hf_causal",
+        subject_adapter="hf_causal",
         out=str(Path("runs")),
         report_out=str(Path("reports")),
         profile="dev",

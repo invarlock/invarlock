@@ -240,7 +240,6 @@ def test_build_evaluate_command_plan_collects_core_execution_inputs(
     plan = build_evaluate_command_plan(
         baseline_model_id="hf:org/source",
         subject_model_id="hf:org/subject",
-        adapter="auto",
         profile="ci",
         tier="balanced",
         preset=str(preset_path),
@@ -254,8 +253,11 @@ def test_build_evaluate_command_plan_collects_core_execution_inputs(
     )
 
     assert plan.profile_name == "ci"
-    assert plan.adapter_name == "hf_causal"
+    assert plan.baseline_adapter_name == "hf_causal"
+    assert plan.subject_adapter_name == "hf_causal"
     assert plan.adapter_auto is True
+    assert plan.baseline_adapter_auto is True
+    assert plan.subject_adapter_auto is True
     assert plan.source_model_id == "org/source"
     assert plan.subject_model_id == "org/subject"
     assert plan.baseline_config["output"] == {"dir": "runs/source"}
@@ -263,6 +265,43 @@ def test_build_evaluate_command_plan_collects_core_execution_inputs(
     assert plan.assurance_mode == "off"
     assert plan.subject_label == "custom"
     assert plan.tmp_dir == (tmp_path / "scratch").resolve()
+
+
+def test_build_evaluate_command_plan_supports_split_side_adapters(
+    tmp_path: Path,
+) -> None:
+    resolved: list[str] = []
+
+    def resolve_auto(model_id: str) -> str:
+        resolved.append(model_id)
+        return "hf_bnb"
+
+    plan = build_evaluate_command_plan(
+        baseline_model_id="hf:org/source",
+        subject_model_id="hf:org/subject-4bit",
+        baseline_adapter="hf_causal",
+        subject_adapter="auto",
+        profile="ci",
+        tier="balanced",
+        preset=None,
+        out="runs",
+        edit_config=None,
+        edit_label=None,
+        resolve_auto_adapter_fn=resolve_auto,
+        load_yaml_fn=lambda _path: {},
+        tmp_dir_candidate=str(tmp_path / "scratch"),
+        assurance_mode="off",
+    )
+
+    assert resolved == ["hf:org/subject-4bit"]
+    assert plan.baseline_adapter_name == "hf_causal"
+    assert plan.subject_adapter_name == "hf_bnb"
+    assert plan.adapter_auto is True
+    assert plan.baseline_adapter_auto is False
+    assert plan.subject_adapter_auto is True
+    assert plan.source_model_id == "org/source"
+    assert plan.subject_model_id == "org/subject-4bit"
+    assert plan.baseline_config["model"]["adapter"] == "hf_causal"
 
 
 def test_build_evaluate_command_plan_strict_rejects_custom_guard_order(
@@ -275,7 +314,6 @@ def test_build_evaluate_command_plan_strict_rejects_custom_guard_order(
         build_evaluate_command_plan(
             baseline_model_id="hf:org/source",
             subject_model_id="hf:org/subject",
-            adapter="auto",
             profile="ci",
             tier="balanced",
             preset=str(preset_path),
@@ -296,7 +334,8 @@ def test_build_evaluate_command_plan_strict_rejects_dev_and_aggressive(
         build_evaluate_command_plan(
             baseline_model_id="gpt2",
             subject_model_id="gpt2",
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             profile="dev",
             tier="aggressive",
             preset=None,

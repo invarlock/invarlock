@@ -58,7 +58,8 @@ def test_evaluate_timing_block_printed(monkeypatch, tmp_path, capsys) -> None:
     evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="auto",
+        baseline_adapter="auto",
+        subject_adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
         report_out=str(tmp_path / "reports"),

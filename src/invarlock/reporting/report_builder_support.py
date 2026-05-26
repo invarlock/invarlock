@@ -246,6 +246,7 @@ def build_baseline_reference(
     baseline_ref: dict[str, Any] = {
         "run_id": optional_text(baseline_normalized.get("run_id")),
         "model_id": optional_text(baseline_normalized.get("model_id")),
+        "adapter": optional_text(baseline_normalized.get("adapter")),
         "primary_metric": {
             "kind": baseline_pm.get("kind", "ppl_causal"),
             "final": float(baseline_final),

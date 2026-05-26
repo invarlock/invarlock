@@ -190,8 +190,15 @@ def _evaluate_lazy(
             "Must include stored evaluation windows (e.g., set INVARLOCK_STORE_EVAL_WINDOWS=1)."
         ),
     ),
-    adapter: str = typer.Option(
-        "auto", "--adapter", help="Adapter name or 'auto' to resolve"
+    baseline_adapter: str = typer.Option(
+        "auto",
+        "--baseline-adapter",
+        help="Adapter for the baseline side, or 'auto' to resolve from baseline.",
+    ),
+    subject_adapter: str = typer.Option(
+        "auto",
+        "--subject-adapter",
+        help="Adapter for the subject side, or 'auto' to resolve from subject.",
     ),
     device: str | None = typer.Option(
         None, "--device", help="Device override for runs (auto|cuda|mps|cpu)"
@@ -203,7 +210,7 @@ def _evaluate_lazy(
         "--preset",
         help=(
             "Universal preset path to use (defaults to causal or masked preset "
-            "based on adapter)"
+            "based on the subject adapter)"
         ),
     ),
     out: str = typer.Option("runs", "--out", help="Base output directory"),
@@ -232,6 +239,19 @@ def _evaluate_lazy(
     ),
     style: str = typer.Option("audit", "--style", help="Output style (audit|friendly)"),
     timing: bool = typer.Option(False, "--timing", help="Show timing summary"),
+    timing_json: str | None = typer.Option(
+        None,
+        "--timing-json",
+        help="Write machine-readable evaluate timing data to this JSON path.",
+    ),
+    defer_report_rendering: bool = typer.Option(
+        False,
+        "--defer-report-rendering",
+        help=(
+            "Write JSON evidence sidecars only; skip markdown/reviewer bundle "
+            "rendering in the hot path."
+        ),
+    ),
     progress: bool = typer.Option(
         True, "--progress/--no-progress", help="Show progress done messages"
     ),
@@ -261,7 +281,8 @@ def _evaluate_lazy(
         baseline=baseline,
         subject=subject,
         baseline_report=baseline_report,
-        adapter=adapter,
+        baseline_adapter=baseline_adapter,
+        subject_adapter=subject_adapter,
         device=device,
         profile=profile,
         tier=tier,
@@ -275,6 +296,8 @@ def _evaluate_lazy(
         banner=banner,
         style=style,
         timing=timing,
+        timing_json=timing_json,
+        defer_report_rendering=defer_report_rendering,
         progress=progress,
         execution_mode=execution_mode.value,
         assurance=assurance,

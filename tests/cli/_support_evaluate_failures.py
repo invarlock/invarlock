@@ -103,7 +103,8 @@ def _assert_baseline_report_validation_exit(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             baseline_report=str(baseline_path),
             out=str(Path("runs")),
             report_out=str(Path("reports")),

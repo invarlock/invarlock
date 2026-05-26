@@ -68,7 +68,8 @@ def test_evaluate_orchestrates_runs_and_cert(monkeypatch, tmp_path):
     evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="auto",
+        baseline_adapter="auto",
+        subject_adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
         report_out=str(tmp_path / "reports"),
@@ -151,7 +152,8 @@ def test_evaluate_reuses_baseline_report_skipping_baseline_run(monkeypatch, tmp_
         baseline=str(src),
         subject=str(edt),
         baseline_report=str(baseline_report),
-        adapter="auto",
+        baseline_adapter="auto",
+        subject_adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
         report_out=str(tmp_path / "reports"),
@@ -164,6 +166,58 @@ def test_evaluate_reuses_baseline_report_skipping_baseline_run(monkeypatch, tmp_
     assert len(calls["reports"]) == 1
     rep = calls["reports"][0]
     assert Path(rep["baseline"]).resolve() == baseline_report.resolve()
+
+
+def test_evaluate_can_defer_optional_rendering_and_write_timing_json(
+    monkeypatch, tmp_path
+):
+    src = tmp_path / "src_model"
+    edt = tmp_path / "edt_model"
+    src.mkdir()
+    edt.mkdir()
+    (src / "config.json").write_text(
+        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
+        encoding="utf-8",
+    )
+    (edt / "config.json").write_text(
+        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
+        encoding="utf-8",
+    )
+
+    calls = {"reports": []}
+
+    def fake_run(**kwargs):  # noqa: ANN001
+        return str(_stub_run(Path(kwargs.get("out"))))
+
+    def fake_report(**kwargs):  # noqa: ANN001
+        calls["reports"].append(kwargs)
+
+    import invarlock.cli.commands.run as run_mod
+    from invarlock.cli.commands import evaluate as mod
+
+    monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", fake_report, raising=False)
+
+    timing_json = tmp_path / "timing" / "evaluate_timing.json"
+    evaluate_command(
+        baseline=str(src),
+        subject=str(edt),
+        baseline_adapter="auto",
+        subject_adapter="auto",
+        profile="ci",
+        out=str(tmp_path / "runs"),
+        report_out=str(tmp_path / "reports"),
+        defer_report_rendering=True,
+        timing_json=str(timing_json),
+    )
+
+    assert calls["reports"][0]["render_optional"] is False
+    payload = json.loads(timing_json.read_text(encoding="utf-8"))
+    assert payload["schema"] == "invarlock/evaluate-timing-v1"
+    assert payload["defer_report_rendering"] is True
+    assert payload["baseline_report_reused"] is False
+    assert payload["timings_seconds"]["subject"] >= 0.0
+    assert payload["timings_seconds"]["evaluation_report"] >= 0.0
 
 
 def test_evaluate_releases_phase_memory_between_runs(monkeypatch, tmp_path):
@@ -202,7 +256,8 @@ def test_evaluate_releases_phase_memory_between_runs(monkeypatch, tmp_path):
     evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="auto",
+        baseline_adapter="auto",
+        subject_adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
         report_out=str(tmp_path / "reports"),
@@ -247,7 +302,8 @@ def test_evaluate_baseline_report_requires_windows(monkeypatch, tmp_path):
             baseline=str(src),
             subject=str(edt),
             baseline_report=str(baseline_report),
-            adapter="auto",
+            baseline_adapter="auto",
+            subject_adapter="auto",
             profile="ci",
             out=str(tmp_path / "runs"),
             report_out=str(tmp_path / "reports"),
@@ -297,7 +353,8 @@ def test_evaluate_autogen_uses_device_auto(monkeypatch, tmp_path):
     evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="auto",
+        baseline_adapter="auto",
+        subject_adapter="auto",
         profile="ci",
         preset=str(
             repo_root / "configs" / "presets" / "causal_lm" / "wikitext2_512.yaml"
@@ -364,7 +421,8 @@ def test_evaluate_quiet_summary_emits_status(monkeypatch, tmp_path, capsys):
     evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="auto",
+        baseline_adapter="auto",
+        subject_adapter="auto",
         profile="ci",
         out=str(tmp_path / "runs"),
         report_out=str(tmp_path / "reports"),
@@ -434,7 +492,8 @@ def test_evaluate_container_bundle_manifest_inherits_container_execution(
     evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="auto",
+        baseline_adapter="auto",
+        subject_adapter="auto",
         profile="dev",
         assurance="off",
         execution_mode="container",
@@ -480,7 +539,8 @@ def test_evaluate_fails_when_edited_report_payload_is_not_an_object(
         evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             out=str(tmp_path / "runs"),
             report_out=str(tmp_path / "reports"),
             profile="dev",
@@ -502,7 +562,8 @@ def test_evaluate_command_defaults_to_strict_assurance(monkeypatch, tmp_path, ca
         evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             profile="dev",
             out=str(tmp_path / "runs"),
             report_out=str(tmp_path / "reports"),

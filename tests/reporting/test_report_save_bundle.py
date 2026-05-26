@@ -116,6 +116,26 @@ def test_save_report_bundle_writes_manifest_and_evidence(tmp_path: Path, monkeyp
     assert (tmp_path / "guards_evidence.json").exists()
 
 
+def test_save_report_bundle_can_defer_optional_rendering(tmp_path: Path, monkeypatch):
+    rep = _minimal_run_report()
+    base = _baseline_v1()
+    monkeypatch.setenv("INVARLOCK_EVIDENCE_DEBUG", "1")
+
+    out = save_evaluation_bundle(
+        run_report=rep,
+        output_dir=tmp_path,
+        evaluation_report=make_report(rep, base),
+        render_optional=False,
+    )
+
+    assert out["report"].exists()
+    assert "report_md" not in out
+    assert not (tmp_path / "evaluation_report.md").exists()
+    assert not (tmp_path / "manifest.json").exists()
+    assert not (tmp_path / "reviewer_summary.txt").exists()
+    assert not (tmp_path / "guards_evidence.json").exists()
+
+
 def test_save_report_requires_baseline(tmp_path: Path):
     rep = _minimal_run_report()
     with pytest.raises(ValueError, match="save_evaluation_bundle"):

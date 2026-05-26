@@ -41,7 +41,8 @@ def test_evaluate_rejects_baseline_report_directory_even_with_report_json(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             baseline_report=str(baseline_dir),
             out=str(Path("runs")),
             report_out=str(Path("reports")),
@@ -77,7 +78,8 @@ def test_evaluate_rejects_baseline_report_directory_without_report_json(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             baseline_report=str(baseline_dir),
             out=str(Path("runs")),
             report_out=str(Path("reports")),
@@ -195,7 +197,8 @@ def test_evaluate_baseline_report_rejects_non_regular_file(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             baseline_report=str(baseline_fifo),
             out=str(Path("runs")),
             report_out=str(Path("reports")),
@@ -254,7 +257,8 @@ def test_evaluate_supplied_baseline_report_path_must_exist(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             baseline_report="missing.json",
             out=str(Path("runs")),
             report_out=str(Path("reports")),
@@ -278,7 +282,8 @@ def test_evaluate_supplied_baseline_report_directory_requires_a_report_file(
         mod.evaluate_command(
             baseline=str(src),
             subject=str(edt),
-            adapter="hf_causal",
+            baseline_adapter="hf_causal",
+            subject_adapter="hf_causal",
             baseline_report=str(baseline_dir),
             out=str(Path("runs")),
             report_out=str(Path("reports")),
@@ -316,7 +321,8 @@ def test_evaluate_baseline_report_accepts_non_mapping_meta_and_context(
     mod.evaluate_command(
         baseline=str(src),
         subject=str(edt),
-        adapter="hf_causal",
+        baseline_adapter="hf_causal",
+        subject_adapter="hf_causal",
         baseline_report=str(baseline_report),
         out=str(Path("runs")),
         report_out=str(Path("reports")),
