@@ -9,7 +9,7 @@ model:
 dataset:
   provider:
     kind: "hf_text"
-    dataset_name: "wikitext"
+    dataset_name: "Salesforce/wikitext"
     config_name: "wikitext-103-v1"
     text_field: "text"
     max_samples: 10000

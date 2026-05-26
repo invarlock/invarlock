@@ -28,7 +28,9 @@ def main() -> int:
     datasets_cache = _env("HF_DATASETS_CACHE")
 
     try:
-        ds = load_dataset("wikitext", "wikitext-2-raw-v1", split="validation")
+        ds = load_dataset(
+            "Salesforce/wikitext", "wikitext-2-raw-v1", split="validation"
+        )
     except (FileNotFoundError, OSError, RuntimeError, ValueError) as exc:
         print("[DATASET_PREFLIGHT] ERROR: failed to load wikitext2 validation split.")
         if offline:
