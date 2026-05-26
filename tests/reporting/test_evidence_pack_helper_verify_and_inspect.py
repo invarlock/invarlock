@@ -62,7 +62,7 @@ def test_verify_reports_covers_remaining_payload_contract_branches(
         report_assurance="report",
     )
     assert errors == [
-        "error-injection report verification did not return a JSON object."
+        "expected-failure report verification did not return a JSON object."
     ]
     assert payload == {"ok": True}
 
@@ -90,7 +90,7 @@ def test_verify_reports_covers_remaining_payload_contract_branches(
         profile="dev",
         report_assurance="report",
     )
-    assert errors == ["clean report verification did not return a JSON object."]
+    assert errors == ["expected-pass report verification did not return a JSON object."]
     assert payload is None
 
     monkeypatch.setattr(
@@ -117,7 +117,7 @@ def test_verify_reports_covers_remaining_payload_contract_branches(
         profile="dev",
         report_assurance="report",
     )
-    assert errors == ["clean report verification did not return a JSON object."]
+    assert errors == ["expected-pass report verification did not return a JSON object."]
     assert payload is None
 
     pack_clean_only = _build_pack("clean-only", with_errors=False)

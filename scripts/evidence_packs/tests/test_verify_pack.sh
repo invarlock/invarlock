@@ -758,6 +758,95 @@ EOF
     PATH="${original_path}"
 }
 
+test_verify_pack_verify_reports_accepts_scenario_expected_failures() {
+    mock_reset
+
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}/metadata"
+    mkdir -p "${pack_dir}/reports/modelA/quant_4bit_clean/run_1"
+    mkdir -p "${pack_dir}/reports/modelA/prune_50pct_stress/run_1"
+    cat > "${pack_dir}/metadata/scenarios.json" <<'JSON'
+{
+  "schema": "evidence_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "quant_4bit_clean", "strictness": "must_pass"},
+    {"id": "prune_50pct_stress", "strictness": "must_fail"}
+  ]
+}
+JSON
+    echo "{}" > "${pack_dir}/reports/modelA/quant_4bit_clean/run_1/evaluation.report.json"
+    echo "{}" > "${pack_dir}/reports/modelA/prune_50pct_stress/run_1/evaluation.report.json"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+echo "$*" >> "${TEST_TMPDIR}/invarlock.calls"
+for arg in "$@"; do
+    if [[ "${arg}" == */prune_50pct_stress/*/evaluation.report.json ]]; then
+        exit 1
+    fi
+done
+exit 0
+EOF
+    chmod +x "${bin_dir}/invarlock"
+
+    local original_path="${PATH}"
+    PATH="${bin_dir}:${PATH}"
+
+    run pack_verify_reports "${pack_dir}" ""
+    assert_rc "0" "${RUN_RC}" "verify succeeds when scenario-declared must_fail reports fail"
+    assert_match "quant_4bit_clean/run_1/evaluation\\.report\\.json" "$(cat "${TEST_TMPDIR}/invarlock.calls")" "verifies expected-pass report"
+    assert_match "prune_50pct_stress/run_1/evaluation\\.report\\.json" "$(cat "${TEST_TMPDIR}/invarlock.calls")" "attempts scenario expected-failure report"
+
+    PATH="${original_path}"
+}
+
+test_verify_pack_verify_reports_rejects_scenario_expected_failure_that_passes() {
+    mock_reset
+
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}/metadata"
+    mkdir -p "${pack_dir}/reports/modelA/quant_4bit_clean/run_1"
+    mkdir -p "${pack_dir}/reports/modelA/prune_50pct_stress/run_1"
+    cat > "${pack_dir}/metadata/scenarios.json" <<'JSON'
+{
+  "schema": "evidence_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "quant_4bit_clean", "strictness": "must_pass"},
+    {"id": "prune_50pct_stress", "strictness": "must_fail"}
+  ]
+}
+JSON
+    echo "{}" > "${pack_dir}/reports/modelA/quant_4bit_clean/run_1/evaluation.report.json"
+    echo "{}" > "${pack_dir}/reports/modelA/prune_50pct_stress/run_1/evaluation.report.json"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+exit 0
+EOF
+    chmod +x "${bin_dir}/invarlock"
+
+    local original_path="${PATH}"
+    PATH="${bin_dir}:${PATH}"
+
+    run pack_verify_reports "${pack_dir}" ""
+    assert_rc "1" "${RUN_RC}" "verify fails when scenario-declared must_fail report verifies clean"
+    assert_match "Expected verify failure passed" "${RUN_ERR}" "unexpected expected-failure pass is explicit"
+
+    PATH="${original_path}"
+}
+
 test_verify_pack_verify_reports_errors_when_only_error_injection_reports_present() {
     mock_reset
 
@@ -769,7 +858,7 @@ test_verify_pack_verify_reports_errors_when_only_error_injection_reports_present
 
     run pack_verify_reports "${pack_dir}" ""
     assert_rc "1" "${RUN_RC}" "only error-injection reports must fail"
-    assert_match "No clean reports found" "${RUN_ERR}" "clean report requirement surfaced"
+    assert_match "No reports expected to pass" "${RUN_ERR}" "expected-pass report requirement surfaced"
 }
 
 test_verify_pack_rejects_tampered_payload_when_checksums_bound() {

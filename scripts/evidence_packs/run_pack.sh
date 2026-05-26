@@ -152,22 +152,86 @@ pack_generate_html() {
     done < <(find "${pack_dir}/reports" -type f -name "evaluation.report.json" | sort)
 }
 
+pack_report_scenario_id() {
+    local pack_dir="$1"
+    local report="$2"
+    local rel="${report#"${pack_dir}/reports/"}"
+    local after_model="${rel#*/}"
+    local scenario="${after_model%%/*}"
+    if [[ -z "${scenario}" || "${scenario}" == "${after_model}" ]]; then
+        return 1
+    fi
+    printf '%s\n' "${scenario}"
+}
+
+pack_scenario_strictness() {
+    local pack_dir="$1"
+    local scenario_id="$2"
+    local scenarios_path="${pack_dir}/metadata/scenarios.json"
+    if [[ ! -f "${scenarios_path}" ]]; then
+        return 1
+    fi
+    python3 - "${scenarios_path}" "${scenario_id}" <<'PY'
+import json
+import sys
+
+path, scenario_id = sys.argv[1], sys.argv[2]
+try:
+    payload = json.load(open(path, encoding="utf-8"))
+except Exception:
+    raise SystemExit(1)
+scenarios = payload.get("scenarios")
+if not isinstance(scenarios, list):
+    raise SystemExit(1)
+for scenario in scenarios:
+    if isinstance(scenario, dict) and scenario.get("id") == scenario_id:
+        strictness = scenario.get("strictness")
+        if isinstance(strictness, str) and strictness:
+            print(strictness)
+            raise SystemExit(0)
+raise SystemExit(1)
+PY
+}
+
+pack_report_expects_verify_failure() {
+    local pack_dir="$1"
+    local report="$2"
+    if [[ "${report}" == */errors/*/evaluation.report.json ]]; then
+        return 0
+    fi
+
+    local scenario_id
+    scenario_id="$(pack_report_scenario_id "${pack_dir}" "${report}")" || return 1
+    local strictness
+    strictness="$(pack_scenario_strictness "${pack_dir}" "${scenario_id}")" || return 1
+    [[ "${strictness}" == "must_fail" ]]
+}
+
 pack_verify_reports() {
     local pack_dir="$1"
     local profile="${PACK_VERIFY_PROFILE:-dev}"
     local report_assurance="${PACK_REPORT_ASSURANCE:-report}"
     local count_clean=0
     local count_error=0
+    local count_expected_failure=0
     local count_failed=0
     local report
     while IFS= read -r report; do
         [[ -n "${report}" ]] || continue
         local report_dir
         report_dir="$(dirname "${report}")"
-        if [[ "${report}" == */errors/*/evaluation.report.json ]]; then
-            # Error injection reports are expected to fail verify (unsafe edits by design).
-            invarlock verify --json --profile "${profile}" --assurance "${report_assurance}" "${report}" > "${report_dir}/verify.json" || true
-            count_error=$((count_error + 1))
+        if pack_report_expects_verify_failure "${pack_dir}" "${report}"; then
+            # Error injection and scenario-declared must_fail reports are expected
+            # to fail report verification; a clean verification result would be
+            # inconsistent with the scenario contract.
+            if invarlock verify --json --profile "${profile}" --assurance "${report_assurance}" "${report}" > "${report_dir}/verify.json"; then
+                echo "ERROR: Expected verify failure passed: ${report}" >&2
+                count_failed=$((count_failed + 1))
+            elif [[ "${report}" == */errors/*/evaluation.report.json ]]; then
+                count_error=$((count_error + 1))
+            else
+                count_expected_failure=$((count_expected_failure + 1))
+            fi
             continue
         fi
 
@@ -179,7 +243,7 @@ pack_verify_reports() {
         fi
     done < <(find "${pack_dir}/reports" -type f -name "evaluation.report.json" | sort)
 
-    local total=$((count_clean + count_error + count_failed))
+    local total=$((count_clean + count_error + count_expected_failure + count_failed))
     if [[ ${total} -eq 0 ]]; then
         echo "ERROR: No reports found to verify." >&2
         return 1
@@ -187,10 +251,11 @@ pack_verify_reports() {
 
     PACK_VERIFY_COUNT_CLEAN="${count_clean}"
     PACK_VERIFY_COUNT_ERROR="${count_error}"
+    PACK_VERIFY_COUNT_EXPECTED_FAILURE="${count_expected_failure}"
     PACK_VERIFY_COUNT_FAILED="${count_failed}"
     PACK_VERIFY_PROFILE_USED="${profile}"
     PACK_REPORT_ASSURANCE_USED="${report_assurance}"
-    export PACK_VERIFY_COUNT_CLEAN PACK_VERIFY_COUNT_ERROR PACK_VERIFY_COUNT_FAILED PACK_VERIFY_PROFILE_USED PACK_REPORT_ASSURANCE_USED
+    export PACK_VERIFY_COUNT_CLEAN PACK_VERIFY_COUNT_ERROR PACK_VERIFY_COUNT_EXPECTED_FAILURE PACK_VERIFY_COUNT_FAILED PACK_VERIFY_PROFILE_USED PACK_REPORT_ASSURANCE_USED
 
     local results_dir="${pack_dir}/results"
     mkdir -p "${results_dir}"
@@ -199,9 +264,10 @@ pack_verify_reports() {
         "${count_clean}" \
         "${count_error}" \
         "${count_failed}" \
-        "${profile}"
+        "${profile}" \
+        "${count_expected_failure}"
 
-    echo "Verified: ${count_clean} clean, ${count_error} error-injection (expected fail), ${count_failed} unexpected failures; report assurance=${report_assurance}"
+    echo "Verified: ${count_clean} expected-pass, ${count_error} error-injection expected-fail, ${count_expected_failure} scenario expected-fail, ${count_failed} unexpected failures; report assurance=${report_assurance}"
 
     if [[ ${count_failed} -gt 0 ]]; then
         return 1

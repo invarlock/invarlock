@@ -217,7 +217,7 @@ def test_evidence_pack_verify_requires_clean_reports(
 
     assert exit_code == EvidencePackStatus.REPORTS
     assert payload["ok"] is False
-    assert any("No clean reports found" in error for error in payload["errors"])
+    assert any("No reports expected to pass" in error for error in payload["errors"])
 
 
 def test_evidence_pack_verify_requires_validation_edit_metadata(

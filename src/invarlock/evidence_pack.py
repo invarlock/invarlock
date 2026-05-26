@@ -8,10 +8,10 @@ from invarlock import evidence_pack_edit_metadata as evidence_pack_edit_metadata
 from invarlock import evidence_pack_integrity as evidence_pack_integrity_mod
 from invarlock import evidence_pack_manifest as evidence_pack_manifest_mod
 from invarlock import evidence_pack_metadata as evidence_pack_metadata_mod
+from invarlock import evidence_pack_report_verification as report_verification_mod
 from invarlock import evidence_pack_support as evidence_pack_support_mod
 from invarlock.reporting.verify_contract import (
     VerifyExecutionResult,
-    VerifyOutcome,
     run_verify_reports,
 )
 from invarlock.runtime_security import unverified_provenance_allowed
@@ -123,7 +123,7 @@ def _run_verify_command(
 
 
 def _verify_command_succeeded(result: VerifyExecutionResult) -> bool:
-    return result.outcome == VerifyOutcome.OK
+    return report_verification_mod._verify_command_succeeded(result)
 
 
 def _verify_reports(
@@ -133,62 +133,13 @@ def _verify_reports(
     profile: str,
     report_assurance: str,
 ) -> tuple[list[str], dict[str, Any] | None]:
-    reports = sorted(pack_dir.glob("reports/**/evaluation.report.json"))
-    if not reports:
-        return ["No reports found in pack."], None
-    clean_reports = [path for path in reports if "/errors/" not in path.as_posix()]
-    error_reports = [path for path in reports if path not in clean_reports]
-    if not clean_reports:
-        return [
-            "No clean reports found in pack (only error-injection reports present)."
-        ], None
-
-    clean_result = _run_verify_command(
-        clean_reports,
+    return report_verification_mod.verify_reports(
+        pack_dir,
+        json_out_path=json_out_path,
         profile=profile,
         report_assurance=report_assurance,
+        run_verify_command=_run_verify_command,
     )
-    if not isinstance(clean_result.payload, dict):
-        return ["clean report verification did not return a JSON object."], None
-    verify_payload = dict(clean_result.payload)
-    if error_reports:
-        try:
-            error_result = _run_verify_command(
-                error_reports,
-                profile=profile,
-                report_assurance=report_assurance,
-            )
-        except (
-            ImportError,
-            ModuleNotFoundError,
-            OSError,
-            RuntimeError,
-            TypeError,
-            ValueError,
-        ) as exc:
-            return [
-                f"error-injection report verification failed: {exc}"
-            ], verify_payload
-        if not isinstance(error_result.payload, dict):
-            return [
-                "error-injection report verification did not return a JSON object."
-            ], verify_payload
-        verify_payload["error_injection"] = {
-            "verify": error_result.payload,
-            "reports": [
-                str(path.relative_to(pack_dir)).replace("\\", "/")
-                for path in error_reports
-            ],
-        }
-    if json_out_path is not None and verify_payload is not None:
-        json_out_path.write_text(
-            json.dumps(verify_payload, sort_keys=True) + "\n", encoding="utf-8"
-        )
-    if not _verify_command_succeeded(clean_result):
-        return [
-            "invarlock verify reported report verification failures."
-        ], verify_payload
-    return [], verify_payload
 
 
 _collect_build_evidence_pack_errors = (

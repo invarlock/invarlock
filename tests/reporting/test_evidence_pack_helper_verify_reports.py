@@ -187,7 +187,7 @@ def test_verify_reports_and_inspect_cover_error_paths(
         report_assurance="report",
     )
     assert errors == [
-        "No clean reports found in pack (only error-injection reports present)."
+        "No reports expected to pass in pack (only expected-failure reports present)."
     ]
     assert payload is None
 
@@ -199,7 +199,7 @@ def test_verify_reports_and_inspect_cover_error_paths(
         report_assurance="off",
     )
     assert errors == [
-        "No clean reports found in pack (only error-injection reports present)."
+        "No reports expected to pass in pack (only expected-failure reports present)."
     ]
     assert payload is None
     assert not json_out_off.exists()
@@ -249,7 +249,7 @@ def test_verify_reports_and_inspect_cover_error_paths(
         report_assurance="report",
     )
     assert errors == [
-        "error-injection report verification failed: ignore nested error reports"
+        "expected-failure report verification failed unexpectedly: ignore nested error reports"
     ]
     assert payload == {"ok": False}
     assert len(verify_calls) == 2

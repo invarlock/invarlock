@@ -270,6 +270,61 @@ pack_verify_signature() {
     return 1
 }
 
+pack_report_scenario_id() {
+    local pack_dir="$1"
+    local report="$2"
+    local rel="${report#"${pack_dir}/reports/"}"
+    local after_model="${rel#*/}"
+    local scenario="${after_model%%/*}"
+    if [[ -z "${scenario}" || "${scenario}" == "${after_model}" ]]; then
+        return 1
+    fi
+    printf '%s\n' "${scenario}"
+}
+
+pack_scenario_strictness() {
+    local pack_dir="$1"
+    local scenario_id="$2"
+    local scenarios_path="${pack_dir}/metadata/scenarios.json"
+    if [[ ! -f "${scenarios_path}" ]]; then
+        return 1
+    fi
+    python3 - "${scenarios_path}" "${scenario_id}" <<'PY'
+import json
+import sys
+
+path, scenario_id = sys.argv[1], sys.argv[2]
+try:
+    payload = json.load(open(path, encoding="utf-8"))
+except Exception:
+    raise SystemExit(1)
+scenarios = payload.get("scenarios")
+if not isinstance(scenarios, list):
+    raise SystemExit(1)
+for scenario in scenarios:
+    if isinstance(scenario, dict) and scenario.get("id") == scenario_id:
+        strictness = scenario.get("strictness")
+        if isinstance(strictness, str) and strictness:
+            print(strictness)
+            raise SystemExit(0)
+raise SystemExit(1)
+PY
+}
+
+pack_report_expects_verify_failure() {
+    local pack_dir="$1"
+    local report="$2"
+    if [[ "${report}" == */errors/*/evaluation.report.json ]]; then
+        return 0
+    fi
+
+    local scenario_id
+    scenario_id="$(pack_report_scenario_id "${pack_dir}" "${report}")" || return 1
+    local strictness
+    strictness="$(pack_scenario_strictness "${pack_dir}" "${scenario_id}")" || return 1
+    [[ "${strictness}" == "must_fail" ]]
+}
+
 pack_verify_reports() {
     local pack_dir="$1"
     local json_out="$2"
@@ -277,12 +332,12 @@ pack_verify_reports() {
     local report_assurance="${PACK_REPORT_ASSURANCE:-report}"
     local -a reports=()
     local -a reports_clean=()
-    local -a reports_error=()
+    local -a reports_expected_failure=()
     while IFS= read -r report; do
         [[ -n "${report}" ]] || continue
         reports+=("${report}")
-        if [[ "${report}" == */errors/*/evaluation.report.json ]]; then
-            reports_error+=("${report}")
+        if pack_report_expects_verify_failure "${pack_dir}" "${report}"; then
+            reports_expected_failure+=("${report}")
         else
             reports_clean+=("${report}")
         fi
@@ -292,7 +347,7 @@ pack_verify_reports() {
         return 1
     fi
     if [[ ${#reports_clean[@]} -eq 0 ]]; then
-        echo "ERROR: No clean reports found in pack (only error-injection reports present)." >&2
+        echo "ERROR: No reports expected to pass in pack (only expected-failure reports present)." >&2
         return 1
     fi
 
@@ -302,8 +357,14 @@ pack_verify_reports() {
         invarlock verify --json --profile "${profile}" --assurance "${report_assurance}" "${reports_clean[@]}"
     fi
 
-    if [[ ${#reports_error[@]} -gt 0 ]]; then
-        invarlock verify --json --profile "${profile}" --assurance "${report_assurance}" "${reports_error[@]}" >/dev/null || true
+    if [[ ${#reports_expected_failure[@]} -gt 0 ]]; then
+        local report
+        for report in "${reports_expected_failure[@]}"; do
+            if invarlock verify --json --profile "${profile}" --assurance "${report_assurance}" "${report}" >/dev/null; then
+                echo "ERROR: Expected verify failure passed: ${report}" >&2
+                return 1
+            fi
+        done
     fi
 }
 

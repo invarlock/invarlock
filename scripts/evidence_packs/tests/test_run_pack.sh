@@ -225,6 +225,29 @@ test_run_pack_entrypoint_release_review_sets_hardened_defaults() {
     unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
 }
 
+test_run_pack_entrypoint_applies_preconfigured_release_review_defaults() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    pack_entrypoint() { printf '%s\n' "$@" > "${TEST_TMPDIR}/run.args"; }
+    pack_build_pack() { :; }
+
+    PACK_RELEASE_REVIEW=1
+    export PACK_RELEASE_REVIEW
+
+    pack_run_pack --out "${TEST_TMPDIR}/out"
+
+    assert_eq "1" "${PACK_REQUIRE_PASS}" "preconfigured release-review requires PASS"
+    assert_eq "ci" "${PACK_VERIFY_PROFILE}" "preconfigured release-review uses ci profile"
+    assert_eq "strict" "${PACK_REPORT_ASSURANCE}" "preconfigured release-review uses strict assurance"
+    assert_eq "1" "${PACK_SIGN_MANIFEST}" "preconfigured release-review signs manifests"
+    assert_eq "1" "${PACK_REQUIRE_RUNTIME_MANIFESTS}" "preconfigured release-review requires runtime manifests"
+
+    unset PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
+    unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+}
+
 test_run_pack_release_review_rejects_dev_verify_profile() {
     mock_reset
 
@@ -264,6 +287,46 @@ test_run_pack_release_review_rejects_weak_report_assurance() {
     run pack_validate_release_review_settings
     assert_rc "1" "${RUN_RC}" "release-review rejects weak report assurance"
     assert_match "PACK_REPORT_ASSURANCE=strict" "${RUN_ERR}" "strict report assurance is required"
+
+    unset PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
+    unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+}
+
+test_run_pack_release_review_rejects_missing_hardened_settings() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    PACK_RELEASE_REVIEW=1
+    PACK_REQUIRE_PASS=0
+    PACK_VERIFY_PROFILE=ci
+    PACK_REPORT_ASSURANCE=strict
+    PACK_SIGN_MANIFEST=1
+    PACK_REQUIRE_RUNTIME_MANIFESTS=1
+    export PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
+    export PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+
+    run pack_validate_release_review_settings
+    assert_rc "1" "${RUN_RC}" "release-review rejects disabled PASS requirement"
+    assert_match "PACK_REQUIRE_PASS=1" "${RUN_ERR}" "PASS requirement error is explicit"
+
+    PACK_REQUIRE_PASS=1
+    PACK_SIGN_MANIFEST=0
+    run pack_validate_release_review_settings
+    assert_rc "1" "${RUN_RC}" "release-review rejects disabled signing"
+    assert_match "PACK_SIGN_MANIFEST=1" "${RUN_ERR}" "signing requirement error is explicit"
+
+    PACK_SIGN_MANIFEST=1
+    PACK_REQUIRE_RUNTIME_MANIFESTS=0
+    run pack_validate_release_review_settings
+    assert_rc "1" "${RUN_RC}" "release-review rejects disabled runtime manifests"
+    assert_match "PACK_REQUIRE_RUNTIME_MANIFESTS=1" "${RUN_ERR}" "runtime manifest requirement error is explicit"
+
+    PACK_REQUIRE_RUNTIME_MANIFESTS=1
+    PACK_VERIFY_PROFILE=""
+    run pack_validate_release_review_settings
+    assert_rc "1" "${RUN_RC}" "release-review rejects missing verify profile"
+    assert_match "explicit PACK_VERIFY_PROFILE" "${RUN_ERR}" "missing profile error is explicit"
 
     unset PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
     unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
@@ -498,6 +561,155 @@ EOF
     assert_match "\"failed_reports\": 0" "$(cat "${pack_dir}/results/verification_summary.json")" "failed count recorded"
 }
 
+test_run_pack_build_pack_accepts_scenario_expected_verify_failures() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    local run_dir="${TEST_TMPDIR}/run"
+    mkdir -p "${run_dir}/reports" "${run_dir}/analysis" "${run_dir}/state"
+    mkdir -p "${run_dir}/modelA/reports/quant_4bit_clean/run_1"
+    mkdir -p "${run_dir}/modelA/reports/prune_50pct_stress/run_1"
+
+    echo "verdict" > "${run_dir}/reports/final_verdict.txt"
+    echo '{"verdict":"PASS"}' > "${run_dir}/reports/final_verdict.json"
+    echo '{"model_list": ["org/model"], "models": {"org/model": {"revision": "abc"}}}' > "${run_dir}/state/model_revisions.json"
+    cat > "${run_dir}/state/scenarios.json" <<'JSON'
+{
+  "schema": "evidence_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "quant_4bit_clean", "strictness": "must_pass"},
+    {"id": "prune_50pct_stress", "strictness": "must_fail"}
+  ]
+}
+JSON
+    echo "{}" > "${run_dir}/modelA/reports/quant_4bit_clean/run_1/evaluation.report.json"
+    echo "{}" > "${run_dir}/modelA/reports/prune_50pct_stress/run_1/evaluation.report.json"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+cmd="${1:-}"
+shift || true
+case "${cmd}" in
+    report)
+        sub="${1:-}"
+        if [[ "${sub}" == "html" ]]; then
+            out=""
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --output|-o)
+                        out="$2"
+                        shift 2
+                        ;;
+                    *)
+                        shift
+                        ;;
+                esac
+            done
+            mkdir -p "$(dirname "${out}")"
+            printf '<html>ok</html>\n' > "${out}"
+            exit 0
+        fi
+        ;;
+    verify)
+        report="${@: -1}"
+        echo '{"ok": false}'
+        if [[ "${report}" == */prune_50pct_stress/*/evaluation.report.json ]]; then
+            exit 1
+        fi
+        exit 0
+        ;;
+esac
+echo '{}'
+EOF
+    chmod +x "${bin_dir}/invarlock"
+    export PATH="${bin_dir}:${PATH}"
+
+    PACK_SIGN_MANIFEST=0
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    pack_build_pack "${run_dir}" "${pack_dir}"
+
+    assert_file_exists "${pack_dir}/reports/modelA/quant_4bit_clean/run_1/verify.json" "expected-pass verify output captured"
+    assert_file_exists "${pack_dir}/reports/modelA/prune_50pct_stress/run_1/verify.json" "expected-fail verify output captured"
+    assert_match "\"clean_reports\": 1" "$(cat "${pack_dir}/results/verification_summary.json")" "expected-pass count recorded"
+    assert_match "\"expected_failure_reports\": 1" "$(cat "${pack_dir}/results/verification_summary.json")" "scenario expected-failure count recorded"
+    assert_match "\"failed_reports\": 0" "$(cat "${pack_dir}/results/verification_summary.json")" "failed count recorded"
+}
+
+test_run_pack_build_pack_rejects_expected_failure_report_that_verifies_clean() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    local run_dir="${TEST_TMPDIR}/run"
+    mkdir -p "${run_dir}/reports" "${run_dir}/analysis" "${run_dir}/state"
+    mkdir -p "${run_dir}/modelA/reports/prune_50pct_stress/run_1"
+
+    echo "verdict" > "${run_dir}/reports/final_verdict.txt"
+    echo '{"verdict":"PASS"}' > "${run_dir}/reports/final_verdict.json"
+    echo '{"model_list": ["org/model"], "models": {"org/model": {"revision": "abc"}}}' > "${run_dir}/state/model_revisions.json"
+    cat > "${run_dir}/state/scenarios.json" <<'JSON'
+{
+  "schema": "evidence_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "prune_50pct_stress", "strictness": "must_fail"}
+  ]
+}
+JSON
+    echo "{}" > "${run_dir}/modelA/reports/prune_50pct_stress/run_1/evaluation.report.json"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/invarlock" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+cmd="${1:-}"
+shift || true
+case "${cmd}" in
+    report)
+        sub="${1:-}"
+        if [[ "${sub}" == "html" ]]; then
+            out=""
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --output|-o)
+                        out="$2"
+                        shift 2
+                        ;;
+                    *)
+                        shift
+                        ;;
+                esac
+            done
+            mkdir -p "$(dirname "${out}")"
+            printf '<html>ok</html>\n' > "${out}"
+            exit 0
+        fi
+        ;;
+    verify)
+        echo '{"ok": true}'
+        exit 0
+        ;;
+esac
+echo '{}'
+EOF
+    chmod +x "${bin_dir}/invarlock"
+    export PATH="${bin_dir}:${PATH}"
+
+    PACK_SIGN_MANIFEST=0
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    run pack_build_pack "${run_dir}" "${pack_dir}"
+    assert_rc "1" "${RUN_RC}" "expected-failure report verifying clean fails pack build"
+    assert_match "Expected verify failure passed" "${RUN_ERR}" "unexpected expected-failure pass is explicit"
+}
+
 test_run_pack_build_pack_continues_when_html_report_fails() {
     mock_reset
 
@@ -673,6 +885,16 @@ test_run_pack_helpers_cover_error_paths() {
     assert_rc "1" "${RUN_RC}" "invalid report path returns non-zero"
 
     local pack_dir="${TEST_TMPDIR}/pack"
+    run pack_report_scenario_id "${pack_dir}" "${pack_dir}/reports/evaluation.report.json"
+    assert_rc "1" "${RUN_RC}" "malformed pack report path has no scenario id"
+
+    run pack_report_expects_verify_failure "${pack_dir}" "${pack_dir}/outside/evaluation.report.json"
+    assert_rc "1" "${RUN_RC}" "malformed report path cannot infer expected failure"
+
+    mkdir -p "${pack_dir}/reports/model/errors/nan_injection"
+    run pack_report_expects_verify_failure "${pack_dir}" "${pack_dir}/reports/model/errors/nan_injection/evaluation.report.json"
+    assert_rc "0" "${RUN_RC}" "error-injection report expects verify failure"
+
     mkdir -p "${pack_dir}/reports"
     run pack_verify_reports "${pack_dir}"
     assert_rc "1" "${RUN_RC}" "missing reports returns non-zero"
@@ -1089,6 +1311,21 @@ test_run_pack_build_pack_propagates_staging_and_finalize_failures() {
     [[ ! -d "${TEST_TMPDIR}/staging" ]] || t_fail "staging directory should be cleaned on finalize failure"
 }
 
+test_run_pack_build_pack_propagates_release_review_validation_failure() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    local run_dir="${TEST_TMPDIR}/run"
+    mkdir -p "${run_dir}"
+
+    pack_require_passing_run_verdict() { return 0; }
+    pack_validate_release_review_settings() { return 1; }
+
+    run pack_build_pack "${run_dir}" "${TEST_TMPDIR}/pack"
+    assert_rc "1" "${RUN_RC}" "pack build fails when release-review validation fails"
+}
+
 test_run_pack_populate_pack_dir_propagates_environment_and_manifest_write_failures() {
     mock_reset
 
@@ -1114,6 +1351,11 @@ test_run_pack_populate_pack_dir_propagates_environment_and_manifest_write_failur
     assert_rc "1" "${RUN_RC}" "populate pack dir fails when environment metadata write fails"
 
     pack_write_environment_metadata() { return 0; }
+    pack_write_edit_artifact_summary() { return 1; }
+    run pack_populate_pack_dir "${run_dir}" "${pack_dir}"
+    assert_rc "1" "${RUN_RC}" "populate pack dir fails when edit artifact summary write fails"
+
+    pack_write_edit_artifact_summary() { return 0; }
     pack_write_readme() { return 1; }
     run pack_populate_pack_dir "${run_dir}" "${pack_dir}"
     assert_rc "1" "${RUN_RC}" "populate pack dir fails when README write fails"

@@ -148,7 +148,7 @@ def test_verify_reports_success_writes_json_and_records_error_injection(
     ) -> VerifyExecutionResult:
         if "errors" in reports[0].as_posix():
             return VerifyExecutionResult(
-                outcome=VerifyOutcome.OK,
+                outcome=VerifyOutcome.POLICY_FAIL,
                 payload={"ok": False},
                 diagnostics=(),
             )
@@ -174,7 +174,7 @@ def test_verify_reports_success_writes_json_and_records_error_injection(
 
     assert errors == []
     assert payload is not None
-    assert payload["error_injection"]["verify"] == {"ok": False}
+    assert payload["expected_failures"]["verify"] == [{"ok": False}]
     assert json.loads(json_out.read_text(encoding="utf-8")) == payload
 
 
