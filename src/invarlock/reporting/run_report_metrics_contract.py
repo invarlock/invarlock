@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -34,6 +35,20 @@ def _coerce_finite_float(value: Any) -> float | None:
     except (TypeError, ValueError, OverflowError):
         return None
     return coerced if math.isfinite(coerced) else None
+
+
+def _pseudo_accuracy_allowed(profile: str, run_config: Any) -> bool:
+    if str(profile or "").strip().lower() == "dev":
+        return True
+    env_value = str(os.environ.get("INVARLOCK_ALLOW_PSEUDO_ACCURACY", "")).lower()
+    if env_value in {"1", "true", "yes"}:
+        return True
+    context = getattr(run_config, "context", None)
+    eval_context = context.get("eval") if isinstance(context, Mapping) else None
+    return bool(
+        isinstance(eval_context, Mapping)
+        and eval_context.get("allow_pseudo_accuracy") is True
+    )
 
 
 def _classification_records(arm_payload: Any) -> list[dict[str, Any]]:
@@ -233,6 +248,15 @@ def enrich_run_report_metrics(
                     c_prev, n_prev = (prev_n, prev_n) if prev_n > 0 else (0, 0)
                     c_fin, n_fin = (fin_n, fin_n) if fin_n > 0 else (0, 0)
                     used_pseudo_counts = prev_n > 0 or fin_n > 0
+                    if used_pseudo_counts and not _pseudo_accuracy_allowed(
+                        profile_normalized,
+                        run_config,
+                    ):
+                        raise ValueError(
+                            "pseudo accuracy is only allowed in dev profile or when "
+                            "INVARLOCK_ALLOW_PSEUDO_ACCURACY=1 / "
+                            "eval.allow_pseudo_accuracy=true is set"
+                        )
 
             classification_metrics = {
                 "preview": {"correct_total": int(c_prev), "total": int(n_prev)},

@@ -41,6 +41,13 @@ def test_markdown_excludes_estimated_suffix_for_measured_accuracy():
         "policies": {},
         "resolved_policy": {},
         "policy_provenance": {},
+        "assurance": {
+            "mode": "strict",
+            "runtime_provenance_verification_status": "verified",
+            "verified_assurance_verdict": "pass",
+        },
     }
     md = render_report_markdown(evaluation_report)
     assert "(estimated)" not in md
+    assert "ESTIMATED / PSEUDO ACCURACY" not in md
+    assert "NON-ASSURANCE REPORT" not in md

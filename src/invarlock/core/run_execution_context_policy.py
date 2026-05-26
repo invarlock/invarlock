@@ -117,6 +117,11 @@ def build_run_context_payload(
         "plugins": dict(plugin_provenance),
         "run_id": run_id,
     }
+    guard_order = guards_section.get("order")
+    if isinstance(guard_order, list) and all(
+        isinstance(item, str) for item in guard_order
+    ):
+        run_context["guard_chain_observed"] = list(guard_order)
     if tiny_relax_enabled:
         run_context["run"] = {"tiny_relax": True}
 

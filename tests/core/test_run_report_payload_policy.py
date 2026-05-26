@@ -45,6 +45,20 @@ def test_build_run_report_context_splits_known_sections() -> None:
     }
 
 
+def test_build_run_report_context_copies_runtime_and_guard_chain() -> None:
+    payload = build_run_report_context(
+        profile_normalized="release",
+        auto_config={},
+        run_context={
+            "runtime": {"mode": "container"},
+            "guard_chain_observed": ["spectral", "rmt"],
+        },
+    )
+
+    assert payload["runtime"] == {"mode": "container"}
+    assert payload["guard_chain_observed"] == ["spectral", "rmt"]
+
+
 def test_build_run_report_meta_collects_profile_and_optional_fields() -> None:
     model_profile = SimpleNamespace(
         family="gpt",

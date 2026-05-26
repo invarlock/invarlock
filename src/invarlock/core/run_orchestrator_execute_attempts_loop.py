@@ -142,6 +142,7 @@ def _execute_attempt_core(
                 edit_config=edit_config,
                 guard_overhead_payload=None,
                 core_report=None,
+                model=execution_state.model,
                 should_continue=True,
             )
         halt("snapshot_restore_failed", error=exc)
@@ -163,6 +164,7 @@ def _execute_attempt_core(
         edit_config=edit_config,
         guard_overhead_payload=guard_overhead_payload,
         core_report=core_report,
+        model=execution_state.model,
         should_continue=False,
     )
 
@@ -323,7 +325,7 @@ def _execute_attempt_loop(
             snapshot_provenance=execution_state.snapshot_provenance,
             edit_op=edit_op,
             adapter=adapter,
-            model=execution_state.model,
+            model=attempt_state.model,
             measure_guard_overhead=measure_guard_overhead,
             retry_controller=retry_controller,
             validate_retry_evaluation_report_fn=validate_retry_evaluation_report_fn,

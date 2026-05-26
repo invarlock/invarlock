@@ -394,7 +394,7 @@ def test_attach_primary_metric_recomputes_ratio_without_marking_degraded():
         },
         {
             "field": "primary_metric.display_ci",
-            "reason": "computed_from_primary_metric_point_or_ci",
+            "reason": "computed_from_primary_metric_point",
             "source": "primary_metric_utils._attach_primary_metric_from_report",
         },
     ]

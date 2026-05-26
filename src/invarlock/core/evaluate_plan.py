@@ -119,10 +119,17 @@ def load_evaluate_preset_data(
         return preset_path, default_preset_data_for_adapter(str(adapter_name))
     if not preset_path.exists():
         raise FileNotFoundError(str(preset_path))
-    return preset_path, sanitize_preset_data_for_evaluate(load_yaml_fn(preset_path))
+    return preset_path, sanitize_preset_data_for_evaluate(
+        load_yaml_fn(preset_path),
+        adapter_name=str(adapter_name),
+    )
 
 
-def sanitize_preset_data_for_evaluate(preset_data: dict[str, Any]) -> dict[str, Any]:
+def sanitize_preset_data_for_evaluate(
+    preset_data: dict[str, Any],
+    *,
+    adapter_name: str | None = None,
+) -> dict[str, Any]:
     """Remove evaluate-local overrides that should be chosen by the runtime."""
 
     sanitized = deepcopy(preset_data)
@@ -131,6 +138,13 @@ def sanitize_preset_data_for_evaluate(preset_data: dict[str, Any]) -> dict[str, 
         model_block = dict(model_block)
         model_block.pop("device", None)
         sanitized["model"] = model_block
+    if adapter_name:
+        default_dataset = default_preset_data_for_adapter(adapter_name)["dataset"]
+        dataset_block = sanitized.get("dataset")
+        if dataset_block is None:
+            sanitized["dataset"] = deepcopy(default_dataset)
+        elif isinstance(dataset_block, dict):
+            sanitized["dataset"] = deep_merge_dicts(default_dataset, dataset_block)
     return sanitized
 
 

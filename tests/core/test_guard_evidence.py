@@ -68,3 +68,13 @@ def test_guard_evidence_blocks_monitor_only_status_spellings() -> None:
     assert "variance status monitor_only is not strict-assurance passing." in (
         underscored.strict_blocking_reasons()
     )
+
+
+def test_guard_evidence_from_report_block_preserves_explicit_pass_decision() -> None:
+    evidence = GuardEvidence.from_report_block(
+        "spectral",
+        {"passed": True, "metrics": {"sigma": 1.0}},
+    )
+
+    assert evidence is not None
+    assert evidence.decision == "allow"

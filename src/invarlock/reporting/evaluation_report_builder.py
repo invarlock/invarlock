@@ -7,6 +7,7 @@ from typing import Any
 
 from invarlock.core.assurance_contract import (
     build_assurance_section,
+    report_build_has_blocking_evidence_events,
     resolve_report_runtime_provenance_declared,
 )
 
@@ -24,9 +25,7 @@ class ReportBuildContext:
 
     def has_repair_or_fallback_events(self) -> bool:
         self.ensure_evidence()
-        return report_build_evidence.report_build_has_evidence_events(
-            self.evaluation_report
-        )
+        return report_build_has_blocking_evidence_events(self.evaluation_report)
 
     def attach_pending_assurance(self) -> dict[str, Any]:
         self.ensure_evidence()

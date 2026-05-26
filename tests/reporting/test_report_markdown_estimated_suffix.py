@@ -43,4 +43,7 @@ def test_markdown_includes_estimated_suffix_and_note_for_accuracy():
     }
     md = render_report_markdown(evaluation_report)
     assert "(estimated)" in md
+    assert "ESTIMATED / PSEUDO ACCURACY" in md
+    assert "NOT MEASURED LABEL ACCURACY" in md
+    assert "NON-ASSURANCE REPORT" in md
     assert "Accuracy derived from pseudo counts" in md

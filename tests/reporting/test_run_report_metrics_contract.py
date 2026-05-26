@@ -80,9 +80,7 @@ def test_enrich_run_report_metrics_adds_classification_primary_metric_and_stats(
     assert result.report["dataset"]["windows"]["stats"]["coverage"] is True
 
 
-def test_enrich_run_report_metrics_uses_pseudo_counts_and_returns_pairing_violation() -> (
-    None
-):
+def test_enrich_run_report_metrics_rejects_pseudo_counts_outside_dev() -> None:
     report = {
         "metrics": {
             "window_match_fraction": 0.5,
@@ -93,6 +91,45 @@ def test_enrich_run_report_metrics_uses_pseudo_counts_and_returns_pairing_violat
     core_report = SimpleNamespace(evaluation_windows=None, metrics={})
     run_config = SimpleNamespace(
         context={"eval": {"loss": {"resolved_type": "classification"}}}
+    )
+    cfg = SimpleNamespace(dataset=SimpleNamespace(preview_n=3, final_n=4))
+
+    with pytest.raises(ValueError, match="pseudo accuracy is only allowed"):
+        enrich_run_report_metrics(
+            report=report,
+            core_report=core_report,
+            run_config=run_config,
+            cfg=cfg,
+            model_profile=SimpleNamespace(),
+            baseline_requested=True,
+            baseline_report_data=None,
+            metric_kind=None,
+            resolved_loss_type="classification",
+            effective_preview=3,
+            effective_final=4,
+            profile_normalized="ci",
+            window_plan=None,
+            debug_metric_diffs_enabled=False,
+            resolve_metric_and_provider_fn=lambda *args, **kwargs: (None, None, {}),
+        )
+
+
+def test_enrich_run_report_metrics_uses_pseudo_counts_when_explicitly_allowed() -> None:
+    report = {
+        "metrics": {
+            "window_match_fraction": 0.5,
+            "window_overlap_fraction": 0.0,
+        },
+        "data": {"preview_n": 3, "final_n": 4},
+    }
+    core_report = SimpleNamespace(evaluation_windows=None, metrics={})
+    run_config = SimpleNamespace(
+        context={
+            "eval": {
+                "loss": {"resolved_type": "classification"},
+                "allow_pseudo_accuracy": True,
+            }
+        }
     )
     cfg = SimpleNamespace(dataset=SimpleNamespace(preview_n=3, final_n=4))
 

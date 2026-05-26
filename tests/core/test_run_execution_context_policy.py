@@ -122,6 +122,42 @@ def test_build_run_context_payload_merges_invariants_baseline_and_loss_context()
     assert payload["eval"]["loss"]["resolved_type"] == "ppl_causal"
 
 
+def test_build_run_context_payload_includes_non_empty_assurance_section() -> None:
+    cfg = SimpleNamespace(
+        eval={},
+        dataset={},
+        guards={"spectral": {}, "rmt": {}, "variance": {}, "invariants": {}},
+        assurance={"mode": "strict"},
+        context={},
+    )
+    model_profile = SimpleNamespace(
+        family="test",
+        default_loss="ppl_causal",
+        module_selectors={},
+        invariants=[],
+        cert_lints=[],
+    )
+
+    payload = build_run_context_payload(
+        cfg=cfg,
+        profile="ci",
+        pairing_schedule=None,
+        seed_bundle={},
+        plugin_provenance={},
+        run_id="run-assurance",
+        baseline_report_data=None,
+        pm_acceptance_range=None,
+        pm_drift_band=None,
+        guard_overhead_threshold=0.01,
+        model_profile=model_profile,
+        resolved_loss_type="ppl_causal",
+        tiny_relax_enabled=False,
+        to_serialisable_dict_fn=lambda obj: dict(obj) if isinstance(obj, dict) else {},
+    )
+
+    assert payload["assurance"] == {"mode": "strict"}
+
+
 def test_build_run_context_payload_skips_invalid_baseline_and_non_dict_context() -> (
     None
 ):

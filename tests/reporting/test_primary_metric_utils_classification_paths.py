@@ -156,7 +156,7 @@ def test_attach_primary_metric_recovers_when_display_ci_lookup_raises() -> None:
     assert evaluation_report["report_build"]["synthesized_fields"] == [
         {
             "field": "primary_metric.display_ci",
-            "reason": "computed_from_primary_metric_point_or_ci",
+            "reason": "computed_from_primary_metric_point",
             "source": "primary_metric_utils._attach_primary_metric_from_report",
         }
     ]
