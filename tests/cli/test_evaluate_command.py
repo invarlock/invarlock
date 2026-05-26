@@ -19,7 +19,16 @@ def _stub_run(out_dir: Path, baseline: Path | None = None) -> Path:
     report = {
         "meta": {"model_id": "stub", "adapter": "hf_causal"},
         "edit": {"name": "quant_rtn"},
-        "metrics": {"ppl_ratio": 1.0, "ppl_final": 10.0},
+        "metrics": {
+            "ppl_ratio": 1.0,
+            "ppl_final": 10.0,
+            "timings": {
+                "load_model": 0.1,
+                "load_dataset": 0.2,
+                "eval": 0.3,
+                "finalize": 0.4,
+            },
+        },
         "data": {"preview_n": 1, "final_n": 1},
     }
     report_path = ts_dir / "report.json"
@@ -216,8 +225,72 @@ def test_evaluate_can_defer_optional_rendering_and_write_timing_json(
     assert payload["schema"] == "invarlock/evaluate-timing-v1"
     assert payload["defer_report_rendering"] is True
     assert payload["baseline_report_reused"] is False
+    assert payload["timings_seconds"]["plan"] >= 0.0
     assert payload["timings_seconds"]["subject"] >= 0.0
     assert payload["timings_seconds"]["evaluation_report"] >= 0.0
+    assert payload["run_timings_seconds"]["baseline"]["load_model"] == 0.1
+    assert payload["run_timings_seconds"]["subject"]["eval"] == 0.3
+    assert payload["aggregate_run_timings_seconds"]["load_dataset"] == 0.4
+
+
+def test_evaluate_timing_helpers_handle_invalid_payloads(tmp_path: Path) -> None:
+    from invarlock.cli.commands import evaluate as mod
+
+    assert mod._coerce_timing_seconds(True) is None
+    assert mod._coerce_timing_seconds("not-a-number") is None
+    assert mod._load_report_payload(tmp_path / "missing.json") is None
+
+    list_payload = tmp_path / "list.json"
+    list_payload.write_text("[]", encoding="utf-8")
+    assert mod._load_report_payload(list_payload) is None
+
+    assert mod._extract_run_timings_seconds(None) == {}
+    assert mod._extract_run_timings_seconds({"metrics": {}}) == {}
+
+
+def test_evaluate_timing_json_omits_empty_run_timings(monkeypatch, tmp_path: Path):
+    src = tmp_path / "src_model"
+    edt = tmp_path / "edt_model"
+    src.mkdir()
+    edt.mkdir()
+    (src / "config.json").write_text(
+        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
+        encoding="utf-8",
+    )
+    (edt / "config.json").write_text(
+        json.dumps({"model_type": "gpt2", "architectures": ["GPT2LMHeadModel"]}),
+        encoding="utf-8",
+    )
+
+    def fake_run(**kwargs):  # noqa: ANN001
+        out = Path(kwargs.get("out"))
+        ts_dir = out / "20250101_000000"
+        ts_dir.mkdir(parents=True, exist_ok=True)
+        report_path = ts_dir / "report.json"
+        report_path.write_text(json.dumps({"metrics": {}}), encoding="utf-8")
+        return str(report_path)
+
+    import invarlock.cli.commands.run as run_mod
+    from invarlock.cli.commands import evaluate as mod
+
+    monkeypatch.setattr(run_mod, "run_command", fake_run, raising=False)
+    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
+
+    timing_json = tmp_path / "timing" / "evaluate_timing.json"
+    evaluate_command(
+        baseline=str(src),
+        subject=str(edt),
+        baseline_adapter="auto",
+        subject_adapter="auto",
+        profile="ci",
+        out=str(tmp_path / "runs"),
+        report_out=str(tmp_path / "reports"),
+        timing_json=str(timing_json),
+    )
+
+    payload = json.loads(timing_json.read_text(encoding="utf-8"))
+    assert "run_timings_seconds" not in payload
+    assert "aggregate_run_timings_seconds" not in payload
 
 
 def test_evaluate_releases_phase_memory_between_runs(monkeypatch, tmp_path):

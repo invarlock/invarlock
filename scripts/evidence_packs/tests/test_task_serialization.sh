@@ -610,6 +610,7 @@ test_estimate_model_memory_multiplier_case_arms_large_and_small() {
     local large="Qwen/Qwen1.5-72B"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "SETUP_BASELINE")" "large SETUP_BASELINE"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "CALIBRATION_RUN")" "large CALIBRATION_RUN"
+    assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "SETUP_EVALUATE_BASELINE_REPORT")" "large SETUP_EVALUATE_BASELINE_REPORT"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "CREATE_EDIT")" "large CREATE_EDIT"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "CREATE_EDITS_BATCH")" "large CREATE_EDITS_BATCH"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "EVAL_EDIT")" "large EVAL_EDIT"
@@ -622,6 +623,7 @@ test_estimate_model_memory_multiplier_case_arms_large_and_small() {
     local small="org/Thing-13B"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${small}" "SETUP_BASELINE")" "small SETUP_BASELINE"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${small}" "CALIBRATION_RUN")" "small CALIBRATION_RUN"
+    assert_match '^[0-9]+$' "$(estimate_model_memory "${small}" "SETUP_EVALUATE_BASELINE_REPORT")" "small SETUP_EVALUATE_BASELINE_REPORT"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${small}" "CREATE_EDIT")" "small CREATE_EDIT"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${small}" "CREATE_EDITS_BATCH")" "small CREATE_EDITS_BATCH"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${small}" "EVAL_EDIT")" "small EVAL_EDIT"
@@ -654,6 +656,7 @@ test_estimate_model_memory_serializes_moe_execution_tasks() {
     assert_eq "480" "${baseline_report_mem}" "MoE eager baseline report reserves host-heavy capacity"
     assert_eq "4" "$(calculate_required_gpus "${baseline_report_mem}")" "MoE eager baseline report uses full-host reservation"
 
+    assert_eq "10" "$(estimate_model_memory "mistralai/Mixtral-8x7B-v0.1" "GENERATE_PRESET")" "MoE preset generation stays CPU-light"
     assert_eq "94" "$(estimate_model_memory "mistralai/Mixtral-8x7B-v0.1" "SETUP_BASELINE")" "MoE baseline setup stays single-host download sized"
     assert_eq "1" "$(calculate_required_gpus "$(estimate_model_memory "mistralai/Mixtral-8x7B-v0.1" "SETUP_BASELINE")")" "MoE baseline setup still fits one GPU lane"
 }

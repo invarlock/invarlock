@@ -2229,6 +2229,7 @@ PRESET_YAML
             defer_rendering="true"
         fi
 
+        local group_entry_filter='{edit_spec:$edit_spec,version:$version,run:$run,baseline:$baseline,baseline_report:$baseline_report,subject:$subject,baseline_adapter:"auto",subject_adapter:"auto",profile:$profile,tier:$tier,out:$out,report_out:$report_out,preset:$preset,edit_label:$edit_label,config_root:$config_root,work_dir:$work_dir,evaluate_tmp_dir:$evaluate_tmp_dir,timing_json:$timing_json,execution_mode:"container",assurance:"strict",allow_remote_code:$allow_remote_code,defer_report_rendering:$defer_report_rendering}'
         jq -cn \
             --arg edit_spec "${edit_spec}" \
             --arg version "${version}" \
@@ -2244,32 +2245,11 @@ PRESET_YAML
             --arg preset "${abs_preset_file}" \
             --arg config_root "${config_root}" \
             --arg work_dir "${cert_dir}/.workdir" \
+            --arg evaluate_tmp_dir "${group_root}/tmp/evaluate" \
             --arg timing_json "${cert_dir}/evaluate_timing.json" \
             --argjson allow_remote_code "${allow_remote_code}" \
             --argjson defer_report_rendering "${defer_rendering}" \
-            '{
-                edit_spec: $edit_spec,
-                version: $version,
-                run: $run,
-                baseline: $baseline,
-                baseline_report: $baseline_report,
-                subject: $subject,
-                baseline_adapter: "auto",
-                subject_adapter: "auto",
-                profile: $profile,
-                tier: $tier,
-                out: $out,
-                report_out: $report_out,
-                preset: $preset,
-                edit_label: $edit_label,
-                config_root: $config_root,
-                work_dir: $work_dir,
-                timing_json: $timing_json,
-                execution_mode: "container",
-                assurance: "strict",
-                allow_remote_code: $allow_remote_code,
-                defer_report_rendering: $defer_report_rendering
-            }' >> "${entry_lines}"
+            "${group_entry_filter}" >> "${entry_lines}"
         prepared_count=$((prepared_count + 1))
     done < <(printf '%s' "${entries_json}" | jq -c '.[]')
 
@@ -2284,8 +2264,13 @@ PRESET_YAML
     echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] grouped evaluating ${prepared_count} edits for ${model_name}" >> "${log_file}"
     local summary_file="${group_root}/summary.json"
     local timing_jsonl="${output_dir}/results/analysis/evaluate_timing.jsonl"
+    local helper_python
+    helper_python="$(_cmd_python_interpreter)" || {
+        echo "ERROR: Unable to resolve a Python interpreter for grouped evaluation helper scripts" >> "${log_file}"
+        return 1
+    }
     PYTHONPATH="${PACK_REPO_PYTHONPATH}" \
-        _cmd_python "${SCRIPT_DIR}/../python/run_evaluate_group.py" \
+        command "${helper_python}" "${SCRIPT_DIR}/../python/run_evaluate_group.py" \
             --entries-json "${entries_file}" \
             --summary-out "${summary_file}" \
             --timing-jsonl "${timing_jsonl}" >> "${log_file}" 2>&1
@@ -2630,6 +2615,7 @@ task_evaluate_error() {
     if error_requires_inline_baseline_eval "${error_type}"; then
         echo "  Baseline report reuse disabled for structural error: ${error_type}" >> "${log_file}"
     else
+        :
         baseline_report_file=$(
             _ensure_evaluate_baseline_report \
                 "${baseline_report_root}" \

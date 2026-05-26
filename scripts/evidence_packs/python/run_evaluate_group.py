@@ -109,6 +109,9 @@ def _run_entry(entry: dict[str, Any]) -> dict[str, Any]:
         "INVARLOCK_CONFIG_ROOT": _entry_str(entry, "config_root"),
         "INVARLOCK_STORE_EVAL_WINDOWS": "1",
     }
+    evaluate_tmp_dir = entry.get("evaluate_tmp_dir")
+    if isinstance(evaluate_tmp_dir, str) and evaluate_tmp_dir:
+        env_updates["INVARLOCK_EVALUATE_TMP_DIR"] = evaluate_tmp_dir
     if _entry_bool(entry, "allow_remote_code"):
         env_updates["INVARLOCK_ALLOW_REMOTE_CODE"] = "1"
 

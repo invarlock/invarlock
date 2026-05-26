@@ -9,6 +9,19 @@ import os
 from pathlib import Path
 from typing import Any
 
+_RUN_TIMING_KEYS = (
+    "load_model",
+    "load_dataset",
+    "prepare",
+    "prepare_guards",
+    "edit",
+    "guards",
+    "eval",
+    "finalize",
+    "execute",
+    "total",
+)
+
 
 def _read_json(path: Path) -> dict[str, Any] | None:
     try:
@@ -29,6 +42,29 @@ def _sum_timing(payloads: list[dict[str, Any]], key: str) -> float:
             total += float(value)
         except (TypeError, ValueError):
             continue
+    return total
+
+
+def _sum_run_timing(payloads: list[dict[str, Any]], key: str) -> float:
+    total = 0.0
+    for payload in payloads:
+        aggregate = payload.get("aggregate_run_timings_seconds")
+        if isinstance(aggregate, dict):
+            try:
+                total += float(aggregate.get(key, 0.0) or 0.0)
+            except (TypeError, ValueError):
+                pass
+            continue
+        run_timings = payload.get("run_timings_seconds")
+        if not isinstance(run_timings, dict):
+            continue
+        for side_payload in run_timings.values():
+            if not isinstance(side_payload, dict):
+                continue
+            try:
+                total += float(side_payload.get(key, 0.0) or 0.0)
+            except (TypeError, ValueError):
+                continue
     return total
 
 
@@ -84,10 +120,14 @@ def build_summary(run_dir: Path) -> dict[str, Any]:
         "grouped_evaluation_entries": grouped_entries,
         "avoided_cli_process_invocations": avoided_processes,
         "timing_totals_seconds": {
+            "plan": _sum_timing(timings, "plan"),
             "baseline": _sum_timing(timings, "baseline"),
             "subject": _sum_timing(timings, "subject"),
             "evaluation_report": _sum_timing(timings, "evaluation_report"),
             "total": _sum_timing(timings, "total"),
+        },
+        "run_timing_totals_seconds": {
+            key: _sum_run_timing(timings, key) for key in _RUN_TIMING_KEYS
         },
     }
 

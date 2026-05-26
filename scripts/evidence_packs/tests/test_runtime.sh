@@ -78,6 +78,109 @@ EOF
     fi
 }
 
+test_cmd_python_interpreter_ignores_wrappers_and_prefers_helper_python() {
+    mock_reset
+    # shellcheck source=../runtime.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/runtime.sh"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/not-python" <<'EOF'
+#!/usr/bin/env bash
+exit 9
+EOF
+    chmod +x "${bin_dir}/not-python"
+
+    local previous_helper="${PACK_HELPER_PYTHON_BIN:-}"
+    local previous_python_bin="${PYTHON_BIN:-}"
+    local had_helper="0"
+    local had_python_bin="0"
+    [[ -v PACK_HELPER_PYTHON_BIN ]] && had_helper="1"
+    [[ -v PYTHON_BIN ]] && had_python_bin="1"
+
+    export PACK_HELPER_PYTHON_BIN="${bin_dir}/not-python -m invarlock"
+    export PYTHON_BIN="${TEST_REAL_PYTHON3}"
+    run _cmd_python_interpreter
+    assert_rc "0" "${RUN_RC}" "interpreter resolver skips helper wrappers with arguments"
+    assert_eq "${TEST_REAL_PYTHON3}" "${RUN_OUT}" "falls back to valid PYTHON_BIN interpreter"
+
+    export PACK_HELPER_PYTHON_BIN="${TEST_REAL_PYTHON3}"
+    export PYTHON_BIN="${bin_dir}/not-python"
+    run _cmd_python_interpreter
+    assert_rc "0" "${RUN_RC}" "interpreter resolver accepts explicit helper python"
+    assert_eq "${TEST_REAL_PYTHON3}" "${RUN_OUT}" "PACK_HELPER_PYTHON_BIN wins when it is a real interpreter"
+
+    if [[ "${had_helper}" == "1" ]]; then
+        export PACK_HELPER_PYTHON_BIN="${previous_helper}"
+    else
+        unset PACK_HELPER_PYTHON_BIN
+    fi
+    if [[ "${had_python_bin}" == "1" ]]; then
+        export PYTHON_BIN="${previous_python_bin}"
+    else
+        unset PYTHON_BIN
+    fi
+}
+
+test_cmd_python_interpreter_discovers_python_and_fails_without_candidates() {
+    mock_reset
+    # shellcheck source=../runtime.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/runtime.sh"
+
+    local previous_path="${PATH}"
+    local previous_helper="${PACK_HELPER_PYTHON_BIN:-}"
+    local previous_python_bin="${PYTHON_BIN:-}"
+    local previous_virtual_env="${VIRTUAL_ENV:-}"
+    local had_helper="0"
+    local had_python_bin="0"
+    local had_virtual_env="0"
+    [[ -v PACK_HELPER_PYTHON_BIN ]] && had_helper="1"
+    [[ -v PYTHON_BIN ]] && had_python_bin="1"
+    [[ -v VIRTUAL_ENV ]] && had_virtual_env="1"
+
+    unset PACK_HELPER_PYTHON_BIN
+    unset PYTHON_BIN
+    unset VIRTUAL_ENV
+    run _cmd_python_interpreter
+    assert_rc "0" "${RUN_RC}" "interpreter resolver discovers python on PATH"
+    assert_match "python" "${RUN_OUT}" "discovered interpreter name contains python"
+
+    local empty_path="${TEST_TMPDIR}/empty-path"
+    mkdir -p "${empty_path}"
+    local fail_rc=0
+    export PATH="${empty_path}"
+    export PACK_HELPER_PYTHON_BIN="${TEST_TMPDIR}/missing-helper"
+    export PYTHON_BIN="${TEST_TMPDIR}/missing-python"
+    export VIRTUAL_ENV="${TEST_TMPDIR}/missing-venv"
+    local fail_err="${TEST_TMPDIR}/interpreter_fail.err"
+    if _cmd_python_interpreter >/dev/null 2>"${fail_err}"; then
+        fail_rc=0
+    else
+        fail_rc=$?
+    fi
+    PATH="${previous_path}"
+    case "$-" in
+        *x*) cat "${fail_err}" >&2 || true ;;
+    esac
+    assert_rc "1" "${fail_rc}" "interpreter resolver fails when no real python candidate exists"
+
+    if [[ "${had_helper}" == "1" ]]; then
+        export PACK_HELPER_PYTHON_BIN="${previous_helper}"
+    else
+        unset PACK_HELPER_PYTHON_BIN
+    fi
+    if [[ "${had_python_bin}" == "1" ]]; then
+        export PYTHON_BIN="${previous_python_bin}"
+    else
+        unset PYTHON_BIN
+    fi
+    if [[ "${had_virtual_env}" == "1" ]]; then
+        export VIRTUAL_ENV="${previous_virtual_env}"
+    else
+        unset VIRTUAL_ENV
+    fi
+}
+
 test_rand_jitter_ms_positive_returns_value_in_range() {
     mock_reset
     # shellcheck source=../runtime.sh

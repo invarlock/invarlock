@@ -49,10 +49,10 @@ def test_evaluate_timing_block_printed(monkeypatch, tmp_path, capsys) -> None:
         cert_mod, "generate_reports", lambda **_kwargs: None, raising=False
     )
 
-    # Deterministic time progression for: total, baseline, subject, evaluation report.
+    # Deterministic time progression for total, plan, baseline, subject, report.
     from invarlock.cli import output as out_mod
 
-    ticks = iter([0.0, 0.0, 1.0, 1.0, 3.0, 3.0, 3.5, 3.5])
+    ticks = iter([0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 3.0, 3.0, 3.5, 3.5])
     monkeypatch.setattr(out_mod, "perf_counter", lambda: next(ticks))
 
     evaluate_command(
@@ -70,6 +70,7 @@ def test_evaluate_timing_block_printed(monkeypatch, tmp_path, capsys) -> None:
 
     out = capsys.readouterr().out
     assert "TIMING SUMMARY" in out
+    assert "Plan" in out and "0.00s" in out
     assert "Baseline" in out and "1.00s" in out
     assert "Subject" in out and "2.00s" in out
     assert "Evaluation Report" in out and "0.50s" in out

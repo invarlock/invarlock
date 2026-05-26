@@ -47,10 +47,11 @@ EOF
     /bin/rm -f "${bin_dir}/python"
     assert_eq "python3" "$(resolve_python_bin)" "python3 is used when python is absent"
 
-    PATH=""
+    local empty_bin="${TEST_TMPDIR}/empty-bin"
+    /bin/mkdir -p "${empty_bin}"
+    PATH="${empty_bin}"
     local rc=0
-    local err_file="${TEST_TMPDIR}/resolve_python_bin.err"
-    if resolve_python_bin > /dev/null 2> "${err_file}"; then
+    if resolve_python_bin > /dev/null; then
         rc=0
     else
         rc=$?
@@ -78,6 +79,10 @@ EOF
     rm -f "${run_dir}/presets/calibrated_preset_${model_name}__quant_rtn.json"
     printf 'preset: base\n' > "${run_dir}/presets/calibrated_preset_${model_name}.json"
     assert_eq "${run_dir}/presets/calibrated_preset_${model_name}.json" "$(resolve_preset_path "${run_dir}" "${model_name}" "quant_rtn")" "base json preset is accepted as final fallback"
+
+    rm -f "${run_dir}/presets/calibrated_preset_${model_name}.json"
+    run resolve_preset_path "${run_dir}" "${model_name}" "quant_rtn"
+    assert_rc "1" "${RUN_RC}" "missing preset returns non-zero"
 }
 
 test_run_qwen14_sentinels_main_is_sourceable_and_covers_mode_dispatch() {

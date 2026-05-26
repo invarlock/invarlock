@@ -383,12 +383,17 @@ Small/medium models default to batch edit creation:
 - **Grouped edit evaluation**: `PACK_GROUP_EVALUATIONS=1` emits one
   `evaluate_EDIT_GROUP` task per model batch. It still loads each subject
   checkpoint separately, but runs the edit evaluations inside one Python
-  process and reuses the staged baseline report, preset, config root, and
-  tokenizer/window evidence paths.
+  process and reuses the staged baseline report, preset, config root,
+  group-level evaluate temp directory, and tokenizer/window evidence paths.
 - **Deferred optional report rendering**: `PACK_DEFER_REPORT_RENDERING=1`
   keeps `evaluation.report.json`, `runtime.manifest.json`, and JSON evidence
   sidecars in the hot path while skipping markdown/reviewer bundle rendering.
   Pack verification does not require those optional rendered files.
+- **Optimization telemetry**: each `evaluate_timing.json` records top-level
+  evaluate timings plus nested baseline/subject run timings when reports expose
+  them. The pack-level `evaluation_optimization_summary.json` aggregates those
+  timings so reviewers can separate process startup savings from model load,
+  dataset preparation, guard/eval, and report-generation costs.
 
 Large or MoE models disable batch edits automatically (or via
 `PACK_USE_BATCH_EDITS=false`) and fall back to per-edit tasks

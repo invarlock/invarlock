@@ -52,6 +52,34 @@ if ! declare -F _cmd_python >/dev/null 2>&1; then
     }
 fi
 
+if ! declare -F _cmd_python_interpreter >/dev/null 2>&1; then
+    :
+    _cmd_python_interpreter() {
+        local candidate resolved
+        for candidate in \
+            "${PACK_HELPER_PYTHON_BIN:-}" \
+            "${PYTHON_BIN:-}" \
+            "${VIRTUAL_ENV:+${VIRTUAL_ENV}/bin/python}" \
+            python3 \
+            python; do
+            [[ -n "${candidate}" ]] || continue
+            [[ "${candidate}" != *[[:space:]]* ]] || continue
+
+            resolved="${candidate}"
+            if [[ "${candidate}" != */* ]]; then
+                resolved="$(command -v "${candidate}" 2>/dev/null || true)"
+            fi
+            [[ -n "${resolved}" && -x "${resolved}" ]] || continue
+
+            if command "${resolved}" -c 'import sys' >/dev/null 2>&1; then
+                printf '%s\n' "${resolved}"
+                return 0
+            fi
+        done
+        return 1
+    }
+fi
+
 if ! declare -F _runtime_python >/dev/null 2>&1; then
     :
     _runtime_python() {

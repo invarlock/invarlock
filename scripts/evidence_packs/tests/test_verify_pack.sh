@@ -92,6 +92,28 @@ test_verify_pack_errors_on_missing_args() {
 
     run pack_verify_pack --nope
     assert_rc "2" "${RUN_RC}" "unknown arg returns 2"
+
+    run pack_verify_pack --pack "${TEST_TMPDIR}/pack" --report-assurance
+    assert_rc "2" "${RUN_RC}" "missing report-assurance value is rejected"
+
+    run pack_verify_pack --pack "${TEST_TMPDIR}/pack" --report-assurance weak
+    assert_rc "2" "${RUN_RC}" "invalid report-assurance value is rejected"
+}
+
+test_verify_pack_source_selects_python_from_path_without_test_real_python() {
+    mock_reset
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/python" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+    chmod +x "${bin_dir}/python"
+
+    run bash -x -c 'unset PYTHON_BIN TEST_REAL_PYTHON3; PATH="$1:/usr/bin:/bin"; source ./scripts/evidence_packs/verify_pack.sh; printf "%s\n" "${PYTHON_BIN}"' _ "${bin_dir}"
+    assert_rc "0" "${RUN_RC}" "verify_pack source selects python from PATH"
+    assert_eq "${bin_dir}/python" "${RUN_OUT}" "python path exported from PATH"
 }
 
 

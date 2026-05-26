@@ -274,16 +274,18 @@ INVARLOCK_ALLOW_REMOTE_CODE=1 \
 
 `PACK_GROUP_EVALUATIONS=1` emits one `evaluate_EDIT_GROUP` task per model batch.
 That task evaluates the batch entries inside one Python process, reuses the
-shared baseline report, and still loads each subject checkpoint separately.
+shared baseline report and group-level evaluate temp directory, and still loads
+each subject checkpoint separately.
 `PACK_DEFER_REPORT_RENDERING=1` keeps `evaluation.report.json` and required
 sidecars, but skips optional markdown/reviewer rendering in the hot path.
 
 Every run writes `results/analysis/evaluation_optimization_summary.json`. It
 records timing files discovered under the run directory, grouped task counts,
-deferred-render counts, baseline-report reuse counts, and the estimated number
-of CLI process startups avoided by grouped evaluation. To compare before and
-after, run the same suite/model selection once with defaults and once with the
-two optimization flags, then compare the summary JSON files.
+deferred-render counts, baseline-report reuse counts, nested run timing totals
+from `evaluate_timing.json`, and the estimated number of CLI process startups
+avoided by grouped evaluation. To compare before and after, run the same
+suite/model selection once with defaults and once with the two optimization
+flags, then compare the summary JSON files.
 
 ## Edit Provenance Labels
 

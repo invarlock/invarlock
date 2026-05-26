@@ -95,6 +95,18 @@ _CHILD_RUN_REPLAY_ERRORS = (
 )
 _EDIT_CONFIG_LOAD_ERRORS = (OSError, TypeError, ValueError, yaml.YAMLError)
 _TEXT_NORMALIZATION_ERRORS = (RuntimeError, TypeError, ValueError)
+_RUN_TIMING_KEYS = (
+    "load_model",
+    "load_dataset",
+    "prepare",
+    "prepare_guards",
+    "edit",
+    "guards",
+    "eval",
+    "finalize",
+    "execute",
+    "total",
+)
 
 console = Console()
 
@@ -129,6 +141,47 @@ def _print_phase_header(console: Console, title: str) -> None:
 
 def _format_ratio(value: Any) -> str:
     return _format_ratio_impl(value)
+
+
+def _coerce_timing_seconds(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _load_report_payload(path: Path) -> dict[str, Any] | None:
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except (OSError, TypeError, ValueError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _extract_run_timings_seconds(payload: dict[str, Any] | None) -> dict[str, float]:
+    metrics = payload.get("metrics") if isinstance(payload, dict) else None
+    timings = metrics.get("timings") if isinstance(metrics, dict) else None
+    if not isinstance(timings, dict):
+        return {}
+    extracted: dict[str, float] = {}
+    for key in _RUN_TIMING_KEYS:
+        value = _coerce_timing_seconds(timings.get(key))
+        if value is not None:
+            extracted[key] = max(0.0, value)
+    return extracted
+
+
+def _aggregate_run_timings_seconds(
+    run_timings: dict[str, dict[str, float]],
+) -> dict[str, float]:
+    aggregate: dict[str, float] = {}
+    for timings in run_timings.values():
+        for key, value in timings.items():
+            aggregate[key] = aggregate.get(key, 0.0) + float(value)
+    return aggregate
 
 
 def _evaluation_report_manifest_execution(
@@ -432,6 +485,9 @@ def evaluate_command(
 
     src_id = str(baseline)
     edt_id = str(subject)
+    plan_start: float | None = (
+        cli_output.perf_counter() if total_start is not None else None
+    )
     try:
         plan = build_evaluate_command_plan(
             baseline_model_id=src_id,
@@ -455,6 +511,8 @@ def evaluate_command(
         _fail(f"Preset not found: {exc}", exit_code=2)
     except ValueError as exc:
         _fail(str(exc), exit_code=2)
+    if plan_start is not None:
+        timings["plan"] = max(0.0, float(cli_output.perf_counter() - plan_start))
     profile_name = plan.profile_name
     tier_name = plan.tier_name
     baseline_eff_adapter = plan.baseline_adapter_name
@@ -656,6 +714,7 @@ def evaluate_command(
             timings,
             style=output_style,
             order=[
+                ("Plan", "plan"),
                 ("Baseline", "baseline"),
                 ("Subject", "subject"),
                 ("Evaluation Report", "evaluation_report"),
@@ -663,6 +722,12 @@ def evaluate_command(
             ],
         )
     if timing_json:
+        baseline_payload = _load_report_payload(baseline_report_path)
+        run_timings_seconds = {
+            "baseline": _extract_run_timings_seconds(baseline_payload),
+            "subject": _extract_run_timings_seconds(edited_payload),
+        }
+        aggregate_run_timings = _aggregate_run_timings_seconds(run_timings_seconds)
         timing_payload = {
             "schema": "invarlock/evaluate-timing-v1",
             "baseline": baseline,
@@ -675,6 +740,10 @@ def evaluate_command(
             "defer_report_rendering": bool(defer_report_rendering),
             "timings_seconds": {key: float(value) for key, value in timings.items()},
         }
+        if any(run_timings_seconds.values()):
+            timing_payload["run_timings_seconds"] = run_timings_seconds
+        if aggregate_run_timings:
+            timing_payload["aggregate_run_timings_seconds"] = aggregate_run_timings
         timing_path = Path(timing_json)
         timing_path.parent.mkdir(parents=True, exist_ok=True)
         timing_path.write_text(

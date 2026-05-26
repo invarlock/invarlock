@@ -19,10 +19,15 @@ def test_build_summary_collects_timing_and_grouped_process_savings(tmp_path: Pat
             "baseline_report_reused": True,
             "defer_report_rendering": True,
             "timings_seconds": {
+                "plan": 0.1,
                 "baseline": 0.0,
                 "subject": 2.0,
                 "evaluation_report": 0.5,
                 "total": 2.5,
+            },
+            "run_timings_seconds": {
+                "baseline": {"load_model": 1.0, "load_dataset": 0.25, "eval": 3.0},
+                "subject": {"load_model": 1.5, "load_dataset": 0.25, "eval": 4.0},
             },
         },
     )
@@ -43,4 +48,8 @@ def test_build_summary_collects_timing_and_grouped_process_savings(tmp_path: Pat
     assert summary["grouped_evaluation_tasks"] == 1
     assert summary["grouped_evaluation_entries"] == 4
     assert summary["avoided_cli_process_invocations"] == 3
+    assert summary["timing_totals_seconds"]["plan"] == 0.1
     assert summary["timing_totals_seconds"]["subject"] == 2.0
+    assert summary["run_timing_totals_seconds"]["load_model"] == 2.5
+    assert summary["run_timing_totals_seconds"]["load_dataset"] == 0.5
+    assert summary["run_timing_totals_seconds"]["eval"] == 7.0

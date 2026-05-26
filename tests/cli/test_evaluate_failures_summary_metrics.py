@@ -363,7 +363,7 @@ def test_evaluate_prints_timing_summary_when_requested(
     baseline_report = _write_json(tmp_path / "baseline.json", {})
     edited_report = _write_json(tmp_path / "edited.json", {})
     summary_calls: list[tuple[dict[str, float], list[tuple[str, str]]]] = []
-    perf_values = iter([100.0, 104.0])
+    perf_values = iter([100.0, 100.1, 100.4, 104.0])
 
     @contextmanager
     def fake_timed_step(*, timings, key, **_kwargs):
@@ -415,10 +415,12 @@ def test_evaluate_prints_timing_summary_when_requested(
 
     assert len(summary_calls) == 1
     timings, order = summary_calls[0]
+    assert timings["plan"] == pytest.approx(0.3)
     assert timings["baseline"] == 1.25
     assert timings["subject"] == 2.0
     assert timings["evaluation_report"] == 0.5
     assert timings["total"] == 4.0
+    assert order[0] == ("Plan", "plan")
     assert order[-1] == ("Total", "total")
 
 

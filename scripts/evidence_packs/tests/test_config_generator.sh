@@ -54,6 +54,31 @@ test_config_generator_run_single_calibration_large_model_emits_log_and_captures_
     assert_match "skip_overhead_check: true" "$(cat "${run_dir}/calibration_config.yaml")" "calibration config carries skip_overhead policy"
 }
 
+test_config_generator_run_single_calibration_returns_runner_failure() {
+    mock_reset
+
+    # shellcheck source=../config_generator.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/config_generator.sh"
+
+    INVARLOCK_DATASET="wikitext2"
+    INVARLOCK_TIER="balanced"
+    FLASH_ATTENTION_AVAILABLE="false"
+    PACK_DETERMINISM="throughput"
+    export INVARLOCK_DATASET INVARLOCK_TIER FLASH_ATTENTION_AVAILABLE PACK_DETERMINISM
+
+    _pack_run_from_config() { return 7; }
+    _cmd_python() { return 0; }
+    estimate_model_params() { echo "7"; }
+
+    local run_dir="${TEST_TMPDIR}/calibration_failed/run_1"
+    local log_file="${TEST_TMPDIR}/calibration_failed.log"
+    mkdir -p "$(dirname "${run_dir}")"
+    : > "${log_file}"
+
+    run run_single_calibration "${TEST_TMPDIR}/model" "${run_dir}" 42 2 2 10 "${log_file}" 0 128 128 1
+    assert_rc "7" "${RUN_RC}" "calibration propagates config-runner failure"
+}
+
 test_config_generator_run_invarlock_calibration_logs_moe_and_all_runs_failed() {
     mock_reset
 

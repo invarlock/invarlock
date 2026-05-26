@@ -1016,10 +1016,18 @@ gpu_worker() { return 0; }
 EOF
     LIB_DIR="${stub_lib}"
     export LIB_DIR
+    python3() {
+        if [[ "${1:-}" == */evaluation_optimization_summary.py ]]; then
+            return 1
+        fi
+        command "${TEST_REAL_PYTHON3}" "$@"
+    }
 
     run main_dynamic
+    unset -f python3
     assert_rc "1" "${RUN_RC}" "failed final verdict makes suite fail"
     assert_match "Final verdict is FAIL" "${RUN_OUT}${RUN_ERR}" "failure reason is logged"
+    assert_match "Failed to write evaluation optimization summary" "${RUN_OUT}${RUN_ERR}" "optimization summary failure is logged as a warning"
 }
 
 test_pack_validation_pack_run_suite_returns_nonzero_when_dataset_preflight_fails() {
@@ -2512,6 +2520,13 @@ test_pack_validation_pack_run_suite_branches() {
     trap - EXIT INT TERM HUP QUIT
     pack_validate_guard_calibration() { return 0; }
 
+    OUTPUT_DIR="${TEST_TMPDIR}/out_fail_runtime_provenance"
+    pack_validate_runtime_provenance() { return 1; }
+    run pack_run_suite
+    assert_rc "1" "${RUN_RC}" "pack_validate_runtime_provenance failure returns non-zero"
+    trap - EXIT INT TERM HUP QUIT
+    pack_validate_runtime_provenance() { return 0; }
+
     pack_model_list_array() { PACK_MODEL_LIST=(); }
     local error_log="${TEST_TMPDIR}/error.calls"
     : > "${error_log}"
@@ -2949,6 +2964,34 @@ JSON
     assert_rc "0" "${RUN_RC}" "tuned edit params validated"
 }
 
+test_pack_validate_tuned_edit_params_uses_presets_canonical_fallback() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/validation_suite.sh
+    CLEAN_EDIT_RUNS="1"
+    EDIT_TYPES_CLEAN=("quant_rtn:clean:ffn")
+    PACK_MODEL_LIST=("org/model1")
+
+    local fake_root="${TEST_TMPDIR}/fake-root"
+    mkdir -p \
+        "${fake_root}/scripts/evidence_packs/lib" \
+        "${fake_root}/scripts/evidence_packs/python" \
+        "${fake_root}/scripts/evidence_packs/presets"
+    cat > "${fake_root}/scripts/evidence_packs/python/validate_tuned_edit_params.py" <<'PY'
+import sys
+sys.exit(0)
+PY
+    printf '{}\n' > "${fake_root}/scripts/evidence_packs/presets/tuned_edit_params.json"
+
+    PACK_TUNED_EDIT_PARAMS_FILE="${TEST_TMPDIR}/tuned.json"
+    export PACK_TUNED_EDIT_PARAMS_FILE
+    printf '{"defaults":{"quant_rtn":{"status":"selected"}},"models":{}}\n' > "${PACK_TUNED_EDIT_PARAMS_FILE}"
+    _PACK_VALIDATION_LIB_DIR="${fake_root}/scripts/evidence_packs/lib"
+
+    run pack_validate_tuned_edit_params
+    assert_rc "0" "${RUN_RC}" "presets/tuned_edit_params.json is accepted as canonical fallback"
+}
+
 test_pack_validate_tuned_edit_params_rejects_noncanonical_selected_entries() {
     mock_reset
 
@@ -3036,6 +3079,17 @@ test_pack_validate_tuned_edit_params_returns_nonzero_when_python_fails() {
         rc=$?
     fi
     assert_ne "0" "${rc}" "python failure returns non-zero"
+}
+
+test_pack_validate_runtime_provenance_propagates_python_failure() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/validation_suite.sh
+    mock_python3_stub_enable
+    fixture_write "python3.rc" "1"
+
+    run pack_validate_runtime_provenance
+    assert_rc "1" "${RUN_RC}" "runtime provenance validation propagates helper failure"
 }
 
 test_pack_prepare_calibration_presets_skips_when_no_preset_dir_or_file() {

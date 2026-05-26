@@ -26,6 +26,17 @@ test_run_pack_collect_reports_ignores_hidden_pack_staging_dirs() {
     assert_eq "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json" "${reports}" "stale hidden pack staging reports are ignored"
 }
 
+test_run_pack_report_expected_failure_rejects_unparseable_report_paths() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}/reports"
+    run pack_report_expects_verify_failure "${pack_dir}" "${pack_dir}/reports/evaluation.report.json"
+    assert_rc "1" "${RUN_RC}" "unparseable report path is not treated as expected failure"
+}
+
 test_run_pack_build_pack_collects_artifacts() {
     mock_reset
 
@@ -972,6 +983,25 @@ test_run_pack_sign_manifest_writes_package_native_signature() {
         "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["signing_key_fingerprint"])' "${pack_dir}/manifest.json" < /dev/null)" \
         "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["signing_key_fingerprint"])' "${pack_dir}/manifest.signature.json" < /dev/null)" \
         "manifest and signature bundle record the same fingerprint"
+}
+
+test_run_pack_sign_manifest_helper_uses_ephemeral_key_by_default() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    local manifest="${TEST_TMPDIR}/manifest.json"
+    echo "{}" > "${manifest}"
+    local calls="${TEST_TMPDIR}/sign_helper.calls"
+    _cmd_python() {
+        printf '%s\n' "$*" > "${calls}"
+        return 0
+    }
+
+    run pack_sign_manifest_helper "${manifest}"
+    assert_rc "0" "${RUN_RC}" "manifest signing helper succeeds"
+    assert_match "sign_manifest\\.py" "$(cat "${calls}")" "sign helper invoked"
+    assert_match "--generate-ephemeral" "$(cat "${calls}")" "ephemeral signing key path is used by default"
 }
 
 test_run_pack_sign_manifest_errors_and_cleans_when_helper_fails() {

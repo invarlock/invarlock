@@ -561,6 +561,30 @@ test_capture_add_task_advances_sequence_without_subshell_loss() {
     assert_eq "2" "${TASK_SEQUENCE}" "task sequence preserved in parent shell"
 }
 
+test_capture_add_task_error_paths() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue_manager.sh"
+
+    local captured=""
+    mktemp() { return 1; }
+    local rc=0
+    set +e
+    capture_add_task captured "SETUP_BASELINE" "org/model" "model" "14" "none" '{}' "50"
+    rc=$?
+    set -e
+    assert_rc "1" "${rc}" "capture_add_task fails when temp file creation fails"
+    unset -f mktemp
+
+    add_task() { return 7; }
+    run capture_add_task captured "SETUP_BASELINE" "org/model" "model" "14" "none" '{}' "50"
+    assert_rc "7" "${RUN_RC}" "capture_add_task propagates add_task failures"
+
+    add_task() { return 0; }
+    run capture_add_task captured "SETUP_BASELINE" "org/model" "model" "14" "none" '{}' "50"
+    assert_rc "1" "${RUN_RC}" "capture_add_task rejects empty add_task output"
+}
+
 test_generate_model_tasks_disables_batch_for_large_memory_and_uses_manifest_fallbacks() {
     mock_reset
     # shellcheck source=../queue_manager.sh
@@ -650,6 +674,44 @@ test_generate_model_tasks_can_group_batch_edit_evaluations() {
     assert_match '"grouped"[[:space:]]*:[[:space:]]*true' "${all_calls}" "group task carries grouped flag"
     assert_match '"entries"[[:space:]]*:' "${all_calls}" "group task carries entries"
     assert_match "CLEANUP_EDIT\\|.*t" "${all_calls}" "cleanup tasks still emitted"
+}
+
+test_generate_model_tasks_groups_stress_entries_and_dependencies() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue_manager.sh"
+
+    local calls="${TEST_TMPDIR}/calls"
+    : > "${calls}"
+
+    add_task() {
+        local task_type="$1"
+        local deps="$5"
+        local params_json="$6"
+        printf '%s|%s|%s\n' "${task_type}" "${deps}" "${params_json}" >> "${calls}"
+        local count
+        count=$(wc -l < "${calls}" | tr -d ' ')
+        echo "s${count}"
+    }
+    estimate_model_memory() { echo "14"; }
+
+    CLEAN_EDIT_RUNS=0
+    STRESS_EDIT_RUNS=1
+    DRIFT_CALIBRATION_RUNS=1
+    PACK_PRESET_READY=0
+    RUN_ERROR_INJECTION=false
+    PACK_GROUP_EVALUATIONS=1
+    PACK_USE_BATCH_EDITS=true
+    export CLEAN_EDIT_RUNS STRESS_EDIT_RUNS DRIFT_CALIBRATION_RUNS PACK_PRESET_READY RUN_ERROR_INJECTION PACK_GROUP_EVALUATIONS PACK_USE_BATCH_EDITS
+
+    generate_model_tasks "1" "org/model" "model" >/dev/null
+
+    local all_calls
+    all_calls="$(cat "${calls}")"
+    assert_match "evaluate_EDIT_GROUP\\|" "${all_calls}" "stress grouped evaluate task emitted"
+    assert_match "version[^\n]*stress" "${all_calls}" "group task carries stress entries"
+    assert_match "CLEANUP_EDIT\\|.*stress" "${all_calls}" "stress cleanup tasks emitted"
+    assert_match "evaluate_EDIT_GROUP\\|s[0-9]+,s[0-9]+,s[0-9]+" "${all_calls}" "group task depends on edits, preset, and eager baseline report"
 }
 
 test_generate_model_tasks_nonbatch_edit_dependencies_match_create_specs() {
@@ -1806,4 +1868,8 @@ test_queue_manager_terminal_state_covers_completed_variants() {
 
     get_queue_stats() { echo "0:0:0:1:1:2"; }
     assert_eq "completed_with_failures" "$(queue_terminal_state)" "failures yield completed_with_failures terminal state"
+
+    get_queue_stats() { echo "0:1:1:0:0:2"; }
+    run queue_terminal_state
+    assert_rc "1" "${RUN_RC}" "active queue is not terminal"
 }

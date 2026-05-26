@@ -211,7 +211,12 @@ test_baseline_report_wait_budget_scales_for_heavy_7b_windows() {
     assert_rc "0" "${RUN_RC}" "large-model wait helper succeeds"
     assert_eq "1200" "${RUN_OUT}" "large-model override still takes precedence"
 
-    unset PACK_BASELINE_REPORT_WAIT_SECS_HEAVY_WINDOWS PACK_BASELINE_REPORT_WAIT_SECS_LARGE
+    export PACK_BASELINE_REPORT_WAIT_HEAVY_WINDOW_TOTAL_MIN="bad"
+    run _baseline_report_wait_secs "7" "400" "400"
+    assert_rc "0" "${RUN_RC}" "invalid heavy-window floor is sanitized"
+    assert_eq "900" "${RUN_OUT}" "invalid heavy-window floor still honors heavy-window wait override"
+
+    unset PACK_BASELINE_REPORT_WAIT_SECS_HEAVY_WINDOWS PACK_BASELINE_REPORT_WAIT_SECS_LARGE PACK_BASELINE_REPORT_WAIT_HEAVY_WINDOW_TOTAL_MIN
 }
 
 test_model_size_and_eval_batch_selection() {
@@ -507,6 +512,7 @@ test_task_evaluate_edit_and_error_cover_preset_discovery_overrides_and_report_co
     export TASK_PARAMS='{"seq_len":100,"stride":200}'
     export INVARLOCK_BOOTSTRAP_N="1234"
     export INVARLOCK_CERT_MIN_WINDOWS="256"
+    export PACK_DEFER_REPORT_RENDERING="1"
     _estimate_model_size() { echo "13"; }
 
     mkdir -p "${out}/presets"
@@ -535,6 +541,7 @@ YAML
     local calls
     calls="$(cat "${TEST_TMPDIR}/fixtures/invarlock.calls")"
     assert_match "calibrated_preset_${model_name}__quant_rtn\\.yaml" "${calls}" "uses edit-type preset"
+    assert_match "--defer-report-rendering" "${calls}" "deferred optional report rendering flag forwarded"
     if [[ "${calls}" =~ oom_override_preset\.yaml ]]; then
         t_fail "expected evaluate to avoid override preset file"
     fi
@@ -557,6 +564,7 @@ YAML
     mkdir -p "${cert_dir}/nested"
     echo "{}" > "${cert_dir}/nested/evaluation.report.json"
     task_evaluate_error "${model_name}" 0 cuda_assert "${out}" "${log_file}"
+    unset PACK_DEFER_REPORT_RENDERING
 }
 
 test_task_evaluate_edit_exits_when_workdir_cd_fails() {
@@ -1319,6 +1327,29 @@ test_task_create_model_variant_fallback_success_paths() {
     assert_match "^lowrank:" "${RUN_OUT}" "lowrank_svd uses create_lowrank_model"
 }
 
+test_task_edit_artifact_probe_helpers_cover_present_and_missing_cases() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+
+    local edit_dir="${TEST_TMPDIR}/edit_probe"
+    mkdir -p "${edit_dir}"
+
+    run _edit_artifact_has_weights "${edit_dir}"
+    assert_rc "1" "${RUN_RC}" "missing weight files are rejected"
+
+    touch "${edit_dir}/foo.safetensors"
+    run _edit_artifact_has_weights "${edit_dir}"
+    assert_rc "0" "${RUN_RC}" "safetensors shard satisfies weight probe"
+
+    run _edit_artifact_has_tokenizer "${edit_dir}"
+    assert_rc "1" "${RUN_RC}" "missing tokenizer files are rejected"
+
+    touch "${edit_dir}/tokenizer.json"
+    run _edit_artifact_has_tokenizer "${edit_dir}"
+    assert_rc "0" "${RUN_RC}" "tokenizer json satisfies tokenizer probe"
+}
+
 test_task_baseline_report_helpers_cover_reuse_lock_race_and_wait_paths() {
     mock_reset
     # shellcheck source=../task_functions.sh
@@ -1447,6 +1478,25 @@ EOF
     local profile_contents
     profile_contents="$(cat "${baseline_root}/config_root/runtime/profiles/ci.yaml")"
     assert_match "skip_overhead_check: true" "${profile_contents}" "large-model baseline report profile carries skip_overhead policy"
+}
+
+test_task_baseline_report_helpers_return_runner_failure() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+
+    local baseline_root="${TEST_TMPDIR}/baseline_root_runner_failure"
+    mkdir -p "${baseline_root}"
+    local log_file="${TEST_TMPDIR}/baseline_runner_failure.log"
+    : > "${log_file}"
+
+    _resolve_invarlock_adapter() { echo "hf_test"; }
+    _validate_evaluate_baseline_report() { return 1; }
+    _pack_run_from_config() { return 9; }
+
+    local rc=0
+    ( _ensure_evaluate_baseline_report "${baseline_root}" "/abs/base" "ci" "balanced" 128 128 1 1 1 10 "7" "${log_file}" ) || rc=$?
+    assert_rc "1" "${rc}" "baseline report helper returns failure when config runner fails"
 }
 
 test_task_baseline_report_helpers_remove_invalid_baseline_report_and_timeout_wait() {
@@ -1677,7 +1727,9 @@ test_task_evaluate_error_reuses_baseline_report_for_nonstructural_errors_and_app
     mkdir -p "${out}/presets"
     echo "{}" > "${out}/presets/calibrated_preset_${model_name}.yaml"
 
+    export PACK_DEFER_REPORT_RENDERING="1"
     task_evaluate_error "${model_name}" 0 norm_collapse "${out}" "${log_file}"
+    unset PACK_DEFER_REPORT_RENDERING
 
     assert_match "CI window override" "$(cat "${log_file}")" "CI window override applied"
     assert_match "Reusing baseline report" "$(cat "${log_file}")" "baseline report reused"
@@ -1731,7 +1783,9 @@ test_task_evaluate_error_skips_baseline_report_reuse_for_structural_errors() {
     mkdir -p "${out}/presets"
     echo "{}" > "${out}/presets/calibrated_preset_${model_name}.yaml"
 
+    export PACK_DEFER_REPORT_RENDERING="1"
     task_evaluate_error "${model_name}" 0 nan_injection "${out}" "${log_file}"
+    unset PACK_DEFER_REPORT_RENDERING
 
     local log_text
     log_text="$(cat "${log_file}")"
@@ -1749,6 +1803,7 @@ test_task_evaluate_error_skips_baseline_report_reuse_for_structural_errors() {
     assert_file_exists "${model_output_dir}/reports/errors/nan_injection/runtime_inputs/calibrated_preset_${model_name}.yaml" "staged preset exists for structural error"
     local calls
     calls="$(cat "${TEST_TMPDIR}/fixtures/invarlock.calls")"
+    assert_match "--defer-report-rendering" "${calls}" "deferred optional report rendering flag forwarded for error evaluation"
     if [[ "${calls}" =~ --baseline-report ]]; then
         t_fail "expected structural error evaluate call to omit --baseline-report"
     fi
@@ -1873,6 +1928,7 @@ EOF
   }
 }
 EOF
+    echo '{"run_id":"edited-run"}' > "${edited_dir}/report.json"
     : > "${edited_dir}/events.jsonl"
 
     task_evaluate_error "${model_name}" 0 inf_injection "${out}" "${log_file}"
@@ -1915,6 +1971,10 @@ test_task_timeout_and_profile_helpers() {
     local rc=0
     _write_model_profile "${TEST_TMPDIR}/missing" "model" || rc=$?
     assert_rc "1" "${rc}" "missing baseline dir returns non-zero"
+
+    PACK_DEFER_REPORT_RENDERING="yes"
+    _pack_defer_report_rendering_enabled || t_fail "truthy defer rendering flag should enable optional report deferral"
+    unset PACK_DEFER_REPORT_RENDERING
 }
 
 test_execute_task_dispatches_all_task_types() {
@@ -1935,6 +1995,7 @@ test_execute_task_dispatches_all_task_types() {
     task_create_edit() { :; }
     task_create_edits_batch() { :; }
     task_evaluate_edit() { :; }
+    task_evaluate_edit_group() { :; }
     task_cleanup_edit() { :; }
     task_create_error() { :; }
     task_evaluate_error() { :; }
@@ -1954,7 +2015,7 @@ test_execute_task_dispatches_all_task_types() {
             > "${TEST_TMPDIR}/${task_id}.task"
     }
 
-    local types=(SETUP_BASELINE CALIBRATION_RUN SETUP_EVALUATE_BASELINE_REPORT CREATE_EDIT CREATE_EDITS_BATCH evaluate_EDIT CLEANUP_EDIT CREATE_ERROR evaluate_ERROR CLEANUP_ERROR GENERATE_PRESET)
+    local types=(SETUP_BASELINE CALIBRATION_RUN SETUP_EVALUATE_BASELINE_REPORT CREATE_EDIT CREATE_EDITS_BATCH evaluate_EDIT evaluate_EDIT_GROUP CLEANUP_EDIT CREATE_ERROR evaluate_ERROR CLEANUP_ERROR GENERATE_PRESET)
     local type
     for type in "${types[@]}"; do
         make_task "task_${type}" "${type}" '{}'
@@ -2099,6 +2160,17 @@ test_task_evaluate_edit_skip_and_invalid() {
     }
     run task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:ffn" clean 1 "${out}" "${log_file}"
     assert_rc "1" "${RUN_RC}" "invalid resolution errors"
+
+    resolve_edit_params() {
+        jq -n '{status:"selected", edit_type:"quant_rtn", param1:"4", param2:"32", scope:"ffn", edit_dir_name:"quant_4bit_clean"}'
+    }
+    mkdir -p "${model_output_dir}/models/quant_4bit_clean"
+    _cmd_python() { return 1; }
+    run task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:ffn" clean 1 "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "edit metadata validation failure errors"
+    unset -f _cmd_python
+    # shellcheck source=../runtime.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/runtime.sh"
 }
 
 test_resolve_edit_params_uses_tuned_presets() {
@@ -2248,6 +2320,331 @@ test_task_helper_effective_ci_and_runtime_stage_error_branches() {
     run _normalize_staged_preset_for_eval "${staged_preset}" 128 128 16 16 0 "${log_file}"
     assert_rc "1" "${RUN_RC}" "normalize helper propagates runtime python failures without PYTHON_BIN"
     [[ ! -v PYTHON_BIN ]] || t_fail "PYTHON_BIN should be unset after normalize failure without an explicit override"
+}
+
+test_task_evaluate_edit_group_uses_raw_python_interpreter_for_group_runner() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    stub_resolve_edit_params
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local baseline_dir="${model_output_dir}/models/baseline"
+    local edit_dir="${model_output_dir}/models/quant_4bit_clean"
+    local preset_dir="${out}/presets"
+    local report_dir="${TEST_TMPDIR}/baseline-report"
+    local log_file="${TEST_TMPDIR}/group.log"
+    local helper_calls="${TEST_TMPDIR}/group-helper.calls"
+    local unexpected_python="${TEST_TMPDIR}/unexpected-python.calls"
+    mkdir -p "${baseline_dir}" "${edit_dir}" "${preset_dir}" "${report_dir}" "$(dirname "${log_file}")"
+    printf '{}\n' > "${baseline_dir}/config.json"
+    printf '{}\n' > "${report_dir}/evaluation.report.json"
+    printf 'dataset:\n  seq_len: 128\n' > "${preset_dir}/calibrated_preset_${model_name}__quant_rtn.yaml"
+    printf '%s\n' "${baseline_dir}" > "${model_output_dir}/.baseline_path"
+    printf 'Qwen/Qwen2.5-7B\n' > "${model_output_dir}/.model_id"
+    write_validation_edit_metadata "${edit_dir}" "quant_rtn"
+    : > "${log_file}"
+    : > "${helper_calls}"
+    : > "${unexpected_python}"
+
+    local fake_python="${TEST_TMPDIR}/fake-python"
+    cat > "${fake_python}" <<EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == "-c" ]]; then
+    exit 0
+fi
+printf '%s\n' "\$*" >> "${helper_calls}"
+exit 0
+EOF
+    chmod +x "${fake_python}"
+
+    _estimate_model_size() { echo "7"; }
+    _get_model_size_from_name() { echo "7"; }
+    _get_invarlock_config() { echo "128:128:1:1:1"; }
+    _default_ci_min_windows() { echo "1"; }
+    pack_dataset_provider_kind() { echo "wikitext2"; }
+    _plan_effective_ci_schedule() { echo '{"status":"selected"}'; }
+    _apply_effective_ci_schedule() { return 0; }
+    _resolve_bootstrap_replicates() { echo "1"; }
+    _ensure_evaluate_baseline_report() { echo "${report_dir}/evaluation.report.json"; }
+    _stage_baseline_report_for_eval() { echo "$1"; }
+    _stage_preset_for_eval() { echo "$1"; }
+    _normalize_staged_preset_for_eval() { return 0; }
+    pack_model_trust_remote_code_yaml() { return 0; }
+    pack_remote_code_allowed() { return 1; }
+    _pack_defer_report_rendering_enabled() { return 0; }
+    _cmd_python() {
+        case "${1:-}" in
+            */validate_edit_artifact.py)
+                return 0
+                ;;
+            *)
+                printf '%s\n' "$*" >> "${unexpected_python}"
+                return 99
+                ;;
+        esac
+    }
+
+    local previous_helper="${PACK_HELPER_PYTHON_BIN:-}"
+    local had_helper="0"
+    [[ -v PACK_HELPER_PYTHON_BIN ]] && had_helper="1"
+    export PACK_HELPER_PYTHON_BIN="${fake_python}"
+    run task_evaluate_edit_group \
+        "${model_name}" \
+        0 \
+        '[{"edit_spec":"quant_rtn:4:ffn","version":"clean","run":1}]' \
+        "${out}" \
+        "${log_file}"
+    if [[ "${had_helper}" == "1" ]]; then
+        export PACK_HELPER_PYTHON_BIN="${previous_helper}"
+    else
+        unset PACK_HELPER_PYTHON_BIN
+    fi
+    assert_rc "0" "${RUN_RC}" "grouped evaluation runs with explicit helper python"
+    assert_match "run_evaluate_group\\.py" "$(cat "${helper_calls}")" "group runner invoked through raw python"
+    assert_eq "" "$(cat "${unexpected_python}")" "group runner does not go through _cmd_python CLI wrapper"
+    assert_match \
+        "${model_output_dir}/evaluation_groups/manual/tmp/evaluate" \
+        "$(cat "${model_output_dir}/evaluation_groups/manual/entries.json")" \
+        "group entries share one evaluate tmp dir"
+}
+
+setup_group_eval_fixture() {
+    local suffix="${1:-group}"
+    GROUP_OUT="${TEST_TMPDIR}/out-${suffix}"
+    GROUP_MODEL_NAME="m"
+    GROUP_MODEL_OUTPUT_DIR="${GROUP_OUT}/${GROUP_MODEL_NAME}"
+    GROUP_BASELINE_DIR="${GROUP_MODEL_OUTPUT_DIR}/models/baseline"
+    GROUP_EDIT_DIR_NAME="${GROUP_EDIT_DIR_NAME:-quant_4bit_clean}"
+    GROUP_EDIT_DIR="${GROUP_MODEL_OUTPUT_DIR}/models/${GROUP_EDIT_DIR_NAME}"
+    GROUP_PRESET_DIR="${GROUP_OUT}/presets"
+    GROUP_REPORT_DIR="${TEST_TMPDIR}/baseline-report-${suffix}"
+    GROUP_LOG_FILE="${TEST_TMPDIR}/group-${suffix}.log"
+    GROUP_HELPER_CALLS="${TEST_TMPDIR}/group-helper-${suffix}.calls"
+    GROUP_FAKE_PYTHON="${TEST_TMPDIR}/fake-python-${suffix}"
+
+    mkdir -p "${GROUP_BASELINE_DIR}" "${GROUP_EDIT_DIR}" "${GROUP_PRESET_DIR}" "${GROUP_REPORT_DIR}"
+    printf '{}\n' > "${GROUP_BASELINE_DIR}/config.json"
+    printf '{}\n' > "${GROUP_REPORT_DIR}/evaluation.report.json"
+    printf 'dataset:\n  seq_len: 128\n' > "${GROUP_PRESET_DIR}/calibrated_preset_${GROUP_MODEL_NAME}__quant_rtn.yaml"
+    printf '%s\n' "${GROUP_BASELINE_DIR}" > "${GROUP_MODEL_OUTPUT_DIR}/.baseline_path"
+    printf 'Qwen/Qwen2.5-7B\n' > "${GROUP_MODEL_OUTPUT_DIR}/.model_id"
+    write_validation_edit_metadata "${GROUP_EDIT_DIR}" "quant_rtn"
+    : > "${GROUP_LOG_FILE}"
+    : > "${GROUP_HELPER_CALLS}"
+
+    cat > "${GROUP_FAKE_PYTHON}" <<EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == "-c" ]]; then
+    exit 0
+fi
+printf '%s\n' "\$*" >> "${GROUP_HELPER_CALLS}"
+exit 0
+EOF
+    chmod +x "${GROUP_FAKE_PYTHON}"
+}
+
+install_group_eval_default_stubs() {
+    _estimate_model_size() { echo "${GROUP_ESTIMATE_MODEL_SIZE:-7}"; }
+    _get_model_size_from_name() { echo "${GROUP_NAME_MODEL_SIZE:-7}"; }
+    _get_invarlock_config() { echo "${GROUP_CONFIG:-128:128:1:1:1}"; }
+    _default_ci_min_windows() { echo "${GROUP_MIN_WINDOWS:-1}"; }
+    pack_dataset_provider_kind() { echo "wikitext2"; }
+    _plan_effective_ci_schedule() {
+        [[ "${GROUP_PLAN_FAIL:-0}" != "1" ]] || return 1
+        echo '{"status":"selected"}'
+    }
+    _apply_effective_ci_schedule() {
+        [[ "${GROUP_APPLY_FAIL:-0}" != "1" ]] || return 1
+        printf '%s\n' "${GROUP_SELECTED_SCHEDULE:-}"
+    }
+    _resolve_bootstrap_replicates() { echo "1"; }
+    _ensure_evaluate_baseline_report() {
+        [[ "${GROUP_BASELINE_REPORT_MISSING:-0}" != "1" ]] || return 0
+        echo "${GROUP_REPORT_DIR}/evaluation.report.json"
+    }
+    _stage_baseline_report_for_eval() {
+        [[ "${GROUP_STAGE_BASELINE_FAIL:-0}" != "1" ]] || return 1
+        echo "$1"
+    }
+    _stage_preset_for_eval() {
+        [[ "${GROUP_STAGE_PRESET_FAIL:-0}" != "1" ]] || return 1
+        echo "$1"
+    }
+    _normalize_staged_preset_for_eval() {
+        [[ "${GROUP_NORMALIZE_FAIL:-0}" != "1" ]] || return 1
+        return 0
+    }
+    pack_model_trust_remote_code_yaml() { return 0; }
+    pack_remote_code_allowed() {
+        [[ "${GROUP_REMOTE_CODE:-0}" == "1" ]]
+    }
+    _pack_defer_report_rendering_enabled() {
+        [[ "${GROUP_DEFER_RENDERING:-1}" == "1" ]]
+    }
+    _cmd_python() {
+        case "${1:-}" in
+            */validate_edit_artifact.py)
+                return "${GROUP_VALIDATE_RC:-0}"
+                ;;
+            *)
+                return 0
+                ;;
+        esac
+    }
+}
+
+test_task_evaluate_edit_group_covers_early_error_branches() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+
+    setup_group_eval_fixture "early"
+    install_group_eval_default_stubs
+
+    command() {
+        if [[ "${1:-}" == "-v" && "${2:-}" == "jq" ]]; then
+            return 1
+        fi
+        builtin command "$@"
+    }
+    run task_evaluate_edit_group "${GROUP_MODEL_NAME}" 0 '[]' "${GROUP_OUT}" "${GROUP_LOG_FILE}"
+    assert_rc "1" "${RUN_RC}" "grouped evaluation falls back when jq is unavailable"
+    unset -f command
+
+    rm -f "${GROUP_MODEL_OUTPUT_DIR}/.baseline_path"
+    run task_evaluate_edit_group "${GROUP_MODEL_NAME}" 0 '[]' "${GROUP_OUT}" "${GROUP_LOG_FILE}"
+    assert_rc "1" "${RUN_RC}" "grouped evaluation fails when baseline path is missing"
+}
+
+test_task_evaluate_edit_group_covers_planning_and_baseline_failures() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    stub_resolve_edit_params
+
+    setup_group_eval_fixture "plan"
+    install_group_eval_default_stubs
+
+    GROUP_CONFIG="128:64:1:1:1"
+    GROUP_MIN_WINDOWS="3"
+    GROUP_PLAN_FAIL="1"
+    run task_evaluate_edit_group "${GROUP_MODEL_NAME}" 0 '[{"edit_spec":"quant_rtn:4:ffn","version":"clean","run":1}]' "${GROUP_OUT}" "${GROUP_LOG_FILE}"
+    assert_rc "1" "${RUN_RC}" "grouped evaluation fails when effective planning fails"
+
+    GROUP_PLAN_FAIL="0"
+    GROUP_APPLY_FAIL="1"
+    run task_evaluate_edit_group "${GROUP_MODEL_NAME}" 0 '[{"edit_spec":"quant_rtn:4:ffn","version":"clean","run":1}]' "${GROUP_OUT}" "${GROUP_LOG_FILE}"
+    assert_rc "1" "${RUN_RC}" "grouped evaluation fails when effective schedule application fails"
+
+    GROUP_APPLY_FAIL="0"
+    GROUP_SELECTED_SCHEDULE="256:256:4:4"
+    GROUP_BASELINE_REPORT_MISSING="1"
+    run task_evaluate_edit_group "${GROUP_MODEL_NAME}" 0 '[{"edit_spec":"quant_rtn:4:ffn","version":"clean","run":1}]' "${GROUP_OUT}" "${GROUP_LOG_FILE}"
+    assert_rc "1" "${RUN_RC}" "grouped evaluation fails when baseline report is unavailable"
+}
+
+test_task_evaluate_edit_group_covers_entry_resolution_and_skip_branches() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+
+    setup_group_eval_fixture "entries"
+    install_group_eval_default_stubs
+
+    run task_evaluate_edit_group "${GROUP_MODEL_NAME}" 0 '[{"version":"clean","run":1}]' "${GROUP_OUT}" "${GROUP_LOG_FILE}"
+    assert_rc "1" "${RUN_RC}" "grouped evaluation rejects entries without edit specs"
+
+    resolve_edit_params() {
+        jq -n '{status:"skipped", edit_type:"quant_rtn", edit_dir_name:"quant_4bit_clean"}'
+    }
+    run task_evaluate_edit_group "${GROUP_MODEL_NAME}" 0 '[{"edit_spec":"quant_rtn:4:ffn","version":"clean","run":1}]' "${GROUP_OUT}" "${GROUP_LOG_FILE}"
+    assert_rc "0" "${RUN_RC}" "grouped evaluation exits cleanly when every edit is skipped"
+
+    resolve_edit_params() {
+        jq -n '{status:"invalid", edit_type:"quant_rtn", edit_dir_name:"quant_4bit_clean"}'
+    }
+    run task_evaluate_edit_group "${GROUP_MODEL_NAME}" 0 '[{"edit_spec":"quant_rtn:4:ffn","version":"clean","run":1}]' "${GROUP_OUT}" "${GROUP_LOG_FILE}"
+    assert_rc "1" "${RUN_RC}" "grouped evaluation rejects invalid edit resolution"
+
+    stub_resolve_edit_params
+    mkdir -p "${GROUP_MODEL_OUTPUT_DIR}/reports/quant_4bit_clean/run_1"
+    printf '{}\n' > "${GROUP_MODEL_OUTPUT_DIR}/reports/quant_4bit_clean/run_1/evaluation.report.json"
+    run task_evaluate_edit_group "${GROUP_MODEL_NAME}" 0 '[{"edit_spec":"quant_rtn:4:ffn","version":"clean","run":1}]' "${GROUP_OUT}" "${GROUP_LOG_FILE}"
+    assert_rc "0" "${RUN_RC}" "grouped evaluation skips entries with existing reports"
+}
+
+test_task_evaluate_edit_group_covers_artifact_and_staging_failures() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    stub_resolve_edit_params
+
+    setup_group_eval_fixture "artifact"
+    install_group_eval_default_stubs
+
+    rm -rf "${GROUP_EDIT_DIR}"
+    run task_evaluate_edit_group "${GROUP_MODEL_NAME}" 0 '[{"edit_spec":"quant_rtn:4:ffn","version":"clean","run":1}]' "${GROUP_OUT}" "${GROUP_LOG_FILE}"
+    assert_rc "1" "${RUN_RC}" "grouped evaluation fails when edit artifact is missing"
+
+    mkdir -p "${GROUP_EDIT_DIR}"
+    write_validation_edit_metadata "${GROUP_EDIT_DIR}" "quant_rtn"
+    GROUP_VALIDATE_RC="1"
+    run task_evaluate_edit_group "${GROUP_MODEL_NAME}" 0 '[{"edit_spec":"quant_rtn:4:ffn","version":"clean","run":1}]' "${GROUP_OUT}" "${GROUP_LOG_FILE}"
+    assert_rc "1" "${RUN_RC}" "grouped evaluation fails when edit metadata validation fails"
+
+    GROUP_VALIDATE_RC="0"
+    GROUP_STAGE_BASELINE_FAIL="1"
+    run task_evaluate_edit_group "${GROUP_MODEL_NAME}" 0 '[{"edit_spec":"quant_rtn:4:ffn","version":"clean","run":1}]' "${GROUP_OUT}" "${GROUP_LOG_FILE}"
+    assert_rc "1" "${RUN_RC}" "grouped evaluation fails when baseline staging fails"
+
+    GROUP_STAGE_BASELINE_FAIL="0"
+    GROUP_STAGE_PRESET_FAIL="1"
+    run task_evaluate_edit_group "${GROUP_MODEL_NAME}" 0 '[{"edit_spec":"quant_rtn:4:ffn","version":"clean","run":1}]' "${GROUP_OUT}" "${GROUP_LOG_FILE}"
+    assert_rc "1" "${RUN_RC}" "grouped evaluation fails when preset staging fails"
+
+    GROUP_STAGE_PRESET_FAIL="0"
+    GROUP_NORMALIZE_FAIL="1"
+    run task_evaluate_edit_group "${GROUP_MODEL_NAME}" 0 '[{"edit_spec":"quant_rtn:4:ffn","version":"clean","run":1}]' "${GROUP_OUT}" "${GROUP_LOG_FILE}"
+    assert_rc "1" "${RUN_RC}" "grouped evaluation fails when preset normalization fails"
+}
+
+test_task_evaluate_edit_group_covers_preset_fallback_large_and_helper_failure() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+
+    GROUP_EDIT_DIR_NAME="_clean"
+    setup_group_eval_fixture "fallbacks"
+    unset GROUP_EDIT_DIR_NAME
+    install_group_eval_default_stubs
+
+    resolve_edit_params() {
+        jq -n '{status:"selected", edit_type:"custom_edit", edit_dir_name:"_clean"}'
+    }
+    GROUP_ESTIMATE_MODEL_SIZE=""
+    GROUP_NAME_MODEL_SIZE="14"
+    GROUP_CONFIG="128:64:1:1:1"
+    GROUP_MIN_WINDOWS="5"
+    GROUP_SELECTED_SCHEDULE="256:256:6:6"
+    GROUP_REMOTE_CODE="1"
+    GROUP_DEFER_RENDERING="0"
+    rm -f "${GROUP_PRESET_DIR}/calibrated_preset_${GROUP_MODEL_NAME}__quant_rtn.yaml"
+    printf 'dataset:\n  seq_len: 256\n' > "${GROUP_PRESET_DIR}/calibrated_preset_${GROUP_MODEL_NAME}.yaml"
+    export PACK_HELPER_PYTHON_BIN="${GROUP_FAKE_PYTHON}"
+    run task_evaluate_edit_group "${GROUP_MODEL_NAME}" 0 '[{"edit_spec":"custom:clean","version":"clean","run":1}]' "${GROUP_OUT}" "${GROUP_LOG_FILE}"
+    unset PACK_HELPER_PYTHON_BIN
+    assert_rc "0" "${RUN_RC}" "grouped evaluation succeeds with model preset fallback and large-model settings"
+
+    rm -f "${GROUP_PRESET_DIR}/calibrated_preset_${GROUP_MODEL_NAME}.yaml"
+    _cmd_python_interpreter() { return 1; }
+    run task_evaluate_edit_group "${GROUP_MODEL_NAME}" 0 '[{"edit_spec":"custom:clean","version":"clean","run":2}]' "${GROUP_OUT}" "${GROUP_LOG_FILE}"
+    assert_rc "1" "${RUN_RC}" "grouped evaluation fails when helper python cannot be resolved"
+    unset -f _cmd_python_interpreter
+    # shellcheck source=../runtime.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/runtime.sh"
 }
 
 test_task_calibration_and_preset_cover_effective_ci_failure_and_remote_code_branches() {
@@ -2468,6 +2865,33 @@ test_task_calibration_run_exports_remote_code_allowance() {
     run task_calibration_run "${model_name}" 0 "1" "42" "${out}" "${log_file}"
     assert_rc "0" "${RUN_RC}" "calibration run succeeds with remote code enabled"
     assert_eq "1" "$(cat "${env_log}")" "calibration run exports remote code allowance when enabled"
+}
+
+test_task_calibration_run_returns_config_runner_failure() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local baseline_dir="${model_output_dir}/models/baseline"
+    local log_file="${TEST_TMPDIR}/log.txt"
+    mkdir -p "${baseline_dir}" "$(dirname "${log_file}")"
+    echo "{}" > "${baseline_dir}/config.json"
+    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
+    echo "mistralai/Mistral-7B-v0.1" > "${model_output_dir}/.model_id"
+    : > "${log_file}"
+
+    _estimate_model_size() { echo "7"; }
+    _get_model_size_from_name() { echo "7"; }
+    _get_invarlock_config() { echo "128:128:1:1:1"; }
+    _plan_effective_ci_schedule() { echo '{"status":"selected"}'; }
+    _apply_effective_ci_schedule() { echo "128:128:1:1"; }
+    _pack_run_from_config() { return 8; }
+
+    run task_calibration_run "${model_name}" 0 "1" "42" "${out}" "${log_file}"
+    assert_rc "8" "${RUN_RC}" "calibration run returns config-runner failure"
 }
 
 test_task_evaluate_edit_covers_effective_ci_and_staging_failure_branches() {

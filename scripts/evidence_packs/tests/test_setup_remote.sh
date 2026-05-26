@@ -136,6 +136,56 @@ test_setup_remote_ensure_runtime_image_respects_explicit_override() {
     assert_eq "ghcr.io/example/custom:latest" "${INVARLOCK_RUNTIME_IMAGE}" "explicit runtime image preserved"
 }
 
+test_setup_remote_helpers_cover_alias_truthy_podman_and_present_image_branches() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/setup_remote.sh
+
+    local cmd_log="${TEST_TMPDIR}/remote-helper.log"
+    : > "${cmd_log}"
+    pack_activate_venv() { :; }
+    pack_run_cmd() { printf '%s\n' "$*" >> "${cmd_log}"; }
+
+    REPO_DIR="${TEST_TMPDIR}/repo"
+    CANONICAL_REPO_ALIAS="${REPO_DIR}"
+    ensure_repo_alias
+    assert_eq "" "$(cat "${cmd_log}")" "repo alias is no-op when alias matches repo dir"
+
+    pack_truthy_flag "yes" || t_fail "yes should be truthy"
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/podman" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+    chmod +x "${bin_dir}/podman"
+    PATH="${bin_dir}:/usr/bin:/bin"
+    export PATH
+    assert_eq "podman" "$(pack_container_engine)" "podman is selected when docker is absent"
+
+    INVARLOCK_ALLOW_HOST_EXECUTION="1"
+    unset INVARLOCK_RUNTIME_IMAGE
+    ensure_runtime_image
+    assert_eq "" "${INVARLOCK_RUNTIME_IMAGE:-}" "host execution skip does not force a runtime image"
+    unset INVARLOCK_ALLOW_HOST_EXECUTION
+
+    PACK_SKIP_RUNTIME_IMAGE_BUILD="1"
+    ensure_runtime_image
+    PACK_SKIP_RUNTIME_IMAGE_BUILD="0"
+
+    cat > "${bin_dir}/docker" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "image" && "${2:-}" == "inspect" ]]; then
+  exit 0
+fi
+exit 1
+EOF
+    chmod +x "${bin_dir}/docker"
+    ensure_runtime_image
+    assert_eq "invarlock-runtime:local" "${INVARLOCK_RUNTIME_IMAGE}" "present runtime image is exported"
+}
+
 test_setup_remote_pack_install_pinned_requirement_requires_file() {
     mock_reset
 
