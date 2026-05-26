@@ -53,7 +53,7 @@ def build_evaluate_command(
         ),
     ]
     if execution_mode == "host":
-        command.extend(["--execution-mode", "host"])
+        command.extend(["--execution-mode", "host", "--assurance", "off"])
     return command
 
 

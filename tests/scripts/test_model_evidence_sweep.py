@@ -387,6 +387,9 @@ def test_model_evidence_sweep_host_mode_emits_explicit_runtime_flags(
         payload[0]["evaluate"][payload[0]["evaluate"].index("--execution-mode") + 1]
         == "host"
     )
+    assert payload[0]["evaluate"][payload[0]["evaluate"].index("--assurance") + 1] == (
+        "off"
+    )
     assert "--allow-host-execution" not in payload[0]["evaluate"]
     assert "--runtime-provenance" in payload[0]["verify"]
     assert (
