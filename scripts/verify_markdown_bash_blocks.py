@@ -15,6 +15,7 @@ can run in order without mutating the developer's working tree.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -703,6 +704,18 @@ def _write_json(path: Path, payload: object) -> None:
     )
 
 
+def _write_runtime_manifest_for_report(report_path: Path) -> None:
+    if not DEMO_RUNTIME_MANIFEST_FIXTURE.is_file() or not report_path.is_file():
+        return
+    manifest = json.loads(DEMO_RUNTIME_MANIFEST_FIXTURE.read_text(encoding="utf-8"))
+    manifest["report"] = {
+        "filename": report_path.name,
+        "path": str(report_path),
+        "sha256": hashlib.sha256(report_path.read_bytes()).hexdigest(),
+    }
+    _write_json(report_path.parent / "runtime.manifest.json", manifest)
+
+
 def _run_logged_script(
     *,
     cmd: list[str],
@@ -818,6 +831,60 @@ def _build_demo_evaluation_report(
     return evaluation_report
 
 
+def _prepare_demo_evaluation_report_for_replay(
+    evaluation_report: dict[str, object],
+) -> dict[str, object]:
+    canonical_guards = ["invariants", "spectral", "rmt", "variance", "invariants"]
+    context = evaluation_report.get("context")
+    if not isinstance(context, dict):
+        context = {}
+    context.update(
+        {
+            "profile": "ci",
+            "tier": "balanced",
+            "assurance": {"mode": "strict"},
+            "runtime": {"execution_mode": "container"},
+            "guard_chain_observed": canonical_guards,
+        }
+    )
+    evaluation_report["context"] = context
+    evaluation_report["guards"] = [{"name": name} for name in canonical_guards]
+    evaluation_report["invariants"] = {"supported": True, "passed": True}
+    evaluation_report["spectral"] = {"supported": True, "passed": True}
+    evaluation_report["rmt"] = {"supported": True, "passed": True}
+    evaluation_report["variance"] = {
+        "enabled": False,
+        "supported": True,
+        "status": "disabled",
+    }
+    evaluation_report["report_build"] = {
+        "synthesized_fields": [],
+        "repaired_fields": [],
+        "fallback_fields": [],
+    }
+    provenance = evaluation_report.get("provenance")
+    if not isinstance(provenance, dict):
+        provenance = {}
+    provenance["edited"] = {"report_path": "../../runs/subject/report.json"}
+    provenance["baseline"] = {"report_path": "../../runs/baseline/report.json"}
+    evaluation_report["provenance"] = provenance
+    evaluation_report["assurance"] = {
+        "claim_set": "invarlock-weight-edit-regression-v1",
+        "mode": "strict",
+        "verdict": "pending_verifier",
+        "report_local_verdict": "pass",
+        "verified_assurance_verdict": "pending",
+        "canonical_guard_chain_enforced": True,
+        "guard_chain_observed": canonical_guards,
+        "fallback_fields_used": False,
+        "runtime_provenance_declared": "container",
+        "runtime_provenance_verified": False,
+        "runtime_provenance_verification_status": "pending",
+        "blocking_reasons": [],
+    }
+    return evaluation_report
+
+
 def _demo_window_summary(section: dict[str, object]) -> tuple[float, float, int] | None:
     loglosses = section.get("logloss")
     token_counts = section.get("token_counts")
@@ -847,6 +914,7 @@ def _demo_window_summary(section: dict[str, object]) -> tuple[float, float, int]
 def _seed_demo_inputs(workspace: Path) -> None:
     evaluation_targets = (
         workspace / "reports" / "eval" / "evaluation.report.json",
+        workspace / "reports" / "quant8_demo" / "evaluation.report.json",
         workspace / "report_bundle" / "evaluation.report.json",
         workspace / "reports" / "baseline_calib" / "evaluation.report.json",
         workspace / "reports" / "baseline_cpu" / "evaluation.report.json",
@@ -854,6 +922,7 @@ def _seed_demo_inputs(workspace: Path) -> None:
     )
     manifest_targets = (
         workspace / "reports" / "eval" / "runtime.manifest.json",
+        workspace / "reports" / "quant8_demo" / "runtime.manifest.json",
         workspace / "report_bundle" / "runtime.manifest.json",
     )
 
@@ -1009,6 +1078,9 @@ def _seed_demo_inputs(workspace: Path) -> None:
 
     evaluation_report = _build_demo_evaluation_report(run_report, baseline_report)
     if evaluation_report is not None:
+        evaluation_report = _prepare_demo_evaluation_report_for_replay(
+            evaluation_report
+        )
         target_payloads = {
             workspace / "reports" / "baseline_cpu" / "evaluation.report.json": {
                 **evaluation_report,
@@ -1021,10 +1093,12 @@ def _seed_demo_inputs(workspace: Path) -> None:
         }
         for target in evaluation_targets:
             _write_json(target, target_payloads.get(target, evaluation_report))
+            _write_runtime_manifest_for_report(target)
     elif DEMO_EVALUATION_REPORT_FIXTURE.is_file():
         for target in evaluation_targets:
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(DEMO_EVALUATION_REPORT_FIXTURE, target)
+            _write_runtime_manifest_for_report(target)
 
     _write_json(
         workspace / "resolved_policy.json",

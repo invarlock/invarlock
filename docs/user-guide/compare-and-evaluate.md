@@ -30,7 +30,7 @@ fine-tuning, or other checkpoint-edit workflows.
 By default, `evaluate` runs inside the runtime container. Use `--execution-mode host`
 only for host-side workflows that intentionally run model loading on the
 host. If you choose that host-side path, verify the resulting report with
-`invarlock verify --runtime-provenance host ...`.
+`invarlock verify --runtime-provenance host --assurance off ...`.
 
 Example (wheel-first, GPT‑2, CPU/MPS friendly; requires `invarlock[hf]` or equivalent HF extra):
 

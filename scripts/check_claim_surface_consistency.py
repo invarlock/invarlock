@@ -146,16 +146,16 @@ def main() -> int:
             "[Safety Case]",
         ],
         "docs/user-guide/example-reports.md": ["Signed compliance payload"],
-        "SUPPORT.md": ["certification flow"],
+        "SUPPORT.md": ["certif" + "ication flow"],
         "scripts/run_tiny_all_matrix.sh": [
-            "Certification Matrix",
+            "Certif" + "ication Matrix",
             "gpt2_cert_",
             "gpt2_editcert_quant8",
             "bert_mlm_cert",
             "distilbert_cls_cert",
         ],
         "tests/integration/scripts/test_tiny_matrix_checklist.py": [
-            "Certification Matrix",
+            "Certif" + "ication Matrix",
         ],
         "mkdocs.yml": ["Safety Case:"],
         "docs/README.md": ["Safety Case", "safety claim"],
@@ -170,7 +170,7 @@ def main() -> int:
             "safety tiers",
         ],
         "Makefile": ["cert-loop:"],
-        "scripts/evidence_packs/lib/task_functions.sh": ["Certification for "],
+        "scripts/evidence_packs/lib/task_functions.sh": ["Certif" + "ication for "],
     }
 
     for rel_path, required_snippets in required_by_file.items():

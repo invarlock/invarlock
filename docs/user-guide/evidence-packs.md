@@ -86,7 +86,7 @@ invarlock advanced evidence-pack build ./tmp/evidence_pack \
   --signing-key ./tmp/evidence_pack_signing_key.pem
 
 # Verify an existing evidence pack
-invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000000/evidence_pack --strict
+invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000000/evidence_pack --strict --report-assurance strict
 ```
 
 Each `--report` must be an explicit `evaluation.report.json` file path. The
@@ -164,6 +164,24 @@ smokes do not expand back to the default 8 edit scenarios. Disk estimation uses
 the same filtered state manifest, so storage preflight reflects the selected
 scenario set rather than the suite defaults.
 
+## Evidence Pack Artifact Taxonomy
+
+Evidence packs do not package model weights by default. The run directory may
+contain edited subject checkpoints under each model's `models/` directory, while
+the evidence pack contains reports and digest-backed sidecars about those
+subjects. Scenarios declare one artifact class:
+
+| Artifact class | Meaning |
+| --- | --- |
+| `validation_subject_checkpoint` | A Hugging Face checkpoint-shaped validation subject, not an optimized runtime backend |
+| `deployable_optimized_subject` | A backend-specific deployable subject with packed storage and smoke evidence |
+| `fault_injection_fixture` | An intentionally invalid or degraded fixture used to test detection |
+| `evidence_only_pack` | Evidence without a corresponding edited subject artifact |
+
+Current RTN, FP8, pruning, and low-rank evidence-pack edits are validation
+subjects. They validate InvarLock behavior on external subject checkpoints; they
+do not claim runtime memory reduction or packed deployment storage.
+
 ## Network & Model Revisions
 
 Evidence packs require pinned model revisions for reproducibility:
@@ -222,9 +240,12 @@ A suite run writes artifacts under `OUTPUT_DIR` (default: `./evidence_pack_runs/
 - `results/final_verdict.txt` + `results/final_verdict.json`
 - `results/**/category_summary.json`, `results/**/guard_signal_summary.json`, `results/**/guard_intervention_summary.json`, `results/**/scenario_signal_summary.json`
 - `results/**/determinism_repeats.json` (if present)
+- `results/**/edit_artifact_summary.json`
 - `reports/<model>/<edit>/<run>/evaluation.report.json`
+- `reports/<model>/<edit>/<run>/edit_metadata.json`
 - `reports/**/rmt_probe.json` (optional sidecar; emitted by some scenarios, e.g. `rmt_norm_noise`)
 - `reports/**/ve_probe.json` (optional sidecar; emitted by VE demo scenarios, e.g. `ve_mlp_scale_skew`)
+- `reports/**/deployable_artifact_validation.json`, `backend_inventory.json`, `memory_report.json`, `load_smoke.json`, and `inference_smoke.json` for deployable scenarios
 - `reports/**/evaluation.html` + `reports/**/verify.json`
 - `README.md` (reviewer summary), `manifest.json`, `checksums.sha256`
 - `manifest.signature.json` when the pack is signed
@@ -247,6 +268,42 @@ reports record the edit algorithm used:
 | `custom` | BYOE (Bring-Your-Own-Edit) pre-edited models |
 
 For BYOE workflows, use `--edit-label custom` or let InvarLock infer from the model path.
+
+Evidence-pack edit artifacts also write `edit_metadata.json`. The metadata uses
+`schema: invarlock/evidence-pack-edit-metadata-v1` and records the scenario
+artifact class, edit type, storage format, deployment flags, parameters, and
+coverage. Evidence-pack task execution validates this metadata before evaluating
+an edited subject, and pack verification checks that metadata agrees with
+`metadata/scenarios.json`.
+
+| Edit Type | Artifact class | Deployable optimization? |
+| --- | --- | --- |
+| RTN dequantized external-subject simulation | validation subject checkpoint | No |
+| FP8 dequantized external-subject simulation | validation subject checkpoint | No |
+| Dense magnitude-pruned checkpoint | validation subject checkpoint | No sparse runtime |
+| Dense low-rank-SVD approximated checkpoint | validation subject checkpoint | No factorized runtime |
+
+## Deployable Edit Lane
+
+Deployable edit scenarios are separate from the default validation suite. They
+are opt-in because backends such as TorchAO, bitsandbytes, GPTQ, and AWQ depend
+on specific PyTorch, CUDA, kernel, architecture, and package versions.
+
+A deployable scenario must produce backend metadata, backend inventory,
+reload-smoke evidence, inference-smoke evidence, storage or memory evidence, an
+InvarLock evaluation report, and verification output. The evidence pack still
+does not include model weights unless explicitly configured; it includes
+digest-backed evidence about the deployable artifact that was validated.
+
+Use explicit scenario selection for deployable work:
+
+```bash
+PACK_INCLUDE_DEPLOYABLE_EDITS=1 \
+PACK_DEPLOY_BACKENDS=torchao \
+./scripts/evidence_packs/run_pack.sh \
+  --suite subset \
+  --scenario-ids deploy_torchao_int4_clean
+```
 
 ## Determinism
 
@@ -293,9 +350,10 @@ Use the package-native subcommands:
 - Default: `invarlock advanced evidence-pack verify <dir>`
   - Verifies `checksums_sha256_digest`, validates digest-backed manifest references, validates `checksums.sha256`, requires a signed `manifest.signature.json`, and runs `invarlock verify`.
   - Fails closed if the pack is unsigned or if signature verification cannot run.
-- Strict (recommended for distributable evidence): `invarlock advanced evidence-pack verify <dir> --strict`
+- Strict (recommended for distributable evidence): `invarlock advanced evidence-pack verify <dir> --strict --report-assurance strict`
   - Adds fail-closed checks for extra files outside `checksums.sha256` on top of the default signed-manifest requirement.
-  - Repo-harness alternative: `PACK_STRICT_MODE=1 scripts/evidence_packs/verify_pack.sh --pack <dir>`.
+  - `--strict` is pack-integrity strictness; `--report-assurance strict` requires every bundled clean report to satisfy strict report assurance.
+  - Repo-harness alternative: `PACK_STRICT_MODE=1 scripts/evidence_packs/verify_pack.sh --pack <dir> --report-assurance strict`.
 
 `invarlock advanced evidence-pack verify` returns structured exit codes:
 
@@ -310,7 +368,7 @@ Use the package-native subcommands:
 
 Reviewer checklist:
 
-- [ ] `invarlock advanced evidence-pack verify <dir> --strict` returns `0`
+- [ ] `invarlock advanced evidence-pack verify <dir> --strict --report-assurance strict` returns `0`
 - [ ] `jq -e . <dir>/manifest.json` succeeds
 - [ ] `sha256sum -c <dir>/checksums.sha256` succeeds
 - [ ] `jq -e . <dir>/manifest.signature.json` succeeds when the pack is

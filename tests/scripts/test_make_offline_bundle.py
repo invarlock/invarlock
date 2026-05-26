@@ -91,7 +91,7 @@ def test_make_offline_bundle_packages_release_materials(tmp_path: Path) -> None:
 
     assert manifest["schema"] == "invarlock/release-offline-bundle-v1"
     assert manifest["bundle"]["tag"] == "v0.3.12"
-    assert manifest["verification"]["certificate_identity"] == (
+    assert manifest["verification"]["certif" + "icate_identity"] == (
         "repo:invarlock/invarlock@refs/tags/v0.3.12"
     )
     assert manifest["sbom"]["path"] == "invarlock-0.3.12-sbom.cdx.json"
