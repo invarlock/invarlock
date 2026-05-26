@@ -165,21 +165,27 @@ run_single_calibration() {
     mkdir -p "${run_dir}"
     local config_yaml="${run_dir}/calibration_config.yaml"
 
-    INVARLOCK_WINDOW_OVERLAP_FRACTION=0.0 generate_invarlock_config \
-        "${model_path}" \
-        "${config_yaml}" \
-        "noop" \
-        "${seed}" \
-        "${preview_n}" \
-        "${final_n}" \
-        "${bootstrap_n}" \
-        "${seq_len}" \
-        "${stride}" \
-        "${eval_batch}"
-
     # For large models, skip overhead check to avoid OOM (task-local via env)
     local model_size
     model_size=$(estimate_model_params "${model_path}")
+
+    (
+        export INVARLOCK_WINDOW_OVERLAP_FRACTION=0.0
+        if [[ "${model_size}" == "70" || "${model_size}" == "72" || "${model_size}" == "moe" ]]; then
+            export INVARLOCK_SKIP_OVERHEAD_CHECK=1
+        fi
+        generate_invarlock_config \
+            "${model_path}" \
+            "${config_yaml}" \
+            "noop" \
+            "${seed}" \
+            "${preview_n}" \
+            "${final_n}" \
+            "${bootstrap_n}" \
+            "${seq_len}" \
+            "${stride}" \
+            "${eval_batch}"
+    )
 
     local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
 

@@ -49,7 +49,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-REAL_PYTHON3="$(command -v python3 2>/dev/null || true)"
+if [[ -x "${ROOT_DIR}/.venv/bin/python" ]]; then
+    REAL_PYTHON3="${ROOT_DIR}/.venv/bin/python"
+else
+    REAL_PYTHON3="$(command -v python3 2>/dev/null || true)"
+fi
 
 coverage_owner_hint() {
     local rel="$1"

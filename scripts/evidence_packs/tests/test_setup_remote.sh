@@ -277,6 +277,7 @@ if [[ "${cmd}" == "clone" ]]; then
     touch "${dest}/scripts/evidence_packs/run_suite.sh" \
         "${dest}/scripts/evidence_packs/run_pack.sh" \
         "${dest}/scripts/evidence_packs/verify_pack.sh" \
+        "${dest}/scripts/evidence_packs/run_mini_pack_gate.sh" \
         "${dest}/scripts/evidence_packs/python/remote_setup_smoke.py" \
         "${dest}/requirements/evidence-packs/huggingface_hub.txt" \
         "${dest}/requirements/evidence-packs/accelerate.txt" \
@@ -313,6 +314,7 @@ EOF
     export PYTHON_BIN="${bin_dir}/python"
     export REPO_URL="https://example.com/repo.git"
     export BRANCH="main"
+    export CANONICAL_REPO_ALIAS="${TEST_TMPDIR}/repo-alias"
     export TORCH_PACKAGES="torch"
     export PACK_SKIP_TORCH_CHECK=0
 
@@ -349,6 +351,7 @@ if [[ "${cmd}" == "clone" ]]; then
     touch "${dest}/scripts/evidence_packs/run_suite.sh" \
         "${dest}/scripts/evidence_packs/run_pack.sh" \
         "${dest}/scripts/evidence_packs/verify_pack.sh" \
+        "${dest}/scripts/evidence_packs/run_mini_pack_gate.sh" \
         "${dest}/scripts/evidence_packs/python/remote_setup_smoke.py" \
         "${dest}/requirements/evidence-packs/huggingface_hub.txt" \
         "${dest}/requirements/evidence-packs/accelerate.txt" \
@@ -516,6 +519,7 @@ EOF
     export PYTHON_BIN="${bin_dir}/python"
     export REPO_URL="https://example.com/repo.git"
     export BRANCH="main"
+    export CANONICAL_REPO_ALIAS="${TEST_TMPDIR}/repo-alias"
     export TORCH_PACKAGES="torch"
     export PACK_SKIP_TORCH_CHECK=1
 

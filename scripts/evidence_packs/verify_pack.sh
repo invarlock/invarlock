@@ -5,7 +5,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/runtime.sh
 source "${SCRIPT_DIR}/lib/runtime.sh"
 if [[ -z "${PYTHON_BIN:-}" ]]; then
-    if command -v python >/dev/null 2>&1; then
+    if [[ -n "${TEST_REAL_PYTHON3:-}" && -x "${TEST_REAL_PYTHON3}" ]]; then
+        PYTHON_BIN="${TEST_REAL_PYTHON3}"
+        export PYTHON_BIN
+    elif command -v python >/dev/null 2>&1; then
         PYTHON_BIN="$(command -v python)"
         export PYTHON_BIN
     fi
@@ -355,6 +358,7 @@ pack_verify_pack() {
                 fi
                 case "${report_assurance}" in
                     report|strict|off)
+                        :
                         ;;
                     *)
                         echo "ERROR: --report-assurance requires report, strict, or off" >&2
