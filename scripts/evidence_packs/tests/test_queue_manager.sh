@@ -612,6 +612,46 @@ test_generate_model_tasks_disables_batch_for_large_memory_and_uses_manifest_fall
     assert_match "weight_tying_break" "${all_calls}" "fallback error type used"
 }
 
+test_generate_model_tasks_can_group_batch_edit_evaluations() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue_manager.sh"
+
+    local calls="${TEST_TMPDIR}/calls"
+    : > "${calls}"
+
+    add_task() {
+        local task_type="$1"
+        local deps="$5"
+        local params_json="$6"
+        printf '%s|%s|%s\n' "${task_type}" "${deps}" "${params_json}" >> "${calls}"
+        local count
+        count=$(wc -l < "${calls}" | tr -d ' ')
+        echo "t${count}"
+    }
+    estimate_model_memory() { echo "14"; }
+
+    CLEAN_EDIT_RUNS=1
+    STRESS_EDIT_RUNS=0
+    DRIFT_CALIBRATION_RUNS=0
+    PACK_PRESET_READY=1
+    RUN_ERROR_INJECTION=false
+    PACK_GROUP_EVALUATIONS=1
+    PACK_USE_BATCH_EDITS=true
+    export CLEAN_EDIT_RUNS STRESS_EDIT_RUNS DRIFT_CALIBRATION_RUNS PACK_PRESET_READY RUN_ERROR_INJECTION PACK_GROUP_EVALUATIONS PACK_USE_BATCH_EDITS
+
+    generate_model_tasks "1" "org/model" "model" >/dev/null
+
+    local all_calls
+    all_calls="$(cat "${calls}")"
+    assert_match "CREATE_EDITS_BATCH\\|" "${all_calls}" "batch edit creation emitted"
+    assert_match "evaluate_EDIT_GROUP\\|" "${all_calls}" "grouped evaluate task emitted"
+    [[ "${all_calls}" != *"evaluate_EDIT|"* ]] || t_fail "per-edit evaluate tasks should not be emitted when grouped"
+    assert_match '"grouped"[[:space:]]*:[[:space:]]*true' "${all_calls}" "group task carries grouped flag"
+    assert_match '"entries"[[:space:]]*:' "${all_calls}" "group task carries entries"
+    assert_match "CLEANUP_EDIT\\|.*t" "${all_calls}" "cleanup tasks still emitted"
+}
+
 test_generate_model_tasks_nonbatch_edit_dependencies_match_create_specs() {
     mock_reset
     # shellcheck source=../queue_manager.sh

@@ -22,7 +22,8 @@ Options:
   --mode NAME         all|saved-model|public-quant (default: all)
   --device NAME       Device for evaluate (default: cuda)
   --profile NAME      Evaluate/verify profile (default: ci)
-  --adapter NAME      Adapter selection (default: auto)
+  --baseline-adapter NAME  Baseline adapter selection (default: auto)
+  --subject-adapter NAME   Subject adapter selection (default: auto)
   --help              Show this help
 EOF
 }
@@ -137,9 +138,10 @@ run_evaluate_sentinel() {
     local subject_path="$3"
     local preset_path="$4"
     local out_dir="$5"
-    local adapter="$6"
-    local profile="$7"
-    local device="$8"
+    local baseline_adapter="$6"
+    local subject_adapter="$7"
+    local profile="$8"
+    local device="$9"
 
     mkdir -p "${out_dir}"
     local runtime_inputs_dir="${out_dir}/runtime_inputs"
@@ -153,7 +155,8 @@ run_evaluate_sentinel() {
     if invarlock evaluate \
         --baseline "${baseline_path}" \
         --subject "${subject_path}" \
-        --adapter "${adapter}" \
+        --baseline-adapter "${baseline_adapter}" \
+        --subject-adapter "${subject_adapter}" \
         --profile "${profile}" \
         --preset "${staged_preset}" \
         --baseline-report "${staged_baseline_report}" \
@@ -198,7 +201,8 @@ main() {
     local mode="all"
     local device="cuda"
     local profile="ci"
-    local adapter="auto"
+    local baseline_adapter="auto"
+    local subject_adapter="auto"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -226,8 +230,12 @@ main() {
                 profile="${2:-}"
                 shift 2
                 ;;
-            --adapter)
-                adapter="${2:-}"
+            --baseline-adapter)
+                baseline_adapter="${2:-}"
+                shift 2
+                ;;
+            --subject-adapter)
+                subject_adapter="${2:-}"
                 shift 2
                 ;;
             --help|-h)
@@ -292,7 +300,8 @@ main() {
             "${quant_subject}" \
             "${quant_preset}" \
             "${out_dir}/quant_4bit_clean" \
-            "${adapter}" \
+            "${baseline_adapter}" \
+            "${subject_adapter}" \
             "${profile}" \
             "${device}"
         run_public_quant_verify \
@@ -312,7 +321,8 @@ main() {
             "${prune_subject}" \
             "${prune_preset}" \
             "${out_dir}/prune_clean" \
-            "${adapter}" \
+            "${baseline_adapter}" \
+            "${subject_adapter}" \
             "${profile}" \
             "${device}"
     fi

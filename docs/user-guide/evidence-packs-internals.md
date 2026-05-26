@@ -380,6 +380,15 @@ Small/medium models default to batch edit creation:
 
 - **Batch edit creation**: `CREATE_EDITS_BATCH` loads a model once and creates
   all 8 edits (cuts repeated model loads).
+- **Grouped edit evaluation**: `PACK_GROUP_EVALUATIONS=1` emits one
+  `evaluate_EDIT_GROUP` task per model batch. It still loads each subject
+  checkpoint separately, but runs the edit evaluations inside one Python
+  process and reuses the staged baseline report, preset, config root, and
+  tokenizer/window evidence paths.
+- **Deferred optional report rendering**: `PACK_DEFER_REPORT_RENDERING=1`
+  keeps `evaluation.report.json`, `runtime.manifest.json`, and JSON evidence
+  sidecars in the hot path while skipping markdown/reviewer bundle rendering.
+  Pack verification does not require those optional rendered files.
 
 Large or MoE models disable batch edits automatically (or via
 `PACK_USE_BATCH_EDITS=false`) and fall back to per-edit tasks
@@ -396,10 +405,22 @@ SETUP_BASELINE
   └─ CREATE_ERROR × types ----------------------┴─> evaluate_ERROR × types
 ```
 
+Batch with grouped edit evaluation (`PACK_GROUP_EVALUATIONS=1`):
+
+```text
+SETUP_BASELINE
+  ├─ CALIBRATION_RUN × N ──> GENERATE_PRESET ──┐
+  ├─ CREATE_EDITS_BATCH ------------------------┴─> evaluate_EDIT_GROUP
+  └─ CREATE_ERROR × types ----------------------┴─> evaluate_ERROR × types
+```
+
 Notes:
 
 - Error injection tasks (`CREATE_ERROR` → `evaluate_ERROR`) branch off
   `SETUP_BASELINE` and require the preset for evaluation.
+- Grouped edit evaluation is opt-in because it trades some multi-GPU task
+  parallelism for lower per-scenario process startup overhead. It is most useful
+  for many short edit evaluations on one model.
 
 Per-edit path (large/MoE or `PACK_USE_BATCH_EDITS=false`):
 
@@ -446,6 +467,7 @@ PHASE 2: GPU worker launch
   - Spawn one worker per GPU, dynamic scheduling in loop
 PHASE 3: Reports + verdict
   - Compile reports into final verdict reports
+  - Write results/analysis/evaluation_optimization_summary.json
 ```
 
 ## Run directory layout
@@ -692,6 +714,8 @@ Common knobs for the setup script:
 | `PACK_REPEATS` | `0` | Determinism repeat metadata |
 | `PACK_MODEL_REVISIONS_FILE` | `OUTPUT_DIR/state/model_revisions.json` | Revisions path |
 | `PACK_USE_BATCH_EDITS` | `auto` | Force/disable batch edit creation |
+| `PACK_GROUP_EVALUATIONS` | `0` | Group batch edit evaluations into one Python process per model |
+| `PACK_DEFER_REPORT_RENDERING` | `0` | Skip optional markdown/reviewer bundle rendering during evaluation |
 | `RESUME_MODE` | `true` | Skip completed steps when outputs exist |
 
 ### Hardware selection

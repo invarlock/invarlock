@@ -537,7 +537,7 @@ validate_task() {
 
     # Validate task_type
     local task_type=$(get_task_type "${task_file}")
-    local valid_types="SETUP_BASELINE CALIBRATION_RUN SETUP_EVALUATE_BASELINE_REPORT CREATE_EDIT CREATE_EDITS_BATCH evaluate_EDIT CREATE_ERROR evaluate_ERROR GENERATE_PRESET"
+    local valid_types="SETUP_BASELINE CALIBRATION_RUN SETUP_EVALUATE_BASELINE_REPORT CREATE_EDIT CREATE_EDITS_BATCH evaluate_EDIT evaluate_EDIT_GROUP CREATE_ERROR evaluate_ERROR GENERATE_PRESET"
     if [[ ! " ${valid_types} " =~ " ${task_type} " ]]; then
         echo "ERROR: Invalid task_type '${task_type}' in: ${task_file}" >&2
         return 1
@@ -682,7 +682,7 @@ estimate_model_memory() {
             "SETUP_BASELINE")
                 :
                 ;;
-            "CALIBRATION_RUN"|"SETUP_EVALUATE_BASELINE_REPORT"|"CREATE_EDIT"|"CREATE_EDITS_BATCH"|"evaluate_EDIT"|"CREATE_ERROR"|"evaluate_ERROR")
+            "CALIBRATION_RUN"|"SETUP_EVALUATE_BASELINE_REPORT"|"CREATE_EDIT"|"CREATE_EDITS_BATCH"|"evaluate_EDIT"|"evaluate_EDIT_GROUP"|"CREATE_ERROR"|"evaluate_ERROR")
                 echo "480"
                 return
                 ;;
@@ -712,7 +712,7 @@ estimate_model_memory() {
             "CREATE_EDITS_BATCH")
                 multiplier="1.3"
                 ;;
-            "evaluate_EDIT")
+            "evaluate_EDIT"|"evaluate_EDIT_GROUP")
                 multiplier="1.05"
                 ;;
             "CREATE_ERROR")
@@ -745,7 +745,7 @@ estimate_model_memory() {
             "CREATE_EDITS_BATCH")
                 multiplier="1.8"
                 ;;
-            "evaluate_EDIT")
+            "evaluate_EDIT"|"evaluate_EDIT_GROUP")
                 multiplier="1.1"
                 ;;
             "CREATE_ERROR")

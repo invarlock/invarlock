@@ -232,6 +232,7 @@ A suite run writes artifacts under `OUTPUT_DIR` (default: `./evidence_pack_runs/
 - `reports/guard_intervention_summary.json` (non-failing remediation signals, e.g. spectral caps + VE probe)
 - `reports/scenario_signal_summary.json`
 - `analysis/determinism_repeats.json` (when `--repeats` is used)
+- `analysis/evaluation_optimization_summary.json`
 - `*/reports/**/evaluation.report.json`
 
 `run_pack.sh` copies curated artifacts into a pack directory (default
@@ -241,6 +242,7 @@ A suite run writes artifacts under `OUTPUT_DIR` (default: `./evidence_pack_runs/
 - `results/**/category_summary.json`, `results/**/guard_signal_summary.json`, `results/**/guard_intervention_summary.json`, `results/**/scenario_signal_summary.json`
 - `results/**/determinism_repeats.json` (if present)
 - `results/**/edit_artifact_summary.json`
+- `results/analysis/evaluation_optimization_summary.json`
 - `reports/<model>/<edit>/<run>/evaluation.report.json`
 - `reports/<model>/<edit>/<run>/edit_metadata.json`
 - `reports/**/rmt_probe.json` (optional sidecar; emitted by some scenarios, e.g. `rmt_norm_noise`)
@@ -256,6 +258,32 @@ a hidden sibling temporary directory and only renames it into the final
 `evidence_pack/` path after manifest generation, checksum sealing, optional HTML
 export, and optional signing succeed. Failed pack builds do not leave a partial
 pack behind at the final destination.
+
+## Evaluation Optimization Controls
+
+The default suite keeps one evaluation task per scenario so scheduler behavior
+and GPU placement remain easy to inspect. For benchmark or throughput work on
+batch edit runs, enable the opt-in grouped path:
+
+```bash
+PACK_GROUP_EVALUATIONS=1 \
+PACK_DEFER_REPORT_RENDERING=1 \
+INVARLOCK_ALLOW_REMOTE_CODE=1 \
+  ./scripts/evidence_packs/run_suite.sh --suite subset --net 1
+```
+
+`PACK_GROUP_EVALUATIONS=1` emits one `evaluate_EDIT_GROUP` task per model batch.
+That task evaluates the batch entries inside one Python process, reuses the
+shared baseline report, and still loads each subject checkpoint separately.
+`PACK_DEFER_REPORT_RENDERING=1` keeps `evaluation.report.json` and required
+sidecars, but skips optional markdown/reviewer rendering in the hot path.
+
+Every run writes `results/analysis/evaluation_optimization_summary.json`. It
+records timing files discovered under the run directory, grouped task counts,
+deferred-render counts, baseline-report reuse counts, and the estimated number
+of CLI process startups avoided by grouped evaluation. To compare before and
+after, run the same suite/model selection once with defaults and once with the
+two optimization flags, then compare the summary JSON files.
 
 ## Edit Provenance Labels
 

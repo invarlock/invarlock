@@ -95,7 +95,7 @@ test_run_qwen14_sentinels_main_is_sourceable_and_covers_mode_dispatch() {
     resolve_baseline_report() { printf '%s\n' "${TEST_TMPDIR}/baseline_report.json"; }
     resolve_preset_path() { printf '%s\n' "${TEST_TMPDIR}/preset_${3}.yaml"; }
     run_evaluate_sentinel() {
-        printf 'evaluate\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5" "$8" >> "${calls_file}"
+        printf 'evaluate\t%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5" "$9" >> "${calls_file}"
         return 0
     }
     run_public_quant_verify() {
@@ -121,7 +121,7 @@ test_run_qwen14_sentinels_main_is_sourceable_and_covers_mode_dispatch() {
     assert_rc "2" "${RUN_RC}" "invalid mode is rejected"
 
     : > "${calls_file}"
-    run main --run-dir "${run_dir}" --model-name "${model_name}" --mode public-quant --device cpu --profile smoke --adapter test
+    run main --run-dir "${run_dir}" --model-name "${model_name}" --mode public-quant --device cpu --profile smoke --baseline-adapter test_base --subject-adapter test_subject
     assert_rc "0" "${RUN_RC}" "public-quant mode succeeds"
     assert_match "evaluate.*quant_4bit_clean.*preset_quant_rtn\\.yaml.*${run_dir}/sentinels/qwen14/quant_4bit_clean.*cpu" "$(cat "${calls_file}")" "public-quant mode evaluates the quant subject and uses default out dir"
     assert_match "verify.*quant_4bit_clean/evaluation\\.report\\.json.*${run_dir}/sentinels/qwen14/quant_4bit_clean" "$(cat "${calls_file}")" "public-quant mode verifies the quant report"
@@ -308,7 +308,7 @@ EOF
     normalize_staged_preset_for_baseline_report() { :; }
 
     local out_dir="${TEST_TMPDIR}/sentinel"
-    run run_evaluate_sentinel "${baseline_dir}" "${baseline_report}" "${subject_dir}" "${preset}" "${out_dir}" "auto" "ci" "cpu"
+    run run_evaluate_sentinel "${baseline_dir}" "${baseline_report}" "${subject_dir}" "${preset}" "${out_dir}" "auto" "auto" "ci" "cpu"
     assert_rc "0" "${RUN_RC}" "evaluate sentinel treats non-zero exit with written report as success"
     assert_match "treating sentinel as load-path success" "${RUN_ERR}" "evaluate warning is surfaced"
 

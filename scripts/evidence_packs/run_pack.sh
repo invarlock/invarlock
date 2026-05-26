@@ -563,6 +563,7 @@ pack_populate_pack_dir() {
     pack_copy_optional "${run_dir}/reports/guard_signal_summary.json" "${analysis_dir}/guard_signal_summary.json"
     pack_copy_optional "${run_dir}/reports/guard_intervention_summary.json" "${analysis_dir}/guard_intervention_summary.json"
     pack_copy_optional "${run_dir}/reports/scenario_signal_summary.json" "${analysis_dir}/scenario_signal_summary.json"
+    pack_copy_optional "${run_dir}/results/analysis/evaluation_optimization_summary.json" "${analysis_dir}/evaluation_optimization_summary.json"
 
     pack_copy_optional "${run_dir}/state/model_revisions.json" "${revisions_dest}"
     pack_copy_optional "${run_dir}/state/scenarios.json" "${scenarios_dest}"

@@ -2262,6 +2262,11 @@ EOF
     compile_results
     run_analysis
     generate_verdict
+    if ! python3 "${_PACK_VALIDATION_PY_DIR}/evaluation_optimization_summary.py" \
+        "${OUTPUT_DIR}" \
+        --out "${OUTPUT_DIR}/results/analysis/evaluation_optimization_summary.json" >> "${LOG_FILE}" 2>&1; then
+        log "WARNING: Failed to write evaluation optimization summary."
+    fi
     local verdict_file="${OUTPUT_DIR}/reports/final_verdict.json"
     local verdict_status
     verdict_status="$(pack_read_final_verdict "${verdict_file}")"
