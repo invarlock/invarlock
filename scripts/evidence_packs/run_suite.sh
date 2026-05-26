@@ -16,7 +16,7 @@ Usage: scripts/evidence_packs/run_suite.sh [options]
 WARNING: This runs the suite WITHOUT creating an evidence pack.
          For distributable validation artifacts, use scripts/evidence_packs/run_pack.sh instead.
 Deployable edit scenarios are opt-in; set PACK_INCLUDE_DEPLOYABLE_EDITS=1,
-PACK_DEPLOY_BACKENDS=torchao,bitsandbytes, and select explicit deployable
+PACK_DEPLOY_BACKENDS=bitsandbytes,gptq,awq, and select explicit deployable
 scenario IDs only in backend-ready environments.
 
 Options:

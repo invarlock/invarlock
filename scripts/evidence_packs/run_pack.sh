@@ -14,7 +14,7 @@ Builds an evidence pack from a completed suite run.
 For strong distributable evidence, require a signed manifest, strict verification,
 and a PASS final verdict.
 Deployable edit scenarios are opt-in; set PACK_INCLUDE_DEPLOYABLE_EDITS=1,
-PACK_DEPLOY_BACKENDS=torchao,bitsandbytes, and select explicit deployable
+PACK_DEPLOY_BACKENDS=bitsandbytes,gptq,awq, and select explicit deployable
 scenario IDs only in backend-ready environments.
 
 Verify a completed pack with:

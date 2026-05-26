@@ -286,14 +286,13 @@ an edited subject, and pack verification checks that metadata agrees with
 ## Deployable Edit Lane
 
 Deployable edit scenarios are separate from the default validation suite. They
-are opt-in because backends such as TorchAO, bitsandbytes, GPTQ, and AWQ depend
+are opt-in because backends such as bitsandbytes, GPTQ, and AWQ depend
 on specific PyTorch, CUDA, kernel, architecture, and package versions.
 
-The current `deploy_torchao_int4_clean` entry is a contract placeholder, not a
-runnable evidence-pack lane. The scenario records the required artifact shape
-and sidecars, but the scheduler does not yet generate or evaluate TorchAO
-deployable subjects. Selecting that scenario fails closed until a real generator
-and smoke-evaluation path are added.
+There is no default deployable scenario in the OSS evidence-pack suite. A
+deployable lane should be added only after its backend has a generator or
+BYOE-loading path that passes reload, inference, inventory, and memory/storage
+checks on a supported GPU stack.
 
 A deployable scenario must produce backend metadata, backend inventory,
 reload-smoke evidence, inference-smoke evidence, storage or memory evidence, an

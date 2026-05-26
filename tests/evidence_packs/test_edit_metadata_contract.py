@@ -82,18 +82,18 @@ def test_validate_edit_artifact_require_metadata_json(tmp_path: Path) -> None:
 
 def _deployable_metadata() -> dict[str, object]:
     return build_edit_metadata(
-        edit_type="torchao_int4",
+        edit_type="bnb_8bit",
         scope="ffn",
         artifact_class=DEPLOYABLE_OPTIMIZED_SUBJECT,
         edit_semantics=EDIT_SEMANTICS_DEPLOYABLE,
         optimized_deployment_backend=True,
-        backend="torchao",
-        storage_format="torchao_int4_packed",
-        actual_storage_format="torchao_int4_packed",
+        backend="bitsandbytes",
+        storage_format="bitsandbytes_8bit_packed",
+        actual_storage_format="bitsandbytes_8bit_packed",
         packed_quantized_storage=True,
         runtime_memory_reduction=True,
         runtime_memory_reduction_expected=True,
-        parameters={"bits": 4},
+        parameters={"bits": 8},
         coverage={"edited_tensors": 1, "edited_params": 1, "total_params": 1},
     )
 
@@ -104,13 +104,13 @@ def _write_deployable_sidecars(report_dir: Path) -> None:
         json.dumps(
             {
                 "schema": "invarlock/backend-inventory-v1",
-                "adapter": "torchao",
-                "backend": "torchao",
+                "adapter": "hf_bnb",
+                "backend": "bitsandbytes",
                 "backend_version": "0.1",
                 "transformers_version": "1.0",
                 "quantization_config": {"bits": 4},
                 "quantized_module_count": 1,
-                "quantized_module_types": ["torchao.Int4Linear"],
+                "quantized_module_types": ["bitsandbytes.nn.Linear8bitLt"],
                 "device_map": "cuda:0",
                 "memory_footprint": {
                     "reported_bytes": 1024,
@@ -158,7 +158,7 @@ def test_validate_deployable_artifact_checks_sidecar_schemas_and_ok(
 
     payload = deployable_validator_mod.validate_deployable_artifact(
         artifact,
-        backend="torchao",
+        backend="bitsandbytes",
         report_dir=report_dir,
         smoke=True,
     )
@@ -174,7 +174,7 @@ def test_validate_deployable_artifact_checks_sidecar_schemas_and_ok(
     )
     payload = deployable_validator_mod.validate_deployable_artifact(
         artifact,
-        backend="torchao",
+        backend="bitsandbytes",
         report_dir=report_dir,
         smoke=True,
     )
@@ -187,7 +187,7 @@ def test_validate_deployable_artifact_checks_sidecar_schemas_and_ok(
         json.dumps(
             {
                 "schema": "wrong",
-                "backend": "torchao",
+                "backend": "bitsandbytes",
                 "load_smoke": True,
                 "inference_smoke": True,
                 "quantized_module_count": 1,
@@ -199,7 +199,7 @@ def test_validate_deployable_artifact_checks_sidecar_schemas_and_ok(
     )
     payload = deployable_validator_mod.validate_deployable_artifact(
         artifact,
-        backend="torchao",
+        backend="bitsandbytes",
         report_dir=report_dir,
         smoke=True,
     )
@@ -265,14 +265,14 @@ def test_edit_artifact_summary_counts_scenario_taxonomy(tmp_path: Path) -> None:
 
 def test_edit_artifact_summary_reports_deployable_smokes(tmp_path: Path) -> None:
     pack_dir = tmp_path / "pack"
-    report_dir = pack_dir / "reports" / "model" / "deploy_torchao_int4_clean" / "run_1"
+    report_dir = pack_dir / "reports" / "model" / "deploy_bnb_8bit_clean" / "run_1"
     report_dir.mkdir(parents=True)
     (report_dir / "deployable_artifact_validation.json").write_text(
         json.dumps(
             {
                 "schema": "invarlock/deployable-artifact-validation-v1",
                 "ok": True,
-                "backend": "torchao",
+                "backend": "bitsandbytes",
                 "load_smoke": True,
                 "inference_smoke": True,
             }
@@ -287,13 +287,13 @@ def test_edit_artifact_summary_reports_deployable_smokes(tmp_path: Path) -> None
                 "schema_version": 1,
                 "scenarios": [
                     {
-                        "id": "deploy_torchao_int4_clean",
+                        "id": "deploy_bnb_8bit_clean",
                         "category": "deployable_clean",
                         "artifact_class": "deployable_optimized_subject",
                         "generation": {
                             "kind": "deployable_edit",
-                            "backend": "torchao",
-                            "edit_spec": "torchao_int4:clean:ffn",
+                            "backend": "bitsandbytes",
+                            "edit_spec": "bnb_8bit:clean:ffn",
                         },
                     }
                 ],
@@ -304,6 +304,6 @@ def test_edit_artifact_summary_reports_deployable_smokes(tmp_path: Path) -> None
 
     summary = build_edit_artifact_summary(pack_dir, scenarios)
 
-    assert summary["deployable_subjects"]["backends"] == ["torchao"]
+    assert summary["deployable_subjects"]["backends"] == ["bitsandbytes"]
     assert summary["deployable_subjects"]["all_reload_smokes_passed"] is True
     assert summary["deployable_subjects"]["all_inference_smokes_passed"] is True

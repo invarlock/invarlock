@@ -965,40 +965,6 @@
       "optimized_deployment_backend": false,
       "contains_model_weights_in_pack": false,
       "run_directory_contains_edit_artifacts": true
-    },
-    {
-      "id": "deploy_torchao_int4_clean",
-      "suites": [
-        "deployable"
-      ],
-      "category": "deployable_clean",
-      "artifact_class": "deployable_optimized_subject",
-      "deployable_as_hf_checkpoint": true,
-      "optimized_deployment_backend": true,
-      "backend": "torchao",
-      "packed_quantized_storage": true,
-      "runtime_memory_reduction_expected": true,
-      "contains_model_weights_in_pack": false,
-      "run_directory_contains_edit_artifacts": true,
-      "runnable": false,
-      "status": "contract_placeholder",
-      "not_runnable_reason": "Deployable TorchAO generation/evaluation tasks are not wired into the evidence-pack scheduler yet.",
-      "failure_class": "deployable_edit.torchao_int4",
-      "strictness": "must_pass",
-      "intent": "production_artifact_assurance",
-      "primary_guard": "primary_metric",
-      "generation": {
-        "kind": "deployable_edit",
-        "backend": "torchao",
-        "edit_spec": "torchao_int4:clean:ffn",
-        "version": "clean"
-      },
-      "deployment_contract": {
-        "packed_quantized_storage": true,
-        "runtime_memory_reduction_expected": true,
-        "reload_required": true,
-        "inference_smoke_required": true
-      }
     }
   ]
 }

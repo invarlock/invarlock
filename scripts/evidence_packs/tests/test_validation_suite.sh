@@ -3300,20 +3300,20 @@ test_pack_prepare_scenarios_manifest_filters_deployable_backends() {
   "schema_version": 1,
   "scenarios": [
     {"id": "quant_4bit_clean", "category": "clean", "artifact_class": "validation_subject_checkpoint", "strictness": "must_pass", "generation": {"kind": "edit", "edit_spec": "quant_rtn:clean:ffn", "version": "clean"}, "suites": ["subset"]},
-    {"id": "deploy_torchao", "category": "deployable_clean", "artifact_class": "deployable_optimized_subject", "strictness": "must_pass", "generation": {"kind": "deployable_edit", "backend": "torchao", "edit_spec": "torchao_int4:clean:ffn", "version": "clean"}, "suites": ["deployable"]},
+    {"id": "deploy_gptq", "category": "deployable_clean", "artifact_class": "deployable_optimized_subject", "strictness": "must_pass", "generation": {"kind": "deployable_edit", "backend": "gptq", "edit_spec": "gptq_int4:clean:ffn", "version": "clean"}, "suites": ["deployable"]},
     {"id": "deploy_bnb", "category": "deployable_clean", "artifact_class": "deployable_optimized_subject", "strictness": "must_pass", "generation": {"kind": "deployable_edit", "backend": "bitsandbytes", "edit_spec": "bnb_8bit:clean:ffn", "version": "clean"}, "suites": ["deployable"]}
   ]
 }
 EOF
     local PACK_SCENARIOS_MANIFEST_FILE="${manifest}"
     local PACK_INCLUDE_DEPLOYABLE_EDITS="1"
-    local PACK_DEPLOY_BACKENDS="torchao"
+    local PACK_DEPLOY_BACKENDS="gptq"
 
     pack_prepare_scenarios_manifest
 
     local ids
     ids="$(jq -r '.scenarios[].id' "${OUTPUT_DIR}/state/scenarios.json" | sort | paste -sd ',' -)"
-    assert_eq "deploy_torchao,quant_4bit_clean" "${ids}" "deployable scenarios honor backend filter"
+    assert_eq "deploy_gptq,quant_4bit_clean" "${ids}" "deployable scenarios honor backend filter"
 }
 
 test_pack_prepare_scenarios_manifest_rejects_non_runnable_deployable() {
@@ -3330,18 +3330,18 @@ test_pack_prepare_scenarios_manifest_rejects_non_runnable_deployable() {
   "schema": "evidence_pack_scenarios_v1",
   "schema_version": 1,
   "scenarios": [
-    {"id": "deploy_torchao", "category": "deployable_clean", "artifact_class": "deployable_optimized_subject", "strictness": "must_pass", "runnable": false, "generation": {"kind": "deployable_edit", "backend": "torchao", "edit_spec": "torchao_int4:clean:ffn", "version": "clean"}, "suites": ["deployable"]}
+    {"id": "deploy_gptq", "category": "deployable_clean", "artifact_class": "deployable_optimized_subject", "strictness": "must_pass", "runnable": false, "generation": {"kind": "deployable_edit", "backend": "gptq", "edit_spec": "gptq_int4:clean:ffn", "version": "clean"}, "suites": ["deployable"]}
   ]
 }
 EOF
     local PACK_SCENARIOS_MANIFEST_FILE="${manifest}"
     local PACK_INCLUDE_DEPLOYABLE_EDITS="1"
-    local PACK_DEPLOY_BACKENDS="torchao"
+    local PACK_DEPLOY_BACKENDS="gptq"
 
     local rc=0
     ( pack_prepare_scenarios_manifest ) || rc=$?
     assert_ne "0" "${rc}" "non-runnable deployable scenario fails closed"
-    assert_match "contract placeholders and are not runnable yet: deploy_torchao" "$(cat "${OUTPUT_DIR}/logs/main.log")" "non-runnable reason is logged"
+    assert_match "contract placeholders and are not runnable yet: deploy_gptq" "$(cat "${OUTPUT_DIR}/logs/main.log")" "non-runnable reason is logged"
 }
 
 test_pack_prepare_scenarios_manifest_rejects_non_runnable_deployable_without_jq() {
@@ -3359,7 +3359,7 @@ test_pack_prepare_scenarios_manifest_rejects_non_runnable_deployable_without_jq(
   "schema": "evidence_pack_scenarios_v1",
   "schema_version": 1,
   "scenarios": [
-    {"id": "deploy_torchao", "category": "deployable_clean", "artifact_class": "deployable_optimized_subject", "strictness": "must_pass", "runnable": false, "generation": {"kind": "deployable_edit", "backend": "torchao", "edit_spec": "torchao_int4:clean:ffn", "version": "clean"}, "suites": ["deployable"]}
+    {"id": "deploy_gptq", "category": "deployable_clean", "artifact_class": "deployable_optimized_subject", "strictness": "must_pass", "runnable": false, "generation": {"kind": "deployable_edit", "backend": "gptq", "edit_spec": "gptq_int4:clean:ffn", "version": "clean"}, "suites": ["deployable"]}
   ]
 }
 EOF
@@ -3369,7 +3369,7 @@ EOF
     local rc=0
     ( pack_prepare_scenarios_manifest ) || rc=$?
     assert_ne "0" "${rc}" "non-runnable deployable scenario fails closed without jq"
-    assert_match "contract placeholders and are not runnable yet: deploy_torchao" "$(cat "${OUTPUT_DIR}/logs/main.log")" "non-runnable reason is logged without jq"
+    assert_match "contract placeholders and are not runnable yet: deploy_gptq" "$(cat "${OUTPUT_DIR}/logs/main.log")" "non-runnable reason is logged without jq"
 }
 
 test_pack_prepare_scenarios_manifest_resume_errors_on_contract_drift() {

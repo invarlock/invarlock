@@ -256,18 +256,18 @@ def test_evidence_pack_verify_requires_validation_edit_metadata(
 def test_evidence_pack_verify_requires_deployable_sidecars(
     monkeypatch, tmp_path: Path
 ) -> None:
-    report_rel = "reports/model/deploy_torchao_int4_clean/run_1/evaluation.report.json"
+    report_rel = "reports/model/deploy_bnb_8bit_clean/run_1/evaluation.report.json"
     pack_dir = _build_pack(tmp_path / "pack", report_rel_path=report_rel)
     _write_json(
         pack_dir / "metadata/scenarios.json",
         {
             "scenarios": [
                 {
-                    "id": "deploy_torchao_int4_clean",
+                    "id": "deploy_bnb_8bit_clean",
                     "artifact_class": "deployable_optimized_subject",
                     "generation": {
                         "kind": "deployable_edit",
-                        "edit_spec": "torchao_int4:clean:ffn",
+                        "edit_spec": "bnb_8bit:clean:ffn",
                     },
                 }
             ]
@@ -278,7 +278,7 @@ def test_evidence_pack_verify_requires_deployable_sidecars(
         {
             "schema": "invarlock/evidence-pack-edit-metadata-v1",
             "artifact_class": "deployable_optimized_subject",
-            "edit_type": "torchao_int4",
+            "edit_type": "bnb_8bit",
             "optimized_deployment_backend": True,
             "packed_quantized_storage": True,
             "coverage": {},
@@ -290,7 +290,7 @@ def test_evidence_pack_verify_requires_deployable_sidecars(
 
     assert result.status == EvidencePackStatus.INTEGRITY
     assert any(
-        "deploy_torchao_int4_clean: deployable sidecar missing" in error
+        "deploy_bnb_8bit_clean: deployable sidecar missing" in error
         for error in result.payload["errors"]
     )
 
@@ -382,9 +382,9 @@ def test_evidence_pack_metadata_helper_edges(tmp_path: Path) -> None:
 
     assert (
         edit_metadata_mod._expected_edit_type(
-            {"failure_class": "deployable_edit.torchao_int4"}
+            {"failure_class": "deployable_edit.bnb_8bit"}
         )
-        == "torchao_int4"
+        == "bnb_8bit"
     )
     assert edit_metadata_mod._expected_edit_type({}) == ""
 
@@ -392,7 +392,7 @@ def test_evidence_pack_metadata_helper_edges(tmp_path: Path) -> None:
         scenario_id="deploy",
         spec={
             "artifact_class": "deployable_optimized_subject",
-            "generation": {"edit_spec": "torchao_int4:clean:ffn"},
+            "generation": {"edit_spec": "bnb_8bit:clean:ffn"},
         },
         metadata={
             "schema": "wrong",
@@ -473,7 +473,7 @@ def test_evidence_pack_metadata_consistency_helper_edges(tmp_path: Path) -> None
                     "artifact_class": "deployable_optimized_subject",
                     "generation": {
                         "kind": "deployable_edit",
-                        "edit_spec": "torchao_int4:clean:ffn",
+                        "edit_spec": "bnb_8bit:clean:ffn",
                     },
                 },
                 {
@@ -481,7 +481,7 @@ def test_evidence_pack_metadata_consistency_helper_edges(tmp_path: Path) -> None
                     "artifact_class": "deployable_optimized_subject",
                     "generation": {
                         "kind": "deployable_edit",
-                        "edit_spec": "torchao_int4:clean:ffn",
+                        "edit_spec": "bnb_8bit:clean:ffn",
                     },
                 },
             ]
@@ -523,7 +523,7 @@ def test_evidence_pack_metadata_consistency_helper_edges(tmp_path: Path) -> None
         {
             "schema": "invarlock/evidence-pack-edit-metadata-v1",
             "artifact_class": "deployable_optimized_subject",
-            "edit_type": "torchao_int4",
+            "edit_type": "bnb_8bit",
             "optimized_deployment_backend": True,
             "packed_quantized_storage": True,
         },

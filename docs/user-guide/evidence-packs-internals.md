@@ -217,11 +217,9 @@ Deployable scenarios use `artifact_class: deployable_optimized_subject` and are
 not part of the default validation lanes. A deployable scenario must carry a
 backend contract (`packed_quantized_storage`, reload smoke, inference smoke,
 and memory/storage evidence) and package the corresponding sidecars into the
-evidence pack. The first scenario contract is `deploy_torchao_int4_clean`; it is
-marked `runnable: false` and is a contract placeholder until TorchAO generation,
-reload smoke, inference smoke, and memory/storage reporting are wired into the
-scheduler. Selecting it fails closed rather than producing partial deployable
-evidence.
+evidence pack. The OSS suite currently has no runnable deployable scenario; add
+one only when the backend can produce or load an artifact and provide all
+required sidecars on the target GPU stack.
 
 ### Error injection tests
 
