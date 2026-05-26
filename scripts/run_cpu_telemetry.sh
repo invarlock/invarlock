@@ -34,7 +34,7 @@ set +e
 INVARLOCK_ALLOW_NETWORK=1 "${CLI[@]}" evaluate \
   --baseline "${MODEL_ID}" \
   --subject "${MODEL_ID}" \
-  --adapter auto \
+  --baseline-adapter auto --subject-adapter auto \
   --profile "${PROFILE}" \
   --tier "${TIER}" \
   --preset "${PRESET}" \

@@ -230,8 +230,13 @@ def test_model_evidence_sweep_dry_run_supports_promotion_gap_suite_candidates(
     assert distilbert["evaluate"][distilbert["evaluate"].index("--baseline") + 1] == (
         "distilbert-base-uncased"
     )
-    assert distilbert["evaluate"][distilbert["evaluate"].index("--adapter") + 1] == (
-        "hf_mlm"
+    assert (
+        distilbert["evaluate"][distilbert["evaluate"].index("--baseline-adapter") + 1]
+        == "hf_mlm"
+    )
+    assert (
+        distilbert["evaluate"][distilbert["evaluate"].index("--subject-adapter") + 1]
+        == "hf_mlm"
     )
 
 

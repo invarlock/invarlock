@@ -26,7 +26,7 @@ invarlock advanced plugins adapters
 invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject gpt2 \
-  --adapter auto
+  --baseline-adapter auto --subject-adapter auto
 ```
 
 The CLI example above uses the runtime container by default. Add
@@ -51,8 +51,9 @@ print(adapter.describe(model)["model_type"])
 
 - **Adapters hide model-specific logic**: they handle loading, structure description,
   and snapshot/restore so edits/guards stay model-agnostic.
-- **Auto selection**: use `adapter: auto` (config/CLI shortcut) or `--adapter hf_auto`
-  (adapter plugin) to choose a concrete role adapter (`hf_causal`, `hf_mlm`,
+- **Auto selection**: use `adapter: auto` in a single-run config, or use
+  `--baseline-adapter auto --subject-adapter auto` for paired evaluation to
+  choose concrete role adapters (`hf_causal`, `hf_mlm`,
   `hf_seq2seq`) plus quant adapters when detected. Local paths can use
   `config.json`; remote IDs fall back to name heuristics and default to
   `hf_causal` when unsure. Image-text models use the explicit

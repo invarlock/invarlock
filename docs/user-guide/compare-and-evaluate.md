@@ -25,7 +25,7 @@ fine-tuning, or other checkpoint-edit workflows.
 - Produce your baseline and edited checkpoints (any external tool).
 - Ensure both use the same tokenizer (InvarLock verify lints tokenizer hash when
   present).
-- Run `invarlock evaluate --baseline <baseline> --subject <subject> --adapter auto`.
+- Run `invarlock evaluate --baseline <baseline> --subject <subject> --baseline-adapter auto --subject-adapter auto`.
 
 By default, `evaluate` runs inside the runtime container. Use `--execution-mode host`
 only for host-side workflows that intentionally run model loading on the
@@ -38,7 +38,7 @@ Example (wheel-first, GPT‑2, CPU/MPS friendly; requires `invarlock[hf]` or equ
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline sshleifer/tiny-gpt2 \
   --subject /path/to/your/edited-model \
-  --adapter auto \
+  --baseline-adapter auto --subject-adapter auto \
   --profile ci \
   --out runs/eval_smoke \
   --report-out reports/eval_smoke
@@ -73,7 +73,7 @@ Example:
 INVARLOCK_STORE_EVAL_WINDOWS=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline sshleifer/tiny-gpt2 \
   --subject sshleifer/tiny-gpt2 \
-  --adapter auto \
+  --baseline-adapter auto --subject-adapter auto \
   --profile ci \
   --tier balanced \
   --out runs/baseline_once \
@@ -85,7 +85,7 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline-report runs/baseline_once/source/<timestamp>/report.json \
   --baseline sshleifer/tiny-gpt2 \
   --subject /path/to/your/edited-model \
-  --adapter auto \
+  --baseline-adapter auto --subject-adapter auto \
   --profile ci \
   --tier balanced \
   --out runs/eval_subject_1 \

@@ -272,7 +272,7 @@ fi
 "${CLI[@]}" evaluate \
   --baseline "$MODEL_ID" \
   --subject "$MODEL_ID" \
-  --adapter hf_causal \
+  --baseline-adapter hf_causal --subject-adapter hf_causal \
   --profile "$PROFILE" \
   --assurance off \
   --preset "$PRESET_PATH" \

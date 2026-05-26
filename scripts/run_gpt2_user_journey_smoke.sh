@@ -407,7 +407,7 @@ run_eval_journey() {
   "${CLI[@]}" evaluate \
     --baseline gpt2 \
     --subject gpt2 \
-    --adapter auto \
+    --baseline-adapter auto --subject-adapter auto \
     --profile "$PROFILE" \
     --preset "$PRESET" \
     --device "$SMOKE_DEVICE" \

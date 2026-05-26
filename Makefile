@@ -573,7 +573,8 @@ eval-loop:  ## Run automated evaluation loop (baseline + quant8 quickstart)
 	@echo "Running automated evaluation workflow..."
 	@rm -rf runs/eval_loop reports/eval/eval_loop
 	@INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
-		--source sshleifer/tiny-gpt2 --edited sshleifer/tiny-gpt2 --adapter auto \
+		--baseline sshleifer/tiny-gpt2 --subject sshleifer/tiny-gpt2 \
+		--baseline-adapter auto --subject-adapter auto \
 		--profile release --tier balanced \
 		--preset configs/presets/causal_lm/wikitext2_512.yaml \
 		--edit-config configs/overlays/edits/quant_rtn/8bit_attn.yaml \

@@ -35,7 +35,8 @@ pip install "invarlock[hf]"
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline <BASELINE_MODEL> \
   --subject  <SUBJECT_MODEL> \
-  --adapter  auto \
+  --baseline-adapter auto \
+  --subject-adapter  auto \
   --profile  ci
 ```
 
@@ -275,7 +276,7 @@ invarlock doctor
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject /path/to/edited \
-  --adapter auto \
+  --baseline-adapter auto --subject-adapter auto \
   --profile ci \
   --preset configs/presets/causal_lm/wikitext2_512.yaml
 ```
@@ -294,7 +295,7 @@ bash scripts/verify_ci_matrix.sh
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate \
   --baseline /path/to/baseline \
   --subject  /path/to/edited \
-  --adapter auto \
+  --baseline-adapter auto --subject-adapter auto \
   --profile release \
   --preset configs/presets/causal_lm/wikitext2_512.yaml
 invarlock verify reports/eval/evaluation.report.json

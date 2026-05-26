@@ -42,6 +42,10 @@ output:
   resolves guard thresholds from `tiers.yaml`.
 - **Defaults merging**: the optional top-level `defaults` mapping is merged into
   the config before execution.
+- **Evaluate adapter split**: `invarlock evaluate` accepts
+  `--baseline-adapter` and `--subject-adapter`, then materializes separate
+  baseline and subject run configs. Each generated run config still uses the
+  existing single-run `model.adapter` field.
 - **Programmatic access**: `load_config()` returns an explicit mapping-backed
   `InvarLockConfig`. Use `cfg["model"]["id"]` or
   `cfg.require_section("model")["id"]`; attribute-style access is unsupported.

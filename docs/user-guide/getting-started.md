@@ -62,7 +62,7 @@ or datasets, opt in per command with `--allow-network`:
 invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject distilgpt2 \
-  --adapter auto \
+  --baseline-adapter auto --subject-adapter auto \
   --profile ci
 ```
 
@@ -79,7 +79,7 @@ container and emits `runtime.manifest.json` beside the evaluation report.
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject distilgpt2 \
-  --adapter auto \
+  --baseline-adapter auto --subject-adapter auto \
   --profile ci \
   --report-out reports/eval
 ```

@@ -18,7 +18,10 @@ def test_tiny_gpt2_matrix_dry_run(tmp_path: Path):
     text = checklist.read_text()
     assert "Evaluation Matrix" in text
     # Basic sanity: contains at least one evaluate command
-    assert "evaluate" in text and "--adapter hf_causal" in text
+    assert (
+        "evaluate" in text
+        and "--baseline-adapter hf_causal --subject-adapter hf_causal" in text
+    )
 
 
 def _read_profile_from_checklist(path: str) -> str:

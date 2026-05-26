@@ -46,7 +46,7 @@ run, then come back here once they already have an evaluation bundle.
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline sshleifer/tiny-gpt2 \
   --subject  sshleifer/tiny-gpt2 \
-  --adapter auto \
+  --baseline-adapter auto --subject-adapter auto \
   --profile release \
   --tier balanced \
   --preset configs/presets/causal_lm/wikitext2_512.yaml \

@@ -180,7 +180,7 @@ for PRESET in \
 do
   tag="gpt2_eval_${PRESET##*/}"
   [ "$PRESET" = "omit" ] && tag="gpt2_eval_auto"
-  cmd=("${CLI[@]}" evaluate --baseline "$GPT2_ID" --subject "$GPT2_ID" --adapter hf_causal --profile "$PROFILE" --tier balanced --device cpu)
+  cmd=("${CLI[@]}" evaluate --baseline "$GPT2_ID" --subject "$GPT2_ID" --baseline-adapter hf_causal --subject-adapter hf_causal --profile "$PROFILE" --tier balanced --device cpu)
   [ "$PRESET" != "omit" ] && cmd+=(--preset "$PRESET")
   append "$tag" "$(render_cmd "${cmd[@]}")"
   if [ "$RUN" = "1" ]; then run_cmd "${cmd[@]}"; fi
@@ -191,7 +191,7 @@ echo "### GPT-2 Quant (demo edit)" >> "$TMP_DIR/checklist.md"
 QCFG="configs/overlays/edits/quant_rtn/tiny_demo.yaml"
 # Keep the quant demo on a smoke-friendly profile so strict CI parity checks do
 # not turn an example edit into a false red path.
-cmd=("${CLI[@]}" evaluate --baseline "$GPT2_ID" --subject "$GPT2_ID" --adapter hf_causal --profile "$QUANT_PROFILE" --tier balanced --device cpu --preset configs/presets/causal_lm/wikitext2_512.yaml --edit-config "$QCFG")
+cmd=("${CLI[@]}" evaluate --baseline "$GPT2_ID" --subject "$GPT2_ID" --baseline-adapter hf_causal --subject-adapter hf_causal --profile "$QUANT_PROFILE" --tier balanced --device cpu --preset configs/presets/causal_lm/wikitext2_512.yaml --edit-config "$QCFG")
 append "gpt2_eval_quant8_${QUANT_PROFILE}" "$(render_cmd "${cmd[@]}")"
 [ "$RUN" = "1" ] && run_cmd "${cmd[@]}"
 
@@ -200,7 +200,7 @@ echo >> "$TMP_DIR/checklist.md"
 # 2) Tiny encoder MLM
 BERT_ID=${BERT_ID:-"sshleifer/tiny-distilroberta-base"}
 echo "## Encoder MLM" >> "$TMP_DIR/checklist.md"
-cmd=("${CLI[@]}" evaluate --baseline "$BERT_ID" --subject "$BERT_ID" --adapter hf_mlm --profile "$PROFILE" --tier balanced --device cpu --preset configs/presets/masked_lm/wikitext2_128.yaml)
+cmd=("${CLI[@]}" evaluate --baseline "$BERT_ID" --subject "$BERT_ID" --baseline-adapter hf_mlm --subject-adapter hf_mlm --profile "$PROFILE" --tier balanced --device cpu --preset configs/presets/masked_lm/wikitext2_128.yaml)
 append "bert_mlm_eval" "$(render_cmd "${cmd[@]}")"
 [ "$RUN" = "1" ] && run_cmd "${cmd[@]}"
 

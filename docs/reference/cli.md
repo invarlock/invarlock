@@ -45,7 +45,7 @@ pip install "invarlock[hf]"
 invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject distilgpt2 \
-  --adapter auto \
+  --baseline-adapter auto --subject-adapter auto \
   --profile ci \
   --assurance strict
 
@@ -124,7 +124,8 @@ Common options:
 - `--subject`: subject checkpoint path or model ID
 - `--baseline-report`: reuse a stored baseline report by passing the explicit
   `report.json` file path that captured the baseline windows
-- `--adapter`: adapter name or `auto`
+- `--baseline-adapter`: baseline-side adapter name or `auto`
+- `--subject-adapter`: subject-side adapter name or `auto`
 - `--profile`: `ci`, `release`, or another included profile
 - `--tier`: tier label for policy context
 - `--preset`: optional repo preset path
@@ -145,7 +146,7 @@ Example:
 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject distilgpt2 \
-  --adapter auto \
+  --baseline-adapter auto --subject-adapter auto \
   --profile ci \
   --report-out reports/eval
 ```

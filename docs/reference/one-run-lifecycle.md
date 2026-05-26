@@ -20,7 +20,7 @@ The minimal end-to-end trace for a single comparison:
 invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject distilgpt2 \
-  --adapter auto \
+  --baseline-adapter auto --subject-adapter auto \
   --profile ci \
   --assurance strict \
   --report-out reports/eval
