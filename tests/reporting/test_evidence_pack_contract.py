@@ -530,8 +530,11 @@ def test_evidence_pack_metadata_consistency_helper_edges(tmp_path: Path) -> None
     )
     _write_json(deploy_report / "deployable_artifact_validation.json", {"ok": False})
     (deploy_report / "backend_inventory.json").write_text("[]", encoding="utf-8")
-    _write_json(deploy_report / "memory_report.json", {"ok": True})
-    _write_json(deploy_report / "load_smoke.json", {"ok": True})
+    _write_json(deploy_report / "memory_report.json", {"ok": False})
+    _write_json(
+        deploy_report / "load_smoke.json",
+        {"schema": "invarlock/deployable-load-smoke-v1", "ok": False},
+    )
     _write_json(deploy_report / "inference_smoke.json", {"ok": True})
 
     errors = edit_metadata_mod._verify_edit_metadata_consistency(pack_dir)
@@ -542,7 +545,19 @@ def test_evidence_pack_metadata_consistency_helper_edges(tmp_path: Path) -> None
         for error in errors
     )
     assert any(
-        "deployable artifact validation did not pass" in error for error in errors
+        "deployable sidecar did not pass: deployable_artifact_validation.json" in error
+        for error in errors
+    )
+    assert any(
+        "deployable sidecar did not pass: memory_report.json" in error
+        for error in errors
+    )
+    assert any(
+        "deployable sidecar schema mismatch (memory_report.json)" in error
+        for error in errors
+    )
+    assert any(
+        "deployable sidecar did not pass: load_smoke.json" in error for error in errors
     )
     assert any(
         "deploy_missing_report: deployable scenario has no deployability report sidecars"
@@ -569,7 +584,8 @@ def test_evidence_pack_metadata_consistency_skips_non_mapping_specs(
     assert edit_metadata_mod._verify_edit_metadata_consistency(pack_dir) == []
 
 
-def test_verify_reports_can_skip_nested_assurance(
+def test_verify_reports_runs_nested_verification_with_assurance_off(
+    monkeypatch,
     tmp_path: Path,
 ) -> None:
     pack_dir = _build_pack(
@@ -577,6 +593,29 @@ def test_verify_reports_can_skip_nested_assurance(
         report_rel_path="reports/model/clean/noop/evaluation.report.json",
     )
     json_out = tmp_path / "verify.json"
+    seen: list[tuple[list[Path], str, str]] = []
+
+    def fake_run_verify_command(
+        reports: list[Path], *, profile: str, report_assurance: str = "report"
+    ) -> VerifyExecutionResult:
+        seen.append((reports, profile, report_assurance))
+        return VerifyExecutionResult(
+            outcome=VerifyOutcome.OK,
+            payload={
+                "ok": True,
+                "profile": profile,
+                "report_assurance": report_assurance,
+                "reports": len(reports),
+            },
+            diagnostics=(),
+        )
+
+    monkeypatch.setattr(
+        evidence_pack_mod,
+        "_run_verify_command",
+        fake_run_verify_command,
+        raising=True,
+    )
 
     errors, payload = evidence_pack_mod._verify_reports(
         pack_dir,
@@ -588,21 +627,12 @@ def test_verify_reports_can_skip_nested_assurance(
     assert errors == []
     assert payload == {
         "ok": True,
-        "skipped": True,
-        "reason": "report_assurance_off",
+        "profile": "dev",
+        "report_assurance": "off",
         "reports": 1,
     }
     assert json.loads(json_out.read_text(encoding="utf-8")) == payload
-
-    errors, payload = evidence_pack_mod._verify_reports(
-        pack_dir,
-        json_out_path=None,
-        profile="dev",
-        report_assurance="off",
-    )
-
-    assert errors == []
-    assert payload["reason"] == "report_assurance_off"
+    assert seen[0][1:] == ("dev", "off")
 
 
 def test_evidence_pack_invalid_report_assurance_modes(tmp_path: Path) -> None:

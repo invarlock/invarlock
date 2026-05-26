@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 EDIT_METADATA_SCHEMA = "invarlock/evidence-pack-edit-metadata-v1"
 VALIDATION_SUBJECT_CHECKPOINT = "validation_subject_checkpoint"
@@ -17,6 +17,15 @@ DEPLOYABLE_SIDECARS = (
     "load_smoke.json",
     "inference_smoke.json",
 )
+DEPLOYABLE_SIDECAR_SCHEMAS = {
+    "deployable_artifact_validation.json": (
+        "invarlock/deployable-artifact-validation-v1"
+    ),
+    "backend_inventory.json": "invarlock/backend-inventory-v1",
+    "memory_report.json": "invarlock/deployable-memory-report-v1",
+    "load_smoke.json": "invarlock/deployable-load-smoke-v1",
+    "inference_smoke.json": "invarlock/deployable-inference-smoke-v1",
+}
 
 
 def _load_json(path: Path) -> Any:
@@ -148,6 +157,50 @@ def _metadata_consistency_errors(
     return errors
 
 
+def _deployable_sidecar_consistency_errors(
+    *,
+    scenario_id: str,
+    sidecar: str,
+    payload: dict[str, Any],
+) -> list[str]:
+    errors: list[str] = []
+    prefix = f"{scenario_id}: "
+    expected_schema = DEPLOYABLE_SIDECAR_SCHEMAS.get(sidecar)
+    if expected_schema and payload.get("schema") != expected_schema:
+        errors.append(
+            prefix
+            + f"deployable sidecar schema mismatch ({sidecar}): "
+            + f"expected {expected_schema!r}, got {payload.get('schema')!r}"
+        )
+
+    if sidecar == "deployable_artifact_validation.json":
+        if payload.get("ok") is not True:
+            errors.append(prefix + f"deployable sidecar did not pass: {sidecar}")
+        if payload.get("load_smoke") is not True:
+            errors.append(prefix + f"{sidecar} load_smoke must be true")
+        if payload.get("inference_smoke") is not True:
+            errors.append(prefix + f"{sidecar} inference_smoke must be true")
+    elif sidecar == "backend_inventory.json":
+        if "ok" in payload and payload.get("ok") is not True:
+            errors.append(prefix + f"deployable sidecar did not pass: {sidecar}")
+        if payload.get("load_smoke") is not True:
+            errors.append(prefix + f"{sidecar} load_smoke must be true")
+        if payload.get("inference_smoke") is not True:
+            errors.append(prefix + f"{sidecar} inference_smoke must be true")
+        quantized_count = payload.get("quantized_module_count")
+        if not isinstance(quantized_count, int) or quantized_count < 0:
+            errors.append(
+                prefix + f"{sidecar} quantized_module_count must be non-negative int"
+            )
+        if not isinstance(payload.get("quantized_module_types"), list):
+            errors.append(prefix + f"{sidecar} quantized_module_types must be a list")
+        if not isinstance(payload.get("memory_footprint"), dict):
+            errors.append(prefix + f"{sidecar} memory_footprint must be an object")
+    elif payload.get("ok") is not True:
+        errors.append(prefix + f"deployable sidecar did not pass: {sidecar}")
+    return errors
+
+
 def _verify_edit_metadata_consistency(pack_dir: Path) -> list[str]:
     errors: list[str] = []
     scenarios = _scenario_index_from_pack(pack_dir)
@@ -204,20 +257,19 @@ def _verify_edit_metadata_consistency(pack_dir: Path) -> list[str]:
                         f"{scenario_id}: deployable sidecar missing: {sidecar}"
                     )
                 else:
-                    _payload, sidecar_error = _load_json_sidecar(sidecar_path)
+                    payload, sidecar_error = _load_json_sidecar(sidecar_path)
                     if sidecar_error is not None:
                         errors.append(
                             f"{scenario_id}: deployable sidecar invalid "
                             f"({sidecar}): {sidecar_error}"
                         )
-                    elif (
-                        sidecar == "deployable_artifact_validation.json"
-                        and _payload is not None
-                        and _payload.get("ok") is not True
-                    ):
-                        errors.append(
-                            f"{scenario_id}: deployable artifact validation "
-                            "did not pass"
+                    else:
+                        errors.extend(
+                            _deployable_sidecar_consistency_errors(
+                                scenario_id=scenario_id,
+                                sidecar=sidecar,
+                                payload=cast(dict[str, Any], payload),
+                            )
                         )
 
     for scenario_id in sorted(deployable_scenarios - seen_deployable_reports):
@@ -237,6 +289,7 @@ __all__ = [
     "_infer_scenario_artifact_class",
     "_load_json_sidecar",
     "_metadata_consistency_errors",
+    "_deployable_sidecar_consistency_errors",
     "_report_scenario_id",
     "_scenario_index_from_pack",
     "_verify_edit_metadata_consistency",

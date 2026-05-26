@@ -48,6 +48,34 @@ EOF
     assert_file_exists "${verify_out}" "verify output written"
 }
 
+test_verify_pack_report_assurance_off_still_invokes_report_verify() {
+    mock_reset
+
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}/reports"
+    echo "{}" > "${pack_dir}/reports/evaluation.report.json"
+
+    local sha_cmd
+    sha_cmd="$(pack_sha256_cmd)"
+    (
+        cd "${pack_dir}"
+        ${sha_cmd} reports/evaluation.report.json > checksums.sha256
+    )
+
+    local checksums_digest
+    checksums_digest="$(cd "${pack_dir}" && python3 -c 'import hashlib;print(hashlib.sha256(open("checksums.sha256","rb").read()).hexdigest())' < /dev/null)"
+    printf '%s\n' "{\"format\":\"evidence-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
+
+    local verify_out="${TEST_TMPDIR}/verify-off.json"
+    run pack_verify_pack --pack "${pack_dir}" --report-assurance off --json-out "${verify_out}"
+
+    assert_rc "0" "${RUN_RC}" "report-assurance off still verifies report files"
+    assert_file_exists "${verify_out}" "verify output path is still used"
+    assert_match "--assurance off" "$(cat "${TEST_TMPDIR}/fixtures/invarlock.calls")" "nested verify uses assurance off"
+}
+
 test_verify_pack_errors_on_missing_args() {
     mock_reset
 

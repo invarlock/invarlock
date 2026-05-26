@@ -291,10 +291,6 @@ pack_verify_reports() {
         echo "ERROR: No reports found in pack." >&2
         return 1
     fi
-    if [[ "${report_assurance}" == "off" ]]; then
-        return 0
-    fi
-
     if [[ ${#reports_clean[@]} -eq 0 ]]; then
         echo "ERROR: No clean reports found in pack (only error-injection reports present)." >&2
         return 1

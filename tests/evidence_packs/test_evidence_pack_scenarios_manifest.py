@@ -68,6 +68,17 @@ def test_scenarios_declare_artifact_taxonomy() -> None:
             assert scenario.get("optimized_deployment_backend") is True
 
 
+def test_torchao_deployable_contract_is_marked_non_runnable() -> None:
+    scenarios = _load_scenarios()
+    by_id = {str(item.get("id")): item for item in scenarios}
+    scenario = by_id["deploy_torchao_int4_clean"]
+
+    assert scenario.get("artifact_class") == "deployable_optimized_subject"
+    assert scenario.get("runnable") is False
+    assert scenario.get("status") == "contract_placeholder"
+    assert isinstance(scenario.get("not_runnable_reason"), str)
+
+
 def test_scenarios_target_expected_guards_for_injection_probes() -> None:
     scenarios = _load_scenarios()
     by_id = {str(item.get("id")): item for item in scenarios}

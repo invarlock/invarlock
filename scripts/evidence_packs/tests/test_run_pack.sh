@@ -225,6 +225,47 @@ test_run_pack_entrypoint_release_review_sets_hardened_defaults() {
     unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
 }
 
+test_run_pack_release_review_rejects_dev_verify_profile() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    PACK_RELEASE_REVIEW=1
+    PACK_REQUIRE_PASS=1
+    PACK_VERIFY_PROFILE=dev
+    PACK_REPORT_ASSURANCE=strict
+    PACK_SIGN_MANIFEST=1
+    PACK_REQUIRE_RUNTIME_MANIFESTS=1
+    export PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
+    export PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+
+    run pack_validate_release_review_settings
+    assert_rc "1" "${RUN_RC}" "release-review rejects dev verify profile"
+    assert_match "PACK_VERIFY_PROFILE=dev" "${RUN_ERR}" "dev profile rejection is explicit"
+
+    unset PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
+    unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+}
+
+test_run_pack_release_review_cli_preserves_and_rejects_explicit_dev_profile() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    pack_entrypoint() { t_fail "pack_entrypoint should not run after dev profile rejection"; }
+    pack_build_pack() { t_fail "pack_build_pack should not run after dev profile rejection"; }
+
+    PACK_VERIFY_PROFILE=dev
+    export PACK_VERIFY_PROFILE
+
+    run pack_run_pack --release-review --out "${TEST_TMPDIR}/out"
+    assert_rc "1" "${RUN_RC}" "release-review CLI rejects explicit dev profile"
+    assert_match "PACK_VERIFY_PROFILE=dev" "${RUN_ERR}" "dev profile rejection is explicit"
+
+    unset PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
+    unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+}
+
 test_run_pack_build_pack_layout_v2_nests_results_and_metadata() {
     mock_reset
 

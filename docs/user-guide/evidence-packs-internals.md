@@ -218,8 +218,10 @@ not part of the default validation lanes. A deployable scenario must carry a
 backend contract (`packed_quantized_storage`, reload smoke, inference smoke,
 and memory/storage evidence) and package the corresponding sidecars into the
 evidence pack. The first scenario contract is `deploy_torchao_int4_clean`; it is
-opt-in and should be selected only in an environment with the required backend
-installed.
+marked `runnable: false` and is a contract placeholder until TorchAO generation,
+reload smoke, inference smoke, and memory/storage reporting are wired into the
+scheduler. Selecting it fails closed rather than producing partial deployable
+evidence.
 
 ### Error injection tests
 

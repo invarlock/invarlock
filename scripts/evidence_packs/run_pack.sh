@@ -324,11 +324,11 @@ pack_require_runtime_manifests() {
 }
 
 pack_apply_release_review_defaults() {
-    PACK_REQUIRE_PASS=1
-    PACK_VERIFY_PROFILE=ci
-    PACK_REPORT_ASSURANCE=strict
-    PACK_SIGN_MANIFEST=1
-    PACK_REQUIRE_RUNTIME_MANIFESTS=1
+    PACK_REQUIRE_PASS="${PACK_REQUIRE_PASS:-1}"
+    PACK_VERIFY_PROFILE="${PACK_VERIFY_PROFILE:-ci}"
+    PACK_REPORT_ASSURANCE="${PACK_REPORT_ASSURANCE:-strict}"
+    PACK_SIGN_MANIFEST="${PACK_SIGN_MANIFEST:-1}"
+    PACK_REQUIRE_RUNTIME_MANIFESTS="${PACK_REQUIRE_RUNTIME_MANIFESTS:-1}"
     PACK_RELEASE_REVIEW=1
     export PACK_REQUIRE_PASS PACK_VERIFY_PROFILE PACK_REPORT_ASSURANCE
     export PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS PACK_RELEASE_REVIEW
@@ -352,6 +352,10 @@ pack_validate_release_review_settings() {
     fi
     if [[ -z "${PACK_VERIFY_PROFILE:-}" ]]; then
         echo "ERROR: release-review mode requires explicit PACK_VERIFY_PROFILE." >&2
+        return 1
+    fi
+    if [[ "${PACK_VERIFY_PROFILE}" == "dev" ]]; then
+        echo "ERROR: release-review mode rejects PACK_VERIFY_PROFILE=dev." >&2
         return 1
     fi
     if [[ -z "${PACK_REPORT_ASSURANCE:-}" || "${PACK_REPORT_ASSURANCE}" == "off" ]]; then
@@ -759,6 +763,8 @@ pack_run_pack() {
     if [[ -n "${scenario_ids}" ]]; then
         run_args+=("--scenario-ids" "${scenario_ids}")
     fi
+
+    pack_validate_release_review_settings || return 1
 
     pack_entrypoint "${run_args[@]}"
     layout="$(pack_normalize_layout "${layout}")" || return $?

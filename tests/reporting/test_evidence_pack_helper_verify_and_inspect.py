@@ -191,6 +191,23 @@ def test_build_and_verify_evidence_pack_cover_usage_and_failure_paths(
     assert any("--report-assurance strict" in error for error in payload["errors"])
     assert any("--signing-key" in error for error in payload["errors"])
 
+    signing_key = tmp_path / "signing.key"
+    evidence_pack_mod._generate_signing_keypair(
+        signing_key,
+        public_key_path=signing_key.with_suffix(".pub"),
+    )
+    result = evidence_pack_mod.build_evidence_pack(
+        tmp_path / "out-release-review-dev-profile",
+        final_verdict_path=final_verdict,
+        report_paths=[report_path],
+        profile="dev",
+        report_assurance="strict",
+        signing_key_path=signing_key,
+        release_review=True,
+    )
+    assert result.status == evidence_pack_mod.EvidencePackStatus.USAGE
+    assert any("profile=dev" in error for error in result.payload["errors"])
+
     result = evidence_pack_mod.build_evidence_pack(
         tmp_path / "out-invalid-material",
         final_verdict_path=final_verdict,

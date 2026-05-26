@@ -289,21 +289,17 @@ Deployable edit scenarios are separate from the default validation suite. They
 are opt-in because backends such as TorchAO, bitsandbytes, GPTQ, and AWQ depend
 on specific PyTorch, CUDA, kernel, architecture, and package versions.
 
+The current `deploy_torchao_int4_clean` entry is a contract placeholder, not a
+runnable evidence-pack lane. The scenario records the required artifact shape
+and sidecars, but the scheduler does not yet generate or evaluate TorchAO
+deployable subjects. Selecting that scenario fails closed until a real generator
+and smoke-evaluation path are added.
+
 A deployable scenario must produce backend metadata, backend inventory,
 reload-smoke evidence, inference-smoke evidence, storage or memory evidence, an
 InvarLock evaluation report, and verification output. The evidence pack still
 does not include model weights unless explicitly configured; it includes
 digest-backed evidence about the deployable artifact that was validated.
-
-Use explicit scenario selection for deployable work:
-
-```bash
-PACK_INCLUDE_DEPLOYABLE_EDITS=1 \
-PACK_DEPLOY_BACKENDS=torchao \
-./scripts/evidence_packs/run_pack.sh \
-  --suite subset \
-  --scenario-ids deploy_torchao_int4_clean
-```
 
 ## Determinism
 

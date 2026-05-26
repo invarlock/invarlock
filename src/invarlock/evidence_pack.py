@@ -136,19 +136,6 @@ def _verify_reports(
     reports = sorted(pack_dir.glob("reports/**/evaluation.report.json"))
     if not reports:
         return ["No reports found in pack."], None
-    if report_assurance == "off":
-        verify_payload = {
-            "ok": True,
-            "skipped": True,
-            "reason": "report_assurance_off",
-            "reports": len(reports),
-        }
-        if json_out_path is not None:
-            json_out_path.write_text(
-                json.dumps(verify_payload, sort_keys=True) + "\n",
-                encoding="utf-8",
-            )
-        return [], verify_payload
     clean_reports = [path for path in reports if "/errors/" not in path.as_posix()]
     error_reports = [path for path in reports if path not in clean_reports]
     if not clean_reports:
@@ -258,8 +245,13 @@ def build_evidence_pack(
         )
         return EvidencePackResult(payload=payload, status=EvidencePackStatus.USAGE)
     if release_review:
-        if not profile:
+        normalized_profile = profile.strip().lower() if isinstance(profile, str) else ""
+        if not normalized_profile:
             errors.append("release-review build requires an explicit profile.")
+        elif normalized_profile == "dev":
+            errors.append(
+                "release-review build rejects profile=dev; use ci or a stricter profile."
+            )
         if report_assurance != "strict":
             errors.append("release-review build requires --report-assurance strict.")
         if signing_key_path is None:

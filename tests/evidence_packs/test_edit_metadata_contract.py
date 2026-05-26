@@ -5,10 +5,16 @@ import subprocess
 import sys
 from pathlib import Path
 
+from scripts.evidence_packs.python import (
+    validate_deployable_artifact as deployable_validator_mod,
+)
 from scripts.evidence_packs.python.edit_artifact_summary import (
     build_edit_artifact_summary,
 )
 from scripts.evidence_packs.python.edit_metadata import (
+    DEPLOYABLE_OPTIMIZED_SUBJECT,
+    EDIT_SEMANTICS_DEPLOYABLE,
+    build_edit_metadata,
     build_validation_edit_metadata,
     validate_edit_metadata,
 )
@@ -72,6 +78,136 @@ def test_validate_edit_artifact_require_metadata_json(tmp_path: Path) -> None:
     assert payload["ok"] is True
     assert payload["has_metadata"] is True
     assert payload["artifact_class"] == "validation_subject_checkpoint"
+
+
+def _deployable_metadata() -> dict[str, object]:
+    return build_edit_metadata(
+        edit_type="torchao_int4",
+        scope="ffn",
+        artifact_class=DEPLOYABLE_OPTIMIZED_SUBJECT,
+        edit_semantics=EDIT_SEMANTICS_DEPLOYABLE,
+        optimized_deployment_backend=True,
+        backend="torchao",
+        storage_format="torchao_int4_packed",
+        actual_storage_format="torchao_int4_packed",
+        packed_quantized_storage=True,
+        runtime_memory_reduction=True,
+        runtime_memory_reduction_expected=True,
+        parameters={"bits": 4},
+        coverage={"edited_tensors": 1, "edited_params": 1, "total_params": 1},
+    )
+
+
+def _write_deployable_sidecars(report_dir: Path) -> None:
+    report_dir.mkdir(parents=True, exist_ok=True)
+    (report_dir / "backend_inventory.json").write_text(
+        json.dumps(
+            {
+                "schema": "invarlock/backend-inventory-v1",
+                "adapter": "torchao",
+                "backend": "torchao",
+                "backend_version": "0.1",
+                "transformers_version": "1.0",
+                "quantization_config": {"bits": 4},
+                "quantized_module_count": 1,
+                "quantized_module_types": ["torchao.Int4Linear"],
+                "device_map": "cuda:0",
+                "memory_footprint": {
+                    "reported_bytes": 1024,
+                    "method": "get_memory_footprint",
+                },
+                "load_smoke": True,
+                "inference_smoke": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (report_dir / "memory_report.json").write_text(
+        json.dumps(
+            {
+                "schema": "invarlock/deployable-memory-report-v1",
+                "ok": True,
+                "runtime_memory_reduction_observed": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (report_dir / "load_smoke.json").write_text(
+        json.dumps({"schema": "invarlock/deployable-load-smoke-v1", "ok": True}),
+        encoding="utf-8",
+    )
+    (report_dir / "inference_smoke.json").write_text(
+        json.dumps({"schema": "invarlock/deployable-inference-smoke-v1", "ok": True}),
+        encoding="utf-8",
+    )
+
+
+def test_validate_deployable_artifact_checks_sidecar_schemas_and_ok(
+    monkeypatch, tmp_path: Path
+) -> None:
+    artifact = tmp_path / "deployable"
+    report_dir = tmp_path / "report"
+    _write_minimal_artifact(artifact, _deployable_metadata())
+    _write_deployable_sidecars(report_dir)
+    monkeypatch.setattr(
+        deployable_validator_mod,
+        "_package_version",
+        lambda _package_name: "0.1",
+        raising=True,
+    )
+
+    payload = deployable_validator_mod.validate_deployable_artifact(
+        artifact,
+        backend="torchao",
+        report_dir=report_dir,
+        smoke=True,
+    )
+
+    assert payload["ok"] is True
+    assert payload["load_smoke"] is True
+    assert payload["inference_smoke"] is True
+    assert payload["runtime_memory_reduction_observed"] is True
+
+    (report_dir / "load_smoke.json").write_text(
+        json.dumps({"schema": "invarlock/deployable-load-smoke-v1", "ok": False}),
+        encoding="utf-8",
+    )
+    payload = deployable_validator_mod.validate_deployable_artifact(
+        artifact,
+        backend="torchao",
+        report_dir=report_dir,
+        smoke=True,
+    )
+    assert payload["ok"] is False
+    assert payload["load_smoke"] is False
+    assert "load_smoke.json ok must be true" in payload["issues"]
+
+    _write_deployable_sidecars(report_dir)
+    (report_dir / "backend_inventory.json").write_text(
+        json.dumps(
+            {
+                "schema": "wrong",
+                "backend": "torchao",
+                "load_smoke": True,
+                "inference_smoke": True,
+                "quantized_module_count": 1,
+                "quantized_module_types": [],
+                "memory_footprint": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+    payload = deployable_validator_mod.validate_deployable_artifact(
+        artifact,
+        backend="torchao",
+        report_dir=report_dir,
+        smoke=True,
+    )
+    assert payload["ok"] is False
+    assert any(
+        issue.startswith("backend_inventory.json schema mismatch")
+        for issue in payload["issues"]
+    )
 
 
 def test_edit_artifact_summary_counts_scenario_taxonomy(tmp_path: Path) -> None:

@@ -3316,6 +3316,62 @@ EOF
     assert_eq "deploy_torchao,quant_4bit_clean" "${ids}" "deployable scenarios honor backend filter"
 }
 
+test_pack_prepare_scenarios_manifest_rejects_non_runnable_deployable() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/evidence_packs/lib/validation_suite.sh
+    pack_setup_output_dirs
+
+    local manifest="${TEST_TMPDIR}/scenarios-non-runnable.json"
+    cat > "${manifest}" <<'EOF'
+{
+  "_meta": {},
+  "schema": "evidence_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "deploy_torchao", "category": "deployable_clean", "artifact_class": "deployable_optimized_subject", "strictness": "must_pass", "runnable": false, "generation": {"kind": "deployable_edit", "backend": "torchao", "edit_spec": "torchao_int4:clean:ffn", "version": "clean"}, "suites": ["deployable"]}
+  ]
+}
+EOF
+    local PACK_SCENARIOS_MANIFEST_FILE="${manifest}"
+    local PACK_INCLUDE_DEPLOYABLE_EDITS="1"
+    local PACK_DEPLOY_BACKENDS="torchao"
+
+    local rc=0
+    ( pack_prepare_scenarios_manifest ) || rc=$?
+    assert_ne "0" "${rc}" "non-runnable deployable scenario fails closed"
+    assert_match "contract placeholders and are not runnable yet: deploy_torchao" "$(cat "${OUTPUT_DIR}/logs/main.log")" "non-runnable reason is logged"
+}
+
+test_pack_prepare_scenarios_manifest_rejects_non_runnable_deployable_without_jq() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/evidence_packs/lib/validation_suite.sh
+    _pack_validation_has_jq() { return 1; }
+    pack_setup_output_dirs
+
+    local manifest="${TEST_TMPDIR}/scenarios-non-runnable-no-jq.json"
+    cat > "${manifest}" <<'EOF'
+{
+  "_meta": {},
+  "schema": "evidence_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "deploy_torchao", "category": "deployable_clean", "artifact_class": "deployable_optimized_subject", "strictness": "must_pass", "runnable": false, "generation": {"kind": "deployable_edit", "backend": "torchao", "edit_spec": "torchao_int4:clean:ffn", "version": "clean"}, "suites": ["deployable"]}
+  ]
+}
+EOF
+    local PACK_SCENARIOS_MANIFEST_FILE="${manifest}"
+    local PACK_INCLUDE_DEPLOYABLE_EDITS="1"
+
+    local rc=0
+    ( pack_prepare_scenarios_manifest ) || rc=$?
+    assert_ne "0" "${rc}" "non-runnable deployable scenario fails closed without jq"
+    assert_match "contract placeholders and are not runnable yet: deploy_torchao" "$(cat "${OUTPUT_DIR}/logs/main.log")" "non-runnable reason is logged without jq"
+}
+
 test_pack_prepare_scenarios_manifest_resume_errors_on_contract_drift() {
     mock_reset
 

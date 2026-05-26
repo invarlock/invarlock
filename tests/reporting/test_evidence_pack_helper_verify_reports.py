@@ -198,14 +198,11 @@ def test_verify_reports_and_inspect_cover_error_paths(
         profile="dev",
         report_assurance="off",
     )
-    assert errors == []
-    assert payload == {
-        "ok": True,
-        "skipped": True,
-        "reason": "report_assurance_off",
-        "reports": 1,
-    }
-    assert json.loads(json_out_off.read_text(encoding="utf-8")) == payload
+    assert errors == [
+        "No clean reports found in pack (only error-injection reports present)."
+    ]
+    assert payload is None
+    assert not json_out_off.exists()
 
     pack_dir = tmp_path / "pack"
     report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)

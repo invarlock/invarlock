@@ -104,6 +104,43 @@ _pack_validation_has_jq() {
     command -v jq >/dev/null 2>&1
 }
 
+pack_non_runnable_deployable_ids() {
+    local scenarios_file="$1"
+    if _pack_validation_has_jq; then
+        jq -r '.scenarios[]
+            | select(.generation.kind=="deployable_edit")
+            | select(.runnable == false)
+            | .id' "${scenarios_file}" 2>/dev/null | paste -sd ',' -
+        return 0
+    fi
+    python3 - "${scenarios_file}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+try:
+    payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+except Exception:
+    print("")
+    raise SystemExit(0)
+
+ids = []
+for scenario in payload.get("scenarios", []):
+    if not isinstance(scenario, dict):
+        continue
+    generation = scenario.get("generation")
+    if (
+        isinstance(generation, dict)
+        and generation.get("kind") == "deployable_edit"
+        and scenario.get("runnable") is False
+    ):
+        scenario_id = scenario.get("id")
+        if isinstance(scenario_id, str) and scenario_id:
+            ids.append(scenario_id)
+print(",".join(ids))
+PY
+}
+
 pack_read_final_verdict() {
     local verdict_path="$1"
     python3 - "${verdict_path}" <<'PY'
@@ -713,6 +750,13 @@ pack_prepare_scenarios_manifest() {
                 rm -f "${rendered}"
                 error_exit "Resume run scenario manifest differs from the current contract; start a fresh OUTPUT_DIR instead of --resume."
             fi
+        fi
+
+        local non_runnable_deployable
+        non_runnable_deployable="$(pack_non_runnable_deployable_ids "${rendered}")"
+        if [[ -n "${non_runnable_deployable}" ]]; then
+            rm -f "${rendered}"
+            error_exit "Deployable scenario(s) are contract placeholders and are not runnable yet: ${non_runnable_deployable}"
         fi
 
         mv "${rendered}" "${dest}"

@@ -17,6 +17,17 @@ except ImportError:  # pragma: no cover - direct module load under pytest
     from validate_edit_artifact import validate_edit_artifact
 
 DEPLOYABLE_VALIDATION_SCHEMA = "invarlock/deployable-artifact-validation-v1"
+BACKEND_INVENTORY_SCHEMA = "invarlock/backend-inventory-v1"
+MEMORY_REPORT_SCHEMA = "invarlock/deployable-memory-report-v1"
+LOAD_SMOKE_SCHEMA = "invarlock/deployable-load-smoke-v1"
+INFERENCE_SMOKE_SCHEMA = "invarlock/deployable-inference-smoke-v1"
+
+REQUIRED_SIDECAR_SCHEMAS = {
+    "backend_inventory.json": BACKEND_INVENTORY_SCHEMA,
+    "memory_report.json": MEMORY_REPORT_SCHEMA,
+    "load_smoke.json": LOAD_SMOKE_SCHEMA,
+    "inference_smoke.json": INFERENCE_SMOKE_SCHEMA,
+}
 
 
 def _package_version(package_name: str) -> str | None:
@@ -54,6 +65,47 @@ def _metadata_issues(metadata: dict[str, Any], backend: str | None) -> list[str]
     return issues
 
 
+def _sidecar_issues(
+    sidecar: str,
+    payload: dict[str, Any],
+    *,
+    backend: str | None,
+) -> list[str]:
+    issues: list[str] = []
+    expected_schema = REQUIRED_SIDECAR_SCHEMAS[sidecar]
+    if payload.get("schema") != expected_schema:
+        issues.append(
+            f"{sidecar} schema mismatch: expected {expected_schema!r}, "
+            f"got {payload.get('schema')!r}"
+        )
+    if sidecar == "backend_inventory.json":
+        if "ok" in payload and payload.get("ok") is not True:
+            issues.append(f"{sidecar} ok must be true")
+        if backend and payload.get("backend") != backend:
+            issues.append(
+                f"{sidecar} backend mismatch: expected {backend!r}, "
+                f"got {payload.get('backend')!r}"
+            )
+        if payload.get("load_smoke") is not True:
+            issues.append(f"{sidecar} load_smoke must be true")
+        if payload.get("inference_smoke") is not True:
+            issues.append(f"{sidecar} inference_smoke must be true")
+        quantized_count = payload.get("quantized_module_count")
+        if not isinstance(quantized_count, int) or quantized_count < 0:
+            issues.append(f"{sidecar} quantized_module_count must be non-negative int")
+        module_types = payload.get("quantized_module_types")
+        if not isinstance(module_types, list):
+            issues.append(f"{sidecar} quantized_module_types must be a list")
+        memory_footprint = payload.get("memory_footprint")
+        if not isinstance(memory_footprint, dict):
+            issues.append(f"{sidecar} memory_footprint must be an object")
+        return issues
+
+    if payload.get("ok") is not True:
+        issues.append(f"{sidecar} ok must be true")
+    return issues
+
+
 def validate_deployable_artifact(
     artifact_dir: Path,
     *,
@@ -85,26 +137,29 @@ def validate_deployable_artifact(
     if resolved_backend and backend_version is None:
         issues.append(f"backend package not importable: {resolved_backend}")
 
-    sidecar_checks: dict[str, bool] = {}
+    sidecar_payloads: dict[str, dict[str, Any]] = {}
     if report_dir is not None:
-        for sidecar in (
-            "backend_inventory.json",
-            "memory_report.json",
-            "load_smoke.json",
-            "inference_smoke.json",
-        ):
+        for sidecar in REQUIRED_SIDECAR_SCHEMAS:
             payload = _load_json_object(report_dir / sidecar)
-            sidecar_checks[sidecar] = payload is not None
             if payload is None:
                 issues.append(f"missing or invalid report sidecar: {sidecar}")
+                continue
+            sidecar_payloads[sidecar] = payload
+            issues.extend(
+                _sidecar_issues(sidecar, payload, backend=resolved_backend or None)
+            )
 
     # This validator is intentionally conservative. Heavy reload/inference smoke
     # should be produced by backend-specific generators and passed as sidecars.
     load_smoke = (
-        bool(sidecar_checks.get("load_smoke.json")) if report_dir else not smoke
+        sidecar_payloads.get("load_smoke.json", {}).get("ok") is True
+        if report_dir
+        else not smoke
     )
     inference_smoke = (
-        bool(sidecar_checks.get("inference_smoke.json")) if report_dir else not smoke
+        sidecar_payloads.get("inference_smoke.json", {}).get("ok") is True
+        if report_dir
+        else not smoke
     )
     if smoke and report_dir is None:
         issues.append(
@@ -122,7 +177,10 @@ def validate_deployable_artifact(
         "inference_smoke": inference_smoke,
         "packed_quantized_storage": metadata.get("packed_quantized_storage") is True,
         "runtime_memory_reduction_observed": bool(
-            metadata.get("runtime_memory_reduction")
+            sidecar_payloads.get("memory_report.json", {}).get(
+                "runtime_memory_reduction_observed"
+            )
+            or metadata.get("runtime_memory_reduction")
         ),
         "issues": issues,
     }
