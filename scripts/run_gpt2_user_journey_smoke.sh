@@ -135,21 +135,31 @@ copy_cached_tree_if_present() {
   fi
 }
 
+has_seeded_wikitext_cache() {
+  [[ -d "$SMOKE_CACHE_ROOT/hub/datasets--Salesforce--wikitext" ]] || \
+    [[ -d "$SMOKE_CACHE_ROOT/hub/datasets--wikitext" ]] || \
+    [[ -d "$SMOKE_CACHE_ROOT/datasets/Salesforce___wikitext/wikitext-2-raw-v1" ]] || \
+    [[ -d "$SMOKE_CACHE_ROOT/datasets/wikitext/wikitext-2-raw-v1" ]]
+}
+
 seed_hf_cache_from_host() {
   local seeded=0
   copy_cached_tree_if_present "$HOST_HF_CACHE_ROOT/hub/models--gpt2" "$SMOKE_CACHE_ROOT/hub/models--gpt2"
+  copy_cached_tree_if_present "$HOST_HF_CACHE_ROOT/hub/datasets--Salesforce--wikitext" "$SMOKE_CACHE_ROOT/hub/datasets--Salesforce--wikitext"
   copy_cached_tree_if_present "$HOST_HF_CACHE_ROOT/hub/datasets--wikitext" "$SMOKE_CACHE_ROOT/hub/datasets--wikitext"
+  copy_cached_tree_if_present \
+    "$HOST_HF_CACHE_ROOT/datasets/Salesforce___wikitext/wikitext-2-raw-v1" \
+    "$SMOKE_CACHE_ROOT/datasets/Salesforce___wikitext/wikitext-2-raw-v1"
   copy_cached_tree_if_present \
     "$HOST_HF_CACHE_ROOT/datasets/wikitext/wikitext-2-raw-v1" \
     "$SMOKE_CACHE_ROOT/datasets/wikitext/wikitext-2-raw-v1"
-  if [[ -d "$SMOKE_CACHE_ROOT/hub/models--gpt2" || -d "$SMOKE_CACHE_ROOT/hub/datasets--wikitext" || -d "$SMOKE_CACHE_ROOT/datasets/wikitext/wikitext-2-raw-v1" ]]; then
+  if [[ -d "$SMOKE_CACHE_ROOT/hub/models--gpt2" ]] || has_seeded_wikitext_cache; then
     seeded=1
   fi
   if [[ "$seeded" != "1" ]]; then
     return 1
   fi
-  if [[ -d "$SMOKE_CACHE_ROOT/hub/models--gpt2" ]] && \
-    [[ -d "$SMOKE_CACHE_ROOT/hub/datasets--wikitext" || -d "$SMOKE_CACHE_ROOT/datasets/wikitext/wikitext-2-raw-v1" ]]; then
+  if [[ -d "$SMOKE_CACHE_ROOT/hub/models--gpt2" ]] && has_seeded_wikitext_cache; then
     export INVARLOCK_SMOKE_CACHE_COMPLETE=1
   fi
   return 0
@@ -172,7 +182,7 @@ MODEL_ID = "gpt2"
 
 AutoTokenizer.from_pretrained(MODEL_ID)
 AutoModelForCausalLM.from_pretrained(MODEL_ID)
-load_dataset("wikitext", "wikitext-2-raw-v1", split="validation")
+load_dataset("Salesforce/wikitext", "wikitext-2-raw-v1", split="validation")
 PY
 }
 

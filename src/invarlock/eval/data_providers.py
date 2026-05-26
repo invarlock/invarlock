@@ -120,7 +120,7 @@ class WikiText2Provider:
 
         dataset_slice = f"{split}[:{max_samples}]" if max_samples > 0 else split
         dataset = load_dataset_with_cache_fallback(
-            "wikitext",
+            "Salesforce/wikitext",
             "wikitext-2-raw-v1",
             split=dataset_slice,
             cache_dir=str(self.cache_dir) if self.cache_dir else None,
@@ -492,7 +492,7 @@ class HFTextProvider:
         _require_load_dataset(
             "DEPENDENCY-MISSING: datasets library required for hf_text provider"
         )
-        self.dataset_name = dataset_name or "wikitext"
+        self.dataset_name = dataset_name or "Salesforce/wikitext"
         self.config_name = config_name or None
         self.text_field = text_field
         self.cache_dir = cache_dir

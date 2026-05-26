@@ -111,7 +111,7 @@ Provider-specific config fields (dataset name, paths, fields) are recorded under
 ```yaml
 dataset:
   provider: hf_text
-  dataset_name: wikitext
+  dataset_name: Salesforce/wikitext
   config_name: wikitext-2-raw-v1
   text_field: text
   split: validation
