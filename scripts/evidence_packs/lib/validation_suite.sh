@@ -10,9 +10,9 @@
 #
 # EDIT TYPES (4 types × 2 versions = 8 tests per model):
 # - Quantization RTN (group-wise): clean tuned preset per model, 4-bit stress
-# - FP8 Quantization: clean tuned preset per model, E5M2 stress
-# - Magnitude Pruning: clean tuned preset per model, 50% stress
-# - Low-Rank SVD: clean tuned preset per model, rank-32 stress
+# - FP8 dequantized external-subject simulation: clean tuned preset per model, E5M2 stress
+# - Dense magnitude-pruned validation checkpoint: clean tuned preset per model, 50% stress
+# - Dense low-rank-SVD approximated validation checkpoint: clean tuned preset per model, rank-32 stress
 #
 # MODEL SUITES:
 # - Defined in scripts/evidence_packs/suites.sh (ungated-only models).
@@ -696,12 +696,14 @@ pack_prepare_scenarios_manifest() {
         local rendered="${OUTPUT_DIR}/state/.scenarios.json.rendered.$$"
         local suite="${PACK_SUITE:-subset}"
         local scenario_ids_csv="${PACK_SCENARIO_IDS:-}"
-        local jq_filter='def suites_ok($suite): ((.suites? | type) != "array") or ((.suites | length) == 0) or ((.suites | index($suite)) != null); def trim: gsub("^\\s+|\\s+$"; ""); def ids($csv): ($csv | split(",") | map(trim) | map(select(length>0))); ._meta = (._meta | if type=="object" then . else {} end) | ._meta.applied_suite = $suite | (ids($scenario_ids_csv)) as $ids | if ($ids | length) > 0 then ._meta.scenario_ids_filter = $ids else . end | .scenarios = [.scenarios[] | select(suites_ok($suite)) | select(($ids | length) == 0 or (.id as $id | ($ids | index($id)) != null))]'
+        local include_deployable="${PACK_INCLUDE_DEPLOYABLE_EDITS:-0}"
+        local deploy_backends_csv="${PACK_DEPLOY_BACKENDS:-}"
+        local jq_filter='def suites_ok($suite): ((.suites? | type) != "array") or ((.suites | length) == 0) or ((.suites | index($suite)) != null); def trim: gsub("^\\s+|\\s+$"; ""); def ids($csv): ($csv | split(",") | map(trim) | map(select(length>0))); def truthy($v): ($v | ascii_downcase) as $x | ($x == "1" or $x == "true" or $x == "yes" or $x == "on"); def deployable: ((.artifact_class // "") == "deployable_optimized_subject") or ((.generation.kind // "") == "deployable_edit") or ((.category // "") | startswith("deployable_")); def backend_allowed($csv): (ids($csv)) as $backends | (.generation.backend // .backend // "") as $backend | (($backends | length) == 0 or ($backends | index($backend)) != null); ._meta = (._meta | if type=="object" then . else {} end) | ._meta.applied_suite = $suite | (ids($scenario_ids_csv)) as $ids | if ($ids | length) > 0 then ._meta.scenario_ids_filter = $ids else . end | .scenarios = [.scenarios[] | (.id as $id | (($ids | index($id)) != null)) as $explicit | (deployable and truthy($include_deployable) and backend_allowed($deploy_backends_csv)) as $deploy_enabled | select($explicit or suites_ok($suite) or $deploy_enabled) | select(($ids | length) == 0 or $explicit) | select((deployable | not) or $explicit or $deploy_enabled)]'
 
         if _pack_validation_has_jq; then
             # Scenarios can optionally declare `suites: ["subset", "full", ...]`.
             # When present, the manifest is filtered to just the active PACK_SUITE.
-            jq --arg suite "${suite}" --arg scenario_ids_csv "${scenario_ids_csv}" "${jq_filter}" "${src}" > "${rendered}"
+            jq --arg suite "${suite}" --arg scenario_ids_csv "${scenario_ids_csv}" --arg include_deployable "${include_deployable}" --arg deploy_backends_csv "${deploy_backends_csv}" "${jq_filter}" "${src}" > "${rendered}"
         else
             cp "${src}" "${rendered}"
         fi

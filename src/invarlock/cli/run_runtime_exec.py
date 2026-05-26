@@ -4,13 +4,19 @@ from __future__ import annotations
 
 import copy
 import inspect
+import json
 import math
 import os
 import shutil
+from pathlib import Path
 from typing import Any
 
 from invarlock.cli.run_runtime import free_model_memory, get_psutil
 from invarlock.cli.run_warning_filters import suppress_noisy_warnings
+from invarlock.core.backend_inventory import (
+    BACKEND_INVENTORY_FILENAME,
+    build_backend_inventory_for_adapter,
+)
 from invarlock.core.exceptions import InvarlockError
 from invarlock.core.run_policy import GUARD_OVERHEAD_THRESHOLD
 from invarlock.core.run_snapshot_contract import (
@@ -43,6 +49,50 @@ def _require_snapshot_reuse_model(*, model: Any, phase: str) -> Any:
             f"Snapshot reuse requested for {phase} without a live model instance."
         )
     return model
+
+
+def _capture_backend_inventory(
+    *,
+    adapter: Any,
+    cfg: Any,
+    model: Any,
+    run_config: Any,
+) -> None:
+    try:
+        from invarlock.cli.run_config import extract_model_load_kwargs
+
+        load_kwargs = extract_model_load_kwargs(
+            cfg,
+            invarlock_error_cls=InvarlockError,
+        )
+    except (AttributeError, KeyError, TypeError, ValueError, InvarlockError):
+        load_kwargs = {}
+    quantization_config = load_kwargs.get("quantization_config")
+    adapter_name = str(getattr(adapter, "name", "") or "")
+    inventory = build_backend_inventory_for_adapter(
+        adapter=adapter_name,
+        quantization_config=(
+            quantization_config if isinstance(quantization_config, dict) else {}
+        ),
+        model=model,
+    )
+    if inventory is None:
+        return
+    context = getattr(run_config, "context", None)
+    if isinstance(context, dict):
+        context["_backend_inventory"] = inventory
+    event_path = getattr(run_config, "event_path", None)
+    if event_path is None:
+        return
+    try:
+        output_dir = Path(event_path).parent
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / BACKEND_INVENTORY_FILENAME).write_text(
+            json.dumps(inventory, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+    except (OSError, TypeError, ValueError):
+        return
 
 
 def build_snapshot_execution_plan(
@@ -191,6 +241,12 @@ def run_bare_control(
     edit_runtime = EditRuntime(
         profile=profile_normalized,
         verbose=bool(getattr(run_config, "verbose", False)),
+    )
+    _capture_backend_inventory(
+        adapter=adapter,
+        cfg=cfg,
+        model=model,
+        run_config=run_config,
     )
 
     private_model_loaded = False
@@ -370,6 +426,12 @@ def execute_guarded_run(
     edit_runtime = EditRuntime(
         profile=profile_normalized,
         verbose=bool(getattr(run_config, "verbose", False)),
+    )
+    _capture_backend_inventory(
+        adapter=adapter,
+        cfg=cfg,
+        model=model,
+        run_config=run_config,
     )
 
     with suppress_noisy_warnings(

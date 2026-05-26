@@ -56,6 +56,10 @@ class PluginInfo:
     package: str | None = None
     version: str | None = None
     entry_point: Any | None = None
+    support_tier: str = "third_party"
+    strict_assurance_allowed: bool = False
+    published_basis: bool = False
+    deployment_claim: bool = False
 
 
 def _select_entry_points(eps: Any, group: str) -> list[EntryPoint]:
@@ -161,6 +165,12 @@ class CoreRegistry:
                     spec.class_name,
                     required_deps=list(spec.required_deps) or None,
                 )
+                registry[spec.name].support_tier = spec.support_tier
+                registry[
+                    spec.name
+                ].strict_assurance_allowed = spec.strict_assurance_allowed
+                registry[spec.name].published_basis = spec.published_basis
+                registry[spec.name].deployment_claim = spec.deployment_claim
 
     def _register_entry_points(
         self,
@@ -398,6 +408,10 @@ class CoreRegistry:
             "version": info.version,
             "entry_point": info.entry_point.name if info.entry_point else None,
             "entry_point_group": entry_group if info.entry_point else None,
+            "support_tier": info.support_tier,
+            "strict_assurance_allowed": info.strict_assurance_allowed,
+            "published_basis": info.published_basis,
+            "deployment_claim": info.deployment_claim,
         }
 
     def get_plugin_metadata(self, name: str, plugin_type: str) -> dict[str, Any]:

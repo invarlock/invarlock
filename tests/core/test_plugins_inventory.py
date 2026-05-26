@@ -99,6 +99,17 @@ def test_gather_adapter_inventory_rows_and_json_payloads() -> None:
     bnb_item = next(item for item in json_items if item["name"] == "hf_bnb")
     assert bnb_item["status"] == "needs_extra"
     assert bnb_item["backend"] == {"name": "bitsandbytes", "present": False}
+    assert bnb_item["support_tier"] == "optional_backend_loader"
+    assert bnb_item["deployment_claim"] is False
+
+
+def test_filter_inventory_rows_support_tier_modes() -> None:
+    rows = [
+        {"name": "spectral", "support_tier": "core_supported", "status": "ready"},
+        {"name": "hello", "support_tier": "demo_only", "status": "ready"},
+    ]
+
+    assert filter_inventory_rows(rows, "demo_only") == [rows[1]]
 
 
 def test_gather_generic_and_combined_inventory_payloads() -> None:
@@ -122,6 +133,8 @@ def test_gather_generic_and_combined_inventory_payloads() -> None:
 
     assert any(item["kind"] == "guard" for item in combined)
     assert any(item["origin"] == "third_party" for item in combined)
+    quant_item = next(item for item in combined if item["name"] == "quant_rtn")
+    assert quant_item["support_tier"] == "validation_simulation"
 
 
 def test_gather_adapter_inventory_rows_tolerates_probe_failures() -> None:

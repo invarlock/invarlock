@@ -140,6 +140,7 @@ class _AttemptExecutionState:
     edit_config: Any
     guard_overhead_payload: dict[str, Any] | None
     core_report: Any | None
+    model: Any | None
     should_continue: bool
 
 

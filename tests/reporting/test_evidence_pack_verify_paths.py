@@ -140,7 +140,12 @@ def test_verify_reports_success_writes_json_and_records_error_injection(
     (error_dir / "evaluation.report.json").write_text("{}", encoding="utf-8")
     json_out = tmp_path / "verify.json"
 
-    def _fake_run_verify(reports: list[Path], *, profile: str) -> VerifyExecutionResult:
+    def _fake_run_verify(
+        reports: list[Path],
+        *,
+        profile: str,
+        report_assurance: str = "report",
+    ) -> VerifyExecutionResult:
         if "errors" in reports[0].as_posix():
             return VerifyExecutionResult(
                 outcome=VerifyOutcome.OK,
@@ -161,7 +166,10 @@ def test_verify_reports_success_writes_json_and_records_error_injection(
     )
 
     errors, payload = evidence_pack_mod._verify_reports(
-        pack_dir, json_out_path=json_out, profile="release"
+        pack_dir,
+        json_out_path=json_out,
+        profile="release",
+        report_assurance="report",
     )
 
     assert errors == []
@@ -211,11 +219,16 @@ def test_verify_evidence_pack_covers_success_integrity_and_report_failure_paths(
     seen: dict[str, object] = {}
 
     def _success_verify_reports(
-        pack_dir: Path, *, json_out_path: Path | None, profile: str
+        pack_dir: Path,
+        *,
+        json_out_path: Path | None,
+        profile: str,
+        report_assurance: str = "report",
     ) -> tuple[list[str], dict[str, object]]:
         seen["pack_dir"] = pack_dir
         seen["json_out_path"] = json_out_path
         seen["profile"] = profile
+        seen["report_assurance"] = report_assurance
         return [], {"ok": True}
 
     monkeypatch.setattr(
@@ -248,6 +261,7 @@ def test_verify_evidence_pack_covers_success_integrity_and_report_failure_paths(
         "pack_dir": pack_success,
         "json_out_path": json_out,
         "profile": "release",
+        "report_assurance": "report",
     }
 
     pack_integrity = tmp_path / "integrity"
@@ -269,7 +283,10 @@ def test_verify_evidence_pack_covers_success_integrity_and_report_failure_paths(
     monkeypatch.setattr(
         evidence_pack_mod,
         "_verify_reports",
-        lambda pack_dir, *, json_out_path, profile: (["verify failed"], {"ok": False}),
+        lambda pack_dir, *, json_out_path, profile, report_assurance="report": (
+            ["verify failed"],
+            {"ok": False},
+        ),
         raising=True,
     )
     reports_result = evidence_pack_mod.verify_evidence_pack(

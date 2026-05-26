@@ -262,11 +262,15 @@ def _attach_primary_metric_from_report(
             if not original_display_present and _is_finite_numeric_interval(
                 final_display_value
             ):
+                final_ci = final_primary_metric.get("ci")
+                reason = "computed_from_primary_metric_point"
+                if _is_finite_numeric_interval(final_ci):
+                    reason = "computed_from_primary_metric_ci"
                 record_report_build_event(
                     evaluation_report,
                     category="synthesized_fields",
                     field="primary_metric.display_ci",
-                    reason="computed_from_primary_metric_point_or_ci",
+                    reason=reason,
                     source="primary_metric_utils._attach_primary_metric_from_report",
                 )
             if (

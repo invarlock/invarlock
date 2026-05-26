@@ -300,6 +300,7 @@ def test_process_attempt_result_maps_halt_invarlock_errors() -> None:
                 edit_config={},
                 guard_overhead_payload=None,
                 core_report=SimpleNamespace(status="success"),
+                model=None,
                 should_continue=False,
             ),
             timings={},

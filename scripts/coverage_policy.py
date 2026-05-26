@@ -66,6 +66,7 @@ THRESHOLDS = {
     # Advanced evidence-pack packaging/inspection coverage now exercises the
     # command shell branch-completely; keep the command surface held there.
     "src/invarlock/evidence_pack.py": 1.00,
+    "src/invarlock/evidence_pack_edit_metadata.py": 1.00,
     "src/invarlock/reporting/evidence.py": 1.00,
     "src/invarlock/reporting/verify_output.py": 1.00,
     "src/invarlock/cli/commands/policy.py": 1.00,
@@ -205,6 +206,11 @@ THRESHOLDS = {
     "src/invarlock/evidence_pack_metadata.py": 1.00,
 }
 
+# Every file on the enforced critical surface is branch-complete. Keep the
+# per-file table explicit for auditability, but normalize any historical lower
+# floors to the current ratchet.
+THRESHOLDS = dict.fromkeys(THRESHOLDS, 1.00)
+
 # Default floors (applied only to core classification; non-core modules are not
 # globally enforced unless explicitly listed in THRESHOLDS).
 CORE_FLOOR_DEFAULT = 0.90
@@ -285,6 +291,7 @@ CORE_FILES = (
     "src/invarlock/public_contracts.py",
     "src/invarlock/policy_pack.py",
     "src/invarlock/evidence_pack.py",
+    "src/invarlock/evidence_pack_edit_metadata.py",
     "src/invarlock/runtime_verify.py",
     "src/invarlock/cli/commands/evidence_pack.py",
     "src/invarlock/runtime_security.py",
@@ -314,6 +321,7 @@ COVERAGE_INCLUDE_PATTERNS = (
     "src/invarlock/public_contracts.py",
     "src/invarlock/policy_pack.py",
     "src/invarlock/evidence_pack.py",
+    "src/invarlock/evidence_pack_edit_metadata.py",
     "src/invarlock/evidence_pack_integrity.py",
     "src/invarlock/evidence_pack_manifest.py",
     "src/invarlock/evidence_pack_metadata.py",
@@ -335,6 +343,7 @@ COVERAGE_INCLUDE_PATTERNS = (
     "invarlock/public_contracts.py",
     "invarlock/policy_pack.py",
     "invarlock/evidence_pack.py",
+    "invarlock/evidence_pack_edit_metadata.py",
     "invarlock/evidence_pack_integrity.py",
     "invarlock/evidence_pack_manifest.py",
     "invarlock/evidence_pack_metadata.py",

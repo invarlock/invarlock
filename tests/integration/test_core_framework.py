@@ -38,13 +38,16 @@ class TestCoreFramework:
         edits = registry.list_edits()
         assert "quant_rtn" in edits
         guards = registry.list_guards()
-        assert "hello_guard" in guards
+        assert "demo_hello_guard" in guards
 
         quant_info = registry.get_plugin_info("quant_rtn", "edits")
         assert quant_info["available"] is True
+        assert quant_info["support_tier"] == "validation_simulation"
 
-        hello_guard = registry.get_plugin_info("hello_guard", "guards")
+        hello_guard = registry.get_plugin_info("demo_hello_guard", "guards")
         assert hello_guard["available"] is True
+        assert hello_guard["support_tier"] == "demo_only"
+        assert hello_guard["strict_assurance_allowed"] is False
 
         quant_edit = registry.get_edit("quant_rtn")
         assert quant_edit.name == "quant_rtn"

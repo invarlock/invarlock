@@ -236,7 +236,9 @@ def test_evidence_pack_verify_json_round_trip(monkeypatch, tmp_path: Path) -> No
 
     monkeypatch.setattr(
         "invarlock.evidence_pack._run_verify_command",
-        lambda reports, profile: _successful_verify_result(reports),
+        lambda reports, profile, report_assurance="report": _successful_verify_result(
+            reports
+        ),
         raising=False,
     )
 
@@ -250,6 +252,8 @@ def test_evidence_pack_verify_json_round_trip(monkeypatch, tmp_path: Path) -> No
             "--json",
             "--json-out",
             str(json_out),
+            "--report-assurance",
+            "strict",
         ],
         env=_ALLOW_UNVERIFIED_PROVENANCE_ENV,
     )
@@ -258,6 +262,7 @@ def test_evidence_pack_verify_json_round_trip(monkeypatch, tmp_path: Path) -> No
     payload = json.loads(result.stdout.strip())
     assert payload["format_version"] == "evidence-pack-verify-v1"
     assert payload["ok"] is True
+    assert payload["report_assurance"] == "strict"
     assert payload["verify"]["format_version"] == "verify-v1"
     assert json.loads(json_out.read_text(encoding="utf-8"))["ok"] is True
 
@@ -269,7 +274,9 @@ def test_evidence_pack_verify_human_success(monkeypatch, tmp_path: Path) -> None
     )
     monkeypatch.setattr(
         "invarlock.evidence_pack._run_verify_command",
-        lambda reports, profile: _successful_verify_result(reports),
+        lambda reports, profile, report_assurance="report": _successful_verify_result(
+            reports
+        ),
         raising=False,
     )
 
@@ -323,7 +330,9 @@ def test_evidence_pack_verify_json_round_trip_with_verify_payload(
     )
     monkeypatch.setattr(
         "invarlock.evidence_pack._run_verify_command",
-        lambda reports, profile: _successful_verify_result(reports),
+        lambda reports, profile, report_assurance="report": _successful_verify_result(
+            reports
+        ),
         raising=False,
     )
 
@@ -474,7 +483,9 @@ def test_evidence_pack_build_json_round_trip(monkeypatch, tmp_path: Path) -> Non
     _write_runtime_manifest(report)
     monkeypatch.setattr(
         "invarlock.evidence_pack._run_verify_command",
-        lambda reports, profile: _successful_verify_result(reports),
+        lambda reports, profile, report_assurance="report": _successful_verify_result(
+            reports
+        ),
         raising=False,
     )
 
@@ -538,7 +549,9 @@ def test_evidence_pack_keygen_and_signed_build_round_trip(
     _write_runtime_manifest(report)
     monkeypatch.setattr(
         "invarlock.evidence_pack._run_verify_command",
-        lambda reports, profile: _successful_verify_result(reports),
+        lambda reports, profile, report_assurance="report": _successful_verify_result(
+            reports
+        ),
         raising=False,
     )
 

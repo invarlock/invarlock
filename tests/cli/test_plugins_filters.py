@@ -22,10 +22,9 @@ def _prov(name: str):
         )
     if name in {"hf_gptq", "hf_awq"}:
         # Simulate package missing → needs_extra
-        lib = "auto-gptq" if name == "hf_gptq" else "autoawq"
         return SimpleNamespace(
             family=name.split("_")[1],
-            library=lib,
+            library="gptqmodel",
             version=None,
             supported=False,
             tested=[],
@@ -50,7 +49,7 @@ def test_plugins_adapters_json_backend_and_filters(monkeypatch):
     monkeypatch.setattr(
         plug_mod, "bitsandbytes_runtime_available", lambda: False, raising=False
     )
-    # Force Linux to avoid Linux-only gating → needs_extra instead of unsupported
+    # Keep the platform deterministic; AWQ/GPTQ readiness now follows GPTQModel.
     monkeypatch.setattr(plug_mod.platform, "system", lambda: "Linux")
 
     r = CliRunner().invoke(

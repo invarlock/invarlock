@@ -133,7 +133,7 @@ Common options:
 - `--execution-mode container|host`: execution policy for `evaluate`.
   `container` keeps model loading inside the runtime container; `host`
   allows host-side execution and produces host artifacts that should
-  be verified with `verify --runtime-provenance host`.
+  be verified with `verify --runtime-provenance host --assurance off`.
 - `--assurance strict|off`: strict is the default assurance contract;
   off is for exploratory/dev reports that must not be treated as assurance
   evidence.
@@ -260,7 +260,7 @@ Subcommands:
 Examples:
 
 ```bash
-invarlock advanced evidence-pack verify <pack> --strict
+invarlock advanced evidence-pack verify <pack> --strict --report-assurance strict
 invarlock advanced policy verify policy-pack.json --json
 invarlock advanced plugins list --json
 invarlock advanced calibrate --help

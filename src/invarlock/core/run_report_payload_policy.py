@@ -23,7 +23,9 @@ def build_run_report_context(
         dict(primary_metric_section) if isinstance(primary_metric_section, dict) else {}
     )
     assurance_section = run_context.get("assurance")
-    return {
+    runtime_section = run_context.get("runtime")
+    guard_chain_observed = run_context.get("guard_chain_observed")
+    context = {
         "profile": profile_normalized,
         "auto": dict(auto_config),
         "assurance": (
@@ -33,6 +35,13 @@ def build_run_report_context(
         "eval": eval_policy_context,
         "primary_metric": primary_metric_context,
     }
+    if isinstance(runtime_section, dict):
+        context["runtime"] = dict(runtime_section)
+    if isinstance(guard_chain_observed, list) and all(
+        isinstance(item, str) for item in guard_chain_observed
+    ):
+        context["guard_chain_observed"] = list(guard_chain_observed)
+    return context
 
 
 def build_run_report_meta(

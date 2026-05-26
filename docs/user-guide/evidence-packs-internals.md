@@ -31,10 +31,10 @@ task graph, scheduling, and artifact generation. It complements
 ./scripts/evidence_packs/run_suite.sh --suite subset
 
 # Run the full suite and build an evidence pack
-./scripts/evidence_packs/run_pack.sh --suite full --net 1
+./scripts/evidence_packs/run_pack.sh --suite full --net 1 --release-review
 
 # Verify an existing evidence pack
-invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000000/evidence_pack --strict
+invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000000/evidence_pack --strict --report-assurance strict
 ```
 
 ## Hardware Target
@@ -163,8 +163,9 @@ Notes:
 
 ## Edit Types
 
-Each model runs 8 edit experiments (4 types × 2 versions) plus optional error
-injection tests.
+Each model runs 8 validation-subject edit experiments (4 types × 2 versions)
+plus optional error-injection tests. `scripts/evidence_packs/scenarios.json`
+is the source of truth for each scenario's `artifact_class`.
 
 Evidence-pack `quant_rtn` scenarios are generated as external subject
 artifacts: the helper applies RTN quantize/dequantize simulation and saves
@@ -173,18 +174,23 @@ floating-point dequantized weights. Those scenarios may use `bits` and
 `edit.name: quant_rtn` plugin plan and they do not produce packed runtime
 quantization.
 
+The same distinction applies to the other current edits: FP8 round-trips tensors
+through FP8 or float16 and saves ordinary floating-point weights; magnitude
+pruning writes zeros into dense tensors; low-rank SVD writes dense approximated
+tensors instead of factorized low-rank modules.
+
 ### Clean edits (tuned)
 
 Clean edits use tuned parameters supplied via `PACK_TUNED_EDIT_PARAMS_FILE`.
 The suite uses `:clean:` as a sentinel in the edit spec and resolves concrete
 parameters at runtime.
 
-| Edit Type | Parameters | Scope |
-| --- | --- | --- |
-| RTN dequantized external-subject simulation | tuned (`bits`, `group_size`) from tuned params file | FFN only |
-| FP8 Quantization | tuned (`format`) from tuned params file | FFN only |
-| Magnitude Pruning | tuned (`prune_level`) from tuned params file | FFN only |
-| Low-Rank SVD | tuned (`rank`) from tuned params file | FFN only |
+| Edit Type | Artifact class | Parameters | Scope |
+| --- | --- | --- | --- |
+| RTN dequantized external-subject simulation | validation subject checkpoint | tuned (`bits`, `group_size`) from tuned params file | FFN only |
+| FP8 dequantized external-subject simulation | validation subject checkpoint | tuned (`format`) from tuned params file | FFN only |
+| Dense magnitude-pruned checkpoint | validation subject checkpoint | tuned (`prune_level`) from tuned params file | FFN only |
+| Dense low-rank-SVD approximated checkpoint | validation subject checkpoint | tuned (`rank`) from tuned params file | FFN only |
 
 ### Stress edits
 
@@ -198,12 +204,22 @@ example, Spectral can remain `validation.spectral_stable=true` while applying ca
 and remediation events (caps applied) as a “signal” so the suite measures guard activity
 without manufacturing clean false positives.
 
-| Edit Type | Parameters | Scope |
-| --- | --- | --- |
-| RTN dequantized external-subject simulation | `quant_rtn:8:all` (8-bit) | All layers |
-| FP8 Quantization | `fp8_quant:e5m2:all` | All layers |
-| Magnitude Pruning | `magnitude_prune:0.5:all` (50% sparsity) | All layers |
-| Low-Rank SVD | `lowrank_svd:32:all` (rank 32) | All layers |
+| Edit Type | Artifact class | Parameters | Scope |
+| --- | --- | --- | --- |
+| RTN dequantized external-subject simulation | validation subject checkpoint | `quant_rtn:8:all` (8-bit) | All layers |
+| FP8 dequantized external-subject simulation | validation subject checkpoint | `fp8_quant:e5m2:all` | All layers |
+| Dense magnitude-pruned checkpoint | validation subject checkpoint | `magnitude_prune:0.5:all` (50% sparsity) | All layers |
+| Dense low-rank-SVD approximated checkpoint | validation subject checkpoint | `lowrank_svd:32:all` (rank 32) | All layers |
+
+### Deployable edits
+
+Deployable scenarios use `artifact_class: deployable_optimized_subject` and are
+not part of the default validation lanes. A deployable scenario must carry a
+backend contract (`packed_quantized_storage`, reload smoke, inference smoke,
+and memory/storage evidence) and package the corresponding sidecars into the
+evidence pack. The first scenario contract is `deploy_torchao_int4_clean`; it is
+opt-in and should be selected only in an environment with the required backend
+installed.
 
 ### Error injection tests
 
@@ -778,6 +794,10 @@ Primary metric acceptance/drift gates should be configured via profile/config
 | `PACK_SIGNING_KEY` | unset | Optional Ed25519 private key PEM for deterministic signer identity |
 | `PACK_SKIP_HTML` | `0` | Skip HTML rendering |
 | `PACK_VERIFY_PROFILE` | `dev` | Profile for `invarlock verify` |
+| `PACK_REPORT_ASSURANCE` | `report` | Nested report assurance mode passed to report verification (`report`, `strict`, or `off`) |
+| `PACK_REQUIRE_PASS` | `0` | Fail pack generation unless `final_verdict.json` is `PASS` |
+| `PACK_REQUIRE_RUNTIME_MANIFESTS` | `0` | Require report-adjacent runtime manifests during hardened pack generation |
+| `PACK_RELEASE_REVIEW` | `0` | Set by `run_pack.sh --release-review`; requires PASS verdicts, signed manifests, runtime manifests, CI profile, and strict report assurance |
 
 ## Troubleshooting
 

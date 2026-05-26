@@ -301,6 +301,7 @@ def _process_attempt_result(
         report=report,
         run_dir=run_dir,
         run_config=run_config,
+        model=model,
         telemetry=telemetry,
     )
     report_path_out = persistence_result.report_path_out or report_path_out

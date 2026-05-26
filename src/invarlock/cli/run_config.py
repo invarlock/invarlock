@@ -340,7 +340,8 @@ def extract_model_load_kwargs(
     extra = {
         key: value
         for key, value in model.items()
-        if key not in {"id", "adapter", "device"} and value is not None
+        if key not in {"id", "adapter", "device", "baseline_id", "subject_id"}
+        and value is not None
     }
 
     trust_remote_code = extra.get("trust_remote_code")

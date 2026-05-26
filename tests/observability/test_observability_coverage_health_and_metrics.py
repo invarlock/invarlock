@@ -649,3 +649,62 @@ def test_metrics_existing_registry_and_snapshot_edge_branches(monkeypatch):
         "gpu_memory_mb_peak": 4.0,
         "gpu_memory_reserved_mb_peak": 9.0,
     }
+
+
+@pytest.mark.unit
+def test_metrics_exception_and_fallback_memory_branches(monkeypatch):
+    import invarlock.observability.metrics as metrics
+
+    monkeypatch.setattr(metrics, "torch", sys.modules["torch"], raising=False)
+    monkeypatch.setattr(metrics.torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(
+        metrics.torch.cuda,
+        "reset_peak_memory_stats",
+        lambda: (_ for _ in ()).throw(RuntimeError("cuda reset failed")),
+        raising=False,
+    )
+    metrics.reset_peak_memory_stats()
+
+    process = types.SimpleNamespace(
+        memory_info=lambda: types.SimpleNamespace(rss=32 * 1024 * 1024)
+    )
+    monkeypatch.setattr(sys.modules["psutil"], "Process", lambda pid: process)
+    monkeypatch.setattr(
+        metrics.torch.cuda,
+        "is_available",
+        lambda: (_ for _ in ()).throw(RuntimeError("cuda probe failed")),
+    )
+    snapshot = metrics.capture_memory_snapshot("torch-error", timestamp=1.0)
+    assert snapshot == {"phase": "torch-error", "ts": 1.0, "rss_mb": 32.0}
+
+    summary = metrics.summarize_memory_snapshots(
+        [{"gpu_mb": 2.0, "gpu_reserved_mb": 3.0}]
+    )
+    assert summary == {
+        "gpu_memory_mb_peak": 2.0,
+        "gpu_memory_reserved_mb_peak": 3.0,
+    }
+
+
+@pytest.mark.unit
+def test_health_cpu_loadavg_os_fallback(monkeypatch):
+    import invarlock.observability.health as health
+
+    class PsutilWithoutLoadavg:
+        Error = health.psutil.Error
+
+        @staticmethod
+        def cpu_percent(interval=1):
+            return 1.0
+
+        @staticmethod
+        def cpu_count():
+            return 8
+
+    monkeypatch.setattr(health, "psutil", PsutilWithoutLoadavg)
+    monkeypatch.setattr(health.os, "getloadavg", lambda: (1.0, 2.0, 3.0))
+
+    checker = health.HealthChecker()
+    result = checker.check_component("cpu")
+
+    assert result.details["load_avg"] == (1.0, 2.0, 3.0)

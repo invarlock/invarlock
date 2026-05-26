@@ -278,6 +278,7 @@ def test_run_command_classification_pseudo_counts_and_export_env_dir(
     monkeypatch.setenv("INVARLOCK_EXPORT_MODEL", "1")
     monkeypatch.setenv("INVARLOCK_EXPORT_DIR", "env_export")
     monkeypatch.setenv("DEBUG_METRIC_DIFFS", "1")
+    monkeypatch.setenv("INVARLOCK_ALLOW_PSEUDO_ACCURACY", "1")
 
     cfg = _Cfg(
         outdir=tmp_path / "runs",

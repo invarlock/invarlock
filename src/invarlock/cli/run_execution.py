@@ -229,6 +229,7 @@ def _assemble_run_report_with_runtime_deps(**kwargs: Any) -> Any:
 
 def _persist_run_report_outputs_with_runtime_deps(**kwargs: Any) -> Any:
     kwargs.pop("console", None)
+    kwargs.pop("model", None)
     report = kwargs["report"]
     run_dir = kwargs["run_dir"]
     run_config = kwargs["run_config"]

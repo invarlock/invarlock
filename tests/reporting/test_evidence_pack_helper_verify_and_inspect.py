@@ -40,7 +40,7 @@ def test_verify_reports_covers_remaining_payload_contract_branches(
     monkeypatch.setattr(
         evidence_pack_mod,
         "_run_verify_command",
-        lambda reports, *, profile: (
+        lambda reports, *, profile, report_assurance="report": (
             VerifyExecutionResult(
                 outcome=VerifyOutcome.OK,
                 payload={"ok": True},
@@ -56,7 +56,10 @@ def test_verify_reports_covers_remaining_payload_contract_branches(
         raising=True,
     )
     errors, payload = evidence_pack_mod._verify_reports(
-        pack_with_errors, json_out_path=None, profile="dev"
+        pack_with_errors,
+        json_out_path=None,
+        profile="dev",
+        report_assurance="report",
     )
     assert errors == [
         "error-injection report verification did not return a JSON object."
@@ -66,7 +69,7 @@ def test_verify_reports_covers_remaining_payload_contract_branches(
     monkeypatch.setattr(
         evidence_pack_mod,
         "_run_verify_command",
-        lambda reports, *, profile: (
+        lambda reports, *, profile, report_assurance="report": (
             VerifyExecutionResult(
                 outcome=VerifyOutcome.OK,
                 payload=None,
@@ -82,7 +85,10 @@ def test_verify_reports_covers_remaining_payload_contract_branches(
         raising=True,
     )
     errors, payload = evidence_pack_mod._verify_reports(
-        pack_with_errors, json_out_path=None, profile="dev"
+        pack_with_errors,
+        json_out_path=None,
+        profile="dev",
+        report_assurance="report",
     )
     assert errors == ["clean report verification did not return a JSON object."]
     assert payload is None
@@ -90,7 +96,7 @@ def test_verify_reports_covers_remaining_payload_contract_branches(
     monkeypatch.setattr(
         evidence_pack_mod,
         "_run_verify_command",
-        lambda reports, *, profile: (
+        lambda reports, *, profile, report_assurance="report": (
             VerifyExecutionResult(
                 outcome=VerifyOutcome.OK,
                 payload=["clean-bad"],
@@ -106,7 +112,10 @@ def test_verify_reports_covers_remaining_payload_contract_branches(
         raising=True,
     )
     errors, payload = evidence_pack_mod._verify_reports(
-        pack_with_errors, json_out_path=None, profile="dev"
+        pack_with_errors,
+        json_out_path=None,
+        profile="dev",
+        report_assurance="report",
     )
     assert errors == ["clean report verification did not return a JSON object."]
     assert payload is None
@@ -115,7 +124,7 @@ def test_verify_reports_covers_remaining_payload_contract_branches(
     monkeypatch.setattr(
         evidence_pack_mod,
         "_run_verify_command",
-        lambda reports, *, profile: VerifyExecutionResult(
+        lambda reports, *, profile, report_assurance="report": VerifyExecutionResult(
             outcome=VerifyOutcome.POLICY_FAIL,
             payload={"ok": False},
             diagnostics=(),
@@ -123,7 +132,10 @@ def test_verify_reports_covers_remaining_payload_contract_branches(
         raising=True,
     )
     errors, payload = evidence_pack_mod._verify_reports(
-        pack_clean_only, json_out_path=None, profile="release"
+        pack_clean_only,
+        json_out_path=None,
+        profile="release",
+        report_assurance="report",
     )
     assert errors == ["invarlock verify reported report verification failures."]
     assert payload == {"ok": False}
@@ -168,6 +180,18 @@ def test_build_and_verify_evidence_pack_cover_usage_and_failure_paths(
     assert "already exists" in payload["errors"][0]
 
     result = evidence_pack_mod.build_evidence_pack(
+        tmp_path / "out-release-review-weak",
+        final_verdict_path=final_verdict,
+        report_paths=[report_path],
+        release_review=True,
+    )
+    payload = result.payload
+    exit_code = result.status
+    assert exit_code == evidence_pack_mod.EvidencePackStatus.USAGE
+    assert any("--report-assurance strict" in error for error in payload["errors"])
+    assert any("--signing-key" in error for error in payload["errors"])
+
+    result = evidence_pack_mod.build_evidence_pack(
         tmp_path / "out-invalid-material",
         final_verdict_path=final_verdict,
         report_paths=[report_path],
@@ -194,7 +218,7 @@ def test_build_and_verify_evidence_pack_cover_usage_and_failure_paths(
     monkeypatch.setattr(
         evidence_pack_mod,
         "_run_verify_command",
-        lambda reports, profile: VerifyExecutionResult(
+        lambda reports, profile, report_assurance="report": VerifyExecutionResult(
             outcome=VerifyOutcome.POLICY_FAIL,
             payload={"ok": False},
             diagnostics=(),
@@ -214,7 +238,7 @@ def test_build_and_verify_evidence_pack_cover_usage_and_failure_paths(
     monkeypatch.setattr(
         evidence_pack_mod,
         "_run_verify_command",
-        lambda reports, profile: VerifyExecutionResult(
+        lambda reports, profile, report_assurance="report": VerifyExecutionResult(
             outcome=VerifyOutcome.OK,
             payload={"ok": True},
             diagnostics=(),
@@ -234,6 +258,7 @@ def test_build_and_verify_evidence_pack_cover_usage_and_failure_paths(
     exit_code = result.status
     assert exit_code == evidence_pack_mod.EvidencePackStatus.OK
     assert payload["ok"] is True
+    assert payload["report_assurance"] == "report"
     assert any("README file not found" in warning for warning in payload["warnings"])
 
     result = evidence_pack_mod.verify_evidence_pack(
@@ -270,10 +295,12 @@ def test_run_verify_command_delegates_to_verify_reports_contract(
         profile=None,
         allow_unverified_provenance=False,
         json_mode=False,
+        assurance_mode="report",
     ):
         captured["reports"] = reports
         captured["profile"] = profile
         captured["json_mode"] = json_mode
+        captured["assurance_mode"] = assurance_mode
         return VerifyExecutionResult(
             outcome=VerifyOutcome.OK,
             payload={"ok": True},
@@ -552,7 +579,7 @@ def test_build_evidence_pack_copies_readme_and_environment_without_optional_refs
     monkeypatch.setattr(
         evidence_pack_mod,
         "_run_verify_command",
-        lambda reports, profile: VerifyExecutionResult(
+        lambda reports, profile, report_assurance="report": VerifyExecutionResult(
             outcome=VerifyOutcome.OK,
             payload={"ok": True},
             diagnostics=(),
@@ -596,7 +623,7 @@ def test_build_evidence_pack_copies_source_repo_without_environment_or_materials
     monkeypatch.setattr(
         evidence_pack_mod,
         "_run_verify_command",
-        lambda reports, profile: VerifyExecutionResult(
+        lambda reports, profile, report_assurance="report": VerifyExecutionResult(
             outcome=VerifyOutcome.OK,
             payload={"ok": True},
             diagnostics=(),

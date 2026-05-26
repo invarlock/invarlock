@@ -1,27 +1,25 @@
 from __future__ import annotations
 
 import gc
-import json
-import shutil
 import sys
 from pathlib import Path
 
 import torch
 
 try:
-    from edit_targeting import matches_edit_scope
+    from edit_implementations import apply_fp8_dequantized_simulation, fp8_dtype
+    from edit_metadata import build_validation_edit_metadata
     from hf_causal_loader import load_causal_model
     from runtime_tools import require_remote_code_opt_in
+    from save_subject_artifact import save_edited_subject_artifact
 except ImportError:  # pragma: no cover - direct module load under pytest
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from edit_targeting import matches_edit_scope
+    from edit_implementations import apply_fp8_dequantized_simulation, fp8_dtype
+    from edit_metadata import build_validation_edit_metadata
     from hf_causal_loader import load_causal_model
     from runtime_tools import require_remote_code_opt_in
+    from save_subject_artifact import save_edited_subject_artifact
 from transformers import AutoTokenizer
-
-
-def _should_quantize(name: str, scope: str) -> bool:
-    return matches_edit_scope(name, scope)
 
 
 def main(argv: list[str]) -> int:
@@ -53,66 +51,47 @@ def main(argv: list[str]) -> int:
         baseline_path, trust_remote_code=trust_remote_code
     )
 
-    if format_type in {"e4m3", "e4m3fn", "e4m3fnuz"}:
-        fp8_dtype = getattr(torch, "float8_e4m3fn", None)
-    else:
-        fp8_dtype = getattr(torch, "float8_e5m2", None)
-
-    if fp8_dtype is None:
+    if fp8_dtype(format_type) is None:
         print(
             "WARNING: torch float8 dtype not available; falling back to float16 quantization"
         )
 
-    @torch.no_grad()
-    def quantize_fp8(tensor: torch.Tensor) -> torch.Tensor:
-        if fp8_dtype is None:
-            return tensor.to(torch.float16).to(tensor.dtype)
-        return tensor.to(fp8_dtype).to(tensor.dtype)
-
     print(f"Applying FP8 quantization (format={format_type}, scope={scope})...")
-    quantized_count = 0
-    num_tensors = 0
-    rel_error_total = 0.0
-    edited_params = 0
-    for name, param in model.named_parameters():
-        if not _should_quantize(name, scope) or param.dim() < 2:
-            continue
-        original = param.data.clone()
-        param.data = quantize_fp8(param.data)
-        num_tensors += 1
-        quantized_count += 1
-        edited_params += param.numel()
-        denom = original.abs().mean() + 1e-10
-        rel_error_total += float((param.data - original).abs().mean() / denom)
-        if quantized_count <= 3:
-            print(f"  FP8: {name}")
-
-    avg_error = rel_error_total / max(num_tensors, 1)
-    print(f"Quantized {quantized_count} tensors, avg relative error: {avg_error:.4f}")
+    stats = apply_fp8_dequantized_simulation(
+        model,
+        format_type=format_type,
+        scope=scope,
+    )
+    avg_error = float(stats.details.get("avg_relative_error") or 0.0)
+    print(
+        f"Quantized {stats.edited_tensors} tensors, avg relative error: {avg_error:.4f}"
+    )
 
     model = model.cpu()
     gc.collect()
     torch.cuda.empty_cache()
 
-    staging_path = output_path.parent / f".{output_path.name}.tmp"
-    if staging_path.exists():
-        shutil.rmtree(staging_path)
-    staging_path.mkdir(parents=True, exist_ok=True)
-    model.save_pretrained(staging_path, safe_serialization=True)
-    tokenizer.save_pretrained(staging_path)
-
-    metadata = {
-        "edit_type": "fp8_quant",
-        "format": format_type,
-        "scope": scope,
-        "quantized_tensors": quantized_count,
-        "avg_relative_error": avg_error,
-    }
-    (staging_path / "edit_metadata.json").write_text(json.dumps(metadata, indent=2))
-
-    if output_path.exists():
-        shutil.rmtree(output_path)
-    staging_path.rename(output_path)
+    metadata = build_validation_edit_metadata(
+        edit_type="fp8_quant",
+        scope=scope,
+        parameters={"format": format_type},
+        coverage=stats.coverage_payload(),
+        extra={
+            "quantization_mode": "fp8_dequantized_external_subject_simulation",
+            "format": format_type,
+            "quantized_tensors": stats.edited_tensors,
+            "avg_relative_error": avg_error,
+            "torch_fp8_dtype_available": bool(
+                stats.details.get("torch_fp8_dtype_available")
+            ),
+        },
+    )
+    save_edited_subject_artifact(
+        model=model,
+        tokenizer=tokenizer,
+        output_path=output_path,
+        metadata=metadata,
+    )
 
     print(f"Saved FP8-quantized model to {output_path}")
     return 0

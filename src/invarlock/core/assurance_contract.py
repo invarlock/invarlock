@@ -134,6 +134,13 @@ def observed_guard_chain_from_report(report: dict[str, Any]) -> list[str]:
             isinstance(item, str) for item in observed
         ):
             return list(observed)
+    context = report.get("context")
+    if isinstance(context, dict):
+        observed = context.get("guard_chain_observed")
+        if isinstance(observed, list) and all(
+            isinstance(item, str) for item in observed
+        ):
+            return list(observed)
     guards = report.get("guards")
     if isinstance(guards, list):
         names: list[str] = []
@@ -188,14 +195,26 @@ def _report_tier(report: dict[str, Any]) -> str:
     return ""
 
 
-def _report_build_has_evidence_events(report: dict[str, Any]) -> bool:
+def _nonblocking_report_build_event(event: Any) -> bool:
+    if not isinstance(event, dict):
+        return False
+    return (
+        event.get("field") == "primary_metric.display_ci"
+        and event.get("reason") == "computed_from_primary_metric_ci"
+    )
+
+
+def report_build_has_blocking_evidence_events(report: dict[str, Any]) -> bool:
     section = report.get("report_build")
     if not isinstance(section, dict):
         return False
     for category in REPORT_BUILD_EVENT_CATEGORIES:
         events = section.get(category)
-        if isinstance(events, list) and bool(events):
-            return True
+        if not isinstance(events, list):
+            continue
+        for event in events:
+            if not _nonblocking_report_build_event(event):
+                return True
     return False
 
 
@@ -246,7 +265,7 @@ def build_assurance_section(
     )
     observed = observed_guard_chain_from_report(report)
     fallback_fields_used = bool(
-        fallback_fields_used or _report_build_has_evidence_events(report)
+        fallback_fields_used or report_build_has_blocking_evidence_events(report)
     )
     profile = _report_profile(report)
     tier = _report_tier(report)
@@ -351,7 +370,7 @@ def strict_report_policy_errors(
         errors.append("strict assurance requires canonical guard chain evidence.")
     if fallback_fields_used is True:
         errors.append("strict assurance forbids synthesized or repaired fields.")
-    if _report_build_has_evidence_events(report):
+    if report_build_has_blocking_evidence_events(report):
         errors.append("strict assurance forbids synthesized or repaired fields.")
     if runtime_provenance_verified is False:
         errors.append("strict assurance requires verified runtime provenance.")
@@ -388,6 +407,7 @@ __all__ = [
     "normalize_assurance_mode",
     "normalize_verify_assurance_mode",
     "observed_guard_chain_from_report",
+    "report_build_has_blocking_evidence_events",
     "resolve_report_assurance_mode",
     "resolve_report_runtime_provenance_declared",
     "strict_evaluate_policy_errors",

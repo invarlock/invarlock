@@ -43,6 +43,7 @@ def build_adapter_inventory_rows(
     find_spec_safe: Callable[[str], object | None],
     bitsandbytes_runtime_ready: bool,
 ) -> list[DoctorInventoryRow]:
+    _ = is_linux
     rows: list[DoctorInventoryRow] = []
     transformers_version = _package_version("transformers")
 
@@ -73,9 +74,9 @@ def build_adapter_inventory_rows(
             backend = "transformers"
             version = transformers_version
         elif name == "hf_gptq":
-            backend = "auto-gptq"
+            backend = "gptqmodel"
         elif name == "hf_awq":
-            backend = "autoawq"
+            backend = "gptqmodel"
         elif name == "hf_bnb":
             backend = "bitsandbytes"
 
@@ -95,9 +96,6 @@ def build_adapter_inventory_rows(
                 if hint:
                     required_extra = hint
 
-        if backend in {"auto-gptq", "autoawq"} and not is_linux:
-            status = "unsupported"
-            detail = "Linux-only"
         if (
             backend == "bitsandbytes"
             and find_spec_safe("bitsandbytes") is not None

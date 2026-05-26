@@ -161,7 +161,10 @@ def test_verify_reports_and_inspect_cover_error_paths(
     empty_pack = tmp_path / "empty"
     empty_pack.mkdir()
     errors, payload = evidence_pack_mod._verify_reports(
-        empty_pack, json_out_path=None, profile="dev"
+        empty_pack,
+        json_out_path=None,
+        profile="dev",
+        report_assurance="report",
     )
     assert errors == ["No reports found in pack."]
     assert payload is None
@@ -178,12 +181,31 @@ def test_verify_reports_and_inspect_cover_error_paths(
     error_report.parent.mkdir(parents=True, exist_ok=True)
     error_report.write_text("{}", encoding="utf-8")
     errors, payload = evidence_pack_mod._verify_reports(
-        error_only_pack, json_out_path=None, profile="dev"
+        error_only_pack,
+        json_out_path=None,
+        profile="dev",
+        report_assurance="report",
     )
     assert errors == [
         "No clean reports found in pack (only error-injection reports present)."
     ]
     assert payload is None
+
+    json_out_off = tmp_path / "report-assurance-off.json"
+    errors, payload = evidence_pack_mod._verify_reports(
+        error_only_pack,
+        json_out_path=json_out_off,
+        profile="dev",
+        report_assurance="off",
+    )
+    assert errors == []
+    assert payload == {
+        "ok": True,
+        "skipped": True,
+        "reason": "report_assurance_off",
+        "reports": 1,
+    }
+    assert json.loads(json_out_off.read_text(encoding="utf-8")) == payload
 
     pack_dir = tmp_path / "pack"
     report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
@@ -205,7 +227,9 @@ def test_verify_reports_and_inspect_cover_error_paths(
     json_out = tmp_path / "nested.json"
     verify_calls: list[list[str]] = []
 
-    def _fake_run_verify(reports: list[Path], *, profile: str):
+    def _fake_run_verify(
+        reports: list[Path], *, profile: str, report_assurance: str = "report"
+    ):
         verify_calls.append([str(path) for path in reports])
         if len(verify_calls) == 1:
             return VerifyExecutionResult(
@@ -222,7 +246,10 @@ def test_verify_reports_and_inspect_cover_error_paths(
         raising=True,
     )
     errors, payload = evidence_pack_mod._verify_reports(
-        pack_dir, json_out_path=json_out, profile="release"
+        pack_dir,
+        json_out_path=json_out,
+        profile="release",
+        report_assurance="report",
     )
     assert errors == [
         "error-injection report verification failed: ignore nested error reports"

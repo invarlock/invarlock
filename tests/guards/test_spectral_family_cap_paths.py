@@ -239,6 +239,14 @@ def test_compute_sigma_max_additional_branches(monkeypatch) -> None:
     )
     assert spectral_measurement.compute_sigma_max(torch.eye(2), iters=1) == 1.0
 
+    class BadNdim:
+        @property
+        def ndim(self):
+            raise TypeError("bad ndim")
+
+    assert spectral_measurement._is_matrix_weight(BadNdim()) is False
+    assert spectral_measurement._scalarize_stat(1.25) == 1.25
+
 
 def test_classify_module_family_moe_and_module_type_branches() -> None:
     linear = torch.nn.Linear(2, 2)

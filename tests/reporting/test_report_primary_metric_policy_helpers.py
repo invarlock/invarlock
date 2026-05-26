@@ -131,6 +131,52 @@ def test_enforce_display_ci_alignment_returns_on_kind_coercion_error() -> None:
     )
 
 
+def test_enforce_display_ci_alignment_returns_on_ci_lookup_error() -> None:
+    class _BadSecondGet(dict):
+        def get(self, key, default=None):  # noqa: ANN001
+            if key == "kind":
+                return "ppl_causal"
+            raise RuntimeError("boom")
+
+    pm_policy.enforce_display_ci_alignment(
+        "paired_baseline", _BadSecondGet({"kind": "ppl_causal"}), (0.0, 0.1), "dev"
+    )
+
+
+def test_enforce_display_ci_alignment_dev_repairs_without_event_report() -> None:
+    missing_ci = {"kind": "ppl_causal"}
+    pm_policy.enforce_display_ci_alignment(
+        "paired_baseline", missing_ci, (0.0, 0.1), "dev"
+    )
+    assert missing_ci["ci"] == [0.0, 0.1]
+    assert missing_ci["display_ci"] == [
+        pytest.approx(1.0),
+        pytest.approx(math.exp(0.1)),
+    ]
+
+    missing_display = {"kind": "ppl_causal", "ci": (0.0, 0.1)}
+    pm_policy.enforce_display_ci_alignment(
+        "paired_baseline", missing_display, (0.0, 0.1), "dev"
+    )
+    assert missing_display["display_ci"] == [
+        pytest.approx(1.0),
+        pytest.approx(math.exp(0.1)),
+    ]
+
+    mismatched_display = {
+        "kind": "ppl_causal",
+        "ci": (0.0, 0.1),
+        "display_ci": [9.0, 9.0],
+    }
+    pm_policy.enforce_display_ci_alignment(
+        "paired_baseline", mismatched_display, (0.0, 0.1), "dev"
+    )
+    assert mismatched_display["display_ci"] == [
+        pytest.approx(1.0),
+        pytest.approx(math.exp(0.1)),
+    ]
+
+
 def test_enforce_display_ci_alignment_dev_missing_ci_no_logloss_ci():
     pm = {"kind": "ppl_causal"}
     pm_policy.enforce_display_ci_alignment(
@@ -260,6 +306,16 @@ def test_fallback_paired_windows_uses_coverage_preview():
     coverage = {"preview": {"used": 7}}
     assert pm_policy.fallback_paired_windows(0, coverage) == 7
     assert pm_policy.fallback_paired_windows(2, coverage) == 2
+    assert pm_policy.fallback_paired_windows(0, {"preview": "bad"}) == 0
+    assert pm_policy.fallback_paired_windows(0, {"preview": {"used": -1}}) == 0
+
+
+def test_propagate_pairing_stats_ignores_non_mapping_ppl_stats() -> None:
+    report = {"dataset": {"windows": {"stats": {}}}}
+
+    pm_policy.propagate_pairing_stats(report, {"stats": "bad"})
+
+    assert report == {"dataset": {"windows": {"stats": {}}}}
 
 
 def test_prepare_guard_overhead_section_ratio_threshold():

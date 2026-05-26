@@ -58,6 +58,36 @@ def test_sanitize_preset_data_for_evaluate_removes_pinned_device() -> None:
     assert payload == {"model": {"device": "cuda", "id": "demo"}}
 
 
+def test_sanitize_preset_data_for_evaluate_fills_missing_dataset_windows() -> None:
+    payload = {
+        "dataset": {
+            "provider": "local_jsonl",
+            "file": "samples.jsonl",
+            "text_field": "text",
+            "max_samples": 16,
+        }
+    }
+
+    sanitized = sanitize_preset_data_for_evaluate(payload, adapter_name="hf_causal")
+
+    assert sanitized["dataset"]["provider"] == "local_jsonl"
+    assert sanitized["dataset"]["file"] == "samples.jsonl"
+    assert sanitized["dataset"]["max_samples"] == 16
+    assert sanitized["dataset"]["preview_n"] == 64
+    assert sanitized["dataset"]["final_n"] == 64
+    assert sanitized["dataset"]["seq_len"] == 512
+    assert sanitized["dataset"]["stride"] == 512
+    assert "preview_n" not in payload["dataset"]
+
+
+def test_sanitize_preset_data_for_evaluate_keeps_non_mapping_dataset() -> None:
+    payload = {"dataset": "custom-provider"}
+
+    sanitized = sanitize_preset_data_for_evaluate(payload, adapter_name="hf_causal")
+
+    assert sanitized == {"dataset": "custom-provider"}
+
+
 def test_resolve_guards_order_prefers_preset_then_default() -> None:
     assert resolve_guards_order({}) == DEFAULT_EVALUATE_GUARDS_ORDER
     assert resolve_guards_order({"guards": {"order": ["g1", "g2"]}}) == ["g1", "g2"]

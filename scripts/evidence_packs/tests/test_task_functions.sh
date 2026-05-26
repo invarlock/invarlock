@@ -51,6 +51,53 @@ stub_resolve_edit_params() {
     }
 }
 
+write_validation_edit_metadata() {
+    local edit_path="$1"
+    local edit_type="${2:-quant_rtn}"
+    local storage_format="float_dequantized"
+    case "${edit_type}" in
+        magnitude_prune)
+            storage_format="dense_float_with_zeros"
+            ;;
+        lowrank_svd)
+            storage_format="dense_float_lowrank_approximated"
+            ;;
+    esac
+    cat > "${edit_path}/edit_metadata.json" <<JSON
+{
+  "schema": "invarlock/evidence-pack-edit-metadata-v1",
+  "artifact_class": "validation_subject_checkpoint",
+  "edit_type": "${edit_type}",
+  "edit_semantics": "external_subject_validation_edit",
+  "deployable_as_hf_checkpoint": true,
+  "optimized_deployment_backend": false,
+  "backend": null,
+  "storage_format": "${storage_format}",
+  "actual_storage_format": "${storage_format}",
+  "packed_quantized_storage": false,
+  "runtime_memory_reduction": false,
+  "scope": "ffn",
+  "parameters": {},
+  "coverage": {
+    "edited_tensors": 1,
+    "edited_params": 1,
+    "total_params": 1,
+    "coverage_ratio": 1.0
+  }
+}
+JSON
+}
+
+write_minimal_validation_edit_artifact() {
+    local edit_path="$1"
+    local edit_type="${2:-quant_rtn}"
+    mkdir -p "${edit_path}"
+    echo "{}" > "${edit_path}/config.json"
+    echo "weights" > "${edit_path}/pytorch_model.bin"
+    echo "{}" > "${edit_path}/tokenizer_config.json"
+    write_validation_edit_metadata "${edit_path}" "${edit_type}"
+}
+
 test_default_ci_min_windows_accounts_for_padding() {
     mock_reset
     # shellcheck source=../task_functions.sh
@@ -343,10 +390,7 @@ test_task_create_edit_and_batch_edits_cover_success_failure_and_missing_function
     fi
 
     _write_complete_edit_artifact() {
-        mkdir -p "$1"
-        echo "{}" > "$1/config.json"
-        echo "weights" > "$1/pytorch_model.bin"
-        echo "{}" > "$1/tokenizer_config.json"
+        write_minimal_validation_edit_artifact "$1"
     }
 
     # Create function stubs that materialize complete edit artifacts for verification.
@@ -455,7 +499,7 @@ test_task_evaluate_edit_and_error_cover_preset_discovery_overrides_and_report_co
     if task_evaluate_edit "${model_name}" 0 "lowrank_svd:8:attn" clean 1 "${out}" "${log_file}"; then :; fi
 
     # Full evaluate flow for quant_rtn with overrides and report copy.
-    mkdir -p "${model_output_dir}/models/quant_4bit_clean"
+    write_minimal_validation_edit_artifact "${model_output_dir}/models/quant_4bit_clean" "quant_rtn"
     local cert_dir="${model_output_dir}/reports/quant_4bit_clean/run_1"
     mkdir -p "${cert_dir}/nested"
     echo "{}" > "${cert_dir}/nested/evaluation.report.json"
@@ -527,9 +571,9 @@ test_task_evaluate_edit_exits_when_workdir_cd_fails() {
     local baseline_dir="${model_output_dir}/models/baseline"
     local edit_dir="${model_output_dir}/models/quant_4bit_clean"
     local log_file="${TEST_TMPDIR}/log.txt"
-    mkdir -p "${baseline_dir}" "${edit_dir}" "$(dirname "${log_file}")"
+    mkdir -p "${baseline_dir}" "$(dirname "${log_file}")"
+    write_minimal_validation_edit_artifact "${edit_dir}" "quant_rtn"
     echo "{}" > "${baseline_dir}/config.json"
-    echo "{}" > "${edit_dir}/config.json"
     echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
     : > "${log_file}"
 
@@ -638,9 +682,9 @@ test_task_evaluate_tasks_treat_nonzero_cli_rc_as_success_when_report_written() {
 
     # evaluate_EDIT: rc!=0 but report exists -> treat as success
     local edit_dir="${model_output_dir}/models/quant_4bit_clean"
-    mkdir -p "${baseline_dir}" "${edit_dir}"
+    mkdir -p "${baseline_dir}"
+    write_minimal_validation_edit_artifact "${edit_dir}" "quant_rtn"
     echo "{}" > "${baseline_dir}/config.json"
-    echo "{}" > "${edit_dir}/config.json"
     echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
 
     run task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 1 "${out}" "${log_file}"
@@ -701,9 +745,9 @@ test_task_evaluate_tasks_generate_evaluation_report_when_only_report_json_writte
 
     # evaluate_EDIT: no evaluation.report.json produced by CLI, but report.json exists -> conversion creates cert.
     local edit_dir="${model_output_dir}/models/quant_4bit_clean"
-    mkdir -p "${baseline_dir}" "${edit_dir}"
+    mkdir -p "${baseline_dir}"
+    write_minimal_validation_edit_artifact "${edit_dir}" "quant_rtn"
     echo "{}" > "${baseline_dir}/config.json"
-    echo "{}" > "${edit_dir}/config.json"
     echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
 
     run task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 1 "${out}" "${log_file}"
@@ -1527,8 +1571,7 @@ EOF
         jq -n '{status:"selected", edit_type:"quant_rtn", param1:"4", param2:"32", scope:"ffn", edit_dir_name:"_clean"}'
     }
     local edit_dir="${model_output_dir}/models/_clean"
-    mkdir -p "${edit_dir}"
-    echo "{}" > "${edit_dir}/config.json"
+    write_minimal_validation_edit_artifact "${edit_dir}" "quant_rtn"
 
     mkdir -p "${out}/presets"
     echo "{}" > "${out}/presets/calibrated_preset_${model_name}.yaml"
@@ -2412,9 +2455,9 @@ EOF
     local baseline_dir="${model_output_dir}/models/baseline"
     local edit_dir="${model_output_dir}/models/_clean"
     local log_file="${TEST_TMPDIR}/log.txt"
-    mkdir -p "${baseline_dir}" "${edit_dir}" "${out}/presets" "$(dirname "${log_file}")"
+    mkdir -p "${baseline_dir}" "${out}/presets" "$(dirname "${log_file}")"
+    write_minimal_validation_edit_artifact "${edit_dir}" "quant_rtn"
     echo "{}" > "${baseline_dir}/config.json"
-    echo "{}" > "${edit_dir}/config.json"
     echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
     echo "Qwen/Qwen2.5-32B" > "${model_output_dir}/.model_id"
     printf 'dataset:\n  seq_len: 128\n' > "${out}/presets/calibrated_preset_${model_name}.yaml"

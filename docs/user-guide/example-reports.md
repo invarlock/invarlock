@@ -35,7 +35,8 @@ Artifact model:
 The command below shows the default runtime-container path. It writes a
 container-backed `runtime.manifest.json` next to `evaluation.report.json`.
 Public host-side workflows use `--execution-mode host` and should verify the
-resulting report with `invarlock verify --runtime-provenance host ...`.
+resulting report with
+`invarlock verify --runtime-provenance host --assurance off ...`.
 This reproduction uses repo-owned preset and overlay files so it matches the
 example artifacts checked into this repository version; wheel-only installs
 should start with [Getting Started](getting-started.md) for the first evaluation

@@ -6,7 +6,7 @@
 | --- | --- |
 | **Purpose** | Load models, describe structure, and snapshot/restore state for edits and guards. |
 | **Audience** | CLI users choosing `model.adapter` and Python callers instantiating adapters. |
-| **Supported surface** | Core HF text and image-text adapters, auto-match adapters, platform-dependent BNB, and Linux-only AWQ/GPTQ quantized adapters. |
+| **Supported surface** | Core HF text and image-text adapters, auto-match adapters, platform-dependent BNB, and GPTQModel-backed AWQ/GPTQ quantized adapters. |
 | **Requires** | `invarlock[adapters]` or `invarlock[hf]` for core HF adapters; `invarlock[gpu]`, `invarlock[awq]`, `invarlock[gptq]` for quantized adapters. |
 | **Network** | Offline by default; use `evaluate --allow-network` when a run needs model downloads. |
 | **Inputs** | `model.id` (HF repo or local path), adapter name, device. |
@@ -81,7 +81,7 @@ Capability matrix (at a glance)
 | HF text (`hf_causal`, `hf_mlm`, `hf_seq2seq`) | Yes | Full | All |
 | HF image-text (`hf_multimodal`) | Yes | Full when decoder layers are exposed | All |
 | Quantized (`hf_bnb`) | Best-effort | Full when modules exposed | Platform-dependent |
-| Quantized (`hf_awq`, `hf_gptq`) | Best-effort | Full when modules exposed | Linux |
+| Quantized (`hf_awq`, `hf_gptq`) | Best-effort | Full when modules exposed | GPTQModel-supported platforms |
 
 Machine-readable adapter capability metadata is published at
 `contracts/adapter_capabilities.json` and surfaced through
@@ -99,8 +99,8 @@ Machine-readable adapter capability metadata is published at
 | `hf_seq2seq` | T5/encoder‑decoder models | `invarlock[adapters]` | All platforms with torch | For seq2seq evaluation. |
 | `hf_auto` | Auto-select HF adapter | `invarlock[adapters]` | All platforms with torch | Delegates to a role adapter; prefers quant adapters when detected. |
 | `hf_bnb` | Bitsandbytes quantized LMs | `invarlock[gpu]` | Platform-dependent | Uses `device_map="auto"`; no `.to()`. Latest bitsandbytes wheels can work outside Linux/CUDA when the runtime imports cleanly. |
-| `hf_awq` | AWQ quantized LMs | `invarlock[awq]` | Linux only | Requires `autoawq`/`triton`. |
-| `hf_gptq` | GPTQ quantized LMs | `invarlock[gptq]` | Linux only | Requires `auto-gptq`/`triton`; packaged extras currently stop at upstream-supported pre-3.13 Python stacks, and newer Python/CUDA combinations may require a vendor build. |
+| `hf_awq` | AWQ quantized LMs | `invarlock[awq]` | GPTQModel-supported platforms | Uses the Transformers AWQ loader backed by GPTQModel; GPU recommended for quantized inference. |
+| `hf_gptq` | GPTQ quantized LMs | `invarlock[gptq]` | GPTQModel-supported platforms | Uses GPTQModel for GPTQ subject loading; GPU recommended for quantized inference. |
 
 ### Adapter capabilities
 
@@ -191,12 +191,9 @@ finally:
 
 - **Adapter missing from `invarlock advanced plugins adapters`**: install the required extra
   (`invarlock[adapters]`, `invarlock[gpu]`, `invarlock[gptq]`, `invarlock[awq]`).
-- **Linux-only adapters not available**: `hf_awq` and `hf_gptq` depend on
-  `triton` and remain Linux-only in `pyproject.toml`.
-- **GPTQ install fails even on Linux/CUDA**: `auto-gptq` packaging is
-  upstream-dependent; Python 3.13+ and some newer CUDA stacks may require a
-  pinned or vendor wheel, or a supported interpreter, beyond
-  `pip install "invarlock[gptq]"`.
+- **GPTQModel-backed adapters unavailable**: `hf_awq` and `hf_gptq` use
+  GPTQModel-backed loading; verify the selected GPTQModel wheel supports your
+  Python, PyTorch, and accelerator stack.
 - **Bitsandbytes not detected**: `hf_bnb` is platform-dependent. If the backend
   imports cleanly, `invarlock advanced plugins adapters` will report it as ready even on
   non-CUDA hosts.

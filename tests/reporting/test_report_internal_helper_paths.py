@@ -125,6 +125,72 @@ def test_compute_validation_flags_hysteresis_and_ci() -> None:
     assert flags.get("hysteresis_applied")
 
 
+def test_metric_specific_primary_metric_gate_handles_none_and_other_kinds() -> None:
+    flags = {"primary_metric_acceptable": True}
+    report_validation_mod._apply_metric_specific_primary_metric_gate(
+        flags,
+        primary_metric={"kind": None},
+        metrics_policy={},
+        ratio_limit_with_hyst=1.1,
+        tokens_ok_eff=True,
+        compression_acceptable=True,
+        tiny_relax=False,
+        dataset_capacity=None,
+    )
+    assert flags["primary_metric_acceptable"] is False
+
+    flags = {"primary_metric_acceptable": True}
+    report_validation_mod._apply_metric_specific_primary_metric_gate(
+        flags,
+        primary_metric={"kind": "bleu"},
+        metrics_policy={},
+        ratio_limit_with_hyst=1.1,
+        tokens_ok_eff=True,
+        compression_acceptable=True,
+        tiny_relax=False,
+        dataset_capacity=None,
+    )
+    assert flags["primary_metric_acceptable"] is False
+
+    flags = {"primary_metric_acceptable": True}
+    report_validation_mod._apply_ppl_primary_metric_reconcile(
+        flags,
+        primary_metric={"kind": None},
+        ratio_limit=1.1,
+        hysteresis_ratio=0.0,
+        tokens_ok_eff=True,
+    )
+    assert flags["primary_metric_acceptable"] is False
+
+
+def test_compute_validation_flags_lower_bound_exception_defaults_open(
+    monkeypatch,
+) -> None:
+    class BadFloat(float):
+        def __float__(self):
+            raise ValueError("bad float")
+
+    original_predicate = report_validation_mod._is_non_bool_finite_number
+
+    def predicate(value):  # noqa: ANN001
+        if isinstance(value, BadFloat):
+            return True
+        return original_predicate(value)
+
+    monkeypatch.setattr(report_validation_mod, "_is_non_bool_finite_number", predicate)
+
+    flags = report_validation_mod.compute_validation_flags(
+        ppl={"preview_final_ratio": 1.0, "ratio_vs_baseline": BadFloat(1.0)},
+        spectral={"caps_applied": 0},
+        rmt={"stable": True},
+        invariants={"status": "pass"},
+        pm_acceptance_range={"min": 0.9},
+        get_tier_policies_fn=lambda: {"balanced": {"metrics": {"pm_ratio": {}}}},
+    )
+
+    assert flags["primary_metric_acceptable"] is True
+
+
 def test_compute_validation_flags_tiny_relax_mode() -> None:
     flags = report_validation_mod.compute_validation_flags(
         ppl={"preview_final_ratio": 1.2, "ratio_vs_baseline": 1.5},

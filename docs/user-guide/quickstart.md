@@ -52,13 +52,13 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
 `--execution-mode host` for a host-side workflow. Container-backed runs emit
 `reports/eval/runtime.manifest.json` next to `evaluation.report.json`. For a
 host-side bypass, verify the resulting report with
-`invarlock verify --runtime-provenance host ...`.
+`invarlock verify --runtime-provenance host --assurance off ...`.
 
 Evidence-pack verification works from an installed wheel and does not require a
 repo checkout:
 
 ```bash
-invarlock advanced evidence-pack verify <pack> --strict
+invarlock advanced evidence-pack verify <pack> --strict --report-assurance strict
 ```
 
 ### 3. Verify the evaluation report
@@ -68,7 +68,7 @@ invarlock advanced evidence-pack verify <pack> --strict
 invarlock verify reports/eval/evaluation.report.json
 
 # Host evaluate output
-invarlock verify --runtime-provenance host reports/eval/evaluation.report.json
+invarlock verify --runtime-provenance host --assurance off reports/eval/evaluation.report.json
 ```
 
 The verifier re-checks schema, paired math, gate results, and the adjacent
@@ -125,15 +125,14 @@ Advanced commands live under `invarlock advanced`:
 
 ```bash
 invarlock advanced plugins list
-invarlock advanced evidence-pack verify <pack> --strict
+invarlock advanced evidence-pack verify <pack> --strict --report-assurance strict
 invarlock advanced policy --help
 invarlock advanced calibrate --help
 ```
 
 Use Python extras such as `pip install "invarlock[awq,gptq]"` when you need
-optional backends. On Python 3.13+ stacks, `gptq` may still require a vendor
-wheel or a supported older interpreter because upstream `auto-gptq` packaging
-remains narrower than the core InvarLock support matrix.
+optional backends. The `awq` and `gptq` extras use GPTQModel-backed subject
+loading.
 
 ## Repo Maintainer Path
 

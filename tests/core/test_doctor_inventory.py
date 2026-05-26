@@ -77,7 +77,7 @@ def test_build_adapter_inventory_rows_marks_bitsandbytes_unsupported_without_run
     assert rows[0].detail == "bitsandbytes unavailable on this host"
 
 
-def test_build_adapter_inventory_rows_marks_auto_adapter_and_linux_only_quantizers(
+def test_build_adapter_inventory_rows_marks_auto_adapter_and_optional_awq(
     monkeypatch,
 ) -> None:
     registry = _FakeRegistry(adapters=["hf_auto", "hf_awq"], edits=[], guards=[])
@@ -99,8 +99,9 @@ def test_build_adapter_inventory_rows_marks_auto_adapter_and_linux_only_quantize
     assert rows[0].mode == "auto-matcher"
     assert rows[0].origin == "core"
     assert rows[0].version == "4.0.0"
-    assert rows[1].status == "unsupported"
-    assert rows[1].detail == "Linux-only"
+    assert rows[1].backend == "gptqmodel"
+    assert rows[1].status == "ready"
+    assert rows[1].detail is None
 
 
 def test_build_adapter_inventory_rows_keeps_missing_extra_hint_optional() -> None:

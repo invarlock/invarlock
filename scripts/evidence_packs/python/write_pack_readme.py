@@ -71,12 +71,13 @@ def _render_readme(
     lines.extend(
         [
             "- Error-injection reports are expected-failure evidence and should not be interpreted as clean PASS runs.",
+            "- Current validation edit artifacts are checkpoint-shaped subjects, not optimized deployment backends; inspect results/analysis/edit_artifact_summary.json and report-local edit_metadata.json sidecars.",
             "- By default this is evidence-grade packaging. For strong distributable evidence, require a signed manifest, strict verification, and a PASS final verdict.",
             "",
             "## Verify",
             "",
             "1) Verify the manifest signature (if present):",
-            "   invarlock advanced evidence-pack verify <pack-dir> --strict",
+            "   invarlock advanced evidence-pack verify <pack-dir> --strict --report-assurance strict",
             "",
             "2) Verify file checksums:",
             "   sha256sum -c checksums.sha256",
@@ -86,9 +87,10 @@ def _render_readme(
             "   invarlock verify --json reports/**/evaluation.report.json",
             "",
             "Or use:",
-            "  invarlock advanced evidence-pack verify <pack-dir> [--strict]",
+            "  invarlock advanced evidence-pack verify <pack-dir>",
+            "  invarlock advanced evidence-pack verify <pack-dir> --strict --report-assurance strict",
             "Repo workflow alternative:",
-            "  scripts/evidence_packs/verify_pack.sh --pack <pack-dir> [--strict]",
+            "  scripts/evidence_packs/verify_pack.sh --pack <pack-dir> --strict --report-assurance strict",
         ]
     )
     return "\n".join(lines) + "\n"

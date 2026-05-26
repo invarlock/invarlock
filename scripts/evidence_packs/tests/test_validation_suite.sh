@@ -693,6 +693,14 @@ test_pack_validation_check_dependencies_flash_attn_branches_and_package_installs
     pack_setup_output_dirs
 
     fixture_write "timeout.stub" ""
+    local req_dir="${TEST_TMPDIR}/requirements/evidence-packs"
+    mkdir -p "${req_dir}"
+    : > "${req_dir}/flash-attn.txt"
+    : > "${req_dir}/protobuf.txt"
+    : > "${req_dir}/sentencepiece.txt"
+    pack_evidence_pack_requirement_path() {
+        printf '%s/%s.txt\n' "${req_dir}" "$1"
+    }
 
     python3() {
         if [[ "${1:-}" == "-c" ]]; then
@@ -2418,6 +2426,7 @@ test_pack_validation_pack_run_suite_branches() {
     pack_validate_tuned_edit_params() { :; }
     pack_prepare_calibration_presets() { :; }
     pack_validate_guard_calibration() { :; }
+    pack_validate_runtime_provenance() { :; }
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
     PACK_NET="0"
@@ -2553,6 +2562,7 @@ test_pack_validation_pack_run_suite_calibrate_only_skips_tuned_edit_params_valid
     pack_prepare_scenarios_manifest() { return 0; }
     pack_setup_hf_cache_dirs() { return 0; }
     pack_preflight_datasets() { :; }
+    pack_validate_runtime_provenance() { :; }
 
     # Ensure the model list would fail tuned preset validation if it ran.
     pack_model_list_array() { PACK_MODEL_LIST=("Qwen/Qwen2.5-14B"); }
@@ -2583,6 +2593,7 @@ test_pack_validation_pack_run_suite_errors_only_skips_tuned_edit_params_validati
     pack_prepare_scenarios_manifest() { return 0; }
     pack_setup_hf_cache_dirs() { return 0; }
     pack_preflight_datasets() { :; }
+    pack_validate_runtime_provenance() { :; }
 
     # Ensure the model list would fail tuned preset validation if it ran.
     pack_model_list_array() { PACK_MODEL_LIST=("Qwen/Qwen2.5-14B"); }
@@ -3209,6 +3220,9 @@ test_pack_prepare_scenarios_manifest_writes_state_manifest() {
     local count
     count="$(jq '.scenarios | length' "${OUTPUT_DIR}/state/scenarios.json")"
     assert_ne "0" "${count}" "scenarios list is non-empty"
+    local deployable_count
+    deployable_count="$(jq '[.scenarios[] | select(.artifact_class=="deployable_optimized_subject")] | length' "${OUTPUT_DIR}/state/scenarios.json")"
+    assert_eq "0" "${deployable_count}" "deployable scenarios are excluded by default"
 }
 
 test_pack_prepare_scenarios_manifest_filters_by_suite_tags() {
@@ -3270,6 +3284,36 @@ EOF
     local ids
     ids="$(jq -r '.scenarios[].id' "${OUTPUT_DIR}/state/scenarios.json" | sort | paste -sd ',' -)"
     assert_eq "b" "${ids}" "filters by scenario id after suite filtering"
+}
+
+test_pack_prepare_scenarios_manifest_filters_deployable_backends() {
+    mock_reset
+
+    OUTPUT_DIR="${TEST_TMPDIR}/out"
+    source ./scripts/evidence_packs/lib/validation_suite.sh
+
+    local manifest="${TEST_TMPDIR}/scenarios.json"
+    cat > "${manifest}" <<'EOF'
+{
+  "_meta": {},
+  "schema": "evidence_pack_scenarios_v1",
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "quant_4bit_clean", "category": "clean", "artifact_class": "validation_subject_checkpoint", "strictness": "must_pass", "generation": {"kind": "edit", "edit_spec": "quant_rtn:clean:ffn", "version": "clean"}, "suites": ["subset"]},
+    {"id": "deploy_torchao", "category": "deployable_clean", "artifact_class": "deployable_optimized_subject", "strictness": "must_pass", "generation": {"kind": "deployable_edit", "backend": "torchao", "edit_spec": "torchao_int4:clean:ffn", "version": "clean"}, "suites": ["deployable"]},
+    {"id": "deploy_bnb", "category": "deployable_clean", "artifact_class": "deployable_optimized_subject", "strictness": "must_pass", "generation": {"kind": "deployable_edit", "backend": "bitsandbytes", "edit_spec": "bnb_8bit:clean:ffn", "version": "clean"}, "suites": ["deployable"]}
+  ]
+}
+EOF
+    local PACK_SCENARIOS_MANIFEST_FILE="${manifest}"
+    local PACK_INCLUDE_DEPLOYABLE_EDITS="1"
+    local PACK_DEPLOY_BACKENDS="torchao"
+
+    pack_prepare_scenarios_manifest
+
+    local ids
+    ids="$(jq -r '.scenarios[].id' "${OUTPUT_DIR}/state/scenarios.json" | sort | paste -sd ',' -)"
+    assert_eq "deploy_torchao,quant_4bit_clean" "${ids}" "deployable scenarios honor backend filter"
 }
 
 test_pack_prepare_scenarios_manifest_resume_errors_on_contract_drift() {

@@ -276,6 +276,8 @@ def test_core_monitoring_loops_export_and_gpu_thresholds(monkeypatch, caplog):
         )
         == 2.0
     )
+    perf.operation_times["empty"] = []
+    perf.update_metrics()
 
     resource = core.ResourceMonitor(
         registry,
@@ -580,3 +582,30 @@ def test_exporter_noop_and_existing_socket_branches(monkeypatch):
     )
     manager._export_loop()
     assert export_calls == []
+
+
+@pytest.mark.unit
+def test_prometheus_name_fallback_and_influx_missing_requests(monkeypatch, caplog):
+    import invarlock.observability.exporters as exporters
+
+    assert exporters._prometheus_name(" !!! ", fallback="fallback_metric") == "___"
+    assert exporters._prometheus_name("", fallback="fallback_metric") == (
+        "fallback_metric"
+    )
+
+    real_import = builtins.__import__
+
+    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "requests":
+            raise ImportError("requests missing")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    influx = exporters.InfluxDBExporter(
+        url="https://influx.example.test",
+        database="metrics",
+    )
+
+    with caplog.at_level("ERROR"):
+        assert influx.export([]) is False
+    assert "requests library required" in caplog.text

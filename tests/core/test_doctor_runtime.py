@@ -80,7 +80,7 @@ def test_collect_optional_dependency_facts_marks_bitsandbytes_runtime() -> None:
     by_name = {fact.name: fact for fact in facts}
     assert by_name["datasets"].present is True
     assert by_name["transformers"].present is True
-    assert by_name["auto_gptq"].present is False
+    assert by_name["gptqmodel"].present is False
     assert by_name["bitsandbytes"].present is True
     assert by_name["bitsandbytes"].runtime_available is False
     assert by_name["bitsandbytes"].spec_probe_failed is False

@@ -102,6 +102,21 @@ def _collect_build_evidence_pack_errors(
                 runtime_manifest_path, label="runtime manifest"
             )
             errors.extend(runtime_manifest_errors)
+        for sidecar_name in (
+            "edit_metadata.json",
+            "deployable_artifact_validation.json",
+            "backend_inventory.json",
+            "memory_report.json",
+            "load_smoke.json",
+            "inference_smoke.json",
+        ):
+            sidecar_path = report_path.parent / sidecar_name
+            if sidecar_path.is_file():
+                _, sidecar_errors = _load_json_object(
+                    sidecar_path,
+                    label=sidecar_name,
+                )
+                errors.extend(sidecar_errors)
     return errors
 
 
@@ -155,6 +170,19 @@ def _copy_build_evidence_pack_artifacts(
             out_dir / runtime_manifest_rel,
         )
         rel_paths.append(runtime_manifest_rel)
+        for sidecar_name in (
+            "edit_metadata.json",
+            "deployable_artifact_validation.json",
+            "backend_inventory.json",
+            "memory_report.json",
+            "load_smoke.json",
+            "inference_smoke.json",
+        ):
+            sidecar_path = report_path.parent / sidecar_name
+            if sidecar_path.is_file():
+                sidecar_rel = f"{report_dir_rel}/{sidecar_name}"
+                _copy_file(sidecar_path, out_dir / sidecar_rel)
+                rel_paths.append(sidecar_rel)
 
     return final_dest, rel_paths, material_refs
 

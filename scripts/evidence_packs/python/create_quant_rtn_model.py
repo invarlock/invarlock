@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import gc
-import json
 import os
 import sys
 from pathlib import Path
@@ -9,14 +8,18 @@ from pathlib import Path
 import torch
 
 try:
-    from edit_targeting import matches_edit_scope
+    from edit_implementations import apply_rtn_dequantized_simulation
+    from edit_metadata import build_validation_edit_metadata
     from hf_causal_loader import load_causal_model
     from runtime_tools import require_remote_code_opt_in
+    from save_subject_artifact import save_edited_subject_artifact
 except ImportError:  # pragma: no cover - direct module load under pytest
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from edit_targeting import matches_edit_scope
+    from edit_implementations import apply_rtn_dequantized_simulation
+    from edit_metadata import build_validation_edit_metadata
     from hf_causal_loader import load_causal_model
     from runtime_tools import require_remote_code_opt_in
+    from save_subject_artifact import save_edited_subject_artifact
 from transformers import AutoTokenizer
 
 
@@ -28,36 +31,6 @@ def _configure_determinism() -> None:
     else:
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
-
-
-def _should_quantize(name: str, scope: str) -> bool:
-    return matches_edit_scope(name, scope)
-
-
-@torch.no_grad()
-def _round_to_nearest_gpu(
-    tensor: torch.Tensor, bits: int, group_size: int
-) -> torch.Tensor:
-    qmin = -(2 ** (bits - 1))
-    qmax = max((2 ** (bits - 1)) - 1, 1)
-    orig_shape = tensor.shape
-    flat = tensor.reshape(orig_shape[0], -1)
-    in_features = flat.shape[1]
-    eff_group_size = group_size if group_size > 0 else in_features
-    if eff_group_size >= in_features:
-        eff_group_size = in_features
-    num_groups = (in_features + eff_group_size - 1) // eff_group_size
-    pad = (num_groups * eff_group_size) - in_features
-    if pad > 0:
-        flat = torch.nn.functional.pad(flat, (0, pad))
-    grouped = flat.reshape(orig_shape[0], num_groups, eff_group_size)
-    max_abs = grouped.abs().amax(dim=-1, keepdim=True)
-    scale = torch.clamp(max_abs / qmax, min=1e-10)
-    quantized = torch.round(grouped / scale).clamp(qmin, qmax) * scale
-    quantized = quantized.reshape(orig_shape[0], num_groups * eff_group_size)
-    if pad > 0:
-        quantized = quantized[:, :in_features]
-    return quantized.reshape(orig_shape).to(tensor.dtype)
 
 
 def main(argv: list[str]) -> int:
@@ -99,48 +72,38 @@ def main(argv: list[str]) -> int:
         "Applying RTN quantize/dequantize simulation "
         f"to {bits}-bit on GPU (scope={scope}, group_size={group_size})..."
     )
-    quantized_count = 0
-    total_model_params = sum(p.numel() for p in model.parameters())
-    edited_params = 0
-
-    for name, param in model.named_parameters():
-        if _should_quantize(name, scope) and param.dim() >= 2:
-            param.data = _round_to_nearest_gpu(param.data, bits, group_size)
-            quantized_count += 1
-            edited_params += param.numel()
-            if quantized_count <= 3:
-                print(f"  Quantized: {name} ({tuple(param.shape)})")
-
-    coverage_pct = (
-        100.0 * edited_params / total_model_params if total_model_params else 0.0
+    stats = apply_rtn_dequantized_simulation(
+        model,
+        bits=bits,
+        group_size=group_size,
+        scope=scope,
     )
+    coverage_pct = 100.0 * stats.coverage_ratio
     print(
-        f"Quantized {quantized_count} parameters "
-        f"({edited_params:,} / {total_model_params:,} = {coverage_pct:.1f}% coverage)"
+        f"Quantized {stats.edited_tensors} tensors "
+        f"({stats.edited_params:,} / {stats.total_params:,} = {coverage_pct:.1f}% coverage)"
     )
 
     model = model.cpu()
     gc.collect()
     torch.cuda.empty_cache()
 
-    output_path.mkdir(parents=True, exist_ok=True)
-    tokenizer.save_pretrained(output_path)
-    model.save_pretrained(output_path, safe_serialization=True)
-
-    metadata = {
-        "edit_type": "quant_rtn",
-        "quantization_mode": "rtn_dequantized_external_subject_simulation",
-        "storage_format": "float_dequantized",
-        "actual_storage_format": "float_dequantized",
-        "packed_quantized_storage": False,
-        "runtime_memory_reduction": False,
-        "deployment_backend": None,
-        "bits": bits,
-        "group_size": group_size,
-        "scope": scope,
-        "quantized_params": quantized_count,
-    }
-    (output_path / "edit_metadata.json").write_text(json.dumps(metadata, indent=2))
+    metadata = build_validation_edit_metadata(
+        edit_type="quant_rtn",
+        scope=scope,
+        parameters={"bits": bits, "group_size": group_size},
+        coverage=stats.coverage_payload(),
+        extra={
+            "quantization_mode": "rtn_dequantized_external_subject_simulation",
+            "quantized_params": stats.edited_tensors,
+        },
+    )
+    save_edited_subject_artifact(
+        model=model,
+        tokenizer=tokenizer,
+        output_path=output_path,
+        metadata=metadata,
+    )
 
     del model
     gc.collect()

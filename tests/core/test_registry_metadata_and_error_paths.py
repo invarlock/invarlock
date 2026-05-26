@@ -190,9 +190,9 @@ def test_registry_entry_points_select_and_get_paths(monkeypatch):
 def test_get_plugin_metadata_adds_name_and_type_for_known_plugin() -> None:
     registry = reg.CoreRegistry()
 
-    metadata = registry.get_plugin_metadata("hello_guard", "guards")
+    metadata = registry.get_plugin_metadata("demo_hello_guard", "guards")
 
-    assert metadata["name"] == "hello_guard"
+    assert metadata["name"] == "demo_hello_guard"
     assert metadata["type"] == "guards"
     assert metadata["available"] is True
     assert metadata["module"] != "unknown"
@@ -335,10 +335,8 @@ def test_registry_optional_plugin_metadata_tracks_missing_dependencies(
     monkeypatch,
 ) -> None:
     def _fake_missing(self, deps: list[str]) -> list[str]:
-        if deps == ["auto_gptq"]:
-            return ["auto_gptq"]
-        if deps == ["awq"]:
-            return []
+        if deps == ["gptqmodel"]:
+            return ["gptqmodel"]
         if deps == ["bitsandbytes"]:
             return ["bitsandbytes"]
         return []
@@ -351,9 +349,9 @@ def test_registry_optional_plugin_metadata_tracks_missing_dependencies(
     bnb_info = registry.get_plugin_info("hf_bnb", "adapters")
 
     assert gptq_info["available"] is False
-    assert gptq_info["status"] == "Needs extra: auto_gptq"
-    assert awq_info["available"] is True
-    assert awq_info["status"] == "Built-in"
+    assert gptq_info["status"] == "Needs extra: gptqmodel"
+    assert awq_info["available"] is False
+    assert awq_info["status"] == "Needs extra: gptqmodel"
     assert bnb_info["available"] is False
     assert bnb_info["status"] == "Needs extra: bitsandbytes"
 
@@ -401,7 +399,7 @@ def test_registry_additional_paths(monkeypatch):
         r.get_guard("not_guard")
 
     # Validate configuration success path
-    ok, msg = r.validate_configuration("hf_causal", "quant_rtn", ["hello_guard"])
+    ok, msg = r.validate_configuration("hf_causal", "quant_rtn", ["demo_hello_guard"])
     assert ok and msg.endswith("valid")
 
     # Validate configuration unavailable paths

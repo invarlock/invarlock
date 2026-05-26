@@ -11,6 +11,18 @@ class BuiltinPluginSpec:
     module: str
     class_name: str
     required_deps: tuple[str, ...] = ()
+    support_tier: str = "core_supported"
+    strict_assurance_allowed: bool = True
+    published_basis: bool = False
+    deployment_claim: bool = False
+
+    def support_metadata(self) -> dict[str, object]:
+        return {
+            "support_tier": self.support_tier,
+            "strict_assurance_allowed": self.strict_assurance_allowed,
+            "published_basis": self.published_basis,
+            "deployment_claim": self.deployment_claim,
+        }
 
 
 BUILTIN_PLUGIN_CATALOG: dict[str, tuple[BuiltinPluginSpec, ...]] = {
@@ -44,19 +56,22 @@ BUILTIN_PLUGIN_CATALOG: dict[str, tuple[BuiltinPluginSpec, ...]] = {
             name="hf_gptq",
             module="invarlock.plugins.hf_gptq_adapter",
             class_name="HF_GPTQ_Adapter",
-            required_deps=("auto_gptq",),
+            required_deps=("gptqmodel",),
+            support_tier="optional_backend_loader",
         ),
         BuiltinPluginSpec(
             name="hf_awq",
             module="invarlock.plugins.hf_awq_adapter",
             class_name="HF_AWQ_Adapter",
-            required_deps=("awq",),
+            required_deps=("gptqmodel",),
+            support_tier="optional_backend_loader",
         ),
         BuiltinPluginSpec(
             name="hf_bnb",
             module="invarlock.plugins.hf_bnb_adapter",
             class_name="HF_BNB_Adapter",
             required_deps=("bitsandbytes",),
+            support_tier="optional_backend_loader",
         ),
     ),
     "edits": (
@@ -64,11 +79,13 @@ BUILTIN_PLUGIN_CATALOG: dict[str, tuple[BuiltinPluginSpec, ...]] = {
             name="quant_rtn",
             module="invarlock.edits.quant_rtn",
             class_name="RTNQuantEdit",
+            support_tier="validation_simulation",
         ),
         BuiltinPluginSpec(
             name="noop",
             module="invarlock.edits.noop",
             class_name="NoopEdit",
+            support_tier="internal_baseline_edit",
         ),
     ),
     "guards": (
@@ -93,9 +110,11 @@ BUILTIN_PLUGIN_CATALOG: dict[str, tuple[BuiltinPluginSpec, ...]] = {
             class_name="RMTGuard",
         ),
         BuiltinPluginSpec(
-            name="hello_guard",
+            name="demo_hello_guard",
             module="invarlock.plugins.hello_guard",
             class_name="HelloGuard",
+            support_tier="demo_only",
+            strict_assurance_allowed=False,
         ),
     ),
 }
@@ -108,8 +127,24 @@ def builtin_plugin_specs(plugin_type: str) -> tuple[BuiltinPluginSpec, ...]:
         raise ValueError(f"Unknown plugin catalog type: {plugin_type}") from error
 
 
+def builtin_plugin_support_metadata(
+    plugin_type: str,
+    name: str,
+) -> dict[str, object]:
+    for spec in builtin_plugin_specs(plugin_type):
+        if spec.name == name:
+            return spec.support_metadata()
+    return {
+        "support_tier": "third_party",
+        "strict_assurance_allowed": False,
+        "published_basis": False,
+        "deployment_claim": False,
+    }
+
+
 __all__ = [
     "BuiltinPluginSpec",
     "BUILTIN_PLUGIN_CATALOG",
     "builtin_plugin_specs",
+    "builtin_plugin_support_metadata",
 ]

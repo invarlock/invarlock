@@ -27,8 +27,8 @@ invarlock advanced runtime-verify \
 
 The default `invarlock evaluate --execution-mode container` flow emits
 `runtime.manifest.json` next to `evaluation.report.json` automatically. Host
-execution requires `verify --runtime-provenance host` and forfeits strict
-assurance unless `--assurance off` is explicit.
+execution forfeits strict assurance and should be verified explicitly with
+`verify --runtime-provenance host --assurance off`.
 
 ## Strict Runtime Requirements
 

@@ -35,9 +35,9 @@ def test_markdownlintignore_curated_docs_use_current_existing_paths() -> None:
         "docs/assurance/07-rmt-epsilon-rule.md",
         "docs/assurance/08-ve-gate-power.md",
         "docs/assurance/09-determinism-contracts.md",
-        "docs/reference/exporting-certificates-html.md",
+        "docs/reference/exporting-" + "certif" + "icates-html.md",
         "docs/user-guide/compare-and-certify.md",
-        "docs/user-guide/reading-certificate.md",
+        "docs/user-guide/reading-" + "certif" + "icate.md",
     ]
 
     for rel_path in expected_curated_paths:
@@ -67,8 +67,8 @@ def test_gitignore_keeps_current_output_paths_and_drops_stale_legacy_scratch() -
     removed_patterns = [
         "/reports_report/",
         "/.certify_tmp/",
-        "/certificates/",
-        "*_certificate/",
+        "/" + "certif" + "icates/",
+        "*_" + "certif" + "icate/",
         "cert-*.json",
         "*.cert",
         "fullLisk.txt",

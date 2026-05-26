@@ -40,6 +40,60 @@ def _render_executive_dashboard(cert: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip()
 
 
+def _primary_metric_is_pseudo_accuracy(evaluation_report: dict[str, Any]) -> bool:
+    primary_metric = evaluation_report.get("primary_metric")
+    if not isinstance(primary_metric, dict):
+        return False
+    kind = str(primary_metric.get("kind") or "").strip().lower()
+    counts_source = str(primary_metric.get("counts_source") or "").strip().lower()
+    return kind == "accuracy" and (
+        counts_source == "pseudo_config" or bool(primary_metric.get("estimated"))
+    )
+
+
+def _is_non_assurance_report(evaluation_report: dict[str, Any]) -> bool:
+    assurance = evaluation_report.get("assurance")
+    if not isinstance(assurance, dict):
+        return True
+    mode = str(assurance.get("mode") or "").strip().lower()
+    runtime_status = (
+        str(assurance.get("runtime_provenance_verification_status") or "")
+        .strip()
+        .lower()
+    )
+    assurance_verdict = (
+        str(
+            assurance.get("verified_assurance_verdict")
+            or assurance.get("verdict")
+            or ""
+        )
+        .strip()
+        .lower()
+    )
+    if mode != "strict":
+        return True
+    if runtime_status and runtime_status not in {"verified", "pass", "ok"}:
+        return True
+    if assurance_verdict and assurance_verdict not in {"verified", "pass", "ok"}:
+        return True
+    return False
+
+
+def _append_report_warning_banners(
+    lines: list[str], evaluation_report: dict[str, Any]
+) -> None:
+    warnings: list[str] = []
+    if _primary_metric_is_pseudo_accuracy(evaluation_report):
+        warnings.append("ESTIMATED / PSEUDO ACCURACY — NOT MEASURED LABEL ACCURACY")
+    if _is_non_assurance_report(evaluation_report):
+        warnings.append("NON-ASSURANCE REPORT")
+    if not warnings:
+        return
+    for warning in warnings:
+        lines.append(f"> **{warning}**")
+    lines.append("")
+
+
 def _append_safety_dashboard_section(
     lines: list[str], evaluation_report: dict[str, Any]
 ) -> None:
@@ -698,6 +752,8 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
     appendix_lines: list[str] = []
 
     _append_report_header(lines, evaluation_report)
+
+    _append_report_warning_banners(lines, evaluation_report)
 
     _append_plugin_provenance_section(lines, evaluation_report)
 

@@ -112,6 +112,9 @@ def test_coverage_policy_is_shared_with_makefile_and_expanded_surface() -> None:
     assert (
         "src/invarlock/reporting/report_primary_metric_policy.py" in policy.CORE_FILES
     )
+    assert policy.CORE_FLOOR_DEFAULT == 0.90
+    assert policy.DEFAULT_FLOOR_DEFAULT == 0.90
+    assert set(policy.THRESHOLDS.values()) == {1.00}
 
     assert policy.COVERAGE_MODULE_FLAGS == ("--cov",)
 
@@ -356,5 +359,6 @@ def test_coverage_include_does_not_embed_space_prefixed_cli_patterns() -> None:
     assert "src/invarlock/cli/commands/*" in include
     assert "src/invarlock/public_contracts.py" in include
     assert "src/invarlock/evidence_pack.py" in include
+    assert "src/invarlock/evidence_pack_edit_metadata.py" in include
     assert "src/invarlock/runtime_security.py" in include
     assert "invarlock/cli/commands/*" in include

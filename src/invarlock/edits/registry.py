@@ -42,7 +42,7 @@ class EditRegistry:
                 EditPlugin(
                     name="quant_rtn",
                     edit_class=RTNQuantEdit,
-                    description="RTN (round-to-nearest) weight quantization",
+                    description="RTN dequantized weight-edit simulation",
                     is_available=True,
                 )
             )

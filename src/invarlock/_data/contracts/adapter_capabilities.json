@@ -81,9 +81,10 @@
       "adapter": "hf_awq",
       "snapshot_restore": "best_effort",
       "guard_coverage": "full_when_modules_exposed",
-      "platform_support": "linux",
+      "platform_support": "gptqmodel-supported platforms",
       "runtime_constraints": [
-        "autoawq",
+        "gptqmodel",
+        "transformers",
         "triton"
       ],
       "required_extra": "awq",
@@ -95,9 +96,9 @@
       "adapter": "hf_gptq",
       "snapshot_restore": "best_effort",
       "guard_coverage": "full_when_modules_exposed",
-      "platform_support": "linux",
+      "platform_support": "gptqmodel-supported platforms",
       "runtime_constraints": [
-        "auto-gptq",
+        "gptqmodel",
         "triton"
       ],
       "required_extra": "gptq",

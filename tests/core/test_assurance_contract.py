@@ -9,6 +9,7 @@ from invarlock.core.assurance_contract import (
     normalize_assurance_mode,
     normalize_verify_assurance_mode,
     observed_guard_chain_from_report,
+    report_build_has_blocking_evidence_events,
     resolve_report_assurance_mode,
     strict_evaluate_policy_errors,
     strict_report_policy_errors,
@@ -47,6 +48,16 @@ def test_build_assurance_section_passes_for_canonical_strict_report() -> None:
     assert section["report_local_verdict"] == "pass"
     assert section["verified_assurance_verdict"] == "pending"
     assert section["blocking_reasons"] == []
+
+
+def test_observed_guard_chain_prefers_context_chain_with_duplicates() -> None:
+    report = _strict_report()
+    report["guards"] = [
+        {"name": name} for name in ("invariants", "spectral", "rmt", "variance")
+    ]
+    report["context"]["guard_chain_observed"] = list(CANONICAL_GUARD_CHAIN)
+
+    assert observed_guard_chain_from_report(report) == list(CANONICAL_GUARD_CHAIN)
 
 
 def test_build_assurance_section_rejects_invalid_runtime_status() -> None:
@@ -210,6 +221,61 @@ def test_strict_report_policy_rejects_structured_report_build_events() -> None:
     errors = strict_report_policy_errors(report, require_strict=True)
 
     assert any("repaired fields" in error for error in errors)
+
+
+def test_strict_report_policy_allows_display_ci_computed_from_ci_event() -> None:
+    report = _strict_report()
+    report["report_build"] = {
+        "synthesized_fields": [
+            {
+                "field": "primary_metric.display_ci",
+                "reason": "computed_from_primary_metric_ci",
+                "source": "primary_metric_utils._attach_primary_metric_from_report",
+            }
+        ],
+        "repaired_fields": [],
+        "fallback_fields": [],
+    }
+    report["assurance"] = build_assurance_section(
+        report,
+        runtime_provenance_verified=True,
+    )
+
+    assert report_build_has_blocking_evidence_events(report) is False
+    assert report["assurance"]["fallback_fields_used"] is False
+    assert report["assurance"]["verdict"] == "pass"
+    assert not strict_report_policy_errors(
+        report,
+        require_strict=True,
+        runtime_provenance_verified=True,
+    )
+
+
+def test_report_build_event_helper_ignores_non_lists_and_flags_non_objects() -> None:
+    assert (
+        report_build_has_blocking_evidence_events(
+            {
+                "report_build": {
+                    "synthesized_fields": "not-a-list",
+                    "repaired_fields": [],
+                    "fallback_fields": [],
+                }
+            }
+        )
+        is False
+    )
+    assert (
+        report_build_has_blocking_evidence_events(
+            {
+                "report_build": {
+                    "synthesized_fields": [None],
+                    "repaired_fields": [],
+                    "fallback_fields": [],
+                }
+            }
+        )
+        is True
+    )
 
 
 def test_assurance_mode_normalizers_reject_unknown_modes() -> None:

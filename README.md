@@ -172,8 +172,8 @@ Evidence packs bundle reports + verification metadata into a distributable artif
 
 - Guide: <https://invarlock.github.io/invarlock/0.9.0/user-guide/evidence-packs/>
 - Verify from an installed wheel:
-  `invarlock advanced evidence-pack verify <dir> --strict`
-- Repo harness alternative: `scripts/evidence_packs/verify_pack.sh --pack <dir> --strict`
+  `invarlock advanced evidence-pack verify <dir> --strict --report-assurance strict`
+- Repo harness alternative: `scripts/evidence_packs/verify_pack.sh --pack <dir> --strict --report-assurance strict`
 
 Note: `configs/` and most `scripts/` remain repo resources and are not included in
 wheels. Installed wheels include the public contracts and the
@@ -191,9 +191,7 @@ pip install "invarlock[hf]"
 ```
 
 Optional extras: `invarlock[probes]`, `invarlock[gpu]`, `invarlock[awq,gptq]`.
-On Python 3.13+ stacks, `gptq` may still require a vendor wheel or a
-supported older interpreter because upstream `auto-gptq` packaging is narrower
-than the core InvarLock support matrix. Full setup:
+The `awq` and `gptq` extras use GPTQModel-backed subject loading. Full setup:
 <https://invarlock.github.io/invarlock/0.9.0/user-guide/getting-started/>.
 
 The minimal install covers the core verification and reporting flows. Add

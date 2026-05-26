@@ -27,6 +27,24 @@ test_run_pack_build_pack_collects_artifacts() {
     echo "{}" > "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json"
     echo "{}" > "${run_dir}/modelA/reports/edit/run_1/manifest.json"
     echo "{}" > "${run_dir}/modelA/reports/edit/run_1/runtime.manifest.json"
+    cat > "${run_dir}/modelA/reports/edit/run_1/edit_metadata.json" <<'JSON'
+{
+  "schema": "invarlock/evidence-pack-edit-metadata-v1",
+  "artifact_class": "validation_subject_checkpoint",
+  "edit_type": "quant_rtn",
+  "optimized_deployment_backend": false,
+  "storage_format": "float_dequantized",
+  "actual_storage_format": "float_dequantized",
+  "packed_quantized_storage": false,
+  "runtime_memory_reduction": false,
+  "coverage": {
+    "edited_tensors": 1,
+    "edited_params": 1,
+    "total_params": 1,
+    "coverage_ratio": 1.0
+  }
+}
+JSON
     echo "# summary" > "${run_dir}/modelA/reports/edit/run_1/evaluation_report.md"
     echo "reviewer summary" > "${run_dir}/modelA/reports/edit/run_1/reviewer_summary.txt"
     mkdir -p "${run_dir}/modelA/reports/edit/run_1/runtime_inputs"
@@ -92,6 +110,7 @@ EOF
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/evaluation.report.json" "report copied"
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/manifest.json" "report manifest copied"
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/runtime.manifest.json" "runtime manifest copied"
+    assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/edit_metadata.json" "edit metadata copied"
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/evaluation_report.md" "markdown summary copied"
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/reviewer_summary.txt" "reviewer summary copied"
     assert_file_exists "${pack_dir}/reports/modelA/edit/run_1/runtime_inputs/baseline_report.json" "runtime inputs copied"
@@ -109,6 +128,7 @@ EOF
     assert_match "signed manifest, strict verification, and a PASS final verdict" "$(cat "${pack_dir}/README.md")" "README documents strict signed verification triad"
     assert_match "invarlock advanced evidence-pack verify" "$(cat "${pack_dir}/README.md")" "README points to advanced evidence-pack verify"
     assert_file_exists "${pack_dir}/results/analysis/guard_intervention_summary.json" "intervention summary copied"
+    assert_file_exists "${pack_dir}/results/analysis/edit_artifact_summary.json" "edit artifact summary written"
     assert_file_exists "${pack_dir}/metadata/source_repo.json" "source repo metadata written"
     assert_file_exists "${pack_dir}/metadata/environment.json" "environment metadata written"
     assert_file_exists "${pack_dir}/metadata/tuned_edit_params.json" "tuned edit params copied"
@@ -150,6 +170,59 @@ test_run_pack_build_pack_rejects_failed_final_verdict() {
     run pack_build_pack "${run_dir}" "${TEST_TMPDIR}/pack"
     assert_rc "1" "${RUN_RC}" "pack build fails when run verdict is FAIL"
     assert_match "refusing to build a distributable pack" "${RUN_ERR}" "rejects failed run verdict"
+}
+
+test_run_pack_release_review_requires_pass_and_runtime_manifests() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    local run_dir="${TEST_TMPDIR}/run"
+    mkdir -p "${run_dir}/reports" "${run_dir}/modelA/reports/edit/run_1"
+    echo "review" > "${run_dir}/reports/final_verdict.txt"
+    echo '{"verdict":"WARN"}' > "${run_dir}/reports/final_verdict.json"
+    echo "{}" > "${run_dir}/modelA/reports/edit/run_1/evaluation.report.json"
+
+    PACK_RELEASE_REVIEW=1
+    PACK_REQUIRE_PASS=1
+    PACK_VERIFY_PROFILE=ci
+    PACK_REPORT_ASSURANCE=strict
+    PACK_SIGN_MANIFEST=1
+    PACK_REQUIRE_RUNTIME_MANIFESTS=1
+    export PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
+    export PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+
+    run pack_build_pack "${run_dir}" "${TEST_TMPDIR}/pack"
+    assert_rc "1" "${RUN_RC}" "release-review rejects non-PASS verdict"
+    assert_match "requires PASS" "${RUN_ERR}" "non-PASS rejection is explicit"
+
+    echo '{"verdict":"PASS"}' > "${run_dir}/reports/final_verdict.json"
+    run pack_build_pack "${run_dir}" "${TEST_TMPDIR}/pack2"
+    assert_rc "1" "${RUN_RC}" "release-review rejects missing runtime manifests"
+    assert_match "Missing runtime.manifest.json" "${RUN_ERR}" "runtime sidecar required"
+
+    unset PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
+    unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+}
+
+test_run_pack_entrypoint_release_review_sets_hardened_defaults() {
+    mock_reset
+
+    source ./scripts/evidence_packs/run_pack.sh
+
+    pack_entrypoint() { printf '%s\n' "$@" > "${TEST_TMPDIR}/run.args"; }
+    pack_build_pack() { :; }
+
+    pack_run_pack --release-review --out "${TEST_TMPDIR}/out"
+
+    assert_eq "1" "${PACK_REQUIRE_PASS}" "release-review requires PASS"
+    assert_eq "ci" "${PACK_VERIFY_PROFILE}" "release-review uses ci profile"
+    assert_eq "strict" "${PACK_REPORT_ASSURANCE}" "release-review uses strict assurance"
+    assert_eq "1" "${PACK_SIGN_MANIFEST}" "release-review signs manifests"
+    assert_eq "1" "${PACK_REQUIRE_RUNTIME_MANIFESTS}" "release-review requires runtime manifests"
+
+    unset PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
+    unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
 }
 
 test_run_pack_build_pack_layout_v2_nests_results_and_metadata() {
