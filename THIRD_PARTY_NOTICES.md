@@ -39,6 +39,7 @@ release tooling.
 | Component | Upstream | License | Notes |
 |-----------|----------|---------|-------|
 | torch | [pytorch/pytorch](https://github.com/pytorch/pytorch) | BSD 3-Clause | Core tensor runtime for adapters and edits |
+| torchvision | [pytorch/vision](https://github.com/pytorch/vision) | BSD 3-Clause | Optional vision/model-definition dependency used by GPTQModel |
 | transformers | [huggingface/transformers](https://github.com/huggingface/transformers) | Apache License 2.0 | Model loading, tokenizers, and generation utilities |
 | safetensors | [huggingface/safetensors](https://github.com/huggingface/safetensors) | Apache License 2.0 | Tensor-only serialization used by secure snapshot flows |
 | datasets | [huggingface/datasets](https://github.com/huggingface/datasets) | Apache License 2.0 | Dataset ingestion and evaluation helpers |
@@ -53,8 +54,7 @@ release tooling.
 | h2 | [python-hyper/h2](https://github.com/python-hyper/h2) | MIT | Optional HTTP/2 support for Hub traffic |
 | pillow | [python-pillow/Pillow](https://github.com/python-pillow/Pillow) | MIT-CMU | Optional image handling for multimodal/runtime helpers |
 | bitsandbytes | [bitsandbytes-foundation/bitsandbytes](https://github.com/bitsandbytes-foundation/bitsandbytes) | MIT | Optional GPU quantization/runtime kernels |
-| auto-gptq | [PanQiWei/AutoGPTQ](https://github.com/PanQiWei/AutoGPTQ) | Apache License 2.0 | Optional GPTQ quantization backend (Linux-only extra) |
-| autoawq | [casper-hansen/AutoAWQ](https://github.com/casper-hansen/AutoAWQ) | Apache License 2.0 | Optional AWQ quantization backend (Linux-only extra) |
+| gptqmodel | [ModelCloud/GPTQModel](https://github.com/ModelCloud/GPTQModel) | Apache License 2.0 | Optional GPTQ and AWQ backend loading |
 | triton | [triton-lang/triton](https://github.com/triton-lang/triton) | MIT | Optional GPU kernel compilation/runtime support |
 
 ## Representative Reference Models

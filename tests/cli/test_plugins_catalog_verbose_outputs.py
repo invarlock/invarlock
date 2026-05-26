@@ -106,6 +106,10 @@ def test_plugins_guards_verbose_json_and_explain(monkeypatch, capsys):
     plugins_command(category="guards", only="core", json_out=True)
     core_payload = json.loads(capsys.readouterr().out)
     assert {item["name"] for item in core_payload["items"]} == {"spectral"}
+    spectral_item = next(
+        item for item in core_payload["items"] if item["name"] == "spectral"
+    )
+    assert spectral_item["support_tier"] == "core_supported"
 
     plugins_command(category="guards", only="optional", json_out=True)
     optional_payload = json.loads(capsys.readouterr().out)
@@ -178,6 +182,8 @@ def test_plugins_plugins_category_json(monkeypatch, capsys):
     payload = json.loads(capsys.readouterr().out)
     kinds = {item["kind"] for item in payload["items"]}
     assert kinds == {"adapter", "guard", "edit"}
+    quant_item = next(item for item in payload["items"] if item["name"] == "quant_rtn")
+    assert quant_item["support_tier"] == "validation_simulation"
 
 
 def test_plugins_category_none_lists_all(monkeypatch):

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import platform as _platform
 from typing import Any
 
 from .backend_runtime import bitsandbytes_runtime_available
@@ -14,8 +13,6 @@ def get_adapter_rows() -> list[dict[str, Any]]:
     from invarlock.core.registry import get_registry
 
     registry = get_registry()
-    is_linux = _platform.system().lower() == "linux"
-
     rows: list[dict[str, Any]] = []
     for name in registry.list_adapters():
         info = registry.get_plugin_info(name, "adapters")
@@ -36,13 +33,9 @@ def get_adapter_rows() -> list[dict[str, Any]]:
         }:
             backend = "transformers"
         elif name == "hf_gptq":
-            backend = "auto-gptq"
-            if not is_linux:
-                status, enable = "unsupported", "Linux-only"
+            backend = "gptqmodel"
         elif name == "hf_awq":
-            backend = "autoawq"
-            if not is_linux:
-                status, enable = "unsupported", "Linux-only"
+            backend = "gptqmodel"
         elif name == "hf_bnb":
             backend = "bitsandbytes"
             if not bitsandbytes_runtime_available():

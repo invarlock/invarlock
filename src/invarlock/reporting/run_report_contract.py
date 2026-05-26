@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+from invarlock.core.backend_inventory import (
+    BACKEND_INVENTORY_FILENAME,
+    write_backend_inventory_sidecar,
+)
 
 from . import report_files
 from .report_types import RunReport
@@ -332,6 +338,27 @@ def persist_run_report_outputs(
         filename_prefix="report",
     )
     saved_files = {key: str(value) for key, value in saved_paths.items()}
+    run_context = getattr(run_config, "context", None)
+    backend_inventory = (
+        run_context.get("_backend_inventory") if isinstance(run_context, dict) else None
+    )
+    existing_backend_inventory_path = run_dir / BACKEND_INVENTORY_FILENAME
+    existing_backend_inventory = None
+    if existing_backend_inventory_path.is_file():
+        try:
+            existing_backend_inventory = json.loads(
+                existing_backend_inventory_path.read_text(encoding="utf-8")
+            )
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            existing_backend_inventory = None
+
+    backend_inventory_path = write_backend_inventory_sidecar(
+        report,
+        run_dir,
+        inventory=backend_inventory or existing_backend_inventory,
+    )
+    if backend_inventory_path is not None:
+        saved_files["backend_inventory"] = str(backend_inventory_path)
 
     report_path_out = saved_files.get("json")
     if report_path_out:

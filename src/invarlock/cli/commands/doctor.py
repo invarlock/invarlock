@@ -629,16 +629,10 @@ def doctor_command(
                 console_obj.print(
                     f"  [yellow]⚠️  {dep.name} — {dep.description}[/yellow]"
                 )
-                if dep.name in {"auto_gptq", "autoawq"}:
-                    console_obj.print(
-                        f"     → Install: pip install 'invarlock[{dep.extra_hint}]'  # Linux + CUDA only",
-                        markup=False,
-                    )
-                else:
-                    console_obj.print(
-                        f"     → Install: pip install 'invarlock[{dep.extra_hint}]'",
-                        markup=False,
-                    )
+                console_obj.print(
+                    f"     → Install: pip install 'invarlock[{dep.extra_hint}]'",
+                    markup=False,
+                )
 
     had_error, cfg_metric_kind = _doctor_apply_preflight(
         config=config,

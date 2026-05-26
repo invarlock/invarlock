@@ -3,7 +3,7 @@ HuggingFace AWQ Adapter (plugin)
 ================================
 
 Optional adapter for loading AWQ-quantized causal LMs from the Hub.
-Requires the `autoawq` extra on supported platforms (typically Linux/CUDA).
+Requires the `gptqmodel`-backed AWQ loader exposed through Transformers.
 
 AWQ models are pre-quantized and typically handle device placement internally
 during loading. This adapter does NOT call .to() on the loaded model.
@@ -23,14 +23,6 @@ from invarlock.core.exceptions import DependencyError, ModelLoadError
 
 INVARLOCK_CORE_ABI = CORE_ABI
 
-_AWQ_IMPORT_ERRORS = (
-    AttributeError,
-    ImportError,
-    ModuleNotFoundError,
-    OSError,
-    RuntimeError,
-)
-
 
 class HF_AWQ_Adapter(HFAdapterMixin, ModelAdapter):
     name = "hf_awq"
@@ -40,30 +32,14 @@ class HF_AWQ_Adapter(HFAdapterMixin, ModelAdapter):
         trust_remote_code = resolve_trust_remote_code(load_kwargs)
         load_kwargs.pop("trust_remote_code", None)
 
-        # Try common import paths used by AWQ projects
-        AutoAWQForCausalLM = None
         with wrap_errors(
             DependencyError,
             "E203",
-            "DEPENDENCY-MISSING: autoawq/awq",
-            lambda e: {"dependency": "autoawq/awq"},
+            "DEPENDENCY-MISSING: transformers/gptqmodel",
+            lambda e: {"dependency": "transformers/gptqmodel"},
         ):
-            for mod_path, attr in (
-                ("autoawq", "AutoAWQForCausalLM"),
-                ("awq", "AutoAWQForCausalLM"),
-            ):
-                try:  # pragma: no cover - exercised in integration
-                    mod = __import__(mod_path, fromlist=[attr])
-                    AutoAWQForCausalLM = getattr(mod, attr)
-                    break
-                except _AWQ_IMPORT_ERRORS:
-                    continue
-
-        if AutoAWQForCausalLM is None:  # pragma: no cover
-            # wrap_errors above will have raised; this is a safety
-            raise DependencyError(
-                code="E203", message="DEPENDENCY-MISSING: autoawq/awq"
-            )
+            import gptqmodel  # noqa: F401
+            from transformers import AutoModelForCausalLM
 
         with wrap_errors(
             ModelLoadError,
@@ -71,7 +47,9 @@ class HF_AWQ_Adapter(HFAdapterMixin, ModelAdapter):
             "MODEL-LOAD-FAILED: awq",
             lambda e: {"model_id": model_id},
         ):
-            model = AutoAWQForCausalLM.from_quantized(
+            load_kwargs.setdefault("device_map", "auto")
+            model = self._load_pretrained_model(
+                AutoModelForCausalLM,
                 model_id,
                 trust_remote_code=trust_remote_code,
                 **load_kwargs,

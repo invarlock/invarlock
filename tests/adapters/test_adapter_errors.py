@@ -67,8 +67,8 @@ def test_gptq_missing_runtime_maps_to_dependency_error(
     real_import = builtins.__import__
 
     def _imp(name: str, *a: object, **k: object) -> object:
-        if name == "auto_gptq":
-            raise ImportError("auto_gptq unavailable")
+        if name == "gptqmodel":
+            raise ImportError("gptqmodel unavailable")
         return real_import(name, *a, **k)
 
     monkeypatch.setattr(builtins, "__import__", _imp)

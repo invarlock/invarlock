@@ -1,4 +1,4 @@
-"""Template guard plugin for entry point demonstrations."""
+"""Demo-only guard plugin for entry point demonstrations."""
 
 from __future__ import annotations
 
@@ -12,9 +12,12 @@ INVARLOCK_CORE_ABI = CORE_ABI
 
 
 class HelloGuard(Guard):
-    """Simple guard that checks a score in the validation context."""
+    """Demo guard that checks a score in the validation context."""
 
-    name = "hello_guard"
+    name = "demo_hello_guard"
+    support_tier = "demo_only"
+    demo_only = True
+    strict_assurance_allowed = False
 
     def __init__(self, threshold: float = 1.0):
         self.threshold = float(threshold)

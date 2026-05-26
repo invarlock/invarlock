@@ -160,6 +160,11 @@ def test_detect_quantization_from_model_variants(monkeypatch) -> None:
     )
     assert auto_mod._detect_quantization_from_model(dict_bnb) == "hf_bnb"
 
+    dict_unknown = SimpleNamespace(
+        config=SimpleNamespace(quantization_config={"quant_method": "marlin"})
+    )
+    assert auto_mod._detect_quantization_from_model(dict_unknown) is None
+
     dict_bad = SimpleNamespace(
         config=SimpleNamespace(quantization_config={"quant_method": 42})
     )

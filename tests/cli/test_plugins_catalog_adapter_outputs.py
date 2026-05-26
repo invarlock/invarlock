@@ -215,8 +215,7 @@ def test_plugins_adapters_json_marks_missing_backends_not_present(monkeypatch, c
     monkeypatch.setattr(plugins_mod.platform, "system", lambda: "Linux", raising=False)
 
     def fake_extract(name):
-        lib = "autoawq" if name == "hf_awq" else "auto-gptq"
-        return SimpleNamespace(library=lib, version=None)
+        return SimpleNamespace(library="gptqmodel", version=None)
 
     monkeypatch.setattr(
         "invarlock.core.adapter_provenance.extract_adapter_provenance",
@@ -227,8 +226,8 @@ def test_plugins_adapters_json_marks_missing_backends_not_present(monkeypatch, c
     plugins_command(category="adapters", json_out=True, hide_unsupported=False)
     payload = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     by_name = {item["name"]: item for item in payload["items"]}
-    assert by_name["hf_awq"]["backend"] == {"name": "autoawq", "present": False}
-    assert by_name["hf_gptq"]["backend"] == {"name": "auto-gptq", "present": False}
+    assert by_name["hf_awq"]["backend"] == {"name": "gptqmodel", "present": False}
+    assert by_name["hf_gptq"]["backend"] == {"name": "gptqmodel", "present": False}
 
 
 def test_plugins_adapters_minimal_only_ready(monkeypatch, capsys):
@@ -342,7 +341,7 @@ def test_plugins_adapters_handle_torch_and_extra_errors(monkeypatch, capsys):
         if name == "hf_bnb":
             return SimpleNamespace(library="bitsandbytes", version="0.42")
         if name == "hf_gptq":
-            return SimpleNamespace(library="auto-gptq", version="1.0")
+            return SimpleNamespace(library="gptqmodel", version="1.0")
         if name == "hf_hint":
             return SimpleNamespace(library="transformers", version="1.2")
         raise RuntimeError("no provenance")
@@ -378,7 +377,7 @@ def test_plugins_adapters_handle_torch_and_extra_errors(monkeypatch, capsys):
     payload = json.loads(capsys.readouterr().out.strip())
     statuses = {item["name"]: item["status"] for item in payload["items"]}
     assert statuses["hf_bnb"] == "unsupported"
-    assert statuses["hf_gptq"] == "unsupported"
+    assert statuses["hf_gptq"] == "ready"
     assert statuses["hf_hint"] == "needs_extra"
     assert "hf_err" in statuses  # row produced even when provenance extras fail
 
@@ -576,7 +575,7 @@ def test_plugins_adapters_show_unsupported_backend_present(monkeypatch, capsys):
     _patch_registry(monkeypatch, adapters)
     monkeypatch.setattr(
         "invarlock.core.adapter_provenance.extract_adapter_provenance",
-        lambda name: SimpleNamespace(library="auto-gptq", version=None),
+        lambda name: SimpleNamespace(library="gptqmodel", version=None),
         raising=False,
     )
     monkeypatch.setattr(
@@ -591,8 +590,8 @@ def test_plugins_adapters_show_unsupported_backend_present(monkeypatch, capsys):
         hide_unsupported=False,
     )
     payload = json.loads(capsys.readouterr().out)
-    assert payload["items"][0]["status"] == "unsupported"
-    assert payload["items"][0]["backend"] == {"name": "auto-gptq", "present": False}
+    assert payload["items"][0]["status"] == "needs_extra"
+    assert payload["items"][0]["backend"] == {"name": "gptqmodel", "present": False}
 
 
 def test_plugins_adapters_explain_enable_hint(monkeypatch):
@@ -640,11 +639,14 @@ def test_plugins_adapters_explain_special_notes(monkeypatch):
     dummy_console = DummyConsole()
     monkeypatch.setattr(plugins_mod, "console", dummy_console, raising=False)
     plugins_command(category="adapters", explain="hf_gptq")
-    assert any("AutoGPTQ-quantized" in line for line in dummy_console.lines)
-    assert any("pinned or vendor wheel" in line for line in dummy_console.lines)
+    assert any("GPTQModel-compatible" in line for line in dummy_console.lines)
+    assert any("Uses GPTQModel" in line for line in dummy_console.lines)
     dummy_console.lines.clear()
     plugins_command(category="adapters", explain="hf_awq")
     assert any("AWQ-quantized" in line for line in dummy_console.lines)
+    assert any(
+        "Transformers AWQ through GPTQModel" in line for line in dummy_console.lines
+    )
 
 
 def test_plugins_adapters_provenance_failure_graceful(monkeypatch, capsys):

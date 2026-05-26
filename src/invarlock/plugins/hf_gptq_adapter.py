@@ -2,8 +2,8 @@
 HuggingFace GPTQ Adapter (plugin)
 =================================
 
-Optional adapter for loading AutoGPTQ-quantized causal LMs from the Hub.
-Requires the `auto-gptq` extra on supported platforms (typically Linux/CUDA).
+Optional adapter for loading GPTQModel-backed GPTQ causal LMs from the Hub.
+Requires the `gptqmodel` extra on supported platforms.
 
 GPTQ models are pre-quantized and typically handle device placement internally
 during loading. This adapter uses safe device movement to respect constraints.
@@ -36,10 +36,10 @@ class HF_GPTQ_Adapter(HFAdapterMixin, ModelAdapter):
         with wrap_errors(
             DependencyError,
             "E203",
-            "DEPENDENCY-MISSING: auto_gptq/transformers",
-            lambda e: {"dependency": "auto_gptq"},
+            "DEPENDENCY-MISSING: gptqmodel/transformers",
+            lambda e: {"dependency": "gptqmodel"},
         ):
-            from auto_gptq import AutoGPTQForCausalLM
+            from gptqmodel import GPTQModel
 
         with wrap_errors(
             ModelLoadError,
@@ -47,10 +47,9 @@ class HF_GPTQ_Adapter(HFAdapterMixin, ModelAdapter):
             "MODEL-LOAD-FAILED: gptq",
             lambda e: {"model_id": model_id},
         ):
-            model = AutoGPTQForCausalLM.from_quantized(
+            model = GPTQModel.load(
                 model_id,
                 trust_remote_code=trust_remote_code,
-                inject_fused_attention=False,
                 **load_kwargs,
             )
 

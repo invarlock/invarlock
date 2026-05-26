@@ -103,7 +103,8 @@ probes = [
 # External edit integrations
 gptq = [
   "torch>=2.11.0",
-  "auto-gptq>=0.7.0; platform_system == \"Linux\" and python_version < \"3.13\"",
+  "torchvision>=0.23.0",
+  "gptqmodel>=5.8.0",
   "triton>=2.3.0; platform_system == \"Linux\"",
   "transformers>=5.5.0",
   "safetensors>=0.4.0",
@@ -112,8 +113,10 @@ gptq = [
 
 awq = [
   "torch>=2.11.0",
-  "autoawq>=0.2.0; platform_system == \"Linux\"",
+  "torchvision>=0.23.0",
+  "gptqmodel>=5.8.0",
   "transformers>=5.5.0",
+  "accelerate>=0.27",
   "safetensors>=0.4.0",
   "triton>=2.3.0; platform_system == \"Linux\"",
 ]
@@ -138,10 +141,10 @@ advanced = [
   "numpy>=1.24",
   "scikit-learn>=1.4",
   "huggingface_hub>=1.0.0",
+  "torchvision>=0.23.0",
   "accelerate>=0.27",
   "bitsandbytes>=0.41",
-  "auto-gptq>=0.7.0; platform_system == \"Linux\" and python_version < \"3.13\"",
-  "autoawq>=0.2.0; platform_system == \"Linux\"",
+  "gptqmodel>=5.8.0",
   "triton>=2.3.0; platform_system == \"Linux\"",
   "aiohttp>=3.12.14",
   "h2>=4.3.0",
@@ -161,10 +164,10 @@ all = [
   "numpy>=1.24",
   "scikit-learn>=1.4",
   "huggingface_hub>=1.0.0",
+  "torchvision>=0.23.0",
   "accelerate>=0.27",
   "bitsandbytes>=0.41",
-  "auto-gptq>=0.7.0; platform_system == \"Linux\" and python_version < \"3.13\"",
-  "autoawq>=0.2.0; platform_system == \"Linux\"",
+  "gptqmodel>=5.8.0",
   "triton>=2.3.0; platform_system == \"Linux\"",
   "aiohttp>=3.12.14",
   "h2>=4.3.0",
@@ -231,7 +234,7 @@ security-ci = [
   "cyclonedx-bom>=4.1",
 ]
 
-# Entry points for production-ready plugins
+# Entry points for built-in and optional plugins
 [project.entry-points."invarlock.edits"]
 quant_rtn = "invarlock.edits:RTNQuantEdit"
 
@@ -240,7 +243,7 @@ spectral = "invarlock.guards:SpectralGuard"
 variance = "invarlock.guards:VarianceGuard"
 rmt = "invarlock.guards:RMTGuard"
 invariants = "invarlock.guards:InvariantsGuard"
-hello_guard = "invarlock.plugins:HelloGuard"
+demo_hello_guard = "invarlock.plugins:HelloGuard"
 
 [project.entry-points."invarlock.adapters"]
 hf_causal = "invarlock.adapters:HF_Causal_Adapter"
@@ -337,7 +340,7 @@ module = [
     "psutil.*",
     "torch.*",
     "transformers.*",
-    "auto_gptq.*",
+    "gptqmodel.*",
     "requests",
     "requests.*",
     "yaml",

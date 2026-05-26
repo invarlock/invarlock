@@ -185,6 +185,7 @@ def _print_adapters_verbose(rows: list[dict[str, Any]]) -> None:
     table.add_column("Backend", style="magenta")
     table.add_column("Version", style="magenta")
     table.add_column("Status", style="green")
+    table.add_column("Tier", style="dim")
     table.add_column("Module", style="dim")
     table.add_column("Entry Point", style="dim")
     for row in rows:
@@ -202,6 +203,7 @@ def _print_adapters_verbose(rows: list[dict[str, Any]]) -> None:
             backend_disp,
             version_disp,
             row["status"].replace("needs_extra", "Needs extra").capitalize(),
+            str(row.get("support_tier") or ""),
             row["module"],
             entry_disp,
         )
@@ -224,6 +226,11 @@ def _explain_adapter(name: str, *, rows: list[dict[str, Any]]) -> None:
     )
     console.print(f"[bold]{row['name']}[/bold]")
     console.print(f"  Support     : {row['support'].capitalize()}")
+    console.print(f"  Tier        : {row.get('support_tier') or '-'}")
+    console.print(
+        "  Strict OK   : " + ("yes" if row.get("strict_assurance_allowed") else "no")
+    )
+    console.print("  Deploys     : " + ("yes" if row.get("deployment_claim") else "no"))
     console.print(f"  Backend     : {backend_disp}")
     if row["support"] == "auto":
         console.print("  Status      : Ready (auto matcher)")
@@ -236,14 +243,15 @@ def _explain_adapter(name: str, *, rows: list[dict[str, Any]]) -> None:
     elif row["status"] == "partial":
         console.print("  Status      : Partial (GPU-only features disabled)")
     if row["name"] == "hf_gptq":
-        console.print("  Matches     : AutoGPTQ-quantized HF repos (from_quantized)")
+        console.print("  Matches     : GPTQModel-compatible GPTQ HF repos")
         console.print(
-            "  Notes       : Linux/CUDA recommended; upstream auto-gptq "
-            "packaging may require a pinned or vendor wheel"
+            "  Notes       : Uses GPTQModel; GPU recommended for quantized inference"
         )
     elif row["name"] == "hf_awq":
         console.print("  Matches     : AWQ-quantized HF repos")
-        console.print("  Notes       : GPU recommended; metadata ingestion on CPU")
+        console.print(
+            "  Notes       : Uses Transformers AWQ through GPTQModel; GPU recommended"
+        )
     elif row["name"] == "hf_bnb":
         console.print("  Matches     : Transformers 4/8-bit loading with bitsandbytes")
         console.print(
@@ -309,6 +317,7 @@ def _print_generic_verbose(rows: list[dict[str, Any]], title: str) -> None:
     table.add_column("Backend", style="magenta")
     table.add_column("Version", style="magenta")
     table.add_column("Status", style="green")
+    table.add_column("Tier", style="dim")
     table.add_column("Module", style="dim")
     table.add_column("Entry Point", style="dim")
     for idx, row in enumerate(rows):
@@ -325,6 +334,7 @@ def _print_generic_verbose(rows: list[dict[str, Any]], title: str) -> None:
             backend_disp,
             version_disp,
             row["status"].replace("needs_extra", "Needs extra").capitalize(),
+            str(row.get("support_tier") or ""),
             row["module"],
             entry,
             end_section=end_section,
@@ -414,6 +424,11 @@ def _explain_generic(
         raise typer.Exit(1)
     console.print(f"[bold]{row['name']}[/bold]")
     console.print(f"  Support     : {row['support'].capitalize()}")
+    console.print(f"  Tier        : {row.get('support_tier') or '-'}")
+    console.print(
+        "  Strict OK   : " + ("yes" if row.get("strict_assurance_allowed") else "no")
+    )
+    console.print("  Deploys     : " + ("yes" if row.get("deployment_claim") else "no"))
     backend_label = row.get("backend") or "—"
     console.print(f"  Backend     : {backend_label}")
     if row["status"] == "ready":
@@ -705,15 +720,15 @@ def _check_plugin_extras(plugin_name: str, plugin_type: str) -> str:
         "spectral": {"packages": [], "extra": ""},
         "variance": {"packages": [], "extra": ""},
         "rmt": {"packages": [], "extra": ""},
+        "demo_hello_guard": {"packages": [], "extra": ""},
         # Adapter plugins (baked-in only)
         "hf_causal": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
         "hf_mlm": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
         "hf_seq2seq": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
         "hf_auto": {"packages": ["transformers"], "extra": "invarlock[adapters]"},
         # Optional adapter plugins
-        "hf_gptq": {"packages": ["auto_gptq"], "extra": "invarlock[gptq]"},
-        # `autoawq` installs the `awq` import name (not `autoawq`) in practice.
-        "hf_awq": {"packages": ["awq"], "extra": "invarlock[awq]"},
+        "hf_gptq": {"packages": ["gptqmodel"], "extra": "invarlock[gptq]"},
+        "hf_awq": {"packages": ["gptqmodel"], "extra": "invarlock[awq]"},
         "hf_bnb": {"packages": ["bitsandbytes"], "extra": "invarlock[gpu]"},
     }
 
@@ -722,21 +737,14 @@ def _check_plugin_extras(plugin_name: str, plugin_type: str) -> str:
         return ""  # No extra dependencies needed
 
     # Check each required package. For most packages we use a light import so
-    # tests can monkeypatch __import__. For GPU-only stacks (bitsandbytes) and
-    # packages with noisy import-time warnings (awq), we probe presence via
-    # importlib.util.find_spec instead of importing.
+    # tests can monkeypatch __import__. For GPU-only stacks (bitsandbytes), we
+    # probe runtime readiness instead of importing.
     missing_packages: list[str] = []
     for pkg in plugin_info["packages"]:
         try:
             if pkg == "bitsandbytes":
                 if not bitsandbytes_runtime_available():
                     raise ImportError("bitsandbytes not importable")
-            elif pkg == "awq":
-                import importlib.util as _util
-
-                spec = _util.find_spec(pkg)
-                if spec is None:
-                    raise ImportError("awq not importable")
             else:
                 __import__(pkg)
         except ImportError:
@@ -783,7 +791,11 @@ def _plugins_list(
 @plugins_app.command("guards")
 def _plugins_guards(
     only: str | None = typer.Option(
-        None, "--only", help="Filter: missing|ready|core|optional"
+        None,
+        "--only",
+        help=(
+            "Filter: missing|ready|core|optional|core_supported|demo_only|third_party"
+        ),
     ),
     verbose: bool = typer.Option(False, "--verbose", help="Verbose table output"),
     json_out: bool = typer.Option(False, "--json", help="Emit JSON output"),
@@ -810,7 +822,12 @@ def _plugins_guards(
 @plugins_app.command("edits")
 def _plugins_edits(
     only: str | None = typer.Option(
-        None, "--only", help="Filter: missing|ready|core|optional"
+        None,
+        "--only",
+        help=(
+            "Filter: missing|ready|core|optional|core_supported|"
+            "validation_simulation|internal_baseline_edit|third_party"
+        ),
     ),
     verbose: bool = typer.Option(False, "--verbose", help="Verbose table output"),
     json_out: bool = typer.Option(False, "--json", help="Emit JSON output"),
@@ -837,7 +854,12 @@ def _plugins_edits(
 @plugins_app.command("adapters")
 def _plugins_adapters(
     only: str | None = typer.Option(
-        None, "--only", help="Filter: missing|ready|core|optional"
+        None,
+        "--only",
+        help=(
+            "Filter: missing|ready|core|optional|core_supported|"
+            "optional_backend_loader|third_party"
+        ),
     ),
     verbose: bool = typer.Option(False, "--verbose", help="Verbose table output"),
     json_out: bool = typer.Option(False, "--json", help="Emit JSON output"),

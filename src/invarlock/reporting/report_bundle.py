@@ -6,6 +6,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+from invarlock.core.backend_inventory import write_backend_inventory_sidecar
 from invarlock.core.report_inputs import ReportInputError, resolve_report_input_path
 from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
 
@@ -50,6 +51,13 @@ def save_evaluation_bundle(
         except ReportInputError:
             resolved_run_path = None
         if resolved_run_path is not None:
+            run_inventory_path = resolved_run_path.parent / "backend_inventory.json"
+            if run_inventory_path.is_file():
+                copied_inventory_path = output_path / "backend_inventory.json"
+                if run_inventory_path.resolve() != copied_inventory_path.resolve():
+                    shutil.copy2(run_inventory_path, copied_inventory_path)
+                saved_files["backend_inventory"] = copied_inventory_path
+
             runtime_manifest_path = resolved_run_path.parent / RUNTIME_MANIFEST_FILENAME
             if runtime_manifest_path.is_file():
                 copied_manifest_path = output_path / RUNTIME_MANIFEST_FILENAME
@@ -79,6 +87,14 @@ def save_evaluation_bundle(
                 elif runtime_manifest_path.resolve() != copied_manifest_path.resolve():
                     shutil.copy2(runtime_manifest_path, copied_manifest_path)
                 saved_files["runtime_manifest"] = copied_manifest_path
+
+    if "backend_inventory" not in saved_files:
+        backend_inventory_path = write_backend_inventory_sidecar(
+            evaluation_report,
+            output_path,
+        )
+        if backend_inventory_path is not None:
+            saved_files["backend_inventory"] = backend_inventory_path
 
     write_report_manifest(
         report=run_report,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -158,6 +159,50 @@ def test_persist_run_report_outputs_adds_telemetry_and_saved_paths(
     assert result.report_path_out == str(tmp_path / "report.json")
     assert result.telemetry_saved_path == str(tmp_path / "telemetry.json")
     assert report["artifacts"]["telemetry_path"].endswith("telemetry.json")
+
+
+def test_persist_run_report_outputs_preserves_existing_backend_inventory(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    def _save_report(report, out_dir, formats=None, filename_prefix="report"):
+        out = out_dir / "report.json"
+        out.write_text("{}", encoding="utf-8")
+        return {"json": out}
+
+    monkeypatch.setattr(report_files, "save_report", _save_report)
+    existing_inventory = {
+        "schema": "invarlock/backend-inventory-v1",
+        "adapter": "hf_bnb",
+        "backend": "bitsandbytes",
+        "backend_version": "0.49.0",
+        "transformers_version": "4.57.0",
+        "quantization_config": {"load_in_8bit": True},
+        "quantized_module_count": 2,
+        "quantized_module_types": ["bitsandbytes.nn.Linear8bitLt"],
+        "device_map": "auto",
+        "memory_footprint": {"reported_bytes": 10, "method": "test"},
+        "load_smoke": True,
+        "inference_smoke": True,
+    }
+    (tmp_path / "backend_inventory.json").write_text(
+        json.dumps(existing_inventory),
+        encoding="utf-8",
+    )
+
+    report = create_empty_report()
+    report["meta"]["adapter"] = "hf_bnb"
+    result = persist_run_report_outputs(
+        report=report,
+        run_dir=tmp_path,
+        run_config=SimpleNamespace(event_path=tmp_path / "events.jsonl"),
+        telemetry=False,
+        save_telemetry_report_fn=lambda *args, **kwargs: None,
+    )
+
+    assert result.saved_files["backend_inventory"].endswith("backend_inventory.json")
+    payload = json.loads((tmp_path / "backend_inventory.json").read_text("utf-8"))
+    assert payload["quantized_module_count"] == 2
 
 
 def test_assemble_run_report_preserves_primary_metric_context() -> None:

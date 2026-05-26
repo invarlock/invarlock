@@ -39,16 +39,14 @@ class DoctorSpecProbeResult:
 OPTIONAL_DEPENDENCIES: tuple[tuple[str, str], ...] = (
     ("datasets", "Dataset loading (WikiText-2, etc.)"),
     ("transformers", "Hugging Face model support"),
-    ("auto_gptq", "GPTQ quantization (Linux/CUDA only)"),
-    ("autoawq", "AWQ quantization (Linux/CUDA only)"),
+    ("gptqmodel", "GPTQ/AWQ quantization backend loading"),
     ("bitsandbytes", "8/4-bit loading (GPU)"),
 )
 
 _OPTIONAL_DEP_HINTS = {
     "datasets": "eval",
     "transformers": "adapters",
-    "auto_gptq": "gptq",
-    "autoawq": "awq",
+    "gptqmodel": "gptq,awq",
     "bitsandbytes": "gpu",
 }
 

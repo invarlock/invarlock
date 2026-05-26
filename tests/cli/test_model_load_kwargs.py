@@ -42,6 +42,8 @@ def test_extract_model_load_kwargs_excludes_core_fields(
                 "id": "foo",
                 "adapter": "dummy",
                 "device": "cuda",
+                "baseline_id": "baseline/model",
+                "subject_id": "subject/model",
                 "dtype": "float16",
                 "trust_remote_code": True,
             }

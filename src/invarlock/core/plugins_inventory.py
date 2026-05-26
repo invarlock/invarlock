@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from typing import Any, Literal
 
+from invarlock.core.builtin_plugin_catalog import builtin_plugin_support_metadata
+
 PluginCategory = Literal["adapters", "guards", "edits"]
 InventoryRow = dict[str, Any]
 _INVENTORY_PROBE_ERRORS = (
@@ -46,6 +48,24 @@ def _adapter_backend_payload(row: Mapping[str, Any]) -> dict[str, Any] | None:
     return backend_obj
 
 
+def _support_metadata(
+    *,
+    plugin_type: PluginCategory,
+    name: str,
+    info: Mapping[str, Any],
+) -> dict[str, Any]:
+    metadata = builtin_plugin_support_metadata(plugin_type, name)
+    for key in (
+        "support_tier",
+        "strict_assurance_allowed",
+        "published_basis",
+        "deployment_claim",
+    ):
+        if key in info:
+            metadata[key] = info[key]
+    return metadata
+
+
 def gather_adapter_inventory_rows(
     *,
     registry: Any,
@@ -56,6 +76,7 @@ def gather_adapter_inventory_rows(
     provenance_extractor: Callable[[str], Any],
     bitsandbytes_runtime_available: Callable[[], bool],
 ) -> list[InventoryRow]:
+    _ = is_linux
     names = list(registry.list_adapters())
     if minimal:
         names = [
@@ -95,10 +116,6 @@ def gather_adapter_inventory_rows(
         enable = ""
         if support == "optional" and not present:
             status = "needs_extra"
-
-        if backend_name in {"auto-gptq", "autoawq"} and not is_linux:
-            status = "unsupported"
-            enable = "Linux-only"
 
         try:
             extras_status = extras_checker(name, "adapters")
@@ -144,6 +161,7 @@ def gather_adapter_inventory_rows(
                 "enable": enable,
                 "module": module,
                 "entry_point": entry,
+                **_support_metadata(plugin_type="adapters", name=name, info=info),
             }
         )
 
@@ -194,6 +212,7 @@ def gather_generic_inventory_rows(
                 "enable": enable,
                 "module": module,
                 "entry_point": entry,
+                **_support_metadata(plugin_type=plugin_type, name=name, info=info),
             }
         )
 
@@ -222,6 +241,16 @@ def filter_inventory_rows(
         return [row for row in rows if row["support"] == "core"]
     if mode == "optional":
         return [row for row in rows if row["support"] == "optional"]
+    support_tiers = {
+        "core_supported",
+        "optional_backend_loader",
+        "validation_simulation",
+        "demo_only",
+        "internal_baseline_edit",
+        "third_party",
+    }
+    if mode in support_tiers:
+        return [row for row in rows if row.get("support_tier") == mode]
     return rows
 
 
@@ -234,6 +263,10 @@ def adapter_inventory_json_items(rows: list[InventoryRow]) -> list[dict[str, Any
             "entry_point": row.get("entry_point"),
             "origin": _module_origin(str(row.get("module") or "")),
             "status": row.get("status"),
+            "support_tier": row.get("support_tier"),
+            "strict_assurance_allowed": row.get("strict_assurance_allowed"),
+            "published_basis": row.get("published_basis"),
+            "deployment_claim": row.get("deployment_claim"),
             "backend": _adapter_backend_payload(row),
             "capability": row.get("capability"),
         }
@@ -254,6 +287,10 @@ def generic_inventory_json_items(
             "module": row.get("module"),
             "entry_point": row.get("entry_point"),
             "origin": _module_origin(str(row.get("module") or "")),
+            "support_tier": row.get("support_tier"),
+            "strict_assurance_allowed": row.get("strict_assurance_allowed"),
+            "published_basis": row.get("published_basis"),
+            "deployment_claim": row.get("deployment_claim"),
         }
         for row in rows
     ]
@@ -273,6 +310,10 @@ def combined_plugins_json_items(
                 "module": row.get("module"),
                 "entry_point": row.get("entry_point"),
                 "origin": _module_origin(str(row.get("module") or "")),
+                "support_tier": row.get("support_tier"),
+                "strict_assurance_allowed": row.get("strict_assurance_allowed"),
+                "published_basis": row.get("published_basis"),
+                "deployment_claim": row.get("deployment_claim"),
                 "backend": _adapter_backend_payload(row),
             }
             for row in adapter_rows

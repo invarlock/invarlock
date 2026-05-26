@@ -3,6 +3,9 @@ from invarlock.plugins.hello_guard import HelloGuard
 
 def test_hello_guard_passes_below_threshold():
     guard = HelloGuard(threshold=1.5)
+    assert guard.name == "demo_hello_guard"
+    assert guard.demo_only is True
+    assert guard.strict_assurance_allowed is False
     result = guard.validate(model=None, adapter=None, context={"hello_score": 1.0})
     assert result["passed"] is True
     assert result["decision"] == "allow"

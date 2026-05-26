@@ -28,8 +28,8 @@ class AdapterProvenance:
 
 _FAMILY_MAP: dict[str, tuple[str, str, list[str]]] = {
     # name -> (family, library, tested_versions)
-    "hf_gptq": ("gptq", "auto-gptq", []),
-    "hf_awq": ("awq", "autoawq", []),
+    "hf_gptq": ("gptq", "gptqmodel", []),
+    "hf_awq": ("awq", "gptqmodel", []),
     "hf_bnb": ("bnb", "bitsandbytes", []),
 }
 
