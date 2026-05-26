@@ -27,6 +27,8 @@ Options:
   --json-out FILE     Write verify JSON output to FILE (must be outside the pack)
   --skip-verify       Skip invarlock verify step
   --strict            Fail closed on missing/invalid signatures and pack mismatches
+  --report-assurance MODE
+                     Nested report assurance mode (report|strict|off)
   --help              Show this help message
 
 Notes:
@@ -269,6 +271,7 @@ pack_verify_reports() {
     local pack_dir="$1"
     local json_out="$2"
     local profile="${PACK_VERIFY_PROFILE:-dev}"
+    local report_assurance="${PACK_REPORT_ASSURANCE:-report}"
     local -a reports=()
     local -a reports_clean=()
     local -a reports_error=()
@@ -285,6 +288,9 @@ pack_verify_reports() {
         echo "ERROR: No reports found in pack." >&2
         return 1
     fi
+    if [[ "${report_assurance}" == "off" ]]; then
+        return 0
+    fi
 
     if [[ ${#reports_clean[@]} -eq 0 ]]; then
         echo "ERROR: No clean reports found in pack (only error-injection reports present)." >&2
@@ -292,13 +298,13 @@ pack_verify_reports() {
     fi
 
     if [[ -n "${json_out}" ]]; then
-        invarlock verify --json --profile "${profile}" "${reports_clean[@]}" > "${json_out}"
+        invarlock verify --json --profile "${profile}" --assurance "${report_assurance}" "${reports_clean[@]}" > "${json_out}"
     else
-        invarlock verify --json --profile "${profile}" "${reports_clean[@]}"
+        invarlock verify --json --profile "${profile}" --assurance "${report_assurance}" "${reports_clean[@]}"
     fi
 
     if [[ ${#reports_error[@]} -gt 0 ]]; then
-        invarlock verify --json --profile "${profile}" "${reports_error[@]}" >/dev/null || true
+        invarlock verify --json --profile "${profile}" --assurance "${report_assurance}" "${reports_error[@]}" >/dev/null || true
     fi
 }
 
@@ -309,6 +315,7 @@ pack_verify_pack() {
     local json_out=""
     local skip_verify=0
     local strict="${PACK_STRICT_MODE:-0}"
+    local report_assurance="${PACK_REPORT_ASSURANCE:-report}"
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -339,6 +346,22 @@ pack_verify_pack() {
             --strict)
                 strict=1
                 shift
+                ;;
+            --report-assurance)
+                report_assurance="${2:-}"
+                if [[ -z "${report_assurance}" ]]; then
+                    echo "ERROR: --report-assurance requires report, strict, or off" >&2
+                    return "${PACK_VERIFY_USAGE}"
+                fi
+                case "${report_assurance}" in
+                    report|strict|off)
+                        ;;
+                    *)
+                        echo "ERROR: --report-assurance requires report, strict, or off" >&2
+                        return "${PACK_VERIFY_USAGE}"
+                        ;;
+                esac
+                shift 2
                 ;;
             --)
                 shift
@@ -373,6 +396,8 @@ pack_verify_pack() {
         echo "ERROR: --json-out must point outside the pack directory." >&2
         return "${PACK_VERIFY_USAGE}"
     fi
+    PACK_REPORT_ASSURANCE="${report_assurance}"
+    export PACK_REPORT_ASSURANCE
 
     if ! pack_validate_manifest_schema "${pack_dir}"; then
         return "${PACK_VERIFY_FORMAT}"

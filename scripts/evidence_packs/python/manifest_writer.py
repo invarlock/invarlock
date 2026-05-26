@@ -275,11 +275,19 @@ def _materials(pack_dir: Path) -> list[dict[str, Any]]:
         ("metadata/model_revisions.json", "model_revisions"),
         ("metadata/scenarios.json", "scenarios"),
         ("metadata/tuned_edit_params.json", "tuned_edit_params"),
+        ("results/analysis/edit_artifact_summary.json", "edit_artifact_summary"),
     ):
         reference = _file_reference(pack_dir, rel_path, name=name)
         if reference is not None:
             materials.append(reference)
     return materials
+
+
+def _edit_artifact_summary(pack_dir: Path) -> dict[str, Any]:
+    payload = _load_json(
+        pack_dir / "results" / "analysis" / "edit_artifact_summary.json"
+    )
+    return payload if isinstance(payload, dict) else {}
 
 
 def _scenario_ids() -> list[str]:
@@ -361,6 +369,18 @@ def write_manifest(
         },
         "materials": _materials(pack_dir),
     }
+
+    edit_summary = _edit_artifact_summary(pack_dir)
+    if edit_summary:
+        lanes = edit_summary.get("evidence_lanes")
+        if isinstance(lanes, dict):
+            payload["evidence_lanes"] = lanes
+        deployable = edit_summary.get("deployable_subjects")
+        if isinstance(deployable, dict):
+            payload["deployable_subjects"] = deployable
+        counts = edit_summary.get("counts")
+        if isinstance(counts, dict):
+            payload["artifact_class_counts"] = counts
 
     if payload["builder"]["id"] and payload["builder"]["name"]:
         version = payload.get("invarlock_version") or ""

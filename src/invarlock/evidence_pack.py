@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from invarlock import evidence_pack_edit_metadata as evidence_pack_edit_metadata_mod
 from invarlock import evidence_pack_integrity as evidence_pack_integrity_mod
 from invarlock import evidence_pack_manifest as evidence_pack_manifest_mod
 from invarlock import evidence_pack_metadata as evidence_pack_metadata_mod
@@ -107,8 +108,18 @@ def _verify_signature(
 _signature_warnings_to_errors = evidence_pack_integrity_mod.signature_warnings_to_errors
 
 
-def _run_verify_command(reports: list[Path], *, profile: str) -> VerifyExecutionResult:
-    return run_verify_reports(reports, profile=profile, json_mode=True)
+def _run_verify_command(
+    reports: list[Path],
+    *,
+    profile: str,
+    report_assurance: str = "report",
+) -> VerifyExecutionResult:
+    return run_verify_reports(
+        reports,
+        profile=profile,
+        json_mode=True,
+        assurance_mode=report_assurance,
+    )
 
 
 def _verify_command_succeeded(result: VerifyExecutionResult) -> bool:
@@ -120,10 +131,24 @@ def _verify_reports(
     *,
     json_out_path: Path | None,
     profile: str,
+    report_assurance: str,
 ) -> tuple[list[str], dict[str, Any] | None]:
     reports = sorted(pack_dir.glob("reports/**/evaluation.report.json"))
     if not reports:
         return ["No reports found in pack."], None
+    if report_assurance == "off":
+        verify_payload = {
+            "ok": True,
+            "skipped": True,
+            "reason": "report_assurance_off",
+            "reports": len(reports),
+        }
+        if json_out_path is not None:
+            json_out_path.write_text(
+                json.dumps(verify_payload, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+        return [], verify_payload
     clean_reports = [path for path in reports if "/errors/" not in path.as_posix()]
     error_reports = [path for path in reports if path not in clean_reports]
     if not clean_reports:
@@ -131,13 +156,21 @@ def _verify_reports(
             "No clean reports found in pack (only error-injection reports present)."
         ], None
 
-    clean_result = _run_verify_command(clean_reports, profile=profile)
+    clean_result = _run_verify_command(
+        clean_reports,
+        profile=profile,
+        report_assurance=report_assurance,
+    )
     if not isinstance(clean_result.payload, dict):
         return ["clean report verification did not return a JSON object."], None
     verify_payload = dict(clean_result.payload)
     if error_reports:
         try:
-            error_result = _run_verify_command(error_reports, profile=profile)
+            error_result = _run_verify_command(
+                error_reports,
+                profile=profile,
+                report_assurance=report_assurance,
+            )
         except (
             ImportError,
             ModuleNotFoundError,
@@ -180,6 +213,10 @@ _copy_build_evidence_pack_artifacts = (
 _build_evidence_pack_manifest = evidence_pack_support_mod._build_evidence_pack_manifest
 inspect_evidence_pack = evidence_pack_support_mod.inspect_evidence_pack
 
+_verify_edit_metadata_consistency = (
+    evidence_pack_edit_metadata_mod._verify_edit_metadata_consistency
+)
+
 
 def build_evidence_pack(
     out_dir: Path,
@@ -192,6 +229,8 @@ def build_evidence_pack(
     readme_path: Path | None = None,
     signing_key_path: Path | None = None,
     profile: str = "dev",
+    report_assurance: str = "report",
+    release_review: bool = False,
 ) -> EvidencePackResult:
     warnings: list[str] = []
     errors: list[str] = []
@@ -212,6 +251,29 @@ def build_evidence_pack(
     if out_dir.exists():
         errors.append(f"Output pack directory already exists: {out_dir}")
         return EvidencePackResult(payload=payload, status=EvidencePackStatus.USAGE)
+    if report_assurance not in {"report", "strict", "off"}:
+        errors.append(
+            "Report assurance must be one of report, strict, or off "
+            f"(got {report_assurance!r})."
+        )
+        return EvidencePackResult(payload=payload, status=EvidencePackStatus.USAGE)
+    if release_review:
+        if not profile:
+            errors.append("release-review build requires an explicit profile.")
+        if report_assurance != "strict":
+            errors.append("release-review build requires --report-assurance strict.")
+        if signing_key_path is None:
+            errors.append("release-review build requires --signing-key.")
+        try:
+            verdict_payload = _load_json(final_verdict_path)
+        except _json_load_error_types() as exc:
+            errors.append(f"Final verdict is not valid JSON: {exc}")
+        else:
+            verdict = verdict_payload.get("verdict")
+            if not isinstance(verdict, str) or verdict.strip().upper() != "PASS":
+                errors.append("release-review build requires final verdict PASS.")
+        if errors:
+            return EvidencePackResult(payload=payload, status=EvidencePackStatus.USAGE)
 
     errors.extend(
         _collect_build_evidence_pack_errors(
@@ -227,7 +289,11 @@ def build_evidence_pack(
     if errors:
         return EvidencePackResult(payload=payload, status=EvidencePackStatus.FORMAT)
 
-    verify_result = _run_verify_command(report_paths, profile=profile)
+    verify_result = _run_verify_command(
+        report_paths,
+        profile=profile,
+        report_assurance=report_assurance,
+    )
     if not _verify_command_succeeded(verify_result):
         payload["verify"] = verify_result.payload
         errors.append("Provided report inputs failed `invarlock verify`.")
@@ -256,6 +322,7 @@ def build_evidence_pack(
         "error_injection_reports": 0,
         "failed_reports": 0,
         "policy_profile": profile,
+        "report_assurance": report_assurance,
     }
     evidence_level = _derive_evidence_pack_evidence_level(
         subject_present=True,
@@ -314,6 +381,9 @@ def build_evidence_pack(
     payload["ok"] = True
     payload["reports"] = {"total": len(report_paths)}
     payload["verify"] = verify_result.payload
+    payload["profile"] = profile
+    payload["report_assurance"] = report_assurance
+    payload["release_review"] = bool(release_review)
     payload["evidence_level"] = evidence_level
     payload["files"] = {
         "hashed": len(rel_paths),
@@ -342,11 +412,29 @@ def verify_evidence_pack(
     skip_verify: bool = False,
     strict: bool = False,
     profile: str = "dev",
+    report_assurance: str = "report",
 ) -> EvidencePackResult:
     warnings: list[str] = []
     errors: list[str] = []
     verify_payload: dict[str, Any] | None = None
     signer_fingerprint: str | None = None
+    if report_assurance not in {"report", "strict", "off"}:
+        errors.append(
+            "--report-assurance must be one of: report, strict, off "
+            f"(got {report_assurance!r})."
+        )
+        return _build_verify_result(
+            pack_dir=pack_dir,
+            ok=False,
+            strict=strict,
+            skip_verify=skip_verify,
+            report_assurance=report_assurance,
+            warnings=warnings,
+            errors=errors,
+            signer_fingerprint=signer_fingerprint,
+            verify_payload=verify_payload,
+            status=EvidencePackStatus.USAGE,
+        )
 
     if not pack_dir.is_dir():
         errors.append(f"Pack directory not found: {pack_dir}")
@@ -450,6 +538,7 @@ def verify_evidence_pack(
     checksum_errors, covered_paths = _verify_checksums(pack_dir)
     errors.extend(checksum_errors)
     errors.extend(verify_manifest_provenance(pack_dir))
+    errors.extend(_verify_edit_metadata_consistency(pack_dir))
     extra_errors, extra_warnings = _verify_no_extra_files(
         pack_dir, covered_paths=covered_paths, strict=strict
     )
@@ -470,7 +559,10 @@ def verify_evidence_pack(
 
     if not skip_verify:
         report_errors, verify_payload = _verify_reports(
-            pack_dir, json_out_path=json_out_path, profile=profile
+            pack_dir,
+            json_out_path=json_out_path,
+            profile=profile,
+            report_assurance=report_assurance,
         )
         if report_errors:
             errors.extend(report_errors)
@@ -479,6 +571,7 @@ def verify_evidence_pack(
                 ok=False,
                 strict=strict,
                 skip_verify=skip_verify,
+                report_assurance=report_assurance,
                 warnings=warnings,
                 errors=errors,
                 signer_fingerprint=signer_fingerprint,
@@ -491,6 +584,7 @@ def verify_evidence_pack(
         ok=True,
         strict=strict,
         skip_verify=skip_verify,
+        report_assurance=report_assurance,
         warnings=warnings,
         errors=errors,
         signer_fingerprint=signer_fingerprint,
@@ -510,6 +604,7 @@ def _build_verify_result(
     signer_fingerprint: str | None,
     verify_payload: dict[str, Any] | None,
     status: EvidencePackStatus,
+    report_assurance: str = "report",
 ) -> EvidencePackResult:
     evidence_level: str | None = None
     manifest_path = pack_dir / "manifest.json"
@@ -527,6 +622,7 @@ def _build_verify_result(
         "ok": ok,
         "strict": strict,
         "skip_verify": skip_verify,
+        "report_assurance": report_assurance,
         "warnings": warnings,
         "errors": errors,
         "evidence_level": evidence_level,

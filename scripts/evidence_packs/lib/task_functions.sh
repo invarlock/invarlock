@@ -1441,7 +1441,7 @@ _edit_artifact_has_tokenizer() {
 
 _edit_artifact_complete() {
     local edit_path="$1"
-    _cmd_python "${SCRIPT_DIR}/../python/validate_edit_artifact.py" "${edit_path}" >/dev/null 2>&1
+    _cmd_python "${SCRIPT_DIR}/../python/validate_edit_artifact.py" "${edit_path}" --require-metadata >/dev/null 2>&1
 }
 
 # ============ TASK: CREATE_EDITS_BATCH ============
@@ -1519,7 +1519,8 @@ task_evaluate_edit() {
         echo "ERROR: Unable to resolve edit spec (${edit_spec}): ${status}" >> "${log_file}"
         return 1
     fi
-    local edit_dir_name
+    local edit_type edit_dir_name
+    edit_type=$(echo "${resolved}" | jq -r '.edit_type')
     edit_dir_name=$(echo "${resolved}" | jq -r '.edit_dir_name')
 
     local edit_path="${model_output_dir}/models/${edit_dir_name}"
@@ -1528,6 +1529,14 @@ task_evaluate_edit() {
 
     if [[ ! -d "${edit_path}" ]]; then
         echo "ERROR: Edit model not found: ${edit_path}" >> "${log_file}"
+        return 1
+    fi
+    if ! _cmd_python "${SCRIPT_DIR}/../python/validate_edit_artifact.py" \
+        "${edit_path}" \
+        --require-metadata \
+        --expected-edit-type "${edit_type}" \
+        --expected-artifact-class "validation_subject_checkpoint" >/dev/null 2>&1; then
+        echo "ERROR: Edit model metadata validation failed: ${edit_path}" >> "${log_file}"
         return 1
     fi
 
@@ -1544,6 +1553,9 @@ task_evaluate_edit() {
     echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] evaluating: ${edit_dir_name} run ${run_num}" >> "${log_file}"
 
     mkdir -p "${cert_dir}"
+    if [[ -f "${edit_path}/edit_metadata.json" ]]; then
+        cp "${edit_path}/edit_metadata.json" "${cert_dir}/edit_metadata.json"
+    fi
 
     local abs_cert_dir
     abs_cert_dir="$(cd "${cert_dir}" && pwd)"
@@ -2293,7 +2305,7 @@ PRESET_YAML
         fi
     fi
 
-    if [[ ! -f "${cert_file}" ]]; then
+    if [[ ! -f "${cert_file}" ]] && ! error_supports_structural_failure_report "${error_type}"; then
         local report_file=""
         report_file=$(find "${cert_dir}" -name "report*.json" -type f 2>/dev/null | sort | tail -1)
         if [[ -n "${report_file}" && -f "${report_file}" ]]; then

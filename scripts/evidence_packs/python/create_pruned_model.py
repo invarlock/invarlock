@@ -1,37 +1,25 @@
 from __future__ import annotations
 
 import gc
-import json
 import sys
 from pathlib import Path
 
 import torch
 
 try:
-    from edit_targeting import matches_edit_scope
+    from edit_implementations import apply_dense_magnitude_prune
+    from edit_metadata import build_validation_edit_metadata
     from hf_causal_loader import load_causal_model
     from runtime_tools import require_remote_code_opt_in
+    from save_subject_artifact import save_edited_subject_artifact
 except ImportError:  # pragma: no cover - direct module load under pytest
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from edit_targeting import matches_edit_scope
+    from edit_implementations import apply_dense_magnitude_prune
+    from edit_metadata import build_validation_edit_metadata
     from hf_causal_loader import load_causal_model
     from runtime_tools import require_remote_code_opt_in
+    from save_subject_artifact import save_edited_subject_artifact
 from transformers import AutoTokenizer
-
-
-def _should_prune(name: str, scope: str) -> bool:
-    return matches_edit_scope(name, scope)
-
-
-@torch.no_grad()
-def _magnitude_prune(weight: torch.Tensor, sparsity: float) -> torch.Tensor:
-    flat = weight.abs().flatten()
-    k = int(flat.numel() * sparsity)
-    if k == 0:
-        return weight
-    threshold = torch.kthvalue(flat, k).values
-    mask = weight.abs() >= threshold
-    return weight * mask.to(weight.dtype)
 
 
 def main(argv: list[str]) -> int:
@@ -62,31 +50,16 @@ def main(argv: list[str]) -> int:
     )
 
     print(f"Pruning with sparsity={sparsity} (scope={scope})...")
-    pruned_count = 0
-    total_zeros = 0
-    total_edited_params = 0
-    total_model_params = sum(p.numel() for p in model.parameters())
-
-    for name, param in model.named_parameters():
-        if _should_prune(name, scope) and param.dim() >= 2:
-            original_zeros = (param == 0).sum().item()
-            param.data = _magnitude_prune(param.data, sparsity)
-            new_zeros = (param == 0).sum().item()
-            pruned_count += 1
-            total_zeros += new_zeros
-            total_edited_params += param.numel()
-            if pruned_count <= 3:
-                print(f"  Pruned: {name} ({original_zeros} -> {new_zeros} zeros)")
-
-    actual_sparsity = (
-        total_zeros / total_edited_params if total_edited_params > 0 else 0.0
+    stats = apply_dense_magnitude_prune(
+        model,
+        sparsity=sparsity,
+        scope=scope,
     )
-    coverage_pct = (
-        100.0 * total_edited_params / total_model_params if total_model_params else 0.0
-    )
+    actual_sparsity = float(stats.details.get("actual_sparsity") or 0.0)
+    coverage_pct = 100.0 * stats.coverage_ratio
     print(
-        f"Pruned {pruned_count} parameters "
-        f"({total_edited_params:,} / {total_model_params:,} = {coverage_pct:.1f}% coverage)"
+        f"Pruned {stats.edited_tensors} tensors "
+        f"({stats.edited_params:,} / {stats.total_params:,} = {coverage_pct:.1f}% coverage)"
     )
     print(f"Actual sparsity within edited params: {actual_sparsity:.2%}")
 
@@ -94,18 +67,23 @@ def main(argv: list[str]) -> int:
     gc.collect()
     torch.cuda.empty_cache()
 
-    output_path.mkdir(parents=True, exist_ok=True)
-    tokenizer.save_pretrained(output_path)
-    model.save_pretrained(output_path, safe_serialization=True)
-
-    metadata = {
-        "edit_type": "magnitude_prune",
-        "target_sparsity": sparsity,
-        "actual_sparsity": actual_sparsity,
-        "scope": scope,
-        "pruned_params": pruned_count,
-    }
-    (output_path / "edit_metadata.json").write_text(json.dumps(metadata, indent=2))
+    metadata = build_validation_edit_metadata(
+        edit_type="magnitude_prune",
+        scope=scope,
+        parameters={"target_sparsity": sparsity},
+        coverage=stats.coverage_payload(),
+        extra={
+            "target_sparsity": sparsity,
+            "actual_sparsity": actual_sparsity,
+            "pruned_params": stats.edited_tensors,
+        },
+    )
+    save_edited_subject_artifact(
+        model=model,
+        tokenizer=tokenizer,
+        output_path=output_path,
+        metadata=metadata,
+    )
 
     del model
     gc.collect()
