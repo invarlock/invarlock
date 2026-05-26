@@ -691,6 +691,107 @@ YAML
     return 1
 }
 
+# ============ TASK: SETUP_EVALUATE_BASELINE_REPORT ============
+
+# Materialize the shared noop baseline report before edit/error evaluations claim
+# GPU workers. This keeps parallel workers from blocking inside evaluate tasks
+# while one worker generates the reusable baseline report.
+task_setup_evaluate_baseline_report() {
+    local model_name="$1"
+    local gpu_id="$2"
+    local output_dir="$3"
+    local log_file="$4"
+
+    local model_output_dir="${output_dir}/${model_name}"
+    local baseline_path
+    baseline_path=$(cat "${model_output_dir}/.baseline_path" 2>/dev/null || true)
+    local model_id
+    model_id=$(cat "${model_output_dir}/.model_id" 2>/dev/null || true)
+
+    if [[ -z "${baseline_path}" || ! -d "${baseline_path}" ]]; then
+        echo "ERROR: Baseline path not found for ${model_name}" >> "${log_file}"
+        return 1
+    fi
+
+    local abs_baseline_path
+    abs_baseline_path="$(cd "$(dirname "${baseline_path}")" && pwd)/$(basename "${baseline_path}")"
+
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] preparing shared evaluate baseline report for ${model_name}" >> "${log_file}"
+
+    local model_size
+    model_size=$(_estimate_model_size "${baseline_path}")
+    if [[ -z "${model_size}" || "${model_size}" == "7" ]] && [[ -n "${model_id}" ]]; then
+        model_size=$(_get_model_size_from_name "${model_id}")
+    fi
+
+    local config seq_len stride preview_n final_n eval_batch
+    config=$(_get_invarlock_config "${model_size}")
+    IFS=':' read -r seq_len stride preview_n final_n eval_batch <<< "${config}"
+
+    if [[ "${stride}" -ne "${seq_len}" ]]; then
+        stride="${seq_len}"
+        echo "  Pairing override: seq=${seq_len}, stride=${stride}" >> "${log_file}"
+    fi
+
+    local profile_flag="ci"
+    local min_windows
+    min_windows="$(_default_ci_min_windows "${seq_len}")"
+    if [[ "${profile_flag}" == "ci" && "${min_windows}" =~ ^[0-9]+$ && "${min_windows}" -gt 0 ]]; then
+        if [[ "${preview_n}" -lt "${min_windows}" || "${final_n}" -lt "${min_windows}" ]]; then
+            preview_n="${min_windows}"
+            final_n="${min_windows}"
+            echo "  CI window override: preview=${preview_n}, final=${final_n}" >> "${log_file}"
+        fi
+    fi
+
+    local tier="${INVARLOCK_TIER:-balanced}"
+    local dataset_kind=""
+    dataset_kind="$(pack_dataset_provider_kind "${INVARLOCK_DATASET:-}")"
+    local effective_plan_json=""
+    effective_plan_json="$(
+        _plan_effective_ci_schedule \
+            "${abs_baseline_path}" \
+            "${model_size}" \
+            "${tier}" \
+            "${dataset_kind}" \
+            "validation" \
+            "42"
+    )" || {
+        echo "ERROR: Effective CI planning failed unexpectedly" >> "${log_file}"
+        return 1
+    }
+    local selected_schedule=""
+    selected_schedule="$(_apply_effective_ci_schedule "${effective_plan_json}" "${log_file}")" || return 1
+    if [[ -n "${selected_schedule}" ]]; then
+        IFS=':' read -r seq_len stride preview_n final_n <<< "${selected_schedule}"
+    fi
+
+    local bootstrap_replicates
+    bootstrap_replicates="$(_resolve_bootstrap_replicates "${model_size}" "${tier}")"
+    local baseline_report_root="${model_output_dir}/baseline_reports/${profile_flag}_${tier}_seq${seq_len}_pv${preview_n}_fn${final_n}"
+    local baseline_report_file=""
+    baseline_report_file=$(
+        _ensure_evaluate_baseline_report \
+            "${baseline_report_root}" \
+            "${abs_baseline_path}" \
+            "${profile_flag}" \
+            "${tier}" \
+            "${seq_len}" \
+            "${stride}" \
+            "${preview_n}" \
+            "${final_n}" \
+            "${eval_batch}" \
+            "${bootstrap_replicates}" \
+            "${model_size}" \
+            "${log_file}"
+    ) || {
+        echo "ERROR: Failed to prepare reusable baseline report for ${model_name}" >> "${log_file}"
+        return 1
+    }
+
+    echo "  Prepared reusable baseline report: ${baseline_report_file}" >> "${log_file}"
+}
+
 # Resolve an edit spec to concrete parameters and directory name.
 # Returns JSON with status, edit_dir_name, and resolved params.
 resolve_edit_params() {
@@ -825,6 +926,9 @@ execute_task() {
                 local run=$(echo "${params}" | jq -r '.run // 1')
                 local seed=$(echo "${params}" | jq -r '.seed // 42')
                 task_calibration_run "${model_name}" "${gpu_id}" "${run}" "${seed}" "${output_dir}" "${task_log}" || exit_code=$?
+                ;;
+            SETUP_EVALUATE_BASELINE_REPORT)
+                task_setup_evaluate_baseline_report "${model_name}" "${gpu_id}" "${output_dir}" "${task_log}" || exit_code=$?
                 ;;
             CREATE_EDIT)
                 local edit_spec=$(echo "${params}" | jq -r '.edit_spec // ""')

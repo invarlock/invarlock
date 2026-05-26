@@ -649,6 +649,11 @@ test_estimate_model_memory_serializes_moe_execution_tasks() {
     assert_eq "480" "${eval_mem}" "MoE edit evaluation reserves host-heavy capacity"
     assert_eq "4" "$(calculate_required_gpus "${eval_mem}")" "MoE edit evaluation uses full-host reservation"
 
-    assert_eq "99" "$(estimate_model_memory "mistralai/Mixtral-8x7B-v0.1" "SETUP_BASELINE")" "MoE baseline setup stays single-host download sized"
+    local baseline_report_mem
+    baseline_report_mem="$(estimate_model_memory "mistralai/Mixtral-8x7B-v0.1" "SETUP_EVALUATE_BASELINE_REPORT")"
+    assert_eq "480" "${baseline_report_mem}" "MoE eager baseline report reserves host-heavy capacity"
+    assert_eq "4" "$(calculate_required_gpus "${baseline_report_mem}")" "MoE eager baseline report uses full-host reservation"
+
+    assert_eq "94" "$(estimate_model_memory "mistralai/Mixtral-8x7B-v0.1" "SETUP_BASELINE")" "MoE baseline setup stays single-host download sized"
     assert_eq "1" "$(calculate_required_gpus "$(estimate_model_memory "mistralai/Mixtral-8x7B-v0.1" "SETUP_BASELINE")")" "MoE baseline setup still fits one GPU lane"
 }

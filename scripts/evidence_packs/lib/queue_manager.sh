@@ -1201,6 +1201,21 @@ generate_model_tasks() {
         stress_edits=("quant_rtn:4:32:all" "fp8_quant:e5m2:all" "magnitude_prune:0.5:all" "lowrank_svd:32:all")
     fi
 
+    # Materialize the reusable noop baseline report as a real dependency instead
+    # of letting the first evaluate task create it lazily while other GPU workers
+    # wait inside claimed tasks.
+    local baseline_report_id=""
+    local eager_baseline_report="${PACK_EAGER_BASELINE_REPORT:-1}"
+    if [[ "${PACK_SUITE_MODE:-full}" != "calibrate-only" && "${use_preset}" == "true" && "${eager_baseline_report}" != "0" && "${eager_baseline_report}" != "false" ]]; then
+        if [[ ${clean_runs} -gt 0 || ${stress_runs} -gt 0 || "${RUN_ERROR_INJECTION:-true}" == "true" ]]; then
+            capture_add_task baseline_report_id "SETUP_EVALUATE_BASELINE_REPORT" "${model_id}" "${model_name}" \
+                "$(estimate_model_memory "${model_id}" "SETUP_EVALUATE_BASELINE_REPORT")" \
+                "${setup_id}" '{}' 73
+            task_ids+=("${baseline_report_id}")
+            echo "Created: ${baseline_report_id}"
+        fi
+    fi
+
     # Ensure use_batch is defined (defensive for set -u)
     use_batch=${use_batch:-true}
     # Skip edits entirely if both clean and stress runs are disabled
@@ -1244,7 +1259,10 @@ generate_model_tasks() {
                 for run in $(seq 1 "${clean_runs}"); do
                     local cert_deps="${edits_id}"
                     if [[ -n "${preset_id}" ]]; then
-                        cert_deps="${edits_id},${preset_id}"
+                        cert_deps="${cert_deps},${preset_id}"
+                    fi
+                    if [[ -n "${baseline_report_id}" ]]; then
+                        cert_deps="${cert_deps},${baseline_report_id}"
                     fi
                     local cert_id=""
                     capture_add_task cert_id "evaluate_EDIT" "${model_id}" "${model_name}" \
@@ -1272,7 +1290,10 @@ generate_model_tasks() {
                 for run in $(seq 1 "${stress_runs}"); do
                     local cert_deps="${edits_id}"
                     if [[ -n "${preset_id}" ]]; then
-                        cert_deps="${edits_id},${preset_id}"
+                        cert_deps="${cert_deps},${preset_id}"
+                    fi
+                    if [[ -n "${baseline_report_id}" ]]; then
+                        cert_deps="${cert_deps},${baseline_report_id}"
                     fi
                     local cert_id=""
                     capture_add_task cert_id "evaluate_EDIT" "${model_id}" "${model_name}" \
@@ -1311,7 +1332,10 @@ generate_model_tasks() {
                 for run in $(seq 1 "${clean_runs}"); do
                     local cert_deps="${edit_id}"
                     if [[ -n "${preset_id}" ]]; then
-                        cert_deps="${edit_id},${preset_id}"
+                        cert_deps="${cert_deps},${preset_id}"
+                    fi
+                    if [[ -n "${baseline_report_id}" ]]; then
+                        cert_deps="${cert_deps},${baseline_report_id}"
                     fi
                     local cert_id=""
                     capture_add_task cert_id "evaluate_EDIT" "${model_id}" "${model_name}" \
@@ -1347,7 +1371,10 @@ generate_model_tasks() {
                 for run in $(seq 1 "${stress_runs}"); do
                     local cert_deps="${edit_id}"
                     if [[ -n "${preset_id}" ]]; then
-                        cert_deps="${edit_id},${preset_id}"
+                        cert_deps="${cert_deps},${preset_id}"
+                    fi
+                    if [[ -n "${baseline_report_id}" ]]; then
+                        cert_deps="${cert_deps},${baseline_report_id}"
                     fi
                     local cert_id=""
                     capture_add_task cert_id "evaluate_EDIT" "${model_id}" "${model_name}" \
@@ -1435,7 +1462,10 @@ generate_model_tasks() {
 
             local cert_deps="${error_create_id}"
             if [[ -n "${preset_id}" ]]; then
-                cert_deps="${error_create_id},${preset_id}"
+                cert_deps="${cert_deps},${preset_id}"
+            fi
+            if [[ -n "${baseline_report_id}" ]]; then
+                cert_deps="${cert_deps},${baseline_report_id}"
             fi
             local error_cert_id=""
             capture_add_task error_cert_id "evaluate_ERROR" "${model_id}" "${model_name}" \

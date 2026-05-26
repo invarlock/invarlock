@@ -32,7 +32,8 @@ _task_serialization_require_jq() {
 # Task record format (stored as JSON):
 #   task_id:         Unique identifier (e.g., "model0_SETUP_BASELINE_001_abcd")
 #   task_type:       One of: SETUP_BASELINE, CALIBRATION_RUN,
-#                    CREATE_EDIT, CREATE_EDITS_BATCH, evaluate_EDIT, CREATE_ERROR,
+#                    SETUP_EVALUATE_BASELINE_REPORT, CREATE_EDIT,
+#                    CREATE_EDITS_BATCH, evaluate_EDIT, CREATE_ERROR,
 #                    evaluate_ERROR, GENERATE_PRESET
 #   model_id:        Full HuggingFace model ID (e.g., "mistralai/Mistral-7B-v0.1")
 #   model_name:      Sanitized name for paths (e.g., "mistral-7b-v0.1")
@@ -536,7 +537,7 @@ validate_task() {
 
     # Validate task_type
     local task_type=$(get_task_type "${task_file}")
-    local valid_types="SETUP_BASELINE CALIBRATION_RUN CREATE_EDIT CREATE_EDITS_BATCH evaluate_EDIT CREATE_ERROR evaluate_ERROR GENERATE_PRESET"
+    local valid_types="SETUP_BASELINE CALIBRATION_RUN SETUP_EVALUATE_BASELINE_REPORT CREATE_EDIT CREATE_EDITS_BATCH evaluate_EDIT CREATE_ERROR evaluate_ERROR GENERATE_PRESET"
     if [[ ! " ${valid_types} " =~ " ${task_type} " ]]; then
         echo "ERROR: Invalid task_type '${task_type}' in: ${task_file}" >&2
         return 1
@@ -679,8 +680,9 @@ estimate_model_memory() {
     if [[ "${size_bucket}" == "moe" ]]; then
         case "${task_type}" in
             "SETUP_BASELINE")
+                :
                 ;;
-            "CALIBRATION_RUN"|"CREATE_EDIT"|"CREATE_EDITS_BATCH"|"evaluate_EDIT"|"CREATE_ERROR"|"evaluate_ERROR")
+            "CALIBRATION_RUN"|"SETUP_EVALUATE_BASELINE_REPORT"|"CREATE_EDIT"|"CREATE_EDITS_BATCH"|"evaluate_EDIT"|"CREATE_ERROR"|"evaluate_ERROR")
                 echo "480"
                 return
                 ;;
@@ -699,6 +701,9 @@ estimate_model_memory() {
                 multiplier="1.0"
                 ;;
             "CALIBRATION_RUN")
+                multiplier="1.05"
+                ;;
+            "SETUP_EVALUATE_BASELINE_REPORT")
                 multiplier="1.05"
                 ;;
             "CREATE_EDIT")
@@ -729,6 +734,9 @@ estimate_model_memory() {
                 multiplier="1.0"
                 ;;
             "CALIBRATION_RUN")
+                multiplier="1.1"
+                ;;
+            "SETUP_EVALUATE_BASELINE_REPORT")
                 multiplier="1.1"
                 ;;
             "CREATE_EDIT")

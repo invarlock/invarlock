@@ -671,6 +671,68 @@ EOF
     done < <(find "${QUEUE_DIR}" -type f -name '*_evaluate_EDIT_*.task' | sort)
 }
 
+test_generate_model_tasks_adds_eager_baseline_report_dependency() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue_manager.sh"
+
+    local out_dir="${TEST_TMPDIR}/out"
+    init_queue "${out_dir}" >/dev/null
+
+    estimate_model_memory() { echo "14"; }
+    DRIFT_CALIBRATION_RUNS=0
+    CLEAN_EDIT_RUNS=1
+    STRESS_EDIT_RUNS=0
+    PACK_PRESET_READY=1
+    PACK_USE_BATCH_EDITS="false"
+    RUN_ERROR_INJECTION="false"
+    export DRIFT_CALIBRATION_RUNS CLEAN_EDIT_RUNS STRESS_EDIT_RUNS PACK_PRESET_READY PACK_USE_BATCH_EDITS RUN_ERROR_INJECTION
+
+    generate_model_tasks "1" "org/model" "model" >/dev/null
+
+    local baseline_task
+    baseline_task="$(find "${QUEUE_DIR}" -type f -name '*_SETUP_EVALUATE_BASELINE_REPORT_*.task' | sort | head -1)"
+    assert_file_exists "${baseline_task}" "eager baseline report task created"
+
+    local baseline_id
+    baseline_id="$(jq -r '.task_id' "${baseline_task}")"
+    local setup_dep
+    setup_dep="$(jq -r '.dependencies[0]' "${baseline_task}")"
+    [[ -n "${setup_dep}" && "${setup_dep}" != "null" ]] || t_fail "baseline report task missing setup dependency"
+
+    while IFS= read -r eval_task; do
+        [[ -n "${eval_task}" ]] || continue
+        local has_dep
+        has_dep="$(jq -r --arg id "${baseline_id}" '(.dependencies // []) | index($id) != null' "${eval_task}")"
+        assert_eq "true" "${has_dep}" "evaluate task waits for eager baseline report"
+    done < <(find "${QUEUE_DIR}" -type f -name '*_evaluate_EDIT_*.task' | sort)
+}
+
+test_generate_model_tasks_can_disable_eager_baseline_report_dependency() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue_manager.sh"
+
+    local out_dir="${TEST_TMPDIR}/out"
+    init_queue "${out_dir}" >/dev/null
+
+    estimate_model_memory() { echo "14"; }
+    DRIFT_CALIBRATION_RUNS=0
+    CLEAN_EDIT_RUNS=1
+    STRESS_EDIT_RUNS=0
+    PACK_PRESET_READY=1
+    PACK_USE_BATCH_EDITS="false"
+    PACK_EAGER_BASELINE_REPORT=0
+    RUN_ERROR_INJECTION="false"
+    export DRIFT_CALIBRATION_RUNS CLEAN_EDIT_RUNS STRESS_EDIT_RUNS PACK_PRESET_READY PACK_USE_BATCH_EDITS PACK_EAGER_BASELINE_REPORT RUN_ERROR_INJECTION
+
+    generate_model_tasks "1" "org/model" "model" >/dev/null
+
+    local baseline_count
+    baseline_count="$(find "${QUEUE_DIR}" -type f -name '*_SETUP_EVALUATE_BASELINE_REPORT_*.task' | wc -l | tr -d ' ')"
+    assert_eq "0" "${baseline_count}" "eager baseline report task disabled"
+}
+
 test_generate_evaluate_tasks_sanitizes_cert_runs() {
     mock_reset
     # shellcheck source=../queue_manager.sh

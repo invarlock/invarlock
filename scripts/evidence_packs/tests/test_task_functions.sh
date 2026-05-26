@@ -1940,6 +1940,7 @@ test_execute_task_dispatches_all_task_types() {
     task_evaluate_error() { :; }
     task_cleanup_error() { :; }
     task_generate_preset() { :; }
+    task_setup_evaluate_baseline_report() { :; }
 
     make_task() {
         local task_id="$1"
@@ -1953,7 +1954,7 @@ test_execute_task_dispatches_all_task_types() {
             > "${TEST_TMPDIR}/${task_id}.task"
     }
 
-    local types=(SETUP_BASELINE CALIBRATION_RUN CREATE_EDIT CREATE_EDITS_BATCH evaluate_EDIT CLEANUP_EDIT CREATE_ERROR evaluate_ERROR CLEANUP_ERROR GENERATE_PRESET)
+    local types=(SETUP_BASELINE CALIBRATION_RUN SETUP_EVALUATE_BASELINE_REPORT CREATE_EDIT CREATE_EDITS_BATCH evaluate_EDIT CLEANUP_EDIT CREATE_ERROR evaluate_ERROR CLEANUP_ERROR GENERATE_PRESET)
     local type
     for type in "${types[@]}"; do
         make_task "task_${type}" "${type}" '{}'
@@ -2368,6 +2369,58 @@ test_task_baseline_report_helper_exports_remote_code_allowance() {
     baseline_report="$(_ensure_evaluate_baseline_report "${baseline_root}" "${baseline_path}" "ci" "balanced" 128 128 4 4 1 100 "7" "${log_file}")"
     assert_match "baseline_report\\.json$" "${baseline_report}" "baseline helper returns the generated baseline report path"
     assert_eq "1" "$(cat "${env_log}")" "baseline helper exports remote code allowance when enabled"
+}
+
+test_task_setup_evaluate_baseline_report_covers_success_and_failure_paths() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local baseline_dir="${model_output_dir}/models/baseline"
+    local log_file="${TEST_TMPDIR}/setup_baseline_report.log"
+    mkdir -p "${baseline_dir}" "$(dirname "${log_file}")"
+    echo "{}" > "${baseline_dir}/config.json"
+    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
+    echo "Qwen/Qwen2.5-14B" > "${model_output_dir}/.model_id"
+    : > "${log_file}"
+
+    local baseline_report="${TEST_TMPDIR}/baseline_report.json"
+    _estimate_model_size() { echo "7"; }
+    _get_model_size_from_name() { echo "14"; }
+    _get_invarlock_config() { echo "256:128:1:1:2"; }
+    _default_ci_min_windows() { echo "3"; }
+    _plan_effective_ci_schedule() { echo '{"status":"selected"}'; }
+    _apply_effective_ci_schedule() { echo "128:128:4:5"; }
+    _resolve_bootstrap_replicates() { echo "7"; }
+    _ensure_evaluate_baseline_report() {
+        printf '{"report":"ok"}\n' > "${baseline_report}"
+        echo "${baseline_report}"
+    }
+
+    run task_setup_evaluate_baseline_report "${model_name}" 0 "${out}" "${log_file}"
+    assert_rc "0" "${RUN_RC}" "baseline report setup succeeds"
+    assert_match "preparing shared evaluate baseline report" "$(cat "${log_file}")" "setup logs start"
+    assert_match "Prepared reusable baseline report" "$(cat "${log_file}")" "setup logs success"
+
+    run task_setup_evaluate_baseline_report "missing" 0 "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "missing baseline path fails"
+
+    _plan_effective_ci_schedule() { return 1; }
+    run task_setup_evaluate_baseline_report "${model_name}" 0 "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "baseline report setup fails when effective ci planning fails"
+
+    _plan_effective_ci_schedule() { echo '{"status":"selected"}'; }
+    _apply_effective_ci_schedule() { return 1; }
+    run task_setup_evaluate_baseline_report "${model_name}" 0 "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "baseline report setup fails when effective ci schedule application fails"
+
+    _apply_effective_ci_schedule() { echo "128:128:4:5"; }
+    _ensure_evaluate_baseline_report() { return 1; }
+    run task_setup_evaluate_baseline_report "${model_name}" 0 "${out}" "${log_file}"
+    assert_rc "1" "${RUN_RC}" "baseline report setup fails when reusable report generation fails"
 }
 
 test_task_calibration_run_exports_remote_code_allowance() {
