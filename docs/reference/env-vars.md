@@ -94,19 +94,11 @@ when remote code is required.
 | `INVARLOCK_OMP_THREADS` | `1` | Thread caps for determinism preset. |
 | `INVARLOCK_DEBUG_TRACE` | unset | Verbose debug traces for data/eval paths. |
 | `INVARLOCK_LIGHT_IMPORT` | unset | Avoid heavy imports for docs/tests. |
-| `PACK_GROUP_EVALUATIONS` | unset | Evidence-pack wrapper toggle that groups batch edit evaluations into helper tasks for scheduler/process-startup regression coverage. By default the group is split across the active GPU worker pool. |
-| `PACK_EVALUATE_GROUPS` | unset | Alias for `PACK_GROUP_EVALUATIONS`. |
-| `PACK_GROUP_EVALUATION_CHUNK_SIZE` | `auto` | Entries per grouped edit-evaluation task. `auto` spreads entries across `NUM_GPUS`; use `all` for one serial group. |
-| `PACK_EVALUATE_GROUP_CHUNK_SIZE` | unset | Alias for `PACK_GROUP_EVALUATION_CHUNK_SIZE`. |
-| `PACK_GROUP_EVALUATION_MAX_PARALLEL` | `NUM_GPUS` | Maximum grouped edit-evaluation tasks emitted per model batch when chunk size is `auto`. |
-| `PACK_GROUP_EVALUATION_SERIAL` | unset | Set to `1` to force the legacy one grouped task per model batch. |
 | `PACK_DEFER_REPORT_RENDERING` | unset (`1` under `run_pack.sh --release-review`) | Evidence-pack wrapper toggle that skips optional markdown/reviewer rendering during evaluation. |
 | `PACK_DEFER_OPTIONAL_REPORT_RENDERING` | unset | Alias for `PACK_DEFER_REPORT_RENDERING`. |
 
 Evidence-pack evaluation-loop toggles are repo-wrapper controls, not public
-`invarlock evaluate` defaults. Grouped evaluation still loads each subject
-checkpoint separately, so it is process/scheduler telemetry rather than a
-guaranteed throughput optimization. Required JSON reports and sidecars are still
+`invarlock evaluate` defaults. Required JSON reports and sidecars are still
 written; `PACK_DEFER_REPORT_RENDERING=1` skips optional rendered review files in
 the evaluation hot path.
 

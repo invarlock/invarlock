@@ -265,31 +265,9 @@ pack behind at the final destination.
 ## Evaluation Loop Controls
 
 The default suite keeps one evaluation task per scenario so scheduler behavior
-and GPU placement remain easy to inspect. For regression testing of the grouped
-helper path on batch edit runs, enable:
-
-```bash
-PACK_GROUP_EVALUATIONS=1 \
-PACK_DEFER_REPORT_RENDERING=1 \
-INVARLOCK_ALLOW_REMOTE_CODE=1 \
-  ./scripts/evidence_packs/run_suite.sh --suite subset --net 1
-```
-
-`PACK_GROUP_EVALUATIONS=1` emits `evaluate_EDIT_GROUP` tasks for batch edit
-entries. By default, the scheduler splits entries across the active GPU worker
-pool (`NUM_GPUS`) so independent edits can still run concurrently; on a one-GPU
-run this collapses to the legacy single grouped task. Set
-`PACK_GROUP_EVALUATION_CHUNK_SIZE=all` or `PACK_GROUP_EVALUATION_SERIAL=1` to
-force one serial group, or set `PACK_GROUP_EVALUATION_CHUNK_SIZE=2` to preserve
-some process-startup savings while emitting multiple chunks. Each grouped task
-evaluates its entries inside one Python process, reuses the shared baseline
-report and group-level evaluate temp directory, and still loads each subject
-checkpoint separately.
-This mode is not a shared-model evaluator: each subject checkpoint is still
-loaded separately, so it should not be treated as a guaranteed throughput
-optimization. It is useful for validating the in-process runner, baseline-report
-reuse, and scheduler chunking without accidentally serializing all edits on
-multi-GPU hosts.
+and GPU placement remain easy to inspect. Batch edit creation still reduces edit
+generation overhead by loading the baseline once for multiple validation edits,
+but each evaluated subject checkpoint is loaded by its own `evaluate_EDIT` task.
 
 `PACK_DEFER_REPORT_RENDERING=1` keeps `evaluation.report.json` and required
 sidecars, but skips optional markdown/reviewer rendering in the hot path.
@@ -297,11 +275,10 @@ sidecars, but skips optional markdown/reviewer rendering in the hot path.
 and verification still run unless explicitly disabled.
 
 Every run writes `results/analysis/evaluation_optimization_summary.json`. It
-records timing files discovered under the run directory, grouped task counts,
-deferred-render counts, baseline-report reuse counts, nested run timing totals
-from `evaluate_timing.json`, and the estimated number of CLI process startups
-avoided by grouped evaluation. Use it as scheduling and regression telemetry,
-not as proof that a run should be faster.
+records timing files discovered under the run directory, deferred-render counts,
+baseline-report reuse counts, and nested run timing totals from
+`evaluate_timing.json`. Use it as scheduling and regression telemetry, not as a
+standalone throughput claim.
 
 ## Edit Provenance Labels
 
