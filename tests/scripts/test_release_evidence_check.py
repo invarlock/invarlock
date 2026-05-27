@@ -169,31 +169,10 @@ def _release_check_command(
     return command
 
 
-def test_release_checklist_exists_outside_published_docs_tree() -> None:
+def test_release_checklist_is_not_part_of_public_repo_surface() -> None:
     repo_root = _repo_root()
-    checklist = repo_root / ".github" / "release-checklist.md"
-    assert checklist.is_file()
+    assert not (repo_root / ".github" / "release-checklist.md").exists()
     assert not (repo_root / "docs" / "release").exists()
-    text = checklist.read_text(encoding="utf-8")
-    for required in (
-        "make verify",
-        "make coverage-enforce",
-        "make dist-check",
-        "make security",
-        "make container-front-door-smoke",
-        "make guard-validation-smoke",
-        "make release-evidence-check",
-        "make empirical-guard-evidence-check",
-        "wheel-sdist-hashes.txt",
-        "runtime-image-digest.txt",
-        "strict/evaluation.report.json",
-        "strict/verify.json",
-        "guard-validation-smoke.json",
-        "guard-validation-smoke.md",
-        "artifacts/release/offline",
-        "artifacts/guard-validation/empirical/manifest.json",
-    ):
-        assert required in text
 
 
 def test_release_evidence_check_passes_with_required_artifacts(tmp_path: Path) -> None:
