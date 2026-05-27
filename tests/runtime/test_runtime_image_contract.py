@@ -21,12 +21,8 @@ def test_runtime_dockerfile_installs_hf_stack() -> None:
     assert '--extra-index-url "${PYTORCH_EXTRA_INDEX_URL}"' in text
     assert 'amd64) echo "/opt/invarlock/${RUNTIME_REQUIREMENTS_AMD64}"' in text
     assert 'arm64) echo "/opt/invarlock/${RUNTIME_REQUIREMENTS_ARM64}"' in text
-    assert (
-        "apt-get install -y --no-install-recommends build-essential libpcre3 libpcre3-dev"
-        in text
-    )
-    assert "apt-mark manual libpcre3" in text
-    assert "apt-get purge -y --auto-remove build-essential libpcre3-dev" in text
+    assert "apt-get install -y --no-install-recommends build-essential" in text
+    assert "apt-get purge -y --auto-remove build-essential" in text
     assert "python -m pip install" in text
     assert "--require-hashes" in text
     assert "python -m pip install --no-deps -e /opt/invarlock" not in text
