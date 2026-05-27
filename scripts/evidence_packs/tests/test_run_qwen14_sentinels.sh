@@ -8,6 +8,10 @@ test_run_qwen14_sentinels_helper_functions_cover_resolution_and_error_paths() {
     run require_dir "${TEST_TMPDIR}/missing-dir" "run directory"
     assert_rc "1" "${RUN_RC}" "missing directories fail directly"
 
+    run require_saved_subject_dir "${TEST_TMPDIR}/missing-subject" "quant_4bit_clean subject"
+    assert_rc "1" "${RUN_RC}" "missing saved subject fails directly"
+    assert_match "PACK_CLEANUP_MODELS=0" "${RUN_ERR}" "missing saved subject explains cleanup requirement"
+
     run require_file "${TEST_TMPDIR}/missing-file" "preset"
     assert_rc "1" "${RUN_RC}" "missing files fail directly"
 

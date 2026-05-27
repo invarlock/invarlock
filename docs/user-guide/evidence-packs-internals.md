@@ -687,9 +687,11 @@ Operational guidance for remote evidence-pack work:
   set `INVARLOCK_ALLOW_CONFIG_INCLUDE_OUTSIDE=1` on the remote host before the
   evidence-pack entrypoint; the default runtime-container launcher rejects that config
   graph before container start when the override is missing.
-- After Qwen2.5-14B campaigns, run
+- After Qwen2.5-14B campaigns run with `PACK_CLEANUP_MODELS=0`, run
   `scripts/evidence_packs/run_qwen14_sentinels.sh` from the same fresh work tree to
-  validate saved-model direct evaluate and the public quant smoke.
+  validate saved-model direct evaluate and the public quant smoke. The sentinel
+  helper reloads retained edit subject directories, so default cleanup mode is
+  not sufficient for this follow-up check.
 
 Recommended remote validation checklist after security-default changes:
 

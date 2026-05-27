@@ -468,13 +468,17 @@ def _rewrite_live_smoke_script_text(text: str) -> str:
 
 
 def _insert_option_after_command(argv: list[str], option: str) -> list[str]:
+    return _insert_tokens_after_command(argv, [option])
+
+
+def _insert_tokens_after_command(argv: list[str], tokens: list[str]) -> list[str]:
     if argv[:1] == ["invarlock"]:
         insert_at = 2
         if len(argv) >= 3 and argv[1] == "report" and argv[2] == "verify":
             insert_at = 3
         if len(argv) >= 3 and argv[1] == "report" and argv[2] == "html":
             insert_at = 3
-        return [*argv[:insert_at], option, *argv[insert_at:]]
+        return [*argv[:insert_at], *tokens, *argv[insert_at:]]
     if (
         len(argv) >= 3
         and argv[0] in {"python", "python3"}
@@ -486,8 +490,8 @@ def _insert_option_after_command(argv: list[str], option: str) -> list[str]:
             insert_at = 5
         if len(argv) >= 5 and argv[3] == "report" and argv[4] == "html":
             insert_at = 5
-        return [*argv[:insert_at], option, *argv[insert_at:]]
-    return [*argv, option]
+        return [*argv[:insert_at], *tokens, *argv[insert_at:]]
+    return [*argv, *tokens]
 
 
 def _rewrite_invarlock_tokens(
@@ -660,6 +664,12 @@ def _sanitize_script(
                 argv=argv,
                 execution_mode=execution_mode,
             )
+            if (
+                skip_model_loading
+                and _is_verify_command(command_tokens)
+                and "--assurance" not in argv
+            ):
+                argv = _insert_tokens_after_command(argv, ["--assurance", "off"])
             if argv[:1] == ["invarlock"]:
                 rebuilt = env_prefix + [py, "-m", "invarlock", *argv[1:]]
                 line = indent + shlex.join(rebuilt)

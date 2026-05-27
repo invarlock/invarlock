@@ -287,7 +287,10 @@ def test_sanitize_script_skip_model_loading_skips_full_multiline_command() -> No
     assert "[skip-model-loading] invarlock evaluate --allow-network \\" in rendered
     assert "--baseline gpt2" not in rendered
     assert "--subject distilgpt2" not in rendered
-    assert "-m invarlock verify reports/eval/evaluation.report.json" in rendered
+    assert (
+        "-m invarlock verify --assurance off reports/eval/evaluation.report.json"
+        in rendered
+    )
 
 
 def test_sanitize_script_skip_model_loading_skips_doctor_health_check() -> None:
