@@ -272,10 +272,16 @@ INVARLOCK_ALLOW_REMOTE_CODE=1 \
   ./scripts/evidence_packs/run_suite.sh --suite subset --net 1
 ```
 
-`PACK_GROUP_EVALUATIONS=1` emits one `evaluate_EDIT_GROUP` task per model batch.
-That task evaluates the batch entries inside one Python process, reuses the
-shared baseline report and group-level evaluate temp directory, and still loads
-each subject checkpoint separately.
+`PACK_GROUP_EVALUATIONS=1` emits `evaluate_EDIT_GROUP` tasks for batch edit
+entries. By default, the scheduler splits entries across the active GPU worker
+pool (`NUM_GPUS`) so independent edits can still run concurrently; on a one-GPU
+run this collapses to the legacy single grouped task. Set
+`PACK_GROUP_EVALUATION_CHUNK_SIZE=all` or `PACK_GROUP_EVALUATION_SERIAL=1` to
+force one serial group, or set `PACK_GROUP_EVALUATION_CHUNK_SIZE=2` to preserve
+some process-startup savings while emitting multiple chunks. Each grouped task
+evaluates its entries inside one Python process, reuses the shared baseline
+report and group-level evaluate temp directory, and still loads each subject
+checkpoint separately.
 `PACK_DEFER_REPORT_RENDERING=1` keeps `evaluation.report.json` and required
 sidecars, but skips optional markdown/reviewer rendering in the hot path.
 

@@ -380,10 +380,14 @@ Small/medium models default to batch edit creation:
 
 - **Batch edit creation**: `CREATE_EDITS_BATCH` loads a model once and creates
   all 8 edits (cuts repeated model loads).
-- **Grouped edit evaluation**: `PACK_GROUP_EVALUATIONS=1` emits one
-  `evaluate_EDIT_GROUP` task per model batch. It still loads each subject
-  checkpoint separately, but runs the edit evaluations inside one Python
-  process and reuses the staged baseline report, preset, config root,
+- **Grouped edit evaluation**: `PACK_GROUP_EVALUATIONS=1` emits
+  `evaluate_EDIT_GROUP` tasks for model-batch entries. The default
+  `PACK_GROUP_EVALUATION_CHUNK_SIZE=auto` splits entries across the active GPU
+  worker pool, so independent edits do not serialize on multi-GPU hosts. Set
+  `PACK_GROUP_EVALUATION_CHUNK_SIZE=all` or `PACK_GROUP_EVALUATION_SERIAL=1`
+  to force the legacy single grouped task. Each grouped task still loads each
+  subject checkpoint separately, but runs its edit evaluations inside one
+  Python process and reuses the staged baseline report, preset, config root,
   group-level evaluate temp directory, and tokenizer/window evidence paths.
 - **Deferred optional report rendering**: `PACK_DEFER_REPORT_RENDERING=1`
   keeps `evaluation.report.json`, `runtime.manifest.json`, and JSON evidence
@@ -415,7 +419,7 @@ Batch with grouped edit evaluation (`PACK_GROUP_EVALUATIONS=1`):
 ```text
 SETUP_BASELINE
   ├─ CALIBRATION_RUN × N ──> GENERATE_PRESET ──┐
-  ├─ CREATE_EDITS_BATCH ------------------------┴─> evaluate_EDIT_GROUP
+  ├─ CREATE_EDITS_BATCH ------------------------┴─> evaluate_EDIT_GROUP × chunks
   └─ CREATE_ERROR × types ----------------------┴─> evaluate_ERROR × types
 ```
 
@@ -719,7 +723,10 @@ Common knobs for the setup script:
 | `PACK_REPEATS` | `0` | Determinism repeat metadata |
 | `PACK_MODEL_REVISIONS_FILE` | `OUTPUT_DIR/state/model_revisions.json` | Revisions path |
 | `PACK_USE_BATCH_EDITS` | `auto` | Force/disable batch edit creation |
-| `PACK_GROUP_EVALUATIONS` | `0` | Group batch edit evaluations into one Python process per model |
+| `PACK_GROUP_EVALUATIONS` | `0` | Group batch edit evaluations into helper tasks |
+| `PACK_GROUP_EVALUATION_CHUNK_SIZE` | `auto` | Entries per grouped helper task; `auto` spreads across `NUM_GPUS`, `all` forces one serial group |
+| `PACK_GROUP_EVALUATION_MAX_PARALLEL` | `NUM_GPUS` | Maximum grouped helper tasks per model batch when chunk size is `auto` |
+| `PACK_GROUP_EVALUATION_SERIAL` | `0` | Force legacy one grouped task per model batch |
 | `PACK_DEFER_REPORT_RENDERING` | `0` | Skip optional markdown/reviewer bundle rendering during evaluation |
 | `RESUME_MODE` | `true` | Skip completed steps when outputs exist |
 

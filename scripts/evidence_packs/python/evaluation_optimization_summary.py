@@ -91,9 +91,10 @@ def _collect_group_summaries(run_dir: Path) -> list[dict[str, Any]]:
 def build_summary(run_dir: Path) -> dict[str, Any]:
     timings = _collect_evaluate_timings(run_dir)
     group_summaries = _collect_group_summaries(run_dir)
-    grouped_entries = sum(
+    grouped_task_sizes = [
         int(item.get("completed_entries") or 0) for item in group_summaries
-    )
+    ]
+    grouped_entries = sum(grouped_task_sizes)
     avoided_processes = sum(
         int(item.get("avoided_cli_process_invocations") or 0)
         for item in group_summaries
@@ -118,6 +119,8 @@ def build_summary(run_dir: Path) -> dict[str, Any]:
         ),
         "grouped_evaluation_tasks": len(group_summaries),
         "grouped_evaluation_entries": grouped_entries,
+        "grouped_evaluation_task_sizes": grouped_task_sizes,
+        "grouped_evaluation_max_entries_per_task": max(grouped_task_sizes, default=0),
         "avoided_cli_process_invocations": avoided_processes,
         "timing_totals_seconds": {
             "plan": _sum_timing(timings, "plan"),

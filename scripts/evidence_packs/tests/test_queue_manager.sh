@@ -640,6 +640,7 @@ test_generate_model_tasks_can_group_batch_edit_evaluations() {
     mock_reset
     # shellcheck source=../queue_manager.sh
     source "${TEST_ROOT}/scripts/evidence_packs/lib/queue_manager.sh"
+    unset PACK_GROUP_EVALUATION_CHUNK_SIZE PACK_GROUP_EVALUATION_SERIAL PACK_GROUP_EVALUATION_MAX_PARALLEL
 
     local calls="${TEST_TMPDIR}/calls"
     : > "${calls}"
@@ -662,7 +663,8 @@ test_generate_model_tasks_can_group_batch_edit_evaluations() {
     RUN_ERROR_INJECTION=false
     PACK_GROUP_EVALUATIONS=1
     PACK_USE_BATCH_EDITS=true
-    export CLEAN_EDIT_RUNS STRESS_EDIT_RUNS DRIFT_CALIBRATION_RUNS PACK_PRESET_READY RUN_ERROR_INJECTION PACK_GROUP_EVALUATIONS PACK_USE_BATCH_EDITS
+    NUM_GPUS=4
+    export CLEAN_EDIT_RUNS STRESS_EDIT_RUNS DRIFT_CALIBRATION_RUNS PACK_PRESET_READY RUN_ERROR_INJECTION PACK_GROUP_EVALUATIONS PACK_USE_BATCH_EDITS NUM_GPUS
 
     generate_model_tasks "1" "org/model" "model" >/dev/null
 
@@ -670,16 +672,123 @@ test_generate_model_tasks_can_group_batch_edit_evaluations() {
     all_calls="$(cat "${calls}")"
     assert_match "CREATE_EDITS_BATCH\\|" "${all_calls}" "batch edit creation emitted"
     assert_match "evaluate_EDIT_GROUP\\|" "${all_calls}" "grouped evaluate task emitted"
+    assert_eq "4" "$(grep -c '^evaluate_EDIT_GROUP|' "${calls}" | tr -d ' ')" "auto grouped evaluation uses available GPU workers"
     [[ "${all_calls}" != *"evaluate_EDIT|"* ]] || t_fail "per-edit evaluate tasks should not be emitted when grouped"
     assert_match '"grouped"[[:space:]]*:[[:space:]]*true' "${all_calls}" "group task carries grouped flag"
     assert_match '"entries"[[:space:]]*:' "${all_calls}" "group task carries entries"
-    assert_match "CLEANUP_EDIT\\|.*t" "${all_calls}" "cleanup tasks still emitted"
+    assert_match '"chunk_count"[[:space:]]*:[[:space:]]*4' "${all_calls}" "group task carries chunk count"
+    assert_match '"chunk_size"[[:space:]]*:[[:space:]]*1' "${all_calls}" "auto chunking splits one edit per worker"
+    assert_match "CLEANUP_EDIT\\|.*t[0-9]+,t[0-9]+,t[0-9]+,t[0-9]+" "${all_calls}" "cleanup waits for all grouped chunks"
+}
+
+test_group_evaluation_chunk_helpers_cover_sanitizers() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue_manager.sh"
+
+    PACK_GROUP_EVALUATION_MAX_PARALLEL="bogus"
+    NUM_GPUS=4
+    assert_eq "1" "$(pack_group_evaluation_available_workers 4)" "invalid max parallel falls back to one worker"
+
+    PACK_GROUP_EVALUATION_MAX_PARALLEL=99
+    assert_eq "3" "$(pack_group_evaluation_available_workers 3)" "max parallel clamps to entry count"
+
+    PACK_GROUP_EVALUATION_SERIAL=yes
+    assert_eq "4" "$(pack_group_evaluation_chunk_size 4)" "serial flag keeps one chunk"
+
+    unset PACK_GROUP_EVALUATION_SERIAL PACK_GROUP_EVALUATION_MAX_PARALLEL
+    PACK_GROUP_EVALUATION_CHUNK_SIZE=all
+    assert_eq "4" "$(pack_group_evaluation_chunk_size 4)" "all chunk size keeps one chunk"
+
+    PACK_GROUP_EVALUATION_CHUNK_SIZE=9
+    assert_eq "4" "$(pack_group_evaluation_chunk_size 4)" "explicit oversized chunk clamps to entry count"
+
+    PACK_GROUP_EVALUATION_CHUNK_SIZE=2
+    assert_eq "2" "$(pack_group_evaluation_chunk_size 4)" "explicit numeric chunk is honored"
+}
+
+test_generate_model_tasks_sanitizes_group_chunk_helper_output() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue_manager.sh"
+
+    local calls="${TEST_TMPDIR}/calls"
+    : > "${calls}"
+
+    add_task() {
+        local task_type="$1"
+        local params_json="$6"
+        printf '%s|%s\n' "${task_type}" "${params_json}" >> "${calls}"
+        local count
+        count=$(wc -l < "${calls}" | tr -d ' ')
+        echo "c${count}"
+    }
+    estimate_model_memory() { echo "14"; }
+
+    CLEAN_EDIT_RUNS=1
+    STRESS_EDIT_RUNS=0
+    DRIFT_CALIBRATION_RUNS=0
+    PACK_PRESET_READY=1
+    RUN_ERROR_INJECTION=false
+    PACK_GROUP_EVALUATIONS=1
+    PACK_USE_BATCH_EDITS=true
+    export CLEAN_EDIT_RUNS STRESS_EDIT_RUNS DRIFT_CALIBRATION_RUNS PACK_PRESET_READY RUN_ERROR_INJECTION PACK_GROUP_EVALUATIONS PACK_USE_BATCH_EDITS
+
+    pack_group_evaluation_chunk_size() { echo "bad"; }
+    generate_model_tasks "1" "org/model" "model" >/dev/null
+    assert_match '"chunk_size"[[:space:]]*:[[:space:]]*4' "$(cat "${calls}")" "invalid helper output falls back to full group"
+
+    : > "${calls}"
+    pack_group_evaluation_chunk_size() { echo "99"; }
+    generate_model_tasks "1" "org/model" "model" >/dev/null
+    assert_match '"chunk_size"[[:space:]]*:[[:space:]]*4' "$(cat "${calls}")" "oversized helper output clamps to entry count"
+    unset -f pack_group_evaluation_chunk_size
+}
+
+test_generate_model_tasks_keeps_single_group_on_one_gpu() {
+    mock_reset
+    # shellcheck source=../queue_manager.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/queue_manager.sh"
+    unset PACK_GROUP_EVALUATION_CHUNK_SIZE PACK_GROUP_EVALUATION_SERIAL PACK_GROUP_EVALUATION_MAX_PARALLEL
+
+    local calls="${TEST_TMPDIR}/calls"
+    : > "${calls}"
+
+    add_task() {
+        local task_type="$1"
+        local deps="$5"
+        local params_json="$6"
+        printf '%s|%s|%s\n' "${task_type}" "${deps}" "${params_json}" >> "${calls}"
+        local count
+        count=$(wc -l < "${calls}" | tr -d ' ')
+        echo "g${count}"
+    }
+    estimate_model_memory() { echo "14"; }
+
+    CLEAN_EDIT_RUNS=1
+    STRESS_EDIT_RUNS=0
+    DRIFT_CALIBRATION_RUNS=0
+    PACK_PRESET_READY=1
+    RUN_ERROR_INJECTION=false
+    PACK_GROUP_EVALUATIONS=1
+    PACK_USE_BATCH_EDITS=true
+    NUM_GPUS=1
+    export CLEAN_EDIT_RUNS STRESS_EDIT_RUNS DRIFT_CALIBRATION_RUNS PACK_PRESET_READY RUN_ERROR_INJECTION PACK_GROUP_EVALUATIONS PACK_USE_BATCH_EDITS NUM_GPUS
+
+    generate_model_tasks "1" "org/model" "model" >/dev/null
+
+    local all_calls
+    all_calls="$(cat "${calls}")"
+    assert_eq "1" "$(grep -c '^evaluate_EDIT_GROUP|' "${calls}" | tr -d ' ')" "single GPU keeps one grouped task"
+    assert_match '"chunk_count"[[:space:]]*:[[:space:]]*1' "${all_calls}" "single GPU group has one chunk"
+    assert_match '"chunk_size"[[:space:]]*:[[:space:]]*4' "${all_calls}" "single GPU group preserves serial batch size"
 }
 
 test_generate_model_tasks_groups_stress_entries_and_dependencies() {
     mock_reset
     # shellcheck source=../queue_manager.sh
     source "${TEST_ROOT}/scripts/evidence_packs/lib/queue_manager.sh"
+    unset PACK_GROUP_EVALUATION_SERIAL PACK_GROUP_EVALUATION_MAX_PARALLEL
 
     local calls="${TEST_TMPDIR}/calls"
     : > "${calls}"
@@ -702,13 +811,18 @@ test_generate_model_tasks_groups_stress_entries_and_dependencies() {
     RUN_ERROR_INJECTION=false
     PACK_GROUP_EVALUATIONS=1
     PACK_USE_BATCH_EDITS=true
-    export CLEAN_EDIT_RUNS STRESS_EDIT_RUNS DRIFT_CALIBRATION_RUNS PACK_PRESET_READY RUN_ERROR_INJECTION PACK_GROUP_EVALUATIONS PACK_USE_BATCH_EDITS
+    PACK_GROUP_EVALUATION_CHUNK_SIZE=2
+    NUM_GPUS=4
+    export CLEAN_EDIT_RUNS STRESS_EDIT_RUNS DRIFT_CALIBRATION_RUNS PACK_PRESET_READY RUN_ERROR_INJECTION PACK_GROUP_EVALUATIONS PACK_USE_BATCH_EDITS PACK_GROUP_EVALUATION_CHUNK_SIZE NUM_GPUS
 
     generate_model_tasks "1" "org/model" "model" >/dev/null
 
     local all_calls
     all_calls="$(cat "${calls}")"
     assert_match "evaluate_EDIT_GROUP\\|" "${all_calls}" "stress grouped evaluate task emitted"
+    assert_eq "2" "$(grep -c '^evaluate_EDIT_GROUP|' "${calls}" | tr -d ' ')" "configured grouped chunk size controls task count"
+    assert_match '"chunk_count"[[:space:]]*:[[:space:]]*2' "${all_calls}" "stress group task carries chunk count"
+    assert_match '"chunk_size"[[:space:]]*:[[:space:]]*2' "${all_calls}" "stress group task carries configured chunk size"
     assert_match "version[^\n]*stress" "${all_calls}" "group task carries stress entries"
     assert_match "CLEANUP_EDIT\\|.*stress" "${all_calls}" "stress cleanup tasks emitted"
     assert_match "evaluate_EDIT_GROUP\\|s[0-9]+,s[0-9]+,s[0-9]+" "${all_calls}" "group task depends on edits, preset, and eager baseline report"

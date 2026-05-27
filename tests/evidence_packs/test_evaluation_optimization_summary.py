@@ -35,8 +35,16 @@ def test_build_summary_collects_timing_and_grouped_process_savings(tmp_path: Pat
         tmp_path / "model" / "evaluation_groups" / "task_1" / "summary.json",
         {
             "schema": "invarlock/evidence-pack-evaluate-group-summary-v1",
-            "completed_entries": 4,
-            "avoided_cli_process_invocations": 3,
+            "completed_entries": 2,
+            "avoided_cli_process_invocations": 1,
+        },
+    )
+    _write_json(
+        tmp_path / "model" / "evaluation_groups" / "task_2" / "summary.json",
+        {
+            "schema": "invarlock/evidence-pack-evaluate-group-summary-v1",
+            "completed_entries": 2,
+            "avoided_cli_process_invocations": 1,
         },
     )
 
@@ -45,9 +53,11 @@ def test_build_summary_collects_timing_and_grouped_process_savings(tmp_path: Pat
     assert summary["evaluation_reports_timed"] == 1
     assert summary["baseline_report_reuse_count"] == 1
     assert summary["deferred_rendering_count"] == 1
-    assert summary["grouped_evaluation_tasks"] == 1
+    assert summary["grouped_evaluation_tasks"] == 2
     assert summary["grouped_evaluation_entries"] == 4
-    assert summary["avoided_cli_process_invocations"] == 3
+    assert summary["grouped_evaluation_task_sizes"] == [2, 2]
+    assert summary["grouped_evaluation_max_entries_per_task"] == 2
+    assert summary["avoided_cli_process_invocations"] == 2
     assert summary["timing_totals_seconds"]["plan"] == 0.1
     assert summary["timing_totals_seconds"]["subject"] == 2.0
     assert summary["run_timing_totals_seconds"]["load_model"] == 2.5
