@@ -201,7 +201,12 @@ def build_evidence_pack(
             errors.append("release-review build requires an explicit profile.")
         elif normalized_profile == "dev":
             errors.append(
-                "release-review build rejects profile=dev; use ci or a stricter profile."
+                "release-review build rejects profile=dev; use ci or release."
+            )
+        elif normalized_profile not in {"ci", "release"}:
+            errors.append(
+                "release-review build requires --profile ci or --profile release "
+                f"(got {profile!r})."
             )
         if report_assurance != "strict":
             errors.append("release-review build requires --report-assurance strict.")

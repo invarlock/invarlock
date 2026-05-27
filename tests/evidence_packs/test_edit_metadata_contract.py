@@ -209,6 +209,63 @@ def test_validate_deployable_artifact_checks_sidecar_schemas_and_ok(
         for issue in payload["issues"]
     )
 
+    _write_deployable_sidecars(report_dir)
+    backend_inventory = json.loads(
+        (report_dir / "backend_inventory.json").read_text(encoding="utf-8")
+    )
+    backend_inventory["backend"] = "other_backend"
+    (report_dir / "backend_inventory.json").write_text(
+        json.dumps(backend_inventory),
+        encoding="utf-8",
+    )
+    payload = deployable_validator_mod.validate_deployable_artifact(
+        artifact,
+        backend="bitsandbytes",
+        report_dir=report_dir,
+        smoke=True,
+    )
+    assert payload["ok"] is False
+    assert any(
+        issue.startswith("backend_inventory.json backend mismatch")
+        for issue in payload["issues"]
+    )
+
+    _write_deployable_sidecars(report_dir)
+    backend_inventory = json.loads(
+        (report_dir / "backend_inventory.json").read_text(encoding="utf-8")
+    )
+    backend_inventory["load_smoke"] = False
+    (report_dir / "backend_inventory.json").write_text(
+        json.dumps(backend_inventory),
+        encoding="utf-8",
+    )
+    payload = deployable_validator_mod.validate_deployable_artifact(
+        artifact,
+        backend="bitsandbytes",
+        report_dir=report_dir,
+        smoke=True,
+    )
+    assert payload["ok"] is False
+    assert "backend_inventory.json load_smoke must be true" in payload["issues"]
+
+    _write_deployable_sidecars(report_dir)
+    backend_inventory = json.loads(
+        (report_dir / "backend_inventory.json").read_text(encoding="utf-8")
+    )
+    backend_inventory["inference_smoke"] = False
+    (report_dir / "backend_inventory.json").write_text(
+        json.dumps(backend_inventory),
+        encoding="utf-8",
+    )
+    payload = deployable_validator_mod.validate_deployable_artifact(
+        artifact,
+        backend="bitsandbytes",
+        report_dir=report_dir,
+        smoke=True,
+    )
+    assert payload["ok"] is False
+    assert "backend_inventory.json inference_smoke must be true" in payload["issues"]
+
 
 def test_edit_artifact_summary_counts_scenario_taxonomy(tmp_path: Path) -> None:
     pack_dir = tmp_path / "pack"
