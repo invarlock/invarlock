@@ -64,6 +64,8 @@ print(adapter.describe(model)["model_type"])
   quant backends installed. For remote CUDA evidence-pack setup, set
   `PACK_RUNTIME_IMAGE_FLAVOR=quant` to select/build
   `invarlock-runtime:cuda-quant` instead of the default CUDA runtime image.
+  This opt-in image retains the compiler toolchain because GPTQModel-backed
+  GPTQ/AWQ kernels may JIT-compile at model-load time.
   Strict release-review evidence still needs normal runtime provenance: use a
   local InvarLock runtime image tag or set `INVARLOCK_RUNTIME_IMAGE_DIGEST` for
   custom image references.

@@ -17,11 +17,14 @@ def test_runtime_dockerfile_installs_hf_stack() -> None:
     assert "COPY requirements/workflows/runtime-image-quant-py312-cu128.txt" in text
     assert "ARG RUNTIME_REQUIREMENTS_AMD64" in text
     assert "ARG RUNTIME_REQUIREMENTS_ARM64" in text
+    assert "ARG RUNTIME_KEEP_BUILD_TOOLCHAIN=0" in text
+    assert "ARG RUNTIME_KEEP_BUILD_TOOLCHAIN" in text
     assert "ARG PYTORCH_EXTRA_INDEX_URL" in text
     assert '--extra-index-url "${PYTORCH_EXTRA_INDEX_URL}"' in text
     assert 'amd64) echo "/opt/invarlock/${RUNTIME_REQUIREMENTS_AMD64}"' in text
     assert 'arm64) echo "/opt/invarlock/${RUNTIME_REQUIREMENTS_ARM64}"' in text
     assert "apt-get install -y --no-install-recommends build-essential" in text
+    assert 'if [ "${RUNTIME_KEEP_BUILD_TOOLCHAIN}" != "1" ]' in text
     assert "apt-get purge -y --auto-remove build-essential" in text
     assert "python -m pip install" in text
     assert "--require-hashes" in text

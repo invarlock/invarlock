@@ -438,6 +438,7 @@ runtime-image-cuda-quant:  ## Build the local CUDA runtime image with optional q
 	$(CONTAINER_ENGINE) build \
 		--build-arg RUNTIME_REQUIREMENTS_AMD64=$(RUNTIME_IMAGE_CUDA_QUANT_REQUIREMENTS) \
 		--build-arg RUNTIME_REQUIREMENTS_ARM64=requirements/workflows/runtime-image-py312-aarch64.txt \
+		--build-arg RUNTIME_KEEP_BUILD_TOOLCHAIN=1 \
 		--build-arg PYTORCH_EXTRA_INDEX_URL=$(RUNTIME_IMAGE_CUDA_INDEX_URL) \
 		-f runtime/Dockerfile \
 		-t $(RUNTIME_IMAGE_CUDA_QUANT) .

@@ -61,6 +61,7 @@ def test_runtime_image_cuda_quant_target_builds_quant_tag_with_quant_requirement
     assert (
         "--build-arg RUNTIME_REQUIREMENTS_AMD64=$(RUNTIME_IMAGE_CUDA_QUANT_REQUIREMENTS)"
     ) in block
+    assert "--build-arg RUNTIME_KEEP_BUILD_TOOLCHAIN=1" in block
     assert (
         "--build-arg PYTORCH_EXTRA_INDEX_URL=$(RUNTIME_IMAGE_CUDA_INDEX_URL)"
     ) in block

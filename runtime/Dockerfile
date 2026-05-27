@@ -1,11 +1,13 @@
 ARG TARGETARCH
 ARG RUNTIME_REQUIREMENTS_AMD64=requirements/workflows/runtime-image-py312.txt
 ARG RUNTIME_REQUIREMENTS_ARM64=requirements/workflows/runtime-image-py312-aarch64.txt
+ARG RUNTIME_KEEP_BUILD_TOOLCHAIN=0
 ARG PYTORCH_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu
 FROM python:3.12-slim@sha256:3d5ed973e45820f5ba5e46bd065bd88b3a504ff0724d85980dcd05eab361fcf4
 ARG TARGETARCH
 ARG RUNTIME_REQUIREMENTS_AMD64
 ARG RUNTIME_REQUIREMENTS_ARM64
+ARG RUNTIME_KEEP_BUILD_TOOLCHAIN
 ARG PYTORCH_EXTRA_INDEX_URL
 
 ENV PIP_NO_CACHE_DIR=1 \
@@ -31,7 +33,9 @@ RUN apt-get update \
       --require-hashes \
       --extra-index-url "${PYTORCH_EXTRA_INDEX_URL}" \
       -r "${requirements_path}" \
-    && apt-get purge -y --auto-remove build-essential \
+    && if [ "${RUNTIME_KEEP_BUILD_TOOLCHAIN}" != "1" ]; then \
+      apt-get purge -y --auto-remove build-essential; \
+    fi \
     && rm -rf /var/lib/apt/lists/*
 
 COPY src /opt/invarlock/src
