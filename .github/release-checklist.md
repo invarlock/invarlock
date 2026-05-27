@@ -33,10 +33,6 @@ release evidence and operator gates rather than the stable user contract.
   `artifacts/guard-validation/guard-validation-smoke.md`.
 - [ ] Offline release bundle was generated with
   `scripts/release/make_offline_bundle.sh` under `artifacts/release/offline/`.
-- [ ] Remote GPU evidence manifest exists under `artifacts/release/` when the
-  release claim includes external GPU validation, and it records remote paths,
-  SHA-256 hashes, runtime image digest, source commit, strict pack verification,
-  and backend inventory/smoke evidence for every quantized-subject adapter run.
 - [ ] Empirical guard-evidence manifest exists at
   `artifacts/guard-validation/empirical/manifest.json` when empirical guard
   evidence is required by the release claim.
