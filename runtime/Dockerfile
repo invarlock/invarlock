@@ -20,7 +20,10 @@ COPY requirements/workflows/runtime-image-py312-cu128.txt /opt/invarlock/require
 COPY requirements/workflows/runtime-image-quant-py312-cu128.txt /opt/invarlock/requirements/workflows/runtime-image-quant-py312-cu128.txt
 # Install only the container runtime execution stack from the pinned
 # requirements surface, then execute the repo source directly via PYTHONPATH.
-RUN requirements_path="$(case "${TARGETARCH:-amd64}" in \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential libpcre3 libpcre3-dev \
+    && apt-mark manual libpcre3 \
+    && requirements_path="$(case "${TARGETARCH:-amd64}" in \
       amd64) echo "/opt/invarlock/${RUNTIME_REQUIREMENTS_AMD64}" ;; \
       arm64) echo "/opt/invarlock/${RUNTIME_REQUIREMENTS_ARM64}" ;; \
       *) echo "unsupported TARGETARCH=${TARGETARCH:-unknown}" >&2; exit 1 ;; \
@@ -28,7 +31,9 @@ RUN requirements_path="$(case "${TARGETARCH:-amd64}" in \
     && python -m pip install \
       --require-hashes \
       --extra-index-url "${PYTORCH_EXTRA_INDEX_URL}" \
-      -r "${requirements_path}"
+      -r "${requirements_path}" \
+    && apt-get purge -y --auto-remove build-essential libpcre3-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY src /opt/invarlock/src
 
