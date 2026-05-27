@@ -89,6 +89,13 @@ compile_req_platform \
   --torch-backend cu128
 
 compile_req_platform \
+  "${WORKFLOW_DIR}/runtime-image-quant.in" \
+  "${WORKFLOW_DIR}/runtime-image-quant-py312-cu128.txt" \
+  --python-version 3.12 \
+  --python-platform x86_64-unknown-linux-gnu \
+  --torch-backend cu128
+
+compile_req_platform \
   "${WORKFLOW_DIR}/runtime-image.in" \
   "${WORKFLOW_DIR}/runtime-image-py312-aarch64.txt" \
   --python-version 3.12 \

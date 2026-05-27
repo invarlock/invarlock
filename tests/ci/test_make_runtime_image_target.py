@@ -46,3 +46,22 @@ def test_runtime_image_cuda_target_builds_cuda_tag_with_cuda_requirements() -> N
         "--build-arg PYTORCH_EXTRA_INDEX_URL=$(RUNTIME_IMAGE_CUDA_INDEX_URL)"
     ) in block
     assert "-t $(RUNTIME_IMAGE_CUDA) ." in block
+
+
+def test_runtime_image_cuda_quant_target_builds_quant_tag_with_quant_requirements() -> (
+    None
+):
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    data = makefile.read_text(encoding="utf-8")
+    block = _get_make_target_block(data, "runtime-image-cuda-quant")
+
+    assert block is not None, "runtime-image-cuda-quant target not found in Makefile"
+    assert "$(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE_CUDA_QUANT)" in block
+    assert "$(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE_CUDA_QUANT)" in block
+    assert (
+        "--build-arg RUNTIME_REQUIREMENTS_AMD64=$(RUNTIME_IMAGE_CUDA_QUANT_REQUIREMENTS)"
+    ) in block
+    assert (
+        "--build-arg PYTORCH_EXTRA_INDEX_URL=$(RUNTIME_IMAGE_CUDA_INDEX_URL)"
+    ) in block
+    assert "-t $(RUNTIME_IMAGE_CUDA_QUANT) ." in block

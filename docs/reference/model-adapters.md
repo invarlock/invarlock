@@ -60,6 +60,13 @@ print(adapter.describe(model)["model_type"])
   `hf_multimodal` adapter rather than adapter auto.
 - **Quantized adapters** (`hf_bnb`, `hf_awq`, `hf_gptq`) handle their own device
   placement; avoid calling `.to(...)` on the loaded model.
+- **Containerized quant evidence** requires a runtime image with the optional
+  quant backends installed. For remote CUDA evidence-pack setup, set
+  `PACK_RUNTIME_IMAGE_FLAVOR=quant` to select/build
+  `invarlock-runtime:cuda-quant` instead of the default CUDA runtime image.
+  Strict release-review evidence still needs normal runtime provenance: use a
+  local InvarLock runtime image tag or set `INVARLOCK_RUNTIME_IMAGE_DIGEST` for
+  custom image references.
 - **Snapshot strategy**: HF adapters expose `snapshot`/`restore` and
   `snapshot_chunked`/`restore_chunked` (large-model friendly). The CLI selects the
   strategy automatically via `context.snapshot.*`.
@@ -195,6 +202,10 @@ finally:
 - **GPTQModel-backed adapters unavailable**: `hf_awq` and `hf_gptq` use
   GPTQModel-backed loading; verify the selected GPTQModel wheel supports your
   Python, PyTorch, and accelerator stack.
+- **Container report fails with missing quant extra**: build or select the quant
+  CUDA runtime image (`make runtime-image-cuda-quant`, or
+  `PACK_RUNTIME_IMAGE_FLAVOR=quant` for the remote setup helper). The default
+  CUDA runtime image is intentionally limited to the core evaluation stack.
 - **Bitsandbytes not detected**: `hf_bnb` is platform-dependent. If the backend
   imports cleanly, `invarlock advanced plugins adapters` will report it as ready even on
   non-CUDA hosts.

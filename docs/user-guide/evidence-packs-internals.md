@@ -389,11 +389,17 @@ Small/medium models default to batch edit creation:
   subject checkpoint separately, but runs its edit evaluations inside one
   Python process and reuses the staged baseline report, preset, config root,
   group-level evaluate temp directory, and tokenizer/window evidence paths.
+  Treat this as scheduler/process-startup regression coverage rather than a
+  guaranteed speedup: subject model loading and evaluation usually dominate
+  large-model runs.
 - **Deferred optional report rendering**: `PACK_DEFER_REPORT_RENDERING=1`
   keeps `evaluation.report.json`, `runtime.manifest.json`, and JSON evidence
   sidecars in the hot path while skipping markdown/reviewer bundle rendering.
-  Pack verification does not require those optional rendered files.
-- **Optimization telemetry**: each `evaluate_timing.json` records top-level
+  Pack verification does not require those optional rendered files. Release
+  review mode enables this default so evaluation workers spend less time on
+  report-heavy filesystem writes; pack-level HTML export still runs unless
+  `PACK_SKIP_HTML=1` is set.
+- **Evaluation-loop telemetry**: each `evaluate_timing.json` records top-level
   evaluate timings plus nested baseline/subject run timings when reports expose
   them. The pack-level `evaluation_optimization_summary.json` aggregates those
   timings so reviewers can separate process startup savings from model load,
@@ -729,7 +735,8 @@ Common knobs for the setup script:
 | `PACK_GROUP_EVALUATION_CHUNK_SIZE` | `auto` | Entries per grouped helper task; `auto` spreads across `NUM_GPUS`, `all` forces one serial group |
 | `PACK_GROUP_EVALUATION_MAX_PARALLEL` | `NUM_GPUS` | Maximum grouped helper tasks per model batch when chunk size is `auto` |
 | `PACK_GROUP_EVALUATION_SERIAL` | `0` | Force legacy one grouped task per model batch |
-| `PACK_DEFER_REPORT_RENDERING` | `0` | Skip optional markdown/reviewer bundle rendering during evaluation |
+| `PACK_DEFER_REPORT_RENDERING` | `0` (`1` under `--release-review`) | Skip optional markdown/reviewer bundle rendering during evaluation |
+| `PACK_RUNTIME_IMAGE_FLAVOR` | `default` | Remote setup runtime image flavor; use `quant` on CUDA hosts for optional quant adapter container evidence |
 | `RESUME_MODE` | `true` | Skip completed steps when outputs exist |
 
 ### Hardware selection

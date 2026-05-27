@@ -262,11 +262,11 @@ a hidden sibling temporary directory and only renames it into the final
 export, and optional signing succeed. Failed pack builds do not leave a partial
 pack behind at the final destination.
 
-## Evaluation Optimization Controls
+## Evaluation Loop Controls
 
 The default suite keeps one evaluation task per scenario so scheduler behavior
-and GPU placement remain easy to inspect. For benchmark or throughput work on
-batch edit runs, enable the opt-in grouped path:
+and GPU placement remain easy to inspect. For regression testing of the grouped
+helper path on batch edit runs, enable:
 
 ```bash
 PACK_GROUP_EVALUATIONS=1 \
@@ -285,16 +285,23 @@ some process-startup savings while emitting multiple chunks. Each grouped task
 evaluates its entries inside one Python process, reuses the shared baseline
 report and group-level evaluate temp directory, and still loads each subject
 checkpoint separately.
+This mode is not a shared-model evaluator: each subject checkpoint is still
+loaded separately, so it should not be treated as a guaranteed throughput
+optimization. It is useful for validating the in-process runner, baseline-report
+reuse, and scheduler chunking without accidentally serializing all edits on
+multi-GPU hosts.
+
 `PACK_DEFER_REPORT_RENDERING=1` keeps `evaluation.report.json` and required
 sidecars, but skips optional markdown/reviewer rendering in the hot path.
+`run_pack.sh --release-review` enables this by default; pack-level HTML export
+and verification still run unless explicitly disabled.
 
 Every run writes `results/analysis/evaluation_optimization_summary.json`. It
 records timing files discovered under the run directory, grouped task counts,
 deferred-render counts, baseline-report reuse counts, nested run timing totals
 from `evaluate_timing.json`, and the estimated number of CLI process startups
-avoided by grouped evaluation. To compare before and after, run the same
-suite/model selection once with defaults and once with the two optimization
-flags, then compare the summary JSON files.
+avoided by grouped evaluation. Use it as scheduling and regression telemetry,
+not as proof that a run should be faster.
 
 ## Edit Provenance Labels
 

@@ -17,6 +17,7 @@ WORKDIR /opt/invarlock
 COPY requirements/workflows/runtime-image-py312.txt /opt/invarlock/requirements/workflows/runtime-image-py312.txt
 COPY requirements/workflows/runtime-image-py312-aarch64.txt /opt/invarlock/requirements/workflows/runtime-image-py312-aarch64.txt
 COPY requirements/workflows/runtime-image-py312-cu128.txt /opt/invarlock/requirements/workflows/runtime-image-py312-cu128.txt
+COPY requirements/workflows/runtime-image-quant-py312-cu128.txt /opt/invarlock/requirements/workflows/runtime-image-quant-py312-cu128.txt
 # Install only the container runtime execution stack from the pinned
 # requirements surface, then execute the repo source directly via PYTHONPATH.
 RUN requirements_path="$(case "${TARGETARCH:-amd64}" in \

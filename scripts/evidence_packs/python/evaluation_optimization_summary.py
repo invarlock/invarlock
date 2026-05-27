@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Summarize evidence-pack evaluation-loop optimization telemetry."""
+"""Summarize evidence-pack evaluation-loop scheduling telemetry."""
 
 from __future__ import annotations
 

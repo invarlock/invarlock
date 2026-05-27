@@ -70,6 +70,28 @@ test_setup_remote_verify_remote_stack_runs_package_native_smoke() {
     assert_match "--repo-root /opt/invarlock" "${cmd}" "repo root forwarded to smoke helper"
 }
 
+test_setup_remote_verify_remote_stack_checks_quant_modules_when_requested() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/setup_remote.sh
+
+    pack_activate_venv() { :; }
+    pack_run_cmd() { echo "$*" > "${TEST_TMPDIR}/smoke.cmd"; }
+
+    REPO_DIR="/opt/invarlock"
+    PACK_RUNTIME_IMAGE_FLAVOR="quant"
+
+    verify_remote_stack
+
+    local cmd
+    cmd="$(cat "${TEST_TMPDIR}/smoke.cmd")"
+    assert_match "--module bitsandbytes" "${cmd}" "quant smoke requires bitsandbytes"
+    assert_match "--module gptqmodel" "${cmd}" "quant smoke requires gptqmodel"
+    assert_match "--repo-root /opt/invarlock" "${cmd}" "repo root forwarded to smoke helper"
+
+    unset PACK_RUNTIME_IMAGE_FLAVOR
+}
+
 test_setup_remote_ensure_runtime_image_builds_cuda_local_when_missing() {
     mock_reset
 
@@ -113,6 +135,141 @@ EOF
     log_text="$(cat "${cmd_log}")"
     assert_match "make runtime-image-cuda" "${log_text}" "cuda runtime image build invoked"
     assert_eq "invarlock-runtime:cuda-local" "${INVARLOCK_RUNTIME_IMAGE}" "cuda runtime image exported"
+}
+
+test_setup_remote_ensure_runtime_image_builds_cuda_quant_when_requested() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/setup_remote.sh
+
+    local cmd_log="${TEST_TMPDIR}/runtime-image.log"
+    : > "${cmd_log}"
+
+    pack_activate_venv() { :; }
+    pack_run_cmd() { printf '%s\n' "$*" >> "${cmd_log}"; }
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+
+    cat > "${bin_dir}/docker" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${1:-}" == "image" && "${2:-}" == "inspect" ]]; then
+  exit 1
+fi
+exit 0
+EOF
+    chmod +x "${bin_dir}/docker"
+
+    cat > "${bin_dir}/nvidia-smi" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+    chmod +x "${bin_dir}/nvidia-smi"
+
+    PATH="${bin_dir}:${PATH}"
+    export PATH
+
+    REPO_DIR="${TEST_TMPDIR}/opt-invarlock"
+    mkdir -p "${REPO_DIR}"
+    PACK_RUNTIME_IMAGE_FLAVOR="quant"
+    unset INVARLOCK_RUNTIME_IMAGE
+
+    ensure_runtime_image
+
+    local log_text
+    log_text="$(cat "${cmd_log}")"
+    assert_match "make runtime-image-cuda-quant" "${log_text}" "quant cuda runtime image build invoked"
+    assert_eq "invarlock-runtime:cuda-quant" "${INVARLOCK_RUNTIME_IMAGE}" "quant cuda runtime image exported"
+    unset PACK_RUNTIME_IMAGE_FLAVOR
+}
+
+test_setup_remote_ensure_runtime_image_rejects_quant_without_cuda() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/setup_remote.sh
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/docker" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+    chmod +x "${bin_dir}/docker"
+
+    PATH="${bin_dir}:/usr/bin:/bin"
+    export PATH
+
+    PACK_RUNTIME_IMAGE_FLAVOR="quant"
+    unset INVARLOCK_RUNTIME_IMAGE
+
+    run ensure_runtime_image
+    assert_rc "1" "${RUN_RC}" "quant runtime image selection requires cuda"
+    assert_match "PACK_RUNTIME_IMAGE_FLAVOR=quant requires a CUDA host" "${RUN_ERR}" "cuda requirement is explicit"
+    unset PACK_RUNTIME_IMAGE_FLAVOR
+}
+
+test_setup_remote_runtime_image_flavor_rejects_unknown_values() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/setup_remote.sh
+
+    PACK_RUNTIME_IMAGE_FLAVOR="legacy"
+
+    run pack_runtime_image_flavor
+    assert_rc "1" "${RUN_RC}" "unsupported runtime image flavor fails"
+    assert_match "unsupported PACK_RUNTIME_IMAGE_FLAVOR=legacy" "${RUN_ERR}" "unsupported flavor is named"
+
+    run pack_runtime_image_ref
+    assert_rc "1" "${RUN_RC}" "ref helper propagates unsupported flavor"
+
+    run pack_runtime_image_target
+    assert_rc "1" "${RUN_RC}" "target helper propagates unsupported flavor"
+
+    unset PACK_RUNTIME_IMAGE_FLAVOR
+}
+
+test_setup_remote_runtime_image_target_rejects_quant_without_cuda() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/setup_remote.sh
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    PATH="${bin_dir}:/usr/bin:/bin"
+    export PATH
+
+    PACK_RUNTIME_IMAGE_FLAVOR="quant"
+
+    run pack_runtime_image_target
+    assert_rc "1" "${RUN_RC}" "quant runtime target requires cuda"
+    assert_match "PACK_RUNTIME_IMAGE_FLAVOR=quant requires a CUDA host" "${RUN_ERR}" "target cuda requirement is explicit"
+
+    unset PACK_RUNTIME_IMAGE_FLAVOR
+}
+
+test_setup_remote_ensure_runtime_image_propagates_target_resolution_failure() {
+    mock_reset
+
+    source ./scripts/evidence_packs/lib/setup_remote.sh
+
+    local bin_dir="${TEST_TMPDIR}/bin"
+    mkdir -p "${bin_dir}"
+    cat > "${bin_dir}/docker" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+    chmod +x "${bin_dir}/docker"
+
+    PATH="${bin_dir}:/usr/bin:/bin"
+    export PATH
+
+    pack_runtime_image_ref() { echo "invarlock-runtime:test"; }
+    pack_runtime_image_target() { return 1; }
+    unset INVARLOCK_RUNTIME_IMAGE
+
+    run ensure_runtime_image
+    assert_rc "1" "${RUN_RC}" "target resolution failure is propagated"
 }
 
 test_setup_remote_ensure_runtime_image_respects_explicit_override() {

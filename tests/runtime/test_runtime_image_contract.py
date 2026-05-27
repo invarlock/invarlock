@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 
@@ -13,6 +14,7 @@ def test_runtime_dockerfile_installs_hf_stack() -> None:
     assert "COPY requirements/workflows/runtime-image-py312.txt" in text
     assert "COPY requirements/workflows/runtime-image-py312-aarch64.txt" in text
     assert "COPY requirements/workflows/runtime-image-py312-cu128.txt" in text
+    assert "COPY requirements/workflows/runtime-image-quant-py312-cu128.txt" in text
     assert "ARG RUNTIME_REQUIREMENTS_AMD64" in text
     assert "ARG RUNTIME_REQUIREMENTS_ARM64" in text
     assert "ARG PYTORCH_EXTRA_INDEX_URL" in text
@@ -26,6 +28,16 @@ def test_runtime_dockerfile_installs_hf_stack() -> None:
         "pip install --index-url https://download.pytorch.org/whl/cpu torch" not in text
     )
     assert "PYTHONPATH=/opt/invarlock/src" in text
+
+
+def test_runtime_dockerfile_copied_requirement_files_exist() -> None:
+    root = Path.cwd()
+    text = (root / "runtime" / "Dockerfile").read_text(encoding="utf-8")
+    copied_requirements = re.findall(r"COPY (requirements/workflows/[^ ]+) ", text)
+
+    assert copied_requirements
+    for relpath in copied_requirements:
+        assert (root / relpath).is_file(), f"missing Dockerfile input: {relpath}"
 
 
 def test_runtime_dockerignore_keeps_runtime_and_fuzzing_inputs() -> None:
@@ -42,6 +54,7 @@ def test_runtime_dockerignore_keeps_runtime_and_fuzzing_inputs() -> None:
     assert "!requirements/workflows/runtime-image-py312.txt" in text
     assert "!requirements/workflows/runtime-image-py312-aarch64.txt" in text
     assert "!requirements/workflows/runtime-image-py312-cu128.txt" in text
+    assert "!requirements/workflows/runtime-image-quant-py312-cu128.txt" in text
     assert "!src/**" in text
 
 
@@ -82,3 +95,32 @@ def test_runtime_image_cuda_requirements_are_hash_locked() -> None:
     assert "nvidia-cublas-cu12" in text
     assert "nvidia-cuda-runtime-cu12" in text
     assert "triton==" in text
+
+
+def test_runtime_image_quant_cuda_requirements_are_hash_locked() -> None:
+    text = (
+        Path.cwd()
+        / "requirements"
+        / "workflows"
+        / "runtime-image-quant-py312-cu128.txt"
+    ).read_text(encoding="utf-8")
+
+    assert "torch==" in text
+    assert "+cu128" in text
+    assert "--hash=sha256:" in text
+    assert "bitsandbytes==" in text
+    assert "gptqmodel==" in text
+    assert "autoawq==" not in text
+
+
+def test_current_quant_dependency_surfaces_do_not_pin_autoawq() -> None:
+    root = Path.cwd()
+    surfaces = (
+        root / "pyproject.toml",
+        root / "requirements" / "workflows" / "advanced-py313.txt",
+        root / "requirements" / "workflows" / "runtime-image-quant.in",
+        root / "requirements" / "workflows" / "runtime-image-quant-py312-cu128.txt",
+    )
+
+    for surface in surfaces:
+        assert "autoawq" not in surface.read_text(encoding="utf-8").lower()

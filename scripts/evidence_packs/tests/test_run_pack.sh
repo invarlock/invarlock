@@ -248,9 +248,11 @@ test_run_pack_entrypoint_release_review_sets_hardened_defaults() {
     assert_eq "strict" "${PACK_REPORT_ASSURANCE}" "release-review uses strict assurance"
     assert_eq "1" "${PACK_SIGN_MANIFEST}" "release-review signs manifests"
     assert_eq "1" "${PACK_REQUIRE_RUNTIME_MANIFESTS}" "release-review requires runtime manifests"
+    assert_eq "1" "${PACK_DEFER_REPORT_RENDERING}" "release-review defers optional report rendering"
 
     unset PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
     unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+    unset PACK_DEFER_REPORT_RENDERING
 }
 
 test_run_pack_entrypoint_applies_preconfigured_release_review_defaults() {
@@ -271,9 +273,11 @@ test_run_pack_entrypoint_applies_preconfigured_release_review_defaults() {
     assert_eq "strict" "${PACK_REPORT_ASSURANCE}" "preconfigured release-review uses strict assurance"
     assert_eq "1" "${PACK_SIGN_MANIFEST}" "preconfigured release-review signs manifests"
     assert_eq "1" "${PACK_REQUIRE_RUNTIME_MANIFESTS}" "preconfigured release-review requires runtime manifests"
+    assert_eq "1" "${PACK_DEFER_REPORT_RENDERING}" "preconfigured release-review defers optional report rendering"
 
     unset PACK_RELEASE_REVIEW PACK_REQUIRE_PASS PACK_VERIFY_PROFILE
     unset PACK_REPORT_ASSURANCE PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+    unset PACK_DEFER_REPORT_RENDERING
 }
 
 test_run_pack_release_review_rejects_dev_verify_profile() {

@@ -16,6 +16,9 @@ and a PASS final verdict.
 Deployable edit scenarios are opt-in; set PACK_INCLUDE_DEPLOYABLE_EDITS=1,
 PACK_DEPLOY_BACKENDS=bitsandbytes,gptq,awq, and select explicit deployable
 scenario IDs only in backend-ready environments.
+For containerized quant adapter evidence on a CUDA remote, set
+PACK_RUNTIME_IMAGE_FLAVOR=quant during remote setup or explicitly set
+INVARLOCK_RUNTIME_IMAGE=invarlock-runtime:cuda-quant with a provenance digest.
 
 Verify a completed pack with:
   invarlock advanced evidence-pack verify <pack-dir> --strict --report-assurance strict
@@ -397,9 +400,11 @@ pack_apply_release_review_defaults() {
     PACK_REPORT_ASSURANCE="${PACK_REPORT_ASSURANCE:-strict}"
     PACK_SIGN_MANIFEST="${PACK_SIGN_MANIFEST:-1}"
     PACK_REQUIRE_RUNTIME_MANIFESTS="${PACK_REQUIRE_RUNTIME_MANIFESTS:-1}"
+    PACK_DEFER_REPORT_RENDERING="${PACK_DEFER_REPORT_RENDERING:-1}"
     PACK_RELEASE_REVIEW=1
     export PACK_REQUIRE_PASS PACK_VERIFY_PROFILE PACK_REPORT_ASSURANCE
-    export PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS PACK_RELEASE_REVIEW
+    export PACK_SIGN_MANIFEST PACK_REQUIRE_RUNTIME_MANIFESTS
+    export PACK_DEFER_REPORT_RENDERING PACK_RELEASE_REVIEW
 }
 
 pack_validate_release_review_settings() {

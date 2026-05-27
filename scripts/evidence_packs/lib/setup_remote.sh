@@ -27,6 +27,7 @@ TORCH_INDEX_URL="${TORCH_INDEX_URL:-}"
 TORCH_PACKAGES="${TORCH_PACKAGES:-torch}"
 PACK_SKIP_TORCH_CHECK="${PACK_SKIP_TORCH_CHECK:-0}"
 PACK_SKIP_RUNTIME_IMAGE_BUILD="${PACK_SKIP_RUNTIME_IMAGE_BUILD:-0}"
+PACK_RUNTIME_IMAGE_FLAVOR="${PACK_RUNTIME_IMAGE_FLAVOR:-default}"
 
 export HF_HOME="${HF_HOME:-${REPO_DIR}/hf_home}"
 export HF_HUB_CACHE="${HF_HUB_CACHE:-${HF_HOME}/hub}"
@@ -161,7 +162,32 @@ pack_container_engine() {
     return 1
 }
 
+pack_runtime_image_flavor() {
+    case "${PACK_RUNTIME_IMAGE_FLAVOR:-default}" in
+        default|cuda|base)
+            echo "default"
+            ;;
+        quant|cuda-quant)
+            echo "quant"
+            ;;
+        *)
+            echo "ERROR: unsupported PACK_RUNTIME_IMAGE_FLAVOR=${PACK_RUNTIME_IMAGE_FLAVOR}" >&2
+            return 1
+            ;;
+    esac
+}
+
 pack_runtime_image_ref() {
+    local flavor
+    flavor="$(pack_runtime_image_flavor)" || return 1
+    if [[ "${flavor}" == "quant" ]]; then
+        if ! command -v nvidia-smi >/dev/null 2>&1; then
+            echo "ERROR: PACK_RUNTIME_IMAGE_FLAVOR=quant requires a CUDA host" >&2
+            return 1
+        fi
+        echo "invarlock-runtime:cuda-quant"
+        return 0
+    fi
     if command -v nvidia-smi >/dev/null 2>&1; then
         echo "invarlock-runtime:cuda-local"
         return 0
@@ -170,6 +196,16 @@ pack_runtime_image_ref() {
 }
 
 pack_runtime_image_target() {
+    local flavor
+    flavor="$(pack_runtime_image_flavor)" || return 1
+    if [[ "${flavor}" == "quant" ]]; then
+        if ! command -v nvidia-smi >/dev/null 2>&1; then
+            echo "ERROR: PACK_RUNTIME_IMAGE_FLAVOR=quant requires a CUDA host" >&2
+            return 1
+        fi
+        echo "runtime-image-cuda-quant"
+        return 0
+    fi
     if command -v nvidia-smi >/dev/null 2>&1; then
         echo "runtime-image-cuda"
         return 0
@@ -199,8 +235,8 @@ ensure_runtime_image() {
 
     local image_ref=""
     local target=""
-    image_ref="$(pack_runtime_image_ref)"
-    target="$(pack_runtime_image_target)"
+    image_ref="$(pack_runtime_image_ref)" || return 1
+    target="$(pack_runtime_image_target)" || return 1
 
     if "${engine}" image inspect "${image_ref}" >/dev/null 2>&1; then
         log "Local runtime image already present: ${image_ref}"
@@ -218,8 +254,12 @@ ensure_runtime_image() {
 verify_remote_stack() {
     log "Running evidence-pack remote smoke check"
     pack_activate_venv
-    pack_run_cmd python "${REPO_DIR}/scripts/evidence_packs/python/remote_setup_smoke.py" \
-        --repo-root "${REPO_DIR}"
+    local -a smoke_args=("${REPO_DIR}/scripts/evidence_packs/python/remote_setup_smoke.py")
+    if [[ "$(pack_runtime_image_flavor)" == "quant" ]]; then
+        smoke_args+=(--module bitsandbytes --module gptqmodel)
+    fi
+    smoke_args+=(--repo-root "${REPO_DIR}")
+    pack_run_cmd python "${smoke_args[@]}"
 }
 
 post_setup() {

@@ -14,6 +14,7 @@
 !requirements/workflows/runtime-image-py312.txt
 !requirements/workflows/runtime-image-py312-aarch64.txt
 !requirements/workflows/runtime-image-py312-cu128.txt
+!requirements/workflows/runtime-image-quant-py312-cu128.txt
 !runtime/
 !runtime/Dockerfile
 !src/

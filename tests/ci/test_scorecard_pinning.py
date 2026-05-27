@@ -75,11 +75,15 @@ def test_refresh_pinned_requirements_generates_runtime_and_clusterfuzz_locks() -
         '  "${WORKFLOW_DIR}/runtime-image-py312-cu128.txt"'
     ) in text
     assert (
+        'compile_req_platform \\\n  "${WORKFLOW_DIR}/runtime-image-quant.in" \\\n'
+        '  "${WORKFLOW_DIR}/runtime-image-quant-py312-cu128.txt"'
+    ) in text
+    assert (
         'compile_req_platform \\\n  "${WORKFLOW_DIR}/runtime-image.in" \\\n'
         '  "${WORKFLOW_DIR}/runtime-image-py312-aarch64.txt"'
     ) in text
     assert text.count("--torch-backend cpu") == 2
-    assert text.count("--torch-backend cu128") == 1
+    assert text.count("--torch-backend cu128") == 2
     assert (
         'compile_req_platform \\\n  "${WORKFLOW_DIR}/clusterfuzzlite.in" \\\n'
         '  "${WORKFLOW_DIR}/clusterfuzzlite-py311.txt"'

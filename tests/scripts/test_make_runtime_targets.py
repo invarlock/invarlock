@@ -10,10 +10,15 @@ def test_makefile_exposes_podman_runtime_targets() -> None:
     assert "runtime-image-podman: CONTAINER_ENGINE=podman" in text
     assert "runtime-image-cuda-podman" in text
     assert "runtime-image-cuda-podman: CONTAINER_ENGINE=podman" in text
+    assert "runtime-image-cuda-quant" in text
+    assert "runtime-image-cuda-quant-podman: CONTAINER_ENGINE=podman" in text
     assert "runtime-smoke-podman" in text
     assert "runtime-smoke-podman: CONTAINER_ENGINE=podman" in text
     assert "runtime-smoke-cuda-podman" in text
     assert "runtime-smoke-cuda-podman: CONTAINER_ENGINE=podman" in text
+    assert "runtime-smoke-cuda-quant" in text
+    assert "runtime-smoke-cuda-quant-podman: CONTAINER_ENGINE=podman" in text
+    assert "import bitsandbytes, datasets, gptqmodel" in text
     assert "container-default-smoke:" in text
     assert "container-default-smoke: runtime-image" in text
     assert "container-default-smoke-podman" in text

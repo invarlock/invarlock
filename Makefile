@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync repo-cruft-check model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-verify actionlint workflow-lint packaging-smoke-minimal packaging-smoke-front-door ensure-mypy cve-audit dist-check release-evidence-check guard-validation-smoke empirical-guard-evidence-check
+.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync repo-cruft-check model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-image-cuda-quant runtime-image-cuda-quant-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-smoke-cuda-quant runtime-smoke-cuda-quant-podman runtime-verify actionlint workflow-lint packaging-smoke-minimal packaging-smoke-front-door ensure-mypy cve-audit dist-check release-evidence-check guard-validation-smoke empirical-guard-evidence-check
 
 PYTHON ?= $(shell bash scripts/select_workspace_python.sh)
 PIP := $(PYTHON) -m pip
@@ -17,6 +17,8 @@ CONTAINER_ENGINE ?= $(shell if command -v docker >/dev/null 2>&1; then echo dock
 RUNTIME_IMAGE ?= invarlock-runtime:local
 RUNTIME_IMAGE_CUDA ?= invarlock-runtime:cuda-local
 RUNTIME_IMAGE_CUDA_REQUIREMENTS ?= requirements/workflows/runtime-image-py312-cu128.txt
+RUNTIME_IMAGE_CUDA_QUANT ?= invarlock-runtime:cuda-quant
+RUNTIME_IMAGE_CUDA_QUANT_REQUIREMENTS ?= requirements/workflows/runtime-image-quant-py312-cu128.txt
 RUNTIME_IMAGE_CUDA_INDEX_URL ?= https://download.pytorch.org/whl/cu128
 RUNTIME_IMAGE_DIGEST ?= sha256:local-runtime-image
 SECURITY_ARTIFACT_DIR ?= artifacts/supply-chain
@@ -430,6 +432,19 @@ runtime-image-cuda:  ## Build the local CUDA container runtime image for GPU-bac
 runtime-image-cuda-podman: CONTAINER_ENGINE=podman
 runtime-image-cuda-podman: runtime-image-cuda  ## Build the local CUDA container runtime image with Podman
 
+runtime-image-cuda-quant:  ## Build the local CUDA runtime image with optional quant adapter backends
+	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ An OCI container engine (Docker or Podman) is required."; exit 1; }
+	@if $(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE_CUDA_QUANT) >/dev/null 2>&1; then $(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE_CUDA_QUANT) >/dev/null 2>&1 || true; fi
+	$(CONTAINER_ENGINE) build \
+		--build-arg RUNTIME_REQUIREMENTS_AMD64=$(RUNTIME_IMAGE_CUDA_QUANT_REQUIREMENTS) \
+		--build-arg RUNTIME_REQUIREMENTS_ARM64=requirements/workflows/runtime-image-py312-aarch64.txt \
+		--build-arg PYTORCH_EXTRA_INDEX_URL=$(RUNTIME_IMAGE_CUDA_INDEX_URL) \
+		-f runtime/Dockerfile \
+		-t $(RUNTIME_IMAGE_CUDA_QUANT) .
+
+runtime-image-cuda-quant-podman: CONTAINER_ENGINE=podman
+runtime-image-cuda-quant-podman: runtime-image-cuda-quant  ## Build the quant CUDA runtime image with Podman
+
 runtime-smoke:  ## Smoke the local container runtime image
 	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ An OCI container engine (Docker or Podman) is required."; exit 1; }
 	$(CONTAINER_ENGINE) run --rm \
@@ -481,6 +496,18 @@ runtime-smoke-cuda: runtime-smoke  ## Smoke the local CUDA container runtime ima
 runtime-smoke-cuda-podman: CONTAINER_ENGINE=podman
 runtime-smoke-cuda-podman: RUNTIME_IMAGE=$(RUNTIME_IMAGE_CUDA)
 runtime-smoke-cuda-podman: runtime-smoke  ## Smoke the local CUDA container runtime image with Podman
+
+runtime-smoke-cuda-quant: RUNTIME_IMAGE=$(RUNTIME_IMAGE_CUDA_QUANT)
+runtime-smoke-cuda-quant:  ## Smoke the local CUDA quant runtime image
+	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ An OCI container engine (Docker or Podman) is required."; exit 1; }
+	$(CONTAINER_ENGINE) run --rm \
+		--entrypoint python \
+		$(RUNTIME_IMAGE) \
+		-c "import bitsandbytes, datasets, gptqmodel, safetensors, torch, transformers; print('quant runtime image imports ok')"
+
+runtime-smoke-cuda-quant-podman: CONTAINER_ENGINE=podman
+runtime-smoke-cuda-quant-podman: RUNTIME_IMAGE=$(RUNTIME_IMAGE_CUDA_QUANT)
+runtime-smoke-cuda-quant-podman: runtime-smoke-cuda-quant  ## Smoke the CUDA quant runtime image with Podman
 
 runtime-verify:  ## Smoke the Python runtime verifier on the fixture bundle
 	PYTHONPATH=src $(PYTHON) -m invarlock advanced runtime-verify \
