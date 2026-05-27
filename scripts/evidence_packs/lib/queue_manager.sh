@@ -205,61 +205,6 @@ capture_add_task() {
     printf -v "${output_var}" '%s' "${task_id}"
 }
 
-# Whether batch edit evaluations should be run through grouped helper tasks.
-pack_group_evaluation_enabled() {
-    local value="${PACK_GROUP_EVALUATIONS:-${PACK_EVALUATE_GROUPS:-0}}"
-    [[ "${value}" == "1" || "${value}" == "true" || "${value}" == "TRUE" || "${value}" == "yes" || "${value}" == "YES" ]]
-}
-
-# Resolve how many grouped edit tasks may run at once. Defaults to the active GPU
-# worker pool so grouped mode does not serialize independent edit scenarios on
-# multi-GPU machines.
-pack_group_evaluation_available_workers() {
-    local entry_count="$1"
-    local configured="${PACK_GROUP_EVALUATION_MAX_PARALLEL:-${NUM_GPUS:-1}}"
-    if ! [[ "${configured}" =~ ^[0-9]+$ ]] || [[ "${configured}" -lt 1 ]]; then
-        configured=1
-    fi
-    if [[ ${configured} -gt ${entry_count} ]]; then
-        configured="${entry_count}"
-    fi
-    [[ ${configured} -lt 1 ]] && configured=1
-    echo "${configured}"
-}
-
-# Resolve entries per grouped task. Set PACK_GROUP_EVALUATION_SERIAL=1 or
-# PACK_GROUP_EVALUATION_CHUNK_SIZE=all to force the old one-task-per-model shape.
-pack_group_evaluation_chunk_size() {
-    local entry_count="$1"
-    local serial="${PACK_GROUP_EVALUATION_SERIAL:-0}"
-    if [[ "${serial}" == "1" || "${serial}" == "true" || "${serial}" == "TRUE" || "${serial}" == "yes" || "${serial}" == "YES" ]]; then
-        echo "${entry_count}"
-        return
-    fi
-
-    local configured="${PACK_GROUP_EVALUATION_CHUNK_SIZE:-${PACK_EVALUATE_GROUP_CHUNK_SIZE:-auto}}"
-    if [[ "${configured}" == "all" || "${configured}" == "serial" ]]; then
-        echo "${entry_count}"
-        return
-    fi
-    if [[ "${configured}" =~ ^[0-9]+$ ]] && [[ "${configured}" -gt 0 ]]; then
-        if [[ "${configured}" -gt "${entry_count}" ]]; then
-            echo "${entry_count}"
-        else
-            echo "${configured}"
-        fi
-        return
-    fi
-
-    local workers
-    workers="$(pack_group_evaluation_available_workers "${entry_count}")"
-    if [[ "${workers}" -le 1 ]]; then
-        echo "${entry_count}"
-        return
-    fi
-    echo $(((entry_count + workers - 1) / workers))
-}
-
 # Get list of task files by status
 # Usage: get_tasks_by_status <status>
 # Returns: newline-separated list of task file paths
@@ -1307,151 +1252,67 @@ generate_model_tasks() {
         task_ids+=("${edits_id}")
         echo "Created: ${edits_id}"
 
-        if pack_group_evaluation_enabled; then
-            local -a grouped_entries=()
-            if [[ ${clean_runs} -gt 0 ]]; then
-                for edit_spec in "${clean_edits[@]}"; do
-                    local run
-                    for run in $(seq 1 "${clean_runs}"); do
-                        grouped_entries+=("{\"edit_spec\": \"${edit_spec}\", \"version\": \"clean\", \"run\": ${run}}")
-                    done
-                done
-            fi
-            if [[ ${stress_runs} -gt 0 ]]; then
-                for edit_spec in "${stress_edits[@]}"; do
-                    local run
-                    for run in $(seq 1 "${stress_runs}"); do
-                        grouped_entries+=("{\"edit_spec\": \"${edit_spec}\", \"version\": \"stress\", \"run\": ${run}}")
-                    done
-                done
-            fi
-
-            if [[ ${#grouped_entries[@]} -gt 0 ]]; then
-                local group_deps="${edits_id}"
-                if [[ -n "${preset_id}" ]]; then
-                    group_deps="${group_deps},${preset_id}"
-                fi
-                if [[ -n "${baseline_report_id}" ]]; then
-                    group_deps="${group_deps},${baseline_report_id}"
-                fi
-
-                local entry_count="${#grouped_entries[@]}"
-                local group_chunk_size
-                group_chunk_size="$(pack_group_evaluation_chunk_size "${entry_count}")"
-                if ! [[ "${group_chunk_size}" =~ ^[0-9]+$ ]] || [[ "${group_chunk_size}" -lt 1 ]]; then
-                    group_chunk_size="${entry_count}"
-                fi
-                if [[ "${group_chunk_size}" -gt "${entry_count}" ]]; then
-                    group_chunk_size="${entry_count}"
-                fi
-                local group_count=$(((entry_count + group_chunk_size - 1) / group_chunk_size))
-                local group_parallelism
-                group_parallelism="$(pack_group_evaluation_available_workers "${entry_count}")"
-
-                local -a group_ids=()
-                local start=0
-                local chunk_index=1
-                while [[ ${start} -lt ${entry_count} ]]; do
-                    local -a chunk_entries=("${grouped_entries[@]:start:group_chunk_size}")
-                    local grouped_json
-                    grouped_json="[$(IFS=','; echo "${chunk_entries[*]}")]"
-                    local group_id=""
-                    capture_add_task group_id "evaluate_EDIT_GROUP" "${model_id}" "${model_name}" \
-                        "$(estimate_model_memory "${model_id}" "evaluate_EDIT_GROUP")" \
-                        "${group_deps}" '{"entries": '"${grouped_json}"', "grouped": true, "chunk_index": '"${chunk_index}"', "chunk_count": '"${group_count}"', "chunk_size": '"${#chunk_entries[@]}"', "group_parallelism": '"${group_parallelism}"'}' 74
-                    group_ids+=("${group_id}")
-                    task_ids+=("${group_id}")
-                    echo "Created: ${group_id}"
-                    start=$((start + group_chunk_size))
-                    chunk_index=$((chunk_index + 1))
-                done
-
-                local group_ids_csv
-                group_ids_csv="$(IFS=','; echo "${group_ids[*]}")"
-
-                if [[ "${cleanup_models}" != "0" ]]; then
-                    if [[ ${clean_runs} -gt 0 ]]; then
-                        for edit_spec in "${clean_edits[@]}"; do
-                            local cleanup_id
-                            capture_add_task cleanup_id "CLEANUP_EDIT" "${model_id}" "${model_name}" \
-                                1 "${group_ids_csv}" '{"edit_spec": "'"${edit_spec}"'", "version": "clean"}' 80
-                            echo "Created: ${cleanup_id}"
-                        done
+        if [[ ${clean_runs} -gt 0 ]]; then
+            for edit_spec in "${clean_edits[@]}"; do
+                local -a eval_ids=()
+                local run
+                for run in $(seq 1 "${clean_runs}"); do
+                    local cert_deps="${edits_id}"
+                    if [[ -n "${preset_id}" ]]; then
+                        cert_deps="${cert_deps},${preset_id}"
                     fi
-                    if [[ ${stress_runs} -gt 0 ]]; then
-                        for edit_spec in "${stress_edits[@]}"; do
-                            local cleanup_id
-                            capture_add_task cleanup_id "CLEANUP_EDIT" "${model_id}" "${model_name}" \
-                                1 "${group_ids_csv}" '{"edit_spec": "'"${edit_spec}"'", "version": "stress"}' 80
-                            echo "Created: ${cleanup_id}"
-                        done
+                    if [[ -n "${baseline_report_id}" ]]; then
+                        cert_deps="${cert_deps},${baseline_report_id}"
                     fi
+                    local cert_id=""
+                    capture_add_task cert_id "evaluate_EDIT" "${model_id}" "${model_name}" \
+                        "$(estimate_model_memory "${model_id}" "evaluate_EDIT")" \
+                        "${cert_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "clean", "run": '"${run}"'}' 74
+                    eval_ids+=("${cert_id}")
+                    task_ids+=("${cert_id}")
+                    echo "Created: ${cert_id}"
+                done
+                if [[ "${cleanup_models}" != "0" && ${#eval_ids[@]} -gt 0 ]]; then
+                    local deps_csv
+                    deps_csv="$(IFS=','; echo "${eval_ids[*]}")"
+                    local cleanup_id
+                    capture_add_task cleanup_id "CLEANUP_EDIT" "${model_id}" "${model_name}" \
+                        1 "${deps_csv}" '{"edit_spec": "'"${edit_spec}"'", "version": "clean"}' 80
+                    echo "Created: ${cleanup_id}"
                 fi
-            fi
-        else
-            if [[ ${clean_runs} -gt 0 ]]; then
-                for edit_spec in "${clean_edits[@]}"; do
-                    local -a eval_ids=()
-                    local run
-                    for run in $(seq 1 "${clean_runs}"); do
-                        local cert_deps="${edits_id}"
-                        if [[ -n "${preset_id}" ]]; then
-                            cert_deps="${cert_deps},${preset_id}"
-                        fi
-                        if [[ -n "${baseline_report_id}" ]]; then
-                            cert_deps="${cert_deps},${baseline_report_id}"
-                        fi
-                        local cert_id=""
-                        capture_add_task cert_id "evaluate_EDIT" "${model_id}" "${model_name}" \
-                            "$(estimate_model_memory "${model_id}" "evaluate_EDIT")" \
-                            "${cert_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "clean", "run": '"${run}"'}' 74
-                        eval_ids+=("${cert_id}")
-                        task_ids+=("${cert_id}")
-                        echo "Created: ${cert_id}"
-                    done
-                    if [[ "${cleanup_models}" != "0" && ${#eval_ids[@]} -gt 0 ]]; then
-                        local deps_csv
-                        deps_csv="$(IFS=','; echo "${eval_ids[*]}")"
-                        local cleanup_id
-                        capture_add_task cleanup_id "CLEANUP_EDIT" "${model_id}" "${model_name}" \
-                            1 "${deps_csv}" '{"edit_spec": "'"${edit_spec}"'", "version": "clean"}' 80
-                        echo "Created: ${cleanup_id}"
-                    fi
-                done
-            fi
-
-            if [[ ${stress_runs} -gt 0 ]]; then
-                for edit_spec in "${stress_edits[@]}"; do
-                    local -a eval_ids=()
-                    local run
-                    for run in $(seq 1 "${stress_runs}"); do
-                        local cert_deps="${edits_id}"
-                        if [[ -n "${preset_id}" ]]; then
-                            cert_deps="${cert_deps},${preset_id}"
-                        fi
-                        if [[ -n "${baseline_report_id}" ]]; then
-                            cert_deps="${cert_deps},${baseline_report_id}"
-                        fi
-                        local cert_id=""
-                        capture_add_task cert_id "evaluate_EDIT" "${model_id}" "${model_name}" \
-                            "$(estimate_model_memory "${model_id}" "evaluate_EDIT")" \
-                            "${cert_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "stress", "run": '"${run}"'}' 74
-                        eval_ids+=("${cert_id}")
-                        task_ids+=("${cert_id}")
-                        echo "Created: ${cert_id}"
-                    done
-                    if [[ "${cleanup_models}" != "0" && ${#eval_ids[@]} -gt 0 ]]; then
-                        local deps_csv
-                        deps_csv="$(IFS=','; echo "${eval_ids[*]}")"
-                        local cleanup_id
-                        capture_add_task cleanup_id "CLEANUP_EDIT" "${model_id}" "${model_name}" \
-                            1 "${deps_csv}" '{"edit_spec": "'"${edit_spec}"'", "version": "stress"}' 80
-                        echo "Created: ${cleanup_id}"
-                    fi
-                done
-            fi
+            done
         fi
 
+        if [[ ${stress_runs} -gt 0 ]]; then
+            for edit_spec in "${stress_edits[@]}"; do
+                local -a eval_ids=()
+                local run
+                for run in $(seq 1 "${stress_runs}"); do
+                    local cert_deps="${edits_id}"
+                    if [[ -n "${preset_id}" ]]; then
+                        cert_deps="${cert_deps},${preset_id}"
+                    fi
+                    if [[ -n "${baseline_report_id}" ]]; then
+                        cert_deps="${cert_deps},${baseline_report_id}"
+                    fi
+                    local cert_id=""
+                    capture_add_task cert_id "evaluate_EDIT" "${model_id}" "${model_name}" \
+                        "$(estimate_model_memory "${model_id}" "evaluate_EDIT")" \
+                        "${cert_deps}" '{"edit_spec": "'"${edit_spec}"'", "version": "stress", "run": '"${run}"'}' 74
+                    eval_ids+=("${cert_id}")
+                    task_ids+=("${cert_id}")
+                    echo "Created: ${cert_id}"
+                done
+                if [[ "${cleanup_models}" != "0" && ${#eval_ids[@]} -gt 0 ]]; then
+                    local deps_csv
+                    deps_csv="$(IFS=','; echo "${eval_ids[*]}")"
+                    local cleanup_id
+                    capture_add_task cleanup_id "CLEANUP_EDIT" "${model_id}" "${model_name}" \
+                        1 "${deps_csv}" '{"edit_spec": "'"${edit_spec}"'", "version": "stress"}' 80
+                    echo "Created: ${cleanup_id}"
+                fi
+            done
+        fi
     else
         # CREATE_EDIT - Create single edits (one task per edit) and enqueue eval/evaluate
         if [[ ${clean_runs} -gt 0 ]]; then

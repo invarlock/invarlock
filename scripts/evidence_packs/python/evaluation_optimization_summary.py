@@ -79,33 +79,12 @@ def _collect_evaluate_timings(run_dir: Path) -> list[dict[str, Any]]:
     return payloads
 
 
-def _collect_group_summaries(run_dir: Path) -> list[dict[str, Any]]:
-    payloads: list[dict[str, Any]] = []
-    for path in sorted(run_dir.glob("**/evaluation_groups/*/summary.json")):
-        payload = _read_json(path)
-        if payload is not None:
-            payloads.append(payload)
-    return payloads
-
-
 def build_summary(run_dir: Path) -> dict[str, Any]:
     timings = _collect_evaluate_timings(run_dir)
-    group_summaries = _collect_group_summaries(run_dir)
-    grouped_task_sizes = [
-        int(item.get("completed_entries") or 0) for item in group_summaries
-    ]
-    grouped_entries = sum(grouped_task_sizes)
-    avoided_processes = sum(
-        int(item.get("avoided_cli_process_invocations") or 0)
-        for item in group_summaries
-    )
     return {
         "schema": "invarlock/evidence-pack-evaluation-optimization-summary-v1",
         "run_dir": str(run_dir),
         "controls": {
-            "PACK_GROUP_EVALUATIONS": os.environ.get("PACK_GROUP_EVALUATIONS")
-            or os.environ.get("PACK_EVALUATE_GROUPS")
-            or "0",
             "PACK_DEFER_REPORT_RENDERING": os.environ.get("PACK_DEFER_REPORT_RENDERING")
             or os.environ.get("PACK_DEFER_OPTIONAL_REPORT_RENDERING")
             or "0",
@@ -117,11 +96,6 @@ def build_summary(run_dir: Path) -> dict[str, Any]:
         "deferred_rendering_count": sum(
             1 for item in timings if bool(item.get("defer_report_rendering"))
         ),
-        "grouped_evaluation_tasks": len(group_summaries),
-        "grouped_evaluation_entries": grouped_entries,
-        "grouped_evaluation_task_sizes": grouped_task_sizes,
-        "grouped_evaluation_max_entries_per_task": max(grouped_task_sizes, default=0),
-        "avoided_cli_process_invocations": avoided_processes,
         "timing_totals_seconds": {
             "plan": _sum_timing(timings, "plan"),
             "baseline": _sum_timing(timings, "baseline"),
