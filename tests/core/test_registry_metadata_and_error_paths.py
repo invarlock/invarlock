@@ -356,6 +356,29 @@ def test_registry_optional_plugin_metadata_tracks_missing_dependencies(
     assert bnb_info["status"] == "Needs extra: bitsandbytes"
 
 
+def test_registry_optional_plugin_metadata_tracks_available_dependencies(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        reg.CoreRegistry,
+        "_check_runtime_dependencies",
+        lambda self, deps: [],
+    )
+
+    registry = reg.CoreRegistry()
+
+    gptq_info = registry.get_plugin_info("hf_gptq", "adapters")
+    awq_info = registry.get_plugin_info("hf_awq", "adapters")
+    bnb_info = registry.get_plugin_info("hf_bnb", "adapters")
+
+    assert gptq_info["available"] is True
+    assert gptq_info["status"] == "Built-in"
+    assert awq_info["available"] is True
+    assert awq_info["status"] == "Built-in"
+    assert bnb_info["available"] is True
+    assert bnb_info["status"] == "Built-in"
+
+
 def test_registry_additional_paths(monkeypatch):
     r = reg.CoreRegistry()
 

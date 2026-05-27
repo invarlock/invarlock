@@ -4,6 +4,7 @@ import pytest
 import torch
 import torch.nn as nn
 
+from invarlock.eval import metrics_runtime as runtime_mod
 from invarlock.eval.metrics import (
     InputValidator,
     MetricsConfig,
@@ -107,6 +108,65 @@ def test_compute_ppl_mps_branch_runs_gather_on_cpu(monkeypatch) -> None:
         ppl = compute_ppl(
             TinyRuntimeModel().eval(),
             EvaluationWindow([[1, 2, 3]], [[1, 1, 1]], [0]),
+            device="mps",
+        )
+    finally:
+        monkeypatch.setattr(torch.Tensor, "to", original_tensor_to, raising=False)
+
+    assert ppl >= 1.0
+
+
+def test_compute_perplexity_mps_available_branch_and_cpu_gather(
+    monkeypatch,
+) -> None:
+    class AvailableMPSBackend:
+        @staticmethod
+        def is_available() -> bool:
+            return True
+
+    monkeypatch.setattr(torch.backends, "mps", AvailableMPSBackend(), raising=False)
+    assert (
+        runtime_mod._resolve_eval_device(nn.Linear(1, 1), torch.device("mps")).type
+        == "mps"
+    )
+
+    class TinyRuntimeModel(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.config = SimpleNamespace(vocab_size=5, pad_token_id=0)
+            self.emb = nn.Embedding(5, 2)
+
+        def get_input_embeddings(self):
+            return self.emb
+
+        def forward(self, input_ids=None, attention_mask=None, return_dict=True):
+            del attention_mask, return_dict
+            batch, seq_len = input_ids.shape
+            logits = torch.zeros((batch, seq_len, 5), dtype=torch.float32)
+            return SimpleNamespace(logits=logits)
+
+    original_tensor_to = torch.Tensor.to
+
+    def _identity_to(self, *args, **kwargs):
+        del args, kwargs
+        return self
+
+    monkeypatch.setattr(
+        runtime_mod,
+        "_resolve_eval_device",
+        lambda *_args, **_kwargs: "mps",
+    )
+    monkeypatch.setattr(torch.Tensor, "to", _identity_to, raising=False)
+    try:
+        ppl = compute_perplexity(
+            TinyRuntimeModel().eval(),
+            [
+                {
+                    "input_ids": torch.tensor([[1, 2, 3]], dtype=torch.long),
+                    "attention_mask": torch.ones((1, 3), dtype=torch.long),
+                }
+            ],
+            max_samples=1,
             device="mps",
         )
     finally:
