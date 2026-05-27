@@ -153,6 +153,24 @@ def test_invariants_tokenizer_mismatch_detected():
     assert "tokenizer_mismatches" in outcome.metrics
 
 
+def test_invariants_allows_renamed_embedding_with_same_vocab_size():
+    model = TinyModel(vocab_size=32, hidden=8)
+    guard = InvariantsGuard()
+    guard.prepare(model, adapter=None, calib=None, policy={})
+
+    original_embedding = model.embed
+    model.embed = nn.Identity()
+    model.transformer.wte = None
+    model.quant_wrapper = nn.Module()
+    model.quant_wrapper.model = nn.Module()
+    model.quant_wrapper.model.embed_tokens = original_embedding
+
+    outcome = guard.finalize(model)
+    types = [v.get("type") for v in outcome.violations]
+    assert "tokenizer_mismatch" not in types
+    assert "tokenizer_mismatches" not in outcome.metrics
+
+
 def test_tokenizer_mismatch_when_embeddings_absent():
     model = TinyModel(vocab_size=16, hidden=4)
     guard = InvariantsGuard()

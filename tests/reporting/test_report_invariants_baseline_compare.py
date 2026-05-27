@@ -61,6 +61,57 @@ def test_invariants_baseline_compare_tokenizer_mismatch_fails() -> None:
     assert any(f.get("type") == "tokenizer_mismatch" for f in out["failures"])
 
 
+def test_invariants_baseline_compare_allows_embedding_path_alias() -> None:
+    baseline_checks = {
+        "parameter_count": 100,
+        "layer_norm_paths": ("ln",),
+        "embedding_vocab_sizes": {"model.embed_tokens": 32000},
+        "structure_hash": "baseline",
+        "weight_tying": True,
+    }
+    current_checks = {
+        **baseline_checks,
+        "parameter_count": 75,
+        "embedding_vocab_sizes": {"model.model.embed_tokens": 32000},
+        "structure_hash": "current",
+        "weight_tying": None,
+    }
+
+    baseline_report = {
+        "guards": [
+            {
+                "name": "invariants",
+                "metrics": {},
+                "violations": [],
+                "details": {
+                    "baseline_checks": baseline_checks,
+                    "current_checks": baseline_checks,
+                },
+            }
+        ],
+        "metrics": {"invariants": {}},
+    }
+    report = {
+        "guards": [
+            {
+                "name": "invariants",
+                "metrics": {},
+                "violations": [],
+                "details": {
+                    "baseline_checks": current_checks,
+                    "current_checks": current_checks,
+                },
+            }
+        ],
+        "metrics": {"invariants": {}},
+    }
+
+    out = _extract_invariants(report, baseline=baseline_report)
+    assert out["status"] == "warn"
+    assert not any(f.get("type") == "tokenizer_mismatch" for f in out["failures"])
+    assert any(f.get("check") == "parameter_count" for f in out["failures"])
+
+
 def test_invariants_baseline_compare_invariant_violation_warns() -> None:
     baseline_checks = {
         "parameter_count": 100,
