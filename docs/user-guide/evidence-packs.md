@@ -195,10 +195,13 @@ Evidence packs require pinned model revisions for reproducibility:
 
 ## Promotion Sentinels
 
-For Qwen2.5-14B promotion work, use the maintained sentinel helper from a fresh
-repo work tree:
+For Qwen2.5-14B promotion work, run the evidence-pack campaign with
+`PACK_CLEANUP_MODELS=0`, then use the maintained sentinel helper from a fresh
+repo work tree. The sentinel helper reloads the saved validation subjects, so
+the default cleanup mode removes the directories it needs.
 
 ```bash
+PACK_CLEANUP_MODELS=0 \
 INVARLOCK_ALLOW_REMOTE_CODE=1 \
 INVARLOCK_ALLOW_NETWORK=1 \
   ./scripts/evidence_packs/run_qwen14_sentinels.sh \

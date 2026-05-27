@@ -37,6 +37,16 @@ require_dir() {
     }
 }
 
+require_saved_subject_dir() {
+    local path="$1"
+    local label="$2"
+    [[ -d "${path}" ]] || {
+        echo "ERROR: ${label} not found: ${path}" >&2
+        echo "Hint: Qwen14 sentinels require retained edit subject directories; rerun the evidence-pack campaign with PACK_CLEANUP_MODELS=0." >&2
+        return 1
+    }
+}
+
 require_file() {
     local path="$1"
     local label="$2"
@@ -293,7 +303,7 @@ main() {
         local quant_subject="${model_root}/models/quant_4bit_clean"
         local quant_preset=""
         quant_preset="$(resolve_preset_path "${run_dir}" "${model_name}" "quant_rtn")"
-        require_dir "${quant_subject}" "quant_4bit_clean subject"
+        require_saved_subject_dir "${quant_subject}" "quant_4bit_clean subject"
         run_evaluate_sentinel \
             "${baseline_path}" \
             "${baseline_report}" \
@@ -314,7 +324,7 @@ main() {
         local prune_subject="${model_root}/models/prune_clean"
         local prune_preset=""
         prune_preset="$(resolve_preset_path "${run_dir}" "${model_name}" "magnitude_prune")"
-        require_dir "${prune_subject}" "prune_clean subject"
+        require_saved_subject_dir "${prune_subject}" "prune_clean subject"
         run_evaluate_sentinel \
             "${baseline_path}" \
             "${baseline_report}" \
