@@ -323,8 +323,8 @@ def test_public_contract_loader_discovers_contracts_from_executable_ancestor(
         "__file__",
         str(tmp_path / "bundle" / "public_contracts.py"),
     )
-    monkeypatch.setattr(sys, "argv", [str(build_out / "policy_pack_fuzzer")])
-    monkeypatch.setattr(sys, "executable", str(build_out / "policy_pack_fuzzer.pkg"))
+    monkeypatch.setattr(sys, "argv", [str(build_out / "bundled_policy_tool")])
+    monkeypatch.setattr(sys, "executable", str(build_out / "bundled_policy_tool.pkg"))
     sandbox = tmp_path / "sandbox"
     sandbox.mkdir()
     monkeypatch.chdir(sandbox)

@@ -91,6 +91,8 @@ step_*/
 # Documentation and frontend build outputs
 /site/
 /node_modules/
+/.clusterfuzzlite/
+/fuzzers/
 /docs/operations/
 /.npm-cache/
 /.npm-prefix/
@@ -117,6 +119,7 @@ benchmarks/results/
 # Optional local asset trees
 /plans/
 /data/
+/.*/operations/
 /.*/plans/
 /.*/reports/
 

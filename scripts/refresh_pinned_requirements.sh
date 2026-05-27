@@ -102,12 +102,6 @@ compile_req_platform \
   --python-platform aarch64-unknown-linux-gnu \
   --torch-backend cpu
 
-compile_req_platform \
-  "${WORKFLOW_DIR}/clusterfuzzlite.in" \
-  "${WORKFLOW_DIR}/clusterfuzzlite-py311.txt" \
-  --python-version 3.11 \
-  --python-platform x86_64-unknown-linux-gnu
-
 compile_pyproject "${WORKFLOW_DIR}/precommit-ci-py313.txt" \
   --python-version 3.13 \
   --extra precommit-ci
