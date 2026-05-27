@@ -64,8 +64,9 @@ print(adapter.describe(model)["model_type"])
   quant backends installed. For remote CUDA evidence-pack setup, set
   `PACK_RUNTIME_IMAGE_FLAVOR=quant` to select/build
   `invarlock-runtime:cuda-quant` instead of the default CUDA runtime image.
-  This opt-in image retains the compiler toolchain because GPTQModel-backed
-  GPTQ/AWQ kernels may JIT-compile at model-load time.
+  This opt-in image uses the pinned CUDA devel base and retains the compiler
+  toolchain because GPTQModel-backed GPTQ/AWQ kernels may JIT-compile CUDA
+  extensions at model-load time and require `nvcc`/`CUDA_HOME`.
   Strict release-review evidence still needs normal runtime provenance: use a
   local InvarLock runtime image tag or set `INVARLOCK_RUNTIME_IMAGE_DIGEST` for
   custom image references.
@@ -208,6 +209,10 @@ finally:
   CUDA runtime image (`make runtime-image-cuda-quant`, or
   `PACK_RUNTIME_IMAGE_FLAVOR=quant` for the remote setup helper). The default
   CUDA runtime image is intentionally limited to the core evaluation stack.
+- **GPTQ/AWQ container load fails during JIT compile**: use the quant CUDA
+  runtime image rather than the default CUDA runtime. The quant image is built
+  from the pinned CUDA devel base so `nvcc` and `CUDA_HOME` are available for
+  GPTQModel kernel compilation.
 - **Bitsandbytes not detected**: `hf_bnb` is platform-dependent. If the backend
   imports cleanly, `invarlock advanced plugins adapters` will report it as ready even on
   non-CUDA hosts.

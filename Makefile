@@ -18,6 +18,7 @@ RUNTIME_IMAGE ?= invarlock-runtime:local
 RUNTIME_IMAGE_CUDA ?= invarlock-runtime:cuda-local
 RUNTIME_IMAGE_CUDA_REQUIREMENTS ?= requirements/workflows/runtime-image-py312-cu128.txt
 RUNTIME_IMAGE_CUDA_QUANT ?= invarlock-runtime:cuda-quant
+RUNTIME_IMAGE_CUDA_QUANT_BASE ?= nvidia/cuda:12.8.1-devel-ubuntu24.04@sha256:520292dbb4f755fd360766059e62956e9379485d9e073bbd2f6e3c20c270ed66
 RUNTIME_IMAGE_CUDA_QUANT_REQUIREMENTS ?= requirements/workflows/runtime-image-quant-py312-cu128.txt
 RUNTIME_IMAGE_CUDA_INDEX_URL ?= https://download.pytorch.org/whl/cu128
 RUNTIME_IMAGE_DIGEST ?= sha256:local-runtime-image
@@ -436,9 +437,12 @@ runtime-image-cuda-quant:  ## Build the local CUDA runtime image with optional q
 	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ An OCI container engine (Docker or Podman) is required."; exit 1; }
 	@if $(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE_CUDA_QUANT) >/dev/null 2>&1; then $(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE_CUDA_QUANT) >/dev/null 2>&1 || true; fi
 	$(CONTAINER_ENGINE) build \
+		--build-arg RUNTIME_BASE_IMAGE=$(RUNTIME_IMAGE_CUDA_QUANT_BASE) \
 		--build-arg RUNTIME_REQUIREMENTS_AMD64=$(RUNTIME_IMAGE_CUDA_QUANT_REQUIREMENTS) \
 		--build-arg RUNTIME_REQUIREMENTS_ARM64=requirements/workflows/runtime-image-py312-aarch64.txt \
+		--build-arg RUNTIME_CUDA_HOME=/usr/local/cuda \
 		--build-arg RUNTIME_KEEP_BUILD_TOOLCHAIN=1 \
+		--build-arg RUNTIME_PATH_PREFIX=/usr/local/cuda/bin: \
 		--build-arg PYTORCH_EXTRA_INDEX_URL=$(RUNTIME_IMAGE_CUDA_INDEX_URL) \
 		-f runtime/Dockerfile \
 		-t $(RUNTIME_IMAGE_CUDA_QUANT) .
@@ -504,7 +508,7 @@ runtime-smoke-cuda-quant:  ## Smoke the local CUDA quant runtime image
 	$(CONTAINER_ENGINE) run --rm \
 		--entrypoint python \
 		$(RUNTIME_IMAGE) \
-		-c "import bitsandbytes, datasets, gptqmodel, safetensors, torch, transformers; print('quant runtime image imports ok')"
+		-c "import shutil; from torch.utils.cpp_extension import CUDA_HOME; import bitsandbytes, datasets, gptqmodel, safetensors, torch, transformers; assert shutil.which('nvcc'), 'nvcc missing'; assert CUDA_HOME, 'CUDA_HOME missing'; print('quant runtime image imports ok')"
 
 runtime-smoke-cuda-quant-podman: CONTAINER_ENGINE=podman
 runtime-smoke-cuda-quant-podman: RUNTIME_IMAGE=$(RUNTIME_IMAGE_CUDA_QUANT)

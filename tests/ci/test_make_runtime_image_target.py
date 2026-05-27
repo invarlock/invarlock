@@ -58,10 +58,13 @@ def test_runtime_image_cuda_quant_target_builds_quant_tag_with_quant_requirement
     assert block is not None, "runtime-image-cuda-quant target not found in Makefile"
     assert "$(CONTAINER_ENGINE) image inspect $(RUNTIME_IMAGE_CUDA_QUANT)" in block
     assert "$(CONTAINER_ENGINE) image rm -f $(RUNTIME_IMAGE_CUDA_QUANT)" in block
+    assert "--build-arg RUNTIME_BASE_IMAGE=$(RUNTIME_IMAGE_CUDA_QUANT_BASE)" in block
     assert (
         "--build-arg RUNTIME_REQUIREMENTS_AMD64=$(RUNTIME_IMAGE_CUDA_QUANT_REQUIREMENTS)"
     ) in block
+    assert "--build-arg RUNTIME_CUDA_HOME=/usr/local/cuda" in block
     assert "--build-arg RUNTIME_KEEP_BUILD_TOOLCHAIN=1" in block
+    assert "--build-arg RUNTIME_PATH_PREFIX=/usr/local/cuda/bin:" in block
     assert (
         "--build-arg PYTORCH_EXTRA_INDEX_URL=$(RUNTIME_IMAGE_CUDA_INDEX_URL)"
     ) in block

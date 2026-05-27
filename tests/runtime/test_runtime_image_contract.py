@@ -7,9 +7,10 @@ from pathlib import Path
 def test_runtime_dockerfile_installs_hf_stack() -> None:
     text = (Path.cwd() / "runtime" / "Dockerfile").read_text(encoding="utf-8")
     assert (
-        "FROM python:3.12-slim@sha256:3d5ed973e45820f5ba5e46bd065bd88b3a504ff0724d85980dcd05eab361fcf4"
+        "ARG RUNTIME_BASE_IMAGE=python:3.12-slim@sha256:3d5ed973e45820f5ba5e46bd065bd88b3a504ff0724d85980dcd05eab361fcf4"
         in text
     )
+    assert "FROM ${RUNTIME_BASE_IMAGE}" in text
     assert "ARG TARGETARCH" in text
     assert "COPY requirements/workflows/runtime-image-py312.txt" in text
     assert "COPY requirements/workflows/runtime-image-py312-aarch64.txt" in text
@@ -17,13 +18,19 @@ def test_runtime_dockerfile_installs_hf_stack() -> None:
     assert "COPY requirements/workflows/runtime-image-quant-py312-cu128.txt" in text
     assert "ARG RUNTIME_REQUIREMENTS_AMD64" in text
     assert "ARG RUNTIME_REQUIREMENTS_ARM64" in text
+    assert "ARG RUNTIME_CUDA_HOME" in text
     assert "ARG RUNTIME_KEEP_BUILD_TOOLCHAIN=0" in text
     assert "ARG RUNTIME_KEEP_BUILD_TOOLCHAIN" in text
+    assert "ARG RUNTIME_PATH_PREFIX" in text
     assert "ARG PYTORCH_EXTRA_INDEX_URL" in text
+    assert "PIP_BREAK_SYSTEM_PACKAGES=1" in text
+    assert "CUDA_HOME=${RUNTIME_CUDA_HOME}" in text
+    assert "PATH=${RUNTIME_PATH_PREFIX}${PATH}" in text
     assert '--extra-index-url "${PYTORCH_EXTRA_INDEX_URL}"' in text
     assert 'amd64) echo "/opt/invarlock/${RUNTIME_REQUIREMENTS_AMD64}"' in text
     assert 'arm64) echo "/opt/invarlock/${RUNTIME_REQUIREMENTS_ARM64}"' in text
     assert "apt-get install -y --no-install-recommends build-essential" in text
+    assert "python3 python3-pip python3-venv python-is-python3" in text
     assert 'if [ "${RUNTIME_KEEP_BUILD_TOOLCHAIN}" != "1" ]' in text
     assert "apt-get purge -y --auto-remove build-essential" in text
     assert "python -m pip install" in text
