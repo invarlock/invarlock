@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added backend-inventory, load-smoke, inference-smoke, memory-report, and
   deployable-sidecar validation contracts for optional quantized subject
   adapters.
+- Added detached evidence-pack source snapshot support and a clean quant-runtime
+  evidence path for optional quantized-subject runs.
 
 ### Changed
 
@@ -29,8 +31,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated evidence-pack validation edits to use shared edit implementations,
   shared artifact saving, schema-aware `edit_metadata.json`, and metadata-aware
   artifact validation in both single-edit and batch-edit paths.
+- Updated evaluate and evidence-pack command surfaces for separate baseline and
+  subject adapters, deferred optional report rendering, canonical WikiText
+  dataset identifiers, stale pack-staging report ignores, and Qwen14 sentinel
+  cleanup guidance.
 - Updated quantized adapter documentation and runtime image guidance around
   GPTQModel-backed GPTQ/AWQ loaders and platform-dependent BNB loading.
+- Updated quant runtime image builds to use portable build dependencies, a CUDA
+  devel base, and a retained JIT toolchain for quantized adapter evidence paths.
 - Re-scoped grouped evidence evaluation to the simpler ungrouped path after
   remote timing showed no useful default speedup.
 
@@ -51,6 +59,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   forwarding, dev-profile rejection, strict PASS requirements, runtime sidecar
   requirements, signed-pack requirements, and deployable sidecar semantic
   validation failures.
+- Fixed evidence-pack verification and host evidence semantics for
+  expected-failure reports and host model evidence that should not claim strict
+  assurance.
+- Fixed invariant-vocabulary guard compatibility for quantized wrapper models.
 - Fixed pseudo-accuracy handling so non-dev report generation fails unless
   pseudo metrics are explicitly allowed, and report output marks pseudo or
   non-assurance results visibly.
