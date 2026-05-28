@@ -100,6 +100,13 @@ def _fake_import_without(missing_name: str):
 def test_utils_false_paths_and_custom_logger(monkeypatch):
     import invarlock.observability.utils as utils
 
+    with pytest.raises(ValueError, match="max_calls must be positive"):
+        utils.RateLimiter(max_calls=0, window_seconds=60)
+    with pytest.raises(ValueError, match="window_seconds must be positive"):
+        utils.RateLimiter(max_calls=1, window_seconds=0)
+    with pytest.raises(ValueError, match="size must be positive"):
+        utils.CircularBuffer(size=0)
+
     callback_names: list[str] = []
 
     @utils.timing_decorator(
@@ -117,6 +124,11 @@ def test_utils_false_paths_and_custom_logger(monkeypatch):
 
     percentiles = utils.PercentileCalculator()
     assert percentiles.get_percentiles([50, 95]) == {50: 0, 95: 0}
+    for value in [10.0, 20.0, 30.0]:
+        percentiles.add(value)
+    assert percentiles.get_percentile(-10) == 10.0
+    assert percentiles.get_percentile(110) == 30.0
+    assert percentiles.get_percentiles([-1, 101]) == {-1: 10.0, 101: 30.0}
 
     monkeypatch.setattr(
         utils.psutil,

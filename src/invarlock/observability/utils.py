@@ -140,6 +140,10 @@ class RateLimiter:
     """Simple rate limiter for monitoring operations."""
 
     def __init__(self, max_calls: int, window_seconds: float):
+        if max_calls <= 0:
+            raise ValueError("max_calls must be positive")
+        if window_seconds <= 0:
+            raise ValueError("window_seconds must be positive")
         self.max_calls = max_calls
         self.window_seconds = window_seconds
         self.calls: list[float] = []
@@ -190,6 +194,8 @@ class CircularBuffer:
     """Circular buffer for storing recent metrics."""
 
     def __init__(self, size: int):
+        if size <= 0:
+            raise ValueError("size must be positive")
         self.size = size
         self.buffer = [None] * size
         self.head = 0
@@ -291,6 +297,7 @@ class PercentileCalculator:
             return 0
 
         sorted_values = sorted(values)
+        percentile = clamp(percentile, 0.0, 100.0)
         index = int((percentile / 100) * (len(sorted_values) - 1))
         return float(sorted_values[index])
 
@@ -304,7 +311,8 @@ class PercentileCalculator:
         result = {}
 
         for percentile in percentiles:
-            index = int((percentile / 100) * (len(sorted_values) - 1))
+            bounded_percentile = clamp(percentile, 0.0, 100.0)
+            index = int((bounded_percentile / 100) * (len(sorted_values) - 1))
             result[percentile] = sorted_values[index]
 
         return result
