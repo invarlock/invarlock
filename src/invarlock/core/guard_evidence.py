@@ -86,17 +86,21 @@ class GuardEvidence:
 
     def strict_blocking_reasons(self) -> tuple[str, ...]:
         reasons: list[str] = []
+        status = str(self.status or "").strip().lower()
         if self.supported is False and self.assurance_blocking is True:
             reason = self.reason or "unsupported"
             reasons.append(f"{self.name} unsupported for strict assurance: {reason}.")
-        if str(self.status or "").strip().lower() in {
-            "degraded",
-            "monitor-only",
-            "monitor_only",
-        }:
+        if status in {"degraded", "monitor-only", "monitor_only"}:
             reasons.append(
                 f"{self.name} status {self.status} is not strict-assurance passing."
             )
+        if (
+            not self.decision
+            and self.passed is None
+            and status not in {"ok", "pass", "passed"}
+            and self.supported is None
+        ):
+            reasons.append(f"{self.name} missing strict guard pass evidence.")
         if self.decision == "block" or self.passed is False:
             reasons.append(f"{self.name} did not pass.")
         return tuple(reasons)

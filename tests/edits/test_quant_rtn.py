@@ -707,6 +707,25 @@ def test_quant_rtn_compute_stats_skips_channel_stats_for_one_dimensional_weight(
     assert "channel_stats" not in stats["module_stats"][0]
 
 
+def test_quant_rtn_stats_are_finite_for_single_value_channels() -> None:
+    edit = RTNQuantEdit(scope="all")
+    module = torch.nn.Linear(1, 1, bias=False)
+    with torch.no_grad():
+        module.weight.fill_(0.25)
+
+    stats = edit._compute_quantization_stats([_target("linear", module)])
+    module_stats = stats["module_stats"][0]
+    quantized = edit._apply_rtn_quantization(module, bitwidth=8, clamp_ratio=0.0)
+
+    assert torch.isfinite(torch.tensor(module_stats["weight_std"]))
+    assert torch.isfinite(torch.tensor(module_stats["channel_stats"][0]["std"]))
+    assert torch.isfinite(torch.tensor(quantized["scale_stats"]["scale_std"]))
+
+
+def test_quant_rtn_population_std_empty_tensor_returns_zero() -> None:
+    assert RTNQuantEdit._population_std(torch.empty(0)) == 0.0
+
+
 def test_quant_rtn_outlier_clipping_and_error_metric_edges() -> None:
     edit = RTNQuantEdit(scope="all")
     weight = torch.tensor([[0.0, 1.0, 100.0], [0.0, -1.0, -100.0]])

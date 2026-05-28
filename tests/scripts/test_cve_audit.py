@@ -6,6 +6,8 @@ from datetime import date
 from pathlib import Path
 from types import ModuleType
 
+import pytest
+
 
 def _load_script_module() -> ModuleType:
     repo_root = Path(__file__).resolve().parents[2]
@@ -132,3 +134,31 @@ def test_build_report_can_run_inventory_only(tmp_path: Path) -> None:
     assert report["inventory"]["src_used_component_count"] == 1
     assert "since" not in report
     assert report["findings"] == []
+
+
+def test_parse_args_rejects_non_positive_batch_size() -> None:
+    module = _load_script_module()
+
+    with pytest.raises(SystemExit):
+        module.parse_args(["--batch-size", "0"])
+
+
+def test_query_osv_batch_rejects_malformed_result_count(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_script_module()
+    component = module.Component(
+        ecosystem="PyPI",
+        name="urllib3",
+        version="2.6.3",
+        sources={"uv.lock"},
+    )
+
+    monkeypatch.setattr(
+        module,
+        "_read_json_url",
+        lambda *_args, **_kwargs: {"results": []},
+    )
+
+    with pytest.raises(RuntimeError, match="returned 0 results for 1 components"):
+        module.query_osv_batch([component], 100, enrich=False)

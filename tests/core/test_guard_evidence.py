@@ -78,3 +78,15 @@ def test_guard_evidence_from_report_block_preserves_explicit_pass_decision() -> 
 
     assert evidence is not None
     assert evidence.decision == "allow"
+
+
+def test_guard_evidence_blocks_report_block_without_pass_signal() -> None:
+    evidence = GuardEvidence.from_report_block(
+        "spectral",
+        {"metrics": {"sigma": 1.0}},
+    )
+
+    assert evidence is not None
+    assert evidence.strict_blocking_reasons() == (
+        "spectral missing strict guard pass evidence.",
+    )

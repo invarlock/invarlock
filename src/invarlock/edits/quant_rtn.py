@@ -978,7 +978,7 @@ class RTNQuantEdit(ModelEdit):
                 "params": int(weight.numel()),
                 "weight_range": [float(weight.min()), float(weight.max())],
                 "weight_mean": float(weight.mean()),
-                "weight_std": float(weight.std()),
+                "weight_std": self._population_std(weight),
                 "selection_reason": target.selection_reason,
                 "matched_pattern": target.matched_pattern,
                 "module_type": target.module_type,
@@ -994,7 +994,7 @@ class RTNQuantEdit(ModelEdit):
                             "channel": c,
                             "absmax": float(channel_weight.abs().max()),
                             "mean": float(channel_weight.mean()),
-                            "std": float(channel_weight.std()),
+                            "std": self._population_std(channel_weight),
                         }
                     )
                 module_stat["channel_stats"] = channel_stats[:10]  # Limit for preview
@@ -1155,7 +1155,7 @@ class RTNQuantEdit(ModelEdit):
         scale_stats = {
             "channel_count": int(scales.numel()),
             "scale_mean": float(scales.mean()),
-            "scale_std": float(scales.std()),
+            "scale_std": self._population_std(scales),
             "scale_min": float(scales.min()),
             "scale_max": float(scales.max()),
             "zero_scales": int((scales <= eps).sum()),
@@ -1166,6 +1166,12 @@ class RTNQuantEdit(ModelEdit):
         }
 
         return weight_dequantized, scales.squeeze(), scale_stats
+
+    @staticmethod
+    def _population_std(tensor: torch.Tensor) -> float:
+        if tensor.numel() == 0:
+            return 0.0
+        return float(tensor.float().std(unbiased=False))
 
     @staticmethod
     def _quantization_error_metrics(

@@ -84,9 +84,16 @@ def _strict_stub_report(*, model_id: str, edit_name: str, context: dict) -> dict
         "provenance": {"provider_digest": {"ids_sha256": "strict-provider-ids"}},
         "artifacts": {},
         "guards": [
-            {"name": "invariants", "metrics": invariant_metrics},
+            {
+                "name": "invariants",
+                "passed": True,
+                "decision": "allow",
+                "metrics": invariant_metrics,
+            },
             {
                 "name": "spectral",
+                "passed": True,
+                "decision": "allow",
                 "metrics": {
                     "stable": True,
                     "caps_applied": 0,
@@ -97,6 +104,8 @@ def _strict_stub_report(*, model_id: str, edit_name: str, context: dict) -> dict
             },
             {
                 "name": "rmt",
+                "passed": True,
+                "decision": "allow",
                 "metrics": {
                     "stable": True,
                     "edge_risk_by_family_base": {"linear": 1.0},
@@ -104,8 +113,18 @@ def _strict_stub_report(*, model_id: str, edit_name: str, context: dict) -> dict
                     "measurement_contract": measurement_contract,
                 },
             },
-            {"name": "variance", "metrics": {"ve_enabled": False, "gain": 0.0}},
-            {"name": "invariants", "metrics": invariant_metrics},
+            {
+                "name": "variance",
+                "passed": True,
+                "decision": "allow",
+                "metrics": {"ve_enabled": False, "gain": 0.0},
+            },
+            {
+                "name": "invariants",
+                "passed": True,
+                "decision": "allow",
+                "metrics": invariant_metrics,
+            },
         ],
     }
 

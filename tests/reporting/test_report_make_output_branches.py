@@ -72,6 +72,78 @@ def _finalize_report(evaluation_report: dict[str, Any], monkeypatch) -> list[dic
     return diagnostics
 
 
+def test_build_evaluation_report_preserves_top_level_guard_outcomes() -> None:
+    report = report_make_output_mod._build_evaluation_report(
+        report_map={
+            "guards": [
+                {"name": "spectral", "passed": True, "decision": "allow"},
+                {"name": "rmt", "passed": False, "decision": "block"},
+                {"name": "variance", "passed": True, "decision": "allow"},
+                {"name": "invariants", "passed": True, "decision": "allow"},
+            ]
+        },
+        current_run_id="run-1",
+        meta={},
+        auto={},
+        dataset_info={},
+        edit_metadata={},
+        telemetry={},
+        baseline_ref={},
+        invariants={},
+        spectral={"summary": {"status": "stable"}},
+        rmt={"status": "stable"},
+        variance={"enabled": False},
+        structure={},
+        policies={},
+        resolved_policy={},
+        policy_provenance={},
+        provenance={},
+        plugin_provenance={},
+        edit_name=None,
+        artifacts_payload={},
+        validation_filtered={},
+        guard_overhead_section={},
+        pm_tail_result={},
+    )
+
+    assert report["spectral"]["passed"] is True
+    assert report["spectral"]["decision"] == "allow"
+    assert report["rmt"]["passed"] is False
+    assert report["rmt"]["decision"] == "block"
+    assert report["variance"]["passed"] is True
+    assert report["invariants"]["decision"] == "allow"
+
+
+def test_guard_outcome_collection_handles_malformed_entries() -> None:
+    assert report_make_output_mod._collect_guard_outcomes("not-a-list") == {}
+
+    outcomes = report_make_output_mod._collect_guard_outcomes(
+        [
+            object(),
+            {"name": "unknown", "passed": False},
+            {
+                "name": "rmt",
+                "passed": True,
+                "decision": "allow",
+                "policy": {"source": "first"},
+            },
+            {"name": "rmt", "passed": False, "decision": "rollback"},
+        ]
+    )
+
+    assert outcomes["rmt"]["passed"] is False
+    assert outcomes["rmt"]["decision"] == "rollback"
+    assert outcomes["rmt"]["policy"] == {"source": "first"}
+
+
+def test_attach_top_level_guard_outcomes_skips_non_dict_sections() -> None:
+    report = {"guards": [{"name": "rmt", "passed": True}], "rmt": "bad-section"}
+
+    report_make_output_mod._attach_top_level_guard_outcomes(report)
+
+    assert report["rmt"] == "bad-section"
+
+
 def test_finalize_evaluation_report_handles_non_dict_tiny_relax_sections(
     monkeypatch,
 ) -> None:

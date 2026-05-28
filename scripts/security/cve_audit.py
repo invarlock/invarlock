@@ -252,6 +252,8 @@ def _read_json_url(
 def query_osv_batch(
     components: list[Component], batch_size: int, *, enrich: bool
 ) -> dict[tuple[str, str, str], list[dict[str, Any]]]:
+    if batch_size <= 0:
+        raise ValueError("OSV batch size must be positive.")
     results: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
     for offset in range(0, len(components), batch_size):
         batch = components[offset : offset + batch_size]
@@ -275,9 +277,15 @@ def query_osv_batch(
             raise RuntimeError(
                 f"OSV batch query failed at offset {offset}: {exc}"
             ) from exc
-        for component, raw_result in zip(
-            batch, response_payload.get("results", []), strict=False
-        ):
+        raw_results = response_payload.get("results")
+        if not isinstance(raw_results, list):
+            raise RuntimeError(f"OSV batch query missing results at offset {offset}.")
+        if len(raw_results) != len(batch):
+            raise RuntimeError(
+                "OSV batch query returned "
+                f"{len(raw_results)} results for {len(batch)} components at offset {offset}."
+            )
+        for component, raw_result in zip(batch, raw_results, strict=True):
             vulns = raw_result.get("vulns", []) if isinstance(raw_result, dict) else []
             results[component.key] = [v for v in vulns if isinstance(v, dict)]
     if enrich:
@@ -530,7 +538,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Skip per-advisory OSV enrichment after batch matching.",
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.batch_size <= 0:
+        parser.error("--batch-size must be positive")
+    return args
 
 
 def main(argv: list[str] | None = None) -> int:

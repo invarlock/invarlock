@@ -14,6 +14,57 @@ from . import report_schema as report_schema_mod
 from .evaluation_report_builder import EvaluationReportBuilder
 from .report_types import RunReport
 
+_TOP_LEVEL_GUARD_NAMES = frozenset({"spectral", "rmt", "variance", "invariants"})
+_GUARD_OUTCOME_FIELDS = (
+    "passed",
+    "decision",
+    "policy",
+    "diagnostics",
+    "violations",
+    "details",
+    "supported",
+    "reason",
+    "assurance_blocking",
+    "status",
+)
+
+
+def _collect_guard_outcomes(guards: Any) -> dict[str, dict[str, Any]]:
+    if not isinstance(guards, list):
+        return {}
+    outcomes: dict[str, dict[str, Any]] = {}
+    for entry in guards:
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry.get("name", "")).strip().lower()
+        if name not in _TOP_LEVEL_GUARD_NAMES:
+            continue
+        outcome = outcomes.setdefault(name, {})
+        for field in _GUARD_OUTCOME_FIELDS:
+            if field not in entry:
+                continue
+            value = entry[field]
+            if field == "passed":
+                if value is False or "passed" not in outcome:
+                    outcome[field] = value
+                continue
+            if field == "decision":
+                if value in {"block", "rollback"} or "decision" not in outcome:
+                    outcome[field] = value
+                continue
+            outcome.setdefault(field, copy.deepcopy(value))
+    return outcomes
+
+
+def _attach_top_level_guard_outcomes(evaluation_report: dict[str, Any]) -> None:
+    outcomes = _collect_guard_outcomes(evaluation_report.get("guards"))
+    for guard_name, outcome in outcomes.items():
+        section = evaluation_report.get(guard_name)
+        if not isinstance(section, dict):
+            continue
+        for field, value in outcome.items():
+            section.setdefault(field, copy.deepcopy(value))
+
 
 def _build_evaluation_report(
     *,
@@ -80,6 +131,7 @@ def _build_evaluation_report(
             else {}
         ),
     }
+    _attach_top_level_guard_outcomes(evaluation_report)
     if edit_name is not None:
         evaluation_report["edit_name"] = edit_name
     report_build_evidence_mod.ensure_report_build_evidence(evaluation_report)

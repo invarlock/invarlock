@@ -307,6 +307,23 @@ def test_verify_assurance_strict_rejects_empty_spectral_guard_evidence(
     assert "missing spectral guard evidence" in diagnostics
 
 
+def test_verify_assurance_strict_rejects_spectral_without_pass_signal(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _verified_runtime(monkeypatch)
+    payload = _report(list(CANONICAL_GUARD_CHAIN))
+    payload["spectral"] = {"metrics": {"sigma": 1.0}}
+    report_path = tmp_path / "evaluation.report.json"
+    _write_report(report_path, payload)
+
+    result = _run_strict(report_path)
+
+    assert result.outcome == VerifyOutcome.POLICY_FAIL
+    diagnostics = "\n".join(item.message for item in result.diagnostics)
+    assert "spectral missing strict guard pass evidence." in diagnostics
+
+
 def test_verify_assurance_strict_rejects_empty_invariants_guard_evidence(
     tmp_path: Path,
     monkeypatch,
