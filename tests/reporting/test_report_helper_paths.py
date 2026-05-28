@@ -37,7 +37,7 @@ def test_compute_edit_digest_quantization_and_fallback():
             raise RuntimeError("boom")
 
     fallback = _compute_edit_digest({"edit": BadEdits()})
-    assert fallback["family"] == "cert_only"
+    assert fallback["family"] == "report_only"
 
 
 def test_compute_confidence_label_respects_custom_thresholds():

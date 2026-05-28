@@ -353,6 +353,66 @@ def test_extract_pairing_schedule_falls_back_for_malformed_attention_rows() -> N
                     "preview": {
                         "input_ids": [[1]],
                         "window_ids": [1],
+                        "actual_token_counts": [True],
+                    },
+                    "final": {"input_ids": [[3]]},
+                }
+            }
+        )
+        is None
+    )
+    assert (
+        extract_pairing_schedule(
+            {
+                "evaluation_windows": {
+                    "preview": {
+                        "input_ids": [[1]],
+                        "window_ids": [1],
+                        "masked_token_counts": ["bad-count"],
+                    },
+                    "final": {"input_ids": [[3]]},
+                }
+            }
+        )
+        is None
+    )
+    assert (
+        extract_pairing_schedule(
+            {
+                "evaluation_windows": {
+                    "preview": {
+                        "input_ids": [[1]],
+                        "window_ids": [1],
+                        "actual_token_counts": [-1],
+                    },
+                    "final": {"input_ids": [[3]]},
+                }
+            }
+        )
+        is None
+    )
+    assert (
+        extract_pairing_schedule(
+            {
+                "evaluation_windows": {
+                    "preview": {
+                        "input_ids": [[1]],
+                        "window_ids": [1],
+                        "actual_token_counts": True,
+                    },
+                    "final": {"input_ids": [[3]]},
+                }
+            }
+        )
+        is None
+    )
+    assert (
+        extract_pairing_schedule(
+            {
+                "evaluation_windows": {
+                    "preview": {
+                        "input_ids": [[1]],
+                        "window_ids": [1],
                         "attention_masks": [[1, 1]],
                     },
                     "final": {"input_ids": [[2]]},

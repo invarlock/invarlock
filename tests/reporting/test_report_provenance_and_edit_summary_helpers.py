@@ -19,7 +19,7 @@ def test_compute_edit_digest_detects_quantization():
 
 def test_compute_edit_digest_defaults_when_missing():
     digest = provenance_mod.compute_edit_digest({})
-    assert digest["family"] == "cert_only"
+    assert digest["family"] == "report_only"
 
 
 def test_compute_confidence_label_accuracy_medium():
@@ -135,7 +135,7 @@ def test_compute_edit_digest_handles_faulty_mapping():
             raise RuntimeError("boom")
 
     digest = provenance_mod.compute_edit_digest(Faulty())
-    assert digest["family"] == "cert_only"
+    assert digest["family"] == "report_only"
 
 
 def test_compute_confidence_label_accuracy_high():
@@ -206,7 +206,7 @@ def test_build_provenance_block_uses_schedule_digest(monkeypatch):
             "digest" if payload is not None else None
         ),
         collect_backend_versions_fn=lambda: {"python": "x.y"},
-        compute_edit_digest_fn=lambda report: {"family": "cert_only"},
+        compute_edit_digest_fn=lambda report: {"family": "report_only"},
     )
 
     assert provenance["provider_digest"] == {"ids_sha256": "abc123"}
@@ -330,7 +330,7 @@ def test_build_provenance_block_respects_existing_provider_digest():
             "digest" if payload is not None else None
         ),
         collect_backend_versions_fn=lambda: {"python": "x.y"},
-        compute_edit_digest_fn=lambda report: {"family": "cert_only"},
+        compute_edit_digest_fn=lambda report: {"family": "report_only"},
     )
     assert provenance["provider_digest"] == {"source": "pre"}
     assert provenance["baseline"]["report_path"] == "/logs/base.log"
@@ -350,7 +350,7 @@ def test_build_provenance_block_fallbacks_to_schedule_digest():
             "digest" if payload is not None else None
         ),
         collect_backend_versions_fn=lambda: {"python": "x.y"},
-        compute_edit_digest_fn=lambda report: {"family": "cert_only"},
+        compute_edit_digest_fn=lambda report: {"family": "report_only"},
     )
     assert provenance["provider_digest"] == {"ids_sha256": "deadbeef"}
 
@@ -374,7 +374,7 @@ def test_build_provenance_block_transfers_dataset_split_and_window_plan():
             "digest" if payload is not None else None
         ),
         collect_backend_versions_fn=lambda: {"python": "x.y"},
-        compute_edit_digest_fn=lambda report: {"family": "cert_only"},
+        compute_edit_digest_fn=lambda report: {"family": "report_only"},
     )
     assert provenance["dataset_split"] == "eval"
     assert provenance["split_fallback"] is True

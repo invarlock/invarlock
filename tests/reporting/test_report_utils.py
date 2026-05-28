@@ -26,7 +26,7 @@ def test_compute_edit_digest_quant_and_default() -> None:
     assert d1["family"] == "quantization"
     rep_none = {"edit": {"name": "noop"}}
     d2 = _compute_edit_digest(rep_none)
-    assert d2["family"] == "cert_only"
+    assert d2["family"] == "report_only"
 
 
 def test_confidence_label_paths() -> None:

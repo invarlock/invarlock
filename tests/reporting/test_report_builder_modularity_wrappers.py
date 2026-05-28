@@ -75,7 +75,7 @@ def test_reporting_owner_modules_expose_injection_points():
             else "missing"
         ),
         collect_backend_versions_fn=lambda: {"python": "3.12"},
-        compute_edit_digest_fn=lambda _report: {"family": "cert_only"},
+        compute_edit_digest_fn=lambda _report: {"family": "report_only"},
     )
     assert prov["policy"]["source"] == "test"
     assert prov["window_ids_digest"] == "abc123"

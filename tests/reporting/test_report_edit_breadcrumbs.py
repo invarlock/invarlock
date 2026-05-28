@@ -41,9 +41,9 @@ def test_edit_digest_quantization():
     assert ed.get("version") == 1
 
 
-def test_edit_digest_cert_only():
+def test_edit_digest_report_only():
     report = _mk_minimal_report_with_windows()
-    # Cert-only (no in-run edit)
+    # Report-only (no in-run edit)
     report["edit"] = {"name": "noop"}
     baseline = {
         "run_id": "b",
@@ -52,6 +52,6 @@ def test_edit_digest_cert_only():
     }
     cert = make_report(report, baseline)
     ed = cert.get("provenance", {}).get("edit_digest", {})
-    assert ed.get("family") == "cert_only"
+    assert ed.get("family") == "report_only"
     ih = ed.get("impl_hash")
     assert isinstance(ih, str) and len(ih) >= 16

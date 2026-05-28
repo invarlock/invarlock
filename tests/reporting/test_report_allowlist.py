@@ -56,7 +56,7 @@ def test_compute_edit_digest_paths():
     noop_digest = provenance_mod.compute_edit_digest(
         {"edit": {"name": "noop", "plan": {}}}
     )
-    assert noop_digest["family"] == "cert_only"
+    assert noop_digest["family"] == "report_only"
 
 
 def test_is_ppl_kind_variants():

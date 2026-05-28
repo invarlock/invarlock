@@ -83,7 +83,7 @@ def test_compute_edit_digest_quant_and_default() -> None:
     d = _compute_edit_digest({"edit": {"name": "quant_rtn", "config": {"bitwidth": 8}}})
     assert d["family"] == "quantization" and isinstance(d["impl_hash"], str)
     d2 = _compute_edit_digest({"edit": {"name": "noop"}})
-    assert d2["family"] == "cert_only"
+    assert d2["family"] == "report_only"
 
 
 def test_extract_report_meta_prefers_python_seed() -> None:

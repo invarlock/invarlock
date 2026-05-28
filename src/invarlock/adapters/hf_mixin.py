@@ -25,6 +25,10 @@ from typing import TYPE_CHECKING, Any
 
 import torch
 
+from invarlock.adapters.hf_snapshot_manifest import (
+    record_snapshot_member_filename,
+    resolve_snapshot_member_path,
+)
 from invarlock.security import is_secure_path
 
 if TYPE_CHECKING:
@@ -645,10 +649,14 @@ class HFAdapterMixin:
             raise FileNotFoundError(f"Missing manifest for snapshot at {snapshot_path}")
 
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if not isinstance(manifest, dict):
+            raise TypeError("Invalid snapshot manifest: payload must be a mapping")
         param_map = dict(model.named_parameters())
         buffer_map = dict(model.named_buffers())
 
         device_map = manifest.get("device_map", {})
+        if not isinstance(device_map, dict):
+            device_map = {}
 
         params_manifest = manifest.get("params", {})
         if not isinstance(params_manifest, dict):
@@ -658,14 +666,24 @@ class HFAdapterMixin:
             raise TypeError("Invalid snapshot manifest: buffers must be a mapping")
         params_meta = manifest.get("params_meta", {})
         buffers_meta = manifest.get("buffers_meta", {})
+        seen_filenames: dict[str, str] = {}
+        param_paths: dict[str, Path] = {}
+        buffer_paths: dict[str, Path] = {}
 
         # Preflight: ensure manifest/model agreement and tensor readability before copying.
         for name, filename in params_manifest.items():
             if name not in param_map:
                 raise KeyError(f"Snapshot parameter missing in target model: {name}")
-            if not isinstance(filename, str) or not filename:
-                raise TypeError(f"Invalid snapshot manifest filename for param: {name}")
-            file_path = snapshot_dir / filename
+            file_path = resolve_snapshot_member_path(
+                snapshot_dir, filename, entry_kind="param", entry_name=str(name)
+            )
+            record_snapshot_member_filename(
+                seen_filenames,
+                filename,
+                entry_kind="param",
+                entry_name=str(name),
+            )
+            param_paths[str(name)] = file_path
             if not file_path.exists():
                 raise FileNotFoundError(
                     f"Missing snapshot tensor for param: {file_path}"
@@ -690,11 +708,16 @@ class HFAdapterMixin:
         for name, filename in buffers_manifest.items():
             if name not in buffer_map:
                 raise KeyError(f"Snapshot buffer missing in target model: {name}")
-            if not isinstance(filename, str) or not filename:
-                raise TypeError(
-                    f"Invalid snapshot manifest filename for buffer: {name}"
-                )
-            file_path = snapshot_dir / filename
+            file_path = resolve_snapshot_member_path(
+                snapshot_dir, filename, entry_kind="buffer", entry_name=str(name)
+            )
+            record_snapshot_member_filename(
+                seen_filenames,
+                filename,
+                entry_kind="buffer",
+                entry_name=str(name),
+            )
+            buffer_paths[str(name)] = file_path
             if not file_path.exists():
                 raise FileNotFoundError(
                     f"Missing snapshot tensor for buffer: {file_path}"
@@ -717,18 +740,18 @@ class HFAdapterMixin:
                         )
 
         # Restore parameters/buffers (second pass) after successful preflight.
-        for name, filename in params_manifest.items():
+        for name in params_manifest:
             target = param_map[name]
             target_device = torch.device(device_map.get(name, str(target.device)))
-            tensor = _load_chunked_tensor(snapshot_dir / filename)
+            tensor = _load_chunked_tensor(param_paths[str(name)])
             with torch.no_grad():
                 target.copy_(tensor.to(target_device))
 
-        for name, filename in buffers_manifest.items():
+        for name in buffers_manifest:
             target = buffer_map[name]
             key = f"buffer::{name}"
             target_device = torch.device(device_map.get(key, str(target.device)))
-            tensor = _load_chunked_tensor(snapshot_dir / filename)
+            tensor = _load_chunked_tensor(buffer_paths[str(name)])
             target.copy_(tensor.to(target_device))
 
         original_tying = manifest.get("weight_tying", {})

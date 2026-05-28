@@ -36,7 +36,7 @@ def compute_edit_digest(report: dict[str, Any]) -> dict[str, Any]:
     except _NON_FATAL_EXCEPTIONS:
         edits = {}
 
-    family = "cert_only"
+    family = "report_only"
     impl_hash = hash_json({"family": family})
     try:
         if str(edits.get("name", "")) == "quant_rtn":

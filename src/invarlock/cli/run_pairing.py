@@ -151,6 +151,26 @@ def extract_pairing_schedule(
             if len(mask) != len(seq):
                 return None
 
+        def _coerce_count_list(raw: Any) -> list[int] | None:
+            if isinstance(raw, bool):
+                return None
+            if isinstance(raw, int) and len(input_ids) == 1:
+                raw = [raw]
+            if not isinstance(raw, list) or len(raw) != len(input_ids):
+                return None
+            counts: list[int] = []
+            for value in raw:
+                if isinstance(value, bool):
+                    return None
+                try:
+                    count = int(value)
+                except _PAIRING_INT_ERRORS:
+                    return None
+                if count < 0:
+                    return None
+                counts.append(count)
+            return counts
+
         labels_raw = section.get("labels")
         labels: list[list[int]] | None = None
         if isinstance(labels_raw, list) and labels_raw:
@@ -171,21 +191,15 @@ def extract_pairing_schedule(
 
         masked_counts: list[int] | None = None
         if section.get("masked_token_counts") is not None:
-            raw = section.get("masked_token_counts")
-            if isinstance(raw, int) and len(input_ids) == 1:
-                raw = [raw]
-            if not isinstance(raw, list) or len(raw) != len(input_ids):
+            masked_counts = _coerce_count_list(section.get("masked_token_counts"))
+            if masked_counts is None:
                 return None
-            masked_counts = [int(value) for value in raw]
 
         actual_counts: list[int] | None = None
         if section.get("actual_token_counts") is not None:
-            raw = section.get("actual_token_counts")
-            if isinstance(raw, int) and len(input_ids) == 1:
-                raw = [raw]
-            if not isinstance(raw, list) or len(raw) != len(input_ids):
+            actual_counts = _coerce_count_list(section.get("actual_token_counts"))
+            if actual_counts is None:
                 return None
-            actual_counts = [int(value) for value in raw]
 
         payload: dict[str, Any] = {
             "window_ids": window_ids,

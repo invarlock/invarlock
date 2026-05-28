@@ -33,7 +33,7 @@ def test_ppl_helpers_and_edit_digest() -> None:
     ed = _compute_edit_digest({"edit": {"name": "quant_rtn", "config": {"k": 1}}})
     assert ed["family"] == "quantization" and ed["impl_hash"]
     ed2 = _compute_edit_digest({})
-    assert ed2["family"] == "cert_only"
+    assert ed2["family"] == "report_only"
 
 
 def test_confidence_label_and_thresholds() -> None:

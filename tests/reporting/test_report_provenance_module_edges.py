@@ -39,7 +39,7 @@ def test_compute_edit_digest_uses_provenance_edits_fallback() -> None:
 def test_compute_edit_digest_ignores_non_mapping_provenance_edits() -> None:
     digest = report_provenance.compute_edit_digest({"provenance": {"edits": "legacy"}})
 
-    assert digest["family"] == "cert_only"
+    assert digest["family"] == "report_only"
 
 
 def test_compute_report_digest_handles_non_mapping_metric_sections() -> None:

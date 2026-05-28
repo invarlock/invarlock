@@ -18,13 +18,13 @@ def test_is_ppl_kind_variants() -> None:
 # Removed _get_ppl_final coverage; use primary_metric in evaluation_report outputs instead.
 
 
-def test_compute_edit_digest_quantization_and_cert_only() -> None:
+def test_compute_edit_digest_quantization_and_report_only() -> None:
     rep_q = {"edit": {"name": "quant_rtn", "config": {"alpha": 0.1}}}
     d_q = _compute_edit_digest(rep_q)
     assert d_q["family"] == "quantization" and isinstance(d_q["impl_hash"], str)
     rep_c = {"edit": {"name": "foo"}}
     d_c = _compute_edit_digest(rep_c)
-    assert d_c["family"] == "cert_only" and isinstance(d_c["impl_hash"], str)
+    assert d_c["family"] == "report_only" and isinstance(d_c["impl_hash"], str)
 
 
 def test_compute_confidence_label_high_medium_low() -> None:
