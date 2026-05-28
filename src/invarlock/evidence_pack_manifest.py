@@ -15,6 +15,8 @@ except ImportError:  # pragma: no cover
 
 EVIDENCE_PACK_FORMAT = "evidence-pack-v1"
 _MATERIAL_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_SHA256_HEX_RE = re.compile(r"^[a-f0-9]{64}$")
+_SHA256_REF_RE = re.compile(r"^sha256:[a-f0-9]{64}$")
 
 
 def _load_json(path: Path) -> Any:
@@ -81,7 +83,7 @@ def _manual_validate_manifest(payload: Any) -> list[str]:
     if payload.get("checksums_sha256") != "checksums.sha256":
         errors.append("manifest checksums_sha256 must point to 'checksums.sha256'")
     digest = payload.get("checksums_sha256_digest")
-    if not isinstance(digest, str) or len(digest) != 64:
+    if not isinstance(digest, str) or _SHA256_HEX_RE.fullmatch(digest) is None:
         errors.append("manifest checksums_sha256_digest must be a 64-char sha256 hex")
     network_mode = payload.get("network_mode")
     if network_mode is not None and network_mode not in {"offline", "online"}:
@@ -117,8 +119,7 @@ def _manual_validate_manifest(payload: Any) -> list[str]:
             errors.append(f"manifest {label}.path must be a non-empty string")
         if (
             not isinstance(digest_value, str)
-            or not digest_value.startswith("sha256:")
-            or len(digest_value) != 71
+            or _SHA256_REF_RE.fullmatch(digest_value) is None
         ):
             errors.append(f"manifest {label}.digest must be a sha256:... string")
 
@@ -151,6 +152,10 @@ def _manual_validate_manifest(payload: Any) -> list[str]:
                     if not isinstance(name, str) or not name:
                         errors.append(
                             f"manifest materials[{index}].name must be a non-empty string"
+                        )
+                    elif _validate_material_name(name) is not None:
+                        errors.append(
+                            f"manifest materials[{index}].name has invalid characters"
                         )
     return errors
 
@@ -219,11 +224,7 @@ def _validate_reference(*, pack_dir: Path, label: str, payload: Any) -> list[str
         return [
             f"{label} must include a non-empty path when digest verification is enabled"
         ]
-    if (
-        not isinstance(digest, str)
-        or not digest.startswith("sha256:")
-        or len(digest) != 71
-    ):
+    if not isinstance(digest, str) or _SHA256_REF_RE.fullmatch(digest) is None:
         return [f"{label} digest must be a sha256:... string"]
     resolved = _normalize_pack_path(pack_dir, rel_path)
     if resolved is None:

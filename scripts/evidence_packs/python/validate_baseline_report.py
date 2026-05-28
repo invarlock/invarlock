@@ -37,7 +37,10 @@ def main(argv: list[str] | None = None) -> int:
 
     meta = payload.get("meta")
     adapter = meta.get("adapter") if isinstance(meta, dict) else None
-    if isinstance(adapter, str) and adapter != expected_adapter:
+    if not isinstance(adapter, str) or not adapter:
+        print("baseline_report_missing_adapter", file=sys.stderr)
+        return 1
+    if adapter != expected_adapter:
         print(
             f"baseline_report_adapter_mismatch:{adapter!r}!={expected_adapter!r}",
             file=sys.stderr,
@@ -45,26 +48,33 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     context = payload.get("context")
-    if isinstance(context, dict):
-        prof = context.get("profile")
-        if (
-            isinstance(prof, str)
-            and prof.strip().lower() != expected_profile.strip().lower()
-        ):
-            print(
-                f"baseline_report_profile_mismatch:{prof!r}!={expected_profile!r}",
-                file=sys.stderr,
-            )
-            return 1
-        auto = context.get("auto")
-        if isinstance(auto, dict):
-            tier = auto.get("tier")
-            if isinstance(tier, str) and tier != expected_tier:
-                print(
-                    f"baseline_report_tier_mismatch:{tier!r}!={expected_tier!r}",
-                    file=sys.stderr,
-                )
-                return 1
+    if not isinstance(context, dict):
+        print("baseline_report_missing_context", file=sys.stderr)
+        return 1
+    prof = context.get("profile")
+    if not isinstance(prof, str) or not prof:
+        print("baseline_report_missing_profile", file=sys.stderr)
+        return 1
+    if prof.strip().lower() != expected_profile.strip().lower():
+        print(
+            f"baseline_report_profile_mismatch:{prof!r}!={expected_profile!r}",
+            file=sys.stderr,
+        )
+        return 1
+    auto = context.get("auto")
+    if not isinstance(auto, dict):
+        print("baseline_report_missing_auto", file=sys.stderr)
+        return 1
+    tier = auto.get("tier")
+    if not isinstance(tier, str) or not tier:
+        print("baseline_report_missing_tier", file=sys.stderr)
+        return 1
+    if tier != expected_tier:
+        print(
+            f"baseline_report_tier_mismatch:{tier!r}!={expected_tier!r}",
+            file=sys.stderr,
+        )
+        return 1
 
     windows = payload.get("evaluation_windows")
     if not isinstance(windows, dict):

@@ -377,6 +377,39 @@ def test_jsonschema_helper_and_direct_validate_fallback_paths(
     ]
 
 
+def test_manual_manifest_validation_rejects_non_hex_digests(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(evidence_pack_mod, "jsonschema", None, raising=False)
+    manifest_path = tmp_path / "manifest.json"
+    _write_json(
+        manifest_path,
+        {
+            "format": evidence_pack_mod.EVIDENCE_PACK_FORMAT,
+            "checksums_sha256": "checksums.sha256",
+            "checksums_sha256_digest": "g" * 64,
+            "subject": {
+                "name": "final_verdict",
+                "path": "results/final_verdict.json",
+                "digest": "sha256:" + ("z" * 64),
+            },
+            "materials": [
+                {
+                    "name": "../bad",
+                    "path": "reports/evaluation.report.json",
+                    "digest": "sha256:" + ("b" * 64),
+                }
+            ],
+        },
+    )
+
+    errors = evidence_pack_mod.validate_manifest(manifest_path)
+
+    assert "manifest checksums_sha256_digest must be a 64-char sha256 hex" in errors
+    assert "manifest subject.digest must be a sha256:... string" in errors
+    assert "manifest materials[0].name has invalid characters" in errors
+
+
 def test_material_and_reference_helpers_cover_invalid_paths(tmp_path: Path) -> None:
     assert evidence_pack_mod._material_spec("missing-separator") is None
     assert evidence_pack_mod._material_spec(" =demo.json") is None
@@ -411,6 +444,11 @@ def test_material_and_reference_helpers_cover_invalid_paths(tmp_path: Path) -> N
         pack_dir=pack_dir,
         label="demo",
         payload={"path": "file.json", "digest": "bad"},
+    ) == ["demo digest must be a sha256:... string"]
+    assert evidence_pack_mod._validate_reference(
+        pack_dir=pack_dir,
+        label="demo",
+        payload={"path": "file.json", "digest": "sha256:" + ("z" * 64)},
     ) == ["demo digest must be a sha256:... string"]
     assert evidence_pack_mod._validate_reference(
         pack_dir=pack_dir,

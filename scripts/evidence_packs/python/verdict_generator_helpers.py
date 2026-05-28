@@ -139,13 +139,13 @@ def _validation_snapshot(cert: dict[str, Any]) -> ValidationSnapshot:
     pm_ok = _as_bool(validation.get("primary_metric_acceptable"), default=False)
     spectral_ok = _as_bool(validation.get("spectral_stable"), default=False)
     rmt_ok = _as_bool(validation.get("rmt_stable"), default=False)
-    drift_ok = _as_bool(validation.get("preview_final_drift_acceptable"), default=True)
+    drift_ok = _as_bool(validation.get("preview_final_drift_acceptable"), default=False)
 
     guard_overhead = cert.get("guard_overhead") or {}
     overhead_evaluated = False
     if isinstance(guard_overhead, dict):
         overhead_evaluated = _as_bool(guard_overhead.get("evaluated"), default=False)
-    overhead_ok = _as_bool(validation.get("guard_overhead_acceptable"), default=True)
+    overhead_ok = _as_bool(validation.get("guard_overhead_acceptable"), default=False)
 
     primary_metric = cert.get("primary_metric") or {}
     pm_degraded = False
