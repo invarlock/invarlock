@@ -12,7 +12,7 @@ simulation edit.
 | **Audience** | Developers adding model support or custom validation. |
 | **Plugin types** | Adapters (model loading), Guards (validation checks). |
 | **Registration** | Via `pyproject.toml` entry points. |
-| **Source of truth** | `src/invarlock/plugins/hello_guard.py` (example). |
+| **Source of truth** | `src/invarlock/plugins/hello_guard.py` is the demo-only guard example registered as `demo_hello_guard`. |
 
 ## Contents
 
@@ -150,7 +150,7 @@ guards:
 
 ## Guard Plugin (Complete Example)
 
-This example shows a production-ready guard with policy support and tests.
+This example shows a policy-aware guard with tests.
 
 ### Guard Implementation
 

@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added evidence-pack artifact taxonomy and edit metadata sidecars so validation
+  checkpoints, fault-injection fixtures, deployable optimized subjects, and
+  evidence-only packs are labeled explicitly in scenarios, packaged evidence,
+  and summary outputs.
+- Added package-native evidence-pack report-assurance controls and release-review
+  hardening so pack integrity strictness and nested report assurance are
+  configured separately.
+- Added backend-inventory, load-smoke, inference-smoke, memory-report, and
+  deployable-sidecar validation contracts for optional quantized subject
+  adapters.
+
+### Changed
+
+- Clarified plugin support tiers and public descriptions: built-in guards and
+  adapters now expose support metadata, `quant_rtn` is described as an RTN
+  dequantized weight-edit simulation, and the demo hello guard is registered as
+  demo-only.
+- Updated evidence-pack validation edits to use shared edit implementations,
+  shared artifact saving, schema-aware `edit_metadata.json`, and metadata-aware
+  artifact validation in both single-edit and batch-edit paths.
+- Updated quantized adapter documentation and runtime image guidance around
+  GPTQModel-backed GPTQ/AWQ loaders and platform-dependent BNB loading.
+- Re-scoped grouped evidence evaluation to the simpler ungrouped path after
+  remote timing showed no useful default speedup.
+
+### Removed
+
+- Removed unverified TorchAO deployable evidence plumbing and kept deployable
+  edit generation absent until a backend can provide complete sidecars and
+  target-stack evidence.
+- Removed public ClusterFuzzLite/fuzzer surfaces from the OSS repo layout and
+  ignore surface.
+- Removed transient release-hardening and release-checklist pages from the
+  published docs tree so durable docs stay focused on current repository
+  behavior and stable user-facing contracts.
+
+### Fixed
+
+- Fixed evidence-pack release-review edge cases, including report-assurance
+  forwarding, dev-profile rejection, strict PASS requirements, runtime sidecar
+  requirements, signed-pack requirements, and deployable sidecar semantic
+  validation failures.
+- Fixed pseudo-accuracy handling so non-dev report generation fails unless
+  pseudo metrics are explicitly allowed, and report output marks pseudo or
+  non-assurance results visibly.
+- Ratcheted critical coverage thresholds and added edge-path coverage for
+  registry metadata and metrics runtime behavior.
+
 ## [0.9.0] - 2026-05-25
 
 ### Added
