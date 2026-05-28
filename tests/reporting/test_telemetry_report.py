@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from invarlock.reporting.telemetry import build_telemetry_payload, save_telemetry_report
 
 
@@ -29,3 +31,17 @@ def test_build_telemetry_payload_includes_timings_and_memory(tmp_path) -> None:
     path = save_telemetry_report(report, tmp_path)
     saved = json.loads(path.read_text(encoding="utf-8"))
     assert saved["timings"]["eval"] == 2.0
+
+
+def test_save_telemetry_report_rejects_path_escape(tmp_path) -> None:
+    report = {"meta": {}, "metrics": {}}
+
+    with pytest.raises(ValueError, match="plain file name"):
+        save_telemetry_report(report, tmp_path / "out", filename="../telemetry.json")
+
+
+def test_save_telemetry_report_rejects_empty_filename(tmp_path) -> None:
+    report = {"meta": {}, "metrics": {}}
+
+    with pytest.raises(ValueError, match="plain file name"):
+        save_telemetry_report(report, tmp_path / "out", filename="")

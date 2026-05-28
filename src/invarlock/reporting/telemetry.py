@@ -77,8 +77,16 @@ def save_telemetry_report(
 ) -> Path:
     """Write telemetry JSON payload to the output directory."""
     payload = build_telemetry_payload(report)
+    filename_str = str(filename)
+    filename_path = Path(filename_str)
+    if (
+        not filename_str
+        or filename_path.is_absolute()
+        or filename_path.name != filename_str
+    ):
+        raise ValueError("telemetry filename must be a plain file name")
     output_dir.mkdir(parents=True, exist_ok=True)
-    path = output_dir / filename
+    path = output_dir / filename_path.name
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
     return path
 

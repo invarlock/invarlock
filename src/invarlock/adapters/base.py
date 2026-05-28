@@ -340,6 +340,10 @@ class PerformanceTracker:
     @contextlib.contextmanager
     def time_operation(self, operation_name: str):
         """Time an operation."""
+        if not self.enabled or not self.track_performance:
+            yield
+            return
+
         start_time = time.time()
         try:
             yield
@@ -369,6 +373,8 @@ class PerformanceTracker:
 
     def record_memory_usage(self, label: str):
         """Record memory usage."""
+        if not self.enabled or not self.track_memory:
+            return
         if "memory_usage" not in self._metrics:
             self._metrics["memory_usage"] = {}
         self._metrics["memory_usage"][label] = _collect_memory_usage()
@@ -379,7 +385,7 @@ class PerformanceTracker:
 
     def export_metrics(self, path: Path):
         """Export metrics to file."""
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(self._metrics, f, indent=2)
 
 
@@ -443,6 +449,21 @@ class AdapterUtils:
     """Adapter utility functions."""
 
     @staticmethod
+    def _parse_version_tuple(value: str) -> tuple[int, ...]:
+        parts: list[int] = []
+        for raw_part in str(value).split("."):
+            digits = ""
+            for char in raw_part:
+                if char.isdigit():
+                    digits += char
+                else:
+                    break
+            if digits == "":
+                break
+            parts.append(int(digits))
+        return tuple(parts)
+
+    @staticmethod
     def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         """Validate adapter configuration."""
         valid = True
@@ -499,8 +520,10 @@ class AdapterUtils:
         for requirement, _version in requirements.items():
             if requirement in system_info:
                 system_version = system_info[requirement]
-                # Simplified check - just compare strings
-                if "python" in requirement and system_version < "3.8":
+                # Parse components so 3.10 is not treated as older than 3.8.
+                if "python" in requirement and AdapterUtils._parse_version_tuple(
+                    system_version
+                ) < (3, 8):
                     compatible = False
                     issues.append(f"Python version {system_version} < 3.8")
 

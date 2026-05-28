@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 
 
@@ -19,7 +20,12 @@ def _extract_ratio(payload: dict) -> float:
     pm = payload.get("primary_metric")
     if isinstance(pm, dict):
         ratio = pm.get("ratio_vs_baseline")
-        if isinstance(ratio, int | float):
+        if isinstance(ratio, int | float) and not isinstance(ratio, bool):
+            if not math.isfinite(float(ratio)):
+                raise SystemExit(
+                    "report ratio must be finite "
+                    "(expected 'primary_metric.ratio_vs_baseline')"
+                )
             return float(ratio)
     raise SystemExit(
         "report missing ratio (expected 'primary_metric.ratio_vs_baseline')"
@@ -37,6 +43,8 @@ def main() -> None:
         help="Maximum allowed absolute ratio drift (default: 0.01).",
     )
     args = parser.parse_args()
+    if not math.isfinite(args.tolerance) or args.tolerance < 0.0:
+        raise SystemExit("--tolerance must be a finite non-negative number")
 
     ref = _load_cert(args.reference)
     cand = _load_cert(args.candidate)
