@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -17,9 +18,10 @@ def _coerce_non_bool_float(value: Any) -> float | None:
     if isinstance(value, bool):
         return None
     try:
-        return float(value)
+        resolved = float(value)
     except (TypeError, ValueError):
         return None
+    return resolved if math.isfinite(resolved) else None
 
 
 def build_timing_summary_payload(

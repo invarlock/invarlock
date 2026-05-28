@@ -91,3 +91,18 @@ def test_build_timing_summary_payload_rejects_bool_timings_and_peaks() -> None:
     assert payload.ordered_keys == ("execute",)
     assert payload.memory_mb_peak is None
     assert payload.gpu_memory_mb_peak is None
+
+
+def test_build_timing_summary_payload_rejects_nonfinite_timings_and_peaks() -> None:
+    payload = build_timing_summary_payload(
+        timings={"load_model": float("nan"), "execute": float("inf")},
+        total_duration=float("-inf"),
+        report={
+            "metrics": {
+                "memory_mb_peak": float("nan"),
+                "gpu_memory_mb_peak": float("inf"),
+            }
+        },
+    )
+
+    assert payload is None

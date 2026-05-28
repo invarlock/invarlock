@@ -11,7 +11,7 @@ def test_maybe_dump_guard_evidence_swallows_json_encoding_errors(
 ) -> None:
     monkeypatch.setenv("INVARLOCK_EVIDENCE_DEBUG", "1")
 
-    maybe_dump_guard_evidence(tmp_path, {"bad": object()})
+    assert maybe_dump_guard_evidence(tmp_path, {"bad": object()}) is None
 
     assert not (tmp_path / "guards_evidence.json").exists()
 
@@ -21,7 +21,9 @@ def test_maybe_dump_guard_evidence_strips_debug_flag_whitespace(
 ) -> None:
     monkeypatch.setenv("INVARLOCK_EVIDENCE_DEBUG", " 1 ")
 
-    maybe_dump_guard_evidence(tmp_path, {"ok": True})
+    assert maybe_dump_guard_evidence(tmp_path, {"ok": True}) == (
+        tmp_path / "guards_evidence.json"
+    )
 
     payload = json.loads(
         (tmp_path / "guards_evidence.json").read_text(encoding="utf-8")
@@ -32,4 +34,4 @@ def test_maybe_dump_guard_evidence_strips_debug_flag_whitespace(
 def test_maybe_dump_guard_evidence_swallows_non_path_targets(monkeypatch) -> None:
     monkeypatch.setenv("INVARLOCK_EVIDENCE_DEBUG", "1")
 
-    maybe_dump_guard_evidence(object(), {"ok": True})
+    assert maybe_dump_guard_evidence(object(), {"ok": True}) is None

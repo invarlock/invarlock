@@ -6,22 +6,41 @@ from pathlib import Path
 from typing import Any
 
 
+def _filter_rule_id_items(
+    items: list[Any],
+    *,
+    id_key: str,
+    excluded_rules: set[str],
+) -> list[Any]:
+    filtered: list[Any] = []
+    for item in items:
+        if not isinstance(item, dict):
+            filtered.append(item)
+            continue
+        if str(item.get(id_key, "")) in excluded_rules:
+            continue
+        filtered.append(item)
+    return filtered
+
+
 def _filter_run(run: dict[str, Any], excluded_rules: set[str]) -> dict[str, Any]:
     results = run.get("results")
     if isinstance(results, list):
-        run["results"] = [
-            result
-            for result in results
-            if str(result.get("ruleId", "")) not in excluded_rules
-        ]
+        run["results"] = _filter_rule_id_items(
+            results,
+            id_key="ruleId",
+            excluded_rules=excluded_rules,
+        )
 
     driver = run.get("tool", {}).get("driver")
     if isinstance(driver, dict):
         rules = driver.get("rules")
         if isinstance(rules, list):
-            driver["rules"] = [
-                rule for rule in rules if str(rule.get("id", "")) not in excluded_rules
-            ]
+            driver["rules"] = _filter_rule_id_items(
+                rules,
+                id_key="id",
+                excluded_rules=excluded_rules,
+            )
 
     extensions = run.get("tool", {}).get("extensions")
     if isinstance(extensions, list):
@@ -30,11 +49,11 @@ def _filter_run(run: dict[str, Any], excluded_rules: set[str]) -> dict[str, Any]
                 continue
             rules = extension.get("rules")
             if isinstance(rules, list):
-                extension["rules"] = [
-                    rule
-                    for rule in rules
-                    if str(rule.get("id", "")) not in excluded_rules
-                ]
+                extension["rules"] = _filter_rule_id_items(
+                    rules,
+                    id_key="id",
+                    excluded_rules=excluded_rules,
+                )
 
     return run
 

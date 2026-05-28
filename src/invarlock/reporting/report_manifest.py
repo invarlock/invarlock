@@ -51,15 +51,13 @@ def write_report_manifest(
         }
 
         guard_payload = build_guard_evidence_payload(report)
-        maybe_dump_guard_evidence(output_path, guard_payload)
-
-        ev_file = output_path / "guards_evidence.json"
-        has_guard_evidence = ev_file.exists()
+        ev_file = maybe_dump_guard_evidence(output_path, guard_payload)
+        has_guard_evidence = ev_file is not None and ev_file.exists()
         evidence_level = derive_report_manifest_evidence_level(
             summary, has_guard_evidence=has_guard_evidence
         )
         manifest["evidence_level"] = evidence_level
-        if ev_file.exists():
+        if has_guard_evidence and ev_file is not None:
             manifest["evidence"] = {"guards_evidence": str(ev_file)}
 
         reviewer_summary_path = output_path / "reviewer_summary.txt"

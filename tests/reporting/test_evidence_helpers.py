@@ -11,7 +11,7 @@ def test_maybe_dump_guard_evidence_noops_when_debug_is_disabled(
 ) -> None:
     monkeypatch.delenv("INVARLOCK_EVIDENCE_DEBUG", raising=False)
 
-    maybe_dump_guard_evidence(tmp_path, {"ok": True})
+    assert maybe_dump_guard_evidence(tmp_path, {"ok": True}) is None
 
     assert not (tmp_path / "guards_evidence.json").exists()
 
@@ -21,7 +21,9 @@ def test_maybe_dump_guard_evidence_writes_json_when_debug_is_enabled(
 ) -> None:
     monkeypatch.setenv("INVARLOCK_EVIDENCE_DEBUG", "1")
 
-    maybe_dump_guard_evidence(tmp_path, {"guard": "spectral", "ok": True})
+    assert maybe_dump_guard_evidence(tmp_path, {"guard": "spectral", "ok": True}) == (
+        tmp_path / "guards_evidence.json"
+    )
 
     payload = json.loads(
         (tmp_path / "guards_evidence.json").read_text(encoding="utf-8")
@@ -34,7 +36,9 @@ def test_maybe_dump_guard_evidence_accepts_string_target_dir(
 ) -> None:
     monkeypatch.setenv("INVARLOCK_EVIDENCE_DEBUG", "1")
 
-    maybe_dump_guard_evidence(str(tmp_path), {"guard": "variance", "ok": False})
+    assert maybe_dump_guard_evidence(
+        str(tmp_path), {"guard": "variance", "ok": False}
+    ) == (tmp_path / "guards_evidence.json")
 
     payload = json.loads(
         (tmp_path / "guards_evidence.json").read_text(encoding="utf-8")
@@ -49,6 +53,6 @@ def test_maybe_dump_guard_evidence_swallows_filesystem_errors(
     target = tmp_path / "not-a-directory"
     target.write_text("sentinel\n", encoding="utf-8")
 
-    maybe_dump_guard_evidence(target, {"ok": True})
+    assert maybe_dump_guard_evidence(target, {"ok": True}) is None
 
     assert target.read_text(encoding="utf-8") == "sentinel\n"

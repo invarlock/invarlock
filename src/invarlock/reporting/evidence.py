@@ -8,11 +8,13 @@ from typing import Any
 _NON_FATAL_EXCEPTIONS = (AttributeError, OSError, TypeError, ValueError)
 
 
-def maybe_dump_guard_evidence(target_dir: str | Path, payload: dict[str, Any]) -> None:
+def maybe_dump_guard_evidence(
+    target_dir: str | Path, payload: dict[str, Any]
+) -> Path | None:
     """Dump a small JSON blob of guard decision inputs when enabled."""
 
     if os.getenv("INVARLOCK_EVIDENCE_DEBUG", "0").strip() != "1":
-        return
+        return None
     try:
         path = Path(target_dir)
         path.mkdir(parents=True, exist_ok=True)
@@ -20,9 +22,10 @@ def maybe_dump_guard_evidence(target_dir: str | Path, payload: dict[str, Any]) -
         out.write_text(
             json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
         )
+        return out
     except _NON_FATAL_EXCEPTIONS:
         # Never raise in evidence hooks.
-        pass
+        return None
 
 
 __all__ = ["maybe_dump_guard_evidence"]

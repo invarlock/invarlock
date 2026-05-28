@@ -83,3 +83,24 @@ def test_manifest_matches_schema(tmp_path: Path):
         "guards_evidence.json file missing"
     )
     assert (out_dir / "reviewer_summary.txt").exists(), "reviewer_summary.txt missing"
+
+
+def test_manifest_does_not_reuse_stale_guard_evidence(tmp_path: Path):
+    primary = _minimal_report()
+    baseline = _minimal_report()
+    out_dir = tmp_path / "reports"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stale_evidence = out_dir / "guards_evidence.json"
+    stale_evidence.write_text('{"stale": true}\n', encoding="utf-8")
+
+    os.environ.pop("INVARLOCK_EVIDENCE_DEBUG", None)
+    save_evaluation_bundle(
+        run_report=primary,
+        output_dir=out_dir,
+        evaluation_report=make_report(primary, baseline),
+    )
+
+    manifest = json.loads((out_dir / "manifest.json").read_text("utf-8"))
+
+    assert manifest["evidence_level"] == "medium"
+    assert "evidence" not in manifest

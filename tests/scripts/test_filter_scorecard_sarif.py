@@ -44,6 +44,43 @@ def test_filter_sarif_removes_excluded_results_and_rules() -> None:
     assert filtered["runs"][0]["tool"]["extensions"][0]["rules"] == []
 
 
+def test_filter_sarif_preserves_malformed_rule_entries() -> None:
+    payload = {
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "rules": [
+                            {"id": "CIIBestPracticesID"},
+                            "malformed-rule",
+                        ],
+                    },
+                    "extensions": [
+                        {
+                            "rules": [
+                                {"id": "CIIBestPracticesID"},
+                                None,
+                            ]
+                        }
+                    ],
+                },
+                "results": [
+                    {"ruleId": "CIIBestPracticesID"},
+                    "malformed-result",
+                ],
+            },
+            "malformed-run",
+        ],
+    }
+
+    filtered = filter_sarif(payload, {"CIIBestPracticesID"})
+
+    assert filtered["runs"][0]["results"] == ["malformed-result"]
+    assert filtered["runs"][0]["tool"]["driver"]["rules"] == ["malformed-rule"]
+    assert filtered["runs"][0]["tool"]["extensions"][0]["rules"] == [None]
+    assert filtered["runs"][1] == "malformed-run"
+
+
 def test_cli_writes_filtered_output(tmp_path: Path) -> None:
     input_path = tmp_path / "input.sarif"
     output_path = tmp_path / "output.sarif"
