@@ -88,6 +88,8 @@ def build_backend_inventory_for_adapter(
     backend_version: str | None = None,
     quantization_config: Mapping[str, Any] | None = None,
     model: Any | None = None,
+    load_smoke: bool = False,
+    inference_smoke: bool = False,
 ) -> dict[str, Any] | None:
     adapter_name = str(adapter or "").strip()
     backend = quantized_adapter_backend(adapter_name)
@@ -108,8 +110,8 @@ def build_backend_inventory_for_adapter(
         "quantized_module_types": module_inventory["types"],
         "device_map": "unknown",
         "memory_footprint": memory_footprint,
-        "load_smoke": True,
-        "inference_smoke": True,
+        "load_smoke": bool(load_smoke),
+        "inference_smoke": bool(inference_smoke),
     }
 
 

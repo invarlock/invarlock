@@ -138,7 +138,9 @@ def validate_deployable_artifact(
         issues.append(f"backend package not importable: {resolved_backend}")
 
     sidecar_payloads: dict[str, dict[str, Any]] = {}
-    if report_dir is not None:
+    if report_dir is None:
+        issues.append("deployable validation requires --report-dir sidecars")
+    else:
         for sidecar in REQUIRED_SIDECAR_SCHEMAS:
             payload = _load_json_object(report_dir / sidecar)
             if payload is None:
@@ -153,13 +155,13 @@ def validate_deployable_artifact(
     # should be produced by backend-specific generators and passed as sidecars.
     load_smoke = (
         sidecar_payloads.get("load_smoke.json", {}).get("ok") is True
-        if report_dir
-        else not smoke
+        if report_dir is not None
+        else False
     )
     inference_smoke = (
         sidecar_payloads.get("inference_smoke.json", {}).get("ok") is True
-        if report_dir
-        else not smoke
+        if report_dir is not None
+        else False
     )
     if smoke and report_dir is None:
         issues.append(

@@ -123,7 +123,9 @@ Common options:
 - `--baseline`: baseline checkpoint path or model ID
 - `--subject`: subject checkpoint path or model ID
 - `--baseline-report`: reuse a stored baseline report by passing the explicit
-  `report.json` file path that captured the baseline windows
+  `report.json` file path that captured the baseline windows. Reused reports
+  must match the requested baseline model, profile, tier, adapter family,
+  assurance mode, and dataset/window-plan fields.
 - `--baseline-adapter`: baseline-side adapter name or `auto`
 - `--subject-adapter`: subject-side adapter name or `auto`
 - `--profile`: `ci`, `release`, or another included profile

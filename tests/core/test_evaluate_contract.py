@@ -23,20 +23,56 @@ def _write_json(path: Path, payload: object) -> Path:
 
 def _baseline_payload(
     *,
+    model_id: str = "baseline-model",
     adapter: str = "hf_causal",
     profile: str = "dev",
     tier: str = "balanced",
+    assurance_mode: str = "off",
+    data: dict[str, object] | None = None,
     edit_name: str = "noop",
     evaluation_windows: dict[str, object] | None = None,
 ) -> dict[str, object]:
     return {
         "edit": {"name": edit_name},
-        "meta": {"adapter": adapter},
-        "context": {"profile": profile, "auto": {"tier": tier}},
+        "meta": {"model_id": model_id, "adapter": adapter},
+        "context": {
+            "profile": profile,
+            "auto": {"tier": tier},
+            "assurance": {"mode": assurance_mode},
+        },
+        "data": data
+        or {
+            "provider": "wikitext2",
+            "split": "validation",
+            "seq_len": 512,
+            "stride": 512,
+            "preview_n": 64,
+            "final_n": 64,
+            "seed": 43,
+        },
         "evaluation_windows": evaluation_windows
         or {
             "preview": {"window_ids": ["preview-0"], "input_ids": [[1, 2, 3]]},
             "final": {"window_ids": ["final-0"], "input_ids": [[4, 5, 6]]},
+        },
+    }
+
+
+def _baseline_validation_kwargs(adapter: str = "hf_causal") -> dict[str, object]:
+    return {
+        "expected_model_id": "baseline-model",
+        "expected_profile": "dev",
+        "expected_tier": "balanced",
+        "expected_adapter": adapter,
+        "expected_assurance_mode": "off",
+        "expected_dataset": {
+            "provider": "wikitext2",
+            "split": "validation",
+            "seq_len": 512,
+            "stride": 512,
+            "preview_n": 64,
+            "final_n": 64,
+            "seed": 43,
         },
     }
 
@@ -68,9 +104,7 @@ def test_load_validated_baseline_report_accepts_valid_explicit_file(
 
     resolved, payload = load_validated_baseline_report(
         report,
-        expected_profile="dev",
-        expected_tier="balanced",
-        expected_adapter="hf_causal",
+        **_baseline_validation_kwargs(),
     )
 
     assert resolved == report.resolve()
@@ -99,35 +133,196 @@ def test_load_validated_baseline_report_accepts_multimodal_baseline_windows(
 
     resolved, payload = load_validated_baseline_report(
         report,
-        expected_profile="dev",
-        expected_tier="balanced",
-        expected_adapter="hf_multimodal",
+        **_baseline_validation_kwargs("hf_multimodal"),
     )
 
     assert resolved == report.resolve()
-    assert payload["meta"] == {"adapter": "hf_multimodal"}
+    assert payload["meta"] == {
+        "model_id": "baseline-model",
+        "adapter": "hf_multimodal",
+    }
 
 
-def test_load_validated_baseline_report_accepts_context_without_auto_tier(
+def test_load_validated_baseline_report_rejects_context_without_tier(
     tmp_path: Path,
 ) -> None:
     report = _write_json(
         tmp_path / "baseline.json",
         {
             **_baseline_payload(),
-            "context": {"profile": "dev", "auto": "skip-tier-check"},
+            "context": {
+                "profile": "dev",
+                "auto": "skip-tier-check",
+                "assurance": {"mode": "off"},
+            },
         },
     )
 
-    resolved, payload = load_validated_baseline_report(
-        report,
-        expected_profile="dev",
-        expected_tier="balanced",
-        expected_adapter="hf_causal",
-    )
+    with pytest.raises(ValidationError, match="tier mismatch"):
+        load_validated_baseline_report(report, **_baseline_validation_kwargs())
 
-    assert resolved == report.resolve()
-    assert payload["context"] == {"profile": "dev", "auto": "skip-tier-check"}
+
+def test_load_validated_baseline_report_accepts_legacy_identity_locations(
+    tmp_path: Path,
+) -> None:
+    kwargs = _baseline_validation_kwargs()
+
+    context_tier = _write_json(
+        tmp_path / "context-tier.json",
+        {
+            **_baseline_payload(),
+            "context": {
+                "profile": "dev",
+                "tier": "balanced",
+                "assurance": {"mode": "off"},
+            },
+        },
+    )
+    load_validated_baseline_report(context_tier, **kwargs)
+
+    top_level_auto = _write_json(
+        tmp_path / "top-level-auto.json",
+        {
+            **_baseline_payload(),
+            "context": {"profile": "dev", "assurance": {"mode": "off"}},
+            "auto": {"tier": "balanced"},
+        },
+    )
+    load_validated_baseline_report(top_level_auto, **kwargs)
+
+    meta_auto = _write_json(
+        tmp_path / "meta-auto.json",
+        {
+            **_baseline_payload(),
+            "meta": {
+                "model_id": "baseline-model",
+                "adapter": "hf_causal",
+                "auto": {"tier": "balanced"},
+            },
+            "context": {"profile": "dev", "assurance": {"mode": "off"}},
+        },
+    )
+    load_validated_baseline_report(meta_auto, **kwargs)
+
+    top_level_assurance = _write_json(
+        tmp_path / "top-level-assurance.json",
+        {
+            **_baseline_payload(),
+            "context": {"profile": "dev", "auto": {"tier": "balanced"}},
+            "assurance": {"mode": "off"},
+        },
+    )
+    load_validated_baseline_report(top_level_assurance, **kwargs)
+
+
+def test_load_validated_baseline_report_accepts_path_equivalent_model_ids(
+    tmp_path: Path,
+) -> None:
+    model_dir = tmp_path / "model"
+    model_dir.mkdir()
+    report = _write_json(
+        tmp_path / "baseline.json",
+        _baseline_payload(model_id=str(model_dir)),
+    )
+    kwargs = {
+        **_baseline_validation_kwargs(),
+        "expected_model_id": str(model_dir.resolve()),
+    }
+
+    load_validated_baseline_report(report, **kwargs)
+
+
+def test_load_validated_baseline_report_rejects_identity_mismatches(
+    tmp_path: Path,
+) -> None:
+    wrong_model = _write_json(
+        tmp_path / "wrong-model.json",
+        _baseline_payload(model_id="other-model"),
+    )
+    with pytest.raises(ValidationError, match="model mismatch"):
+        load_validated_baseline_report(wrong_model, **_baseline_validation_kwargs())
+
+    wrong_assurance = _write_json(
+        tmp_path / "wrong-assurance.json",
+        _baseline_payload(assurance_mode="strict"),
+    )
+    with pytest.raises(ValidationError, match="assurance mode mismatch"):
+        load_validated_baseline_report(
+            wrong_assurance,
+            **_baseline_validation_kwargs(),
+        )
+
+    missing_assurance = _write_json(
+        tmp_path / "missing-assurance.json",
+        {
+            **_baseline_payload(),
+            "context": {"profile": "dev", "auto": {"tier": "balanced"}},
+        },
+    )
+    with pytest.raises(ValidationError, match="assurance mode mismatch"):
+        load_validated_baseline_report(
+            missing_assurance,
+            **_baseline_validation_kwargs(),
+        )
+
+    wrong_dataset_payload = _baseline_payload()
+    data = wrong_dataset_payload["data"]
+    assert isinstance(data, dict)
+    wrong_dataset_payload["data"] = {**data, "seed": 999}
+    wrong_dataset = _write_json(tmp_path / "wrong-dataset.json", wrong_dataset_payload)
+    with pytest.raises(ValidationError, match="dataset/window-plan mismatch"):
+        load_validated_baseline_report(wrong_dataset, **_baseline_validation_kwargs())
+
+
+def test_load_validated_baseline_report_rejects_missing_context_and_data(
+    tmp_path: Path,
+) -> None:
+    missing_context = _write_json(
+        tmp_path / "missing-context.json",
+        {**_baseline_payload(), "context": None},
+    )
+    with pytest.raises(ValidationError, match="missing context object"):
+        load_validated_baseline_report(missing_context, **_baseline_validation_kwargs())
+
+    missing_data = _write_json(
+        tmp_path / "missing-data.json",
+        {**_baseline_payload(), "data": None},
+    )
+    with pytest.raises(ValidationError, match="missing data object"):
+        load_validated_baseline_report(missing_data, **_baseline_validation_kwargs())
+
+
+def test_load_validated_baseline_report_accepts_partial_expected_dataset(
+    tmp_path: Path,
+) -> None:
+    report = _write_json(tmp_path / "baseline.json", _baseline_payload())
+    kwargs = {
+        **_baseline_validation_kwargs(),
+        "expected_dataset": {"provider": "wikitext2"},
+    }
+
+    load_validated_baseline_report(report, **kwargs)
+
+
+def test_model_id_equivalence_returns_false_when_resolution_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    model_dir = tmp_path / "model"
+    model_dir.mkdir()
+    original_resolve = Path.resolve
+
+    def _raise_for_model_dir(self: Path, *args: object, **kwargs: object) -> Path:
+        if self == model_dir:
+            raise OSError("cannot resolve")
+        return original_resolve(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "resolve", _raise_for_model_dir)
+
+    assert (
+        evaluate_contract_mod._model_ids_equivalent(str(model_dir), "other-model")
+        is False
+    )
 
 
 def test_load_validated_baseline_report_rejects_directory_and_bad_edit(
@@ -140,9 +335,7 @@ def test_load_validated_baseline_report_rejects_directory_and_bad_edit(
     ):
         load_validated_baseline_report(
             report_dir,
-            expected_profile="dev",
-            expected_tier="balanced",
-            expected_adapter="hf_causal",
+            **_baseline_validation_kwargs(),
         )
 
     bad_edit = _write_json(
@@ -152,9 +345,7 @@ def test_load_validated_baseline_report_rejects_directory_and_bad_edit(
     with pytest.raises(ValidationError, match="must be a no-op run"):
         load_validated_baseline_report(
             bad_edit,
-            expected_profile="dev",
-            expected_tier="balanced",
-            expected_adapter="hf_causal",
+            **_baseline_validation_kwargs(),
         )
 
 
@@ -168,9 +359,7 @@ def test_load_validated_baseline_report_rejects_policy_and_window_mismatches(
     with pytest.raises(ValidationError, match="profile mismatch"):
         load_validated_baseline_report(
             mismatched,
-            expected_profile="dev",
-            expected_tier="balanced",
-            expected_adapter="hf_causal",
+            **_baseline_validation_kwargs(),
         )
 
     bad_windows = _write_json(
@@ -185,9 +374,7 @@ def test_load_validated_baseline_report_rejects_policy_and_window_mismatches(
     with pytest.raises(ValidationError, match="inconsistent evaluation window"):
         load_validated_baseline_report(
             bad_windows,
-            expected_profile="dev",
-            expected_tier="balanced",
-            expected_adapter="hf_causal",
+            **_baseline_validation_kwargs(),
         )
 
     missing_records = _write_json(
@@ -208,9 +395,7 @@ def test_load_validated_baseline_report_rejects_policy_and_window_mismatches(
     ):
         load_validated_baseline_report(
             missing_records,
-            expected_profile="dev",
-            expected_tier="balanced",
-            expected_adapter="hf_multimodal",
+            **_baseline_validation_kwargs("hf_multimodal"),
         )
 
     inconsistent_records = _write_json(
@@ -234,9 +419,7 @@ def test_load_validated_baseline_report_rejects_policy_and_window_mismatches(
     ):
         load_validated_baseline_report(
             inconsistent_records,
-            expected_profile="dev",
-            expected_tier="balanced",
-            expected_adapter="hf_multimodal",
+            **_baseline_validation_kwargs("hf_multimodal"),
         )
 
 
@@ -250,9 +433,7 @@ def test_load_validated_baseline_report_missing_windows_has_no_env_remediation(
     with pytest.raises(ValidationError) as excinfo:
         load_validated_baseline_report(
             missing_windows,
-            expected_profile="dev",
-            expected_tier="balanced",
-            expected_adapter="hf_causal",
+            **_baseline_validation_kwargs(),
         )
     assert "INVARLOCK_STORE_EVAL_WINDOWS" not in str(excinfo.value)
 
@@ -269,9 +450,7 @@ def test_load_validated_baseline_report_rejects_non_regular_file(
     with pytest.raises(ValidationError, match="Baseline report not found"):
         load_validated_baseline_report(
             fifo,
-            expected_profile="dev",
-            expected_tier="balanced",
-            expected_adapter="hf_causal",
+            **_baseline_validation_kwargs(),
         )
 
 

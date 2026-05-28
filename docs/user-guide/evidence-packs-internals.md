@@ -378,8 +378,11 @@ START gpu_worker
 
 Small/medium models default to batch edit creation:
 
-- **Batch edit creation**: `CREATE_EDITS_BATCH` loads a model once and creates
-  all 8 edits (cuts repeated model loads).
+- **Batch edit creation**: `CREATE_EDITS_BATCH` parses and schedules all edit
+  specs together, but reloads the baseline per edit by default to avoid
+  deep-copying large loaded models. Set `PACK_BATCH_EDIT_STRATEGY=deepcopy`
+  only for small models where single-load throughput is more important than
+  peak memory.
 - **Deferred optional report rendering**: `PACK_DEFER_REPORT_RENDERING=1`
   keeps `evaluation.report.json`, `runtime.manifest.json`, and JSON evidence
   sidecars in the hot path while skipping markdown/reviewer bundle rendering.
@@ -393,9 +396,9 @@ Small/medium models default to batch edit creation:
   timings so reviewers can separate process startup savings from model load,
   dataset preparation, guard/eval, and report-generation costs.
 
-Large or MoE models disable batch edits automatically (or via
+Large or MoE models can still disable batch edit tasks automatically (or via
 `PACK_USE_BATCH_EDITS=false`) and fall back to per-edit tasks
-(`CREATE_EDIT → evaluate_EDIT`).
+(`CREATE_EDIT -> evaluate_EDIT`).
 
 ### Task dependency graphs
 

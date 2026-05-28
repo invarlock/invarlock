@@ -28,8 +28,8 @@ def test_backend_inventory_sidecar_for_optional_quantized_adapter(tmp_path):
     assert inventory["backend"] == "bitsandbytes"
     assert inventory["backend_version"] == "0.47.0"
     assert inventory["quantization_config"] == {"load_in_8bit": True}
-    assert inventory["load_smoke"] is True
-    assert inventory["inference_smoke"] is True
+    assert inventory["load_smoke"] is False
+    assert inventory["inference_smoke"] is False
 
     sidecar = write_backend_inventory_sidecar(report, tmp_path)
     assert sidecar is not None
@@ -57,6 +57,8 @@ def test_backend_inventory_counts_live_quantized_modules(tmp_path):
     assert sidecar is not None
     payload = json.loads(sidecar.read_text(encoding="utf-8"))
     assert payload["quantized_module_count"] == 1
+    assert payload["load_smoke"] is False
+    assert payload["inference_smoke"] is False
     assert payload["quantized_module_types"] == ["bitsandbytes.nn.modules.Linear8bitLt"]
     assert payload["memory_footprint"] == {
         "reported_bytes": 1234,
@@ -184,6 +186,8 @@ def test_backend_inventory_can_write_prebuilt_payload(tmp_path):
         backend_version="0.49.2",
         quantization_config={"load_in_8bit": True},
         model=None,
+        load_smoke=True,
+        inference_smoke=True,
     )
     assert inventory is not None
     inventory["quantized_module_count"] = 3
@@ -193,6 +197,8 @@ def test_backend_inventory_can_write_prebuilt_payload(tmp_path):
     payload = json.loads(sidecar.read_text(encoding="utf-8"))
     assert payload["adapter"] == "hf_bnb"
     assert payload["quantized_module_count"] == 3
+    assert payload["load_smoke"] is True
+    assert payload["inference_smoke"] is True
 
 
 def test_backend_inventory_skips_core_adapter(tmp_path):

@@ -1049,18 +1049,16 @@ generate_model_tasks() {
     # Calculate model size for memory estimation
     local base_size=$(estimate_model_memory "${model_id}" "evaluate_EDIT")
 
-    # Decide whether to use batch edit creation or per-edit tasks.
-    # Deep-copying a 70B+ model for batch edits can exceed per-GPU memory,
-    # so we disable CREATE_EDITS_BATCH for very large models and fall back
-    # to per-edit CREATE_EDIT tasks in that case.
+    # Decide whether to use batch edit creation or per-edit tasks. The batch
+    # helper now defaults to reload-per-edit, but very large models still use
+    # per-edit CREATE_EDIT tasks to keep scheduling and cleanup granular.
     local use_batch="true"
     local model_lower
     model_lower=$(printf '%s' "${model_id}" | tr '[:upper:]' '[:lower:]')
     if [[ "${model_lower}" =~ 70b || "${model_lower}" =~ 72b || "${model_lower}" =~ 65b || "${model_lower}" =~ mixtral || "${model_lower}" =~ 8x7b || "${model_lower}" =~ moe ]]; then
         use_batch="false"
     elif [[ -n "${base_size}" ]]; then
-        # For very large models, evaluate memory estimates can still be high.
-        # Treat anything >=170GB as "large" and avoid batch edits.
+        # Treat anything >=170GB as "large" and avoid batch edit tasks.
         if [[ "${base_size}" -ge 170 ]]; then
             use_batch="false"
         fi
@@ -1226,7 +1224,8 @@ generate_model_tasks() {
         echo "Skipping edit creation (no calibrated preset available)"
 
     elif [[ "${use_batch}" == "true" ]]; then
-        # CREATE_EDITS_BATCH - Create edits with a single model load (Batch optimization)
+        # CREATE_EDITS_BATCH - Create edits from one parsed batch. The Python
+        # helper defaults to reload-per-edit to avoid deep-copy memory spikes.
         :
 
         local -a requested_specs=()

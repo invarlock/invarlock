@@ -342,6 +342,10 @@ def persist_run_report_outputs(
     backend_inventory = (
         run_context.get("_backend_inventory") if isinstance(run_context, dict) else None
     )
+    if isinstance(backend_inventory, dict):
+        backend_inventory = dict(backend_inventory)
+        backend_inventory["load_smoke"] = backend_inventory.get("load_smoke") is True
+        backend_inventory["inference_smoke"] = True
     existing_backend_inventory_path = run_dir / BACKEND_INVENTORY_FILENAME
     existing_backend_inventory = None
     if existing_backend_inventory_path.is_file():

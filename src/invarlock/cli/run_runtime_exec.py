@@ -75,6 +75,8 @@ def _capture_backend_inventory(
             quantization_config if isinstance(quantization_config, dict) else {}
         ),
         model=model,
+        load_smoke=True,
+        inference_smoke=False,
     )
     if inventory is None:
         return

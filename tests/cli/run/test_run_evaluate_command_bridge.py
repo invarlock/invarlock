@@ -283,9 +283,26 @@ def test_evaluate_command_reuses_baseline_report_for_bridge(monkeypatch, tmp_pat
     baseline_report.write_text(
         json.dumps(
             {
-                "meta": {"model_id": "stub", "adapter": "hf_causal", "device": "cpu"},
-                "context": {"profile": "ci", "auto": {"tier": "balanced"}},
+                "meta": {
+                    "model_id": str(src),
+                    "adapter": "hf_causal",
+                    "device": "cpu",
+                },
+                "context": {
+                    "profile": "ci",
+                    "auto": {"tier": "balanced"},
+                    "assurance": {"mode": "off"},
+                },
                 "edit": {"name": "noop"},
+                "data": {
+                    "provider": "wikitext2",
+                    "split": "validation",
+                    "seq_len": 512,
+                    "stride": 512,
+                    "preview_n": 64,
+                    "final_n": 64,
+                    "seed": 43,
+                },
                 "evaluation_windows": {
                     "preview": {"window_ids": [1], "input_ids": [[1, 2]]},
                     "final": {"window_ids": [2], "input_ids": [[3, 4]]},

@@ -64,7 +64,8 @@ Requirements:
 
 - Baseline report must be from a no-op run (`edit.name == "noop"`).
 - Baseline report must include stored evaluation windows (set `INVARLOCK_STORE_EVAL_WINDOWS=1` when generating it).
-- The baseline report must match the intended `--profile`, `--tier`, and adapter family.
+- The baseline report must match the intended baseline model, `--profile`, `--tier`, adapter family,
+  assurance mode, and dataset/window-plan fields.
 
 Example:
 

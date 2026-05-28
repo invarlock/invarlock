@@ -6,6 +6,12 @@ import sys
 from pathlib import Path
 
 from scripts.evidence_packs.python import (
+    create_edits_batch as batch_edit_mod,
+)
+from scripts.evidence_packs.python import (
+    save_subject_artifact as save_artifact_mod,
+)
+from scripts.evidence_packs.python import (
     validate_deployable_artifact as deployable_validator_mod,
 )
 from scripts.evidence_packs.python.edit_artifact_summary import (
@@ -265,6 +271,104 @@ def test_validate_deployable_artifact_checks_sidecar_schemas_and_ok(
     )
     assert payload["ok"] is False
     assert "backend_inventory.json inference_smoke must be true" in payload["issues"]
+
+    _write_deployable_sidecars(report_dir)
+    (report_dir / "inference_smoke.json").write_text(
+        json.dumps({"schema": "invarlock/deployable-inference-smoke-v1", "ok": False}),
+        encoding="utf-8",
+    )
+    payload = deployable_validator_mod.validate_deployable_artifact(
+        artifact,
+        backend="bitsandbytes",
+        report_dir=report_dir,
+        smoke=True,
+    )
+    assert payload["ok"] is False
+    assert payload["inference_smoke"] is False
+    assert "inference_smoke.json ok must be true" in payload["issues"]
+
+    payload = deployable_validator_mod.validate_deployable_artifact(
+        artifact,
+        backend="bitsandbytes",
+        report_dir=None,
+        smoke=False,
+    )
+    assert payload["ok"] is False
+    assert payload["load_smoke"] is False
+    assert payload["inference_smoke"] is False
+    assert "deployable validation requires --report-dir sidecars" in payload["issues"]
+
+
+def test_save_subject_replace_restores_existing_output_on_swap_failure(
+    monkeypatch, tmp_path: Path
+) -> None:
+    output = tmp_path / "subject"
+    output.mkdir()
+    (output / "marker.txt").write_text("original", encoding="utf-8")
+    staging = save_artifact_mod.staging_path_for(output)
+    staging.mkdir()
+    (staging / "marker.txt").write_text("new", encoding="utf-8")
+    original_rename = Path.rename
+
+    def _rename_with_staging_failure(self: Path, target: Path) -> Path:
+        if self == staging:
+            raise OSError("simulated staging swap failure")
+        return original_rename(self, target)
+
+    monkeypatch.setattr(Path, "rename", _rename_with_staging_failure)
+
+    try:
+        try:
+            save_artifact_mod._replace_output(staging, output)
+        except OSError as exc:
+            assert "simulated staging swap failure" in str(exc)
+        else:  # pragma: no cover - defensive assertion
+            raise AssertionError("expected staging swap failure")
+    finally:
+        monkeypatch.setattr(Path, "rename", original_rename)
+
+    assert output.is_dir()
+    assert (output / "marker.txt").read_text(encoding="utf-8") == "original"
+    assert staging.is_dir()
+
+
+def test_batch_edit_artifact_can_avoid_model_deepcopy(
+    monkeypatch, tmp_path: Path
+) -> None:
+    class NoDeepcopyModel:
+        def __deepcopy__(self, memo: dict[object, object]) -> object:
+            raise AssertionError("deepcopy should not be used")
+
+    class Stats:
+        edited_tensors = 1
+
+        def coverage_payload(self) -> dict[str, object]:
+            return {"edited_tensors": 1, "edited_params": 1, "total_params": 1}
+
+    saved: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        batch_edit_mod,
+        "apply_rtn_dequantized_simulation",
+        lambda model, *, bits, group_size, scope: Stats(),
+    )
+    monkeypatch.setattr(
+        batch_edit_mod,
+        "save_edited_subject_artifact",
+        lambda **kwargs: saved.update(kwargs),
+    )
+    monkeypatch.setattr(batch_edit_mod, "_clear_memory", lambda: None)
+
+    model = NoDeepcopyModel()
+    batch_edit_mod._create_edit_artifact(
+        model=model,
+        tokenizer=object(),
+        parsed_spec={"type": "quant_rtn", "bits": 4, "group_size": 32, "scope": "ffn"},
+        edit_path=tmp_path / "edit",
+        clone_model=False,
+    )
+
+    assert saved["model"] is model
 
 
 def test_edit_artifact_summary_counts_scenario_taxonomy(tmp_path: Path) -> None:

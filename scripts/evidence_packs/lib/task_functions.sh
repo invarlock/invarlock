@@ -1562,8 +1562,11 @@ _edit_artifact_complete() {
 
 # ============ TASK: CREATE_EDITS_BATCH ============
 
-# Create all edited models with single model load (Batch optimization)
-# This loads the baseline model once and creates all 8 edits, avoiding 8× model load overhead
+# Create all edited models from one parsed batch.
+# By default the Python helper reloads the baseline per edit to avoid GPU
+# memory spikes from deep-copying large loaded models. Set
+# PACK_BATCH_EDIT_STRATEGY=deepcopy for small models where single-load
+# throughput is preferred.
 # Usage: task_create_edits_batch <model_name> <gpu_id> <edit_specs_json> <output_dir> <log_file>
 task_create_edits_batch() {
     local model_name="$1"
@@ -1580,7 +1583,7 @@ task_create_edits_batch() {
         return 1
     fi
 
-    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Creating batch edits (8 edits with single model load)" >> "${log_file}"
+    echo "[$(_cmd_date '+%Y-%m-%d %H:%M:%S')] Creating batch edits" >> "${log_file}"
     echo "  Baseline: ${baseline_path}" >> "${log_file}"
 
     # Process each edit spec using Python for efficient batch creation

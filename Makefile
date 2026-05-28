@@ -546,9 +546,9 @@ clean:  ## Clean build artifacts
 	rm -rf build/
 	rm -rf dist/
 	rm -rf *.egg-info/
-	find . -type f \( -name ".DS_Store" -o -name "._*" \) -delete
-	find . -type d -name __pycache__ -exec rm -rf {} +
-	find . -type f -name "*.pyc" -delete
+	find . -type f \( -name ".DS_Store" -o -name "._*" \) ! -path "./.git/*" -delete
+	find . -type d -name __pycache__ ! -path "./.git/*" -exec rm -rf {} +
+	find . -type f -name "*.pyc" ! -path "./.git/*" -delete
 
 docsclean: ## Remove local MkDocs site build
 	rm -rf site/
@@ -569,7 +569,7 @@ deepclean: ## Remove all generated artifacts, caches, and run outputs (destructi
 		.coverage coverage.xml htmlcov/ \
 		test_config.yaml tmp_cfg.yaml \
 		*.pyc *.pyo
-	find . -type f \( -name ".DS_Store" -o -name "._*" \) -delete
+	find . -type f \( -name ".DS_Store" -o -name "._*" \) ! -path "./.git/*" -delete
 
 docs-serve: ## Serve documentation locally
 	$(MAKE) ensure-python

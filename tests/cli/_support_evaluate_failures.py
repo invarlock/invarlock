@@ -50,16 +50,33 @@ def _fake_run_command_with_paths(
 
 def _valid_baseline_report_payload(
     *,
+    model_id: str = "src",
     adapter: str = "hf_causal",
     profile: str = "dev",
     tier: str = "balanced",
+    assurance_mode: str = "off",
+    data: dict[str, object] | None = None,
     edit_name: str = "noop",
     evaluation_windows: dict[str, object] | None = None,
 ) -> dict[str, object]:
     return {
         "edit": {"name": edit_name},
-        "meta": {"adapter": adapter},
-        "context": {"profile": profile, "auto": {"tier": tier}},
+        "meta": {"model_id": model_id, "adapter": adapter},
+        "context": {
+            "profile": profile,
+            "auto": {"tier": tier},
+            "assurance": {"mode": assurance_mode},
+        },
+        "data": data
+        or {
+            "provider": "wikitext2",
+            "split": "validation",
+            "seq_len": 512,
+            "stride": 512,
+            "preview_n": 64,
+            "final_n": 64,
+            "seed": 43,
+        },
         "evaluation_windows": evaluation_windows
         or {
             "preview": {"window_ids": ["preview-0"], "input_ids": [[1, 2, 3]]},

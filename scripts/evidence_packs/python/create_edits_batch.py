@@ -43,10 +43,12 @@ except ImportError:  # pragma: no cover - direct module load under pytest
     from validate_edit_artifact import validate_edit_artifact
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+_BATCH_EDIT_STRATEGIES = {"reload", "deepcopy"}
+
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Create many evidence-pack edits with a single baseline model load."
+        description="Create many evidence-pack edits from one baseline checkpoint."
     )
     parser.add_argument("--baseline", required=True)
     parser.add_argument("--model-output-dir", required=True)
@@ -73,20 +75,33 @@ def _configure_determinism() -> None:
     torch.set_grad_enabled(False)
 
 
-def _load_baseline_artifacts(baseline_path: Path) -> tuple[Any, Any]:
+def _load_tokenizer(baseline_path: Path) -> Any:
     trust_remote_code = require_remote_code_opt_in("create_edits_batch.py")
-    tokenizer = AutoTokenizer.from_pretrained(
+    return AutoTokenizer.from_pretrained(
         baseline_path,
         trust_remote_code=trust_remote_code,
     )
-    model = AutoModelForCausalLM.from_pretrained(
+
+
+def _load_baseline_model(baseline_path: Path) -> Any:
+    trust_remote_code = require_remote_code_opt_in("create_edits_batch.py")
+    return AutoModelForCausalLM.from_pretrained(
         baseline_path,
         dtype=torch.bfloat16,
         trust_remote_code=trust_remote_code,
         device_map="auto",
         low_cpu_mem_usage=True,
     )
-    return tokenizer, model
+
+
+def _batch_edit_strategy() -> str:
+    raw = os.environ.get("PACK_BATCH_EDIT_STRATEGY", "reload").strip().lower()
+    if raw not in _BATCH_EDIT_STRATEGIES:
+        raise ValueError(
+            "PACK_BATCH_EDIT_STRATEGY must be one of: "
+            + ", ".join(sorted(_BATCH_EDIT_STRATEGIES))
+        )
+    return raw
 
 
 def _get_edit_dir_name(parsed_spec: dict[str, object], version: str) -> str:
@@ -109,8 +124,10 @@ def _get_edit_dir_name(parsed_spec: dict[str, object], version: str) -> str:
 def _build_edited_model_and_metadata(
     model: Any,
     parsed_spec: dict[str, object],
+    *,
+    clone_model: bool = True,
 ) -> tuple[Any, dict[str, object]]:
-    edited = copy.deepcopy(model)
+    edited = copy.deepcopy(model) if clone_model else model
     edit_type = str(parsed_spec["type"])
     if edit_type == "quant_rtn":
         bits = int(parsed_spec["bits"])
@@ -210,8 +227,13 @@ def _create_edit_artifact(
     tokenizer: Any,
     parsed_spec: dict[str, object],
     edit_path: Path,
+    clone_model: bool = True,
 ) -> None:
-    edited_model, metadata = _build_edited_model_and_metadata(model, parsed_spec)
+    edited_model, metadata = _build_edited_model_and_metadata(
+        model,
+        parsed_spec,
+        clone_model=clone_model,
+    )
     save_edited_subject_artifact(
         model=edited_model,
         tokenizer=tokenizer,
@@ -228,41 +250,23 @@ def _process_spec_entry(
     model_output_dir: Path,
     model: Any,
     tokenizer: Any,
+    clone_model: bool = True,
 ) -> tuple[int, int]:
-    if not isinstance(spec_entry, dict):
-        return 0, 0
-
-    spec_str = str(spec_entry.get("spec", ""))
-    version = str(spec_entry.get("version", "clean"))
-    parsed_resolved = resolve_batch_entry(
+    pending, created, failed = _resolve_pending_spec_entry(
         spec_entry=spec_entry,
         model_output_dir=model_output_dir,
     )
-    if parsed_resolved is None:
-        return 0, 0
-    parsed = parsed_resolved.to_batch_payload()
+    if pending is None:
+        return created, failed
 
-    if parsed_resolved.skip:
-        print(f"  Skip (tuned edit preset skipped): {spec_str}")
-        return 0, 0
-    if not parsed_resolved.selected:
-        raise ValueError(
-            f"Tuned edit preset missing for {spec_str}: {parsed_resolved.status}"
-        )
-
-    edit_dir_name = _get_edit_dir_name(parsed, version)
-    edit_path = model_output_dir / "models" / edit_dir_name
-    if _edit_artifact_complete(edit_path):
-        print(f"  Skip (exists): {edit_dir_name}")
-        return 1, 0
-
-    print(f"  Creating: {edit_dir_name}...")
+    parsed, edit_path = pending
     try:
         _create_edit_artifact(
             model=model,
             tokenizer=tokenizer,
             parsed_spec=parsed,
             edit_path=edit_path,
+            clone_model=clone_model,
         )
     except (KeyError, OSError, RuntimeError, TypeError, ValueError) as exc:
         print(f"    ERROR: {exc}", file=sys.stderr)
@@ -272,12 +276,49 @@ def _process_spec_entry(
     return 1, 0
 
 
+def _resolve_pending_spec_entry(
+    *,
+    spec_entry: object,
+    model_output_dir: Path,
+) -> tuple[tuple[dict[str, object], Path] | None, int, int]:
+    if not isinstance(spec_entry, dict):
+        return None, 0, 0
+
+    spec_str = str(spec_entry.get("spec", ""))
+    version = str(spec_entry.get("version", "clean"))
+    parsed_resolved = resolve_batch_entry(
+        spec_entry=spec_entry,
+        model_output_dir=model_output_dir,
+    )
+    if parsed_resolved is None:
+        return None, 0, 0
+    parsed = parsed_resolved.to_batch_payload()
+
+    if parsed_resolved.skip:
+        print(f"  Skip (tuned edit preset skipped): {spec_str}")
+        return None, 0, 0
+    if not parsed_resolved.selected:
+        raise ValueError(
+            f"Tuned edit preset missing for {spec_str}: {parsed_resolved.status}"
+        )
+
+    edit_dir_name = _get_edit_dir_name(parsed, version)
+    edit_path = model_output_dir / "models" / edit_dir_name
+    if _edit_artifact_complete(edit_path):
+        print(f"  Skip (exists): {edit_dir_name}")
+        return None, 1, 0
+
+    print(f"  Creating: {edit_dir_name}...")
+    return (parsed, edit_path), 0, 0
+
+
 def _process_edit_specs(
     *,
     edit_specs: list[object],
     model_output_dir: Path,
     model: Any,
     tokenizer: Any,
+    clone_model: bool = True,
 ) -> tuple[int, int]:
     created_count = 0
     failed_count = 0
@@ -287,9 +328,51 @@ def _process_edit_specs(
             model_output_dir=model_output_dir,
             model=model,
             tokenizer=tokenizer,
+            clone_model=clone_model,
         )
         created_count += created
         failed_count += failed
+    return created_count, failed_count
+
+
+def _process_edit_specs_reloading_model(
+    *,
+    edit_specs: list[object],
+    baseline_path: Path,
+    model_output_dir: Path,
+    tokenizer: Any,
+) -> tuple[int, int]:
+    created_count = 0
+    failed_count = 0
+    for spec_entry in edit_specs:
+        model: Any | None = None
+        try:
+            pending, created, failed = _resolve_pending_spec_entry(
+                spec_entry=spec_entry,
+                model_output_dir=model_output_dir,
+            )
+            if pending is None:
+                created_count += created
+                failed_count += failed
+                continue
+            parsed, edit_path = pending
+            model = _load_baseline_model(baseline_path)
+            _create_edit_artifact(
+                model=model,
+                tokenizer=tokenizer,
+                parsed_spec=parsed,
+                edit_path=edit_path,
+                clone_model=False,
+            )
+            print(f"    Saved: {edit_path}")
+            created_count += 1
+        except (KeyError, OSError, RuntimeError, TypeError, ValueError) as exc:
+            print(f"    ERROR: {exc}", file=sys.stderr)
+            failed_count += 1
+        finally:
+            if model is not None:
+                del model
+            _clear_memory()
     return created_count, failed_count
 
 
@@ -304,20 +387,38 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
-    print(f"Loading baseline model once for {len(edit_specs)} edits...")
-
     _configure_determinism()
+    try:
+        strategy = _batch_edit_strategy()
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"Creating {len(edit_specs)} edits with strategy={strategy}...")
 
     model: Any | None = None
     try:
-        tokenizer, model = _load_baseline_artifacts(baseline_path)
-        print(f"Baseline loaded. Creating {len(edit_specs)} edits...")
-        created_count, failed_count = _process_edit_specs(
-            edit_specs=edit_specs,
-            model_output_dir=model_output_dir,
-            model=model,
-            tokenizer=tokenizer,
-        )
+        tokenizer = _load_tokenizer(baseline_path)
+        if strategy == "deepcopy":
+            model = _load_baseline_model(baseline_path)
+            print("Baseline loaded once. Creating edits via model deepcopy...")
+            created_count, failed_count = _process_edit_specs(
+                edit_specs=edit_specs,
+                model_output_dir=model_output_dir,
+                model=model,
+                tokenizer=tokenizer,
+                clone_model=True,
+            )
+        else:
+            print(
+                "Reloading baseline per edit to avoid model deepcopy memory spikes..."
+            )
+            created_count, failed_count = _process_edit_specs_reloading_model(
+                edit_specs=edit_specs,
+                baseline_path=baseline_path,
+                model_output_dir=model_output_dir,
+                tokenizer=tokenizer,
+            )
     finally:
         if model is not None:
             del model
