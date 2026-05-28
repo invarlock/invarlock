@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import random
 
+import pytest
+
 from invarlock.eval.providers.base import (
     deterministic_shards,
     deterministic_worker_init_fn,
@@ -39,3 +41,27 @@ def test_provider_digest_independent_of_workers():
     for k in (0, 2, 4):
         _ = deterministic_shards(8, num_workers=k)
         assert p.digest() == base
+
+
+def test_text_lm_provider_validates_shape_parameters():
+    with pytest.raises(ValueError, match="task"):
+        TextLMProvider(task="classification")
+    with pytest.raises(ValueError, match="n"):
+        TextLMProvider(n=-1)
+    with pytest.raises(ValueError, match="seq_len"):
+        TextLMProvider(seq_len=2)
+    with pytest.raises(ValueError, match="mask_prob"):
+        TextLMProvider(mask_prob=float("nan"))
+
+
+def test_text_lm_provider_rejects_non_positive_batch_size():
+    provider = TextLMProvider(n=1)
+    with pytest.raises(ValueError, match="batch_size"):
+        list(provider.batches(seed=0, batch_size=0))
+
+
+def test_text_lm_provider_emits_requested_sequence_length():
+    provider = TextLMProvider(n=3, seq_len=3)
+    batch = next(iter(provider.batches(seed=0, batch_size=3)))
+    assert [len(row) for row in batch["input_ids"]] == [3, 3, 3]
+    assert [len(row) for row in batch["attention_mask"]] == [3, 3, 3]

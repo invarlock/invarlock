@@ -8,6 +8,7 @@ EvaluationProvider protocol.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable
 from typing import Any
 
@@ -34,6 +35,14 @@ class TextLMProvider(EvaluationProvider):
         self._pad_id = int(kwargs.get("pad_id", 0))
         self._eos_id = int(kwargs.get("eos_id", 2))
         self._ids: list[str] = []
+        if self._task not in {"causal", "mlm"}:
+            raise ValueError("task must be 'causal' or 'mlm'")
+        if self._n < 0:
+            raise ValueError("n must be non-negative")
+        if self._seq_len < 3:
+            raise ValueError("seq_len must be at least 3")
+        if not math.isfinite(self._mask_prob) or not 0.0 <= self._mask_prob <= 1.0:
+            raise ValueError("mask_prob must be a finite value in [0, 1]")
 
     def pairing_schedule(self) -> list[str]:
         return (
@@ -86,7 +95,8 @@ class TextLMProvider(EvaluationProvider):
         }
 
     def batches(self, *, seed: int, batch_size: int) -> Iterable[dict[str, Any]]:
-        assert batch_size > 0
+        if batch_size <= 0:
+            raise ValueError("batch_size must be positive")
         batch: dict[str, Any] = {
             "ids": [],
             "input_ids": [],
