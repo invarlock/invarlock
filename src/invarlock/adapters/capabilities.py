@@ -153,6 +153,20 @@ class ModelCapabilities:
         )
 
 
+def _lower_string(value: Any) -> str:
+    return value.strip().lower() if isinstance(value, str) else ""
+
+
+def _coerce_positive_int(value: Any, *, default: int) -> int:
+    if isinstance(value, bool):
+        return default
+    try:
+        resolved = int(value)
+    except (TypeError, ValueError, OverflowError):
+        return default
+    return resolved if resolved > 0 else default
+
+
 def detect_quantization_from_config(config: Any) -> QuantizationConfig:
     """
     Detect quantization configuration from a HuggingFace model config.
@@ -176,12 +190,17 @@ def detect_quantization_from_config(config: Any) -> QuantizationConfig:
 
     # Handle dict-style config (common in saved checkpoints)
     if isinstance(quant_cfg, dict):
-        quant_method = quant_cfg.get("quant_method", "").lower()
-        load_in_8bit = quant_cfg.get("load_in_8bit", False)
-        load_in_4bit = quant_cfg.get("load_in_4bit", False)
-        bits = quant_cfg.get("bits", 16)
-        group_size = quant_cfg.get("group_size")
-        double_quant = quant_cfg.get("bnb_4bit_use_double_quant", False)
+        quant_method = _lower_string(quant_cfg.get("quant_method", ""))
+        load_in_8bit = quant_cfg.get("load_in_8bit", False) is True
+        load_in_4bit = quant_cfg.get("load_in_4bit", False) is True
+        bits = _coerce_positive_int(quant_cfg.get("bits", 16), default=16)
+        raw_group_size = quant_cfg.get("group_size")
+        group_size = (
+            _coerce_positive_int(raw_group_size, default=128)
+            if raw_group_size is not None
+            else None
+        )
+        double_quant = quant_cfg.get("bnb_4bit_use_double_quant", False) is True
         compute_dtype = quant_cfg.get("bnb_4bit_compute_dtype")
 
         if quant_method == "awq":
@@ -198,13 +217,13 @@ def detect_quantization_from_config(config: Any) -> QuantizationConfig:
                 group_size=group_size,
                 from_checkpoint=True,
             )
-        elif load_in_8bit or quant_method == "bitsandbytes" and bits == 8:
+        elif load_in_8bit or (quant_method == "bitsandbytes" and bits == 8):
             return QuantizationConfig(
                 method=QuantizationMethod.BNB_8BIT,
                 bits=8,
                 from_checkpoint=True,
             )
-        elif load_in_4bit or quant_method == "bitsandbytes" and bits == 4:
+        elif load_in_4bit or (quant_method == "bitsandbytes" and bits == 4):
             return QuantizationConfig(
                 method=QuantizationMethod.BNB_4BIT,
                 bits=4,
@@ -239,8 +258,11 @@ def detect_quantization_from_config(config: Any) -> QuantizationConfig:
             )
 
     if cfg_class in ("AWQConfig",):
-        bits = getattr(quant_cfg, "bits", 4)
-        group_size = getattr(quant_cfg, "group_size", 128)
+        bits = _coerce_positive_int(getattr(quant_cfg, "bits", 4), default=4)
+        group_size = _coerce_positive_int(
+            getattr(quant_cfg, "group_size", 128),
+            default=128,
+        )
         return QuantizationConfig(
             method=QuantizationMethod.AWQ,
             bits=bits,
@@ -249,8 +271,11 @@ def detect_quantization_from_config(config: Any) -> QuantizationConfig:
         )
 
     if cfg_class in ("GPTQConfig",):
-        bits = getattr(quant_cfg, "bits", 4)
-        group_size = getattr(quant_cfg, "group_size", 128)
+        bits = _coerce_positive_int(getattr(quant_cfg, "bits", 4), default=4)
+        group_size = _coerce_positive_int(
+            getattr(quant_cfg, "group_size", 128),
+            default=128,
+        )
         return QuantizationConfig(
             method=QuantizationMethod.GPTQ,
             bits=bits,

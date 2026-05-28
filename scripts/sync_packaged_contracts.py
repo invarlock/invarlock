@@ -13,7 +13,11 @@ SOURCE_DIR = REPO_ROOT / "contracts"
 PACKAGED_DIR = REPO_ROOT / "src" / "invarlock" / "_data" / "contracts"
 
 
-def _contract_map(directory: Path) -> dict[str, Path]:
+def _contract_map(directory: Path, *, allow_missing: bool = False) -> dict[str, Path]:
+    if not directory.is_dir():
+        if allow_missing:
+            return {}
+        raise FileNotFoundError(f"contract directory not found: {directory}")
     return {
         path.name: path
         for path in sorted(directory.glob("*.json"))
@@ -66,7 +70,7 @@ def sync_packaged_contracts(
     source_dir: Path = SOURCE_DIR, packaged_dir: Path = PACKAGED_DIR
 ) -> tuple[int, int]:
     source = _contract_map(source_dir)
-    packaged = _contract_map(packaged_dir)
+    packaged = _contract_map(packaged_dir, allow_missing=True)
     packaged_dir.mkdir(parents=True, exist_ok=True)
 
     updated = 0
@@ -131,14 +135,22 @@ def main(argv: list[str] | None = None) -> int:
         check_mode = args.check or not args.write
 
     if write_mode:
-        updated, removed = sync_packaged_contracts(source_dir, packaged_dir)
+        try:
+            updated, removed = sync_packaged_contracts(source_dir, packaged_dir)
+        except FileNotFoundError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
         print(
             "Synchronized packaged contracts from "
             f"{source_dir} -> {packaged_dir} (updated={updated}, removed={removed})."
         )
 
     if check_mode:
-        errors = check_contract_sync(source_dir, packaged_dir)
+        try:
+            errors = check_contract_sync(source_dir, packaged_dir)
+        except FileNotFoundError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
         if errors:
             for error in errors:
                 print(error, file=sys.stderr)

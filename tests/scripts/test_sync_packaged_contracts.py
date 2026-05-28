@@ -102,3 +102,40 @@ def test_sync_packaged_contracts_write_syncs_and_removes_extras(tmp_path: Path) 
         "beta": 2
     }
     assert not (packaged_dir / "gamma.json").exists()
+
+
+def test_sync_packaged_contracts_check_rejects_missing_dirs(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "sync_packaged_contracts.py"
+
+    proc = _run_sync_script(
+        script,
+        source_dir=tmp_path / "missing-source",
+        packaged_dir=tmp_path / "missing-packaged",
+        extra_args=["--check"],
+    )
+
+    assert proc.returncode == 1
+    assert "contract directory not found" in proc.stderr
+
+
+def test_sync_packaged_contracts_write_allows_missing_packaged_dir(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "sync_packaged_contracts.py"
+    source_dir = tmp_path / "contracts"
+    packaged_dir = tmp_path / "packaged"
+    _write_json(source_dir / "alpha.json", {"alpha": 1})
+
+    proc = _run_sync_script(
+        script,
+        source_dir=source_dir,
+        packaged_dir=packaged_dir,
+        extra_args=["--write"],
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    assert json.loads((packaged_dir / "alpha.json").read_text(encoding="utf-8")) == {
+        "alpha": 1
+    }

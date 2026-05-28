@@ -204,6 +204,34 @@ class TestDetectQuantizationFromConfig:
         assert cfg.bits == 4
         assert cfg.group_size == 128
 
+    def test_dict_style_quantization_config_tolerates_malformed_values(self):
+        """Malformed serialized config fields should not crash detection."""
+        mock_config = MagicMock()
+        mock_config.quantization_config = {
+            "quant_method": 7,
+            "bits": "4",
+            "group_size": "128",
+        }
+
+        cfg = detect_quantization_from_config(mock_config)
+
+        assert cfg.method == QuantizationMethod.NONE
+
+    def test_dict_style_quantization_config_normalizes_numeric_strings(self):
+        """Serialized string numeric fields should still be detected."""
+        mock_config = MagicMock()
+        mock_config.quantization_config = {
+            "quant_method": "gptq",
+            "bits": "4",
+            "group_size": "128",
+        }
+
+        cfg = detect_quantization_from_config(mock_config)
+
+        assert cfg.method == QuantizationMethod.GPTQ
+        assert cfg.bits == 4
+        assert cfg.group_size == 128
+
     def test_object_style_bnb_8bit(self):
         """Object-style BitsAndBytesConfig should be detected."""
         mock_quant_cfg = MagicMock()
