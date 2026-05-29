@@ -5,6 +5,7 @@ from pathlib import Path
 
 from invarlock.public_contracts import published_basis_lanes
 from invarlock.reporting.report_schema import validate_report
+from invarlock.reporting.verify_contract import VerifyOutcome, run_verify_reports
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -16,8 +17,11 @@ def test_published_basis_lanes_ship_public_evidence_references() -> None:
         report_fixture = evidence.get("evaluation_report_fixture")
         evidence_pack_recipe = evidence.get("evidence_pack_recipe")
         assert isinstance(report_fixture, str) and report_fixture
+        runtime_manifest = evidence.get("runtime_manifest_fixture")
+        assert isinstance(runtime_manifest, str) and runtime_manifest
         assert isinstance(evidence_pack_recipe, str) and evidence_pack_recipe
         assert (REPO_ROOT / report_fixture).is_file(), report_fixture
+        assert (REPO_ROOT / runtime_manifest).is_file(), runtime_manifest
         assert (REPO_ROOT / evidence_pack_recipe).is_file(), evidence_pack_recipe
 
 
@@ -78,3 +82,48 @@ def test_offline_golden_runs_public_fixtures() -> None:
         assert report["meta"]["model_id"] == lane["model_id"]
         assert report["primary_metric"]["kind"] == lane["primary_metric_kind"]
         assert report["validation"]["primary_metric_acceptable"] is True
+
+
+def test_published_basis_public_evidence_verifies_release_strict() -> None:
+    for lane in published_basis_lanes():
+        evidence = lane.get("evidence", {})
+        report_fixture = evidence.get("evaluation_report_fixture")
+        runtime_manifest = evidence.get("runtime_manifest_fixture")
+        assert isinstance(report_fixture, str) and report_fixture
+        assert isinstance(runtime_manifest, str) and runtime_manifest
+        report_path = REPO_ROOT / report_fixture
+        assert (REPO_ROOT / runtime_manifest).is_file()
+
+        result = run_verify_reports(
+            [report_path],
+            profile="release",
+            assurance_mode="strict",
+        )
+
+        assert result.outcome == VerifyOutcome.OK
+        verification = result.payload["results"][0]["verification"]
+        assert verification["runtime_provenance"]["status"] == "verified"
+
+
+def test_caught_regression_fixture_fails_guard_despite_clean_primary_metric() -> None:
+    report_path = (
+        REPO_ROOT
+        / "public_evidence"
+        / "caught_regressions"
+        / "spectral_guard_failure"
+        / "evaluation.report.json"
+    )
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["validation"]["primary_metric_acceptable"] is True
+    assert report["primary_metric"]["ratio_vs_baseline"] == 1.0
+
+    result = run_verify_reports(
+        [report_path],
+        profile="release",
+        assurance_mode="strict",
+    )
+
+    assert result.outcome == VerifyOutcome.POLICY_FAIL
+    diagnostics = "\n".join(item.message for item in result.diagnostics)
+    assert "validation.spectral_stable == true" in diagnostics
+    assert "spectral did not pass" in diagnostics

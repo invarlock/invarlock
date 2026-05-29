@@ -1,7 +1,11 @@
 {
-  "artifacts": {},
+  "artifacts": {
+    "regression_example": "spectral_guard_failure_primary_metric_passes"
+  },
   "assurance": {
-    "blocking_reasons": [],
+    "blocking_reasons": [
+      "spectral did not pass."
+    ],
     "canonical_guard_chain": [
       "invariants",
       "spectral",
@@ -21,23 +25,23 @@
     ],
     "mode": "strict",
     "profile": "release",
-    "report_local_verdict": "pass",
+    "report_local_verdict": "fail",
     "runtime_provenance_declared": "container",
     "runtime_provenance_verification_status": "pending",
     "runtime_provenance_verified": false,
     "tier": "balanced",
-    "verdict": "pending_verifier",
-    "verified_assurance_verdict": "pending"
+    "verdict": "fail",
+    "verified_assurance_verdict": "fail"
   },
   "auto": {
     "tier": "balanced"
   },
   "baseline_ref": {
     "primary_metric": {
-      "final": 8.4,
-      "kind": "ppl_mlm"
+      "final": 29.1,
+      "kind": "ppl_causal"
     },
-    "tokenizer_hash": "bert-tokenizer-sha256-fixture"
+    "tokenizer_hash": "gpt2-tokenizer-sha256-fixture"
   },
   "context": {
     "profile": "release",
@@ -46,7 +50,7 @@
     }
   },
   "dataset": {
-    "provider": "hf_text",
+    "provider": "wikitext2",
     "seq_len": 128,
     "windows": {
       "final": 8,
@@ -70,14 +74,14 @@
   "evaluation_windows": {
     "final": {
       "logloss": [
-        2.128231705849268,
-        2.128231705849268,
-        2.128231705849268,
-        2.128231705849268,
-        2.128231705849268,
-        2.128231705849268,
-        2.128231705849268,
-        2.128231705849268
+        3.370738174177447,
+        3.370738174177447,
+        3.370738174177447,
+        3.370738174177447,
+        3.370738174177447,
+        3.370738174177447,
+        3.370738174177447,
+        3.370738174177447
       ],
       "token_counts": [
         16,
@@ -90,14 +94,14 @@
         16
       ],
       "window_ids": [
-        "bert-window-00",
-        "bert-window-01",
-        "bert-window-02",
-        "bert-window-03",
-        "bert-window-04",
-        "bert-window-05",
-        "bert-window-06",
-        "bert-window-07"
+        "gpt2-window-00",
+        "gpt2-window-01",
+        "gpt2-window-02",
+        "gpt2-window-03",
+        "gpt2-window-04",
+        "gpt2-window-05",
+        "gpt2-window-06",
+        "gpt2-window-07"
       ]
     }
   },
@@ -134,15 +138,15 @@
     "violations": []
   },
   "meta": {
-    "adapter": "hf_mlm",
+    "adapter": "hf_causal",
     "execution_mode": "container",
-    "model_id": "prajjwal1/bert-tiny",
+    "model_id": "sshleifer/tiny-gpt2",
     "profile": "release"
   },
   "plugins": {
     "adapters": [
       {
-        "name": "hf_mlm"
+        "name": "hf_causal"
       }
     ],
     "edits": [],
@@ -162,29 +166,29 @@
   },
   "primary_metric": {
     "ci": [
-      0.0,
-      0.0
+      -0.01005033585350145,
+      0.009950330853168092
     ],
     "display_ci": [
-      1.0,
-      1.0
+      0.99,
+      1.01
     ],
     "drift_band": {
       "max": 1.05,
       "min": 0.95
     },
-    "final": 8.4,
+    "final": 29.1,
     "gating_basis": "ratio",
-    "kind": "ppl_mlm",
-    "preview": 8.4,
+    "kind": "ppl_causal",
+    "preview": 29.1,
     "ratio_vs_baseline": 1.0
   },
   "provenance": {
     "execution_mode": "container",
     "provider_digest": {
-      "ids_sha256": "bert-window-ids-sha256-fixture",
-      "masking_sha256": "bert-masking-sha256-fixture",
-      "tokenizer_sha256": "bert-tokenizer-sha256-fixture"
+      "ids_sha256": "gpt2-window-ids-sha256-fixture",
+      "masking_sha256": "none",
+      "tokenizer_sha256": "gpt2-tokenizer-sha256-fixture"
     }
   },
   "resolved_policy": {
@@ -253,11 +257,21 @@
     "supported": true,
     "violations": []
   },
-  "run_id": "bert-published-basis-strict-pass-20260529",
+  "run_id": "gpt2-spectral-guard-caught-regression-20260529",
   "schema_version": "v1",
   "spectral": {
-    "decision": "allow",
-    "diagnostics": [],
+    "decision": "block",
+    "diagnostics": [
+      {
+        "cap_ratio": 1.1,
+        "family": "mlp",
+        "kind": "spectral_family_cap_exceeded",
+        "message": "MLP projection spectral growth exceeded the release cap.",
+        "module": "transformer.h.3.mlp.c_proj",
+        "severity": "error",
+        "sigma_ratio": 1.42
+      }
+    ],
     "measurement_contract": {
       "estimator": {
         "init": "deterministic_ones",
@@ -274,10 +288,20 @@
     "measurement_contract_hash": "efcfc5d7407a1f66",
     "measurement_contract_match": true,
     "metrics": {},
-    "passed": true,
-    "status": "pass",
+    "passed": false,
+    "status": "fail",
     "supported": true,
-    "violations": []
+    "violations": [
+      {
+        "cap_ratio": 1.1,
+        "family": "mlp",
+        "kind": "spectral_family_cap_exceeded",
+        "message": "MLP projection spectral growth exceeded the release cap.",
+        "module": "transformer.h.3.mlp.c_proj",
+        "severity": "error",
+        "sigma_ratio": 1.42
+      }
+    ]
   },
   "validation": {
     "guard_overhead_acceptable": true,
@@ -285,7 +309,7 @@
     "preview_final_drift_acceptable": true,
     "primary_metric_acceptable": true,
     "rmt_stable": true,
-    "spectral_stable": true
+    "spectral_stable": false
   },
   "variance": {
     "decision": "allow",
