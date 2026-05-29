@@ -42,6 +42,20 @@ contents.
   monitor-only for a pass.
 - [ ] Unsupported guard/model statuses are explicit and block assurance.
 
+## Guard Fallback Policy
+
+- [ ] Numeric measurement fallbacks are recorded as diagnostics or events; a
+  neutral fallback value alone is not acceptable evidence.
+- [ ] Spectral estimator failures, non-tensor weights, non-finite weights, and
+  quantized-weight skips include structured `spectral_sigma_fallback_*`
+  diagnostics.
+- [ ] RMT correction failures are emitted as `rmt_correct_failed` error events
+  and do not silently erase the original outlier.
+- [ ] Variance guard preparation/finalization failures fail closed unless an
+  explicit monitor-only policy is recorded in the report.
+- [ ] Reviewer-facing reports expose fallback diagnostics under the relevant
+  guard result, and strict assurance blocks unsupported or degraded guard states.
+
 ## Metrics And Windows
 
 - [ ] Final and baseline paired arrays have equal lengths.
