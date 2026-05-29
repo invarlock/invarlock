@@ -9,15 +9,16 @@ from __future__ import annotations
 import importlib.machinery
 import sys
 import types
+from typing import Any, cast
 
 from .render_markdown import render_report_markdown as _render_report_markdown
+from .report_schema import REPORT_JSON_SCHEMA, REPORT_SCHEMA_VERSION, validate_report
 from .report_summary import (
     build_quality_gates_summary as _build_quality_gates_summary,
 )
 from .report_summary import (
     build_safety_dashboard_summary as _build_safety_dashboard_summary,
 )
-from .report_schema import REPORT_JSON_SCHEMA, REPORT_SCHEMA_VERSION, validate_report
 from .telemetry import (
     telemetry_output_enabled as _telemetry_output_enabled,
 )
@@ -45,7 +46,7 @@ def _install_compat_module(name: str, exports: dict[str, object]) -> types.Modul
     module = types.ModuleType(module_name)
     module.__spec__ = importlib.machinery.ModuleSpec(module_name, loader=None)
     module.__dict__.update(exports)
-    setattr(module, "__all__", tuple(exports))
+    cast(Any, module).__all__ = tuple(exports)
     sys.modules[module_name] = module
     globals()[name] = module
     return module
