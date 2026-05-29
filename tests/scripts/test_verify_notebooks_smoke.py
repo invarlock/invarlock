@@ -12,7 +12,7 @@ import pytest
 
 def _load_script_module() -> ModuleType:
     repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "verify_notebooks_smoke.py"
+    script_path = repo_root / "scripts" / "docs" / "verify_notebooks_smoke.py"
     spec = importlib.util.spec_from_file_location(
         "tests_verify_notebooks_smoke", script_path
     )

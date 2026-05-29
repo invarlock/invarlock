@@ -3,7 +3,7 @@
 test_pack_validation_cleanup_kills_spawned_pids_and_exits_with_previous_rc() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     local rc=0
     (
@@ -32,7 +32,7 @@ test_pack_validation_determinism_strict_sets_compile_off() {
     mock_reset
 
     PACK_DETERMINISM="strict"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     assert_eq "strict" "${PACK_DETERMINISM}" "strict preserved"
     assert_eq "0" "${NVIDIA_TF32_OVERRIDE}" "strict disables TF32"
@@ -44,7 +44,7 @@ test_pack_validation_determinism_invalid_defaults_to_throughput() {
     mock_reset
 
     PACK_DETERMINISM="not-a-preset"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     assert_eq "throughput" "${PACK_DETERMINISM}" "invalid preset coerces to throughput"
     assert_eq "1" "${NVIDIA_TF32_OVERRIDE}" "throughput enables TF32"
@@ -55,7 +55,7 @@ test_pack_validation_determinism_invalid_defaults_to_throughput() {
 test_pack_validation_bash4_guard_reports_error_on_bash3() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     # Simulate bash3 (non-bash4) regardless of the host bash version.
     pack_is_bash4() { return 1; }
     local rc=0
@@ -70,7 +70,7 @@ test_pack_validation_bash4_guard_reports_error_on_bash3() {
 test_pack_validation_bash4_guard_succeeds_when_bash4_is_reported() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     pack_is_bash4() { return 0; }
     pack_require_bash4
@@ -79,7 +79,7 @@ test_pack_validation_bash4_guard_succeeds_when_bash4_is_reported() {
 test_pack_validation_pack_is_bash4_default_impl_executes() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     pack_is_bash4 || true
 }
@@ -88,7 +88,7 @@ test_pack_validation_setup_hf_cache_dirs_errors_when_home_is_file() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     local hf_home="${TEST_TMPDIR}/hf_file"
     : > "${hf_home}"
@@ -107,7 +107,7 @@ test_pack_validation_setup_hf_cache_dirs_creates_directories_and_returns_zero() 
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     export HF_HOME="${TEST_TMPDIR}/hf"
     unset HF_HUB_CACHE HF_DATASETS_CACHE TRANSFORMERS_CACHE
@@ -130,7 +130,7 @@ test_pack_validation_run_determinism_repeats_writes_summary() {
     PACK_SUITE="subset"
     PACK_DETERMINISM="strict"
     PACK_REPEATS="2"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     pack_setup_output_dirs
 
@@ -184,7 +184,7 @@ test_pack_validation_generate_verdict_writes_reports() {
     PACK_DETERMINISM="throughput"
     PACK_REPEATS="0"
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     pack_setup_output_dirs
     mkdir -p "${OUTPUT_DIR}/analysis"
@@ -224,7 +224,7 @@ test_pack_validation_pack_run_suite_runs_dependency_check_before_preflight_when_
         OUTPUT_DIR="${TEST_TMPDIR}/out"
         PACK_NET="1"
         PACK_SUITE="subset"
-        source ./scripts/evidence_packs/lib/validation_suite.sh
+        source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
         # Stub out heavy setup (we only care about call ordering inside pack_run_suite).
         pack_apply_network_mode() { :; }
@@ -256,7 +256,7 @@ _make_validation_suite_sandbox() {
     local sandbox
     sandbox="$(mktemp -d "${TEST_TMPDIR}/pack_validation_suite.XXXXXX")"
     mkdir -p "${sandbox}/lib"
-    cp "${TEST_ROOT}/scripts/evidence_packs/lib/"*.sh "${sandbox}/lib/"
+    cp -R "${TEST_ROOT}/scripts/evidence_packs/lib/." "${sandbox}/lib/"
     echo "${sandbox}"
 }
 
@@ -264,7 +264,7 @@ test_pack_validation_source_libs_nested_layout_succeeds_and_exports_loaded_flags
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     pack_source_libs
 
@@ -280,7 +280,7 @@ test_pack_validation_source_libs_nested_layout_succeeds_and_exports_loaded_flags
 test_pack_validation_source_libs_falls_back_to_lib_dir_when_missing() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     local sandbox
     sandbox="$(_make_validation_suite_sandbox)"
@@ -298,7 +298,7 @@ test_pack_validation_source_libs_falls_back_to_lib_dir_when_missing() {
 test_pack_validation_source_libs_packaged_v2_layout_succeeds() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     local sandbox
     sandbox="$(_make_validation_suite_sandbox)"
@@ -314,12 +314,12 @@ test_pack_validation_source_libs_packaged_v2_layout_succeeds() {
 test_pack_validation_source_libs_packaged_v2_layout_errors_when_queue_manager_missing() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     local sandbox
     sandbox="$(_make_validation_suite_sandbox)"
 
-    rm -f "${sandbox}/lib/queue_manager.sh"
+    rm -f "${sandbox}/lib/queue/queue_manager.sh"
 
     local rc=0
     (
@@ -332,7 +332,7 @@ test_pack_validation_source_libs_packaged_v2_layout_errors_when_queue_manager_mi
 test_pack_validation_list_run_gpu_ids_prefers_gpu_id_list_and_falls_back_to_num_gpus() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     GPU_ID_LIST="2,3,,4"
     local out
@@ -349,7 +349,7 @@ test_pack_validation_configure_gpu_pool_parses_sources_and_validates_ids() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     # CUDA_VISIBLE_DEVICES branch
@@ -389,7 +389,7 @@ test_pack_validation_configure_gpu_pool_errors_on_non_numeric_invalid_or_empty()
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     # Non-numeric branch
@@ -415,7 +415,7 @@ test_pack_validation_configure_gpu_pool_errors_on_non_numeric_invalid_or_empty()
 test_pack_validation_format_gb_as_tb_returns_empty_for_invalid_input() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     local out
     out="$(format_gb_as_tb "nope")"
@@ -425,7 +425,7 @@ test_pack_validation_format_gb_as_tb_returns_empty_for_invalid_input() {
 test_pack_validation_get_free_disk_gb_parses_df_output() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     local path="${TEST_TMPDIR}/disk"
     mkdir -p "${path}"
@@ -442,7 +442,7 @@ EOF
 test_pack_validation_estimate_model_weights_covers_known_patterns_and_local_path() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     local local_model="${TEST_TMPDIR}/local_model"
     mkdir -p "${local_model}"
@@ -469,7 +469,7 @@ test_pack_validation_estimate_model_weights_covers_known_patterns_and_local_path
 test_pack_validation_estimate_model_weights_default_case_returns_nonzero() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     local rc=0
     local out
@@ -485,7 +485,7 @@ test_pack_validation_edit_creators_run_offline_with_stubbed_python() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     log() { :; }
@@ -502,7 +502,7 @@ test_pack_validation_estimate_planned_storage_accounts_for_modes_and_unknown_mod
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     # Force the hub cache to appear on a different device than OUTPUT_DIR.
     export HF_HUB_CACHE="${TEST_TMPDIR}/hub"
@@ -536,7 +536,7 @@ test_pack_validation_estimate_planned_storage_succeeds_when_all_models_are_known
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     HF_HUB_CACHE=""
     MODEL_1="mistralai/Mistral-7B-v0.1"
@@ -558,7 +558,7 @@ test_pack_validation_disk_preflight_allows_resume_but_aborts_without_resume() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     get_free_disk_gb() { echo "10"; }
@@ -580,7 +580,7 @@ test_pack_validation_disk_preflight_returns_ok_when_disk_is_sufficient() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     get_free_disk_gb() { echo "5000"; }
     estimate_planned_model_storage_gb() { echo "10"; }
@@ -593,7 +593,7 @@ test_pack_validation_estimate_planned_storage_counts_snapshot_copy_baseline_mate
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     EDIT_TYPES_CLEAN=()
     EDIT_TYPES_STRESS=()
@@ -612,7 +612,7 @@ test_pack_validation_disk_preflight_describes_cache_backed_symlink_mode() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     get_free_disk_gb() { echo "10"; }
@@ -631,7 +631,7 @@ test_pack_validation_handle_disk_pressure_shutdown_and_reclaim_branches() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     QUEUE_DIR="${OUTPUT_DIR}/queue"
@@ -662,7 +662,7 @@ test_pack_validation_setup_pack_environment_sets_fp8_flag_and_propagates_failure
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     python3() { printf '%s\n' "ok" "[FP8_NATIVE_SUPPORT=true]"; }
@@ -689,7 +689,7 @@ test_pack_validation_check_dependencies_flash_attn_branches_and_package_installs
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
     PACK_NET="1"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     fixture_write "timeout.stub" ""
@@ -779,7 +779,7 @@ test_pack_validation_check_dependencies_errors_when_missing() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     log_section() { :; }
@@ -800,7 +800,7 @@ test_pack_validation_preflight_datasets_success_and_offline_failure_paths() {
     LOG_FILE="${TEST_TMPDIR}/preflight.log"
     LOG_LOCK="${TEST_TMPDIR}/preflight.lock"
     PACK_NET="0"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     : > "${LOG_FILE}"
     error_exit() { return 1; }
 
@@ -830,13 +830,16 @@ test_pack_validation_preflight_datasets_success_and_offline_failure_paths() {
 test_pack_validation_source_libs_errors_when_required_libs_are_missing() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     local file
     for file in scheduler.sh task_functions.sh gpu_worker.sh; do
         local sandbox
         sandbox="$(_make_validation_suite_sandbox)"
-        rm -f "${sandbox}/lib/${file}"
+        case "${file}" in
+            scheduler.sh|gpu_worker.sh) rm -f "${sandbox}/lib/queue/${file}" ;;
+            task_functions.sh) rm -f "${sandbox}/lib/tasks/${file}" ;;
+        esac
 
         local rc=0
         (
@@ -852,7 +855,7 @@ test_pack_validation_check_dependencies_covers_pip_bootstrap_and_missing_install
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
     PACK_NET="1"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     log_section() { :; }
@@ -975,7 +978,7 @@ test_pack_validation_main_dynamic_marks_suite_failed_when_final_verdict_fails() 
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     check_dependencies() { :; }
@@ -1033,7 +1036,7 @@ EOF
 test_pack_validation_pack_run_suite_returns_nonzero_when_dataset_preflight_fails() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     cleanup() { return 0; }
     pack_apply_network_mode() { :; }
@@ -1056,7 +1059,7 @@ test_pack_prepare_scenarios_manifest_copies_source_when_jq_is_unavailable() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     _pack_validation_has_jq() { return 1; }
 
     local manifest="${TEST_TMPDIR}/scenarios_copy.json"
@@ -1081,7 +1084,7 @@ test_pack_validation_estimate_planned_storage_covers_error_fallback_and_batch_cl
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     HF_HUB_CACHE=""
     MODEL_1="mistralai/Mistral-7B-v0.1"
@@ -1114,7 +1117,7 @@ test_pack_validation_setup_model_early_returns_for_local_or_cached_paths_and_err
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
     PACK_NET=1
     pack_model_revision() { echo "rev"; }
@@ -1151,7 +1154,7 @@ test_pack_validation_setup_model_cleans_incomplete_baseline_dir_on_download_fail
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
     PACK_NET=1
     pack_model_revision() { echo "rev"; }
@@ -1222,7 +1225,7 @@ test_pack_validation_setup_model_succeeds_when_python_stub_creates_success_marke
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
     PACK_NET=1
     pack_model_revision() { echo "rev"; }
@@ -1276,7 +1279,7 @@ EOF
 test_pack_validation_estimate_model_params_defaults_to_7_without_config() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     local model_dir="${TEST_TMPDIR}/model"
     mkdir -p "${model_dir}"
@@ -1286,7 +1289,7 @@ test_pack_validation_estimate_model_params_defaults_to_7_without_config() {
 test_pack_validation_estimate_model_params_classifies_when_config_is_present() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     local model_dir="${TEST_TMPDIR}/model"
     mkdir -p "${model_dir}"
@@ -1300,7 +1303,7 @@ EOF
 test_pack_validation_get_model_invarlock_config_covers_all_case_arms() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     assert_eq "512:512:64:64:96" "$(get_model_invarlock_config 7)" "7B config"
     assert_eq "512:512:64:64:64" "$(get_model_invarlock_config 13)" "13B config"
@@ -1315,7 +1318,7 @@ test_pack_validation_create_edited_model_quant_rtn_and_unknown_edit_type_branche
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     mock_python3_stub_enable
@@ -1332,7 +1335,7 @@ test_pack_validation_generate_invarlock_config_attn_and_strict_accelerator_flags
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     FLASH_ATTENTION_AVAILABLE="true"
     PACK_DETERMINISM="strict"
@@ -1351,7 +1354,7 @@ test_pack_validation_run_single_calibration_large_model_and_report_copy_branch()
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     mock_python3_stub_enable
@@ -1372,7 +1375,7 @@ test_pack_validation_run_invarlock_calibration_failure_paths_and_labels() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     mock_python3_stub_enable
@@ -1394,7 +1397,7 @@ test_pack_validation_run_invarlock_evaluate_preset_optional_and_cert_copy_paths(
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     mock_python3_stub_enable
@@ -1422,7 +1425,7 @@ test_pack_validation_main_dynamic_resume_and_monitoring_branches_offline() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     # Stub early heavyweight phases.
@@ -1526,7 +1529,7 @@ test_pack_validation_main_dynamic_exits_with_resumable_blocked_state() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     check_dependencies() { :; }
@@ -1596,7 +1599,7 @@ test_pack_validation_main_dynamic_fresh_task_generation_and_touch_shutdown_branc
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     check_dependencies() { :; }
@@ -1657,7 +1660,7 @@ EOF
     export PATH="${bin_dir}:$PATH"
     hash -r 2>/dev/null || true
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     check_dependencies() { :; }
     configure_gpu_pool() { NUM_GPUS=1; GPU_ID_LIST="0"; export NUM_GPUS GPU_ID_LIST; }
@@ -1725,7 +1728,7 @@ test_pack_validation_main_dynamic_calibrate_only_stops_after_presets_even_with_p
     export OUTPUT_DIR
     export PACK_SUITE_MODE="calibrate-only"
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     check_dependencies() { :; }
@@ -1784,7 +1787,7 @@ test_pack_validation_main_wrapper_parses_progress_and_reports_failed_tasks_offli
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     log() { :; }
@@ -1854,7 +1857,7 @@ EOF
 test_pack_validation_setup_output_dirs_returns_nonzero_when_output_dir_is_file() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     OUTPUT_DIR="${TEST_TMPDIR}/out_file"
     echo "not a dir" > "${OUTPUT_DIR}"
@@ -1869,7 +1872,7 @@ test_pack_validation_pack_output_dir_defaults_to_pack_output_dir() {
 
     unset OUTPUT_DIR
     PACK_OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     assert_eq "${PACK_OUTPUT_DIR}" "${OUTPUT_DIR}" "PACK_OUTPUT_DIR seeds OUTPUT_DIR"
     unset PACK_OUTPUT_DIR OUTPUT_DIR
@@ -1881,7 +1884,7 @@ test_pack_validation_pack_model_list_and_revisions_branches() {
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
     mkdir -p "${OUTPUT_DIR}/state"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     MODEL_1="org/model1"
     MODEL_2=""
@@ -1939,7 +1942,7 @@ test_pack_validation_pack_model_list_and_revisions_branches() {
 test_pack_validation_fallback_resolve_edit_params_executes_python() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     local model_output_dir="${TEST_TMPDIR}/model_out"
     mkdir -p "${model_output_dir}"
@@ -1954,7 +1957,7 @@ test_pack_validation_preflight_models_error_branches() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     mock_python3_stub_enable
     fixture_write "python3.rc" "0"
@@ -1984,7 +1987,7 @@ test_pack_validation_setup_hf_cache_dirs_requires_output_dir() {
 
     OUTPUT_DIR=""
     PACK_OUTPUT_DIR=""
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     run pack_setup_hf_cache_dirs
     assert_rc "1" "${RUN_RC}" "missing OUTPUT_DIR fails"
@@ -1995,7 +1998,7 @@ test_pack_validation_estimate_planned_model_storage_mapfile() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     EDIT_TYPES_CLEAN=("quant_rtn:clean:ffn")
     EDIT_TYPES_STRESS=()
@@ -2032,7 +2035,7 @@ test_pack_validation_estimate_planned_storage_honors_one_sided_state_manifest() 
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
     mkdir -p "${OUTPUT_DIR}/state"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     cat > "${OUTPUT_DIR}/state/scenarios.json" <<'EOF'
 {
@@ -2065,7 +2068,7 @@ test_pack_validation_setup_model_revision_branches() {
     OUTPUT_DIR="${TEST_TMPDIR}/out"
     LOG_FILE="${TEST_TMPDIR}/log.txt"
     : > "${LOG_FILE}"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     error_exit() { echo "$1" > "${TEST_TMPDIR}/error.msg"; return 1; }
 
@@ -2089,7 +2092,7 @@ test_pack_validation_generate_invarlock_config_guard_order() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     local cfg="${TEST_TMPDIR}/cfg.yaml"
     PACK_GUARDS_ORDER="variance,invariants"
@@ -2106,7 +2109,7 @@ test_pack_validation_run_determinism_repeats_branch_coverage() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     OUTPUT_DIR=""
@@ -2216,7 +2219,7 @@ test_pack_validation_run_determinism_repeats_branch_coverage() {
 test_pack_validation_source_libs_prefers_lib_subdir() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     local root="${TEST_TMPDIR}/pkg"
     mkdir -p "${root}/lib"
@@ -2233,7 +2236,7 @@ test_pack_validation_source_libs_prefers_lib_subdir() {
 test_pack_validation_source_libs_uses_parent_lib_dir() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     local root="${TEST_TMPDIR}/pkg"
     mkdir -p "${root}/lib" "${root}/child"
@@ -2251,7 +2254,7 @@ test_pack_validation_main_dynamic_demote_ready_tasks_for_calibration_only() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     check_dependencies() { :; }
@@ -2312,7 +2315,7 @@ test_pack_validation_main_dynamic_calibrate_only_without_signal_shutdown() {
     export OUTPUT_DIR
     export PACK_SUITE_MODE="calibrate-only"
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     check_dependencies() { :; }
@@ -2368,7 +2371,7 @@ test_pack_validation_main_dynamic_warns_on_determinism_repeats_failure() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     check_dependencies() { :; }
@@ -2424,7 +2427,7 @@ EOF
 test_pack_validation_pack_run_suite_branches() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     cleanup() { return 0; }
     pack_apply_network_mode() { :; }
@@ -2568,7 +2571,7 @@ test_pack_validation_pack_run_suite_branches() {
 test_pack_validation_pack_run_suite_calibrate_only_skips_tuned_edit_params_validation() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     cleanup() { return 0; }
     pack_require_bash4() { return 0; }
@@ -2599,7 +2602,7 @@ test_pack_validation_pack_run_suite_calibrate_only_skips_tuned_edit_params_valid
 test_pack_validation_pack_run_suite_errors_only_skips_tuned_edit_params_validation() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     cleanup() { return 0; }
     pack_require_bash4() { return 0; }
@@ -2635,7 +2638,7 @@ test_pack_validation_pack_run_suite_errors_only_skips_tuned_edit_params_validati
 test_pack_apply_network_mode_sets_env_flags() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     PACK_NET="0"
     pack_apply_network_mode "1"
@@ -2656,7 +2659,7 @@ test_pack_apply_network_mode_sets_env_flags() {
 test_pack_configure_hf_access_noop_when_offline() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     PACK_NET="0"
     unset HF_ENDPOINT HF_HUB_TIMEOUT HF_HUB_ETAG_TIMEOUT HF_HUB_DOWNLOAD_TIMEOUT HF_HUB_MAX_RETRIES
@@ -2696,7 +2699,7 @@ EOF
     export PATH="${bin_dir}:$PATH"
     hash -r 2>/dev/null || true
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     PACK_NET="1"
     unset HF_ENDPOINT HF_HUB_TIMEOUT HF_HUB_ETAG_TIMEOUT HF_HUB_DOWNLOAD_TIMEOUT HF_HUB_MAX_RETRIES
@@ -2735,7 +2738,7 @@ EOF
     export PATH="${bin_dir}:$PATH"
     hash -r 2>/dev/null || true
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     PACK_NET="1"
     unset HF_ENDPOINT HF_PRIMARY_ENDPOINT HF_MIRROR_ENDPOINT HF_ENDPOINT_TEST_PATH
@@ -2763,7 +2766,7 @@ EOF
     export PATH="${bin_dir}:$PATH"
     hash -r 2>/dev/null || true
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     PACK_NET="1"
     unset HF_ENDPOINT HF_PRIMARY_ENDPOINT HF_MIRROR_ENDPOINT HF_ENDPOINT_TEST_PATH
@@ -2777,7 +2780,7 @@ EOF
 test_pack_configure_hf_access_falls_back_to_primary_when_curl_missing() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     PACK_NET="1"
     unset HF_ENDPOINT HF_PRIMARY_ENDPOINT HF_MIRROR_ENDPOINT HF_ENDPOINT_TEST_PATH
@@ -2807,7 +2810,7 @@ EOF
     export PATH="${bin_dir}:$PATH"
     hash -r 2>/dev/null || true
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     PACK_NET="1"
     HF_ENDPOINT="https://example.invalid"
@@ -2827,7 +2830,7 @@ test_pack_prepare_tuned_edit_params_resolves_default_from_scripts_dir_and_copies
     local fake_repo
     fake_repo="$(mktemp -d "${TEST_TMPDIR}/fake_repo.XXXXXX")"
     mkdir -p "${fake_repo}/scripts/evidence_packs/lib"
-    cp "${TEST_ROOT}/scripts/evidence_packs/lib/"*.sh "${fake_repo}/scripts/evidence_packs/lib/"
+    cp -R "${TEST_ROOT}/scripts/evidence_packs/lib/." "${fake_repo}/scripts/evidence_packs/lib/"
     mkdir -p "${fake_repo}/scripts/evidence_packs/python"
     mkdir -p "${fake_repo}/scripts/evidence_packs"
 
@@ -2842,8 +2845,8 @@ JSON
     CLEAN_EDIT_RUNS="1"
     unset PACK_TUNED_EDIT_PARAMS_FILE
 
-    # shellcheck source=../lib/validation_suite.sh
-    source "${fake_repo}/scripts/evidence_packs/lib/validation_suite.sh"
+    # shellcheck source=../lib/validation/validation_suite.sh
+    source "${fake_repo}/scripts/evidence_packs/lib/validation/validation_suite.sh"
     pack_setup_output_dirs
 
     pack_prepare_tuned_edit_params
@@ -2856,7 +2859,7 @@ JSON
 test_pack_resolve_tuned_edit_params_file_returns_early_when_env_set() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     PACK_TUNED_EDIT_PARAMS_FILE="/tmp/already_set.json"
     export PACK_TUNED_EDIT_PARAMS_FILE
@@ -2870,7 +2873,7 @@ test_pack_prepare_tuned_edit_params_skips_when_clean_edit_runs_zero() {
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
     CLEAN_EDIT_RUNS="0"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     run pack_prepare_tuned_edit_params
     assert_rc "0" "${RUN_RC}" "clean presets skipped when CLEAN_EDIT_RUNS=0"
@@ -2883,7 +2886,7 @@ test_pack_prepare_tuned_edit_params_uses_repo_root_override_and_copies_to_state(
     CLEAN_EDIT_RUNS="1"
     unset PACK_TUNED_EDIT_PARAMS_FILE
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     local fake_root="${TEST_TMPDIR}/fake_root"
@@ -2906,7 +2909,7 @@ test_pack_prepare_tuned_edit_params_errors_when_missing_preset_file() {
     CLEAN_EDIT_RUNS="1"
     unset PACK_TUNED_EDIT_PARAMS_FILE
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     local fake_root="${TEST_TMPDIR}/fake_root_missing"
@@ -2927,7 +2930,7 @@ test_pack_prepare_tuned_edit_params_errors_when_file_missing() {
     PACK_TUNED_EDIT_PARAMS_FILE="${TEST_TMPDIR}/does_not_exist.json"
     export PACK_TUNED_EDIT_PARAMS_FILE
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     local rc=0
@@ -2940,7 +2943,7 @@ test_pack_validate_tuned_edit_params_skips_when_clean_edit_runs_zero() {
     mock_reset
 
     CLEAN_EDIT_RUNS="0"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     run pack_validate_tuned_edit_params
     assert_rc "0" "${RUN_RC}" "validation skipped when CLEAN_EDIT_RUNS=0"
@@ -2949,7 +2952,7 @@ test_pack_validate_tuned_edit_params_skips_when_clean_edit_runs_zero() {
 test_pack_validate_tuned_edit_params_builds_model_names_csv_and_succeeds() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     CLEAN_EDIT_RUNS="1"
     EDIT_TYPES_CLEAN=("quant_rtn:clean:ffn")
     PACK_MODEL_LIST=("org/model1" "org/model2")
@@ -2967,7 +2970,7 @@ JSON
 test_pack_validate_tuned_edit_params_uses_presets_canonical_fallback() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     CLEAN_EDIT_RUNS="1"
     EDIT_TYPES_CLEAN=("quant_rtn:clean:ffn")
     PACK_MODEL_LIST=("org/model1")
@@ -2995,7 +2998,7 @@ PY
 test_pack_validate_tuned_edit_params_rejects_noncanonical_selected_entries() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     CLEAN_EDIT_RUNS="1"
     EDIT_TYPES_CLEAN=("lowrank_svd:clean:ffn")
     PACK_MODEL_LIST=("Qwen/Qwen3-8B")
@@ -3027,7 +3030,7 @@ JSON
 test_pack_validate_tuned_edit_params_allows_noncanonical_override_when_opted_in() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     CLEAN_EDIT_RUNS="1"
     EDIT_TYPES_CLEAN=("lowrank_svd:clean:ffn")
     PACK_MODEL_LIST=("Qwen/Qwen3-8B")
@@ -3060,7 +3063,7 @@ JSON
 test_pack_validate_tuned_edit_params_returns_nonzero_when_python_fails() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     CLEAN_EDIT_RUNS="1"
     EDIT_TYPES_CLEAN=("quant_rtn:clean:ffn")
     PACK_MODEL_LIST=("org/model1")
@@ -3084,7 +3087,7 @@ test_pack_validate_tuned_edit_params_returns_nonzero_when_python_fails() {
 test_pack_validate_runtime_provenance_propagates_python_failure() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     mock_python3_stub_enable
     fixture_write "python3.rc" "1"
 
@@ -3096,7 +3099,7 @@ test_pack_prepare_calibration_presets_skips_when_no_preset_dir_or_file() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     PACK_MODEL_LIST=("org/model")
     unset PACK_CALIBRATION_PRESET_DIR PACK_CALIBRATION_PRESET_FILE
@@ -3109,7 +3112,7 @@ test_pack_prepare_calibration_presets_errors_when_preset_file_missing() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     PACK_MODEL_LIST=("org/model")
@@ -3126,7 +3129,7 @@ test_pack_prepare_calibration_presets_uses_preset_file_for_all_models() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     PACK_MODEL_LIST=("org/model")
@@ -3147,7 +3150,7 @@ test_pack_prepare_calibration_presets_uses_preset_dir_candidates() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     PACK_MODEL_LIST=("org/model")
@@ -3169,7 +3172,7 @@ test_pack_prepare_calibration_presets_copies_edit_type_presets_from_dir() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     PACK_MODEL_LIST=("org/model")
@@ -3193,7 +3196,7 @@ test_pack_prepare_calibration_presets_errors_when_candidate_missing() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     PACK_MODEL_LIST=("org/model")
@@ -3213,7 +3216,7 @@ test_pack_validate_guard_calibration_sanitizes_non_numeric_runs() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     DRIFT_CALIBRATION_RUNS="not-a-number"
@@ -3227,7 +3230,7 @@ test_pack_validate_guard_calibration_errors_when_disabled_without_preset() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     DRIFT_CALIBRATION_RUNS="0"
@@ -3243,7 +3246,7 @@ test_pack_validation_estimate_planned_model_storage_falls_back_when_mapfile_disa
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     EDIT_TYPES_CLEAN=("quant_rtn:clean:ffn")
     EDIT_TYPES_STRESS=()
@@ -3263,7 +3266,7 @@ test_pack_prepare_scenarios_manifest_writes_state_manifest() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     pack_prepare_scenarios_manifest
 
@@ -3283,7 +3286,7 @@ test_pack_prepare_scenarios_manifest_filters_by_suite_tags() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     local PACK_SUITE="showcase"
 
@@ -3313,7 +3316,7 @@ test_pack_prepare_scenarios_manifest_filters_by_scenario_ids() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     local PACK_SUITE="showcase"
 
@@ -3344,7 +3347,7 @@ test_pack_prepare_scenarios_manifest_filters_deployable_backends() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     local manifest="${TEST_TMPDIR}/scenarios.json"
     cat > "${manifest}" <<'EOF'
@@ -3374,7 +3377,7 @@ test_pack_prepare_scenarios_manifest_rejects_non_runnable_deployable() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     local manifest="${TEST_TMPDIR}/scenarios-non-runnable.json"
@@ -3402,7 +3405,7 @@ test_pack_prepare_scenarios_manifest_rejects_non_runnable_deployable_without_jq(
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     _pack_validation_has_jq() { return 1; }
     pack_setup_output_dirs
 
@@ -3430,7 +3433,7 @@ test_pack_prepare_scenarios_manifest_resume_errors_on_contract_drift() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     cat > "${OUTPUT_DIR}/state/scenarios.json" <<'EOF'
@@ -3469,7 +3472,7 @@ test_pack_validation_resolve_active_scenarios_manifest_prefers_state_then_repo_s
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     mkdir -p "${OUTPUT_DIR}/state"
     local state_manifest="${OUTPUT_DIR}/state/scenarios.json"
@@ -3492,7 +3495,7 @@ test_pack_validation_estimate_planned_storage_sanitizes_invalid_edit_counts() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
 
     HF_HUB_CACHE=""
     PACK_BASELINE_STORAGE_MODE="snapshot_symlink"
@@ -3511,7 +3514,7 @@ test_pack_validation_check_dependencies_reports_missing_pinned_requirements() {
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
     PACK_NET="1"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     log_section() { :; }
@@ -3574,7 +3577,7 @@ test_pack_validation_main_dynamic_blocked_state_touches_shutdown_without_signal_
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     check_dependencies() { :; }
@@ -3639,7 +3642,7 @@ test_pack_validation_main_dynamic_sanitizes_invalid_edit_scenario_counts() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out_invalid_counts"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
 
     check_dependencies() { :; }

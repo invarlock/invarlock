@@ -178,6 +178,7 @@ def _reference_index(root: Path) -> dict[str, str]:
         root / "Makefile",
         root / ".github" / "workflows",
         root / "docs",
+        root / "scripts",
         root / "tests",
     ]
     index: dict[str, str] = {}
@@ -191,6 +192,8 @@ def _reference_index(root: Path) -> dict[str, str]:
         for path in paths:
             try:
                 rel = _normalize_rel(path, root)
+                if rel == DEFAULT_INVENTORY.as_posix():
+                    continue
                 if any(
                     fnmatch.fnmatch(rel, pattern)
                     for pattern in IGNORED_REFERENCE_PATH_PATTERNS
@@ -203,7 +206,9 @@ def _reference_index(root: Path) -> dict[str, str]:
 
 
 def _referenced_by(rel_path: str, index: dict[str, str]) -> list[str]:
-    return sorted(path for path, text in index.items() if rel_path in text)
+    return sorted(
+        path for path, text in index.items() if path != rel_path and rel_path in text
+    )
 
 
 def build_audit_payload(

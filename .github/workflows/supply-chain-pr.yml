@@ -65,7 +65,7 @@ jobs:
         run: python scripts/security/run_pip_audit.py --path "${{ steps.install_surface.outputs.site_packages }}"
 
       - name: Generate install-surface SBOM
-        run: bash scripts/generate_sbom.sh --scope install-surface --python "${{ steps.install_surface.outputs.python }}" artifacts/supply-chain/sbom.json
+        run: bash scripts/security/generate_sbom.sh --scope install-surface --python "${{ steps.install_surface.outputs.python }}" artifacts/supply-chain/sbom.json
 
       - name: Remove install-surface venv
         run: rm -rf .artifact-venv

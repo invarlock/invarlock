@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from scripts.coverage_policy import THRESHOLDS
+from scripts.coverage.coverage_policy import THRESHOLDS
 
 CONFIGURED_THRESHOLD_FILES = len(THRESHOLDS)
 
@@ -37,7 +37,7 @@ def _run_checker(
 ) -> subprocess.CompletedProcess:
     cmd = [
         sys.executable,
-        str(Path("scripts") / "check_coverage_thresholds.py"),
+        str(Path("scripts") / "coverage" / "check_coverage_thresholds.py"),
         "--coverage",
         str(xml_path),
         "--json",
@@ -106,13 +106,13 @@ def test_two_tier_policy_enforced(tmp_path: Path) -> None:
 
 def test_checker_uses_canonical_coverage_policy_module(monkeypatch) -> None:
     root = Path(__file__).resolve().parents[2]
-    monkeypatch.syspath_prepend(str(root / "scripts"))
-    sys.modules.pop("coverage_policy", None)
+    monkeypatch.syspath_prepend(str(root))
+    sys.modules.pop("scripts.coverage.coverage_policy", None)
     checker = _load_module(
-        root / "scripts" / "check_coverage_thresholds.py",
+        root / "scripts" / "coverage" / "check_coverage_thresholds.py",
         "check_coverage_thresholds_under_test",
     )
-    policy = importlib.import_module("coverage_policy")
+    policy = importlib.import_module("scripts.coverage.coverage_policy")
 
     assert checker.CORE_PREFIXES is policy.CORE_PREFIXES
     assert checker.CORE_FILES is policy.CORE_FILES
@@ -333,7 +333,6 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
     _write_cov_xml(
         xml,
         [
-            ("src/invarlock/reporting/evidence.py", 0.999, 1.0),
             ("src/invarlock/cli/_json.py", 0.999, 1.0),
             ("src/invarlock/cli/app.py", 0.999, 1.0),
             ("src/invarlock/cli/runtime_modes.py", 0.999, 1.0),
@@ -419,7 +418,6 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
 
     assert proc.returncode != 0
     for path in (
-        "src/invarlock/reporting/evidence.py",
         "src/invarlock/cli/_json.py",
         "src/invarlock/cli/app.py",
         "src/invarlock/cli/runtime_modes.py",
@@ -519,7 +517,7 @@ def test_calibrated_split_owner_thresholds_are_explicit(tmp_path: Path) -> None:
             ("src/invarlock/core/run_orchestrator_execute.py", 0.999, 1.0),
             ("src/invarlock/evidence_pack_integrity.py", 0.949, 1.0),
             ("src/invarlock/evidence_pack_manifest.py", 0.949, 1.0),
-            ("src/invarlock/reporting/verify_check_helpers.py", 0.949, 1.0),
+            ("src/invarlock/reporting/verify_check_helpers_consistency.py", 0.949, 1.0),
             ("src/invarlock/runtime_security_helpers.py", 0.999, 1.0),
             ("src/invarlock/cli/run_execution_output.py", 0.949, 1.0),
             ("src/invarlock/cli/runtime_launch_plan.py", 0.999, 1.0),
@@ -543,7 +541,7 @@ def test_calibrated_split_owner_thresholds_are_explicit(tmp_path: Path) -> None:
         "src/invarlock/core/run_orchestrator_execute.py",
         "src/invarlock/evidence_pack_integrity.py",
         "src/invarlock/evidence_pack_manifest.py",
-        "src/invarlock/reporting/verify_check_helpers.py",
+        "src/invarlock/reporting/verify_check_helpers_consistency.py",
         "src/invarlock/runtime_security_helpers.py",
         "src/invarlock/cli/run_execution_output.py",
         "src/invarlock/cli/runtime_launch_plan.py",

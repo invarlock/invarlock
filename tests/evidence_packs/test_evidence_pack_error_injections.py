@@ -21,7 +21,7 @@ def test_error_injection_set_includes_weight_tying_break() -> None:
 
     # Ensure the harness is wired to the manifest (avoid drift between task graph and verdict).
     queue_manager = (
-        repo_root / "scripts/evidence_packs/lib/queue_manager.sh"
+        repo_root / "scripts/evidence_packs/lib/queue/queue_manager.sh"
     ).read_text(encoding="utf-8")
     assert "scenarios.json" in queue_manager
 

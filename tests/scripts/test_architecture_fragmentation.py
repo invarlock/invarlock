@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = REPO_ROOT / "scripts" / "check_architecture_fragmentation.py"
+SCRIPT = REPO_ROOT / "scripts" / "checks" / "check_architecture_fragmentation.py"
 
 
 def test_architecture_fragmentation_metrics_are_machine_readable() -> None:

@@ -15,24 +15,24 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'requirements/workflows/docs-ci-py313.txt'
-      - 'scripts/check_claim_surface_consistency.py'
-      - 'scripts/check_cli_completeness.py'
-      - 'scripts/check_config_schema_sync.py'
-      - 'scripts/check_docs_links.py'
-      - 'scripts/check_guard_completeness.py'
-      - 'scripts/check_internal_links.py'
-      - 'scripts/check_version_consistency.py'
-      - 'scripts/docs_check.py'
-      - 'scripts/docs_lint.py'
-      - 'scripts/lint_assurance_xrefs.py'
-      - 'scripts/test_cli_examples.py'
-      - 'scripts/validate_doc_references.py'
-      - 'scripts/validate_docs_api_refs.py'
-      - 'scripts/validate_python_examples.py'
-      - 'scripts/validate_yaml_examples.py'
-      - 'scripts/verify_live_examples.py'
-      - 'scripts/verify_markdown_bash_blocks.py'
-      - 'scripts/verify_notebooks_smoke.py'
+      - 'scripts/checks/check_claim_surface_consistency.py'
+      - 'scripts/checks/check_cli_completeness.py'
+      - 'scripts/checks/check_config_schema_sync.py'
+      - 'scripts/docs/check_docs_links.py'
+      - 'scripts/checks/check_guard_completeness.py'
+      - 'scripts/docs/check_internal_links.py'
+      - 'scripts/checks/check_version_consistency.py'
+      - 'scripts/docs/docs_check.py'
+      - 'scripts/docs/docs_lint.py'
+      - 'scripts/docs/lint_assurance_xrefs.py'
+      - 'scripts/docs/test_cli_examples.py'
+      - 'scripts/docs/validate_doc_references.py'
+      - 'scripts/docs/validate_docs_api_refs.py'
+      - 'scripts/docs/validate_python_examples.py'
+      - 'scripts/docs/validate_yaml_examples.py'
+      - 'scripts/docs/verify_live_examples.py'
+      - 'scripts/docs/verify_markdown_bash_blocks.py'
+      - 'scripts/docs/verify_notebooks_smoke.py'
       - '.github/workflows/docs-ci.yml'
   workflow_dispatch:
   pull_request:
@@ -47,24 +47,24 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'requirements/workflows/docs-ci-py313.txt'
-      - 'scripts/check_claim_surface_consistency.py'
-      - 'scripts/check_cli_completeness.py'
-      - 'scripts/check_config_schema_sync.py'
-      - 'scripts/check_docs_links.py'
-      - 'scripts/check_guard_completeness.py'
-      - 'scripts/check_internal_links.py'
-      - 'scripts/check_version_consistency.py'
-      - 'scripts/docs_check.py'
-      - 'scripts/docs_lint.py'
-      - 'scripts/lint_assurance_xrefs.py'
-      - 'scripts/test_cli_examples.py'
-      - 'scripts/validate_doc_references.py'
-      - 'scripts/validate_docs_api_refs.py'
-      - 'scripts/validate_python_examples.py'
-      - 'scripts/validate_yaml_examples.py'
-      - 'scripts/verify_live_examples.py'
-      - 'scripts/verify_markdown_bash_blocks.py'
-      - 'scripts/verify_notebooks_smoke.py'
+      - 'scripts/checks/check_claim_surface_consistency.py'
+      - 'scripts/checks/check_cli_completeness.py'
+      - 'scripts/checks/check_config_schema_sync.py'
+      - 'scripts/docs/check_docs_links.py'
+      - 'scripts/checks/check_guard_completeness.py'
+      - 'scripts/docs/check_internal_links.py'
+      - 'scripts/checks/check_version_consistency.py'
+      - 'scripts/docs/docs_check.py'
+      - 'scripts/docs/docs_lint.py'
+      - 'scripts/docs/lint_assurance_xrefs.py'
+      - 'scripts/docs/test_cli_examples.py'
+      - 'scripts/docs/validate_doc_references.py'
+      - 'scripts/docs/validate_docs_api_refs.py'
+      - 'scripts/docs/validate_python_examples.py'
+      - 'scripts/docs/validate_yaml_examples.py'
+      - 'scripts/docs/verify_live_examples.py'
+      - 'scripts/docs/verify_markdown_bash_blocks.py'
+      - 'scripts/docs/verify_notebooks_smoke.py'
       - '.github/workflows/docs-ci.yml'
   schedule:
     # Run weekly to check external links
@@ -121,16 +121,16 @@ jobs:
       run: mkdocs build --strict
 
     - name: Check internal links
-      run: python scripts/docs_check.py --links
+      run: python scripts/docs/docs_check.py --links
 
     - name: Lint markdown
-      run: python scripts/docs_lint.py --markdown
+      run: python scripts/docs/docs_lint.py --markdown
 
     - name: Spell check
-      run: python scripts/docs_lint.py --spell
+      run: python scripts/docs/docs_lint.py --spell
 
     - name: Check consistency
-      run: python scripts/docs_check.py --consistency
+      run: python scripts/docs/docs_check.py --consistency
 
     - name: Run curated live examples
       run: make docs-live-fast
@@ -148,7 +148,7 @@ jobs:
         fi
 
     - name: Validate examples
-      run: python scripts/docs_check.py --examples
+      run: python scripts/docs/docs_check.py --examples
       timeout-minutes: 5
 
     - name: Check build size

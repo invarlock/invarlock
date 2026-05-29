@@ -905,7 +905,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Role-based HuggingFace adapters with updated auto-routing (replaces model-name adapters).
 - Proof packs: v2 pack layout, scenarios manifest, and assurance verdict generation.
 - CLI flags: `invarlock run --edit-label` and `invarlock certify --baseline-report`.
-- CI notebook smoke runner (`scripts/verify_notebooks_smoke.py`).
+- CI notebook smoke runner (`scripts/docs/verify_notebooks_smoke.py`).
 - Task-metric overrides, richer telemetry snapshots/reports, and CLI
   progress/NO_COLOR output refinements for longer-running evaluation flows.
 
@@ -958,7 +958,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Evidence pack bash test suite (`scripts/evidence_packs/tests/*`, `scripts/evidence_packs/tests/run.sh`) with deterministic command mocks and optional branch/line coverage checks.
-- Evidence pack runtime helpers (`scripts/evidence_packs/lib/runtime.sh`) plus pack build/verify helpers (`scripts/evidence_packs/run_pack.sh`, `scripts/evidence_packs/verify_pack.sh`) to capture artifacts during long runs.
+- Evidence pack runtime helpers (`scripts/evidence_packs/lib/core/runtime.sh`) plus pack build/verify helpers (`scripts/evidence_packs/run_pack.sh`, `scripts/evidence_packs/verify_pack.sh`) to capture artifacts during long runs.
 - Perplexity token-id sanitization to mask out-of-range IDs (and ignore them in labels) instead of triggering device-side asserts.
 
 ### Changed

@@ -101,7 +101,7 @@ write_minimal_validation_edit_artifact() {
 test_default_ci_min_windows_accounts_for_padding() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     unset INVARLOCK_CERT_MIN_WINDOWS
     unset INVARLOCK_DATASET
@@ -125,7 +125,7 @@ test_default_ci_min_windows_accounts_for_padding() {
 test_effective_ci_schedule_selects_and_logs_viable_candidate() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local model_dir="${TEST_TMPDIR}/model"
     mkdir -p "${model_dir}"
@@ -160,7 +160,7 @@ EOF
 test_effective_ci_schedule_fails_fast_when_no_candidate_clears_floor() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local log_file="${TEST_TMPDIR}/plan_fail.log"
     : > "${log_file}"
@@ -179,7 +179,7 @@ test_effective_ci_schedule_fails_fast_when_no_candidate_clears_floor() {
 test_large_model_threshold_covers_14b_dense_checkpoints() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     _is_large_model "13" || t_fail "expected 13B-class model sizes to skip overhead check"
     _is_large_model "14" || t_fail "expected 14B-class model sizes to skip overhead check"
@@ -191,7 +191,7 @@ test_large_model_threshold_covers_14b_dense_checkpoints() {
 test_baseline_report_wait_budget_scales_for_heavy_7b_windows() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     run _baseline_report_wait_secs "7" "128" "128"
     assert_rc "0" "${RUN_RC}" "default wait helper succeeds"
@@ -222,7 +222,7 @@ test_baseline_report_wait_budget_scales_for_heavy_7b_windows() {
 test_model_size_and_eval_batch_selection() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     mock_python3_stub_enable
 
@@ -277,7 +277,7 @@ test_model_size_and_eval_batch_selection() {
 test_ensure_evaluate_baseline_report_falls_back_to_hf_causal_adapter_when_resolver_empty() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     _resolve_invarlock_adapter() { echo ""; }
     _validate_evaluate_baseline_report() {
@@ -316,7 +316,7 @@ test_ensure_evaluate_baseline_report_falls_back_to_hf_causal_adapter_when_resolv
 test_task_calibration_run_and_generate_preset_cover_overrides_large_model_and_report_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     mock_python3_stub_enable
     fixture_write "python3.rc" "0"
@@ -372,7 +372,7 @@ test_task_calibration_run_and_generate_preset_cover_overrides_large_model_and_re
 test_task_create_edit_and_batch_edits_cover_success_failure_and_missing_function_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
     stub_resolve_edit_params
 
     mock_python3_stub_enable
@@ -479,7 +479,7 @@ test_task_create_edit_and_batch_edits_cover_success_failure_and_missing_function
 test_task_evaluate_edit_and_error_cover_preset_discovery_overrides_and_report_copy_paths() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
     stub_resolve_edit_params
 
     local out="${TEST_TMPDIR}/out"
@@ -570,7 +570,7 @@ YAML
 test_task_evaluate_edit_exits_when_workdir_cd_fails() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
     stub_resolve_edit_params
 
     local out="${TEST_TMPDIR}/out"
@@ -600,7 +600,7 @@ test_task_evaluate_edit_exits_when_workdir_cd_fails() {
 test_task_evaluate_error_exits_when_workdir_cd_fails() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -629,7 +629,7 @@ test_task_evaluate_error_exits_when_workdir_cd_fails() {
 test_task_evaluate_error_missing_baseline_missing_error_model_skip_and_preset_missing_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -670,7 +670,7 @@ test_task_evaluate_error_missing_baseline_missing_error_model_skip_and_preset_mi
 test_task_evaluate_tasks_treat_nonzero_cli_rc_as_success_when_report_written() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
     stub_resolve_edit_params
 
     fixture_write "invarlock.create_cert" ""
@@ -712,7 +712,7 @@ test_task_evaluate_tasks_treat_nonzero_cli_rc_as_success_when_report_written() {
 test_task_evaluate_tasks_generate_evaluation_report_when_only_report_json_written() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
     stub_resolve_edit_params
 
     fixture_write "invarlock.create_report_for_evaluate" ""
@@ -775,7 +775,7 @@ test_task_evaluate_tasks_generate_evaluation_report_when_only_report_json_writte
 test_task_create_error_branches_cover_skip_missing_function_and_verify_paths() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -823,7 +823,7 @@ test_task_create_error_branches_cover_skip_missing_function_and_verify_paths() {
 test_task_create_error_recreates_incomplete_models_and_propagates_failures() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -867,7 +867,7 @@ test_task_create_error_recreates_incomplete_models_and_propagates_failures() {
 test_task_cleanup_edit_and_error_cover_guard_paths() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -969,7 +969,7 @@ test_task_evaluate_error_probe_warning_branches() {
     mock_reset
     push_active_python_bin
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -1064,7 +1064,7 @@ EOF
 test_task_helpers_cover_fallback_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     assert_eq "moe" "$(_get_model_size_from_name "Mixtral-8x7B")" "moe detection"
     assert_eq "13" "$(_get_model_size_from_name "model-13b")" "13B detection"
@@ -1109,7 +1109,7 @@ test_task_helpers_cover_fallback_branches() {
 test_task_helpers_cover_bootstrap_replicates_floor_logic() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     assert_eq "1500" "$(_bootstrap_replicates_floor_for_tier conservative)" "conservative floor"
     assert_eq "1200" "$(_bootstrap_replicates_floor_for_tier balanced)" "balanced floor"
@@ -1124,7 +1124,7 @@ test_task_helpers_cover_bootstrap_replicates_floor_logic() {
 test_task_baseline_report_helpers_wait_sanitizes_interval_and_large_timeout() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local baseline_root="${TEST_TMPDIR}/baseline_root_sanitize_wait"
     mkdir -p "${baseline_root}"
@@ -1155,7 +1155,7 @@ test_task_baseline_report_helpers_wait_sanitizes_interval_and_large_timeout() {
 test_task_baseline_report_helpers_wait_iters_floor_to_one() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local baseline_root="${TEST_TMPDIR}/baseline_root_wait_iters"
     mkdir -p "${baseline_root}"
@@ -1191,7 +1191,7 @@ test_task_baseline_report_helpers_wait_iters_floor_to_one() {
 test_task_evaluate_error_repairs_missing_tensors_config_when_available() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     fixture_write "invarlock.create_cert" ""
 
@@ -1213,7 +1213,7 @@ test_task_evaluate_error_repairs_missing_tensors_config_when_available() {
 test_task_evaluate_error_emits_rmt_cross_model_probe_for_rmt_norm_noise() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     fixture_write "invarlock.create_cert" ""
 
@@ -1272,7 +1272,7 @@ YAML
 test_task_create_model_variant_dispatch_and_fallback_errors() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     create_model_variant() { echo "main:$*"; return 0; }
     run _task_create_model_variant "/b" "/o" "quant_rtn" "8" "128" "ffn" "0"
@@ -1301,7 +1301,7 @@ test_task_create_model_variant_dispatch_and_fallback_errors() {
 test_task_create_model_variant_fallback_success_paths() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     unset -f create_model_variant || true
 
@@ -1330,7 +1330,7 @@ test_task_create_model_variant_fallback_success_paths() {
 test_task_edit_artifact_probe_helpers_cover_present_and_missing_cases() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local edit_dir="${TEST_TMPDIR}/edit_probe"
     mkdir -p "${edit_dir}"
@@ -1353,7 +1353,7 @@ test_task_edit_artifact_probe_helpers_cover_present_and_missing_cases() {
 test_task_baseline_report_helpers_cover_reuse_lock_race_and_wait_paths() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     run _resolve_invarlock_adapter ""
     assert_ne "0" "${RUN_RC}" "empty adapter input returns non-zero"
@@ -1411,7 +1411,7 @@ test_task_baseline_report_helpers_cover_reuse_lock_race_and_wait_paths() {
 test_task_baseline_report_helpers_execute_python_wrappers() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local calls="${TEST_TMPDIR}/python.calls"
     _cmd_python() {
@@ -1437,7 +1437,7 @@ test_task_baseline_report_helpers_execute_python_wrappers() {
 test_task_baseline_report_helpers_cover_generate_baseline_report_path() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local baseline_root="${TEST_TMPDIR}/baseline_root_generate"
     mkdir -p "${baseline_root}"
@@ -1483,7 +1483,7 @@ EOF
 test_task_baseline_report_helpers_return_runner_failure() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local baseline_root="${TEST_TMPDIR}/baseline_root_runner_failure"
     mkdir -p "${baseline_root}"
@@ -1502,7 +1502,7 @@ test_task_baseline_report_helpers_return_runner_failure() {
 test_task_baseline_report_helpers_remove_invalid_baseline_report_and_timeout_wait() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local baseline_root="${TEST_TMPDIR}/baseline_root_timeout"
     mkdir -p "${baseline_root}"
@@ -1527,7 +1527,7 @@ test_task_baseline_report_helpers_remove_invalid_baseline_report_and_timeout_wai
 test_task_baseline_report_helpers_remove_invalid_baseline_report_after_lock_acquired() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local baseline_root="${TEST_TMPDIR}/baseline_root_lock_rm"
     mkdir -p "${baseline_root}"
@@ -1560,7 +1560,7 @@ test_task_evaluate_edit_reuses_baseline_report_applies_ci_override_and_falls_bac
     mock_reset
     push_active_python_bin
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     fixture_write "invarlock.create_cert" ""
     local bin_dir="${TEST_TMPDIR}/bin"
@@ -1662,7 +1662,7 @@ test_normalize_staged_preset_for_eval_handles_sparse_yaml_and_json_inputs() {
     mock_reset
     push_active_python_bin
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local log_file="${TEST_TMPDIR}/normalize.log"
     : > "${log_file}"
@@ -1700,7 +1700,7 @@ test_task_evaluate_error_reuses_baseline_report_for_nonstructural_errors_and_app
     mock_reset
     push_active_python_bin
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     fixture_write "invarlock.create_cert" ""
 
@@ -1752,7 +1752,7 @@ test_task_evaluate_error_skips_baseline_report_reuse_for_structural_errors() {
     mock_reset
     push_active_python_bin
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     fixture_write "invarlock.create_cert" ""
 
@@ -1814,7 +1814,7 @@ test_task_evaluate_error_emits_structural_failure_report_when_structural_eval_ca
     mock_reset
     push_active_python_bin
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     fixture_write "invarlock.rc" "1"
 
@@ -1946,7 +1946,7 @@ EOF
 test_task_timeout_and_profile_helpers() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     TASK_TIMEOUT_DEFAULT=""
     assert_eq "" "$(_get_task_timeout "X")" "empty timeout returns blank"
@@ -1980,7 +1980,7 @@ test_task_timeout_and_profile_helpers() {
 test_execute_task_dispatches_all_task_types() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}"
@@ -2031,7 +2031,7 @@ test_execute_task_dispatches_all_task_types() {
 test_execute_task_handles_job_control_enabled() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}"
@@ -2052,7 +2052,7 @@ test_execute_task_handles_job_control_enabled() {
 test_execute_task_timeout_triggers_marker() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     mkdir -p "${out}"
@@ -2075,7 +2075,7 @@ test_execute_task_timeout_triggers_marker() {
 test_task_setup_baseline_revision_errors() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -2104,7 +2104,7 @@ test_task_setup_baseline_revision_errors() {
 test_task_create_edit_handles_skip_and_invalid() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -2137,7 +2137,7 @@ test_task_create_edit_handles_skip_and_invalid() {
 test_task_evaluate_edit_skip_and_invalid() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -2169,13 +2169,13 @@ test_task_evaluate_edit_skip_and_invalid() {
     assert_rc "1" "${RUN_RC}" "edit metadata validation failure errors"
     unset -f _cmd_python
     # shellcheck source=../runtime.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/runtime.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/core/runtime.sh"
 }
 
 test_resolve_edit_params_uses_tuned_presets() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -2230,7 +2230,7 @@ JSON
 test_task_calibration_run_guard_order_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -2278,7 +2278,7 @@ EOF
 test_task_helper_effective_ci_and_runtime_stage_error_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local plan_json
     plan_json="$(_plan_effective_ci_schedule "${TEST_TMPDIR}/missing-model" "13" "balanced" "wikitext2" "validation" "42")"
@@ -2325,7 +2325,7 @@ test_task_helper_effective_ci_and_runtime_stage_error_branches() {
 test_task_calibration_and_preset_cover_effective_ci_failure_and_remote_code_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -2405,7 +2405,7 @@ test_task_calibration_and_preset_cover_effective_ci_failure_and_remote_code_bran
 test_task_baseline_report_helper_exports_remote_code_allowance() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local baseline_root="${TEST_TMPDIR}/baseline_root"
     local baseline_path="${TEST_TMPDIR}/baseline_model"
@@ -2446,7 +2446,7 @@ test_task_baseline_report_helper_exports_remote_code_allowance() {
 test_task_setup_evaluate_baseline_report_covers_success_and_failure_paths() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -2498,7 +2498,7 @@ test_task_setup_evaluate_baseline_report_covers_success_and_failure_paths() {
 test_task_calibration_run_exports_remote_code_allowance() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -2545,7 +2545,7 @@ test_task_calibration_run_exports_remote_code_allowance() {
 test_task_calibration_run_returns_config_runner_failure() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"
@@ -2572,7 +2572,7 @@ test_task_calibration_run_returns_config_runner_failure() {
 test_task_evaluate_edit_covers_effective_ci_and_staging_failure_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
@@ -2663,7 +2663,7 @@ EOF
 test_task_evaluate_error_covers_effective_ci_staging_and_probe_remote_code_branches() {
     mock_reset
     # shellcheck source=../task_functions.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_functions.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"

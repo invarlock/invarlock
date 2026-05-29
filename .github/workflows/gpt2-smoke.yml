@@ -51,4 +51,4 @@ jobs:
           make runtime-image
 
       - name: Run GPT-2 user journey smoke
-        run: bash scripts/run_gpt2_user_journey_smoke.sh "$RUNNER_TEMP/invarlock-gpt2-smoke"
+        run: bash scripts/smoke/run_gpt2_user_journey_smoke.sh "$RUNNER_TEMP/invarlock-gpt2-smoke"

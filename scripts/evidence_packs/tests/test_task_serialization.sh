@@ -3,7 +3,7 @@
 test_calculate_required_gpus_basic() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     GPU_MEMORY_PER_DEVICE=180 NUM_GPUS=8
     assert_eq "1" "$(calculate_required_gpus "abc")" "invalid model size defaults to 1"
@@ -37,7 +37,7 @@ test_task_serialization_requires_jq_when_missing() {
         }
         export PATH="${TEST_ROOT}/scripts/evidence_packs/tests/mocks/bin"
         # shellcheck source=../task_serialization.sh
-        source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+        source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
         assert_eq "0" "${TASK_SERIALIZATION_HAS_JQ}" "detects jq missing"
 
         local rc=0
@@ -49,7 +49,7 @@ test_task_serialization_requires_jq_when_missing() {
 test_task_serialization_require_jq_short_circuit_sites() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     _task_serialization_require_jq() { return 1; }
 
@@ -96,7 +96,7 @@ test_task_serialization_require_jq_short_circuit_sites() {
 test_calculate_required_gpus_sanitizes_per_device_and_num_gpus() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     GPU_MEMORY_PER_DEVICE="bad" NUM_GPUS=8
     assert_eq "3" "$(calculate_required_gpus "181")" "invalid per-device falls back to default"
@@ -117,7 +117,7 @@ test_calculate_required_gpus_sanitizes_per_device_and_num_gpus() {
 test_create_task_success_and_invalid_params() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     _now_iso() { echo "2025-01-01T00:00:00Z"; }
 
@@ -147,7 +147,7 @@ test_create_task_success_and_invalid_params() {
 test_create_task_rejects_invalid_model_size_gb() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     local queue_dir="${TEST_TMPDIR}/queue"
     mkdir -p "${queue_dir}"
@@ -160,7 +160,7 @@ test_create_task_rejects_invalid_model_size_gb() {
 test_create_task_rejects_invalid_priority() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     local queue_dir="${TEST_TMPDIR}/queue"
     mkdir -p "${queue_dir}"
@@ -173,7 +173,7 @@ test_create_task_rejects_invalid_priority() {
 test_create_task_sanitizes_non_numeric_task_sequence() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     _now_iso() { echo "2025-01-01T00:00:00Z"; }
 
@@ -189,7 +189,7 @@ test_create_task_sanitizes_non_numeric_task_sequence() {
 test_create_task_rejects_invalid_dependencies_json_array() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     local queue_dir="${TEST_TMPDIR}/queue"
     mkdir -p "${queue_dir}"
@@ -202,7 +202,7 @@ test_create_task_rejects_invalid_dependencies_json_array() {
 test_create_task_rejects_non_object_params_json() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     local queue_dir="${TEST_TMPDIR}/queue"
     mkdir -p "${queue_dir}"
@@ -215,7 +215,7 @@ test_create_task_rejects_non_object_params_json() {
 test_create_task_returns_error_when_dependency_parse_fails() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     jq() {
         if [[ "${1:-}" == "-s" ]]; then
@@ -236,7 +236,7 @@ test_create_task_returns_error_when_dependency_parse_fails() {
 test_create_task_returns_error_when_task_json_build_fails() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     jq() {
         if [[ "${1:-}" == "-n" ]]; then
@@ -257,7 +257,7 @@ test_create_task_returns_error_when_task_json_build_fails() {
 test_create_task_returns_error_when_pending_dir_mkdir_fails() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     local queue_dir="${TEST_TMPDIR}/queue"
     echo "not a dir" > "${queue_dir}"
@@ -270,7 +270,7 @@ test_create_task_returns_error_when_pending_dir_mkdir_fails() {
 test_create_task_returns_error_when_task_file_write_fails() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     local queue_dir="${TEST_TMPDIR}/queue"
     mkdir -p "${queue_dir}/pending"
@@ -293,7 +293,7 @@ test_create_task_returns_error_when_task_file_write_fails() {
 test_create_task_returns_error_when_task_file_finalize_fails() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     mv() { return 4; }
 
@@ -311,7 +311,7 @@ test_create_task_returns_error_when_task_file_finalize_fails() {
 test_create_task_dependency_and_params_default_branches() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     _now_iso() { echo "2025-01-01T00:00:00Z"; }
 
@@ -335,7 +335,7 @@ test_create_task_dependency_and_params_default_branches() {
 test_task_status_transitions() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     _now_iso() { echo "2025-01-01T00:00:00Z"; }
 
@@ -365,7 +365,7 @@ test_task_status_transitions() {
 test_task_serialization_field_access_and_update_error_paths() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     local missing="${TEST_TMPDIR}/missing.task"
     local rc=0
@@ -408,7 +408,7 @@ test_task_serialization_field_access_and_update_error_paths() {
 test_task_serialization_helper_accessors_cover_wrappers() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     local task="${TEST_TMPDIR}/helper.task"
     jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"pending", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:null, assigned_gpus:"0,1", dependencies:["d1","d2"], params:{batch_size:2}, priority:50}' \
@@ -429,7 +429,7 @@ test_task_serialization_helper_accessors_cover_wrappers() {
 test_validate_task_required_fields_and_enums() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     local task_file="${TEST_TMPDIR}/task.json"
 
@@ -466,7 +466,7 @@ test_validate_task_required_fields_and_enums() {
 test_get_task_fields_and_simple_accessors_return_expected_values() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     local task="${TEST_TMPDIR}/t.task"
     jq -n '{task_id:"t1", task_type:"EVAL_BASELINE", model_id:"m", model_name:"n", status:"ready", model_size_gb:14, required_gpus:2, dependencies:[], params:{}, priority:50}' \
@@ -503,7 +503,7 @@ test_get_task_fields_and_simple_accessors_return_expected_values() {
 test_print_task_summary_and_queue_summary_print_expected_headers() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     local queue_dir="${TEST_TMPDIR}/queue"
     mkdir -p "${queue_dir}/ready"
@@ -519,7 +519,7 @@ test_print_task_summary_and_queue_summary_print_expected_headers() {
 test_task_serialization_multi_gpu_and_jq_failure_branches() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     _now_iso() { echo "2025-01-01T00:00:00Z"; }
 
@@ -551,7 +551,7 @@ test_task_serialization_multi_gpu_and_jq_failure_branches() {
 test_get_task_param_supports_non_identifier_keys() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     local task_file="${TEST_TMPDIR}/task.json"
     jq -n '{params:{"retry-after":123}}' > "${task_file}"
@@ -561,7 +561,7 @@ test_get_task_param_supports_non_identifier_keys() {
 test_task_serialization_task_summary_branches() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     local missing="${TEST_TMPDIR}/missing.task"
     local rc=0
@@ -573,7 +573,7 @@ test_task_serialization_task_summary_branches() {
 test_estimate_model_memory_name_buckets() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     local v
     v="$(estimate_model_memory "Qwen/Qwen1.5-72B" "EVAL_BASELINE")"
@@ -588,7 +588,7 @@ test_estimate_model_memory_name_buckets() {
 test_estimate_model_memory_name_bucket_arms_and_local_path_override() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     local model_dir="${TEST_TMPDIR}/model"
     mkdir -p "${model_dir}"
@@ -605,7 +605,7 @@ test_estimate_model_memory_name_bucket_arms_and_local_path_override() {
 test_estimate_model_memory_multiplier_case_arms_large_and_small() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     local large="Qwen/Qwen1.5-72B"
     assert_match '^[0-9]+$' "$(estimate_model_memory "${large}" "SETUP_BASELINE")" "large SETUP_BASELINE"
@@ -637,7 +637,7 @@ test_estimate_model_memory_multiplier_case_arms_large_and_small() {
 test_estimate_model_memory_serializes_moe_execution_tasks() {
     mock_reset
     # shellcheck source=../task_serialization.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/task_serialization.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
 
     GPU_MEMORY_PER_DEVICE=140 NUM_GPUS=4
 

@@ -12,7 +12,7 @@ import pytest
 
 def _load_script_module() -> ModuleType:
     repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "verify_markdown_bash_blocks.py"
+    script_path = repo_root / "scripts" / "docs" / "verify_markdown_bash_blocks.py"
     spec = importlib.util.spec_from_file_location(
         "tests_verify_markdown_bash_blocks", script_path
     )
@@ -227,13 +227,15 @@ def test_sanitize_script_rewrites_python_script_invocations_to_selected_python()
         file="docs/reference/device-drift-bands.md",
         line=1,
         block_index=1,
-        text="python scripts/check_device_drift.py reports/a.json reports/b.json\n",
+        text="python scripts/smoke/check_device_drift.py reports/a.json reports/b.json\n",
     )
 
     rendered = module._sanitize_script(block, execution_mode="host")
 
     assert rendered.startswith(sys.executable)
-    assert "scripts/check_device_drift.py reports/a.json reports/b.json" in rendered
+    assert (
+        "scripts/smoke/check_device_drift.py reports/a.json reports/b.json" in rendered
+    )
 
 
 def test_sanitize_script_adds_force_to_report_html() -> None:

@@ -216,7 +216,8 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
 
     sbom_step = _find_step_by_name(steps, "Generate install-surface SBOM")
     assert (
-        "scripts/generate_sbom.sh --scope install-surface --python" in sbom_step["run"]
+        "scripts/security/generate_sbom.sh --scope install-surface --python"
+        in sbom_step["run"]
     )
     assert "artifacts/supply-chain/sbom.json" in sbom_step["run"]
 
@@ -286,7 +287,7 @@ def test_pr_supply_chain_workflow_is_configured() -> None:
 
 
 def test_generate_sbom_script_exists():
-    script_path = Path("scripts/generate_sbom.sh")
+    script_path = Path("scripts/security/generate_sbom.sh")
     assert script_path.exists(), "SBOM generator script missing"
 
     contents = script_path.read_text(encoding="utf-8")

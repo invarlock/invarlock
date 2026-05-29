@@ -205,7 +205,7 @@ The guards are calibrated on CPU/MPS. We expect:
 Automate the check with:
 
 ```bash
-python scripts/check_device_drift.py \
+python scripts/smoke/check_device_drift.py \
   artifacts/ci-pack-*/baseline_cpu/evaluation.report.json \
   artifacts/ci-pack-*/baseline_mps/evaluation.report.json \
   --tolerance 0.005

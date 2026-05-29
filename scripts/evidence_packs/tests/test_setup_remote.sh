@@ -3,7 +3,7 @@
 test_setup_remote_install_torch_uses_index_url() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/setup_remote.sh
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
 
     pack_activate_venv() { :; }
     pack_run_cmd() { echo "$*" > "${TEST_TMPDIR}/cmd"; }
@@ -23,7 +23,7 @@ test_setup_remote_install_torch_uses_index_url() {
 test_setup_remote_install_invarlock_stack_uses_pinned_requirement_repairs() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/setup_remote.sh
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
 
     local cmd_log="${TEST_TMPDIR}/install.log"
     : > "${cmd_log}"
@@ -55,7 +55,7 @@ test_setup_remote_install_invarlock_stack_uses_pinned_requirement_repairs() {
 test_setup_remote_verify_remote_stack_runs_package_native_smoke() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/setup_remote.sh
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
 
     pack_activate_venv() { :; }
     pack_run_cmd() { echo "$*" > "${TEST_TMPDIR}/smoke.cmd"; }
@@ -73,7 +73,7 @@ test_setup_remote_verify_remote_stack_runs_package_native_smoke() {
 test_setup_remote_verify_remote_stack_checks_quant_modules_when_requested() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/setup_remote.sh
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
 
     pack_activate_venv() { :; }
     pack_run_cmd() { echo "$*" > "${TEST_TMPDIR}/smoke.cmd"; }
@@ -95,7 +95,7 @@ test_setup_remote_verify_remote_stack_checks_quant_modules_when_requested() {
 test_setup_remote_ensure_runtime_image_builds_cuda_local_when_missing() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/setup_remote.sh
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
 
     local cmd_log="${TEST_TMPDIR}/runtime-image.log"
     : > "${cmd_log}"
@@ -140,7 +140,7 @@ EOF
 test_setup_remote_ensure_runtime_image_builds_cuda_quant_when_requested() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/setup_remote.sh
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
 
     local cmd_log="${TEST_TMPDIR}/runtime-image.log"
     : > "${cmd_log}"
@@ -187,7 +187,7 @@ EOF
 test_setup_remote_ensure_runtime_image_rejects_quant_without_cuda() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/setup_remote.sh
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
@@ -212,7 +212,7 @@ EOF
 test_setup_remote_runtime_image_flavor_rejects_unknown_values() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/setup_remote.sh
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
 
     PACK_RUNTIME_IMAGE_FLAVOR="legacy"
 
@@ -232,7 +232,7 @@ test_setup_remote_runtime_image_flavor_rejects_unknown_values() {
 test_setup_remote_runtime_image_target_rejects_quant_without_cuda() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/setup_remote.sh
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
@@ -251,7 +251,7 @@ test_setup_remote_runtime_image_target_rejects_quant_without_cuda() {
 test_setup_remote_ensure_runtime_image_propagates_target_resolution_failure() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/setup_remote.sh
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
@@ -275,7 +275,7 @@ EOF
 test_setup_remote_ensure_runtime_image_respects_explicit_override() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/setup_remote.sh
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
 
     local cmd_log="${TEST_TMPDIR}/runtime-image.log"
     : > "${cmd_log}"
@@ -296,7 +296,7 @@ test_setup_remote_ensure_runtime_image_respects_explicit_override() {
 test_setup_remote_helpers_cover_alias_truthy_podman_and_present_image_branches() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/setup_remote.sh
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
 
     local cmd_log="${TEST_TMPDIR}/remote-helper.log"
     : > "${cmd_log}"
@@ -346,7 +346,7 @@ EOF
 test_setup_remote_pack_install_pinned_requirement_requires_file() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/setup_remote.sh
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
 
     REPO_DIR="${TEST_TMPDIR}/repo"
     mkdir -p "${REPO_DIR}/requirements/evidence-packs"
@@ -361,7 +361,7 @@ test_setup_remote_pack_install_pinned_requirement_requires_file() {
 test_setup_remote_post_setup_marks_entrypoints_executable() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/setup_remote.sh
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
 
     pack_run_cmd() { echo "$*" > "${TEST_TMPDIR}/chmod.cmd"; }
 
@@ -381,7 +381,7 @@ test_setup_remote_post_setup_marks_entrypoints_executable() {
 test_setup_remote_ensure_repo_alias_links_canonical_root_when_repo_dir_differs() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/setup_remote.sh
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
 
     local cmd_log="${TEST_TMPDIR}/alias.log"
     : > "${cmd_log}"
@@ -403,7 +403,7 @@ test_setup_remote_ensure_repo_alias_links_canonical_root_when_repo_dir_differs()
 test_setup_remote_clone_and_torch_check_branches() {
     mock_reset
 
-    source ./scripts/evidence_packs/lib/setup_remote.sh
+    source ./scripts/evidence_packs/lib/core/setup_remote.sh
 
     local cmd_log="${TEST_TMPDIR}/cmds.log"
     : > "${cmd_log}"
@@ -525,7 +525,7 @@ EOF
     export TORCH_PACKAGES="torch"
     export PACK_SKIP_TORCH_CHECK=0
 
-    run bash -x ./scripts/evidence_packs/lib/setup_remote.sh
+    run bash -x ./scripts/evidence_packs/lib/core/setup_remote.sh
     assert_rc "0" "${RUN_RC}" "setup_remote main succeeds"
     assert_dir_exists "${REPO_DIR}/.git" "repo initialized"
     assert_file_exists "${VENV_DIR}/bin/activate" "venv activate created"
@@ -730,7 +730,7 @@ EOF
     export TORCH_PACKAGES="torch"
     export PACK_SKIP_TORCH_CHECK=1
 
-    run bash -x ./scripts/evidence_packs/lib/setup_remote.sh
+    run bash -x ./scripts/evidence_packs/lib/core/setup_remote.sh
     assert_rc "0" "${RUN_RC}" "setup_remote main succeeds"
     assert_file_exists "${TEST_TMPDIR}/remote_smoke.cmd" "remote smoke helper ran"
 
@@ -739,7 +739,7 @@ EOF
     PACK_NET="1"
     SKIP_FLASH_ATTN="true"
     OUTPUT_DIR="${TEST_TMPDIR}/validation-out"
-    source ./scripts/evidence_packs/lib/validation_suite.sh
+    source ./scripts/evidence_packs/lib/validation/validation_suite.sh
     pack_setup_output_dirs
     check_dependencies
 

@@ -3,7 +3,7 @@
 test_create_edited_model_unknown_type_exits_nonzero() {
     mock_reset
     # shellcheck source=../model_creation.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/model_creation.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/model_creation.sh"
 
     local rc=0
     if ( create_edited_model "/b" "${TEST_TMPDIR}/out/model" "nope" "8" "128" "ffn" "0" ); then
@@ -17,7 +17,7 @@ test_create_edited_model_unknown_type_exits_nonzero() {
 test_create_pruned_model_invokes_python_wrapper() {
     mock_reset
     # shellcheck source=../model_creation.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/model_creation.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/model_creation.sh"
 
     local calls="${TEST_TMPDIR}/python.calls"
     _cmd_python() { echo "python $*" >> "${calls}"; return 0; }
@@ -30,7 +30,7 @@ test_create_pruned_model_invokes_python_wrapper() {
 test_create_pruned_model_returns_nonzero_when_parent_dir_is_file() {
     mock_reset
     # shellcheck source=../model_creation.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/model_creation.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/model_creation.sh"
 
     local calls="${TEST_TMPDIR}/python.calls"
     _cmd_python() { echo "python $*" >> "${calls}"; return 0; }
@@ -46,7 +46,7 @@ test_create_pruned_model_returns_nonzero_when_parent_dir_is_file() {
 test_create_edited_model_quant_rtn_invokes_python_wrapper() {
     mock_reset
     # shellcheck source=../model_creation.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/model_creation.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/model_creation.sh"
 
     local calls="${TEST_TMPDIR}/python.calls"
     _cmd_python() { echo "python $*" >> "${calls}"; return 0; }
@@ -59,7 +59,7 @@ test_create_edited_model_quant_rtn_invokes_python_wrapper() {
 test_create_lowrank_model_invokes_python_wrapper() {
     mock_reset
     # shellcheck source=../model_creation.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/model_creation.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/model_creation.sh"
 
     local calls="${TEST_TMPDIR}/python.calls"
     _cmd_python() { echo "python $*" >> "${calls}"; return 0; }
@@ -72,7 +72,7 @@ test_create_lowrank_model_invokes_python_wrapper() {
 test_create_fp8_model_invokes_python_wrapper() {
     mock_reset
     # shellcheck source=../model_creation.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/model_creation.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/model_creation.sh"
 
     local calls="${TEST_TMPDIR}/python.calls"
     _cmd_python() { echo "python $*" >> "${calls}"; return 0; }
@@ -85,7 +85,7 @@ test_create_fp8_model_invokes_python_wrapper() {
 test_create_error_model_invokes_python_wrapper() {
     mock_reset
     # shellcheck source=../model_creation.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/model_creation.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/model_creation.sh"
 
     local calls="${TEST_TMPDIR}/python.calls"
     _cmd_python() { echo "python $*" >> "${calls}"; return 0; }
@@ -98,7 +98,7 @@ test_create_error_model_invokes_python_wrapper() {
 test_create_model_variant_dispatches_and_rejects_unknown_type() {
     mock_reset
     # shellcheck source=../model_creation.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/model_creation.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/model_creation.sh"
 
     local calls="${TEST_TMPDIR}/python.calls"
     _cmd_python() { echo "python $*" >> "${calls}"; return 0; }
@@ -119,7 +119,7 @@ test_create_model_variant_dispatches_and_rejects_unknown_type() {
 test_create_model_variant_dispatches_success_paths_for_other_edit_types() {
     mock_reset
     # shellcheck source=../model_creation.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/model_creation.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/model_creation.sh"
 
     local calls="${TEST_TMPDIR}/python.calls"
     _cmd_python() { echo "python $*" >> "${calls}"; return 0; }
@@ -140,7 +140,7 @@ test_create_model_variant_dispatches_success_paths_for_other_edit_types() {
 test_create_model_variant_requires_params_for_each_edit_type() {
     mock_reset
     # shellcheck source=../model_creation.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/model_creation.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/model_creation.sh"
 
     run create_model_variant "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/out/quant" "quant_rtn" "" "" "" "0"
     assert_ne "0" "${RUN_RC}" "quant_rtn missing params returns non-zero"

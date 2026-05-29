@@ -10,11 +10,11 @@ def test_evidence_pack_does_not_depend_on_lmeval() -> None:
     paths = [
         repo_root / "scripts/evidence_packs/run_pack.sh",
         repo_root / "scripts/evidence_packs/run_suite.sh",
-        repo_root / "scripts/evidence_packs/lib/validation_suite.sh",
-        repo_root / "scripts/evidence_packs/lib/task_serialization.sh",
-        repo_root / "scripts/evidence_packs/lib/queue_manager.sh",
-        repo_root / "scripts/evidence_packs/lib/task_functions.sh",
-        repo_root / "scripts/evidence_packs/lib/result_compiler.sh",
+        repo_root / "scripts/evidence_packs/lib/validation/validation_suite.sh",
+        repo_root / "scripts/evidence_packs/lib/tasks/task_serialization.sh",
+        repo_root / "scripts/evidence_packs/lib/queue/queue_manager.sh",
+        repo_root / "scripts/evidence_packs/lib/tasks/task_functions.sh",
+        repo_root / "scripts/evidence_packs/lib/validation/result_compiler.sh",
     ]
 
     combined = "\n".join(path.read_text(encoding="utf-8") for path in paths)

@@ -25,7 +25,7 @@ def test_evidence_pack_bootstrap_floor_matches_core_runner() -> None:
             _bash(
                 repo_root,
                 (
-                    "source scripts/evidence_packs/lib/task_functions.sh\n"
+                    "source scripts/evidence_packs/lib/tasks/task_functions.sh\n"
                     f"_bootstrap_replicates_floor_for_tier {tier}\n"
                 ),
             )
@@ -41,7 +41,7 @@ def test_evidence_pack_bootstrap_resolver_enforces_floor_for_large_models() -> N
         _bash(
             repo_root,
             (
-                "source scripts/evidence_packs/lib/task_functions.sh\n"
+                "source scripts/evidence_packs/lib/tasks/task_functions.sh\n"
                 "unset INVARLOCK_BOOTSTRAP_N\n"
                 "_resolve_bootstrap_replicates 30 balanced\n"
             ),
@@ -53,7 +53,7 @@ def test_evidence_pack_bootstrap_resolver_enforces_floor_for_large_models() -> N
         _bash(
             repo_root,
             (
-                "source scripts/evidence_packs/lib/task_functions.sh\n"
+                "source scripts/evidence_packs/lib/tasks/task_functions.sh\n"
                 "INVARLOCK_BOOTSTRAP_N=1000 _resolve_bootstrap_replicates 30 balanced\n"
             ),
         )

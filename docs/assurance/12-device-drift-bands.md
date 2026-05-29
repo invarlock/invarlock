@@ -18,7 +18,7 @@ CPU (e.g., ≤ 0.5% MPS, ≤ 1.0% CUDA).
 | CUDA   | within ±1.0%           | Deterministic algorithms; set `CUBLAS_WORKSPACE_CONFIG`, disable TF32 |
 
 Bands were empirically derived on pilot models. The repo ships and tests
-`scripts/check_device_drift.py`; CI enforces the checker behavior on fixtures,
+`scripts/smoke/check_device_drift.py`; CI enforces the checker behavior on fixtures,
 while real CPU/MPS/CUDA drift enforcement requires CI or release evidence to
 provide comparable reports from those devices. Actual values may vary slightly
 by family/precision; verify on your setup.
@@ -53,7 +53,7 @@ INVARLOCK_ALLOW_HOST_EXECUTION=1 invarlock evaluate \
   --report-out reports/baseline_mps
 
 # Lint cross-device drift (absolute ratio tolerance)
-python scripts/check_device_drift.py \
+python scripts/smoke/check_device_drift.py \
   reports/baseline_cpu/evaluation.report.json \
   reports/baseline_mps/evaluation.report.json \
   --tolerance 0.005

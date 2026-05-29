@@ -3,8 +3,8 @@
 test_result_compiler_generate_verdict_passes_manifest_when_present() {
     mock_reset
 
-    # shellcheck source=../lib/result_compiler.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/result_compiler.sh"
+    # shellcheck source=../lib/validation/result_compiler.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/validation/result_compiler.sh"
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
     mkdir -p "${OUTPUT_DIR}/state" "${OUTPUT_DIR}/reports"

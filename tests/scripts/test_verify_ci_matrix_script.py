@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 def test_verify_ci_matrix_script_falls_back_without_ripgrep(tmp_path: Path) -> None:
-    script = Path("scripts/verify_ci_matrix.sh")
+    script = Path("scripts/checks/verify_ci_matrix.sh")
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
 

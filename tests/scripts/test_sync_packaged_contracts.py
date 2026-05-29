@@ -33,7 +33,7 @@ def _run_sync_script(
 
 def test_sync_packaged_contracts_check_passes_when_dirs_match(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "scripts" / "sync_packaged_contracts.py"
+    script = repo_root / "scripts" / "checks" / "sync_packaged_contracts.py"
     source_dir = tmp_path / "contracts"
     packaged_dir = tmp_path / "packaged"
     _write_json(source_dir / "alpha.json", {"alpha": 1})
@@ -54,7 +54,7 @@ def test_sync_packaged_contracts_check_reports_missing_extra_and_changed(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "scripts" / "sync_packaged_contracts.py"
+    script = repo_root / "scripts" / "checks" / "sync_packaged_contracts.py"
     source_dir = tmp_path / "contracts"
     packaged_dir = tmp_path / "packaged"
     _write_json(source_dir / "alpha.json", {"alpha": 1})
@@ -78,7 +78,7 @@ def test_sync_packaged_contracts_check_reports_missing_extra_and_changed(
 
 def test_sync_packaged_contracts_write_syncs_and_removes_extras(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "scripts" / "sync_packaged_contracts.py"
+    script = repo_root / "scripts" / "checks" / "sync_packaged_contracts.py"
     source_dir = tmp_path / "contracts"
     packaged_dir = tmp_path / "packaged"
     _write_json(source_dir / "alpha.json", {"alpha": 1})
@@ -106,7 +106,7 @@ def test_sync_packaged_contracts_write_syncs_and_removes_extras(tmp_path: Path) 
 
 def test_sync_packaged_contracts_check_rejects_missing_dirs(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "scripts" / "sync_packaged_contracts.py"
+    script = repo_root / "scripts" / "checks" / "sync_packaged_contracts.py"
 
     proc = _run_sync_script(
         script,
@@ -123,7 +123,7 @@ def test_sync_packaged_contracts_write_allows_missing_packaged_dir(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "scripts" / "sync_packaged_contracts.py"
+    script = repo_root / "scripts" / "checks" / "sync_packaged_contracts.py"
     source_dir = tmp_path / "contracts"
     packaged_dir = tmp_path / "packaged"
     _write_json(source_dir / "alpha.json", {"alpha": 1})

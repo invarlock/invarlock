@@ -39,9 +39,9 @@ def test_small_workflow_configs_present() -> None:
 
 def test_gpt2_user_journey_smoke_script_is_executable() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "run_gpt2_user_journey_smoke.sh"
+    script_path = repo_root / "scripts" / "smoke" / "run_gpt2_user_journey_smoke.sh"
     assert script_path.exists(), (
-        "Expected scripts/run_gpt2_user_journey_smoke.sh to exist"
+        "Expected scripts/smoke/run_gpt2_user_journey_smoke.sh to exist"
     )
     assert os.access(script_path, os.X_OK), (
         "run_gpt2_user_journey_smoke.sh should be executable"
@@ -110,8 +110,10 @@ def test_gpt2_user_journey_smoke_script_is_executable() -> None:
 
 def test_tiny_container_smoke_campaign_script_is_executable() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "run_tiny_container_smoke.sh"
-    assert script_path.exists(), "Expected scripts/run_tiny_container_smoke.sh to exist"
+    script_path = repo_root / "scripts" / "smoke" / "run_tiny_container_smoke.sh"
+    assert script_path.exists(), (
+        "Expected scripts/smoke/run_tiny_container_smoke.sh to exist"
+    )
     assert os.access(script_path, os.X_OK), (
         "run_tiny_container_smoke.sh should be executable"
     )
@@ -151,8 +153,8 @@ def test_tiny_container_smoke_campaign_script_is_executable() -> None:
 
 def test_cli_smoke_fast_uses_repo_selected_python() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "cli_smoke_fast.sh"
-    assert script_path.exists(), "Expected scripts/cli_smoke_fast.sh to exist"
+    script_path = repo_root / "scripts" / "smoke" / "cli_smoke_fast.sh"
+    assert script_path.exists(), "Expected scripts/smoke/cli_smoke_fast.sh to exist"
     assert os.access(script_path, os.X_OK), "cli_smoke_fast.sh should be executable"
 
     contents = script_path.read_text(encoding="utf-8")
@@ -193,8 +195,8 @@ def test_cli_smoke_fast_uses_repo_selected_python() -> None:
 
 def test_cli_smoke_negative_exercises_failure_categories() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "cli_smoke_negative.sh"
-    assert script_path.exists(), "Expected scripts/cli_smoke_negative.sh to exist"
+    script_path = repo_root / "scripts" / "smoke" / "cli_smoke_negative.sh"
+    assert script_path.exists(), "Expected scripts/smoke/cli_smoke_negative.sh to exist"
     assert os.access(script_path, os.X_OK), "cli_smoke_negative.sh should be executable"
 
     contents = script_path.read_text(encoding="utf-8")
@@ -217,8 +219,10 @@ def test_cli_smoke_negative_exercises_failure_categories() -> None:
 
 def test_cli_smoke_realistic_wraps_gpt2_user_journey_smoke() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "cli_smoke_realistic.sh"
-    assert script_path.exists(), "Expected scripts/cli_smoke_realistic.sh to exist"
+    script_path = repo_root / "scripts" / "smoke" / "cli_smoke_realistic.sh"
+    assert script_path.exists(), (
+        "Expected scripts/smoke/cli_smoke_realistic.sh to exist"
+    )
     assert os.access(script_path, os.X_OK), (
         "cli_smoke_realistic.sh should be executable"
     )
@@ -232,25 +236,27 @@ def test_cli_smoke_realistic_wraps_gpt2_user_journey_smoke() -> None:
 
 def test_cli_exhaustive_smoke_dispatches_lane_matrix() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "cli_exhaustive_smoke.sh"
-    assert script_path.exists(), "Expected scripts/cli_exhaustive_smoke.sh to exist"
+    script_path = repo_root / "scripts" / "smoke" / "cli_exhaustive_smoke.sh"
+    assert script_path.exists(), (
+        "Expected scripts/smoke/cli_exhaustive_smoke.sh to exist"
+    )
     assert os.access(script_path, os.X_OK), (
         "cli_exhaustive_smoke.sh should be executable"
     )
 
     contents = script_path.read_text(encoding="utf-8")
     assert 'LANES_RAW="${INVARLOCK_SMOKE_LANES:-fast,negative,realistic}"' in contents
-    assert 'script_path="$REPO_ROOT/scripts/cli_smoke_fast.sh"' in contents
-    assert 'script_path="$REPO_ROOT/scripts/cli_smoke_negative.sh"' in contents
-    assert 'script_path="$REPO_ROOT/scripts/cli_smoke_realistic.sh"' in contents
+    assert 'script_path="$REPO_ROOT/scripts/smoke/cli_smoke_fast.sh"' in contents
+    assert 'script_path="$REPO_ROOT/scripts/smoke/cli_smoke_negative.sh"' in contents
+    assert 'script_path="$REPO_ROOT/scripts/smoke/cli_smoke_realistic.sh"' in contents
     assert "unknown smoke lane" in contents
     assert "failed=${FAILED_LANES}" in contents
 
 
 def test_run_cpu_telemetry_uses_repo_selected_python() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "run_cpu_telemetry.sh"
-    assert script_path.exists(), "Expected scripts/run_cpu_telemetry.sh to exist"
+    script_path = repo_root / "scripts" / "smoke" / "run_cpu_telemetry.sh"
+    assert script_path.exists(), "Expected scripts/smoke/run_cpu_telemetry.sh to exist"
     assert os.access(script_path, os.X_OK), "run_cpu_telemetry.sh should be executable"
 
     contents = script_path.read_text(encoding="utf-8")
@@ -274,7 +280,7 @@ def test_run_cpu_telemetry_uses_repo_selected_python() -> None:
 
 def test_cli_smoke_fast_uses_reporting_verify_contract_helpers() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "cli_smoke_fast.sh"
+    script_path = repo_root / "scripts" / "smoke" / "cli_smoke_fast.sh"
     contents = script_path.read_text(encoding="utf-8")
 
     assert "from invarlock.reporting import verify_contract as verify_mod" in contents

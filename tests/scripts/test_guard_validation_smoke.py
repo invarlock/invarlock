@@ -13,7 +13,7 @@ def test_guard_validation_smoke_writes_deterministic_artifacts(tmp_path: Path) -
     proc = subprocess.run(
         [
             sys.executable,
-            str(repo_root / "scripts" / "guard_validation_smoke.py"),
+            str(repo_root / "scripts" / "smoke" / "guard_validation_smoke.py"),
             "--output-dir",
             str(out_dir),
             "--replicates",

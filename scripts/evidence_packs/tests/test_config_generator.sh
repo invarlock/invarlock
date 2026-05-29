@@ -4,7 +4,7 @@ test_config_generator_run_single_calibration_large_model_emits_log_and_captures_
     mock_reset
 
     # shellcheck source=../config_generator.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/config_generator.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/config/config_generator.sh"
 
     INVARLOCK_DATASET="wikitext2"
     INVARLOCK_TIER="balanced"
@@ -58,7 +58,7 @@ test_config_generator_run_single_calibration_returns_runner_failure() {
     mock_reset
 
     # shellcheck source=../config_generator.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/config_generator.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/config/config_generator.sh"
 
     INVARLOCK_DATASET="wikitext2"
     INVARLOCK_TIER="balanced"
@@ -83,7 +83,7 @@ test_config_generator_run_invarlock_calibration_logs_moe_and_all_runs_failed() {
     mock_reset
 
     # shellcheck source=../config_generator.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/config_generator.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/config/config_generator.sh"
 
     INVARLOCK_DATASET="wikitext2"
     INVARLOCK_TIER="balanced"
@@ -127,7 +127,7 @@ test_config_generator_run_invarlock_evaluate_preset_and_cert_copy_branches() {
     mock_reset
 
     # shellcheck source=../config_generator.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/config_generator.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/config/config_generator.sh"
 
     INVARLOCK_TIER="balanced"
     export INVARLOCK_TIER
@@ -228,7 +228,7 @@ test_config_generator_generate_invarlock_config_writes_to_stdout_when_requested(
     mock_reset
 
     # shellcheck source=../config_generator.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/config_generator.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/config/config_generator.sh"
 
     INVARLOCK_PREVIEW_WINDOWS="128"
     INVARLOCK_FINAL_WINDOWS="128"
@@ -271,7 +271,7 @@ test_config_generator_run_single_calibration_exports_remote_code_allowance() {
     mock_reset
 
     # shellcheck source=../config_generator.sh
-    source "${TEST_ROOT}/scripts/evidence_packs/lib/config_generator.sh"
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/config/config_generator.sh"
 
     INVARLOCK_DATASET="wikitext2"
     INVARLOCK_TIER="balanced"
