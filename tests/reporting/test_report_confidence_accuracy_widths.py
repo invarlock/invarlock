@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from invarlock.reporting.report_confidence import compute_confidence_label
+from invarlock.reporting.report_enrichment import compute_confidence_label
 
 
 def test_confidence_label_accuracy_threshold_override():

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from invarlock.reporting.report_confidence import compute_confidence_label
+from invarlock.reporting.report_enrichment import compute_confidence_label
 from invarlock.reporting.report_make import make_report
 
 

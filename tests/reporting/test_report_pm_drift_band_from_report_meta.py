@@ -1,5 +1,7 @@
 from invarlock.reporting.report_make import make_report
-from invarlock.reporting.verify_check_helpers import _validate_primary_metric_policy
+from invarlock.reporting.verify_check_helpers_metrics import (
+    _validate_primary_metric_policy,
+)
 
 
 def _report_with_meta_pm_drift_band():

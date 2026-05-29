@@ -5,7 +5,12 @@ from pathlib import Path
 
 
 def _load_coverage_policy():
-    policy_path = Path(__file__).resolve().parents[2] / "scripts" / "coverage_policy.py"
+    policy_path = (
+        Path(__file__).resolve().parents[2]
+        / "scripts"
+        / "coverage"
+        / "coverage_policy.py"
+    )
     spec = importlib.util.spec_from_file_location("coverage_policy", policy_path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -94,7 +99,7 @@ def test_coverage_policy_is_shared_with_makefile_and_expanded_surface() -> None:
     makefile = Path(__file__).resolve().parents[2] / "Makefile"
     text = makefile.read_text(encoding="utf-8")
 
-    assert "COVERAGE_POLICY := $(PYTHON) scripts/coverage_policy.py" in text
+    assert "COVERAGE_POLICY := $(PYTHON) scripts/coverage/coverage_policy.py" in text
     assert "COVERAGE_MODULES := \\" in text
     assert "\t$(shell $(COVERAGE_POLICY) coverage-modules)" in text
     assert "COVERAGE_INCLUDE := $(shell $(COVERAGE_POLICY) coverage-include)" in text
@@ -107,7 +112,6 @@ def test_coverage_policy_is_shared_with_makefile_and_expanded_surface() -> None:
     assert "scripts/release/check_empirical_guard_evidence.py" in policy.CORE_FILES
     assert "scripts/release/check_release_evidence.py" in policy.CORE_FILES
     assert "src/invarlock/reporting/report_build_evidence.py" in policy.CORE_FILES
-    assert "src/invarlock/reporting/evaluation_report_builder.py" in policy.CORE_FILES
     assert "src/invarlock/reporting/report_make_output.py" in policy.CORE_FILES
     assert (
         "src/invarlock/reporting/report_primary_metric_policy.py" in policy.CORE_FILES
@@ -177,7 +181,7 @@ def test_makefile_exposes_actionlint_and_minimal_packaging_smoke_targets() -> No
     ) in text
     assert "docs-live-fast:" in text
     assert "docs-live:" in text
-    assert "scripts/verify_live_examples.py" in text
+    assert "scripts/docs/verify_live_examples.py" in text
     docs_live_fast_block = text.split("docs-live-fast:", 1)[1].split("docs-live:", 1)[0]
     docs_live_block = text.split("docs-live:", 1)[1].split("docs-check-build:", 1)[0]
 
@@ -311,7 +315,7 @@ def test_makefile_exposes_isolated_security_gate() -> None:
     assert ".PHONY: security supply-chain-security" in text
     assert "security: supply-chain-security" in text
     assert "command -v uv" in text
-    assert "scripts/generate_sbom.sh --scope tool-environment" in text
+    assert "scripts/security/generate_sbom.sh --scope tool-environment" in text
     assert "$(SECURITY_ARTIFACT_DIR)/sbom.json" in text
     assert "python scripts/security/run_pip_audit.py" in text
 

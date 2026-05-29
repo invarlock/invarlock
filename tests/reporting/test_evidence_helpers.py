@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from invarlock.reporting.evidence import maybe_dump_guard_evidence
+from invarlock.reporting.report_evidence import maybe_dump_guard_evidence
 
 
 def test_maybe_dump_guard_evidence_noops_when_debug_is_disabled(

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from invarlock.reporting import report_schema as schema_mod
-from invarlock.reporting.report_confidence import (
+from invarlock.reporting.report_console import compute_console_validation_block
+from invarlock.reporting.report_enrichment import (
     compute_confidence_label as _compute_confidence_label,
 )
-from invarlock.reporting.report_console import compute_console_validation_block
 from invarlock.reporting.report_primary_metric_policy import is_ppl_kind as _is_ppl_kind
 from invarlock.reporting.report_provenance import (
     compute_edit_digest as _compute_edit_digest,

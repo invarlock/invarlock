@@ -21,6 +21,7 @@ def _is_matrix_weight(weight: Any) -> bool:
     try:
         return int(getattr(weight, "ndim", 0) or 0) == 2
     except (TypeError, ValueError):
+        # guard-fallback-ok: malformed weight metadata is classified as not a matrix.
         return False
 
 

@@ -9,6 +9,7 @@ def finite01(value: Any) -> bool:
         numeric = float(value)
         return math.isfinite(numeric) and 0.0 <= numeric <= 1.0
     except (TypeError, ValueError):
+        # guard-fallback-ok: malformed p-values are invalid and excluded from selection math.
         return False
 
 
@@ -16,9 +17,11 @@ def z_to_two_sided_pvalue(z: Any) -> float:
     try:
         zf = float(z)
         if not math.isfinite(zf):
+            # guard-fallback-ok: invalid z maps to conservative p=1.0 in this pure helper.
             return 1.0
         return float(math.erfc(abs(zf) / math.sqrt(2.0)))
     except (TypeError, ValueError):
+        # guard-fallback-ok: malformed z maps to conservative p=1.0 in this pure helper.
         return 1.0
 
 

@@ -217,7 +217,7 @@ class SpectralGuard(Guard):
     def finalize(self, model: Any) -> dict[str, Any]:
         result = _spectral_runtime.finalize_guard(self, model)
         try:
-            from invarlock.reporting.evidence import maybe_dump_guard_evidence
+            from invarlock.reporting.report_evidence import maybe_dump_guard_evidence
 
             maybe_dump_guard_evidence(
                 ".",
