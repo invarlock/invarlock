@@ -43,10 +43,13 @@ def test_baseline_guard_payload_edge_branches() -> None:
         def get(self, *args: object, **kwargs: object) -> object:
             raise RuntimeError("broken")
 
-    assert verify_helpers_mod._baseline_guard_payload(  # noqa: SLF001
-        BrokenBaseline(),
-        "variance",
-    ) == {}
+    assert (
+        verify_helpers_mod._baseline_guard_payload(  # noqa: SLF001
+            BrokenBaseline(),
+            "variance",
+        )
+        == {}
+    )
 
 
 def test_validate_variance_enablement_edge_branches() -> None:
