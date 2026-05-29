@@ -23,7 +23,9 @@ def load_json(path: Path) -> Any:
     return json.loads(read_text(path))
 
 
-def path_contains_all(path: Path, snippets: set[str] | list[str] | tuple[str, ...]) -> bool:
+def path_contains_all(
+    path: Path, snippets: set[str] | list[str] | tuple[str, ...]
+) -> bool:
     if not path.exists():
         return False
     text = read_text(path)
