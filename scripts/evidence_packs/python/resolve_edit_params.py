@@ -5,10 +5,10 @@ import sys
 from pathlib import Path
 
 try:
-    from edit_specs import resolve_edit_spec
+    from .editing.specs import resolve_edit_spec
 except ImportError:  # pragma: no cover - direct module load under pytest
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from edit_specs import resolve_edit_spec
+    from editing.specs import resolve_edit_spec
 
 
 def main(argv: list[str] | None = None) -> int:

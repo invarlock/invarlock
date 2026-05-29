@@ -28,7 +28,7 @@ def _load_script(script_name: str):
 
 @pytest.fixture
 def matcher():
-    module = _load_script("edit_implementations.py")
+    module = _load_script("editing/implementations.py")
     return module._matches_scope
 
 

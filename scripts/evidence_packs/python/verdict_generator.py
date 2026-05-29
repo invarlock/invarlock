@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from verdict_generator_helpers import (
+    from .verdict.generator_helpers import (
         CORE_GUARDS,
         INTERVENTION_SIGNALS,
         SUMMARY_CATEGORIES,
@@ -34,7 +34,7 @@ try:
     )
 except ImportError:  # pragma: no cover - direct module load under pytest
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from verdict_generator_helpers import (
+    from verdict.generator_helpers import (
         CORE_GUARDS,
         INTERVENTION_SIGNALS,
         SUMMARY_CATEGORIES,

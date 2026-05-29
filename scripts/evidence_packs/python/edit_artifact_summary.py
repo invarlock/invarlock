@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from edit_metadata import (
+    from .editing.metadata import (
         DEPLOYABLE_OPTIMIZED_SUBJECT,
         EDIT_METADATA_SCHEMA,
         FAULT_INJECTION_FIXTURE,
@@ -18,7 +18,7 @@ except ImportError:  # pragma: no cover - direct module load under pytest
     import sys
 
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from edit_metadata import (
+    from editing.metadata import (
         DEPLOYABLE_OPTIMIZED_SUBJECT,
         EDIT_METADATA_SCHEMA,
         FAULT_INJECTION_FIXTURE,

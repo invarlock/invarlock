@@ -7,10 +7,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 try:
-    from edit_metadata import read_edit_metadata, validate_edit_metadata
+    from .metadata import read_edit_metadata, validate_edit_metadata
 except ImportError:  # pragma: no cover - direct module load under pytest
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from edit_metadata import read_edit_metadata, validate_edit_metadata
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from editing.metadata import read_edit_metadata, validate_edit_metadata
 
 try:
     from safetensors import safe_open

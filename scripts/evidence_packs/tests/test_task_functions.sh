@@ -377,7 +377,7 @@ test_task_create_edit_and_batch_edits_cover_success_failure_and_missing_function
 
     mock_python3_stub_enable
     fixture_write "python3.rc" "0"
-    mock_python3_stub_allow_real_script "validate_edit_artifact.py"
+    mock_python3_stub_allow_real_script "validate_artifact.py"
 
     local out="${TEST_TMPDIR}/out"
     local model_name="m"

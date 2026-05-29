@@ -114,7 +114,8 @@ create_edited_model() {
         _model_creation_run_python \
             "${parent_dir}" \
             "${cuda_devices}" \
-            "${EVIDENCE_PACK_PY_DIR}/create_quant_rtn_model.py" \
+            "${EVIDENCE_PACK_PY_DIR}/create_edit_model.py" \
+            "quant-rtn" \
             "${baseline_path}" \
             "${output_path}" \
             "${bits}" \
@@ -145,7 +146,8 @@ create_pruned_model() {
     _model_creation_run_python \
         "${parent_dir}" \
         "${cuda_devices}" \
-        "${EVIDENCE_PACK_PY_DIR}/create_pruned_model.py" \
+        "${EVIDENCE_PACK_PY_DIR}/create_edit_model.py" \
+        "magnitude-prune" \
         "${baseline_path}" \
         "${output_path}" \
         "${sparsity}" \
@@ -172,7 +174,8 @@ create_lowrank_model() {
     _model_creation_run_python \
         "${parent_dir}" \
         "${cuda_devices}" \
-        "${EVIDENCE_PACK_PY_DIR}/create_lowrank_model.py" \
+        "${EVIDENCE_PACK_PY_DIR}/create_edit_model.py" \
+        "lowrank-svd" \
         "${baseline_path}" \
         "${output_path}" \
         "${rank}" \
@@ -199,7 +202,8 @@ create_fp8_model() {
     _model_creation_run_python \
         "${parent_dir}" \
         "${cuda_devices}" \
-        "${EVIDENCE_PACK_PY_DIR}/create_fp8_model.py" \
+        "${EVIDENCE_PACK_PY_DIR}/create_edit_model.py" \
+        "fp8-quant" \
         "${baseline_path}" \
         "${output_path}" \
         "${format}" \

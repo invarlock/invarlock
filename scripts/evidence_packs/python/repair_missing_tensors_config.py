@@ -4,7 +4,10 @@ import json
 import sys
 from pathlib import Path
 
-from error_injection_config import fix_layer_drop_config_json
+try:
+    from .error_model.config import fix_layer_drop_config_json
+except ImportError:  # pragma: no cover - direct module load under pytest
+    from error_model.config import fix_layer_drop_config_json
 
 
 def _layer_count(cfg: dict) -> int | None:

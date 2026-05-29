@@ -6,27 +6,27 @@ import sys
 from pathlib import Path
 
 try:
-    from create_error_model_helpers import (
+    from .error_model.common import (
         _OVERLAY_FALLBACK_ERRORS,
-        _apply_error_injection,
         _collect_block_params,
         _load_error_model,
         _save_error_model,
         _shape_mismatch_overlay_safetensors,
     )
+    from .error_model.probe_injections import _apply_error_injection
 except ImportError:  # pragma: no cover - direct module load under pytest
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from create_error_model_helpers import (
+    from error_model.common import (
         _OVERLAY_FALLBACK_ERRORS,
-        _apply_error_injection,
         _collect_block_params,
         _load_error_model,
         _save_error_model,
         _shape_mismatch_overlay_safetensors,
     )
+    from error_model.probe_injections import _apply_error_injection
 
 try:
-    from runtime_tools import require_remote_code_opt_in
+    from .runtime_tools import require_remote_code_opt_in
 except ImportError:  # pragma: no cover - direct module load under pytest
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from runtime_tools import require_remote_code_opt_in

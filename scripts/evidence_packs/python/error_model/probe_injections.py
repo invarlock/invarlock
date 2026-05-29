@@ -6,23 +6,43 @@ import re
 from pathlib import Path
 
 import torch
-from create_error_model_basic_injections import (
-    _break_weight_tying,
-    _inject_extreme_quant,
-    _inject_inf_injection,
-    _inject_missing_tensors,
-    _inject_nan_injection,
-    _inject_norm_collapse,
-    _inject_rank_collapse,
-    _inject_scale_explosion,
-)
-from create_error_model_common import (
-    _default_last_layers,
-    _get_norm_weight,
-    _is_norm_module,
-    _parse_layer_indices,
-    _select_row_indices,
-)
+
+try:
+    from .basic_injections import (
+        _break_weight_tying,
+        _inject_extreme_quant,
+        _inject_inf_injection,
+        _inject_missing_tensors,
+        _inject_nan_injection,
+        _inject_norm_collapse,
+        _inject_rank_collapse,
+        _inject_scale_explosion,
+    )
+    from .common import (
+        _default_last_layers,
+        _get_norm_weight,
+        _is_norm_module,
+        _parse_layer_indices,
+        _select_row_indices,
+    )
+except ImportError:  # pragma: no cover - direct script-path loading in tests
+    from error_model.basic_injections import (
+        _break_weight_tying,
+        _inject_extreme_quant,
+        _inject_inf_injection,
+        _inject_missing_tensors,
+        _inject_nan_injection,
+        _inject_norm_collapse,
+        _inject_rank_collapse,
+        _inject_scale_explosion,
+    )
+    from error_model.common import (
+        _default_last_layers,
+        _get_norm_weight,
+        _is_norm_module,
+        _parse_layer_indices,
+        _select_row_indices,
+    )
 
 
 def _inject_rmt_norm_noise(

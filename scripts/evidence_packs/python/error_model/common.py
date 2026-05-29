@@ -13,10 +13,10 @@ from typing import Any
 import torch
 
 try:
-    from hf_causal_loader import load_causal_model
+    from ..model_io.hf_causal_loader import load_causal_model
 except ImportError:  # pragma: no cover - direct module load under pytest
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from hf_causal_loader import load_causal_model
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from model_io.hf_causal_loader import load_causal_model
 
 _IMPORT_OR_LOAD_ERRORS = (ImportError, ModuleNotFoundError, OSError, RuntimeError)
 _NUMERIC_COERCION_ERRORS = (TypeError, ValueError, OverflowError)

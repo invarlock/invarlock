@@ -14,7 +14,7 @@ def _write_verdict(path: Path, payload: dict) -> None:
 
 def test_verdict_tables_core_and_without_pm_counts(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "scripts/evidence_packs/python/verdict_tables.py"
+    script = repo_root / "scripts/evidence_packs/python/verdict/tables.py"
 
     verdict_path = tmp_path / "final_verdict.json"
     out_json = tmp_path / "tables.json"

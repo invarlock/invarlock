@@ -1162,17 +1162,15 @@ test_retry_task_atomic_update_failure_triggers_error_block() {
     jq -n '{task_id:"t1", task_type:"SETUP_BASELINE", model_id:"m", model_name:"n", status:"failed", retries:0, max_retries:3, created_at:"x", started_at:null, completed_at:null, error_msg:"x", assigned_gpus:null, dependencies:[], params:{}, priority:50}' \
         > "${QUEUE_DIR}/failed/t1.task"
 
-    local real_jq
-    real_jq="$(command -v jq)"
-    jq() {
-        if [[ "${1:-}" == "--arg" && "${2:-}" == "status" ]]; then
+    _runtime_python() {
+        if [[ "${1:-}" == "queue_state.py" && "${2:-}" == "retry-task" ]]; then
             return 1
         fi
-        "${real_jq}" "$@"
+        command "${TEST_REAL_PYTHON3}" "${TEST_ROOT}/scripts/evidence_packs/python/${1}" "${@:2}"
     }
 
     run retry_task "t1"
-    assert_rc "1" "${RUN_RC}" "jq failure triggers error path"
+    assert_rc "1" "${RUN_RC}" "queue-state update failure triggers error path"
 }
 
 test_retry_task_move_failure_returns_error() {

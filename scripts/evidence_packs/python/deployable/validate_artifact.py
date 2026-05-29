@@ -7,14 +7,14 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from edit_metadata import DEPLOYABLE_OPTIMIZED_SUBJECT, read_edit_metadata
-    from validate_edit_artifact import validate_edit_artifact
+    from ..editing.metadata import DEPLOYABLE_OPTIMIZED_SUBJECT, read_edit_metadata
+    from ..editing.validate_artifact import validate_edit_artifact
 except ImportError:  # pragma: no cover - direct module load under pytest
     import sys
 
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from edit_metadata import DEPLOYABLE_OPTIMIZED_SUBJECT, read_edit_metadata
-    from validate_edit_artifact import validate_edit_artifact
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from editing.metadata import DEPLOYABLE_OPTIMIZED_SUBJECT, read_edit_metadata
+    from editing.validate_artifact import validate_edit_artifact
 
 DEPLOYABLE_VALIDATION_SCHEMA = "invarlock/deployable-artifact-validation-v1"
 BACKEND_INVENTORY_SCHEMA = "invarlock/backend-inventory-v1"

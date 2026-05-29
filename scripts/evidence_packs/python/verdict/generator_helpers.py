@@ -21,7 +21,7 @@ SUMMARY_CATEGORIES: tuple[str, ...] = ("clean", "stress", "error_injection")
 
 
 def _manifest_root() -> Path:
-    return Path(__file__).resolve().parents[1]
+    return Path(__file__).resolve().parents[2]
 
 
 def _load_scenarios_manifest(path: Path) -> dict[str, Any]:

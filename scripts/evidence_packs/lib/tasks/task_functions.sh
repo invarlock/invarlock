@@ -1557,7 +1557,7 @@ _edit_artifact_has_tokenizer() {
 
 _edit_artifact_complete() {
     local edit_path="$1"
-    _cmd_python "${SCRIPT_DIR}/../../python/validate_edit_artifact.py" "${edit_path}" --require-metadata >/dev/null 2>&1
+    _cmd_python "${SCRIPT_DIR}/../../python/editing/validate_artifact.py" "${edit_path}" --require-metadata >/dev/null 2>&1
 }
 
 # ============ TASK: CREATE_EDITS_BATCH ============
@@ -1650,7 +1650,7 @@ task_evaluate_edit() {
         echo "ERROR: Edit model not found: ${edit_path}" >> "${log_file}"
         return 1
     fi
-    if ! _cmd_python "${SCRIPT_DIR}/../../python/validate_edit_artifact.py" \
+    if ! _cmd_python "${SCRIPT_DIR}/../../python/editing/validate_artifact.py" \
         "${edit_path}" \
         --require-metadata \
         --expected-edit-type "${edit_type}" \

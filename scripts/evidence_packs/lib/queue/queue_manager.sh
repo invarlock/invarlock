@@ -464,17 +464,10 @@ retry_task() {
                 target_dir="${QUEUE_DIR}/ready"
             fi
 
-            local tmp_file="${src}.tmp.${BASHPID:-$$}"
-            jq --arg status "${target_status}" '
-                .retries = ((.retries // 0) + 1)
-                | .status = $status
-                | .assigned_gpus = null
-                | .started_at = null
-                | .completed_at = null
-                | .error_msg = null
-            ' "${src}" > "${tmp_file}" 2>/dev/null \
-                && mv "${tmp_file}" "${src}" 2>/dev/null \
-                || { rm -f "${tmp_file}" 2>/dev/null || true; release_queue_lock; return 1; }
+            _runtime_python queue_state.py retry-task \
+                --task-file "${src}" \
+                --status "${target_status}" \
+                || { release_queue_lock; return 1; }
 
             mv "${src}" "${target_dir}/" 2>/dev/null || { release_queue_lock; return 1; }
             release_queue_lock
@@ -880,25 +873,18 @@ update_progress_state() {
         status="${terminal_state}"
     fi
 
-    local progress_pct=0
-    if [[ ${total} -gt 0 ]]; then
-        progress_pct=$((completed * 100 / total))
-    fi
-
     mkdir -p "$(dirname "${state_file}")" 2>/dev/null || true
-    cat > "${tmp_file}" << EOF
-{
-    "updated_at": "$(_now_iso)",
-    "total_tasks": ${total},
-    "pending_tasks": ${pending},
-    "ready_tasks": ${ready},
-    "running_tasks": ${running},
-    "completed_tasks": ${completed},
-    "failed_tasks": ${failed},
-    "progress_pct": ${progress_pct},
-    "status": "${status}"
-}
-EOF
+    _runtime_python queue_state.py progress \
+        --output "${tmp_file}" \
+        --updated-at "$(_now_iso)" \
+        --pending "${pending}" \
+        --ready "${ready}" \
+        --running "${running}" \
+        --completed "${completed}" \
+        --failed "${failed}" \
+        --total "${total}" \
+        --status "${status}" \
+        || { rm -f "${tmp_file}" 2>/dev/null || true; return 1; }
     mv -f "${tmp_file}" "${state_file}" 2>/dev/null || {
         rm -f "${tmp_file}" 2>/dev/null || true
         return 1

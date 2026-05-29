@@ -6,13 +6,13 @@ from typing import Any
 import torch
 
 try:
-    from edit_targeting import matches_edit_scope
+    from .targeting import matches_edit_scope
 except ImportError:  # pragma: no cover - direct module load under pytest
     import sys
     from pathlib import Path
 
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from edit_targeting import matches_edit_scope
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from editing.targeting import matches_edit_scope
 
 
 @dataclass

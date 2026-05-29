@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from scripts.evidence_packs.python.verdict_generator_helpers import _evaluate_report
+from scripts.evidence_packs.python.verdict.generator_helpers import _evaluate_report
 
 
 def _write_cert(

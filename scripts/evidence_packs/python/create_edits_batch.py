@@ -11,36 +11,36 @@ from typing import Any
 import torch
 
 try:
-    from edit_implementations import (
+    from .editing.implementations import (
         apply_dense_lowrank_approximation,
         apply_dense_magnitude_prune,
         apply_fp8_dequantized_simulation,
         apply_rtn_dequantized_simulation,
     )
-    from edit_metadata import build_validation_edit_metadata
-    from edit_specs import (
+    from .editing.metadata import build_validation_edit_metadata
+    from .editing.save_artifact import save_edited_subject_artifact
+    from .editing.specs import (
         parse_edit_specs_json,
         resolve_batch_entry,
     )
-    from runtime_tools import require_remote_code_opt_in
-    from save_subject_artifact import save_edited_subject_artifact
-    from validate_edit_artifact import validate_edit_artifact
+    from .editing.validate_artifact import validate_edit_artifact
+    from .runtime_tools import require_remote_code_opt_in
 except ImportError:  # pragma: no cover - direct module load under pytest
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from edit_implementations import (
+    from editing.implementations import (
         apply_dense_lowrank_approximation,
         apply_dense_magnitude_prune,
         apply_fp8_dequantized_simulation,
         apply_rtn_dequantized_simulation,
     )
-    from edit_metadata import build_validation_edit_metadata
-    from edit_specs import (
+    from editing.metadata import build_validation_edit_metadata
+    from editing.save_artifact import save_edited_subject_artifact
+    from editing.specs import (
         parse_edit_specs_json,
         resolve_batch_entry,
     )
+    from editing.validate_artifact import validate_edit_artifact
     from runtime_tools import require_remote_code_opt_in
-    from save_subject_artifact import save_edited_subject_artifact
-    from validate_edit_artifact import validate_edit_artifact
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 _BATCH_EDIT_STRATEGIES = {"reload", "deepcopy"}

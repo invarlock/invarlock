@@ -8,16 +8,14 @@ from pathlib import Path
 from scripts.evidence_packs.python import (
     create_edits_batch as batch_edit_mod,
 )
-from scripts.evidence_packs.python import (
-    save_subject_artifact as save_artifact_mod,
-)
-from scripts.evidence_packs.python import (
-    validate_deployable_artifact as deployable_validator_mod,
+from scripts.evidence_packs.python.deployable import (
+    validate_artifact as deployable_validator_mod,
 )
 from scripts.evidence_packs.python.edit_artifact_summary import (
     build_edit_artifact_summary,
 )
-from scripts.evidence_packs.python.edit_metadata import (
+from scripts.evidence_packs.python.editing import save_artifact as save_artifact_mod
+from scripts.evidence_packs.python.editing.metadata import (
     DEPLOYABLE_OPTIMIZED_SUBJECT,
     EDIT_SEMANTICS_DEPLOYABLE,
     build_edit_metadata,
@@ -64,7 +62,7 @@ def test_validate_edit_artifact_require_metadata_json(tmp_path: Path) -> None:
     )
     _write_minimal_artifact(artifact, metadata)
 
-    script = Path("scripts/evidence_packs/python/validate_edit_artifact.py")
+    script = Path("scripts/evidence_packs/python/editing/validate_artifact.py")
     result = subprocess.run(
         [
             sys.executable,

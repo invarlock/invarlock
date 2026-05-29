@@ -23,6 +23,27 @@ orchestration-focused. Shared verification parsing now lives in
 `scripts/evidence_packs/python/verify_pack_checks.py` instead of inline shell
 heredocs.
 
+The remaining `lib/*.sh` files are acceptable where they coordinate processes:
+locking queue directories, moving task files between states, launching workers,
+handling signals, and dispatching remote commands. Structured state mutation
+belongs in Python. Queue retry/progress JSON is handled by
+`scripts/evidence_packs/python/queue_state.py`; future queue changes that parse
+or rewrite task JSON should extend that helper instead of adding more `jq`
+programs or shell heredocs.
+
+Python helper boundaries:
+
+- `python/create_edit_model.py`: one-shot validation-subject edit creation
+  (`quant-rtn`, `magnitude-prune`, `lowrank-svd`, `fp8-quant`).
+- `python/create_edits_batch.py`: batched edit creation from tuned edit specs.
+- `python/editing/`: shared edit metadata, targeting, implementation, save, and
+  validation helpers used by edit entrypoints.
+- `python/model_io/`: shared Hugging Face model-loading helpers.
+- `python/create_error_model.py` + `python/error_model/`: structural/error
+  injection subject creation.
+- `python/deployable/`: deployable artifact validation helpers.
+- `python/verdict/`: verdict table and verdict-generation internals.
+
 Workflow boundaries:
 
 | Area | Owner | Notes |
@@ -32,7 +53,7 @@ Workflow boundaries:
 | Verification | `verify_pack.sh`, Python verification helpers | Offline-first; signing-key pinning is forwarded when supplied. |
 | Remote/GPU campaigns | scenario manifests and model evidence sweep callers | Keep campaign-specific state out of root `scripts/`. |
 
-Deprecation rule: mark stale helpers in this README or
-`scripts/scripts_inventory.toml` first, keep the stable front door for one
-release cycle, then remove the helper once Makefile, CI, docs, and tests no
-longer reference it.
+Breaking cleanup rule: scripts under `python/` are not public package APIs. If a
+helper is unreferenced or only exists as an internal compatibility shim, remove
+or move it in the same change that updates repo-owned shell callers, docs, and
+tests.
