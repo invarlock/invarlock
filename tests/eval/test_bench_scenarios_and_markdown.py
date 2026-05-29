@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
+import invarlock.reporting.telemetry as telemetry_mod
 from invarlock.eval.bench import (
     BenchmarkConfig,
     BenchmarkSummary,
@@ -126,8 +127,9 @@ class TestExecuteScenario:
                     "invarlock.reporting.report_make.make_report",
                     return_value=create_empty_report(),
                 ),
-                patch(
-                    "invarlock.reporting.telemetry.telemetry_output_enabled",
+                patch.object(
+                    telemetry_mod,
+                    "telemetry_output_enabled",
                     return_value=False,
                 ),
             ):
@@ -198,8 +200,9 @@ class TestExecuteScenario:
                     "invarlock.reporting.report_make.make_report",
                     side_effect=RuntimeError("report boom"),
                 ),
-                patch(
-                    "invarlock.reporting.telemetry.telemetry_output_enabled",
+                patch.object(
+                    telemetry_mod,
+                    "telemetry_output_enabled",
                     return_value=False,
                 ),
                 pytest.raises(
