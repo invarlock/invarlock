@@ -8,6 +8,8 @@ import pytest
 
 import invarlock.public_contracts as contracts
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
 
 def test_public_contract_loaders_and_catalog_round_trip() -> None:
     support_matrix = contracts.load_support_matrix()
@@ -186,6 +188,11 @@ def test_support_matrix_published_basis_evidence_uses_public_evidence_paths() ->
             assert evidence["evidence_pack_fixture"].startswith(
                 "public_evidence/published_basis/"
             )
+        if "artifact_package" in evidence:
+            assert evidence["artifact_package"].startswith(
+                "public_evidence/published_basis/"
+            )
+            assert (REPO_ROOT / evidence["artifact_package"]).is_dir()
         assert "tests/fixtures/" not in evidence["evaluation_report_fixture"]
         assert "tests/fixtures/" not in evidence["runtime_manifest_fixture"]
         assert "tests/fixtures/" not in evidence["evidence_pack_recipe"]
