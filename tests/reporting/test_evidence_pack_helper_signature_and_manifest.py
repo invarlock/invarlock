@@ -612,6 +612,22 @@ def test_verify_signature_covers_missing_signature_failure_and_fingerprint_misma
     assert fingerprint_out == mismatch_fingerprint
 
 
+def test_verify_evidence_pack_rejects_invalid_trust_store(tmp_path: Path) -> None:
+    pack_dir = tmp_path / "pack"
+    pack_dir.mkdir()
+    trust_store = tmp_path / "trusted-signers.json"
+    _write_json(trust_store, {"trusted_signers": ["not-a-fingerprint"]})
+
+    result = evidence_pack_mod.verify_evidence_pack(
+        pack_dir,
+        skip_verify=True,
+        trust_store_path=trust_store,
+    )
+    assert result.status.value == 2
+    assert result.payload["authenticity"] == "unpinned"
+    assert "not a sha256 fingerprint" in result.payload["errors"][0]
+
+
 def test_verify_signature_uses_default_failure_text_and_rejects_malformed_bundle(
     tmp_path: Path,
 ) -> None:

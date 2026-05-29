@@ -54,6 +54,19 @@ def verify_command(
         "--strict",
         help="Fail closed on missing/invalid signatures and extra unhashed files.",
     ),
+    expected_fingerprint: str | None = typer.Option(
+        None,
+        "--expected-fingerprint",
+        help="Require the manifest signer to match this sha256:... key fingerprint.",
+    ),
+    trust_store: str | None = typer.Option(
+        None,
+        "--trust-store",
+        help=(
+            "JSON trust store of accepted signer fingerprints "
+            "(defaults to ~/.config/invarlock/trusted-signers.json when present)."
+        ),
+    ),
     profile: str = typer.Option(
         "dev",
         "--profile",
@@ -76,6 +89,8 @@ def verify_command(
         strict=strict,
         profile=profile,
         report_assurance=report_assurance,
+        expected_fingerprint=expected_fingerprint,
+        trust_store_path=Path(trust_store) if trust_store else None,
     )
     payload = {
         "format_version": EVIDENCE_PACK_VERIFY_FORMAT_VERSION,

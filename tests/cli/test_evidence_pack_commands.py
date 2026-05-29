@@ -602,6 +602,7 @@ def test_evidence_pack_keygen_and_signed_build_round_trip(
     assert verify.exit_code == 0, verify.output
     verify_payload = json.loads(verify.stdout.strip())
     assert verify_payload["ok"] is True
+    assert verify_payload["authenticity"] == "unpinned"
     assert (
         verify_payload["signer_fingerprint"]
         == keygen_payload["signing_key_fingerprint"]

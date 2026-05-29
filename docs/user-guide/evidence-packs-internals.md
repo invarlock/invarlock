@@ -35,6 +35,9 @@ task graph, scheduling, and artifact generation. It complements
 
 # Verify an existing evidence pack
 invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000000/evidence_pack --strict --report-assurance strict
+
+# Verify and pin the expected package-native signer
+invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000000/evidence_pack --strict --report-assurance strict --expected-fingerprint sha256:<64-hex-chars>
 ```
 
 ## Hardware Target
@@ -621,6 +624,7 @@ run_pack.sh
   `environment`, and `materials`) against on-pack files.
 - Verifies `checksums.sha256` (and thus all hashed artifacts).
 - Verifies the package-native Ed25519 signature bundle when present; `--strict` requires it.
+- Enforces signer authenticity when `--expected-fingerprint` or `--trust-store` is supplied.
 - Enforces “no extra files” semantics in `--strict` mode.
 - Runs `invarlock verify` across all bundled reports (JSON output optional) with
   runtime-manifest enforcement on; each packaged `evaluation.report.json`

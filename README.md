@@ -136,6 +136,12 @@ Artifact model:
 | `evaluation.report.json` | `invarlock evaluate`, `invarlock report generate --format report` | `invarlock verify`, `invarlock report html`, `invarlock report validate`, `invarlock report explain --evaluation-report`, `invarlock advanced runtime-verify` |
 | `report.json` | Baseline/subject run directories under `runs/...` | `invarlock report generate`, `invarlock report explain --subject-report ... --baseline-report ...` |
 
+`invarlock verify` expects `evaluation.report.json`; if you only have a raw
+run directory containing `report.json`, first build the reviewer bundle with
+`invarlock report generate --run <subject report.json> --baseline-run-report <baseline report.json> --format report -o <output-dir>`.
+`invarlock advanced runtime-verify` is narrower: it checks runtime manifest
+binding/provenance and does not replace the report/gate verifier.
+
 Example output (abridged; counts vary by profile/config):
 
 ```text
@@ -172,8 +178,10 @@ Evidence packs bundle reports + verification metadata into a distributable artif
 
 - Guide: <https://invarlock.github.io/invarlock/0.9.0/user-guide/evidence-packs/>
 - Verify from an installed wheel:
-  `invarlock advanced evidence-pack verify <dir> --strict --report-assurance strict`
-- Repo harness alternative: `scripts/evidence_packs/verify_pack.sh --pack <dir> --strict --report-assurance strict`
+  `invarlock advanced evidence-pack verify <dir> --strict --report-assurance strict --expected-fingerprint sha256:<64-hex-chars>`
+- Repo harness alternative: `scripts/evidence_packs/verify_pack.sh --pack <dir> --strict --report-assurance strict --expected-fingerprint sha256:<64-hex-chars>`
+- For recurring signers, use `--trust-store <json>` or
+  `~/.config/invarlock/trusted-signers.json` with the package-native verifier.
 
 Note: `configs/` and most `scripts/` remain repo resources and are not included in
 wheels. Installed wheels include the public contracts and the

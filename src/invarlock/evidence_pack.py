@@ -10,6 +10,7 @@ from invarlock import evidence_pack_manifest as evidence_pack_manifest_mod
 from invarlock import evidence_pack_metadata as evidence_pack_metadata_mod
 from invarlock import evidence_pack_report_verification as report_verification_mod
 from invarlock import evidence_pack_support as evidence_pack_support_mod
+from invarlock import evidence_pack_trust as evidence_pack_trust_mod
 from invarlock.reporting.verify_contract import (
     VerifyExecutionResult,
     run_verify_reports,
@@ -93,16 +94,7 @@ _verify_no_extra_files = evidence_pack_support_mod._verify_no_extra_files
 _sign_manifest = evidence_pack_integrity_mod.sign_manifest
 _validate_signing_key = evidence_pack_support_mod._validate_signing_key
 _generate_signing_keypair = evidence_pack_integrity_mod.generate_signing_keypair
-
-
-def _verify_signature(
-    pack_dir: Path, *, strict: bool
-) -> tuple[list[str], list[str], str | None]:
-    return evidence_pack_integrity_mod.verify_signature(
-        pack_dir,
-        strict=strict,
-        load_json_fn=_load_json,
-    )
+_verify_signature = evidence_pack_trust_mod.verify_signature
 
 
 _signature_warnings_to_errors = evidence_pack_integrity_mod.signature_warnings_to_errors
@@ -361,16 +353,40 @@ def verify_evidence_pack(
     strict: bool = False,
     profile: str = "dev",
     report_assurance: str = "report",
+    expected_fingerprint: str | None = None,
+    trust_store_path: Path | None = None,
 ) -> EvidencePackResult:
     warnings: list[str] = []
     errors: list[str] = []
     verify_payload: dict[str, Any] | None = None
     signer_fingerprint: str | None = None
+    authenticity = "unpinned"
+    normalized_expected = None
+    if expected_fingerprint is not None:
+        normalized_expected = (
+            evidence_pack_integrity_mod.normalize_expected_fingerprint(
+                expected_fingerprint
+            )
+        )
+        if normalized_expected is None:
+            errors.append(
+                "--expected-fingerprint must be a sha256:... signing key fingerprint "
+                f"(got {expected_fingerprint!r})."
+            )
     if report_assurance not in {"report", "strict", "off"}:
         errors.append(
             "--report-assurance must be one of: report, strict, off "
             f"(got {report_assurance!r})."
         )
+    trust_fingerprints, trust_errors, trust_store_used = (
+        evidence_pack_trust_mod.load_trust_store_fingerprints(trust_store_path)
+    )
+    errors.extend(trust_errors)
+    expected_fingerprints = set(trust_fingerprints)
+    if normalized_expected is not None:
+        expected_fingerprints.add(normalized_expected)
+    expected_set = frozenset(expected_fingerprints) if expected_fingerprints else None
+    if errors:
         return _build_verify_result(
             pack_dir=pack_dir,
             ok=False,
@@ -382,6 +398,8 @@ def verify_evidence_pack(
             signer_fingerprint=signer_fingerprint,
             verify_payload=verify_payload,
             status=EvidencePackStatus.USAGE,
+            authenticity="mismatch" if expected_set else authenticity,
+            trust_store_path=trust_store_used,
         )
 
     if not pack_dir.is_dir():
@@ -396,6 +414,8 @@ def verify_evidence_pack(
             signer_fingerprint=signer_fingerprint,
             verify_payload=verify_payload,
             status=EvidencePackStatus.MISSING,
+            authenticity=authenticity,
+            trust_store_path=trust_store_used,
         )
     if not (pack_dir / "manifest.json").is_file():
         errors.append("manifest.json missing in pack.")
@@ -409,6 +429,8 @@ def verify_evidence_pack(
             signer_fingerprint=signer_fingerprint,
             verify_payload=verify_payload,
             status=EvidencePackStatus.MISSING,
+            authenticity=authenticity,
+            trust_store_path=trust_store_used,
         )
     if not (pack_dir / "checksums.sha256").is_file():
         errors.append("checksums.sha256 missing in pack.")
@@ -422,6 +444,8 @@ def verify_evidence_pack(
             signer_fingerprint=signer_fingerprint,
             verify_payload=verify_payload,
             status=EvidencePackStatus.MISSING,
+            authenticity=authenticity,
+            trust_store_path=trust_store_used,
         )
     if json_out_path is not None and _path_within_dir(pack_dir, json_out_path):
         errors.append("--json-out must point outside the pack directory.")
@@ -435,6 +459,8 @@ def verify_evidence_pack(
             signer_fingerprint=signer_fingerprint,
             verify_payload=verify_payload,
             status=EvidencePackStatus.USAGE,
+            authenticity=authenticity,
+            trust_store_path=trust_store_used,
         )
 
     errors.extend(validate_manifest(pack_dir / "manifest.json"))
@@ -449,11 +475,25 @@ def verify_evidence_pack(
             signer_fingerprint=signer_fingerprint,
             verify_payload=verify_payload,
             status=EvidencePackStatus.FORMAT,
+            authenticity=authenticity,
+            trust_store_path=trust_store_used,
         )
 
-    signature_errors, signature_warnings, signer_fingerprint = _verify_signature(
-        pack_dir, strict=strict
-    )
+    if expected_set is None:
+        signature_errors, signature_warnings, signer_fingerprint = _verify_signature(
+            pack_dir,
+            strict=strict,
+        )
+    else:
+        signature_errors, signature_warnings, signer_fingerprint = _verify_signature(
+            pack_dir,
+            strict=strict,
+            expected_fingerprints=expected_set,
+        )
+    if signer_fingerprint and expected_set and signer_fingerprint in expected_set:
+        authenticity = "pinned"
+    elif signer_fingerprint and expected_set:
+        authenticity = "mismatch"
     if signature_warnings and not strict and not unverified_provenance_allowed():
         errors.extend(_signature_warnings_to_errors(signature_warnings))
         return _build_verify_result(
@@ -466,6 +506,8 @@ def verify_evidence_pack(
             signer_fingerprint=signer_fingerprint,
             verify_payload=verify_payload,
             status=EvidencePackStatus.SIGNATURE,
+            authenticity=authenticity,
+            trust_store_path=trust_store_used,
         )
     warnings.extend(signature_warnings)
     if signature_errors:
@@ -480,6 +522,8 @@ def verify_evidence_pack(
             signer_fingerprint=signer_fingerprint,
             verify_payload=verify_payload,
             status=EvidencePackStatus.SIGNATURE,
+            authenticity=authenticity,
+            trust_store_path=trust_store_used,
         )
 
     errors.extend(_verify_manifest_binds_checksums(pack_dir))
@@ -503,6 +547,8 @@ def verify_evidence_pack(
             signer_fingerprint=signer_fingerprint,
             verify_payload=verify_payload,
             status=EvidencePackStatus.INTEGRITY,
+            authenticity=authenticity,
+            trust_store_path=trust_store_used,
         )
 
     if not skip_verify:
@@ -525,6 +571,8 @@ def verify_evidence_pack(
                 signer_fingerprint=signer_fingerprint,
                 verify_payload=verify_payload,
                 status=EvidencePackStatus.REPORTS,
+                authenticity=authenticity,
+                trust_store_path=trust_store_used,
             )
 
     return _build_verify_result(
@@ -538,6 +586,8 @@ def verify_evidence_pack(
         signer_fingerprint=signer_fingerprint,
         verify_payload=verify_payload,
         status=EvidencePackStatus.OK,
+        authenticity=authenticity,
+        trust_store_path=trust_store_used,
     )
 
 
@@ -553,6 +603,8 @@ def _build_verify_result(
     verify_payload: dict[str, Any] | None,
     status: EvidencePackStatus,
     report_assurance: str = "report",
+    authenticity: str = "unpinned",
+    trust_store_path: str | None = None,
 ) -> EvidencePackResult:
     evidence_level: str | None = None
     manifest_path = pack_dir / "manifest.json"
@@ -574,7 +626,10 @@ def _build_verify_result(
         "warnings": warnings,
         "errors": errors,
         "evidence_level": evidence_level,
+        "authenticity": authenticity,
     }
+    if trust_store_path:
+        payload["trust_store"] = trust_store_path
     if signer_fingerprint:
         payload["signer_fingerprint"] = signer_fingerprint
     if verify_payload is not None:

@@ -30,6 +30,8 @@ Options:
   --json-out FILE     Write verify JSON output to FILE (must be outside the pack)
   --skip-verify       Skip invarlock verify step
   --strict            Fail closed on missing/invalid signatures and pack mismatches
+  --expected-fingerprint FPR
+                     Require the signed manifest to use this signer fingerprint
   --report-assurance MODE
                      Nested report assurance mode (report|strict|off)
   --help              Show this help message
@@ -77,41 +79,13 @@ pack_file_sha256() {
 pack_manifest_field() {
     local manifest_path="$1"
     local field="$2"
-    _cmd_python - "${manifest_path}" "${field}" <<'PY'
-import json
-import sys
-
-path = sys.argv[1]
-field = sys.argv[2]
-with open(path, "r", encoding="utf-8") as handle:
-    payload = json.load(handle)
-value = payload.get(field)
-if value is None:
-    raise SystemExit(1)
-if isinstance(value, str):
-    print(value)
-else:
-    print(str(value))
-PY
+    _cmd_python "${SCRIPT_DIR}/python/verify_pack_checks.py" manifest-field "${manifest_path}" "${field}"
 }
 
 pack_path_within_dir() {
     local dir_path="$1"
     local candidate_path="$2"
-    _cmd_python - "${dir_path}" "${candidate_path}" <<'PY'
-from pathlib import Path
-import sys
-
-dir_path = Path(sys.argv[1]).resolve()
-candidate_path = Path(sys.argv[2]).resolve()
-
-try:
-    candidate_path.relative_to(dir_path)
-except ValueError:
-    raise SystemExit(1)
-
-raise SystemExit(0)
-PY
+    _cmd_python "${SCRIPT_DIR}/python/verify_pack_checks.py" path-within "${dir_path}" "${candidate_path}"
 }
 
 pack_verify_manifest_binds_checksums() {
@@ -182,77 +156,39 @@ pack_verify_checksums() {
 pack_verify_no_extra_files() {
     local pack_dir="$1"
     local strict="$2"
-
-    local tmp_dir
-    tmp_dir="$(mktemp -d 2>/dev/null || mktemp -d -t invarlock_pack_verify.XXXXXXXX)"
-    local expected_file="${tmp_dir}/expected.txt"
-    local actual_file="${tmp_dir}/actual.txt"
-    local extra_file="${tmp_dir}/extra.txt"
-
-    (
-        cd "${pack_dir}"
-        # The checksum file uses "hash  filename" (sha256sum) or "hash  filename" (shasum).
-        # Normalize to paths without leading "./" and without sha256sum "*" markers.
-        awk '{print $NF}' checksums.sha256 | sed 's/^\*//' | sed 's|^\./||' | sort -u > "${expected_file}"
-
-        # Allow pack control files even if they're not in checksums.sha256.
-        printf '%s\n' \
-            "checksums.sha256" \
-            "manifest.json" \
-            "manifest.signature.json" \
-            "metadata/manifest.json" \
-            "metadata/manifest.signature.json" \
-            "metadata/checksums.sha256" \
-            >> "${expected_file}"
-        sort -u -o "${expected_file}" "${expected_file}"
-
-        find . -type f -print \
-            | sed 's|^\./||' \
-            | grep -v '^\.DS_Store$' \
-            | grep -v '/\.DS_Store$' \
-            | grep -v '^\._' \
-            | grep -v '/\._' \
-            | grep -v '^__MACOSX/' \
-            | sort -u > "${actual_file}"
-    )
-
-    if comm -13 "${expected_file}" "${actual_file}" > "${extra_file}"; then
-        if [[ -s "${extra_file}" ]]; then
-            if [[ "${strict}" == "1" ]]; then
-                echo "ERROR: Pack contains extra files not covered by checksums.sha256:" >&2
-                sed 's/^/  - /' "${extra_file}" >&2
-                rm -rf "${tmp_dir}"
-                return 1
-            fi
-            pack_warn "Pack contains extra files not covered by checksums.sha256:"
-            sed 's/^/  - /' "${extra_file}" >&2
-        fi
+    local -a args=("${SCRIPT_DIR}/python/verify_pack_checks.py" extra-files "${pack_dir}")
+    if [[ "${strict}" == "1" ]]; then
+        args+=("--strict")
     fi
-
-    rm -rf "${tmp_dir}"
-    return 0
+    _cmd_python "${args[@]}"
 }
 
 pack_verify_signature_helper() {
     local pack_dir="$1"
     local strict="$2"
+    local expected_fingerprint="$3"
     local helper="${SCRIPT_DIR}/python/verify_signature.py"
+    local -a args=("${helper}")
 
     if [[ "${strict}" == "1" ]]; then
-        _cmd_python "${helper}" --strict "${pack_dir}"
-        return
+        args+=("--strict")
     fi
-    _cmd_python "${helper}" "${pack_dir}"
+    if [[ -n "${expected_fingerprint}" ]]; then
+        args+=("--expected-fingerprint" "${expected_fingerprint}")
+    fi
+    args+=("${pack_dir}")
+    _cmd_python "${args[@]}"
 }
 
 pack_verify_signature() {
     local pack_dir="$1"
     local strict="$2"
+    local expected_fingerprint="$3"
     local tmp_err=""
     local signer_fpr=""
 
     tmp_err="$(mktemp 2>/dev/null || mktemp -t invarlock_pack_verify_sig.XXXXXXXX)" || return 1
-    if signer_fpr="$(pack_verify_signature_helper "${pack_dir}" "${strict}" 2>"${tmp_err}")"; then
+    if signer_fpr="$(pack_verify_signature_helper "${pack_dir}" "${strict}" "${expected_fingerprint}" 2>"${tmp_err}")"; then
         if [[ -s "${tmp_err}" ]]; then
             cat "${tmp_err}" >&2
         fi
@@ -289,26 +225,7 @@ pack_scenario_strictness() {
     if [[ ! -f "${scenarios_path}" ]]; then
         return 1
     fi
-    python3 - "${scenarios_path}" "${scenario_id}" <<'PY'
-import json
-import sys
-
-path, scenario_id = sys.argv[1], sys.argv[2]
-try:
-    payload = json.load(open(path, encoding="utf-8"))
-except Exception:
-    raise SystemExit(1)
-scenarios = payload.get("scenarios")
-if not isinstance(scenarios, list):
-    raise SystemExit(1)
-for scenario in scenarios:
-    if isinstance(scenario, dict) and scenario.get("id") == scenario_id:
-        strictness = scenario.get("strictness")
-        if isinstance(strictness, str) and strictness:
-            print(strictness)
-            raise SystemExit(0)
-raise SystemExit(1)
-PY
+    _cmd_python "${SCRIPT_DIR}/python/verify_pack_checks.py" scenario-strictness "${scenarios_path}" "${scenario_id}"
 }
 
 pack_report_expects_verify_failure() {
@@ -375,6 +292,7 @@ pack_verify_pack() {
     local json_out=""
     local skip_verify=0
     local strict="${PACK_STRICT_MODE:-0}"
+    local expected_fingerprint="${PACK_EXPECTED_FINGERPRINT:-}"
     local report_assurance="${PACK_REPORT_ASSURANCE:-report}"
 
     while [[ $# -gt 0 ]]; do
@@ -406,6 +324,14 @@ pack_verify_pack() {
             --strict)
                 strict=1
                 shift
+                ;;
+            --expected-fingerprint)
+                expected_fingerprint="${2:-}"
+                if [[ -z "${expected_fingerprint}" ]]; then
+                    echo "ERROR: --expected-fingerprint requires a value" >&2
+                    return "${PACK_VERIFY_USAGE}"
+                fi
+                shift 2
                 ;;
             --report-assurance)
                 report_assurance="${2:-}"
@@ -463,7 +389,7 @@ pack_verify_pack() {
     if ! pack_validate_manifest_schema "${pack_dir}"; then
         return "${PACK_VERIFY_FORMAT}"
     fi
-    if ! pack_verify_signature "${pack_dir}" "${strict}"; then
+    if ! pack_verify_signature "${pack_dir}" "${strict}" "${expected_fingerprint}"; then
         return "${PACK_VERIFY_SIGNATURE}"
     fi
     if ! pack_verify_manifest_binds_checksums "${pack_dir}" "${strict}"; then

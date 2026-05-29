@@ -20,6 +20,10 @@ Strict verification also expects the sibling `runtime.manifest.json` for
 container-backed evidence. See [Runtime Provenance Guide](../security/runtime-provenance-guide.md)
 for the manifest contract.
 
+Evidence-pack verification is separate from report verification. A signed
+evidence pack proves manifest integrity; signer authenticity requires pinning
+with `--expected-fingerprint` or a local trust store.
+
 ## What A Strict Pass Means
 
 A strict pass means one configured edited checkpoint comparison did not
@@ -47,6 +51,8 @@ A strict pass does not mean:
 
 - the model is safe, aligned, or free of content harms
 - the baseline model is trustworthy
+- an evidence-pack signer is authentic unless the signer fingerprint was pinned
+  or matched through a trusted local store
 - downstream tasks outside the configured evaluation windows are preserved
 - prompt injection, jailbreak, toxicity, bias, or deployment security risks
   are addressed
@@ -76,6 +82,24 @@ verified runtime-provenance result, not as a successful command exit alone.
 
 The verifier JSON result must then include
 `verification.runtime_provenance.status = verified`.
+
+## Evidence Pack Signer Authenticity
+
+Package-native evidence packs can include `manifest.signature.json`, an Ed25519
+signature over `manifest.json`. The verifier always derives and reports the
+signing-key fingerprint when a signature is present. That check provides
+tamper evidence for the manifest and checksum chain.
+
+Authenticity is stronger: reviewers must decide which signing keys they accept.
+For distributable evidence, require one of:
+
+- `invarlock advanced evidence-pack verify <dir> --expected-fingerprint sha256:<64-hex-chars>`
+- `invarlock advanced evidence-pack verify <dir> --trust-store <json>`
+- `~/.config/invarlock/trusted-signers.json` containing accepted fingerprints
+
+An unpinned signature should be treated as trust-on-first-use evidence: useful
+for integrity review, but not enough to prove the pack came from a specific
+publisher.
 
 ### Example (report fragment)
 
