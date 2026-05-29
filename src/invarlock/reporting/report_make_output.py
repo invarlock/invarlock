@@ -5,13 +5,12 @@ from typing import Any
 
 from . import policy_utils as report_policy_utils_mod
 from . import report_build_evidence as report_build_evidence_mod
-from . import report_confidence as report_confidence_mod
 from . import report_enrichment as report_enrichment_mod
 from . import report_overhead as report_overhead_mod
 from . import report_primary_metric_policy as report_primary_metric_policy_mod
 from . import report_provenance as report_provenance_mod
 from . import report_schema as report_schema_mod
-from .evaluation_report_builder import EvaluationReportBuilder
+from .report_build_context import EvaluationReportBuilder
 from .report_types import RunReport
 
 _TOP_LEVEL_GUARD_NAMES = frozenset({"spectral", "rmt", "variance", "invariants"})
@@ -243,7 +242,7 @@ def _finalize_evaluation_report(
         evaluation_report, report_map, current_run_id
     )
     report_enrichment_mod.attach_confidence_label(
-        evaluation_report, report_confidence_mod.compute_confidence_label
+        evaluation_report, report_enrichment_mod.compute_confidence_label
     )
     if build_diagnostics:
         meta_section = evaluation_report.setdefault("meta", {})

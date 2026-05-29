@@ -74,12 +74,12 @@ invarlock doctor --json
 For maintainer-facing CLI smoke coverage, use the lane scripts directly:
 
 ```bash
-bash scripts/cli_smoke_fast.sh
-bash scripts/cli_smoke_negative.sh
-bash scripts/cli_smoke_realistic.sh
+bash scripts/smoke/cli_smoke_fast.sh
+bash scripts/smoke/cli_smoke_negative.sh
+bash scripts/smoke/cli_smoke_realistic.sh
 
 # or dispatch the full matrix
-bash scripts/cli_exhaustive_smoke.sh
+bash scripts/smoke/cli_exhaustive_smoke.sh
 ```
 
 Lane intent:
@@ -193,7 +193,7 @@ For more curated examples (including the CI subset), see `tests/README.md`.
 
 Coverage configuration lives in `pyproject.toml` under `[tool.coverage.*]`.
 The canonical threshold/source-of-truth lives in
-`scripts/coverage_policy.py`; both `scripts/check_coverage_thresholds.py` and
+`scripts/coverage/coverage_policy.py`; both `scripts/coverage/check_coverage_thresholds.py` and
 the Makefile coverage targets consume that shared policy. Per-file branch
 coverage thresholds are enforced by `make coverage-enforce`.
 
@@ -218,11 +218,11 @@ Key points:
 
   ```bash
   make coverage-enforce
-  # internally: python scripts/check_coverage_thresholds.py --coverage reports/cov.xml --json reports/thresholds.json
+  # internally: python scripts/coverage/check_coverage_thresholds.py --coverage reports/cov.xml --json reports/thresholds.json
   ```
 
 - **Critical surface** includes (see `THRESHOLDS`, `CORE_PREFIXES`, and
-  `CORE_FILES` in `scripts/coverage_policy.py`):
+  `CORE_FILES` in `scripts/coverage/coverage_policy.py`):
   - Core runtime: everything under `src/invarlock/core/`
     (runner, registry, contracts, auto_tuning, events, types, checkpoint, api, retry)
   - Guards: everything under `src/invarlock/guards/`
@@ -287,7 +287,7 @@ Key points:
 When you modify a file covered by thresholds, please:
 
 - Add or extend tests to keep its measured coverage at or above its enforced floor
-- Update/add entries in `scripts/coverage_policy.py` if you
+- Update/add entries in `scripts/coverage/coverage_policy.py` if you
   expand the critical surface or add new core modules
 
 If the checker reports **“no coverage data present”**, ensure the module is
@@ -308,7 +308,7 @@ make docs           # mkdocs build --strict
 make docs-serve     # mkdocs serve -a 127.0.0.1:8000
 make docs-check     # consolidated docs validation plus curated live examples
 make docs-live-fast # curated deterministic live docs/notebook subset
-make docs-lint      # markdown + spell lint (via scripts/docs_lint.py)
+make docs-lint      # markdown + spell lint (via scripts/docs/docs_lint.py)
 ```
 
 Granular helpers:
@@ -322,7 +322,7 @@ make docs-lint-spell      # cspell only
 
 ### 4.2 Docs linting (markdownlint + cspell)
 
-`python scripts/docs_lint.py` wraps common linters:
+`python scripts/docs/docs_lint.py` wraps common linters:
 
 - Requires Node 22.18+.
 - Uses `markdownlint`, `markdownlint-cli2`, or `npx markdownlint-cli*`
@@ -332,8 +332,8 @@ This script runs over `README.md`, `CONTRIBUTING.md`, and all `docs/**/*.md`.
 To keep docs CI‑clean, please run at least:
 
 ```bash
-python scripts/docs_lint.py --markdown   # style
-python scripts/docs_lint.py --spell      # spelling
+python scripts/docs/docs_lint.py --markdown   # style
+python scripts/docs/docs_lint.py --spell      # spelling
 ```
 
 If you only have Node installed, the script will look for `node_modules/.bin` first.
@@ -349,7 +349,7 @@ otherwise it skips with a warning.
   - Relevant pages under `docs/reference/` and `docs/user-guide/`
 - When adding new CLI switches or config fields, update:
   - `docs/reference/cli.md`
-  - `docs/reference/config-schema.md` (and run `scripts/check_config_schema_sync.py`)
+  - `docs/reference/config-schema.md` (and run `scripts/checks/check_config_schema_sync.py`)
 
 ---
 
@@ -396,7 +396,7 @@ make test
 make lint
 make format
 make docs
-python scripts/docs_lint.py --markdown
+python scripts/docs/docs_lint.py --markdown
 ```
 
 For a more complete sweep, use:
@@ -405,7 +405,7 @@ For a more complete sweep, use:
 make verify
 ```
 
-This runs tests, a smoke regression (`scripts/run_smoke_regression.sh`),
+This runs tests, a smoke regression (`scripts/smoke/run_smoke_regression.sh`),
 CLI command-surface smokes, ruff lint, ruff format (check mode), packaged
 contract sync checks, and markdown lint over docs.
 

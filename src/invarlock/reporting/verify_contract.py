@@ -23,7 +23,8 @@ from invarlock.core.runtime_provenance import (
     verify_runtime_provenance,
 )
 
-from . import verify_check_helpers as _verify_checks
+from . import verify_check_helpers_consistency as _verify_consistency
+from . import verify_check_helpers_metrics as _verify_metrics
 from . import verify_output as _verify_output
 
 _VERIFY_RECOVERABLE_EXCEPTIONS = (
@@ -37,24 +38,24 @@ _VERIFY_RECOVERABLE_EXCEPTIONS = (
     ValueError,
 )
 
-_coerce_float = _verify_checks._coerce_float
-_coerce_int = _verify_checks._coerce_int
-_load_evaluation_report = _verify_checks._load_evaluation_report
-_resolve_path = _verify_checks._resolve_path
-_measurement_contract_digest = _verify_checks._measurement_contract_digest
-_validate_logspace_ci_identity = _verify_checks._validate_logspace_ci_identity
-_validate_primary_metric = _verify_checks._validate_primary_metric
-_validate_pairing = _verify_checks._validate_pairing
-_validate_counts = _verify_checks._validate_counts
-_validate_drift_band = _verify_checks._validate_drift_band
-_validate_tokenizer_hash = _verify_checks._validate_tokenizer_hash
-_validate_measurement_contracts = _verify_checks._validate_measurement_contracts
-_validate_variance_enablement = _verify_checks._validate_variance_enablement
-_apply_profile_lints = _verify_checks._apply_profile_lints
-_report_schema = _verify_checks._report_schema
-validate_report = _verify_checks.validate_report
-compute_validation_flags = _verify_checks.compute_validation_flags
-resolve_tiny_relax_from_report = _verify_checks.resolve_tiny_relax_from_report
+_coerce_float = _verify_metrics._coerce_float
+_coerce_int = _verify_metrics._coerce_int
+_load_evaluation_report = _verify_metrics._load_evaluation_report
+_resolve_path = _verify_consistency._resolve_path
+_measurement_contract_digest = _verify_consistency._measurement_contract_digest
+_validate_logspace_ci_identity = _verify_metrics._validate_logspace_ci_identity
+_validate_primary_metric = _verify_metrics._validate_primary_metric
+_validate_pairing = _verify_consistency._validate_pairing
+_validate_counts = _verify_consistency._validate_counts
+_validate_drift_band = _verify_consistency._validate_drift_band
+_validate_tokenizer_hash = _verify_consistency._validate_tokenizer_hash
+_validate_measurement_contracts = _verify_consistency._validate_measurement_contracts
+_validate_variance_enablement = _verify_consistency._validate_variance_enablement
+_apply_profile_lints = _verify_consistency._apply_profile_lints
+_report_schema = _verify_metrics._report_schema
+validate_report = _verify_metrics.validate_report
+compute_validation_flags = _verify_metrics.compute_validation_flags
+resolve_tiny_relax_from_report = _verify_metrics.resolve_tiny_relax_from_report
 
 
 @dataclass(frozen=True)
@@ -129,24 +130,25 @@ class VerifyReportResult:
 
 
 def _validate_report_schema_strict(report: dict[str, Any]) -> bool:
-    return _verify_checks._validate_report_schema_strict(
+    return _verify_metrics._validate_report_schema_strict(
         report,
         report_schema_module=_report_schema,
     )
 
 
 def _recompute_validation_flags(report: dict[str, Any]) -> dict[str, bool]:
-    return _verify_checks._recompute_validation_flags(
+    flags: dict[str, bool] = _verify_metrics._recompute_validation_flags(
         report,
         compute_validation_flags_fn=compute_validation_flags,
         resolve_tiny_relax_from_report_fn=resolve_tiny_relax_from_report,
     )
+    return flags
 
 
 def _validate_primary_metric_policy(
     report: dict[str, Any], *, profile: str | None = None
 ) -> list[str]:
-    return _verify_checks._validate_primary_metric_policy(
+    return _verify_metrics._validate_primary_metric_policy(
         report,
         profile=profile,
         recompute_validation_flags_fn=_recompute_validation_flags,
@@ -156,7 +158,7 @@ def _validate_primary_metric_policy(
 def _validate_evaluation_report_payload(
     path: Path, *, profile: str | None = None
 ) -> list[str]:
-    return _verify_checks._validate_evaluation_report_payload(
+    return _verify_consistency._validate_evaluation_report_payload(
         path,
         profile=profile,
         load_evaluation_report_fn=_load_evaluation_report,

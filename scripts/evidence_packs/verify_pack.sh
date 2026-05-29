@@ -2,8 +2,8 @@
 # verify_pack.sh - Validate evidence pack checksums and reports.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=lib/runtime.sh
-source "${SCRIPT_DIR}/lib/runtime.sh"
+# shellcheck source=lib/core/runtime.sh
+source "${SCRIPT_DIR}/lib/core/runtime.sh"
 if [[ -z "${PYTHON_BIN:-}" ]]; then
     if [[ -n "${TEST_REAL_PYTHON3:-}" && -x "${TEST_REAL_PYTHON3}" ]]; then
         PYTHON_BIN="${TEST_REAL_PYTHON3}"

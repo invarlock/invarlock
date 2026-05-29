@@ -386,7 +386,7 @@ baseline and the tail-gate evaluation outcome:
 
 Telemetry values are copied from `report.json` into reports and always
 include the execution device. CPU telemetry sweeps are collected via
-`scripts/run_cpu_telemetry.sh`.
+`scripts/smoke/run_cpu_telemetry.sh`.
 
 | JSON Pointer | Meaning | Notes |
 | --- | --- | --- |

@@ -1,8 +1,9 @@
 # Scripts Directory
 
-`scripts/` contains repo-maintainer tooling, not install-time package APIs. Treat
-top-level paths that appear in `Makefile`, `.github/workflows/`, or published docs
-as compatibility entry points.
+`scripts/` contains repo-maintainer tooling, not install-time package APIs. The
+root directory is intentionally small; stable commands live under family
+subdirectories and are normally reached through `make` targets or documented
+workflow paths.
 
 The checked taxonomy lives in `scripts/scripts_inventory.toml`:
 
@@ -32,8 +33,9 @@ Makefile, GitHub workflow, docs, and test references. Unreferenced files are not
 deleted automatically; use the list to mark deprecations or consolidate helpers
 around stable entry points.
 
-Run `make scripts-inventory-check` after adding, moving, or deleting anything
-under `scripts/`; run `make scripts-audit` when reorganizing the tree. New broad
-workflow code should go under an existing family subdirectory when possible; keep
-a top-level compatibility wrapper only when a documented command or CI workflow
-already depends on that path.
+Current top-level files are limited to this README, the inventory, the inventory
+checker, `select_workspace_python.sh`, and the `scripts` package marker. Run
+`make scripts-inventory-check` after adding, moving, or deleting anything under
+`scripts/`; run `make scripts-audit` when reorganizing the tree. New broad
+workflow code must go under an existing family subdirectory unless it is the
+inventory checker itself.

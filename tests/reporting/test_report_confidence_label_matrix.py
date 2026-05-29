@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_confidence import compute_confidence_label
+from invarlock.reporting.report_enrichment import compute_confidence_label
 from invarlock.reporting.report_schema import REPORT_SCHEMA_VERSION
 
 

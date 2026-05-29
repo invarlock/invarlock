@@ -58,19 +58,19 @@ fi
 coverage_owner_hint() {
     local rel="$1"
     case "${rel}" in
-        scripts/evidence_packs/lib/config_generator.sh) echo "scripts/evidence_packs/tests/test_config_generator.sh" ;;
-        scripts/evidence_packs/lib/dataset_provider_config.sh) echo "scripts/evidence_packs/tests/test_dataset_provider_config.sh" ;;
-        scripts/evidence_packs/lib/task_serialization.sh) echo "scripts/evidence_packs/tests/test_task_serialization.sh" ;;
-        scripts/evidence_packs/lib/queue_manager.sh) echo "scripts/evidence_packs/tests/test_queue_manager.sh" ;;
-        scripts/evidence_packs/lib/scheduler.sh) echo "scripts/evidence_packs/tests/test_scheduler.sh" ;;
-        scripts/evidence_packs/lib/gpu_worker.sh) echo "scripts/evidence_packs/tests/test_gpu_worker.sh" ;;
-        scripts/evidence_packs/lib/fault_tolerance.sh) echo "scripts/evidence_packs/tests/test_fault_tolerance.sh" ;;
-        scripts/evidence_packs/lib/task_functions.sh) echo "scripts/evidence_packs/tests/test_task_functions.sh" ;;
-        scripts/evidence_packs/lib/result_compiler.sh) echo "scripts/evidence_packs/tests/test_result_compiler.sh" ;;
-        scripts/evidence_packs/lib/model_creation.sh) echo "scripts/evidence_packs/tests/test_model_creation.sh" ;;
-        scripts/evidence_packs/lib/runtime.sh) echo "scripts/evidence_packs/tests/test_runtime.sh" ;;
-        scripts/evidence_packs/lib/validation_suite.sh) echo "scripts/evidence_packs/tests/test_validation_suite.sh" ;;
-        scripts/evidence_packs/lib/setup_remote.sh) echo "scripts/evidence_packs/tests/test_setup_remote.sh" ;;
+        scripts/evidence_packs/lib/config/config_generator.sh) echo "scripts/evidence_packs/tests/test_config_generator.sh" ;;
+        scripts/evidence_packs/lib/config/dataset_provider_config.sh) echo "scripts/evidence_packs/tests/test_dataset_provider_config.sh" ;;
+        scripts/evidence_packs/lib/tasks/task_serialization.sh) echo "scripts/evidence_packs/tests/test_task_serialization.sh" ;;
+        scripts/evidence_packs/lib/queue/queue_manager.sh) echo "scripts/evidence_packs/tests/test_queue_manager.sh" ;;
+        scripts/evidence_packs/lib/queue/scheduler.sh) echo "scripts/evidence_packs/tests/test_scheduler.sh" ;;
+        scripts/evidence_packs/lib/queue/gpu_worker.sh) echo "scripts/evidence_packs/tests/test_gpu_worker.sh" ;;
+        scripts/evidence_packs/lib/core/fault_tolerance.sh) echo "scripts/evidence_packs/tests/test_fault_tolerance.sh" ;;
+        scripts/evidence_packs/lib/tasks/task_functions.sh) echo "scripts/evidence_packs/tests/test_task_functions.sh" ;;
+        scripts/evidence_packs/lib/validation/result_compiler.sh) echo "scripts/evidence_packs/tests/test_result_compiler.sh" ;;
+        scripts/evidence_packs/lib/tasks/model_creation.sh) echo "scripts/evidence_packs/tests/test_model_creation.sh" ;;
+        scripts/evidence_packs/lib/core/runtime.sh) echo "scripts/evidence_packs/tests/test_runtime.sh" ;;
+        scripts/evidence_packs/lib/validation/validation_suite.sh) echo "scripts/evidence_packs/tests/test_validation_suite.sh" ;;
+        scripts/evidence_packs/lib/core/setup_remote.sh) echo "scripts/evidence_packs/tests/test_setup_remote.sh" ;;
         scripts/evidence_packs/suites.sh) echo "scripts/evidence_packs/tests/test_suites.sh" ;;
         scripts/evidence_packs/run_qwen14_sentinels.sh) echo "scripts/evidence_packs/tests/test_run_qwen14_sentinels.sh" ;;
         scripts/evidence_packs/run_suite.sh) echo "scripts/evidence_packs/tests/test_run_suite.sh" ;;
@@ -85,7 +85,7 @@ coverage_target_files() {
     (
         cd "${ROOT_DIR}"
         find scripts/evidence_packs -maxdepth 1 -type f -name '*.sh' -print
-        find scripts/evidence_packs/lib -maxdepth 1 -type f -name '*.sh' -print
+        find scripts/evidence_packs/lib -type f -name '*.sh' -print
     ) | sort
 }
 

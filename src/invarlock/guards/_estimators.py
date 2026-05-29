@@ -142,6 +142,7 @@ def stable_rank_estimate(
     try:
         denom = float(sigma_max) ** 2
     except _ESTIMATOR_COERCION_ERRORS:
+        # guard-fallback-ok: stable-rank helper has no report context; invalid sigma is non-measurable.
         return 0.0
     if not math.isfinite(denom) or denom <= 0.0:
         return 0.0

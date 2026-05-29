@@ -164,7 +164,7 @@ configured acceptance envelopes even when aggressive compression is attempted.
   `notebooks/invarlock_python_api.ipynb`, and
   `notebooks/invarlock_policy_tiers.ipynb`.
 - Runnable documentation surfaces can be verified locally with
-  `make docs-live-fast`, `python scripts/verify_live_examples.py`, or
+  `make docs-live-fast`, `python scripts/docs/verify_live_examples.py`, or
   `make docs-live`.
 - The curated fast lane replays concrete Markdown CLI snippets in host
   mode with seeded demo evidence, then smoke-runs the curated notebook subset.
@@ -248,13 +248,13 @@ the canonical source of truth for normalized support tiers
 published-basis evidence references.
 
 Model evidence automation lives in
-`scripts/model_evidence_sweep.py`, with tmux-based remote launch support in
-`scripts/run_model_evidence_remote.py` and a nightly/manual runner workflow in
+`scripts/model_evidence/model_evidence_sweep.py`, with tmux-based remote launch support in
+`scripts/model_evidence/run_model_evidence_remote.py` and a nightly/manual runner workflow in
 `.github/workflows/model-evidence-sweep.yml`.
 Repo-prepared-but-not-yet-promoted lanes are tracked in
 `contracts/model_family_catalog.json`.
 For the new Gemma 4 text lane, the repo-maintained local smoke is the included
-manifest dry-run (`scripts/model_evidence_sweep.py --slug gemma4_e2b --dry-run`).
+manifest dry-run (`scripts/model_evidence/model_evidence_sweep.py --slug gemma4_e2b --dry-run`).
 The image-text path also includes an offline demo preset at
 `configs/presets/multimodal/gemma4_e2b_vision_text_256.yaml` plus
 `tests/fixtures/vision_text/demo_manifest.jsonl` for provider/config validation;
@@ -287,7 +287,7 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
 ```bash
 invarlock advanced plugins adapters
 invarlock advanced calibrate --help
-bash scripts/verify_ci_matrix.sh
+bash scripts/checks/verify_ci_matrix.sh
 ```
 
 ### Production Evaluation
@@ -343,7 +343,7 @@ output:
 <!-- Quick CPU demos are intentionally omitted from this public docs index. -->
 
 ```bash
-NET=1 INCLUDE_MEASURED_CLS=1 RUN=0 bash scripts/run_tiny_all_matrix.sh
+NET=1 INCLUDE_MEASURED_CLS=1 RUN=0 bash scripts/smoke/run_tiny_all_matrix.sh
 ```
 
 Run with `RUN=1` to execute the matrix.

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from invarlock.reporting import report_edit_summary as report_edit_summary_mod
 from invarlock.reporting import report_provenance as provenance_mod
-from invarlock.reporting.report_confidence import compute_confidence_label
+from invarlock.reporting.report_enrichment import compute_confidence_label
 
 
 def test_compute_edit_digest_detects_quantization():

@@ -12,7 +12,7 @@ def test_tiny_gpt2_matrix_dry_run(tmp_path: Path):
     env["GPT2_ID"] = "sshleifer/tiny-gpt2"
     env["TMP_DIR"] = str(tmp_path / "tmp")
     # The script should complete without executing any commands and write a checklist
-    subprocess.check_call(["bash", "scripts/run_tiny_all_matrix.sh"], env=env)
+    subprocess.check_call(["bash", "scripts/smoke/run_tiny_all_matrix.sh"], env=env)
     checklist = Path(env["TMP_DIR"]) / "checklist.md"
     assert checklist.exists()
     text = checklist.read_text()
@@ -41,7 +41,7 @@ def test_checklist_uses_dev_profile_when_tiny_relax(monkeypatch, tmp_path):
     env["NET"] = "0"
     env["INVARLOCK_TINY_RELAX"] = "1"
     subprocess_result = subprocess.run(
-        ["bash", "scripts/run_tiny_all_matrix.sh"],
+        ["bash", "scripts/smoke/run_tiny_all_matrix.sh"],
         env=env,
         check=True,
         capture_output=True,
@@ -60,7 +60,7 @@ def test_checklist_defaults_to_ci_when_no_relax(monkeypatch, tmp_path):
     env["NET"] = "0"
     env.pop("INVARLOCK_TINY_RELAX", None)
     subprocess_result = subprocess.run(
-        ["bash", "scripts/run_tiny_all_matrix.sh"],
+        ["bash", "scripts/smoke/run_tiny_all_matrix.sh"],
         env=env,
         check=True,
         capture_output=True,
@@ -80,7 +80,7 @@ def test_explicit_profile_overrides_relax(monkeypatch, tmp_path):
     env["PROFILE"] = "ci"
     env["INVARLOCK_TINY_RELAX"] = "1"  # should NOT override explicit PROFILE
     res = subprocess.run(
-        ["bash", "scripts/run_tiny_all_matrix.sh"],
+        ["bash", "scripts/smoke/run_tiny_all_matrix.sh"],
         env=env,
         check=True,
         capture_output=True,
@@ -97,7 +97,7 @@ def test_checklist_no_longer_advertises_distilbert_classification(tmp_path: Path
     env["RUN"] = "0"
     env["TMP_DIR"] = str(tmp_path / "tmp")
     subprocess.run(
-        ["bash", "scripts/run_tiny_all_matrix.sh"],
+        ["bash", "scripts/smoke/run_tiny_all_matrix.sh"],
         env=env,
         check=True,
         capture_output=True,
@@ -110,7 +110,7 @@ def test_checklist_no_longer_advertises_distilbert_classification(tmp_path: Path
 
 
 def test_net_bootstrap_prefers_cpu_torch_before_hf_extra() -> None:
-    text = Path("scripts/run_tiny_all_matrix.sh").read_text(encoding="utf-8")
+    text = Path("scripts/smoke/run_tiny_all_matrix.sh").read_text(encoding="utf-8")
     cpu_torch_install = 'os.environ["TORCH_CPU_INDEX_URL"]'
     hf_install = '".[hf]"'
 
@@ -134,7 +134,7 @@ def test_hf_extras_include_sentencepiece_for_runtime_tokenizer_support() -> None
 
 
 def test_matrix_uses_repo_python_selector_and_py312_floor() -> None:
-    text = Path("scripts/run_tiny_all_matrix.sh").read_text(encoding="utf-8")
+    text = Path("scripts/smoke/run_tiny_all_matrix.sh").read_text(encoding="utf-8")
 
     assert (
         'PYTHON_BIN="${PYTHON_BIN:-$(bash scripts/select_workspace_python.sh)}"' in text
@@ -144,7 +144,7 @@ def test_matrix_uses_repo_python_selector_and_py312_floor() -> None:
 
 
 def test_quant_demo_uses_dev_profile_by_default() -> None:
-    text = Path("scripts/run_tiny_all_matrix.sh").read_text(encoding="utf-8")
+    text = Path("scripts/smoke/run_tiny_all_matrix.sh").read_text(encoding="utf-8")
 
     assert 'QUANT_PROFILE="${QUANT_PROFILE:-dev}"' in text
     assert '--profile "$QUANT_PROFILE"' in text
@@ -152,14 +152,14 @@ def test_quant_demo_uses_dev_profile_by_default() -> None:
 
 
 def test_encoder_mlm_smoke_uses_stable_tiny_model() -> None:
-    text = Path("scripts/run_tiny_all_matrix.sh").read_text(encoding="utf-8")
+    text = Path("scripts/smoke/run_tiny_all_matrix.sh").read_text(encoding="utf-8")
 
     assert 'BERT_ID=${BERT_ID:-"sshleifer/tiny-distilroberta-base"}' in text
     assert 'echo "## Encoder MLM" >> "$TMP_DIR/checklist.md"' in text
 
 
 def test_matrix_prefers_local_runtime_image_when_available() -> None:
-    text = Path("scripts/run_tiny_all_matrix.sh").read_text(encoding="utf-8")
+    text = Path("scripts/smoke/run_tiny_all_matrix.sh").read_text(encoding="utf-8")
 
     assert "docker image inspect invarlock-runtime:cuda-local" in text
     assert 'export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"' in text
@@ -207,7 +207,7 @@ def test_run_mode_falls_back_to_python_module_when_console_script_missing(
     env["PATH"] = os.pathsep.join([str(bin_dir), *path_parts])
 
     subprocess.run(
-        ["bash", "scripts/run_tiny_all_matrix.sh"],
+        ["bash", "scripts/smoke/run_tiny_all_matrix.sh"],
         env=env,
         check=True,
         capture_output=True,

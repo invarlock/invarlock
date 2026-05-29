@@ -3,8 +3,8 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# shellcheck source=lib/validation_suite.sh
-source "${SCRIPT_DIR}/lib/validation_suite.sh"
+# shellcheck source=lib/validation/validation_suite.sh
+source "${SCRIPT_DIR}/lib/validation/validation_suite.sh"
 # shellcheck source=suites.sh
 source "${SCRIPT_DIR}/suites.sh"
 

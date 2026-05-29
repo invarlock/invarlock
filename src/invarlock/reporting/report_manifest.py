@@ -7,16 +7,58 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
-from .evidence import maybe_dump_guard_evidence
-from .report_evidence import build_guard_evidence_payload
+from .report_evidence import build_guard_evidence_payload, maybe_dump_guard_evidence
 from .report_summary import (
+    ReportManifestSummary,
     build_report_manifest_summary,
     derive_report_manifest_evidence_level,
 )
 from .report_types import RunReport
-from .reviewer_summary import render_evaluation_bundle_reviewer_summary
 
 _NON_FATAL_EXCEPTIONS = (AttributeError, OSError, TypeError, ValueError)
+
+
+def render_evaluation_bundle_reviewer_summary(
+    summary: ReportManifestSummary,
+    *,
+    evidence_level: str,
+    has_guard_evidence: bool,
+) -> str:
+    """Render a short plain-text audit summary for evaluation bundles."""
+    lines = [
+        "InvarLock Evaluation Bundle Reviewer Summary",
+        "",
+        f"Evidence level: {evidence_level}",
+        f"Overall status: {summary.overall_status}",
+        (
+            "What we tested: "
+            f"model={summary.run_model or 'unknown'}, device={summary.device or 'unknown'}, "
+            f"gates={summary.gates_passed}/{summary.gates_total}."
+        ),
+        "",
+        "Why it might be wrong:",
+    ]
+    if has_guard_evidence:
+        lines.append(
+            "- Guard evidence sidecar is present, but reviewers should still compare it against the canonical evaluation report."
+        )
+    else:
+        lines.append(
+            "- No guard evidence sidecar was bundled, so this package only includes the rendered report artifacts."
+        )
+    lines.extend(
+        [
+            "- This bundle is a packaging surface, not a signed provenance envelope.",
+            "",
+            "Known rerun guidance:",
+            "- Reproduce from the same run inputs and compare evaluation.report.json with evaluation_report.md for drift.",
+            "",
+            "Environment assumptions:",
+            f"- Device: {summary.device or 'unknown'}",
+            f"- Seed: {summary.seed if summary.seed is not None else 'unknown'}",
+        ]
+    )
+    return "\n".join(lines) + "\n"
 
 
 def write_report_manifest(
@@ -82,4 +124,4 @@ def write_report_manifest(
         pass
 
 
-__all__ = ["write_report_manifest"]
+__all__ = ["render_evaluation_bundle_reviewer_summary", "write_report_manifest"]

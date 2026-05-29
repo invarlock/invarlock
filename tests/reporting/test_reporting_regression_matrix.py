@@ -8,7 +8,8 @@ import invarlock.reporting.report_validation as report_validation_mod
 import invarlock.reporting.run_report_contract as run_report_contract_mod
 import invarlock.reporting.run_report_formatters as run_report_formatters_mod
 import invarlock.reporting.validate as validate_mod
-import invarlock.reporting.verify_check_helpers as verify_helpers_mod
+import invarlock.reporting.verify_check_helpers_consistency as verify_helpers_mod
+import invarlock.reporting.verify_check_helpers_metrics as verify_metrics_mod
 import invarlock.reporting.verify_contract as verify_contract_mod
 from invarlock.core.exceptions import InvarlockError
 from invarlock.reporting.report_types import RunReport, create_empty_report
@@ -351,7 +352,7 @@ def test_verify_helpers_cover_report_loading_primary_metric_and_validation_edges
         "report missing preview/final to compute drift ratio."
     ]
 
-    recomputed = verify_helpers_mod._recompute_validation_flags(  # noqa: SLF001
+    recomputed = verify_metrics_mod._recompute_validation_flags(  # noqa: SLF001
         {
             "primary_metric": {
                 "kind": "ppl_causal",
@@ -414,7 +415,7 @@ def test_verify_helpers_cover_report_loading_primary_metric_and_validation_edges
         == []
     )
 
-    non_dict_stats = verify_helpers_mod._recompute_validation_flags(  # noqa: SLF001
+    non_dict_stats = verify_metrics_mod._recompute_validation_flags(  # noqa: SLF001
         {
             "primary_metric": {
                 "kind": "ppl_causal",

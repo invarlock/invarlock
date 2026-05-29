@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = REPO_ROOT / "scripts" / "check_repo_cruft.py"
+SCRIPT = REPO_ROOT / "scripts" / "checks" / "check_repo_cruft.py"
 
 
 def _run(root: Path) -> subprocess.CompletedProcess[str]:

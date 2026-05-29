@@ -270,7 +270,7 @@ jobs:
         run: python -m pip install --require-hashes -r requirements/workflows/security-ci-py313.txt
 
       - name: Generate tool-environment SBOM
-        run: bash scripts/generate_sbom.sh --scope tool-environment
+        run: bash scripts/security/generate_sbom.sh --scope tool-environment
 
       - name: Run pip-audit
         run: python scripts/security/run_pip_audit.py

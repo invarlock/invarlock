@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_confidence import (
+from invarlock.reporting.report_enrichment import (
     compute_confidence_label as _compute_confidence_label,
 )
 from invarlock.reporting.report_primary_metric_policy import is_ppl_kind as _is_ppl_kind

@@ -11,7 +11,7 @@ import pytest
 
 def _load_script_module() -> ModuleType:
     repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "docs_lint.py"
+    script_path = repo_root / "scripts" / "docs" / "docs_lint.py"
     spec = importlib.util.spec_from_file_location("tests_docs_lint", script_path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)

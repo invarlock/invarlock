@@ -62,7 +62,7 @@ invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000
   installed wheels.
 - `scripts/evidence_packs/suites.sh` defines the model suites and allows
   `MODEL_1`–`MODEL_8` overrides.
-- `scripts/evidence_packs/lib/validation_suite.sh` orchestrates the run: preflight,
+- `scripts/evidence_packs/lib/validation/validation_suite.sh` orchestrates the run: preflight,
   queue creation, worker launch, and monitoring.
 
 ### Library modules
@@ -657,7 +657,7 @@ Maintainer evidence-pack packaging also treats source provenance as fail-closed:
 
 ## Remote setup helper
 
-`scripts/evidence_packs/lib/setup_remote.sh` is an optional bootstrap script for
+`scripts/evidence_packs/lib/core/setup_remote.sh` is an optional bootstrap script for
 fresh GPU hosts. It clones the repo, creates a venv, installs PyTorch and
 InvarLock, and leaves the host ready to run `run_pack.sh`.
 
@@ -691,7 +691,7 @@ Recommended remote validation checklist after security-default changes:
    `INVARLOCK_CONFIG_ROOT` overrides.
 2. Run one delegated `invarlock evaluate` with external `--edit-config`,
    `TMPDIR`, and `INVARLOCK_EXPORT_DIR` roots.
-3. Run one `scripts/model_evidence_sweep.py --execution-mode container` lane
+3. Run one `scripts/model_evidence/model_evidence_sweep.py --execution-mode container` lane
    with an external output root and confirm the published report path is
    populated.
 

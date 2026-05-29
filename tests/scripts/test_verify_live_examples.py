@@ -9,7 +9,7 @@ from types import ModuleType
 
 def _load_script_module() -> ModuleType:
     repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "verify_live_examples.py"
+    script_path = repo_root / "scripts" / "docs" / "verify_live_examples.py"
     spec = importlib.util.spec_from_file_location(
         "tests_verify_live_examples", script_path
     )

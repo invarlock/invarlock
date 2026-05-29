@@ -7,7 +7,7 @@
 | **Purpose** | Track non-synthetic guard evidence for spectral, RMT, and variance behavior on real model/checkpoint workflows. |
 | **Audience** | Maintainers, release reviewers, and calibration owners. |
 | **Contract scope** | Portable evidence manifests that point to real-run artifacts; not a substitute for the strict verifier report contract. |
-| **Source of truth** | `scripts/release/check_empirical_guard_evidence.py`, `scripts/model_evidence_sweep.py`, calibration commands, and evidence-pack scripts. |
+| **Source of truth** | `scripts/release/check_empirical_guard_evidence.py`, `scripts/model_evidence/model_evidence_sweep.py`, calibration commands, and evidence-pack scripts. |
 
 ## Maintainer Command
 
@@ -29,9 +29,9 @@ different location.
 The empirical bundle is meant to reference artifacts produced by existing
 non-synthetic workflows:
 
-- `make model-evidence-sweep` or `scripts/model_evidence_sweep.py` for
+- `make model-evidence-sweep` or `scripts/model_evidence/model_evidence_sweep.py` for
   maintained shipped-model lanes.
-- `scripts/run_model_evidence_remote.py` for remote GPU execution of the same
+- `scripts/model_evidence/run_model_evidence_remote.py` for remote GPU execution of the same
   model-evidence sweep.
 - `invarlock advanced calibrate null-sweep` for empirical spectral null
   behavior.

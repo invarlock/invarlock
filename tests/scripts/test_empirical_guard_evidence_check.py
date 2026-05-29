@@ -207,7 +207,9 @@ def test_empirical_guard_evidence_check_rejects_artifact_path_edges(
         json.dumps(
             {
                 "schema": "invarlock/empirical-guard-evidence-v1",
-                "source_commands": ["scripts/model_evidence_sweep.py --dry-run"],
+                "source_commands": [
+                    "scripts/model_evidence/model_evidence_sweep.py --dry-run"
+                ],
                 "guard_rows": rows,
                 "model_family_rows": [
                     {
@@ -333,7 +335,11 @@ def test_empirical_guard_evidence_check_rejects_required_field_edges(
 
     failures.clear()
     module._validate_source_commands(
-        {"source_commands": ["scripts/model_evidence_sweep.py --dry-run"]},
+        {
+            "source_commands": [
+                "scripts/model_evidence/model_evidence_sweep.py --dry-run"
+            ]
+        },
         failures,
     )
     assert failures == []
@@ -472,7 +478,7 @@ def test_empirical_guard_evidence_contract_empty_guard_rows(tmp_path: Path) -> N
         root=tmp_path,
         payload={
             "schema": "invarlock/empirical-guard-evidence-v1",
-            "source_commands": ["scripts/model_evidence_sweep.py"],
+            "source_commands": ["scripts/model_evidence/model_evidence_sweep.py"],
             "guard_rows": [],
             "model_family_rows": [{"model_family": "gpt2", "status": "observed"}],
         },

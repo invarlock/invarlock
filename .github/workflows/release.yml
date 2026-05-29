@@ -178,7 +178,7 @@ jobs:
       - name: Run release pip-audit
         run: python scripts/security/run_pip_audit.py --path "${{ steps.install_surface.outputs.site_packages }}"
       - name: Generate release install-surface SBOM
-        run: bash scripts/generate_sbom.sh --scope install-surface --python "${{ steps.install_surface.outputs.python }}" artifacts/supply-chain/sbom.json
+        run: bash scripts/security/generate_sbom.sh --scope install-surface --python "${{ steps.install_surface.outputs.python }}" artifacts/supply-chain/sbom.json
       - name: Upload dist artifacts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

@@ -48,7 +48,7 @@ def test_promotion_gap_gpu_suite_glm_host_dry_run_uses_lane_preset(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "scripts" / "model_evidence_sweep.py"
+    script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
     output_root = tmp_path / "candidate-glm-host"
 
     proc = subprocess.run(
@@ -108,7 +108,7 @@ def test_model_evidence_sweep_marks_remote_code_prefetch_as_skipped(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "scripts" / "model_evidence_sweep.py"
+    script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
     fake_python = tmp_path / "remote-code-fake-python"
     fake_python.write_text(
         """#!/bin/bash

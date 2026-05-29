@@ -27,10 +27,18 @@ Each directory includes:
 | `evaluation.report.json` | Canonical verifier input with primary metric, guard evidence, policy digest, and assurance section. |
 | `runtime.manifest.json` | Container runtime provenance manifest bound to the report by SHA-256. |
 | `evidence_pack_recipe.json` | Recipe pointer for rebuilding a full validation evidence pack. |
+| `artifact_package/` | Checkpoint references, report/runtime paths, signed-pack path, and exact verifier commands. |
 | `evidence_pack/` | Signed, checksum-bound GPT-2 public evidence pack that verifies under strict release policy. |
 
 The support matrix records these paths under
 `contracts/support_matrix.json` as the `published_basis` evidence floor.
+
+The GPT-2 `artifact_package/` is intentionally a checkpoint-reference package,
+not a weight dump. It names the baseline and subject checkpoint references, binds
+them to the report, runtime manifest, and signed pack, and keeps the exact
+verification commands in `artifact_package/artifact_package.json`. Large model
+weights remain external to the repository; the rebuild recipe is the source of
+truth for materializing a fresh BYOE evidence drop.
 
 The GPT-2 lane also ships a small signed pack so reviewers can exercise the
 full offline evidence-pack verifier without rebuilding the suite:

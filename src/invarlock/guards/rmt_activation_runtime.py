@@ -326,6 +326,7 @@ def activation_svd_outliers(
     try:
         mat = activations.detach().float().cpu()
     except (AttributeError, RuntimeError, TypeError, ValueError):
+        # guard-fallback-ok: activation outlier helper has no report context; caller treats zero samples as not evaluated.
         return 0, 0.0, 0.0
 
     if not torch.isfinite(mat).all():
@@ -346,6 +347,7 @@ def activation_svd_outliers(
     try:
         s_vals = torch.linalg.svdvals(mat)
     except (RuntimeError, torch.linalg.LinAlgError):
+        # guard-fallback-ok: SVD failure makes this activation slice non-measurable for the caller.
         return 0, 0.0, 0.0
 
     if s_vals.numel() == 0:

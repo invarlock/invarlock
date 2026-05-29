@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from scripts.filter_scorecard_sarif import filter_sarif
+from scripts.security.filter_scorecard_sarif import filter_sarif
 
 
 def test_filter_sarif_removes_excluded_results_and_rules() -> None:
@@ -101,7 +101,7 @@ def test_cli_writes_filtered_output(tmp_path: Path) -> None:
     subprocess.run(
         [
             sys.executable,
-            "scripts/filter_scorecard_sarif.py",
+            "scripts/security/filter_scorecard_sarif.py",
             "--input",
             str(input_path),
             "--output",

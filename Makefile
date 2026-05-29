@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync repo-cruft-check scripts-inventory-check scripts-audit architecture-fragmentation-check model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-image-cuda-quant runtime-image-cuda-quant-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-smoke-cuda-quant runtime-smoke-cuda-quant-podman runtime-verify actionlint workflow-lint packaging-smoke-minimal packaging-smoke-front-door ensure-mypy cve-audit dist-check release-evidence-check guard-validation-smoke empirical-guard-evidence-check
+.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint typecheck mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync repo-cruft-check scripts-inventory-check scripts-audit architecture-fragmentation-check guard-fallback-audit model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-image-cuda-quant runtime-image-cuda-quant-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-smoke-cuda-quant runtime-smoke-cuda-quant-podman runtime-verify actionlint workflow-lint packaging-smoke-minimal packaging-smoke-front-door ensure-mypy cve-audit dist-check release-evidence-check guard-validation-smoke empirical-guard-evidence-check
 
 PYTHON ?= $(shell bash scripts/select_workspace_python.sh)
 PIP := $(PYTHON) -m pip
@@ -25,7 +25,7 @@ RUNTIME_IMAGE_DIGEST ?= sha256:local-runtime-image
 SECURITY_ARTIFACT_DIR ?= artifacts/supply-chain
 SECURITY_RUN ?= uv run --isolated --locked --extra security-ci
 DIST_RUN ?= uv run --isolated --locked --extra release-ci
-COVERAGE_POLICY := $(PYTHON) scripts/coverage_policy.py
+COVERAGE_POLICY := $(PYTHON) scripts/coverage/coverage_policy.py
 
 # Keep repo-wide coverage practical while still exercising the CLI command
 # surface that would otherwise pull the project floor below the real trust core.
@@ -163,14 +163,15 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/cli/commands/verify.py \
 	src/invarlock/cli/runtime_verify.py \
 	src/invarlock/eval/probes/mi.py \
-	src/invarlock/reporting/evaluation_report_builder.py \
-	src/invarlock/reporting/report_confidence.py \
+	src/invarlock/reporting/report_build_context.py \
 	src/invarlock/reporting/report_build_evidence.py \
+	src/invarlock/reporting/report_enrichment.py \
 	src/invarlock/reporting/report_make_output.py \
 	src/invarlock/reporting/report_primary_metric_policy.py \
 	src/invarlock/reporting/report_schema.py \
 	src/invarlock/reporting/report_types.py \
-	src/invarlock/reporting/verify_check_helpers.py \
+	src/invarlock/reporting/verify_check_helpers_consistency.py \
+	src/invarlock/reporting/verify_check_helpers_metrics.py \
 	src/invarlock/reporting/verify_contract.py \
 	src/invarlock/runtime_security.py \
 	src/invarlock/runtime_security_helpers.py \
@@ -229,7 +230,7 @@ coverage:  ## Run tests with coverage and generate XML
 
 coverage-enforce:  ## Run coverage and enforce per-file thresholds
 	$(MAKE) coverage
-	$(PYTHON) scripts/check_coverage_thresholds.py --coverage reports/cov.xml --json reports/thresholds.json
+	$(PYTHON) scripts/coverage/check_coverage_thresholds.py --coverage reports/cov.xml --json reports/thresholds.json
 
 # Grouped test targets
 .PHONY: $(addprefix test-,$(GROUPED_TEST_DIR_TARGETS))
@@ -306,6 +307,10 @@ lint:  ## Run linting
 	$(RUFF) check src/ tests/ scripts/
 	$(MYPY) src/
 
+typecheck:  ## Run type checking
+	$(MAKE) ensure-mypy
+	$(MYPY) src/
+
 mypy-typed-surface:  ## Run mypy on the enforced typed surface
 	$(MAKE) ensure-python
 	$(MAKE) ensure-mypy
@@ -322,8 +327,9 @@ verify:  ## Run verification (pytest -q, runtime verifier, lint, format, strict 
 	$(MAKE) repo-cruft-check
 	$(MAKE) scripts-inventory-check
 	$(MAKE) architecture-fragmentation-check
+	$(MAKE) guard-fallback-audit
 	PYTHONPATH=src $(PYTEST) -q
-	OMP_NUM_THREADS=1 SKIP_RUFF=1 INVARLOCK_PYTHON="$(PYTHON)" bash scripts/run_smoke_regression.sh
+	OMP_NUM_THREADS=1 SKIP_RUFF=1 INVARLOCK_PYTHON="$(PYTHON)" bash scripts/smoke/run_smoke_regression.sh
 	$(MAKE) cli-smoke-core
 	$(MAKE) cli-smoke-advanced
 	$(MAKE) runtime-verify
@@ -331,7 +337,7 @@ verify:  ## Run verification (pytest -q, runtime verifier, lint, format, strict 
 	$(MAKE) contracts-check
 	$(MAKE) docs-lint-strict
 	@if [ -n "$$VERIFY_DOCS_API" ]; then \
-		$(PYTHON) scripts/validate_docs_api_refs.py; \
+		$(PYTHON) scripts/docs/validate_docs_api_refs.py; \
 	fi
 	@echo "Verification completed successfully"
 
@@ -377,7 +383,7 @@ supply-chain-security:  ## Run SBOM generation and pip-audit in an isolated uv s
 		echo "❌ uv is required to run the isolated security toolchain."; \
 		exit 1; \
 	}
-	$(SECURITY_RUN) bash -c 'scripts/generate_sbom.sh --scope tool-environment --python "$$(command -v python)" "$(SECURITY_ARTIFACT_DIR)/sbom.json"'
+	$(SECURITY_RUN) bash -c 'scripts/security/generate_sbom.sh --scope tool-environment --python "$$(command -v python)" "$(SECURITY_ARTIFACT_DIR)/sbom.json"'
 	$(SECURITY_RUN) python scripts/security/run_pip_audit.py
 
 cve-audit:  ## Audit locked dependency versions against OSV advisories
@@ -408,11 +414,11 @@ packaging-smoke-front-door:  ## Smoke installed-wheel evaluate -> verify -> repo
 
 model-evidence-list:  ## Print the maintained shipped-model evidence manifest
 	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTHON) scripts/model_evidence_sweep.py --list-json $(MODEL_EVIDENCE_ARGS)
+	PYTHONPATH=src $(PYTHON) scripts/model_evidence/model_evidence_sweep.py --list-json $(MODEL_EVIDENCE_ARGS)
 
 model-evidence-sweep:  ## Run the maintained shipped-model evidence sweep
 	$(MAKE) ensure-python
-	PYTHONPATH=src INVARLOCK_ALLOW_NETWORK=1 $(PYTHON) scripts/model_evidence_sweep.py $(MODEL_EVIDENCE_ARGS)
+	PYTHONPATH=src INVARLOCK_ALLOW_NETWORK=1 $(PYTHON) scripts/model_evidence/model_evidence_sweep.py $(MODEL_EVIDENCE_ARGS)
 
 runtime-image:  ## Build the local container runtime image used for default execution
 	@test -n "$(CONTAINER_ENGINE)" || { echo "❌ An OCI container engine (Docker or Podman) is required."; exit 1; }
@@ -538,7 +544,7 @@ release-evidence-check:  ## Validate required local release evidence artifacts
 
 guard-validation-smoke:  ## Run deterministic synthetic guard-validation smoke
 	$(MAKE) ensure-python
-	$(PYTHON) scripts/guard_validation_smoke.py --output-dir artifacts/guard-validation
+	$(PYTHON) scripts/smoke/guard_validation_smoke.py --output-dir artifacts/guard-validation
 
 empirical-guard-evidence-check:  ## Validate non-synthetic guard-evidence artifacts when present for release review
 	$(MAKE) ensure-python
@@ -597,7 +603,7 @@ docs:  ## Build docs with default mkdocs.yml (CI/networked)
 docs-ci:  ## Build documentation and run link checker
 	$(MAKE) ensure-python
 	$(MKDOCS) build --strict
-	$(PYTHON) scripts/check_docs_links.py
+	$(PYTHON) scripts/docs/check_docs_links.py
 
 ## (Consolidated) Single docs-serve target defined above
 
@@ -618,15 +624,15 @@ eval-loop:  ## Run automated evaluation loop (baseline + quant8 quickstart)
 
 ##@ Utilities
 ci-matrix:  ## Verify CI matrix
-	bash scripts/verify_ci_matrix.sh
+	bash scripts/checks/verify_ci_matrix.sh
 
 contracts-check:  ## Ensure packaged contracts match the repo contract source
 	$(MAKE) ensure-python
-	$(PYTHON) scripts/sync_packaged_contracts.py --check
+	$(PYTHON) scripts/checks/sync_packaged_contracts.py --check
 
 repo-cruft-check:  ## Fail if macOS transport artifacts leaked into repo source paths
 	$(MAKE) ensure-python
-	$(PYTHON) scripts/check_repo_cruft.py
+	$(PYTHON) scripts/checks/check_repo_cruft.py
 
 scripts-inventory-check:  ## Ensure scripts/ files are classified by maintained family
 	$(MAKE) ensure-python
@@ -638,11 +644,15 @@ scripts-audit:  ## Emit per-file scripts inventory with references/runtime/netwo
 
 architecture-fragmentation-check:  ## Report source fragmentation metrics without forcing artificial splits
 	$(MAKE) ensure-python
-	$(PYTHON) scripts/check_architecture_fragmentation.py --json >/dev/null
+	$(PYTHON) scripts/checks/check_architecture_fragmentation.py --json >/dev/null
+
+guard-fallback-audit:  ## Ensure guard numeric fallbacks are diagnostic or explicitly justified
+	$(MAKE) ensure-python
+	$(PYTHON) scripts/checks/check_guard_fallback_diagnostics.py
 
 contracts-sync:  ## Copy repo contracts into src/invarlock/_data/contracts
 	$(MAKE) ensure-python
-	$(PYTHON) scripts/sync_packaged_contracts.py --write
+	$(PYTHON) scripts/checks/sync_packaged_contracts.py --write
 
 ## (manual-tests target removed)
 
@@ -677,11 +687,11 @@ ensure-mypy:
 .PHONY: docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell
 docs-check: ## Run consolidated docs validation plus curated live examples
 	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTHON) scripts/docs_check.py --all
+	PYTHONPATH=src $(PYTHON) scripts/docs/docs_check.py --all
 
 docs-live-fast: ## Live-run the curated deterministic docs and notebook subset
 	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTHON) scripts/verify_live_examples.py \
+	PYTHONPATH=src $(PYTHON) scripts/docs/verify_live_examples.py \
 		--markdown-execution-mode host \
 		--skip-markdown-model-loading \
 		--skip-notebook-model-loading \
@@ -694,37 +704,37 @@ docs-live-fast: ## Live-run the curated deterministic docs and notebook subset
 
 docs-live: ## Live-run runnable markdown CLI examples and notebooks
 	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTHON) scripts/verify_live_examples.py \
+	PYTHONPATH=src $(PYTHON) scripts/docs/verify_live_examples.py \
 		--markdown-execution-mode host
 
 docs-check-build: ## Build docs strictly and run link checks
 	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTHON) scripts/docs_check.py --build --links
+	PYTHONPATH=src $(PYTHON) scripts/docs/docs_check.py --build --links
 
 docs-check-links: ## Run docs link checks only
 	$(MAKE) ensure-python
-	PYTHONPATH=src $(PYTHON) scripts/docs_check.py --links
+	PYTHONPATH=src $(PYTHON) scripts/docs/docs_check.py --links
 
 docs-lint: ## Lint docs (markdown + spell)
 	$(MAKE) ensure-python
-	$(PYTHON) scripts/docs_lint.py --all
+	$(PYTHON) scripts/docs/docs_lint.py --all
 
 docs-lint-strict: ## Lint docs and fail if markdownlint/cspell are unavailable
 	$(MAKE) ensure-python
-	$(PYTHON) scripts/docs_lint.py --all --require-tools
+	$(PYTHON) scripts/docs/docs_lint.py --all --require-tools
 
 docs-lint-markdown: ## Lint docs markdown style only
 	$(MAKE) ensure-python
-	$(PYTHON) scripts/docs_lint.py --markdown
+	$(PYTHON) scripts/docs/docs_lint.py --markdown
 
 docs-lint-spell: ## Spell-check docs only
 	$(MAKE) ensure-python
-	$(PYTHON) scripts/docs_lint.py --spell
+	$(PYTHON) scripts/docs/docs_lint.py --spell
 
 .PHONY: config-check
 config-check: ## Verify config includes and adapter availability
 	$(MAKE) ensure-python
-	$(PYTHON) scripts/check_config_integrity.py configs
+	$(PYTHON) scripts/checks/check_config_integrity.py configs
 
 ##@ Local CI (act)
 # Run GitHub Actions workflows locally using nektos/act

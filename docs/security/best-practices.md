@@ -25,7 +25,7 @@ Copy-paste checklist for production or CI deployments:
 - [ ] Dependencies locked (`pip freeze > requirements.lock`)
 - [ ] Python ≥ 3.12
 - [ ] pip-audit clean or exceptions documented
-- [ ] SBOM generated from the installed release surface (`scripts/generate_sbom.sh --scope install-surface --python ...`)
+- [ ] SBOM generated from the installed release surface (`scripts/security/generate_sbom.sh --scope install-surface --python ...`)
 
 ## Model & Data
 - [ ] Model source verified (local path or trusted HF repo)

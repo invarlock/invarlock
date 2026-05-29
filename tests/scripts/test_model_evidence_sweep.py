@@ -195,7 +195,7 @@ def test_model_evidence_sweep_dry_run_supports_promotion_gap_suite_candidates(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "scripts" / "model_evidence_sweep.py"
+    script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
     output_root = tmp_path / "promotion-gap-dry-run"
 
     proc = subprocess.run(
@@ -263,7 +263,7 @@ def test_model_evidence_sweep_dry_run_uses_lane_specific_verify_profile_when_omi
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "scripts" / "model_evidence_sweep.py"
+    script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
     output_root = tmp_path / "evidence-lane-profile"
 
     proc = subprocess.run(
@@ -316,7 +316,7 @@ def test_model_evidence_sweep_dry_run_emits_commands_and_manifest(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "scripts" / "model_evidence_sweep.py"
+    script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
     output_root = tmp_path / "evidence"
 
     proc = subprocess.run(
@@ -360,7 +360,7 @@ def test_model_evidence_sweep_host_mode_emits_explicit_runtime_flags(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "scripts" / "model_evidence_sweep.py"
+    script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
     output_root = tmp_path / "evidence-host"
 
     proc = subprocess.run(
@@ -415,7 +415,7 @@ def test_model_evidence_sweep_host_mode_prefetches_before_evaluate(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "scripts" / "model_evidence_sweep.py"
+    script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
     fake_python = tmp_path / "fake-python"
     write_fake_python(fake_python)
     output_root = tmp_path / "evidence-host-prefetch"
@@ -454,7 +454,7 @@ def test_model_evidence_sweep_retries_evaluate_once_after_sigterm(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "scripts" / "model_evidence_sweep.py"
+    script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
     fake_python = tmp_path / "flaky-fake-python"
     write_flaky_fake_python(fake_python)
     output_root = tmp_path / "evidence-host-retry"
@@ -499,7 +499,7 @@ def test_model_evidence_sweep_retries_evaluate_once_after_sigterm(
 
 def test_model_evidence_sweep_marks_gated_prefetch_as_skipped(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "scripts" / "model_evidence_sweep.py"
+    script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
     fake_python = tmp_path / "gated-fake-python"
     fake_python.write_text(
         """#!/bin/bash
@@ -619,7 +619,7 @@ def test_model_evidence_sweep_returns_failure_when_verify_fails(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "scripts" / "model_evidence_sweep.py"
+    script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
     fake_python = tmp_path / "fake-python"
     write_fake_python(fake_python)
     output_root = tmp_path / "evidence"
@@ -656,7 +656,7 @@ def test_model_evidence_sweep_returns_failure_when_verify_fails(
 
 def test_model_evidence_sweep_host_mode_rejects_ci_profile(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "scripts" / "model_evidence_sweep.py"
+    script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
     output_root = tmp_path / "evidence-host-ci"
 
     proc = subprocess.run(
@@ -686,7 +686,7 @@ def test_model_evidence_sweep_container_mode_publishes_external_output_root(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = repo_root / "scripts" / "model_evidence_sweep.py"
+    script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
     fake_python = tmp_path / "fake-python"
     write_fake_python(fake_python)
     output_root = tmp_path / "external-container-evidence"

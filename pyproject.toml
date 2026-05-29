@@ -354,7 +354,8 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 # Temporary debt allowlist from a no-ignore mypy audit. Keep this list module
-# specific so newly clean guards/eval/CLI modules remain type-checked.
+# and error-code specific so newly clean modules remain type-checked and new
+# error classes cannot hide behind blanket ignore_errors.
 module = [
     "invarlock.adapters.hf_causal",
     "invarlock.adapters.hf_mixin",
@@ -416,7 +417,29 @@ module = [
     "invarlock.cli.run_warning_filters",
     "invarlock.cli.security_helpers",
 ]
-ignore_errors = true
+disable_error_code = [
+    "arg-type",
+    "assignment",
+    "attr-defined",
+    "call-arg",
+    "call-overload",
+    "dict-item",
+    "import-not-found",
+    "index",
+    "misc",
+    "name-defined",
+    "no-any-return",
+    "no-redef",
+    "operator",
+    "redundant-cast",
+    "return-value",
+    "typeddict-item",
+    "typeddict-unknown-key",
+    "union-attr",
+    "unreachable",
+    "unused-ignore",
+    "var-annotated",
+]
 
 [[tool.mypy.overrides]]
 module = [

@@ -430,7 +430,7 @@
       "repo_evidence": [
         "docs/user-guide/evidence-packs-internals.md",
         "scripts/evidence_packs/suites.sh",
-        "scripts/evidence_packs/lib/validation_suite.sh"
+        "scripts/evidence_packs/lib/validation/validation_suite.sh"
       ],
       "notes": "Used in evidence-pack suites and validation defaults outside the declared Qwen2.5 14B support lane."
     },
@@ -444,7 +444,7 @@
       "repo_evidence": [
         "docs/user-guide/evidence-packs-internals.md",
         "scripts/evidence_packs/suites.sh",
-        "scripts/evidence_packs/lib/validation_suite.sh"
+        "scripts/evidence_packs/lib/validation/validation_suite.sh"
       ],
       "notes": "Used as a concrete evidence-pack checkpoint, but not declared as a public support lane."
     },
@@ -510,8 +510,8 @@
           "tests/core/test_model_profiles.py",
           "tests/cli/test_preset_causal_presets.py",
           "tests/scripts/test_model_evidence_sweep.py",
-          "scripts/model_evidence_sweep.py",
-          "scripts/evidence_packs/lib/validation_suite.sh"
+          "scripts/model_evidence/model_evidence_sweep.py",
+          "scripts/evidence_packs/lib/validation/validation_suite.sh"
         ],
         "missing_artifacts": [],
         "notes": "The reduced promotion matrix now closes on the shipped preset/config/test/smoke path, so the lane moves into declared support as supported_experimental."

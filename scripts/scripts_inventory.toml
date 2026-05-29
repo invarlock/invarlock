@@ -13,8 +13,8 @@ description = "Inventory and hygiene checks for the scripts tree itself."
 paths = [
   "scripts/README.md",
   "scripts/__init__.py",
-  "scripts/check_architecture_fragmentation.py",
-  "scripts/check_repo_cruft.py",
+  "scripts/checks/check_architecture_fragmentation.py",
+  "scripts/checks/check_repo_cruft.py",
   "scripts/check_scripts_inventory.py",
   "scripts/scripts_inventory.toml",
   "scripts/select_workspace_python.sh",
@@ -31,14 +31,16 @@ gpu = "never"
 invoked_by = ["make verify", "make contracts-check", "CI"]
 description = "Repository consistency checks for contracts, claims, config, CLI, guards, and versions."
 paths = [
-  "scripts/check_claim_surface_consistency.py",
-  "scripts/check_cli_completeness.py",
-  "scripts/check_config_integrity.py",
-  "scripts/check_config_schema_sync.py",
-  "scripts/check_guard_completeness.py",
-  "scripts/check_version_consistency.py",
-  "scripts/sync_packaged_contracts.py",
-  "scripts/verify_ci_matrix.sh",
+  "scripts/checks/__init__.py",
+  "scripts/checks/check_claim_surface_consistency.py",
+  "scripts/checks/check_cli_completeness.py",
+  "scripts/checks/check_config_integrity.py",
+  "scripts/checks/check_config_schema_sync.py",
+  "scripts/checks/check_guard_fallback_diagnostics.py",
+  "scripts/checks/check_guard_completeness.py",
+  "scripts/checks/check_version_consistency.py",
+  "scripts/checks/sync_packaged_contracts.py",
+  "scripts/checks/verify_ci_matrix.sh",
 ]
 
 [[families]]
@@ -52,19 +54,20 @@ gpu = "never"
 invoked_by = ["make docs-check", "make verify", "CI"]
 description = "Documentation, assurance cross-reference, example, and link validation."
 paths = [
-  "scripts/check_docs_links.py",
-  "scripts/check_internal_links.py",
-  "scripts/docs_check.py",
-  "scripts/docs_lint.py",
-  "scripts/lint_assurance_xrefs.py",
-  "scripts/test_cli_examples.py",
-  "scripts/validate_doc_references.py",
-  "scripts/validate_docs_api_refs.py",
-  "scripts/validate_python_examples.py",
-  "scripts/validate_yaml_examples.py",
-  "scripts/verify_live_examples.py",
-  "scripts/verify_markdown_bash_blocks.py",
-  "scripts/verify_notebooks_smoke.py",
+  "scripts/docs/__init__.py",
+  "scripts/docs/check_docs_links.py",
+  "scripts/docs/check_internal_links.py",
+  "scripts/docs/docs_check.py",
+  "scripts/docs/docs_lint.py",
+  "scripts/docs/lint_assurance_xrefs.py",
+  "scripts/docs/test_cli_examples.py",
+  "scripts/docs/validate_doc_references.py",
+  "scripts/docs/validate_docs_api_refs.py",
+  "scripts/docs/validate_python_examples.py",
+  "scripts/docs/validate_yaml_examples.py",
+  "scripts/docs/verify_live_examples.py",
+  "scripts/docs/verify_markdown_bash_blocks.py",
+  "scripts/docs/verify_notebooks_smoke.py",
 ]
 
 [[families]]
@@ -78,8 +81,9 @@ gpu = "never"
 invoked_by = ["make coverage-enforce", "CI"]
 description = "Coverage surface selection and threshold enforcement."
 paths = [
-  "scripts/check_coverage_thresholds.py",
-  "scripts/coverage_policy.py",
+  "scripts/coverage/__init__.py",
+  "scripts/coverage/check_coverage_thresholds.py",
+  "scripts/coverage/coverage_policy.py",
 ]
 
 [[families]]
@@ -93,17 +97,18 @@ gpu = "optional"
 invoked_by = ["make verify", "make smoke-fast", "runtime smoke CI"]
 description = "Local smoke, runtime, tiny-model, and guard-validation entry points."
 paths = [
-  "scripts/check_device_drift.py",
-  "scripts/cli_exhaustive_smoke.sh",
-  "scripts/cli_smoke_fast.sh",
-  "scripts/cli_smoke_negative.sh",
-  "scripts/cli_smoke_realistic.sh",
-  "scripts/guard_validation_smoke.py",
-  "scripts/run_cpu_telemetry.sh",
-  "scripts/run_gpt2_user_journey_smoke.sh",
-  "scripts/run_smoke_regression.sh",
-  "scripts/run_tiny_all_matrix.sh",
-  "scripts/run_tiny_container_smoke.sh",
+  "scripts/smoke/__init__.py",
+  "scripts/smoke/check_device_drift.py",
+  "scripts/smoke/cli_exhaustive_smoke.sh",
+  "scripts/smoke/cli_smoke_fast.sh",
+  "scripts/smoke/cli_smoke_negative.sh",
+  "scripts/smoke/cli_smoke_realistic.sh",
+  "scripts/smoke/guard_validation_smoke.py",
+  "scripts/smoke/run_cpu_telemetry.sh",
+  "scripts/smoke/run_gpt2_user_journey_smoke.sh",
+  "scripts/smoke/run_smoke_regression.sh",
+  "scripts/smoke/run_tiny_all_matrix.sh",
+  "scripts/smoke/run_tiny_container_smoke.sh",
 ]
 
 [[families]]
@@ -117,10 +122,11 @@ gpu = "optional"
 invoked_by = ["make model-evidence-list", "make model-evidence-sweep", "manual remote campaigns"]
 description = "Model-evidence sweep planning, remote launch, command generation, and outputs."
 paths = [
-  "scripts/model_evidence_commands.py",
-  "scripts/model_evidence_sweep.py",
-  "scripts/model_evidence_sweep_output.py",
-  "scripts/run_model_evidence_remote.py",
+  "scripts/model_evidence/__init__.py",
+  "scripts/model_evidence/model_evidence_commands.py",
+  "scripts/model_evidence/model_evidence_sweep.py",
+  "scripts/model_evidence/model_evidence_sweep_output.py",
+  "scripts/model_evidence/run_model_evidence_remote.py",
 ]
 
 [[families]]
@@ -162,8 +168,8 @@ gpu = "never"
 invoked_by = ["make security", "make cve-audit", "supply-chain CI"]
 description = "SBOM, CVE audit, pip-audit, requirements pinning, and scorecard helpers."
 paths = [
-  "scripts/filter_scorecard_sarif.py",
-  "scripts/generate_sbom.sh",
-  "scripts/refresh_pinned_requirements.sh",
+  "scripts/security/filter_scorecard_sarif.py",
+  "scripts/security/generate_sbom.sh",
+  "scripts/security/refresh_pinned_requirements.sh",
   "scripts/security/**",
 ]

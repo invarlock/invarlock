@@ -4,9 +4,9 @@ from pathlib import Path
 
 
 def test_refresh_pinned_requirements_generates_runtime_locks() -> None:
-    text = (Path.cwd() / "scripts" / "refresh_pinned_requirements.sh").read_text(
-        encoding="utf-8"
-    )
+    text = (
+        Path.cwd() / "scripts" / "security" / "refresh_pinned_requirements.sh"
+    ).read_text(encoding="utf-8")
 
     assert (
         'compile_req_platform \\\n  "${WORKFLOW_DIR}/runtime-image.in" \\\n'

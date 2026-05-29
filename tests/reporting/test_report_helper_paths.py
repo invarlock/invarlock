@@ -8,7 +8,7 @@ import pytest
 from invarlock.reporting import report_edit_summary as report_edit_summary_mod
 from invarlock.reporting import report_overhead as report_overhead_mod
 from invarlock.reporting import report_validation as report_validation_mod
-from invarlock.reporting.report_confidence import (
+from invarlock.reporting.report_enrichment import (
     compute_confidence_label as _compute_confidence_label,
 )
 from invarlock.reporting.report_normalization import _generate_run_id

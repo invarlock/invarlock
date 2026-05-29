@@ -48,6 +48,7 @@ def _embedding_vocab_size_matches(
     try:
         expected = int(baseline_size)
     except _INVARIANT_CAPTURE_ERRORS:
+        # guard-fallback-ok: caller reports the embedding mismatch with unavailable size details.
         return False, None
     current_size = None
     if isinstance(current_vocab_sizes, dict):
@@ -56,6 +57,7 @@ def _embedding_vocab_size_matches(
         try:
             current_int = int(current_size)
         except _INVARIANT_CAPTURE_ERRORS:
+            # guard-fallback-ok: caller reports the embedding mismatch with unavailable size details.
             return False, None
         return current_int == expected, current_int
 
@@ -452,6 +454,7 @@ class InvariantsGuard(Guard):
             try:
                 return left.data_ptr() == right.data_ptr()
             except _INVARIANT_CAPTURE_ERRORS:
+                # guard-fallback-ok: inaccessible tensor pointers are treated as not tied.
                 return False
 
         # GPT-2 style (transformer.wte <-> lm_head)

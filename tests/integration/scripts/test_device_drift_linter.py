@@ -11,7 +11,7 @@ import pytest
 
 
 def _script_path() -> Path:
-    return Path("scripts/check_device_drift.py")
+    return Path("scripts/smoke/check_device_drift.py")
 
 
 def test_device_drift_checker_pass(tmp_path: Path) -> None:

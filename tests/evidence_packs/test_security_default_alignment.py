@@ -39,7 +39,7 @@ def test_config_generator_remote_code_defaults_false() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     command = (
         "set -e\n"
-        "source scripts/evidence_packs/lib/config_generator.sh\n"
+        "source scripts/evidence_packs/lib/config/config_generator.sh\n"
         'generate_invarlock_config "model" "/dev/stdout" "noop" 42 10 20 100 128 64 1\n'
     )
     result = subprocess.run(
@@ -57,7 +57,7 @@ def test_config_generator_remote_code_true_requires_explicit_allow() -> None:
     command = (
         "set -e\n"
         "export INVARLOCK_ALLOW_REMOTE_CODE=1\n"
-        "source scripts/evidence_packs/lib/config_generator.sh\n"
+        "source scripts/evidence_packs/lib/config/config_generator.sh\n"
         'generate_invarlock_config "model" "/dev/stdout" "noop" 42 10 20 100 128 64 1\n'
     )
     result = subprocess.run(
@@ -87,7 +87,7 @@ def test_probe_scripts_gate_remote_code_explicitly(relative_path: str) -> None:
 
 def test_task_functions_forward_probe_remote_code_opt_in() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    text = (repo_root / "scripts/evidence_packs/lib/task_functions.sh").read_text(
+    text = (repo_root / "scripts/evidence_packs/lib/tasks/task_functions.sh").read_text(
         encoding="utf-8"
     )
     assert "probe_args+=(--trust-remote-code)" in text
@@ -103,12 +103,12 @@ def test_evidence_pack_shell_flows_keep_provenance_enforced() -> None:
         encoding="utf-8"
     )
     task_functions = (
-        repo_root / "scripts/evidence_packs/lib/task_functions.sh"
+        repo_root / "scripts/evidence_packs/lib/tasks/task_functions.sh"
     ).read_text(encoding="utf-8")
     config_generator = (
-        repo_root / "scripts/evidence_packs/lib/config_generator.sh"
+        repo_root / "scripts/evidence_packs/lib/config/config_generator.sh"
     ).read_text(encoding="utf-8")
-    runtime_sh = (repo_root / "scripts/evidence_packs/lib/runtime.sh").read_text(
+    runtime_sh = (repo_root / "scripts/evidence_packs/lib/core/runtime.sh").read_text(
         encoding="utf-8"
     )
 
