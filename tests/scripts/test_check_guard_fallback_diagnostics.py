@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
 
 
@@ -12,7 +13,12 @@ def _load_checker():
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    helper_dir = str(path.parent.resolve())
+    sys.path.insert(0, helper_dir)
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.path.remove(helper_dir)
     return module
 
 

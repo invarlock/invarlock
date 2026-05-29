@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-import invarlock.guards.variance as var_mod
+import invarlock.guards.variance_evaluation as variance_evaluation_mod
 from invarlock.guards.variance import VarianceGuard
 
 
@@ -53,7 +53,7 @@ def test_evaluate_calibration_pass_with_enable_and_delta_ci_error(monkeypatch):
 
     # Force compute_paired_delta_log_ci to raise to hit warn branch
     monkeypatch.setattr(
-        var_mod,
+        variance_evaluation_mod,
         "compute_paired_delta_log_ci",
         lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("fail")),
     )
