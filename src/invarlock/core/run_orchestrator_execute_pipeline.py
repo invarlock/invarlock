@@ -2,19 +2,51 @@
 
 from __future__ import annotations
 
+from time import perf_counter
 from typing import Any
 
-from invarlock.core.run_orchestrator_execute_outcome import _build_outcome_result
 from invarlock.core.run_orchestrator_types import (
     RunExecutionRequest,
     RunExecutionResult,
     RunExecutionServices,
+    TimingSummaryPayload,
 )
 from invarlock.core.run_retry_policy import (
     build_restore_failure_attempt_summary,
     decide_failed_retry_transition,
     record_retry_attempt,
 )
+
+
+def _build_outcome_result(
+    *,
+    capture_timings: bool,
+    total_start: float | None,
+    timings: dict[str, float],
+    report: dict[str, Any],
+    report_path_out: str | None,
+    build_timing_summary_payload_fn: Any,
+) -> RunExecutionResult:
+    timing_summary: TimingSummaryPayload | None = None
+    if capture_timings:
+        total_duration = (
+            max(0.0, float(perf_counter() - total_start))
+            if total_start is not None
+            else None
+        )
+        summary_payload = build_timing_summary_payload_fn(
+            timings=timings,
+            total_duration=total_duration,
+            report=report if isinstance(report, dict) else None,
+        )
+        if summary_payload is not None:
+            timings = dict(summary_payload.timings)
+            timing_summary = summary_payload
+    return RunExecutionResult(
+        report_path=report_path_out,
+        timings=dict(timings),
+        timing_summary=timing_summary,
+    )
 
 
 def _execute_run_pipeline_steps(

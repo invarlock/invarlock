@@ -155,7 +155,10 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
 
 ## `invarlock verify`
 
-Purpose: verify existing evaluation report JSON files.
+Purpose: verify existing evaluation report JSON files end to end. This command
+checks report schema, primary-metric recomputation, paired-window consistency,
+policy gates, strict-assurance claims when requested, and runtime provenance
+through the report's sibling `runtime.manifest.json`.
 
 Arguments:
 
@@ -209,6 +212,10 @@ Core subcommands:
   - `verify` accepts directories containing canonical `evaluation.report.json`
     and optional baselines containing canonical `report.json` or
     `evaluation.report.json`
+    - A directory containing only `report.json` is a raw run directory, not a
+      verifier bundle. Generate `evaluation.report.json` first with
+      `invarlock report generate --run <subject report.json>
+      --baseline-run-report <baseline report.json> --format report -o <output-dir>`.
     - If a directory contains both canonical filenames, it is ambiguous and
       rejected; pass the exact file path instead.
 
@@ -293,8 +300,11 @@ Plugin install and uninstall commands are not part of the CLI surface.
 
 ## `invarlock advanced runtime-verify`
 
-Purpose: package-native runtime provenance verification for an existing
-evaluation report and its sibling runtime manifest.
+Purpose: low-level runtime provenance verification for an existing evaluation
+report and runtime manifest. This command validates the manifest contract,
+container execution fields, image digest presence, and the report SHA-256
+binding. It does not replace `invarlock verify`; it does not enforce
+primary-metric gates, paired-window math, or strict-assurance report policy.
 
 Common options:
 

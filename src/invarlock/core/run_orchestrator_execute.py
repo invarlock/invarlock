@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from contextlib import contextmanager
 from functools import partial
 from time import perf_counter
@@ -17,13 +18,6 @@ from invarlock.core.run_execution_context_policy import (
 from invarlock.core.run_execution_context_policy import (
     build_run_execution_config_payloads as _build_run_execution_config_payloads_impl,
 )
-from invarlock.core.run_orchestrator_execute_events import (
-    _emit_run_diagnostic,
-    _emit_run_guard_overhead_summary,
-    _emit_run_retry_summary,
-    _emit_transition_diagnostic,
-    _raise_run_halt,
-)
 from invarlock.core.run_orchestrator_execute_helpers import (
     RunEventEmitter as RunEventEmitter,
 )
@@ -36,14 +30,12 @@ from invarlock.core.run_orchestrator_execute_helpers import (
 from invarlock.core.run_orchestrator_execute_helpers import (
     _coerce_int as _coerce_int,
 )
-from invarlock.core.run_orchestrator_execute_outcome import (
-    _cleanup_snapshot_tmpdir,
-    _map_pipeline_failure,
-)
 from invarlock.core.run_orchestrator_execute_pipeline import (
     _execute_run_pipeline_steps,
 )
 from invarlock.core.run_orchestrator_types import (
+    RunCleanupStatusEvent,
+    RunDiagnosticEvent,
     RunExecutionEvent,
     RunExecutionFailure,
     RunExecutionObserver,
@@ -52,6 +44,8 @@ from invarlock.core.run_orchestrator_types import (
     RunExecutionResult,
     RunExecutionServices,
     RunFailureEvent,
+    RunGuardOverheadSummaryEvent,
+    RunRetrySummaryEvent,
     _RunExecutionHalt,
 )
 from invarlock.core.run_policy import (
@@ -82,6 +76,203 @@ from invarlock.core.run_timing_policy import (
 # class RunPrimaryMetricSummaryEvent
 # Typed contracts live in `invarlock.core.run_orchestrator_types` and are
 # re-exported here so the owner boundary remains stable.
+
+
+def _emit_run_diagnostic(
+    emit: RunEventEmitter,
+    *,
+    origin: str | None = None,
+    code: str | None = None,
+    summary: str | None = None,
+    level: str | None = None,
+    **context: Any,
+) -> None:
+    emit(
+        RunDiagnosticEvent(
+            source=origin,
+            code=code,
+            summary=summary,
+            level=level,
+            context=dict(context),
+        )
+    )
+
+
+def _emit_run_guard_overhead_summary(
+    emit: RunEventEmitter,
+    guard_overhead_info: dict[str, Any],
+    *,
+    default_threshold: float,
+) -> None:
+    emit(
+        RunGuardOverheadSummaryEvent(
+            guard_overhead_info=guard_overhead_info,
+            default_threshold=default_threshold,
+        )
+    )
+
+
+def _emit_run_retry_summary(
+    emit: RunEventEmitter,
+    retry_controller: Any | None,
+) -> None:
+    if not retry_controller or not getattr(retry_controller, "attempt_history", None):
+        return
+    try:
+        summary = retry_controller.get_attempt_summary()
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return
+    if not isinstance(summary, dict):
+        return
+    emit(RunRetrySummaryEvent(summary=summary))
+
+
+def _raise_run_halt(
+    emit: RunEventEmitter,
+    halt_error_type: type[_RunExecutionHalt],
+    *,
+    code: str,
+    summary: str | None = None,
+    error: Exception | None = None,
+    **context: Any,
+) -> NoReturn:
+    failure = RunExecutionFailure(
+        code=code,
+        summary=summary,
+        error=error,
+        context=dict(context),
+    )
+    emit(RunFailureEvent(failure=failure))
+    raise halt_error_type(failure)
+
+
+def _emit_transition_diagnostic(
+    emit_diagnostic: Any,
+    source: str,
+    diagnostic: Any,
+) -> None:
+    code = getattr(diagnostic, "code", None)
+    if isinstance(code, str) and code:
+        details = getattr(diagnostic, "details", None)
+        context = getattr(diagnostic, "context", None)
+        payload = {}
+        if isinstance(details, dict):
+            payload.update(details)
+        if isinstance(context, dict):
+            payload.update(context)
+        payload.setdefault("diagnostic_source", source)
+        summary = getattr(diagnostic, "summary", None)
+        if not isinstance(summary, str) or not summary:
+            message = getattr(diagnostic, "message", None)
+            summary = message if isinstance(message, str) and message else None
+        emit_diagnostic(origin=source, code=code, summary=summary, **payload)
+        return
+    kind = getattr(diagnostic, "kind", None)
+    if isinstance(kind, str) and kind:
+        payload = {}
+        metadata = getattr(diagnostic, "metadata", None)
+        if isinstance(metadata, dict):
+            payload.update(metadata)
+        context = getattr(diagnostic, "context", None)
+        if isinstance(context, dict):
+            payload.update(context)
+        payload.setdefault("diagnostic_source", source)
+        level = getattr(diagnostic, "level", None)
+        if not isinstance(level, str) or not level:
+            severity = getattr(diagnostic, "severity", None)
+            level = severity if isinstance(severity, str) and severity else None
+        summary = getattr(diagnostic, "summary", None)
+        if not isinstance(summary, str) or not summary:
+            message = getattr(diagnostic, "message", None)
+            summary = message if isinstance(message, str) and message else None
+        emit_diagnostic(
+            origin=source,
+            code=kind,
+            summary=summary,
+            level=level,
+            **payload,
+        )
+        return
+    payload = {"diagnostic_source": source}
+    metadata = getattr(diagnostic, "metadata", None)
+    if isinstance(metadata, dict):
+        payload.update(metadata)
+    details = getattr(diagnostic, "details", None)
+    if isinstance(details, dict):
+        payload.update(details)
+    context = getattr(diagnostic, "context", None)
+    if isinstance(context, dict):
+        payload.update(context)
+    level = getattr(diagnostic, "level", None)
+    if not isinstance(level, str) or not level:
+        severity = getattr(diagnostic, "severity", None)
+        level = severity if isinstance(severity, str) and severity else None
+    summary = getattr(diagnostic, "summary", None)
+    if not isinstance(summary, str) or not summary:
+        message = getattr(diagnostic, "message", None)
+        summary = message if isinstance(message, str) and message else None
+    if len(payload) > 1 or (isinstance(summary, str) and summary):
+        emit_diagnostic(
+            origin=source,
+            code="transition_diagnostic",
+            summary=summary,
+            level=level,
+            **payload,
+        )
+
+
+def _map_pipeline_failure(
+    error: BaseException,
+    *,
+    emit: RunEventEmitter,
+) -> RunExecutionFailure:
+    error_obj = error if isinstance(error, Exception) else Exception(str(error))
+    if os.environ.get("INVARLOCK_DEBUG_TRACE"):
+        import traceback
+
+        traceback.print_exc()
+    if isinstance(error, ValueError) and "Invalid RunReport" in str(error):
+        failure = RunExecutionFailure(
+            code="schema_invalid_run_report",
+            summary=str(error),
+            error=error_obj,
+        )
+    elif isinstance(error, ModuleNotFoundError | ImportError) and "torch" in str(error):
+        failure = RunExecutionFailure(
+            code="torch_missing",
+            summary=str(error),
+            error=error_obj,
+        )
+    else:
+        failure = RunExecutionFailure(
+            code="pipeline_failed",
+            summary=str(error),
+            error=error_obj,
+        )
+    emit(RunFailureEvent(failure=failure))
+    return failure
+
+
+def _cleanup_snapshot_tmpdir(
+    *,
+    snapshot_tmpdir: Any | None,
+    no_cleanup: bool,
+    emit: RunEventEmitter,
+) -> None:
+    try:
+        if snapshot_tmpdir and not no_cleanup:
+            try:
+                import shutil as _sh
+
+                _sh.rmtree(snapshot_tmpdir, ignore_errors=True)
+            except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
+                pass
+            finally:
+                emit(RunCleanupStatusEvent(removed=True))
+        else:
+            emit(RunCleanupStatusEvent(removed=False))
+    except (AttributeError, NameError, TypeError, OSError):
+        return
 
 
 def execute_run_request_impl(

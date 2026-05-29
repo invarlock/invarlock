@@ -234,12 +234,21 @@ def detect_spectral_violations(
     metrics: dict[str, float],
     phase: str = "finalize",
     *,
-    compute_sigma_max_fn: Any = compute_sigma_max,
-    classify_module_family_fn: Any = classify_module_family,
-    compute_z_score_for_value_fn: Any = compute_z_score_for_value,
-    default_family_caps_fn: Any = default_family_caps,
+    compute_sigma_max_fn: Any | None = None,
+    classify_module_family_fn: Any | None = None,
+    compute_z_score_for_value_fn: Any | None = None,
+    default_family_caps_fn: Any | None = None,
 ) -> list[dict[str, Any]]:
     """Detect spectral property violations using per-family z-score caps."""
+    if compute_sigma_max_fn is None:
+        compute_sigma_max_fn = compute_sigma_max
+    if classify_module_family_fn is None:
+        classify_module_family_fn = classify_module_family
+    if compute_z_score_for_value_fn is None:
+        compute_z_score_for_value_fn = compute_z_score_for_value
+    if default_family_caps_fn is None:
+        default_family_caps_fn = default_family_caps
+
     violations: list[dict[str, Any]] = []
     latest_z: dict[str, float] = {}
 

@@ -6,7 +6,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
 
-from invarlock.evidence_pack_integrity import verify_signature
+from invarlock.evidence_pack_integrity import (
+    normalize_expected_fingerprint,
+    verify_signature,
+)
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -19,14 +22,29 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Fail closed when manifest.signature.json is missing.",
     )
+    parser.add_argument(
+        "--expected-fingerprint",
+        help="Require the signer to match this sha256:... key fingerprint.",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
+    expected_fingerprints = None
+    if args.expected_fingerprint:
+        normalized = normalize_expected_fingerprint(args.expected_fingerprint)
+        if normalized is None:
+            print(
+                "--expected-fingerprint must be a sha256:... signing key fingerprint",
+                file=sys.stderr,
+            )
+            return 2
+        expected_fingerprints = frozenset({normalized})
     errors, warnings, signer_fingerprint = verify_signature(
         Path(args.pack_dir),
         strict=args.strict,
+        expected_fingerprints=expected_fingerprints,
     )
     for warning in warnings:
         print(warning, file=sys.stderr)

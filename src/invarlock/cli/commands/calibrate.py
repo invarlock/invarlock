@@ -13,7 +13,7 @@ import json
 import math
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -379,7 +379,7 @@ def null_sweep(
         }
         tiers_patch[tier_name] = spectral_patch
 
-    stamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     payload = {
         "kind": "spectral_null_sweep",
         "generated_at": stamp,
@@ -664,7 +664,7 @@ def ve_sweep(
             }
         )
 
-    stamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     payload = {
         "kind": "variance_ve_sweep",
         "generated_at": stamp,

@@ -35,6 +35,25 @@ def test_compute_paired_delta_and_ratio_ci_consistency():
     assert math.isclose(math.exp(dlog_ci[1]), r_ci[1], rel_tol=1e-6)
 
 
+def test_paired_logloss_ratio_ci_known_answer_constant_delta():
+    baseline = [1.0, 1.5, 2.0, 2.5]
+    delta = math.log(1.05)
+    final = [value + delta for value in baseline]
+    dlog_ci = compute_paired_delta_log_ci(
+        final,
+        baseline,
+        weights=[1.0, 2.0, 4.0, 8.0],
+        method="bca",
+        replicates=128,
+        alpha=0.05,
+        seed=17,
+    )
+    ratio_ci = logspace_to_ratio_ci(dlog_ci)
+
+    assert dlog_ci == pytest.approx((delta, delta), abs=1e-15)
+    assert ratio_ci == pytest.approx((1.05, 1.05), abs=1e-15)
+
+
 @given(
     values=st.lists(
         st.floats(min_value=0.1, max_value=10.0, allow_nan=False, allow_infinity=False),

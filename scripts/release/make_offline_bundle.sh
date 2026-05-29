@@ -20,6 +20,7 @@ Required:
 Optional:
   --bundle-name NAME      Bundle base name (default: invarlock-<version>-offline-bundle)
   --issuer URL            Expected OIDC issuer (default: https://token.actions.githubusercontent.com)
+  --dry-run               Validate inputs and print the bundle path without writing files
   --help                  Show this help message
 EOF
 }
@@ -49,6 +50,7 @@ PROVENANCE_DIR=""
 OUTPUT_DIR=""
 BUNDLE_NAME=""
 OIDC_ISSUER="https://token.actions.githubusercontent.com"
+DRY_RUN=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -88,6 +90,10 @@ while [[ $# -gt 0 ]]; do
             OIDC_ISSUER="${2:-}"
             shift 2
             ;;
+        --dry-run)
+            DRY_RUN=1
+            shift
+            ;;
         --help|-h)
             usage
             exit 0
@@ -122,12 +128,17 @@ if [[ ! -d "${PROVENANCE_DIR}" ]]; then
     exit 1
 fi
 
-mkdir -p "${OUTPUT_DIR}"
-OUTPUT_DIR="$(cd "${OUTPUT_DIR}" && pwd)"
-
 if [[ -z "${BUNDLE_NAME}" ]]; then
     BUNDLE_NAME="invarlock-${VERSION}-offline-bundle"
 fi
+
+if [[ "${DRY_RUN}" == "1" ]]; then
+    echo "DRY RUN: would write ${OUTPUT_DIR}/${BUNDLE_NAME}.tar.gz"
+    exit 0
+fi
+
+mkdir -p "${OUTPUT_DIR}"
+OUTPUT_DIR="$(cd "${OUTPUT_DIR}" && pwd)"
 
 SBOM_BASENAME="invarlock-${VERSION}-sbom.cdx.json"
 BUNDLE_TARBALL="${OUTPUT_DIR}/${BUNDLE_NAME}.tar.gz"

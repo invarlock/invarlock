@@ -338,7 +338,10 @@ def validate_guard(
     guard_assert(0.0 < alpha <= 1.0, "spectral.multiple_testing.alpha out of range")
     guard_assert(guard.max_caps >= 0, "spectral.max_caps must be >= 0")
 
-    diagnostics = build_spectral_diagnostics(selected_violations)
+    diagnostics = [
+        *getattr(guard, "_measurement_diagnostics", []),
+        *build_spectral_diagnostics(selected_violations),
+    ]
     return GuardValidationResult(
         passed=passed,
         decision=decision,
@@ -436,7 +439,10 @@ def finalize_guard(guard: Any, model: Any) -> dict[str, Any]:
         "warnings": warnings,
         "errors": errors,
         "violations": selected_final_violations,
-        "diagnostics": build_spectral_diagnostics(selected_final_violations),
+        "diagnostics": [
+            *getattr(guard, "_measurement_diagnostics", []),
+            *build_spectral_diagnostics(selected_final_violations),
+        ],
         "baseline_metrics": guard.baseline_metrics,
         "final_metrics": final_metrics,
         "final_z_scores": guard.latest_z_scores,

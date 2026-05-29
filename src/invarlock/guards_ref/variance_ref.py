@@ -28,33 +28,56 @@ def variance_decide(
 
     # One-sided vs two-sided enablement semantics
     if predictive_one_sided:
-        # Production parity: evaluate with one-sided criteria (no strict 0-exclusion required)
         evaluated = True
+        if hi >= 0.0:
+            return {
+                "evaluated": evaluated,
+                "pass": False,
+                "reason": "ci_contains_zero",
+            }
         if mu >= 0.0:
             return {
                 "evaluated": evaluated,
                 "pass": False,
                 "reason": "mean_not_negative",
             }
-        if me > 0.0 and (-mu) < me:
+        if hi > -me:
             return {
                 "evaluated": evaluated,
                 "pass": False,
                 "reason": "gain_below_threshold",
             }
-        if lo >= 0.0:
-            return {"evaluated": evaluated, "pass": False, "reason": "ci_contains_zero"}
+        if mu > -me:
+            return {
+                "evaluated": evaluated,
+                "pass": False,
+                "reason": "gain_below_threshold",
+            }
         return {"evaluated": evaluated, "pass": True, "reason": "ci_gain_met"}
 
-    # Two-sided enablement requires strict exclusion of 0 and sufficient effect
-    evaluated = (lo <= hi) and (abs(mu) >= me) and not (lo <= 0.0 <= hi)
-    if not evaluated:
-        return {"evaluated": False, "pass": True, "reason": "not_evaluated"}
-
-    # Two-sided: require CI strictly below zero with gain >= min_effect
-    if hi >= 0.0:
-        return {"evaluated": True, "pass": False, "reason": "ci_contains_zero"}
-    gain_lower = -hi
-    if gain_lower < me:
-        return {"evaluated": True, "pass": False, "reason": "gain_below_threshold"}
-    return {"evaluated": True, "pass": True, "reason": "ci_gain_met"}
+    evaluated = True
+    if lo <= 0.0 <= hi:
+        return {"evaluated": evaluated, "pass": False, "reason": "ci_contains_zero"}
+    if lo > 0.0:
+        if lo >= me and mu >= me:
+            return {
+                "evaluated": evaluated,
+                "pass": False,
+                "reason": "regression_detected",
+            }
+        return {"evaluated": evaluated, "pass": False, "reason": "mean_not_negative"}
+    if hi > -me:
+        return {
+            "evaluated": evaluated,
+            "pass": False,
+            "reason": "gain_below_threshold",
+        }
+    if mu >= 0.0:
+        return {"evaluated": evaluated, "pass": False, "reason": "mean_not_negative"}
+    if mu > -me:
+        return {
+            "evaluated": evaluated,
+            "pass": False,
+            "reason": "gain_below_threshold",
+        }
+    return {"evaluated": evaluated, "pass": True, "reason": "ci_gain_met"}

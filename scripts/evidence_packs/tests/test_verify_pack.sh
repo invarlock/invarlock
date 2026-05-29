@@ -90,6 +90,9 @@ test_verify_pack_errors_on_missing_args() {
     run pack_verify_pack --pack "${TEST_TMPDIR}/pack" --json-out
     assert_rc "2" "${RUN_RC}" "missing json-out value"
 
+    run pack_verify_pack --pack "${TEST_TMPDIR}/pack" --expected-fingerprint
+    assert_rc "2" "${RUN_RC}" "missing expected-fingerprint value"
+
     run pack_verify_pack --nope
     assert_rc "2" "${RUN_RC}" "unknown arg returns 2"
 
@@ -369,6 +372,60 @@ test_verify_pack_signed_manifest_verifies_signature() {
 
     run pack_verify_pack --pack "${pack_dir}" --skip-verify
     assert_rc "0" "${RUN_RC}" "verify succeeds with package-native signature present"
+}
+
+test_verify_pack_signed_manifest_accepts_expected_fingerprint() {
+    mock_reset
+
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}"
+    echo "payload" > "${pack_dir}/payload.txt"
+
+    local sha_cmd
+    sha_cmd="$(pack_sha256_cmd)"
+    (
+        cd "${pack_dir}"
+        ${sha_cmd} payload.txt > checksums.sha256
+    )
+
+    local checksums_digest
+    checksums_digest="$(cd "${pack_dir}" && python3 -c 'import hashlib;print(hashlib.sha256(open("checksums.sha256","rb").read()).hexdigest())' < /dev/null)"
+    printf '%s\n' "{\"format\":\"evidence-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
+    pack_test_sign_manifest "${pack_dir}"
+
+    local expected_fingerprint
+    expected_fingerprint="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["signing_key_fingerprint"])' "${pack_dir}/manifest.json")"
+
+    run pack_verify_pack --pack "${pack_dir}" --skip-verify --expected-fingerprint "${expected_fingerprint}"
+    assert_rc "0" "${RUN_RC}" "verify succeeds with pinned package-native signature"
+}
+
+test_verify_pack_signed_manifest_rejects_unexpected_fingerprint() {
+    mock_reset
+
+    source ./scripts/evidence_packs/verify_pack.sh
+
+    local pack_dir="${TEST_TMPDIR}/pack"
+    mkdir -p "${pack_dir}"
+    echo "payload" > "${pack_dir}/payload.txt"
+
+    local sha_cmd
+    sha_cmd="$(pack_sha256_cmd)"
+    (
+        cd "${pack_dir}"
+        ${sha_cmd} payload.txt > checksums.sha256
+    )
+
+    local checksums_digest
+    checksums_digest="$(cd "${pack_dir}" && python3 -c 'import hashlib;print(hashlib.sha256(open("checksums.sha256","rb").read()).hexdigest())' < /dev/null)"
+    printf '%s\n' "{\"format\":\"evidence-pack-v1\",\"checksums_sha256\":\"checksums.sha256\",\"checksums_sha256_digest\":\"${checksums_digest}\"}" > "${pack_dir}/manifest.json"
+    pack_test_sign_manifest "${pack_dir}"
+
+    run pack_verify_pack --pack "${pack_dir}" --skip-verify --expected-fingerprint "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    assert_rc "5" "${RUN_RC}" "verify rejects an unexpected signature signer"
+    assert_match "signer mismatch" "${RUN_ERR}" "mismatch error names signer mismatch"
 }
 
 

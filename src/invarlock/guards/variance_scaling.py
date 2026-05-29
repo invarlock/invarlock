@@ -5,7 +5,7 @@ import math
 from collections import defaultdict
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 import torch
@@ -381,7 +381,7 @@ def compute_variance_scales(
         )
     guard._stats.setdefault("raw_scales_observations", []).append(
         {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "count": len(focus_raw_scales),
             "scales": focus_raw_scales,
         }
@@ -467,7 +467,7 @@ def compute_variance_scales(
     }
     guard._stats.setdefault("filtered_scales_observations", []).append(
         {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "count": len(filtered_normalized),
             "scales": filtered_normalized,
             "backstop_used": backstop_used,

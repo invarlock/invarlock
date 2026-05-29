@@ -125,6 +125,66 @@ def spectral_decide(
     }
 
 
+def spectral_family_decide(
+    z_by_name: Mapping[str, float],
+    family_of_name: Mapping[str, str],
+    mtest: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    """Reference production-family selection for budgeted spectral violations."""
+    names = list(z_by_name.keys())
+
+    def _p(z: float) -> float:
+        return float(math.erfc(abs(z) / math.sqrt(2.0)))
+
+    family_pvals: dict[str, float] = {}
+    family_counts: dict[str, int] = {}
+    for name in names:
+        family = str(family_of_name.get(name, "other") or "other")
+        z_val = _coerce_float(z_by_name.get(name, 0.0), 0.0)
+        if not math.isfinite(z_val):
+            continue
+        p_val = _p(z_val)
+        current = family_pvals.get(family)
+        if current is None or p_val < current:
+            family_pvals[family] = p_val
+        family_counts[family] = family_counts.get(family, 0) + 1
+
+    families = list(family_pvals.keys())
+    pvals = [family_pvals[family] for family in families]
+    method_obj = (mtest or {}).get("method", "bh")
+    method = str(method_obj).lower()
+    alpha_obj = (mtest or {}).get("alpha", 0.05)
+    alpha = _coerce_float(alpha_obj, 0.05)
+    if method in {"bh", "benjamini-hochberg", "benjamini_hochberg"}:
+        rejects = bh_select(pvals, alpha)
+        applied_method = "bh"
+    elif method in {"bonferroni", "bonf"}:
+        cutoff = alpha / max(1, len(pvals))
+        rejects = [bool(p <= cutoff) if _finite01(p) else False for p in pvals]
+        applied_method = "bonferroni"
+    else:
+        cutoff = alpha / max(1, len(pvals))
+        rejects = [bool(p <= cutoff) if _finite01(p) else False for p in pvals]
+        applied_method = "bonferroni"
+
+    selected_families = {
+        family for family, reject in zip(families, rejects, strict=False) if reject
+    }
+    selected = [
+        name
+        for name in names
+        if str(family_of_name.get(name, "other") or "other") in selected_families
+    ]
+    return {
+        "pass": len(selected) == 0,
+        "selected": selected,
+        "families_selected": sorted(selected_families),
+        "family_pvalues": family_pvals,
+        "family_violation_counts": family_counts,
+        "method": applied_method,
+    }
+
+
 def _finite01(p: object) -> bool:
     if not isinstance(p, int | float):
         return False

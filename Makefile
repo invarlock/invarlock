@@ -1,7 +1,7 @@
 # InvarLock Development Makefile
 # Optional development shortcuts
 
-.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync repo-cruft-check model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-image-cuda-quant runtime-image-cuda-quant-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-smoke-cuda-quant runtime-smoke-cuda-quant-podman runtime-verify actionlint workflow-lint packaging-smoke-minimal packaging-smoke-front-door ensure-mypy cve-audit dist-check release-evidence-check guard-validation-smoke empirical-guard-evidence-check
+.PHONY: help install dev-install lock-sync test test-fast test-integration test-assurance lint mypy-typed-surface format clean docsclean deepclean docs docs-ci verify verify-ruff cli-smoke-core cli-smoke-advanced coverage coverage-enforce docs-serve docs-deploy pre-commit pre-commit-install docs-check docs-live docs-live-fast docs-lint docs-lint-strict docs-check-build docs-check-links docs-lint-markdown docs-lint-spell ci-local ci-local-list ci-local-job ci-local-dry contracts-check contracts-sync repo-cruft-check scripts-inventory-check scripts-audit architecture-fragmentation-check model-evidence-list model-evidence-sweep runtime-image runtime-image-podman runtime-image-cuda runtime-image-cuda-podman runtime-image-cuda-quant runtime-image-cuda-quant-podman runtime-smoke runtime-smoke-podman runtime-smoke-cuda runtime-smoke-cuda-podman runtime-smoke-cuda-quant runtime-smoke-cuda-quant-podman runtime-verify actionlint workflow-lint packaging-smoke-minimal packaging-smoke-front-door ensure-mypy cve-audit dist-check release-evidence-check guard-validation-smoke empirical-guard-evidence-check
 
 PYTHON ?= $(shell bash scripts/select_workspace_python.sh)
 PIP := $(PYTHON) -m pip
@@ -320,6 +320,8 @@ verify:  ## Run verification (pytest -q, runtime verifier, lint, format, strict 
 	@echo "Running verification..."
 	$(MAKE) ensure-python
 	$(MAKE) repo-cruft-check
+	$(MAKE) scripts-inventory-check
+	$(MAKE) architecture-fragmentation-check
 	PYTHONPATH=src $(PYTEST) -q
 	OMP_NUM_THREADS=1 SKIP_RUFF=1 INVARLOCK_PYTHON="$(PYTHON)" bash scripts/run_smoke_regression.sh
 	$(MAKE) cli-smoke-core
@@ -625,6 +627,18 @@ contracts-check:  ## Ensure packaged contracts match the repo contract source
 repo-cruft-check:  ## Fail if macOS transport artifacts leaked into repo source paths
 	$(MAKE) ensure-python
 	$(PYTHON) scripts/check_repo_cruft.py
+
+scripts-inventory-check:  ## Ensure scripts/ files are classified by maintained family
+	$(MAKE) ensure-python
+	$(PYTHON) scripts/check_scripts_inventory.py
+
+scripts-audit:  ## Emit per-file scripts inventory with references/runtime/network/GPU metadata
+	$(MAKE) ensure-python
+	$(PYTHON) scripts/check_scripts_inventory.py --json >/dev/null
+
+architecture-fragmentation-check:  ## Report source fragmentation metrics without forcing artificial splits
+	$(MAKE) ensure-python
+	$(PYTHON) scripts/check_architecture_fragmentation.py --json >/dev/null
 
 contracts-sync:  ## Copy repo contracts into src/invarlock/_data/contracts
 	$(MAKE) ensure-python

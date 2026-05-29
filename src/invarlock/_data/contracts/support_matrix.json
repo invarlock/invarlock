@@ -17,6 +17,7 @@
       "provenance_source": "docs/README.md#support-matrix",
       "evidence": {
         "evaluation_report_fixture": "public_evidence/published_basis/gpt2/evaluation.report.json",
+        "runtime_manifest_fixture": "public_evidence/published_basis/gpt2/runtime.manifest.json",
         "evidence_pack_recipe": "public_evidence/published_basis/gpt2/evidence_pack_recipe.json"
       }
     },
@@ -31,6 +32,7 @@
       "provenance_source": "docs/README.md#support-matrix",
       "evidence": {
         "evaluation_report_fixture": "public_evidence/published_basis/bert/evaluation.report.json",
+        "runtime_manifest_fixture": "public_evidence/published_basis/bert/runtime.manifest.json",
         "evidence_pack_recipe": "public_evidence/published_basis/bert/evidence_pack_recipe.json"
       }
     },

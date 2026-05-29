@@ -341,6 +341,25 @@ Package-native signed packs store the detached Ed25519 signature bundle in
 `manifest.signature.json` and record `signing_key_fingerprint` in the manifest
 for audit trails.
 
+Signature verification proves that `manifest.json` has not changed since the
+holder of the matching private key signed it. To also prove signer authenticity,
+pin the expected signer fingerprint or use a local trust store. Without pinning,
+the verifier reports the signer fingerprint for review, but a different key can
+sign a different pack.
+
+```bash
+invarlock advanced evidence-pack verify <dir> \
+  --strict \
+  --expected-fingerprint sha256:<64-hex-chars> \
+  --report-assurance strict
+```
+
+The package-native verifier also accepts `--trust-store <json>`. If the flag is
+omitted and `~/.config/invarlock/trusted-signers.json` exists, that file is used.
+The trust store may be either a JSON list of fingerprints or an object with a
+`trusted_signers` or `fingerprints` list; list entries may be strings or objects
+with a `fingerprint` field.
+
 The manifest contract is published at `contracts/evidence_pack_manifest.schema.json`.
 `invarlock advanced evidence-pack verify` validates this schema before checksum and signature verification so
 malformed evidence packs fail deterministically.
@@ -371,7 +390,8 @@ Use the package-native subcommands:
 - Strict (recommended for distributable evidence): `invarlock advanced evidence-pack verify <dir> --strict --report-assurance strict`
   - Adds fail-closed checks for extra files outside `checksums.sha256` on top of the default signed-manifest requirement.
   - `--strict` is pack-integrity strictness; `--report-assurance strict` requires every bundled clean report to satisfy strict report assurance.
-  - Repo-harness alternative: `PACK_STRICT_MODE=1 scripts/evidence_packs/verify_pack.sh --pack <dir> --report-assurance strict`.
+  - Add `--expected-fingerprint sha256:<64-hex-chars>` or `--trust-store <json>` when accepting evidence from a specific signer.
+  - Repo-harness alternative: `PACK_STRICT_MODE=1 scripts/evidence_packs/verify_pack.sh --pack <dir> --report-assurance strict --expected-fingerprint sha256:<64-hex-chars>`.
 
 `invarlock advanced evidence-pack verify` returns structured exit codes:
 
@@ -387,6 +407,8 @@ Use the package-native subcommands:
 Reviewer checklist:
 
 - [ ] `invarlock advanced evidence-pack verify <dir> --strict --report-assurance strict` returns `0`
+- [ ] Verification is signer-pinned with `--expected-fingerprint` or a trust
+  store when authenticity matters outside the producing workspace
 - [ ] `jq -e . <dir>/manifest.json` succeeds
 - [ ] `sha256sum -c <dir>/checksums.sha256` succeeds
 - [ ] `jq -e . <dir>/manifest.signature.json` succeeds when the pack is

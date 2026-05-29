@@ -472,6 +472,21 @@ def test_verify_rejects_noncanonical_report_directory(tmp_path: Path):
     assert result.exit_code == 2
 
 
+def test_verify_explains_run_report_directory_when_evaluation_missing(
+    tmp_path: Path,
+) -> None:
+    report_dir = tmp_path / "run-dir"
+    report_dir.mkdir()
+    (report_dir / "report.json").write_text("{}", encoding="utf-8")
+
+    result = runner.invoke(app, ["verify", str(report_dir)])
+
+    assert result.exit_code == 2
+    output = " ".join(result.output.split())
+    assert "contains report.json, which is a raw run report" in output
+    assert "invarlock report generate --run <subject report.json>" in output
+
+
 def test_verify_rejects_noncanonical_baseline_directory(tmp_path: Path):
     report_dir = tmp_path / "report-dir"
     report_dir.mkdir()

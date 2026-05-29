@@ -1,0 +1,24 @@
+{
+  "config": {
+    "path": null,
+    "sha256": null,
+    "source": "missing"
+  },
+  "execution_mode": "container",
+  "generated_at_utc": "2026-05-29T00:00:00+00:00",
+  "manifest_version": 1,
+  "report": {
+    "filename": "evaluation.report.json",
+    "path": "public_evidence/published_basis/bert/evaluation.report.json",
+    "sha256": "f25d7124f80994aaff83735f72049a7725434a88e0acb3fc057cef6fcaacc366"
+  },
+  "runtime": {
+    "allow_network": false,
+    "allow_remote_code": false,
+    "allow_third_party_plugins": false,
+    "container_execution": true,
+    "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "image_ref": "ghcr.io/invarlock/invarlock-runtime:public-fixture"
+  },
+  "verifier_contract_version": "runtime-manifest-v1"
+}

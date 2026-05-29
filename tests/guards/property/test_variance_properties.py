@@ -25,10 +25,10 @@ def test_variance_enablement(data):
         lo_n, hi_n = -hi, -lo
     r = variance_decide(mu, ci, direction, me, one_sided)
     if one_sided:
-        # One-sided parity: evaluate regardless of 0 in CI; pass when mu indicates improvement and min_effect met
-        if mu_n >= 0.0 or (me > 0 and (-mu_n) < me) or lo_n >= 0.0:
+        assert r["evaluated"] is True
+        if hi_n >= 0.0 or mu_n >= 0.0 or hi_n > -me or mu_n > -me:
             assert r["evaluated"] is True and r["pass"] is False
     else:
-        # Two-sided: If CI contains 0 or |mu| < min_effect => not evaluated
-        if lo_n <= 0.0 <= hi_n or abs(mu_n) < me:
-            assert r["evaluated"] is False and r["pass"] is True
+        assert r["evaluated"] is True
+        if lo_n <= 0.0 <= hi_n or lo_n > 0.0 or hi_n > -me or mu_n >= 0.0 or mu_n > -me:
+            assert r["pass"] is False

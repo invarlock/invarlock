@@ -1,7 +1,144 @@
 {
-  "schema_version": "v1",
-  "run_id": "bert-published-basis-fixture",
   "artifacts": {},
+  "assurance": {
+    "blocking_reasons": [],
+    "canonical_guard_chain": [
+      "invariants",
+      "spectral",
+      "rmt",
+      "variance",
+      "invariants"
+    ],
+    "canonical_guard_chain_enforced": true,
+    "claim_set": "invarlock-weight-edit-regression-v1",
+    "fallback_fields_used": false,
+    "guard_chain_observed": [
+      "invariants",
+      "spectral",
+      "rmt",
+      "variance",
+      "invariants"
+    ],
+    "mode": "strict",
+    "profile": "release",
+    "report_local_verdict": "pass",
+    "runtime_provenance_declared": "container",
+    "runtime_provenance_verification_status": "pending",
+    "runtime_provenance_verified": false,
+    "tier": "balanced",
+    "verdict": "pending_verifier",
+    "verified_assurance_verdict": "pending"
+  },
+  "auto": {
+    "tier": "balanced"
+  },
+  "baseline_ref": {
+    "primary_metric": {
+      "final": 8.4,
+      "kind": "ppl_mlm"
+    },
+    "tokenizer_hash": "bert-tokenizer-sha256-fixture"
+  },
+  "context": {
+    "profile": "release",
+    "runtime": {
+      "execution_mode": "container"
+    }
+  },
+  "dataset": {
+    "provider": "hf_text",
+    "seq_len": 128,
+    "windows": {
+      "final": 8,
+      "preview": 8,
+      "stats": {
+        "coverage": {
+          "final": {
+            "used": 8
+          },
+          "preview": {
+            "used": 8
+          }
+        },
+        "paired_windows": 8,
+        "window_match_fraction": 1.0,
+        "window_overlap_fraction": 0.0,
+        "window_pairing_reason": null
+      }
+    }
+  },
+  "evaluation_windows": {
+    "final": {
+      "logloss": [
+        2.128231705849268,
+        2.128231705849268,
+        2.128231705849268,
+        2.128231705849268,
+        2.128231705849268,
+        2.128231705849268,
+        2.128231705849268,
+        2.128231705849268
+      ],
+      "token_counts": [
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "window_ids": [
+        "bert-window-00",
+        "bert-window-01",
+        "bert-window-02",
+        "bert-window-03",
+        "bert-window-04",
+        "bert-window-05",
+        "bert-window-06",
+        "bert-window-07"
+      ]
+    }
+  },
+  "guard_overhead": {
+    "evaluated": true,
+    "overhead_ratio": 0.001,
+    "overhead_threshold": 0.01,
+    "passed": true
+  },
+  "guards": [
+    {
+      "name": "invariants"
+    },
+    {
+      "name": "spectral"
+    },
+    {
+      "name": "rmt"
+    },
+    {
+      "name": "variance"
+    },
+    {
+      "name": "invariants"
+    }
+  ],
+  "invariants": {
+    "decision": "allow",
+    "diagnostics": [],
+    "metrics": {},
+    "passed": true,
+    "status": "pass",
+    "supported": true,
+    "violations": []
+  },
+  "meta": {
+    "adapter": "hf_mlm",
+    "execution_mode": "container",
+    "model_id": "prajjwal1/bert-tiny",
+    "profile": "release"
+  },
   "plugins": {
     "adapters": [
       {
@@ -9,72 +146,155 @@
       }
     ],
     "edits": [],
-    "guards": []
+    "guards": [
+      "invariants",
+      "spectral",
+      "rmt",
+      "variance",
+      "invariants"
+    ]
   },
-  "meta": {
-    "model_id": "prajjwal1/bert-tiny",
-    "adapter": "hf_mlm",
-    "profile": "release"
-  },
-  "dataset": {
-    "provider": "hf_text",
-    "seq_len": 128,
-    "windows": {
-      "preview": 8,
-      "final": 8,
-      "stats": {
-        "coverage": {
-          "preview": {
-            "used": 8
-          },
-          "final": {
-            "used": 8
-          }
-        },
-        "paired_windows": 8,
-        "window_match_fraction": 1.0,
-        "window_overlap_fraction": 1.0
-      }
-    }
+  "policy_digest": {
+    "changed": false,
+    "policy_version": "policy-v1",
+    "thresholds_hash": "3f1ee6570fcf3a12",
+    "tier_policy_name": "balanced"
   },
   "primary_metric": {
-    "kind": "ppl_mlm",
-    "preview": 8.4,
-    "final": 8.4,
-    "ratio_vs_baseline": 1.0,
+    "ci": [
+      0.0,
+      0.0
+    ],
     "display_ci": [
       1.0,
       1.0
     ],
-    "gating_basis": "ratio"
+    "drift_band": {
+      "max": 1.05,
+      "min": 0.95
+    },
+    "final": 8.4,
+    "gating_basis": "ratio",
+    "kind": "ppl_mlm",
+    "preview": 8.4,
+    "ratio_vs_baseline": 1.0
   },
-  "validation": {
-    "primary_metric_acceptable": true,
-    "preview_final_drift_acceptable": true,
-    "invariants_pass": true,
-    "spectral_stable": true,
-    "rmt_stable": true
+  "provenance": {
+    "execution_mode": "container",
+    "provider_digest": {
+      "ids_sha256": "bert-window-ids-sha256-fixture",
+      "masking_sha256": "bert-masking-sha256-fixture",
+      "tokenizer_sha256": "bert-tokenizer-sha256-fixture"
+    }
   },
   "resolved_policy": {
     "metrics": {
       "pm_ratio": {
-        "ratio_limit_base": 1.1,
-        "min_tokens": 128,
+        "hysteresis_ratio": 0.0,
         "min_token_fraction": 0.0,
-        "hysteresis_ratio": 0.0
+        "min_tokens": 128,
+        "ratio_limit_base": 1.1
+      }
+    },
+    "rmt": {
+      "measurement_contract": {
+        "activation_sampling": {
+          "windows": {
+            "count": 8,
+            "indices_policy": "paired_final"
+          }
+        },
+        "bulk_edge": "marchenko_pastur",
+        "estimator": {
+          "init": "deterministic_ones",
+          "iters": 8,
+          "type": "power_iter"
+        }
+      }
+    },
+    "spectral": {
+      "measurement_contract": {
+        "estimator": {
+          "init": "deterministic_ones",
+          "iters": 8,
+          "type": "power_iter"
+        },
+        "scope": {
+          "families": [
+            "attn",
+            "mlp"
+          ]
+        }
       }
     }
   },
-  "policy_digest": {
-    "policy_version": "policy-v1",
-    "tier_policy_name": "balanced",
-    "thresholds_hash": "3f1ee6570fcf3a12",
-    "changed": false
+  "rmt": {
+    "decision": "allow",
+    "diagnostics": [],
+    "measurement_contract": {
+      "activation_sampling": {
+        "windows": {
+          "count": 8,
+          "indices_policy": "paired_final"
+        }
+      },
+      "bulk_edge": "marchenko_pastur",
+      "estimator": {
+        "init": "deterministic_ones",
+        "iters": 8,
+        "type": "power_iter"
+      }
+    },
+    "measurement_contract_hash": "074d72405a1c519b",
+    "measurement_contract_match": true,
+    "metrics": {},
+    "passed": true,
+    "status": "pass",
+    "supported": true,
+    "violations": []
   },
-  "provenance": {
-    "provider_digest": {
-      "tokenizer_sha256": "bert-tokenizer-fixture",
-      "masking_sha256": "bert-mask-fixture"
-    }
+  "run_id": "bert-published-basis-strict-pass-20260529",
+  "schema_version": "v1",
+  "spectral": {
+    "decision": "allow",
+    "diagnostics": [],
+    "measurement_contract": {
+      "estimator": {
+        "init": "deterministic_ones",
+        "iters": 8,
+        "type": "power_iter"
+      },
+      "scope": {
+        "families": [
+          "attn",
+          "mlp"
+        ]
+      }
+    },
+    "measurement_contract_hash": "efcfc5d7407a1f66",
+    "measurement_contract_match": true,
+    "metrics": {},
+    "passed": true,
+    "status": "pass",
+    "supported": true,
+    "violations": []
+  },
+  "validation": {
+    "guard_overhead_acceptable": true,
+    "invariants_pass": true,
+    "preview_final_drift_acceptable": true,
+    "primary_metric_acceptable": true,
+    "rmt_stable": true,
+    "spectral_stable": true
+  },
+  "variance": {
+    "decision": "allow",
+    "diagnostics": [],
+    "enabled": false,
+    "metrics": {},
+    "passed": true,
+    "status": "pass",
+    "supported": true,
+    "violations": []
   }
 }

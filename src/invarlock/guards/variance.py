@@ -8,7 +8,7 @@ stable residual stream dynamics after edits.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import torch.nn as nn
@@ -187,7 +187,7 @@ class VarianceGuard(Guard):
         }.get(level_code, level_code.lower())
         self._event_records.append(
             {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "component": "variance_guard",
                 "kind": operation,
                 "severity": severity,

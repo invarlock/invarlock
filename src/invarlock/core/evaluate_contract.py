@@ -339,17 +339,21 @@ def _baseline_report_tier(
     context: dict[str, Any],
 ) -> str | None:
     auto_ctx = context.get("auto")
-    if isinstance(auto_ctx, dict) and isinstance(auto_ctx.get("tier"), str):
-        return auto_ctx["tier"]
-    if isinstance(context.get("tier"), str):
-        return context["tier"]
+    tier = auto_ctx.get("tier") if isinstance(auto_ctx, dict) else None
+    if isinstance(tier, str):
+        return tier
+    tier = context.get("tier")
+    if isinstance(tier, str):
+        return tier
     auto_top = payload.get("auto")
-    if isinstance(auto_top, dict) and isinstance(auto_top.get("tier"), str):
-        return auto_top["tier"]
+    tier = auto_top.get("tier") if isinstance(auto_top, dict) else None
+    if isinstance(tier, str):
+        return tier
     meta = payload.get("meta")
     auto_meta = meta.get("auto") if isinstance(meta, dict) else None
-    if isinstance(auto_meta, dict) and isinstance(auto_meta.get("tier"), str):
-        return auto_meta["tier"]
+    tier = auto_meta.get("tier") if isinstance(auto_meta, dict) else None
+    if isinstance(tier, str):
+        return tier
     return None
 
 
@@ -358,17 +362,15 @@ def _baseline_report_assurance_mode(
     context: dict[str, Any],
 ) -> str | None:
     context_assurance = context.get("assurance")
-    if isinstance(context_assurance, dict) and isinstance(
-        context_assurance.get("mode"),
-        str,
-    ):
-        return context_assurance["mode"]
+    mode = (
+        context_assurance.get("mode") if isinstance(context_assurance, dict) else None
+    )
+    if isinstance(mode, str):
+        return mode
     report_assurance = payload.get("assurance")
-    if isinstance(report_assurance, dict) and isinstance(
-        report_assurance.get("mode"),
-        str,
-    ):
-        return report_assurance["mode"]
+    mode = report_assurance.get("mode") if isinstance(report_assurance, dict) else None
+    if isinstance(mode, str):
+        return mode
     return None
 
 

@@ -249,7 +249,7 @@ def enrich_run_report_metrics(
                     c_fin, n_fin = (fin_n, fin_n) if fin_n > 0 else (0, 0)
                     used_pseudo_counts = prev_n > 0 or fin_n > 0
                     if used_pseudo_counts and not _pseudo_accuracy_allowed(
-                        profile_normalized,
+                        profile_normalized or "",
                         run_config,
                     ):
                         raise ValueError(

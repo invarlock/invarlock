@@ -36,6 +36,10 @@ CONTROL_FILES = {
     f"metadata/{MANIFEST_SIGNATURE_FILENAME}",
 }
 CHECKSUM_LINE_RE = re.compile(r"^([A-Fa-f0-9]{64}) [ *](.+)$")
+SIGNING_KEY_FINGERPRINT_RE = re.compile(r"sha256:[a-f0-9]{64}")
+DEFAULT_TRUST_STORE_PATH = (
+    Path.home() / ".config" / "invarlock" / "trusted-signers.json"
+)
 
 
 def jsonschema_validation_error_types() -> tuple[type[BaseException], ...]:
@@ -122,6 +126,16 @@ def public_key_fingerprint(public_key: ed25519.Ed25519PublicKey) -> str:
         format=serialization.PublicFormat.Raw,
     )
     return f"sha256:{hashlib.sha256(key_bytes).hexdigest()}"
+
+
+def normalize_expected_fingerprint(value: str | None) -> str | None:
+    """Normalize a caller-pinned signing key fingerprint."""
+    if value is None:
+        return None
+    normalized = value.strip().lower()
+    if not SIGNING_KEY_FINGERPRINT_RE.fullmatch(normalized):
+        return None
+    return normalized
 
 
 def sign_manifest(
@@ -313,8 +327,8 @@ def _load_signature_bundle(path: Path) -> tuple[dict[str, Any] | None, list[str]
                 f"{MANIFEST_SIGNATURE_FILENAME} signature.value must be a non-empty base64 string."
             )
     fingerprint = payload.get("signing_key_fingerprint")
-    if not isinstance(fingerprint, str) or not re.fullmatch(
-        r"sha256:[a-f0-9]{64}", fingerprint
+    if not isinstance(fingerprint, str) or not SIGNING_KEY_FINGERPRINT_RE.fullmatch(
+        fingerprint
     ):
         errors.append(
             f"{MANIFEST_SIGNATURE_FILENAME} signing_key_fingerprint must be a sha256:... string."
@@ -327,6 +341,7 @@ def verify_signature(
     *,
     strict: bool,
     load_json_fn: Any = _load_json,
+    expected_fingerprints: set[str] | frozenset[str] | None = None,
 ) -> tuple[list[str], list[str], str | None]:
     signature_path = pack_dir / MANIFEST_SIGNATURE_FILENAME
     if not signature_path.is_file():
@@ -386,6 +401,19 @@ def verify_signature(
             [],
             derived_fingerprint,
         )
+    if (
+        expected_fingerprints is not None
+        and derived_fingerprint not in expected_fingerprints
+    ):
+        expected = ", ".join(sorted(expected_fingerprints))
+        return (
+            [
+                "manifest signature signer mismatch: "
+                f"expected one of [{expected}], got {derived_fingerprint}."
+            ],
+            [],
+            derived_fingerprint,
+        )
     return [], [], derived_fingerprint
 
 
@@ -405,6 +433,8 @@ __all__ = [
     "CONTROL_FILES",
     "MANIFEST_SIGNATURE_FILENAME",
     "EVIDENCE_PACK_SIGNATURE_FORMAT",
+    "DEFAULT_TRUST_STORE_PATH",
+    "SIGNING_KEY_FINGERPRINT_RE",
     "_path_within_dir",
     "copy_file",
     "generate_signing_keypair",
@@ -421,4 +451,5 @@ __all__ = [
     "verify_manifest_binds_checksums",
     "verify_no_extra_files",
     "write_checksums_file",
+    "normalize_expected_fingerprint",
 ]

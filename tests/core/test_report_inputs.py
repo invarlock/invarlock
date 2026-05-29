@@ -56,6 +56,20 @@ def test_resolve_report_input_path_accepts_canonical_evaluation_directory(
     assert resolved == report.resolve()
 
 
+def test_resolve_report_input_path_explains_run_dir_when_evaluation_expected(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "report.json").write_text("{}", encoding="utf-8")
+
+    with pytest.raises(ReportInputError) as exc:
+        resolve_report_input_path(tmp_path, expected_kind="evaluation")
+
+    message = str(exc.value)
+    assert "contains report.json, which is a raw run report" in message
+    assert "invarlock report generate --run <subject report.json>" in message
+    assert "evaluation.report.json" in message
+
+
 def test_resolve_report_input_path_rejects_ambiguous_directory(tmp_path: Path) -> None:
     (tmp_path / "report.json").write_text("{}", encoding="utf-8")
     (tmp_path / "evaluation.report.json").write_text("{}", encoding="utf-8")

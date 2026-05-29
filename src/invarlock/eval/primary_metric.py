@@ -400,8 +400,10 @@ class _Accuracy:
         ):
             c = windows.get(c_key)
             t = windows.get(t_key)
-            if _is_non_bool_number(c) and _is_non_bool_number(t) and t > 0:
-                total = float(t)
+            c_value = _coerce_float(c)
+            t_value = _coerce_float(t)
+            if c_value is not None and t_value is not None and t_value > 0:
+                total = t_value
                 # Optional abstain/tie handling with documented policy
                 policy = (
                     windows.get("policy", {})
@@ -416,18 +418,20 @@ class _Accuracy:
                     policy.get("ties_count_as_incorrect", False)
                 )
                 # Apply abstain exclusion from denominator if requested
-                if exclude_abstain and _is_non_bool_number(abstain) and abstain > 0:
-                    total = max(1.0, total - float(abstain))
+                abstain_value = _coerce_float(abstain)
+                if exclude_abstain and abstain_value is not None and abstain_value > 0:
+                    total = max(1.0, total - abstain_value)
                 # Apply tie policy
-                if _is_non_bool_number(ties) and ties > 0:
+                ties_value = _coerce_float(ties)
+                if ties_value is not None and ties_value > 0:
                     if count_ties_as_correct:
-                        c = float(c) + float(ties)
+                        c_value += ties_value
                     elif count_ties_as_incorrect:
                         pass
                     else:
                         if exclude_abstain:
-                            total = max(1.0, total - float(ties))
-                return float(c) / float(total)
+                            total = max(1.0, total - ties_value)
+                return c_value / total
         return float("nan")
 
     def accumulate(self, contrib: MetricContribution) -> None:
@@ -582,11 +586,13 @@ def compute_primary_metric_from_report(
             final_win = fin
             # Attach counts into a small context to help gating
             n_prev = _coerce_int(prev.get("total"))
-            if n_prev is None and isinstance(prev.get("example_correct"), list):
-                n_prev = len(prev.get("example_correct"))
+            prev_examples = prev.get("example_correct")
+            if n_prev is None and isinstance(prev_examples, list):
+                n_prev = len(prev_examples)
             n_fin = _coerce_int(fin.get("total"))
-            if n_fin is None and isinstance(fin.get("example_correct"), list):
-                n_fin = len(fin.get("example_correct"))
+            fin_examples = fin.get("example_correct")
+            if n_fin is None and isinstance(fin_examples, list):
+                n_fin = len(fin_examples)
             # Propagate counts source tagging when present
             counts_source = clf.get("counts_source")
             if isinstance(counts_source, str) and counts_source:
@@ -623,10 +629,11 @@ def compute_primary_metric_from_report(
     if kind == "accuracy":
 
         def _ensure_counts(win: dict[str, Any]) -> dict[str, Any]:
+            total = _coerce_float(win.get("total"))
             has_counts = (
                 isinstance(win.get("correct_total"), int | float)
-                and isinstance(win.get("total"), int | float)
-                and win.get("total") > 0
+                and total is not None
+                and total > 0
             )
             if has_counts:
                 return win
@@ -673,12 +680,13 @@ def compute_primary_metric_from_report(
         )
         if isinstance(pm_base, dict) and (base_kind == kind_l or same_family):
             base_ref = pm_base.get("final")
-            if _is_non_bool_number(base_ref):
+            base_value = _coerce_float(base_ref)
+            if base_value is not None:
                 is_ppl_like = str(kind).lower().startswith("ppl")
-                if is_ppl_like and base_ref > 0:
-                    ratio_vs_baseline = float(final_point) / float(base_ref)
-                elif str(kind).lower() == "accuracy" and 0 <= base_ref <= 1:
-                    ratio_vs_baseline = float(final_point) - float(base_ref)
+                if is_ppl_like and base_value > 0:
+                    ratio_vs_baseline = float(final_point) / base_value
+                elif str(kind).lower() == "accuracy" and 0 <= base_value <= 1:
+                    ratio_vs_baseline = float(final_point) - base_value
 
     invalid = True
     invalid = not (_is_finite(preview_point) and _is_finite(final_point))
