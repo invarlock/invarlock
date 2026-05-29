@@ -1,0 +1,169 @@
+version = 1
+
+[[families]]
+name = "scripts-governance"
+owner = "maintainers"
+stability = "repo-internal"
+audience = "ci-only"
+expected_runtime = "fast"
+network = "never"
+gpu = "never"
+invoked_by = ["make verify", "make scripts-audit"]
+description = "Inventory and hygiene checks for the scripts tree itself."
+paths = [
+  "scripts/README.md",
+  "scripts/__init__.py",
+  "scripts/check_architecture_fragmentation.py",
+  "scripts/check_repo_cruft.py",
+  "scripts/check_scripts_inventory.py",
+  "scripts/scripts_inventory.toml",
+  "scripts/select_workspace_python.sh",
+]
+
+[[families]]
+name = "repo-contracts"
+owner = "maintainers"
+stability = "ci-stable"
+audience = "ci-only"
+expected_runtime = "fast"
+network = "never"
+gpu = "never"
+invoked_by = ["make verify", "make contracts-check", "CI"]
+description = "Repository consistency checks for contracts, claims, config, CLI, guards, and versions."
+paths = [
+  "scripts/check_claim_surface_consistency.py",
+  "scripts/check_cli_completeness.py",
+  "scripts/check_config_integrity.py",
+  "scripts/check_config_schema_sync.py",
+  "scripts/check_guard_completeness.py",
+  "scripts/check_version_consistency.py",
+  "scripts/sync_packaged_contracts.py",
+  "scripts/verify_ci_matrix.sh",
+]
+
+[[families]]
+name = "docs-assurance"
+owner = "docs-maintainers"
+stability = "ci-stable"
+audience = "ci-only"
+expected_runtime = "fast-to-medium"
+network = "never"
+gpu = "never"
+invoked_by = ["make docs-check", "make verify", "CI"]
+description = "Documentation, assurance cross-reference, example, and link validation."
+paths = [
+  "scripts/check_docs_links.py",
+  "scripts/check_internal_links.py",
+  "scripts/docs_check.py",
+  "scripts/docs_lint.py",
+  "scripts/lint_assurance_xrefs.py",
+  "scripts/test_cli_examples.py",
+  "scripts/validate_doc_references.py",
+  "scripts/validate_docs_api_refs.py",
+  "scripts/validate_python_examples.py",
+  "scripts/validate_yaml_examples.py",
+  "scripts/verify_live_examples.py",
+  "scripts/verify_markdown_bash_blocks.py",
+  "scripts/verify_notebooks_smoke.py",
+]
+
+[[families]]
+name = "coverage"
+owner = "maintainers"
+stability = "ci-stable"
+audience = "ci-only"
+expected_runtime = "medium"
+network = "never"
+gpu = "never"
+invoked_by = ["make coverage-enforce", "CI"]
+description = "Coverage surface selection and threshold enforcement."
+paths = [
+  "scripts/check_coverage_thresholds.py",
+  "scripts/coverage_policy.py",
+]
+
+[[families]]
+name = "smoke-runtime"
+owner = "maintainers"
+stability = "ci-stable"
+audience = "ci-only"
+expected_runtime = "medium"
+network = "optional"
+gpu = "optional"
+invoked_by = ["make verify", "make smoke-fast", "runtime smoke CI"]
+description = "Local smoke, runtime, tiny-model, and guard-validation entry points."
+paths = [
+  "scripts/check_device_drift.py",
+  "scripts/cli_exhaustive_smoke.sh",
+  "scripts/cli_smoke_fast.sh",
+  "scripts/cli_smoke_negative.sh",
+  "scripts/cli_smoke_realistic.sh",
+  "scripts/guard_validation_smoke.py",
+  "scripts/run_cpu_telemetry.sh",
+  "scripts/run_gpt2_user_journey_smoke.sh",
+  "scripts/run_smoke_regression.sh",
+  "scripts/run_tiny_all_matrix.sh",
+  "scripts/run_tiny_container_smoke.sh",
+]
+
+[[families]]
+name = "model-evidence"
+owner = "maintainers"
+stability = "maintainer-workflow"
+audience = "maintainer"
+expected_runtime = "long"
+network = "required"
+gpu = "optional"
+invoked_by = ["make model-evidence-list", "make model-evidence-sweep", "manual remote campaigns"]
+description = "Model-evidence sweep planning, remote launch, command generation, and outputs."
+paths = [
+  "scripts/model_evidence_commands.py",
+  "scripts/model_evidence_sweep.py",
+  "scripts/model_evidence_sweep_output.py",
+  "scripts/run_model_evidence_remote.py",
+]
+
+[[families]]
+name = "evidence-packs"
+owner = "maintainers"
+stability = "maintainer-workflow"
+audience = "maintainer"
+expected_runtime = "medium-to-long"
+network = "optional"
+gpu = "optional"
+invoked_by = ["scripts/evidence_packs/run_pack.sh", "scripts/evidence_packs/verify_pack.sh", "evidence-pack tests"]
+description = "Evidence-pack suite orchestration, helpers, fixtures, and shell tests."
+paths = [
+  "scripts/evidence_packs/**",
+]
+
+[[families]]
+name = "release"
+owner = "maintainers"
+stability = "release-critical"
+audience = "release-only"
+expected_runtime = "medium"
+network = "optional"
+gpu = "never"
+invoked_by = ["make release-evidence-check", "make empirical-guard-evidence-check", "release checklist"]
+description = "Release evidence checks and offline-bundle helpers."
+paths = [
+  "scripts/release/**",
+]
+
+[[families]]
+name = "security-supply-chain"
+owner = "security-maintainers"
+stability = "security-critical"
+audience = "ci-only"
+expected_runtime = "medium"
+network = "required"
+gpu = "never"
+invoked_by = ["make security", "make cve-audit", "supply-chain CI"]
+description = "SBOM, CVE audit, pip-audit, requirements pinning, and scorecard helpers."
+paths = [
+  "scripts/filter_scorecard_sarif.py",
+  "scripts/generate_sbom.sh",
+  "scripts/refresh_pinned_requirements.sh",
+  "scripts/security/**",
+]

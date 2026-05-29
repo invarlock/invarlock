@@ -43,3 +43,31 @@ def test_verify_target_runs_repo_cruft_check() -> None:
     assert "$(MAKE) repo-cruft-check" in block, (
         "verify target should fail fast on macOS transport artifacts"
     )
+
+
+def test_verify_target_runs_scripts_inventory_check() -> None:
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    data = makefile.read_text(encoding="utf-8")
+    block = _get_make_target_block(data, "verify")
+    assert block is not None, "verify target not found in Makefile"
+    assert "$(MAKE) scripts-inventory-check" in block, (
+        "verify target should fail fast on unclassified scripts"
+    )
+
+
+def test_verify_target_runs_architecture_fragmentation_check() -> None:
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    data = makefile.read_text(encoding="utf-8")
+    block = _get_make_target_block(data, "verify")
+    assert block is not None, "verify target not found in Makefile"
+    assert "$(MAKE) architecture-fragmentation-check" in block, (
+        "verify target should track source fragmentation metrics"
+    )
+
+
+def test_makefile_exposes_scripts_audit_target() -> None:
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    data = makefile.read_text(encoding="utf-8")
+    block = _get_make_target_block(data, "scripts-audit")
+    assert block is not None, "scripts-audit target not found in Makefile"
+    assert "scripts/check_scripts_inventory.py --json" in block
