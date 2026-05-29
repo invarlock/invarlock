@@ -7,6 +7,8 @@ import re
 import sys
 from pathlib import Path
 
+from common_io import read_text, repo_root_from
+
 COMMANDS = {
     "invarlock evaluate",
     "invarlock report",
@@ -19,7 +21,7 @@ COMMANDS = {
 def gather_documented_commands(doc_root: Path) -> set[str]:
     documented: set[str] = set()
     for md_file in doc_root.rglob("*.md"):
-        text = md_file.read_text(encoding="utf-8")
+        text = read_text(md_file)
         for command in COMMANDS:
             if re.search(rf"\b{re.escape(command)}\b", text):
                 documented.add(command)
@@ -27,7 +29,7 @@ def gather_documented_commands(doc_root: Path) -> set[str]:
 
 
 def main() -> int:
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = repo_root_from(__file__)
     docs_root = repo_root / "docs"
     if not docs_root.exists():
         print("Docs directory not found; skipping CLI completeness check.")

@@ -13,6 +13,8 @@ import re
 import sys
 from pathlib import Path
 
+from common_io import read_text, repo_root_from
+
 VERSION_PATTERN = re.compile(r'__version__\s*=\s*"([^"]+)"')
 PYPROJECT_VERSION_PATTERN = re.compile(r'^\s*version\s*=\s*"([^"]+)"\s*$', re.M)
 CITATION_VERSION_PATTERN = re.compile(
@@ -22,7 +24,7 @@ CITATION_VERSION_PATTERN = re.compile(
 
 def get_package_version(repo_root: Path) -> str:
     init_path = repo_root / "src" / "invarlock" / "__init__.py"
-    content = init_path.read_text(encoding="utf-8")
+    content = read_text(init_path)
     match = VERSION_PATTERN.search(content)
     if not match:
         raise RuntimeError(
@@ -32,19 +34,19 @@ def get_package_version(repo_root: Path) -> str:
 
 
 def main() -> int:
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = repo_root_from(__file__)
     version = get_package_version(repo_root)
 
     pyproject = repo_root / "pyproject.toml"
     citation_cff = repo_root / "CITATION.cff"
 
     missing: list[str] = []
-    pyproject_text = pyproject.read_text(encoding="utf-8")
+    pyproject_text = read_text(pyproject)
     pyproject_match = PYPROJECT_VERSION_PATTERN.search(pyproject_text)
     if not pyproject_match or pyproject_match.group(1) != version:
         missing.append(str(pyproject.relative_to(repo_root)))
 
-    citation_text = citation_cff.read_text(encoding="utf-8")
+    citation_text = read_text(citation_cff)
     citation_match = CITATION_VERSION_PATTERN.search(citation_text)
     if not citation_match or citation_match.group(1) != version:
         missing.append(str(citation_cff.relative_to(repo_root)))

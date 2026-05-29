@@ -6,6 +6,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from common_io import path_contains_all, repo_root_from
+
 EXPECTED_KEYS = {
     "model:",
     "dataset:",
@@ -18,14 +20,11 @@ EXPECTED_KEYS = {
 
 
 def doc_contains_keys(path: Path) -> bool:
-    if not path.exists():
-        return False
-    text = path.read_text(encoding="utf-8")
-    return all(key in text for key in EXPECTED_KEYS)
+    return path_contains_all(path, EXPECTED_KEYS)
 
 
 def main() -> int:
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = repo_root_from(__file__)
     candidates = [
         repo_root / "docs" / "reference" / "config-schema.md",
         repo_root / "docs" / "README.md",
