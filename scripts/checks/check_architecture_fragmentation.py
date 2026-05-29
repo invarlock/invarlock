@@ -9,6 +9,8 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+from common_io import read_lines, read_text
+
 
 def _python_files(root: Path) -> list[Path]:
     return sorted(path for path in root.rglob("*.py") if path.is_file())
@@ -16,13 +18,13 @@ def _python_files(root: Path) -> list[Path]:
 
 def _line_count(path: Path) -> int:
     try:
-        return len(path.read_text(encoding="utf-8").splitlines())
+        return len(read_lines(path))
     except UnicodeDecodeError:
         return 0
 
 
 def _is_reexport_shim(path: Path) -> bool:
-    text = path.read_text(encoding="utf-8")
+    text = read_text(path)
     meaningful = [
         line.strip()
         for line in text.splitlines()

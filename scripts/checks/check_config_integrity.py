@@ -14,6 +14,8 @@ import re
 import sys
 from pathlib import Path
 
+from common_io import read_lines
+
 
 def find_includes_and_adapters(
     root: Path,
@@ -24,7 +26,7 @@ def find_includes_and_adapters(
     adapters: set[str] = set()
     for p in root.rglob("*.yaml"):
         try:
-            for line in p.read_text(encoding="utf-8").splitlines():
+            for line in read_lines(p):
                 m = include_re.match(line)
                 if m:
                     inc = m.group(1)

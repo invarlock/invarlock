@@ -4,7 +4,8 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
+
+from common_io import read_text, repo_root_from
 
 GUARD_HEADINGS = {
     "### Invariants Guard",
@@ -15,14 +16,14 @@ GUARD_HEADINGS = {
 
 
 def main() -> int:
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = repo_root_from(__file__)
     guards_doc = repo_root / "docs" / "reference" / "guards.md"
 
     if not guards_doc.exists():
         print("Guard reference documentation not found.")
         return 1
 
-    text = guards_doc.read_text(encoding="utf-8")
+    text = read_text(guards_doc)
     missing = [heading for heading in GUARD_HEADINGS if heading not in text]
 
     if missing:

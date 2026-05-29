@@ -11,7 +11,7 @@ from rich.console import Console
 from invarlock.core.auto_tuning import get_tier_policies
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_policy import PM_DRIFT_BAND_DEFAULT
-from invarlock.reporting.report_telemetry import (
+from invarlock.reporting.telemetry import (
     telemetry_output_enabled,
     telemetry_summary_line,
 )

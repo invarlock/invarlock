@@ -5,9 +5,12 @@ from typing import Any
 
 from invarlock.core.auto_tuning import get_tier_policies
 
-from .guards_common import _baseline_guard_payload, _measurement_contract_digest
 from .policy_utils import _resolve_policy_tier
 from .report_types import RunReport
+from .verify_check_helpers_consistency import (
+    _baseline_guard_payload,
+    _measurement_contract_digest,
+)
 
 _PARSE_EXCEPTIONS = (AttributeError, KeyError, OverflowError, TypeError, ValueError)
 

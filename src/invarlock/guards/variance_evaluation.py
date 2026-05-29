@@ -483,9 +483,12 @@ def evaluate_calibration_pass(
     calib_seed: int,
     tag: str,
     *,
-    compute_paired_delta_log_ci_fn: Any = compute_paired_delta_log_ci,
+    compute_paired_delta_log_ci_fn: Any | None = None,
 ) -> None:
     """Run deterministic calibration for A/B evaluation and predictive gating."""
+    if compute_paired_delta_log_ci_fn is None:
+        compute_paired_delta_log_ci_fn = compute_paired_delta_log_ci
+
     predictive_state = _initial_predictive_state(guard)
     requested = len(calibration_batches)
     fingerprint = _record_calibration_request(

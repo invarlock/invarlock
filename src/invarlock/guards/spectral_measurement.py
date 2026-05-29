@@ -451,13 +451,7 @@ def capture_sigmas(
 
 def compute_spectral_norms(model: Any, scope: str = "all") -> dict[str, float]:
     """Compatibility helper returning per-module spectral norms for a model."""
-    from .spectral_detection import should_process_module
-
-    return capture_baseline_sigmas(
-        model,
-        scope=scope,
-        should_process_module_fn=should_process_module,
-    )
+    return capture_baseline_sigmas(model, scope=scope)
 
 
 __all__ = [

@@ -4,15 +4,16 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from common_io import read_text, repo_root_from
+
+REPO_ROOT = repo_root_from(__file__)
 REMOVED_README_GUARANTEE_LABEL = "Statistical " + "guarantees"
 REMOVED_REPORT_GUARANTEE_LABEL = "What the report " + "guarantees"
 
 
 def _read(rel_path: str) -> str:
-    return (REPO_ROOT / rel_path).read_text(encoding="utf-8")
+    return read_text(REPO_ROOT / rel_path)
 
 
 def _check_required_snippets(

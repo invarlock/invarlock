@@ -19,6 +19,36 @@ def _report(
     }
 
 
+def test_baseline_guard_payload_edge_branches() -> None:
+    assert verify_helpers_mod._baseline_guard_payload(None, "variance") == {}  # noqa: SLF001
+    assert (
+        verify_helpers_mod._baseline_guard_payload(  # noqa: SLF001
+            {
+                "guards": [
+                    "not-a-guard",
+                    {"name": "spectral", "metrics": {"sigma": 1.0}},
+                    {"name": "variance"},
+                ]
+            },
+            "variance",
+        )
+        == {}
+    )
+    assert verify_helpers_mod._baseline_guard_payload(  # noqa: SLF001
+        {"guards": [{"name": "variance", "metrics": {"enabled": True}}]},
+        "variance",
+    ) == {"enabled": True}
+
+    class BrokenBaseline(dict):
+        def get(self, *args: object, **kwargs: object) -> object:
+            raise RuntimeError("broken")
+
+    assert verify_helpers_mod._baseline_guard_payload(  # noqa: SLF001
+        BrokenBaseline(),
+        "variance",
+    ) == {}
+
+
 def test_validate_variance_enablement_edge_branches() -> None:
     cases = [
         (

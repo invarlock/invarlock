@@ -1055,7 +1055,7 @@ test_pack_validation_pack_run_suite_returns_nonzero_when_dataset_preflight_fails
     trap - EXIT INT TERM HUP QUIT
 }
 
-test_pack_prepare_scenarios_manifest_copies_source_when_jq_is_unavailable() {
+test_pack_prepare_scenarios_manifest_filters_source_without_jq() {
     mock_reset
 
     OUTPUT_DIR="${TEST_TMPDIR}/out"
@@ -1076,7 +1076,7 @@ EOF
     PACK_SCENARIO_IDS=""
 
     pack_prepare_scenarios_manifest
-    assert_eq "null" "$(jq -r '._meta.applied_suite' "${OUTPUT_DIR}/state/scenarios.json")" "cp fallback leaves manifest metadata unchanged"
+    assert_eq "subset" "$(jq -r '._meta.applied_suite' "${OUTPUT_DIR}/state/scenarios.json")" "python renderer records suite metadata"
     assert_eq "a" "$(jq -r '.scenarios[0].id' "${OUTPUT_DIR}/state/scenarios.json")" "scenario content preserved under cp fallback"
 }
 

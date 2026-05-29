@@ -15,7 +15,6 @@ import torch.nn as nn
 
 from invarlock.core.abi import INVARLOCK_CORE_ABI as CORE_ABI
 from invarlock.core.api import Guard
-from invarlock.core.bootstrap import compute_paired_delta_log_ci
 from invarlock.core.types import GuardValidationResult
 
 from . import variance_batching as _variance_batching
@@ -362,7 +361,6 @@ class VarianceGuard(Guard):
             self,
             model,
             dataloader,
-            equalise_fn=_variance_scaling.equalise_residual_variance,
         )
         self._raw_scales = result.raw_scales
         return result.filtered_scales
@@ -382,7 +380,6 @@ class VarianceGuard(Guard):
             min_coverage,
             calib_seed,
             tag,
-            compute_paired_delta_log_ci_fn=compute_paired_delta_log_ci,
         )
 
     def _refresh_after_edit_metrics(

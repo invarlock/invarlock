@@ -150,6 +150,7 @@ def test_execute_scenario_writes_pairing_schedule_and_telemetry_summary(
     monkeypatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     import invarlock.eval.bench_runner as bench_runner_mod
+    import invarlock.reporting.telemetry as telemetry_mod
 
     bare = RunResult("bare", _report_with_artifacts("bare.json"), success=True)
     guarded = RunResult("guarded", _report_with_artifacts("guarded.json"), success=True)
@@ -172,12 +173,10 @@ def test_execute_scenario_writes_pairing_schedule_and_telemetry_summary(
             "summary": {"status": "ok"}
         },
     )
+    monkeypatch.setattr(telemetry_mod, "telemetry_output_enabled", lambda: True)
     monkeypatch.setattr(
-        "invarlock.reporting.report_telemetry.telemetry_output_enabled",
-        lambda: True,
-    )
-    monkeypatch.setattr(
-        "invarlock.reporting.report_telemetry.telemetry_summary_line",
+        telemetry_mod,
+        "telemetry_summary_line",
         lambda _report: "telemetry summary",
     )
 
@@ -203,6 +202,7 @@ def test_execute_scenario_writes_report_without_telemetry_summary_line(
     monkeypatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     import invarlock.eval.bench_runner as bench_runner_mod
+    import invarlock.reporting.telemetry as telemetry_mod
 
     bare = RunResult("bare", _report_with_artifacts("bare.json"), success=True)
     guarded = RunResult("guarded", _report_with_artifacts("guarded.json"), success=True)
@@ -225,14 +225,8 @@ def test_execute_scenario_writes_report_without_telemetry_summary_line(
             "summary": {"status": "ok"}
         },
     )
-    monkeypatch.setattr(
-        "invarlock.reporting.report_telemetry.telemetry_output_enabled",
-        lambda: True,
-    )
-    monkeypatch.setattr(
-        "invarlock.reporting.report_telemetry.telemetry_summary_line",
-        lambda _report: "",
-    )
+    monkeypatch.setattr(telemetry_mod, "telemetry_output_enabled", lambda: True)
+    monkeypatch.setattr(telemetry_mod, "telemetry_summary_line", lambda _report: "")
 
     caplog.set_level("INFO")
     scenario = ScenarioConfig(edit="quant_rtn", tier="balanced", probes=1)

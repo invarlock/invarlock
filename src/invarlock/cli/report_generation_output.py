@@ -33,13 +33,13 @@ def _section_as_mapping(section: Any) -> dict[str, Any]:
 
 
 def _telemetry_output_enabled() -> bool:
-    from invarlock.reporting.report_telemetry import telemetry_output_enabled
+    from invarlock.reporting.telemetry import telemetry_output_enabled
 
     return telemetry_output_enabled()
 
 
 def _telemetry_summary_line(evaluation_report: dict[str, Any]) -> str | None:
-    from invarlock.reporting.report_telemetry import telemetry_summary_line
+    from invarlock.reporting.telemetry import telemetry_summary_line
 
     return telemetry_summary_line(evaluation_report)
 
