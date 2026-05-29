@@ -14,6 +14,7 @@ Steps:
 
 from __future__ import annotations
 
+import inspect
 import io
 import json
 import os
@@ -631,14 +632,22 @@ def evaluate_command(
             emoji="📜",
         ):
             try:
-                report_kwargs = {
+                report_kwargs: dict[str, Any] = {
                     "run": str(edited_report),
                     "format": "report",
                     "baseline": str(baseline_report_path),
                     "output": str(report_out),
                 }
-                if defer_report_rendering:
-                    report_kwargs["render_optional"] = False
+                report_signature = inspect.signature(generate_reports)
+                supports_render_optional = (
+                    "render_optional" in report_signature.parameters
+                    or any(
+                        param.kind is inspect.Parameter.VAR_KEYWORD
+                        for param in report_signature.parameters.values()
+                    )
+                )
+                if supports_render_optional:
+                    report_kwargs["render_optional"] = not defer_report_rendering
                 generate_reports(**report_kwargs)
             except (ConfigError, MetricsError, ValidationError) as exc:
                 _fail(str(getattr(exc, "message", exc)), exit_code=1)

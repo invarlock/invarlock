@@ -130,23 +130,13 @@ def test_scan_model_gains_reports_when_no_modules_are_scanned() -> None:
     assert result["message"].startswith("Scanned 0 modules")
 
 
-def test_scan_model_gains_ignores_weight_stat_failures() -> None:
-    class _BadStatsWeight:
-        ndim = 2
-
-        def mean(self):
-            raise RuntimeError("bad mean")
-
-        def std(self):
-            raise RuntimeError("bad std")
-
-        def min(self):
-            raise RuntimeError("bad min")
-
-        def max(self):
-            raise RuntimeError("bad max")
-
-    model = _Model({"fragile": _Module(_BadStatsWeight())})
+def test_scan_model_gains_ignores_weight_stat_failures(monkeypatch) -> None:
+    model = _Model({"fragile": _Module(torch.eye(2))})
+    monkeypatch.setattr(
+        spectral_measurement,
+        "_scalarize_stat",
+        lambda _value: (_ for _ in ()).throw(ValueError("bad stat")),
+    )
 
     result = scan_model_gains(
         model,

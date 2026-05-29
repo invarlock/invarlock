@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import numpy as np
@@ -33,12 +34,106 @@ def _scalarize_stat(value: Any) -> float:
     return float(value)
 
 
+def _append_measurement_diagnostic(
+    diagnostics: list[dict[str, Any]] | None,
+    *,
+    kind: str,
+    severity: str,
+    message: str,
+    module_name: str | None = None,
+    fallback_value: float,
+    **details: Any,
+) -> None:
+    if diagnostics is None:
+        return
+    payload: dict[str, Any] = {
+        "kind": kind,
+        "severity": severity,
+        "message": message,
+        "fallback_value": fallback_value,
+    }
+    if module_name is not None:
+        payload["module"] = module_name
+    payload.update(details)
+    diagnostics.append(payload)
+
+
+def _record_guard_measurement_diagnostics(
+    guard: Any,
+    diagnostics: list[dict[str, Any]],
+    *,
+    phase: str,
+) -> None:
+    if not diagnostics:
+        return
+    store = getattr(guard, "_measurement_diagnostics", None)
+    for diagnostic in diagnostics:
+        record = dict(diagnostic)
+        record["phase"] = phase
+        if isinstance(store, list):
+            store.append(record)
+        if hasattr(guard, "_log_event"):
+            severity = str(record.get("severity", "warning")).lower()
+            level = "ERROR" if severity == "error" else "WARN"
+            if severity in {"info", "debug"}:
+                level = severity.upper()
+            details = {
+                key: value
+                for key, value in record.items()
+                if key not in {"kind", "severity", "message"}
+            }
+            guard._log_event(
+                str(record.get("kind", "spectral_measurement_fallback")),
+                level=level,
+                message=str(record.get("message", "")),
+                **details,
+            )
+
+
+def _compute_sigma_with_optional_diagnostics(
+    compute_sigma_max_fn: Any,
+    weight: Any,
+    *,
+    diagnostics: list[dict[str, Any]] | None = None,
+    module_name: str | None = None,
+) -> float:
+    if compute_sigma_max_fn is compute_sigma_max:
+        return float(
+            compute_sigma_max_fn(
+                weight,
+                diagnostics=diagnostics,
+                module_name=module_name,
+            )
+        )
+    try:
+        return float(compute_sigma_max_fn(weight))
+    except (
+        ArithmeticError,
+        AttributeError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ) as exc:
+        _append_measurement_diagnostic(
+            diagnostics,
+            kind="spectral_sigma_fallback_custom_estimator_error",
+            severity="error",
+            message="Custom spectral sigma measurement failed; using neutral fallback.",
+            module_name=module_name,
+            fallback_value=1.0,
+            error=str(exc),
+        )
+        return 1.0
+
+
 def compute_sigma_max(
     weight_matrix: Any,
     *,
     iters: int = 4,
     init: str = "ones",
     power_iter_sigma_max_fn: Any | None = None,
+    diagnostics: list[dict[str, Any]] | None = None,
+    module_name: str | None = None,
 ) -> float:
     """Compute maximum singular value of a weight matrix."""
     if power_iter_sigma_max_fn is None:
@@ -54,16 +149,88 @@ def compute_sigma_max(
         init_s = "ones"
 
     if not isinstance(weight_matrix, torch.Tensor):
+        _append_measurement_diagnostic(
+            diagnostics,
+            kind="spectral_sigma_fallback_non_tensor",
+            severity="error",
+            message="Spectral sigma measurement received a non-tensor weight.",
+            module_name=module_name,
+            fallback_value=1.0,
+            observed_type=type(weight_matrix).__name__,
+        )
         return 1.0
     if weight_matrix.dtype in {torch.int8, torch.uint8}:
+        _append_measurement_diagnostic(
+            diagnostics,
+            kind="spectral_sigma_fallback_quantized_weight",
+            severity="warning",
+            message="Spectral sigma measurement skipped a quantized weight.",
+            module_name=module_name,
+            fallback_value=1.0,
+            dtype=str(weight_matrix.dtype),
+        )
         return 1.0
     if weight_matrix.numel() == 0 or weight_matrix.ndim != 2:
+        _append_measurement_diagnostic(
+            diagnostics,
+            kind="spectral_sigma_fallback_invalid_shape",
+            severity="warning",
+            message="Spectral sigma measurement received an empty or non-matrix weight.",
+            module_name=module_name,
+            fallback_value=0.0,
+            shape=tuple(weight_matrix.shape),
+        )
+        return 0.0
+    try:
+        finite = bool(torch.isfinite(weight_matrix).all().item())
+    except _SPECTRAL_MEASUREMENT_ERRORS:
+        finite = True
+    if not finite:
+        _append_measurement_diagnostic(
+            diagnostics,
+            kind="spectral_sigma_fallback_non_finite_weight",
+            severity="error",
+            message="Spectral sigma measurement found non-finite weight values.",
+            module_name=module_name,
+            fallback_value=0.0,
+            dtype=str(weight_matrix.dtype),
+            shape=tuple(weight_matrix.shape),
+        )
         return 0.0
 
     try:
-        return float(power_iter_sigma_max_fn(weight_matrix, iters=iters_i, init=init_s))
-    except (ArithmeticError, AttributeError, RuntimeError, TypeError, ValueError):
+        sigma = float(
+            power_iter_sigma_max_fn(weight_matrix, iters=iters_i, init=init_s)
+        )
+    except (
+        ArithmeticError,
+        AttributeError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ) as exc:
+        _append_measurement_diagnostic(
+            diagnostics,
+            kind="spectral_sigma_fallback_estimator_error",
+            severity="error",
+            message="Spectral sigma estimator failed; using neutral fallback.",
+            module_name=module_name,
+            fallback_value=1.0,
+            error=str(exc),
+        )
         return 1.0
+    if not math.isfinite(sigma):
+        _append_measurement_diagnostic(
+            diagnostics,
+            kind="spectral_sigma_fallback_non_finite_estimate",
+            severity="error",
+            message="Spectral sigma estimator returned a non-finite value.",
+            module_name=module_name,
+            fallback_value=1.0,
+            observed_value=str(sigma),
+        )
+        return 1.0
+    return sigma
 
 
 def auto_sigma_target(
@@ -108,9 +275,11 @@ def capture_baseline_sigmas(
 ) -> dict[str, float]:
     """Capture baseline singular values for model layers."""
     if should_process_module_fn is None:
-        from .spectral_detection import (
-            should_process_module as should_process_module_fn,
-        )
+        from .spectral_detection import should_process_module
+
+        should_process = should_process_module
+    else:
+        should_process = should_process_module_fn
 
     try:
         baseline_sigmas = {}
@@ -118,12 +287,20 @@ def capture_baseline_sigmas(
         if module_iter is None:
             module_iter = tuple(model.named_modules())
         for name, module in module_iter:
-            if not should_process_module_fn(name, module, scope):
+            if not should_process(name, module, scope):
                 continue
             weight = getattr(module, "weight", None)
-            if not _is_matrix_weight(weight) or _is_quantized_weight(weight):
+            if (
+                not isinstance(weight, torch.Tensor)
+                or not _is_matrix_weight(weight)
+                or _is_quantized_weight(weight)
+            ):
                 continue
-            baseline_sigmas[name] = compute_sigma_max_fn(weight)
+            baseline_sigmas[name] = _compute_sigma_with_optional_diagnostics(
+                compute_sigma_max_fn,
+                weight,
+                module_name=name,
+            )
         return baseline_sigmas
     except (
         ArithmeticError,
@@ -145,9 +322,11 @@ def scan_model_gains(
 ) -> dict[str, Any]:
     """Scan model for gain values and spectral statistics."""
     if should_process_module_fn is None:
-        from .spectral_detection import (
-            should_process_module as should_process_module_fn,
-        )
+        from .spectral_detection import should_process_module
+
+        should_process = should_process_module
+    else:
+        should_process = should_process_module_fn
 
     results: dict[str, Any] = {
         "total_layers": 0,
@@ -162,13 +341,25 @@ def scan_model_gains(
             module_iter = tuple(model.named_modules())
         for name, module in module_iter:
             results["total_layers"] += 1
-            if should_process_module_fn(name, module, scope):
+            if should_process(name, module, scope):
                 weight = getattr(module, "weight", None)
-                if not _is_matrix_weight(weight) or _is_quantized_weight(weight):
+                if (
+                    not isinstance(weight, torch.Tensor)
+                    or not _is_matrix_weight(weight)
+                    or _is_quantized_weight(weight)
+                ):
                     continue
                 results["scanned_modules"] += 1
-                sigma_max = compute_sigma_max_fn(weight)
+                diagnostics: list[dict[str, Any]] = []
+                sigma_max = _compute_sigma_with_optional_diagnostics(
+                    compute_sigma_max_fn,
+                    weight,
+                    diagnostics=diagnostics,
+                    module_name=name,
+                )
                 results["spectral_norms"].append(sigma_max)
+                if diagnostics:
+                    results.setdefault("diagnostics", []).extend(diagnostics)
                 try:
                     results["weight_statistics"][name] = {
                         "mean": _scalarize_stat(weight.mean()),
@@ -244,21 +435,16 @@ def capture_sigmas(
         weight = getattr(module, "weight", None)
         if not isinstance(weight, torch.Tensor) or weight.ndim != 2:
             continue
-        if weight.dtype in {torch.int8, torch.uint8}:
-            sigmas[name] = 1.0
-            continue
-        try:
-            sigmas[name] = float(
-                power_iter_sigma_max_fn(weight, iters=iters, init=init)
-            )
-        except (
-            ArithmeticError,
-            AttributeError,
-            RuntimeError,
-            TypeError,
-            ValueError,
-        ):
-            sigmas[name] = 1.0
+        diagnostics: list[dict[str, Any]] = []
+        sigmas[name] = compute_sigma_max(
+            weight,
+            iters=iters,
+            init=init,
+            power_iter_sigma_max_fn=power_iter_sigma_max_fn,
+            diagnostics=diagnostics,
+            module_name=name,
+        )
+        _record_guard_measurement_diagnostics(guard, diagnostics, phase=phase)
     return sigmas
 
 

@@ -40,6 +40,33 @@ def test_ppl_paired_compare_ratio_ci_matches_exp_delta_ci():
     assert math.isclose(rhi, exp_ci[1], rel_tol=1e-6, abs_tol=1e-6)
 
 
+def test_ppl_paired_compare_known_answer_constant_ratio_ci():
+    delta = math.log(1.05)
+    base_log = [1.0, 1.5, 2.0, 2.5]
+    subj_log = [value + delta for value in base_log]
+    m = get_metric("ppl_causal")
+
+    result = m.paired_compare(
+        subject=[
+            {"value": value, "weight": weight}
+            for value, weight in zip(subj_log, [1.0, 2.0, 4.0, 8.0], strict=False)
+        ],
+        baseline=[
+            {"value": value, "weight": weight}
+            for value, weight in zip(base_log, [1.0, 2.0, 4.0, 8.0], strict=False)
+        ],
+        reps=128,
+        seed=17,
+        ci_level=0.95,
+    )
+
+    assert math.isclose(result["delta"], delta, rel_tol=0.0, abs_tol=1e-15)
+    assert math.isclose(result["display"], 1.05, rel_tol=0.0, abs_tol=1e-15)
+    lo, hi = result["display_ci"]
+    assert math.isclose(lo, 1.05, rel_tol=0.0, abs_tol=1e-15)
+    assert math.isclose(hi, 1.05, rel_tol=0.0, abs_tol=1e-15)
+
+
 def test_accuracy_paired_ci_narrower_than_unpaired_naive():
     rng = np.random.default_rng(1)
     n = 200

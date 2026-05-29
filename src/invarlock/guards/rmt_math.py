@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import numpy as np
 import torch
 
@@ -70,7 +72,8 @@ def clip_full_svd(
         S_clipped = torch.clamp(S, max=clip_val)
         if return_components:
             return U, S_clipped, Vt
-        return (U @ torch.diag(S_clipped) @ Vt).to(W.dtype)
+        clipped = (U @ torch.diag(S_clipped) @ Vt).to(W.dtype)
+        return cast(torch.Tensor, clipped)
     except (RuntimeError, torch.linalg.LinAlgError):
         if return_components:
             return None, None, None

@@ -8,7 +8,7 @@ their dedicated owner modules.
 from __future__ import annotations
 
 import math
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 import torch
@@ -193,7 +193,7 @@ class RMTGuard(Guard):
         }.get(level_code, level_code.lower())
         self._event_records.append(
             {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "component": "rmt_guard",
                 "kind": operation,
                 "severity": severity,

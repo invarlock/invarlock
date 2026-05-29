@@ -8,16 +8,13 @@ Provides spectral control mechanisms for maintaining numerical stability.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
-
-import numpy as np
 
 from invarlock.core.abi import INVARLOCK_CORE_ABI as CORE_ABI
 from invarlock.core.api import Guard
 from invarlock.core.types import GuardValidationResult
 
-from . import spectral_control as _spectral_control
 from . import spectral_detection as _spectral_detection
 from . import spectral_measurement as _spectral_measurement
 from . import spectral_policy as _spectral_policy
@@ -85,6 +82,7 @@ class SpectralGuard(Guard):
         self.latest_z_scores: dict[str, float] = {}
         self.pre_edit_z_scores: dict[str, float] = {}
         self.baseline_degeneracy: dict[str, dict[str, float]] = {}
+        self._measurement_diagnostics: list[dict[str, Any]] = []
         self.target_sigma = float(self.sigma_quantile)
         self._run_profile: str | None = None
         self._scoped_modules_model_id: int | None = None
@@ -105,7 +103,7 @@ class SpectralGuard(Guard):
         }.get(level_code, level_code.lower())
         self._event_records.append(
             {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "component": "spectral_guard",
                 "kind": operation,
                 "severity": severity,
@@ -174,37 +172,16 @@ class SpectralGuard(Guard):
     def prepare(
         self, model: Any, adapter: Any, calib: Any, policy: dict[str, Any]
     ) -> dict[str, Any]:
-        return _spectral_runtime.prepare_guard(
-            self,
-            model,
-            adapter,
-            calib,
-            policy,
-            classify_model_families_fn=_spectral_detection.classify_model_families,
-            compute_family_stats_fn=_spectral_detection.compute_family_stats,
-            summarize_sigmas_fn=_spectral_detection.summarize_sigmas,
-            percentile_fn=np.percentile,
-        )
+        return _spectral_runtime.prepare_guard(self, model, adapter, calib, policy)
 
     def before_edit(self, model: Any) -> None:
-        _spectral_runtime.before_edit_guard(
-            self, model, compute_z_scores_fn=_spectral_detection.compute_z_scores
-        )
+        _spectral_runtime.before_edit_guard(self, model)
 
     def after_edit(self, model: Any) -> None:
-        _spectral_runtime.after_edit_guard(
-            self,
-            model,
-            apply_spectral_control_fn=_spectral_control.apply_spectral_control,
-        )
+        _spectral_runtime.after_edit_guard(self, model)
 
     def _capture_sigmas(self, model: Any, *, phase: str) -> dict[str, float]:
-        return _spectral_measurement.capture_sigmas(
-            self,
-            model,
-            phase=phase,
-            power_iter_sigma_max_fn=_spectral_measurement.power_iter_sigma_max,
-        )
+        return _spectral_measurement.capture_sigmas(self, model, phase=phase)
 
     def _detect_spectral_violations(
         self, model: Any, metrics: dict[str, float], phase: str = "finalize"
@@ -214,10 +191,6 @@ class SpectralGuard(Guard):
             model,
             metrics,
             phase=phase,
-            compute_sigma_max_fn=_spectral_measurement.compute_sigma_max,
-            classify_module_family_fn=_spectral_detection.classify_module_family,
-            compute_z_score_for_value_fn=_spectral_detection.compute_z_score_for_value,
-            default_family_caps_fn=_spectral_policy.default_family_caps,
         )
 
     def _should_check_module(self, name: str, module: Any) -> bool:

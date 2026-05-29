@@ -50,7 +50,7 @@ def _quantization_config_from_report(report: Mapping[str, Any]) -> dict[str, Any
 
 
 def build_backend_inventory_from_report(
-    report: Mapping[str, Any],
+    report: object,
     *,
     model: Any | None = None,
 ) -> dict[str, Any] | None:

@@ -6,6 +6,7 @@ import invarlock.guards.spectral as spectral_guard
 import invarlock.guards.spectral_detection as spectral_detection
 import invarlock.guards.spectral_measurement as spectral_measurement
 import invarlock.guards.spectral_policy as spectral_policy
+import invarlock.guards.spectral_runtime as spectral_runtime
 from invarlock.core.exceptions import ValidationError
 
 guards_pkg.spectral = spectral_guard
@@ -183,7 +184,7 @@ def test_spectral_prepare_percentile_failure_falls_back_to_sigma_quantile(
         lambda *a, **k: {"ffn": {"mean": 1.0, "std": 0.0}},
     )
     monkeypatch.setattr(spectral_measurement, "scan_model_gains", lambda *a, **k: {})
-    monkeypatch.setattr(spectral_guard.np, "percentile", lambda *_a, **_k: 1 / 0)
+    monkeypatch.setattr(spectral_runtime.np, "percentile", lambda *_a, **_k: 1 / 0)
 
     g = spectral_guard.SpectralGuard(sigma_quantile=0.9)
 

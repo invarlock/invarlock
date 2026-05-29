@@ -130,9 +130,7 @@ def test_detect_violations_computes_sigma_and_classifies_family_when_missing(
         lambda *_a, **_k: True,
         raising=False,
     )
-    monkeypatch.setattr(
-        spectral_measurement, "compute_sigma_max", lambda *_a, **_k: 1.0
-    )
+    monkeypatch.setattr(spectral_detection, "compute_sigma_max", lambda *_a, **_k: 1.0)
     monkeypatch.setattr(
         spectral_detection, "classify_module_family", lambda *_a, **_k: "ffn"
     )
