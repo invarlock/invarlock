@@ -77,13 +77,13 @@ from invarlock.eval import window_planning as window_planning_mod
 from invarlock.exit_codes import (
     resolve_command_exit_code as _resolve_exit_code,
 )
-from invarlock.reporting import report_telemetry as report_telemetry_mod
 from invarlock.reporting import report_types as report_types_mod
 from invarlock.reporting import run_provenance_contract as run_provenance_contract_mod
 from invarlock.reporting import run_report_contract as run_report_contract_mod
 from invarlock.reporting import (
     run_report_metrics_contract as run_report_metrics_contract_mod,
 )
+from invarlock.reporting import telemetry as report_telemetry_mod
 from invarlock.reporting import telemetry as telemetry_mod
 from invarlock.reporting.report_make import make_report as build_evaluation_report
 from invarlock.reporting.run_retry_validation import (

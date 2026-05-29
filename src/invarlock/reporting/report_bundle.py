@@ -10,7 +10,7 @@ from invarlock.core.backend_inventory import write_backend_inventory_sidecar
 from invarlock.core.report_inputs import ReportInputError, resolve_report_input_path
 from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
 
-from .render import render_report_markdown
+from .render_markdown import render_report_markdown
 from .report_manifest import write_report_manifest
 from .report_schema import validate_report
 from .report_types import RunReport

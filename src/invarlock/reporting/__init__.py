@@ -45,7 +45,7 @@ def _install_compat_module(name: str, exports: dict[str, object]) -> types.Modul
     module = types.ModuleType(module_name)
     module.__spec__ = importlib.machinery.ModuleSpec(module_name, loader=None)
     module.__dict__.update(exports)
-    module.__all__ = tuple(exports)
+    setattr(module, "__all__", tuple(exports))
     sys.modules[module_name] = module
     globals()[name] = module
     return module

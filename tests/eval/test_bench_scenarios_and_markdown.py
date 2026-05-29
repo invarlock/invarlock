@@ -127,7 +127,7 @@ class TestExecuteScenario:
                     return_value=create_empty_report(),
                 ),
                 patch(
-                    "invarlock.reporting.report_telemetry.telemetry_output_enabled",
+                    "invarlock.reporting.telemetry.telemetry_output_enabled",
                     return_value=False,
                 ),
             ):
@@ -199,7 +199,7 @@ class TestExecuteScenario:
                     side_effect=RuntimeError("report boom"),
                 ),
                 patch(
-                    "invarlock.reporting.report_telemetry.telemetry_output_enabled",
+                    "invarlock.reporting.telemetry.telemetry_output_enabled",
                     return_value=False,
                 ),
                 pytest.raises(

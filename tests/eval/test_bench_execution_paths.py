@@ -173,11 +173,11 @@ def test_execute_scenario_writes_pairing_schedule_and_telemetry_summary(
         },
     )
     monkeypatch.setattr(
-        "invarlock.reporting.report_telemetry.telemetry_output_enabled",
+        "invarlock.reporting.telemetry.telemetry_output_enabled",
         lambda: True,
     )
     monkeypatch.setattr(
-        "invarlock.reporting.report_telemetry.telemetry_summary_line",
+        "invarlock.reporting.telemetry.telemetry_summary_line",
         lambda _report: "telemetry summary",
     )
 
@@ -226,11 +226,11 @@ def test_execute_scenario_writes_report_without_telemetry_summary_line(
         },
     )
     monkeypatch.setattr(
-        "invarlock.reporting.report_telemetry.telemetry_output_enabled",
+        "invarlock.reporting.telemetry.telemetry_output_enabled",
         lambda: True,
     )
     monkeypatch.setattr(
-        "invarlock.reporting.report_telemetry.telemetry_summary_line",
+        "invarlock.reporting.telemetry.telemetry_summary_line",
         lambda _report: "",
     )
 

@@ -7,7 +7,7 @@ from typing import Any
 
 from invarlock.core.retry import RetryDiagnostic
 from invarlock.reporting.report_make import make_report
-from invarlock.reporting.report_telemetry import (
+from invarlock.reporting.telemetry import (
     telemetry_output_enabled,
     telemetry_summary_line,
 )
