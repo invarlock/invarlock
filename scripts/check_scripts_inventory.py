@@ -20,6 +20,17 @@ IGNORED_PATH_PATTERNS = (
     "scripts/**/__pycache__/**",
     "scripts/**/*.pyc",
 )
+IGNORED_REFERENCE_PATH_PATTERNS = (
+    ".github/**/.DS_Store",
+    "docs/**/.DS_Store",
+    "tests/**/.DS_Store",
+    "tests/**/.coverage/**",
+    "tests/**/.mypy_cache/**",
+    "tests/**/.pytest_cache/**",
+    "tests/**/.ruff_cache/**",
+    "tests/**/__pycache__/**",
+    "tests/**/*.pyc",
+)
 
 
 @dataclass(frozen=True)
@@ -180,6 +191,11 @@ def _reference_index(root: Path) -> dict[str, str]:
         for path in paths:
             try:
                 rel = _normalize_rel(path, root)
+                if any(
+                    fnmatch.fnmatch(rel, pattern)
+                    for pattern in IGNORED_REFERENCE_PATH_PATTERNS
+                ):
+                    continue
                 index[rel] = path.read_text(encoding="utf-8", errors="ignore")
             except OSError:
                 continue

@@ -36,6 +36,20 @@ def _build_diagnostics(
     return tuple(diagnostics)
 
 
+def _diagnostics_to_dicts(
+    diagnostics: tuple[GuardDiagnostic, ...],
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "kind": diagnostic.kind,
+            "severity": diagnostic.severity,
+            "message": diagnostic.message,
+            "details": dict(diagnostic.details),
+        }
+        for diagnostic in diagnostics
+    ]
+
+
 def before_edit_guard(guard: Any, model: nn.Module) -> None:
     """Execute before edit (no action needed beyond readiness logging)."""
     _ = model
@@ -130,7 +144,7 @@ def finalize_guard(guard: Any, model: nn.Module) -> dict[str, Any]:
             "warnings": ["Variance guard not properly prepared"],
             "errors": ["Preparation failed or no target modules found"],
             "finalize_time": time.time() - start_time,
-            "diagnostics": list(
+            "diagnostics": _diagnostics_to_dicts(
                 _build_diagnostics(
                     warnings=["Variance guard not properly prepared"],
                     errors=["Preparation failed or no target modules found"],
@@ -236,15 +250,9 @@ def finalize_guard(guard: Any, model: nn.Module) -> dict[str, Any]:
         if passed and not warnings
         else ("monitor" if passed or guard._monitor_only else "block")
     )
-    result["diagnostics"] = [
-        {
-            "kind": diagnostic.kind,
-            "severity": diagnostic.severity,
-            "message": diagnostic.message,
-            "details": dict(diagnostic.details),
-        }
-        for diagnostic in _build_diagnostics(warnings=warnings, errors=errors)
-    ]
+    result["diagnostics"] = _diagnostics_to_dicts(
+        _build_diagnostics(warnings=warnings, errors=errors)
+    )
 
     return result
 

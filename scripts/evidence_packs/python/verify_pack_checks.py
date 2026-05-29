@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -93,19 +94,10 @@ def cmd_path_within(args: argparse.Namespace) -> int:
 
 
 def cmd_scenario_strictness(args: argparse.Namespace) -> int:
-    payload = _load_json(args.scenarios)
-    if not isinstance(payload, dict):
-        return 1
-    scenarios = payload.get("scenarios")
-    if not isinstance(scenarios, list):
-        return 1
-    for scenario in scenarios:
-        if not isinstance(scenario, dict) or scenario.get("id") != args.scenario_id:
-            continue
-        strictness = scenario.get("strictness")
-        if isinstance(strictness, str) and strictness:
-            print(strictness)
-            return 0
+    strictness = _scenario_strictness(args.scenarios, args.scenario_id)
+    if strictness:
+        print(strictness)
+        return 0
     return 1
 
 
@@ -125,6 +117,247 @@ def cmd_extra_files(args: argparse.Namespace) -> int:
     for rel_path in extras:
         print(f"  - {rel_path}", file=sys.stderr)
     return 1 if args.strict else 0
+
+
+def _report_scenario_id(pack_dir: Path, report: Path) -> str | None:
+    try:
+        rel = report.resolve().relative_to((pack_dir / "reports").resolve())
+    except ValueError:
+        return None
+    parts = rel.parts
+    if len(parts) < 3:
+        return None
+    scenario = parts[1].strip()
+    return scenario or None
+
+
+def _scenario_strictness(scenarios_path: Path, scenario_id: str) -> str | None:
+    payload = _load_json(scenarios_path)
+    if not isinstance(payload, dict):
+        return None
+    scenarios = payload.get("scenarios")
+    if not isinstance(scenarios, list):
+        return None
+    for scenario in scenarios:
+        if not isinstance(scenario, dict) or scenario.get("id") != scenario_id:
+            continue
+        strictness = scenario.get("strictness")
+        if isinstance(strictness, str) and strictness:
+            return strictness
+    return None
+
+
+def _report_expects_verify_failure(pack_dir: Path, report: Path) -> bool:
+    if "errors" in report.parts and report.name == "evaluation.report.json":
+        return True
+
+    scenario_id = _report_scenario_id(pack_dir, report)
+    if scenario_id is None:
+        return False
+    scenarios_path = pack_dir / "metadata" / "scenarios.json"
+    if not scenarios_path.is_file():
+        return False
+    return _scenario_strictness(scenarios_path, scenario_id) == "must_fail"
+
+
+def _is_error_injection_report(report: Path) -> bool:
+    return "errors" in report.parts and report.name == "evaluation.report.json"
+
+
+def _report_paths(pack_dir: Path) -> list[Path]:
+    reports_root = pack_dir / "reports"
+    if not reports_root.is_dir():
+        return []
+    return sorted(reports_root.rglob("evaluation.report.json"))
+
+
+def _verify_command(
+    reports: list[Path],
+    *,
+    profile: str,
+    report_assurance: str,
+    stdout_path: Path | None = None,
+    stdout_to_null: bool = False,
+) -> int:
+    cmd = [
+        "invarlock",
+        "verify",
+        "--json",
+        "--profile",
+        profile,
+        "--assurance",
+        report_assurance,
+        *[str(path) for path in reports],
+    ]
+    if stdout_path is not None:
+        stdout_path.parent.mkdir(parents=True, exist_ok=True)
+        with stdout_path.open("w", encoding="utf-8") as handle:
+            return subprocess.run(cmd, check=False, stdout=handle).returncode
+    if stdout_to_null:
+        return subprocess.run(cmd, check=False, stdout=subprocess.DEVNULL).returncode
+    return subprocess.run(cmd, check=False).returncode
+
+
+def cmd_report_scenario_id(args: argparse.Namespace) -> int:
+    scenario_id = _report_scenario_id(args.pack_dir, args.report)
+    if scenario_id is None:
+        return 1
+    print(scenario_id)
+    return 0
+
+
+def cmd_report_expects_verify_failure(args: argparse.Namespace) -> int:
+    return 0 if _report_expects_verify_failure(args.pack_dir, args.report) else 1
+
+
+def _verify_reports_with_sidecars(
+    reports: list[Path],
+    *,
+    pack_dir: Path,
+    profile: str,
+    report_assurance: str,
+    summary_out: Path | None,
+) -> int:
+    count_clean = 0
+    count_error = 0
+    count_expected_failure = 0
+    count_failed = 0
+
+    for report in reports:
+        verify_out = report.parent / "verify.json"
+        if _report_expects_verify_failure(pack_dir, report):
+            rc = _verify_command(
+                [report],
+                profile=profile,
+                report_assurance=report_assurance,
+                stdout_path=verify_out,
+            )
+            if rc == 0:
+                print(
+                    f"ERROR: Expected verify failure passed: {report}", file=sys.stderr
+                )
+                count_failed += 1
+            elif _is_error_injection_report(report):
+                count_error += 1
+            else:
+                count_expected_failure += 1
+            continue
+
+        rc = _verify_command(
+            [report],
+            profile=profile,
+            report_assurance=report_assurance,
+            stdout_path=verify_out,
+        )
+        if rc == 0:
+            count_clean += 1
+        else:
+            print(f"ERROR: Unexpected verify failure: {report}", file=sys.stderr)
+            count_failed += 1
+
+    total = count_clean + count_error + count_expected_failure + count_failed
+    if total == 0:
+        print("ERROR: No reports found to verify.", file=sys.stderr)
+        return 1
+
+    if summary_out is not None:
+        summary_out.parent.mkdir(parents=True, exist_ok=True)
+        summary_out.write_text(
+            json.dumps(
+                {
+                    "clean_reports": count_clean,
+                    "error_injection_reports": count_error,
+                    "expected_failure_reports": count_expected_failure,
+                    "failed_reports": count_failed,
+                    "policy_profile": profile,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+    print(
+        "Verified: "
+        f"{count_clean} expected-pass, "
+        f"{count_error} error-injection expected-fail, "
+        f"{count_expected_failure} scenario expected-fail, "
+        f"{count_failed} unexpected failures; "
+        f"report assurance={report_assurance}"
+    )
+    return 1 if count_failed else 0
+
+
+def _verify_reports_aggregate(
+    reports: list[Path],
+    *,
+    pack_dir: Path,
+    profile: str,
+    report_assurance: str,
+    json_out: Path | None,
+    require_clean: bool,
+) -> int:
+    clean_reports = [
+        report
+        for report in reports
+        if not _report_expects_verify_failure(pack_dir, report)
+    ]
+    expected_failure_reports = [
+        report for report in reports if _report_expects_verify_failure(pack_dir, report)
+    ]
+    if not reports:
+        print("ERROR: No reports found in pack.", file=sys.stderr)
+        return 1
+    if require_clean and not clean_reports:
+        print(
+            "ERROR: No reports expected to pass in pack "
+            "(only expected-failure reports present).",
+            file=sys.stderr,
+        )
+        return 1
+
+    if clean_reports:
+        rc = _verify_command(
+            clean_reports,
+            profile=profile,
+            report_assurance=report_assurance,
+            stdout_path=json_out,
+        )
+        if rc != 0:
+            return 1
+
+    for report in expected_failure_reports:
+        rc = _verify_command(
+            [report],
+            profile=profile,
+            report_assurance=report_assurance,
+            stdout_to_null=True,
+        )
+        if rc == 0:
+            print(f"ERROR: Expected verify failure passed: {report}", file=sys.stderr)
+            return 1
+    return 0
+
+
+def cmd_verify_reports(args: argparse.Namespace) -> int:
+    reports = _report_paths(args.pack_dir)
+    if args.write_sidecars:
+        return _verify_reports_with_sidecars(
+            reports,
+            pack_dir=args.pack_dir,
+            profile=args.profile,
+            report_assurance=args.report_assurance,
+            summary_out=args.summary_out,
+        )
+    return _verify_reports_aggregate(
+        reports,
+        pack_dir=args.pack_dir,
+        profile=args.profile,
+        report_assurance=args.report_assurance,
+        json_out=args.json_out,
+        require_clean=args.require_clean,
+    )
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -147,6 +380,32 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     scenario_strictness.add_argument("scenarios", type=Path)
     scenario_strictness.add_argument("scenario_id")
     scenario_strictness.set_defaults(func=cmd_scenario_strictness)
+
+    report_scenario_id = subparsers.add_parser("report-scenario-id")
+    report_scenario_id.add_argument("pack_dir", type=Path)
+    report_scenario_id.add_argument("report", type=Path)
+    report_scenario_id.set_defaults(func=cmd_report_scenario_id)
+
+    report_expects_verify_failure = subparsers.add_parser(
+        "report-expects-verify-failure"
+    )
+    report_expects_verify_failure.add_argument("pack_dir", type=Path)
+    report_expects_verify_failure.add_argument("report", type=Path)
+    report_expects_verify_failure.set_defaults(func=cmd_report_expects_verify_failure)
+
+    verify_reports = subparsers.add_parser("verify-reports")
+    verify_reports.add_argument("pack_dir", type=Path)
+    verify_reports.add_argument("--json-out", type=Path)
+    verify_reports.add_argument("--profile", default="dev")
+    verify_reports.add_argument(
+        "--report-assurance",
+        default="report",
+        choices=("report", "strict", "off"),
+    )
+    verify_reports.add_argument("--require-clean", action="store_true")
+    verify_reports.add_argument("--write-sidecars", action="store_true")
+    verify_reports.add_argument("--summary-out", type=Path)
+    verify_reports.set_defaults(func=cmd_verify_reports)
 
     extra_files = subparsers.add_parser("extra-files")
     extra_files.add_argument("pack_dir", type=Path)

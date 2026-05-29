@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from invarlock.evidence_pack import EvidencePackStatus, verify_evidence_pack
 from invarlock.public_contracts import published_basis_lanes
 from invarlock.reporting.report_schema import validate_report
 from invarlock.reporting.verify_contract import VerifyOutcome, run_verify_reports
@@ -23,6 +24,10 @@ def test_published_basis_lanes_ship_public_evidence_references() -> None:
         assert (REPO_ROOT / report_fixture).is_file(), report_fixture
         assert (REPO_ROOT / runtime_manifest).is_file(), runtime_manifest
         assert (REPO_ROOT / evidence_pack_recipe).is_file(), evidence_pack_recipe
+        evidence_pack_fixture = evidence.get("evidence_pack_fixture")
+        if evidence_pack_fixture is not None:
+            assert isinstance(evidence_pack_fixture, str) and evidence_pack_fixture
+            assert (REPO_ROOT / evidence_pack_fixture).is_dir(), evidence_pack_fixture
 
 
 def test_packaged_public_evidence_matches_repo_public_evidence() -> None:
@@ -103,6 +108,33 @@ def test_published_basis_public_evidence_verifies_release_strict() -> None:
         assert result.outcome == VerifyOutcome.OK
         verification = result.payload["results"][0]["verification"]
         assert verification["runtime_provenance"]["status"] == "verified"
+
+
+def test_public_signed_evidence_pack_verifies_release_strict_pinned() -> None:
+    packs = []
+    for lane in published_basis_lanes():
+        evidence = lane.get("evidence", {})
+        pack_fixture = evidence.get("evidence_pack_fixture")
+        if isinstance(pack_fixture, str) and pack_fixture:
+            packs.append(REPO_ROOT / pack_fixture)
+
+    assert packs
+    for pack_dir in packs:
+        manifest = json.loads((pack_dir / "manifest.json").read_text(encoding="utf-8"))
+        fingerprint = manifest["signing_key_fingerprint"]
+
+        result = verify_evidence_pack(
+            pack_dir,
+            strict=True,
+            profile="release",
+            report_assurance="strict",
+            expected_fingerprint=fingerprint,
+        )
+
+        assert result.status == EvidencePackStatus.OK
+        assert result.payload["ok"] is True
+        assert result.payload["authenticity"] == "pinned"
+        assert result.payload["signer_fingerprint"] == fingerprint
 
 
 def test_caught_regression_fixture_fails_guard_despite_clean_primary_metric() -> None:

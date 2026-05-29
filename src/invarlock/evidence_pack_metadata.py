@@ -112,9 +112,9 @@ def _render_evidence_pack_readme(
             "   invarlock verify --json reports/**/evaluation.report.json",
             "",
             "Or use:",
-            "  invarlock advanced evidence-pack verify <pack-dir> [--strict]",
+            "  invarlock advanced evidence-pack verify <pack-dir> --strict",
             "Repo workflow alternative:",
-            "  scripts/evidence_packs/verify_pack.sh --pack <pack-dir> [--strict]",
+            "  scripts/evidence_packs/verify_pack.sh --pack <pack-dir> --strict",
         ]
     )
     return "\n".join(lines) + "\n"

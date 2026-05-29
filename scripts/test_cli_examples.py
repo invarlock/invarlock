@@ -38,6 +38,7 @@ EXCLUDE_TOP_LEVEL_DIRS = {
     # Internal tool directories
     "worktrees",
     # Generated/artifact dirs
+    "build",
     "site",
     "tmp",
     "runs",
