@@ -7,6 +7,7 @@ Produces a compact JSON summary for performance analysis.
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -91,4 +92,28 @@ def save_telemetry_report(
     return path
 
 
-__all__ = ["build_telemetry_payload", "save_telemetry_report"]
+def telemetry_summary_line(evaluation_report: dict[str, Any]) -> str | None:
+    telemetry = evaluation_report.get("telemetry")
+    if not isinstance(telemetry, dict):
+        return None
+    summary = telemetry.get("summary_line")
+    if isinstance(summary, str) and summary.strip():
+        return summary
+    return None
+
+
+def telemetry_output_enabled() -> bool:
+    return str(os.environ.get("INVARLOCK_TELEMETRY", "")).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+__all__ = [
+    "build_telemetry_payload",
+    "save_telemetry_report",
+    "telemetry_output_enabled",
+    "telemetry_summary_line",
+]

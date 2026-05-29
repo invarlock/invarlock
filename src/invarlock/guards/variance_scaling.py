@@ -312,8 +312,6 @@ def compute_variance_scales(
     guard: Any,
     model: nn.Module,
     dataloader,
-    *,
-    equalise_fn: Any = equalise_residual_variance,
 ) -> ScaleComputationResult:
     """Compute filtered VE scales for the guard state."""
     if guard._monitor_only:
@@ -325,7 +323,7 @@ def compute_variance_scales(
         return ScaleComputationResult({}, {}, False, False)
 
     tensor_ready_batches = guard._tensorize_calibration_batches(dataloader)
-    proposed_scales = equalise_fn(
+    proposed_scales = equalise_residual_variance(
         model=model,
         dataloader=tensor_ready_batches,
         windows=min(guard._policy["max_calib"] // 10, 50),
@@ -340,7 +338,7 @@ def compute_variance_scales(
     if not proposed_scales and guard._policy.get("deadband", 0.0) > 0.0:
         relaxed_tol = max(guard._policy["deadband"] * 0.5, 1e-4)
         tensor_ready_batches = guard._tensorize_calibration_batches(dataloader)
-        proposed_scales = equalise_fn(
+        proposed_scales = equalise_residual_variance(
             model=model,
             dataloader=tensor_ready_batches,
             windows=min(guard._policy["max_calib"] // 10, 50),
