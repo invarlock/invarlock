@@ -109,71 +109,18 @@ pack_is_bash4() {
     [[ "${BASH_VERSINFO[0]}" -ge 4 ]]
 }
 
-_pack_validation_has_jq() {
-    command -v jq >/dev/null 2>&1
+_pack_validation_state() {
+    python3 "${_PACK_VALIDATION_PY_DIR}/validation_state.py" "$@"
 }
 
 pack_non_runnable_deployable_ids() {
     local scenarios_file="$1"
-    if _pack_validation_has_jq; then
-        jq -r '.scenarios[]
-            | select(.generation.kind=="deployable_edit")
-            | select(.runnable == false)
-            | .id' "${scenarios_file}" 2>/dev/null | paste -sd ',' -
-        return 0
-    fi
-    python3 - "${scenarios_file}" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-try:
-    payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-except Exception:
-    print("")
-    raise SystemExit(0)
-
-ids = []
-for scenario in payload.get("scenarios", []):
-    if not isinstance(scenario, dict):
-        continue
-    generation = scenario.get("generation")
-    if (
-        isinstance(generation, dict)
-        and generation.get("kind") == "deployable_edit"
-        and scenario.get("runnable") is False
-    ):
-        scenario_id = scenario.get("id")
-        if isinstance(scenario_id, str) and scenario_id:
-            ids.append(scenario_id)
-print(",".join(ids))
-PY
+    _pack_validation_state non-runnable-deployable-ids "${scenarios_file}"
 }
 
 pack_read_final_verdict() {
     local verdict_path="$1"
-    python3 - "${verdict_path}" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-path = Path(sys.argv[1])
-if not path.is_file():
-    print("MISSING")
-    raise SystemExit(0)
-
-try:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-except (OSError, json.JSONDecodeError):
-    print("INVALID")
-    raise SystemExit(0)
-
-value = payload.get("verdict")
-if isinstance(value, str):
-    print(value.strip().upper())
-else:
-    print("MISSING")
-PY
+    _pack_validation_state final-verdict "${verdict_path}"
 }
 
 # ============ VERSION ============
@@ -765,15 +712,13 @@ pack_prepare_scenarios_manifest() {
         local scenario_ids_csv="${PACK_SCENARIO_IDS:-}"
         local include_deployable="${PACK_INCLUDE_DEPLOYABLE_EDITS:-0}"
         local deploy_backends_csv="${PACK_DEPLOY_BACKENDS:-}"
-        local jq_filter='def suites_ok($suite): ((.suites? | type) != "array") or ((.suites | length) == 0) or ((.suites | index($suite)) != null); def trim: gsub("^\\s+|\\s+$"; ""); def ids($csv): ($csv | split(",") | map(trim) | map(select(length>0))); def truthy($v): ($v | ascii_downcase) as $x | ($x == "1" or $x == "true" or $x == "yes" or $x == "on"); def deployable: ((.artifact_class // "") == "deployable_optimized_subject") or ((.generation.kind // "") == "deployable_edit") or ((.category // "") | startswith("deployable_")); def backend_allowed($csv): (ids($csv)) as $backends | (.generation.backend // .backend // "") as $backend | (($backends | length) == 0 or ($backends | index($backend)) != null); ._meta = (._meta | if type=="object" then . else {} end) | ._meta.applied_suite = $suite | (ids($scenario_ids_csv)) as $ids | if ($ids | length) > 0 then ._meta.scenario_ids_filter = $ids else . end | .scenarios = [.scenarios[] | (.id as $id | (($ids | index($id)) != null)) as $explicit | (deployable and truthy($include_deployable) and backend_allowed($deploy_backends_csv)) as $deploy_enabled | select($explicit or suites_ok($suite) or $deploy_enabled) | select(($ids | length) == 0 or $explicit) | select((deployable | not) or $explicit or $deploy_enabled)]'
-
-        if _pack_validation_has_jq; then
-            # Scenarios can optionally declare `suites: ["subset", "full", ...]`.
-            # When present, the manifest is filtered to just the active PACK_SUITE.
-            jq --arg suite "${suite}" --arg scenario_ids_csv "${scenario_ids_csv}" --arg include_deployable "${include_deployable}" --arg deploy_backends_csv "${deploy_backends_csv}" "${jq_filter}" "${src}" > "${rendered}"
-        else
-            cp "${src}" "${rendered}"
-        fi
+        _pack_validation_state render-scenarios \
+            --src "${src}" \
+            --out "${rendered}" \
+            --suite "${suite}" \
+            --scenario-ids "${scenario_ids_csv}" \
+            --include-deployable "${include_deployable}" \
+            --deploy-backends "${deploy_backends_csv}"
 
         if [[ "${RESUME_FLAG:-false}" == "true" && -f "${dest}" ]]; then
             if ! cmp -s "${dest}" "${rendered}"; then
@@ -817,17 +762,15 @@ pack_count_edit_scenarios() {
     local scenarios_file=""
     scenarios_file="$(pack_resolve_active_scenarios_manifest 2>/dev/null || true)"
 
-    if command -v jq >/dev/null 2>&1 && [[ -n "${scenarios_file}" && -f "${scenarios_file}" ]]; then
-        local clean_scenarios=""
-        local stress_scenarios=""
-        clean_scenarios="$(jq -r '[.scenarios[] | select(.generation.kind=="edit" and .generation.version=="clean")] | length' "${scenarios_file}" 2>/dev/null || true)"
-        stress_scenarios="$(jq -r '[.scenarios[] | select(.generation.kind=="edit" and .generation.version=="stress")] | length' "${scenarios_file}" 2>/dev/null || true)"
-        if [[ "${clean_scenarios}" =~ ^[0-9]+$ && "${stress_scenarios}" =~ ^[0-9]+$ ]]; then
-            local source_label="scenarios.json"
-            if [[ -n "${OUTPUT_DIR:-}" && "${scenarios_file}" == "${OUTPUT_DIR}/state/scenarios.json" ]]; then
-                source_label="state/scenarios.json"
-            fi
-            printf '%s|%s|%s\n' "${clean_scenarios}" "${stress_scenarios}" "${source_label}"
+    if [[ -n "${scenarios_file}" && -f "${scenarios_file}" ]]; then
+        local source_label="scenarios.json"
+        if [[ -n "${OUTPUT_DIR:-}" && "${scenarios_file}" == "${OUTPUT_DIR}/state/scenarios.json" ]]; then
+            source_label="state/scenarios.json"
+        fi
+        local counts=""
+        counts="$(_pack_validation_state count-edit-scenarios "${scenarios_file}" --source-label "${source_label}" 2>/dev/null || true)"
+        if [[ "${counts}" =~ ^[0-9]+\|[0-9]+\| ]]; then
+            printf '%s\n' "${counts}"
             return 0
         fi
     fi
@@ -1197,8 +1140,8 @@ estimate_planned_model_storage_gb() {
         local pack_root
         pack_root="$(cd "${_PACK_VALIDATION_LIB_DIR}/.." && pwd)"
         local scenarios_file="${pack_root}/scenarios.json"
-        if command -v jq >/dev/null 2>&1 && [[ -f "${scenarios_file}" ]]; then
-            errors_total="$(jq -r '[.scenarios[] | select(.generation.kind=="error")] | length' "${scenarios_file}" 2>/dev/null || true)"
+        if [[ -f "${scenarios_file}" ]]; then
+            errors_total="$(_pack_validation_state count-generation-kind "${scenarios_file}" --kind error 2>/dev/null || true)"
         fi
         if [[ -z "${errors_total}" || ! "${errors_total}" =~ ^[0-9]+$ ]]; then
             errors_total=9  # fallback for legacy scenario sets
@@ -1328,14 +1271,11 @@ write_disk_pressure_state() {
     local free_gb="$1"
     local min_gb="$2"
     mkdir -p "${OUTPUT_DIR}/state" 2>/dev/null || true
-    cat > "${OUTPUT_DIR}/state/disk_pressure.json" << EOF
-{
-  "detected_at": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-  "free_gb": ${free_gb},
-  "min_free_gb": ${min_gb},
-  "output_dir": "${OUTPUT_DIR}"
-}
-EOF
+    _pack_validation_state write-disk-pressure \
+        --path "${OUTPUT_DIR}/state/disk_pressure.json" \
+        --free-gb "${free_gb}" \
+        --min-gb "${min_gb}" \
+        --output-dir "${OUTPUT_DIR}"
 }
 
 handle_disk_pressure() {
@@ -1671,67 +1611,7 @@ export -f setup_model
 # ============ ESTIMATE MODEL SIZE FOR BATCH OPTIMIZATION ============
 estimate_model_params() {
     local model_path="$1"
-    local config_file="${model_path}/config.json"
-    if [[ ! -f "${config_file}" ]]; then
-        echo "7"
-        return
-    fi
-
-    # Returns model size bucket for batch optimization
-    # Also detects MoE architectures (Mixtral) which need special handling
-    # Note: config_file is passed as argument to avoid shell injection issues
-    local params=$(python3 -c "
-import json
-import sys
-try:
-    config_path = sys.argv[1]
-    config = json.load(open(config_path))
-
-    # Extract architecture parameters
-    h = config.get('hidden_size', 4096)
-    l = config.get('num_hidden_layers', 32)
-    v = config.get('vocab_size', 32000)
-    i = config.get('intermediate_size', h * 4)  # FFN intermediate size
-
-    # Detect MoE architecture (Mixtral style)
-    num_experts = config.get('num_local_experts', 1)
-    if num_experts == 1:
-        num_experts = config.get('num_experts', 1)
-
-    # Better parameter estimation formula:
-    # - Embedding: vocab_size * hidden_size
-    # - Attention per layer: 4 * hidden_size^2 (Q,K,V,O projections)
-    # - FFN per layer: 3 * hidden_size * intermediate_size (SwiGLU/gate has 3 matrices)
-    # - LM head: hidden_size * vocab_size
-    embedding_params = v * h
-    attention_per_layer = 4 * h * h
-    ffn_per_layer = 3 * h * i  # gate_proj, up_proj, down_proj
-    lm_head = h * v
-
-    base_params = (embedding_params + l * (attention_per_layer + ffn_per_layer) + lm_head) / 1e9
-
-    # For MoE, each expert has its own FFN, but we only activate some at a time
-    # Memory scales with total params (all experts loaded), so multiply FFN contribution
-    if num_experts > 1:
-        moe_ffn = l * ffn_per_layer * num_experts
-        base_params = (embedding_params + l * attention_per_layer + moe_ffn + lm_head) / 1e9
-        print('moe')
-    elif base_params > 55:  # 70B/72B models
-        print('70')
-    elif base_params > 28:  # 30B-40B models
-        print('40')
-    elif base_params > 18:  # 20B-30B models (Qwen2.5-32B etc)
-        print('30')
-    elif base_params > 10:  # 13B-14B models
-        print('13')
-    else:
-        print('7')
-except (FileNotFoundError, OSError, TypeError, ValueError, json.JSONDecodeError) as e:
-    # Debug: uncomment to see why detection fails
-    # import sys; print(f'estimate_model_params error: {e}', file=sys.stderr)
-    print('7')
-" "${config_file}" 2>/dev/null)
-    echo "${params:-7}"
+    _pack_validation_state estimate-model-params "${model_path}" 2>/dev/null || echo "7"
 }
 export -f estimate_model_params
 
@@ -1853,8 +1733,8 @@ main_dynamic() {
     if ! [[ "${stress_scenarios}" =~ ^[0-9]+$ ]]; then
         stress_scenarios=0
     fi
-    if command -v jq >/dev/null 2>&1 && [[ -f "${scenarios_file}" ]]; then
-        error_scenarios="$(jq -r '[.scenarios[] | select(.generation.kind=="error")] | length' "${scenarios_file}" 2>/dev/null || echo 0)"
+    if [[ -f "${scenarios_file}" ]]; then
+        error_scenarios="$(_pack_validation_state count-generation-kind "${scenarios_file}" --kind error 2>/dev/null || echo 0)"
         error_scenarios_source="state/scenarios.json"
     fi
     if ! [[ "${error_scenarios}" =~ ^[0-9]+$ ]]; then
@@ -1960,17 +1840,7 @@ main_dynamic() {
             local task_file
             for task_file in "${QUEUE_DIR}/failed"/*.task; do
                 [[ -f "${task_file}" ]] || continue
-                local tmp_file="${task_file}.resume.$$"
-                jq '(.params // {}) as $p
-                    | .status="pending"
-                    | .retries=0
-                    | .assigned_gpus=null
-                    | .started_at=null
-                    | .completed_at=null
-                    | .error_msg=null
-                    | .params=($p + {retry_after:null,last_error_type:null})' "${task_file}" > "${tmp_file}" 2>/dev/null \
-                    && mv "${tmp_file}" "${task_file}" 2>/dev/null \
-                    || { rm -f "${tmp_file}" 2>/dev/null || true; }
+                _pack_validation_state reset-task-for-resume "${task_file}" 2>/dev/null || true
                 mv "${task_file}" "${QUEUE_DIR}/pending/" 2>/dev/null || true
             done
         fi
