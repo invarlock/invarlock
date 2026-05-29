@@ -209,13 +209,7 @@ pack_verify_signature() {
 pack_report_scenario_id() {
     local pack_dir="$1"
     local report="$2"
-    local rel="${report#"${pack_dir}/reports/"}"
-    local after_model="${rel#*/}"
-    local scenario="${after_model%%/*}"
-    if [[ -z "${scenario}" || "${scenario}" == "${after_model}" ]]; then
-        return 1
-    fi
-    printf '%s\n' "${scenario}"
+    _cmd_python "${SCRIPT_DIR}/python/verify_pack_checks.py" report-scenario-id "${pack_dir}" "${report}"
 }
 
 pack_scenario_strictness() {
@@ -231,15 +225,7 @@ pack_scenario_strictness() {
 pack_report_expects_verify_failure() {
     local pack_dir="$1"
     local report="$2"
-    if [[ "${report}" == */errors/*/evaluation.report.json ]]; then
-        return 0
-    fi
-
-    local scenario_id
-    scenario_id="$(pack_report_scenario_id "${pack_dir}" "${report}")" || return 1
-    local strictness
-    strictness="$(pack_scenario_strictness "${pack_dir}" "${scenario_id}")" || return 1
-    [[ "${strictness}" == "must_fail" ]]
+    _cmd_python "${SCRIPT_DIR}/python/verify_pack_checks.py" report-expects-verify-failure "${pack_dir}" "${report}"
 }
 
 pack_verify_reports() {
@@ -247,42 +233,20 @@ pack_verify_reports() {
     local json_out="$2"
     local profile="${PACK_VERIFY_PROFILE:-dev}"
     local report_assurance="${PACK_REPORT_ASSURANCE:-report}"
-    local -a reports=()
-    local -a reports_clean=()
-    local -a reports_expected_failure=()
-    while IFS= read -r report; do
-        [[ -n "${report}" ]] || continue
-        reports+=("${report}")
-        if pack_report_expects_verify_failure "${pack_dir}" "${report}"; then
-            reports_expected_failure+=("${report}")
-        else
-            reports_clean+=("${report}")
-        fi
-    done < <(find "${pack_dir}/reports" -type f -name "evaluation.report.json" | sort)
-    if [[ ${#reports[@]} -eq 0 ]]; then
-        echo "ERROR: No reports found in pack." >&2
-        return 1
-    fi
-    if [[ ${#reports_clean[@]} -eq 0 ]]; then
-        echo "ERROR: No reports expected to pass in pack (only expected-failure reports present)." >&2
-        return 1
-    fi
-
+    local -a args=(
+        "${SCRIPT_DIR}/python/verify_pack_checks.py"
+        verify-reports
+        "${pack_dir}"
+        --profile
+        "${profile}"
+        --report-assurance
+        "${report_assurance}"
+        --require-clean
+    )
     if [[ -n "${json_out}" ]]; then
-        invarlock verify --json --profile "${profile}" --assurance "${report_assurance}" "${reports_clean[@]}" > "${json_out}"
-    else
-        invarlock verify --json --profile "${profile}" --assurance "${report_assurance}" "${reports_clean[@]}"
+        args+=(--json-out "${json_out}")
     fi
-
-    if [[ ${#reports_expected_failure[@]} -gt 0 ]]; then
-        local report
-        for report in "${reports_expected_failure[@]}"; do
-            if invarlock verify --json --profile "${profile}" --assurance "${report_assurance}" "${report}" >/dev/null; then
-                echo "ERROR: Expected verify failure passed: ${report}" >&2
-                return 1
-            fi
-        done
-    fi
+    _cmd_python "${args[@]}"
 }
 
 pack_verify_pack() {
