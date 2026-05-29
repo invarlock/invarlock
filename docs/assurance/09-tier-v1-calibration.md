@@ -7,6 +7,7 @@
 > The public evidence floor is the packaged `published_basis` fixture set:
 > `src/invarlock/_data/public_evidence/published_basis/gpt2/evaluation.report.json`,
 > `src/invarlock/_data/public_evidence/published_basis/gpt2/evidence_pack_recipe.json`,
+> `src/invarlock/_data/public_evidence/published_basis/gpt2/evidence_pack/`,
 > `src/invarlock/_data/public_evidence/published_basis/bert/evaluation.report.json`,
 > and `src/invarlock/_data/public_evidence/published_basis/bert/evidence_pack_recipe.json`.
 >

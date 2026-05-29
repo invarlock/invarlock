@@ -98,7 +98,9 @@ logical paths from packaged files under
 `invarlock/_data/public_evidence/published_basis/...`, so installed packages can
 render and verify the shipped published-basis `evaluation.report.json` examples
 with their sibling `runtime.manifest.json` files, and load the paired
-`evidence_pack_recipe.json` data without cloning the repo.
+`evidence_pack_recipe.json` data without cloning the repo. The GPT-2
+published-basis lane also packages a signed `evidence_pack/` directory for
+strict offline evidence-pack verification.
 
 ## Policy packs
 

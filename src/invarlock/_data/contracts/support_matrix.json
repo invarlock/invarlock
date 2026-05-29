@@ -18,7 +18,8 @@
       "evidence": {
         "evaluation_report_fixture": "public_evidence/published_basis/gpt2/evaluation.report.json",
         "runtime_manifest_fixture": "public_evidence/published_basis/gpt2/runtime.manifest.json",
-        "evidence_pack_recipe": "public_evidence/published_basis/gpt2/evidence_pack_recipe.json"
+        "evidence_pack_recipe": "public_evidence/published_basis/gpt2/evidence_pack_recipe.json",
+        "evidence_pack_fixture": "public_evidence/published_basis/gpt2/evidence_pack"
       }
     },
     {

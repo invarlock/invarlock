@@ -182,6 +182,10 @@ def test_support_matrix_published_basis_evidence_uses_public_evidence_paths() ->
         assert evidence["evidence_pack_recipe"].startswith(
             "public_evidence/published_basis/"
         )
+        if "evidence_pack_fixture" in evidence:
+            assert evidence["evidence_pack_fixture"].startswith(
+                "public_evidence/published_basis/"
+            )
         assert "tests/fixtures/" not in evidence["evaluation_report_fixture"]
         assert "tests/fixtures/" not in evidence["runtime_manifest_fixture"]
         assert "tests/fixtures/" not in evidence["evidence_pack_recipe"]

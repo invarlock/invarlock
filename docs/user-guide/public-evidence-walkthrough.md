@@ -27,9 +27,38 @@ Each directory includes:
 | `evaluation.report.json` | Canonical verifier input with primary metric, guard evidence, policy digest, and assurance section. |
 | `runtime.manifest.json` | Container runtime provenance manifest bound to the report by SHA-256. |
 | `evidence_pack_recipe.json` | Recipe pointer for rebuilding a full validation evidence pack. |
+| `evidence_pack/` | Signed, checksum-bound GPT-2 public evidence pack that verifies under strict release policy. |
 
 The support matrix records these paths under
 `contracts/support_matrix.json` as the `published_basis` evidence floor.
+
+The GPT-2 lane also ships a small signed pack so reviewers can exercise the
+full offline evidence-pack verifier without rebuilding the suite:
+
+```bash
+FPR=$(python - <<'PY'
+import json
+from pathlib import Path
+
+manifest = json.loads(
+    Path("public_evidence/published_basis/gpt2/evidence_pack/manifest.json")
+    .read_text(encoding="utf-8")
+)
+print(manifest["signing_key_fingerprint"])
+PY
+)
+
+invarlock advanced evidence-pack verify \
+  public_evidence/published_basis/gpt2/evidence_pack \
+  --strict \
+  --profile release \
+  --report-assurance strict \
+  --expected-fingerprint "$FPR"
+```
+
+The expected pack result is `ok=true` with `authenticity=pinned`. Without
+`--expected-fingerprint`, the signature still proves integrity but not signer
+authenticity.
 
 ## Caught regression
 
