@@ -20,6 +20,11 @@ report. This avoids coupling to any particular edit stack and keeps your
 existing tooling intact whether you are validating quantization, pruning,
 fine-tuning, or other checkpoint-edit workflows.
 
+That is the production boundary in InvarLock: guards and verifier policy inspect
+the resulting subject checkpoint and paired metrics, not the external program
+that produced the subject. Built-in edit generation is kept to demo/smoke
+support; production validation should normally use BYOE.
+
 ## TL;DR
 
 - Produce your baseline and edited checkpoints (any external tool).
@@ -110,6 +115,9 @@ keep `seq_len=stride` for deterministic non-overlapping windows.
 - Stable: your edit stack remains yours; InvarLock focuses on gates and evidence.
 - Portable: reports are self-contained artifacts with provenance.
 - Low maintenance: you can update your edit tools without waiting for InvarLock updates.
+- Auditable: public BYOE fixtures under `public_evidence/byoe_examples/` show
+  dense magnitude pruning and LoRA-merge style subjects verifying through the
+  same release gate.
 
 ## When to use built-in edits
 

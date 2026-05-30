@@ -1,0 +1,21 @@
+{
+  "baseline_checkpoint": {
+    "model_id": "sshleifer/tiny-gpt2",
+    "revision": "runtime-resolved",
+    "role": "baseline"
+  },
+  "evaluation_report": "evaluation.report.json",
+  "evidence_class": "real_model_run",
+  "generated_at": "2026-05-30T00:00:00Z",
+  "runtime_manifest": "runtime.manifest.json",
+  "schema": "invarlock.public_evidence.checkpoint_refs.v1",
+  "signed_evidence_pack": "evidence_pack",
+  "subject_checkpoint": {
+    "built_in_edit_plugin": true,
+    "external_edit_type": "quant_rtn",
+    "model_id": "sshleifer/tiny-gpt2",
+    "revision": "runtime-resolved",
+    "role": "subject"
+  },
+  "weights_vendored": false
+}

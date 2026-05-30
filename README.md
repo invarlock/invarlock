@@ -8,7 +8,7 @@
   </picture>
 </p>
 
-<p align="center"><em>Edit‑agnostic robustness reports for weight edits</em></p>
+<p align="center"><em>Auditable release gates for edited model checkpoints</em></p>
 
 <p align="center">
   <a href="https://github.com/invarlock/invarlock/actions/workflows/ci.yml">
@@ -29,7 +29,7 @@
 </p>
 
 <p align="center">
-  <strong>Catch silent quality regressions from quantization, pruning, and weight edits before they ship.</strong>
+  <strong>Catch silent quality regressions in edited model checkpoints before they ship.</strong>
 </p>
 
 Quantizing, pruning, or otherwise editing a model’s weights can silently degrade quality.
@@ -37,6 +37,20 @@ InvarLock compares an edited **subject** checkpoint against a fixed **baseline**
 evaluation windows, enforces the canonical guard chain (`invariants` -> `spectral` -> `RMT`
 -> `variance` -> `invariants`), and produces a machine-readable evaluation report you can gate
 in CI.
+
+InvarLock validates baseline-vs-subject checkpoint comparisons. The subject can
+come from any external edit workflow: quantization, pruning, LoRA merge,
+fine-tuning, or another weight-edit pipeline. The built-in `quant_rtn` edit is
+for demos and smoke tests; production workflows are
+bring-your-own-edited-checkpoint (BYOE). The repo ships strict-verifiable BYOE
+fixtures for dense magnitude pruning and LoRA-merge style subjects under
+`public_evidence/byoe_examples/`, plus a real external magnitude-prune BYOE run
+under `public_evidence/real_runs/`.
+
+The `public_evidence/` tree separates verifier fixtures from real runs. Fixtures
+prove report and evidence-pack contracts; `public_evidence/real_runs/` contains a
+small set of GPT-2-family `invarlock evaluate` runs with signed,
+fingerprint-pinned evidence packs.
 
 ## Why InvarLock?
 
@@ -49,7 +63,8 @@ in CI.
 
 ## Who is this for?
 
-- ML engineers shipping edited model checkpoints, including quantized, pruned, fine-tuned, or otherwise weight-modified variants.
+- ML engineers shipping edited model checkpoints, including quantized, pruned,
+  fine-tuned, adapter-merged, or otherwise weight-modified variants.
 - MLOps and platform teams building CI gates, runtime-provenance verification, and reviewable evaluation artifacts.
 - Researchers validating weight-edit, compression, and model-comparison methods with reproducible paired evaluation across text and image-text workflows supported here.
 
@@ -230,7 +245,7 @@ If you use InvarLock in scientific work, please cite it (canonical metadata is i
 
 ```bibtex
 @software{invarlock,
-  title  = {InvarLock: Edit-agnostic robustness evaluation reports for weight edits},
+  title  = {InvarLock: Auditable release gates for edited model checkpoints},
   author = {{InvarLock}},
   url    = {https://github.com/invarlock/invarlock},
 }

@@ -1,0 +1,17 @@
+{
+  "artifact_paths": {
+    "evaluation_report": "evaluation.report.json",
+    "runtime_manifest": "runtime.manifest.json"
+  },
+  "evidence_class": "caught_regression_fixture",
+  "generated_by": "public fixture assembly",
+  "non_goals": [
+    "Does not claim to be a production incident.",
+    "Does not prove model-wide failure rates."
+  ],
+  "schema": "invarlock.public_evidence.meta.v1",
+  "summary": "Caught-regression fixture where the primary metric passes but the RMT guard fails.",
+  "verifier_commands": [
+    "uv run invarlock verify public_evidence/caught_regressions/rmt_guard_failure/evaluation.report.json --profile release --assurance strict"
+  ]
+}

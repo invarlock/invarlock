@@ -1,0 +1,31 @@
+{
+  "config": {
+    "path": null,
+    "sha256": "bf9621de2e75e4e72bcdb1671a57e3ab30306c0af61b38e4f0e74bea72d4df25",
+    "source": "inline"
+  },
+  "context": {
+    "assurance": "strict",
+    "command": "evaluate",
+    "execution_mode": "container",
+    "profile": "release",
+    "tier": "balanced"
+  },
+  "execution_mode": "container",
+  "generated_at_utc": "2026-05-30T05:24:47.121112+00:00",
+  "manifest_version": 1,
+  "report": {
+    "filename": "evaluation.report.json",
+    "path": "public_evidence/real_runs/tiny_gpt2_quant_rtn/evaluation.report.json",
+    "sha256": "01ed52d0c592f0ed69623b05a347b57a49f9f576ca6080af0d2c6782fcca9994"
+  },
+  "runtime": {
+    "allow_network": true,
+    "allow_remote_code": false,
+    "allow_third_party_plugins": false,
+    "container_execution": true,
+    "image_digest": "sha256:1b00b1d839a2b4f757e72505289fe1ee00f71a7c49f4fc59a47c17df47727c54",
+    "image_ref": "ghcr.io/invarlock/invarlock-runtime:latest@sha256:1b00b1d839a2b4f757e72505289fe1ee00f71a7c49f4fc59a47c17df47727c54"
+  },
+  "verifier_contract_version": "runtime-manifest-v1"
+}

@@ -68,19 +68,10 @@ sitecustomize.py
 /runs/
 /runs_cfg/
 /artifacts/
-/public_evidence/implemented_coverage/
 /guards_evidence.json
 /tmp/
 /tmp_*/
 *.log
-
-# Pruning results and evaluation outputs
-*_pruning_results/
-*_pruning_results_*/
-test_*/
-*_test_results.json
-*_validation_results.json
-*_run.log
 
 # Model outputs
 *.pt
@@ -91,9 +82,6 @@ step_*/
 # Documentation and frontend build outputs
 /site/
 /node_modules/
-/.clusterfuzzlite/
-/fuzzers/
-/docs/operations/
 /.npm-cache/
 /.npm-prefix/
 npm-debug.log*
@@ -119,9 +107,6 @@ benchmarks/results/
 # Optional local asset trees
 /plans/
 /data/
-/.*/operations/
-/.*/plans/
-/.*/reports/
 
 # Tracked public contracts and shipped test artifacts must remain visible.
 # Root-anchored output rules above avoid masking these paths.

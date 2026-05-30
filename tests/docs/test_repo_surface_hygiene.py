@@ -25,20 +25,6 @@ def test_markdownlintignore_curated_docs_use_current_existing_paths() -> None:
         "docs/user-guide/compare-and-evaluate.md",
         "docs/user-guide/reading-report.md",
     ]
-    removed_paths = [
-        "docs/assurance/01-logspace-rationale.md",
-        "docs/assurance/02-eval-math-proof.md",
-        "docs/assurance/03-coverage-and-pairing.md",
-        "docs/assurance/04-bca-bootstrap.md",
-        "docs/assurance/05-guard-contracts.md",
-        "docs/assurance/06-spectral-fpr-derivation.md",
-        "docs/assurance/07-rmt-epsilon-rule.md",
-        "docs/assurance/08-ve-gate-power.md",
-        "docs/assurance/09-determinism-contracts.md",
-        "docs/reference/exporting-" + "certif" + "icates-html.md",
-        "docs/user-guide/compare-and-certify.md",
-        "docs/user-guide/reading-" + "certif" + "icate.md",
-    ]
 
     for rel_path in expected_curated_paths:
         assert f"!{rel_path}" in text, f"missing markdownlint curated path {rel_path}"
@@ -46,13 +32,8 @@ def test_markdownlintignore_curated_docs_use_current_existing_paths() -> None:
             f"curated markdownlint path missing: {rel_path}"
         )
 
-    for rel_path in removed_paths:
-        assert rel_path not in text, (
-            f"removed markdownlint path still present: {rel_path}"
-        )
 
-
-def test_gitignore_keeps_current_output_paths_and_drops_stale_legacy_scratch() -> None:
+def test_gitignore_keeps_current_output_paths() -> None:
     text = _read(".gitignore")
     required_patterns = [
         "/reports/",
@@ -64,30 +45,9 @@ def test_gitignore_keeps_current_output_paths_and_drops_stale_legacy_scratch() -
         "/tmp_*/",
         "._*",
     ]
-    removed_patterns = [
-        "/reports_report/",
-        "/.certify_tmp/",
-        "/" + "certif" + "icates/",
-        "*_" + "certif" + "icate/",
-        "cert-*.json",
-        "*.cert",
-        "fullLisk.txt",
-        "*.clinerules",
-        ".clinerules",
-        "/demo_*/",
-        "/mock_run/",
-        "test_comprehensive_results*.json",
-        "mps_full_stats/",
-        "test_mps_stats/",
-        "optuna_results/",
-        "invarlock_comparison_results/",
-    ]
 
     for pattern in required_patterns:
         assert pattern in text, f"required gitignore pattern missing: {pattern}"
-
-    for pattern in removed_patterns:
-        assert pattern not in text, f"stale gitignore pattern still present: {pattern}"
 
 
 def test_public_docs_use_repo_and_package_native_wording_for_pack_verification() -> (

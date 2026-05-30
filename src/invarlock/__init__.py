@@ -1,6 +1,6 @@
 """
-InvarLock: Edit‑agnostic evaluation reports for weight edits
-=============================================================
+InvarLock: auditable release gates for edited model checkpoints
+===============================================================
 
 Core runtime package — torch-independent utilities, configuration, and interfaces.
 

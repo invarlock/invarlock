@@ -45,6 +45,16 @@ def test_verify_target_runs_repo_cruft_check() -> None:
     )
 
 
+def test_verify_target_runs_public_evidence_audit() -> None:
+    makefile = Path(__file__).resolve().parents[2] / "Makefile"
+    data = makefile.read_text(encoding="utf-8")
+    block = _get_make_target_block(data, "verify")
+    assert block is not None, "verify target not found in Makefile"
+    assert "$(MAKE) public-evidence-audit" in block, (
+        "verify target should fail fast on overclaimed public evidence"
+    )
+
+
 def test_verify_target_runs_scripts_inventory_check() -> None:
     makefile = Path(__file__).resolve().parents[2] / "Makefile"
     data = makefile.read_text(encoding="utf-8")

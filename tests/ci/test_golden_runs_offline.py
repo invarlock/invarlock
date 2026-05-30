@@ -137,25 +137,108 @@ def test_public_signed_evidence_pack_verifies_release_strict_pinned() -> None:
         assert result.payload["signer_fingerprint"] == fingerprint
 
 
-def test_caught_regression_fixture_fails_guard_despite_clean_primary_metric() -> None:
-    report_path = (
-        REPO_ROOT
-        / "public_evidence"
-        / "caught_regressions"
-        / "spectral_guard_failure"
-        / "evaluation.report.json"
-    )
-    report = json.loads(report_path.read_text(encoding="utf-8"))
-    assert report["validation"]["primary_metric_acceptable"] is True
-    assert report["primary_metric"]["ratio_vs_baseline"] == 1.0
+def test_caught_regression_fixtures_fail_expected_guard() -> None:
+    cases = {
+        "spectral_guard_failure": (
+            "validation.spectral_stable == true",
+            "spectral did not pass",
+        ),
+        "rmt_guard_failure": ("validation.rmt_stable == true", "rmt did not pass"),
+        "variance_guard_failure": (
+            "variance.predictive_gate.passed == true",
+            "variance did not pass",
+        ),
+    }
 
-    result = run_verify_reports(
-        [report_path],
-        profile="release",
-        assurance_mode="strict",
-    )
+    for directory, expected_messages in cases.items():
+        report_path = (
+            REPO_ROOT
+            / "public_evidence"
+            / "caught_regressions"
+            / directory
+            / "evaluation.report.json"
+        )
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        assert report["validation"]["primary_metric_acceptable"] is True
+        assert report["primary_metric"]["ratio_vs_baseline"] == 1.0
 
-    assert result.outcome == VerifyOutcome.POLICY_FAIL
-    diagnostics = "\n".join(item.message for item in result.diagnostics)
-    assert "validation.spectral_stable == true" in diagnostics
-    assert "spectral did not pass" in diagnostics
+        result = run_verify_reports(
+            [report_path],
+            profile="release",
+            assurance_mode="strict",
+        )
+
+        assert result.outcome == VerifyOutcome.POLICY_FAIL
+        diagnostics = "\n".join(item.message for item in result.diagnostics)
+        for expected in expected_messages:
+            assert expected in diagnostics
+
+
+def test_policy_failure_fixtures_fail_expected_policy_predicate() -> None:
+    cases = {
+        "invariants_failure": (
+            "validation.invariants_pass == true",
+            "invariants did not pass",
+        ),
+        "primary_metric_failure": (
+            "Primary metric policy gate failed",
+            "validation.primary_metric_acceptable == true",
+        ),
+        "runtime_provenance_failure": (
+            "runtime.manifest.json marks evaluation.report.json as 'host-bypass'",
+            "strict assurance requires verified runtime provenance",
+        ),
+    }
+
+    for directory, expected_messages in cases.items():
+        report_path = (
+            REPO_ROOT
+            / "public_evidence"
+            / "policy_failures"
+            / directory
+            / "evaluation.report.json"
+        )
+
+        result = run_verify_reports(
+            [report_path],
+            profile="release",
+            assurance_mode="strict",
+        )
+
+        assert result.outcome == VerifyOutcome.POLICY_FAIL
+        diagnostics = "\n".join(item.message for item in result.diagnostics)
+        for expected in expected_messages:
+            assert expected in diagnostics
+
+
+def test_byoe_examples_verify_release_strict() -> None:
+    examples = {
+        "magnitude_prune_byoe": "magnitude_prune",
+        "lora_merge_byoe": "lora_merge",
+    }
+
+    for directory, edit_type in examples.items():
+        example_dir = REPO_ROOT / "public_evidence" / "byoe_examples" / directory
+        report_path = example_dir / "evaluation.report.json"
+        refs_path = example_dir / "checkpoint_refs.json"
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        refs = json.loads(refs_path.read_text(encoding="utf-8"))
+
+        assert validate_report(report) is True
+        assert report["artifacts"]["byoe_example"] is True
+        assert report["artifacts"]["external_edit_type"] == edit_type
+        assert report["artifacts"]["built_in_edit_plugin"] is False
+        assert report["plugins"]["edits"] == []
+        assert refs["weights_vendored"] is False
+        assert refs["subject_checkpoint"]["external_edit_type"] == edit_type
+        assert refs["subject_checkpoint"]["built_in_edit_plugin"] is False
+
+        result = run_verify_reports(
+            [report_path],
+            profile="release",
+            assurance_mode="strict",
+        )
+
+        assert result.outcome == VerifyOutcome.OK
+        verification = result.payload["results"][0]["verification"]
+        assert verification["runtime_provenance"]["status"] == "verified"

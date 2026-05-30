@@ -14,6 +14,7 @@ paths = [
   "scripts/README.md",
   "scripts/__init__.py",
   "scripts/checks/check_architecture_fragmentation.py",
+  "scripts/checks/check_public_evidence.py",
   "scripts/checks/check_repo_cruft.py",
   "scripts/check_scripts_inventory.py",
   "scripts/scripts_inventory.toml",

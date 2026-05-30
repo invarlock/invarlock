@@ -1,11 +1,15 @@
 # InvarLock Documentation
 
-InvarLock is edit-agnostic (BYOE). A small built-in RTN dequantized
-weight-edit simulation (`quant_rtn`, 8-bit) exists for advanced smoke and demo
-workflows. See
-[Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md).
+InvarLock provides auditable release gates for edited model checkpoints. It
+validates baseline-vs-subject comparisons, not a specific edit toolchain. A
+small built-in RTN dequantized weight-edit simulation (`quant_rtn`, 8-bit)
+exists for advanced smoke and demo workflows; production workflows are
+bring-your-own-edited-checkpoint (BYOE). See [Compare & evaluate
+(BYOE)](user-guide/compare-and-evaluate.md) and the [Public Evidence
+Walkthrough](user-guide/public-evidence-walkthrough.md).
 
-Welcome to the documentation hub for InvarLock (Edit‑agnostic robustness reports for weight edits).
+Welcome to the documentation hub for InvarLock (auditable release gates for
+edited model checkpoints).
 The material below is organized so new users can ramp quickly while practitioners
 find detailed reference, design rationales, and assurance notes.
 It is aimed at checkpoint editors, CI and assurance owners, and researchers

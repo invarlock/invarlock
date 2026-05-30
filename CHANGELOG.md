@@ -21,6 +21,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   adapters.
 - Added detached evidence-pack source snapshot support and a clean quant-runtime
   evidence path for optional quantized-subject runs.
+- Added evidence-pack signer authentication via `--expected-fingerprint`, local
+  trust stores, and verifier JSON `authenticity` states (`pinned`, `unpinned`,
+  `mismatch`).
+- Added signed public GPT-2 evidence pack fixtures, strict public GPT-2/BERT
+  evidence reports, checkpoint-reference artifact packages, and a caught
+  spectral-regression fixture whose primary metric remains acceptable.
+- Added public evidence walkthrough documentation with pinned evidence-pack
+  verification commands and explicit integrity-versus-authenticity guidance.
+- Added scripts inventory governance, architecture-fragmentation tracking, and
+  guard fallback diagnostic checks so repository maintenance surfaces are
+  classified and auditable.
+- Added guard fault-injection seam documentation and regression coverage for
+  spectral, RMT, variance, and fallback diagnostic paths.
 
 ### Changed
 
@@ -41,6 +54,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   devel base, and a retained JIT toolchain for quantized adapter evidence paths.
 - Re-scoped grouped evidence evaluation to the simpler ungrouped path after
   remote timing showed no useful default speedup.
+- Consolidated run-orchestrator execution helpers and reporting render/context
+  modules to reduce re-export shims and one-helper-per-file fragmentation.
+- Reorganized `scripts/` into maintained families (`checks`, `coverage`,
+  `docs`, `security`, `smoke`, `model_evidence`) with an inventory manifest and
+  a `make scripts-audit` gate.
+- Refactored evidence-pack script helpers so queue state, validation state,
+  edit implementations, edit metadata, artifact saving, artifact validation, and
+  pack verification logic live in Python modules instead of brittle shell-only
+  state handling.
+- Updated `CODEOWNERS` to use the organization `core-maintainers` team for
+  protected ownership rules.
+- Updated the pre-commit workflow check context to report as `pre-commit`
+  instead of the generic `run` job name.
 
 ### Removed
 
@@ -52,6 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed transient release-hardening and release-checklist pages from the
   published docs tree so durable docs stay focused on current repository
   behavior and stable user-facing contracts.
+- Removed stale docs workflow targeting for the retired `develop` branch.
 
 ### Fixed
 
@@ -68,6 +95,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   non-assurance results visibly.
 - Ratcheted critical coverage thresholds and added edge-path coverage for
   registry metadata and metrics runtime behavior.
+- Fixed typed-surface mypy coverage after orchestrator consolidation by removing
+  stale file paths from the maintained check list.
+- Fixed stale workflow/check metadata after GitHub ruleset hardening so
+  protected branches require current CI contexts only.
+- Fixed reporting test import ordering to satisfy the active pre-commit gate.
+- Fixed additional guard and reporting compatibility edge cases, including
+  variance fault-injection preservation, telemetry monkeypatch stability,
+  canonical reporting imports, and shared check-script IO helpers.
 
 ## [0.9.0] - 2026-05-25
 
