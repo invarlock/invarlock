@@ -175,7 +175,6 @@ def test_docs_workflow_enforces_docs_lint_on_main_and_staging() -> None:
     assert triggers["push"]["branches"] == ["main", "staging/next", "release/v*"]
     assert triggers["pull_request"]["branches"] == [
         "main",
-        "develop",
         "staging/next",
         "release/v*",
     ]

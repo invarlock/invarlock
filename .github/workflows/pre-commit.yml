@@ -20,6 +20,7 @@ concurrency:
 
 jobs:
   run:
+    name: pre-commit
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
