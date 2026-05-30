@@ -4,10 +4,10 @@
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Edit-agnostic safety evaluation framework for ML model weight modifications. |
+| **Purpose** | Auditable release-gate framework for ML model weight modifications. |
 | **Audience** | Developers extending InvarLock, operators debugging pipelines, security reviewers. |
 | **Core components** | CLI shells, Core/runtime policy layer, Guard chain, Reporting/artifact subsystem. |
-| **Design goals** | Torch-independent core, edit-agnostic guards, deterministic evaluation, explicit artifact contracts, full provenance. |
+| **Design goals** | Torch-independent core, edit-stack-neutral guards, deterministic evaluation, explicit artifact contracts, full provenance. |
 | **Source of truth** | `src/invarlock/core/*.py`, `src/invarlock/reporting/*.py`, `src/invarlock/runtime_provenance.py`, `src/invarlock/runtime_verify.py`, `src/invarlock/cli/commands/*.py`, `src/invarlock/cli/run_*.py`, `src/invarlock/guards/*.py`. |
 
 See the [Glossary](../assurance/glossary.md) for definitions of terms such as
@@ -360,13 +360,19 @@ verification and programmatic execution.
 | Decision | Rationale | Implementation |
 | --- | --- | --- |
 | **Torch-independent core** | `runner.py` coordinates without importing torch; adapters encapsulate torch-specific logic. | Adapter protocol in `core/api.py` |
-| **Edit-agnostic guards** | Guards work with any weight modification (quantization, pruning, LoRA merge). | Guard protocol validates model state, not edit type |
+| **Edit-stack-neutral guards** | Guards work with subject checkpoints from quantization, pruning, LoRA merge, fine-tuning, or other weight-edit workflows. | Guard protocol validates model state, not edit toolchain |
 | **Tier-based policies** | Calibrated thresholds in `tiers.yaml` for balanced/conservative/aggressive safety profiles. | Policy resolution in `guards/policies.py` |
 | **Deterministic evaluation** | Seed bundle + window pairing schedules ensure reproducible metrics. | `meta.seeds`, `dataset.windows.stats` tracking |
 | **Functional-core / imperative-shell split** | Keep policy, artifact contracts, and verdict computation reusable outside the CLI while CLI modules stay thin. | `core/*.py` + `reporting/*.py` owners called from `cli/commands/*.py` |
 | **Single verifier ownership** | Runtime-manifest verification should not vary with host tooling, so it must use one product implementation. | `core/runtime_manifest_verify.py`, `runtime_verify.py`, `runtime_provenance.py` |
 | **Plugin architecture** | Entry points for guards, adapters, edits enable extension without core changes. | `importlib.metadata` discovery in `core/registry.py` |
 | **Log-space primary metrics** | Paired ΔlogNLL with BCa bootstrap avoids ratio math bias. | `core/bootstrap.py` implementation |
+
+Edit-stack neutral does not mean every edit stack is bundled as an InvarLock
+edit plugin. The stable production boundary is BYOE: an external quantization
+tool, pruner, adapter merge, or fine-tuning pipeline produces the subject
+checkpoint, and InvarLock validates the resulting baseline-vs-subject evidence.
+Built-in edit generation is limited to demo/smoke support.
 
 ## Module Dependencies
 

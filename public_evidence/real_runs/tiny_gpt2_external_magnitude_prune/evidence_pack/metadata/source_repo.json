@@ -1,0 +1,13 @@
+{
+  "artifact_class": "real_model_run",
+  "base_commit": "25fd73a0b19ac5e79b2d6cf0d2cf203f48c02c25",
+  "generated_from": [
+    "uv run python public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/external_edit_recipe.py \\\n  --output-dir /private/tmp/invarlock-byoe-magnitude-prune-subject \\\n  --prune-fraction 0.0025",
+    "uv run invarlock evaluate \\\n  --baseline sshleifer/tiny-gpt2 \\\n  --subject /private/tmp/invarlock-byoe-magnitude-prune-subject \\\n  --baseline-adapter auto \\\n  --subject-adapter auto \\\n  --preset configs/presets/causal_lm/wikitext2_512.yaml \\\n  --edit-label custom \\\n  --profile release \\\n  --assurance strict \\\n  --execution-mode container \\\n  --allow-network \\\n  --out /private/tmp/invarlock-real-byoe-magnitude-prune/runs \\\n  --report-out /private/tmp/invarlock-real-byoe-magnitude-prune/report \\\n  --quiet \\\n  --no-progress"
+  ],
+  "repo": "invarlock-public",
+  "report": "evaluation.report.json",
+  "runtime_manifest": "runtime.manifest.json",
+  "source_ref": "working-tree-public-evidence-update-2026-05-30",
+  "working_tree_dirty": true
+}

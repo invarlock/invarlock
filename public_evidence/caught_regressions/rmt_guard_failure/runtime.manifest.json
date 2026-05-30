@@ -1,0 +1,24 @@
+{
+  "config": {
+    "path": null,
+    "sha256": null,
+    "source": "missing"
+  },
+  "execution_mode": "container",
+  "generated_at_utc": "2026-05-29T00:00:00+00:00",
+  "manifest_version": 1,
+  "report": {
+    "filename": "evaluation.report.json",
+    "path": "public_evidence/caught_regressions/rmt_guard_failure/evaluation.report.json",
+    "sha256": "b36da2777d26ee148ac41aecfcfbb4b1eab9d30b9a78576128d02d60eb33318b"
+  },
+  "runtime": {
+    "allow_network": false,
+    "allow_remote_code": false,
+    "allow_third_party_plugins": false,
+    "container_execution": true,
+    "image_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "image_ref": "ghcr.io/invarlock/invarlock-runtime:public-fixture"
+  },
+  "verifier_contract_version": "runtime-manifest-v1"
+}

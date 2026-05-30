@@ -134,7 +134,7 @@ def test_render_report_markdown_full_envelope() -> None:
         }
     }
 
-    # Structural changes (non-quant path)
+    # Structural changes path
     cert["structure"] = {
         "params_changed": 10,
         "layers_modified": 2,

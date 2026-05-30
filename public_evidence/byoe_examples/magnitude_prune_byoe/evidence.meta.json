@@ -1,0 +1,18 @@
+{
+  "artifact_paths": {
+    "checkpoint_refs": "checkpoint_refs.json",
+    "evaluation_report": "evaluation.report.json",
+    "runtime_manifest": "runtime.manifest.json"
+  },
+  "evidence_class": "byoe_subject_fixture",
+  "generated_by": "public fixture assembly",
+  "non_goals": [
+    "Does not vendor model weights.",
+    "Does not claim sparse runtime speedups or packed storage."
+  ],
+  "schema": "invarlock.public_evidence.meta.v1",
+  "summary": "BYOE subject fixture for dense magnitude-prune style checkpoint evidence.",
+  "verifier_commands": [
+    "uv run invarlock verify public_evidence/byoe_examples/magnitude_prune_byoe/evaluation.report.json --profile release --assurance strict"
+  ]
+}

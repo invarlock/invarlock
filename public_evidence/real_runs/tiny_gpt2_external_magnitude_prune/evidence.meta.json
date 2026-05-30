@@ -1,0 +1,28 @@
+{
+  "artifact_paths": {
+    "checkpoint_refs": "checkpoint_refs.json",
+    "evaluation_report": "evaluation.report.json",
+    "evidence_pack": "evidence_pack",
+    "external_edit_recipe": "external_edit_recipe.py",
+    "external_edit_summary": "external_edit_summary.json",
+    "run_command": "run_command.txt",
+    "runtime_manifest": "runtime.manifest.json"
+  },
+  "evidence_class": "real_model_run",
+  "expected_fingerprint": "sha256:e01c40a94c89b22306a2670b032f623aa5428351d06e18f9b3e9e6a39b42c41b",
+  "generated_by": "invarlock evaluate",
+  "model_family": "gpt2",
+  "non_goals": [
+    "Does not vendor model weights.",
+    "Does not claim sparse runtime speedup.",
+    "Does not claim magnitude pruning is a production compression backend."
+  ],
+  "profile": "release",
+  "report_sha256": "8fc11124a3013c4b54e67be1ee0a05a5b200326a1394bdd15e9d3907c200c1dd",
+  "schema": "invarlock.public_evidence.meta.v1",
+  "summary": "Container-backed real BYOE run for sshleifer/tiny-gpt2 with an externally materialized magnitude-pruned subject checkpoint.",
+  "verifier_commands": [
+    "uv run invarlock verify public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evaluation.report.json --profile release --assurance strict",
+    "uv run invarlock advanced evidence-pack verify public_evidence/real_runs/tiny_gpt2_external_magnitude_prune/evidence_pack --strict --profile release --report-assurance strict --expected-fingerprint sha256:e01c40a94c89b22306a2670b032f623aa5428351d06e18f9b3e9e6a39b42c41b"
+  ]
+}
