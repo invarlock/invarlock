@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_telemetry import (
     telemetry_output_enabled,
     telemetry_summary_line,
 )
+
+from invarlock.reporting.report_make import make_report
 
 
 def _mk_minimal_report() -> dict:

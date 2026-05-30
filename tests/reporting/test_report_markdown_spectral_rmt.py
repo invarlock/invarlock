@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from invarlock.reporting import report_make as C
 from invarlock.reporting.render import render_report_markdown
+
+from invarlock.reporting import report_make as C
 from invarlock.reporting.report_make import make_report
 
 

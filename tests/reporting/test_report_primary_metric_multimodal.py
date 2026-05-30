@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.render import render_report_markdown
+
 from invarlock.reporting.report_validation import compute_validation_flags
 
 

@@ -3,11 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from invarlock.reporting import render_markdown as render_markdown_mod
-from invarlock.reporting import report_summary as report_summary_mod
 from invarlock.reporting.render import (
     render_report_markdown,
 )
+
+from invarlock.reporting import render_markdown as render_markdown_mod
+from invarlock.reporting import report_summary as report_summary_mod
 from invarlock.reporting.report_schema import validate_report
 
 

@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any
 
 from invarlock.reporting.render import render_report_markdown
+
 from invarlock.reporting.report_files import save_report
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.run_report_formatters import (

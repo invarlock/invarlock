@@ -1,10 +1,10 @@
 import pytest
+from invarlock.reporting.render import render_report_markdown
 
 import invarlock.reporting.policy_utils as policy_utils
 import invarlock.reporting.report_normalization as report_normalization
 from invarlock.reporting.guards_invariants import _extract_invariants
 from invarlock.reporting.policy_utils import _build_resolved_policies
-from invarlock.reporting.render import render_report_markdown
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.utils import _infer_scope_from_modules, _pair_logloss_windows
 

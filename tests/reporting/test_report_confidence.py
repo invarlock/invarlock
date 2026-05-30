@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting.render import render_report_markdown
+
 from invarlock.reporting.report_enrichment import compute_confidence_label
 from invarlock.reporting.report_make import make_report
 
