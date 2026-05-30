@@ -145,9 +145,7 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/core/run_orchestrator_execute_dataset.py \
 	src/invarlock/core/run_orchestrator_execute_attempts.py \
 	src/invarlock/core/run_orchestrator_execute_execution.py \
-	src/invarlock/core/run_orchestrator_execute_events.py \
 	src/invarlock/core/run_orchestrator_execute_helpers.py \
-	src/invarlock/core/run_orchestrator_execute_outcome.py \
 	src/invarlock/core/run_orchestrator_execute_pipeline.py \
 	src/invarlock/cli/__init__.py \
 	src/invarlock/cli/__main__.py \

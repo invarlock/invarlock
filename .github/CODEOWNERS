@@ -1,20 +1,20 @@
 # Security-sensitive workflows, locks, docs, and helper scripts.
-.github/workflows/codeql.yml @MLPulse @invarlock-dev
-.github/workflows/ci.yml @MLPulse @invarlock-dev
-.github/workflows/dependabot-main-guard.yml @MLPulse @invarlock-dev
-.github/workflows/release.yml @MLPulse @invarlock-dev
-.github/workflows/supply-chain-pr.yml @MLPulse @invarlock-dev
-.github/codeql/ @MLPulse @invarlock-dev
-.github/dependabot.yml @MLPulse @invarlock-dev
-.github/WORKFLOWS.md @MLPulse @invarlock-dev
-docs/security/ @MLPulse @invarlock-dev
-requirements/workflows/*security*.txt @MLPulse @invarlock-dev
-requirements/workflows/pip-bootstrap-py313.txt @MLPulse @invarlock-dev
-scripts/security/generate_sbom.sh @MLPulse @invarlock-dev
-scripts/security/refresh_pinned_requirements.sh @MLPulse @invarlock-dev
-scripts/security/ @MLPulse @invarlock-dev
+.github/workflows/codeql.yml @invarlock/core-maintainers
+.github/workflows/ci.yml @invarlock/core-maintainers
+.github/workflows/dependabot-main-guard.yml @invarlock/core-maintainers
+.github/workflows/release.yml @invarlock/core-maintainers
+.github/workflows/supply-chain-pr.yml @invarlock/core-maintainers
+.github/codeql/ @invarlock/core-maintainers
+.github/dependabot.yml @invarlock/core-maintainers
+.github/WORKFLOWS.md @invarlock/core-maintainers
+docs/security/ @invarlock/core-maintainers
+requirements/workflows/*security*.txt @invarlock/core-maintainers
+requirements/workflows/pip-bootstrap-py313.txt @invarlock/core-maintainers
+scripts/security/generate_sbom.sh @invarlock/core-maintainers
+scripts/security/refresh_pinned_requirements.sh @invarlock/core-maintainers
+scripts/security/ @invarlock/core-maintainers
 
 # Code owners for automatic review assignment
 # Format: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 
-* @MLPulse @invarlock-dev
+* @invarlock/core-maintainers
