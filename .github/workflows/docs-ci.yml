@@ -36,7 +36,7 @@ on:
       - '.github/workflows/docs-ci.yml'
   workflow_dispatch:
   pull_request:
-    branches: [ main, develop, staging/next, 'release/v*' ]
+    branches: [ main, staging/next, 'release/v*' ]
     paths:
       - 'docs/**'
       - 'README.md'

@@ -98,6 +98,12 @@ def _extract_transformers_550_hashes(path: Path) -> set[str]:
     return {match.group("digest1"), match.group("digest2")}
 
 
+def test_precommit_workflow_uses_named_check_context() -> None:
+    workflow = _load_workflow(Path(".github/workflows/pre-commit.yml"))
+
+    assert workflow["jobs"]["run"]["name"] == "pre-commit"
+
+
 def test_supply_chain_job_configured():
     """Test supply-chain job includes core security checks.
 
