@@ -25,8 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   trust stores, and verifier JSON `authenticity` states (`pinned`, `unpinned`,
   `mismatch`).
 - Added signed public GPT-2 evidence pack fixtures, strict public GPT-2/BERT
-  evidence reports, checkpoint-reference artifact packages, and a caught
-  spectral-regression fixture whose primary metric remains acceptable.
+  evidence reports, real tiny-GPT-2 quant and external magnitude-prune BYOE
+  runs, checkpoint-reference artifact packages, non-quant BYOE examples, and
+  caught-regression fixtures for guard and policy failures.
+- Added `make public-evidence-audit` and CI coverage for classifying public
+  evidence fixtures, verifying signed pack metadata, and preventing overclaims
+  in packaged public evidence.
 - Added public evidence walkthrough documentation with pinned evidence-pack
   verification commands and explicit integrity-versus-authenticity guidance.
 - Added scripts inventory governance, architecture-fragmentation tracking, and
@@ -67,6 +71,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   protected ownership rules.
 - Updated the pre-commit workflow check context to report as `pre-commit`
   instead of the generic `run` job name.
+- Updated contributor guidance with PR-ready local gate expectations, including
+  docs, coverage, typed-surface, supply-chain, packaging, and public-evidence
+  checks before protected-branch PRs are pushed for review.
 
 ### Removed
 

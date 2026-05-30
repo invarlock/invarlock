@@ -389,7 +389,8 @@ When touching core runtime or guards, bias toward deterministic tests
 
 ### 5.3 Code quality checks
 
-Before opening a PR, please run at least:
+Before opening a PR, run the focused checks for the files you changed. For
+small code changes this usually starts with:
 
 ```bash
 make test
@@ -399,7 +400,23 @@ make docs
 python scripts/docs/docs_lint.py --markdown
 ```
 
-For a more complete sweep, use:
+For maintainer PRs targeting protected branches, the expected bar is stronger:
+run the practical local equivalent of the GitHub checks before pushing, then
+use GitHub as confirmation rather than discovery. Start with:
+
+```bash
+git diff --check origin/staging/next...HEAD
+make lock-sync
+pre-commit run --all-files --show-diff-on-failure
+make workflow-lint
+make docs-check
+make mypy-typed-surface
+make coverage-enforce
+make packaging-smoke-minimal
+make security
+```
+
+For broader functional validation, use:
 
 ```bash
 make verify
@@ -407,7 +424,49 @@ make verify
 
 This runs tests, a smoke regression (`scripts/smoke/run_smoke_regression.sh`),
 CLI command-surface smokes, ruff lint, ruff format (check mode), packaged
-contract sync checks, and markdown lint over docs.
+contract sync checks, repository maintenance checks, public evidence audit, and
+strict docs linting.
+
+### 5.4 Supply-chain and artifact checks
+
+For security-sensitive, public-evidence, release, or artifact-heavy PRs, also
+run a PR-range secret scan before pushing. Install the same scanner version used
+by the GitHub workflow if needed:
+
+```bash
+go install github.com/zricethezav/gitleaks/v8@v8.30.0
+gitleaks git . \
+  --redact \
+  --no-banner \
+  --log-opts origin/staging/next..HEAD \
+  --report-format json \
+  --report-path artifacts/supply-chain/gitleaks-pr.json
+```
+
+Keep large generated outputs out of the PR. GitHub rejects files over 10 MB in
+the PR diff and generated directories such as `site/`, `dist/`, `build/`,
+`runs/`, and report-output directories. If you must add review artifacts, prefer
+compact canonical JSON and verifier-ready metadata over opaque archives.
+
+### 5.5 Public evidence changes
+
+Public evidence is part of the trust surface. When changing `public_evidence/`
+or packaged evidence under `src/invarlock/_data/public_evidence/`, run:
+
+```bash
+make public-evidence-audit
+uv run invarlock verify <evidence-dir>/evaluation.report.json --profile release --assurance strict
+uv run invarlock advanced evidence-pack verify <evidence-dir>/evidence_pack \
+  --strict \
+  --profile release \
+  --report-assurance strict \
+  --expected-fingerprint sha256:<fingerprint>
+```
+
+Evidence metadata should be scanner-friendly and reviewer-friendly. Store file
+hashes as records such as `{"path": "...", "sha256": "..."}` instead of using
+file names as JSON keys when those names can look like secret/token fields to
+generic scanners.
 
 ---
 
@@ -440,7 +499,12 @@ PRs should:
 2. Link to any relevant issues
 3. Include tests for new or changed behavior
 4. Update docs when CLI/config/schema or user‑visible behavior changes
-5. Pass CI (tests, lint, docs) before requesting review
+5. Target `staging/next` unless a maintainer explicitly asks otherwise
+6. Pass the relevant local gates before pushing
+7. Pass GitHub checks and required review before merge
+
+Force-pushing a PR can invalidate an earlier approval. After a force-push,
+confirm the review decision and check status again before merging.
 
 A simple checklist to include in the PR description:
 
@@ -448,16 +512,19 @@ A simple checklist to include in the PR description:
 ## Testing
 - [ ] Unit tests added/updated
 - [ ] Integration/regression tests added/updated (if applicable)
+- [ ] Focused tests for changed files
 
 ## Docs
 - [ ] User docs updated (if user-facing behavior changed)
 - [ ] Reference docs updated (if CLI/config/API changed)
 
 ## Quality
-- [ ] make test
-- [ ] make lint
-- [ ] make format
-- [ ] make docs
+- [ ] pre-commit run --all-files --show-diff-on-failure
+- [ ] make docs-check (docs/user-facing changes)
+- [ ] make mypy-typed-surface (typed-surface changes)
+- [ ] make coverage-enforce (core/guards/reporting/CLI changes)
+- [ ] make security or PR-range gitleaks scan (security/evidence/artifact changes)
+- [ ] make public-evidence-audit (public evidence changes)
 ```
 
 ### 6.3 Release flow (maintainers)
