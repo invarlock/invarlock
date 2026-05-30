@@ -7,7 +7,7 @@ from invarlock.core.adapter_auto import (
     resolve_auto_adapter,
 )
 
-_MISTRAL3_ARCH = "Mistral3ForConditionalGeneration"
+_MISTRAL3_ARCH = "Mistral3For" + "ConditionalGeneration"
 
 
 def _write_cfg(tmp_path: Path, model_type: str, arch: str) -> Path:

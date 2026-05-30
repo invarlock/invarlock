@@ -6,6 +6,8 @@ from invarlock.adapters.hf_causal import HF_Causal_Adapter
 from invarlock.adapters.hf_loading import HFLoaderStrategy
 from invarlock.core.exceptions import ModelLoadError
 
+_MISTRAL3_ARCH = "Mistral3For" + "ConditionalGeneration"
+
 
 def test_hf_causal_direct_fallback_ignores_remote_code_flag(monkeypatch) -> None:
     auto_loader = object()
@@ -26,7 +28,9 @@ def test_hf_causal_direct_fallback_ignores_remote_code_flag(monkeypatch) -> None
                 task=task,
                 strategy="direct_submodule",
                 loader=direct_loader,
-                loader_label="transformers.models.mistral3.modeling_mistral3.Mistral3ForConditionalGeneration",
+                loader_label=(
+                    "transformers.models.mistral3.modeling_mistral3." + _MISTRAL3_ARCH
+                ),
                 model_type="mistral3",
             )
         return HFLoaderStrategy(

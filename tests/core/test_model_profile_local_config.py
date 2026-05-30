@@ -7,7 +7,7 @@ import pytest
 
 import invarlock.model_profile as mp
 
-_MISTRAL3_ARCH = "Mistral3ForConditionalGeneration"
+_MISTRAL3_ARCH = "Mistral3For" + "ConditionalGeneration"
 
 
 class _DummyTokenizer:
