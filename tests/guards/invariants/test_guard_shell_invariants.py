@@ -3,7 +3,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from tests._repo_root import REPO_ROOT
 
 
 def _nested_function_names(path: Path) -> list[str]:

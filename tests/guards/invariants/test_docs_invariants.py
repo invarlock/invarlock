@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from tests._repo_root import REPO_ROOT
+
 
 def _iter_doc_files(root: Path):
     for dp, _dn, fns in os.walk(root):
@@ -12,7 +14,7 @@ def _iter_doc_files(root: Path):
 
 
 def test_docs_invariants_pm_first_strings():
-    docs_root = Path(__file__).resolve().parents[2] / "docs" / "reference"
+    docs_root = REPO_ROOT / "docs" / "reference"
     assert docs_root.exists()
 
     banned = [

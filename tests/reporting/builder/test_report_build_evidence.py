@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from invarlock.reporting.report_builder_support import (
@@ -9,6 +7,7 @@ from invarlock.reporting.report_builder_support import (
     record_report_build_event,
     report_build_has_evidence_events,
 )
+from tests._repo_root import REPO_ROOT
 
 
 def test_ensure_report_build_evidence_replaces_non_dict_section() -> None:
@@ -61,12 +60,11 @@ def test_report_build_has_evidence_events_detects_events() -> None:
 
 
 def test_primary_metric_repair_paths_record_structured_evidence() -> None:
-    repo_root = Path(__file__).resolve().parents[2]
     primary_metric_utils = (
-        repo_root / "src" / "invarlock" / "reporting" / "primary_metric_utils.py"
+        REPO_ROOT / "src" / "invarlock" / "reporting" / "primary_metric_utils.py"
     ).read_text(encoding="utf-8")
     report_enrichment = (
-        repo_root / "src" / "invarlock" / "reporting" / "report_enrichment.py"
+        REPO_ROOT / "src" / "invarlock" / "reporting" / "report_enrichment.py"
     ).read_text(encoding="utf-8")
 
     for required in (

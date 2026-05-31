@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from invarlock.reporting import guards_common as gc_mod
 from invarlock.reporting import guards_invariants as gi_mod
+from invarlock.reporting import guards_rmt as gr_mod
 from invarlock.reporting import guards_spectral as gs_mod
 from invarlock.reporting import report_make as report_make_mod
 
@@ -291,10 +292,10 @@ def test_extract_rmt_analysis_edge_risk_paths_and_contract_hashes() -> None:
 def test_extract_rmt_analysis_numeric_fallback_and_explicit_violations(
     monkeypatch,
 ) -> None:
-    assert report_make_mod._to_float_or_none(_BadFloat(1.0)) is None
+    assert gr_mod._to_float_or_none(_BadFloat(1.0)) is None
 
     monkeypatch.setattr(
-        report_make_mod,
+        gr_mod,
         "get_tier_policies",
         lambda: {
             "balanced": {
@@ -339,7 +340,7 @@ def test_extract_rmt_analysis_invalid_numeric_maps_and_contract_lookup_error(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(
-        report_make_mod,
+        gr_mod,
         "get_tier_policies",
         lambda: {"balanced": {"rmt": {"epsilon_default": "bad"}}},
     )
@@ -374,7 +375,7 @@ def test_extract_rmt_analysis_invalid_numeric_maps_and_contract_lookup_error(
 
 def test_extract_rmt_analysis_ignores_non_mapping_metric_maps(monkeypatch) -> None:
     monkeypatch.setattr(
-        report_make_mod,
+        gr_mod,
         "get_tier_policies",
         lambda: {"balanced": {"rmt": {"epsilon_by_family": {"attn": 0.2}}}},
     )
