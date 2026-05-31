@@ -20,7 +20,7 @@ import numpy as np
 
 from invarlock.core.bootstrap import compute_paired_delta_log_ci
 from invarlock.core.exceptions import ValidationError
-from invarlock.utils.bootstrap import (
+from invarlock.utils import (
     bootstrap_mean_statistics,
     percentile_interval_from_statistics,
 )

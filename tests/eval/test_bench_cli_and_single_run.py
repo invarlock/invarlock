@@ -10,9 +10,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from invarlock.cli.bench import main
-from invarlock.eval.bench import (
+from invarlock.eval.bench_policy import (
     ConfigurationManager,
     ScenarioConfig,
+)
+from invarlock.eval.bench_runner import (
     execute_single_run,
 )
 from invarlock.reporting.report_types import create_empty_report

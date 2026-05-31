@@ -5,8 +5,7 @@ import torch
 import torch.nn as nn
 
 from invarlock.core.api import ModelAdapter, RunConfig, RunReport
-from invarlock.core.runner import CoreRunner
-from invarlock.core.runner_context import collect_cuda_flags
+from invarlock.core.runner import CoreRunner, collect_cuda_flags
 from invarlock.core.types import RunStatus
 
 

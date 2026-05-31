@@ -3,8 +3,8 @@ from __future__ import annotations
 import importlib.metadata as importlib_metadata
 from types import SimpleNamespace
 
-import invarlock.core.doctor_inventory as mod
-from invarlock.core.doctor_inventory import (
+import invarlock.core.doctor_findings as mod
+from invarlock.core.doctor_findings import (
     build_adapter_inventory_rows,
     build_dataset_inventory_rows,
     build_generic_inventory_rows,

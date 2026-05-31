@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from invarlock.core.run_evaluation_windows_policy import (
+from invarlock.core.run_policy import (
     _nested_list_payload,
     _token_count,
     build_fallback_evaluation_windows,

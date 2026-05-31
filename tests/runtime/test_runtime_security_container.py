@@ -336,7 +336,7 @@ def test_build_container_python_module_command_uses_module_entrypoint(
     )
 
     command = runtime_security.build_container_python_module_command(
-        "invarlock.cli.internal_config_run",
+        "invarlock.cli.config_execution",
         _plan(
             ["--config", "configs/demo.yaml", "--out", "runs"],
             gpu_passthrough=True,
@@ -354,7 +354,7 @@ def test_build_container_python_module_command_uses_module_entrypoint(
     assert "all" in command
     assert "ghcr.io/invarlock/runtime:test" in command
     assert "-m" in command
-    assert "invarlock.cli.internal_config_run" in command
+    assert "invarlock.cli.config_execution" in command
     assert "PYTHONPATH=/workspace/src" in command
     assert "EXTRA=1" in command
 
@@ -426,7 +426,7 @@ def test_delegate_python_module_to_container_uses_module_builder(monkeypatch) ->
 
     assert (
         runtime_security.delegate_python_module_to_container(
-            "invarlock.cli.internal_config_run",
+            "invarlock.cli.config_execution",
             _plan(["--config", "demo.yaml"]),
         )
         == 11
@@ -472,7 +472,7 @@ def test_delegate_python_module_to_container_surfaces_timeout(
 
     with pytest.raises(RuntimeError, match="timed out"):
         runtime_security.delegate_python_module_to_container(
-            "invarlock.cli.internal_config_run",
+            "invarlock.cli.config_execution",
             _plan(["--config", "demo.yaml"]),
         )
 

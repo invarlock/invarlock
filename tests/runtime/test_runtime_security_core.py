@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-import invarlock.cli.runtime_launch_plan as runtime_launch_plan
+import invarlock.runtime_security as runtime_launch_plan
 import invarlock.runtime_security as runtime_security
 import invarlock.runtime_security_helpers as runtime_security_helpers
 

@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from invarlock.core.run_guard_overhead_policy import (
+from invarlock.reporting.report_overhead import (
     _append_guard_overhead_diagnostic,
     _coerce_guard_overhead_diagnostics,
     build_guard_overhead_summary,

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.core.run_timing_policy import build_timing_summary_payload
+from invarlock.core.run_policy import build_timing_summary_payload
 
 
 def test_build_timing_summary_payload_prefers_breakdown_order_and_peak_lines() -> None:

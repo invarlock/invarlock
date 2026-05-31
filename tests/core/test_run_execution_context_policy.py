@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from invarlock.core.run_execution_context_policy import (
+from invarlock.core.run_policy import (
     _baseline_eval_windows,
     _normalize_edit_plan,
     _normalize_profile_checks,

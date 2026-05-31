@@ -8,11 +8,11 @@ import torch
 import torch.nn as nn
 
 from invarlock.core.exceptions import MetricsError
+from invarlock.eval import metrics as lens_mod
+from invarlock.eval import metrics as metrics_environment_mod
 from invarlock.eval import metrics as metrics_mod
 from invarlock.eval import metrics_activation as activation_mod
-from invarlock.eval import metrics_environment as metrics_environment_mod
-from invarlock.eval import metrics_lens as lens_mod
-from invarlock.eval import metrics_model_io as model_io_mod
+from invarlock.eval import metrics_runtime as model_io_mod
 from invarlock.eval import metrics_support as support_mod
 
 

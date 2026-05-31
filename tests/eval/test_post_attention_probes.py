@@ -4,7 +4,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from invarlock.eval.probes.post_attention import (
+from invarlock.eval.probes.importance import (
     blend_neuron_scores,
     compute_post_attention_head_scores,
     compute_wanda_neuron_scores,

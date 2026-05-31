@@ -4,9 +4,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from invarlock.eval.data_capacity import estimate_wikitext2_capacity
-from invarlock.eval.data_difficulty import score_candidates_byte_ngram
 from invarlock.eval.data_stratification import stratify_wikitext_candidates
+from invarlock.eval.data_support import (
+    estimate_wikitext2_capacity,
+    score_candidates_byte_ngram,
+)
 
 
 def test_wikitext2_capacity_helper_fast_and_slow_paths(monkeypatch):

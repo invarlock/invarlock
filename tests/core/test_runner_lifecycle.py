@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from invarlock.core.api import RunConfig, RunReport
-from invarlock.core.runner_lifecycle import (
+from invarlock.core.runner import (
     finalize_run_report,
     initialize_run_report,
     merge_execution_metrics,

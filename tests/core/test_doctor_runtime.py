@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from invarlock.core import doctor_runtime as mod
+from invarlock.core import doctor_findings as mod
 
 
 def test_find_spec_safe_swallows_broken_hook() -> None:

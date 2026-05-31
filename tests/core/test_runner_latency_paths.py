@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from invarlock.core.runner_latency import (
+from invarlock.core.runner_eval_metrics import (
     _raise_latency_error,
     measure_latency,
     samples_to_dataloader,

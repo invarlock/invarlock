@@ -28,6 +28,15 @@ def test_ppl_mlm_uses_masked_token_counts():
     assert abs(out - 10.0) < 1e-6
 
 
+def test_ppl_accumulate_and_finalize_weighted():
+    m = get_metric("ppl_causal")
+    m.accumulate(MetricContribution(value=2.0, weight=2))
+    m.accumulate(MetricContribution(value=1.0, weight=1))
+    val = m.finalize()
+    # Weighted mean logloss = (2*2 + 1*1)/3 = 5/3; exp(5/3) is about 5.294.
+    assert abs(val - 5.294) < 0.1
+
+
 def test_accuracy_point_from_windows_variants():
     acc = get_metric("accuracy")
     # Per-example flags
@@ -64,3 +73,11 @@ def test_ppl_paired_compare_shapes():
     res = ppl.paired_compare(subj, base, reps=100, seed=0, ci_level=0.90)
     assert {"delta", "ci", "display", "display_ci"} <= set(res.keys())
     assert isinstance(res["ci"], list) and len(res["ci"]) == 2
+
+
+def test_ppl_paired_compare_reps_and_ci_level_echo():
+    ppl = get_metric("ppl_causal")
+    subj = [MetricContribution(2.2, 1), MetricContribution(2.0, 1)]
+    base = [MetricContribution(2.0, 1), MetricContribution(2.0, 1)]
+    res = ppl.paired_compare(subj, base, reps=123, seed=7, ci_level=0.90)
+    assert res["reps"] == 123 and abs(res["ci_level"] - 0.90) < 1e-12

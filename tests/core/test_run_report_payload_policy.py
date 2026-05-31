@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from invarlock.core.run_report_payload_policy import (
+from invarlock.reporting.run_report_contract import (
     build_artifacts_payload,
     build_edit_payload,
     build_flags_payload,

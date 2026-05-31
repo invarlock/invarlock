@@ -13,18 +13,23 @@ import numpy as np
 from invarlock.core.exceptions import DataError as _DataErr
 from invarlock.core.exceptions import ValidationError as _ValErr
 
-from .data_capacity import estimate_wikitext2_capacity as _estimate_wikitext2_capacity
-from .data_difficulty import (
-    score_candidates_byte_ngram as _score_candidates_byte_ngram_impl,
-)
 from .data_stratification import (
     stratify_wikitext_candidates as _stratify_wikitext_candidates,
 )
-from .data_support import _require_load_dataset, load_dataset_with_cache_fallback
+from .data_support import (
+    EvaluationWindow,
+    _require_load_dataset,
+    load_dataset_with_cache_fallback,
+    split_labels_by_index,
+    split_window_by_index,
+)
+from .data_support import (
+    estimate_wikitext2_capacity as _estimate_wikitext2_capacity,
+)
+from .data_support import (
+    score_candidates_byte_ngram as _score_candidates_byte_ngram_impl,
+)
 from .data_tokenization import tokenize_combined_pairs, tokenize_texts_padded
-from .data_windows import EvaluationWindow, split_labels_by_index, split_window_by_index
-from .providers.local_jsonl import LocalJSONLProvider
-from .providers.local_jsonl_pairs import LocalJSONLPairsProvider
 
 LOGGER = logging.getLogger(__name__)
 
@@ -800,8 +805,6 @@ __all__ = [
     "DatasetProvider",
     "HFSeq2SeqProvider",
     "HFTextProvider",
-    "LocalJSONLProvider",
-    "LocalJSONLPairsProvider",
     "SyntheticProvider",
     "WikiText2Provider",
 ]

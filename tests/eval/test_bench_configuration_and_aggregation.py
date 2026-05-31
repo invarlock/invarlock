@@ -10,13 +10,15 @@ from pathlib import Path
 
 import pytest
 
-from invarlock.eval.bench import (
+from invarlock.eval.bench_policy import (
     BenchmarkConfig,
     ConfigurationManager,
-    DependencyChecker,
     MetricsAggregator,
     RunResult,
     ScenarioConfig,
+)
+from invarlock.eval.bench_runner import (
+    DependencyChecker,
     execute_single_run,
 )
 from invarlock.reporting.report_types import create_empty_report
