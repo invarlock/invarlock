@@ -274,23 +274,23 @@ test-assurance:  ## Run assurance-related tests only
 		tests/core/test_bootstrap.py::test_paired_delta_log_ci_property_rejects_mismatched_lengths \
 		tests/core/test_assurance_contract.py \
 		tests/core/test_runner_pairing.py::test_assess_bootstrap_coverage_paths \
-		tests/guards/test_invariants_guard.py::test_invariants_guard_detects_non_finite_weights \
-		tests/guards/test_unsupported_assurance_shape.py \
+		tests/guards/invariants/test_invariants_guard.py::test_invariants_guard_detects_non_finite_weights \
+		tests/guards/contracts/test_unsupported_assurance_shape.py \
 		tests/eval/test_assurance_contracts.py \
 		tests/eval/test_metrics_masked_lm.py \
 		tests/edits/test_quant_rtn.py \
 		tests/cli/test_verify.py::test_verify_command_passes \
 		tests/docs/test_claim_surface_consistency.py \
 		tests/docs/test_assurance_xref_linter.py \
-		tests/reporting/test_report_paired_ci_identity.py::test_paired_ci_identity_holds \
-		tests/reporting/test_report_pairing_and_validation_helpers.py::test_enforce_pairing_and_coverage_path_matrix \
-		tests/reporting/test_report_policy_edges.py::test_ppl_hysteresis_applied_near_threshold \
-		tests/reporting/test_verify_assurance_guard_chain.py \
-		tests/reporting/test_public_contracts.py \
-		tests/reporting/test_evidence_pack_contract.py \
-		tests/reporting/test_policy_pack_contract.py \
-		tests/reporting/test_policy_utils.py::test_compute_policy_digest_matches_assurance_spec \
-		tests/reporting/test_reporting_regression_matrix.py::test_validate_variance_enablement_rejects_missing_gate_provenance
+		tests/reporting/policy/test_report_paired_ci_identity.py::test_paired_ci_identity_holds \
+		tests/reporting/policy/test_report_pairing_and_validation_helpers.py::test_enforce_pairing_and_coverage_path_matrix \
+		tests/reporting/contracts/test_report_policy_edges.py::test_ppl_hysteresis_applied_near_threshold \
+		tests/reporting/validation/test_verify_assurance_guard_chain.py \
+		tests/reporting/schema/test_public_contracts.py \
+		tests/reporting/evidence_pack/test_evidence_pack_contract.py \
+		tests/reporting/schema/test_policy_pack_contract.py \
+		tests/reporting/policy/test_policy_utils.py::test_compute_policy_digest_matches_assurance_spec \
+		tests/reporting/contracts/test_reporting_regression_matrix.py::test_validate_variance_enablement_rejects_missing_gate_provenance
 
 lint:  ## Run linting
 	$(MAKE) ensure-ruff
@@ -322,7 +322,7 @@ verify:  ## Run verification (pytest -q, runtime verifier, lint, format, strict 
 	$(MAKE) guard-fallback-audit
 	PYTHONPATH=src $(PYTEST) -q
 	OMP_NUM_THREADS=1 PYTHONPATH=src $(PYTEST) -q tests/cli/test_cli_smoke.py tests/cli/test_app_version.py tests/cli/test_verify_json_shape.py
-	OMP_NUM_THREADS=1 PYTHONPATH=src $(PYTEST) -q tests/reporting/test_report_pm_only.py tests/core/test_default_providers.py
+	OMP_NUM_THREADS=1 PYTHONPATH=src $(PYTEST) -q tests/reporting/policy/test_report_pm_only.py tests/core/test_default_providers.py
 	OMP_NUM_THREADS=1 PYTHONPATH=src $(PYTEST) -q tests/guards/property/test_variance_properties.py
 	OMP_NUM_THREADS=1 PYTHONPATH=src $(PYTEST) -q tests/integration/test_end_to_end_evaluate.py
 	$(MAKE) cli-smoke-core

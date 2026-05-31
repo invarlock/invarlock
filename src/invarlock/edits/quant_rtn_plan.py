@@ -323,6 +323,7 @@ class QuantTargetSelector:
     def _selector_patterns_for_scope(self) -> tuple[str, ...]:
         if not self.module_selectors:
             return ()
+        keys: tuple[str, ...]
         if self.scope == "ffn":
             keys = ("ffn", "feed_forward")
         elif self.scope == "attn":

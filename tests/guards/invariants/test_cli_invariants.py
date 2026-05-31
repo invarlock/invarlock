@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from tests._repo_root import REPO_ROOT
+
 
 def _iter_source_files(root: Path):
     for dirpath, _dirnames, filenames in os.walk(root):
@@ -13,7 +15,7 @@ def _iter_source_files(root: Path):
 
 def test_cli_invariants_ban_removed_strings():
     # Restrict scan to code paths only
-    src_root = Path(__file__).resolve().parents[2] / "src"
+    src_root = REPO_ROOT / "src"
     assert src_root.exists()
 
     banned = [

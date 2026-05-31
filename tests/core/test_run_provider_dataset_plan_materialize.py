@@ -2,10 +2,31 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from invarlock.core.run_provider_dataset_materialization import (
+    _calibration_entry,
+    _optional_text,
+)
 from invarlock.core.run_provider_dataset_plan import (
     _materialize_text_provider_dataset_plan,
 )
 from tests.core._support_run_provider_dataset_plan import _DummyTokenizer
+
+
+def test_materialization_private_edges_for_blank_tokenizer_and_short_labels() -> None:
+    assert _optional_text("   ") is None
+    assert _optional_text(123) is None
+
+    entry = _calibration_entry(
+        {"input_ids": [1, 2], "attention_mask": [1, 1], "dataset_index": 3},
+        arm="final",
+        index=1,
+        use_mlm=False,
+        provider_labels_fin=[[7, 8]],
+        tensor_or_list_to_ints_fn=lambda values: list(values),
+    )
+
+    assert entry["window_id"] == "final::1"
+    assert "labels" not in entry
 
 
 def test_materialize_text_provider_dataset_plan_handles_provider_attr_failures() -> (
