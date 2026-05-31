@@ -74,9 +74,16 @@ coverage_owner_hint() {
         scripts/evidence_packs/lib/queue/gpu_worker.sh) echo "scripts/evidence_packs/tests/test_gpu_worker.sh" ;;
         scripts/evidence_packs/lib/core/fault_tolerance.sh) echo "scripts/evidence_packs/tests/test_fault_tolerance.sh" ;;
         scripts/evidence_packs/lib/tasks/task_functions.sh) echo "scripts/evidence_packs/tests/test_task_functions.sh" ;;
+        scripts/evidence_packs/lib/tasks/task_common.sh) echo "scripts/evidence_packs/tests/test_task_functions.sh" ;;
+        scripts/evidence_packs/lib/tasks/task_baseline.sh) echo "scripts/evidence_packs/tests/test_task_functions.sh" ;;
+        scripts/evidence_packs/lib/tasks/task_edit_lifecycle.sh) echo "scripts/evidence_packs/tests/test_task_functions.sh" ;;
+        scripts/evidence_packs/lib/tasks/task_error_lifecycle.sh) echo "scripts/evidence_packs/tests/test_task_functions.sh" ;;
         scripts/evidence_packs/lib/tasks/model_creation.sh) echo "scripts/evidence_packs/tests/test_model_creation.sh" ;;
         scripts/evidence_packs/lib/core/runtime.sh) echo "scripts/evidence_packs/tests/test_runtime.sh" ;;
         scripts/evidence_packs/lib/validation/validation_suite.sh) echo "scripts/evidence_packs/tests/test_validation_suite.sh" ;;
+        scripts/evidence_packs/lib/validation/validation_preflight.sh) echo "scripts/evidence_packs/tests/test_validation_suite.sh" ;;
+        scripts/evidence_packs/lib/validation/validation_runtime.sh) echo "scripts/evidence_packs/tests/test_validation_suite.sh" ;;
+        scripts/evidence_packs/lib/validation/validation_dynamic.sh) echo "scripts/evidence_packs/tests/test_validation_suite.sh" ;;
         scripts/evidence_packs/lib/core/setup_remote.sh) echo "scripts/evidence_packs/tests/test_setup_remote.sh" ;;
         scripts/evidence_packs/run_qwen14_sentinels.sh) echo "scripts/evidence_packs/tests/test_run_qwen14_sentinels.sh" ;;
         scripts/evidence_packs/run_suite.sh) echo "scripts/evidence_packs/tests/test_run_suite.sh" ;;
