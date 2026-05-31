@@ -1581,7 +1581,7 @@ requires-dist = [
     { name = "sentencepiece", marker = "extra == 'advanced'", specifier = ">=0.2.1" },
     { name = "sentencepiece", marker = "extra == 'all'", specifier = ">=0.2.1" },
     { name = "sentencepiece", marker = "extra == 'hf'", specifier = ">=0.2.1" },
-    { name = "shellingham", specifier = ">=1.5.0" },
+    { name = "shellingham", specifier = ">=1.5.4" },
     { name = "sphinx", marker = "extra == 'dev'", specifier = ">=7.0" },
     { name = "tiktoken", marker = "extra == 'adapters'", specifier = ">=0.9.0" },
     { name = "tiktoken", marker = "extra == 'advanced'", specifier = ">=0.9.0" },
