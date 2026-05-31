@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-import invarlock.cli.runtime_launch_plan as runtime_launch_plan
+import invarlock.runtime_security as runtime_launch_plan
 from invarlock.cli.config_execution import ConfigExecutionRequest
 from invarlock.runtime_security import ContainerLaunchPlan
 

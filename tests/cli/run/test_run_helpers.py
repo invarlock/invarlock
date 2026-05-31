@@ -10,7 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from invarlock.cli.commands.run import run_command
-from invarlock.cli.run_artifacts import persist_ref_masks
+from invarlock.cli.run_execution import persist_ref_masks
 from invarlock.cli.run_overhead import plan_release_windows
 from rich.console import Console
 
@@ -258,7 +258,7 @@ output:
             ),
         ),
         patch(
-            "invarlock.cli.run_runtime.detect_model_profile",
+            "invarlock.cli.run_runtime_exec.detect_model_profile",
             lambda model_id, adapter: SimpleNamespace(
                 default_loss="mlm",
                 model_id=model_id,
@@ -280,7 +280,7 @@ output:
             ),
         ),
         patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
+            "invarlock.cli.run_runtime_exec.resolve_tokenizer",
             lambda model_profile: (
                 SimpleNamespace(
                     mask_token_id=103,
@@ -301,7 +301,7 @@ output:
             },
         ),
         patch(
-            "invarlock.cli.run_runtime.validate_guard_overhead",
+            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
             lambda *args, **kwargs: SimpleNamespace(
                 passed=True,
                 overhead_ratio=0.0,
@@ -438,7 +438,7 @@ def test_to_serialisable_dict_uses_dict_method(tmp_path: Path):
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.resolve_tokenizer",
+                "invarlock.cli.run_runtime_exec.resolve_tokenizer",
                 lambda *_a, **_k: (
                     SimpleNamespace(
                         eos_token="</s>",

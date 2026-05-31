@@ -4,7 +4,7 @@ from collections.abc import Iterable
 import pytest
 
 import invarlock.eval.primary_metric as primary_metric_mod
-from invarlock.cli.overhead_utils import _extract_pm_snapshot_for_overhead as extract
+from invarlock.cli.run_overhead import _extract_pm_snapshot_for_overhead as extract
 from invarlock.reporting.validate import validate_guard_overhead
 
 

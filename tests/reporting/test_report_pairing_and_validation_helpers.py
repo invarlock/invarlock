@@ -15,7 +15,7 @@ from invarlock.reporting import (
 from invarlock.reporting import (
     report_primary_metric_policy as pm_policy,
 )
-from invarlock.reporting import report_validation_allowlist as allowlist_mod
+from invarlock.reporting import report_schema as allowlist_mod
 from invarlock.reporting import utils as report_utils
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_schema import validate_report

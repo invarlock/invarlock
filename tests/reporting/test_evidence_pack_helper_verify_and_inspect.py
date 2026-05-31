@@ -13,6 +13,7 @@ from tests.reporting.test_evidence_pack_helper_signature_and_manifest import (
     _write_json,
     _write_manifest_and_checksums,
     _write_pack_scaffold,
+    evidence_pack_integrity_mod,
     evidence_pack_mod,
 )
 
@@ -403,7 +404,7 @@ def test_validate_manifest_uses_manual_validation_when_schema_is_unavailable(
         },
     )
     monkeypatch.setattr(
-        evidence_pack_mod,
+        evidence_pack_integrity_mod,
         "load_evidence_pack_manifest_schema",
         lambda: None,
         raising=True,

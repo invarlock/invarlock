@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from invarlock.cli import run_serialization as run_serial_mod
+from invarlock.cli import run_config as run_serial_mod
 from invarlock.core.config_loader import load_config
 
 

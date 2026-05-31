@@ -137,7 +137,7 @@ def test_plugins_adapters_explain_variants(monkeypatch):
 
     # Patch at the provenance module level so the import inside the function gets it
     monkeypatch.setattr(
-        "invarlock.core.adapter_provenance.extract_adapter_provenance",
+        "invarlock.core.backend_inventory.extract_adapter_provenance",
         fake_extract,
         raising=False,
     )
@@ -174,7 +174,7 @@ def test_plugins_plugins_category_json(monkeypatch, capsys):
     edits = {"quant_rtn": {"module": "invarlock.edits.quant", "entry_point": "edit"}}
     _patch_registry(monkeypatch, adapters, guards=guards, edits=edits)
     monkeypatch.setattr(
-        "invarlock.core.adapter_provenance.extract_adapter_provenance",
+        "invarlock.core.backend_inventory.extract_adapter_provenance",
         lambda name: SimpleNamespace(library="transformers", version="1.0"),
         raising=False,
     )
@@ -194,7 +194,7 @@ def test_plugins_category_none_lists_all(monkeypatch):
     edits = {"quant_rtn": {"module": "invarlock.edits.quant", "entry_point": "edit"}}
     _patch_registry(monkeypatch, adapters, guards=guards, edits=edits)
     monkeypatch.setattr(
-        "invarlock.core.adapter_provenance.extract_adapter_provenance",
+        "invarlock.core.backend_inventory.extract_adapter_provenance",
         lambda name: SimpleNamespace(library="transformers", version="1.0"),
         raising=False,
     )
@@ -264,7 +264,7 @@ def test_plugins_plugins_category_tables(monkeypatch):
     edits = {"quant_rtn": {"module": "invarlock.edits.quant", "entry_point": "edit"}}
     _patch_registry(monkeypatch, adapters, guards=guards, edits=edits)
     monkeypatch.setattr(
-        "invarlock.core.adapter_provenance.extract_adapter_provenance",
+        "invarlock.core.backend_inventory.extract_adapter_provenance",
         lambda name: SimpleNamespace(library="transformers", version="1.0"),
         raising=False,
     )

@@ -5,10 +5,11 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import invarlock.reporting.report_files as report_files
-from invarlock.core.run_report_payload_policy import build_run_report_context
+
 from invarlock.reporting.report_types import create_empty_report
 from invarlock.reporting.run_report_contract import (
     assemble_run_report,
+    build_run_report_context,
     persist_run_report_outputs,
 )
 

@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-import invarlock.core.adapter_auto as mod
-from invarlock.core.adapter_auto import (
+import invarlock.adapters.auto as mod
+from invarlock.adapters.auto import (
     _read_local_hf_config,
     apply_auto_adapter_if_needed,
     resolve_auto_adapter,

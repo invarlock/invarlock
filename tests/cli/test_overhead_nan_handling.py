@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.core.run_guard_overhead_policy import (
+from invarlock.reporting.report_overhead import (
     normalize_guard_overhead_result as _norm,
 )
 

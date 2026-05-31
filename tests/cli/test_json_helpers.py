@@ -6,8 +6,8 @@ from dataclasses import dataclass
 import pytest
 import typer
 
-from invarlock.cli import _json
-from invarlock.core import error_encoding
+from invarlock.cli import output
+from invarlock.core import error_utils
 
 
 @dataclass
@@ -22,10 +22,10 @@ def test_emit_adds_ts_and_component_for_dict_payload(monkeypatch, capsys) -> Non
         calls["ts"] += 1
         return "2025-01-01T00:00:00+00:00"
 
-    monkeypatch.setattr(_json, "_ts", _fake_ts)
+    monkeypatch.setattr(output, "_ts", _fake_ts)
 
     with pytest.raises(typer.Exit) as ei:
-        _json.emit({"ok": True}, exit_code=5)
+        output.emit({"ok": True}, exit_code=5)
 
     out = capsys.readouterr().out.strip()
     payload = json.loads(out)
@@ -36,14 +36,14 @@ def test_emit_adds_ts_and_component_for_dict_payload(monkeypatch, capsys) -> Non
 
 
 def test_ts_returns_utc_isoformat_string() -> None:
-    assert _json._ts().endswith("+00:00")
+    assert output._ts().endswith("+00:00")
 
 
 def test_emit_accepts_dataclass_payload(monkeypatch, capsys) -> None:
-    monkeypatch.setattr(_json, "_ts", lambda: "X")
+    monkeypatch.setattr(output, "_ts", lambda: "X")
 
     with pytest.raises(typer.Exit):
-        _json.emit(_Payload("hello"), exit_code=0)
+        output.emit(_Payload("hello"), exit_code=0)
 
     out = capsys.readouterr().out.strip()
     payload = json.loads(out)
@@ -53,10 +53,10 @@ def test_emit_accepts_dataclass_payload(monkeypatch, capsys) -> None:
 
 
 def test_emit_passes_through_non_mapping_payload(monkeypatch, capsys) -> None:
-    monkeypatch.setattr(_json, "_ts", lambda: "IGNORED")
+    monkeypatch.setattr(output, "_ts", lambda: "IGNORED")
 
     with pytest.raises(typer.Exit):
-        _json.emit(["not-a-dict"], exit_code=3)
+        output.emit(["not-a-dict"], exit_code=3)
 
     out = capsys.readouterr().out.strip()
     payload = json.loads(out)
@@ -65,7 +65,7 @@ def test_emit_passes_through_non_mapping_payload(monkeypatch, capsys) -> None:
 
 def test_encode_error_for_generic_exception() -> None:
     exc = RuntimeError("boom")
-    encoded = error_encoding.encode_error(exc)
+    encoded = error_utils.encode_error(exc)
     assert encoded["code"] == "E_GENERIC"
     assert encoded["category"] == "RuntimeError"
     assert encoded["recoverable"] is False
@@ -76,7 +76,7 @@ def test_encode_error_for_schema_like_errors() -> None:
     class ValidationError(Exception): ...
 
     err = ValidationError("bad schema")
-    encoded = error_encoding.encode_error(err)
+    encoded = error_utils.encode_error(err)
     assert encoded["code"] == "E_SCHEMA"
     assert encoded["category"] == "ValidationError"
 
@@ -88,10 +88,10 @@ def test_encode_error_handles_invarlock_error(monkeypatch) -> None:
             self.recoverable = True
             self.details = {"reason": "details"}
 
-    monkeypatch.setattr(error_encoding, "InvarlockError", FakeInvarlockError)
+    monkeypatch.setattr(error_utils, "InvarlockError", FakeInvarlockError)
 
     err = FakeInvarlockError()
-    encoded = error_encoding.encode_error(err)
+    encoded = error_utils.encode_error(err)
     assert encoded["code"] == "E_CUSTOM"
     assert encoded["recoverable"] is True
     assert encoded["context"] == {"reason": "details"}
@@ -104,10 +104,10 @@ def test_encode_error_invarlock_path_handles_non_dict_details(monkeypatch) -> No
             self.recoverable = False
             self.details = "not-a-dict"
 
-    monkeypatch.setattr(error_encoding, "InvarlockError", FakeInvarlockError)
+    monkeypatch.setattr(error_utils, "InvarlockError", FakeInvarlockError)
 
     err = FakeInvarlockError()
-    encoded = error_encoding.encode_error(err)
+    encoded = error_utils.encode_error(err)
     assert encoded["code"] == "E_CUSTOM"
     assert encoded["recoverable"] is False
     assert encoded["context"] == {}
@@ -122,7 +122,7 @@ def test_encode_error_handles_category_introspection_failure() -> None:
 
     class BrokenExc(Exception, metaclass=_Meta): ...
 
-    encoded = error_encoding.encode_error(BrokenExc())
+    encoded = error_utils.encode_error(BrokenExc())
     assert encoded["category"] == "Exception"
 
 
@@ -133,9 +133,9 @@ def test_encode_error_falls_back_when_invarlock_type_check_raises(monkeypatch) -
 
     class FakeInvarlockError(Exception, metaclass=_Meta): ...
 
-    monkeypatch.setattr(error_encoding, "InvarlockError", FakeInvarlockError)
+    monkeypatch.setattr(error_utils, "InvarlockError", FakeInvarlockError)
 
-    encoded = error_encoding.encode_error(RuntimeError("boom"))
+    encoded = error_utils.encode_error(RuntimeError("boom"))
     assert encoded["code"] == "E_GENERIC"
     assert encoded["category"] == "RuntimeError"
     assert encoded["context"] == {}

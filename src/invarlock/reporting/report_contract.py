@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import math
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,11 +9,12 @@ from typing import Any, cast
 from invarlock.core.report_inputs import load_report_input_json
 
 from .report_bundle import save_evaluation_bundle
-from .report_console import compute_console_validation_block
-from .report_files import save_report
 from .report_make import make_report
 from .report_schema import validate_report
+from .report_summary import compute_console_validation_block
 from .report_types import RunReport
+
+report_files = cast(Any, importlib.import_module("invarlock.reporting.report_files"))
 
 
 @dataclass(frozen=True)
@@ -25,6 +27,23 @@ class ReportGenerationResult:
     baseline_report: RunReport | None
     evaluation_report: dict[str, Any] | None
     validation_block: dict[str, Any] | None
+
+
+def save_report(
+    report: RunReport,
+    output_dir: str | Path,
+    formats: list[str] | None = None,
+    compare: RunReport | None = None,
+    filename_prefix: str = "report",
+) -> dict[str, Path]:
+    saved = report_files.save_report(
+        report,
+        output_dir,
+        formats=formats,
+        compare=compare,
+        filename_prefix=filename_prefix,
+    )
+    return cast(dict[str, Path], saved)
 
 
 def load_report_payload(path: str | Path) -> RunReport:

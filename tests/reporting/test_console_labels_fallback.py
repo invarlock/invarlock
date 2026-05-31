@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_console import (
+from invarlock.reporting.report_summary import (
     _CONSOLE_LABELS_DEFAULT,
     load_console_labels,
 )
@@ -11,7 +11,7 @@ def test_console_labels_fallback_when_contract_file_missing(monkeypatch):
         raise FileNotFoundError
 
     monkeypatch.setattr(
-        "invarlock.reporting.report_console.load_json_contract", _missing
+        "invarlock.reporting.report_summary.load_json_contract", _missing
     )
     labels = load_console_labels()
     # Default allow-list should include common rows
@@ -22,7 +22,7 @@ def test_console_labels_fallback_when_contract_file_missing(monkeypatch):
 
 def test_console_labels_handles_invalid_payload(monkeypatch):
     monkeypatch.setattr(
-        "invarlock.reporting.report_console.load_json_contract",
+        "invarlock.reporting.report_summary.load_json_contract",
         lambda _filename: {"not": "a list"},
     )
     labels = load_console_labels()

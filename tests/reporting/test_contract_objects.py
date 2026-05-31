@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from invarlock.reporting.report_build_context import EvaluationReportBuilder
+from invarlock.reporting.report_builder_support import EvaluationReportBuilder
 from invarlock.reporting.verify_contract import VerifyRequest
 from invarlock.runtime_provenance import (
     RuntimeProvenanceResult,

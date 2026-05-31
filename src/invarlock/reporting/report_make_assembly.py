@@ -8,7 +8,6 @@ from invarlock.core import auto_tuning as auto_tuning_mod
 from invarlock.eval import tail_stats as tail_stats_mod
 
 from . import policy_utils as report_policy_utils_mod
-from . import report_build_context as report_build_context_mod
 from . import report_builder_support as report_builder_support_mod
 from . import report_edit_summary as report_edit_summary_mod
 from . import report_normalization as report_normalization_mod
@@ -16,8 +15,8 @@ from . import report_overhead as report_overhead_mod
 from . import report_policy as report_policy_mod
 from . import report_provenance as report_provenance_mod
 from . import report_validation as report_validation_mod
+from .report_schema import load_validation_allowlist
 from .report_types import RunReport
-from .report_validation_allowlist import load_validation_allowlist
 
 
 def _copy_meta_provenance_fields(
@@ -222,7 +221,7 @@ def _resolve_policy_edit_and_telemetry_context(
     if isinstance(edit_metadata, dict) and edit_name is None:
         edit_metadata.pop("name", None)
 
-    telemetry = report_build_context_mod.extract_telemetry(report, meta.get("device"))
+    telemetry = report_builder_support_mod.extract_telemetry(report, meta.get("device"))
 
     return {
         "profile": profile,
@@ -262,12 +261,12 @@ def _build_report_assembly_context(
         else None
     )
 
-    artifacts_payload = report_build_context_mod.build_artifacts_payload(report)
+    artifacts_payload = report_builder_support_mod.build_artifacts_payload(report)
     raw_guard_ctx = report.get("guard_overhead")
     guard_overhead_section, _ = report_overhead_mod.prepare_guard_overhead_section(
         raw_guard_ctx
     )
-    schedule_digest = report_build_context_mod.attach_schedule_digest(
+    schedule_digest = report_builder_support_mod.attach_schedule_digest(
         report, guard_overhead_section
     )
 
@@ -289,11 +288,11 @@ def _build_report_assembly_context(
         env_flags_payload=provenance_env_flags,
     )
 
-    moe_section = report_build_context_mod.build_moe_section(
+    moe_section = report_builder_support_mod.build_moe_section(
         report, baseline_raw, baseline_normalized
     )
     capacity_tokens, capacity_examples = (
-        report_build_context_mod.resolve_capacity_context(
+        report_builder_support_mod.resolve_capacity_context(
             window_capacity_ctx,
             dataset_info,
         )
@@ -307,7 +306,7 @@ def _build_report_assembly_context(
         drift_band_default=report_policy_mod.PM_DRIFT_BAND_DEFAULT,
     )
     tiny_relax = report_policy_mod.resolve_tiny_relax_from_report(report_map)
-    pm_tail_result = report_build_context_mod.evaluate_primary_metric_tail(
+    pm_tail_result = report_builder_support_mod.evaluate_primary_metric_tail(
         report,
         baseline_normalized,
         resolved_policy,

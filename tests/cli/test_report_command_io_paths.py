@@ -313,7 +313,7 @@ def test_report_html_resolves_canonical_directory_input(monkeypatch, tmp_path):
     captured: dict[str, object] = {}
 
     monkeypatch.setattr(
-        "invarlock.cli.commands.export_html.export_html_command",
+        "invarlock.cli.commands.report.export_html_command",
         lambda **kwargs: captured.update(kwargs),
         raising=False,
     )

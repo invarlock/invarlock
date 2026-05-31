@@ -1,20 +1,22 @@
 from __future__ import annotations
 
-import invarlock.cli.internal_config_run as internal_config_run
+import invarlock.cli.config_execution as config_execution
 from invarlock.cli.config_execution import ConfigExecutionRequest
 
 
-def test_internal_config_run_forwards_args_without_redelegating(monkeypatch) -> None:
+def test_config_execution_entrypoint_forwards_args_without_redelegating(
+    monkeypatch,
+) -> None:
     seen: dict[str, object] = {}
 
     monkeypatch.setattr(
-        internal_config_run,
+        config_execution,
         "run_request",
         lambda request, **kwargs: seen.update({"request": request, **kwargs}),
         raising=True,
     )
 
-    exit_code = internal_config_run.main(
+    exit_code = config_execution.main(
         [
             "--invoked-command",
             "advanced calibrate null-sweep",

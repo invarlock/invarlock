@@ -43,7 +43,7 @@ def test_plugins_adapters_json_backend_and_filters(monkeypatch):
     monkeypatch.setitem(__import__("sys").modules, "torch", fake_torch)
     # Patch provenance to control backend presence
     import invarlock.cli.commands.plugins as plug_mod
-    import invarlock.core.adapter_provenance as prov_mod
+    import invarlock.core.backend_inventory as prov_mod
 
     monkeypatch.setattr(prov_mod, "extract_adapter_provenance", _prov)
     monkeypatch.setattr(

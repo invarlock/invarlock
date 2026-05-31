@@ -278,16 +278,18 @@ def test_validate_manifest_and_load_json_object_cover_error_paths(
         },
     )
     monkeypatch.setattr(
-        evidence_pack_mod,
+        evidence_pack_integrity_mod,
         "load_evidence_pack_manifest_schema",
         lambda: {"type": "object"},
         raising=True,
     )
     monkeypatch.setattr(
-        evidence_pack_mod.jsonschema,
+        evidence_pack_integrity_mod.jsonschema,
         "validate",
         lambda instance, schema: (_ for _ in ()).throw(
-            evidence_pack_mod.jsonschema.exceptions.ValidationError("schema boom")
+            evidence_pack_integrity_mod.jsonschema.exceptions.ValidationError(
+                "schema boom"
+            )
         ),
         raising=True,
     )
@@ -325,15 +327,19 @@ def test_jsonschema_helper_and_direct_validate_fallback_paths(
     class _ValidationError(Exception):
         pass
 
-    monkeypatch.setattr(evidence_pack_mod, "jsonschema", None, raising=False)
-    assert evidence_pack_mod._jsonschema_validation_error_types() == ()
+    monkeypatch.setattr(evidence_pack_integrity_mod, "jsonschema", None, raising=False)
+    assert evidence_pack_integrity_mod._jsonschema_validation_error_types() == ()
 
     jsonschema_stub = SimpleNamespace(
         ValidationError=_ValidationError,
         validate=lambda instance, schema: None,
     )
-    monkeypatch.setattr(evidence_pack_mod, "jsonschema", jsonschema_stub, raising=False)
-    assert evidence_pack_mod._jsonschema_validation_error_types() == (_ValidationError,)
+    monkeypatch.setattr(
+        evidence_pack_integrity_mod, "jsonschema", jsonschema_stub, raising=False
+    )
+    assert evidence_pack_integrity_mod._jsonschema_validation_error_types() == (
+        _ValidationError,
+    )
 
     manifest_path = tmp_path / "manifest.json"
     _write_json(
@@ -355,13 +361,13 @@ def test_jsonschema_helper_and_direct_validate_fallback_paths(
     )
     calls: list[tuple[object, object]] = []
     monkeypatch.setattr(
-        evidence_pack_mod,
+        evidence_pack_integrity_mod,
         "load_evidence_pack_manifest_schema",
         lambda: {"type": "object"},
         raising=True,
     )
     monkeypatch.setattr(
-        evidence_pack_mod,
+        evidence_pack_integrity_mod,
         "jsonschema",
         SimpleNamespace(
             validate=lambda instance, schema: calls.append((instance, schema))
@@ -380,7 +386,7 @@ def test_jsonschema_helper_and_direct_validate_fallback_paths(
 def test_manual_manifest_validation_rejects_non_hex_digests(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(evidence_pack_mod, "jsonschema", None, raising=False)
+    monkeypatch.setattr(evidence_pack_integrity_mod, "jsonschema", None, raising=False)
     manifest_path = tmp_path / "manifest.json"
     _write_json(
         manifest_path,

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from invarlock.reporting.report_build_evidence import (
+from invarlock.reporting.report_builder_support import (
     ensure_report_build_evidence,
     record_report_build_event,
     report_build_has_evidence_events,

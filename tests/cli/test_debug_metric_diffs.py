@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.run_metric_utils import format_debug_metric_diffs
+from invarlock.reporting.run_report_metrics_contract import format_debug_metric_diffs
 
 
 def test_debug_metric_diffs_logs_small_deltas():

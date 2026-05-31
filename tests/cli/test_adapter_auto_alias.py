@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from invarlock.core.adapter_auto import resolve_auto_adapter
+from invarlock.adapters.auto import resolve_auto_adapter
 
 
 def _write_cfg(tmp: Path, cfg: dict) -> Path:

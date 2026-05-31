@@ -110,7 +110,7 @@ def _stub_runtime(monkeypatch, tmp_path: Path):
 
     # Model profile and tokenizer stub
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.detect_model_profile",
+        "invarlock.cli.run_runtime_exec.detect_model_profile",
         lambda *a, **k: SimpleNamespace(
             default_loss="ce",
             invariants=[],
@@ -131,7 +131,7 @@ def _stub_runtime(monkeypatch, tmp_path: Path):
         return ids
 
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.resolve_tokenizer",
+        "invarlock.cli.run_runtime_exec.resolve_tokenizer",
         lambda *a, **k: (
             SimpleNamespace(encode=_enc, pad_token_id=0, vocab_size=256),
             "tokhash123",

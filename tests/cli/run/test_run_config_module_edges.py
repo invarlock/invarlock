@@ -56,7 +56,7 @@ def test_resolve_requested_edit_name_import_error_falls_back_to_known_edit(
     orig_import = builtins.__import__
 
     def _import(name, globals=None, locals=None, fromlist=(), level=0):  # noqa: A002
-        if name == "invarlock.edits.registry":
+        if name == "invarlock.edits":
             raise ImportError("boom")
         return orig_import(name, globals, locals, fromlist, level)
 
@@ -161,7 +161,7 @@ def test_prepare_config_for_run_tolerates_default_auto_adapter_import_failure(
     orig_import = builtins.__import__
 
     def _import(name, globals=None, locals=None, fromlist=(), level=0):  # noqa: A002
-        if name == "invarlock.core.adapter_auto":
+        if name == "invarlock.adapters.auto":
             raise ImportError("optional adapter unavailable")
         return orig_import(name, globals, locals, fromlist, level)
 
@@ -189,7 +189,7 @@ def test_prepare_config_for_run_propagates_default_auto_adapter_failure(
         raise RuntimeError("auto adapter failed")
 
     monkeypatch.setattr(
-        "invarlock.core.adapter_auto.apply_auto_adapter_if_needed",
+        "invarlock.adapters.auto.apply_auto_adapter_if_needed",
         _boom,
     )
 
