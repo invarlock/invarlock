@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import invarlock.evidence_pack_integrity as evidence_pack_integrity_mod
-from tests.reporting.test_evidence_pack_helper_signature_and_manifest import (
+from tests.reporting.evidence_pack.test_evidence_pack_helper_signature_and_manifest import (
     _sign_pack,
     _write_json,
     _write_manifest_and_checksums,

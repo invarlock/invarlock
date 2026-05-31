@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass
-from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from tests._repo_root import REPO_ROOT
+
 GUARDS_DIR = REPO_ROOT / "src" / "invarlock" / "guards"
 
 

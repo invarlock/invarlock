@@ -3,11 +3,11 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 
 from invarlock.guards.policies import guard_assert
+from tests._repo_root import REPO_ROOT
 
 
 def test_guard_assert_disabled_noop(monkeypatch):
@@ -24,7 +24,7 @@ def test_guard_assert_enabled_raises(monkeypatch):
 def test_guard_assert_enabled_survives_optimized_python():
     env = os.environ.copy()
     env["INVARLOCK_ASSERT_GUARDS"] = "1"
-    src_path = str(Path(__file__).resolve().parents[2] / "src")
+    src_path = str(REPO_ROOT / "src")
     env["PYTHONPATH"] = os.pathsep.join(
         part for part in (src_path, env.get("PYTHONPATH", "")) if part
     )
