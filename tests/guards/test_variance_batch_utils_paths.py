@@ -23,3 +23,19 @@ def test_prepare_batch_tensors_all_paths():
     # Else path (scalar tensor)
     ids3, labels3 = g._prepare_batch_tensors(x, device)
     assert isinstance(ids3, torch.Tensor) and isinstance(labels3, torch.Tensor)
+
+
+def test_prepare_batch_tensors_uses_inputs_when_input_ids_missing():
+    g = VarianceGuard()
+    device = torch.device("cpu")
+    x = torch.ones(1, 3, dtype=torch.long)
+    ids, labels = g._prepare_batch_tensors({"inputs": x}, device)
+    assert isinstance(ids, torch.Tensor) and isinstance(labels, torch.Tensor)
+
+
+def test_prepare_batch_tensors_tuple_branch():
+    g = VarianceGuard()
+    device = torch.device("cpu")
+    x = torch.ones(2, 3, dtype=torch.long)
+    ids, labels = g._prepare_batch_tensors((x, x.clone()), device)
+    assert isinstance(ids, torch.Tensor) and isinstance(labels, torch.Tensor)

@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from invarlock.guards.rmt import RMTGuard
-from invarlock.guards_ref.rmt_ref import rmt_decide
+from tests.guards.property.strategies import rmt_decide
 
 
 @pytest.mark.parametrize(

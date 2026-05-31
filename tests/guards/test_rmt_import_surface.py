@@ -5,9 +5,7 @@ import importlib.util
 import invarlock.guards.rmt as runtime_rmt
 import invarlock.guards.rmt_analysis as rmt_analysis
 import invarlock.guards.rmt_detection as rmt_detection
-import invarlock.guards.rmt_math as rmt_math
 import invarlock.guards.rmt_policy as rmt_policy
-import invarlock.guards.rmt_types as rmt_types
 
 
 def test_runtime_module_exposes_guard_surface_only() -> None:
@@ -20,8 +18,8 @@ def test_runtime_module_exposes_guard_surface_only() -> None:
 
 
 def test_policy_modules_expose_the_split_contracts() -> None:
-    assert hasattr(rmt_types, "RMTPolicy")
-    assert hasattr(rmt_types, "RMTPolicyDict")
+    assert hasattr(rmt_policy, "RMTPolicy")
+    assert hasattr(rmt_policy, "RMTPolicyDict")
     assert hasattr(rmt_policy, "get_rmt_policy")
     assert hasattr(rmt_policy, "create_custom_rmt_policy")
 
@@ -38,12 +36,12 @@ def test_detection_module_exposes_detection_helpers() -> None:
     assert hasattr(rmt_detection, "rmt_detect_with_names")
 
 
-def test_math_module_exposes_pure_rmt_helpers() -> None:
-    assert hasattr(rmt_math, "mp_bulk_edge")
-    assert hasattr(rmt_math, "mp_bulk_edges")
-    assert hasattr(rmt_math, "rmt_growth_ratio")
-    assert hasattr(rmt_math, "within_deadband")
-    assert hasattr(rmt_math, "clip_full_svd")
+def test_analysis_module_exposes_pure_rmt_helpers() -> None:
+    assert hasattr(rmt_analysis, "mp_bulk_edge")
+    assert hasattr(rmt_analysis, "mp_bulk_edges")
+    assert hasattr(rmt_analysis, "rmt_growth_ratio")
+    assert hasattr(rmt_analysis, "within_deadband")
+    assert hasattr(rmt_analysis, "clip_full_svd")
 
 
 def test_legacy_module_is_gone() -> None:

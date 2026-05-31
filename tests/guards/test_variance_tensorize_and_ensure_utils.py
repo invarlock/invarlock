@@ -14,6 +14,8 @@ def test_tensorize_and_ensure_tensor_value_paths():
     v_list = [1, 2, 3]
     out_list = g._ensure_tensor_value(v_list)
     assert hasattr(out_list, "shape")
+    string_list = ["a", "b", "c"]
+    assert g._ensure_tensor_value(string_list) is string_list
 
     v_tuple = (1, 2)
     out_tuple = g._ensure_tensor_value(v_tuple)

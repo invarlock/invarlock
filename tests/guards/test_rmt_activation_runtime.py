@@ -6,9 +6,9 @@ import pytest
 import torch
 import torch.nn as nn
 
-import invarlock.guards.rmt_math as rmt_math
+import invarlock.guards.rmt_analysis as rmt_analysis
 from invarlock.guards import rmt_activation_runtime as runtime
-from invarlock.guards import rmt_result_contract
+from invarlock.guards.rmt_runtime import build_after_edit_result, build_prepare_result
 
 
 class IndexedSource:
@@ -271,13 +271,13 @@ def test_activation_edge_risk_handles_zero_std_mp_edge_failure_and_iters_clamp(
 
     monkeypatch.setattr(torch, "sqrt", original_sqrt)
     monkeypatch.setattr(
-        rmt_math,
+        rmt_analysis,
         "mp_bulk_edge",
         lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
     )
     assert runtime.activation_edge_risk(torch.randn(3, 2)) is None
 
-    monkeypatch.setattr(rmt_math, "mp_bulk_edge", lambda *args, **kwargs: 1.0)
+    monkeypatch.setattr(rmt_analysis, "mp_bulk_edge", lambda *args, **kwargs: 1.0)
     assert (
         runtime.activation_edge_risk(
             torch.randn(3, 2), estimator={"iters": 0, "init": "e0"}
@@ -694,7 +694,7 @@ def test_compute_activation_outliers_failure_and_restore_paths() -> None:
 
 
 def test_prepare_and_after_edit_result_contract_helpers() -> None:
-    prepare = rmt_result_contract.build_prepare_result(
+    prepare = build_prepare_result(
         ready=True,
         baseline_metrics={"edge_risk_by_family": {"attn": 0.2}},
         policy_applied={"activation_required": True},
@@ -707,7 +707,7 @@ def test_prepare_and_after_edit_result_contract_helpers() -> None:
         "preparation_time": 1.25,
     }
 
-    failed = rmt_result_contract.build_prepare_result(
+    failed = build_prepare_result(
         ready=False,
         baseline_metrics={},
         policy_applied={},
@@ -716,7 +716,7 @@ def test_prepare_and_after_edit_result_contract_helpers() -> None:
     )
     assert failed["error"] == "Activation baseline unavailable"
 
-    after = rmt_result_contract.build_after_edit_result(
+    after = build_after_edit_result(
         edge_risk_by_module={"layer": 0.2},
         edge_risk_by_family={"attn": 0.2},
         token_weight_total=12,

@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from ._contracts import guard_assert
+from .policies import guard_assert
 
 
 def _is_non_bool_finite_number(value: Any) -> bool:

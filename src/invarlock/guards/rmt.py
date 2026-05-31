@@ -14,15 +14,13 @@ from typing import Any, Literal
 import torch
 import torch.nn as nn
 
-from invarlock.core.abi import INVARLOCK_CORE_ABI as CORE_ABI
+from invarlock.core import INVARLOCK_CORE_ABI as CORE_ABI
 from invarlock.core.api import Guard
 from invarlock.core.types import GuardValidationResult
 
 from . import (
     rmt_activation_runtime,
     rmt_analysis,
-    rmt_detection,
-    rmt_math,
 )
 from .rmt_activation_runtime import (
     activation_svd_outliers as _activation_svd_outliers_impl,
@@ -70,9 +68,6 @@ __all__ = [
     "get_rmt_policy",
     "create_custom_rmt_policy",
 ]
-
-# Preserve module-level monkeypatch targets used by existing tests and callers.
-_COMPAT_MODULE_EXPORTS = (rmt_detection, rmt_math)
 
 # === Guard Implementation ===
 

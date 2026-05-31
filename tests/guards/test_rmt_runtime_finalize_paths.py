@@ -302,7 +302,7 @@ def test_prepare_rmt_guard_covers_invalid_window_count_and_activation_requiremen
         runtime_helpers, "apply_rmt_policy_overrides", lambda *_a, **_k: None
     )
     monkeypatch.setattr(
-        runtime_helpers.rmt_result_contract,
+        runtime_helpers,
         "build_prepare_result",
         lambda **kwargs: kwargs,
     )
@@ -344,7 +344,7 @@ def test_prepare_rmt_guard_returns_ready_without_activation_baseline(
         runtime_helpers, "apply_rmt_policy_overrides", lambda *_a, **_k: None
     )
     monkeypatch.setattr(
-        runtime_helpers.rmt_result_contract,
+        runtime_helpers,
         "build_prepare_result",
         lambda **kwargs: kwargs,
     )
@@ -371,7 +371,7 @@ def test_prepare_rmt_guard_handles_required_baseline_and_exception_paths(
         runtime_helpers, "apply_rmt_policy_overrides", lambda *_a, **_k: None
     )
     monkeypatch.setattr(
-        runtime_helpers.rmt_result_contract,
+        runtime_helpers,
         "build_prepare_result",
         lambda **kwargs: kwargs,
     )
@@ -561,7 +561,7 @@ def test_before_and_after_edit_rmt_guard_helper_paths(monkeypatch) -> None:
     ]
 
     monkeypatch.setattr(
-        runtime_helpers.rmt_result_contract,
+        runtime_helpers,
         "build_after_edit_result",
         lambda: {"analysis_source": "activations_edge_risk"},
     )

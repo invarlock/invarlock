@@ -43,3 +43,10 @@ def test_prepare_with_calibration_data_exercises_ab_path():
     assert isinstance(res, dict) and "baseline_metrics" in res
     # prepared flag may be set depending on scales; ensure calibration stats exist
     assert isinstance(getattr(g, "_calibration_stats", {}), dict)
+
+
+def test_collect_calibration_batches_negative_windows_returns_empty():
+    guard = VarianceGuard()
+    assert (
+        guard._collect_calibration_batches(iter([object(), object()]), windows=-5) == []
+    )

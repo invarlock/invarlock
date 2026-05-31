@@ -12,7 +12,7 @@ from typing import Any
 import torch
 import torch.nn as nn
 
-from invarlock.core.abi import INVARLOCK_CORE_ABI as CORE_ABI
+from invarlock.core import INVARLOCK_CORE_ABI as CORE_ABI
 from invarlock.core.api import Guard
 from invarlock.core.types import GuardDiagnostic, GuardOutcome, GuardValidationResult
 
