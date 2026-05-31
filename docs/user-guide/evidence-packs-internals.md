@@ -60,7 +60,7 @@ invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000
 - `scripts/evidence_packs/verify_pack.sh` validates an evidence pack in repo workflows.
 - `invarlock advanced evidence-pack verify` provides the package-native verifier path for
   installed wheels.
-- `scripts/evidence_packs/suites.sh` defines the model suites and allows
+- `scripts/evidence_packs/run_suite.sh` defines the model suites and allows
   `MODEL_1`–`MODEL_8` overrides.
 - `scripts/evidence_packs/lib/validation/validation_suite.sh` orchestrates the run: preflight,
   queue creation, worker launch, and monitoring.
@@ -74,7 +74,7 @@ invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000
 - `lib/task_functions.sh`: implementations for each task type.
 - `lib/model_creation.sh`: edit and error-model creation helpers (`create_model_variant` dispatcher).
 - `lib/config_generator.sh`: InvarLock config generation and wrapper helpers.
-- `lib/result_compiler.sh`: analysis and verdict compilation.
+- `lib/validation/validation_suite.sh`: validation orchestration, analysis setup, and verdict compilation.
 - `lib/fault_tolerance.sh`: error classification and retry/backoff logic.
 - `scripts/evidence_packs/python/manifest_writer.py`: evidence pack `manifest.json` writer.
 - `scripts/evidence_packs/python/preset_generator.py`: preset derivation + edit-type variants.
@@ -137,7 +137,7 @@ Evidence pack issues?
 
 ## Model Suite
 
-Model suites are defined in `scripts/evidence_packs/suites.sh` and applied by
+Model suites are defined and applied by
 `run_suite.sh`.
 
 | Suite | Models | Notes |
@@ -162,7 +162,7 @@ Notes:
 
 - Override models via `MODEL_1`–`MODEL_8`; set an empty string to disable a slot.
 - `validation_suite.sh` includes a fallback list of large causal models if it is
-  run directly without `suites.sh`.
+  run directly without separate suite plumbing.
 
 ## Edit Types
 

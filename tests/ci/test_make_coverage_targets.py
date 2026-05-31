@@ -9,7 +9,7 @@ def _load_coverage_policy():
         Path(__file__).resolve().parents[2]
         / "scripts"
         / "coverage"
-        / "coverage_policy.py"
+        / "check_coverage_thresholds.py"
     )
     spec = importlib.util.spec_from_file_location("coverage_policy", policy_path)
     assert spec is not None and spec.loader is not None
@@ -99,20 +99,22 @@ def test_coverage_policy_is_shared_with_makefile_and_expanded_surface() -> None:
     makefile = Path(__file__).resolve().parents[2] / "Makefile"
     text = makefile.read_text(encoding="utf-8")
 
-    assert "COVERAGE_POLICY := $(PYTHON) scripts/coverage/coverage_policy.py" in text
+    assert (
+        "COVERAGE_POLICY := $(PYTHON) scripts/coverage/check_coverage_thresholds.py"
+        in text
+    )
     assert "COVERAGE_MODULES := \\" in text
     assert "\t$(shell $(COVERAGE_POLICY) coverage-modules)" in text
     assert "COVERAGE_INCLUDE := $(shell $(COVERAGE_POLICY) coverage-include)" in text
     assert "empirical-guard-evidence-check:" in text
 
     assert "src/invarlock/observability/" in policy.CORE_PREFIXES
-    assert "src/invarlock/config.py" in policy.CORE_FILES
+    assert "src/invarlock/__init__.py" in policy.CORE_FILES
     assert "src/invarlock/adapters/auto.py" in policy.CORE_FILES
     assert "scripts/release/evidence_contracts.py" in policy.CORE_FILES
-    assert "scripts/release/check_empirical_guard_evidence.py" in policy.CORE_FILES
-    assert "scripts/release/check_release_evidence.py" in policy.CORE_FILES
-    assert "src/invarlock/reporting/report_build_evidence.py" in policy.CORE_FILES
-    assert "src/invarlock/reporting/report_make_output.py" in policy.CORE_FILES
+    assert "src/invarlock/reporting/report_builder_support.py" in policy.THRESHOLDS
+    assert "src/invarlock/reporting/report_bundle.py" in policy.THRESHOLDS
+    assert "src/invarlock/reporting/report_make.py" in policy.CORE_FILES
     assert (
         "src/invarlock/reporting/report_primary_metric_policy.py" in policy.CORE_FILES
     )
@@ -128,11 +130,11 @@ def test_coverage_policy_is_shared_with_makefile_and_expanded_surface() -> None:
 
     for pattern in (
         "src/invarlock/observability/*",
-        "src/invarlock/config.py",
+        "src/invarlock/__init__.py",
         "src/invarlock/adapters/auto.py",
         "scripts/release/*.py",
         "invarlock/observability/*",
-        "invarlock/config.py",
+        "invarlock/__init__.py",
         "invarlock/adapters/auto.py",
     ):
         assert pattern in policy.COVERAGE_INCLUDE_PATTERNS
@@ -270,7 +272,7 @@ def test_makefile_exposes_typed_surface_target() -> None:
     assert "mypy-typed-surface:" in text
     for path in (
         "src/invarlock/observability/metrics.py",
-        "src/invarlock/config.py",
+        "src/invarlock/__init__.py",
         "src/invarlock/adapters/auto.py",
         "src/invarlock/core/assurance_contract.py",
         "src/invarlock/core/bootstrap.py",
@@ -279,17 +281,16 @@ def test_makefile_exposes_typed_surface_target() -> None:
         "src/invarlock/core/evaluate_plan.py",
         "src/invarlock/core/metric_provider_resolution.py",
         "src/invarlock/core/runner_eval_metrics_stats.py",
-        "src/invarlock/core/run_orchestrator_execute_seed.py",
+        "src/invarlock/core/run_orchestrator.py",
+        "src/invarlock/core/run_orchestrator_execute.py",
         "src/invarlock/core/run_orchestrator_execute_environment.py",
-        "src/invarlock/core/run_orchestrator_execute_dataset.py",
         "src/invarlock/core/run_orchestrator_execute_attempts.py",
         "src/invarlock/core/run_orchestrator_execute_execution.py",
         "src/invarlock/core/run_orchestrator_execute_helpers.py",
         "src/invarlock/cli/app.py",
-        "src/invarlock/cli/runtime_verify.py",
-        "src/invarlock/eval/probes/mi.py",
-        "src/invarlock/reporting/report_build_evidence.py",
-        "src/invarlock/reporting/report_make_output.py",
+        "src/invarlock/eval/probes/importance.py",
+        "src/invarlock/reporting/report_builder_support.py",
+        "src/invarlock/reporting/report_make.py",
         "src/invarlock/reporting/report_primary_metric_policy.py",
         "src/invarlock/reporting/report_schema.py",
         "src/invarlock/reporting/verify_contract.py",

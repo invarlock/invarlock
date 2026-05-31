@@ -10,7 +10,7 @@
 | **Runtime verifier** | `invarlock advanced runtime-verify` for direct runtime manifest checks. |
 | **Requires** | `invarlock[hf]` for model-loading workflows; extra backends are installed via Python extras. |
 | **Network** | Offline by default; use `evaluate --allow-network` when a run needs model or dataset downloads. |
-| **Source of truth** | `src/invarlock/cli/app.py`, `src/invarlock/cli/commands/*.py`, `src/invarlock/cli/runtime_verify.py`. |
+| **Source of truth** | `src/invarlock/cli/app.py`, `src/invarlock/cli/commands/*.py`. |
 
 Most users only need a narrow top-level surface:
 

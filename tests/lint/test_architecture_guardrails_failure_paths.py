@@ -21,9 +21,7 @@ REMOVED_REPORTING_MODULES = (
 )
 RUN_COMMAND_PATH = REPO_ROOT / "src/invarlock/cli/commands/run.py"
 RUN_EXECUTION_PATH = REPO_ROOT / "src/invarlock/cli/run_execution.py"
-REPORT_FILES_PATH = REPO_ROOT / "src/invarlock/reporting/report_files.py"
 METRICS_PATH = REPO_ROOT / "src/invarlock/eval/metrics.py"
-METRICS_LENS_PATH = REPO_ROOT / "src/invarlock/eval/metrics_lens.py"
 CONFIG_RUNTIME_PATH = REPO_ROOT / "src/invarlock/core/config_runtime.py"
 CONFIG_LOADER_PATH = REPO_ROOT / "src/invarlock/core/config_loader.py"
 RUNTIME_SECURITY_PATH = REPO_ROOT / "src/invarlock/runtime_security.py"

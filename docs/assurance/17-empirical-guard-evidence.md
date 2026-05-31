@@ -7,7 +7,7 @@
 | **Purpose** | Track non-synthetic guard evidence for spectral, RMT, and variance behavior on real model/checkpoint workflows. |
 | **Audience** | Maintainers, release reviewers, and calibration owners. |
 | **Contract scope** | Portable evidence manifests that point to real-run artifacts; not a substitute for the strict verifier report contract. |
-| **Source of truth** | `scripts/release/check_empirical_guard_evidence.py`, `scripts/model_evidence/model_evidence_sweep.py`, calibration commands, and evidence-pack scripts. |
+| **Source of truth** | `scripts/release/evidence_contracts.py empirical`, `scripts/model_evidence/model_evidence_sweep.py`, calibration commands, and evidence-pack scripts. |
 
 ## Maintainer Command
 
