@@ -23,7 +23,11 @@ def test_error_injection_set_includes_weight_tying_break() -> None:
     queue_manager = (
         repo_root / "scripts/evidence_packs/lib/queue/queue_manager.sh"
     ).read_text(encoding="utf-8")
-    assert "scenarios.json" in queue_manager
+    queue_generation = (
+        repo_root / "scripts/evidence_packs/lib/queue/queue_generation.sh"
+    ).read_text(encoding="utf-8")
+    assert "queue_generation.sh" in queue_manager
+    assert "scenarios.json" in queue_generation
 
 
 class _FakeTextLayer(nn.Module):
