@@ -11,7 +11,7 @@
 | **Network** | Offline by default; CLI runs use `evaluate --allow-network`, while Python callers set `INVARLOCK_ALLOW_NETWORK=1` to download models or datasets. |
 | **Inputs** | Model instance, adapter, edit, guard list, `RunConfig`, optional calibration data. |
 | **Outputs / Artifacts** | `RunReport` object; optional event logs/checkpoints; evaluation bundles via `invarlock.reporting.make_report(...)` and `report_bundle.save_evaluation_bundle(...)`. |
-| **Source of truth** | `src/invarlock/core/runner.py`, `src/invarlock/core/api.py`, `src/invarlock/cli/config_execution.py`, `src/invarlock/reporting/report_make.py`, `src/invarlock/reporting/report_make_inputs.py`, `src/invarlock/reporting/report_make_assembly.py`, `src/invarlock/reporting/report_make_output.py`, `src/invarlock/reporting/report_bundle.py`, `src/invarlock/reporting/report_console.py`, `src/invarlock/reporting/report_files.py`, `src/invarlock/reporting/report_schema.py`. |
+| **Source of truth** | `src/invarlock/core/runner.py`, `src/invarlock/core/api.py`, `src/invarlock/cli/config_execution.py`, `src/invarlock/reporting/report_make.py`, `src/invarlock/reporting/report_make_assembly.py`, `src/invarlock/reporting/report_bundle.py`, `src/invarlock/reporting/report_summary.py`, `src/invarlock/reporting/report_schema.py`. |
 
 ## Quick Start
 

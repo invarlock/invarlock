@@ -8,7 +8,7 @@
 | **Audience** | Users with proprietary or custom text corpora for evaluation. |
 | **Supported providers** | `local_jsonl` (hermetic, no deps), `hf_text` (requires `datasets`). |
 | **Network** | `local_jsonl` is fully offline; `hf_text` needs network on first fetch only. |
-| **Source of truth** | `src/invarlock/eval/providers/text_lm.py`. |
+| **Source of truth** | `src/invarlock/eval/data.py`. |
 
 Run InvarLock on your own small text files with zero network access. Two options:
 

@@ -44,7 +44,7 @@ an explicit non-assurance bypass.
 | Component resolution | `invarlock.cli.run_execution`, guard/adapter/edit registries | resolved adapter, edit, and guard order |
 | Guard execution | `invarlock.core.runner`, `invarlock.guards.*` | guard evidence and statuses |
 | Metric computation | `invarlock.core.bootstrap`, runner metric helpers | paired delta log-loss, ratio, CI fields |
-| Report assembly | `invarlock.reporting.report_make_output` | `evaluation.report.json` |
+| Report assembly | `invarlock.reporting.report_make` | `evaluation.report.json` |
 | Verification | `invarlock.reporting.verify_contract` | verifier pass/fail details |
 | Human report | `invarlock report html` | rendered HTML report |
 

@@ -81,7 +81,7 @@ documented tiers and environments, not a universal guarantee about model safety.
 >
 > ```bash
 > OMP_NUM_THREADS=1 conda run -n invarlock pytest -q
-> OMP_NUM_THREADS=1 conda run -n invarlock python scripts/docs/check_docs_links.py
+> OMP_NUM_THREADS=1 conda run -n invarlock python scripts/docs/docs_check.py --links
 > OMP_NUM_THREADS=1 conda run -n invarlock mkdocs build --strict
 > ```
 >

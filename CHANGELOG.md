@@ -1115,8 +1115,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - `hf_causal.py`: Uses `_safe_to_device()` instead of direct `model.to()` call
-- `hf_awq_adapter.py`: Uses `_safe_to_device()` with AWQ capabilities
-- `hf_gptq_adapter.py`: Uses `_safe_to_device()` with GPTQ capabilities
+- `invarlock.plugins` AWQ adapter: Uses `_safe_to_device()` with AWQ capabilities
+- `invarlock.plugins` GPTQ adapter: Uses `_safe_to_device()` with GPTQ capabilities
 
 - Added quantized adapter section to `docs/reference/model-adapters.md`
   - BNB adapter usage and pre-quantized detection
