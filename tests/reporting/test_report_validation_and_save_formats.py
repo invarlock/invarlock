@@ -3,12 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from invarlock.reporting.report_files import save_report
 
 from invarlock.core import guard_evidence as report_evidence_mod
 from invarlock.reporting import report_bundle as report_bundle_mod
 from invarlock.reporting import report_summary as report_summary_mod
 from invarlock.reporting.report_bundle import save_evaluation_bundle
-from invarlock.reporting.report_files import save_report
 from invarlock.reporting.report_types import create_empty_report
 from invarlock.reporting.run_report_formatters import to_html, to_markdown
 
