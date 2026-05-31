@@ -148,6 +148,14 @@ def test_resolve_metric_and_provider_handles_section_lookup_errors() -> None:
     assert opts == {}
 
 
+def test_mapping_items_returns_empty_when_items_call_fails() -> None:
+    class _BadItems:
+        def items(self):
+            raise ValueError("bad items")
+
+    assert mpr._mapping_items(_BadItems()) == []
+
+
 def test_resolve_metric_and_provider_rejects_unknown_metric_override(monkeypatch):
     monkeypatch.setattr(
         mpr, "resolve_provider_kind_and_kwargs", lambda _value: ("", {})

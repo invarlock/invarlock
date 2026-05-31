@@ -1,10 +1,20 @@
 from __future__ import annotations
 
+import json
 import math
 
 import pytest
 
+from invarlock.reporting import report_make as report_make_mod
 from invarlock.reporting import report_normalization as normalization_mod
+from invarlock.reporting.report_builder_support import (
+    attach_schedule_digest,
+    build_moe_section,
+    evaluate_primary_metric_tail,
+    extract_telemetry,
+    resolve_capacity_context,
+    validate_retry_evaluation_report,
+)
 from invarlock.reporting.report_builder_support import (
     extract_report_meta as _extract_report_meta,
 )
@@ -30,6 +40,11 @@ class _RaisingGet:
         self, *args, **kwargs
     ):  # pragma: no cover - used to trigger exception in target
         raise RuntimeError("boom")
+
+
+class _ValueErrorGet(dict):
+    def get(self, *args, **kwargs):  # type: ignore[override]
+        raise ValueError("bad get")
 
 
 def test_is_ppl_kind_handles_str_exception() -> None:
@@ -124,3 +139,277 @@ def test_extract_report_meta_records_missing_fields() -> None:
 def test_normalize_and_validate_report_rejects_invalid() -> None:
     with pytest.raises(ValueError):
         normalization_mod.normalize_and_validate_run_report("oops")
+
+
+def test_report_builder_support_moe_capacity_and_tail_edge_paths() -> None:
+    report = {
+        "metrics": {
+            "primary_metric": {"kind": "ppl_causal"},
+            "moe": {
+                "load_balance_loss": 0.7,
+                "router_entropy": 0.4,
+                "utilization": [1, "bad"],
+            },
+        },
+        "evaluation_windows": {
+            "final": {
+                "window_ids": [1, "bad", 3],
+                "logloss": [2.0, 9.0, float("inf")],
+                "token_counts": [-5, "bad", 7],
+            }
+        },
+    }
+    baseline = {
+        "metrics": {
+            "moe": {"load_balance_loss": 0.5, "router_entropy": 0.3},
+        },
+        "evaluation_windows": {"final": {"window_ids": [1, 2], "logloss": [1.5, 2.5]}},
+    }
+
+    moe = build_moe_section(report, {}, baseline)
+    assert moe["delta_load_balance_loss"] == pytest.approx(0.2)
+    assert "utilization_mean" not in moe
+
+    assert resolve_capacity_context(
+        {}, {"windows": {"preview": "2", "final": "3"}}
+    ) == (
+        None,
+        5,
+    )
+    assert resolve_capacity_context(
+        {"total_tokens": 10, "candidate_limit": 4}, {"windows": {}}
+    ) == (10, 4)
+
+    captured: dict[str, object] = {}
+
+    def _evaluate_tail(**kwargs):
+        captured.update(kwargs)
+        return {"mode": "strict", "evaluated": True, "passed": True}
+
+    tail = evaluate_primary_metric_tail(
+        report,
+        baseline,
+        {"metrics": {"pm_tail": {"max_delta": 0.1}}},
+        _evaluate_tail,
+    )
+
+    assert tail["source"] == "paired_baseline.final"
+    assert captured["deltas"] == [0.5]
+    assert captured["weights"] == [0.0]
+    assert captured["policy"] == {"max_delta": 0.1}
+
+
+def test_report_builder_support_defensive_helper_edges() -> None:
+    assert extract_telemetry({"metrics": []}, "cpu") == {"device": "cpu"}
+
+    overhead_section: dict[str, object] = {}
+    assert attach_schedule_digest(_ValueErrorGet(), overhead_section) is None
+    assert overhead_section == {}
+
+    assert build_moe_section(_ValueErrorGet(), {}, {}) == {}
+
+    moe = build_moe_section(
+        {
+            "metrics": {
+                "moe": {
+                    "load_balance_loss": 0.7,
+                    "router_entropy": 0.4,
+                    "utilization": [0.5, 0.75],
+                }
+            }
+        },
+        _ValueErrorGet(),
+        {"metrics": {"moe": {"utilization": [0.25, object()]}}},
+    )
+    assert moe["utilization_count"] == 2
+    assert "delta_utilization_mean" not in moe
+
+    assert resolve_capacity_context(_ValueErrorGet(), {"windows": {}}) == (None, None)
+
+
+def test_report_builder_support_moe_missing_baseline_paths() -> None:
+    report = {
+        "metrics": {
+            "moe": {
+                "load_balance_loss": 0.7,
+                "router_entropy": 0.4,
+            }
+        }
+    }
+
+    no_baseline = build_moe_section(report, [], {})
+    assert no_baseline["load_balance_loss"] == pytest.approx(0.7)
+    assert "delta_load_balance_loss" not in no_baseline
+
+    raw_baseline = build_moe_section(
+        report,
+        {"moe": {"load_balance_loss": 0.5, "router_entropy": 0.3}},
+        {},
+    )
+    assert raw_baseline["delta_load_balance_loss"] == pytest.approx(0.2)
+    assert raw_baseline["delta_router_entropy"] == pytest.approx(0.1)
+
+    fallback_error = build_moe_section(report, {}, _ValueErrorGet())
+    assert fallback_error["load_balance_loss"] == pytest.approx(0.7)
+    assert "delta_load_balance_loss" not in fallback_error
+
+
+def test_report_builder_support_primary_metric_tail_pairing_edges() -> None:
+    captured: dict[str, object] = {}
+
+    def _evaluate_tail(**kwargs):
+        captured.update(kwargs)
+        return {"mode": "strict", "evaluated": True, "passed": True}
+
+    report = {
+        "metrics": {"primary_metric": {"kind": "ppl_causal"}},
+        "evaluation_windows": {
+            "final": {
+                "window_ids": [1, 2, "bad", 4],
+                "logloss": [2.0, float("inf"), 9.0, 4.0],
+                "token_counts": ["bad", 9, 3, 4],
+            }
+        },
+    }
+    baseline = {
+        "evaluation_windows": {
+            "final": {
+                "window_ids": [1, 2, "bad-base", 4],
+                "logloss": [1.5, 1.0, 7.0, 3.5],
+            }
+        }
+    }
+
+    tail = evaluate_primary_metric_tail(
+        report,
+        baseline,
+        _ValueErrorGet(),
+        _evaluate_tail,
+    )
+
+    assert tail["source"] == "paired_baseline.final"
+    assert captured["deltas"] == [0.5, 0.5]
+    assert captured["weights"] == [0.0, 4.0]
+    assert captured["policy"] == {}
+
+
+def test_report_builder_support_primary_metric_tail_lookup_errors() -> None:
+    captured: dict[str, object] = {}
+
+    def _evaluate_tail(**kwargs):
+        captured.update(kwargs)
+        return {"mode": "strict", "evaluated": True, "passed": True}
+
+    tail = evaluate_primary_metric_tail(
+        _ValueErrorGet(),
+        {},
+        {"metrics": {"pm_tail": {"max_delta": 0.1}}},
+        _evaluate_tail,
+    )
+
+    assert tail["source"] == "paired_baseline.final"
+    assert captured["deltas"] == []
+    assert captured["weights"] is None
+
+
+def test_report_builder_support_primary_metric_tail_non_ppl_kind() -> None:
+    captured: dict[str, object] = {}
+
+    def _evaluate_tail(**kwargs):
+        captured.update(kwargs)
+        return {"mode": "strict", "evaluated": True, "passed": True}
+
+    tail = evaluate_primary_metric_tail(
+        {"metrics": {"primary_metric": []}},
+        {},
+        {},
+        _evaluate_tail,
+    )
+
+    assert tail["source"] == "paired_baseline.final"
+    assert captured["deltas"] == []
+    assert captured["weights"] is None
+
+
+def test_report_builder_support_tail_evaluator_exception_falls_back() -> None:
+    result = evaluate_primary_metric_tail(
+        {"metrics": {"primary_metric": {"kind": "ppl_causal"}}},
+        {},
+        {},
+        lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("tail failed")),
+    )
+
+    assert result == {"mode": "warn", "evaluated": False, "passed": True}
+
+
+def test_validate_retry_evaluation_report_loads_baseline_path_and_validation_edges(
+    tmp_path,
+) -> None:
+    baseline_path = tmp_path / "baseline.json"
+    baseline_path.write_text(json.dumps({"baseline": True}), encoding="utf-8")
+
+    result = validate_retry_evaluation_report(
+        report={"run": True},
+        baseline_report_data=None,
+        baseline_path=baseline_path,
+        build_retry_result_summary_fn=lambda validation: {
+            "passed": False,
+            "failures": ["primary_metric_acceptable"],
+            "validation": validation,
+        },
+        make_report_fn=lambda _report, _baseline: {"validation": ["bad-shape"]},
+        telemetry_output_enabled_fn=lambda: True,
+        telemetry_summary_line_fn=lambda _report: "telemetry-summary",
+    )
+
+    assert result.status == "failed"
+    assert result.validation == {}
+    assert result.validation_gates == ("primary_metric_acceptable",)
+    assert result.telemetry_summary == "telemetry-summary"
+
+
+def test_validate_retry_evaluation_report_uses_default_report_factory(monkeypatch):
+    def _fake_make_report(_report, _baseline):
+        return {"validation": {"primary_metric_acceptable": True}}
+
+    monkeypatch.setattr(report_make_mod, "make_report", _fake_make_report)
+    monkeypatch.setattr(
+        "invarlock.reporting.report_make.make_report", _fake_make_report
+    )
+
+    result = validate_retry_evaluation_report(
+        report={"run": True},
+        baseline_report_data={"baseline": True},
+        baseline_path=None,
+        build_retry_result_summary_fn=lambda validation: {
+            "passed": True,
+            "failures": [],
+            "validation": validation,
+        },
+        make_report_fn=None,
+        telemetry_output_enabled_fn=lambda: False,
+    )
+
+    assert result.status == "passed"
+    assert result.validation == {"primary_metric_acceptable": True}
+
+
+def test_validate_retry_evaluation_report_rejects_non_mapping_baseline_file(
+    tmp_path,
+) -> None:
+    baseline_path = tmp_path / "baseline.json"
+    baseline_path.write_text("[]", encoding="utf-8")
+
+    result = validate_retry_evaluation_report(
+        report={"run": True},
+        baseline_report_data=None,
+        baseline_path=baseline_path,
+        build_retry_result_summary_fn=lambda _validation: {
+            "passed": True,
+            "failures": [],
+        },
+        make_report_fn=lambda _report, _baseline: {"validation": {}},
+    )
+
+    assert result.status == "error"
+    assert result.validation_gates == ("report_error",)

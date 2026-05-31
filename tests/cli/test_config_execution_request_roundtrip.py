@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import invarlock.cli.commands.run as run_mod
 import invarlock.cli.config_execution as config_execution
 import invarlock.runtime_security as runtime_launch_plan
@@ -122,3 +124,20 @@ def test_config_execution_request_rejects_unknown_kwargs() -> None:
         assert "unknown" in str(exc)
     else:
         raise AssertionError("unknown request fields should fail closed")
+
+
+def test_run_command_runtime_delegation_error_exits_one(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(
+        run_mod,
+        "run_request",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            run_mod.RuntimeDelegationError("runtime unavailable")
+        ),
+        raising=True,
+    )
+
+    with pytest.raises(run_mod.typer.Exit) as excinfo:
+        run_mod.run_command(config="configs/demo.yaml")
+
+    assert excinfo.value.exit_code == 1
+    assert "runtime unavailable" in capsys.readouterr().err

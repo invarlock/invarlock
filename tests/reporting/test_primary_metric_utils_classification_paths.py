@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+import invarlock.reporting.primary_metric_utils as primary_metric_utils
 from invarlock.reporting.primary_metric_utils import (
     _attach_classification_primary_metric_fallback,
     _attach_ppl_analysis_fields,
@@ -476,6 +477,57 @@ def test_primary_metric_private_helpers_cover_error_and_fallback_paths() -> None
             raise RuntimeError("explode")
 
     _ensure_primary_metric_display_ci(_ExplodingReport())
+
+
+def test_finalize_primary_metric_snapshot_ignores_display_ci_write_errors() -> None:
+    class _DisplayWriteFails(dict):
+        def __setitem__(self, key, value):  # type: ignore[override]
+            if key == "display_ci":
+                raise RuntimeError("display write failed")
+            return super().__setitem__(key, value)
+
+    out = _finalize_primary_metric_snapshot(
+        _DisplayWriteFails({"kind": "accuracy", "final": 2.0}),
+        report={},
+        metrics_map={},
+        baseline_ref=None,
+        ppl_analysis=None,
+    )
+
+    assert out["final"] == 2.0
+    assert "display_ci" not in out
+
+
+def test_attach_primary_metric_from_report_recovers_from_final_display_lookup_error(
+    monkeypatch,
+) -> None:
+    class _FinalMetric(dict):
+        def __contains__(self, key):  # type: ignore[override]
+            return key == "display_ci" or super().__contains__(key)
+
+        def __getitem__(self, key):  # type: ignore[override]
+            if key == "display_ci":
+                raise RuntimeError("display lookup failed")
+            return super().__getitem__(key)
+
+    def _finalize_stub(*_args, **_kwargs):
+        return _FinalMetric({"kind": "accuracy", "final": 0.8})
+
+    monkeypatch.setattr(
+        primary_metric_utils,
+        "_finalize_primary_metric_snapshot",
+        _finalize_stub,
+    )
+
+    evaluation_report: dict[str, object] = {}
+    _attach_primary_metric_from_report(
+        evaluation_report,
+        {"metrics": {"primary_metric": {"kind": "accuracy", "final": 0.8}}},
+        baseline_ref=None,
+        ppl_analysis=None,
+    )
+
+    assert evaluation_report["primary_metric"]["final"] == 0.8
 
 
 def test_attach_classification_primary_metric_fallback_handles_bad_payload_shapes() -> (

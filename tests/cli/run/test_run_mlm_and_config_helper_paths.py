@@ -183,6 +183,17 @@ def test_compute_mask_positions_digest_covers_none_digest_and_exception() -> Non
         pairing_mod._compute_mask_positions_digest(_BadDict())
 
 
+def test_compute_mask_positions_digest_skips_empty_label_rows() -> None:
+    digest = pairing_mod._compute_mask_positions_digest(
+        {
+            "preview": {"labels": [[]]},
+            "final": {"labels": [[-100, 5]]},
+        }
+    )
+
+    assert isinstance(digest, str) and digest
+
+
 def test_tensor_or_list_to_ints_covers_tolist_numpy_iterable_and_exceptions(
     monkeypatch,
 ) -> None:

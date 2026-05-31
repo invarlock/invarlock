@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 from types import SimpleNamespace
 
 import click
@@ -27,6 +28,41 @@ def test_tensor_or_list_to_ints_reraises_click_exit(monkeypatch):
     monkeypatch.setattr(pairing_mod, "torch", SimpleNamespace(), raising=False)
     with pytest.raises(click.exceptions.Exit):
         pairing_mod._tensor_or_list_to_ints(fake_tensor)
+
+
+def test_tensor_or_list_to_ints_returns_empty_for_nonconvertible_tensor_like(
+    monkeypatch,
+) -> None:
+    class BadRaw:
+        def __iter__(self):
+            raise TypeError("not iterable")
+
+    fake_tensor = SimpleNamespace(tolist=lambda: BadRaw())
+    monkeypatch.setattr(pairing_mod, "torch", SimpleNamespace(), raising=False)
+
+    assert pairing_mod._tensor_or_list_to_ints(fake_tensor) == []
+
+
+def test_get_torch_returns_none_when_torch_import_fails(monkeypatch) -> None:
+    original_import = builtins.__import__
+
+    def _blocked_import(name, *args, **kwargs):  # noqa: ANN001
+        if name == "torch":
+            raise ImportError("torch unavailable")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", _blocked_import)
+    monkeypatch.setattr(pairing_mod, "torch", pairing_mod._IMPORT_UNSET)
+
+    assert pairing_mod._get_torch() is None
+
+
+def test_tensor_or_list_to_ints_returns_empty_for_non_iterable_without_torch(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(pairing_mod, "torch", None, raising=False)
+
+    assert pairing_mod._tensor_or_list_to_ints(object()) == []
 
 
 def test_resolve_provider_and_split_provider_and_split_access_errors():

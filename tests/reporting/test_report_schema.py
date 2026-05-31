@@ -44,6 +44,16 @@ def test_load_validation_allowlist_non_list_payload(monkeypatch):
         allowlist_mod.load_validation_allowlist()
 
 
+def test_load_validation_allowlist_rejects_empty_normalized_payload(monkeypatch):
+    monkeypatch.setattr(allowlist_mod, "load_json_contract", lambda _filename: ["", 1])
+
+    with pytest.raises(
+        allowlist_mod.ValidationAllowlistContractError,
+        match="at least one concrete key",
+    ):
+        allowlist_mod.load_validation_allowlist()
+
+
 def test_validate_with_jsonschema_handles_missing_library(monkeypatch):
     monkeypatch.setattr(schema_mod, "jsonschema", None, raising=False)
     assert schema_mod._validate_with_jsonschema({"schema_version": "v1"}) is False

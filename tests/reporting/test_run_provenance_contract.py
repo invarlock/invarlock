@@ -177,6 +177,180 @@ def test_finalize_run_provenance_builds_fallback_and_recomputes_baseline_digest(
     }
 
 
+def test_finalize_run_provenance_uses_final_signal_when_preview_is_not_mapping() -> (
+    None
+):
+    report: dict[str, object] = {}
+
+    finalize_run_provenance(
+        report=report,
+        core_report=SimpleNamespace(evaluation_windows=None),
+        preview_records=[],
+        final_records=[],
+        use_mlm=False,
+        preview_mask_counts=None,
+        final_mask_counts=None,
+        had_baseline=False,
+        profile="dev",
+        resolved_split="validation",
+        used_fallback_split=False,
+        baseline_report_data=None,
+        serialize_evaluation_windows_fn=lambda _windows: {
+            "preview": ["bad"],
+            "final": {"records": [{"id": "f"}]},
+        },
+        build_fallback_evaluation_windows_fn=lambda *args, **kwargs: {},
+        compute_provider_digest_fn=lambda payload: {"ids_sha256": "subject"},
+        enforce_provider_parity_fn=lambda *args, **kwargs: None,
+    )
+
+    assert report["evaluation_windows"] == {
+        "preview": ["bad"],
+        "final": {"records": [{"id": "f"}]},
+    }
+
+
+def test_finalize_run_provenance_recomputes_when_baseline_digest_is_not_mapping() -> (
+    None
+):
+    report: dict[str, object] = {}
+    seen: dict[str, object] = {}
+
+    def _digest(payload):
+        if payload is report:
+            return {"ids_sha256": "subject"}
+        return {"ids_sha256": "baseline"}
+
+    finalize_run_provenance(
+        report=report,
+        core_report=SimpleNamespace(
+            evaluation_windows={"preview": {}, "final": {"window_ids": [1]}}
+        ),
+        preview_records=[],
+        final_records=[],
+        use_mlm=False,
+        preview_mask_counts=None,
+        final_mask_counts=None,
+        had_baseline=True,
+        profile="ci",
+        resolved_split="validation",
+        used_fallback_split=False,
+        baseline_report_data={"provenance": {"provider_digest": "bad"}},
+        serialize_evaluation_windows_fn=lambda windows: dict(windows),
+        build_fallback_evaluation_windows_fn=lambda *args, **kwargs: {},
+        compute_provider_digest_fn=_digest,
+        enforce_provider_parity_fn=lambda subject, baseline, profile=None: seen.update(
+            {"subject": subject, "baseline": baseline, "profile": profile}
+        ),
+    )
+
+    assert seen == {
+        "subject": {"ids_sha256": "subject"},
+        "baseline": {"ids_sha256": "baseline"},
+        "profile": "ci",
+    }
+
+
+def test_finalize_run_provenance_swallows_fallback_and_digest_errors() -> None:
+    report: dict[str, object] = {"provenance": {}}
+
+    result = finalize_run_provenance(
+        report=report,
+        core_report=SimpleNamespace(evaluation_windows=None),
+        preview_records=[],
+        final_records=[],
+        use_mlm=False,
+        preview_mask_counts=None,
+        final_mask_counts=None,
+        had_baseline=False,
+        profile="dev",
+        resolved_split="validation",
+        used_fallback_split=False,
+        baseline_report_data={"meta": {}},
+        serialize_evaluation_windows_fn=lambda _windows: None,
+        build_fallback_evaluation_windows_fn=lambda *args, **kwargs: (
+            _ for _ in ()
+        ).throw(ValueError("fallback failed")),
+        compute_provider_digest_fn=lambda _payload: (_ for _ in ()).throw(
+            ValueError("digest failed")
+        ),
+        enforce_provider_parity_fn=lambda *args, **kwargs: None,
+    )
+
+    assert result.missing_evaluation_windows_for_baseline is False
+    assert "evaluation_windows" not in report
+
+
+def test_finalize_run_provenance_swallows_baseline_digest_errors() -> None:
+    report: dict[str, object] = {}
+    seen: dict[str, object] = {}
+
+    def _digest(payload):
+        if payload is report:
+            return {"ids_sha256": "subject"}
+        raise ValueError("baseline digest failed")
+
+    finalize_run_provenance(
+        report=report,
+        core_report=SimpleNamespace(
+            evaluation_windows={"preview": {}, "final": {"window_ids": [1]}}
+        ),
+        preview_records=[],
+        final_records=[],
+        use_mlm=False,
+        preview_mask_counts=None,
+        final_mask_counts=None,
+        had_baseline=True,
+        profile="ci",
+        resolved_split="validation",
+        used_fallback_split=False,
+        baseline_report_data={"provenance": {"provider_digest": "bad"}},
+        serialize_evaluation_windows_fn=lambda windows: dict(windows),
+        build_fallback_evaluation_windows_fn=lambda *args, **kwargs: {},
+        compute_provider_digest_fn=_digest,
+        enforce_provider_parity_fn=lambda subject, baseline, profile=None: seen.update(
+            {"subject": subject, "baseline": baseline, "profile": profile}
+        ),
+    )
+
+    assert seen == {
+        "subject": {"ids_sha256": "subject"},
+        "baseline": None,
+        "profile": "ci",
+    }
+
+
+def test_finalize_run_provenance_swallows_provenance_assignment_errors() -> None:
+    class _BadProvenance(dict):
+        def __setitem__(self, key, value):  # type: ignore[override]
+            raise ValueError(f"cannot set {key}")
+
+    report: dict[str, object] = {"provenance": _BadProvenance()}
+
+    result = finalize_run_provenance(
+        report=report,
+        core_report=SimpleNamespace(
+            evaluation_windows={"preview": {}, "final": {"window_ids": [1]}}
+        ),
+        preview_records=[],
+        final_records=[],
+        use_mlm=False,
+        preview_mask_counts=None,
+        final_mask_counts=None,
+        had_baseline=False,
+        profile="dev",
+        resolved_split="validation",
+        used_fallback_split=True,
+        baseline_report_data=None,
+        serialize_evaluation_windows_fn=lambda windows: dict(windows),
+        build_fallback_evaluation_windows_fn=lambda *args, **kwargs: {},
+        compute_provider_digest_fn=lambda _payload: None,
+        enforce_provider_parity_fn=lambda *args, **kwargs: None,
+    )
+
+    assert result.missing_evaluation_windows_for_baseline is False
+
+
 def test_finalize_run_provenance_propagates_parity_failure() -> None:
     with pytest.raises(RuntimeError, match="boom"):
         finalize_run_provenance(

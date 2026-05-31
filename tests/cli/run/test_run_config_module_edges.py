@@ -587,6 +587,33 @@ def test_resolve_provider_and_split_handles_missing_provider_split_and_split_pro
     assert used is True
 
 
+def test_resolve_provider_and_split_handles_missing_dataset_attribute() -> None:
+    class _Cfg:
+        @property
+        def dataset(self):
+            raise AttributeError("missing dataset")
+
+    class Provider:
+        def available_splits(self):
+            return ["validation"]
+
+    provider, split, used = run_config_mod.resolve_provider_and_split(
+        _Cfg(),
+        model_profile=SimpleNamespace(default_provider="wikitext2"),
+        get_provider_fn=lambda *_args, **_kwargs: Provider(),
+        choose_dataset_split_fn=lambda **kwargs: (
+            "validation",
+            kwargs["requested"] is None,
+        ),
+        provider_kwargs=None,
+        resolved_device="cpu",
+    )
+
+    assert isinstance(provider, Provider)
+    assert split == "validation"
+    assert used is True
+
+
 def test_resolve_provider_and_split_uses_default_provider_import(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

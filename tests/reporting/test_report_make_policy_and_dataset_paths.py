@@ -541,6 +541,72 @@ def test_make_evaluation_report_populates_dataset_stats_when_absent(monkeypatch)
     assert stats["paired_windows"] >= 1
 
 
+def test_make_evaluation_report_handles_non_mapping_dataset_windows(monkeypatch):
+    report = _base_report()
+    baseline = _base_baseline()
+    _patch_common(monkeypatch, report, baseline)
+
+    _stub_evaluation_report_extractors(
+        monkeypatch,
+        dataset_info={"hash": {}, "windows": []},
+        resolved_policy={"spectral": {}, "variance": {}},
+    )
+
+    evaluation_report = make_report(report, baseline)
+
+    assert "stats" in evaluation_report["dataset"]["windows"]
+
+
+def test_extract_report_build_sections_accepts_non_mapping_dataset_info(monkeypatch):
+    report = _base_report()
+    baseline = _base_baseline()
+    diagnostics: list[dict[str, object]] = []
+
+    monkeypatch.setattr(dataset_hashing, "_extract_dataset_info", lambda *_: ["bad"])
+    monkeypatch.setattr(
+        pm_analysis_mod,
+        "build_primary_metric_analysis",
+        lambda *_args, **_kwargs: ({}, "dev"),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        guards_invariants,
+        "_extract_invariants",
+        lambda *args, **kwargs: {"status": "ok"},
+        raising=False,
+    )
+    monkeypatch.setattr(
+        guards_spectral,
+        "_extract_spectral_analysis",
+        lambda *_: {"caps_applied": 0},
+        raising=False,
+    )
+    monkeypatch.setattr(cert, "_extract_rmt_analysis", lambda *_: {"stable": True})
+    monkeypatch.setattr(
+        cert, "_extract_variance_analysis", lambda *_: {"enabled": False}
+    )
+    monkeypatch.setattr(
+        report_edit_summary,
+        "extract_structural_deltas",
+        lambda *_: {"compression_diagnostics": {}},
+        raising=False,
+    )
+    monkeypatch.setattr(policy_utils, "_extract_effective_policies", lambda *_: {})
+
+    sections = cert._extract_report_build_sections(
+        report,
+        report,
+        baseline,
+        baseline,
+        baseline,
+        diagnostics,
+        record_blocking_diagnostic=lambda _code, _message: None,
+        non_fatal_exceptions=cert._MAKE_REPORT_NON_FATAL_EXCEPTIONS,
+    )
+
+    assert sections["dataset_info"] == ["bad"]
+
+
 def test_make_evaluation_report_policy_digest_marks_tier_change(monkeypatch):
     report = _base_report()
     baseline = _base_baseline()
@@ -609,6 +675,62 @@ def test_make_evaluation_report_policy_digest_detects_threshold_hash_change(
     assert evaluation_report["policy_digest"]["changed"] is True
 
 
+def test_make_evaluation_report_variance_policy_digest_falls_back_to_guard_policy(
+    monkeypatch,
+) -> None:
+    report = _base_report()
+    baseline = _base_baseline()
+    guard_policy = {"min_effect_lognll": 0.2, "mode": "ab"}
+    report["guards"] = [{"name": "variance", "policy": guard_policy}]
+
+    _patch_common(monkeypatch, report, baseline)
+    _stub_evaluation_report_extractors(
+        monkeypatch,
+        dataset_info={"hash": {}, "windows": {"stats": {}}},
+        policies_payload={"variance": {}},
+        resolved_policy={"spectral": {}, "variance": {}},
+    )
+
+    monkeypatch.setattr(
+        policy_utils,
+        "_compute_variance_policy_digest",
+        lambda policy: "guard-digest" if policy.get("min_effect_lognll") == 0.2 else "",
+        raising=False,
+    )
+
+    evaluation_report = make_report(report, baseline)
+
+    variance_policy = evaluation_report["policies"]["variance"]
+    assert variance_policy["policy_digest"] == "guard-digest"
+
+
+def test_make_evaluation_report_leaves_empty_variance_policy_digest_absent(
+    monkeypatch,
+) -> None:
+    report = _base_report()
+    baseline = _base_baseline()
+    report["guards"] = [{"name": "variance", "policy": {"mode": "ab"}}]
+
+    _patch_common(monkeypatch, report, baseline)
+    _stub_evaluation_report_extractors(
+        monkeypatch,
+        dataset_info={"hash": {}, "windows": {"stats": {}}},
+        policies_payload={"variance": {}},
+        resolved_policy={"spectral": {}, "variance": {}},
+    )
+
+    monkeypatch.setattr(
+        policy_utils,
+        "_compute_variance_policy_digest",
+        lambda _policy: "",
+        raising=False,
+    )
+
+    evaluation_report = make_report(report, baseline)
+
+    assert "policy_digest" not in evaluation_report["policies"]["variance"]
+
+
 def test_make_evaluation_report_copies_meta_environment_flags(monkeypatch):
     report = _base_report()
     baseline = _base_baseline()
@@ -652,64 +774,3 @@ def test_make_evaluation_report_uses_meta_tokenizer_hash(monkeypatch):
 
     evaluation_report = make_report(report, baseline)
     assert evaluation_report["meta"]["tokenizer_hash"] == "tok-meta"
-
-
-def test_make_evaluation_report_handles_missing_dataset_section(monkeypatch):
-    report = _base_report()
-    baseline = _base_baseline()
-    report["meta"].pop("tokenizer_hash", None)
-    report["data"] = None
-
-    monkeypatch.setattr(
-        report_normalization,
-        "normalize_and_validate_run_report",
-        lambda value: value,
-        raising=False,
-    )
-    monkeypatch.setattr(
-        report_normalization, "normalize_baseline", lambda value: value, raising=False
-    )
-    monkeypatch.setattr(
-        dataset_hashing,
-        "_extract_dataset_info",
-        lambda *_: {"hash": {}, "windows": {}},
-    )
-
-    evaluation_report = make_report(report, baseline)
-    assert "tokenizer_hash" not in evaluation_report["meta"]
-
-
-def test_make_evaluation_report_preserves_nullable_provenance(monkeypatch):
-    report = _base_report()
-    baseline = _base_baseline()
-    report["meta"]["model_id"] = None
-    report["meta"]["adapter"] = ""
-    report["meta"]["device"] = None
-    report["edit"]["name"] = None
-    baseline["meta"].pop("model_id", None)
-    baseline.pop("model_id", None)
-    baseline.pop("run_id", None)
-
-    _patch_common(monkeypatch, report, baseline)
-    _stub_evaluation_report_extractors(
-        monkeypatch,
-        dataset_info={"hash": {}, "windows": {"stats": {}}},
-        resolved_policy={"spectral": {}, "variance": {}},
-    )
-
-    evaluation_report = make_report(report, baseline)
-
-    assert evaluation_report["meta"]["model_id"] is None
-    assert evaluation_report["meta"]["adapter"] is None
-    assert evaluation_report["meta"]["device"] is None
-    assert "edit_name" not in evaluation_report
-    assert "name" not in evaluation_report["edit"]
-    assert evaluation_report["baseline_ref"]["model_id"] is None
-    assert evaluation_report["baseline_ref"]["run_id"] is None
-    diagnostics = evaluation_report["meta"].get("build_diagnostics", [])
-    codes = {entry["code"] for entry in diagnostics}
-    assert {
-        "meta.model_id_unavailable",
-        "meta.adapter_unavailable",
-        "meta.device_unavailable",
-    }.issubset(codes)

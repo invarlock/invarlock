@@ -102,3 +102,20 @@ def test_collect_optional_dependency_facts_marks_probe_failures() -> None:
     assert by_name["datasets"].spec_probe_failed is True
     assert by_name["bitsandbytes"].spec_probe_failed is True
     assert by_name["bitsandbytes"].runtime_probe_failed is False
+
+
+def test_collect_optional_dependency_facts_marks_bitsandbytes_runtime_probe_failure():
+    specs = {"bitsandbytes": object()}
+
+    facts = mod.collect_optional_dependency_facts(
+        has_cuda=True,
+        bitsandbytes_runtime_available_fn=lambda: (_ for _ in ()).throw(
+            RuntimeError("runtime probe failed")
+        ),
+        find_spec_fn=lambda name: specs.get(name),
+    )
+
+    by_name = {fact.name: fact for fact in facts}
+    assert by_name["bitsandbytes"].present is True
+    assert by_name["bitsandbytes"].runtime_available is None
+    assert by_name["bitsandbytes"].runtime_probe_failed is True

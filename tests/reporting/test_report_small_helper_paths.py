@@ -10,6 +10,11 @@ from invarlock.reporting.utils import (
 )
 
 
+class _BadFloat(float):
+    def __float__(self) -> float:
+        raise ValueError("bad float")
+
+
 def test_seed_bundle_sanitize_all_none() -> None:
     out = _sanitize_seed_bundle(
         {"python": None, "numpy": None, "torch": None}, fallback=7
@@ -28,6 +33,10 @@ def test_weighted_mean_handles_invalid_weights() -> None:
     # Non-positive and non-finite weights should be ignored; result finite
     val = _weighted_mean([1, 2, 3], [0, float("nan"), 1])
     assert math.isfinite(val)
+
+
+def test_weighted_mean_ignores_uncoercible_numeric_subclasses() -> None:
+    assert _weighted_mean([_BadFloat(1.0), 4.0], [1.0, 2.0]) == 4.0
 
 
 def test_pair_logloss_windows_insufficient_and_none() -> None:

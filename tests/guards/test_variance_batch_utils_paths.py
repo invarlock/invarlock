@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import torch
 
 from invarlock.guards.variance import VarianceGuard
@@ -39,3 +41,32 @@ def test_prepare_batch_tensors_tuple_branch():
     x = torch.ones(2, 3, dtype=torch.long)
     ids, labels = g._prepare_batch_tensors((x, x.clone()), device)
     assert isinstance(ids, torch.Tensor) and isinstance(labels, torch.Tensor)
+
+
+def test_compute_ppl_for_batches_falls_back_when_label_count_fails(monkeypatch):
+    g = VarianceGuard()
+
+    class _Model(torch.nn.Module):
+        def forward(self, inputs, labels=None):
+            return SimpleNamespace(loss=torch.tensor(0.25))
+
+    original_item = torch.Tensor.item
+
+    def bad_item(self):
+        value = original_item(self)
+        if value == 3:
+            raise RuntimeError("count failed")
+        return value
+
+    monkeypatch.setattr(torch.Tensor, "item", bad_item, raising=False)
+
+    ppl_values, loss_values, token_counts = g._compute_ppl_for_batches(
+        _Model(),
+        [torch.tensor([[1, 2, 3]])],
+        torch.device("cpu"),
+        return_counts=True,
+    )
+
+    assert len(ppl_values) == 1
+    assert loss_values == [0.25]
+    assert token_counts == [3]

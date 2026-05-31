@@ -4,6 +4,7 @@ import pytest
 import torch
 
 from invarlock.guards.spectral_control import (
+    _is_matrix_weight,
     apply_relative_spectral_cap,
     apply_spectral_control,
     apply_weight_rescale,
@@ -234,3 +235,15 @@ def test_apply_spectral_control_reraises_unexpected_errors() -> None:
                 _ for _ in ()
             ).throw(AssertionError("explode")),
         )
+
+
+def test_is_matrix_weight_rejects_malformed_ndim_metadata() -> None:
+    class _BadNdim:
+        @property
+        def ndim(self):
+            return self
+
+        def __int__(self):
+            raise TypeError("bad ndim")
+
+    assert _is_matrix_weight(_BadNdim()) is False

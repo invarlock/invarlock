@@ -6,6 +6,11 @@ from invarlock.reporting import guards_spectral as gs_mod
 from invarlock.reporting import report_make as report_make_mod
 
 
+class _BadFloat(float):
+    def __float__(self) -> float:
+        raise ValueError("bad float")
+
+
 def test_measurement_contract_digest_handles_bad_str() -> None:
     class _BadStr:
         def __str__(self) -> str:  # pragma: no cover
@@ -283,6 +288,119 @@ def test_extract_rmt_analysis_edge_risk_paths_and_contract_hashes() -> None:
     assert out["mode"] == "activation_edge_risk"
 
 
+def test_extract_rmt_analysis_numeric_fallback_and_explicit_violations(
+    monkeypatch,
+) -> None:
+    assert report_make_mod._to_float_or_none(_BadFloat(1.0)) is None
+
+    monkeypatch.setattr(
+        report_make_mod,
+        "get_tier_policies",
+        lambda: {
+            "balanced": {
+                "rmt": {
+                    "epsilon_default": _BadFloat(0.1),
+                    "epsilon_by_family": {"attn": 0.1},
+                }
+            }
+        },
+    )
+
+    report = {
+        "guards": [
+            {
+                "name": "rmt",
+                "policy": {"epsilon_by_family": {"attn": 0.3}},
+                "metrics": {
+                    "edge_risk_by_family_base": {
+                        "attn": 1.0,
+                        "ffn": 1.0,
+                    },
+                    "edge_risk_by_family": {"attn": 2.0, "ffn": 2.0},
+                    "epsilon_violations": [
+                        {"family": "attn", "edge_base": 1.0, "edge_cur": 1.2}
+                    ],
+                    "measurement_contract": {"kind": "  "},
+                },
+            }
+        ]
+    }
+
+    out = report_make_mod._extract_rmt_analysis(report, {})
+
+    assert out["evaluated"] is True
+    assert out["epsilon_violations"] == [
+        {"family": "attn", "edge_base": 1.0, "edge_cur": 1.2}
+    ]
+    assert out["mode"] == "activation_edge_risk"
+
+
+def test_extract_rmt_analysis_invalid_numeric_maps_and_contract_lookup_error(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        report_make_mod,
+        "get_tier_policies",
+        lambda: {"balanced": {"rmt": {"epsilon_default": "bad"}}},
+    )
+
+    class _BadMetrics(dict):
+        def get(self, key, default=None):  # type: ignore[override]
+            if key == "measurement_contract":
+                raise ValueError("contract failed")
+            return super().get(key, default)
+
+    report = {
+        "guards": [
+            {
+                "name": "rmt",
+                "policy": {"epsilon_by_family": {"attn": "bad"}},
+                "metrics": _BadMetrics(
+                    {
+                        "edge_risk_by_family_base": {"attn": "bad", "ffn": 1.0},
+                        "edge_risk_by_family": {"attn": 2.0, "ffn": "bad"},
+                    }
+                ),
+            }
+        ]
+    }
+
+    out = report_make_mod._extract_rmt_analysis(report, {})
+
+    assert out["evaluated"] is True
+    assert "measurement_contract" not in out
+    assert out["families"]["ffn"]["edge_base"] == 1.0
+
+
+def test_extract_rmt_analysis_ignores_non_mapping_metric_maps(monkeypatch) -> None:
+    monkeypatch.setattr(
+        report_make_mod,
+        "get_tier_policies",
+        lambda: {"balanced": {"rmt": {"epsilon_by_family": {"attn": 0.2}}}},
+    )
+
+    report = {
+        "guards": [
+            {
+                "name": "rmt",
+                "metrics": {
+                    "edge_risk_by_family_base": ["bad"],
+                    "edge_risk_by_family": ["bad"],
+                    "epsilon_by_family": ["bad"],
+                },
+            }
+        ]
+    }
+
+    out = report_make_mod._extract_rmt_analysis(report, {})
+
+    assert out["evaluated"] is True
+    assert out["edge_risk_by_family_base"] == {}
+    assert out["edge_risk_by_family"] == {}
+    assert out["epsilon_by_family"] == {}
+    assert out["families"]["attn"]["epsilon"] == 0.2
+
+
 def test_extract_spectral_analysis_uses_run_report_baseline_contract() -> None:
     contract = {"estimator": {"type": "power_iter", "iters": 4, "init": "ones"}}
     baseline = {
@@ -354,6 +472,39 @@ def test_extract_variance_analysis_handles_non_dict_variance_metrics() -> None:
         {"guards": [], "metrics": {"variance": ["bad"]}}
     )
     assert out["gain"] is None
+
+
+def test_extract_variance_analysis_ignores_non_dict_calibration() -> None:
+    report = {
+        "guards": [
+            {
+                "name": "variance",
+                "metrics": {"calibration": ["bad"], "gain": 0.2},
+                "policy": {"mode": "ab"},
+            }
+        ]
+    }
+
+    out = report_make_mod._extract_variance_analysis(report)
+
+    assert out["gain"] == 0.2
+    assert "calibration" not in out
+
+
+def test_extract_variance_analysis_ignores_bad_ratio_ci_values() -> None:
+    report = {
+        "guards": [
+            {
+                "name": "variance",
+                "metrics": {"ratio_ci": (_BadFloat(1.0), 2.0), "gain": 0.2},
+            }
+        ]
+    }
+
+    out = report_make_mod._extract_variance_analysis(report)
+
+    assert out["gain"] == 0.2
+    assert "ratio_ci" not in out
 
 
 def test_extract_variance_analysis_keeps_existing_window_ids() -> None:

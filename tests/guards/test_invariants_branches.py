@@ -3,7 +3,17 @@ from types import SimpleNamespace
 import torch
 import torch.nn as nn
 
-from invarlock.guards.invariants import InvariantsGuard, check_all_invariants
+from invarlock.guards.invariants import (
+    InvariantsGuard,
+    _coerce_vocab_counts,
+    _embedding_vocab_size_matches,
+    check_all_invariants,
+)
+
+
+class _BadInt:
+    def __int__(self):
+        raise ValueError("bad integer")
 
 
 class TinyModel(nn.Module):
@@ -389,3 +399,14 @@ def test_detect_non_finite_ignores_bad_tensor_checks_and_iteration_failures() ->
     guard = InvariantsGuard()
 
     assert guard._detect_non_finite(_BrokenModel()) == []
+
+
+def test_vocab_size_helpers_treat_uncoercible_values_as_mismatches() -> None:
+    counts = _coerce_vocab_counts({"good": "7", "bad": _BadInt()})
+
+    assert counts[7] == 1
+    assert _embedding_vocab_size_matches({}, {}, "embed", _BadInt()) == (False, None)
+    assert _embedding_vocab_size_matches({}, {"embed": _BadInt()}, "embed", 7) == (
+        False,
+        None,
+    )

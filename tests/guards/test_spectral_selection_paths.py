@@ -85,3 +85,17 @@ def test_select_budgeted_violations_bh_and_fail_closed() -> None:
 
     assert metrics["method"] == "bh"
     assert metrics["default_selected_without_pvalue"] == 1
+
+
+def test_finalize_ignores_evidence_dump_failures(monkeypatch) -> None:
+    import invarlock.core.guard_evidence as guard_evidence
+
+    expected = {"passed": True, "decision": "allow"}
+    monkeypatch.setattr(sp._spectral_runtime, "finalize_guard", lambda *_args: expected)
+    monkeypatch.setattr(
+        guard_evidence,
+        "maybe_dump_guard_evidence",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("dump failed")),
+    )
+
+    assert SpectralGuard().finalize(object()) is expected

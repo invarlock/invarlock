@@ -19,6 +19,17 @@ def test_set_seed_reseeds_python_and_numpy() -> None:
     assert first == second
 
 
+def test_set_seed_tolerates_missing_torch(monkeypatch) -> None:
+    monkeypatch.setattr(determinism_policy, "torch", None)
+    determinism_policy.set_seed(321)
+    first = (random.random(), float(np.random.rand()))
+
+    determinism_policy.set_seed(321)
+    second = (random.random(), float(np.random.rand()))
+
+    assert first == second
+
+
 def test_determinism_policy_exports_seed_helper() -> None:
     assert callable(determinism_policy.set_seed)
 

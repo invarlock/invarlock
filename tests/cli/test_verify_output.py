@@ -12,12 +12,18 @@ class _BadFloat:
         raise ValueError("boom")
 
 
+class _BadFloatSubclass(float):
+    def __float__(self) -> float:
+        raise ValueError("boom")
+
+
 class _ExplodingDict(dict[str, Any]):
     def get(self, key: str, default: Any = None) -> Any:
         raise RuntimeError(f"cannot read {key}")
 
 
 def test_coerce_ci_output_and_metric_family_paths() -> None:
+    assert verify_output._coerce_finite_float(_BadFloatSubclass(1.0)) is None
     assert verify_output._coerce_ci_output(None) is None
     assert verify_output._coerce_ci_output([1, 2]) == [1.0, 2.0]
     assert verify_output._coerce_ci_output([_BadFloat(), 2]) is None

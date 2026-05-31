@@ -106,6 +106,11 @@ class _RecoverableBadQuantConfig(dict):
         raise ValueError("broken quant config")
 
 
+class _RecoverableBadQuantConfigFull(dict):
+    def get(self, *_args, **_kwargs):
+        raise TypeError("broken quant config")
+
+
 def test_read_local_hf_config_and_quant_detection_paths(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -129,6 +134,12 @@ def test_read_local_hf_config_and_quant_detection_paths(
     assert (
         mod._detect_quant_family_from_cfg(
             {"quantization_config": _RecoverableBadQuantConfig()}
+        )
+        is None
+    )
+    assert (
+        mod._detect_quant_family_from_cfg(
+            {"quantization_config": _RecoverableBadQuantConfigFull({"truthy": True})}
         )
         is None
     )

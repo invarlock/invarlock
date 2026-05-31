@@ -261,6 +261,35 @@ def test_calculate_lens_metrics_non_strict_continues_on_activation_failure(
     )
 
 
+def test_calculate_lens_metrics_continues_after_pre_eval_check_failure(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        lens_mod,
+        "_perform_pre_eval_checks",
+        lambda *_a, **_k: (_ for _ in ()).throw(AttributeError("precheck")),
+    )
+    monkeypatch.setattr(
+        lens_mod,
+        "_collect_activations",
+        lambda *_a, **_k: {
+            "hidden_states": [],
+            "fc1_activations": [],
+            "targets": [],
+            "first_batch": None,
+        },
+    )
+
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
+    dataloader = [{"input_ids": torch.zeros(1, 2, dtype=torch.long)}]
+
+    out = lens_mod.calculate_lens_metrics_for_model(
+        nn.Linear(2, 2), dataloader, config=cfg
+    )
+
+    assert all(math.isnan(out[key]) for key in ("sigma_max", "head_energy", "mi_gini"))
+
+
 def test_perform_pre_eval_checks_handles_missing_context_attr_and_no_warning_path() -> (
     None
 ):
@@ -355,6 +384,91 @@ def test_calculate_sigma_max_all_non_finite_triggers_nan_path() -> None:
     assert math.isnan(out)
 
 
+def test_calculate_sigma_max_uses_values_when_name_column_is_missing() -> None:
+    class _DepMgr:
+        def is_available(self, _name: str) -> bool:  # noqa: ANN001
+            return True
+
+        def get_module(self, _name: str):  # noqa: ANN001
+            def _scan(_model, _batch):  # noqa: ANN001
+                class _Gains:
+                    values = [0.5, 1.25]
+
+                    def __len__(self) -> int:
+                        return 2
+
+                return _Gains()
+
+            return _scan
+
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
+    out = activation_mod._calculate_sigma_max(
+        nn.Linear(2, 2),
+        first_batch={"input_ids": torch.zeros(1, 2, dtype=torch.long)},
+        dep_manager=_DepMgr(),
+        config=cfg,
+        device=torch.device("cpu"),
+    )
+
+    assert out == 1.25
+
+
+def test_calculate_sigma_max_filters_embed_and_lm_head_named_layers() -> None:
+    class _NameSeries:
+        class _StringOps:
+            def contains(self, *_args, **_kwargs):
+                return _Mask([True, False, True])
+
+        str = _StringOps()
+
+    class _Mask:
+        def __init__(self, values):
+            self.values = list(values)
+
+        def __invert__(self):
+            return _Mask([not value for value in self.values])
+
+    class _Gains:
+        columns = ["name", "gain"]
+
+        def __init__(self, gains):
+            self.gain = list(gains)
+
+        def __getitem__(self, key):
+            if key == "name":
+                return _NameSeries()
+            if isinstance(key, _Mask):
+                return _Gains(
+                    [
+                        gain
+                        for gain, keep in zip(self.gain, key.values, strict=False)
+                        if keep
+                    ]
+                )
+            raise KeyError(key)
+
+        def __len__(self) -> int:
+            return len(self.gain)
+
+    class _DepMgr:
+        def is_available(self, _name: str) -> bool:  # noqa: ANN001
+            return True
+
+        def get_module(self, _name: str):  # noqa: ANN001
+            return lambda _model, _batch: _Gains([99.0, 1.75, 88.0])
+
+    cfg = metrics_mod.MetricsConfig(use_cache=False, strict_validation=False)
+    out = activation_mod._calculate_sigma_max(
+        nn.Linear(2, 2),
+        first_batch={"input_ids": torch.zeros(1, 2, dtype=torch.long)},
+        dep_manager=_DepMgr(),
+        config=cfg,
+        device=torch.device("cpu"),
+    )
+
+    assert out == 1.75
+
+
 def test_calculate_mi_gini_oom_calls_empty_cache_when_cuda_available(
     monkeypatch,
 ) -> None:
@@ -436,6 +550,30 @@ def test_validate_metrics_environment_reports_missing_modules(monkeypatch) -> No
     report = metrics_environment_mod.validate_metrics_environment()
     assert report.ok is True
     assert report.missing_dependencies == (("missing", "boom"),)
+    assert "missing: boom" in report.messages
+
+
+def test_validate_metrics_environment_reports_clean_optional_dependency_set(
+    monkeypatch,
+) -> None:
+    class _DepMgr:
+        available_modules = {"numpy": object()}
+        missing_modules = []
+
+        def get_missing_dependencies(self):  # noqa: ANN001
+            return self.missing_modules
+
+    monkeypatch.setattr(metrics_environment_mod, "DependencyManager", _DepMgr)
+
+    report = metrics_environment_mod.validate_metrics_environment()
+
+    assert report.ok is True
+    assert report.available_dependencies == ("numpy",)
+    assert report.missing_dependencies == ()
+    assert report.messages == (
+        "Basic dependencies available",
+        "1/1 optional dependencies available",
+    )
 
 
 def test_validate_perplexity_hits_poor_status_path() -> None:

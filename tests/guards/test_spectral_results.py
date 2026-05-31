@@ -13,6 +13,11 @@ from invarlock.guards.spectral_results import (
 )
 
 
+class _BadFloat(float):
+    def __float__(self):
+        raise ValueError("bad float")
+
+
 def test_quantile_helper_branches() -> None:
     assert _quantile([], 0.5) == 0.0
     assert _quantile([3.0], 0.5) == 3.0
@@ -45,6 +50,16 @@ def test_compute_family_observability_ignores_boolean_scores() -> None:
     assert quantiles["ffn"]["count"] == 1
     assert quantiles["ffn"]["max"] == 2.5
     assert top["ffn"] == [{"module": "m2", "z": 2.5, "family": "ffn"}]
+
+
+def test_compute_family_observability_ignores_uncoercible_real_scores() -> None:
+    quantiles, top = compute_family_observability(
+        {"bad": _BadFloat(1.0), "good": 2.0},
+        {"bad": "ffn", "good": "ffn"},
+    )
+
+    assert quantiles["ffn"]["count"] == 1
+    assert top["ffn"] == [{"module": "good", "z": 2.0, "family": "ffn"}]
 
 
 def test_compute_family_observability_clamps_invalid_top_k() -> None:

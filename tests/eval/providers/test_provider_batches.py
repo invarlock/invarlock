@@ -36,6 +36,38 @@ def test_text_lm_causal_batches_and_pairing():
     assert len(schedule) == 7
 
 
+def test_text_lm_batches_exact_division_has_no_trailing_empty_batch():
+    provider = TextLMProvider(task="causal", n=6, seq_len=5)
+    batches = list(provider.batches(seed=123, batch_size=3))
+
+    assert [len(batch["ids"]) for batch in batches] == [3, 3]
+    assert len(_flatten_batches(batches)) == 6
+
+
+def test_text_lm_provider_rejects_invalid_config_and_reports_digest() -> None:
+    with pytest.raises(ValueError, match="task"):
+        TextLMProvider(task="classification")
+    with pytest.raises(ValueError, match="non-negative"):
+        TextLMProvider(n=-1)
+    with pytest.raises(ValueError, match="at least 3"):
+        TextLMProvider(seq_len=2)
+    with pytest.raises(ValueError, match=r"\[0, 1\]"):
+        TextLMProvider(mask_prob=-0.1)
+
+    assert TextLMProvider(task="mlm").digest() == {
+        "provider": "text_lm",
+        "version": 1,
+        "task": "mlm",
+    }
+
+
+def test_text_lm_batches_rejects_nonpositive_batch_size() -> None:
+    provider = TextLMProvider(task="causal", n=1, seq_len=5)
+
+    with pytest.raises(ValueError, match="batch_size"):
+        list(provider.batches(seed=1, batch_size=0))
+
+
 def test_text_lm_mlm_masks_and_digest_stability():
     provider = TextLMProvider(task="mlm", n=5, seq_len=8, mask_prob=0.2)
     batches1 = list(provider.batches(seed=7, batch_size=2))
@@ -74,6 +106,14 @@ def test_text_lm_mlm_masks_present_even_with_zero_prob():
     batch = next(iter(provider.batches(seed=5, batch_size=1)))
     labels = batch["labels"][0]
     assert any(val != -100 for val in labels)
+
+
+def test_text_lm_mlm_zero_prob_can_leave_no_maskable_tokens() -> None:
+    provider = TextLMProvider(task="mlm", n=1, seq_len=3, mask_prob=0.0, eos_id=14)
+    batch = next(iter(provider.batches(seed=7, batch_size=1)))
+
+    assert batch["labels"][0] == [-100, -100, -100]
+    assert batch["weights"][0] == 0
 
 
 def test_text_lm_provider_mlm_masks_present_extra():

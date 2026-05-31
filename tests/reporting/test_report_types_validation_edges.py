@@ -10,6 +10,13 @@ def test_validate_report_rejects_blank_primary_metric_kind() -> None:
     assert report_types.validate_report(report) is False
 
 
+def test_validate_report_rejects_unknown_primary_metric_kind() -> None:
+    report = report_types.create_empty_report()
+    report["metrics"]["primary_metric"] = {"kind": "unknown_metric", "final": 1.0}
+
+    assert report_types.validate_report(report) is False
+
+
 def test_validate_report_rejects_bool_primary_metric_final() -> None:
     report = report_types.create_empty_report()
     report["metrics"]["primary_metric"] = {"kind": "accuracy", "final": True}

@@ -1,4 +1,6 @@
 import builtins
+import importlib
+import importlib.metadata
 import os
 import re
 from unittest.mock import patch
@@ -6,10 +8,13 @@ from unittest.mock import patch
 import click
 import typer
 from click.termui import strip_ansi
+from click.testing import CliRunner as ClickRunner
 from typer.testing import CliRunner
 
 os.environ["INVARLOCK_LIGHT_IMPORT"] = "1"
-from invarlock.cli.app import _load_lazy_subapp, app, version
+from invarlock.cli.app import _load_advanced_subapp, _load_lazy_subapp, app, version
+
+app_mod = importlib.import_module("invarlock.cli.app")
 
 
 def test_app_initialization():
@@ -110,3 +115,62 @@ def test_ordered_group_handles_advanced_and_unknown_lazy_subapps():
     assert _load_lazy_subapp(command, "_run") is False
     assert command.get_command(ctx, "_run") is None
     assert command.get_command(ctx, "definitely-missing-command") is None
+
+
+def test_advanced_group_handles_registered_runtime_and_unknown_commands():
+    command = typer.main.get_command(app)
+    assert isinstance(command, click.Group)
+    root_ctx = click.Context(command)
+    assert _load_lazy_subapp(command, "advanced") is True
+    advanced = command.get_command(root_ctx, "advanced")
+    assert isinstance(advanced, click.Group)
+    advanced_ctx = click.Context(advanced)
+
+    assert _load_advanced_subapp(advanced, "runtime-verify") is True
+    assert advanced.get_command(advanced_ctx, "runtime-verify") is not None
+    assert _load_advanced_subapp(advanced, "definitely-missing") is False
+    assert advanced.get_command(advanced_ctx, "definitely-missing") is None
+
+
+def test_missing_dependency_subapp_raises_usage_error():
+    missing = app_mod._missing_dependency_subapp("calibrate", "demo-lib")
+
+    result = ClickRunner().invoke(typer.main.get_command(missing), [])
+
+    assert result.exit_code != 0
+    assert "demo-lib" in result.output
+
+
+def test_package_version_import_failure_and_module_version_failure(monkeypatch):
+    original_import = builtins.__import__
+
+    def _blocked_import(name, *args, **kwargs):  # noqa: ANN001
+        fromlist = args[2] if len(args) > 2 else kwargs.get("fromlist", ())
+        if name == "importlib.metadata":
+            raise ImportError("metadata unavailable")
+        if name == "invarlock" and fromlist:
+            raise ImportError("version unavailable")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", _blocked_import)
+
+    assert app_mod._resolve_package_version() is None
+    assert app_mod._resolve_module_version() is None
+
+
+def test_package_version_not_found_falls_back_to_module_version(monkeypatch):
+    monkeypatch.setattr(
+        importlib.metadata,
+        "version",
+        lambda _name: (_ for _ in ()).throw(
+            importlib.metadata.PackageNotFoundError("missing")
+        ),
+    )
+
+    assert app_mod._resolve_package_version() is None
+    with patch("invarlock.cli.app.console") as mock_console:
+        app_mod._emit_version()
+
+    args, _ = mock_console.print.call_args
+    assert isinstance(args[0], str)
+    assert args[0].startswith("InvarLock ")

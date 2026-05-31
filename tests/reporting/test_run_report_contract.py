@@ -206,6 +206,30 @@ def test_persist_run_report_outputs_preserves_existing_backend_inventory(
     assert payload["quantized_module_count"] == 2
 
 
+def test_persist_run_report_outputs_ignores_corrupt_backend_inventory(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    def _save_report(report, out_dir, formats=None, filename_prefix="report"):
+        out = out_dir / "report.json"
+        out.write_text("{}", encoding="utf-8")
+        return {"json": out}
+
+    monkeypatch.setattr(report_files, "save_report", _save_report)
+    (tmp_path / "backend_inventory.json").write_text("[", encoding="utf-8")
+
+    report = create_empty_report()
+    result = persist_run_report_outputs(
+        report=report,
+        run_dir=tmp_path,
+        run_config=SimpleNamespace(event_path=tmp_path / "events.jsonl"),
+        telemetry=False,
+        save_telemetry_report_fn=lambda *args, **kwargs: None,
+    )
+
+    assert "backend_inventory" not in result.saved_files
+
+
 def test_persist_run_report_outputs_marks_context_inventory_inference_smoke(
     monkeypatch,
     tmp_path: Path,
