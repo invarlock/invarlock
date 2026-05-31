@@ -63,6 +63,16 @@ def test_validate_tensor_inf_non_strict_replaces() -> None:
     assert float(out[1].item()) == -123.0
 
 
+def test_validate_tensor_inf_replacement_nonstrict() -> None:
+    tensor = torch.tensor([float("inf"), -float("inf"), 1.0])
+    out = InputValidator.validate_tensor(
+        tensor,
+        "tensor",
+        MetricsConfig(strict_validation=False),
+    )
+    assert torch.isfinite(out).all()
+
+
 def test_validate_dataloader_empty_paths_raise_or_warn(monkeypatch) -> None:
     seen: list[str] = []
     monkeypatch.setattr(

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from invarlock.core.api import Guard, RunReport
 from invarlock.core.exceptions import InvarlockError
+from invarlock.core.runner import CoreRunner
 from invarlock.core.runner_guards import (
     _coerce_diagnostics,
     _normalize_guard_result,
@@ -204,6 +207,16 @@ def test_resolve_guard_policies_defaults_when_config_meta_has_no_auto_key() -> N
 
     assert policies == {"spectral": {"deadband": 0.1}}
     assert seen == {"tier": "balanced", "edit_name": "quant", "overrides": {}}
+
+
+def test_core_runner_resolve_guard_policies_fallback_to_default_tier() -> None:
+    runner = CoreRunner()
+    report = SimpleNamespace(meta={"config": {}}, edit={})
+    policies = runner._resolve_guard_policies(report, auto_config=None)
+
+    assert isinstance(policies, dict)
+    for key in ("spectral", "rmt", "variance"):
+        assert key in policies
 
 
 def test_prepare_guards_phase_non_strict_invarlock_errors_are_recorded_and_skipped() -> (

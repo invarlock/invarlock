@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import importlib
+import io
+import warnings
 from collections.abc import Callable, Mapping
+from contextlib import redirect_stderr, redirect_stdout
 from typing import Any, Literal
 
 from invarlock.core.builtin_plugin_catalog import builtin_plugin_support_metadata
@@ -15,6 +19,7 @@ _INVENTORY_PROBE_ERRORS = (
     TypeError,
     ValueError,
 )
+_SAFE_IMPORT_ERRORS = (ImportError, AttributeError, RuntimeError, OSError)
 
 
 def is_minimal_plugins_view(env_value: str | None) -> bool:
@@ -28,6 +33,81 @@ def detect_cuda_available(torch_module: Any) -> bool:
         return bool(cuda and cuda.is_available())
     except _INVENTORY_PROBE_ERRORS:
         return False
+
+
+def _safe_import(module_name: str, attr: str | None = None) -> bool:
+    """Return True when a backend module (and optional symbol) imports cleanly."""
+
+    try:
+        with (
+            warnings.catch_warnings(),
+            redirect_stdout(io.StringIO()),
+            redirect_stderr(io.StringIO()),
+        ):
+            warnings.simplefilter("ignore")
+            module = importlib.import_module(module_name)
+        if attr is None:
+            return True
+        return getattr(module, attr, None) is not None
+    except _SAFE_IMPORT_ERRORS:
+        return False
+
+
+def bitsandbytes_runtime_available() -> bool:
+    """Return True when bitsandbytes is importable on this host."""
+
+    return _safe_import("bitsandbytes")
+
+
+def get_adapter_rows() -> list[dict[str, Any]]:
+    """Build compact adapter rows without importing heavy optional backends."""
+    from invarlock.core.registry import get_registry
+
+    registry = get_registry()
+    rows: list[dict[str, Any]] = []
+    for name in registry.list_adapters():
+        info = registry.get_plugin_info(name, "adapters")
+        module = str(info.get("module") or "")
+        support = (
+            "auto"
+            if module.startswith("invarlock.adapters") and name in {"hf_auto"}
+            else ("core" if module.startswith("invarlock.adapters") else "optional")
+        )
+        backend, status, enable = None, "ready", ""
+
+        if name in {
+            "hf_causal",
+            "hf_mlm",
+            "hf_multimodal",
+            "hf_seq2seq",
+            "hf_auto",
+        }:
+            backend = "transformers"
+        elif name == "hf_gptq":
+            backend = "gptqmodel"
+        elif name == "hf_awq":
+            backend = "gptqmodel"
+        elif name == "hf_bnb":
+            backend = "bitsandbytes"
+            if not bitsandbytes_runtime_available():
+                status, enable = (
+                    "unsupported",
+                    "Requires CUDA or a compatible bitsandbytes runtime",
+                )
+
+        rows.append(
+            {
+                "name": name,
+                "origin": "core" if support in {"core", "auto"} else "plugin",
+                "mode": "auto-matcher" if support == "auto" else "adapter",
+                "backend": backend,
+                "version": None,
+                "status": status,
+                "enable": enable,
+            }
+        )
+
+    return rows
 
 
 def _module_origin(module: str) -> str:

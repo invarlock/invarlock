@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from invarlock.eval import bench as bench_mod
+import invarlock.eval.bench_policy as bench_mod
+from invarlock.eval.bench_runner import DependencyChecker
 
 
 def test_scenario_config_profiles_and_validation():
@@ -33,7 +34,7 @@ def test_benchmark_config_epsilon_override_sets_epsilon():
 
 
 def test_dependency_checker_only_allows_quant_rtn():
-    ok, msg = bench_mod.DependencyChecker.check_edit_dependencies("quant_rtn")
+    ok, msg = DependencyChecker.check_edit_dependencies("quant_rtn")
     assert ok is True and "Available" in msg
-    bad, reason = bench_mod.DependencyChecker.check_edit_dependencies("other")
+    bad, reason = DependencyChecker.check_edit_dependencies("other")
     assert bad is False and "unsupported" in reason

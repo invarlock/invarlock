@@ -1,9 +1,9 @@
 import torch
 
-from invarlock.core.contracts import (
+from invarlock.guards.rmt_analysis import rmt_correction_is_monotone
+from invarlock.guards.spectral_control import (
     enforce_relative_spectral_cap,
     enforce_weight_energy_bound,
-    rmt_correction_is_monotone,
 )
 
 

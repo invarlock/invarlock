@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 import torch.nn as nn
 
-from invarlock.eval.probes.fft import compute_head_energy_scores, fft_head_energy
+from invarlock.eval.probes.importance import compute_head_energy_scores, fft_head_energy
 
 torch = pytest.importorskip("torch")
 

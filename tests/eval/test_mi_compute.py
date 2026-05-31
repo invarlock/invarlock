@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 import pytest
 import torch
 
-import invarlock.eval.probes.mi as mi_mod
+import invarlock.eval.probes.importance as mi_mod
 from tests.eval._support_mi import MockAlternativeModel, MockGPT2Model
 
 

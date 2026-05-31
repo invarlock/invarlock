@@ -1,6 +1,6 @@
 import types
 
-from invarlock.core.runner_context import collect_cuda_flags
+from invarlock.core.runner import collect_cuda_flags
 
 
 def test_collect_cuda_flags_minimal_torch(monkeypatch):

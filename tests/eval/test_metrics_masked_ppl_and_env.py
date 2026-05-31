@@ -7,12 +7,10 @@ import torch.nn as nn
 from invarlock.eval.metrics import (
     MetricsConfig,
     compute_ppl,
-)
-from invarlock.eval.metrics_activation import _mi_gini_optimized_cpu_path
-from invarlock.eval.metrics_environment import (
     get_metrics_info,
     validate_metrics_environment,
 )
+from invarlock.eval.metrics_activation import _mi_gini_optimized_cpu_path
 
 
 class DummyLM(nn.Module):

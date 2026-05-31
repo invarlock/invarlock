@@ -5,7 +5,7 @@ import pytest
 import torch
 
 from invarlock.eval import metrics as M
-from invarlock.eval import metrics_environment as ME
+from invarlock.eval import metrics as ME
 from invarlock.eval.metrics_activation import _mi_gini_optimized_cpu_path
 
 

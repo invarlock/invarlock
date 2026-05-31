@@ -3,7 +3,7 @@ import types
 import torch
 import torch.nn as nn
 
-import invarlock.eval.probes.post_attention as pa
+import invarlock.eval.probes.importance as pa
 
 
 class TinyBlock(nn.Module):

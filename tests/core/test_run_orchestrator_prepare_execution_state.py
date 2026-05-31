@@ -6,8 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from invarlock.core import run_orchestrator_execute_environment as environment_mod
 from invarlock.core import run_orchestrator_execute_execution as execution_mod
-from invarlock.core import run_orchestrator_execute_seed as seed_mod
 
 
 def test_prepare_execution_state_emits_snapshot_retry_and_reuses_loaded_model(
@@ -91,7 +91,7 @@ def test_resolve_loss_seed_defaults_when_torch_is_missing(
         random=SimpleNamespace(get_state=lambda: ("MT19937", [42], 0, 0, 0))
     )
 
-    state = seed_mod._resolve_loss_seed_and_determinism_state(
+    state = environment_mod._resolve_loss_seed_and_determinism_state(
         SimpleNamespace(eval={"loss": {"type": "auto"}}),
         model_profile=SimpleNamespace(default_loss="ce"),
         profile_normalized="dev",

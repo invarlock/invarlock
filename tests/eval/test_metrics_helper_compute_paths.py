@@ -15,13 +15,16 @@ from invarlock.eval.metrics import (
     InputValidator,
     MetricsConfig,
     ValidationError,
+    _finalize_results,
     analyze_spectral_changes,
     compute_parameter_deltas,
     compute_perplexity,
     compute_perplexity_strict,
     compute_ppl,
+    get_metrics_info,
     measure_latency,
     measure_memory,
+    validate_metrics_environment,
     validate_perplexity,
 )
 from invarlock.eval.metrics_activation import (
@@ -37,11 +40,6 @@ from invarlock.eval.metrics_activation import (
     _mi_gini_optimized_cpu_path,
     _perform_pre_eval_checks,
 )
-from invarlock.eval.metrics_environment import (
-    get_metrics_info,
-    validate_metrics_environment,
-)
-from invarlock.eval.metrics_lens import _finalize_results
 
 
 class DummyCausalLM(nn.Module):

@@ -4,19 +4,22 @@ import math
 
 import pytest
 
-import invarlock.eval.bench_regression as bench_regression
-import invarlock.guards.spectral_analysis as spectral_analysis
+import invarlock.eval.bench_policy as bench
+from invarlock.core.bootstrap import paired_delta_mean_ci
 from invarlock.core.exceptions import ValidationError
-from invarlock.eval.bootstrap import paired_delta_mean_ci
-from invarlock.eval.tasks.classification import accuracy_from_records
-from invarlock.eval.tasks.qa import exact_match_from_records
-from invarlock.eval.tasks.text_generation import (
+from invarlock.eval.tasks import (
     _lcs_len,
     _rouge_l,
+    accuracy_from_records,
     bleu1_from_records,
+    exact_match_from_records,
     rouge_l_from_records,
 )
-from invarlock.guards.spectral_detection import classify_model_families
+from invarlock.guards.spectral_detection import (
+    classify_model_families,
+    compute_z_scores,
+)
+from invarlock.guards.spectral_measurement import compute_spectral_norms
 
 
 def test_paired_delta_mean_ci_supports_weights_and_percentile() -> None:
@@ -39,16 +42,17 @@ def test_paired_delta_mean_ci_rejects_bad_method() -> None:
         paired_delta_mean_ci([1.0, 2.0], [1.0, 2.0], method="bogus")
 
 
-def test_bench_regression_constants_are_exported() -> None:
-    assert bench_regression.BENCH_GOLDEN_ID == "bench-golden-2025-12-13"
-    assert len(bench_regression.BENCH_GOLDEN_SHA256) == 64
-    assert bench_regression.__all__ == ["BENCH_GOLDEN_ID", "BENCH_GOLDEN_SHA256"]
+def test_bench_golden_constants_are_exported() -> None:
+    assert bench.BENCH_GOLDEN_ID == "bench-golden-2025-12-13"
+    assert len(bench.BENCH_GOLDEN_SHA256) == 64
+    assert "BENCH_GOLDEN_ID" in bench.__all__
+    assert "BENCH_GOLDEN_SHA256" in bench.__all__
 
 
-def test_spectral_analysis_reexports_expected_symbols() -> None:
-    assert "compute_z_scores" in spectral_analysis.__all__
-    assert "compute_spectral_norms" in spectral_analysis.__all__
-    assert spectral_analysis.classify_model_families is classify_model_families
+def test_spectral_owned_modules_export_expected_symbols() -> None:
+    assert callable(compute_z_scores)
+    assert callable(compute_spectral_norms)
+    assert callable(classify_model_families)
 
 
 def test_accuracy_from_records_covers_variants_and_nan() -> None:

@@ -217,23 +217,6 @@ def test_cli_smoke_negative_exercises_failure_categories() -> None:
     )
 
 
-def test_cli_smoke_realistic_wraps_gpt2_user_journey_smoke() -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "smoke" / "cli_smoke_realistic.sh"
-    assert script_path.exists(), (
-        "Expected scripts/smoke/cli_smoke_realistic.sh to exist"
-    )
-    assert os.access(script_path, os.X_OK), (
-        "cli_smoke_realistic.sh should be executable"
-    )
-
-    contents = script_path.read_text(encoding="utf-8")
-    assert 'MODE="${INVARLOCK_REALISTIC_SMOKE_MODE:-local}"' in contents
-    assert 'JOURNEYS="${INVARLOCK_REALISTIC_SMOKE_JOURNEYS:-noop,negative}"' in contents
-    assert "run_gpt2_user_journey_smoke.sh" in contents
-    assert "lane=realistic exit_code=$RC" in contents
-
-
 def test_cli_exhaustive_smoke_dispatches_lane_matrix() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     script_path = repo_root / "scripts" / "smoke" / "cli_exhaustive_smoke.sh"
@@ -248,7 +231,16 @@ def test_cli_exhaustive_smoke_dispatches_lane_matrix() -> None:
     assert 'LANES_RAW="${INVARLOCK_SMOKE_LANES:-fast,negative,realistic}"' in contents
     assert 'script_path="$REPO_ROOT/scripts/smoke/cli_smoke_fast.sh"' in contents
     assert 'script_path="$REPO_ROOT/scripts/smoke/cli_smoke_negative.sh"' in contents
-    assert 'script_path="$REPO_ROOT/scripts/smoke/cli_smoke_realistic.sh"' in contents
+    assert (
+        'script_path="$REPO_ROOT/scripts/smoke/run_gpt2_user_journey_smoke.sh"'
+        in contents
+    )
+    assert 'mode="${INVARLOCK_REALISTIC_SMOKE_MODE:-local}"' in contents
+    assert 'journeys="${INVARLOCK_REALISTIC_SMOKE_JOURNEYS:-noop,negative}"' in contents
+    assert (
+        'INVARLOCK_SMOKE_MODE="$mode" INVARLOCK_SMOKE_JOURNEYS="$journeys"' in contents
+    )
+    assert "lane=realistic exit_code=$rc" in contents
     assert "unknown smoke lane" in contents
     assert "failed=${FAILED_LANES}" in contents
 

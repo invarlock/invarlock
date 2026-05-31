@@ -18,7 +18,7 @@ from invarlock.eval.metrics import (
     validate_perplexity,
 )
 from invarlock.eval.metrics import ValidationError as MValidationError
-from invarlock.eval.metrics_model_io import forward_loss_causal
+from invarlock.eval.metrics_runtime import forward_loss_causal
 
 
 def test_bootstrap_confidence_interval_valid_and_errors():

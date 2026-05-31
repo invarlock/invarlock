@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from invarlock.cli.run_pairing_helpers import _compute_mask_positions_digest
-from invarlock.eval.providers.seq2seq import Seq2SeqProvider
-from invarlock.eval.providers.text_lm import TextLMProvider
+from invarlock.cli.run_pairing import _compute_mask_positions_digest
+from invarlock.eval.data import Seq2SeqProvider, TextLMProvider
 
 
 def _flatten_batches(batches):
@@ -75,6 +74,16 @@ def test_text_lm_mlm_masks_present_even_with_zero_prob():
     batch = next(iter(provider.batches(seed=5, batch_size=1)))
     labels = batch["labels"][0]
     assert any(val != -100 for val in labels)
+
+
+def test_text_lm_provider_mlm_masks_present_extra():
+    provider = TextLMProvider(task="mlm", n=5, seq_len=6, mask_prob=0.5)
+    for batch in provider.batches(seed=7, batch_size=10):
+        for labels, weight in zip(batch["labels"], batch["weights"], strict=False):
+            assert weight > 0
+            assert any(int(token) != -100 for token in labels)
+    schedule = provider.pairing_schedule()
+    assert schedule == sorted(schedule)
 
 
 def test_seq2seq_provider_weights_match_target_tokens():

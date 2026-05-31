@@ -25,7 +25,7 @@ from typing import Any, cast
 from invarlock import __version__ as INVARLOCK_VERSION
 from invarlock.runtime_security import third_party_plugins_allowed
 
-from .abi import INVARLOCK_CORE_ABI
+from . import INVARLOCK_CORE_ABI
 from .api import Guard, ModelAdapter, ModelEdit
 from .builtin_plugin_catalog import builtin_plugin_specs
 from .exceptions import DependencyError, PluginError

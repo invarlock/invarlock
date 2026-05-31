@@ -21,7 +21,7 @@ from invarlock.eval.metrics import (
 from invarlock.eval.metrics_activation import (
     _collect_activations,
 )
-from invarlock.eval.metrics_model_io import forward_loss_causal
+from invarlock.eval.metrics_runtime import forward_loss_causal
 
 
 class DummyCausalLM(nn.Module):
@@ -244,7 +244,7 @@ def test_measure_memory_break_and_continue_and_latency_total_tokens_zero():
 
 def test_validate_env_failure_path():
     # Patch DependencyManager on the real module to raise in constructor
-    from invarlock.eval import metrics_environment as metrics_environment_mod
+    from invarlock.eval import metrics as metrics_environment_mod
 
     class DMErr:
         def __init__(self):

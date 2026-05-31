@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.eval.providers.vision_text import VisionTextProvider
+from invarlock.eval.data import VisionTextProvider
 
 
 def test_vtext_provider_digest_and_schedule_extra_case():

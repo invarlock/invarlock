@@ -136,11 +136,11 @@ def test_registry_entry_points_select_and_get_paths(monkeypatch):
     # Build stubs that exercise both eps.select(...) and eps.get(...)
 
     # One entry point that resolves to a valid guard via .load()
-    from invarlock.plugins.hello_guard import HelloGuard
+    from invarlock.plugins import HelloGuard
 
     ep_ok = _EP(
         name="ep_hello_guard",
-        value="invarlock.plugins.hello_guard:HelloGuard",
+        value="invarlock.plugins:HelloGuard",
         dist=_Dist("invarlock-plugins", "0.0"),
         loader=HelloGuard,
     )
@@ -203,11 +203,11 @@ def test_get_plugin_info_reports_entry_point_group_for_entry_point_plugins(
 ) -> None:
     monkeypatch.setenv("INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS", "1")
 
-    from invarlock.plugins.hello_guard import HelloGuard
+    from invarlock.plugins import HelloGuard
 
     ep = _EP(
         name="ep_hello_guard",
-        value="invarlock.plugins.hello_guard:HelloGuard",
+        value="invarlock.plugins:HelloGuard",
         dist=_Dist("invarlock-plugins", "0.0"),
         loader=HelloGuard,
     )
@@ -443,7 +443,7 @@ def test_registry_additional_paths(monkeypatch):
     )
     r._guards["hello_guard"] = reg.PluginInfo(
         name="hello_guard",
-        module="invarlock.plugins.hello_guard",
+        module="invarlock.plugins",
         class_name="HelloGuard",
         available=False,
         status="disabled",
@@ -516,7 +516,7 @@ def test_create_plugin_info_parse_and_metadata_paths(monkeypatch):
         "metadata_version",
         lambda pkg: (_ for _ in ()).throw(reg.PackageNotFoundError(pkg)),
     )
-    ok_ep = _EP(name="ok", value="invarlock.plugins.hello_guard:HelloGuard", dist=None)
+    ok_ep = _EP(name="ok", value="invarlock.plugins:HelloGuard", dist=None)
     info_ok = r._create_plugin_info(ok_ep, "guards")
     assert info_ok.available is True
     assert info_ok.status == "Deferred load"
@@ -528,7 +528,7 @@ def test_create_plugin_info_uses_dist_name_when_metadata_name_is_missing() -> No
     r = reg.CoreRegistry()
     ep = _EP(
         name="ok",
-        value="invarlock.plugins.hello_guard:HelloGuard",
+        value="invarlock.plugins:HelloGuard",
         dist=types.SimpleNamespace(name="fallback-dist", version="1.2.3", metadata={}),
     )
 
@@ -637,7 +637,7 @@ def test_registry_unavailable_and_abi_mismatch_paths(monkeypatch):
 
     registry._edits["unavailable_edit"] = reg.PluginInfo(
         name="unavailable_edit",
-        module="invarlock.edits.noop",
+        module="invarlock.edits",
         class_name="NoopEdit",
         available=False,
         status="disabled",
@@ -645,7 +645,7 @@ def test_registry_unavailable_and_abi_mismatch_paths(monkeypatch):
     )
     registry._guards["unavailable_guard"] = reg.PluginInfo(
         name="unavailable_guard",
-        module="invarlock.plugins.hello_guard",
+        module="invarlock.plugins",
         class_name="HelloGuard",
         available=False,
         status="disabled",

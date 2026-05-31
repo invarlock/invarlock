@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from invarlock.core.exceptions import InvarlockError
-from invarlock.core.run_dataset_contract import materialize_run_dataset
+from invarlock.core.run_provider_dataset_plan import materialize_run_dataset
 from invarlock.eval.data_support import DatasetDiagnostic
 
 

@@ -36,6 +36,13 @@ _STRUCTURED_TEXT_LOAD_ERRORS = (
     ValueError,
     yaml.YAMLError,
 )
+_STRUCTURED_FUZZ_SUFFIXES = (".json", ".yaml", ".yml")
+
+
+def _choose_structured_fuzz_suffix(data: bytes) -> str:
+    if not data:
+        return ".json"
+    return _STRUCTURED_FUZZ_SUFFIXES[data[0] % len(_STRUCTURED_FUZZ_SUFFIXES)]
 
 
 def _load_structured_text(text: str, *, suffix: str) -> Any:
@@ -163,10 +170,29 @@ def verify_policy_pack(pack: object) -> list[str]:
     return errors
 
 
+def exercise_policy_pack_bytes(data: bytes) -> None:
+    text = data.decode("utf-8", errors="ignore")
+    try:
+        payload = _load_structured_text(
+            text, suffix=_choose_structured_fuzz_suffix(data)
+        )
+    except (
+        json.JSONDecodeError,
+        RecursionError,
+        TypeError,
+        ValueError,
+        yaml.YAMLError,
+    ):
+        return
+
+    verify_policy_pack(payload)
+
+
 __all__ = [
     "POLICY_PACK_FORMAT",
     "build_policy_pack",
     "compute_policy_pack_digest",
+    "exercise_policy_pack_bytes",
     "load_policy_pack",
     "verify_policy_pack",
     "write_policy_pack",
