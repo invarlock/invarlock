@@ -7,6 +7,21 @@ import pytest
 
 from scripts.evidence_packs.python import preset_generator, runtime_tools
 
+TASK_MODULES = (
+    "scripts/evidence_packs/lib/tasks/task_functions.sh",
+    "scripts/evidence_packs/lib/tasks/task_common.sh",
+    "scripts/evidence_packs/lib/tasks/task_baseline.sh",
+    "scripts/evidence_packs/lib/tasks/task_edit_lifecycle.sh",
+    "scripts/evidence_packs/lib/tasks/task_error_lifecycle.sh",
+)
+
+
+def _read_task_modules(repo_root: Path) -> str:
+    return "\n".join(
+        (repo_root / relative_path).read_text(encoding="utf-8")
+        for relative_path in TASK_MODULES
+    )
+
 
 def test_runtime_tools_require_remote_code_opt_in(
     monkeypatch: pytest.MonkeyPatch,
@@ -87,9 +102,9 @@ def test_probe_scripts_gate_remote_code_explicitly(relative_path: str) -> None:
 
 def test_task_functions_forward_probe_remote_code_opt_in() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    text = (repo_root / "scripts/evidence_packs/lib/tasks/task_functions.sh").read_text(
-        encoding="utf-8"
-    )
+    text = (
+        repo_root / "scripts/evidence_packs/lib/tasks/task_error_lifecycle.sh"
+    ).read_text(encoding="utf-8")
     assert "probe_args+=(--trust-remote-code)" in text
     assert "ve_probe_args+=(--trust-remote-code)" in text
 
@@ -102,9 +117,7 @@ def test_evidence_pack_shell_flows_keep_provenance_enforced() -> None:
     verify_pack = (repo_root / "scripts/evidence_packs/verify_pack.sh").read_text(
         encoding="utf-8"
     )
-    task_functions = (
-        repo_root / "scripts/evidence_packs/lib/tasks/task_functions.sh"
-    ).read_text(encoding="utf-8")
+    task_functions = _read_task_modules(repo_root)
     config_generator = (
         repo_root / "scripts/evidence_packs/lib/config/config_generator.sh"
     ).read_text(encoding="utf-8")

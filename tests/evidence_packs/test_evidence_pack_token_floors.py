@@ -5,7 +5,7 @@ from pathlib import Path
 
 def test_evidence_pack_default_cert_min_windows_is_high_enough() -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    text = (repo_root / "scripts/evidence_packs/lib/tasks/task_functions.sh").read_text(
+    text = (repo_root / "scripts/evidence_packs/lib/tasks/task_common.sh").read_text(
         encoding="utf-8"
     )
 

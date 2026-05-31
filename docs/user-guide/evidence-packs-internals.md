@@ -80,7 +80,11 @@ invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000
 - `lib/queue/scheduler_reservations.sh`: GPU reservation and availability helpers.
 - `lib/queue/scheduler_selection.sh`: task priority, selection, work stealing, and scheduling metrics.
 - `lib/gpu_worker.sh`: worker loop, heartbeats, task execution glue.
-- `lib/task_functions.sh`: implementations for each task type.
+- `lib/tasks/task_functions.sh`: compatibility facade and `execute_task` dispatcher.
+- `lib/tasks/task_common.sh`: shared scheduling, model, preset, and reusable baseline-report helpers.
+- `lib/tasks/task_baseline.sh`: baseline setup, calibration, preset generation, and shared baseline report preparation.
+- `lib/tasks/task_edit_lifecycle.sh`: edit creation, batch edit creation, evaluation, and cleanup.
+- `lib/tasks/task_error_lifecycle.sh`: error-model creation, evaluation probes, structural-failure reports, and cleanup.
 - `lib/model_creation.sh`: edit and error-model creation helpers (`create_model_variant` dispatcher).
 - `lib/config_generator.sh`: InvarLock config generation and wrapper helpers.
 - `lib/validation/validation_suite.sh`: validation orchestration, analysis setup, and verdict compilation.
@@ -114,8 +118,9 @@ invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000
 │                   │                                                   │
 │                   ▼                                                   │
 │ TASK FUNCTIONS                                                        │
-│   SETUP_BASELINE, CALIBRATION_RUN, GENERATE_PRESET                    │
-│   CREATE_EDITS(_BATCH), CREATE_ERROR, evaluate_*                      │
+│   task_functions facade + task_common shared helpers                  │
+│   task_baseline | task_edit_lifecycle | task_error_lifecycle          │
+│   SETUP_BASELINE, CALIBRATION_RUN, GENERATE_PRESET, evaluate_*        │
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
