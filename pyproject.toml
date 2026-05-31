@@ -50,7 +50,7 @@ Changelog = "https://github.com/invarlock/invarlock/blob/v0.9.0/CHANGELOG.md"
 [project.optional-dependencies]
 # Core torch dependencies for adapters
 adapters = [
-  "torch>=2.11.0",
+  "torch>=2.12.0",
   "transformers>=5.5.0",
   "safetensors>=0.4.0",
   "protobuf>=4.25",
@@ -61,7 +61,7 @@ adapters = [
 
 # Hugging Face workflow (adapters + evaluation stack)
 hf = [
-  "torch>=2.11.0",
+  "torch>=2.12.0",
   "accelerate>=0.26.0",
   "transformers>=5.5.0",
   "safetensors>=0.4.0",
@@ -79,18 +79,18 @@ hf = [
 
 # Full guards functionality
 guards = [
-  "torch>=2.11.0",
+  "torch>=2.12.0",
   "numpy>=1.24",
 ]
 
 # Edit functionality
 edits = [
-  "torch>=2.11.0",
+  "torch>=2.12.0",
 ]
 
 # Evaluation functionality
 eval = [
-  "torch>=2.11.0",
+  "torch>=2.12.0",
   "datasets>=3.0",
   "requests>=2.33.0",
 ]
@@ -102,7 +102,7 @@ probes = [
 
 # External edit integrations
 gptq = [
-  "torch>=2.11.0",
+  "torch>=2.12.0",
   "torchvision>=0.23.0",
   "gptqmodel>=5.8.0",
   "triton>=2.3.0; platform_system == \"Linux\"",
@@ -112,7 +112,7 @@ gptq = [
 
 
 awq = [
-  "torch>=2.11.0",
+  "torch>=2.12.0",
   "torchvision>=0.23.0",
   "gptqmodel>=5.8.0",
   "transformers>=5.5.0",
@@ -123,7 +123,7 @@ awq = [
 
 # GPU helper stack (optional extras for CUDA/MPS optimisations)
 gpu = [
-  "torch>=2.11.0",
+  "torch>=2.12.0",
   "accelerate>=0.27",
   "bitsandbytes>=0.41",
   "safetensors>=0.4.0",
@@ -131,7 +131,7 @@ gpu = [
 
 # Convenience install for advanced evidence-pack/policy/plugins/calibration workflows.
 advanced = [
-  "torch>=2.11.0",
+  "torch>=2.12.0",
   "transformers>=5.5.0",
   "protobuf>=4.25",
   "sentencepiece>=0.2.1",
@@ -154,7 +154,7 @@ advanced = [
 
 # Complete installation with all features
 all = [
-  "torch>=2.11.0",
+  "torch>=2.12.0",
   "transformers>=5.5.0",
   "protobuf>=4.25",
   "sentencepiece>=0.2.1",
