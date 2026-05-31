@@ -279,8 +279,11 @@ def test_selected_critical_files_reject_subcomplete_branch_coverage(
             ("src/invarlock/core/runner_guards.py", 0.949, 1.0),
             ("src/invarlock/core/types.py", 0.949, 1.0),
             ("src/invarlock/eval/primary_metric.py", 0.949, 1.0),
+            ("src/invarlock/eval/data_local.py", 0.949, 1.0),
+            ("src/invarlock/eval/metrics_runtime_resources.py", 0.949, 1.0),
             ("src/invarlock/eval/probes/importance.py", 0.949, 1.0),
             ("src/invarlock/guards/invariants.py", 0.949, 1.0),
+            ("src/invarlock/guards/invariants_standard.py", 0.949, 1.0),
             ("src/invarlock/guards/rmt.py", 0.949, 1.0),
             ("src/invarlock/evidence_pack_integrity.py", 0.949, 1.0),
             ("src/invarlock/evidence_pack_support.py", 0.949, 1.0),
@@ -315,8 +318,11 @@ def test_selected_critical_files_reject_subcomplete_branch_coverage(
         "src/invarlock/core/runner_guards.py",
         "src/invarlock/core/types.py",
         "src/invarlock/eval/primary_metric.py",
+        "src/invarlock/eval/data_local.py",
+        "src/invarlock/eval/metrics_runtime_resources.py",
         "src/invarlock/eval/probes/importance.py",
         "src/invarlock/guards/invariants.py",
+        "src/invarlock/guards/invariants_standard.py",
         "src/invarlock/guards/rmt.py",
         "src/invarlock/evidence_pack_integrity.py",
         "src/invarlock/evidence_pack_support.py",
@@ -357,8 +363,10 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
             ("src/invarlock/core/report_inputs.py", 0.999, 1.0),
             ("src/invarlock/core/run_orchestrator.py", 0.999, 1.0),
             ("src/invarlock/eval/data.py", 0.999, 1.0),
+            ("src/invarlock/eval/data_local.py", 0.999, 1.0),
             ("src/invarlock/eval/metrics.py", 0.999, 1.0),
             ("src/invarlock/eval/metrics_support.py", 0.999, 1.0),
+            ("src/invarlock/eval/metrics_runtime_resources.py", 0.999, 1.0),
             ("src/invarlock/eval/probes/importance.py", 0.999, 1.0),
             ("src/invarlock/guards/rmt_runtime.py", 0.999, 1.0),
             ("src/invarlock/guards/spectral_runtime.py", 0.999, 1.0),
@@ -389,6 +397,7 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
             ("src/invarlock/reporting/report_policy.py", 0.999, 1.0),
             ("src/invarlock/reporting/report_make.py", 0.999, 1.0),
             ("src/invarlock/reporting/report_builder_support.py", 0.999, 1.0),
+            ("src/invarlock/reporting/report_builder_telemetry.py", 0.999, 1.0),
             ("src/invarlock/runtime_security_helpers.py", 0.999, 1.0),
         ],
     )
@@ -410,6 +419,8 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
         "src/invarlock/core/report_inputs.py",
         "src/invarlock/core/run_orchestrator.py",
         "src/invarlock/eval/metrics_support.py",
+        "src/invarlock/eval/data_local.py",
+        "src/invarlock/eval/metrics_runtime_resources.py",
         "src/invarlock/guards/rmt_runtime.py",
         "src/invarlock/guards/spectral_runtime.py",
         "src/invarlock/guards/variance_batching.py",
@@ -438,6 +449,7 @@ def test_ratchets_selected_files_to_branch_complete(tmp_path: Path) -> None:
         "src/invarlock/reporting/report_policy.py",
         "src/invarlock/reporting/report_make.py",
         "src/invarlock/reporting/report_builder_support.py",
+        "src/invarlock/reporting/report_builder_telemetry.py",
         "src/invarlock/runtime_security_helpers.py",
     ):
         assert path in proc.stderr
@@ -456,6 +468,7 @@ def test_calibrated_split_owner_thresholds_are_explicit(tmp_path: Path) -> None:
             ("src/invarlock/cli/run_config.py", 0.919, 1.0),
             ("src/invarlock/cli/run_pairing.py", 0.949, 1.0),
             ("src/invarlock/eval/metrics_runtime.py", 0.899, 1.0),
+            ("src/invarlock/eval/metrics_runtime_resources.py", 0.899, 1.0),
             ("src/invarlock/core/run_orchestrator_execute.py", 0.999, 1.0),
             ("src/invarlock/evidence_pack_integrity.py", 0.949, 1.0),
             ("src/invarlock/evidence_pack_support.py", 0.949, 1.0),
@@ -465,6 +478,7 @@ def test_calibrated_split_owner_thresholds_are_explicit(tmp_path: Path) -> None:
             ("src/invarlock/runtime_security.py", 0.999, 1.0),
             ("src/invarlock/reporting/run_report_contract.py", 0.949, 1.0),
             ("src/invarlock/reporting/report_builder_support.py", 0.909, 1.0),
+            ("src/invarlock/reporting/report_builder_telemetry.py", 0.909, 1.0),
         ],
     )
 
@@ -479,6 +493,7 @@ def test_calibrated_split_owner_thresholds_are_explicit(tmp_path: Path) -> None:
         "src/invarlock/cli/run_config.py",
         "src/invarlock/cli/run_pairing.py",
         "src/invarlock/eval/metrics_runtime.py",
+        "src/invarlock/eval/metrics_runtime_resources.py",
         "src/invarlock/core/run_orchestrator_execute.py",
         "src/invarlock/evidence_pack_integrity.py",
         "src/invarlock/evidence_pack_support.py",
@@ -488,6 +503,7 @@ def test_calibrated_split_owner_thresholds_are_explicit(tmp_path: Path) -> None:
         "src/invarlock/runtime_security.py",
         "src/invarlock/reporting/run_report_contract.py",
         "src/invarlock/reporting/report_builder_support.py",
+        "src/invarlock/reporting/report_builder_telemetry.py",
     ):
         assert path in proc.stderr
 
@@ -504,6 +520,11 @@ def test_newly_promoted_core_thresholds_are_explicit(tmp_path: Path) -> None:
             ("src/invarlock/core/plugins_inventory.py", 0.949, 1.0),
             ("src/invarlock/core/run_baseline_evidence.py", 0.899, 1.0),
             ("src/invarlock/core/run_orchestrator_execute_attempts.py", 0.899, 1.0),
+            (
+                "src/invarlock/core/run_orchestrator_execute_attempt_results.py",
+                0.899,
+                1.0,
+            ),
             ("src/invarlock/core/retry.py", 0.899, 1.0),
             ("src/invarlock/cli/run_pairing_baseline.py", 0.899, 1.0),
         ],
@@ -519,6 +540,7 @@ def test_newly_promoted_core_thresholds_are_explicit(tmp_path: Path) -> None:
         "src/invarlock/core/plugins_inventory.py",
         "src/invarlock/core/run_baseline_evidence.py",
         "src/invarlock/core/run_orchestrator_execute_attempts.py",
+        "src/invarlock/core/run_orchestrator_execute_attempt_results.py",
         "src/invarlock/core/retry.py",
         "src/invarlock/cli/run_pairing_baseline.py",
     ):

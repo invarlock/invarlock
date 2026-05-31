@@ -4,6 +4,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+SNS = SimpleNamespace
+
 
 def write_base_run_config(
     tmp_path: Path,

@@ -48,6 +48,42 @@ def _fake_run_command_with_paths(
     return _fake_run
 
 
+def _patch_run_command_reports(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    baseline_report: Path,
+    edited_report: Path,
+    run_calls: list[dict[str, object]] | None = None,
+) -> None:
+    monkeypatch.setattr(
+        run_mod,
+        "run_command",
+        _fake_run_command_with_paths(
+            {"source": baseline_report, "edited": edited_report},
+            run_calls=run_calls,
+        ),
+        raising=False,
+    )
+
+
+def _patch_generate_reports_noop(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(mod, "generate_reports", lambda **_: None, raising=False)
+
+
+def _evaluate_basic(src: Path, edt: Path, **overrides: object) -> None:
+    kwargs: dict[str, object] = {
+        "baseline": str(src),
+        "subject": str(edt),
+        "baseline_adapter": "hf_causal",
+        "subject_adapter": "hf_causal",
+        "out": str(Path("runs")),
+        "profile": "ci",
+        "assurance": "off",
+    }
+    kwargs.update(overrides)
+    mod.evaluate_command(**kwargs)
+
+
 def _valid_baseline_report_payload(
     *,
     model_id: str = "src",
@@ -136,7 +172,10 @@ def _assert_baseline_report_validation_exit(
 __all__ = [
     "RecordingConsole",
     "_assert_baseline_report_validation_exit",
+    "_evaluate_basic",
     "_fake_run_command_with_paths",
+    "_patch_generate_reports_noop",
+    "_patch_run_command_reports",
     "_prepare_evaluate_paths",
     "_stub_run_dir",
     "_valid_baseline_report_payload",

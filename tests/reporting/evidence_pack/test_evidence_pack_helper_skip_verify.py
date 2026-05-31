@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.reporting.evidence_pack.test_evidence_pack_helper_signature_and_manifest import (
+from tests.reporting._support_evidence_pack_paths import (
     _write_manifest_and_checksums,
     _write_pack_scaffold,
     evidence_pack_mod,

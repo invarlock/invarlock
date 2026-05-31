@@ -11,59 +11,14 @@ import pytest
 
 from invarlock.cli.commands.run import run_command
 from tests.cli.run._support_run_common import (
-    common_ce_patches,
-    write_base_run_config,
-)
-from tests.cli.run._support_run_common import (
     synthetic_provider_min as _provider_min,
 )
-
-
-def _write_cfg(tmp_path: Path, preview=2, final=2, loss_type="auto") -> Path:
-    return write_base_run_config(
-        tmp_path,
-        preview,
-        final,
-        eval_fields="  spike_threshold: 2.0\n",
-        loss_type=loss_type,
-    )
-
-
-def _common_ce():
-    return common_ce_patches(
-        include_registry=True,
-        include_save_report=True,
-    )
-
-
-def _baseline_with_meta(tmp_path: Path, meta: dict, preview_ids, final_ids) -> Path:
-    p = tmp_path / "baseline.json"
-    payload = {
-        "meta": meta,
-        "metrics": {
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "preview": 1.0,
-                "final": 1.0,
-            }
-        },
-        "edit": {
-            "name": "structured",
-            "plan_digest": "baseline",
-            "deltas": {
-                "params_changed": 0,
-                "heads_pruned": 0,
-                "neurons_pruned": 0,
-                "layers_modified": 0,
-            },
-        },
-        "evaluation_windows": {
-            "preview": {"window_ids": [0], "input_ids": preview_ids},
-            "final": {"window_ids": [1], "input_ids": final_ids},
-        },
-    }
-    p.write_text(json.dumps(payload))
-    return p
+from tests.cli.run._support_run_plugins import (
+    plugins_invariants_common_ce as _common_ce,
+)
+from tests.cli.run._support_run_plugins import (
+    plugins_invariants_write_cfg as _write_cfg,
+)
 
 
 def test_provider_non_evalwindow_mismatch_counts_no_exit(tmp_path: Path):

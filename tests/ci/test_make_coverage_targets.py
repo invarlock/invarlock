@@ -114,7 +114,12 @@ def test_coverage_policy_is_shared_with_makefile_and_expanded_surface() -> None:
     assert "scripts/release/evidence_contracts.py" in policy.CORE_FILES
     assert "src/invarlock/calibration.py" in policy.CORE_FILES
     assert "src/invarlock/calibration.py" in policy.THRESHOLDS
+    assert "src/invarlock/eval/data_local.py" in policy.CORE_FILES
+    assert "src/invarlock/eval/data_local.py" in policy.THRESHOLDS
+    assert "src/invarlock/eval/metrics_runtime_resources.py" in policy.CORE_FILES
+    assert "src/invarlock/eval/metrics_runtime_resources.py" in policy.THRESHOLDS
     assert "src/invarlock/reporting/report_builder_support.py" in policy.THRESHOLDS
+    assert "src/invarlock/reporting/report_builder_telemetry.py" in policy.THRESHOLDS
     assert "src/invarlock/reporting/report_bundle.py" in policy.THRESHOLDS
     assert "src/invarlock/reporting/report_make.py" in policy.CORE_FILES
     assert (
@@ -289,10 +294,12 @@ def test_makefile_exposes_typed_surface_target() -> None:
         "src/invarlock/core/run_orchestrator_execute.py",
         "src/invarlock/core/run_orchestrator_execute_environment.py",
         "src/invarlock/core/run_orchestrator_execute_attempts.py",
+        "src/invarlock/core/run_orchestrator_execute_attempt_results.py",
         "src/invarlock/core/run_orchestrator_execute_execution.py",
         "src/invarlock/core/run_orchestrator_execute_helpers.py",
         "src/invarlock/cli/app.py",
         "src/invarlock/eval/probes/importance.py",
+        "src/invarlock/reporting/report_builder_telemetry.py",
         "src/invarlock/reporting/report_builder_support.py",
         "src/invarlock/reporting/report_make.py",
         "src/invarlock/reporting/report_primary_metric_policy.py",

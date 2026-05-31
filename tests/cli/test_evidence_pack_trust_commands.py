@@ -6,7 +6,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from invarlock.cli.app import app
-from tests.cli.test_evidence_pack_commands import (
+from tests.reporting._support_evidence_pack_paths import (
     _build_report_payload,
     _successful_verify_result,
     _write_json,

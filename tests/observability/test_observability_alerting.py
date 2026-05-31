@@ -18,6 +18,21 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from invarlock.observability.alerting import (
+    Alert,
+    AlertManager,
+    AlertRule,
+    AlertSeverity,
+    AlertStatus,
+    NotificationChannel,
+    create_performance_alerts,
+    create_resource_alerts,
+    setup_email_notifications,
+    setup_slack_notifications,
+    setup_webhook_notifications,
+)
+from invarlock.observability.health import ComponentHealth, HealthStatus
+
 # =============================================================================
 # AlertSeverity and AlertStatus Tests
 # =============================================================================
@@ -29,7 +44,6 @@ class TestAlertEnums:
 
     def test_alert_severity_values(self):
         """Test AlertSeverity enum values."""
-        from invarlock.observability.alerting import AlertSeverity
 
         assert AlertSeverity.INFO.value == "info"
         assert AlertSeverity.WARNING.value == "warning"
@@ -37,7 +51,6 @@ class TestAlertEnums:
 
     def test_alert_status_values(self):
         """Test AlertStatus enum values."""
-        from invarlock.observability.alerting import AlertStatus
 
         assert AlertStatus.ACTIVE.value == "active"
         assert AlertStatus.RESOLVED.value == "resolved"
@@ -55,7 +68,6 @@ class TestAlert:
 
     def test_alert_creation(self):
         """Test creating an alert."""
-        from invarlock.observability.alerting import Alert, AlertSeverity, AlertStatus
 
         alert = Alert(
             id="alert_1",
@@ -77,7 +89,6 @@ class TestAlert:
 
     def test_alert_to_dict(self):
         """Test alert serialization to dict."""
-        from invarlock.observability.alerting import Alert, AlertSeverity
 
         alert = Alert(
             id="alert_1",
@@ -99,7 +110,6 @@ class TestAlert:
 
     def test_alert_resolve(self):
         """Test resolving an alert."""
-        from invarlock.observability.alerting import Alert, AlertSeverity, AlertStatus
 
         alert = Alert(
             id="alert_1",
@@ -130,7 +140,6 @@ class TestAlertRule:
 
     def test_rule_creation(self):
         """Test creating an alert rule."""
-        from invarlock.observability.alerting import AlertRule, AlertSeverity
 
         rule = AlertRule(
             name="high_cpu",
@@ -149,7 +158,6 @@ class TestAlertRule:
 
     def test_rule_default_message(self):
         """Test rule generates default message."""
-        from invarlock.observability.alerting import AlertRule
 
         rule = AlertRule(name="test_rule", metric="test_metric", threshold=100.0)
 
@@ -159,7 +167,6 @@ class TestAlertRule:
 
     def test_rule_custom_message(self):
         """Test rule with custom message."""
-        from invarlock.observability.alerting import AlertRule
 
         rule = AlertRule(
             name="test_rule",
@@ -172,7 +179,6 @@ class TestAlertRule:
 
     def test_rule_with_percentile(self):
         """Test rule with percentile threshold."""
-        from invarlock.observability.alerting import AlertRule
 
         rule = AlertRule(
             name="slow_requests",
@@ -195,7 +201,6 @@ class TestNotificationChannel:
 
     def test_channel_creation(self):
         """Test creating a notification channel."""
-        from invarlock.observability.alerting import NotificationChannel
 
         channel = NotificationChannel(
             name="email",
@@ -210,7 +215,6 @@ class TestNotificationChannel:
 
     def test_channel_default_severity_filter(self):
         """Test default severity filter includes WARNING and CRITICAL."""
-        from invarlock.observability.alerting import AlertSeverity, NotificationChannel
 
         channel = NotificationChannel(name="test", type="webhook", config={})
 
@@ -220,7 +224,6 @@ class TestNotificationChannel:
 
     def test_channel_custom_severity_filter(self):
         """Test custom severity filter."""
-        from invarlock.observability.alerting import AlertSeverity, NotificationChannel
 
         channel = NotificationChannel(
             name="test",
@@ -243,7 +246,6 @@ class TestAlertManager:
 
     def test_manager_initialization(self):
         """Test alert manager initializes correctly."""
-        from invarlock.observability.alerting import AlertManager
 
         manager = AlertManager()
 
@@ -254,7 +256,6 @@ class TestAlertManager:
 
     def test_add_rule(self):
         """Test adding an alert rule."""
-        from invarlock.observability.alerting import AlertManager, AlertRule
 
         manager = AlertManager()
         rule = AlertRule(name="test_rule", metric="test_metric", threshold=100.0)
@@ -266,7 +267,6 @@ class TestAlertManager:
 
     def test_remove_rule(self):
         """Test removing an alert rule."""
-        from invarlock.observability.alerting import AlertManager, AlertRule
 
         manager = AlertManager()
         rule = AlertRule(name="test_rule", metric="test_metric", threshold=100.0)
@@ -278,7 +278,6 @@ class TestAlertManager:
 
     def test_add_notification_channel(self):
         """Test adding a notification channel."""
-        from invarlock.observability.alerting import AlertManager, NotificationChannel
 
         manager = AlertManager()
         channel = NotificationChannel(
@@ -292,7 +291,6 @@ class TestAlertManager:
 
     def test_check_metric_triggers_alert(self):
         """Test metric check triggers alert when threshold exceeded."""
-        from invarlock.observability.alerting import AlertManager, AlertRule
 
         manager = AlertManager()
         rule = AlertRule(
@@ -310,7 +308,6 @@ class TestAlertManager:
 
     def test_check_metric_no_trigger_below_threshold(self):
         """Test metric check doesn't trigger when below threshold."""
-        from invarlock.observability.alerting import AlertManager, AlertRule
 
         manager = AlertManager()
         rule = AlertRule(
@@ -326,7 +323,6 @@ class TestAlertManager:
 
     def test_check_metric_less_than_comparison(self):
         """Test metric check with 'less' comparison."""
-        from invarlock.observability.alerting import AlertManager, AlertRule
 
         manager = AlertManager()
         rule = AlertRule(
@@ -343,7 +339,6 @@ class TestAlertManager:
 
     def test_check_metric_equal_comparison(self):
         """Test metric check with 'equal' comparison."""
-        from invarlock.observability.alerting import AlertManager, AlertRule
 
         manager = AlertManager()
         rule = AlertRule(
@@ -360,7 +355,6 @@ class TestAlertManager:
 
     def test_alert_not_duplicated(self):
         """Test same alert is not duplicated."""
-        from invarlock.observability.alerting import AlertManager, AlertRule
 
         manager = AlertManager()
         rule = AlertRule(name="test_rule", metric="test_metric", threshold=50.0)
@@ -374,7 +368,6 @@ class TestAlertManager:
 
     def test_disabled_rule_not_evaluated(self):
         """Test disabled rules are not evaluated."""
-        from invarlock.observability.alerting import AlertManager, AlertRule
 
         manager = AlertManager()
         rule = AlertRule(
@@ -391,7 +384,6 @@ class TestAlertManager:
 
     def test_get_active_alerts(self):
         """Test getting active alerts."""
-        from invarlock.observability.alerting import AlertManager, AlertRule
 
         manager = AlertManager()
         rule = AlertRule(name="test_rule", metric="test_metric", threshold=50.0)
@@ -405,12 +397,6 @@ class TestAlertManager:
 
     def test_get_alert_summary(self):
         """Test getting alert summary."""
-        from invarlock.observability.alerting import (
-            AlertManager,
-            AlertRule,
-            AlertSeverity,
-        )
-
         manager = AlertManager()
         manager.add_rule(
             AlertRule(
@@ -443,8 +429,6 @@ class TestAlertManager:
 
     def test_check_health_alerts_unhealthy(self):
         """Test health-based alerts trigger for unhealthy components."""
-        from invarlock.observability.alerting import AlertManager
-        from invarlock.observability.health import ComponentHealth, HealthStatus
 
         manager = AlertManager()
 
@@ -464,8 +448,6 @@ class TestAlertManager:
 
     def test_check_health_alerts_resolves(self):
         """Test health alerts resolve when component becomes healthy."""
-        from invarlock.observability.alerting import AlertManager
-        from invarlock.observability.health import ComponentHealth, HealthStatus
 
         manager = AlertManager()
 
@@ -497,7 +479,6 @@ class TestAlertManager:
 
     def test_check_resource_alerts(self):
         """Test resource usage alerts."""
-        from invarlock.observability.alerting import AlertManager, AlertRule
 
         manager = AlertManager()
         manager.add_rule(
@@ -514,7 +495,6 @@ class TestAlertManager:
 
     def test_alert_history_limited(self):
         """Test alert history is limited to 1000 entries."""
-        from invarlock.observability.alerting import AlertManager, AlertRule
 
         manager = AlertManager()
 
@@ -538,12 +518,6 @@ class TestNotifications:
 
     def test_notification_not_sent_if_channel_disabled(self):
         """Test notifications not sent to disabled channels."""
-        from invarlock.observability.alerting import (
-            AlertManager,
-            AlertRule,
-            NotificationChannel,
-        )
-
         manager = AlertManager()
         channel = NotificationChannel(
             name="test",
@@ -561,13 +535,6 @@ class TestNotifications:
 
     def test_notification_severity_filter(self):
         """Test notifications respect severity filter."""
-        from invarlock.observability.alerting import (
-            AlertManager,
-            AlertRule,
-            AlertSeverity,
-            NotificationChannel,
-        )
-
         manager = AlertManager()
         channel = NotificationChannel(
             name="critical_only",
@@ -593,13 +560,6 @@ class TestNotifications:
     @patch("invarlock.observability.alerting.requests.post")
     def test_webhook_notification(self, mock_post):
         """Test webhook notification sends correct payload."""
-        from invarlock.observability.alerting import (
-            Alert,
-            AlertManager,
-            AlertSeverity,
-            NotificationChannel,
-        )
-
         mock_post.return_value.status_code = 200
         mock_post.return_value.raise_for_status = MagicMock()
 
@@ -630,12 +590,6 @@ class TestNotifications:
     @patch("invarlock.observability.alerting.requests.post")
     def test_notification_failure_is_logged_and_swallowed(self, mock_post, caplog):
         """Notification transport failures should not abort alert creation."""
-        from invarlock.observability.alerting import (
-            AlertManager,
-            AlertRule,
-            NotificationChannel,
-        )
-
         mock_post.side_effect = OSError("webhook down")
 
         manager = AlertManager()
@@ -665,11 +619,6 @@ class TestAlertUtilities:
 
     def test_create_resource_alerts(self):
         """Test creating standard resource alerts."""
-        from invarlock.observability.alerting import (
-            AlertSeverity,
-            create_resource_alerts,
-        )
-
         alerts = create_resource_alerts()
 
         # Should have alerts for CPU, memory, GPU
@@ -687,7 +636,6 @@ class TestAlertUtilities:
 
     def test_create_performance_alerts(self):
         """Test creating standard performance alerts."""
-        from invarlock.observability.alerting import create_performance_alerts
 
         alerts = create_performance_alerts()
 
@@ -698,7 +646,6 @@ class TestAlertUtilities:
 
     def test_setup_email_notifications(self):
         """Test setting up email notification channel."""
-        from invarlock.observability.alerting import setup_email_notifications
 
         channel = setup_email_notifications(
             smtp_server="smtp.example.com",
@@ -717,7 +664,6 @@ class TestAlertUtilities:
 
     def test_setup_slack_notifications(self):
         """Test setting up Slack notification channel."""
-        from invarlock.observability.alerting import setup_slack_notifications
 
         channel = setup_slack_notifications(
             webhook_url="https://hooks.slack.com/services/xxx",
@@ -730,7 +676,6 @@ class TestAlertUtilities:
 
     def test_setup_webhook_notifications(self):
         """Test setting up webhook notification channel."""
-        from invarlock.observability.alerting import setup_webhook_notifications
 
         channel = setup_webhook_notifications(
             url="http://alerts.example.com/webhook",

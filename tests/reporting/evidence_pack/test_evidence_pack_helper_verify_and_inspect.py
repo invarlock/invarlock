@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
 
-from tests.reporting.evidence_pack.test_evidence_pack_helper_signature_and_manifest import (
-    RUNTIME_MANIFEST_FILENAME,
+from tests.reporting._support_evidence_pack_paths import (
     VerifyExecutionResult,
     VerifyOutcome,
+    _patch_verify_result,
+    _read_manifest,
     _sign_pack,
+    _write_build_inputs,
     _write_json,
-    _write_manifest_and_checksums,
-    _write_pack_scaffold,
+    _write_pack_with_manifest,
     evidence_pack_integrity_mod,
     evidence_pack_mod,
 )
@@ -21,22 +21,10 @@ from tests.reporting.evidence_pack.test_evidence_pack_helper_signature_and_manif
 def test_verify_reports_covers_remaining_payload_contract_branches(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    def _build_pack(name: str, *, with_errors: bool) -> Path:
-        pack_dir = tmp_path / name
-        report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
-        _write_manifest_and_checksums(
-            pack_dir,
-            report_path=report_path,
-            final_verdict=final_verdict,
-            environment=environment,
-        )
-        if with_errors:
-            error_dir = pack_dir / "reports" / "model" / "errors" / "noop"
-            error_dir.mkdir(parents=True, exist_ok=True)
-            (error_dir / "evaluation.report.json").write_text("{}", encoding="utf-8")
-        return pack_dir
-
-    pack_with_errors = _build_pack("with-errors", with_errors=True)
+    pack_with_errors = _write_pack_with_manifest(
+        tmp_path / "with-errors",
+        with_error_report=True,
+    )
 
     monkeypatch.setattr(
         evidence_pack_mod,
@@ -121,7 +109,7 @@ def test_verify_reports_covers_remaining_payload_contract_branches(
     assert errors == ["expected-pass report verification did not return a JSON object."]
     assert payload is None
 
-    pack_clean_only = _build_pack("clean-only", with_errors=False)
+    pack_clean_only = _write_pack_with_manifest(tmp_path / "clean-only")
     monkeypatch.setattr(
         evidence_pack_mod,
         "_run_verify_command",
@@ -145,18 +133,13 @@ def test_verify_reports_covers_remaining_payload_contract_branches(
 def test_build_and_verify_evidence_pack_cover_usage_and_failure_paths(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    final_verdict = tmp_path / "final.json"
-    _write_json(final_verdict, {"verdict": "PASS"})
-    report_path = tmp_path / "report.json"
-    _write_json(report_path, {"ok": True})
-    runtime_manifest = report_path.parent / RUNTIME_MANIFEST_FILENAME
-    _write_json(runtime_manifest, {"ok": True})
-    source_repo = tmp_path / "source_repo.json"
-    _write_json(source_repo, {"commit": "abc123"})
-    environment = tmp_path / "environment.json"
-    _write_json(environment, {"platform": "test"})
-    material = tmp_path / "material.json"
-    _write_json(material, {"name": "demo"})
+    inputs = _write_build_inputs(tmp_path)
+    final_verdict = inputs.final_verdict
+    report_path = inputs.report_path
+    runtime_manifest = inputs.runtime_manifest
+    source_repo = inputs.source_repo
+    environment = inputs.environment
+    material = inputs.material
 
     result = evidence_pack_mod.build_evidence_pack(
         tmp_path / "out-none",
@@ -248,15 +231,10 @@ def test_build_and_verify_evidence_pack_cover_usage_and_failure_paths(
     assert any("report sidecar file not found" in error for error in payload["errors"])
     _write_json(runtime_manifest, {"ok": True})
 
-    monkeypatch.setattr(
-        evidence_pack_mod,
-        "_run_verify_command",
-        lambda reports, profile, report_assurance="report": VerifyExecutionResult(
-            outcome=VerifyOutcome.POLICY_FAIL,
-            payload={"ok": False},
-            diagnostics=(),
-        ),
-        raising=True,
+    _patch_verify_result(
+        monkeypatch,
+        outcome=VerifyOutcome.POLICY_FAIL,
+        payload={"ok": False},
     )
     result = evidence_pack_mod.build_evidence_pack(
         tmp_path / "out-verify-fail",
@@ -268,16 +246,7 @@ def test_build_and_verify_evidence_pack_cover_usage_and_failure_paths(
     assert exit_code == evidence_pack_mod.EvidencePackStatus.REPORTS
     assert payload["verify"] == {"ok": False}
 
-    monkeypatch.setattr(
-        evidence_pack_mod,
-        "_run_verify_command",
-        lambda reports, profile, report_assurance="report": VerifyExecutionResult(
-            outcome=VerifyOutcome.OK,
-            payload={"ok": True},
-            diagnostics=(),
-        ),
-        raising=True,
-    )
+    _patch_verify_result(monkeypatch)
     result = evidence_pack_mod.build_evidence_pack(
         tmp_path / "out-ok",
         final_verdict_path=final_verdict,
@@ -444,12 +413,8 @@ def test_verify_manifest_provenance_skips_non_dict_invocation_and_materials(
     tmp_path: Path,
 ) -> None:
     pack_dir = tmp_path / "pack"
-    report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
-    _write_manifest_and_checksums(
+    _write_pack_with_manifest(
         pack_dir,
-        report_path=report_path,
-        final_verdict=final_verdict,
-        environment=environment,
         manifest_overrides={
             "subject": None,
             "invocation": "not-a-dict",
@@ -477,13 +442,7 @@ def test_verify_signature_success_without_manifest_fingerprint_returns_signer(
     tmp_path: Path,
 ) -> None:
     pack_dir = tmp_path / "pack"
-    report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
-    _write_manifest_and_checksums(
-        pack_dir,
-        report_path=report_path,
-        final_verdict=final_verdict,
-        environment=environment,
-    )
+    _write_pack_with_manifest(pack_dir)
     expected_fingerprint = _sign_pack(
         pack_dir,
         tmp_path,
@@ -501,13 +460,7 @@ def test_verify_signature_success_with_matching_fingerprint_returns_signer(
     tmp_path: Path,
 ) -> None:
     pack_dir = tmp_path / "pack"
-    report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
-    _write_manifest_and_checksums(
-        pack_dir,
-        report_path=report_path,
-        final_verdict=final_verdict,
-        environment=environment,
-    )
+    _write_pack_with_manifest(pack_dir)
     expected_fingerprint = _sign_pack(pack_dir, tmp_path)
     errors, warnings, fingerprint = evidence_pack_mod._verify_signature(
         pack_dir, strict=False
@@ -552,13 +505,7 @@ def test_inspect_evidence_pack_signed_pack_omits_unsigned_warning_and_reports_ex
     tmp_path: Path,
 ) -> None:
     pack_dir = tmp_path / "pack"
-    report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
-    _write_manifest_and_checksums(
-        pack_dir,
-        report_path=report_path,
-        final_verdict=final_verdict,
-        environment=environment,
-    )
+    _write_pack_with_manifest(pack_dir)
     _sign_pack(pack_dir, tmp_path)
     (pack_dir / "extra.bin").write_text("extra", encoding="utf-8")
 
@@ -575,13 +522,7 @@ def test_inspect_evidence_pack_unsigned_clean_pack_reports_warning_without_extra
     tmp_path: Path,
 ) -> None:
     pack_dir = tmp_path / "unsigned-pack"
-    report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
-    _write_manifest_and_checksums(
-        pack_dir,
-        report_path=report_path,
-        final_verdict=final_verdict,
-        environment=environment,
-    )
+    _write_pack_with_manifest(pack_dir)
 
     result = evidence_pack_mod.inspect_evidence_pack(pack_dir)
     payload = result.payload
@@ -598,42 +539,22 @@ def test_inspect_evidence_pack_unsigned_clean_pack_reports_warning_without_extra
 def test_build_evidence_pack_copies_readme_and_environment_without_optional_refs(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    final_verdict = tmp_path / "final.json"
-    report_path = tmp_path / "report.json"
-    runtime_manifest = report_path.parent / RUNTIME_MANIFEST_FILENAME
-    environment = tmp_path / "environment.json"
-    readme = tmp_path / "README.md"
-    _write_json(final_verdict, {"verdict": "PASS"})
-    _write_json(report_path, {"ok": True})
-    _write_json(runtime_manifest, {"ok": True})
-    _write_json(environment, {"platform": "test"})
-    readme.write_text("# Evidence Pack\n", encoding="utf-8")
+    inputs = _write_build_inputs(tmp_path, readme=True)
 
-    monkeypatch.setattr(
-        evidence_pack_mod,
-        "_run_verify_command",
-        lambda reports, profile, report_assurance="report": VerifyExecutionResult(
-            outcome=VerifyOutcome.OK,
-            payload={"ok": True},
-            diagnostics=(),
-        ),
-        raising=True,
-    )
+    _patch_verify_result(monkeypatch)
 
     result = evidence_pack_mod.build_evidence_pack(
         tmp_path / "out-readme",
-        final_verdict_path=final_verdict,
-        report_paths=[report_path],
-        environment_path=environment,
-        readme_path=readme,
+        final_verdict_path=inputs.final_verdict,
+        report_paths=[inputs.report_path],
+        environment_path=inputs.environment,
+        readme_path=inputs.readme,
     )
     payload = result.payload
     exit_code = result.status
     assert exit_code == evidence_pack_mod.EvidencePackStatus.OK
     assert payload["ok"] is True
-    manifest = json.loads(
-        (tmp_path / "out-readme" / "manifest.json").read_text(encoding="utf-8")
-    )
+    manifest = _read_manifest(tmp_path / "out-readme")
     assert manifest["evidence_level"] == "medium"
     assert "invocation" not in manifest
     assert "materials" not in manifest
@@ -644,39 +565,21 @@ def test_build_evidence_pack_copies_readme_and_environment_without_optional_refs
 def test_build_evidence_pack_copies_source_repo_without_environment_or_materials(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    final_verdict = tmp_path / "final.json"
-    report_path = tmp_path / "report.json"
-    runtime_manifest = report_path.parent / RUNTIME_MANIFEST_FILENAME
-    source_repo = tmp_path / "source_repo.json"
-    _write_json(final_verdict, {"verdict": "PASS"})
-    _write_json(report_path, {"ok": True})
-    _write_json(runtime_manifest, {"ok": True})
-    _write_json(source_repo, {"commit": "abc123"})
+    inputs = _write_build_inputs(tmp_path)
 
-    monkeypatch.setattr(
-        evidence_pack_mod,
-        "_run_verify_command",
-        lambda reports, profile, report_assurance="report": VerifyExecutionResult(
-            outcome=VerifyOutcome.OK,
-            payload={"ok": True},
-            diagnostics=(),
-        ),
-        raising=True,
-    )
+    _patch_verify_result(monkeypatch)
 
     result = evidence_pack_mod.build_evidence_pack(
         tmp_path / "out-source-only",
-        final_verdict_path=final_verdict,
-        report_paths=[report_path],
-        source_repo_path=source_repo,
+        final_verdict_path=inputs.final_verdict,
+        report_paths=[inputs.report_path],
+        source_repo_path=inputs.source_repo,
     )
     payload = result.payload
     exit_code = result.status
     assert exit_code == evidence_pack_mod.EvidencePackStatus.OK
     assert payload["ok"] is True
-    manifest = json.loads(
-        (tmp_path / "out-source-only" / "manifest.json").read_text(encoding="utf-8")
-    )
+    manifest = _read_manifest(tmp_path / "out-source-only")
     assert manifest["evidence_level"] == "medium"
     assert manifest["verification"]["clean_reports"] == 1
     assert (
@@ -751,13 +654,7 @@ def test_verify_evidence_pack_returns_signature_failure_payload(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     pack_dir = tmp_path / "pack"
-    report_path, final_verdict, environment = _write_pack_scaffold(pack_dir)
-    _write_manifest_and_checksums(
-        pack_dir,
-        report_path=report_path,
-        final_verdict=final_verdict,
-        environment=environment,
-    )
+    _write_pack_with_manifest(pack_dir)
 
     monkeypatch.setattr(
         evidence_pack_mod,

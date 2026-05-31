@@ -6,7 +6,7 @@ import pytest
 import typer
 
 from invarlock.core.doctor_findings import build_cross_check_findings
-from tests.cli.test_doctor_preflight_config_paths import (
+from tests.cli._support_doctor import (
     _install_fake_torch,
     _mk_report,
     _patch_minimal_doctor_env,
