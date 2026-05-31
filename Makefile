@@ -37,6 +37,7 @@ COVERAGE_TESTS_RUN := \
 
 COVERAGE_TESTS_VERIFY := \
 	tests/cli/test_verify*.py tests/cli/test_cli_command_help_smoke.py \
+	tests/cli/test_runtime_verify_cli.py \
 	tests/cli/test_policy_commands.py tests/cli/test_evidence_pack_commands.py \
 	tests/cli/test_evidence_pack_commands_release_review.py
 
