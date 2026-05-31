@@ -1,4 +1,4 @@
-from invarlock.plugins.hello_guard import HelloGuard
+from invarlock.plugins import HelloGuard
 
 
 def test_hello_guard_passes_below_threshold():

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.guards.variance_policy import predictive_gate_outcome
-from invarlock.guards_ref.variance_ref import variance_decide
+from tests.guards.property.strategies import variance_decide
 
 
 def test_variance_decision_parity_cases():

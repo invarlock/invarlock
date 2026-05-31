@@ -11,10 +11,16 @@ from typing import Any, Literal
 import torch
 import torch.nn as nn
 
-from .variance_types import ScaleComputationResult
-
 ProgressPhase = Literal["calibration"]
 _VARIANCE_SCALING_ERRORS = (AttributeError, RuntimeError, TypeError, ValueError)
+
+
+@dataclass(frozen=True)
+class ScaleComputationResult:
+    raw_scales: dict[str, float]
+    filtered_scales: dict[str, float]
+    backstop_used: bool
+    trimmed_to_limit: bool
 
 
 @dataclass(frozen=True)

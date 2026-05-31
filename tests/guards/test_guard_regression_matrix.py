@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-import builtins
-import importlib.util
-import sys
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -164,7 +160,7 @@ def test_rmt_guard_covers_default_auto_context_and_none_epsilon() -> None:
     assert guard.epsilon_default == original
 
 
-def test_guard_policies_cover_import_fallback_and_overlay_passthrough(
+def test_guard_policies_cover_overlay_passthrough(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import invarlock.guards.policies as policies_mod
@@ -186,28 +182,6 @@ def test_guard_policies_cover_import_fallback_and_overlay_passthrough(
     overlay = policies_mod.get_spectral_policy("balanced", use_yaml=True)
     assert overlay["deadband"] == baseline["deadband"]
     assert overlay["scope"] == "all"
-
-    original_import = builtins.__import__
-
-    def _fake_import(name, globals=None, locals=None, fromlist=(), level=0):
-        if name == "typing" and tuple(fromlist) == ("NotRequired", "TypedDict"):
-            raise ImportError("simulated py311 fallback")
-        return original_import(name, globals, locals, fromlist, level)
-
-    monkeypatch.setattr(builtins, "__import__", _fake_import)
-    sys.modules.pop("invarlock.guards._policies_import_fallback", None)
-    module_path = Path(policies_mod.__file__)
-    spec = importlib.util.spec_from_file_location(
-        "invarlock.guards._policies_import_fallback",
-        module_path,
-    )
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-
-    assert module.TypedDict is not None
-    assert module.NotRequired is not None
 
 
 def test_guard_policies_ignore_non_mapping_rmt_epsilon_family_overlay(

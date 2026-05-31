@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from invarlock.core.abi import INVARLOCK_CORE_ABI as INVARLOCK_CORE_ABI
+from invarlock.core import INVARLOCK_CORE_ABI as INVARLOCK_CORE_ABI
 
 from .base import (
     AdapterConfig,

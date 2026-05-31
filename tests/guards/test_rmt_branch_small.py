@@ -6,8 +6,10 @@ import invarlock.guards.rmt as runtime_rmt
 from invarlock.guards.rmt_analysis import (
     analyze_weight_distribution,
     capture_baseline_mp_stats,
+    mp_bulk_edges,
+    rmt_growth_ratio,
+    within_deadband,
 )
-from invarlock.guards.rmt_math import mp_bulk_edges, rmt_growth_ratio, within_deadband
 
 
 def test_mp_bulk_edges_whitened_and_unwhitened() -> None:

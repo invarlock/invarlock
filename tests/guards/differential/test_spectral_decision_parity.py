@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from invarlock.guards.spectral import SpectralGuard
-from invarlock.guards_ref.spectral_ref import spectral_family_decide
+from tests.guards.property.strategies import spectral_family_decide
 
 
 @pytest.mark.parametrize(

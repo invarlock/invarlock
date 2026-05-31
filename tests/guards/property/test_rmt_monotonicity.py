@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from hypothesis import given
 
-from invarlock.guards_ref.rmt_ref import rmt_decide
-from tests.guards.property.strategies import rmt_inputs
+from tests.guards.property.strategies import rmt_decide, rmt_inputs
 
 
 @given(rmt_inputs())

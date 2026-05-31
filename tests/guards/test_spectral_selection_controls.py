@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from invarlock.guards.spectral_selection import select_budgeted_violations
+from invarlock.guards.spectral import select_budgeted_violations
 
 
 def test_select_budgeted_violations_handles_unknown_method_and_default_selection() -> (

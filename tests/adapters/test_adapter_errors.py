@@ -10,7 +10,7 @@ import pytest
 
 
 def test_bnb_missing_transformers_dependency(monkeypatch: pytest.MonkeyPatch) -> None:
-    from invarlock.plugins.hf_bnb_adapter import HF_BNB_Adapter
+    from invarlock.plugins import HF_BNB_Adapter
 
     # Make importing transformers fail
     real_import = builtins.__import__
@@ -62,7 +62,7 @@ def test_hf_causal_invalid_model_id_maps_to_model_load_error(
 def test_gptq_missing_runtime_maps_to_dependency_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from invarlock.plugins.hf_gptq_adapter import HF_GPTQ_Adapter
+    from invarlock.plugins import HF_GPTQ_Adapter
 
     real_import = builtins.__import__
 
@@ -277,7 +277,7 @@ def test_hf_mlm_loader_retries_with_direct_submodule_hint_for_remote_model_id(
     assert calls == ["primary", "bert-direct"]
 
 
-def test_hf_causal_loader_retries_with_direct_submodule_hint_for_remote_model_id(
+def test_hf_causal_adapter_retries_with_direct_submodule_hint_for_remote_model_id(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from invarlock.adapters import hf_causal as hf_causal_mod

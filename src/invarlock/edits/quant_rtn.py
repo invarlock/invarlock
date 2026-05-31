@@ -23,7 +23,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from invarlock.core.abi import INVARLOCK_CORE_ABI as CORE_ABI
+from invarlock.core import INVARLOCK_CORE_ABI as CORE_ABI
 from invarlock.core.api import (
     CalibrationData,
     EditRuntime,

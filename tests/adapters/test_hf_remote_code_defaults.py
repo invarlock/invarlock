@@ -27,7 +27,7 @@ def test_hf_bnb_uses_resolved_remote_code(monkeypatch: pytest.MonkeyPatch):
     transformers.BitsAndBytesConfig = _BitsAndBytesConfig
     monkeypatch.setitem(sys.modules, "transformers", transformers)
 
-    from invarlock.plugins.hf_bnb_adapter import HF_BNB_Adapter
+    from invarlock.plugins import HF_BNB_Adapter
 
     calls: dict[str, object] = {}
     adapter = HF_BNB_Adapter()
@@ -61,7 +61,7 @@ def test_hf_awq_uses_resolved_remote_code(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setitem(sys.modules, "transformers", transformers)
     monkeypatch.setitem(sys.modules, "gptqmodel", gptqmodel)
 
-    from invarlock.plugins.hf_awq_adapter import HF_AWQ_Adapter
+    from invarlock.plugins import HF_AWQ_Adapter
 
     adapter = HF_AWQ_Adapter()
     monkeypatch.setattr(
@@ -92,7 +92,7 @@ def test_hf_gptq_uses_resolved_remote_code(monkeypatch: pytest.MonkeyPatch):
     gptqmodel.GPTQModel = _GPTQModel
     monkeypatch.setitem(sys.modules, "gptqmodel", gptqmodel)
 
-    from invarlock.plugins.hf_gptq_adapter import HF_GPTQ_Adapter
+    from invarlock.plugins import HF_GPTQ_Adapter
 
     adapter = HF_GPTQ_Adapter()
     monkeypatch.setattr(

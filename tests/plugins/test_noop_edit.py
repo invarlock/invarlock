@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch.nn as nn
 
-from invarlock.edits.noop import NoopEdit
+from invarlock.edits import NoopEdit
 
 
 def test_noop_edit_reports_zero_deltas() -> None:

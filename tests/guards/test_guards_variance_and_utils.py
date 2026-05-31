@@ -27,8 +27,6 @@ from invarlock.guards.policies import (
 )
 from invarlock.guards.rmt_analysis import (
     capture_baseline_mp_stats,
-)
-from invarlock.guards.rmt_math import (
     mp_bulk_edge,
 )
 from invarlock.guards.spectral_measurement import (
