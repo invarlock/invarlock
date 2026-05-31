@@ -17,7 +17,6 @@ def _build_wheel(tmp_path):
             "-m",
             "build",
             "--wheel",
-            "--no-isolation",
             "--outdir",
             str(tmp_path),
         ],
