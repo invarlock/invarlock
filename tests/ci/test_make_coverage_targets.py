@@ -112,6 +112,8 @@ def test_coverage_policy_is_shared_with_makefile_and_expanded_surface() -> None:
     assert "src/invarlock/__init__.py" in policy.CORE_FILES
     assert "src/invarlock/adapters/auto.py" in policy.CORE_FILES
     assert "scripts/release/evidence_contracts.py" in policy.CORE_FILES
+    assert "src/invarlock/calibration.py" in policy.CORE_FILES
+    assert "src/invarlock/calibration.py" in policy.THRESHOLDS
     assert "src/invarlock/reporting/report_builder_support.py" in policy.THRESHOLDS
     assert "src/invarlock/reporting/report_bundle.py" in policy.THRESHOLDS
     assert "src/invarlock/reporting/report_make.py" in policy.CORE_FILES
@@ -131,10 +133,12 @@ def test_coverage_policy_is_shared_with_makefile_and_expanded_surface() -> None:
     for pattern in (
         "src/invarlock/observability/*",
         "src/invarlock/__init__.py",
+        "src/invarlock/calibration.py",
         "src/invarlock/adapters/auto.py",
         "scripts/release/*.py",
         "invarlock/observability/*",
         "invarlock/__init__.py",
+        "invarlock/calibration.py",
         "invarlock/adapters/auto.py",
     ):
         assert pattern in policy.COVERAGE_INCLUDE_PATTERNS
