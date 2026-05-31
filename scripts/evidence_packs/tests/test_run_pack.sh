@@ -3,7 +3,7 @@
 pack_test_sign_manifest() {
     local pack_dir="$1"
     local repo_root="${TEST_ROOT:-$(pwd)}"
-    python3 "${repo_root}/scripts/evidence_packs/python/sign_manifest.py" \
+    python3 "${repo_root}/scripts/evidence_packs/python/manifest_writer.py" sign \
         --manifest "${pack_dir}/manifest.json" \
         --generate-ephemeral \
         >/dev/null
@@ -939,13 +939,49 @@ test_run_pack_sha256_cmd_fallback_and_sign_toggle() {
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
-    local repo_root
-    repo_root="$(pwd)"
-    cat > "${bin_dir}/shasum" <<EOF
+    cat > "${bin_dir}/shasum" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
-exec python3 "${repo_root}/scripts/evidence_packs/python/shasum_mock.py" "\$@"
+python3 - "$@" <<'PY'
+from __future__ import annotations
+
+import hashlib
+import pathlib
+import sys
+
+args = sys.argv[1:]
+check_file = None
+files: list[str] = []
+i = 0
+while i < len(args):
+    if args[i] == "-a":
+        i += 2
+    elif args[i] == "-c":
+        check_file = args[i + 1] if i + 1 < len(args) else ""
+        i += 2
+    else:
+        files.append(args[i])
+        i += 1
+
+
+def sha256(path: str) -> str:
+    return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+
+
+if check_file:
+    ok = True
+    for line in pathlib.Path(check_file).read_text().splitlines():
+        if not line.strip():
+            continue
+        parts = line.split()
+        if sha256(parts[-1]) != parts[0]:
+            ok = False
+    raise SystemExit(0 if ok else 1)
+
+for filename in files:
+    print(f"{sha256(filename)}  {filename}")
+PY
 EOF
     chmod +x "${bin_dir}/shasum"
 
@@ -1004,7 +1040,7 @@ test_run_pack_sign_manifest_helper_uses_ephemeral_key_by_default() {
 
     run pack_sign_manifest_helper "${manifest}"
     assert_rc "0" "${RUN_RC}" "manifest signing helper succeeds"
-    assert_match "sign_manifest\\.py" "$(cat "${calls}")" "sign helper invoked"
+    assert_match "manifest_writer\\.py sign" "$(cat "${calls}")" "sign helper invoked"
     assert_match "--generate-ephemeral" "$(cat "${calls}")" "ephemeral signing key path is used by default"
 }
 
@@ -1420,4 +1456,51 @@ test_run_pack_populate_pack_dir_propagates_environment_and_manifest_write_failur
     pack_write_manifest() { return 1; }
     run pack_populate_pack_dir "${run_dir}" "${pack_dir}"
     assert_rc "1" "${RUN_RC}" "populate pack dir fails when manifest write fails"
+}
+
+test_pack_build_pack_and_verify_pack_end_to_end_v2_layout() {
+    mock_reset
+
+    PACK_SKIP_HTML=1
+    PACK_PACK_LAYOUT=v2
+    PACK_SUITE=subset
+    PACK_NET=0
+    PACK_DETERMINISM=throughput
+    PACK_REPEATS=0
+
+    local run_dir="${TEST_TMPDIR}/run"
+    local pack_dir="${TEST_TMPDIR}/pack"
+
+    mkdir -p "${run_dir}/reports" "${run_dir}/analysis" "${run_dir}/state"
+    echo "PASS" > "${run_dir}/reports/final_verdict.txt"
+    echo '{"ok":true}' > "${run_dir}/reports/final_verdict.json"
+    echo 'model,edit' > "${run_dir}/analysis/eval_results.csv"
+    echo 'm,quant_rtn' >> "${run_dir}/analysis/eval_results.csv"
+    echo '{"model_list":["m"],"models":{"m":{"revision":"rev"}}}' > "${run_dir}/state/model_revisions.json"
+
+    mkdir -p "${run_dir}/m/reports/clean/quant_rtn"
+    echo '{}' > "${run_dir}/m/reports/clean/quant_rtn/evaluation.report.json"
+
+    source "${TEST_ROOT}/scripts/evidence_packs/run_pack.sh"
+
+    run pack_build_pack "${run_dir}" "${pack_dir}"
+    assert_rc "0" "${RUN_RC}" "pack_build_pack succeeds"
+
+    assert_file_exists "${pack_dir}/manifest.json" "manifest written"
+    assert_file_exists "${pack_dir}/checksums.sha256" "checksums written"
+    assert_file_exists "${pack_dir}/README.md" "readme written"
+    assert_file_exists "${pack_dir}/results/verification_summary.json" "verification summary written"
+    assert_file_exists "${pack_dir}/reports/m/clean/quant_rtn/evaluation.report.json" "report copied"
+    assert_file_exists "${pack_dir}/manifest.signature.json" "signature bundle written"
+
+    assert_file_exists "${pack_dir}/metadata/manifest.json" "manifest copied to metadata"
+    assert_file_exists "${pack_dir}/metadata/manifest.signature.json" "signature copied to metadata"
+    assert_file_exists "${pack_dir}/metadata/checksums.sha256" "checksum copied to metadata"
+    assert_file_exists "${pack_dir}/metadata/source_repo.json" "source repo metadata copied"
+    assert_file_exists "${pack_dir}/metadata/environment.json" "environment metadata copied"
+
+    local verify_json="${TEST_TMPDIR}/verify.json"
+    run bash "${TEST_ROOT}/scripts/evidence_packs/verify_pack.sh" --pack "${pack_dir}" --json-out "${verify_json}"
+    assert_rc "0" "${RUN_RC}" "verify_pack succeeds"
+    assert_file_exists "${verify_json}" "verify json written"
 }

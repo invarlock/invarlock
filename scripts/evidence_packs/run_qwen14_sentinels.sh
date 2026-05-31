@@ -90,7 +90,7 @@ normalize_staged_preset_for_baseline_report() {
     local staged_baseline_report="$2"
     local python_bin=""
     python_bin="$(resolve_python_bin)"
-    "${python_bin}" "${SCRIPT_DIR}/python/normalize_staged_preset.py" \
+    "${python_bin}" "${SCRIPT_DIR}/python/task_tools.py" normalize-staged-preset \
         --preset "${staged_preset}" \
         --baseline-report "${staged_baseline_report}" \
         --skip-overhead-check

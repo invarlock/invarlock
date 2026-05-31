@@ -60,19 +60,13 @@ def test_manifest_writer_runs_with_warnings_as_errors(tmp_path: Path) -> None:
 
 def test_write_source_repo_metadata_fails_closed_without_git(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = (
-        repo_root
-        / "scripts"
-        / "evidence_packs"
-        / "python"
-        / "write_source_repo_metadata.py"
-    )
+    script = repo_root / "scripts" / "evidence_packs" / "python" / "manifest_writer.py"
     out_path = tmp_path / "source_repo.json"
     empty_path = tmp_path / "empty-bin"
     empty_path.mkdir()
 
     proc = subprocess.run(
-        [sys.executable, str(script), "--out", str(out_path)],
+        [sys.executable, str(script), "source-repo", "--out", str(out_path)],
         capture_output=True,
         text=True,
         check=False,
@@ -89,13 +83,7 @@ def test_write_source_repo_metadata_uses_explicit_snapshot_marker_without_git(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = (
-        repo_root
-        / "scripts"
-        / "evidence_packs"
-        / "python"
-        / "write_source_repo_metadata.py"
-    )
+    script = repo_root / "scripts" / "evidence_packs" / "python" / "manifest_writer.py"
     out_path = tmp_path / "source_repo.json"
     marker_path = tmp_path / "GPU_RUN_SOURCE.txt"
     marker_path.write_text(
@@ -115,7 +103,7 @@ def test_write_source_repo_metadata_uses_explicit_snapshot_marker_without_git(
     empty_path.mkdir()
 
     proc = subprocess.run(
-        [sys.executable, str(script), "--out", str(out_path)],
+        [sys.executable, str(script), "source-repo", "--out", str(out_path)],
         capture_output=True,
         text=True,
         check=False,
@@ -236,3 +224,36 @@ def test_manifest_writer_fails_closed_without_source_repo_metadata_or_git(
     assert proc.returncode == 1
     assert "git is required to collect evidence-pack source provenance" in proc.stderr
     assert not (pack_dir / "manifest.json").exists()
+
+
+def test_manifest_writer_readme_command_documents_verification(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "evidence_packs" / "python" / "manifest_writer.py"
+    pack_dir = tmp_path / "pack"
+    (pack_dir / "results").mkdir(parents=True)
+    (pack_dir / "metadata").mkdir(parents=True)
+    (pack_dir / "results" / "final_verdict.json").write_text("{}", encoding="utf-8")
+    (pack_dir / "metadata" / "source_repo.json").write_text("{}", encoding="utf-8")
+    (pack_dir / "metadata" / "environment.json").write_text("{}", encoding="utf-8")
+    (pack_dir / "results" / "verification_summary.json").write_text(
+        json.dumps(
+            {
+                "clean_reports": 2,
+                "error_injection_reports": 1,
+                "failed_reports": 0,
+                "policy_profile": "strict",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    subprocess.run(
+        [sys.executable, str(script), "readme", str(pack_dir)],
+        check=True,
+        cwd=repo_root,
+    )
+
+    readme = (pack_dir / "README.md").read_text(encoding="utf-8")
+    assert "Evidence level: high" in readme
+    assert "signed manifest, strict verification, and a PASS final verdict" in readme
+    assert "invarlock advanced evidence-pack verify" in readme

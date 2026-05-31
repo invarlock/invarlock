@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from scripts.evidence_packs.python.error_model.config import (
+from scripts.evidence_packs.python.error_model.common import (
     fix_layer_drop_config,
     fix_layer_drop_config_json,
 )

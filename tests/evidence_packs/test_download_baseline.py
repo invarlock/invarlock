@@ -1,24 +1,11 @@
 from __future__ import annotations
 
-import importlib.util
 import json
 import sys
 import types
 from pathlib import Path
 
-
-def _load_download_baseline_module():
-    repo_root = Path(__file__).resolve().parents[2]
-    script = (
-        repo_root / "scripts" / "evidence_packs" / "python" / "download_baseline.py"
-    )
-    spec = importlib.util.spec_from_file_location(
-        "evidence_pack_download_baseline", script
-    )
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+from scripts.evidence_packs.python import task_tools as download_baseline
 
 
 def _stub_huggingface_hub(
@@ -36,7 +23,6 @@ def _stub_huggingface_hub(
 def test_download_snapshot_copy_prefers_safetensors(
     monkeypatch, tmp_path: Path
 ) -> None:
-    download_baseline = _load_download_baseline_module()
     calls: list[dict[str, object]] = []
 
     def fake_list_repo_files(
@@ -82,7 +68,6 @@ def test_download_snapshot_copy_prefers_safetensors(
 def test_download_snapshot_symlink_uses_cache_tree_and_copy_on_write_generation_config(
     monkeypatch, tmp_path: Path
 ) -> None:
-    download_baseline = _load_download_baseline_module()
     calls: list[dict[str, object]] = []
     snapshot_dir = tmp_path / "hf-cache" / "snapshots" / "abc123"
     snapshot_dir.mkdir(parents=True)

@@ -889,10 +889,10 @@ test_estimate_task_memory_reserves_full_host_for_moe_execution() {
     jq -n '{model_id:"mistralai/Mixtral-8x7B-v0.1", weights_gb:90, hidden_size:4096, num_layers:32, num_heads:32, num_kv_heads:8, dtype_bytes:2}' > "${profile}"
 
     local result
-    result="$(TASK_TYPE=CALIBRATION_RUN MODEL_ID="mistralai/Mixtral-8x7B-v0.1" PROFILE_PATH="${profile}" GPU_MEMORY_PER_DEVICE=140 NUM_GPUS=4 python3 "${TEST_ROOT}/scripts/evidence_packs/python/estimate_task_memory.py")"
+    result="$(TASK_TYPE=CALIBRATION_RUN MODEL_ID="mistralai/Mixtral-8x7B-v0.1" PROFILE_PATH="${profile}" GPU_MEMORY_PER_DEVICE=140 NUM_GPUS=4 python3 "${TEST_ROOT}/scripts/evidence_packs/python/queue_state.py" estimate-task-memory)"
     assert_eq "421 4" "${result}" "MoE calibration reserves the full 4-GPU host"
 
-    result="$(TASK_TYPE=SETUP_BASELINE MODEL_ID="mistralai/Mixtral-8x7B-v0.1" PROFILE_PATH="${profile}" GPU_MEMORY_PER_DEVICE=140 NUM_GPUS=4 python3 "${TEST_ROOT}/scripts/evidence_packs/python/estimate_task_memory.py")"
+    result="$(TASK_TYPE=SETUP_BASELINE MODEL_ID="mistralai/Mixtral-8x7B-v0.1" PROFILE_PATH="${profile}" GPU_MEMORY_PER_DEVICE=140 NUM_GPUS=4 python3 "${TEST_ROOT}/scripts/evidence_packs/python/queue_state.py" estimate-task-memory)"
     assert_eq "94 1" "${result}" "MoE baseline setup stays single-GPU sized"
 }
 
@@ -903,7 +903,7 @@ test_estimate_task_memory_uses_runtime_sized_7b_windows() {
     jq -n '{model_id:"allenai/OLMo-2-1124-7B", weights_gb:14, hidden_size:4096, num_layers:32, num_heads:32, num_kv_heads:32, dtype_bytes:2}' > "${profile}"
 
     local result
-    result="$(TASK_TYPE=CALIBRATION_RUN MODEL_ID="allenai/OLMo-2-1124-7B" PROFILE_PATH="${profile}" GPU_MEMORY_PER_DEVICE=80 NUM_GPUS=1 python3 "${TEST_ROOT}/scripts/evidence_packs/python/estimate_task_memory.py")"
+    result="$(TASK_TYPE=CALIBRATION_RUN MODEL_ID="allenai/OLMo-2-1124-7B" PROFILE_PATH="${profile}" GPU_MEMORY_PER_DEVICE=80 NUM_GPUS=1 python3 "${TEST_ROOT}/scripts/evidence_packs/python/queue_state.py" estimate-task-memory)"
     assert_eq "44 1" "${result}" "7B calibration memory estimate stays aligned with runtime-sized windows on 80 GB GPUs"
 }
 

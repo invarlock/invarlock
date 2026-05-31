@@ -8,8 +8,6 @@ import ast
 import sys
 from pathlib import Path
 
-from common_io import read_text
-
 GUARD_ROOT = Path("src/invarlock/guards")
 DIAGNOSTIC_MARKERS = (
     "guard-fallback-ok",
@@ -54,7 +52,7 @@ def _source_segment(source: str, node: ast.AST) -> str:
 
 
 def _audit_file(path: Path, root: Path) -> list[str]:
-    source = read_text(path)
+    source = path.read_text(encoding="utf-8")
     try:
         tree = ast.parse(source, filename=str(path))
     except SyntaxError as exc:

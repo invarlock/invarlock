@@ -150,7 +150,7 @@ debug_verify_failure() {
   local manifest_path="$SMOKE_REPORT_DIR/runtime.manifest.json"
   if [[ -f "$manifest_path" ]]; then
     echo "[smoke] runtime_verify_diagnostics"
-    "$PYTHON_BIN" -m invarlock.cli.runtime_verify \
+    "$PYTHON_BIN" -m invarlock advanced runtime-verify \
       --report "$EVAL_REPORT" \
       --manifest "$manifest_path" \
       --json || true

@@ -36,12 +36,12 @@ Python helper boundaries:
 - `python/create_edit_model.py`: one-shot validation-subject edit creation
   (`quant-rtn`, `magnitude-prune`, `lowrank-svd`, `fp8-quant`).
 - `python/create_edits_batch.py`: batched edit creation from tuned edit specs.
-- `python/editing/`: shared edit metadata, targeting, implementation, save, and
-  validation helpers used by edit entrypoints.
-- `python/model_io/`: shared Hugging Face model-loading helpers.
-- `python/create_error_model.py` + `python/error_model/`: structural/error
-  injection subject creation.
-- `python/deployable/`: deployable artifact validation helpers.
+- `python/editing/`: shared edit metadata, targeting, implementation, save,
+  validation, and deployable artifact helpers used by edit entrypoints.
+- `python/runtime_tools.py`: runtime environment checks plus shared Hugging Face
+  model-loading helpers.
+- `python/task_tools.py create-error-model` + `python/error_model/`:
+  structural/error injection subject creation.
 - `python/verdict/`: verdict table and verdict-generation internals.
 
 Workflow boundaries:

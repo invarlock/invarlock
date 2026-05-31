@@ -28,6 +28,20 @@ echo "[info] $(ts) lanes=$LANES_RAW" | tee -a "$LOG_FILE"
 TOTAL_LANES=0
 FAILED_LANES=0
 
+run_realistic_lane() {
+  local lane_work_root="$1"
+  local mode="${INVARLOCK_REALISTIC_SMOKE_MODE:-local}"
+  local journeys="${INVARLOCK_REALISTIC_SMOKE_JOURNEYS:-noop,negative}"
+
+  echo "[info] $(ts) realistic smoke mode=$mode journeys=$journeys work_root=$lane_work_root" | tee -a "$LOG_FILE"
+  set +e
+  INVARLOCK_SMOKE_MODE="$mode" INVARLOCK_SMOKE_JOURNEYS="$journeys" bash "$REPO_ROOT/scripts/smoke/run_gpt2_user_journey_smoke.sh" "$lane_work_root" >>"$LOG_FILE" 2>&1
+  local rc=$?
+  set -e
+  echo "[summary] $(ts) lane=realistic exit_code=$rc" | tee -a "$LOG_FILE"
+  return "$rc"
+}
+
 run_lane() {
   local lane="$1"
   local script_path=""
@@ -39,7 +53,7 @@ run_lane() {
       script_path="$REPO_ROOT/scripts/smoke/cli_smoke_negative.sh"
       ;;
     realistic)
-      script_path="$REPO_ROOT/scripts/smoke/cli_smoke_realistic.sh"
+      script_path="$REPO_ROOT/scripts/smoke/run_gpt2_user_journey_smoke.sh"
       ;;
     *)
       echo "[error] unknown smoke lane: $lane" | tee -a "$LOG_FILE"
@@ -52,7 +66,11 @@ run_lane() {
   echo "[script] $script_path" | tee -a "$LOG_FILE"
   local rc=0
   set +e
-  bash "$script_path" "$WORK_ROOT/$lane" >>"$LOG_FILE" 2>&1
+  if [[ "$lane" == "realistic" ]]; then
+    run_realistic_lane "$WORK_ROOT/$lane"
+  else
+    bash "$script_path" "$WORK_ROOT/$lane" >>"$LOG_FILE" 2>&1
+  fi
   rc=$?
   set -e
   echo "[exit_code] $rc" | tee -a "$LOG_FILE"

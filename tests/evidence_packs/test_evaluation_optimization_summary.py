@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from scripts.evidence_packs.python.evaluation_optimization_summary import build_summary
+from scripts.evidence_packs.python.validation_state import (
+    build_evaluation_optimization_summary,
+)
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -31,7 +33,7 @@ def test_build_summary_collects_timing_and_reuse_counts(tmp_path: Path):
             },
         },
     )
-    summary = build_summary(tmp_path)
+    summary = build_evaluation_optimization_summary(tmp_path)
 
     assert summary["evaluation_reports_timed"] == 1
     assert summary["baseline_report_reuse_count"] == 1

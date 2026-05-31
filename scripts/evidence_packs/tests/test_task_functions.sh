@@ -733,7 +733,7 @@ test_task_evaluate_tasks_generate_evaluation_report_when_only_report_json_writte
     _cmd_python() {
         local script="$1"
         shift || true
-        if [[ "${script}" == *"evaluation_report_from_report.py" ]]; then
+        if [[ "${script}" == *"task_tools.py" && "${1:-}" == "evaluation-report" ]]; then
             local out_path=""
             while [[ $# -gt 0 ]]; do
                 if [[ "${1}" == "--out" ]]; then
@@ -1416,7 +1416,7 @@ test_task_baseline_report_helpers_execute_python_wrappers() {
     local calls="${TEST_TMPDIR}/python.calls"
     _cmd_python() {
         echo "python $*" >> "${calls}"
-        if [[ $# -eq 2 ]]; then
+        if [[ $# -eq 3 && "${2:-}" == "resolve-adapter" ]]; then
             echo "hf_auto"
         fi
         return 0
