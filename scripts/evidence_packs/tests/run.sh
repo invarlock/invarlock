@@ -61,7 +61,16 @@ coverage_owner_hint() {
         scripts/evidence_packs/lib/config/dataset_provider_config.sh) echo "scripts/evidence_packs/tests/test_dataset_provider_config.sh" ;;
         scripts/evidence_packs/lib/tasks/task_serialization.sh) echo "scripts/evidence_packs/tests/test_task_serialization.sh" ;;
         scripts/evidence_packs/lib/queue/queue_manager.sh) echo "scripts/evidence_packs/tests/test_queue_manager.sh" ;;
+        scripts/evidence_packs/lib/queue/queue_core.sh) echo "scripts/evidence_packs/tests/test_queue_manager.sh" ;;
+        scripts/evidence_packs/lib/queue/queue_lifecycle.sh) echo "scripts/evidence_packs/tests/test_queue_manager.sh" ;;
+        scripts/evidence_packs/lib/queue/queue_dependencies.sh) echo "scripts/evidence_packs/tests/test_queue_manager.sh" ;;
+        scripts/evidence_packs/lib/queue/queue_memory_plan.sh) echo "scripts/evidence_packs/tests/test_queue_manager.sh" ;;
+        scripts/evidence_packs/lib/queue/queue_generation.sh) echo "scripts/evidence_packs/tests/test_queue_manager.sh" ;;
         scripts/evidence_packs/lib/queue/scheduler.sh) echo "scripts/evidence_packs/tests/test_scheduler.sh" ;;
+        scripts/evidence_packs/lib/queue/scheduler_core.sh) echo "scripts/evidence_packs/tests/test_scheduler.sh" ;;
+        scripts/evidence_packs/lib/queue/scheduler_gpu_runtime.sh) echo "scripts/evidence_packs/tests/test_scheduler.sh" ;;
+        scripts/evidence_packs/lib/queue/scheduler_reservations.sh) echo "scripts/evidence_packs/tests/test_scheduler.sh" ;;
+        scripts/evidence_packs/lib/queue/scheduler_selection.sh) echo "scripts/evidence_packs/tests/test_scheduler.sh" ;;
         scripts/evidence_packs/lib/queue/gpu_worker.sh) echo "scripts/evidence_packs/tests/test_gpu_worker.sh" ;;
         scripts/evidence_packs/lib/core/fault_tolerance.sh) echo "scripts/evidence_packs/tests/test_fault_tolerance.sh" ;;
         scripts/evidence_packs/lib/tasks/task_functions.sh) echo "scripts/evidence_packs/tests/test_task_functions.sh" ;;

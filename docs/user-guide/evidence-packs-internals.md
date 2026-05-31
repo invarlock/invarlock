@@ -68,8 +68,17 @@ invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000
 ### Library modules
 
 - `lib/task_serialization.sh`: task schema, JSON helpers, GPU planning.
-- `lib/queue_manager.sh`: queue states, dependency resolution, task generation.
-- `lib/scheduler.sh`: dynamic priority, memory gating, reservations.
+- `lib/queue/queue_manager.sh`: compatibility facade for queue state, dependency, and task-generation modules.
+- `lib/queue/queue_core.sh`: queue setup, locking, summaries, and terminal-state helpers.
+- `lib/queue/queue_lifecycle.sh`: task state transitions and orphan reclamation.
+- `lib/queue/queue_dependencies.sh`: dependency resolution and dependent promotion.
+- `lib/queue/queue_memory_plan.sh`: profile-based memory refresh and memory-plan export.
+- `lib/queue/queue_generation.sh`: progress state, task search, and task graph generation.
+- `lib/queue/scheduler.sh`: compatibility facade for scheduler modules.
+- `lib/queue/scheduler_core.sh`: GPU ID/cache helpers, scheduler lock, and GPU-count policy.
+- `lib/queue/scheduler_gpu_runtime.sh`: OOM checks, memory probes, utilization, and purge helpers.
+- `lib/queue/scheduler_reservations.sh`: GPU reservation and availability helpers.
+- `lib/queue/scheduler_selection.sh`: task priority, selection, work stealing, and scheduling metrics.
 - `lib/gpu_worker.sh`: worker loop, heartbeats, task execution glue.
 - `lib/task_functions.sh`: implementations for each task type.
 - `lib/model_creation.sh`: edit and error-model creation helpers (`create_model_variant` dispatcher).
@@ -98,8 +107,8 @@ invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000
 │                   ┌───────────────┴───────────────┐                   │
 │                   ▼                               ▼                   │
 │ TASK EXECUTION                                  CORE SERVICES         │
-│   lib/gpu_worker.sh                               queue_manager       │
-│   task claim -> precheck -> execute -> cleanup    scheduler           │
+│   lib/gpu_worker.sh                               queue_* modules     │
+│   task claim -> precheck -> execute -> cleanup    scheduler_* modules │
 │                                                  task_serialization   │
 │                                                  fault_tolerance      │
 │                   │                                                   │
