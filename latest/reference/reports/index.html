@@ -1,0 +1,3687 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Official documentation for the InvarLock toolkit">
+      
+      
+      
+        <link rel="canonical" href="https://invarlock.github.io/invarlock/reference/reports/">
+      
+      
+        <link rel="prev" href="../guards/">
+      
+      
+        <link rel="next" href="../env-vars/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>Reports - InvarLock Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#reports" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="InvarLock Documentation" class="md-header__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            InvarLock Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Reports
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../user-guide/getting-started/" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../cli/" class="md-tabs__link">
+          
+  
+  
+  CLI Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../assurance/00-assurance-case/" class="md-tabs__link">
+          
+  
+  
+  Assurance
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../security/best-practices/" class="md-tabs__link">
+          
+  
+  
+  Security
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="InvarLock Documentation" class="md-nav__button md-logo" aria-label="InvarLock Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    InvarLock Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/invarlock/invarlock" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invarlock
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/primary-metric-smoke/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Primary Metric Smoke
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/compare-and-evaluate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compare & Evaluate (BYOE)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/live-examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/bring-your-own-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bring Your Own Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/plugins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/config-gallery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Gallery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/example-reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Example Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/failure-examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Failure Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/reading-report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading a Report
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/evidence-packs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence Packs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/evidence-packs-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evidence Pack Internals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    CLI Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../one-run-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    One Run Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../programmatic-quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Programmatic Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#report-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        report Layout
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="report Layout">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#executive-summary-interpretation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Executive Summary Interpretation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evidence-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evidence Flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Schema">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#concepts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concepts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#provenance-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provenance Map
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#minimal-v1-report-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minimal v1 report Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#schema-summary-validator-view" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema Summary (Validator View)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#report-verify-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        report → Verify Matrix
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#required-vs-optional-blocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required vs Optional Blocks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#primary-metric-tail-gate-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Primary Metric Tail Gate (optional)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#telemetry-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Telemetry Fields
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#html-export" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HTML Export
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="HTML Export">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python API
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#schema-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema Issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#telemetry-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Telemetry Issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#html-export-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HTML Export Issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#observability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related Documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../env-vars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environment Variables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model-adapters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Adapters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model-family-catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Family Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../config-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tier-policy-catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tier Policy Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datasets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifact Layout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../observability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../calibration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calibration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../alternatives-comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Alternatives Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Assurance
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/00-assurance-case/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Assurance Case
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/14-trust-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trust Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/15-strict-assurance-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strict Assurance Checklist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/01-eval-math-derivation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Math Derivation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/02-coverage-and-pairing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Coverage & Pairing Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/03-bca-bootstrap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    BCa Bootstrap (Paired Δlog)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/04-guard-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guard Contracts & Primer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/05-spectral-fpr-derivation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Spectral False-Positive Control
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/06-rmt-epsilon-rule/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RMT ε-Rule
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/07-ve-gate-power/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VE Predictive Gate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/08-determinism-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Determinism Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/09-tier-v1-calibration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tier v1.0 Calibration (Pilot)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/10-guard-overhead-method/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guard Overhead Method
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/11-policy-provenance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policy Provenance & Digest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/12-device-drift-bands/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Device Drift Bands
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/13-gpu-mps-first-guards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GPU/MPS-First Guards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/16-guard-validation-smoke/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guard Validation Smoke
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../assurance/17-empirical-guard-evidence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Empirical Guard Evidence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Security
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/best-practices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best Practices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/release-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threat Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/runtime-provenance-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Provenance Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/pip-audit-allowlist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pip Audit Allowlist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#report-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        report Layout
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="report Layout">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#executive-summary-interpretation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Executive Summary Interpretation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evidence-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evidence Flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Schema">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#concepts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concepts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#provenance-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provenance Map
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#minimal-v1-report-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Minimal v1 report Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#schema-summary-validator-view" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema Summary (Validator View)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#report-verify-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        report → Verify Matrix
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#required-vs-optional-blocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required vs Optional Blocks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#primary-metric-tail-gate-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Primary Metric Tail Gate (optional)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#telemetry-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Telemetry Fields
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#html-export" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HTML Export
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="HTML Export">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python API
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#schema-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema Issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#telemetry-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Telemetry Issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#html-export-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HTML Export Issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#observability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related Documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="reports">reports<a class="headerlink" href="#reports" title="Permanent link">&para;</a></h1>
+<p>This document consolidates all report-related reference material: schema,
+telemetry fields, and HTML export.</p>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Purpose</strong></td>
+<td>Define the v1 report contract, telemetry fields, and export formats.</td>
+</tr>
+<tr>
+<td><strong>Audience</strong></td>
+<td>Operators verifying reports and tool authors parsing them.</td>
+</tr>
+<tr>
+<td><strong>Schema version</strong></td>
+<td><code>schema_version = "v1"</code> (PM-only).</td>
+</tr>
+<tr>
+<td><strong>Source of truth</strong></td>
+<td><code>invarlock.reporting.report_schema.REPORT_JSON_SCHEMA</code>.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="table-of-contents">Table of Contents<a class="headerlink" href="#table-of-contents" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="#quick-start">Quick Start</a></li>
+<li><a href="#report-layout">report Layout</a></li>
+<li><a href="#executive-summary-interpretation">Executive Summary Interpretation</a></li>
+<li><a href="#schema">Schema</a></li>
+<li><a href="#minimal-v1-report-example">Minimal v1 report Example</a></li>
+<li><a href="#schema-summary-validator-view">Schema Summary</a></li>
+<li><a href="#required-vs-optional-blocks">Required vs Optional Blocks</a></li>
+<li><a href="#primary-metric-tail-gate-optional">Primary Metric Tail Gate</a></li>
+<li><a href="#telemetry-fields">Telemetry Fields</a></li>
+<li><a href="#html-export">HTML Export</a></li>
+<li><a href="#troubleshooting">Troubleshooting</a></li>
+<li><a href="#related-documentation">Related Documentation</a></li>
+</ul>
+<hr />
+<h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Generate a report from a run report</span>
+invarlock<span class="w"> </span>report<span class="w"> </span>generate<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--run<span class="w"> </span>runs/subject/report.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--baseline-run-report<span class="w"> </span>runs/baseline/report.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--format<span class="w"> </span>report
+
+<span class="c1"># Validate an container-backed report bundle</span>
+invarlock<span class="w"> </span>verify<span class="w"> </span>reports/eval/evaluation.report.json
+<span class="c1"># expects reports/eval/runtime.manifest.json next to the report</span>
+
+<span class="c1"># Explain a bundle directly from report provenance</span>
+invarlock<span class="w"> </span>report<span class="w"> </span>explain<span class="w"> </span>--evaluation-report<span class="w"> </span>reports/eval/evaluation.report.json
+
+<span class="c1"># Inspect telemetry fields</span>
+jq<span class="w"> </span><span class="s1">&#39;.telemetry&#39;</span><span class="w"> </span>reports/eval/evaluation.report.json
+
+<span class="c1"># Export to HTML</span>
+invarlock<span class="w"> </span>report<span class="w"> </span>html<span class="w"> </span>-i<span class="w"> </span>reports/eval/evaluation.report.json<span class="w"> </span>-o<span class="w"> </span>reports/eval/evaluation.html
+</code></pre></div>
+
+<p>Artifact model:</p>
+<table>
+<thead>
+<tr>
+<th>Artifact</th>
+<th>Produced by</th>
+<th>Primary consumers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>evaluation.report.json</code></td>
+<td><code>invarlock evaluate</code>, <code>invarlock report generate --format report</code></td>
+<td><code>invarlock verify</code>, <code>invarlock report html</code>, <code>invarlock report validate</code>, <code>invarlock report explain --evaluation-report</code>, <code>invarlock advanced runtime-verify</code></td>
+</tr>
+<tr>
+<td><code>report.json</code></td>
+<td>Baseline/subject run directories under <code>runs/...</code></td>
+<td><code>invarlock report generate</code>, <code>invarlock report explain --subject-report ... --baseline-report ...</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="report-layout">report Layout<a class="headerlink" href="#report-layout" title="Permanent link">&para;</a></h2>
+<p>The markdown report is structured to highlight evaluation outcomes first:</p>
+<p>Container-backed evaluations emit <code>runtime.manifest.json</code> next to
+<code>evaluation.report.json</code>. Archive and verify them together.</p>
+<p>The HTML export keeps that same body content but adds a browser shell with:</p>
+<ul>
+<li>summary chips for the overall status, primary-metric kind, and linked-run readiness</li>
+<li>quick links for the major report sections</li>
+<li>
+<p>anchored section headings so reviews can deep-link directly into the report</p>
+</li>
+<li>
+<p><strong>Executive Summary</strong>: one-line PASS/FAIL + compact gate table (primary metric, drift, invariants, spectral, RMT, overhead).</p>
+</li>
+<li><strong>Quality Gates</strong>: table of canonical gating checks with measured values.</li>
+<li><strong>Guard Check Details</strong>: invariants, spectral stability, RMT health, and pairing snapshots.</li>
+<li><strong>Primary Metric</strong>: task-specific metric summary with CI + baseline comparison.</li>
+<li><strong>Guard Observability</strong>: compact summaries with expandable guard details.</li>
+<li><strong>Policy Configuration</strong>: tier + digest summary with resolved policy details in <code>&lt;details&gt;</code>.</li>
+<li><strong>Appendix</strong>: environment, inference diagnostics, and variance guard details.</li>
+</ul>
+<h3 id="executive-summary-interpretation">Executive Summary Interpretation<a class="headerlink" href="#executive-summary-interpretation" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Meaning</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Overall</td>
+<td>Aggregate PASS/FAIL of canonical gates</td>
+<td>If FAIL, inspect the matching gate row</td>
+</tr>
+<tr>
+<td>Primary Metric</td>
+<td>Ratio/Δpp vs baseline</td>
+<td>Confirm within tier threshold</td>
+</tr>
+<tr>
+<td>Drift</td>
+<td>Final/preview ratio</td>
+<td>Check device stability, dataset drift</td>
+</tr>
+<tr>
+<td>Invariants/Spectral/RMT</td>
+<td>Guard status</td>
+<td>Expand guard details for failures</td>
+</tr>
+<tr>
+<td>Overhead</td>
+<td>Guarded vs bare PM</td>
+<td>Only present if overhead is evaluated</td>
+</tr>
+</tbody>
+</table>
+<h2 id="evidence-flow">Evidence Flow<a class="headerlink" href="#evidence-flow" title="Permanent link">&para;</a></h2>
+<div class="codehilite"><pre><span></span><code>┌─────────────────────────────────────────────────────────────────────────┐
+│                        EVIDENCE FLOW                                    │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│                        ┌───────────────┐                                │
+│                        │  BASELINE RUN │                                │
+│                        │   report.json │                                │
+│                        └───────┬───────┘                                │
+│                                │                                        │
+│                                ▼                                        │
+│   ┌───────────────────────────────────────────────────────────────┐     │
+│   │                      SUBJECT RUN                              │     │
+│   │ ┌─────────────┐  ┌──────────────┐  ┌────────────────────────┐ │     │
+│   │ │ model.meta  │  │ dataset.data │  │ guards[].metrics       │ │     │
+│   │ │ ─────────── │  │ ──────────── │  │ ────────────────────── │ │     │
+│   │ │ model_id    │  │ provider     │  │ invariants.passed      │ │     │
+│   │ │ adapter     │  │ seq_len      │  │ spectral.summary       │ │     │
+│   │ │ device      │  │ windows.stats│  │ rmt.families           │ │     │
+│   │ │ seeds       │  │ paired_count │  │ variance.enabled       │ │     │
+│   │ └─────────────┘  └──────────────┘  └────────────────────────┘ │     │
+│   │                                                               │     │
+│   │ ┌─────────────────┐  ┌──────────────────────────────────────┐ │     │
+│   │ │ metrics         │  │ policy_resolved                      │ │     │
+│   │ │ ─────────────── │  │ ──────────────────────────────────── │ │     │
+│   │ │ primary_metric  │  │ spectral.*, rmt.*, variance.*        │ │     │
+│   │ │ ratio_vs_base   │  │ tier_policy_name                     │ │     │
+│   │ │ display_ci      │  │ thresholds_hash                      │ │     │
+│   │ └─────────────────┘  └──────────────────────────────────────┘ │     │
+│   └────────────────────────────────┬──────────────────────────────┘     │
+│                                    │                                    │
+│                                    ▼                                    │
+│   ┌────────────────────────────────────────────────────────────────┐    │
+│   │                    make_report()                               │    │
+│   │ baseline_report + subject_report → evaluation.report.json      │    │
+│   └────────────────────────────────┬───────────────────────────────┘    │
+│                                    │                                    │
+│                                    ▼                                    │
+│   ┌────────────────────────────────────────────────────────────────┐    │
+│   │                    invarlock verify                            │    │
+│   │ schema + pairing + ratio math + measurement contracts +        │    │
+│   │ runtime-manifest provenance                                    │    │
+│   └────────────────────────────────────────────────────────────────┘    │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+</code></pre></div>
+
+<hr />
+<h2 id="schema">Schema<a class="headerlink" href="#schema" title="Permanent link">&para;</a></h2>
+<h3 id="concepts">Concepts<a class="headerlink" href="#concepts" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Schema stability</strong>: v1 is a PM-only contract; breaking changes require a
+  schema-version bump.</li>
+<li><strong>Validation allow-list</strong>: only specific <code>validation.*</code> flags are accepted by
+  the schema validator.</li>
+<li><strong>Baseline pairing</strong>: reports assume paired windows; verification enforces
+  pairing in CI/Release profiles.</li>
+</ul>
+<h3 id="provenance-map">Provenance Map<a class="headerlink" href="#provenance-map" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>report block</th>
+<th>Sourced from report</th>
+<th>Verify checks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>meta</code></td>
+<td><code>report.meta</code></td>
+<td>Schema only.</td>
+</tr>
+<tr>
+<td><code>dataset</code> / <code>evaluation_windows</code></td>
+<td><code>report.data</code>, <code>report.dataset.windows.stats</code></td>
+<td>Pairing + count checks; <code>dataset.hash.source</code> records whether hashes came from explicit preview/final hashes, explicit token IDs, or config fallback.</td>
+</tr>
+<tr>
+<td><code>primary_metric</code></td>
+<td><code>report.metrics.primary_metric</code></td>
+<td>Ratio + drift band (CI/Release).</td>
+</tr>
+<tr>
+<td><code>spectral</code> / <code>rmt</code> / <code>variance</code></td>
+<td><code>report.guards[]</code></td>
+<td>Measurement contracts (CI/Release); <code>rmt.mode</code> surfaces the active RMT measurement path.</td>
+</tr>
+<tr>
+<td><code>provenance.provider_digest</code></td>
+<td><code>report.provenance.provider_digest</code></td>
+<td>Required in CI/Release.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="minimal-v1-report-example">Minimal v1 report Example<a class="headerlink" href="#minimal-v1-report-example" title="Permanent link">&para;</a></h3>
+<p>The example below shows a realistic, PM‑only report envelope. It follows
+the validator in <code>invarlock.reporting.report_schema</code> and the
+fields produced by <code>invarlock.reporting.make_report</code>.</p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;schema_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;v1&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;run_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;20251013T012233Z-quant8-balanced&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;meta&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;model_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;gpt2&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;adapter&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;hf_causal&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;device&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;seeds&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;python&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1337</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;numpy&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1337</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;torch&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1337</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;dataset&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;provider&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;wikitext2&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;seq_len&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">512</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;windows&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;preview&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;final&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;seed&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;stats&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;window_match_fraction&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;window_overlap_fraction&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;paired_windows&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;coverage&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">          </span><span class="nt">&quot;preview&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;used&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="w"> </span><span class="p">},</span>
+<span class="w">          </span><span class="nt">&quot;final&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;used&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="w"> </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;primary_metric&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;kind&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ppl_causal&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;unit&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ppl&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;direction&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;lower&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;preview&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">42.18</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;final&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">43.10</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;ratio_vs_baseline&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.02</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;display_ci&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mf">1.00</span><span class="p">,</span><span class="w"> </span><span class="mf">1.05</span><span class="p">]</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;primary_metric_tail&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;mode&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;warn&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;evaluated&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;passed&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;warned&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;violations&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">    </span><span class="nt">&quot;policy&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;mode&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;warn&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;min_windows&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">50</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;quantile&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.95</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;quantile_max&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.20</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;epsilon&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0001</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;mass_max&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;stats&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;n&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;epsilon&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0001</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;q95&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.02</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;q99&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.04</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;max&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.06</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;tail_mass&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.03</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;source&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;paired_baseline.final&quot;</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;validation&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;primary_metric_acceptable&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;primary_metric_tail_acceptable&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;preview_final_drift_acceptable&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;guard_overhead_acceptable&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;policy_digest&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;policy_version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;v1&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;tier_policy_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;balanced&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;thresholds_hash&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;d49f15ade7d54beb&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;hysteresis&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;ppl&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.002</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;min_effective&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;changed&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;artifacts&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;events_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;runs/quant8/20251013_012233/events.jsonl&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;report_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;runs/quant8/20251013_012233/report.json&quot;</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;plugins&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;adapters&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">    </span><span class="nt">&quot;edits&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">    </span><span class="nt">&quot;guards&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Notes:</strong></p>
+<ul>
+<li><code>schema_version</code> is a string and must be <code>"v1"</code> for the v1 format.</li>
+<li><code>run_id</code> is a short, opaque identifier; reports treat it as a stable
+  string key.</li>
+<li><code>primary_metric</code> is the <strong>canonical</strong> place for PM values.</li>
+<li>The <code>validation</code> object holds boolean flags; only a small allow‑list of
+  keys is recognized by the validator.</li>
+</ul>
+<h3 id="schema-summary-validator-view">Schema Summary (Validator View)<a class="headerlink" href="#schema-summary-validator-view" title="Permanent link">&para;</a></h3>
+<p>The v1 validator uses a JSON Schema (draft 2020‑12) embedded in
+<code>REPORT_JSON_SCHEMA</code>. The schema is intentionally permissive around new
+fields while enforcing a small, stable core:</p>
+<p><strong>Required top‑level fields:</strong></p>
+<ul>
+<li><code>schema_version</code> — must equal <code>"v1"</code>.</li>
+<li><code>run_id</code> — non‑empty string (minimum length 4).</li>
+<li><code>meta</code> — object (model/device/seeds; validator does not fix sub‑shape).</li>
+<li><code>dataset</code> — object with at least:</li>
+<li><code>provider</code>: string</li>
+<li><code>seq_len</code>: integer ≥ 1</li>
+<li><code>windows.preview</code>: integer ≥ 0</li>
+<li><code>windows.final</code>: integer ≥ 0</li>
+<li><code>windows.stats</code>: object (paired-window stats and coverage)</li>
+<li><code>artifacts</code> — object (paths to <code>report.json</code>, <code>events.jsonl</code>, etc.).</li>
+<li><code>plugins</code> — object listing discovered adapters/edits/guards.</li>
+<li><code>primary_metric</code> — object (canonical primary metric snapshot).</li>
+</ul>
+<p><strong>Primary metric block (required):</strong></p>
+<ul>
+<li><code>primary_metric.kind</code>: string (e.g., <code>"ppl_causal"</code>, <code>"accuracy"</code>).</li>
+<li><code>primary_metric.preview</code> / <code>primary_metric.final</code>: numbers.</li>
+<li><code>primary_metric.ratio_vs_baseline</code>: number.</li>
+<li><code>primary_metric.display_ci</code>: two‑element numeric array <code>[lo, hi]</code>.</li>
+<li>Additional optional fields: <code>unit</code>, <code>direction</code>, <code>ci</code>, <code>gating_basis</code>,
+  <code>aggregation_scope</code>, <code>estimated</code>, etc.</li>
+</ul>
+<p><strong>Validation flags:</strong></p>
+<ul>
+<li><code>validation</code> is an object of booleans; allowed keys come from
+  <code>contracts/validation_keys.json</code>, and report validation fails closed when that
+  contract is missing or malformed.</li>
+<li>Common flags:</li>
+<li><code>primary_metric_acceptable</code></li>
+<li><code>primary_metric_tail_acceptable</code></li>
+<li><code>preview_final_drift_acceptable</code></li>
+<li><code>guard_overhead_acceptable</code></li>
+<li><code>invariants_pass</code></li>
+<li><code>spectral_stable</code></li>
+<li><code>rmt_stable</code></li>
+<li><code>hysteresis_applied</code></li>
+<li><code>moe_observed</code></li>
+<li><code>moe_identity_ok</code></li>
+<li>The validator rejects reports that contain non‑boolean values under
+  any of these keys.</li>
+</ul>
+<p><strong>Policy and structure:</strong></p>
+<ul>
+<li><code>policy_digest</code> — small summary of tier policy thresholds and whether they
+  changed relative to the baseline.</li>
+<li><code>resolved_policy</code> — snapshot of effective guard policies (spectral, rmt,
+  variance, metrics).</li>
+<li><code>policy_provenance</code> — tier label, overrides, and digest.</li>
+<li><code>structure</code> — structural deltas and compression diagnostics (optional).</li>
+</ul>
+<p><strong>Confidence (optional):</strong></p>
+<ul>
+<li><code>confidence</code> — object with:</li>
+<li><code>label</code>: <code>"High" | "Medium" | "Low"</code>.</li>
+<li><code>basis</code>: string description of the confidence basis.</li>
+<li>Optional numeric fields: <code>width</code>, <code>threshold</code>, <code>unstable</code> flag, etc.</li>
+</ul>
+<p>The full machine‑readable schema is available at runtime via
+<code>invarlock.reporting.report_schema.REPORT_JSON_SCHEMA</code>.</p>
+<h3 id="report-verify-matrix">report → Verify Matrix<a class="headerlink" href="#report-verify-matrix" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>report block</th>
+<th>Derived from</th>
+<th>Verify checks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>meta</code></td>
+<td><code>report.meta</code></td>
+<td>Schema only.</td>
+</tr>
+<tr>
+<td><code>dataset</code> / <code>evaluation_windows</code></td>
+<td><code>report.data</code>, <code>report.dataset.windows.stats</code></td>
+<td>Pairing + count checks.</td>
+</tr>
+<tr>
+<td><code>primary_metric</code></td>
+<td><code>report.metrics.primary_metric</code></td>
+<td>Ratio + drift band (CI/Release).</td>
+</tr>
+<tr>
+<td><code>validation</code></td>
+<td><code>report.metrics</code> + policy thresholds</td>
+<td>Schema allow‑list only.</td>
+</tr>
+<tr>
+<td><code>spectral</code> / <code>rmt</code> / <code>variance</code></td>
+<td><code>report.guards[]</code></td>
+<td>Measurement contracts (CI/Release).</td>
+</tr>
+<tr>
+<td><code>guard_overhead</code></td>
+<td><code>report.guard_overhead</code></td>
+<td>Required in Release unless skipped.</td>
+</tr>
+<tr>
+<td><code>provenance.provider_digest</code></td>
+<td><code>report.provenance.provider_digest</code></td>
+<td>Required in CI/Release.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="required-vs-optional-blocks">Required vs Optional Blocks<a class="headerlink" href="#required-vs-optional-blocks" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Required</th>
+<th>Source</th>
+<th>Stability</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>schema_version</code></td>
+<td>Yes</td>
+<td><code>REPORT_SCHEMA_VERSION</code></td>
+<td>PM-only v1</td>
+</tr>
+<tr>
+<td><code>run_id</code></td>
+<td>Yes</td>
+<td>Run metadata</td>
+<td>Stable</td>
+</tr>
+<tr>
+<td><code>meta</code></td>
+<td>Yes</td>
+<td><code>report.meta</code></td>
+<td>Stable</td>
+</tr>
+<tr>
+<td><code>dataset</code></td>
+<td>Yes</td>
+<td><code>report.dataset</code> + windows stats</td>
+<td>Stable</td>
+</tr>
+<tr>
+<td><code>primary_metric</code></td>
+<td>Yes</td>
+<td><code>report.metrics.primary_metric</code></td>
+<td>Stable</td>
+</tr>
+<tr>
+<td><code>artifacts</code></td>
+<td>Yes</td>
+<td>Run artifact paths</td>
+<td>Stable</td>
+</tr>
+<tr>
+<td><code>plugins</code></td>
+<td>Yes</td>
+<td>Plugin discovery snapshot</td>
+<td>Stable</td>
+</tr>
+<tr>
+<td><code>validation</code></td>
+<td>Optional</td>
+<td>Gate outcomes</td>
+<td>Allow-list evolves</td>
+</tr>
+<tr>
+<td><code>policy_digest</code> / <code>resolved_policy</code></td>
+<td>Optional</td>
+<td>Tier policies</td>
+<td>Calibrated changes</td>
+</tr>
+<tr>
+<td><code>primary_metric_tail</code></td>
+<td>Optional</td>
+<td>Paired ΔlogNLL tail gate</td>
+<td>ppl-like only</td>
+</tr>
+<tr>
+<td><code>structure</code> / <code>confidence</code> / <code>system_overhead</code> / <code>provenance</code></td>
+<td>Optional</td>
+<td>Best-effort evidence</td>
+<td>May evolve</td>
+</tr>
+</tbody>
+</table>
+<h3 id="primary-metric-tail-gate-optional">Primary Metric Tail Gate (optional)<a class="headerlink" href="#primary-metric-tail-gate-optional" title="Permanent link">&para;</a></h3>
+<p>For ppl-like metrics with paired per-window logloss, reports may include
+<code>primary_metric_tail</code>, which records tail summaries of per-window ΔlogNLL vs the
+baseline and the tail-gate evaluation outcome:</p>
+<ul>
+<li><code>primary_metric_tail.stats</code> — deterministic quantiles (<code>q50/q90/q95/q99</code>),
+  <code>max</code>, and <code>tail_mass = Pr[ΔlogNLL &gt; ε]</code>.</li>
+<li><code>primary_metric_tail.policy</code> — resolved <code>metrics.pm_tail</code> policy (mode,
+  quantile, thresholds, floors).</li>
+<li><code>primary_metric_tail.violations</code> — structured reasons when thresholds are exceeded.</li>
+<li><code>validation.primary_metric_tail_acceptable</code> — remains <code>true</code> in <code>warn</code> mode;
+  flips <code>false</code> only when <code>mode=fail</code> and a violation is evaluated.</li>
+</ul>
+<hr />
+<h2 id="telemetry-fields">Telemetry Fields<a class="headerlink" href="#telemetry-fields" title="Permanent link">&para;</a></h2>
+<p>Telemetry values are copied from <code>report.json</code> into reports and always
+include the execution device. CPU telemetry sweeps are collected via
+<code>scripts/run_cpu_telemetry.sh</code>.</p>
+<table>
+<thead>
+<tr>
+<th>JSON Pointer</th>
+<th>Meaning</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/telemetry/device</code></td>
+<td>Execution device (<code>cpu</code>, <code>mps</code>, <code>cuda</code>).</td>
+<td>Mirrors <code>meta.device</code>.</td>
+</tr>
+<tr>
+<td><code>/telemetry/latency_ms_per_tok</code></td>
+<td>Mean latency per token.</td>
+<td>ms/token.</td>
+</tr>
+<tr>
+<td><code>/telemetry/memory_mb_peak</code></td>
+<td>Peak resident memory.</td>
+<td>MiB.</td>
+</tr>
+<tr>
+<td><code>/telemetry/preview_total_tokens</code></td>
+<td>Tokens processed in preview.</td>
+<td>Derived from windows.</td>
+</tr>
+<tr>
+<td><code>/telemetry/final_total_tokens</code></td>
+<td>Tokens processed in final.</td>
+<td>Derived from windows.</td>
+</tr>
+<tr>
+<td><code>/telemetry/throughput_tok_per_s</code></td>
+<td>Average throughput.</td>
+<td>Present when available.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Observability:</strong></p>
+<ul>
+<li><code>report.json</code> contains <code>metrics.latency_ms_per_tok</code> and <code>metrics.memory_mb_peak</code>.</li>
+<li><code>telemetry.summary_line</code> is emitted when <code>INVARLOCK_TELEMETRY=1</code>.</li>
+<li><code>dataset.hash.source</code> distinguishes content-derived, provider-derived, and config-derived dataset hashes.</li>
+<li><code>rmt.mode</code> and <code>rmt.measurement_contract_hash</code> show which RMT measurement contract produced the report evidence.</li>
+</ul>
+<hr />
+<h2 id="html-export">HTML Export<a class="headerlink" href="#html-export" title="Permanent link">&para;</a></h2>
+<p>The HTML renderer converts the Markdown report into structured HTML
+tables (via the <code>markdown</code> library when available) and preserves the same
+numeric values (ratios, CIs, deltas). When the dependency is unavailable, the
+renderer falls back to a <code>&lt;pre&gt;</code> block. Use <code>--embed-css</code> (default) to inline
+a minimal stylesheet for standalone use, including status badges and
+print-friendly rules.</p>
+<h3 id="cli">CLI<a class="headerlink" href="#cli" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code>invarlock<span class="w"> </span>report<span class="w"> </span>html<span class="w"> </span>-i<span class="w"> </span>&lt;evaluation.report.json&gt;<span class="w"> </span>-o<span class="w"> </span>&lt;out.html&gt;
+</code></pre></div>
+
+<p><strong>Flags:</strong></p>
+<ul>
+<li><code>--embed-css/--no-embed-css</code> — inline stylesheet (default: embed)</li>
+<li><code>--force</code> — overwrite existing output</li>
+</ul>
+<h3 id="python-api">Python API<a class="headerlink" href="#python-api" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">invarlock.reporting.html</span><span class="w"> </span><span class="kn">import</span> <span class="n">render_report_html</span>
+
+<span class="n">html</span> <span class="o">=</span> <span class="n">render_report_html</span><span class="p">(</span><span class="n">report</span><span class="p">)</span>
+</code></pre></div>
+
+<hr />
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<h3 id="schema-issues">Schema Issues<a class="headerlink" href="#schema-issues" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Schema validation fails</strong>: check <code>schema_version</code> and required top-level
+  fields (<code>run_id</code>, <code>meta</code>, <code>dataset</code>, <code>artifacts</code>, <code>primary_metric</code>).</li>
+<li><strong>Unexpected validation keys</strong>: ensure <code>validation.*</code> keys match the allow-list
+  in <code>report_schema</code>.</li>
+</ul>
+<h3 id="telemetry-issues">Telemetry Issues<a class="headerlink" href="#telemetry-issues" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Telemetry missing</strong>: ensure the run completed successfully and check
+  <code>report.metrics</code> for latency/memory values.</li>
+</ul>
+<h3 id="html-export-issues">HTML Export Issues<a class="headerlink" href="#html-export-issues" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Missing report</strong>: generate one first via <code>invarlock report --format report</code>.</li>
+<li><strong>HTML missing styles</strong>: omit <code>--no-embed-css</code> or apply custom CSS later in your publishing layer.</li>
+</ul>
+<hr />
+<h2 id="observability">Observability<a class="headerlink" href="#observability" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>validation.*</code>, <code>resolved_policy.*</code>, and <code>policy_digest.*</code> capture policy state.</li>
+<li><code>primary_metric_tail</code> appears only for ppl-like metrics with paired windows.</li>
+<li>The rendered HTML is derived from the Markdown report. If values look wrong,
+  inspect the underlying <code>evaluation.report.json</code>.</li>
+<li>The Markdown report is a human-readable view that starts with the Executive Summary; the JSON report is the canonical evidence artifact.</li>
+</ul>
+<hr />
+<h2 id="related-documentation">Related Documentation<a class="headerlink" href="#related-documentation" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../cli/">CLI Reference</a></li>
+<li><a href="../artifacts/">Artifact Layout</a></li>
+<li><a href="../../assurance/00-assurance-case/">Assurance Case</a> — What the report covers</li>
+<li><a href="../../user-guide/reading-report/">Reading a report</a> — User-oriented guide</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.expand", "navigation.tabs"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
