@@ -133,6 +133,14 @@ def test_runtime_verify_cli_version(capsys) -> None:
     assert "InvarLock runtime verifier" in capsys.readouterr().out
 
 
+def test_runtime_verify_version_uses_package_metadata(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(importlib.metadata, "version", lambda _name: "9.9.9")
+
+    runtime_verify._emit_version(SimpleNamespace(print=print))
+
+    assert "InvarLock runtime verifier 9.9.9" in capsys.readouterr().out
+
+
 def test_runtime_verify_version_falls_back_to_module_version(monkeypatch, capsys):
     monkeypatch.setattr(
         importlib.metadata,
