@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.reporting.test_evidence_pack_helper_signature_and_manifest import (
+from tests.reporting.evidence_pack.test_evidence_pack_helper_signature_and_manifest import (
     RUNTIME_MANIFEST_FILENAME,
     VerifyExecutionResult,
     VerifyOutcome,

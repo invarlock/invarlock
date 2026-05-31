@@ -225,10 +225,10 @@ def test_makefile_assurance_lane_includes_strict_assurance_tests() -> None:
 
     for expected in (
         "tests/core/test_assurance_contract.py",
-        "tests/reporting/test_verify_assurance_guard_chain.py",
+        "tests/reporting/validation/test_verify_assurance_guard_chain.py",
         "tests/core/test_bootstrap.py::test_paired_delta_log_ci_property_strict_identity",
         "tests/core/test_bootstrap.py::test_paired_delta_log_ci_property_rejects_mismatched_lengths",
-        "tests/guards/test_unsupported_assurance_shape.py",
+        "tests/guards/contracts/test_unsupported_assurance_shape.py",
     ):
         assert expected in target_block
 

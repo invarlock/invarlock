@@ -7,8 +7,7 @@ from pathlib import Path
 import pytest
 
 import invarlock.public_contracts as contracts
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from tests._repo_root import REPO_ROOT
 
 
 def test_public_contract_loaders_and_catalog_round_trip() -> None:

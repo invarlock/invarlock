@@ -58,7 +58,7 @@ ties the runtime contract back to reproducible maths:
   metadata and timestamped run directories.
 - Determinism is best-effort on some backends; enforce `|Δ ratio| ≤ 1e-6` when
   regenerating reports on the **same backend** (see
-  `tests/reporting/test_report_paired_ci_identity.py::test_paired_ci_identity_holds`).
+  `tests/reporting/policy/test_report_paired_ci_identity.py::test_paired_ci_identity_holds`).
 - Cross-device drift must stay within the bands listed in
   `docs/assurance/04-guard-contracts.md`; use `scripts/smoke/check_device_drift.py` in
   CI to guard the limit.
