@@ -3,9 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from invarlock.reporting.report_files import save_report
 
 from invarlock.core.exceptions import ValidationError
-from invarlock.reporting.report_files import save_report
 from invarlock.reporting.report_make import make_report
 
 
