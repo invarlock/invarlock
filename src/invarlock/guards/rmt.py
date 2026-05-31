@@ -16,7 +16,7 @@ import torch.nn as nn
 
 from invarlock.core import INVARLOCK_CORE_ABI as CORE_ABI
 from invarlock.core.api import Guard
-from invarlock.core.types import GuardValidationResult
+from invarlock.core.types import GuardOutcome, GuardValidationResult
 
 from . import (
     rmt_activation_runtime,
@@ -71,15 +71,7 @@ __all__ = [
 
 # === Guard Implementation ===
 
-# Import GuardOutcome types if available
-try:
-    from invarlock.core.types import GuardOutcome
-
-    HAS_GUARD_OUTCOME = True
-except ImportError:
-    # Fallback for standalone usage or when types not available
-    HAS_GUARD_OUTCOME = False
-    GuardOutcome = dict
+HAS_GUARD_OUTCOME = True
 
 
 class RMTGuard(Guard):

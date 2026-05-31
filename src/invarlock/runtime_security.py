@@ -17,7 +17,7 @@ from __future__ import annotations
 import sys
 from collections.abc import Iterable
 from pathlib import Path as _Path
-from typing import TYPE_CHECKING
+from typing import Protocol
 
 from invarlock.runtime_security_helpers import (
     ALLOW_HOST_EXECUTION_ENV,
@@ -71,8 +71,10 @@ from invarlock.runtime_security_helpers import (
     write_runtime_manifest,
 )
 
-if TYPE_CHECKING:  # pragma: no cover
-    from invarlock.cli.config_execution import ConfigExecutionRequest
+
+class SupportsContainerLaunchRequest(Protocol):
+    def to_internal_argv(self, command_name: str | Iterable[str]) -> list[str]: ...
+
 
 _CONFIG_SCAN_ARG_FLAGS = {"--config", "-c", "--preset", "--edit-config"}
 _CONFIG_PATH_ARG_FLAGS = _CONFIG_SCAN_ARG_FLAGS | {"--baseline-report"}
@@ -245,7 +247,7 @@ def build_current_process_container_launch_plan(
 
 def build_request_container_launch_plan(
     command_name: str | Iterable[str],
-    request: ConfigExecutionRequest,
+    request: SupportsContainerLaunchRequest,
 ) -> ContainerLaunchPlan:
     return normalize_delegated_argv(
         request.to_internal_argv(command_name),

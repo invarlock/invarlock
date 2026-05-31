@@ -8,7 +8,7 @@ from pathlib import Path
 import jsonschema
 
 from invarlock.public_contracts import load_runtime_manifest_schema
-from invarlock.runtime_security import RUNTIME_VERIFIER_CONTRACT_VERSION
+from invarlock.runtime_security_helpers import RUNTIME_VERIFIER_CONTRACT_VERSION
 
 
 @dataclass(frozen=True)
