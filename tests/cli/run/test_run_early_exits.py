@@ -72,7 +72,7 @@ def test_run_edit_name_missing_exits(
     )
     # Stub out registry and model_profile to avoid heavy imports
     run_mod = _import_run_module()
-    import invarlock.cli.run_runtime as runtime_mod
+    import invarlock.cli.run_runtime_exec as runtime_mod
 
     monkeypatch.setattr("invarlock.core.registry.get_registry", lambda: _StubRegistry())
     monkeypatch.setattr(
@@ -126,7 +126,7 @@ def test_run_command_missing_torch_shows_extra_hint(
 
     run_mod = _import_run_module()
     # Stub profile to avoid heavy imports; we should fail before using it.
-    import invarlock.cli.run_runtime as runtime_mod
+    import invarlock.cli.run_runtime_exec as runtime_mod
 
     monkeypatch.setattr(
         runtime_mod, "detect_model_profile", lambda model_id, adapter: _StubProfile()
@@ -172,7 +172,7 @@ def test_run_baseline_schedule_absent_release_exits(
 
     # Stub model_profile to avoid transformers dependency
     run_mod = _import_run_module()
-    import invarlock.cli.run_runtime as runtime_mod
+    import invarlock.cli.run_runtime_exec as runtime_mod
 
     monkeypatch.setattr(
         runtime_mod, "detect_model_profile", lambda model_id, adapter: _StubProfile()
@@ -233,7 +233,7 @@ def test_run_baseline_schedule_mismatch_release_exits(
     )
 
     run_mod = _import_run_module()
-    import invarlock.cli.run_runtime as runtime_mod
+    import invarlock.cli.run_runtime_exec as runtime_mod
 
     monkeypatch.setattr(
         runtime_mod, "detect_model_profile", lambda model_id, adapter: _StubProfile()
@@ -272,7 +272,7 @@ def test_run_device_validation_error_exits(
     )
     run_mod = _import_run_module()
     # Stub profile to avoid heavy imports
-    import invarlock.cli.run_runtime as runtime_mod
+    import invarlock.cli.run_runtime_exec as runtime_mod
 
     monkeypatch.setattr(
         runtime_mod, "detect_model_profile", lambda model_id, adapter: _StubProfile()

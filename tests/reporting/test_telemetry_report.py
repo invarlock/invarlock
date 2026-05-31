@@ -4,7 +4,10 @@ import json
 
 import pytest
 
-from invarlock.reporting.telemetry import build_telemetry_payload, save_telemetry_report
+from invarlock.reporting.report_builder_support import (
+    build_telemetry_payload,
+    save_telemetry_report,
+)
 
 
 def test_build_telemetry_payload_includes_timings_and_memory(tmp_path) -> None:

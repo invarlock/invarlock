@@ -19,6 +19,7 @@ from rich.table import Table
 
 from invarlock.core.plugins_inventory import (
     adapter_inventory_json_items,
+    bitsandbytes_runtime_available,
     combined_plugins_json_items,
     dataset_inventory_json_items,
     detect_cuda_available,
@@ -35,7 +36,6 @@ from invarlock.public_contracts import (
     load_support_matrix,
 )
 
-from ..backend_runtime import bitsandbytes_runtime_available
 from ..constants import PLUGINS_FORMAT_VERSION
 from ..security_helpers import runtime_security_scoped
 
@@ -117,7 +117,7 @@ def _gather_adapter_rows(registry: Any) -> list[dict[str, Any]]:
         has_cuda = detect_cuda_available(torch_mod)
     except ImportError:
         has_cuda = False
-    from invarlock.core.adapter_provenance import extract_adapter_provenance
+    from invarlock.core.backend_inventory import extract_adapter_provenance
 
     rows = gather_adapter_inventory_rows(
         registry=registry,

@@ -58,7 +58,7 @@ def _common_ce():
             },
         ),
         patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
+            "invarlock.cli.run_runtime_exec.resolve_tokenizer",
             lambda profile: (
                 SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
                 "tokhash123",
@@ -139,7 +139,7 @@ def test_overhead_threshold_bad_type_uses_default(tmp_path: Path):
             stack.enter_context(ctx)
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.run_runtime.validate_guard_overhead",
+            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
         ):
             stack.enter_context(patch(target, vg))
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
@@ -290,7 +290,7 @@ def test_psutil_virtual_memory_failure(tmp_path: Path):
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.psutil.virtual_memory",
+                "invarlock.cli.run_runtime_exec.psutil.virtual_memory",
                 lambda: (_ for _ in ()).throw(RuntimeError("fail")),
             )
         )

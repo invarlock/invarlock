@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from invarlock.reporting import report_schema as schema_mod
-from invarlock.reporting.report_console import compute_console_validation_block
+from invarlock.reporting.report_summary import compute_console_validation_block
 
 
 def test_compute_console_validation_block_guard_omitted_and_included():

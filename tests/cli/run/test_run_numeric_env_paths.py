@@ -105,7 +105,7 @@ def _common_ce_detect_ce():
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch("invarlock.core.registry.get_registry", lambda: _Registry()),
         patch(
-            "invarlock.cli.run_runtime.detect_model_profile",
+            "invarlock.cli.run_runtime_exec.detect_model_profile",
             lambda model_id, adapter: SimpleNamespace(
                 default_loss="ce",
                 model_id=model_id,
@@ -117,7 +117,7 @@ def _common_ce_detect_ce():
             ),
         ),
         patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
+            "invarlock.cli.run_runtime_exec.resolve_tokenizer",
             lambda profile: (
                 SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
                 "tokhash123",
@@ -206,11 +206,11 @@ def test_baseline_mlm_no_masked_tokens_exit(tmp_path: Path):
             patch("invarlock.core.config_loader.load_config", lambda p: Cfg())
         )
         stack.enter_context(
-            patch("invarlock.cli.run_runtime.detect_model_profile", detect_mlm)
+            patch("invarlock.cli.run_runtime_exec.detect_model_profile", detect_mlm)
         )
         for target in (
-            "invarlock.cli.run_runtime.resolve_tokenizer",
-            "invarlock.cli.run_runtime.resolve_tokenizer",
+            "invarlock.cli.run_runtime_exec.resolve_tokenizer",
+            "invarlock.cli.run_runtime_exec.resolve_tokenizer",
         ):
             stack.enter_context(
                 patch(
@@ -338,7 +338,7 @@ def test_guard_order_permutations(tmp_path: Path, order):
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.resolve_tokenizer",
+                "invarlock.cli.run_runtime_exec.resolve_tokenizer",
                 lambda *_a, **_k: (
                     SimpleNamespace(
                         eos_token="</s>",

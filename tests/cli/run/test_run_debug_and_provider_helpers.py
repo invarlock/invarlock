@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import pytest
 
-from invarlock.cli import run_pairing_helpers as pairing_helpers_mod
+from invarlock.cli import run_pairing as pairing_helpers_mod
 from invarlock.cli.run_overhead import plan_release_windows
 from invarlock.cli.run_pairing import (
     _canonical_dataset_id,
     compute_provider_digest,
     resolve_metric_and_provider,
 )
-from invarlock.core.run_guard_overhead_policy import normalize_guard_overhead_result
-from invarlock.reporting.run_metric_utils import format_debug_metric_diffs
+from invarlock.reporting.report_overhead import normalize_guard_overhead_result
+from invarlock.reporting.run_report_metrics_contract import format_debug_metric_diffs
 
 
 class _CfgObj:

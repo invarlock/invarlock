@@ -113,7 +113,7 @@ def runtime_security_scoped(
 def build_current_process_container_launch_plan(
     argv: list[str] | None = None,
 ) -> Any:
-    from invarlock.cli.runtime_launch_plan import (
+    from invarlock.runtime_security import (
         build_current_process_container_launch_plan as _build_current_process_container_launch_plan,
     )
 

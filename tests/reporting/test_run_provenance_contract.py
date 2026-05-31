@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from invarlock.reporting.run_provenance_contract import (
+from invarlock.reporting.run_report_contract import (
     finalize_run_provenance,
 )
 

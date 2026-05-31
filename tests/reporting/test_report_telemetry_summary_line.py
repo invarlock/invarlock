@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_telemetry import (
+from invarlock.reporting.report_builder_support import (
     telemetry_output_enabled,
     telemetry_summary_line,
 )
-
 from invarlock.reporting.report_make import make_report
 
 

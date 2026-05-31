@@ -8,7 +8,7 @@ import os
 import platform
 from typing import Any
 
-from invarlock.utils.digest import hash_json
+from invarlock.utils import hash_json
 
 POLICY_VERSION = "policy-v1"
 _NON_FATAL_EXCEPTIONS = (

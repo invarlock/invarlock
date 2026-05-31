@@ -93,7 +93,7 @@ def _common_stubs(monkeypatch):
     )
     # Profile + tokenizer
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.detect_model_profile",
+        "invarlock.cli.run_runtime_exec.detect_model_profile",
         lambda *a, **k: SimpleNamespace(
             default_loss="ce",
             invariants=[],
@@ -103,7 +103,7 @@ def _common_stubs(monkeypatch):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.resolve_tokenizer",
+        "invarlock.cli.run_runtime_exec.resolve_tokenizer",
         lambda *a, **k: (
             SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=10),
             "tokhash123",

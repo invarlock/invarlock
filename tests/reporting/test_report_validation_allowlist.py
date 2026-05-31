@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from invarlock.reporting import report_validation_allowlist as allowlist_mod
+from invarlock.reporting import report_schema as allowlist_mod
 
 
 def test_load_validation_allowlist_raises_when_missing(monkeypatch):

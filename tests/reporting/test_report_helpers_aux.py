@@ -52,6 +52,7 @@ def test_confidence_label_and_thresholds() -> None:
     }
     out_acc = _compute_confidence_label(cert_acc)
     assert out_acc["basis"] == "accuracy"
+    assert out_acc["label"] == "High"
 
     # Unstable → Medium at best
     cert_unstable = {
@@ -68,6 +69,8 @@ def test_confidence_label_and_thresholds() -> None:
 def test_coercions_and_scope_inference() -> None:
     assert _coerce_int(3.0) == 3
     assert _coerce_int(3.2) is None
+    assert _coerce_int(5.000000001) is None
+    assert _coerce_int(round(5.0)) == 5
     assert _coerce_int(float("inf")) is None
     assert _coerce_int(True) == 1
     sb = _sanitize_seed_bundle({"python": 1, "numpy": None, "torch": 3.0}, fallback=7)
@@ -86,6 +89,11 @@ def test_coercions_and_scope_inference() -> None:
 
 def test_weighted_mean_and_pair_logloss_windows() -> None:
     assert math.isclose(_weighted_mean([1, 2, 3], [1, 0, 1]), 2.0)
+    assert math.isclose(_weighted_mean([1.0, 2.0, 3.0], [1.0, 1.0, 2.0]), 2.25)
+    assert math.isnan(_weighted_mean([1.0, 2.0], [1.0]))
+    assert math.isnan(
+        _weighted_mean([1.0, 100.0, float("nan")], [0.0, float("nan"), 1.0])
+    )
     run_w = {"window_ids": [1, 2, 3], "logloss": [0.1, 0.2, 0.3]}
     base_w = {"window_ids": [2, 3, 4], "logloss": [0.25, 0.35, 0.45]}
     paired = _pair_logloss_windows(run_w, base_w)

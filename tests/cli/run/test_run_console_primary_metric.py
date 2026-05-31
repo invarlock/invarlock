@@ -98,7 +98,7 @@ output:
             "invarlock.eval.primary_metric.compute_primary_metric_from_report", fake_pm
         ),
         patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
+            "invarlock.cli.run_runtime_exec.resolve_tokenizer",
             lambda *_a, **_k: (
                 SimpleNamespace(
                     eos_token="</s>",

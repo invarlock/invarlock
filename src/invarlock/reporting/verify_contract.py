@@ -13,12 +13,12 @@ from invarlock.core.assurance_contract import (
     resolve_report_runtime_provenance_declared,
     strict_report_policy_errors,
 )
-from invarlock.core.error_encoding import encode_error as _encode_error
+from invarlock.core.error_utils import encode_error as _encode_error
 from invarlock.core.exceptions import InvarlockError
 from invarlock.core.exceptions import MetricsError as _MetricsError
 from invarlock.core.exceptions import ValidationError as _ValidationError
-from invarlock.core.provider_parity import enforce_provider_parity
-from invarlock.core.runtime_provenance import (
+from invarlock.core.run_policy import enforce_provider_parity
+from invarlock.runtime_provenance import (
     RuntimeProvenanceVerdict,
     verify_runtime_provenance,
 )

@@ -7,7 +7,7 @@ from typer.testing import CliRunner
 
 os.environ["INVARLOCK_LIGHT_IMPORT"] = "1"
 from invarlock.cli.app import app
-from invarlock.cli.runtime_verify import runtime_verify_app
+from invarlock.cli.commands.verify import runtime_verify_app
 
 
 def test_top_level_help_lists_only_core_and_advanced_commands():

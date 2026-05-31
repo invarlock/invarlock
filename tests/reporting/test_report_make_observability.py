@@ -7,7 +7,7 @@ import pytest
 from invarlock.reporting import report_make_assembly as report_make_assembly_mod
 from invarlock.reporting import report_normalization as report_normalization_mod
 from invarlock.reporting import report_primary_metric_analysis as report_pm_analysis_mod
-from invarlock.reporting import report_validation_allowlist as allowlist_mod
+from invarlock.reporting import report_schema as allowlist_mod
 from invarlock.reporting.report_make import make_report
 from tests.reporting.test_report_full_context import _rich_run_report
 

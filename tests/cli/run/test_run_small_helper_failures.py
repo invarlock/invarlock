@@ -6,8 +6,8 @@ import click
 import pytest
 
 from invarlock.cli import run_config as run_config_mod
+from invarlock.cli import run_pairing as pairing_mod
 from invarlock.cli import run_pairing as run_pairing_mod
-from invarlock.cli import run_pairing_helpers as pairing_mod
 from invarlock.cli import run_runtime_exec as run_runtime_exec_mod
 from invarlock.core.exceptions import InvarlockError
 
@@ -98,7 +98,9 @@ def test_extract_model_load_kwargs_rejects_removed_dtype_aliases_and_preserves_c
 
 
 def test_run_bare_control_skip_model_load_requires_live_model(monkeypatch):
-    monkeypatch.setattr("invarlock.model_utils.set_seed", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "invarlock.core.determinism_policy.set_seed", lambda *args, **kwargs: None
+    )
     monkeypatch.setattr(
         "invarlock.core.runner.CoreRunner",
         lambda: SimpleNamespace(execute=lambda **kwargs: None),

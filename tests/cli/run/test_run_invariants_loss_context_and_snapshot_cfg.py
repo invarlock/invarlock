@@ -59,7 +59,7 @@ def _common_ce():
             },
         ),
         patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
+            "invarlock.cli.run_runtime_exec.resolve_tokenizer",
             lambda profile: (
                 SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
                 "tokhash123",
@@ -167,7 +167,7 @@ def test_invariants_existing_checks_as_scalar_becomes_list(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.run_runtime.detect_model_profile", detect_profile)
+            patch("invarlock.cli.run_runtime_exec.detect_model_profile", detect_profile)
         )
         stack.enter_context(
             patch("invarlock.core.config_loader.load_config", lambda p: DummyCfg())
@@ -245,7 +245,7 @@ def test_invariants_existing_checks_set_becomes_list(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.run_runtime.detect_model_profile", detect_profile)
+            patch("invarlock.cli.run_runtime_exec.detect_model_profile", detect_profile)
         )
         stack.enter_context(
             patch("invarlock.core.config_loader.load_config", lambda p: DummyCfg())
@@ -326,7 +326,7 @@ def test_invariants_existing_checks_tuple_becomes_list(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.run_runtime.detect_model_profile", detect_profile)
+            patch("invarlock.cli.run_runtime_exec.detect_model_profile", detect_profile)
         )
         stack.enter_context(
             patch("invarlock.core.config_loader.load_config", lambda p: DummyCfg())
@@ -388,7 +388,7 @@ def test_loss_cfg_nan_values_coerced(tmp_path: Path):
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.resolve_tokenizer",
+                "invarlock.cli.run_runtime_exec.resolve_tokenizer",
                 lambda profile: (
                     SimpleNamespace(
                         mask_token_id=103,
@@ -486,7 +486,7 @@ def test_snapshot_auto_ram_fraction_env(tmp_path: Path, monkeypatch):
             )
         )
         stack.enter_context(
-            patch("invarlock.cli.run_runtime.psutil.virtual_memory", vm)
+            patch("invarlock.cli.run_runtime_exec.psutil.virtual_memory", vm)
         )
         stack.enter_context(
             patch("invarlock.cli.run_runtime_exec.shutil.disk_usage", du)
@@ -598,7 +598,7 @@ def test_snapshot_cfg_threshold_and_tempdir(tmp_path: Path, monkeypatch):
             )
         )
         stack.enter_context(
-            patch("invarlock.cli.run_runtime.psutil.virtual_memory", vm)
+            patch("invarlock.cli.run_runtime_exec.psutil.virtual_memory", vm)
         )
         stack.enter_context(
             patch("invarlock.cli.run_runtime_exec.shutil.disk_usage", du)
@@ -641,7 +641,7 @@ def test_loss_type_resolved_in_context(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.run_runtime.detect_model_profile", detect)
+            patch("invarlock.cli.run_runtime_exec.detect_model_profile", detect)
         )
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider())
@@ -703,11 +703,11 @@ def test_baseline_masked_counts_used_when_present(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.run_runtime.detect_model_profile", detect_mlm)
+            patch("invarlock.cli.run_runtime_exec.detect_model_profile", detect_mlm)
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.resolve_tokenizer",
+                "invarlock.cli.run_runtime_exec.resolve_tokenizer",
                 lambda profile: (
                     SimpleNamespace(
                         mask_token_id=103,

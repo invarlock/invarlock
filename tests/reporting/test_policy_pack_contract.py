@@ -9,6 +9,7 @@ import invarlock.policy_pack as policy_pack_mod
 from invarlock.policy_pack import (
     build_policy_pack,
     compute_policy_pack_digest,
+    exercise_policy_pack_bytes,
     load_policy_pack,
     verify_policy_pack,
     write_policy_pack,
@@ -97,6 +98,29 @@ def test_policy_pack_structured_text_loader_supports_json_and_yaml() -> None:
     assert policy_pack_mod._load_structured_text(
         "tier: balanced\n", suffix=".yaml"
     ) == {"tier": "balanced"}
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b"",
+        b"{",
+        b"tier: balanced\nresolved_policy:\n  metrics: []\n",
+        bytes(range(256)),
+        json.dumps(
+            {
+                "format": "policy-pack-v1",
+                "tier": "balanced",
+                "resolved_policy": {"metrics": {"pm_ratio": {"ratio_limit_base": 1.1}}},
+                "overrides": [],
+                "policy_digest": "placeholder",
+                "compatibility": {"support_tiers": ["published_basis"]},
+            }
+        ).encode("utf-8"),
+    ],
+)
+def test_policy_pack_fuzz_target_handles_arbitrary_bytes(payload: bytes) -> None:
+    exercise_policy_pack_bytes(payload)
 
 
 def test_policy_pack_structured_text_loader_normalizes_yaml_overflow(

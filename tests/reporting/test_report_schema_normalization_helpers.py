@@ -4,8 +4,8 @@ import pytest
 
 from invarlock.reporting import report_normalization as normalization_mod
 from invarlock.reporting import report_primary_metric_policy as pm_policy
+from invarlock.reporting import report_schema as allowlist_mod
 from invarlock.reporting import report_schema as schema_mod
-from invarlock.reporting import report_validation_allowlist as allowlist_mod
 
 
 def test_normalize_baseline_handles_schema_v1():

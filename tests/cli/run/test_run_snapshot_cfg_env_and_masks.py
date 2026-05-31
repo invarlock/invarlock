@@ -49,7 +49,7 @@ def _common_ce():
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
+            "invarlock.cli.run_runtime_exec.resolve_tokenizer",
             lambda *_a, **_k: (
                 SimpleNamespace(
                     eos_token="</s>",
@@ -148,7 +148,7 @@ def test_snapshot_auto_ram_fraction_env(tmp_path: Path, monkeypatch):
             stack.enter_context(ctx)
         monkeypatch.setenv("INVARLOCK_SNAPSHOT_AUTO_RAM_FRACTION", "0.2")
         stack.enter_context(
-            patch("invarlock.cli.run_runtime.psutil.virtual_memory", vm)
+            patch("invarlock.cli.run_runtime_exec.psutil.virtual_memory", vm)
         )
         stack.enter_context(
             patch("invarlock.cli.run_runtime_exec.shutil.disk_usage", du)
@@ -260,7 +260,7 @@ def test_snapshot_cfg_threshold_and_tempdir(tmp_path: Path, monkeypatch):
             stack.enter_context(ctx)
         stack.enter_context(patch("invarlock.core.config_loader.load_config", load_cfg))
         stack.enter_context(
-            patch("invarlock.cli.run_runtime.psutil.virtual_memory", vm)
+            patch("invarlock.cli.run_runtime_exec.psutil.virtual_memory", vm)
         )
         stack.enter_context(
             patch("invarlock.cli.run_runtime_exec.shutil.disk_usage", du)
@@ -359,7 +359,7 @@ def test_snapshot_bytes_supported_but_ram_low_prefers_chunked(tmp_path: Path):
             )
         )
         stack.enter_context(
-            patch("invarlock.cli.run_runtime.psutil.virtual_memory", vm)
+            patch("invarlock.cli.run_runtime_exec.psutil.virtual_memory", vm)
         )
         stack.enter_context(
             patch("invarlock.cli.run_runtime_exec.shutil.disk_usage", du)

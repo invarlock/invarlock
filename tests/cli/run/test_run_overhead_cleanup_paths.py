@@ -61,7 +61,7 @@ def _common_ce():
             },
         ),
         patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
+            "invarlock.cli.run_runtime_exec.resolve_tokenizer",
             lambda profile: (
                 SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
                 "tokhash123",
@@ -232,8 +232,8 @@ def test_overhead_display_fallbacks(tmp_path: Path, percent, ratio, expect_na):
             stack.enter_context(ctx)
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.run_runtime.validate_guard_overhead",
-            "invarlock.cli.run_runtime.validate_guard_overhead",
+            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
+            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
         ):
             stack.enter_context(patch(target, vg))
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
@@ -419,8 +419,8 @@ def test_until_pass_baseline_disappears_between_attempts(tmp_path: Path):
         )
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.run_runtime.validate_guard_overhead",
-            "invarlock.cli.run_runtime.validate_guard_overhead",
+            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
+            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
         ):
             stack.enter_context(
                 patch(
@@ -626,8 +626,8 @@ def test_guard_overhead_failure_exits(tmp_path: Path):
             stack.enter_context(ctx)
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.run_runtime.validate_guard_overhead",
-            "invarlock.cli.run_runtime.validate_guard_overhead",
+            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
+            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
         ):
             stack.enter_context(patch(target, vg))
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))

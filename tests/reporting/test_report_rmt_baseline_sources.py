@@ -1,4 +1,4 @@
-from invarlock.reporting.guards_rmt import _extract_rmt_analysis
+from invarlock.reporting.report_make import _extract_rmt_analysis
 
 
 def test_rmt_extracts_baseline_from_baseline_metrics_when_present():

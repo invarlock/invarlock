@@ -6,9 +6,9 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from invarlock.cli import run_masking as masking_mod
-from invarlock.cli import run_pairing_helpers as pairing_mod
-from invarlock.cli import run_serialization as run_serial_mod
+from invarlock.cli import run_execution as masking_mod
+from invarlock.cli import run_pairing as pairing_mod
+from invarlock.cli import run_config as run_serial_mod
 from invarlock.core.exceptions import ConfigError
 from invarlock.core import run_policy as run_policy_mod
 from invarlock.core.run_policy import GUARD_OVERHEAD_THRESHOLD

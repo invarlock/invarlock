@@ -11,9 +11,7 @@ from invarlock.core.exceptions import MetricsError, ValidationError
 from invarlock.reporting import (
     dataset_hashing,
     guards_invariants,
-    guards_rmt,
     guards_spectral,
-    guards_variance,
     policy_utils,
     primary_metric_utils,
     report_builder_support,
@@ -180,14 +178,9 @@ def _stub_evaluation_report_extractors(
         lambda *_: spectral,
         raising=False,
     )
+    monkeypatch.setattr(cert, "_extract_rmt_analysis", lambda *_: rmt, raising=False)
     monkeypatch.setattr(
-        guards_rmt, "_extract_rmt_analysis", lambda *_: rmt, raising=False
-    )
-    monkeypatch.setattr(
-        guards_variance,
-        "_extract_variance_analysis",
-        lambda *_: variance,
-        raising=False,
+        cert, "_extract_variance_analysis", lambda *_: variance, raising=False
     )
     monkeypatch.setattr(
         report_edit_summary,
@@ -479,14 +472,9 @@ def test_make_evaluation_report_populates_optional_sections(monkeypatch):
         lambda *_: spectral,
         raising=False,
     )
+    monkeypatch.setattr(cert, "_extract_rmt_analysis", lambda *_: rmt, raising=False)
     monkeypatch.setattr(
-        guards_rmt, "_extract_rmt_analysis", lambda *_: rmt, raising=False
-    )
-    monkeypatch.setattr(
-        guards_variance,
-        "_extract_variance_analysis",
-        lambda *_: variance,
-        raising=False,
+        cert, "_extract_variance_analysis", lambda *_: variance, raising=False
     )
     monkeypatch.setattr(
         report_edit_summary,

@@ -160,7 +160,7 @@ def stubbed_run_environment(monkeypatch, tmp_path):
     )
     # Tokenizer
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.resolve_tokenizer",
+        "invarlock.cli.run_runtime_exec.resolve_tokenizer",
         lambda *a, **k: (
             SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=10),
             "tokhash123",
@@ -318,7 +318,7 @@ output:
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.detect_model_profile",
+                "invarlock.cli.run_runtime_exec.detect_model_profile",
                 lambda *a, **k: SimpleNamespace(
                     default_loss="ce",
                     invariants=[],
@@ -330,7 +330,7 @@ output:
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.resolve_tokenizer",
+                "invarlock.cli.run_runtime_exec.resolve_tokenizer",
                 lambda *a, **k: (
                     SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=10),
                     "tokhash123",
@@ -611,7 +611,7 @@ def _stub_minimal_environment(monkeypatch, tmp_path: Path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.detect_model_profile",
+        "invarlock.cli.run_runtime_exec.detect_model_profile",
         lambda model_id=None, adapter=None: SimpleNamespace(
             default_loss="ce",
             invariants=[],
@@ -621,7 +621,7 @@ def _stub_minimal_environment(monkeypatch, tmp_path: Path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.resolve_tokenizer",
+        "invarlock.cli.run_runtime_exec.resolve_tokenizer",
         lambda *a, **k: (
             SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=10),
             "tokhash123",
@@ -644,7 +644,7 @@ def test_schema_invalid_returns_2(tmp_path: Path, monkeypatch):
 def test_parity_error_dev_exit_1(tmp_path: Path, monkeypatch):
     _stub_minimal_environment(monkeypatch, tmp_path)
     cfg = Path(_cfg(tmp_path))
-    from invarlock.cli import run_runtime as run_runtime_mod
+    from invarlock.cli import run_runtime_exec as run_runtime_mod
 
     monkeypatch.setattr(
         run_runtime_mod,
@@ -658,7 +658,7 @@ def test_parity_error_dev_exit_1(tmp_path: Path, monkeypatch):
 def test_parity_error_ci_exit_3(tmp_path: Path, monkeypatch):
     _stub_minimal_environment(monkeypatch, tmp_path)
     cfg = Path(_cfg(tmp_path))
-    from invarlock.cli import run_runtime as run_runtime_mod
+    from invarlock.cli import run_runtime_exec as run_runtime_mod
     from invarlock.core.exceptions import InvarlockError as CoreInvarlockError
 
     monkeypatch.setattr(

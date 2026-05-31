@@ -67,7 +67,7 @@ def _common_ce():
             ),
         ),
         patch(
-            "invarlock.cli.run_runtime.detect_model_profile",
+            "invarlock.cli.run_runtime_exec.detect_model_profile",
             lambda model_id, adapter: SimpleNamespace(
                 default_loss="ce",
                 model_id=model_id,
@@ -79,7 +79,7 @@ def _common_ce():
             ),
         ),
         patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
+            "invarlock.cli.run_runtime_exec.resolve_tokenizer",
             lambda profile: (
                 SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=1000),
                 "tokhash123",

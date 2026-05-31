@@ -285,7 +285,7 @@ def test_evaluate_quiet_summary_variants(tmp_path: Path, monkeypatch) -> None:
     )
     console.calls.clear()
     monkeypatch.setattr(
-        "invarlock.reporting.report_console.compute_console_validation_block",
+        "invarlock.reporting.report_summary.compute_console_validation_block",
         lambda _report: (_ for _ in ()).throw(RuntimeError("boom")),
         raising=False,
     )
@@ -337,7 +337,7 @@ def test_evaluate_yaml_tmp_dir_and_successful_quiet_summary(
     )
     runtime_manifest.write_text("{}", encoding="utf-8")
     monkeypatch.setattr(
-        "invarlock.reporting.report_console.compute_console_validation_block",
+        "invarlock.reporting.report_summary.compute_console_validation_block",
         lambda _report: {
             "rows": [{"ok": True}, {"ok": False}],
             "overall_pass": True,
@@ -491,7 +491,7 @@ def test_evaluate_quiet_summary_skips_primary_metric_line_when_ratio_missing(
     _write_json(report_out / "evaluation.report.json", {"primary_metric": {}})
 
     monkeypatch.setattr(
-        "invarlock.reporting.report_console.compute_console_validation_block",
+        "invarlock.reporting.report_summary.compute_console_validation_block",
         lambda _report: {"rows": [], "overall_pass": False},
         raising=False,
     )

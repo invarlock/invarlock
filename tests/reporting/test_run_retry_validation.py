@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from invarlock.reporting.run_retry_validation import validate_retry_evaluation_report
+from invarlock.reporting.report_builder_support import validate_retry_evaluation_report
 
 
 def test_validate_retry_evaluation_report_passes_and_emits_telemetry(

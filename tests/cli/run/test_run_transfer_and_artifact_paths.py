@@ -65,7 +65,7 @@ def _common_patches_detect_ce():
             },
         ),
         patch(
-            "invarlock.cli.run_runtime.detect_model_profile",
+            "invarlock.cli.run_runtime_exec.detect_model_profile",
             lambda model_id=None, adapter=None: SimpleNamespace(
                 default_loss="ce",
                 model_id=model_id,
@@ -77,7 +77,7 @@ def _common_patches_detect_ce():
             ),
         ),
         patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
+            "invarlock.cli.run_runtime_exec.resolve_tokenizer",
             lambda prof: (
                 SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
                 "tokhash123",
@@ -202,7 +202,7 @@ def _runner_min():
 
 def _detect_loss(loss_type: str = "ce"):
     return patch(
-        "invarlock.cli.run_runtime.detect_model_profile",
+        "invarlock.cli.run_runtime_exec.detect_model_profile",
         lambda model_id, adapter: SimpleNamespace(
             default_loss=loss_type,
             model_id=model_id,
@@ -266,7 +266,7 @@ def test_transfer_guard_extras_and_guard_recovered_flag(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.validate_guard_overhead",
+                "invarlock.cli.run_runtime_exec.validate_guard_overhead",
                 lambda *a, **k: SimpleNamespace(
                     passed=True,
                     messages=[],
@@ -375,7 +375,7 @@ def test_invariants_profile_checks_merged(tmp_path: Path):
             stack.enter_context(ctx)
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.detect_model_profile",
+                "invarlock.cli.run_runtime_exec.detect_model_profile",
                 lambda *a, **k: SimpleNamespace(
                     default_loss="ce",
                     model_id=None,
@@ -546,7 +546,7 @@ def test_bare_overhead_measurement_pass(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.detect_model_profile",
+        "invarlock.cli.run_runtime_exec.detect_model_profile",
         lambda *a, **k: SimpleNamespace(
             default_loss="ce",
             module_selectors={},
@@ -560,7 +560,7 @@ def test_bare_overhead_measurement_pass(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.resolve_tokenizer",
+        "invarlock.cli.run_runtime_exec.resolve_tokenizer",
         lambda *_: (
             SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
             "tokhash123",
@@ -626,7 +626,7 @@ def test_dataset_meta_tokenizer_hash_passthrough(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.detect_model_profile",
+        "invarlock.cli.run_runtime_exec.detect_model_profile",
         lambda *a, **k: SimpleNamespace(
             default_loss="ce",
             module_selectors={},
@@ -640,7 +640,7 @@ def test_dataset_meta_tokenizer_hash_passthrough(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.resolve_tokenizer",
+        "invarlock.cli.run_runtime_exec.resolve_tokenizer",
         lambda *_: (
             SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
             "tokhash123",
@@ -676,7 +676,7 @@ def test_auto_adapter_apply_fails_closed_on_error(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.core.adapter_auto.apply_auto_adapter_if_needed",
+        "invarlock.adapters.auto.apply_auto_adapter_if_needed",
         lambda cfg: (_ for _ in ()).throw(RuntimeError("auto-err")),
     )
     with pytest.raises(click.exceptions.Exit) as excinfo:

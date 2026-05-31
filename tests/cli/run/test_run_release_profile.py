@@ -115,7 +115,7 @@ output:
         patch("invarlock.core.runner.CoreRunner", lambda: DummyRunner()),
         patch("invarlock.eval.data.get_provider", lambda *args, **kwargs: Provider()),
         patch(
-            "invarlock.cli.run_runtime.detect_model_profile",
+            "invarlock.cli.run_runtime_exec.detect_model_profile",
             lambda model_id=None, adapter=None: SimpleNamespace(
                 default_loss="ce",
                 model_id=model_id,
@@ -133,7 +133,7 @@ output:
             ),
         ),
         patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
+            "invarlock.cli.run_runtime_exec.resolve_tokenizer",
             lambda model_profile: (
                 SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
                 "tokhash123",
@@ -148,7 +148,7 @@ output:
             },
         ),
         patch(
-            "invarlock.cli.run_runtime.validate_guard_overhead",
+            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
             lambda *args, **kwargs: SimpleNamespace(
                 passed=True,
                 overhead_ratio=0.0,

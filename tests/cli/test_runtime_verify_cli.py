@@ -6,7 +6,7 @@ from pathlib import Path
 from click.termui import strip_ansi
 from click.testing import CliRunner
 
-from invarlock.cli import runtime_verify
+from invarlock.cli.commands import verify as runtime_verify
 from invarlock.runtime_verify import RuntimeVerifyResult
 
 

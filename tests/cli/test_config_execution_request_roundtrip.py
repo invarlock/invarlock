@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import invarlock.cli.commands.run as run_mod
-import invarlock.cli.internal_config_run as internal_config_run
-import invarlock.cli.runtime_launch_plan as runtime_launch_plan
+import invarlock.cli.config_execution as config_execution
+import invarlock.runtime_security as runtime_launch_plan
 from invarlock.cli.config_execution import ConfigExecutionRequest
 from invarlock.runtime_security import ContainerLaunchPlan
 
@@ -92,7 +92,7 @@ def test_run_command_request_delegated_argv_internal_runner_round_trip(
     assert "--allow-remote-code" not in plan.argv
     assert "--allow-unverified-provenance" not in plan.argv
 
-    parser = internal_config_run._build_parser()
+    parser = config_execution._build_parser()
     parsed = parser.parse_args(list(plan.argv))
     parsed_request = ConfigExecutionRequest.from_argparse(parsed)
 
@@ -101,13 +101,13 @@ def test_run_command_request_delegated_argv_internal_runner_round_trip(
 
     seen: dict[str, object] = {}
     monkeypatch.setattr(
-        internal_config_run,
+        config_execution,
         "run_request",
         lambda request, **kwargs: seen.update({"request": request, **kwargs}),
         raising=True,
     )
 
-    assert internal_config_run.main(list(plan.argv)) == 0
+    assert config_execution.main(list(plan.argv)) == 0
     assert seen == {
         "request": parsed_request,
         "command_name": "run",

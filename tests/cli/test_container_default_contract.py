@@ -6,8 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import invarlock.cli.runtime_launch_plan as runtime_launch_plan
 import invarlock.core.registry as registry_mod
+import invarlock.runtime_security as runtime_launch_plan
 import invarlock.runtime_security as runtime_security
 import invarlock.runtime_security_helpers as runtime_security_helpers
 from invarlock.cli.run_config import extract_model_load_kwargs

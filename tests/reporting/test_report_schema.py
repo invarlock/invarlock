@@ -5,8 +5,9 @@ import importlib
 
 import pytest
 
+import invarlock.public_contracts as public_contracts_mod
+import invarlock.reporting.report_schema as allowlist_mod
 import invarlock.reporting.report_schema as schema_mod
-import invarlock.reporting.report_validation_allowlist as allowlist_mod
 from invarlock.core import metric_kind_contract as metric_kind_mod
 
 
@@ -70,6 +71,10 @@ def test_validate_with_jsonschema_success(monkeypatch):
 
 def test_validate_report_schema_version_mismatch():
     assert schema_mod.validate_report({"schema_version": "v0"}) is False
+
+
+def test_validate_evaluation_report_returns_false_for_invalid_payload() -> None:
+    assert schema_mod.validate_report({}) is False
 
 
 def test_validate_report_rejects_payload_when_schema_validation_fails(monkeypatch):
@@ -280,13 +285,7 @@ def test_report_schema_import_tolerates_allowlist_bootstrap_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     with monkeypatch.context() as patch:
-        patch.setattr(
-            allowlist_mod,
-            "load_validation_allowlist_strict",
-            lambda: (_ for _ in ()).throw(
-                allowlist_mod.ValidationAllowlistContractError("boom")
-            ),
-        )
+        patch.setattr(public_contracts_mod, "load_json_contract", lambda _name: {})
         reloaded = importlib.reload(schema_mod)
         validation_schema = reloaded.REPORT_JSON_SCHEMA["properties"]["validation"]
         assert validation_schema["properties"] == {}
