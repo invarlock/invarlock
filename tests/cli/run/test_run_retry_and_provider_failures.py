@@ -58,7 +58,7 @@ def _common_patches_detect_ce():
             },
         ),
         patch(
-            "invarlock.cli.run_runtime.detect_model_profile",
+            "invarlock.cli.run_runtime_exec.detect_model_profile",
             lambda model_id=None, adapter=None: SimpleNamespace(
                 default_loss="ce",
                 model_id=model_id,
@@ -110,7 +110,7 @@ def test_window_match_fraction_mismatch_exit(tmp_path: Path):
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.resolve_tokenizer",
+                "invarlock.cli.run_runtime_exec.resolve_tokenizer",
                 lambda prof: (
                     SimpleNamespace(
                         eos_token="</s>", pad_token="</s>", vocab_size=50000
@@ -151,7 +151,7 @@ def test_dataset_meta_context_non_dict_path(tmp_path: Path):
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.resolve_tokenizer",
+                "invarlock.cli.run_runtime_exec.resolve_tokenizer",
                 lambda prof: (
                     SimpleNamespace(
                         eos_token="</s>", pad_token="</s>", vocab_size=50000
@@ -192,7 +192,7 @@ def test_guard_overhead_threshold_parse_fallback(tmp_path: Path):
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.resolve_tokenizer",
+                "invarlock.cli.run_runtime_exec.resolve_tokenizer",
                 lambda prof: (
                     SimpleNamespace(
                         eos_token="</s>", pad_token="</s>", vocab_size=50000
@@ -356,8 +356,8 @@ def test_dataset_provider_tokenizer_resolution_exception_exit(tmp_path: Path):
         )
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", lambda: Runner()))
         for target in (
-            "invarlock.cli.run_runtime.resolve_tokenizer",
-            "invarlock.cli.run_runtime.resolve_tokenizer",
+            "invarlock.cli.run_runtime_exec.resolve_tokenizer",
+            "invarlock.cli.run_runtime_exec.resolve_tokenizer",
         ):
             stack.enter_context(patch(target, side_effect=RuntimeError("tok-fail")))
         run_command(config=str(cfg), device="cpu", out=str(tmp_path / "runs"))

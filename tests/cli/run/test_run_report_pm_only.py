@@ -136,7 +136,7 @@ output:
         patch("invarlock.core.runner.CoreRunner", lambda: DummyRunner()),
         patch("invarlock.eval.data.get_provider", lambda *a, **k: StubProvider()),
         patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
+            "invarlock.cli.run_runtime_exec.resolve_tokenizer",
             lambda _profile: (SimpleNamespace(name_or_path="test"), "tokhash"),
         ),
         patch("invarlock.cli.device.resolve_device", lambda d: d),

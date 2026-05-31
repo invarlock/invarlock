@@ -200,13 +200,13 @@ pack_verify_reports() {
 
 pack_write_source_repo_metadata() {
     local dest="$1"
-    python3 "${RUN_PACK_SCRIPT_DIR}/python/write_source_repo_metadata.py" --out "${dest}"
+    python3 "${RUN_PACK_SCRIPT_DIR}/python/manifest_writer.py" source-repo --out "${dest}"
 }
 
 pack_write_environment_metadata() {
     local run_dir="$1"
     local dest="$2"
-    python3 "${RUN_PACK_SCRIPT_DIR}/python/write_environment_metadata.py" \
+    python3 "${RUN_PACK_SCRIPT_DIR}/python/manifest_writer.py" environment \
         --run-dir "${run_dir}" \
         --out "${dest}"
 }
@@ -235,7 +235,8 @@ pack_write_edit_artifact_summary() {
     if [[ ! -f "${scenarios_path}" ]]; then
         return 0
     fi
-    python3 "${RUN_PACK_SCRIPT_DIR}/python/edit_artifact_summary.py" \
+    python3 "${RUN_PACK_SCRIPT_DIR}/python/task_tools.py" \
+        edit-artifact-summary \
         --pack-dir "${pack_dir}" \
         --scenarios "${scenarios_path}" \
         --out "${summary_path}"
@@ -244,13 +245,13 @@ pack_write_edit_artifact_summary() {
 pack_sign_manifest_helper() {
     local manifest_path="$1"
     local signing_key_path="${2:-}"
-    local helper="${RUN_PACK_SCRIPT_DIR}/python/sign_manifest.py"
+    local helper="${RUN_PACK_SCRIPT_DIR}/python/manifest_writer.py"
 
     if [[ -n "${signing_key_path}" ]]; then
-        _cmd_python "${helper}" --manifest "${manifest_path}" --signing-key "${signing_key_path}"
+        _cmd_python "${helper}" sign --manifest "${manifest_path}" --signing-key "${signing_key_path}"
         return
     fi
-    _cmd_python "${helper}" --manifest "${manifest_path}" --generate-ephemeral
+    _cmd_python "${helper}" sign --manifest "${manifest_path}" --generate-ephemeral
 }
 
 pack_require_passing_run_verdict() {
@@ -417,7 +418,7 @@ pack_write_checksums() {
 pack_write_readme() {
     local pack_dir="$1"
     echo "[run_pack.sh] Writing README.md to ${pack_dir}" >&2
-    python3 "${RUN_PACK_SCRIPT_DIR}/python/write_pack_readme.py" "${pack_dir}"
+    python3 "${RUN_PACK_SCRIPT_DIR}/python/manifest_writer.py" readme "${pack_dir}"
 }
 
 pack_prepare_staging_dir() {

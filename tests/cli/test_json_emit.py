@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import pytest
 import typer
 
-from invarlock.cli._json import emit
+from invarlock.cli.output import emit
 
 
 @dataclass

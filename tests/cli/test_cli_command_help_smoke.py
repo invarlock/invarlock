@@ -40,10 +40,10 @@ def test_command_wrappers_importable():
         verify_command as evidence_pack_verify_command,
     )
     from invarlock.cli.commands.explain_gates import explain_gates_command
-    from invarlock.cli.commands.export_html import export_html_command
     from invarlock.cli.commands.plugins import plugins_command
     from invarlock.cli.commands.policy import build_command as policy_build_command
     from invarlock.cli.commands.policy import verify_command as policy_verify_command
+    from invarlock.cli.commands.report import export_html_command
     from invarlock.cli.commands.verify import verify_command
     from invarlock.reporting.report_contract import generate_reports
 

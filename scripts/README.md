@@ -34,8 +34,13 @@ deleted automatically; use the list to mark deprecations or consolidate helpers
 around stable entry points.
 
 Current top-level files are limited to this README, the inventory, the inventory
-checker, `select_workspace_python.sh`, and the `scripts` package marker. Run
+checker, and `select_workspace_python.sh`. Run
 `make scripts-inventory-check` after adding, moving, or deleting anything under
 `scripts/`; run `make scripts-audit` when reorganizing the tree. New broad
 workflow code must go under an existing family subdirectory unless it is the
 inventory checker itself.
+
+`make architecture-fragmentation-check` also includes tracked `scripts/` metrics
+for large shell files, small-file churn, evidence-pack script concentration, and
+ignored generated cruft. Use those metrics when deciding whether to consolidate
+helpers before public outreach.

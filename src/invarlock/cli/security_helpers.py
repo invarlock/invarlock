@@ -9,12 +9,6 @@ from typing import Any, cast
 
 import typer
 
-from invarlock.runtime_provenance import (
-    configure_runtime_security as _configure_runtime_security_core,
-)
-from invarlock.runtime_provenance import (
-    verify_runtime_provenance as _verify_runtime_provenance_core,
-)
 from invarlock.runtime_security import (
     ALLOW_HOST_EXECUTION_ENV,
     ALLOW_NETWORK_ENV,
@@ -68,6 +62,10 @@ def configure_runtime_security(
     allow_remote_code: bool = False,
     allow_unverified_provenance: bool = False,
 ) -> Iterator[None]:
+    from invarlock.runtime_provenance import (
+        configure_runtime_security as configure_runtime_security_core,
+    )
+
     policy = resolve_shell_runtime_security_policy(
         allow_network=allow_network,
         allow_host_execution=allow_host_execution,
@@ -75,7 +73,7 @@ def configure_runtime_security(
         allow_remote_code=allow_remote_code,
         allow_unverified_provenance=allow_unverified_provenance,
     )
-    with _configure_runtime_security_core(
+    with configure_runtime_security_core(
         allow_network=policy.allow_network,
         allow_host_execution=policy.allow_host_execution,
         allow_third_party_plugins=policy.allow_third_party_plugins,
@@ -113,7 +111,7 @@ def runtime_security_scoped(
 def build_current_process_container_launch_plan(
     argv: list[str] | None = None,
 ) -> Any:
-    from invarlock.cli.runtime_launch_plan import (
+    from invarlock.runtime_security import (
         build_current_process_container_launch_plan as _build_current_process_container_launch_plan,
     )
 
@@ -159,7 +157,11 @@ def verify_runtime_provenance(
     *,
     allow_unverified: bool = False,
 ) -> list[str]:
-    return _verify_runtime_provenance_core(
+    from invarlock.runtime_provenance import (
+        verify_runtime_provenance as verify_runtime_provenance_core,
+    )
+
+    return verify_runtime_provenance_core(
         report_path,
         allow_unverified=allow_unverified,
     )

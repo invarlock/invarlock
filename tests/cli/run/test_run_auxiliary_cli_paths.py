@@ -50,8 +50,8 @@ def test_output_helpers_fallback_print_and_no_color(monkeypatch) -> None:
     assert "\x1b[" not in buf.getvalue()
 
 
-def test_doctor_helpers_get_adapter_rows(monkeypatch) -> None:
-    from invarlock.cli import doctor_helpers
+def test_plugins_inventory_get_adapter_rows(monkeypatch) -> None:
+    from invarlock.core import plugins_inventory
 
     class DummyRegistry:
         def list_adapters(self):  # noqa: ANN001
@@ -71,10 +71,13 @@ def test_doctor_helpers_get_adapter_rows(monkeypatch) -> None:
 
     monkeypatch.setattr("invarlock.core.registry.get_registry", lambda: DummyRegistry())
     monkeypatch.setattr(
-        doctor_helpers, "bitsandbytes_runtime_available", lambda: False, raising=False
+        plugins_inventory,
+        "bitsandbytes_runtime_available",
+        lambda: False,
+        raising=False,
     )
 
-    rows = doctor_helpers.get_adapter_rows()
+    rows = plugins_inventory.get_adapter_rows()
     by_name = {row["name"]: row for row in rows}
 
     assert by_name["hf_gptq"]["status"] == "ready"

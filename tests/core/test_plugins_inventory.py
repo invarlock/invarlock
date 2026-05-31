@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from invarlock.core import plugins_inventory as plugins_inventory_mod
 from invarlock.core.plugins_inventory import (
     adapter_inventory_json_items,
     combined_plugins_json_items,
@@ -69,6 +70,35 @@ def test_is_minimal_plugins_view_and_cuda_detection() -> None:
         )
         is False
     )
+
+
+def test_safe_import_success_and_attribute_detection(monkeypatch) -> None:
+    monkeypatch.setattr(
+        plugins_inventory_mod.importlib,
+        "import_module",
+        lambda _name: SimpleNamespace(present=object()),
+    )
+
+    assert plugins_inventory_mod._safe_import("demo") is True
+    assert plugins_inventory_mod._safe_import("demo", "present") is True
+    assert plugins_inventory_mod._safe_import("demo", "missing") is False
+
+
+def test_get_adapter_rows_keeps_bitsandbytes_ready_when_runtime_available(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr("invarlock.core.registry.get_registry", lambda: _Registry())
+    monkeypatch.setattr(
+        plugins_inventory_mod,
+        "bitsandbytes_runtime_available",
+        lambda: True,
+    )
+
+    rows = plugins_inventory_mod.get_adapter_rows()
+    bnb_row = next(row for row in rows if row["name"] == "hf_bnb")
+
+    assert bnb_row["backend"] == "bitsandbytes"
+    assert bnb_row["status"] == "ready"
 
 
 def test_gather_adapter_inventory_rows_and_json_payloads() -> None:

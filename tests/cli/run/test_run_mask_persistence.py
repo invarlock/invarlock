@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from invarlock.cli.run_artifacts import persist_ref_masks
+from invarlock.cli.run_execution import persist_ref_masks
 
 
 class _Obj:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -21,9 +22,8 @@ REMOVED_REPORTING_MODULES = (
 )
 RUN_COMMAND_PATH = REPO_ROOT / "src/invarlock/cli/commands/run.py"
 RUN_EXECUTION_PATH = REPO_ROOT / "src/invarlock/cli/run_execution.py"
-REPORT_FILES_PATH = REPO_ROOT / "src/invarlock/reporting/report_files.py"
+REPORT_BUNDLE_PATH = REPO_ROOT / "src/invarlock/reporting/report_bundle.py"
 METRICS_PATH = REPO_ROOT / "src/invarlock/eval/metrics.py"
-METRICS_LENS_PATH = REPO_ROOT / "src/invarlock/eval/metrics_lens.py"
 CONFIG_RUNTIME_PATH = REPO_ROOT / "src/invarlock/core/config_runtime.py"
 CONFIG_LOADER_PATH = REPO_ROOT / "src/invarlock/core/config_loader.py"
 RUNTIME_SECURITY_PATH = REPO_ROOT / "src/invarlock/runtime_security.py"
@@ -71,12 +71,12 @@ def test_removed_reporting_facades_do_not_reappear() -> None:
             offenders.append(f"unexpected file present: {path.relative_to(REPO_ROOT)}")
 
     banned_refs = (
-        "invarlock.reporting.report_builder",
-        "invarlock.reporting.report_make_support",
-        "invarlock.reporting.verify_checks",
-        "src/invarlock/reporting/report_builder.py",
-        "src/invarlock/reporting/report_make_support.py",
-        "src/invarlock/reporting/verify_checks.py",
+        re.compile(r"\binvarlock\.reporting\.report_builder\b"),
+        re.compile(r"\binvarlock\.reporting\.report_make_support\b"),
+        re.compile(r"\binvarlock\.reporting\.verify_checks\b"),
+        re.compile(r"src/invarlock/reporting/report_builder\.py"),
+        re.compile(r"src/invarlock/reporting/report_make_support\.py"),
+        re.compile(r"src/invarlock/reporting/verify_checks\.py"),
     )
     for root in (REPO_ROOT / "src", REPO_ROOT / "docs", REPO_ROOT / "scripts"):
         for path in root.rglob("*"):
@@ -84,8 +84,10 @@ def test_removed_reporting_facades_do_not_reappear() -> None:
                 continue
             text = _read_text(path)
             for banned in banned_refs:
-                if banned in text:
-                    offenders.append(f"{path.relative_to(REPO_ROOT)} -> {banned}")
+                if banned.search(text):
+                    offenders.append(
+                        f"{path.relative_to(REPO_ROOT)} -> {banned.pattern}"
+                    )
 
     assert not offenders, "\n".join(sorted(offenders))
 
@@ -151,15 +153,26 @@ def test_run_service_facade_is_removed() -> None:
     assert not path.exists()
 
 
-def test_report_files_remains_persistence_only() -> None:
-    text = _read_text(REPORT_FILES_PATH)
+def test_report_bundle_raw_save_remains_persistence_only() -> None:
+    text = _read_text(REPORT_BUNDLE_PATH)
+    tree = ast.parse(text, filename=str(REPORT_BUNDLE_PATH))
+    save_report = next(
+        (
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef) and node.name == "save_report"
+        ),
+        None,
+    )
+    assert save_report is not None
+    source = ast.get_source_segment(text, save_report) or ""
     banned_snippets = (
         "from .report_make import",
         "make_report(",
         "from .report_schema import validate_report",
         "baseline:",
     )
-    offenders = [snippet for snippet in banned_snippets if snippet in text]
+    offenders = [snippet for snippet in banned_snippets if snippet in source]
     assert not offenders, "\n".join(offenders)
 
 
@@ -295,20 +308,9 @@ def test_python_312_floor_removes_typed_dict_compat_shims() -> None:
         assert "except ImportError" not in text
 
 
-def test_eval_bench_is_not_a_shell_entrypoint() -> None:
+def test_eval_bench_facade_has_been_removed() -> None:
     path = REPO_ROOT / "src/invarlock/eval/bench.py"
-    text = _read_text(path)
-    offenders = []
-    for snippet in (
-        "import argparse",
-        "import sys",
-        "sys.exit(",
-        'if __name__ == "__main__"',
-    ):
-        if snippet in text:
-            offenders.append(snippet)
-
-    assert not offenders, "\n".join(offenders)
+    assert not path.exists()
 
 
 def test_dataset_diagnostics_do_not_encode_presentation_metadata() -> None:
@@ -328,19 +330,16 @@ def test_dataset_diagnostics_do_not_encode_presentation_metadata() -> None:
 
 def test_retry_core_does_not_expose_legacy_notice_api() -> None:
     offenders: list[str] = []
-    for path in (
-        REPO_ROOT / "src/invarlock/core/retry.py",
-        REPO_ROOT / "src/invarlock/core/run_retry_policy.py",
-    ):
-        text = _read_text(path)
-        if "drain_notices" in text:
-            offenders.append(str(path.relative_to(REPO_ROOT)))
+    retry_path = REPO_ROOT / "src/invarlock/core/retry.py"
+    text = _read_text(retry_path)
+    if "drain_notices" in text:
+        offenders.append(str(retry_path.relative_to(REPO_ROOT)))
 
     assert not offenders, "\n".join(offenders)
 
 
 def test_retry_and_evaluate_contracts_use_typed_outcomes() -> None:
-    retry_path = REPO_ROOT / "src/invarlock/core/run_retry_policy.py"
+    retry_path = REPO_ROOT / "src/invarlock/core/retry.py"
     retry_text = _read_text(retry_path)
     for required in (
         "status: str",
@@ -356,7 +355,7 @@ def test_retry_and_evaluate_contracts_use_typed_outcomes() -> None:
     ):
         assert legacy not in retry_text
 
-    report_path = REPO_ROOT / "src/invarlock/reporting/run_retry_validation.py"
+    report_path = REPO_ROOT / "src/invarlock/reporting/report_builder_support.py"
     report_text = _read_text(report_path)
     for required in (
         "validation_gates: tuple[str, ...]",
@@ -483,7 +482,7 @@ def test_guard_validation_and_report_contracts_do_not_use_legacy_action_transcri
         REPO_ROOT / "src/invarlock/guards/spectral_runtime.py",
         REPO_ROOT / "src/invarlock/guards/variance_runtime.py",
         REPO_ROOT / "src/invarlock/guards/rmt_runtime.py",
-        REPO_ROOT / "src/invarlock/core/run_report_payload_policy.py",
+        REPO_ROOT / "src/invarlock/reporting/run_report_contract.py",
         REPO_ROOT / "src/invarlock/eval/bench_runner.py",
         REPO_ROOT / "src/invarlock/reporting/report_types.py",
     ):
@@ -511,7 +510,7 @@ def test_runner_guard_and_report_payload_contracts_use_typed_decisions() -> None
         assert legacy not in runner_guards_text
 
     report_payload_text = _read_text(
-        REPO_ROOT / "src/invarlock/core/run_report_payload_policy.py"
+        REPO_ROOT / "src/invarlock/reporting/run_report_contract.py"
     )
     assert "_decision_from_action" not in report_payload_text
     assert 'guard_result.get("action")' not in report_payload_text

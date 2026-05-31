@@ -5,7 +5,6 @@ from pathlib import Path
 
 import jsonschema
 
-from invarlock.core.runtime_manifest_verify import verify_report_manifest
 from invarlock.public_contracts import load_runtime_manifest_schema
 from invarlock.runtime_security import (
     CONTAINER_EXECUTION_ENV,
@@ -13,6 +12,7 @@ from invarlock.runtime_security import (
     RUNTIME_IMAGE_ENV,
     write_runtime_manifest,
 )
+from invarlock.runtime_verify import verify_report_manifest
 
 _VALID_TEST_IMAGE_DIGEST = "sha256:" + ("a" * 64)
 
@@ -163,7 +163,7 @@ def test_runtime_verifier_reports_missing_schema(tmp_path: Path, monkeypatch) ->
     monkeypatch.setenv(RUNTIME_IMAGE_DIGEST_ENV, _VALID_TEST_IMAGE_DIGEST)
     report_path, manifest_path = _write_valid_report_and_manifest(tmp_path)
     monkeypatch.setattr(
-        "invarlock.core.runtime_manifest_verify.load_runtime_manifest_schema",
+        "invarlock.runtime_verify.load_runtime_manifest_schema",
         lambda: {},
     )
 
@@ -196,7 +196,7 @@ def test_runtime_verifier_reports_contract_runtime_and_digest_mismatches(
     manifest["report"]["sha256"] = "0" * 64
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     monkeypatch.setattr(
-        "invarlock.core.runtime_manifest_verify.jsonschema.validate",
+        "invarlock.runtime_verify.jsonschema.validate",
         lambda instance, schema: None,
     )
 
@@ -223,7 +223,7 @@ def test_runtime_verifier_reports_missing_report_sha_and_empty_report(
     manifest["runtime"] = "invalid"
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     monkeypatch.setattr(
-        "invarlock.core.runtime_manifest_verify.jsonschema.validate",
+        "invarlock.runtime_verify.jsonschema.validate",
         lambda instance, schema: None,
     )
 

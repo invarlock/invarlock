@@ -17,10 +17,13 @@ from statistics import NormalDist
 
 import numpy as np
 
+from invarlock.core.exceptions import ValidationError
+
 __all__ = [
     "compute_logloss_ci",
     "compute_paired_delta_log_ci",
     "logspace_to_ratio_ci",
+    "paired_delta_mean_ci",
 ]
 
 
@@ -380,3 +383,32 @@ def logspace_to_ratio_ci(delta_log_ci: tuple[float, float]) -> tuple[float, floa
     """Convert Δlog-loss bounds to ratio (perplexity) space."""
     lo, hi = delta_log_ci
     return math.exp(lo), math.exp(hi)
+
+
+def paired_delta_mean_ci(
+    subject: Iterable[float],
+    baseline: Iterable[float],
+    weights: Iterable[float] | None = None,
+    *,
+    reps: int = 2000,
+    seed: int = 0,
+    ci_level: float = 0.95,
+    method: str = "bca",
+) -> tuple[float, float]:
+    """Paired bootstrap CI for the mean delta of paired samples."""
+    alpha = 1.0 - float(ci_level)
+    if method not in {"bca", "percentile"}:
+        raise ValidationError(
+            code="E402",
+            message="METRICS-VALIDATION-FAILED",
+            details={"reason": "method must be 'bca' or 'percentile'"},
+        )
+    return compute_paired_delta_log_ci(
+        list(subject),
+        list(baseline),
+        weights=list(weights) if weights is not None else None,
+        method="bca" if method == "bca" else "percentile",
+        replicates=int(reps),
+        alpha=alpha,
+        seed=int(seed),
+    )

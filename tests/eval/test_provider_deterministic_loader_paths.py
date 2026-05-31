@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from invarlock.eval.providers.base import (
+from invarlock.eval.data_support import (
     deterministic_shards,
     deterministic_worker_init_fn,
 )

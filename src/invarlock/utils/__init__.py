@@ -1,23 +1,20 @@
-"""
-InvarLock Utilities
-===============
-
-Common utility functions used across InvarLock modules.
-
-This package also exposes submodules such as `invarlock.utils.digest` for
-hashing and provenance utilities.
-"""
+"""Common utility functions used across InvarLock modules."""
 
 from __future__ import annotations
 
+import hashlib
 import importlib
-from typing import TYPE_CHECKING, Any
+import json
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
+import numpy as np
 import psutil
 
 if TYPE_CHECKING:
     import torch
 
+_ENC = "utf-8"
 _TORCH_UNSET = object()
 _torch: Any = _TORCH_UNSET
 _TORCH_CUDA_QUERY_ERRORS = (
@@ -29,6 +26,12 @@ _TORCH_CUDA_QUERY_ERRORS = (
     TypeError,
     ValueError,
 )
+_FAST_MEAN_STATISTICS = {np.mean, np.nanmean}
+
+
+class _HashLike(Protocol):
+    def update(self, data: bytes, /) -> None: ...
+    def hexdigest(self, /) -> str: ...
 
 
 def _get_torch() -> Any | None:
@@ -50,6 +53,98 @@ def _require_torch() -> Any:
             "torch is required for invarlock.utils tensor helpers"
         )
     return torch_mod
+
+
+def _h() -> _HashLike:
+    return hashlib.blake2s(digest_size=32)
+
+
+def hash_bytes(b: bytes, *, salt: bytes | None = None) -> str:
+    h = _h()
+    if salt:
+        h.update(salt)
+    h.update(b)
+    return h.hexdigest()
+
+
+def hash_json(obj: Any, *, salt: str | None = None) -> str:
+    s = json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hash_bytes(s.encode(_ENC), salt=salt.encode(_ENC) if salt else None)
+
+
+def hash_int_array(arr: Any, *, salt: str | None = None) -> str:
+    a = np.asarray(arr, dtype=np.int32, order="C")
+    return hash_bytes(a.tobytes(order="C"), salt=salt.encode(_ENC) if salt else None)
+
+
+def _is_mean_statistic(statistic: Callable[[Any], Any] | None) -> bool:
+    if statistic is None or statistic in _FAST_MEAN_STATISTICS:
+        return True
+    name = getattr(statistic, "__name__", "")
+    return bool(name in {"mean", "nanmean"})
+
+
+def bootstrap_mean_statistics(
+    data: np.ndarray,
+    *,
+    n_bootstrap: int,
+    random_state: np.random.Generator,
+    max_resample_elements: int = 1_000_000,
+) -> np.ndarray:
+    """Return bootstrap resample means for a 1D array using chunked vectorization."""
+    if data.ndim != 1:
+        raise ValueError("bootstrap_mean_statistics requires 1D input")
+    if n_bootstrap <= 0:
+        return np.empty(0, dtype=float)
+
+    data = np.asarray(data, dtype=float)
+    sample_size = int(data.size)
+    if sample_size <= 0:
+        return np.empty(0, dtype=float)
+
+    chunk_rows = max(1, int(max_resample_elements) // max(sample_size, 1))
+    chunk_rows = min(chunk_rows, int(n_bootstrap))
+
+    stats = np.empty(int(n_bootstrap), dtype=float)
+    for start in range(0, int(n_bootstrap), chunk_rows):
+        stop = min(start + chunk_rows, int(n_bootstrap))
+        indices = random_state.integers(
+            0, sample_size, size=(stop - start, sample_size)
+        )
+        stats[start:stop] = data[indices].mean(axis=1, dtype=float)
+    return stats
+
+
+def bootstrap_statistics(
+    data: np.ndarray,
+    *,
+    n_bootstrap: int,
+    random_state: np.random.Generator,
+    statistic: Callable[[Any], Any] | None = None,
+) -> np.ndarray:
+    """Return bootstrap statistics for a 1D array with a fast path for sample means."""
+    data = np.asarray(data, dtype=float)
+    if _is_mean_statistic(statistic):
+        return bootstrap_mean_statistics(
+            data,
+            n_bootstrap=int(n_bootstrap),
+            random_state=random_state,
+        )
+
+    stats = np.empty(int(n_bootstrap), dtype=float)
+    for index in range(int(n_bootstrap)):
+        sample_idx = random_state.integers(0, data.size, size=data.size)
+        stats[index] = float(cast(Callable[[Any], Any], statistic)(data[sample_idx]))
+    return stats
+
+
+def percentile_interval_from_statistics(
+    statistics: np.ndarray, *, alpha: float
+) -> tuple[float, float]:
+    """Return the two-sided percentile interval for bootstrap statistics."""
+    lower = float(np.percentile(statistics, 100.0 * (alpha / 2.0)))
+    upper = float(np.percentile(statistics, 100.0 * (1.0 - alpha / 2.0)))
+    return lower, upper
 
 
 def extract_input_ids(
@@ -184,6 +279,12 @@ def get_memory_usage() -> dict[str, float]:
 
 
 __all__ = [
+    "bootstrap_mean_statistics",
+    "bootstrap_statistics",
+    "percentile_interval_from_statistics",
+    "hash_bytes",
+    "hash_json",
+    "hash_int_array",
     "extract_input_ids",
     "get_model_device",
     "ensure_tensor",

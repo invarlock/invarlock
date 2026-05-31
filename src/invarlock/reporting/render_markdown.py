@@ -5,19 +5,30 @@ from typing import Any
 
 import yaml
 
-from .render_dataset_section import append_dataset_and_provenance_section
 from .render_guard_sections import (
     append_guard_check_details_section,
     append_guard_observability_sections,
 )
-from .render_helpers import _fmtv, _p, _short_digest
-from .render_primary_metric_section import (
-    append_primary_metric_section as _append_primary_metric_section,
+from .render_markdown_structure import (
+    append_appendix_sections as _append_appendix_sections,
 )
-from .report_console import (
-    compute_report_hash as _compute_report_hash,
+from .render_markdown_structure import (
+    append_compression_diagnostics_section as _append_compression_diagnostics_section,
+)
+from .render_markdown_structure import (
+    append_moe_observability_section as _append_moe_observability_section,
+)
+from .render_markdown_structure import (
+    append_structural_changes_section as _append_structural_changes_section,
+)
+from .render_markdown_structure import (
+    get_generated_at as _get_generated_at,
 )
 from .report_summary import build_quality_gates_summary, build_safety_dashboard_summary
+from .report_summary import (
+    compute_report_hash as _compute_report_hash,
+)
+from .utils import _fmt_by_kind, _fmtv, _p, _short_digest
 
 _MODEL_CONTEXT_PARSE_EXCEPTIONS = (
     AttributeError,
@@ -84,6 +95,257 @@ def _is_non_assurance_report(evaluation_report: dict[str, Any]) -> bool:
     if assurance_verdict and assurance_verdict not in {"verified", "pass", "ok"}:
         return True
     return False
+
+
+def _is_estimated_metric(primary_metric: dict[str, Any]) -> bool:
+    try:
+        if bool(primary_metric.get("estimated")):
+            return True
+        return str(primary_metric.get("counts_source", "")).lower() == "pseudo_config"
+    except _MODEL_CONTEXT_PARSE_EXCEPTIONS:
+        return False
+
+
+def _format_secondary_metric_ratio(metric: dict[str, Any], kind: str) -> str:
+    ratio = metric.get("ratio_vs_baseline")
+    try:
+        if kind.startswith("ppl"):
+            if isinstance(ratio, int | float):
+                return f"{float(ratio):.3f}"
+            return "N/A"
+        return _fmt_by_kind(ratio, kind)
+    except _MODEL_CONTEXT_PARSE_EXCEPTIONS:
+        return "N/A"
+
+
+def _append_primary_metric_section(
+    lines: list[str], evaluation_report: dict[str, Any]
+) -> None:
+    primary_metric = evaluation_report.get("primary_metric")
+    if not isinstance(primary_metric, dict) or not primary_metric:
+        return
+
+    kind = primary_metric.get("kind", "unknown")
+    lines.append("## Primary Metric")
+    lines.append("")
+    unit = primary_metric.get("unit", "-")
+    paired = primary_metric.get("paired", False)
+    estimated_flag = _is_estimated_metric(primary_metric)
+    estimated_suffix = " (estimated)" if estimated_flag else ""
+
+    lines.append(f"- Kind: {kind} (unit: {unit}){estimated_suffix}")
+    gating_basis = primary_metric.get("gating_basis") or primary_metric.get("basis")
+    if gating_basis:
+        lines.append(f"- Basis: {gating_basis}")
+    if isinstance(paired, bool):
+        lines.append(f"- Paired: {paired}")
+    reps = primary_metric.get("reps")
+    if isinstance(reps, int | float):
+        lines.append(f"- Bootstrap Reps: {int(reps)}")
+    ci = primary_metric.get("ci") or primary_metric.get("display_ci")
+    if (
+        isinstance(ci, list | tuple)
+        and len(ci) == 2
+        and all(isinstance(value, int | float) for value in ci)
+    ):
+        lines.append(f"- CI: {ci[0]:.3f}–{ci[1]:.3f}")
+
+    preview = primary_metric.get("preview")
+    final = primary_metric.get("final")
+    ratio = primary_metric.get("ratio_vs_baseline")
+
+    lines.append("")
+    kind_name = str(kind).lower()
+    if estimated_flag and kind_name == "accuracy":
+        lines.append(
+            "- Note: Accuracy derived from pseudo counts (quick dev preset); use a labeled preset for measured accuracy."
+        )
+    lines.append("| Field | Value |")
+    lines.append("|-------|-------|")
+    lines.append(f"| Preview | {_fmt_by_kind(preview, str(kind))} |")
+    lines.append(f"| Final | {_fmt_by_kind(final, str(kind))} |")
+
+    if kind == "accuracy":
+        lines.append(f"| Δ vs Baseline | {_fmt_by_kind(ratio, str(kind))} |")
+        try:
+            baseline_point = primary_metric.get("baseline_point")
+        except _MODEL_CONTEXT_PARSE_EXCEPTIONS:
+            baseline_point = None
+        if isinstance(baseline_point, int | float) and baseline_point < 0.05:
+            lines.append("- Note: baseline < 5%; ratio suppressed; showing Δpp")
+    else:
+        try:
+            if isinstance(ratio, int | float):
+                lines.append(f"| Ratio vs Baseline | {float(ratio):.3f} |")
+            else:
+                lines.append("| Ratio vs Baseline | N/A |")
+        except _MODEL_CONTEXT_PARSE_EXCEPTIONS:
+            lines.append("| Ratio vs Baseline | N/A |")
+    lines.append("")
+
+    secondary_metrics = evaluation_report.get("secondary_metrics")
+    if not isinstance(secondary_metrics, list) or not secondary_metrics:
+        return
+
+    lines.append("## Secondary Metrics (informational)")
+    lines.append("")
+    lines.append("| Kind | Preview | Final | vs Baseline | CI |")
+    lines.append("|------|---------|-------|-------------|----|")
+    for metric in secondary_metrics:
+        if not isinstance(metric, dict):
+            continue
+        metric_kind = str(metric.get("kind", "?"))
+        preview_value = _fmt_by_kind(metric.get("preview"), metric_kind)
+        final_value = _fmt_by_kind(metric.get("final"), metric_kind)
+        ratio_value = _format_secondary_metric_ratio(metric, metric_kind)
+        ci = metric.get("display_ci") or metric.get("ci")
+        if isinstance(ci, tuple | list) and len(ci) == 2:
+            ci_value = f"{float(ci[0]):.3f}-{float(ci[1]):.3f}"
+        else:
+            ci_value = "–"
+        lines.append(
+            f"| {metric_kind} | {preview_value} | {final_value} | {ratio_value} | {ci_value} |"
+        )
+    lines.append("")
+
+
+def _dataset_hash_source_label(source: Any) -> str | None:
+    source_map = {
+        "explicit_preview_final_hashes": "provider-derived explicit preview/final hashes",
+        "explicit_token_ids": "content-derived token IDs",
+        "config_fallback": "config-derived fallback",
+    }
+    key = str(source or "").strip()
+    return source_map.get(key)
+
+
+def _append_dataset_and_provenance_section(
+    lines: list[str], evaluation_report: dict[str, Any]
+) -> None:
+    """Append the dataset/provenance Markdown block."""
+    dataset = evaluation_report.get("dataset", {}) or {}
+    provenance_info = evaluation_report.get("provenance", {}) or {}
+
+    has_dataset = isinstance(dataset, dict) and bool(dataset)
+    has_provenance = isinstance(provenance_info, dict) and bool(provenance_info)
+    if not (has_dataset or has_provenance):
+        return
+
+    lines.append("## Dataset and Provenance")
+    lines.append("")
+
+    if has_dataset:
+        provider = dataset.get("provider") or "unknown"
+        lines.append(f"- **Provider:** {provider}")
+        seq_len_raw = dataset.get("seq_len")
+        seq_len_val = (
+            int(seq_len_raw) if isinstance(seq_len_raw, int | float) else seq_len_raw
+        )
+        if seq_len_val is not None:
+            lines.append(f"- **Sequence Length:** {seq_len_val}")
+        windows_blk = (
+            dataset.get("windows", {})
+            if isinstance(dataset.get("windows"), dict)
+            else {}
+        )
+        win_prev = windows_blk.get("preview")
+        win_final = windows_blk.get("final")
+        if win_prev is not None and win_final is not None:
+            lines.append(f"- **Windows:** {win_prev} preview + {win_final} final")
+        if windows_blk.get("seed") is not None:
+            lines.append(f"- **Seed:** {windows_blk.get('seed')}")
+        hash_blk = (
+            dataset.get("hash", {}) if isinstance(dataset.get("hash"), dict) else {}
+        )
+        if hash_blk.get("preview_tokens") is not None:
+            lines.append(f"- **Preview Tokens:** {hash_blk.get('preview_tokens'):,}")
+        if hash_blk.get("final_tokens") is not None:
+            lines.append(f"- **Final Tokens:** {hash_blk.get('final_tokens'):,}")
+        if hash_blk.get("total_tokens") is not None:
+            lines.append(f"- **Total Tokens:** {hash_blk.get('total_tokens'):,}")
+        if hash_blk.get("dataset"):
+            lines.append(f"- **Dataset Hash:** {hash_blk.get('dataset')}")
+        hash_source = _dataset_hash_source_label(hash_blk.get("source"))
+        if hash_source:
+            lines.append(f"- **Hash Source:** {hash_source}")
+        tokenizer = dataset.get("tokenizer", {})
+        if isinstance(tokenizer, dict) and (
+            tokenizer.get("name") or tokenizer.get("hash")
+        ):
+            vocab_size = tokenizer.get("vocab_size")
+            vocab_suffix = (
+                f" (vocab {vocab_size})" if isinstance(vocab_size, int) else ""
+            )
+            lines.append(
+                f"- **Tokenizer:** {tokenizer.get('name', 'unknown')}{vocab_suffix}"
+            )
+            if tokenizer.get("hash"):
+                lines.append(f"  - Hash: {tokenizer['hash']}")
+            lines.append(
+                f"  - BOS/EOS: {tokenizer.get('bos_token')} / {tokenizer.get('eos_token')}"
+            )
+            if tokenizer.get("pad_token") is not None:
+                lines.append(f"  - PAD: {tokenizer.get('pad_token')}")
+            if tokenizer.get("add_prefix_space") is not None:
+                lines.append(
+                    f"  - add_prefix_space: {tokenizer.get('add_prefix_space')}"
+                )
+
+    if has_provenance:
+        baseline_info = provenance_info.get("baseline", {}) or {}
+        edited_info = provenance_info.get("edited", {}) or {}
+
+        if baseline_info or edited_info:
+            lines.append("")
+        if baseline_info:
+            lines.append(f"- **Baseline Run ID:** {baseline_info.get('run_id')}")
+            if baseline_info.get("report_hash"):
+                lines.append(f"  - Report Hash: `{baseline_info.get('report_hash')}`")
+            if baseline_info.get("report_path"):
+                lines.append(f"  - Report Path: {baseline_info.get('report_path')}")
+        if edited_info:
+            lines.append(f"- **Edited Run ID:** {edited_info.get('run_id')}")
+            if edited_info.get("report_hash"):
+                lines.append(f"  - Report Hash: `{edited_info.get('report_hash')}`")
+            if edited_info.get("report_path"):
+                lines.append(f"  - Report Path: {edited_info.get('report_path')}")
+
+        provider_digest = provenance_info.get("provider_digest")
+        if isinstance(provider_digest, dict) and provider_digest:
+            ids_d = provider_digest.get("ids_sha256")
+            tok_d = provider_digest.get("tokenizer_sha256")
+            mask_d = provider_digest.get("masking_sha256")
+
+            lines.append("- **Provider Digest:**")
+            if tok_d:
+                lines.append(
+                    f"  - tokenizer_sha256: `{_short_digest(tok_d)}` (full in JSON)"
+                )
+            if ids_d:
+                lines.append(f"  - ids_sha256: `{_short_digest(ids_d)}` (full in JSON)")
+            if mask_d:
+                lines.append(
+                    f"  - masking_sha256: `{_short_digest(mask_d)}` (full in JSON)"
+                )
+
+        confidence = evaluation_report.get("confidence", {}) or {}
+        if isinstance(confidence, dict) and confidence.get("label"):
+            lines.append(f"- **Confidence:** {confidence.get('label')}")
+
+        policy_digest = evaluation_report.get("policy_digest", {}) or {}
+        if isinstance(policy_digest, dict) and policy_digest:
+            policy_version = policy_digest.get("policy_version")
+            thresholds_hash = policy_digest.get("thresholds_hash")
+            if policy_version:
+                lines.append(f"- **Policy Version:** {policy_version}")
+            if isinstance(thresholds_hash, str) and thresholds_hash:
+                lines.append(
+                    f"- **Thresholds Digest:** `{_short_digest(thresholds_hash)}` (full in JSON)"
+                )
+            if policy_digest.get("changed"):
+                lines.append("- Note: policy changed")
+
+    lines.append("")
 
 
 def _append_report_warning_banners(
@@ -366,20 +628,6 @@ def _append_accuracy_subgroups(lines: list[str], subgroups: dict[str, Any]) -> N
     lines.append("")
 
 
-def _get_generated_at(evaluation_report: dict[str, Any]) -> str:
-    artifacts = evaluation_report.get("artifacts")
-    if isinstance(artifacts, dict):
-        generated_at = artifacts.get("generated_at")
-        if generated_at:
-            return str(generated_at)
-    policy_provenance = evaluation_report.get("policy_provenance")
-    if isinstance(policy_provenance, dict):
-        resolved_at = policy_provenance.get("resolved_at")
-        if resolved_at:
-            return str(resolved_at)
-    return "(not recorded)"
-
-
 def _get_window_plan_summary(evaluation_report: dict[str, Any]) -> str | None:
     try:
         plan_ctx = (
@@ -506,340 +754,6 @@ def _append_plugin_provenance_section(
     lines.append("")
 
 
-def _append_inference_diagnostics_section(
-    appendix_lines: list[str], evaluation_report: dict[str, Any]
-) -> None:
-    compression_diag = (
-        evaluation_report.get("structure", {}).get("compression_diagnostics", {})
-        if isinstance(evaluation_report.get("structure"), dict)
-        else {}
-    )
-    inference_flags = compression_diag.get("inferred") or {}
-    inference_sources = compression_diag.get("inference_source") or {}
-    inference_log = compression_diag.get("inference_log") or []
-    if not (inference_flags or inference_sources or inference_log):
-        return
-
-    appendix_lines.append("### Inference Diagnostics")
-    appendix_lines.append("")
-    if inference_flags:
-        appendix_lines.append("- **Fields Inferred:**")
-        for field, flag in inference_flags.items():
-            appendix_lines.append(f"  - {field}: {'yes' if flag else 'no'}")
-    if inference_sources:
-        appendix_lines.append("- **Sources:**")
-        for field, source in inference_sources.items():
-            appendix_lines.append(f"  - {field}: {source}")
-    if inference_log:
-        appendix_lines.append("- **Inference Log:**")
-        for entry in inference_log:
-            appendix_lines.append(f"  - {entry}")
-    appendix_lines.append("")
-
-
-def _append_structural_changes_section(
-    lines: list[str], evaluation_report: dict[str, Any]
-) -> None:
-    try:
-        structure = evaluation_report.get("structure", {}) or {}
-        params_changed = int(structure.get("params_changed", 0) or 0)
-        layers_modified = int(structure.get("layers_modified", 0) or 0)
-        bitwidth_changes = 0
-        try:
-            bitwidth_changes = int(len(structure.get("bitwidths", []) or []))
-        except (
-            AttributeError,
-            ImportError,
-            KeyError,
-            OSError,
-            OverflowError,
-            RuntimeError,
-            TypeError,
-            ValueError,
-        ):
-            bitwidth_changes = 0
-        has_changes = any(
-            v > 0 for v in (params_changed, layers_modified, bitwidth_changes)
-        )
-        edit_name = str(evaluation_report.get("edit_name", "unknown"))
-        if has_changes:
-            lines.append("## Structural Changes")
-            lines.append("")
-            lines.append("| Change Type | Count |")
-            lines.append("|-------------|-------|")
-            lines.append(f"| Parameters Changed | {params_changed:,} |")
-            if edit_name == "quant_rtn":
-                try:
-                    t_an = (structure.get("compression_diagnostics", {}) or {}).get(
-                        "target_analysis", {}
-                    )
-                except (
-                    AttributeError,
-                    ImportError,
-                    KeyError,
-                    OSError,
-                    OverflowError,
-                    RuntimeError,
-                    TypeError,
-                    ValueError,
-                ):
-                    t_an = {}
-                eligible = None
-                modified = None
-                if isinstance(t_an, dict) and t_an:
-                    eligible = t_an.get("modules_eligible")
-                    modified = t_an.get("modules_modified")
-                if isinstance(modified, int) and isinstance(eligible, int):
-                    lines.append(
-                        f"| Linear Modules Quantized | {modified} of {eligible} targeted |"
-                    )
-                else:
-                    total_bitwidth_changes = bitwidth_changes
-                    if total_bitwidth_changes > 0 and layers_modified > 0:
-                        modules_per_layer = total_bitwidth_changes // max(
-                            layers_modified, 1
-                        )
-                        lines.append(
-                            f"| Linear Modules Quantized | {total_bitwidth_changes} ({modules_per_layer} per block × {layers_modified} blocks) |"
-                        )
-                    elif total_bitwidth_changes > 0:
-                        lines.append(
-                            f"| Linear Modules Quantized | {total_bitwidth_changes} |"
-                        )
-            else:
-                lines.append(f"| Layers Modified | {layers_modified} |")
-            lines.append("")
-    except (
-        AttributeError,
-        ImportError,
-        KeyError,
-        OSError,
-        OverflowError,
-        RuntimeError,
-        TypeError,
-        ValueError,
-    ):
-        pass
-
-
-def _append_compression_diagnostics_section(
-    lines: list[str], evaluation_report: dict[str, Any]
-) -> None:
-    structure = evaluation_report.get("structure", {}) or {}
-    compression_diag = structure.get("compression_diagnostics", {})
-    edit_name = str(evaluation_report.get("edit_name", "unknown"))
-
-    if edit_name == "noop":
-        lines.append("### Compression Diagnostics")
-        lines.append("")
-        lines.append("Not applicable (no parameters modified).")
-        lines.append("")
-    elif compression_diag:
-        lines.append("### Compression Diagnostics")
-        lines.append("")
-
-        status = compression_diag.get("execution_status", "unknown")
-        status_emoji = (
-            "✅" if status == "successful" else "❌" if status == "failed" else "⚠️"
-        )
-        lines.append(f"**Execution Status:** {status_emoji} {status.upper()}")
-        lines.append("")
-
-        target_analysis = compression_diag.get("target_analysis", {})
-        if target_analysis:
-            lines.append("**Target Module Analysis:**")
-            lines.append("")
-            lines.append("| Metric | Value |")
-            lines.append("|--------|-------|")
-            lines.append(
-                f"| Modules Found | {target_analysis.get('modules_found', 0)} |"
-            )
-            lines.append(
-                f"| Modules Eligible | {target_analysis.get('modules_eligible', 0)} |"
-            )
-            lines.append(
-                f"| Modules Modified | {target_analysis.get('modules_modified', 0)} |"
-            )
-            try:
-                _eligible = int(target_analysis.get("modules_eligible", 0))
-                _modified = int(target_analysis.get("modules_modified", 0))
-                lines.append(f"| Targets → Applied | {_eligible} → {_modified} |")
-            except (
-                AttributeError,
-                ImportError,
-                KeyError,
-                OSError,
-                OverflowError,
-                RuntimeError,
-                TypeError,
-                ValueError,
-            ):
-                pass
-            lines.append(f"| Scope | {target_analysis.get('scope', 'unknown')} |")
-            lines.append("")
-
-        param_analysis = compression_diag.get("parameter_analysis", {})
-        if param_analysis:
-            lines.append("**Parameter Effectiveness:**")
-            lines.append("")
-            for param, info in param_analysis.items():
-                if isinstance(info, dict):
-                    lines.append(
-                        f"- **{param}:** {info.get('value', 'N/A')} ({info.get('effectiveness', 'unknown')})"
-                    )
-                else:
-                    lines.append(f"- **{param}:** {info}")
-            lines.append("")
-
-        algo_details = compression_diag.get("algorithm_details", {})
-        if algo_details:
-            lines.append("**Algorithm Details:**")
-            lines.append("")
-            for key, value in algo_details.items():
-                lines.append(f"- **{key}:** {value}")
-            lines.append("")
-
-        warnings = compression_diag.get("warnings", [])
-        if warnings:
-            lines.append("**ℹ️ Informational:**")
-            lines.append("")
-            for warning in warnings:
-                lines.append(f"- {warning}")
-            lines.append("")
-
-
-def _append_variance_guard_appendix(
-    appendix_lines: list[str], evaluation_report: dict[str, Any]
-) -> None:
-    variance = evaluation_report.get("variance", {}) or {}
-    if not isinstance(variance, dict):
-        variance = {}
-    appendix_lines.append("### Variance Guard")
-    appendix_lines.append("")
-
-    variance_enabled = bool(variance.get("enabled"))
-    appendix_lines.append(f"- **Enabled:** {'Yes' if variance_enabled else 'No'}")
-
-    if variance_enabled:
-        gain_value = variance.get("gain", "N/A")
-        if isinstance(gain_value, int | float):
-            appendix_lines.append(f"- **Gain:** {gain_value:.3f}")
-        else:
-            appendix_lines.append(f"- **Gain:** {gain_value}")
-    else:
-        ppl_no_ve = variance.get("ppl_no_ve")
-        ppl_with_ve = variance.get("ppl_with_ve")
-        ratio_ci = variance.get("ratio_ci")
-        if ppl_no_ve is not None and ppl_with_ve is not None and ratio_ci:
-            appendix_lines.append(f"- **Primary metric without VE:** {ppl_no_ve:.3f}")
-            appendix_lines.append(f"- **Primary metric with VE:** {ppl_with_ve:.3f}")
-            gain_value = variance.get("gain")
-            if isinstance(gain_value, int | float):
-                appendix_lines.append(f"- **Gain (insufficient):** {gain_value:.3f}")
-        else:
-            appendix_lines.append(
-                "- Variance Guard: Disabled (predictive gate not evaluated for this edit)."
-            )
-            try:
-                ve_policy = evaluation_report.get("policies", {}).get("variance", {})
-                min_effect = ve_policy.get("min_effect_lognll")
-                if isinstance(min_effect, int | float):
-                    appendix_lines.append(
-                        f"- Predictive gate (Balanced): one-sided; enables only if CI excludes 0 and |mean Δ| ≥ {float(min_effect):.4g}."
-                    )
-                else:
-                    appendix_lines.append(
-                        "- Predictive gate (Balanced): one-sided; enables only if CI excludes 0 and |mean Δ| ≥ min_effect."
-                    )
-                appendix_lines.append(
-                    "- Predictive Gate: evaluated=false (disabled under current policy/edit)."
-                )
-            except (
-                AttributeError,
-                ImportError,
-                KeyError,
-                OSError,
-                OverflowError,
-                RuntimeError,
-                TypeError,
-                ValueError,
-            ):
-                pass
-
-    if variance.get("ratio_ci"):
-        ratio_lo, ratio_hi = variance["ratio_ci"]
-        appendix_lines.append(f"- **Ratio CI:** [{ratio_lo:.3f}, {ratio_hi:.3f}]")
-
-    if variance.get("calibration") and variance.get("enabled"):
-        calib = variance["calibration"]
-        coverage = calib.get("coverage")
-        requested = calib.get("requested")
-        status = calib.get("status", "unknown")
-        appendix_lines.append(
-            f"- **Calibration:** {coverage}/{requested} windows ({status})"
-        )
-    appendix_lines.append("")
-
-
-def _append_moe_observability_section(
-    lines: list[str], evaluation_report: dict[str, Any]
-) -> None:
-    moe = (
-        evaluation_report.get("moe", {})
-        if isinstance(evaluation_report.get("moe"), dict)
-        else {}
-    )
-    if not moe:
-        return
-    lines.append("## MoE Observability")
-    lines.append("")
-    for key in ("top_k", "capacity_factor", "expert_drop_rate"):
-        if key in moe:
-            lines.append(f"- **{key}:** {moe[key]}")
-    if "utilization_count" in moe or "utilization_mean" in moe:
-        uc = moe.get("utilization_count")
-        um = moe.get("utilization_mean")
-        parts = []
-        if uc is not None:
-            parts.append(f"N={int(uc)}")
-        if isinstance(um, int | float):
-            parts.append(f"mean={um:.3f}")
-        if parts:
-            lines.append(f"- **Utilization:** {'; '.join(parts)}")
-    for key, label in (
-        ("delta_load_balance_loss", "Δ load_balance_loss"),
-        ("delta_router_entropy", "Δ router_entropy"),
-        ("delta_utilization_mean", "Δ utilization mean"),
-    ):
-        if key in moe and isinstance(moe.get(key), int | float):
-            lines.append(f"- **{label}:** {float(moe[key]):+.4f}")
-    lines.append("")
-
-
-def _append_appendix_sections(
-    lines: list[str], appendix_lines: list[str], evaluation_report: dict[str, Any]
-) -> None:
-    _append_inference_diagnostics_section(appendix_lines, evaluation_report)
-    _append_variance_guard_appendix(appendix_lines, evaluation_report)
-
-    appendix_lines.append("### Artifacts")
-    appendix_lines.append("")
-    artifacts = evaluation_report["artifacts"]
-    if artifacts.get("events_path"):
-        appendix_lines.append(f"- **Events Log:** `{artifacts['events_path']}`")
-    if artifacts.get("report_path"):
-        appendix_lines.append(f"- **Full Report:** `{artifacts['report_path']}`")
-    appendix_lines.append(
-        f"- **Report Generated:** {_get_generated_at(evaluation_report)}"
-    )
-    appendix_lines.append("")
-
-    if appendix_lines:
-        lines.append("## Appendix")
-        lines.append("")
-        lines.extend(appendix_lines)
-
-
 def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
     """
     Render an evaluation report as a formatted Markdown report with pretty tables.
@@ -867,7 +781,7 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
 
     _append_model_context_sections(lines, evaluation_report)
 
-    append_dataset_and_provenance_section(lines, evaluation_report)
+    _append_dataset_and_provenance_section(lines, evaluation_report)
 
     # Structural Changes heading is printed with content later; avoid empty header here
 

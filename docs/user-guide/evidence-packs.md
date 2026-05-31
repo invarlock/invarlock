@@ -137,7 +137,7 @@ scheduler flow, and artifacts, see [Evidence Pack Internals](evidence-packs-inte
 
 ## Suites
 
-Model suites live in `scripts/evidence_packs/suites.sh`. You can also override individual
+Model suites live in `scripts/evidence_packs/run_suite.sh`. You can also override individual
 models via `MODEL_1`–`MODEL_8`.
 
 | Suite | Models | Notes |

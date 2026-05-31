@@ -10,6 +10,7 @@ import os
 import shutil
 import subprocess
 import sys
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from functools import cache
@@ -17,14 +18,6 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
-try:
-    import model_evidence_commands as evidence_commands
-    from model_evidence_sweep_output import write_manifest, write_summary
-except ImportError:  # pragma: no cover - direct module load under pytest
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    import model_evidence_commands as evidence_commands
-    from model_evidence_sweep_output import write_manifest, write_summary
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SUPPORT_MATRIX_PATH = REPO_ROOT / "contracts" / "support_matrix.json"
@@ -89,6 +82,63 @@ class LaneResult:
         payload = asdict(self)
         payload["ok"] = self.ok
         return payload
+
+
+def write_summary(
+    output_root: Path,
+    *,
+    suite: str,
+    execution_mode: str,
+    shard_index: int,
+    shard_count: int,
+    results: Sequence[LaneResult],
+) -> None:
+    summary_tsv = output_root / "summary.tsv"
+    with summary_tsv.open("w", encoding="utf-8") as handle:
+        handle.write(
+            "slug\tlane_id\tstatus\tdetail\tevaluate_exit\tverify_exit\treport\n"
+        )
+        for result in results:
+            verify_exit = (
+                "NA" if result.verify_exit is None else str(result.verify_exit)
+            )
+            handle.write(
+                f"{result.slug}\t{result.lane_id}\t{result.status}\t"
+                f"{result.detail or ''}\t{result.evaluate_exit}\t"
+                f"{verify_exit}\t{result.report_path}\n"
+            )
+
+    payload = {
+        "suite": suite,
+        "execution_mode": execution_mode,
+        "shard_index": shard_index,
+        "shard_count": shard_count,
+        "ok": all(result.ok for result in results),
+        "results": [result.to_summary_entry() for result in results],
+    }
+    (output_root / "summary.json").write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def write_manifest(
+    output_root: Path,
+    *,
+    suite: str,
+    execution_mode: str,
+    specs: Sequence[EvidenceLane],
+) -> None:
+    payload = {
+        "generated_at": datetime.now(UTC).isoformat(),
+        "suite": suite,
+        "execution_mode": execution_mode,
+        "lanes": [spec.to_manifest_entry() for spec in specs],
+    }
+    (output_root / "manifest.json").write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
 
 
 CURRENT_SUPPORTED_EXPERIMENTAL_LANES: tuple[EvidenceLane, ...] = (
@@ -615,19 +665,49 @@ def build_evaluate_command(
     execution_mode: str,
     lane_root: Path,
 ) -> list[str]:
-    return evidence_commands.build_evaluate_command(
-        spec,
-        python_exe=python_exe,
-        profile=profile,
-        device=device,
-        execution_mode=execution_mode,
-        lane_root=lane_root,
-        repo_root=REPO_ROOT,
-    )
+    command = [
+        python_exe,
+        "-m",
+        "invarlock",
+        "evaluate",
+        "--baseline",
+        spec.model_id,
+        "--subject",
+        spec.model_id,
+        "--baseline-adapter",
+        spec.adapter,
+        "--subject-adapter",
+        spec.adapter,
+        "--preset",
+        spec.preset_arg(execution_mode=execution_mode),
+        "--profile",
+        profile,
+        "--allow-network",
+        "--device",
+        device,
+        "--out",
+        _command_path(lane_root / "runs", execution_mode=execution_mode),
+        "--report-out",
+        _command_path(lane_root / "report", execution_mode=execution_mode),
+    ]
+    if execution_mode == "host":
+        command.extend(["--execution-mode", "host", "--assurance", "off"])
+    return command
 
 
 def _prefetch_adapter_name(spec: EvidenceLane) -> str:
-    return evidence_commands.prefetch_adapter_name(spec)
+    adapter_name = spec.adapter
+    if adapter_name in {"auto", "auto_hf"}:
+        preset = spec.preset_relpath.lower()
+        lane = spec.lane_id.lower()
+        model_id = spec.model_id.lower()
+        if "masked_lm" in preset or "masked" in lane or "bert" in model_id:
+            adapter_name = "hf_mlm"
+        elif "seq2seq" in preset or "t5" in model_id:
+            adapter_name = "hf_seq2seq"
+        else:
+            adapter_name = "hf_causal"
+    return adapter_name
 
 
 def build_prefetch_command(
@@ -635,7 +715,16 @@ def build_prefetch_command(
     *,
     python_exe: str,
 ) -> list[str]:
-    return evidence_commands.build_prefetch_command(spec, python_exe=python_exe)
+    adapter_name = _prefetch_adapter_name(spec)
+    prefetch_code = (
+        "from huggingface_hub import snapshot_download; "
+        "from invarlock.model_profile import detect_model_profile; "
+        "import sys; "
+        "model_id = sys.argv[1]; "
+        f"detect_model_profile(model_id, adapter={adapter_name!r}).make_tokenizer(); "
+        "snapshot_download(model_id)"
+    )
+    return [python_exe, "-c", prefetch_code, spec.model_id]
 
 
 def build_verify_command(
@@ -645,22 +734,29 @@ def build_verify_command(
     execution_mode: str,
     report_path: Path,
 ) -> list[str]:
-    return evidence_commands.build_verify_command(
-        python_exe=python_exe,
-        profile=profile,
-        execution_mode=execution_mode,
-        report_path=report_path,
-    )
+    command = [
+        python_exe,
+        "-m",
+        "invarlock",
+        "verify",
+        "--profile",
+        profile,
+        "--json",
+        str(report_path),
+    ]
+    if execution_mode == "host":
+        command[4:4] = ["--runtime-provenance", "host"]
+    return command
 
 
 def resolve_lane_profile(
     *, profile_override: str | None, execution_mode: str, spec: EvidenceLane
 ) -> str:
-    return evidence_commands.resolve_lane_profile(
-        profile_override=profile_override,
-        execution_mode=execution_mode,
-        spec=spec,
-    )
+    if profile_override:
+        return profile_override
+    if execution_mode == "host":
+        return "dev"
+    return spec.verify_profile
 
 
 def runtime_env() -> dict[str, str]:
@@ -688,11 +784,12 @@ def _execution_root(output_root: Path, *, execution_mode: str) -> Path:
 
 
 def _command_path(path: Path, *, execution_mode: str) -> str:
-    return evidence_commands.command_path(
-        path,
-        execution_mode=execution_mode,
-        repo_root=REPO_ROOT,
-    )
+    if execution_mode == "container":
+        try:
+            return path.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
+        except ValueError:
+            pass
+    return str(path)
 
 
 def _publish_lane_artifacts(source: Path, destination: Path) -> None:

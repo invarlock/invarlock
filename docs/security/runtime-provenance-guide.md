@@ -8,7 +8,7 @@
 | **Audience** | Release reviewers, security reviewers, operators packaging evidence bundles. |
 | **Contract scope** | Current strict assurance behavior, runtime manifest schema v1. |
 | **Required artifact** | `runtime.manifest.json` adjacent to every container-backed `evaluation.report.json`. |
-| **Source of truth** | `src/invarlock/core/runtime_manifest_verify.py`, `src/invarlock/runtime_provenance.py`, `contracts/runtime_manifest.schema.json`, `docs/security/threat-model.md`. |
+| **Source of truth** | `src/invarlock/runtime_verify.py`, `src/invarlock/runtime_provenance.py`, `contracts/runtime_manifest.schema.json`, `docs/security/threat-model.md`. |
 
 Strict assurance requires runtime provenance. The verifier must be able to
 connect an evaluation report to the runtime environment that produced it.

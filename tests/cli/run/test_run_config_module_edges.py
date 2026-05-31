@@ -56,7 +56,7 @@ def test_resolve_requested_edit_name_import_error_falls_back_to_known_edit(
     orig_import = builtins.__import__
 
     def _import(name, globals=None, locals=None, fromlist=(), level=0):  # noqa: A002
-        if name == "invarlock.edits.registry":
+        if name == "invarlock.edits":
             raise ImportError("boom")
         return orig_import(name, globals, locals, fromlist, level)
 
@@ -161,7 +161,7 @@ def test_prepare_config_for_run_tolerates_default_auto_adapter_import_failure(
     orig_import = builtins.__import__
 
     def _import(name, globals=None, locals=None, fromlist=(), level=0):  # noqa: A002
-        if name == "invarlock.core.adapter_auto":
+        if name == "invarlock.adapters.auto":
             raise ImportError("optional adapter unavailable")
         return orig_import(name, globals, locals, fromlist, level)
 
@@ -189,7 +189,7 @@ def test_prepare_config_for_run_propagates_default_auto_adapter_failure(
         raise RuntimeError("auto adapter failed")
 
     monkeypatch.setattr(
-        "invarlock.core.adapter_auto.apply_auto_adapter_if_needed",
+        "invarlock.adapters.auto.apply_auto_adapter_if_needed",
         _boom,
     )
 
@@ -579,6 +579,33 @@ def test_resolve_provider_and_split_handles_missing_provider_split_and_split_pro
             kwargs["available"] is None,
         ),
         provider_kwargs={"existing": True},
+        resolved_device="cpu",
+    )
+
+    assert isinstance(provider, Provider)
+    assert split == "validation"
+    assert used is True
+
+
+def test_resolve_provider_and_split_handles_missing_dataset_attribute() -> None:
+    class _Cfg:
+        @property
+        def dataset(self):
+            raise AttributeError("missing dataset")
+
+    class Provider:
+        def available_splits(self):
+            return ["validation"]
+
+    provider, split, used = run_config_mod.resolve_provider_and_split(
+        _Cfg(),
+        model_profile=SimpleNamespace(default_provider="wikitext2"),
+        get_provider_fn=lambda *_args, **_kwargs: Provider(),
+        choose_dataset_split_fn=lambda **kwargs: (
+            "validation",
+            kwargs["requested"] is None,
+        ),
+        provider_kwargs=None,
         resolved_device="cpu",
     )
 

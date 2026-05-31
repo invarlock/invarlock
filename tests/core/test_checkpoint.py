@@ -287,6 +287,25 @@ def test_checkpoint_manager_reraises_unexpected_restore_errors(
         mgr.restore_checkpoint(object(), adapter, checkpoint_id)
 
 
+def test_restore_checkpoint_swallowed_adapter_restore_error_returns_false(
+    tmp_path: Path,
+) -> None:
+    class RecoverableRestoreErrorAdapter(DummyAdapter):
+        def restore(self, model: object, blob: bytes) -> None:
+            raise RuntimeError("restore failed")
+
+    good_adapter = DummyAdapter(tmp_path)
+    mgr = CheckpointManager()
+    checkpoint_id = mgr.create_checkpoint(object(), good_adapter)
+
+    assert (
+        mgr.restore_checkpoint(
+            object(), RecoverableRestoreErrorAdapter(tmp_path), checkpoint_id
+        )
+        is False
+    )
+
+
 def test_checkpoint_manager_cleanup_tolerates_missing_chunked_path() -> None:
     mgr = CheckpointManager()
     mgr.checkpoints["checkpoint_1"] = {"mode": "chunked", "path": ""}

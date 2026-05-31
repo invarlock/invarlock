@@ -1,0 +1,72 @@
+from types import SimpleNamespace
+
+import torch
+
+from invarlock.guards.variance import VarianceGuard
+
+
+def test_normalize_pairing_ids_preserves_prefixed():
+    g = VarianceGuard()
+    ids = g._normalize_pairing_ids("preview", ["preview::1", "x"])
+    assert ids[0] == "preview::1" and ids[1].startswith("preview::")
+
+
+def test_prepare_batch_tensors_all_paths():
+    g = VarianceGuard()
+    device = torch.device("cpu")
+    # Dict path
+    x = torch.ones(1, 3, dtype=torch.long)
+    d = {"input_ids": x, "attention_mask": torch.ones_like(x)}
+    ids, attn = g._prepare_batch_tensors(d, device)
+    assert isinstance(ids, torch.Tensor) and isinstance(attn, torch.Tensor)
+    # Tuple/list path
+    ids2, attn2 = g._prepare_batch_tensors([x, torch.ones_like(x)], device)
+    assert isinstance(ids2, torch.Tensor) and isinstance(attn2, torch.Tensor)
+    # Else path (scalar tensor)
+    ids3, labels3 = g._prepare_batch_tensors(x, device)
+    assert isinstance(ids3, torch.Tensor) and isinstance(labels3, torch.Tensor)
+
+
+def test_prepare_batch_tensors_uses_inputs_when_input_ids_missing():
+    g = VarianceGuard()
+    device = torch.device("cpu")
+    x = torch.ones(1, 3, dtype=torch.long)
+    ids, labels = g._prepare_batch_tensors({"inputs": x}, device)
+    assert isinstance(ids, torch.Tensor) and isinstance(labels, torch.Tensor)
+
+
+def test_prepare_batch_tensors_tuple_branch():
+    g = VarianceGuard()
+    device = torch.device("cpu")
+    x = torch.ones(2, 3, dtype=torch.long)
+    ids, labels = g._prepare_batch_tensors((x, x.clone()), device)
+    assert isinstance(ids, torch.Tensor) and isinstance(labels, torch.Tensor)
+
+
+def test_compute_ppl_for_batches_falls_back_when_label_count_fails(monkeypatch):
+    g = VarianceGuard()
+
+    class _Model(torch.nn.Module):
+        def forward(self, inputs, labels=None):
+            return SimpleNamespace(loss=torch.tensor(0.25))
+
+    original_item = torch.Tensor.item
+
+    def bad_item(self):
+        value = original_item(self)
+        if value == 3:
+            raise RuntimeError("count failed")
+        return value
+
+    monkeypatch.setattr(torch.Tensor, "item", bad_item, raising=False)
+
+    ppl_values, loss_values, token_counts = g._compute_ppl_for_batches(
+        _Model(),
+        [torch.tensor([[1, 2, 3]])],
+        torch.device("cpu"),
+        return_counts=True,
+    )
+
+    assert len(ppl_values) == 1
+    assert loss_values == [0.25]
+    assert token_counts == [3]

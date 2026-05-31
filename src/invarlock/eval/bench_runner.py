@@ -494,11 +494,11 @@ def execute_scenario(
 
     if bare_result.success and guarded_result.success:
         try:
-            from invarlock.reporting.report_make import make_report
-            from invarlock.reporting.telemetry import (
+            from invarlock.reporting.report_builder_support import (
                 telemetry_output_enabled,
                 telemetry_summary_line,
             )
+            from invarlock.reporting.report_make import make_report
 
             evaluation_report = make_report(guarded_result.report, bare_result.report)
             if telemetry_output_enabled():

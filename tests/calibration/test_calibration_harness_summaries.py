@@ -2,59 +2,55 @@ from __future__ import annotations
 
 import math
 
-from invarlock.calibration import spectral_null, variance_ve
+import invarlock.calibration as calibration
 
 
 def test_spectral_null_helpers_cover_edge_cases() -> None:
-    assert spectral_null._finite01(0.0)
-    assert spectral_null._finite01(1.0)
-    assert spectral_null._finite01(0.5)
-    assert spectral_null._finite01("0.5")
-    assert not spectral_null._finite01(-0.1)
-    assert not spectral_null._finite01(1.1)
-    assert not spectral_null._finite01(float("nan"))
-    assert not spectral_null._finite01("nope")
+    assert calibration._finite01(0.0)
+    assert calibration._finite01(1.0)
+    assert calibration._finite01(0.5)
+    assert calibration._finite01("0.5")
+    assert not calibration._finite01(-0.1)
+    assert not calibration._finite01(1.1)
+    assert not calibration._finite01(float("nan"))
+    assert not calibration._finite01("nope")
 
-    assert spectral_null._bh_reject_families({}, alpha=0.05, m=4) == set()
-    assert spectral_null._bh_reject_families({"ffn": 0.01}, alpha="bad", m=4) == set()
-    assert spectral_null._bh_reject_families({"ffn": 0.01}, alpha=-0.1, m=4) == set()
+    assert calibration._bh_reject_families({}, alpha=0.05, m=4) == set()
+    assert calibration._bh_reject_families({"ffn": 0.01}, alpha="bad", m=4) == set()
+    assert calibration._bh_reject_families({"ffn": 0.01}, alpha=-0.1, m=4) == set()
     assert (
-        spectral_null._bh_reject_families({"ffn": float("nan")}, alpha=0.05, m=4)
-        == set()
+        calibration._bh_reject_families({"ffn": float("nan")}, alpha=0.05, m=4) == set()
     )
 
-    selected = spectral_null._bh_reject_families(
+    selected = calibration._bh_reject_families(
         {"a": 0.01, "b": 0.5, "c": float("nan")}, alpha=0.05, m=4
     )
     assert selected == {"a"}
 
-    assert spectral_null._bonferroni_reject_families({}, alpha=0.05, m=4) == set()
+    assert calibration._bonferroni_reject_families({}, alpha=0.05, m=4) == set()
     assert (
-        spectral_null._bonferroni_reject_families({"a": 0.01}, alpha="bad", m=4)
-        == set()
+        calibration._bonferroni_reject_families({"a": 0.01}, alpha="bad", m=4) == set()
     )
-    assert spectral_null._bonferroni_reject_families({"a": 0.01}, alpha=0.05, m=2) == {
+    assert calibration._bonferroni_reject_families({"a": 0.01}, alpha=0.05, m=2) == {
         "a"
     }
-    assert (
-        spectral_null._bonferroni_reject_families({"a": 0.01}, alpha=2.0, m=2) == set()
-    )
+    assert calibration._bonferroni_reject_families({"a": 0.01}, alpha=2.0, m=2) == set()
 
     metrics = {
         "family_z_summary": {"ffn": {"max": 2.0}, "bad": "x"},
         "family_z_quantiles": {"ffn": {"max": 3.0}, "attn": {"max": float("nan")}},
     }
-    assert spectral_null._extract_family_max_z(metrics) == {"ffn": 3.0}
+    assert calibration._extract_family_max_z(metrics) == {"ffn": 3.0}
 
-    assert spectral_null._extract_multiple_testing({"multiple_testing": "nope"}) == {}
-    mt = spectral_null._extract_multiple_testing(
+    assert calibration._extract_multiple_testing({"multiple_testing": "nope"}) == {}
+    mt = calibration._extract_multiple_testing(
         {"multiple_testing": {"method": "Bonferroni", "alpha": "0.1", "m": "4"}}
     )
     assert mt["method"] == "bonferroni"
     assert math.isclose(mt["alpha"], 0.1)
     assert mt["m"] == 4
 
-    assert spectral_null._selected_families_for_alpha(
+    assert calibration._selected_families_for_alpha(
         {"a": 0.01}, method="bonferroni", alpha=0.05, m=4
     ) == {"a"}
 
@@ -85,7 +81,7 @@ def test_spectral_null_summary_covers_additional_parse_branches() -> None:
         },
     ]
 
-    summary = spectral_null.summarize_null_sweep_reports(
+    summary = calibration.summarize_null_sweep_reports(
         reports,
         tier="balanced",
         safety_margin=0.0,
@@ -115,7 +111,7 @@ def test_spectral_null_summary_handles_no_solution_for_alpha_target() -> None:
             ],
         }
     ]
-    summary = spectral_null.summarize_null_sweep_reports(
+    summary = calibration.summarize_null_sweep_reports(
         reports,
         tier="balanced",
         safety_margin=0.0,
@@ -168,7 +164,7 @@ def test_spectral_null_summary_recommends_kappa_and_alpha() -> None:
         },
     ]
 
-    summary = spectral_null.summarize_null_sweep_reports(
+    summary = calibration.summarize_null_sweep_reports(
         reports,
         tier="balanced",
         safety_margin=0.05,
@@ -207,7 +203,7 @@ def test_spectral_null_summary_halves_alpha_to_meet_target_rate() -> None:
             }
         )
 
-    summary = spectral_null.summarize_null_sweep_reports(
+    summary = calibration.summarize_null_sweep_reports(
         reports,
         tier="balanced",
         safety_margin=2.0,  # invalid → fallback to default
@@ -218,56 +214,56 @@ def test_spectral_null_summary_halves_alpha_to_meet_target_rate() -> None:
 
 
 def test_variance_ve_helpers_cover_edge_cases() -> None:
-    assert variance_ve._extract_guard({"guards": "not-a-list"}, "variance") is None
-    assert variance_ve._coerce_delta_ci((-0.1, 0.2)) == (-0.1, 0.2)
-    assert variance_ve._coerce_delta_ci([0.1]) is None
-    assert variance_ve._coerce_delta_ci(["a", "b"]) is None
-    assert variance_ve._coerce_delta_ci([float("nan"), 0.0]) is None
+    assert calibration._extract_guard({"guards": "not-a-list"}, "variance") is None
+    assert calibration._coerce_delta_ci((-0.1, 0.2)) == (-0.1, 0.2)
+    assert calibration._coerce_delta_ci([0.1]) is None
+    assert calibration._coerce_delta_ci(["a", "b"]) is None
+    assert calibration._coerce_delta_ci([float("nan"), 0.0]) is None
 
     assert (
-        variance_ve._gain_lower_bound(mean_delta=None, delta_ci=None, one_sided=True)
+        calibration._gain_lower_bound(mean_delta=None, delta_ci=None, one_sided=True)
         == 0.0
     )
     assert (
-        variance_ve._gain_lower_bound(
+        calibration._gain_lower_bound(
             mean_delta=-0.01, delta_ci=(-0.02, 0.0), one_sided=True
         )
         == 0.0
     )
     assert (
-        variance_ve._gain_lower_bound(
+        calibration._gain_lower_bound(
             mean_delta=0.0, delta_ci=(-0.02, -0.01), one_sided=True
         )
         == 0.0
     )
     assert (
-        variance_ve._gain_lower_bound(
+        calibration._gain_lower_bound(
             mean_delta=None, delta_ci=(-0.02, -0.01), one_sided=False
         )
         == 0.01
     )
 
-    thr, rate = variance_ve._recommend_threshold_for_target_rate(
+    thr, rate = calibration._recommend_threshold_for_target_rate(
         [], target_rate=0.1, safety_margin=0.0
     )
     assert thr == 0.0 and rate == 0.0
 
-    thr0, rate0 = variance_ve._recommend_threshold_for_target_rate(
+    thr0, rate0 = calibration._recommend_threshold_for_target_rate(
         [0.1, 0.1, 0.1], target_rate=0.0, safety_margin=0.1
     )
     assert thr0 == 0.11 and rate0 == 0.0
 
-    thr1, rate1 = variance_ve._recommend_threshold_for_target_rate(
+    thr1, rate1 = calibration._recommend_threshold_for_target_rate(
         [0.1, 0.1, 0.1], target_rate=0.4, safety_margin=0.0
     )
     assert thr1 == 0.1 and rate1 == 0.0
 
-    thr_invalid, rate_invalid = variance_ve._recommend_threshold_for_target_rate(
+    thr_invalid, rate_invalid = calibration._recommend_threshold_for_target_rate(
         [0.2], target_rate=2.0, safety_margin=0.0
     )
     assert thr_invalid == 0.2 and rate_invalid == 0.0
 
-    thr2, rate2 = variance_ve._recommend_threshold_for_target_rate(
+    thr2, rate2 = calibration._recommend_threshold_for_target_rate(
         [0.2, 0.1, 0.0], target_rate=1.0 / 3.0, safety_margin=0.0
     )
     assert thr2 == 0.2 and rate2 <= (1.0 / 3.0) + 1e-9
@@ -322,7 +318,7 @@ def test_variance_ve_recommend_min_effect_hits_target_enable_rate() -> None:
         },
     ]
 
-    summary = variance_ve.summarize_ve_sweep_reports(
+    summary = calibration.summarize_ve_sweep_reports(
         reports,
         tier="balanced",
         target_enable_rate=1.0 / 3.0,
@@ -348,7 +344,7 @@ def test_variance_ve_summary_skips_missing_predictive_gate() -> None:
             ]
         },
     ]
-    summary = variance_ve.summarize_ve_sweep_reports(reports, tier="balanced")
+    summary = calibration.summarize_ve_sweep_reports(reports, tier="balanced")
     assert summary["n_runs"] == 1
 
 
@@ -370,7 +366,7 @@ def test_variance_ve_summary_tolerates_invalid_margin_and_bad_mean_delta() -> No
         }
     ]
 
-    summary = variance_ve.summarize_ve_sweep_reports(
+    summary = calibration.summarize_ve_sweep_reports(
         reports,
         tier="balanced",
         safety_margin=2.0,

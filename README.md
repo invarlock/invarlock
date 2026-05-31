@@ -32,7 +32,7 @@
   <strong>Catch silent quality regressions in edited model checkpoints before they ship.</strong>
 </p>
 
-Quantizing, pruning, or otherwise editing a model’s weights can silently degrade quality.
+Quantizing, pruning, or otherwise editing a model's weights can silently degrade quality.
 InvarLock compares an edited **subject** checkpoint against a fixed **baseline** with paired
 evaluation windows, enforces the canonical guard chain (`invariants` -> `spectral` -> `RMT`
 -> `variance` -> `invariants`), and produces a machine-readable evaluation report you can gate
@@ -44,13 +44,14 @@ fine-tuning, or another weight-edit pipeline. The built-in `quant_rtn` edit is
 for demos and smoke tests; production workflows are
 bring-your-own-edited-checkpoint (BYOE). The repo ships strict-verifiable BYOE
 fixtures for dense magnitude pruning and LoRA-merge style subjects under
-`public_evidence/byoe_examples/`, plus a real external magnitude-prune BYOE run
-under `public_evidence/real_runs/`.
+`public_evidence/byoe_examples/`. Real model runs under
+`public_evidence/real_runs/` include an external magnitude-prune BYOE run and a
+tiny GPT-2 quantization smoke.
 
 The `public_evidence/` tree separates verifier fixtures from real runs. Fixtures
-prove report and evidence-pack contracts; `public_evidence/real_runs/` contains a
-small set of GPT-2-family `invarlock evaluate` runs with signed,
-fingerprint-pinned evidence packs.
+prove report, runtime-manifest, failure-policy, and evidence-pack contracts;
+`public_evidence/real_runs/` contains concrete GPT-2-family `invarlock evaluate`
+runs with signed, fingerprint-pinned evidence packs.
 
 ## Why InvarLock?
 
@@ -71,21 +72,36 @@ fingerprint-pinned evidence packs.
 ## How it works
 
 ```text
-┌───────────────────────┐     ┌────────────────────────────────────────────┐
-│ Baseline (checkpoint) │────►│                                            │
-└───────────────────────┘     │  invarlock evaluate                        │
-                              │  ├─► Paired windows (deterministic)        │
-┌───────────────────────┐     │  ├─► GuardChain pipeline                   │
-│ Subject  (checkpoint) │────►│  │   └─► invariants -> spectral -> RMT -> VE │
-└───────────────────────┘     │  └─► Emit: evaluation.report.json          │
-                              │                                            │
-                              └────────────────────────────────────────────┘
-                                                     │
-                                     ┌───────────────┴───────────────┐
-                                     ▼                               ▼
-                                 ✅ PASS                          ❌ FAIL
-                                 (ship)                          (rollback)
-
+Baseline checkpoint         Subject checkpoint
+        |                          |
+        +------------+-------------+
+                     |
+                     v
+             evaluate command
+       container by default; host opt-in
+                     |
+     deterministic paired windows
+     invariants -> spectral -> RMT -> variance -> invariants
+                     |
+        +------------+-------------+
+        |                          |
+        v                          v
+runs/.../report.json        reports/<name>/
+baseline/subject traces       evaluation.report.json
+        |                     runtime.manifest.json
+        v                             |
+report generate / explain             v
+                             verify command
+                  schema + pairing + gates + provenance
+                                      |
+                         +------------+------------+
+                         |                         |
+                         v                         v
+                    PASS: promote            FAIL: block
+                         |
+                         v
+                 report html command
+                 optional evidence pack
 ```
 
 ## Quick Start
@@ -93,8 +109,8 @@ fingerprint-pinned evidence packs.
 Colab (CPU-friendly):
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/invarlock/invarlock/blob/v0.9.0/notebooks/invarlock_quickstart_cpu.ipynb)
 
-The public front door is `evaluate -> verify -> report html`, but the repo now
-splits onboarding by user type:
+The public front door is `evaluate -> verify -> report html`. The README keeps
+the three common onboarding paths separate:
 
 - **Wheel user / reviewer**: install `invarlock`, inspect an existing
   `evaluation.report.json`, and render HTML without cloning the repository.
@@ -119,7 +135,7 @@ pip install "invarlock[hf]"
 invarlock --version
 
 # Compare baseline vs subject (downloads require explicit network enable)
-invarlock evaluate --allow-network \
+INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
   --baseline gpt2 \
   --subject  distilgpt2 \
   --baseline-adapter auto --subject-adapter auto \
@@ -130,7 +146,7 @@ invarlock evaluate --allow-network \
 
 # Validate the container-backed evaluation report
 test -f reports/eval/runtime.manifest.json
-invarlock verify --json reports/eval/evaluation.report.json
+invarlock verify reports/eval/evaluation.report.json
 
 # Render HTML for sharing
 invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/evaluation.html
@@ -138,8 +154,9 @@ invarlock report html -i reports/eval/evaluation.report.json -o reports/eval/eva
 
 Wheel-only review path:
 `pip install invarlock`, `invarlock doctor`,
-`invarlock verify /path/to/evaluation.report.json`, and
-`invarlock report html -i /path/to/evaluation.report.json -o /path/to/evaluation.html`.
+`invarlock verify /path/to/evaluation.report.json`,
+`invarlock report html -i /path/to/evaluation.report.json -o /path/to/evaluation.html`,
+and `invarlock report explain --evaluation-report /path/to/evaluation.report.json`.
 
 Repo maintainers can build the local runtime image once with `make runtime-image`;
 InvarLock automatically prefers `invarlock-runtime:local` when it is present.
@@ -160,9 +177,9 @@ binding/provenance and does not replace the report/gate verifier.
 Example output (abridged; counts vary by profile/config):
 
 ```text
-INVARLOCK v<version> · EVALUATE
-Baseline: gpt2 -> Subject: gpt2 · Profile: dev
-Status: PASS · Gates: <passed>/<total> passed
+INVARLOCK v<version> - EVALUATE
+Baseline: gpt2 -> Subject: distilgpt2 - Profile: ci
+Status: PASS - Gates: <passed>/<total> passed
 Primary metric ratio: <ratio>
 Output: reports/eval/evaluation.report.json
 Runtime provenance: reports/eval/runtime.manifest.json
@@ -262,7 +279,7 @@ If you use InvarLock in scientific work, please cite it (canonical metadata is i
 <!-- markdownlint-disable MD060 -->
 | Platform               | Status          | Notes                                     |
 | ---------------------- | --------------- | ----------------------------------------- |
-| Python 3.12+           | ✅ Required      |                                           |
+| Python 3.12+           | ✅ Required      | CI covers 3.12 minimum and 3.13 primary   |
 | Linux                  | ✅ Full          | Primary dev target                        |
 | macOS (Intel/M-series) | ✅ Full          | MPS supported (default on Apple Silicon)  |
 | Windows                | ❌ Not supported | Use WSL2 or a Linux container if required |
@@ -279,13 +296,14 @@ For guidance on where to ask questions, how to report bugs, and what to expect i
 
 ## Contributing
 
-- Contributing guide: <https://github.com/invarlock/invarlock/blob/v0.9.0/CONTRIBUTING.md>
-- Fast local checks (repo clone):
-  - `make` targets auto-select Python 3.12+, preferring an active 3.12 env, `python3.12`, then the Conda env `invarlock-py312` when present.
-  - `make dev-install`
-  - `make test`
-  - `make lint`
-  - `make docs-live`
+- Contributing guide: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- Local setup: `make dev-install`
+- Everyday checks: `make test`, `make lint`, and `make docs-check`
+- Maintainer PR gate: `git diff --check origin/staging/next...HEAD`,
+  `make lock-sync`, `pre-commit run --all-files --show-diff-on-failure`,
+  `make workflow-lint`, `make docs-check`, `make mypy-typed-surface`,
+  `make coverage-enforce`, `make packaging-smoke-minimal`, and `make security`
+- Broader local confirmation before protected-branch PRs: `make verify`
 
 ## License
 

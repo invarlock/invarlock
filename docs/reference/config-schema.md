@@ -227,7 +227,7 @@ eval:
 - **Unsupported keys rejected**: remove `edit.kind`, `edit.parameters`,
   unknown `assurance.*` keys, or guard `mode` keys.
 - **Provider not found**: verify `dataset.provider` and install `invarlock[eval]`.
-- **Preset drift**: run `python scripts/checks/check_config_schema_sync.py` after edits.
+- **Preset drift**: run `python scripts/docs/docs_check.py --config-schema-sync` after edits.
 
 ## Observability
 

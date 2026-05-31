@@ -25,9 +25,9 @@ from typing import TYPE_CHECKING, Any
 
 import torch
 
-from invarlock.adapters.hf_snapshot_manifest import (
-    record_snapshot_member_filename,
-    resolve_snapshot_member_path,
+from invarlock.adapters.base import (
+    _record_snapshot_member_filename,
+    _resolve_snapshot_member_path,
 )
 from invarlock.security import is_secure_path
 
@@ -674,10 +674,10 @@ class HFAdapterMixin:
         for name, filename in params_manifest.items():
             if name not in param_map:
                 raise KeyError(f"Snapshot parameter missing in target model: {name}")
-            file_path = resolve_snapshot_member_path(
+            file_path = _resolve_snapshot_member_path(
                 snapshot_dir, filename, entry_kind="param", entry_name=str(name)
             )
-            record_snapshot_member_filename(
+            _record_snapshot_member_filename(
                 seen_filenames,
                 filename,
                 entry_kind="param",
@@ -708,10 +708,10 @@ class HFAdapterMixin:
         for name, filename in buffers_manifest.items():
             if name not in buffer_map:
                 raise KeyError(f"Snapshot buffer missing in target model: {name}")
-            file_path = resolve_snapshot_member_path(
+            file_path = _resolve_snapshot_member_path(
                 snapshot_dir, filename, entry_kind="buffer", entry_name=str(name)
             )
-            record_snapshot_member_filename(
+            _record_snapshot_member_filename(
                 seen_filenames,
                 filename,
                 entry_kind="buffer",

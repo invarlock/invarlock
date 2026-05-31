@@ -60,7 +60,7 @@ invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000
 - `scripts/evidence_packs/verify_pack.sh` validates an evidence pack in repo workflows.
 - `invarlock advanced evidence-pack verify` provides the package-native verifier path for
   installed wheels.
-- `scripts/evidence_packs/suites.sh` defines the model suites and allows
+- `scripts/evidence_packs/run_suite.sh` defines the model suites and allows
   `MODEL_1`–`MODEL_8` overrides.
 - `scripts/evidence_packs/lib/validation/validation_suite.sh` orchestrates the run: preflight,
   queue creation, worker launch, and monitoring.
@@ -68,13 +68,26 @@ invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000
 ### Library modules
 
 - `lib/task_serialization.sh`: task schema, JSON helpers, GPU planning.
-- `lib/queue_manager.sh`: queue states, dependency resolution, task generation.
-- `lib/scheduler.sh`: dynamic priority, memory gating, reservations.
+- `lib/queue/queue_manager.sh`: compatibility facade for queue state, dependency, and task-generation modules.
+- `lib/queue/queue_core.sh`: queue setup, locking, summaries, and terminal-state helpers.
+- `lib/queue/queue_lifecycle.sh`: task state transitions and orphan reclamation.
+- `lib/queue/queue_dependencies.sh`: dependency resolution and dependent promotion.
+- `lib/queue/queue_memory_plan.sh`: profile-based memory refresh and memory-plan export.
+- `lib/queue/queue_generation.sh`: progress state, task search, and task graph generation.
+- `lib/queue/scheduler.sh`: compatibility facade for scheduler modules.
+- `lib/queue/scheduler_core.sh`: GPU ID/cache helpers, scheduler lock, and GPU-count policy.
+- `lib/queue/scheduler_gpu_runtime.sh`: OOM checks, memory probes, utilization, and purge helpers.
+- `lib/queue/scheduler_reservations.sh`: GPU reservation and availability helpers.
+- `lib/queue/scheduler_selection.sh`: task priority, selection, work stealing, and scheduling metrics.
 - `lib/gpu_worker.sh`: worker loop, heartbeats, task execution glue.
-- `lib/task_functions.sh`: implementations for each task type.
+- `lib/tasks/task_functions.sh`: compatibility facade and `execute_task` dispatcher.
+- `lib/tasks/task_common.sh`: shared scheduling, model, preset, and reusable baseline-report helpers.
+- `lib/tasks/task_baseline.sh`: baseline setup, calibration, preset generation, and shared baseline report preparation.
+- `lib/tasks/task_edit_lifecycle.sh`: edit creation, batch edit creation, evaluation, and cleanup.
+- `lib/tasks/task_error_lifecycle.sh`: error-model creation, evaluation probes, structural-failure reports, and cleanup.
 - `lib/model_creation.sh`: edit and error-model creation helpers (`create_model_variant` dispatcher).
 - `lib/config_generator.sh`: InvarLock config generation and wrapper helpers.
-- `lib/result_compiler.sh`: analysis and verdict compilation.
+- `lib/validation/validation_suite.sh`: validation orchestration, analysis setup, and verdict compilation.
 - `lib/fault_tolerance.sh`: error classification and retry/backoff logic.
 - `scripts/evidence_packs/python/manifest_writer.py`: evidence pack `manifest.json` writer.
 - `scripts/evidence_packs/python/preset_generator.py`: preset derivation + edit-type variants.
@@ -98,15 +111,16 @@ invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000
 │                   ┌───────────────┴───────────────┐                   │
 │                   ▼                               ▼                   │
 │ TASK EXECUTION                                  CORE SERVICES         │
-│   lib/gpu_worker.sh                               queue_manager       │
-│   task claim -> precheck -> execute -> cleanup    scheduler           │
+│   lib/gpu_worker.sh                               queue_* modules     │
+│   task claim -> precheck -> execute -> cleanup    scheduler_* modules │
 │                                                  task_serialization   │
 │                                                  fault_tolerance      │
 │                   │                                                   │
 │                   ▼                                                   │
 │ TASK FUNCTIONS                                                        │
-│   SETUP_BASELINE, CALIBRATION_RUN, GENERATE_PRESET                    │
-│   CREATE_EDITS(_BATCH), CREATE_ERROR, evaluate_*                      │
+│   task_functions facade + task_common shared helpers                  │
+│   task_baseline | task_edit_lifecycle | task_error_lifecycle          │
+│   SETUP_BASELINE, CALIBRATION_RUN, GENERATE_PRESET, evaluate_*        │
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -137,7 +151,7 @@ Evidence pack issues?
 
 ## Model Suite
 
-Model suites are defined in `scripts/evidence_packs/suites.sh` and applied by
+Model suites are defined and applied by
 `run_suite.sh`.
 
 | Suite | Models | Notes |
@@ -162,7 +176,7 @@ Notes:
 
 - Override models via `MODEL_1`–`MODEL_8`; set an empty string to disable a slot.
 - `validation_suite.sh` includes a fallback list of large causal models if it is
-  run directly without `suites.sh`.
+  run directly without separate suite plumbing.
 
 ## Edit Types
 

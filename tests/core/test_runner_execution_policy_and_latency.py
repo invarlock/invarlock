@@ -6,8 +6,7 @@ from typing import Any
 import pytest
 
 from invarlock.core.api import Guard, ModelAdapter, ModelEdit, RunConfig
-from invarlock.core.runner import CoreRunner
-from invarlock.core.runner_context import collect_cuda_flags
+from invarlock.core.runner import CoreRunner, collect_cuda_flags
 
 
 class DummyModel:

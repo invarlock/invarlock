@@ -6,10 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from invarlock.cli import run_masking as masking_mod
-from invarlock.cli.run_artifacts import persist_ref_masks
+from invarlock.cli import run_execution as masking_mod
+from invarlock.cli.run_execution import persist_ref_masks
 from invarlock.cli.run_pairing import compute_provider_digest, extract_pairing_schedule
-from invarlock.exit_codes import resolve_command_exit_code
+from invarlock.core.exceptions import resolve_command_exit_code
 from invarlock.core.exceptions import (
     ConfigError,
     DataError,

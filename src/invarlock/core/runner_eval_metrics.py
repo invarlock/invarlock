@@ -10,6 +10,11 @@ import numpy as np
 
 from .bootstrap import compute_paired_delta_log_ci, logspace_to_ratio_ci
 from .exceptions import InvarlockError
+from .runner_eval_latency import (
+    _raise_latency_error,
+    measure_latency,
+    samples_to_dataloader,
+)
 from .runner_eval_metrics_multimodal import (
     _build_multimodal_eval_result,
     _evaluate_vision_text_arm,
@@ -28,7 +33,6 @@ from .runner_eval_metrics_stats import (
     _PairingCoverageResult,
 )
 from .runner_eval_windows import compute_slice_summary, resolve_limit, slice_calibration
-from .runner_latency import measure_latency
 from .runner_pairing import (
     BOOTSTRAP_COVERAGE_REQUIREMENTS,
     assess_bootstrap_coverage,
@@ -768,6 +772,9 @@ def compute_real_metrics(
 
 __all__ = [
     "compute_real_metrics",
+    "measure_latency",
+    "samples_to_dataloader",
+    "_raise_latency_error",
     "_evaluate_vision_text_arm",
     "_is_multimodal_batch",
     "_model_kwargs",

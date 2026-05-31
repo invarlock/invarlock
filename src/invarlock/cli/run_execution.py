@@ -2,52 +2,52 @@
 
 from __future__ import annotations
 
+import copy
+import hashlib
+import importlib
+import json
 import os
+import random
+from datetime import datetime
 from functools import partial
-from typing import Any
+from pathlib import Path
+from typing import Any, cast
 
 import typer
 
-from invarlock.cli import overhead_utils as overhead_utils_mod
-from invarlock.cli import run_artifact_output as run_artifact_output_mod
-from invarlock.cli import run_artifacts as run_artifacts_mod
 from invarlock.cli import run_config as run_config_mod
 from invarlock.cli import run_execution_output as run_execution_output_mod
 from invarlock.cli import run_pairing as run_pairing_mod
-from invarlock.cli import run_runtime as run_runtime_mod
 from invarlock.cli import run_runtime_exec as run_runtime_exec_mod
-from invarlock.cli import run_warning_filters as run_warning_filters_mod
 from invarlock.cli.output import (
     make_console,
     print_timing_summary,
 )
-from invarlock.cli.run_masking import _apply_mlm_masks, _tokenizer_digest
-from invarlock.cli.run_overhead import plan_release_windows as _plan_release_windows
-from invarlock.cli.run_pairing_helpers import (
+from invarlock.cli.run_overhead import (
+    _extract_pm_snapshot_for_overhead,
+)
+from invarlock.cli.run_overhead import (
+    plan_release_windows as _plan_release_windows,
+)
+from invarlock.cli.run_pairing import (
     _hash_sequences,
     _safe_int,
     _tensor_or_list_to_ints,
+    _to_int_list,
 )
-from invarlock.cli.run_serialization import _to_serialisable_dict
 from invarlock.cli.run_shell_output import _event
 from invarlock.core import metric_provider_resolution as metric_provider_resolution_mod
-from invarlock.core import provider_parity as provider_parity_mod
 from invarlock.core import run_baseline_evidence as run_baseline_evidence_mod
-from invarlock.core import (
-    run_evaluation_windows_policy as run_evaluation_windows_policy_mod,
+from invarlock.core import run_policy as run_policy_mod
+from invarlock.core.exceptions import (
+    ValidationError,
 )
-from invarlock.core import run_guard_overhead_policy as run_guard_overhead_policy_mod
-from invarlock.core import run_report_payload_policy as run_report_payload_policy_mod
-from invarlock.core.exceptions import ValidationError
+from invarlock.core.exceptions import (
+    resolve_command_exit_code as _resolve_exit_code,
+)
 from invarlock.core.retry import adjust_edit_params as _adjust_edit_params
-from invarlock.core.run_dataset_contract import (
-    materialize_run_dataset as _materialize_run_dataset,
-)
-from invarlock.core.run_execution_request_policy import (
-    SupportsRunExecutionRequest,
-)
-from invarlock.core.run_execution_request_policy import (
-    build_run_execution_request as _build_run_execution_request_impl,
+from invarlock.core.retry import (
+    build_retry_result_summary as _build_retry_result_summary_impl,
 )
 from invarlock.core.run_orchestrator import (
     RunExecutionEvent,
@@ -58,43 +58,264 @@ from invarlock.core.run_orchestrator import (
     execute_run_request as _execute_run_request_impl,
 )
 from invarlock.core.run_policy import (
+    SupportsRunExecutionRequest,
+    build_fallback_evaluation_windows,
+    serialize_evaluation_windows,
+)
+from invarlock.core.run_policy import (
+    build_run_execution_request as _build_run_execution_request_impl,
+)
+from invarlock.core.run_policy import (
     resolve_pm_min_tokens_target as _resolve_pm_min_tokens_target,
 )
 from invarlock.core.run_provider_dataset_plan import (
     build_provider_dataset_plan as _build_provider_dataset_plan,
 )
-from invarlock.core.run_retry_policy import (
-    build_retry_result_summary as _build_retry_result_summary_impl,
+from invarlock.core.run_provider_dataset_plan import (
+    materialize_run_dataset as _materialize_run_dataset,
+)
+from invarlock.core.run_snapshot_contract import (
+    resolve_snapshot_config as _resolve_snapshot_config_impl,
 )
 from invarlock.core.run_snapshot_contract import (
     resolve_snapshot_retry_transition as _resolve_snapshot_retry_transition_impl,
 )
-from invarlock.core.run_snapshot_policy import (
-    resolve_snapshot_config as _resolve_snapshot_config_impl,
-)
 from invarlock.eval import data as eval_data_mod
 from invarlock.eval import window_planning as window_planning_mod
-from invarlock.exit_codes import (
-    resolve_command_exit_code as _resolve_exit_code,
-)
+from invarlock.reporting import report_builder_support as telemetry_mod
+from invarlock.reporting import report_overhead as report_overhead_mod
 from invarlock.reporting import report_types as report_types_mod
-from invarlock.reporting import run_provenance_contract as run_provenance_contract_mod
 from invarlock.reporting import run_report_contract as run_report_contract_mod
 from invarlock.reporting import (
     run_report_metrics_contract as run_report_metrics_contract_mod,
 )
-from invarlock.reporting import telemetry as report_telemetry_mod
-from invarlock.reporting import telemetry as telemetry_mod
 from invarlock.reporting.report_make import make_report as build_evaluation_report
-from invarlock.reporting.run_retry_validation import (
-    validate_retry_evaluation_report as _validate_retry_evaluation_report,
-)
 
 console = make_console()
+_to_serialisable_dict = run_config_mod._to_serialisable_dict
+_INT_COERCE_ERRORS = (TypeError, ValueError, OverflowError)
+
+
+def persist_ref_masks(core_report: Any, run_dir: Path) -> Path | None:
+    """Persist reference keep indices to artifact if present."""
+    edit_section = (
+        core_report.get("edit")
+        if isinstance(core_report, dict)
+        else getattr(core_report, "edit", None)
+    )
+    if not isinstance(edit_section, dict):
+        return None
+
+    artifacts_section = edit_section.get("artifacts")
+    if not isinstance(artifacts_section, dict):
+        return None
+
+    mask_payload = artifacts_section.get("mask_payload")
+    if not isinstance(mask_payload, dict) or not mask_payload:
+        return None
+
+    payload_copy = copy.deepcopy(mask_payload)
+    meta_section = payload_copy.setdefault("meta", {})
+    meta_section.setdefault("generated_at", datetime.now().isoformat())
+
+    target_dir = run_dir / "artifacts" / "edit_masks"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    mask_path = target_dir / "masks.json"
+    with mask_path.open("w", encoding="utf-8") as handle:
+        json.dump(payload_copy, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+    return mask_path
+
+
+def emit_run_outputs(
+    *, report: Any, out_dir: Path, filename_prefix: str, console: Any
+) -> dict[str, str]:
+    """Save run report and return emitted artifact paths."""
+    report_files_mod = cast(
+        Any, importlib.import_module("invarlock.reporting.report_files")
+    )
+    save_report = report_files_mod.save_report
+    _event(console, "DATA", "Saving run report...", emoji="💾")
+    saved_paths = save_report(
+        report, out_dir, formats=["json"], filename_prefix=filename_prefix
+    )
+    return {key: str(path) for key, path in saved_paths.items()}
+
+
+def postprocess_and_summarize(
+    *,
+    report: dict[str, Any],
+    run_dir: Path,
+    run_config: Any,
+    console: Any,
+    saved_files: dict[str, str] | None = None,
+) -> dict[str, str]:
+    if saved_files is None:
+        saved_files = emit_run_outputs(
+            report=report, out_dir=run_dir, filename_prefix="report", console=console
+        )
+    _event(console, "PASS", "Run completed successfully!", emoji="✅")
+    _event(console, "DATA", f"Report: {saved_files['json']}", emoji="📄")
+    if run_config.event_path:
+        _event(console, "DATA", f"Events: {run_config.event_path}", emoji="📝")
+    return saved_files
+
+
+def _derive_mlm_seed(base_seed: int, window_id: str | int, position: int) -> int:
+    payload = f"{base_seed}:{window_id}:{position}".encode()
+    digest = hashlib.blake2s(payload, digest_size=8).digest()
+    return int.from_bytes(digest, "little", signed=False)
+
+
+def _apply_mlm_masks(
+    records: list[dict[str, Any]],
+    *,
+    tokenizer: Any,
+    mask_prob: float,
+    seed: int,
+    random_token_prob: float,
+    original_token_prob: float,
+    prefix: str,
+) -> tuple[int, list[int]]:
+    """Apply basic BERT-style MLM masking to tokenized records in-place."""
+    if mask_prob <= 0.0:
+        zeroed: list[int] = []
+        for record in records:
+            length = len(record["input_ids"])
+            record["labels"] = [-100] * length
+            record["mlm_masked"] = 0
+            zeroed.append(0)
+        return 0, zeroed
+
+    vocab_size = _safe_int(getattr(tokenizer, "vocab_size", 0))
+    mask_token_id = getattr(tokenizer, "mask_token_id", None)
+    if mask_token_id is None:
+        raise RuntimeError(
+            "Tokenizer does not define mask_token_id; required for MLM evaluation."
+        )
+    try:
+        mask_token_id = int(mask_token_id)
+    except _INT_COERCE_ERRORS:
+        mask_token_id = _safe_int(mask_token_id, 0)
+
+    special_ids = set()
+    for attr in (
+        "cls_token_id",
+        "sep_token_id",
+        "bos_token_id",
+        "eos_token_id",
+        "pad_token_id",
+    ):
+        value = getattr(tokenizer, attr, None)
+        if value is not None:
+            try:
+                special_ids.add(int(value))
+            except _INT_COERCE_ERRORS:
+                pass
+    try:
+        all_special_ids = getattr(tokenizer, "all_special_ids", None) or ()
+        for token in all_special_ids:
+            try:
+                special_ids.add(int(token))
+            except _INT_COERCE_ERRORS:
+                continue
+    except (AttributeError, RuntimeError, TypeError):
+        pass
+
+    masked_total = 0
+    masked_counts: list[int] = []
+    for idx_record, record in enumerate(records):
+        window_id = record.get("window_id", f"{prefix}:{idx_record}")
+        input_ids = _tensor_or_list_to_ints(record.get("input_ids", []))
+        attention = _tensor_or_list_to_ints(record.get("attention_mask", []))
+        labels = [-100] * len(input_ids)
+
+        masked = 0
+        for pos, (token, attn) in enumerate(zip(input_ids, attention, strict=False)):
+            if not attn:
+                continue
+            if int(token) in special_ids:
+                continue
+            if random.random() < mask_prob:
+                rng = random.Random(_derive_mlm_seed(seed, window_id, pos))
+                labels[pos] = int(token)
+                choice = rng.random()
+                if choice < 1.0 - (random_token_prob + original_token_prob):
+                    input_ids[pos] = mask_token_id
+                elif choice < 1.0 - original_token_prob and vocab_size > 0:
+                    rng2 = random.Random(_derive_mlm_seed(seed + 17, window_id, pos))
+                    input_ids[pos] = rng2.randint(0, max(1, vocab_size - 1))
+                masked += 1
+
+        if masked == 0:
+            candidate_positions = [
+                pos
+                for pos, (token, attn) in enumerate(
+                    zip(input_ids, attention, strict=False)
+                )
+                if attn and int(token) not in special_ids
+            ]
+            if candidate_positions:
+                pos = candidate_positions[len(candidate_positions) // 2]
+                rng = random.Random(_derive_mlm_seed(seed + 17, window_id, pos))
+                labels[pos] = int(input_ids[pos])
+                masked = 1
+                choice = rng.random()
+                if choice < 1.0 - (random_token_prob + original_token_prob):
+                    input_ids[pos] = mask_token_id
+                elif choice < 1.0 - original_token_prob and vocab_size > 0:
+                    input_ids[pos] = rng.randrange(vocab_size)
+
+        record["input_ids"] = _to_int_list(input_ids)
+        record["attention_mask"] = _to_int_list(attention)
+        record["labels"] = _to_int_list(labels)
+        record["mlm_masked"] = masked
+        masked_total += masked
+        masked_counts.append(masked)
+
+    return masked_total, masked_counts
+
+
+def _tokenizer_digest(tokenizer: Any) -> str:
+    """Compute a stable digest for a tokenizer config."""
+    if hasattr(tokenizer, "get_vocab"):
+        try:
+            items = getattr(tokenizer.get_vocab(), "items", None)
+            if callable(items):
+                pairs = list(items())
+                pairs = [
+                    (str(key), int(value))
+                    for key, value in pairs
+                    if isinstance(key, str | int)
+                ]
+                payload = json.dumps(sorted(pairs), separators=(",", ":")).encode()
+                return hashlib.sha256(payload).hexdigest()
+        except (AttributeError, RuntimeError, TypeError, ValueError):
+            pass
+    vocab = getattr(tokenizer, "vocab", None)
+    if isinstance(vocab, list):
+        try:
+            payload = json.dumps(
+                [(str(key), int(value)) for key, value in vocab],
+                separators=(",", ":"),
+            ).encode()
+            return hashlib.sha256(payload).hexdigest()
+        except (TypeError, ValueError):
+            pass
+    name_or_path = getattr(tokenizer, "name_or_path", None)
+    eos_token = getattr(tokenizer, "eos_token", None)
+    pad_token = getattr(tokenizer, "pad_token", None)
+    attrs = {
+        "name": None if name_or_path is None else str(name_or_path),
+        "eos": None if eos_token is None else str(eos_token),
+        "pad": None if pad_token is None else str(pad_token),
+        "size": _safe_int(getattr(tokenizer, "vocab_size", 0)),
+    }
+    return hashlib.sha256(json.dumps(attrs, sort_keys=True).encode()).hexdigest()
 
 
 def execute_config_run_request(request: SupportsRunExecutionRequest) -> str | None:
-    run_runtime_mod.reset_optional_runtime_caches()
+    run_runtime_exec_mod.reset_optional_runtime_caches()
     return execute_run_request(request)
 
 
@@ -108,7 +329,7 @@ def _build_run_execution_services() -> RunExecutionServices:
         execute_guarded_run=run_runtime_exec_mod.execute_guarded_run,
         load_baseline_pairing_evidence=_load_baseline_pairing_evidence_with_runtime_deps,
         materialize_run_dataset=_materialize_run_dataset_with_runtime_deps,
-        free_model_memory=run_runtime_mod.free_model_memory,
+        free_model_memory=run_runtime_exec_mod.free_model_memory,
         init_retry_controller=run_runtime_exec_mod.init_retry_controller,
         load_model_with_cfg=run_runtime_exec_mod.load_model_with_cfg,
         persist_run_report_outputs=_persist_run_report_outputs_with_runtime_deps,
@@ -129,10 +350,10 @@ def _build_run_execution_services() -> RunExecutionServices:
         materialize_baseline_pairing_schedule=(
             _materialize_baseline_pairing_schedule_with_runtime_deps
         ),
-        resolve_tokenizer=run_runtime_mod.resolve_tokenizer,
-        detect_model_profile=run_runtime_mod.detect_model_profile,
-        get_psutil=run_runtime_mod.get_psutil,
-        get_torch=run_runtime_mod.get_torch,
+        resolve_tokenizer=run_runtime_exec_mod.resolve_tokenizer,
+        detect_model_profile=run_runtime_exec_mod.detect_model_profile,
+        get_psutil=run_runtime_exec_mod.get_psutil,
+        get_torch=run_runtime_exec_mod.get_torch,
     )
 
 
@@ -180,7 +401,7 @@ def _build_provider_dataset_plan_with_runtime_deps(**kwargs: Any) -> Any:
         **kwargs,
         get_provider_fn=eval_data_mod.get_provider,
         resolve_provider_and_split_fn=_resolve_provider_and_split_for_dataset_plan,
-        resolve_tokenizer_fn=run_runtime_mod.resolve_tokenizer,
+        resolve_tokenizer_fn=run_runtime_exec_mod.resolve_tokenizer,
         maybe_plan_release_windows_fn=_plan_release_windows,
         resolve_effective_windows_fn=window_planning_mod.resolve_effective_windows,
         apply_mlm_masks_fn=_apply_mlm_masks,
@@ -196,33 +417,29 @@ def _assemble_run_report_with_runtime_deps(**kwargs: Any) -> Any:
     return run_report_contract_mod.assemble_run_report(
         **kwargs,
         create_empty_report_fn=report_types_mod.create_empty_report,
-        build_run_report_context_fn=(
-            run_report_payload_policy_mod.build_run_report_context
-        ),
-        build_run_report_meta_fn=run_report_payload_policy_mod.build_run_report_meta,
+        build_run_report_context_fn=(run_report_contract_mod.build_run_report_context),
+        build_run_report_meta_fn=run_report_contract_mod.build_run_report_meta,
         canonical_dataset_id_fn=run_pairing_mod._canonical_dataset_id,
         safe_int_fn=_safe_int,
-        build_run_report_data_fn=run_report_payload_policy_mod.build_run_report_data,
+        build_run_report_data_fn=run_report_contract_mod.build_run_report_data,
         build_snapshot_provenance_fn=(
-            run_report_payload_policy_mod.build_snapshot_provenance
+            run_report_contract_mod.build_snapshot_provenance
         ),
-        build_edit_payload_fn=run_report_payload_policy_mod.build_edit_payload,
-        persist_ref_masks_fn=run_artifacts_mod.persist_ref_masks,
-        build_artifacts_payload_fn=(
-            run_report_payload_policy_mod.build_artifacts_payload
-        ),
+        build_edit_payload_fn=run_report_contract_mod.build_edit_payload,
+        persist_ref_masks_fn=persist_ref_masks,
+        build_artifacts_payload_fn=(run_report_contract_mod.build_artifacts_payload),
         merge_core_timing_metrics_fn=(
-            run_report_payload_policy_mod.merge_core_timing_metrics
+            run_report_contract_mod.merge_core_timing_metrics
         ),
-        build_metrics_payload_fn=run_report_payload_policy_mod.build_metrics_payload,
+        build_metrics_payload_fn=run_report_contract_mod.build_metrics_payload,
         prepare_guard_overhead_report_fn=(
             _prepare_guard_overhead_report_with_runtime_deps
         ),
         finalize_run_provenance_fn=(_finalize_run_provenance_with_runtime_deps),
-        build_guard_entries_fn=run_report_payload_policy_mod.build_guard_entries,
-        build_flags_payload_fn=run_report_payload_policy_mod.build_flags_payload,
+        build_guard_entries_fn=run_report_contract_mod.build_guard_entries,
+        build_flags_payload_fn=run_report_contract_mod.build_flags_payload,
         enrich_run_report_metrics_fn=(_enrich_run_report_metrics_with_runtime_deps),
-        optional_torch_fn=run_runtime_mod.get_torch,
+        optional_torch_fn=run_runtime_exec_mod.get_torch,
         environ=os.environ,
     )
 
@@ -237,7 +454,7 @@ def _persist_run_report_outputs_with_runtime_deps(**kwargs: Any) -> Any:
         **kwargs,
         save_telemetry_report_fn=telemetry_mod.save_telemetry_report,
     )
-    run_artifact_output_mod.postprocess_and_summarize(
+    postprocess_and_summarize(
         report=report,
         run_dir=run_dir,
         run_config=run_config,
@@ -248,27 +465,21 @@ def _persist_run_report_outputs_with_runtime_deps(**kwargs: Any) -> Any:
 
 
 def _prepare_guard_overhead_report_with_runtime_deps(*args: Any, **kwargs: Any) -> Any:
-    return run_guard_overhead_policy_mod.prepare_guard_overhead_report(
+    return report_overhead_mod.prepare_guard_overhead_report(
         *args,
         **kwargs,
-        extract_pm_snapshot_for_overhead_fn=(
-            overhead_utils_mod._extract_pm_snapshot_for_overhead
-        ),
-        validate_guard_overhead_fn=run_runtime_mod.validate_guard_overhead,
+        extract_pm_snapshot_for_overhead_fn=_extract_pm_snapshot_for_overhead,
+        validate_guard_overhead_fn=run_runtime_exec_mod.validate_guard_overhead,
     )
 
 
 def _finalize_run_provenance_with_runtime_deps(**kwargs: Any) -> Any:
-    return run_provenance_contract_mod.finalize_run_provenance(
+    return run_report_contract_mod.finalize_run_provenance(
         **kwargs,
-        serialize_evaluation_windows_fn=(
-            run_evaluation_windows_policy_mod.serialize_evaluation_windows
-        ),
-        build_fallback_evaluation_windows_fn=(
-            run_evaluation_windows_policy_mod.build_fallback_evaluation_windows
-        ),
+        serialize_evaluation_windows_fn=serialize_evaluation_windows,
+        build_fallback_evaluation_windows_fn=build_fallback_evaluation_windows,
         compute_provider_digest_fn=run_pairing_mod.compute_provider_digest,
-        enforce_provider_parity_fn=provider_parity_mod.enforce_provider_parity,
+        enforce_provider_parity_fn=run_policy_mod.enforce_provider_parity,
     )
 
 
@@ -282,12 +493,12 @@ def _enrich_run_report_metrics_with_runtime_deps(**kwargs: Any) -> Any:
 
 
 def _validate_retry_evaluation_report_with_runtime_deps(**kwargs: Any) -> Any:
-    return _validate_retry_evaluation_report(
+    return telemetry_mod.validate_retry_evaluation_report(
         **kwargs,
         build_retry_result_summary_fn=_build_retry_result_summary_impl,
         make_report_fn=build_evaluation_report,
-        telemetry_output_enabled_fn=report_telemetry_mod.telemetry_output_enabled,
-        telemetry_summary_line_fn=report_telemetry_mod.telemetry_summary_line,
+        telemetry_output_enabled_fn=telemetry_mod.telemetry_output_enabled,
+        telemetry_summary_line_fn=telemetry_mod.telemetry_summary_line,
     )
 
 
@@ -395,7 +606,7 @@ def execute_run_request(request: Any) -> str | None:
     _resolve_shell_output_style(request)
     console._invarlock_progress_steps = {}
     console._invarlock_progress_completed = set()
-    run_warning_filters_mod._apply_warning_filters(
+    run_runtime_exec_mod._apply_warning_filters(
         str(request.profile or "").strip().lower() or None
     )
     core_request = _to_core_run_execution_request(request)

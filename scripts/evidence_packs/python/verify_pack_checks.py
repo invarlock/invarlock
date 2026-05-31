@@ -4,6 +4,7 @@ import argparse
 import json
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -117,6 +118,62 @@ def cmd_extra_files(args: argparse.Namespace) -> int:
     for rel_path in extras:
         print(f"  - {rel_path}", file=sys.stderr)
     return 1 if args.strict else 0
+
+
+def _run_manifest_check(path: Path, check: Callable[[Path], list[str]]) -> int:
+    errors = check(path)
+    if errors:
+        for error in errors:
+            print(error)
+        return 1
+    return 0
+
+
+def cmd_validate_manifest(args: argparse.Namespace) -> int:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
+    from invarlock.evidence_pack import validate_manifest
+
+    return _run_manifest_check(args.manifest, validate_manifest)
+
+
+def cmd_verify_manifest_provenance(args: argparse.Namespace) -> int:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
+    from invarlock.evidence_pack import verify_manifest_provenance
+
+    return _run_manifest_check(args.pack_dir, verify_manifest_provenance)
+
+
+def cmd_verify_signature(args: argparse.Namespace) -> int:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))
+    from invarlock.evidence_pack_integrity import (
+        normalize_expected_fingerprint,
+        verify_signature,
+    )
+
+    expected_fingerprints = None
+    if args.expected_fingerprint:
+        normalized = normalize_expected_fingerprint(args.expected_fingerprint)
+        if normalized is None:
+            print(
+                "--expected-fingerprint must be a sha256:... signing key fingerprint",
+                file=sys.stderr,
+            )
+            return 2
+        expected_fingerprints = frozenset({normalized})
+    errors, warnings, signer_fingerprint = verify_signature(
+        args.pack_dir,
+        strict=args.strict,
+        expected_fingerprints=expected_fingerprints,
+    )
+    for warning in warnings:
+        print(warning, file=sys.stderr)
+    if errors:
+        for error in errors:
+            print(error, file=sys.stderr)
+        return 1
+    if signer_fingerprint:
+        print(signer_fingerprint)
+    return 0
 
 
 def _report_scenario_id(pack_dir: Path, report: Path) -> str | None:
@@ -411,6 +468,29 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     extra_files.add_argument("pack_dir", type=Path)
     extra_files.add_argument("--strict", action="store_true")
     extra_files.set_defaults(func=cmd_extra_files)
+
+    validate_manifest = subparsers.add_parser("validate-manifest")
+    validate_manifest.add_argument("manifest", type=Path)
+    validate_manifest.set_defaults(func=cmd_validate_manifest)
+
+    manifest_provenance = subparsers.add_parser("manifest-provenance")
+    manifest_provenance.add_argument("pack_dir", type=Path)
+    manifest_provenance.set_defaults(func=cmd_verify_manifest_provenance)
+
+    signature = subparsers.add_parser(
+        "signature", help="Verify a package-native evidence-pack signature bundle."
+    )
+    signature.add_argument("pack_dir", type=Path)
+    signature.add_argument(
+        "--strict",
+        action="store_true",
+        help="Fail closed when manifest.signature.json is missing.",
+    )
+    signature.add_argument(
+        "--expected-fingerprint",
+        help="Require the signer to match this sha256:... key fingerprint.",
+    )
+    signature.set_defaults(func=cmd_verify_signature)
 
     return parser.parse_args(argv)
 

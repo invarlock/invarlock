@@ -6,9 +6,9 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from invarlock.cli import run_masking as masking_mod
-from invarlock.cli import run_pairing_helpers as pairing_mod
-from invarlock.cli import run_serialization as run_serial_mod
+from invarlock.cli import run_execution as masking_mod
+from invarlock.cli import run_pairing as pairing_mod
+from invarlock.cli import run_config as run_serial_mod
 from invarlock.core.exceptions import ConfigError
 from invarlock.core import run_policy as run_policy_mod
 from invarlock.core.run_policy import GUARD_OVERHEAD_THRESHOLD
@@ -181,6 +181,17 @@ def test_compute_mask_positions_digest_covers_none_digest_and_exception() -> Non
 
     with pytest.raises(RuntimeError, match="boom"):
         pairing_mod._compute_mask_positions_digest(_BadDict())
+
+
+def test_compute_mask_positions_digest_skips_empty_label_rows() -> None:
+    digest = pairing_mod._compute_mask_positions_digest(
+        {
+            "preview": {"labels": [[]]},
+            "final": {"labels": [[-100, 5]]},
+        }
+    )
+
+    assert isinstance(digest, str) and digest
 
 
 def test_tensor_or_list_to_ints_covers_tolist_numpy_iterable_and_exceptions(

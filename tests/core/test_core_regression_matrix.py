@@ -9,19 +9,19 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-import invarlock.core.adapter_auto as adapter_auto_mod
+import invarlock.adapters.auto as adapter_auto_mod
 import invarlock.core.auto_tuning as auto_tuning_mod
 import invarlock.core.bootstrap as bootstrap_mod
 import invarlock.core.config_runtime as config_mod
 import invarlock.core.metric_provider_resolution as metric_provider_mod
-import invarlock.core.run_guard_overhead_policy as run_guard_overhead_mod
-import invarlock.core.run_report_payload_policy as run_report_payload_mod
+import invarlock.core.run_policy as run_policy_mod
 import invarlock.core.run_snapshot_contract as run_snapshot_contract_mod
-import invarlock.core.run_timing_policy as run_timing_policy_mod
-import invarlock.core.runner_context as runner_context_mod
+import invarlock.core.runner as runner_context_mod
 import invarlock.core.runner_eval_metrics_stats as runner_eval_stats
-import invarlock.core.runtime_manifest_verify as runtime_manifest_verify_mod
 import invarlock.core.types as core_types_mod
+import invarlock.reporting.report_overhead as run_guard_overhead_mod
+import invarlock.reporting.run_report_contract as run_report_payload_mod
+import invarlock.runtime_verify as runtime_verify_mod
 from invarlock.core.api import RunConfig, RunReport
 from invarlock.core.doctor_preflight import run_doctor_config_preflight
 from invarlock.core.events import EventLogger
@@ -606,13 +606,11 @@ def test_run_payload_snapshot_and_runtime_helpers_cover_remaining_paths(
     manifest_payload["report"] = "bad"
     manifest_path.write_text(json.dumps(manifest_payload), encoding="utf-8")
     monkeypatch.setattr(
-        runtime_manifest_verify_mod.jsonschema,
+        runtime_verify_mod.jsonschema,
         "validate",
         lambda **_kwargs: None,
     )
-    errors = runtime_manifest_verify_mod.verify_report_manifest(
-        report_path, manifest_path
-    )
+    errors = runtime_verify_mod.verify_report_manifest(report_path, manifest_path)
     assert "manifest is missing report.sha256" in errors
 
     monkeypatch.setenv("INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE", "true")
@@ -621,7 +619,7 @@ def test_run_payload_snapshot_and_runtime_helpers_cover_remaining_paths(
     )
     assert flags["allow_calibration_materialize"] is True
 
-    timing = run_timing_policy_mod.build_timing_summary_payload(
+    timing = run_policy_mod.build_timing_summary_payload(
         timings={"execute": 1.5},
         total_duration=None,
         report={"metrics": []},

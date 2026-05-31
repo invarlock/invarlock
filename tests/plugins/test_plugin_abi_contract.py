@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from invarlock.core.abi import INVARLOCK_CORE_ABI
+from invarlock.core import INVARLOCK_CORE_ABI
 from invarlock.core.api import Guard, ModelAdapter, ModelEdit
 from invarlock.core.registry import CoreRegistry, PluginInfo
 
@@ -141,13 +141,13 @@ def test_builtin_provider_modules_declare_core_abi() -> None:
         "invarlock.adapters.hf_mlm",
         "invarlock.adapters.hf_multimodal",
         "invarlock.adapters.hf_seq2seq",
-        "invarlock.edits.noop",
+        "invarlock.edits",
         "invarlock.edits.quant_rtn",
         "invarlock.guards.invariants",
         "invarlock.guards.rmt",
         "invarlock.guards.spectral",
         "invarlock.guards.variance",
-        "invarlock.plugins.hello_guard",
+        "invarlock.plugins",
     )
 
     missing = []

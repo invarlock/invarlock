@@ -5,8 +5,73 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # shellcheck source=lib/validation/validation_suite.sh
 source "${SCRIPT_DIR}/lib/validation/validation_suite.sh"
-# shellcheck source=suites.sh
-source "${SCRIPT_DIR}/suites.sh"
+
+PACK_SUITE="${PACK_SUITE:-subset}"
+
+pack_list_suites() {
+    printf '%s\n' subset showcase workshop3 full
+}
+
+pack_apply_suite() {
+    local suite="${1:-${PACK_SUITE:-subset}}"
+    case "${suite}" in
+        subset)
+            # Single-GPU friendly: one 7B model (fits 24GB workstation GPUs).
+            # License: Apache-2.0 (permissive, business-friendly).
+            MODEL_1="mistralai/Mistral-7B-v0.1"
+            MODEL_2=""
+            MODEL_3=""
+            MODEL_4=""
+            MODEL_5=""
+            MODEL_6=""
+            MODEL_7=""
+            MODEL_8=""
+            ;;
+        showcase)
+            # Fast multi-model suite for guard demonstrations (fits on 2-4 GPUs).
+            # Keep models ungated and covered by tuned clean-edit presets.
+            MODEL_1="mistralai/Mistral-7B-v0.1"
+            MODEL_2="Qwen/Qwen2.5-14B"
+            MODEL_3="Qwen/Qwen2.5-32B"
+            MODEL_4=""
+            MODEL_5=""
+            MODEL_6=""
+            MODEL_7=""
+            MODEL_8=""
+            ;;
+        full)
+            # Multi-GPU: ungated medium/large models.
+            MODEL_1="mistralai/Mistral-7B-v0.1"
+            MODEL_2="Qwen/Qwen2.5-14B"
+            MODEL_3="Qwen/Qwen2.5-32B"
+            MODEL_4="01-ai/Yi-34B"
+            MODEL_5="mistralai/Mixtral-8x7B-v0.1"
+            MODEL_6="Qwen/Qwen1.5-72B"
+            MODEL_7=""
+            MODEL_8=""
+            ;;
+        workshop3)
+            # Workshop-friendly 3-model suite (architecture diversity).
+            MODEL_1="mistralai/Mistral-7B-v0.1"
+            MODEL_2="mistralai/Mixtral-8x7B-v0.1"
+            MODEL_3="01-ai/Yi-34B"
+            MODEL_4=""
+            MODEL_5=""
+            MODEL_6=""
+            MODEL_7=""
+            MODEL_8=""
+            ;;
+        *)
+            local available
+            available="$(pack_list_suites | paste -sd ', ' -)"
+            echo "ERROR: Unknown suite '${suite}'. Available suites: ${available}" >&2
+            return 2
+            ;;
+    esac
+
+    PACK_SUITE="${suite}"
+    export PACK_SUITE MODEL_1 MODEL_2 MODEL_3 MODEL_4 MODEL_5 MODEL_6 MODEL_7 MODEL_8
+}
 
 pack_usage() {
     cat <<'EOF'

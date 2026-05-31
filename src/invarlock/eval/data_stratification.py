@@ -7,7 +7,7 @@ import numpy as np
 from invarlock.core.exceptions import DataError as _DataErr
 from invarlock.core.exceptions import ValidationError as _ValErr
 
-from .data_windows import EvaluationWindow
+from .data_support import EvaluationWindow
 
 
 def stratify_wikitext_candidates(

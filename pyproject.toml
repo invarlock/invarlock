@@ -251,9 +251,9 @@ hf_mlm = "invarlock.adapters:HF_MLM_Adapter"
 hf_seq2seq = "invarlock.adapters:HF_Seq2Seq_Adapter"
 hf_auto = "invarlock.adapters:HF_Auto_Adapter"
 hf_multimodal = "invarlock.adapters.hf_multimodal:HF_Multimodal_Adapter"
-hf_gptq = "invarlock.plugins.hf_gptq_adapter:HF_GPTQ_Adapter"
-hf_awq = "invarlock.plugins.hf_awq_adapter:HF_AWQ_Adapter"
-hf_bnb = "invarlock.plugins.hf_bnb_adapter:HF_BNB_Adapter"
+hf_gptq = "invarlock.plugins:HF_GPTQ_Adapter"
+hf_awq = "invarlock.plugins:HF_AWQ_Adapter"
+hf_bnb = "invarlock.plugins:HF_BNB_Adapter"
 
 # Console scripts
 [project.scripts]
@@ -362,23 +362,14 @@ module = [
     "invarlock.adapters.hf_mlm",
     "invarlock.adapters.hf_multimodal",
     "invarlock.edits.quant_rtn",
-    "invarlock.edits.registry",
     "invarlock.eval.bench_policy",
     "invarlock.eval.bench_runner",
     "invarlock.eval.data",
     "invarlock.eval.metrics_activation",
-    "invarlock.eval.metrics_aggregation",
-    "invarlock.eval.metrics_lens",
     "invarlock.eval.metrics_runtime",
     "invarlock.eval.metrics_support",
-    "invarlock.eval.probes.fft",
-    "invarlock.eval.probes.post_attention",
-    "invarlock.eval.providers.seq2seq",
-    "invarlock.eval.providers.vision_text",
+    "invarlock.eval.probes.importance",
     "invarlock.eval.tail_stats",
-    "invarlock.eval.tasks.classification",
-    "invarlock.eval.tasks.qa",
-    "invarlock.eval.tasks.text_generation",
     "invarlock.guards.invariants",
     "invarlock.guards.rmt",
     "invarlock.guards.rmt_activation_runtime",
@@ -387,7 +378,7 @@ module = [
     "invarlock.guards.rmt_policy",
     "invarlock.guards.rmt_runtime",
     "invarlock.guards.spectral_control",
-    "invarlock.guards.spectral_selection",
+    "invarlock.guards.spectral",
     "invarlock.guards.tier_config",
     "invarlock.guards.variance",
     "invarlock.guards.variance_batching",
@@ -400,12 +391,10 @@ module = [
     "invarlock.cli.commands.doctor",
     "invarlock.cli.commands.explain_gates",
     "invarlock.cli.commands.evidence_pack",
-    "invarlock.cli.commands.export_html",
     "invarlock.cli.commands.plugins",
     "invarlock.cli.config_execution",
     "invarlock.cli.device",
     "invarlock.cli.output",
-    "invarlock.cli.run_artifact_output",
     "invarlock.cli.run_config",
     "invarlock.cli.run_execution",
     "invarlock.cli.run_execution_output",
@@ -413,8 +402,6 @@ module = [
     "invarlock.cli.run_pairing",
     "invarlock.cli.run_pairing_baseline",
     "invarlock.cli.run_runtime_exec",
-    "invarlock.cli.run_serialization",
-    "invarlock.cli.run_warning_filters",
     "invarlock.cli.security_helpers",
 ]
 disable_error_code = [
@@ -446,13 +433,11 @@ module = [
     "invarlock.adapters.auto",
     "invarlock.cli.__init__",
     "invarlock.cli.__main__",
-    "invarlock.cli._json",
     "invarlock.cli.app",
     "invarlock.cli.commands.evaluate",
     "invarlock.cli.commands.verify",
     "invarlock.cli.evaluate_output",
     "invarlock.cli.evaluate_phases",
-    "invarlock.cli.runtime_verify",
 ]
 ignore_errors = false
 
@@ -498,7 +483,7 @@ include = [
     "scripts/release/*.py",
     "src/invarlock/eval/*",
     "src/invarlock/guards/*",
-    "src/invarlock/calibration/*",
+    "src/invarlock/calibration.py",
     "src/invarlock/cli/*",
     "src/invarlock/reporting/*",
     "src/invarlock/core/*",

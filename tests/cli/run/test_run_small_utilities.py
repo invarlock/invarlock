@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from invarlock.cli.run_pairing_helpers import (
+from invarlock.cli.run_pairing import (
     _compute_mask_positions_digest,
     _hash_sequences,
 )

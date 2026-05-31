@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.run_metric_utils import merge_primary_metric_health
+from invarlock.reporting.run_report_metrics_contract import merge_primary_metric_health
 
 
 def test_merge_primary_metric_health_prefers_core_flags() -> None:

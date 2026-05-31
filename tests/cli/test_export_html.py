@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import typer
 
-from invarlock.cli.commands.export_html import export_html_command
+from invarlock.cli.commands.report import export_html_command
 
 
 def test_export_html_refuses_overwrite(tmp_path: Path):

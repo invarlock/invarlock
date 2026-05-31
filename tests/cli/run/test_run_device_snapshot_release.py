@@ -9,82 +9,19 @@ import click
 import pytest
 
 from invarlock.cli.commands.run import run_command
-
-
-def _base_cfg(tmp_path: Path, preview=1, final=1) -> Path:
-    p = tmp_path / "config.yaml"
-    p.write_text(
-        f"""
-model:
-  adapter: hf_causal
-  id: gpt2
-  device: cpu
-edit:
-  name: quant_rtn
-  plan: {{}}
-
-dataset:
-  provider: synthetic
-  id: synthetic
-  split: validation
-  seq_len: 8
-  stride: 4
-  preview_n: {preview}
-  final_n: {final}
-
-guards:
-  order: []
-
-eval:
-  loss:
-    type: auto
-
-output:
-  dir: runs
-        """
-    )
-    return p
+from tests.cli.run._support_run_common import (
+    common_ce_patches,
+)
+from tests.cli.run._support_run_common import (
+    synthetic_provider_min as _provider_min,
+)
+from tests.cli.run._support_run_common import (
+    write_base_run_config as _base_cfg,
+)
 
 
 def _common_ce():
-    return (
-        patch(
-            "invarlock.cli.run_runtime.detect_model_profile",
-            lambda model_id, adapter: SimpleNamespace(
-                default_loss="ce",
-                model_id=model_id,
-                adapter=adapter,
-                module_selectors={},
-                invariants=set(),
-                cert_lints=[],
-                family="gpt",
-            ),
-        ),
-        patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
-            lambda model_profile: (
-                SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
-                "tokhash123",
-            ),
-        ),
-        patch("invarlock.cli.device.resolve_device", lambda d: d),
-        patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
-        patch(
-            "invarlock.reporting.report_files.save_report",
-            lambda report, run_dir, formats, filename_prefix: {
-                "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
-            },
-        ),
-    )
-
-
-def _provider_min():
-    return SimpleNamespace(
-        windows=lambda **kw: (
-            SimpleNamespace(input_ids=[[1, 2, 3]], attention_masks=[[1, 1, 1]]),
-            SimpleNamespace(input_ids=[[4, 5, 6]], attention_masks=[[1, 1, 1]]),
-        )
-    )
+    return common_ce_patches(include_save_report=True)
 
 
 def _is_bare_control(kwargs: dict[str, object]) -> bool:
@@ -608,8 +545,8 @@ def test_guard_overhead_bare_missing_ppl_and_status_warn(tmp_path: Path):
         # Patch validator to avoid exit; we only inspect warnings/errors aggregated pre-validation
         for target in (
             "invarlock.reporting.validate.validate_guard_overhead",
-            "invarlock.cli.run_runtime.validate_guard_overhead",
-            "invarlock.cli.run_runtime.validate_guard_overhead",
+            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
+            "invarlock.cli.run_runtime_exec.validate_guard_overhead",
         ):
             stack.enter_context(
                 patch(
@@ -730,7 +667,7 @@ def test_tokenizer_hash_populated_from_context_when_missing(tmp_path: Path):
         for ctx in _common_ce():
             stack.enter_context(ctx)
         stack.enter_context(
-            patch("invarlock.cli.run_runtime.resolve_tokenizer", resolver)
+            patch("invarlock.cli.run_runtime_exec.resolve_tokenizer", resolver)
         )
         stack.enter_context(
             patch("invarlock.eval.data.get_provider", lambda *a, **k: _provider_min())

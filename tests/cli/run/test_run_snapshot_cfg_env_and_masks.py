@@ -6,101 +6,32 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from invarlock.cli.commands.run import run_command
+from tests.cli.run._support_run_common import (
+    common_ce_patches,
+    write_base_run_config,
+)
+from tests.cli.run._support_run_common import (
+    runner_success as _runner_success,
+)
+from tests.cli.run._support_run_common import (
+    synthetic_provider_min as _provider,
+)
 
 
 def _base_cfg(tmp_path: Path, preview=1, final=1) -> Path:
-    p = tmp_path / "config.yaml"
-    p.write_text(
-        f"""
-model:
-  adapter: hf_causal
-  id: gpt2
-  device: cpu
-edit:
-  name: quant_rtn
-  plan: {{}}
-
-dataset:
-  provider: synthetic
-  id: synthetic
-  split: validation
-  seq_len: 8
-  stride: 4
-  preview_n: {preview}
-  final_n: {final}
-
-guards:
-  order: []
-
-eval:
-  spike_threshold: 2.0
-  loss:
-    type: auto
-
-output:
-  dir: runs
-        """
+    return write_base_run_config(
+        tmp_path,
+        preview,
+        final,
+        eval_fields="  spike_threshold: 2.0\n",
     )
-    return p
 
 
 def _common_ce():
-    return (
-        patch("invarlock.cli.device.resolve_device", lambda d: d),
-        patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
-        patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
-            lambda *_a, **_k: (
-                SimpleNamespace(
-                    eos_token="</s>",
-                    pad_token="</s>",
-                    vocab_size=50000,
-                ),
-                "tokhash123",
-            ),
-        ),
-        patch(
-            "invarlock.reporting.report_files.save_report",
-            lambda report, run_dir, formats, filename_prefix: {
-                "json": str(run_dir / (str(filename_prefix or "report") + ".json"))
-            },
-        ),
-        patch(
-            "invarlock.core.registry.get_registry",
-            lambda: SimpleNamespace(
-                get_adapter=lambda name: SimpleNamespace(
-                    name=name, load_model=lambda model_id, device=None: object()
-                ),
-                get_edit=lambda name: SimpleNamespace(name=name),
-                get_guard=lambda name: SimpleNamespace(name=name),
-                get_plugin_metadata=lambda n, t: {
-                    "name": n,
-                    "module": f"{t}.{n}",
-                    "version": "test",
-                },
-            ),
-        ),
-    )
-
-
-def _provider():
-    return SimpleNamespace(
-        windows=lambda **kw: (
-            SimpleNamespace(input_ids=[[1, 2, 3]], attention_masks=[[1, 1, 1]]),
-            SimpleNamespace(input_ids=[[4, 5, 6]], attention_masks=[[1, 1, 1]]),
-        )
-    )
-
-
-def _runner_success():
-    return SimpleNamespace(
-        execute=lambda **k: SimpleNamespace(
-            edit={},
-            metrics={"ppl_preview": 1.0, "ppl_final": 1.0, "ppl_ratio": 1.0},
-            guards={},
-            context={"dataset_meta": {}},
-            status="success",
-        )
+    return common_ce_patches(
+        include_profile=False,
+        include_registry=True,
+        include_save_report=True,
     )
 
 
@@ -148,7 +79,7 @@ def test_snapshot_auto_ram_fraction_env(tmp_path: Path, monkeypatch):
             stack.enter_context(ctx)
         monkeypatch.setenv("INVARLOCK_SNAPSHOT_AUTO_RAM_FRACTION", "0.2")
         stack.enter_context(
-            patch("invarlock.cli.run_runtime.psutil.virtual_memory", vm)
+            patch("invarlock.cli.run_runtime_exec.psutil.virtual_memory", vm)
         )
         stack.enter_context(
             patch("invarlock.cli.run_runtime_exec.shutil.disk_usage", du)
@@ -260,7 +191,7 @@ def test_snapshot_cfg_threshold_and_tempdir(tmp_path: Path, monkeypatch):
             stack.enter_context(ctx)
         stack.enter_context(patch("invarlock.core.config_loader.load_config", load_cfg))
         stack.enter_context(
-            patch("invarlock.cli.run_runtime.psutil.virtual_memory", vm)
+            patch("invarlock.cli.run_runtime_exec.psutil.virtual_memory", vm)
         )
         stack.enter_context(
             patch("invarlock.cli.run_runtime_exec.shutil.disk_usage", du)
@@ -359,7 +290,7 @@ def test_snapshot_bytes_supported_but_ram_low_prefers_chunked(tmp_path: Path):
             )
         )
         stack.enter_context(
-            patch("invarlock.cli.run_runtime.psutil.virtual_memory", vm)
+            patch("invarlock.cli.run_runtime_exec.psutil.virtual_memory", vm)
         )
         stack.enter_context(
             patch("invarlock.cli.run_runtime_exec.shutil.disk_usage", du)

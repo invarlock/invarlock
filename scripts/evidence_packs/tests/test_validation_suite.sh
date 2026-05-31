@@ -807,7 +807,7 @@ test_pack_validation_preflight_datasets_success_and_offline_failure_paths() {
     local repo_root
     repo_root="$(pwd)"
     python3() {
-        if [[ "${1:-}" == "${repo_root}/scripts/evidence_packs/python/dataset_preflight.py" ]]; then
+        if [[ "${1:-}" == "${repo_root}/scripts/evidence_packs/python/runtime_tools.py" && "${2:-}" == "dataset-preflight" ]]; then
             if [[ "${DATASET_PREFLIGHT_MODE:-ok}" == "ok" ]]; then
                 printf '%s\n' "dataset ok"
                 return 0
@@ -1020,7 +1020,7 @@ EOF
     LIB_DIR="${stub_lib}"
     export LIB_DIR
     python3() {
-        if [[ "${1:-}" == */evaluation_optimization_summary.py ]]; then
+        if [[ "${1:-}" == */validation_state.py && "${2:-}" == "evaluation-optimization-summary" ]]; then
             return 1
         fi
         command "${TEST_REAL_PYTHON3}" "$@"
@@ -2980,7 +2980,7 @@ test_pack_validate_tuned_edit_params_uses_presets_canonical_fallback() {
         "${fake_root}/scripts/evidence_packs/lib" \
         "${fake_root}/scripts/evidence_packs/python" \
         "${fake_root}/scripts/evidence_packs/presets"
-    cat > "${fake_root}/scripts/evidence_packs/python/validate_tuned_edit_params.py" <<'PY'
+    cat > "${fake_root}/scripts/evidence_packs/python/validation_state.py" <<'PY'
 import sys
 sys.exit(0)
 PY

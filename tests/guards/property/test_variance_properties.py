@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from hypothesis import given
 
-from invarlock.guards_ref.variance_ref import variance_decide
-from tests.guards.property.strategies import variance_inputs
+from tests.guards.property.strategies import variance_decide, variance_inputs
 
 
 @given(variance_inputs())

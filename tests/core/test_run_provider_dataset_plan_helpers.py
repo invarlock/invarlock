@@ -8,6 +8,7 @@ from invarlock.core.run_provider_dataset_plan import (
     ProviderDatasetPlanDiagnostic,
     _build_provider_kwargs,
     _build_signature_transform,
+    _cfg_auto_tier,
     _hash_texts,
     _optional_text,
     _resolve_release_window_plan,
@@ -40,6 +41,16 @@ def test_provider_dataset_plan_section_helpers_cover_fallback_paths() -> None:
 
     assert _section_dict(_Config(), "dataset") == {"name": "demo"}
     assert _section_dict(_Config(), "text") == {"value": "ns"}
+
+
+def test_cfg_auto_tier_falls_back_when_section_lookup_fails() -> None:
+    class _Config:
+        auto = SimpleNamespace(tier="release")
+
+        def section(self, _name: str) -> object:
+            raise KeyError("missing")
+
+    assert _cfg_auto_tier(_Config()) == "release"
 
 
 def test_provider_dataset_plan_small_helpers_cover_blank_text_and_provider_overrides() -> (

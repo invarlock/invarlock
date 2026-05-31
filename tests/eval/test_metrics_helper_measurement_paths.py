@@ -21,7 +21,7 @@ from invarlock.eval.metrics import (
 from invarlock.eval.metrics_activation import (
     _collect_activations,
 )
-from invarlock.eval.metrics_model_io import forward_loss_causal
+from invarlock.eval.metrics_runtime import forward_loss_causal
 
 
 class DummyCausalLM(nn.Module):
@@ -244,7 +244,7 @@ def test_measure_memory_break_and_continue_and_latency_total_tokens_zero():
 
 def test_validate_env_failure_path():
     # Patch DependencyManager on the real module to raise in constructor
-    from invarlock.eval import metrics_environment as metrics_environment_mod
+    from invarlock.eval import metrics as metrics_environment_mod
 
     class DMErr:
         def __init__(self):
@@ -343,6 +343,63 @@ def test_forward_loss_causal_paths():
 
     with pytest.raises(MValidationError):
         forward_loss_causal(TupNoLabels(), ids)
+
+
+def test_forward_logits_causal_fallbacks_and_error_paths():
+    from invarlock.eval.metrics_runtime import forward_logits_causal
+
+    ids = torch.randint(0, 8, (1, 4))
+    logits = torch.randn(1, 4, 8)
+
+    class ObjectLogits(nn.Module):
+        def forward(self, input_ids=None, attention_mask=None, **kwargs):
+            if kwargs.get("return_dict", False):
+                raise TypeError("no return dict")
+            return SimpleNamespace(logits=logits)
+
+    assert torch.equal(forward_logits_causal(ObjectLogits(), ids), logits)
+
+    class EmptyTuple(nn.Module):
+        def forward(self, input_ids=None, attention_mask=None, **kwargs):
+            if kwargs.get("return_dict", False):
+                raise TypeError("no return dict")
+            return ()
+
+    from invarlock.eval.metrics import MetricsError as MMetricsError
+
+    with pytest.raises(MMetricsError):
+        forward_logits_causal(EmptyTuple(), ids)
+
+    class NonTensorLogits(nn.Module):
+        def forward(self, input_ids=None, attention_mask=None, **kwargs):
+            return SimpleNamespace(logits=[1, 2, 3])
+
+    with pytest.raises(MMetricsError):
+        forward_logits_causal(NonTensorLogits(), ids)
+
+    class RawTensorFallback(nn.Module):
+        def forward(self, input_ids=None, attention_mask=None, **kwargs):
+            if kwargs.get("return_dict", False):
+                raise TypeError("no return dict")
+            return logits
+
+    assert torch.equal(forward_logits_causal(RawTensorFallback(), ids), logits)
+
+
+def test_forward_loss_causal_fallback_object_without_loss_computes_from_logits():
+    ids = torch.randint(0, 8, (1, 4))
+    logits = torch.randn(1, 4, 8)
+
+    class ObjectWithoutLoss(nn.Module):
+        def forward(self, input_ids=None, attention_mask=None, labels=None, **kwargs):
+            if kwargs.get("return_dict", False):
+                raise TypeError("no return dict")
+            return SimpleNamespace(loss=None, logits=logits)
+
+    loss, returned_logits = forward_loss_causal(ObjectWithoutLoss(), ids, labels=ids)
+
+    assert isinstance(loss, float)
+    assert torch.equal(returned_logits, logits)
 
 
 def test_compute_perplexity_strict_tuple_and_no_valid_tokens():

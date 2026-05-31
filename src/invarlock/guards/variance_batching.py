@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import math
+from dataclasses import dataclass
 from inspect import getattr_static
 from typing import Any
 
@@ -10,12 +11,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from invarlock.utils.bootstrap import (
+from invarlock.utils import (
     bootstrap_mean_statistics,
     percentile_interval_from_statistics,
 )
-
-from .variance_types import CalibrationBatchContext
 
 _VARIANCE_BATCHING_ERRORS = (
     AttributeError,
@@ -23,6 +22,14 @@ _VARIANCE_BATCHING_ERRORS = (
     TypeError,
     ValueError,
 )
+
+
+@dataclass(frozen=True)
+class CalibrationBatchContext:
+    window_ids: list[str]
+    count: int
+    observed_digest: str | None
+    expected_digest: str | None = None
 
 
 def _model_kwargs(prepared: dict[str, Any]) -> dict[str, Any]:

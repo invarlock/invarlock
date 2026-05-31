@@ -3,7 +3,7 @@ from __future__ import annotations
 import ast
 
 from tests.lint.test_architecture_guardrails_import_boundaries import (
-    METRICS_LENS_PATH,
+    METRICS_PATH,
     REPO_ROOT,
     _read_text,
 )
@@ -20,8 +20,11 @@ def test_adapter_probe_helpers_do_not_hide_unexpected_failures() -> None:
     auto_text = _read_text(auto_path)
     auto_tree = ast.parse(auto_text, filename=str(auto_path))
 
+    read_config_target = None
     detect_target = None
     for node in ast.walk(auto_tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "_read_local_hf_config":
+            read_config_target = node
         if (
             isinstance(node, ast.FunctionDef)
             and node.name == "_detect_quantization_from_path"
@@ -29,10 +32,14 @@ def test_adapter_probe_helpers_do_not_hide_unexpected_failures() -> None:
             detect_target = node
             break
 
+    assert read_config_target is not None, "_read_local_hf_config not found"
     assert detect_target is not None, "_detect_quantization_from_path not found"
+    read_config_source = ast.get_source_segment(auto_text, read_config_target) or ""
     detect_source = ast.get_source_segment(auto_text, detect_target) or ""
+    assert BROAD_EXCEPTION not in read_config_source
     assert BROAD_EXCEPTION not in detect_source
-    assert "except (OSError, TypeError, ValueError)" in detect_source
+    assert "except (OSError, TypeError, ValueError)" in read_config_source
+    assert "_read_local_hf_config(model_id)" in detect_source
 
     hf_path = REPO_ROOT / "src/invarlock/adapters/hf_causal.py"
     hf_text = _read_text(hf_path)
@@ -73,7 +80,7 @@ def test_subprocess_verifiers_use_timeouts() -> None:
 def test_tokenizer_provenance_helpers_do_not_normalize_unknown_placeholders() -> None:
     expectations = {
         REPO_ROOT / "src/invarlock/model_profile.py": ('return "unknown"',),
-        REPO_ROOT / "src/invarlock/cli/run_masking.py": ('"unknown-tokenizer"',),
+        REPO_ROOT / "src/invarlock/cli/run_execution.py": ('"unknown-tokenizer"',),
     }
     offenders: list[str] = []
     for path, snippets in expectations.items():
@@ -151,17 +158,17 @@ def test_cli_runtime_helpers_do_not_hide_snapshot_reuse_failures() -> None:
 
 def test_core_summary_helpers_do_not_embed_display_strings() -> None:
     expectations = {
-        REPO_ROOT / "src/invarlock/core/run_guard_overhead_policy.py": (
+        REPO_ROOT / "src/invarlock/reporting/report_overhead.py": (
             'status = "PASS"',
             "threshold_display",
             "overhead_display",
         ),
-        REPO_ROOT / "src/invarlock/core/run_timing_policy.py": (
+        REPO_ROOT / "src/invarlock/core/run_policy.py": (
             "Peak Memory",
             "Peak GPU Mem",
             '("Load model", "load_model")',
         ),
-        REPO_ROOT / "src/invarlock/core/doctor_inventory.py": (
+        REPO_ROOT / "src/invarlock/core/doctor_findings.py": (
             "pip install",
             "✓ Available",
             "Cache/Net",
@@ -202,41 +209,17 @@ def test_run_execution_consumes_core_timing_summary() -> None:
         assert required in text
 
 
-def test_core_runtime_provenance_is_wrapper_only() -> None:
-    path = REPO_ROOT / "src/invarlock/core/runtime_provenance.py"
-    tree = ast.parse(_read_text(path), filename=str(path))
+def test_runtime_provenance_has_single_product_owner() -> None:
+    assert not (REPO_ROOT / "src/invarlock/core/runtime_provenance.py").exists()
 
-    imports: list[str] = []
-    for node in tree.body:
-        if isinstance(node, ast.Import):
-            imports.extend(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom):
-            imports.append(node.module or "")
-
-    banned = {
-        "json",
-        "shutil",
-        "subprocess",
-        "pathlib",
-        "invarlock.runtime_security",
-    }
-    assert not banned.intersection(imports)
-
-    text = _read_text(path)
-    for snippet in (
-        "load_runtime_manifest",
-        "runtime_verifier_binary",
-        "unverified_provenance_allowed",
-    ):
-        assert snippet not in text
+    text = _read_text(REPO_ROOT / "src/invarlock/reporting/verify_contract.py")
+    assert "from invarlock.runtime_provenance import (" in text
+    assert "from invarlock.core.runtime_provenance" not in text
 
 
 def test_core_config_helpers_do_not_swallow_unexpected_runtime_errors() -> None:
     expectations = {
-        REPO_ROOT / "src/invarlock/core/run_dataset_contract.py": (BROAD_EXCEPTION,),
-        REPO_ROOT / "src/invarlock/core/run_execution_context_policy.py": (
-            BROAD_EXCEPTION,
-        ),
+        REPO_ROOT / "src/invarlock/core/run_policy.py": (BROAD_EXCEPTION,),
         REPO_ROOT / "src/invarlock/core/run_provider_dataset_plan.py": (
             BROAD_EXCEPTION,
         ),
@@ -255,7 +238,7 @@ def test_hardened_runtime_paths_keep_broad_catch_budgets() -> None:
         REPO_ROOT / "src/invarlock/core/events.py": 0,
         REPO_ROOT / "src/invarlock/core/plugins_inventory.py": 0,
         REPO_ROOT / "src/invarlock/core/registry.py": 2,
-        REPO_ROOT / "src/invarlock/core/runner_latency.py": 0,
+        REPO_ROOT / "src/invarlock/core/runner_eval_metrics.py": 0,
         REPO_ROOT / "src/invarlock/adapters/hf_causal.py": 0,
         REPO_ROOT / "src/invarlock/adapters/hf_mixin.py": 0,
         REPO_ROOT / "src/invarlock/eval/data_tokenization.py": 0,
@@ -269,11 +252,10 @@ def test_hardened_runtime_paths_keep_broad_catch_budgets() -> None:
         REPO_ROOT / "src/invarlock/observability/health.py": 0,
         REPO_ROOT / "src/invarlock/adapters/hf_seq2seq.py": 0,
         REPO_ROOT / "src/invarlock/utils/__init__.py": 0,
-        REPO_ROOT / "src/invarlock/guards_ref/spectral_ref.py": 0,
         REPO_ROOT / "src/invarlock/core/runner_eval_phase.py": 0,
         REPO_ROOT / "src/invarlock/cli/app.py": 0,
-        REPO_ROOT / "src/invarlock/cli/commands/export_html.py": 0,
-        REPO_ROOT / "src/invarlock/cli/overhead_utils.py": 0,
+        REPO_ROOT / "src/invarlock/cli/commands/report.py": 0,
+        REPO_ROOT / "src/invarlock/cli/run_overhead.py": 0,
     }
     offenders: list[str] = []
     for path, budget in budgets.items():
@@ -303,7 +285,6 @@ def test_hardened_followup_paths_have_no_local_type_ignore_escapes() -> None:
         REPO_ROOT / "src/invarlock/observability/health.py",
         REPO_ROOT / "src/invarlock/adapters/hf_seq2seq.py",
         REPO_ROOT / "src/invarlock/utils/__init__.py",
-        REPO_ROOT / "src/invarlock/guards_ref/spectral_ref.py",
     )
     offenders: list[str] = []
     for path in hardened_paths:
@@ -347,7 +328,7 @@ def test_run_report_contract_is_persistence_only() -> None:
 
 
 def test_lens_metrics_entrypoint_requires_metrics_config() -> None:
-    tree = ast.parse(_read_text(METRICS_LENS_PATH), filename=str(METRICS_LENS_PATH))
+    tree = ast.parse(_read_text(METRICS_PATH), filename=str(METRICS_PATH))
     target = None
     for node in tree.body:
         if (

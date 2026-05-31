@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import importlib
 import json
-import sys
 import types
 from pathlib import Path
 from types import SimpleNamespace
@@ -12,15 +11,7 @@ def _load_auto_module(monkeypatch) -> types.ModuleType:
     root = Path(__file__).resolve().parents[2]
     monkeypatch.syspath_prepend(str(root / "src"))
 
-    import invarlock
-
-    adapters_pkg = types.ModuleType("invarlock.adapters")
-    adapters_pkg.__path__ = [str(root / "src" / "invarlock" / "adapters")]
-    monkeypatch.setitem(sys.modules, "invarlock.adapters", adapters_pkg)
-    monkeypatch.setattr(invarlock, "adapters", adapters_pkg, raising=False)
-
-    sys.modules.pop("invarlock.adapters.auto", None)
-    return importlib.import_module("invarlock.adapters.auto")
+    return importlib.reload(importlib.import_module("invarlock.adapters.auto"))
 
 
 def _delegate_class(label: str):
@@ -203,12 +194,15 @@ def test_load_adapter_dispatches_all_known_adapter_names(monkeypatch) -> None:
         ".hf_mlm": ("HF_MLM_Adapter", "hf_mlm"),
         ".hf_multimodal": ("HF_Multimodal_Adapter", "hf_multimodal"),
         ".hf_seq2seq": ("HF_Seq2Seq_Adapter", "hf_seq2seq"),
-        "invarlock.plugins.hf_bnb_adapter": ("HF_BNB_Adapter", "hf_bnb"),
-        "invarlock.plugins.hf_awq_adapter": ("HF_AWQ_Adapter", "hf_awq"),
-        "invarlock.plugins.hf_gptq_adapter": ("HF_GPTQ_Adapter", "hf_gptq"),
     }
 
     def _fake_import(name: str, package: str | None = None):
+        if name == "invarlock.plugins":
+            return SimpleNamespace(
+                HF_BNB_Adapter=_delegate_class("hf_bnb"),
+                HF_AWQ_Adapter=_delegate_class("hf_awq"),
+                HF_GPTQ_Adapter=_delegate_class("hf_gptq"),
+            )
         attr_name, label = delegate_specs[name]
         return SimpleNamespace(**{attr_name: _delegate_class(label)})
 

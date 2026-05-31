@@ -3,7 +3,7 @@ from __future__ import annotations
 from hypothesis import given
 from hypothesis import strategies as st
 
-from invarlock.guards_ref.spectral_ref import bh_select
+from tests.guards.property.strategies import bh_select
 
 
 @given(

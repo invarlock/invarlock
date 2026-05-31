@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from scripts.evidence_packs.python import validate_baseline_report
+from scripts.evidence_packs.python import task_tools
 
 
 def _write_report(path: Path, payload: dict[str, object]) -> None:
@@ -24,7 +24,9 @@ def _baseline_payload() -> dict[str, Any]:
 
 
 def _validate(path: Path) -> int:
-    return validate_baseline_report.main([str(path), "hf_causal", "ci", "balanced"])
+    return task_tools.main(
+        ["validate-baseline-report", str(path), "hf_causal", "ci", "balanced"]
+    )
 
 
 def test_validate_baseline_report_accepts_expected_contract(tmp_path: Path) -> None:

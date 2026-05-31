@@ -225,7 +225,8 @@ create_error_model() {
     _model_creation_run_python \
         "${parent_dir}" \
         "${cuda_devices}" \
-        "${EVIDENCE_PACK_PY_DIR}/create_error_model.py" \
+        "${EVIDENCE_PACK_PY_DIR}/task_tools.py" \
+        "create-error-model" \
         "${baseline_path}" \
         "${output_path}" \
         "${error_type}"

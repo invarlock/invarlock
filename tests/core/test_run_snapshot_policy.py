@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-import invarlock.core.run_snapshot_policy as mod
-from invarlock.core.run_snapshot_policy import (
+import invarlock.core.run_snapshot_contract as mod
+from invarlock.core.run_snapshot_contract import (
     choose_snapshot_mode,
     estimate_model_bytes,
     resolve_snapshot_config,

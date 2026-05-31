@@ -244,7 +244,7 @@ def null_sweep(
     # import this module without heavy deps. Import lazily so CLI example
     # validation can parse `invarlock calibrate ...` without installing torch.
     try:
-        from invarlock.calibration.spectral_null import summarize_null_sweep_reports
+        from invarlock.calibration import summarize_null_sweep_reports
     except ModuleNotFoundError as exc:
         missing = getattr(exc, "name", "") or ""
         if missing in {"torch", "transformers"}:
@@ -496,7 +496,7 @@ def ve_sweep(
 ) -> None:
     # Optional deps: see null_sweep() note.
     try:
-        from invarlock.calibration.variance_ve import summarize_ve_sweep_reports
+        from invarlock.calibration import summarize_ve_sweep_reports
     except ModuleNotFoundError as exc:
         missing = getattr(exc, "name", "") or ""
         if missing in {"torch", "transformers"}:

@@ -116,7 +116,7 @@ def _common_min(monkeypatch, tmp_path):
         "invarlock.eval.data.get_provider", lambda *a, **k: _provider_min()
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.detect_model_profile",
+        "invarlock.cli.run_runtime_exec.detect_model_profile",
         lambda model_id=None, adapter=None: SimpleNamespace(
             default_loss="ce",
             invariants=[],
@@ -127,7 +127,7 @@ def _common_min(monkeypatch, tmp_path):
     )
     # default tokenizer to a simple object with eos/pad
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.resolve_tokenizer",
+        "invarlock.cli.run_runtime_exec.resolve_tokenizer",
         lambda *a, **k: (
             SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
             "tokhash123",
@@ -145,7 +145,7 @@ def _common_min(monkeypatch, tmp_path):
             self.metrics = {"overhead_ratio": 1.0, "overhead_percent": 0.0}
 
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.validate_guard_overhead",
+        "invarlock.cli.run_runtime_exec.validate_guard_overhead",
         lambda *args, **kwargs: _OverheadOK(),
     )
 
@@ -202,7 +202,7 @@ def _base_patches_gfm(monkeypatch):
         "invarlock.eval.data.get_provider", lambda *a, **k: _provider_min_gfm()
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.resolve_tokenizer",
+        "invarlock.cli.run_runtime_exec.resolve_tokenizer",
         lambda *_: (
             _SNS(eos_token="</s>", pad_token="</s>", vocab_size=50000),
             "tokhash123",
@@ -219,7 +219,7 @@ def _base_patches_gfm(monkeypatch):
             self.checks = {}
 
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.validate_guard_overhead",
+        "invarlock.cli.run_runtime_exec.validate_guard_overhead",
         lambda *a, **k: _OverheadOK(),
     )
 
@@ -272,7 +272,7 @@ def test_snapshot_env_bytes_fallback_to_chunked(monkeypatch, tmp_path):
         "invarlock.eval.data.get_provider", lambda *a, **k: _provider_min()
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.detect_model_profile",
+        "invarlock.cli.run_runtime_exec.detect_model_profile",
         lambda *a, **k: SimpleNamespace(
             default_loss="ce",
             invariants=[],
@@ -282,7 +282,7 @@ def test_snapshot_env_bytes_fallback_to_chunked(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.resolve_tokenizer",
+        "invarlock.cli.run_runtime_exec.resolve_tokenizer",
         lambda *a, **k: (
             SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
             "tok",
@@ -338,7 +338,7 @@ def test_snapshot_env_chunked_fallback_to_bytes(monkeypatch, tmp_path):
         "invarlock.eval.data.get_provider", lambda *a, **k: _provider_min()
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.detect_model_profile",
+        "invarlock.cli.run_runtime_exec.detect_model_profile",
         lambda *a, **k: SimpleNamespace(
             default_loss="ce",
             invariants=[],
@@ -348,7 +348,7 @@ def test_snapshot_env_chunked_fallback_to_bytes(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.resolve_tokenizer",
+        "invarlock.cli.run_runtime_exec.resolve_tokenizer",
         lambda *a, **k: (
             SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
             "tok",
@@ -420,7 +420,7 @@ def test_stratification_count_mismatch_final_only(monkeypatch, tmp_path):
         "invarlock.eval.data.get_provider", lambda *a, **k: _provider_min()
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.detect_model_profile",
+        "invarlock.cli.run_runtime_exec.detect_model_profile",
         lambda *a, **k: SimpleNamespace(
             default_loss="ce",
             invariants=[],
@@ -430,7 +430,7 @@ def test_stratification_count_mismatch_final_only(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.resolve_tokenizer",
+        "invarlock.cli.run_runtime_exec.resolve_tokenizer",
         lambda *a, **k: (
             SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
             "tok",
@@ -459,7 +459,9 @@ def test_snapshot_auto_both_memory_disk_queries_fail(monkeypatch, tmp_path):
     def _raise_du(_):
         raise RuntimeError("du fail")
 
-    monkeypatch.setattr("invarlock.cli.run_runtime.psutil.virtual_memory", _raise_vm)
+    monkeypatch.setattr(
+        "invarlock.cli.run_runtime_exec.psutil.virtual_memory", _raise_vm
+    )
     monkeypatch.setattr("invarlock.cli.run_runtime_exec.shutil.disk_usage", _raise_du)
 
     cfg = _basic_yaml(tmp_path)

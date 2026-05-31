@@ -73,7 +73,7 @@ def test_former_trust_critical_paths_no_longer_use_broad_exception() -> None:
         "src/invarlock/guards/variance_batching.py",
         "src/invarlock/guards/variance_evaluation.py",
         "src/invarlock/guards/variance_ops.py",
-        "src/invarlock/guards/variance_prepare.py",
+        "src/invarlock/guards/variance.py",
         "src/invarlock/guards/variance_scaling.py",
     }
     assert must_be_absent.isdisjoint(actual)

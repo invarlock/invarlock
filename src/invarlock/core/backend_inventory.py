@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from dataclasses import asdict, dataclass
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as pkg_version
 from pathlib import Path
@@ -19,6 +20,24 @@ _QUANTIZED_ADAPTER_BACKENDS = {
 }
 
 _VERSION_ERRORS = (PackageNotFoundError, OSError, RuntimeError, TypeError, ValueError)
+_ADAPTER_PROVENANCE_FAMILY_MAP: dict[str, tuple[str, str, list[str]]] = {
+    "hf_gptq": ("gptq", "gptqmodel", []),
+    "hf_awq": ("awq", "gptqmodel", []),
+    "hf_bnb": ("bnb", "bitsandbytes", []),
+}
+
+
+@dataclass
+class AdapterProvenance:
+    family: str
+    library: str
+    version: str | None
+    supported: bool
+    tested: list[str]
+    message: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
 
 
 def quantized_adapter_backend(adapter_name: str | None) -> str | None:
@@ -30,6 +49,35 @@ def _package_version(name: str) -> str | None:
         return pkg_version(name)
     except _VERSION_ERRORS:
         return None
+
+
+def extract_adapter_provenance(adapter_name: str) -> AdapterProvenance:
+    name = (adapter_name or "").strip().lower()
+    family, library, tested = _ADAPTER_PROVENANCE_FAMILY_MAP.get(
+        name, ("hf", "transformers", [])
+    )
+
+    try:
+        version = pkg_version(library)
+        supported = True if (not tested or version in tested) else False
+        message = (
+            None
+            if supported
+            else f"Use Compare & Evaluate (BYOE); {library} version unsupported (tested: {tested})"
+        )
+    except _VERSION_ERRORS:
+        version = None
+        supported = False
+        message = f"{library} not available; prefer Compare & Evaluate (BYOE) or install extras."
+
+    return AdapterProvenance(
+        family=family,
+        library=library,
+        version=version,
+        supported=supported,
+        tested=tested,
+        message=message,
+    )
 
 
 def _quantization_config_from_report(report: Mapping[str, Any]) -> dict[str, Any]:

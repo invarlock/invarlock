@@ -598,6 +598,20 @@ def test_local_jsonl_pairs_missing_fields(tmp_path):
     assert len(prev.indices) == 1 and len(fin.indices) == 0
 
 
+def test_local_jsonl_pairs_windows_rejects_empty_pair_set(tmp_path):
+    data = tmp_path / "pairs_empty.jsonl"
+    data.write_text('{"source": "", "target": ""}\n', encoding="utf-8")
+
+    class Tok:
+        def encode(self, text, truncation=True, max_length=4, padding="max_length"):  # noqa: ARG002
+            return list(range(1, max_length + 1))
+
+    provider = data_mod.LocalJSONLPairsProvider(file=str(data), max_samples=2)
+
+    with pytest.raises(ValueError, match="produced no pairs"):
+        provider.windows(Tok(), seq_len=4, preview_n=1, final_n=1)
+
+
 def test_local_jsonl_load_handles_io_errors(tmp_path, monkeypatch):
     target = tmp_path / "broken.jsonl"
     target.write_text('{"text": "hello"}\n', encoding="utf-8")
