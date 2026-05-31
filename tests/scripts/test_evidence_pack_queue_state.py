@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -9,12 +10,15 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "evidence_packs" / "python" / "queue_state.py"
 
 
-def _run(*args: str) -> subprocess.CompletedProcess[str]:
+def _run(
+    *args: str, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(SCRIPT), *args],
         capture_output=True,
         text=True,
         check=False,
+        env=env,
     )
 
 
@@ -85,3 +89,36 @@ def test_queue_state_progress_writes_canonical_summary(tmp_path: Path) -> None:
         "progress_pct": 50,
         "status": "running",
     }
+
+
+def test_queue_state_estimate_task_memory_preserves_stdout_contract(
+    tmp_path: Path,
+) -> None:
+    profile = tmp_path / "profile.json"
+    profile.write_text(
+        json.dumps(
+            {
+                "model_id": "allenai/OLMo-2-1124-7B",
+                "weights_gb": 14,
+                "hidden_size": 4096,
+                "num_layers": 32,
+                "num_heads": 32,
+                "num_kv_heads": 32,
+                "dtype_bytes": 2,
+            }
+        ),
+        encoding="utf-8",
+    )
+    env = {
+        **os.environ,
+        "TASK_TYPE": "CALIBRATION_RUN",
+        "MODEL_ID": "allenai/OLMo-2-1124-7B",
+        "PROFILE_PATH": str(profile),
+        "GPU_MEMORY_PER_DEVICE": "80",
+        "NUM_GPUS": "1",
+    }
+
+    result = _run("estimate-task-memory", env=env)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.strip() == "44 1"

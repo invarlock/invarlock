@@ -6,11 +6,17 @@ from pathlib import Path
 import torch
 
 try:
-    from .common import _NUMERIC_COERCION_ERRORS, _shrink_layer_stack
-    from .config import fix_layer_drop_config
+    from .common import (
+        _NUMERIC_COERCION_ERRORS,
+        _shrink_layer_stack,
+        fix_layer_drop_config,
+    )
 except ImportError:  # pragma: no cover - direct script-path loading in tests
-    from error_model.common import _NUMERIC_COERCION_ERRORS, _shrink_layer_stack
-    from error_model.config import fix_layer_drop_config
+    from error_model.common import (
+        _NUMERIC_COERCION_ERRORS,
+        _shrink_layer_stack,
+        fix_layer_drop_config,
+    )
 
 
 def _inject_nan_injection(

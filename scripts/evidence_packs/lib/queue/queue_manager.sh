@@ -1623,7 +1623,7 @@ update_model_task_memory() {
                 INVARLOCK_OVERHEAD_GB="${INVARLOCK_OVERHEAD_GB:-6}" \
                 GPU_MEMORY_PER_DEVICE="${GPU_MEMORY_PER_DEVICE:-${GPU_MEMORY_GB:-180}}" \
                 NUM_GPUS="${NUM_GPUS:-8}" \
-                _cmd_python "${pack_root}/python/estimate_task_memory.py"
+                _cmd_python "${pack_root}/python/queue_state.py" estimate-task-memory
             )
 
             local required_mem=""

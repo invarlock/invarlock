@@ -97,6 +97,307 @@ mock_reset() {
     mkdir -p "${TEST_TMPDIR}/fixtures"
 }
 
+mock_install_bin_dir() {
+    local bin_dir="${TEST_TMPDIR}/mocks/bin"
+    local dispatcher="${bin_dir}/mock-command"
+    mkdir -p "${bin_dir}"
+    cat > "${dispatcher}" <<'EOF'
+#!/bin/bash
+set -euo pipefail
+
+tool="$(basename "$0")"
+fixtures="${TEST_TMPDIR:-}/fixtures"
+
+get_flag_val() {
+    local flag="$1"
+    shift
+    local -a args=("$@")
+    local i
+    for ((i=0; i<${#args[@]}; i++)); do
+        if [[ "${args[$i]}" == "${flag}" ]]; then
+            echo "${args[$((i+1))]:-}"
+            return 0
+        fi
+    done
+    return 1
+}
+
+case "${tool}" in
+    date)
+        fixtures_dir="${fixtures}/date"
+        mkdir -p "${fixtures_dir}" 2>/dev/null || true
+        for arg in "$@"; do
+            case "${arg}" in
+                -d|-j|-v*) exit 1 ;;
+            esac
+        done
+        fmt="${*: -1}"
+        case "${fmt}" in
+            +%s)
+                base="$(cat "${fixtures_dir}/epoch" 2>/dev/null || echo "1700000000")"
+                counter_file="${fixtures_dir}/epoch.counter"
+                if [[ -f "${counter_file}" ]]; then
+                    cur="$(cat "${counter_file}" 2>/dev/null || echo "${base}")"
+                else
+                    cur="${base}"
+                fi
+                echo "${cur}"
+                echo "$((cur + 1))" > "${counter_file}" 2>/dev/null || true
+                ;;
+            +%Y%m%d_%H%M%S) cat "${fixtures_dir}/compact" 2>/dev/null || echo "20250101_000000" ;;
+            +%Y-%m-%d\ %H:%M:%S) cat "${fixtures_dir}/pretty" 2>/dev/null || echo "2025-01-01 00:00:00" ;;
+            +%Y-%m-%dT%H:%M:%SZ) cat "${fixtures_dir}/iso" 2>/dev/null || echo "2025-01-01T00:00:00Z" ;;
+            *) echo "2025-01-01T00:00:00Z" ;;
+        esac
+        ;;
+    df)
+        mode=""
+        args=("$@")
+        for arg in "${args[@]}"; do
+            case "${arg}" in
+                -P) mode="P" ;;
+                -BG) mode="BG" ;;
+            esac
+        done
+        path="${args[$(( ${#args[@]} - 1 ))]}"
+        base="$(basename "${path}" 2>/dev/null || echo "")"
+        if [[ -n "${TEST_TMPDIR:-}" && -n "${mode}" && -n "${base}" && -f "${fixtures}/df.${mode}.${base}" ]]; then
+            cat "${fixtures}/df.${mode}.${base}"
+        elif [[ -n "${TEST_TMPDIR:-}" && -f "${fixtures}/df.out" ]]; then
+            cat "${fixtures}/df.out"
+        else
+            cat <<'DFEOF'
+Filesystem  1G-blocks  Used Available Use% Mounted on
+/dev/mock      1000    10       990   1% /
+DFEOF
+        fi
+        ;;
+    du)
+        cat "${fixtures}/du.out" 2>/dev/null || printf '0\t.\n'
+        ;;
+    flock)
+        exit 0
+        ;;
+    hostname)
+        cat "${fixtures}/hostname" 2>/dev/null || echo "test-host"
+        ;;
+    invarlock)
+        subcmd="${1:-}"
+        shift || true
+        mkdir -p "${fixtures}" 2>/dev/null || true
+        if [[ -f "${fixtures}/invarlock.stub" ]]; then
+            [[ -f "${fixtures}/invarlock.stdout" ]] && cat "${fixtures}/invarlock.stdout"
+            [[ -f "${fixtures}/invarlock.stderr" ]] && cat "${fixtures}/invarlock.stderr" >&2
+            if [[ -f "${fixtures}/invarlock.rc" ]]; then
+                rc="$(cat "${fixtures}/invarlock.rc" 2>/dev/null || echo "0")"
+                exit "${rc}"
+            fi
+            exit 0
+        fi
+        echo "invarlock ${subcmd} $*" >> "${fixtures}/invarlock.calls" 2>/dev/null || true
+        if [[ -f "${fixtures}/invarlock.capture_env_keys" ]]; then
+            while IFS= read -r key; do
+                [[ -z "${key}" ]] && continue
+                value=""
+                [[ "${!key+x}" == "x" ]] && value="${!key}"
+                printf '%s=%s\n' "${key}" "${value}" >> "${fixtures}/invarlock.env"
+            done < "${fixtures}/invarlock.capture_env_keys"
+        fi
+        case "${subcmd}" in
+            run)
+                out_dir="$(get_flag_val --out "$@" || true)"
+                if [[ -n "${out_dir:-}" ]]; then
+                    if [[ -f "${fixtures}/invarlock.create_report_nested" ]]; then
+                        nested_dir="${out_dir}/run_1"
+                        mkdir -p "${nested_dir}"
+                        printf '{"ok":true}\n' > "${nested_dir}/report.json"
+                    elif [[ -f "${fixtures}/invarlock.create_report" ]]; then
+                        mkdir -p "${out_dir}"
+                        printf '{"ok":true}\n' > "${out_dir}/report.json"
+                    fi
+                fi
+                ;;
+            evaluate)
+                cert_out="$(get_flag_val --report-out "$@" || true)"
+                out_dir="$(get_flag_val --out "$@" || true)"
+                target="${cert_out:-${out_dir:-}}"
+                if [[ -n "${target:-}" && -f "${fixtures}/invarlock.create_cert" ]]; then
+                    mkdir -p "${target}"
+                    printf '{"ok":true}\n' > "${target}/evaluation.report.json"
+                fi
+                if [[ -n "${target:-}" && -f "${fixtures}/invarlock.create_report_for_evaluate" ]]; then
+                    nested_dir="${target}/edited/000000"
+                    mkdir -p "${nested_dir}"
+                    printf '{"ok":true}\n' > "${nested_dir}/report.json"
+                fi
+                ;;
+        esac
+        if [[ -f "${fixtures}/invarlock.rc" ]]; then
+            rc="$(cat "${fixtures}/invarlock.rc" 2>/dev/null || echo "0")"
+            [[ "${rc}" =~ ^-?[0-9]+$ ]] && exit "${rc}"
+        fi
+        exit 0
+        ;;
+    kill)
+        mkdir -p "${fixtures}" 2>/dev/null || true
+        echo "kill $*" >> "${fixtures}/kill.calls" 2>/dev/null || true
+        if [[ "${1:-}" == "-0" && -n "${2:-}" ]]; then
+            pid="${2}"
+            grep -q -E "^${pid}$" "${fixtures}/kill/alive" 2>/dev/null
+            exit $?
+        fi
+        exit 0
+        ;;
+    nvidia-smi)
+        fixtures_dir="${fixtures}/nvidia-smi"
+        gpu_id=""
+        query=""
+        args=("$@")
+        for ((i=0; i<${#args[@]}; i++)); do
+            case "${args[$i]}" in
+                -i) gpu_id="${args[$((i+1))]:-}" ;;
+                --query-gpu=*) query="${args[$i]#--query-gpu=}" ;;
+                --query-compute-apps=*) query="${args[$i]#--query-compute-apps=}" ;;
+            esac
+        done
+        [[ -n "${gpu_id}" ]] || gpu_id="0"
+        if [[ -z "${query}" && -f "${fixtures_dir}/invalid_ids" ]] && grep -q -E "^${gpu_id}$" "${fixtures_dir}/invalid_ids" 2>/dev/null; then
+            exit 1
+        fi
+        case "${query}" in
+            index) cat "${fixtures_dir}/indices" 2>/dev/null || echo "0" ;;
+            memory.free) cat "${fixtures_dir}/memory_free.${gpu_id}" 2>/dev/null || echo "0" ;;
+            memory.total) cat "${fixtures_dir}/memory_total.${gpu_id}" 2>/dev/null || echo "184320" ;;
+            utilization.gpu) cat "${fixtures_dir}/utilization.${gpu_id}" 2>/dev/null || echo "0" ;;
+            pid) cat "${fixtures_dir}/compute_pids.${gpu_id}" 2>/dev/null || true ;;
+            *) ;;
+        esac
+        ;;
+    ps)
+        fixtures_dir="${fixtures}/ps"
+        want_pgid="false"
+        pid=""
+        args=("$@")
+        for ((i=0; i<${#args[@]}; i++)); do
+            case "${args[$i]}" in
+                -o)
+                    [[ "${args[$((i+1))]:-}" == "pgid=" ]] && want_pgid="true"
+                    ;;
+                -p) pid="${args[$((i+1))]:-}" ;;
+            esac
+        done
+        [[ -n "${pid}" ]] || exit 1
+        grep -q -E "^${pid}$" "${fixtures_dir}/alive" 2>/dev/null || exit 1
+        if [[ "${want_pgid}" == "true" ]]; then
+            cat "${fixtures_dir}/pgid.${pid}" 2>/dev/null || echo "${pid}"
+        fi
+        ;;
+    python3)
+        real_python3="${TEST_REAL_PYTHON3:-}"
+        if [[ -n "${TEST_TMPDIR:-}" && "${1:-}" == */run_from_config.py ]]; then
+            mkdir -p "${fixtures}"
+            echo "python3 $*" >> "${fixtures}/python3.calls" 2>/dev/null || true
+            if [[ -f "${fixtures}/python3.capture_env_keys" ]]; then
+                while IFS= read -r key; do
+                    [[ -z "${key}" ]] && continue
+                    value=""
+                    [[ "${!key+x}" == "x" ]] && value="${!key}"
+                    printf '%s=%s\n' "${key}" "${value}" >> "${fixtures}/python3.env"
+                done < "${fixtures}/python3.capture_env_keys"
+            fi
+            out_dir="$(get_flag_val --out "$@" || true)"
+            if [[ -n "${out_dir:-}" ]]; then
+                if [[ -f "${fixtures}/python3.create_report_nested" ]]; then
+                    nested_dir="${out_dir}/run_1"
+                    mkdir -p "${nested_dir}"
+                    printf '{"ok":true}\n' > "${nested_dir}/report.json"
+                elif [[ -f "${fixtures}/python3.create_report" ]]; then
+                    mkdir -p "${out_dir}"
+                    printf '{"ok":true}\n' > "${out_dir}/report.json"
+                fi
+            fi
+            [[ -f "${fixtures}/python3.stdout" ]] && cat "${fixtures}/python3.stdout"
+            [[ -f "${fixtures}/python3.stderr" ]] && cat "${fixtures}/python3.stderr" >&2
+            if [[ -f "${fixtures}/python3.rc" ]]; then
+                rc="$(cat "${fixtures}/python3.rc" 2>/dev/null || echo "0")"
+                exit "${rc}"
+            fi
+            exit 0
+        fi
+        if [[ -f "${fixtures}/python3.stub" ]]; then
+            if [[ -f "${fixtures}/python3.real_passthrough" && -n "${1:-}" ]]; then
+                while IFS= read -r script_name || [[ -n "${script_name}" ]]; do
+                    [[ -n "${script_name}" ]] || continue
+                    if [[ "${1}" == "${script_name}" || "${1}" == */"${script_name}" ]]; then
+                        [[ -n "${real_python3}" && -x "${real_python3}" ]] || {
+                            echo "ERROR: TEST_REAL_PYTHON3 is not set to an executable path" >&2
+                            exit 127
+                        }
+                        exec "${real_python3}" "$@"
+                    fi
+                done < "${fixtures}/python3.real_passthrough"
+            fi
+            [[ -f "${fixtures}/python3.stdout" ]] && cat "${fixtures}/python3.stdout"
+            [[ -f "${fixtures}/python3.stderr" ]] && cat "${fixtures}/python3.stderr" >&2
+            if [[ -f "${fixtures}/python3.rc" ]]; then
+                rc="$(cat "${fixtures}/python3.rc" 2>/dev/null || echo "0")"
+                exit "${rc}"
+            fi
+            exit 0
+        fi
+        [[ -n "${real_python3}" && -x "${real_python3}" ]] || {
+            echo "ERROR: TEST_REAL_PYTHON3 is not set to an executable path" >&2
+            exit 127
+        }
+        exec "${real_python3}" "$@"
+        ;;
+    sleep)
+        mkdir -p "${fixtures}" 2>/dev/null || true
+        echo "sleep $*" >> "${fixtures}/sleep.calls" 2>/dev/null || true
+        ;;
+    stat)
+        fixtures_file="${fixtures}/stat/mtime"
+        fmt=""
+        args=("$@")
+        for ((i=0; i<${#args[@]}; i++)); do
+            case "${args[$i]}" in
+                -c|-f) fmt="${args[$((i+1))]:-}" ;;
+            esac
+        done
+        path="${args[$(( ${#args[@]} - 1 ))]}"
+        if [[ -f "${fixtures_file}" ]]; then
+            value="$(awk -v p="${path}" 'BEGIN{found=0} $1==p {print $2; found=1; exit} END{if(!found) exit 1}' "${fixtures_file}" 2>/dev/null || true)"
+            [[ -n "${value:-}" ]] && { echo "${value}"; exit 0; }
+        fi
+        echo "1700000000"
+        ;;
+    timeout)
+        if [[ -f "${fixtures}/timeout.stub" ]]; then
+            echo "timeout $*" >> "${fixtures}/timeout.calls" 2>/dev/null || true
+            if [[ -f "${fixtures}/timeout.rc" ]]; then
+                rc="$(cat "${fixtures}/timeout.rc" 2>/dev/null || echo "0")"
+                exit "${rc}"
+            fi
+            exit 0
+        fi
+        [[ $# -ge 2 ]] || exit 1
+        shift
+        exec "$@"
+        ;;
+    *)
+        echo "unknown mock command: ${tool}" >&2
+        exit 127
+        ;;
+esac
+EOF
+    chmod +x "${dispatcher}"
+    local command_name
+    for command_name in date df du flock hostname invarlock kill nvidia-smi ps python3 sleep stat timeout; do
+        ln -sf "mock-command" "${bin_dir}/${command_name}"
+    done
+    echo "${bin_dir}"
+}
+
 mock_python3_stub_enable() {
     fixture_write "python3.stub" ""
 }

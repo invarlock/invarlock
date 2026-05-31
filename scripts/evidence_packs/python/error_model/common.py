@@ -7,19 +7,22 @@ import re
 import shutil
 import sys
 import zlib
+from collections.abc import Mapping, MutableMapping
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import torch
+if TYPE_CHECKING:
+    import torch
 
 try:
-    from ..model_io.hf_causal_loader import load_causal_model
+    from ..runtime_tools import load_causal_model
 except ImportError:  # pragma: no cover - direct module load under pytest
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from model_io.hf_causal_loader import load_causal_model
+    from runtime_tools import load_causal_model
 
 _IMPORT_OR_LOAD_ERRORS = (ImportError, ModuleNotFoundError, OSError, RuntimeError)
 _NUMERIC_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
+_CONFIG_ATTR_ERRORS = (AttributeError, RuntimeError, TypeError, ValueError)
 _OVERLAY_FALLBACK_ERRORS = (
     OSError,
     RuntimeError,
@@ -28,6 +31,103 @@ _OVERLAY_FALLBACK_ERRORS = (
     json.JSONDecodeError,
     KeyError,
 )
+
+
+def fix_layer_drop_config(
+    config: Any,
+    *,
+    total_layers: int,
+    kept_layers: int,
+    baseline_config: Mapping[str, Any] | None = None,
+) -> None:
+    if config is None:
+        return
+
+    if not isinstance(total_layers, int) or not isinstance(kept_layers, int):
+        return
+    if total_layers < 1 or kept_layers < 1 or kept_layers > total_layers:
+        return
+
+    for key in ("num_hidden_layers", "n_layer", "num_layers"):
+        if hasattr(config, key):
+            try:
+                setattr(config, key, int(kept_layers))
+            except _CONFIG_ATTR_ERRORS:
+                continue
+
+    # Some architectures (e.g., Qwen2) store per-layer config lists such as
+    # `layer_types`. If we shrink the transformer stack, these lists must be
+    # truncated to match the new `num_hidden_layers` or model loading fails.
+    try:
+        items = list(vars(config).items())
+    except TypeError:
+        items = []
+
+    for name, value in items:
+        if "layer" not in name:
+            continue
+        if not isinstance(value, list):
+            continue
+        if len(value) != total_layers:
+            continue
+        try:
+            setattr(config, name, value[:kept_layers])
+        except _CONFIG_ATTR_ERRORS:
+            continue
+
+    if baseline_config is None:
+        return
+
+    # Some configs can lose optional attributes during save/load (custom
+    # transformers configs + remote-code-backed configs). Preserve baseline
+    # settings when they are present but become null on the mutated config.
+    if (
+        hasattr(config, "sliding_window")
+        and getattr(config, "sliding_window", None) is None
+    ):
+        sliding_window = baseline_config.get("sliding_window")
+        if isinstance(sliding_window, int) and sliding_window > 0:
+            try:
+                config.sliding_window = sliding_window
+            except _CONFIG_ATTR_ERRORS:
+                pass
+
+
+def fix_layer_drop_config_json(
+    config: MutableMapping[str, Any],
+    *,
+    total_layers: int,
+    kept_layers: int,
+    baseline_config: Mapping[str, Any] | None = None,
+) -> None:
+    if not isinstance(total_layers, int) or not isinstance(kept_layers, int):
+        return
+    if total_layers < 1 or kept_layers < 1 or kept_layers > total_layers:
+        return
+
+    for key in ("num_hidden_layers", "n_layer", "num_layers"):
+        if key in config:
+            try:
+                config[key] = int(kept_layers)
+            except (TypeError, ValueError, OverflowError):
+                pass
+
+    for name, value in list(config.items()):
+        if "layer" not in name:
+            continue
+        if not isinstance(value, list):
+            continue
+        if len(value) != total_layers:
+            continue
+        config[name] = value[:kept_layers]
+
+    if baseline_config is None:
+        return
+
+    if config.get("sliding_window") is None:
+        sliding_window = baseline_config.get("sliding_window")
+        if isinstance(sliding_window, int) and sliding_window > 0:
+            config["sliding_window"] = sliding_window
 
 
 def _is_norm_module(module: torch.nn.Module) -> bool:
@@ -87,6 +187,8 @@ def _select_row_indices(
     seed: int,
     name: str,
 ) -> torch.Tensor:
+    import torch
+
     """Select row indices deterministically (per-param) for row-wise probes."""
     rows = max(0, min(int(rows), int(w.shape[0])))
     if rows <= 0:
@@ -171,6 +273,8 @@ def _shape_mismatch_overlay_safetensors(
     index_path = baseline_path / "model.safetensors.index.json"
     if not index_path.is_file():
         return None
+
+    import torch
 
     try:
         from safetensors import safe_open
@@ -303,9 +407,11 @@ def _shape_mismatch_overlay_safetensors(
 def _load_error_model(
     *, baseline_path: Path, trust_remote_code: bool
 ) -> tuple[torch.nn.Module, bool]:
+    import torch
+
     # trust_remote_code is gated by require_remote_code_opt_in /
-    # INVARLOCK_ALLOW_REMOTE_CODE in create_error_model.py before it reaches
-    # this shared helper.
+    # INVARLOCK_ALLOW_REMOTE_CODE in task_tools.py create-error-model before it
+    # reaches this shared helper.
     try:
         model, _ = load_causal_model(
             baseline_path,
@@ -344,6 +450,8 @@ def _collect_block_params(
 
 
 def _shrink_layer_stack(container: object, attr: str) -> tuple[bool, int, int]:
+    import torch
+
     layers = getattr(container, attr, None)
     if layers is None:
         return False, 0, 0
@@ -374,6 +482,8 @@ def _save_error_model(
     use_gpu: bool,
 ) -> None:
     if use_gpu:
+        import torch
+
         model = model.cpu()
         gc.collect()
         torch.cuda.empty_cache()

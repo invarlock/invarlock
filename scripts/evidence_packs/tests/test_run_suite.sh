@@ -277,3 +277,81 @@ test_run_suite_entrypoint_requires_remote_code_opt_in() {
     assert_match "require INVARLOCK_ALLOW_REMOTE_CODE=1" "${RUN_ERR}" "error explains missing remote-code opt-in"
     [[ ! -f "${TEST_TMPDIR}/entrypoint.called" ]] || t_fail "pack_run_suite should not run without remote-code opt-in"
 }
+
+test_run_suite_list_returns_known_suites() {
+    mock_reset
+
+    source_run_suite_with_remote_code
+
+    local out
+    out="$(pack_list_suites)"
+    assert_match "subset" "${out}" "lists subset"
+    assert_match "showcase" "${out}" "lists showcase"
+    assert_match "workshop3" "${out}" "lists workshop3"
+    assert_match "full" "${out}" "lists full"
+}
+
+test_run_suite_apply_subset_sets_models() {
+    mock_reset
+
+    source_run_suite_with_remote_code
+
+    pack_apply_suite subset
+
+    assert_eq "subset" "${PACK_SUITE}" "suite set"
+    assert_eq "mistralai/Mistral-7B-v0.1" "${MODEL_1}" "model 1 set"
+    assert_eq "" "${MODEL_2}" "model 2 cleared"
+    assert_eq "" "${MODEL_3}" "model 3 cleared"
+}
+
+test_run_suite_apply_full_sets_models() {
+    mock_reset
+
+    source_run_suite_with_remote_code
+
+    pack_apply_suite full
+
+    assert_eq "full" "${PACK_SUITE}" "suite set"
+    assert_eq "mistralai/Mistral-7B-v0.1" "${MODEL_1}" "model 1 set"
+    assert_eq "Qwen/Qwen2.5-14B" "${MODEL_2}" "model 2 set"
+    assert_eq "Qwen/Qwen2.5-32B" "${MODEL_3}" "model 3 set"
+    assert_eq "01-ai/Yi-34B" "${MODEL_4}" "model 4 set"
+    assert_eq "mistralai/Mixtral-8x7B-v0.1" "${MODEL_5}" "model 5 set"
+}
+
+test_run_suite_apply_showcase_sets_models() {
+    mock_reset
+
+    source_run_suite_with_remote_code
+
+    pack_apply_suite showcase
+
+    assert_eq "showcase" "${PACK_SUITE}" "suite set"
+    assert_eq "mistralai/Mistral-7B-v0.1" "${MODEL_1}" "model 1 set"
+    assert_eq "Qwen/Qwen2.5-14B" "${MODEL_2}" "model 2 set"
+    assert_eq "Qwen/Qwen2.5-32B" "${MODEL_3}" "model 3 set"
+    assert_eq "" "${MODEL_4}" "model 4 cleared"
+}
+
+test_run_suite_apply_workshop3_sets_models() {
+    mock_reset
+
+    source_run_suite_with_remote_code
+
+    pack_apply_suite workshop3
+
+    assert_eq "workshop3" "${PACK_SUITE}" "suite set"
+    assert_eq "mistralai/Mistral-7B-v0.1" "${MODEL_1}" "model 1 set"
+    assert_eq "mistralai/Mixtral-8x7B-v0.1" "${MODEL_2}" "model 2 set"
+    assert_eq "01-ai/Yi-34B" "${MODEL_3}" "model 3 set"
+    assert_eq "" "${MODEL_4}" "model 4 cleared"
+}
+
+test_run_suite_apply_invalid_suite_returns_error() {
+    mock_reset
+
+    source_run_suite_with_remote_code
+
+    run pack_apply_suite nope
+    assert_rc "2" "${RUN_RC}" "invalid suite returns 2"
+}

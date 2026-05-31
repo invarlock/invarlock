@@ -3,7 +3,7 @@
 pack_test_sign_manifest() {
     local pack_dir="$1"
     local repo_root="${TEST_ROOT:-$(pwd)}"
-    python3 "${repo_root}/scripts/evidence_packs/python/sign_manifest.py" \
+    python3 "${repo_root}/scripts/evidence_packs/python/manifest_writer.py" sign \
         --manifest "${pack_dir}/manifest.json" \
         --generate-ephemeral \
         >/dev/null
@@ -287,12 +287,48 @@ test_verify_pack_sha256_cmd_fallback_and_no_reports() {
 
     local bin_dir="${TEST_TMPDIR}/bin"
     mkdir -p "${bin_dir}"
-    local repo_root
-    repo_root="$(pwd)"
-    cat > "${bin_dir}/shasum" <<EOF
+    cat > "${bin_dir}/shasum" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-exec python3 "${repo_root}/scripts/evidence_packs/python/shasum_mock.py" "\$@"
+python3 - "$@" <<'PY'
+from __future__ import annotations
+
+import hashlib
+import pathlib
+import sys
+
+args = sys.argv[1:]
+check_file = None
+files: list[str] = []
+i = 0
+while i < len(args):
+    if args[i] == "-a":
+        i += 2
+    elif args[i] == "-c":
+        check_file = args[i + 1] if i + 1 < len(args) else ""
+        i += 2
+    else:
+        files.append(args[i])
+        i += 1
+
+
+def sha256(path: str) -> str:
+    return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+
+
+if check_file:
+    ok = True
+    for line in pathlib.Path(check_file).read_text().splitlines():
+        if not line.strip():
+            continue
+        parts = line.split()
+        if sha256(parts[-1]) != parts[0]:
+            ok = False
+    raise SystemExit(0 if ok else 1)
+
+for filename in files:
+    print(f"{sha256(filename)}  {filename}")
+PY
 EOF
     chmod +x "${bin_dir}/shasum"
 

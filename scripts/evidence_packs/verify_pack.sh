@@ -119,10 +119,10 @@ pack_verify_manifest_binds_checksums() {
 
 pack_validate_manifest_schema() {
     local pack_dir="$1"
-    local validator="${SCRIPT_DIR}/python/validate_manifest.py"
+    local validator="${SCRIPT_DIR}/python/verify_pack_checks.py"
     local out
 
-    if ! out="$(_cmd_python "${validator}" "${pack_dir}/manifest.json" 2>&1)"; then
+    if ! out="$(_cmd_python "${validator}" validate-manifest "${pack_dir}/manifest.json" 2>&1)"; then
         echo "ERROR: manifest.json failed contract validation." >&2
         printf '%s\n' "${out}" >&2
         return 1
@@ -132,10 +132,10 @@ pack_validate_manifest_schema() {
 
 pack_verify_manifest_provenance() {
     local pack_dir="$1"
-    local verifier="${SCRIPT_DIR}/python/verify_manifest_provenance.py"
+    local verifier="${SCRIPT_DIR}/python/verify_pack_checks.py"
     local out
 
-    if ! out="$(_cmd_python "${verifier}" "${pack_dir}" 2>&1)"; then
+    if ! out="$(_cmd_python "${verifier}" manifest-provenance "${pack_dir}" 2>&1)"; then
         echo "ERROR: manifest.json provenance references failed verification." >&2
         printf '%s\n' "${out}" >&2
         return 1
@@ -167,8 +167,7 @@ pack_verify_signature_helper() {
     local pack_dir="$1"
     local strict="$2"
     local expected_fingerprint="$3"
-    local helper="${SCRIPT_DIR}/python/verify_signature.py"
-    local -a args=("${helper}")
+    local -a args=("${SCRIPT_DIR}/python/verify_pack_checks.py" signature)
 
     if [[ "${strict}" == "1" ]]; then
         args+=("--strict")

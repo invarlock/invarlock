@@ -4,7 +4,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 HELPERS_SH="${SCRIPT_DIR}/helpers.sh"
-MOCK_BIN_DIR="${SCRIPT_DIR}/mocks/bin"
 
 FILTER_REGEX=""
 DO_BRANCH_COVERAGE="false"
@@ -66,12 +65,10 @@ coverage_owner_hint() {
         scripts/evidence_packs/lib/queue/gpu_worker.sh) echo "scripts/evidence_packs/tests/test_gpu_worker.sh" ;;
         scripts/evidence_packs/lib/core/fault_tolerance.sh) echo "scripts/evidence_packs/tests/test_fault_tolerance.sh" ;;
         scripts/evidence_packs/lib/tasks/task_functions.sh) echo "scripts/evidence_packs/tests/test_task_functions.sh" ;;
-        scripts/evidence_packs/lib/validation/result_compiler.sh) echo "scripts/evidence_packs/tests/test_result_compiler.sh" ;;
         scripts/evidence_packs/lib/tasks/model_creation.sh) echo "scripts/evidence_packs/tests/test_model_creation.sh" ;;
         scripts/evidence_packs/lib/core/runtime.sh) echo "scripts/evidence_packs/tests/test_runtime.sh" ;;
         scripts/evidence_packs/lib/validation/validation_suite.sh) echo "scripts/evidence_packs/tests/test_validation_suite.sh" ;;
         scripts/evidence_packs/lib/core/setup_remote.sh) echo "scripts/evidence_packs/tests/test_setup_remote.sh" ;;
-        scripts/evidence_packs/suites.sh) echo "scripts/evidence_packs/tests/test_suites.sh" ;;
         scripts/evidence_packs/run_qwen14_sentinels.sh) echo "scripts/evidence_packs/tests/test_run_qwen14_sentinels.sh" ;;
         scripts/evidence_packs/run_suite.sh) echo "scripts/evidence_packs/tests/test_run_suite.sh" ;;
         scripts/evidence_packs/run_mini_pack_gate.sh) echo "scripts/evidence_packs/tests/test_run_mini_pack_gate.sh" ;;
@@ -924,16 +921,16 @@ run_one_test() {
 export TEST_ROOT="."
 export TEST_TMPDIR="$2"
 export TEST_REAL_PYTHON3="$3"
-export PATH="$4:$PATH"
+source "$4"
+export PATH="$(mock_install_bin_dir):$PATH"
 source "$5"
-source "$6"
 # Keep xtrace prefixes short to avoid bash 3.2 truncation on long absolute paths.
 # Note: bash 3.2 truncates long PS4 expansions; we rely on shorter prod script paths
 # and ignore malformed trace lines from very long absolute paths (e.g., temp dirs).
 export PS4="__XTRACE__:\${BASH_SOURCE[0]:-}:\${LINENO}: "
 	set -x
-	"$7"
-	        ' -- "${ROOT_DIR}" "${tmp_dir}" "${REAL_PYTHON3}" "${MOCK_BIN_DIR}" "${HELPERS_SH}" "${file}" "${fn}" >"${out_file}" 2>"${err_file}" </dev/null
+	"$6"
+	        ' -- "${ROOT_DIR}" "${tmp_dir}" "${REAL_PYTHON3}" "${HELPERS_SH}" "${file}" "${fn}" >"${out_file}" 2>"${err_file}" </dev/null
 	    rc=$?
 	    if [[ ${rc} -eq 0 ]]; then
             local safe_id trace_copy
@@ -953,11 +950,11 @@ export PS4="__XTRACE__:\${BASH_SOURCE[0]:-}:\${LINENO}: "
 export TEST_ROOT="."
 export TEST_TMPDIR="$2"
 export TEST_REAL_PYTHON3="$3"
-export PATH="$4:$PATH"
+	source "$4"
+export PATH="$(mock_install_bin_dir):$PATH"
 	source "$5"
-	source "$6"
-	"$7"
-	        ' -- "${ROOT_DIR}" "${tmp_dir}" "${REAL_PYTHON3}" "${MOCK_BIN_DIR}" "${HELPERS_SH}" "${file}" "${fn}" >"${out_file}" 2>"${err_file}" </dev/null
+	"$6"
+	        ' -- "${ROOT_DIR}" "${tmp_dir}" "${REAL_PYTHON3}" "${HELPERS_SH}" "${file}" "${fn}" >"${out_file}" 2>"${err_file}" </dev/null
 	    rc=$?
 	    if [[ ${rc} -eq 0 ]]; then
             rm -rf "${tmp_dir}"

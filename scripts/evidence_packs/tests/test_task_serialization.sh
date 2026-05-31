@@ -35,7 +35,7 @@ test_task_serialization_requires_jq_when_missing() {
                 echo "${path%/*}"
             fi
         }
-        export PATH="${TEST_ROOT}/scripts/evidence_packs/tests/mocks/bin"
+        export PATH="$(mock_install_bin_dir)"
         # shellcheck source=../task_serialization.sh
         source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_serialization.sh"
         assert_eq "0" "${TASK_SERIALIZATION_HAS_JQ}" "detects jq missing"

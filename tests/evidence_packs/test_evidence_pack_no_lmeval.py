@@ -14,7 +14,6 @@ def test_evidence_pack_does_not_depend_on_lmeval() -> None:
         repo_root / "scripts/evidence_packs/lib/tasks/task_serialization.sh",
         repo_root / "scripts/evidence_packs/lib/queue/queue_manager.sh",
         repo_root / "scripts/evidence_packs/lib/tasks/task_functions.sh",
-        repo_root / "scripts/evidence_packs/lib/validation/result_compiler.sh",
     ]
 
     combined = "\n".join(path.read_text(encoding="utf-8") for path in paths)

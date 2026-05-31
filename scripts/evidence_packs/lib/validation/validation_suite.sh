@@ -15,7 +15,7 @@
 # - Dense low-rank-SVD approximated validation checkpoint: clean tuned preset per model, rank-32 stress
 #
 # MODEL SUITES:
-# - Defined in scripts/evidence_packs/suites.sh (ungated-only models).
+# - Defined in scripts/evidence_packs/run_suite.sh (ungated-only models).
 # - Subset targets single-GPU runs; full targets multi-GPU hardware.
 #
 # EXECUTION FLOW:
@@ -67,8 +67,35 @@ unset _pack_prev_script_dir_was_set _pack_prev_script_dir_value
 
 # shellcheck source=../config/config_generator.sh
 source "${_PACK_VALIDATION_LIB_ROOT}/config/config_generator.sh"
-# shellcheck source=result_compiler.sh
-source "${_PACK_VALIDATION_LIB_DIR}/result_compiler.sh"
+
+_pack_result_compiler_root() {
+    cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd
+}
+
+compile_results() {
+    mkdir -p "${OUTPUT_DIR}/analysis" "${OUTPUT_DIR}/reports"
+}
+
+run_analysis() {
+    # Optional, non-gating analysis artifacts can be written under ${OUTPUT_DIR}/analysis.
+    mkdir -p "${OUTPUT_DIR}/analysis"
+}
+
+generate_verdict() {
+    log_section "FINAL VERDICT"
+
+    local root
+    root="$(_pack_result_compiler_root)"
+
+    local -a manifest_args=()
+    if [[ -f "${OUTPUT_DIR}/state/scenarios.json" ]]; then
+        manifest_args+=(--manifest "${OUTPUT_DIR}/state/scenarios.json")
+    fi
+
+    python3 "${root}/python/verdict_generator.py" --output-dir "${OUTPUT_DIR}" "${manifest_args[@]}"
+    log "Wrote: ${OUTPUT_DIR}/reports/final_verdict.txt"
+    log "Wrote: ${OUTPUT_DIR}/reports/final_verdict.json"
+}
 
 
 # ============ CLEANUP TRAP ============
@@ -159,7 +186,7 @@ fi
 # ============================================================
 # MODEL SELECTION (DEFAULT FULL SUITE)
 # ============================================================
-# Defaults are ungated/public. run_suite.sh overrides these via suites.sh.
+# Defaults are ungated/public. run_suite.sh overrides these via its suite definitions.
 # Approx VRAM below is weights-only; exact per-task memory is computed from
 # `model_profile.json` after download.
 
@@ -255,7 +282,7 @@ pack_preflight_models() {
     local out_file="${output_dir}/state/model_revisions.json"
     local repo_root
     repo_root="$(_pack_validation_repo_root)"
-    python3 "${repo_root}/scripts/evidence_packs/python/preflight_models.py" "${out_file}" "${models[@]}" || return 1
+    python3 "${repo_root}/scripts/evidence_packs/python/validation_state.py" preflight-models "${out_file}" "${models[@]}" || return 1
     PACK_MODEL_REVISIONS_FILE="${out_file}"
     export PACK_MODEL_REVISIONS_FILE
 }
@@ -360,7 +387,7 @@ pack_preflight_datasets() {
     local repo_root
     repo_root="$(_pack_validation_repo_root)"
 
-    if python3 "${repo_root}/scripts/evidence_packs/python/dataset_preflight.py" | tee -a "${LOG_FILE}"; then
+    if python3 "${repo_root}/scripts/evidence_packs/python/runtime_tools.py" dataset-preflight | tee -a "${LOG_FILE}"; then
         log "Dataset preflight: OK"
         return 0
     fi
@@ -465,7 +492,8 @@ pack_run_determinism_repeats() {
     mkdir -p "${OUTPUT_DIR}/analysis" || return 1
     local repo_root
     repo_root="$(_pack_validation_repo_root)"
-    python3 "${repo_root}/scripts/evidence_packs/python/determinism_repeats_summary.py" \
+    python3 "${repo_root}/scripts/evidence_packs/python/validation_state.py" \
+        determinism-repeats-summary \
         "${OUTPUT_DIR}/analysis/determinism_repeats.json" \
         "${model_id}" \
         "${edit_name}" \
@@ -685,7 +713,7 @@ resolve_edit_params() {
     local edit_spec="$2"
     local version_hint="${3:-}"
 
-    python3 "${_PACK_VALIDATION_PY_DIR}/resolve_edit_params.py" \
+    python3 "${_PACK_VALIDATION_PY_DIR}/task_tools.py" resolve-edit-params \
         "${model_output_dir}" "${edit_spec}" "${version_hint}"
 }
 fi
@@ -846,7 +874,8 @@ pack_validate_tuned_edit_params() {
         canonical_tuned_edit_params_file="${repo_root}/scripts/evidence_packs/presets/tuned_edit_params.json"
     fi
     local -a validate_args=(
-        "${repo_root}/scripts/evidence_packs/python/validate_tuned_edit_params.py"
+        "${repo_root}/scripts/evidence_packs/python/validation_state.py"
+        validate-tuned-edit-params
         --file "${PACK_TUNED_EDIT_PARAMS_FILE}"
         --models "${model_csv}"
         --model-names "${model_names_csv}"
@@ -918,7 +947,8 @@ pack_validate_guard_calibration() {
 pack_validate_runtime_provenance() {
     local repo_root
     repo_root="$(_pack_validation_repo_root)"
-    python3 "${repo_root}/scripts/evidence_packs/python/remote_setup_smoke.py" \
+    python3 "${repo_root}/scripts/evidence_packs/python/runtime_tools.py" \
+        remote-setup-smoke \
         --only-runtime-provenance || return 1
 }
 
@@ -1315,7 +1345,7 @@ setup_pack_environment() {
     local env_report
     local repo_root
     repo_root="$(_pack_validation_repo_root)"
-    env_report=$(python3 "${repo_root}/scripts/evidence_packs/python/env_report.py")
+    env_report=$(python3 "${repo_root}/scripts/evidence_packs/python/runtime_tools.py" env-report)
     local setup_rc=$?
     if [[ ${setup_rc} -ne 0 ]]; then
         printf '%s\n' "${env_report}"
@@ -1585,7 +1615,7 @@ setup_model() {
     local cuda_devices="${CUDA_VISIBLE_DEVICES:-${gpu_id}}"
     {
         PACK_MODEL_REVISION="${revision}" CUDA_VISIBLE_DEVICES="${cuda_devices}" \
-            python3 "${_PACK_VALIDATION_PY_DIR}/download_baseline.py" \
+            python3 "${_PACK_VALIDATION_PY_DIR}/task_tools.py" download-baseline \
                 --model-id "${model_id}" \
                 --output-dir "${model_dir}/baseline" \
                 --success-marker "${success_marker}"
@@ -2171,7 +2201,8 @@ EOF
     compile_results
     run_analysis
     generate_verdict
-    if ! python3 "${_PACK_VALIDATION_PY_DIR}/evaluation_optimization_summary.py" \
+    if ! python3 "${_PACK_VALIDATION_PY_DIR}/validation_state.py" \
+        evaluation-optimization-summary \
         "${OUTPUT_DIR}" \
         --out "${OUTPUT_DIR}/results/analysis/evaluation_optimization_summary.json" >> "${LOG_FILE}" 2>&1; then
         log "WARNING: Failed to write evaluation optimization summary."

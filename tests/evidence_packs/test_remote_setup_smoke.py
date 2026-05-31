@@ -7,11 +7,9 @@ from pathlib import Path
 
 def _load_remote_setup_smoke():
     repo_root = Path(__file__).resolve().parents[2]
-    script = (
-        repo_root / "scripts" / "evidence_packs" / "python" / "remote_setup_smoke.py"
-    )
+    script = repo_root / "scripts" / "evidence_packs" / "python" / "runtime_tools.py"
     spec = importlib.util.spec_from_file_location(
-        "evidence_pack_remote_setup_smoke", script
+        "evidence_pack_runtime_tools_remote_smoke", script
     )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -68,7 +66,7 @@ def test_remote_setup_smoke_main_succeeds_when_modules_and_cli_are_ready(
     monkeypatch.setattr(remote_setup_smoke, "check_repo_root", lambda repo_root: None)
     monkeypatch.setattr(remote_setup_smoke, "check_runtime_provenance", lambda: None)
 
-    assert remote_setup_smoke.main([]) == 0
+    assert remote_setup_smoke.main(["remote-setup-smoke"]) == 0
 
 
 def test_remote_setup_smoke_detects_runtime_provenance_gap(monkeypatch) -> None:
@@ -85,7 +83,7 @@ def test_remote_setup_smoke_detects_runtime_provenance_gap(monkeypatch) -> None:
         ),
     )
 
-    assert remote_setup_smoke.main([]) == 1
+    assert remote_setup_smoke.main(["remote-setup-smoke"]) == 1
 
 
 def test_remote_setup_smoke_only_runtime_provenance_mode_skips_module_and_cli_checks(
@@ -109,7 +107,10 @@ def test_remote_setup_smoke_only_runtime_provenance_mode_skips_module_and_cli_ch
     )
     monkeypatch.setattr(remote_setup_smoke, "check_runtime_provenance", lambda: None)
 
-    assert remote_setup_smoke.main(["--only-runtime-provenance"]) == 0
+    assert (
+        remote_setup_smoke.main(["remote-setup-smoke", "--only-runtime-provenance"])
+        == 0
+    )
 
 
 def test_remote_setup_smoke_repo_root_requires_entrypoints(tmp_path: Path) -> None:
@@ -139,5 +140,8 @@ def test_remote_setup_smoke_main_checks_repo_root(monkeypatch, tmp_path: Path) -
     monkeypatch.setattr(remote_setup_smoke, "check_repo_root", fake_check_repo_root)
 
     repo_root = tmp_path / "repo"
-    assert remote_setup_smoke.main(["--repo-root", str(repo_root)]) == 0
+    assert (
+        remote_setup_smoke.main(["remote-setup-smoke", "--repo-root", str(repo_root)])
+        == 0
+    )
     assert checked == [str(repo_root)]

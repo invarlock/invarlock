@@ -15,12 +15,11 @@ try:
         apply_dense_magnitude_prune,
         apply_fp8_dequantized_simulation,
         apply_rtn_dequantized_simulation,
+        build_validation_edit_metadata,
         fp8_dtype,
     )
-    from .editing.metadata import build_validation_edit_metadata
-    from .editing.save_artifact import save_edited_subject_artifact
-    from .model_io.hf_causal_loader import load_causal_model
-    from .runtime_tools import require_remote_code_opt_in
+    from .editing.validate_artifact import save_edited_subject_artifact
+    from .runtime_tools import load_causal_model, require_remote_code_opt_in
 except ImportError:  # pragma: no cover - direct module load under pytest
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from editing.implementations import (
@@ -28,12 +27,11 @@ except ImportError:  # pragma: no cover - direct module load under pytest
         apply_dense_magnitude_prune,
         apply_fp8_dequantized_simulation,
         apply_rtn_dequantized_simulation,
+        build_validation_edit_metadata,
         fp8_dtype,
     )
-    from editing.metadata import build_validation_edit_metadata
-    from editing.save_artifact import save_edited_subject_artifact
-    from model_io.hf_causal_loader import load_causal_model
-    from runtime_tools import require_remote_code_opt_in
+    from editing.validate_artifact import save_edited_subject_artifact
+    from runtime_tools import load_causal_model, require_remote_code_opt_in
 from transformers import AutoTokenizer
 
 
