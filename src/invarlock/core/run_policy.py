@@ -6,13 +6,10 @@ import math
 import os
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import Any, Protocol
 
 from invarlock.core.auto_tuning import resolve_tier_policies
 from invarlock.core.exceptions import ConfigError, InvarlockError
-
-if TYPE_CHECKING:
-    from invarlock.core.run_orchestrator import RunExecutionRequest
 
 GUARD_OVERHEAD_THRESHOLD = 0.01
 
@@ -97,6 +94,35 @@ class TimingSummaryPayload:
 
 
 @dataclass(frozen=True)
+class RunExecutionRequest:
+    """Typed request contract for config-driven run execution."""
+
+    config: str
+    device: str | None = None
+    profile: str | None = None
+    out: str | None = None
+    edit: str | None = None
+    edit_label: str | None = None
+    tier: str | None = None
+    metric_kind: str | None = None
+    probes: int | None = None
+    until_pass: bool = False
+    max_attempts: int = 3
+    timeout: int | None = None
+    baseline: str | None = None
+    no_cleanup: bool = False
+    capture_timings: bool = False
+    telemetry: bool = False
+    prefer_local_files_only: bool = False
+    eval_device_override: str | None = None
+    determinism_mode: str | None = None
+    determinism_warn_only: bool = False
+    tiny_relax_enabled: bool = False
+    export_model_requested: bool = False
+    export_dir: str | None = None
+
+
+@dataclass(frozen=True)
 class RunExecutionConfigPayloads:
     auto_config: dict[str, Any]
     edit_config: dict[str, Any]
@@ -150,10 +176,7 @@ def coerce_mapping(obj: object) -> dict[str, Any]:
     """Convert config-like objects to plain dicts without hiding programming errors."""
     if isinstance(obj, dict):
         return obj
-    try:
-        raw = getattr(obj, "_data", None)
-    except AttributeError:
-        raw = None
+    raw = getattr(obj, "_data", None)
     if isinstance(raw, dict):
         return raw
     dumped = getattr(obj, "model_dump", None)
@@ -468,8 +491,6 @@ def build_run_execution_request(
     *,
     environ: Mapping[str, str] | None = None,
 ) -> RunExecutionRequest:
-    from invarlock.core.run_orchestrator import RunExecutionRequest
-
     return RunExecutionRequest(
         config=request.config,
         device=request.device,

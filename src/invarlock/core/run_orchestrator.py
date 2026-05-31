@@ -6,36 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from invarlock.core.run_policy import TimingSummaryPayload
-
-
-@dataclass(frozen=True)
-class RunExecutionRequest:
-    """Typed request contract for config-driven run execution."""
-
-    config: str
-    device: str | None = None
-    profile: str | None = None
-    out: str | None = None
-    edit: str | None = None
-    edit_label: str | None = None
-    tier: str | None = None
-    metric_kind: str | None = None
-    probes: int | None = None
-    until_pass: bool = False
-    max_attempts: int = 3
-    timeout: int | None = None
-    baseline: str | None = None
-    no_cleanup: bool = False
-    capture_timings: bool = False
-    telemetry: bool = False
-    prefer_local_files_only: bool = False
-    eval_device_override: str | None = None
-    determinism_mode: str | None = None
-    determinism_warn_only: bool = False
-    tiny_relax_enabled: bool = False
-    export_model_requested: bool = False
-    export_dir: str | None = None
+from invarlock.core.run_policy import RunExecutionRequest, TimingSummaryPayload
 
 
 class RunExecutionEvent:
@@ -312,9 +283,20 @@ class RunExecutionServices:
     get_torch: Callable[[], Any | None]
 
 
-from invarlock.core.run_orchestrator_execute import (  # noqa: E402
-    execute_run_request_impl as execute_run_request,
-)
+def execute_run_request(
+    request: RunExecutionRequest,
+    *,
+    services: RunExecutionServices,
+    observer: RunExecutionObserver | None = None,
+) -> RunExecutionOutcome:
+    from invarlock.core.run_orchestrator_execute import execute_run_request_impl
+
+    return execute_run_request_impl(
+        request,
+        services=services,
+        observer=observer,
+    )
+
 
 __all__ = [
     "RunAdapterSelectedEvent",

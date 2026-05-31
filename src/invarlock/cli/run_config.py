@@ -83,12 +83,9 @@ def _to_serialisable_dict(section: object) -> dict[str, Any]:
                 return _coerce_mapping(dumped)
         except (TypeError, ValueError):
             pass
-    try:
-        raw = getattr(section, "_data", None)
-        if isinstance(raw, dict):
-            return raw
-    except AttributeError:
-        pass
+    raw = getattr(section, "_data", None)
+    if isinstance(raw, dict):
+        return raw
     if isinstance(section, dict):
         return section
     try:
