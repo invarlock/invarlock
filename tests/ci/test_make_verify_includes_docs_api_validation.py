@@ -30,7 +30,7 @@ def test_verify_target_runs_docs_api_refs_check() -> None:
     assert block is not None, "verify target not found in Makefile"
     # Either always run or behind an env flag is acceptable; require presence
     # of the script path within the verify recipe body.
-    assert "scripts/docs/validate_docs_api_refs.py" in block, (
+    assert "scripts/docs/docs_check.py --api-refs" in block, (
         "verify target should include docs API refs validation (optionally gated)"
     )
 

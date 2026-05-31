@@ -212,8 +212,10 @@ def _run_with_common_patches(
 
     patches = [
         patch("invarlock.cli.run_config.prepare_config_for_run", lambda **k: cfg),
-        patch("invarlock.cli.run_runtime.detect_model_profile", _detect_profile),
-        patch("invarlock.cli.run_runtime.resolve_tokenizer", lambda *_a, **_k: _tok()),
+        patch("invarlock.cli.run_runtime_exec.detect_model_profile", _detect_profile),
+        patch(
+            "invarlock.cli.run_runtime_exec.resolve_tokenizer", lambda *_a, **_k: _tok()
+        ),
         patch("invarlock.cli.device.resolve_device", lambda d: d),
         patch("invarlock.cli.device.validate_device_for_config", lambda d: (True, "")),
         patch("invarlock.core.registry.get_registry", lambda: Registry()),
@@ -222,7 +224,7 @@ def _run_with_common_patches(
             lambda *_a: (False, False, None),
         ),
         patch("invarlock.cli.run_runtime_exec.execute_guarded_run", exec_stub),
-        patch("invarlock.cli.run_artifact_output.postprocess_and_summarize", post_stub),
+        patch("invarlock.cli.run_execution.postprocess_and_summarize", post_stub),
         patch(
             "invarlock.cli.run_pairing.resolve_metric_and_provider",
             lambda *_a, **_k: ("ppl_causal", None, {}),
@@ -613,9 +615,12 @@ def test_run_command_baseline_token_counts_provider_parity_export_and_classifica
         for p in (
             patch("invarlock.cli.run_execution.console", rec_console),
             patch("invarlock.cli.run_config.prepare_config_for_run", lambda **k: cfg),
-            patch("invarlock.cli.run_runtime.detect_model_profile", _detect_profile),
             patch(
-                "invarlock.cli.run_runtime.resolve_tokenizer", lambda *_a, **_k: _tok()
+                "invarlock.cli.run_runtime_exec.detect_model_profile", _detect_profile
+            ),
+            patch(
+                "invarlock.cli.run_runtime_exec.resolve_tokenizer",
+                lambda *_a, **_k: _tok(),
             ),
             patch("invarlock.cli.device.resolve_device", lambda d: d),
             patch(
@@ -626,9 +631,7 @@ def test_run_command_baseline_token_counts_provider_parity_export_and_classifica
                 lambda *_a: (False, False, None),
             ),
             patch("invarlock.cli.run_runtime_exec.execute_guarded_run", exec_stub),
-            patch(
-                "invarlock.cli.run_artifact_output.postprocess_and_summarize", post_stub
-            ),
+            patch("invarlock.cli.run_execution.postprocess_and_summarize", post_stub),
             patch(
                 "invarlock.cli.run_pairing.resolve_metric_and_provider",
                 lambda *_a, **_k: ("ppl_causal", None, {}),
@@ -640,11 +643,11 @@ def test_run_command_baseline_token_counts_provider_parity_export_and_classifica
             patch("invarlock.core.registry.get_registry", lambda: Registry()),
             patch("invarlock.cli.run_pairing.compute_provider_digest", provider_digest),
             patch(
-                "invarlock.core.provider_parity.enforce_provider_parity",
+                "invarlock.core.run_policy.enforce_provider_parity",
                 enforce_parity,
             ),
             patch(
-                "invarlock.reporting.run_metric_utils.format_debug_metric_diffs",
+                "invarlock.reporting.run_report_metrics_contract.format_debug_metric_diffs",
                 lambda *_a, **_k: "diffs",
             ),
         ):

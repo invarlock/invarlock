@@ -7,7 +7,7 @@ from typing import Any
 from rich.console import Console
 
 from invarlock.cli.output import OutputStyle, print_event, resolve_output_style
-from invarlock.core.run_guard_overhead_policy import (
+from invarlock.reporting.report_overhead import (
     build_guard_overhead_summary as _build_guard_overhead_summary_impl,
 )
 

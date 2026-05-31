@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from invarlock.core.run_execution_request_policy import (
+from invarlock.core.run_policy import (
     build_run_execution_request,
     env_flag,
     env_text,

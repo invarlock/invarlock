@@ -10,13 +10,15 @@ from pathlib import Path
 
 import pytest
 
-from invarlock.eval.bench import (
+from invarlock.eval.bench_policy import (
     BenchmarkConfig,
     ConfigurationManager,
-    DependencyChecker,
     MetricsAggregator,
     RunResult,
     ScenarioConfig,
+)
+from invarlock.eval.bench_runner import (
+    DependencyChecker,
     execute_single_run,
 )
 from invarlock.reporting.report_types import create_empty_report
@@ -265,13 +267,24 @@ class TestMetricsAggregator:
                 "latency_ms_per_tok": 1.0,
                 "memory_mb_peak": 2.0,
             },
-            "meta": _ExplodingGetDict(),
+            "meta": _ExplodingGetDict({"duration": 1.0}),
         }
 
         metrics = MetricsAggregator.extract_core_metrics(report)
 
         assert math.isnan(metrics["primary_metric_preview"])
         assert math.isnan(metrics["primary_metric_final"])
+        assert math.isnan(metrics["duration_s"])
+
+    def test_extract_core_metrics_tolerates_value_error_from_meta_duration(self):
+        class _BadDurationMeta(dict):
+            def get(self, *_args, **_kwargs):  # type: ignore[override]
+                raise ValueError("bad duration")
+
+        metrics = MetricsAggregator.extract_core_metrics(
+            {"metrics": {}, "meta": _BadDurationMeta({"duration": 1.0})}
+        )
+
         assert math.isnan(metrics["duration_s"])
 
     def test_extract_guard_metrics_empty_report(self):

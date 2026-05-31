@@ -28,7 +28,7 @@ def test_hf_bnb_uses_quantization_config(monkeypatch: pytest.MonkeyPatch) -> Non
     tr.BitsAndBytesConfig = _BitsAndBytesConfig
     monkeypatch.setitem(sys.modules, "transformers", tr)
 
-    from invarlock.plugins.hf_bnb_adapter import HF_BNB_Adapter
+    from invarlock.plugins import HF_BNB_Adapter
 
     adapter = HF_BNB_Adapter()
     adapter.load_model("nonexistent-model-id-for-test")
@@ -61,7 +61,7 @@ def test_hf_bnb_surfaces_checkpoint_quantization_mismatch(
     tr.BitsAndBytesConfig = _BitsAndBytesConfig
     monkeypatch.setitem(sys.modules, "transformers", tr)
 
-    from invarlock.plugins.hf_bnb_adapter import HF_BNB_Adapter
+    from invarlock.plugins import HF_BNB_Adapter
 
     adapter = HF_BNB_Adapter()
     with pytest.raises(ModelLoadError) as excinfo:

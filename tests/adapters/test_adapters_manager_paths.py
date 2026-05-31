@@ -19,12 +19,10 @@ import torch.nn as nn
 # Import invarlock adapters namespace
 from invarlock.adapters.base import (
     AdapterManager,
+    AdapterState,
     AdapterUtils,
     BaseAdapter,
     PerformanceTracker,
-)
-from invarlock.adapters.base_types import (
-    AdapterState,
 )
 
 

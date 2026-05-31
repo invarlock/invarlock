@@ -8,20 +8,22 @@ from pathlib import Path
 from scripts.evidence_packs.python import (
     create_edits_batch as batch_edit_mod,
 )
-from scripts.evidence_packs.python.deployable import (
-    validate_artifact as deployable_validator_mod,
+from scripts.evidence_packs.python.editing import (
+    validate_artifact as edit_artifact_mod,
 )
-from scripts.evidence_packs.python.edit_artifact_summary import (
-    build_edit_artifact_summary,
-)
-from scripts.evidence_packs.python.editing import save_artifact as save_artifact_mod
-from scripts.evidence_packs.python.editing.metadata import (
+from scripts.evidence_packs.python.editing.implementations import (
     DEPLOYABLE_OPTIMIZED_SUBJECT,
     EDIT_SEMANTICS_DEPLOYABLE,
     build_edit_metadata,
     build_validation_edit_metadata,
     validate_edit_metadata,
 )
+from scripts.evidence_packs.python.task_tools import (
+    build_edit_artifact_summary,
+)
+
+save_artifact_mod = edit_artifact_mod
+deployable_validator_mod = edit_artifact_mod
 
 
 def _write_minimal_artifact(path: Path, metadata: dict[str, object] | None) -> None:

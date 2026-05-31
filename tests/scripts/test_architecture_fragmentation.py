@@ -23,3 +23,11 @@ def test_architecture_fragmentation_metrics_are_machine_readable() -> None:
     assert payload["source_python_files"] > 0
     assert payload["run_orchestrator_file_count"] > 0
     assert isinstance(payload["reexport_shims"], list)
+    assert payload["script_tracked_files"] > 0
+    assert payload["script_python_files"] > 0
+    assert payload["script_shell_files"] > 0
+    assert payload["script_evidence_pack_files"] > 0
+    assert payload["script_large_shell_files_over_1000_lines"] > 0
+    assert payload["script_generated_cruft_sample_limit"] == 50
+    assert isinstance(payload["script_generated_cruft_sample_paths"], list)
+    assert isinstance(payload["largest_script_families_by_file_count"], list)

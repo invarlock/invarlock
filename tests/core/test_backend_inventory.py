@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from invarlock.core import backend_inventory as backend_inventory_mod
 from invarlock.core.backend_inventory import (
     BACKEND_INVENTORY_SCHEMA,
     build_backend_inventory_for_adapter,
@@ -118,6 +119,37 @@ def test_backend_inventory_counts_gptq_named_modules_for_gptq_adapter() -> None:
     assert inventory is not None
     assert inventory["quantized_module_count"] == 1
     assert inventory["quantized_module_types"] == ["vendor.layers.gptq.GptqLinear"]
+
+
+def test_backend_inventory_ignores_plain_modules_for_gptq_adapter() -> None:
+    class PlainLinear:
+        __module__ = "torch.nn.modules.linear"
+
+    class Model:
+        def modules(self):
+            return [PlainLinear()]
+
+    inventory = build_backend_inventory_for_adapter(
+        adapter="hf_gptq",
+        model=Model(),
+    )
+
+    assert inventory is not None
+    assert inventory["quantized_module_count"] == 0
+    assert inventory["quantized_module_types"] == []
+
+
+def test_backend_inventory_ignores_plain_modules_for_unknown_adapter_key() -> None:
+    class PlainLinear:
+        __module__ = "torch.nn.modules.linear"
+
+    class Model:
+        def modules(self):
+            return [PlainLinear()]
+
+    inventory = backend_inventory_mod._quantized_module_inventory(Model(), adapter="hf")
+
+    assert inventory == {"count": 0, "types": []}
 
 
 def test_backend_inventory_handles_non_module_models_and_memory_errors() -> None:

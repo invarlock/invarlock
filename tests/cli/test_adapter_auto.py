@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from invarlock.core.adapter_auto import (
+from invarlock.adapters.auto import (
     apply_auto_adapter_if_needed,
     resolve_auto_adapter,
 )

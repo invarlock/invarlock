@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from invarlock.guards._contracts import guard_assert
+from invarlock.guards.policies import guard_assert
 
 
 def test_guard_assert_disabled_noop(monkeypatch):
@@ -34,7 +34,7 @@ def test_guard_assert_enabled_survives_optimized_python():
             "-O",
             "-c",
             (
-                "from invarlock.guards._contracts import guard_assert\n"
+                "from invarlock.guards.policies import guard_assert\n"
                 "try:\n"
                 "    guard_assert(False, 'boom')\n"
                 "except AssertionError as exc:\n"

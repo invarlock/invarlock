@@ -7,17 +7,15 @@ import invarlock.guards.rmt_analysis as rmt_analysis_mod
 from invarlock.guards.rmt_analysis import (
     analyze_weight_distribution,
     capture_baseline_mp_stats,
+    clip_full_svd,
     layer_svd_stats,
+    rmt_growth_ratio,
+    within_deadband,
 )
 from invarlock.guards.rmt_detection import (
     rmt_detect,
     rmt_detect_report,
     rmt_detect_with_names,
-)
-from invarlock.guards.rmt_math import (
-    clip_full_svd,
-    rmt_growth_ratio,
-    within_deadband,
 )
 
 
@@ -75,6 +73,9 @@ def test_analyze_weight_distribution_paths():
     assert (
         isinstance(stats, dict) and "histogram" in stats and "singular_values" in stats
     )
+    seq_stats = analyze_weight_distribution(nn.Sequential(nn.Linear(8, 8)))
+    assert isinstance(seq_stats, dict)
+    assert "histogram" in seq_stats and "singular_values" in seq_stats
 
     # Empty-model path returns {}
     empty = nn.Module()

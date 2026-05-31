@@ -5,12 +5,10 @@ import sys
 from pathlib import Path
 
 from invarlock.cli.config_execution import RuntimeDelegationError, run_from_config
-from invarlock.cli.runtime_launch_plan import (
-    build_current_process_container_launch_plan,
-)
 from invarlock.cli.security_helpers import resolve_shell_runtime_security_policy
 from invarlock.runtime_security import (
     apply_runtime_allowances,
+    build_current_process_container_launch_plan,
     delegate_python_script_to_container,
     host_execution_allowed,
     running_inside_container,

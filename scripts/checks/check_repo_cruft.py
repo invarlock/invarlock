@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -30,12 +31,40 @@ EXCLUDED_DIRS = {
     "__pycache__",
 }
 BANNED_FILENAMES: set[str] = set()
+BANNED_TRACKED_FILENAMES = {".DS_Store"}
 BANNED_DIRNAMES = {"__MACOSX"}
 BANNED_PREFIX = "._"
 
 
+def _git_tracked_paths(root: Path) -> set[str] | None:
+    try:
+        result = subprocess.run(
+            ["git", "ls-files"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return {line for line in result.stdout.splitlines() if line}
+
+
+def _is_banned_file(
+    rel_path: str,
+    filename: str,
+    tracked_paths: set[str] | None,
+) -> bool:
+    if filename in BANNED_FILENAMES or filename.startswith(BANNED_PREFIX):
+        return True
+    if filename not in BANNED_TRACKED_FILENAMES:
+        return False
+    return tracked_paths is None or rel_path in tracked_paths
+
+
 def _iter_cruft_paths(root: Path) -> list[str]:
     matches: list[str] = []
+    tracked_paths = _git_tracked_paths(root)
     for dirpath, dirnames, filenames in os.walk(root):
         current = Path(dirpath)
         rel_current = current.relative_to(root)
@@ -53,8 +82,9 @@ def _iter_cruft_paths(root: Path) -> list[str]:
                 matches.append((rel_current / dirname).as_posix())
 
         for filename in filenames:
-            if filename in BANNED_FILENAMES or filename.startswith(BANNED_PREFIX):
-                matches.append((rel_current / filename).as_posix())
+            rel_path = (rel_current / filename).as_posix()
+            if _is_banned_file(rel_path, filename, tracked_paths):
+                matches.append(rel_path)
     return sorted(matches)
 
 

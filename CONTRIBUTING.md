@@ -76,7 +76,7 @@ For maintainer-facing CLI smoke coverage, use the lane scripts directly:
 ```bash
 bash scripts/smoke/cli_smoke_fast.sh
 bash scripts/smoke/cli_smoke_negative.sh
-bash scripts/smoke/cli_smoke_realistic.sh
+INVARLOCK_SMOKE_LANES=realistic bash scripts/smoke/cli_exhaustive_smoke.sh
 
 # or dispatch the full matrix
 bash scripts/smoke/cli_exhaustive_smoke.sh
@@ -86,10 +86,10 @@ Lane intent:
 
 - `cli_smoke_fast.sh` covers broad command-surface and positive-path tiny-model flows
 - `cli_smoke_negative.sh` covers malformed, policy-fail, and fail-closed categories
-- `cli_smoke_realistic.sh` wraps the GPT-2-sized smoke campaign
+- `INVARLOCK_SMOKE_LANES=realistic cli_exhaustive_smoke.sh` wraps the GPT-2-sized smoke campaign
 
 Delegated config execution and calibration internals re-enter through the
-package-internal `python -m invarlock.cli.internal_config_run` module, not a
+package-internal `python -m invarlock.cli.config_execution` module, not a
 public CLI command. Public docs and user examples should continue to use
 `evaluate`, `verify`, `report`, `doctor`, and `advanced ...`.
 
@@ -193,9 +193,9 @@ For more curated examples (including the CI subset), see `tests/README.md`.
 
 Coverage configuration lives in `pyproject.toml` under `[tool.coverage.*]`.
 The canonical threshold/source-of-truth lives in
-`scripts/coverage/coverage_policy.py`; both `scripts/coverage/check_coverage_thresholds.py` and
-the Makefile coverage targets consume that shared policy. Per-file branch
-coverage thresholds are enforced by `make coverage-enforce`.
+`scripts/coverage/check_coverage_thresholds.py`, which is also consumed by
+the Makefile coverage targets. Per-file branch coverage thresholds are
+enforced by `make coverage-enforce`.
 
 Key points:
 
@@ -222,7 +222,7 @@ Key points:
   ```
 
 - **Critical surface** includes (see `THRESHOLDS`, `CORE_PREFIXES`, and
-  `CORE_FILES` in `scripts/coverage/coverage_policy.py`):
+  `CORE_FILES` in `scripts/coverage/check_coverage_thresholds.py`):
   - Core runtime: everything under `src/invarlock/core/`
     (runner, registry, contracts, auto_tuning, events, types, checkpoint, api, retry)
   - Guards: everything under `src/invarlock/guards/`
@@ -287,7 +287,7 @@ Key points:
 When you modify a file covered by thresholds, please:
 
 - Add or extend tests to keep its measured coverage at or above its enforced floor
-- Update/add entries in `scripts/coverage/coverage_policy.py` if you
+- Update/add entries in `scripts/coverage/check_coverage_thresholds.py` if you
   expand the critical surface or add new core modules
 
 If the checker reports **“no coverage data present”**, ensure the module is
@@ -349,7 +349,7 @@ otherwise it skips with a warning.
   - Relevant pages under `docs/reference/` and `docs/user-guide/`
 - When adding new CLI switches or config fields, update:
   - `docs/reference/cli.md`
-  - `docs/reference/config-schema.md` (and run `scripts/checks/check_config_schema_sync.py`)
+  - `docs/reference/config-schema.md` (and run `scripts/docs/docs_check.py --config-schema-sync`)
 
 ---
 
@@ -462,6 +462,10 @@ uv run invarlock advanced evidence-pack verify <evidence-dir>/evidence_pack \
   --report-assurance strict \
   --expected-fingerprint sha256:<fingerprint>
 ```
+
+Verifier examples must preserve the provenance link to the matching
+`runtime.manifest.json`; reviewers need that manifest to confirm execution
+context, profile, and artifact integrity.
 
 Evidence metadata should be scanner-friendly and reviewer-friendly. Store file
 hashes as records such as `{"path": "...", "sha256": "..."}` instead of using

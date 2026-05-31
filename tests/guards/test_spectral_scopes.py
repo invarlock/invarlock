@@ -19,6 +19,8 @@ def test_spectral_should_check_module_scopes():
     guard_ffn = SpectralGuard(scope="ffn")
     assert guard_ffn._should_check_module("transformer.h.0.mlp.c_fc", m)
     assert not guard_ffn._should_check_module("transformer.h.0.attn.c_proj", m)
+    assert guard_attn._should_check_module("layer.self_attn.out_proj", m)
+    assert guard_ffn._should_check_module("layer.mlp.fc_in", m)
 
     guard_all = SpectralGuard(scope="all")
     assert guard_all._should_check_module("anything", m)

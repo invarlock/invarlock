@@ -4,11 +4,11 @@ import random
 
 import pytest
 
-from invarlock.eval.providers.base import (
+from invarlock.eval.data import TextLMProvider
+from invarlock.eval.data_support import (
     deterministic_shards,
     deterministic_worker_init_fn,
 )
-from invarlock.eval.providers.text_lm import TextLMProvider
 
 
 def test_deterministic_shards_and_schedule_parity():
@@ -52,6 +52,10 @@ def test_text_lm_provider_validates_shape_parameters():
         TextLMProvider(seq_len=2)
     with pytest.raises(ValueError, match="mask_prob"):
         TextLMProvider(mask_prob=float("nan"))
+    with pytest.raises(ValueError, match="mask_prob"):
+        TextLMProvider(mask_prob=-0.1)
+    with pytest.raises(ValueError, match="mask_prob"):
+        TextLMProvider(mask_prob=1.1)
 
 
 def test_text_lm_provider_rejects_non_positive_batch_size():

@@ -92,7 +92,7 @@ test_create_error_model_invokes_python_wrapper() {
 
     create_error_model "${TEST_TMPDIR}/baseline" "${TEST_TMPDIR}/out/error" "nan_injection" "0"
     assert_file_exists "${calls}" "python called for error model"
-    assert_match "python .*scripts/evidence_packs/python/create_error_model\\.py ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/error nan_injection" "$(cat "${calls}")" "args passed via argv"
+    assert_match "python .*scripts/evidence_packs/python/task_tools\\.py create-error-model ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/error nan_injection" "$(cat "${calls}")" "args passed via argv"
 }
 
 test_create_model_variant_dispatches_and_rejects_unknown_type() {
@@ -134,7 +134,7 @@ test_create_model_variant_dispatches_success_paths_for_other_edit_types() {
     assert_match "python .*scripts/evidence_packs/python/create_edit_model\\.py quant-rtn ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/quant 8 128 ffn" "${logged}" "quant_rtn dispatch calls python"
     assert_match "python .*scripts/evidence_packs/python/create_edit_model\\.py fp8-quant ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/fp8 e4m3fn ffn" "${logged}" "fp8_quant dispatch calls python"
     assert_match "python .*scripts/evidence_packs/python/create_edit_model\\.py lowrank-svd ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/lowrank 256 ffn" "${logged}" "lowrank_svd dispatch calls python"
-    assert_match "python .*scripts/evidence_packs/python/create_error_model\\.py ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/error nan_injection" "${logged}" "error_injection dispatch calls python"
+    assert_match "python .*scripts/evidence_packs/python/task_tools\\.py create-error-model ${TEST_TMPDIR}/baseline ${TEST_TMPDIR}/out/error nan_injection" "${logged}" "error_injection dispatch calls python"
 }
 
 test_create_model_variant_requires_params_for_each_edit_type() {

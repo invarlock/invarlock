@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_console import compute_console_validation_block
 from invarlock.reporting.report_make import make_report
+from invarlock.reporting.report_summary import compute_console_validation_block
 
 
 def _mk_pm_report(*, ratio: float, pm_final: float = 10.0) -> dict:

@@ -148,7 +148,7 @@ def test_run_command_returns_report_path_and_emits_determinism_meta(
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.detect_model_profile",
+                "invarlock.cli.run_runtime_exec.detect_model_profile",
                 lambda *a, **k: SimpleNamespace(
                     default_loss="ce",
                     invariants=[],
@@ -160,7 +160,7 @@ def test_run_command_returns_report_path_and_emits_determinism_meta(
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.resolve_tokenizer",
+                "invarlock.cli.run_runtime_exec.resolve_tokenizer",
                 lambda *a, **k: (
                     SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=10),
                     "tokhash123",
@@ -281,7 +281,7 @@ def test_run_command_persists_tiny_relax_context(tmp_path: Path, monkeypatch) ->
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.detect_model_profile",
+                "invarlock.cli.run_runtime_exec.detect_model_profile",
                 lambda *a, **k: SimpleNamespace(
                     default_loss="ce",
                     invariants=[],
@@ -293,7 +293,7 @@ def test_run_command_persists_tiny_relax_context(tmp_path: Path, monkeypatch) ->
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.resolve_tokenizer",
+                "invarlock.cli.run_runtime_exec.resolve_tokenizer",
                 lambda *a, **k: (
                     SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=10),
                     "tokhash123",
@@ -414,7 +414,7 @@ def test_run_command_does_not_include_determinism_when_preset_empty(
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.detect_model_profile",
+                "invarlock.cli.run_runtime_exec.detect_model_profile",
                 lambda *a, **k: SimpleNamespace(
                     default_loss="ce",
                     invariants=[],
@@ -426,7 +426,7 @@ def test_run_command_does_not_include_determinism_when_preset_empty(
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.resolve_tokenizer",
+                "invarlock.cli.run_runtime_exec.resolve_tokenizer",
                 lambda *a, **k: (
                     SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=10),
                     "tokhash123",
@@ -562,7 +562,7 @@ context:
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.detect_model_profile",
+                "invarlock.cli.run_runtime_exec.detect_model_profile",
                 lambda *a, **k: SimpleNamespace(
                     default_loss="ce",
                     invariants=[],
@@ -574,7 +574,7 @@ context:
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.resolve_tokenizer",
+                "invarlock.cli.run_runtime_exec.resolve_tokenizer",
                 lambda *a, **k: (
                     SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=10),
                     "tokhash123",

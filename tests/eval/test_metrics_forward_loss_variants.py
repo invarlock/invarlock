@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 from invarlock.eval.metrics import compute_perplexity_strict
-from invarlock.eval.metrics_model_io import forward_loss_causal
+from invarlock.eval.metrics_runtime import forward_loss_causal
 
 
 class ModelWithOutput(nn.Module):

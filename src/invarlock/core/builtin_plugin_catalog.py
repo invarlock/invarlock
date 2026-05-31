@@ -54,21 +54,21 @@ BUILTIN_PLUGIN_CATALOG: dict[str, tuple[BuiltinPluginSpec, ...]] = {
         ),
         BuiltinPluginSpec(
             name="hf_gptq",
-            module="invarlock.plugins.hf_gptq_adapter",
+            module="invarlock.plugins",
             class_name="HF_GPTQ_Adapter",
             required_deps=("gptqmodel",),
             support_tier="optional_backend_loader",
         ),
         BuiltinPluginSpec(
             name="hf_awq",
-            module="invarlock.plugins.hf_awq_adapter",
+            module="invarlock.plugins",
             class_name="HF_AWQ_Adapter",
             required_deps=("gptqmodel",),
             support_tier="optional_backend_loader",
         ),
         BuiltinPluginSpec(
             name="hf_bnb",
-            module="invarlock.plugins.hf_bnb_adapter",
+            module="invarlock.plugins",
             class_name="HF_BNB_Adapter",
             required_deps=("bitsandbytes",),
             support_tier="optional_backend_loader",
@@ -83,7 +83,7 @@ BUILTIN_PLUGIN_CATALOG: dict[str, tuple[BuiltinPluginSpec, ...]] = {
         ),
         BuiltinPluginSpec(
             name="noop",
-            module="invarlock.edits.noop",
+            module="invarlock.edits",
             class_name="NoopEdit",
             support_tier="internal_baseline_edit",
         ),
@@ -111,7 +111,7 @@ BUILTIN_PLUGIN_CATALOG: dict[str, tuple[BuiltinPluginSpec, ...]] = {
         ),
         BuiltinPluginSpec(
             name="demo_hello_guard",
-            module="invarlock.plugins.hello_guard",
+            module="invarlock.plugins",
             class_name="HelloGuard",
             support_tier="demo_only",
             strict_assurance_allowed=False,

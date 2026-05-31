@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from invarlock.reporting import report_schema as schema_mod
-from invarlock.reporting.report_console import compute_console_validation_block
 from invarlock.reporting.report_enrichment import (
     compute_confidence_label as _compute_confidence_label,
 )
@@ -9,6 +8,7 @@ from invarlock.reporting.report_primary_metric_policy import is_ppl_kind as _is_
 from invarlock.reporting.report_provenance import (
     compute_edit_digest as _compute_edit_digest,
 )
+from invarlock.reporting.report_summary import compute_console_validation_block
 
 
 def test_is_ppl_kind_and_get_ppl_final() -> None:

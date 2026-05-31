@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from invarlock.reporting.report_console import (
+from invarlock.reporting.report_summary import (
     build_console_summary_pack,
     compute_console_validation_block,
 )

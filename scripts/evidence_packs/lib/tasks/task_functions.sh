@@ -183,7 +183,7 @@ _plan_effective_ci_schedule() {
         return 0
     fi
 
-    local planner="${SCRIPT_DIR}/../../python/plan_effective_windows.py"
+    local planner="${SCRIPT_DIR}/../../python/task_tools.py"
     local -a candidate_args=()
     local seq_len=""
     for seq_len in 512 768 1024 1536; do
@@ -195,6 +195,7 @@ _plan_effective_ci_schedule() {
     PYTHONPATH="${PACK_REPO_PYTHONPATH}" \
         INVARLOCK_ALLOW_REMOTE_CODE="${INVARLOCK_ALLOW_REMOTE_CODE:-}" \
         _cmd_python "${planner}" \
+            plan-effective-windows \
             --model-path "${model_ref}" \
             --dataset-provider "${dataset_kind}" \
             --split "${split}" \
@@ -330,7 +331,7 @@ _task_get_model_revision() {
     fi
     local path="${PACK_MODEL_REVISIONS_FILE:-${OUTPUT_DIR:-}/state/model_revisions.json}"
     [[ -f "${path}" ]] || return 0
-    _cmd_python "${SCRIPT_DIR}/../../python/get_model_revision.py" "${path}" "${model_id}" 2>/dev/null
+    _cmd_python "${SCRIPT_DIR}/../../python/task_tools.py" model-revision "${path}" "${model_id}" 2>/dev/null
 }
 
 # Check if model is large (30B+) and needs special handling.
@@ -381,7 +382,7 @@ _resolve_invarlock_adapter() {
     if [[ -z "${model_id}" ]]; then
         return 1
     fi
-    _cmd_python "${SCRIPT_DIR}/../../python/resolve_invarlock_adapter.py" "${model_id}"
+    _cmd_python "${SCRIPT_DIR}/../../python/task_tools.py" resolve-adapter "${model_id}"
 }
 
 _validate_evaluate_baseline_report() {
@@ -394,7 +395,7 @@ _validate_evaluate_baseline_report() {
         return 1
     fi
 
-    _cmd_python "${SCRIPT_DIR}/../../python/validate_baseline_report.py" \
+    _cmd_python "${SCRIPT_DIR}/../../python/task_tools.py" validate-baseline-report \
         "${report_path}" "${expected_adapter}" "${expected_profile}" "${expected_tier}"
 }
 
@@ -453,7 +454,8 @@ _normalize_staged_preset_for_eval() {
     fi
 
     local normalize_args=(
-        "normalize_staged_preset.py"
+        "task_tools.py"
+        "normalize-staged-preset"
         --preset "${staged_preset}"
         --seq-len "${seq_len}"
         --stride "${stride}"
@@ -811,7 +813,7 @@ resolve_edit_params() {
     local edit_spec="$2"
     local version_hint="${3:-}"
 
-    _cmd_python "${SCRIPT_DIR}/../../python/resolve_edit_params.py" \
+    _cmd_python "${SCRIPT_DIR}/../../python/task_tools.py" resolve-edit-params \
         "${model_output_dir}" "${edit_spec}" "${version_hint}"
 }
 
@@ -858,7 +860,7 @@ _write_model_profile() {
     [[ -f "${profile_path}" ]] && return 0
     [[ -d "${baseline_dir}" ]] || return 1
 
-    _cmd_python "${SCRIPT_DIR}/../../python/write_model_profile.py" \
+    _cmd_python "${SCRIPT_DIR}/../../python/task_tools.py" write-model-profile \
         "${baseline_dir}" "${model_id}" >/dev/null 2>&1 || true
 }
 
@@ -1109,7 +1111,7 @@ task_setup_baseline() {
         # CUDA_VISIBLE_DEVICES is inherited from execute_task() for multi-GPU support
         local exit_code=0
         PACK_MODEL_REVISION="${revision}" \
-            _cmd_python "${SCRIPT_DIR}/../../python/download_baseline.py" \
+            _cmd_python "${SCRIPT_DIR}/../../python/task_tools.py" download-baseline \
                 --model-id "${model_id}" \
                 --output-dir "${baseline_dir}" >> "${log_file}" 2>&1 || exit_code=$?
 
@@ -1370,7 +1372,7 @@ YAML_EOF
     local report_file=$(find "${run_dir}" -name "report*.json" -type f 2>/dev/null | head -1)
     if [[ -n "${report_file}" ]]; then
         cp "${report_file}" "${run_dir}/baseline_report.json" 2>/dev/null || true
-        _cmd_python "${SCRIPT_DIR}/../../python/evaluation_report_from_report.py" \
+        _cmd_python "${SCRIPT_DIR}/../../python/task_tools.py" evaluation-report \
             --report "${report_file}" \
             --out "${run_dir}/evaluation.report.json" >> "${log_file}" 2>&1 || true
     fi
@@ -1935,7 +1937,7 @@ PRESET_YAML
         local report_file=""
         report_file=$(find "${cert_dir}" -name "report*.json" -type f 2>/dev/null | sort | tail -1)
         if [[ -n "${report_file}" && -f "${report_file}" ]]; then
-            _cmd_python "${SCRIPT_DIR}/../../python/evaluation_report_from_report.py" \
+            _cmd_python "${SCRIPT_DIR}/../../python/task_tools.py" evaluation-report \
                 --report "${report_file}" \
                 --out "${cert_file}" >> "${log_file}" 2>&1 || true
         fi
@@ -2048,7 +2050,7 @@ task_create_error() {
     fi
 
     # Only treat error models as cached when the injector completed fully.
-    # error_metadata.json is written by create_error_model.py at the end; partial
+    # error_metadata.json is written by task_tools.py create-error-model; partial
     # directories (e.g. OOM-killed saves) may still contain config.json.
     if [[ -d "${error_path}" && -f "${error_path}/config.json" && -f "${error_path}/error_metadata.json" ]]; then
         echo "  Error model ${error_type} already exists, skipping" >> "${log_file}"
@@ -2192,9 +2194,9 @@ task_evaluate_error() {
 
     # Repair known config inconsistencies for missing_tensors error models created by older pack versions.
     if [[ "${error_type}" == "missing_tensors" ]]; then
-        local repair_script="${SCRIPT_DIR}/../../python/repair_missing_tensors_config.py"
+        local repair_script="${SCRIPT_DIR}/../../python/task_tools.py"
         if [[ -f "${repair_script}" && -f "${abs_baseline_path}/config.json" && -f "${abs_error_path}/config.json" ]]; then
-            _cmd_python "${repair_script}" "${abs_baseline_path}/config.json" "${abs_error_path}/config.json" >> "${log_file}" 2>&1 || true
+            _cmd_python "${repair_script}" repair-missing-tensors-config "${abs_baseline_path}/config.json" "${abs_error_path}/config.json" >> "${log_file}" 2>&1 || true
         fi
     fi
 
@@ -2441,7 +2443,7 @@ PRESET_YAML
         local report_file=""
         report_file=$(find "${cert_dir}" -name "report*.json" -type f 2>/dev/null | sort | tail -1)
         if [[ -n "${report_file}" && -f "${report_file}" ]]; then
-            _cmd_python "${SCRIPT_DIR}/../../python/evaluation_report_from_report.py" \
+            _cmd_python "${SCRIPT_DIR}/../../python/task_tools.py" evaluation-report \
                 --report "${report_file}" \
                 --out "${cert_file}" >> "${log_file}" 2>&1 || true
         fi
@@ -2457,7 +2459,8 @@ PRESET_YAML
         edited_events_file=$({ find "${cert_dir}/edited" -name "events.jsonl" -type f 2>/dev/null || true; } | sort | tail -1)
         source_runtime_manifest=$({ find "${cert_dir}/source" -name "runtime.manifest.json" -type f 2>/dev/null || true; } | sort | tail -1)
         local structural_report_args=(
-            "${SCRIPT_DIR}/../../python/structural_failure_report.py"
+            "${SCRIPT_DIR}/../../python/task_tools.py"
+            structural-failure-report
             --error-type "${error_type}"
             --out "${cert_file}"
             --message "invarlock evaluate exited ${exit_code} without evaluation.report.json"

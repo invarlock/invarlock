@@ -1,85 +1,46 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from invarlock import evidence_pack_edit_metadata as evidence_pack_edit_metadata_mod
 from invarlock import evidence_pack_integrity as evidence_pack_integrity_mod
-from invarlock import evidence_pack_manifest as evidence_pack_manifest_mod
-from invarlock import evidence_pack_metadata as evidence_pack_metadata_mod
-from invarlock import evidence_pack_report_verification as report_verification_mod
 from invarlock import evidence_pack_support as evidence_pack_support_mod
-from invarlock import evidence_pack_trust as evidence_pack_trust_mod
 from invarlock.reporting.verify_contract import (
     VerifyExecutionResult,
+    VerifyOutcome,
     run_verify_reports,
 )
 from invarlock.runtime_security import unverified_provenance_allowed
 
-EVIDENCE_PACK_FORMAT = evidence_pack_manifest_mod.EVIDENCE_PACK_FORMAT
-jsonschema = evidence_pack_manifest_mod.jsonschema
-load_evidence_pack_manifest_schema = (
-    evidence_pack_manifest_mod.load_evidence_pack_manifest_schema
-)
-_load_json = evidence_pack_manifest_mod._load_json
-_json_load_error_types = evidence_pack_manifest_mod._json_load_error_types
-_load_json_object = evidence_pack_manifest_mod._load_json_object
-_manual_validate_manifest = evidence_pack_manifest_mod._manual_validate_manifest
-_material_spec = evidence_pack_manifest_mod._material_spec
-_normalize_pack_path = evidence_pack_manifest_mod._normalize_pack_path
-_path_within_dir = evidence_pack_manifest_mod._path_within_dir
-_sha256_bytes = evidence_pack_manifest_mod._sha256_bytes
-_sha256_file = evidence_pack_manifest_mod._sha256_file
-_validate_material_name = evidence_pack_manifest_mod._validate_material_name
-_validate_reference = evidence_pack_manifest_mod._validate_reference
-verify_manifest_provenance = evidence_pack_manifest_mod.verify_manifest_provenance
+EVIDENCE_PACK_FORMAT = evidence_pack_integrity_mod.EVIDENCE_PACK_FORMAT
+_load_json = evidence_pack_integrity_mod._load_json
+_json_load_error_types = evidence_pack_integrity_mod._json_load_error_types
+_load_json_object = evidence_pack_integrity_mod._load_json_object
+_manual_validate_manifest = evidence_pack_integrity_mod._manual_validate_manifest
+_material_spec = evidence_pack_integrity_mod._material_spec
+_normalize_pack_path = evidence_pack_integrity_mod._normalize_pack_path
+_path_within_dir = evidence_pack_integrity_mod._path_within_dir
+_sha256_bytes = evidence_pack_integrity_mod._sha256_bytes
+_sha256_file = evidence_pack_integrity_mod._sha256_file
+_validate_material_name = evidence_pack_integrity_mod._validate_material_name
+_validate_reference = evidence_pack_integrity_mod._validate_reference
+validate_manifest = evidence_pack_integrity_mod.validate_manifest
+verify_manifest_provenance = evidence_pack_integrity_mod.verify_manifest_provenance
 _evidence_pack_counts_from_verification = (
-    evidence_pack_metadata_mod._evidence_pack_counts_from_verification
+    evidence_pack_support_mod._evidence_pack_counts_from_verification
 )
 _derive_evidence_pack_evidence_level = (
-    evidence_pack_metadata_mod._derive_evidence_pack_evidence_level
+    evidence_pack_support_mod._derive_evidence_pack_evidence_level
 )
-_render_evidence_pack_readme = evidence_pack_metadata_mod._render_evidence_pack_readme
+_render_evidence_pack_readme = evidence_pack_support_mod._render_evidence_pack_readme
 _CONTROL_FILES = evidence_pack_integrity_mod.CONTROL_FILES
 MANIFEST_SIGNATURE_FILENAME = evidence_pack_integrity_mod.MANIFEST_SIGNATURE_FILENAME
 EvidencePackStatus = evidence_pack_support_mod.EvidencePackStatus
 EvidencePackResult = evidence_pack_support_mod.EvidencePackResult
-
-
-def _jsonschema_validation_error_types() -> tuple[type[BaseException], ...]:
-    if jsonschema is None:
-        return ()
-    exceptions_mod = getattr(jsonschema, "exceptions", None)
-    error_types: list[type[BaseException]] = []
-    for attr in ("ValidationError", "SchemaError"):
-        exc_type = None
-        if exceptions_mod is not None:
-            exc_type = getattr(exceptions_mod, attr, None)
-        if exc_type is None:
-            exc_type = getattr(jsonschema, attr, None)
-        if isinstance(exc_type, type) and issubclass(exc_type, BaseException):
-            error_types.append(exc_type)
-    return tuple(error_types)
-
-
-def validate_manifest(path: Path) -> list[str]:
-    try:
-        payload = _load_json(path)
-    except _json_load_error_types() as exc:
-        return [f"manifest is not valid JSON: {exc}"]
-
-    schema = load_evidence_pack_manifest_schema()
-    if schema and jsonschema is not None:
-        validation_error_types = _jsonschema_validation_error_types()
-        if validation_error_types:
-            try:
-                jsonschema.validate(instance=payload, schema=schema)
-            except validation_error_types as exc:
-                return [f"manifest schema validation failed: {exc}"]
-        else:
-            jsonschema.validate(instance=payload, schema=schema)
-    return _manual_validate_manifest(payload)
+RunVerifyCommand = Callable[..., VerifyExecutionResult]
 
 
 _relative_file_paths = evidence_pack_support_mod._relative_file_paths
@@ -94,10 +55,79 @@ _verify_no_extra_files = evidence_pack_support_mod._verify_no_extra_files
 _sign_manifest = evidence_pack_integrity_mod.sign_manifest
 _validate_signing_key = evidence_pack_support_mod._validate_signing_key
 _generate_signing_keypair = evidence_pack_integrity_mod.generate_signing_keypair
-_verify_signature = evidence_pack_trust_mod.verify_signature
-
 
 _signature_warnings_to_errors = evidence_pack_integrity_mod.signature_warnings_to_errors
+
+
+def load_trust_store_fingerprints(
+    trust_store_path: Path | None,
+) -> tuple[set[str], list[str], str | None]:
+    """Load trusted evidence-pack signer fingerprints from a JSON trust store."""
+    path = trust_store_path
+    if path is None:
+        default_path = evidence_pack_integrity_mod.DEFAULT_TRUST_STORE_PATH
+        path = default_path if default_path.is_file() else None
+    if path is None:
+        return set(), [], None
+    if not path.is_file():
+        return set(), [f"Evidence-pack trust store not found: {path}"], str(path)
+    try:
+        payload = _load_json(path)
+    except _json_load_error_types() as exc:
+        return set(), [f"Evidence-pack trust store is not valid JSON: {exc}"], str(path)
+
+    raw_entries: list[Any]
+    if isinstance(payload, list):
+        raw_entries = list(payload)
+    elif isinstance(payload, dict):
+        raw = payload.get("trusted_signers", payload.get("fingerprints", []))
+        if not isinstance(raw, list):
+            return (
+                set(),
+                ["Evidence-pack trust store trusted_signers must be a list."],
+                str(path),
+            )
+        raw_entries = raw
+    else:
+        return (
+            set(),
+            ["Evidence-pack trust store must be a JSON object or list."],
+            str(path),
+        )
+
+    fingerprints: set[str] = set()
+    errors: list[str] = []
+    for index, entry in enumerate(raw_entries):
+        raw_value = entry.get("fingerprint") if isinstance(entry, dict) else entry
+        if not isinstance(raw_value, str):
+            errors.append(f"Evidence-pack trust store entry {index} is not a string.")
+            continue
+        normalized = evidence_pack_integrity_mod.normalize_expected_fingerprint(
+            raw_value
+        )
+        if normalized is None:
+            errors.append(
+                f"Evidence-pack trust store entry {index} is not a sha256 fingerprint."
+            )
+            continue
+        fingerprints.add(normalized)
+    if not fingerprints and not errors:
+        errors.append("Evidence-pack trust store contains no trusted signers.")
+    return fingerprints, errors, str(path)
+
+
+def _verify_signature(
+    pack_dir: Path,
+    *,
+    strict: bool,
+    expected_fingerprints: set[str] | frozenset[str] | None = None,
+) -> tuple[list[str], list[str], str | None]:
+    return evidence_pack_integrity_mod.verify_signature(
+        pack_dir,
+        strict=strict,
+        load_json_fn=_load_json,
+        expected_fingerprints=expected_fingerprints,
+    )
 
 
 def _run_verify_command(
@@ -114,8 +144,52 @@ def _run_verify_command(
     )
 
 
+def _scenario_strictness_by_id(pack_dir: Path) -> dict[str, str]:
+    scenarios_path = pack_dir / "metadata" / "scenarios.json"
+    if not scenarios_path.is_file():
+        return {}
+    try:
+        payload = json.loads(scenarios_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    scenarios = payload.get("scenarios")
+    if not isinstance(scenarios, list):
+        return {}
+    strictness_by_id: dict[str, str] = {}
+    for scenario in scenarios:
+        if not isinstance(scenario, dict):
+            continue
+        scenario_id = scenario.get("id")
+        strictness = scenario.get("strictness")
+        if isinstance(scenario_id, str) and isinstance(strictness, str):
+            strictness_by_id[scenario_id] = strictness
+    return strictness_by_id
+
+
+def _report_scenario_id(pack_dir: Path, report: Path) -> str | None:
+    try:
+        parts = report.relative_to(pack_dir / "reports").parts
+    except ValueError:
+        return None
+    if len(parts) < 4:
+        return None
+    return parts[1]
+
+
+def _report_expects_verify_failure(
+    pack_dir: Path,
+    report: Path,
+    *,
+    strictness_by_id: dict[str, str],
+) -> bool:
+    if "/errors/" in report.as_posix():
+        return True
+    scenario_id = _report_scenario_id(pack_dir, report)
+    return bool(scenario_id and strictness_by_id.get(scenario_id) == "must_fail")
+
+
 def _verify_command_succeeded(result: VerifyExecutionResult) -> bool:
-    return report_verification_mod._verify_command_succeeded(result)
+    return result.outcome == VerifyOutcome.OK
 
 
 def _verify_reports(
@@ -125,13 +199,79 @@ def _verify_reports(
     profile: str,
     report_assurance: str,
 ) -> tuple[list[str], dict[str, Any] | None]:
-    return report_verification_mod.verify_reports(
-        pack_dir,
-        json_out_path=json_out_path,
+    reports = sorted(pack_dir.glob("reports/**/evaluation.report.json"))
+    if not reports:
+        return ["No reports found in pack."], None
+    strictness_by_id = _scenario_strictness_by_id(pack_dir)
+    expected_failure_reports = [
+        path
+        for path in reports
+        if _report_expects_verify_failure(
+            pack_dir, path, strictness_by_id=strictness_by_id
+        )
+    ]
+    expected_pass_reports = [
+        path for path in reports if path not in expected_failure_reports
+    ]
+    if not expected_pass_reports:
+        return [
+            "No reports expected to pass in pack (only expected-failure reports present)."
+        ], None
+
+    expected_pass_result = _run_verify_command(
+        expected_pass_reports,
         profile=profile,
         report_assurance=report_assurance,
-        run_verify_command=_run_verify_command,
     )
+    if not isinstance(expected_pass_result.payload, dict):
+        return ["expected-pass report verification did not return a JSON object."], None
+    verify_payload = dict(expected_pass_result.payload)
+    expected_failure_payloads: list[dict[str, Any]] = []
+    for report in expected_failure_reports:
+        try:
+            expected_failure_result = _run_verify_command(
+                [report],
+                profile=profile,
+                report_assurance=report_assurance,
+            )
+        except (
+            ImportError,
+            ModuleNotFoundError,
+            OSError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ) as exc:
+            return [
+                f"expected-failure report verification failed unexpectedly: {exc}"
+            ], verify_payload
+        if not isinstance(expected_failure_result.payload, dict):
+            return [
+                "expected-failure report verification did not return a JSON object."
+            ], verify_payload
+        if _verify_command_succeeded(expected_failure_result):
+            rel_report = str(report.relative_to(pack_dir)).replace("\\", "/")
+            return [
+                f"expected-failure report verified as passing: {rel_report}"
+            ], verify_payload
+        expected_failure_payloads.append(expected_failure_result.payload)
+    if expected_failure_reports:
+        verify_payload["expected_failures"] = {
+            "verify": expected_failure_payloads,
+            "reports": [
+                str(path.relative_to(pack_dir)).replace("\\", "/")
+                for path in expected_failure_reports
+            ],
+        }
+    if json_out_path is not None:
+        json_out_path.write_text(
+            json.dumps(verify_payload, sort_keys=True) + "\n", encoding="utf-8"
+        )
+    if not _verify_command_succeeded(expected_pass_result):
+        return [
+            "invarlock verify reported report verification failures."
+        ], verify_payload
+    return [], verify_payload
 
 
 _collect_build_evidence_pack_errors = (
@@ -378,8 +518,8 @@ def verify_evidence_pack(
             "--report-assurance must be one of: report, strict, off "
             f"(got {report_assurance!r})."
         )
-    trust_fingerprints, trust_errors, trust_store_used = (
-        evidence_pack_trust_mod.load_trust_store_fingerprints(trust_store_path)
+    trust_fingerprints, trust_errors, trust_store_used = load_trust_store_fingerprints(
+        trust_store_path
     )
     errors.extend(trust_errors)
     expected_fingerprints = set(trust_fingerprints)

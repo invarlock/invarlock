@@ -185,7 +185,7 @@ def test_local_jsonl_pairs_provider_windows_and_labels(tmp_path: Path):
     assert provider.last_preview_labels and provider.last_final_labels
 
 
-def test_local_jsonl_pairs_provider_registry_survives_module_split(tmp_path: Path):
+def test_local_jsonl_pairs_provider_registry_uses_local_jsonl_owner(tmp_path: Path):
     pairs_file = tmp_path / "pairs.jsonl"
     _write_jsonl(
         pairs_file,

@@ -27,6 +27,12 @@ def test_compute_thresholds_payload_uses_tier_defaults(monkeypatch):
     assert payload["tier"] == "balanced"
     assert "pm_ratio" in payload
     assert payload["variance"]["min_effect_lognll"] == 0.2
+    assert "accuracy" in payload
+    assert set(payload["accuracy"]).issuperset(
+        {"delta_min_pp", "min_examples", "min_examples_fraction", "hysteresis_delta_pp"}
+    )
+    assert isinstance(payload["accuracy"]["delta_min_pp"], float)
+    assert isinstance(payload["accuracy"]["min_examples"], int)
 
 
 def test_resolve_policy_tier_checks_multiple_sources():

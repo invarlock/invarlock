@@ -9,8 +9,8 @@ import torch
 
 from invarlock.core.types import GuardDiagnostic, GuardValidationResult
 
-from ._contracts import guard_assert
 from ._estimators import frobenius_norm_sq, row_col_norm_extrema
+from .policies import guard_assert
 from .spectral_control import apply_spectral_control
 from .spectral_detection import (
     classify_model_families,

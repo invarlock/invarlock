@@ -8,10 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from invarlock.core.run_orchestrator_types import (
-    RunExecutionEvent,
-)
-
 _build_run_context_payload_impl: Any | None = None
 _build_run_execution_config_payloads_impl: Any | None = None
 _resolve_pm_acceptance_range_impl: Any | None = None
@@ -35,7 +31,7 @@ def _coerce_int(value: Any, default: int) -> int:
         return int(default)
 
 
-RunEventEmitter = Callable[[RunExecutionEvent], None]
+RunEventEmitter = Callable[[Any], None]
 
 
 @dataclass(frozen=True)

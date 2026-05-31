@@ -7,6 +7,8 @@ import torch
 import torch.nn as nn
 
 import invarlock.guards.rmt as runtime_rmt
+import invarlock.guards.rmt_analysis as rmt_analysis
+import invarlock.guards.rmt_detection as rmt_detection
 
 
 def test_runtime_activation_module_and_edge_risk_guardrails(monkeypatch) -> None:
@@ -48,13 +50,11 @@ def test_runtime_activation_module_and_edge_risk_guardrails(monkeypatch) -> None
     assert guard._activation_edge_risk(torch.randn(3, 2)) is None
 
     monkeypatch.setattr(torch, "sqrt", original_sqrt)
-    original_mp_bulk_edge = runtime_rmt.rmt_math.mp_bulk_edge
-    monkeypatch.setattr(
-        runtime_rmt.rmt_math, "mp_bulk_edge", lambda *_a, **_k: float("nan")
-    )
+    original_mp_bulk_edge = rmt_analysis.mp_bulk_edge
+    monkeypatch.setattr(rmt_analysis, "mp_bulk_edge", lambda *_a, **_k: float("nan"))
     assert guard._activation_edge_risk(torch.randn(3, 2)) is None
 
-    monkeypatch.setattr(runtime_rmt.rmt_math, "mp_bulk_edge", original_mp_bulk_edge)
+    monkeypatch.setattr(rmt_analysis, "mp_bulk_edge", original_mp_bulk_edge)
     guard.estimator = {"iters": "bad", "init": "bogus"}
     assert guard._activation_edge_risk(torch.randn(3, 2)) is not None
 
@@ -130,7 +130,7 @@ def test_runtime_detection_logs_correction_failure(monkeypatch) -> None:
         },
     )
     monkeypatch.setattr(
-        runtime_rmt.rmt_detection,
+        rmt_detection,
         "_apply_rmt_correction",
         lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("boom")),
     )

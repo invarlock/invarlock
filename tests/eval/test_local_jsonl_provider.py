@@ -33,3 +33,13 @@ not json
     assert cap["available_nonoverlap"] == 2
     prev, fin = p.windows(_Tok(), seq_len=8, stride=4, preview_n=1, final_n=1)
     assert len(prev.indices) == 1 and len(fin.indices) == 1
+
+
+def test_local_jsonl_data_files_glob(tmp_path: Path):
+    (tmp_path / "a.jsonl").write_text('{"text": "a"}\n', encoding="utf-8")
+    (tmp_path / "b.jsonl").write_text('{"text": "b"}\n', encoding="utf-8")
+    provider = get_provider("local_jsonl", data_files=str(tmp_path / "*.jsonl"))
+    texts = provider.load()
+    assert sorted(texts) == ["a", "b"]
+    cap = provider.estimate_capacity(tokenizer=None, seq_len=8, stride=4)
+    assert cap["available_nonoverlap"] == 2 and cap["candidate_limit"] == 2

@@ -8,7 +8,7 @@ from typing import Any
 import torch
 import torch.nn as nn
 
-from . import rmt_analysis, rmt_math
+from . import rmt_analysis
 
 logger = logging.getLogger(__name__)
 _RMT_CORRECTION_ERRORS = (
@@ -548,7 +548,7 @@ def _apply_rmt_correction(
                         target_sigma = sigma_base * margin * (1.0 - deadband)
                     else:
                         m, n = W.shape
-                        mp_edge = rmt_math.mp_bulk_edge(m, n, whitened=False)
+                        mp_edge = rmt_analysis.mp_bulk_edge(m, n, whitened=False)
                         target_sigma = mp_edge * 1.0
 
                     if sigma_pre > target_sigma:

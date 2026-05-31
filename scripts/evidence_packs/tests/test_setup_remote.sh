@@ -66,7 +66,7 @@ test_setup_remote_verify_remote_stack_runs_package_native_smoke() {
 
     local cmd
     cmd="$(cat "${TEST_TMPDIR}/smoke.cmd")"
-    assert_match "python /opt/invarlock/scripts/evidence_packs/python/remote_setup_smoke.py" "${cmd}" "remote smoke helper invoked"
+    assert_match "python /opt/invarlock/scripts/evidence_packs/python/runtime_tools.py remote-setup-smoke" "${cmd}" "remote smoke helper invoked"
     assert_match "--repo-root /opt/invarlock" "${cmd}" "repo root forwarded to smoke helper"
 }
 
@@ -485,7 +485,7 @@ if [[ "${cmd}" == "clone" ]]; then
         "${dest}/scripts/evidence_packs/run_pack.sh" \
         "${dest}/scripts/evidence_packs/verify_pack.sh" \
         "${dest}/scripts/evidence_packs/run_mini_pack_gate.sh" \
-        "${dest}/scripts/evidence_packs/python/remote_setup_smoke.py" \
+        "${dest}/scripts/evidence_packs/python/runtime_tools.py" \
         "${dest}/requirements/evidence-packs/huggingface_hub.txt" \
         "${dest}/requirements/evidence-packs/accelerate.txt" \
         "${dest}/requirements/evidence-packs/pyyaml.txt" \
@@ -559,7 +559,7 @@ if [[ "${cmd}" == "clone" ]]; then
         "${dest}/scripts/evidence_packs/run_pack.sh" \
         "${dest}/scripts/evidence_packs/verify_pack.sh" \
         "${dest}/scripts/evidence_packs/run_mini_pack_gate.sh" \
-        "${dest}/scripts/evidence_packs/python/remote_setup_smoke.py" \
+        "${dest}/scripts/evidence_packs/python/runtime_tools.py" \
         "${dest}/requirements/evidence-packs/huggingface_hub.txt" \
         "${dest}/requirements/evidence-packs/accelerate.txt" \
         "${dest}/requirements/evidence-packs/pyyaml.txt" \
@@ -687,7 +687,7 @@ if [[ "${1:-}" == "-c" ]]; then
     esac
 fi
 
-if [[ "${1:-}" == "${REPO_DIR}/scripts/evidence_packs/python/remote_setup_smoke.py" ]]; then
+if [[ "${1:-}" == "${REPO_DIR}/scripts/evidence_packs/python/runtime_tools.py" && "${2:-}" == "remote-setup-smoke" ]]; then
     has_marker invarlock || exit 1
     has_marker torch || exit 1
     has_marker transformers || exit 1

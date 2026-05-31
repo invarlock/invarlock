@@ -29,12 +29,12 @@ from rich.console import Console
 
 from invarlock import __version__ as INVARLOCK_VERSION
 from invarlock.cli import output as cli_output
-from invarlock.exit_codes import resolve_command_exit_code
+from invarlock.core.exceptions import resolve_command_exit_code
 from invarlock.runtime_security import (
     RuntimeManifestExecution,
 )
 
-from ...core.adapter_auto import resolve_auto_adapter
+from ...adapters.auto import resolve_auto_adapter
 from ...core.evaluate_contract import (
     apply_edited_primary_metric_policy,
 )
@@ -243,7 +243,7 @@ def _print_quiet_summary(
 
 
 def _release_phase_memory() -> None:
-    from .. import run_runtime as run_runtime_mod
+    from .. import run_runtime_exec as run_runtime_mod
 
     run_runtime_mod.release_process_memory()
 

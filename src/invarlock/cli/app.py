@@ -12,6 +12,7 @@ minimal environments.
 from __future__ import annotations
 
 import os
+from enum import StrEnum
 from importlib.metadata import PackageNotFoundError
 
 import click
@@ -19,7 +20,6 @@ import typer
 from rich.console import Console
 from typer.core import TyperGroup
 
-from invarlock.cli.runtime_modes import ExecutionMode, RuntimeProvenanceMode
 from invarlock.core.report_inputs import (
     ReportInputError,
     resolve_report_input_path,
@@ -40,6 +40,16 @@ LIGHT_IMPORT = os.getenv("INVARLOCK_LIGHT_IMPORT", "").strip().lower() in {
 }
 
 
+class ExecutionMode(StrEnum):
+    CONTAINER = "container"
+    HOST = "host"
+
+
+class RuntimeProvenanceMode(StrEnum):
+    CONTAINER = "container"
+    HOST = "host"
+
+
 # Deterministic help ordering
 class OrderedGroup(TyperGroup):
     def list_commands(self, ctx: click.Context) -> list[str]:
@@ -57,6 +67,19 @@ class OrderedGroup(TyperGroup):
         if command is not None:
             return command
         if _load_lazy_subapp(self, cmd_name):
+            return super().get_command(ctx, cmd_name)
+        return None
+
+
+class AdvancedGroup(TyperGroup):
+    def list_commands(self, ctx: click.Context) -> list[str]:
+        return ["evidence-pack", "policy", "plugins", "calibrate", "runtime-verify"]
+
+    def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
+        command = super().get_command(ctx, cmd_name)
+        if command is not None:
+            return command
+        if _load_advanced_subapp(self, cmd_name):
             return super().get_command(ctx, cmd_name)
         return None
 
@@ -81,6 +104,14 @@ app = typer.Typer(
 )
 
 console = Console()
+advanced_app = typer.Typer(
+    help=(
+        "Advanced and maintenance workflows. "
+        "These commands are intentionally outside the core evaluate/verify/report path."
+    ),
+    no_args_is_help=True,
+    cls=AdvancedGroup,
+)
 _VERSION_IMPORT_ERRORS = (
     AttributeError,
     ImportError,
@@ -312,6 +343,61 @@ def _register_subapps() -> None:
     pass
 
 
+@advanced_app.callback(invoke_without_command=True)
+def _advanced_root() -> None:
+    """Advanced command namespace."""
+
+
+def _missing_dependency_subapp(name: str, missing: str) -> typer.Typer:
+    subapp = typer.Typer(help=f"{name} requires optional dependency {missing!r}.")
+
+    @subapp.callback(invoke_without_command=True)
+    def _missing() -> None:
+        raise click.UsageError(
+            f"`invarlock advanced {name}` requires optional dependency {missing!r}."
+        )
+
+    return subapp
+
+
+def _load_advanced_subapp(group: TyperGroup, name: str) -> bool:
+    def _register(sub_name: str, subapp: typer.Typer) -> bool:
+        command = typer.main.get_command(subapp)
+        command.name = sub_name
+        group.add_command(command, name=sub_name)
+        return True
+
+    def _register_command(sub_name: str, command: click.Command) -> bool:
+        command.name = sub_name
+        group.add_command(command, name=sub_name)
+        return True
+
+    if name == "evidence-pack":
+        from .commands.evidence_pack import evidence_pack_app
+
+        return _register(name, evidence_pack_app)
+    if name == "policy":
+        from .commands.policy import policy_app
+
+        return _register(name, policy_app)
+    if name == "plugins":
+        from .commands.plugins import plugins_app
+
+        return _register(name, plugins_app)
+    if name == "calibrate":
+        try:
+            from .commands.calibrate import calibrate_app
+        except ModuleNotFoundError as exc:  # pragma: no cover - exercised in venvs
+            missing = getattr(exc, "name", "") or "optional runtime"
+            return _register(name, _missing_dependency_subapp(name, missing))
+        return _register(name, calibrate_app)
+    if name == "runtime-verify":
+        from invarlock.cli.commands.verify import runtime_verify_app
+
+        return _register_command(name, runtime_verify_app)
+    return False
+
+
 def _load_lazy_subapp(group: TyperGroup, name: str) -> bool:
     def _register_lazy(name: str, subapp: typer.Typer) -> bool:
         command = typer.main.get_command(subapp)
@@ -324,9 +410,7 @@ def _load_lazy_subapp(group: TyperGroup, name: str) -> bool:
 
         return _register_lazy(name, _report_app)
     if name == "advanced":
-        from .commands.advanced import advanced_app as _advanced_app
-
-        return _register_lazy(name, _advanced_app)
+        return _register_lazy(name, advanced_app)
     return False
 
 

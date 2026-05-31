@@ -2,19 +2,116 @@
 
 from __future__ import annotations
 
+import hashlib
+from array import array
+from collections.abc import Iterable, Sequence
 from typing import Any
 
+import click
+import numpy as np
+import typer
 from rich.console import Console
 
 from invarlock.core.metric_provider_resolution import (
     resolve_metric_and_provider as _resolve_metric_and_provider_core,
 )
-from invarlock.core.provider_parity import (
+from invarlock.core.run_policy import (
     enforce_provider_parity as _enforce_provider_parity_core,
 )
 
 _PAIRING_INT_ERRORS = (OverflowError, TypeError, ValueError)
 _PAIRING_ASSIGNMENT_ERRORS = (KeyError, TypeError, ValueError)
+_IMPORT_UNSET = object()
+torch: Any = _IMPORT_UNSET
+
+
+def _get_torch() -> Any:
+    global torch
+    if torch is _IMPORT_UNSET:
+        try:
+            import torch as _torch
+        except ImportError:
+            torch = None
+        else:
+            torch = _torch
+    return None if torch is _IMPORT_UNSET else torch
+
+
+def _to_int_list(values: Sequence[int] | Iterable[int]) -> list[int]:
+    return [int(v) for v in values]
+
+
+def _tensor_or_list_to_ints(values: Any) -> list[int]:
+    """Coerce possible tensor/list-like inputs to a list[int]."""
+    torch_mod = _get_torch()
+    if torch_mod is not None and hasattr(values, "tolist"):
+        raw = values.tolist()
+        if isinstance(raw, list):
+            return _to_int_list(raw)
+        try:
+            return _to_int_list(list(raw))
+        except (typer.Exit, SystemExit, click.exceptions.Exit):
+            raise
+        except (TypeError, ValueError):
+            return []
+    if isinstance(values, np.ndarray | list | tuple):
+        return _to_int_list(list(values))
+    if isinstance(values, Iterable):
+        return _to_int_list(values)
+    return []
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _hash_sequences(seqs: Sequence[Sequence[int]] | Iterable[Sequence[int]]) -> str:
+    """Compute a stable digest for a sequence of integer token sequences."""
+    hasher = hashlib.blake2s(digest_size=16)
+    for seq in seqs:
+        try:
+            seq_len = len(seq)
+        except TypeError:
+            seq = list(seq)
+            seq_len = len(seq)
+        hasher.update(seq_len.to_bytes(4, "little", signed=False))
+        arr = array("I", (int(token) & 0xFFFFFFFF for token in seq))
+        hasher.update(arr.tobytes())
+    return hasher.hexdigest()
+
+
+def _compute_mask_positions_digest(windows: dict[str, Any]) -> str | None:
+    """Compute a rolled hash of MLM mask positions across windows."""
+    hasher = hashlib.blake2s(digest_size=16)
+    any_masked = False
+    for arm in ("preview", "final"):
+        sec = windows.get(arm)
+        if not isinstance(sec, dict):
+            continue
+        labels = sec.get("labels")
+        if not isinstance(labels, list) or not labels:
+            continue
+        hasher.update(arm.encode("utf-8"))
+        for row in labels:
+            row_list = _tensor_or_list_to_ints(row)
+            if not row_list:
+                continue
+            found = False
+            for idx, value in enumerate(row_list):
+                if int(value) != -100:
+                    hasher.update(b"1")
+                    hasher.update(idx.to_bytes(4, "little", signed=False))
+                    found = True
+            if found:
+                any_masked = True
+            hasher.update(b"|")
+    if not any_masked:
+        return None
+    digest = hasher.hexdigest()
+    return digest if digest else None
 
 
 def _canonical_dataset_id(value: Any) -> str | None:
@@ -59,8 +156,6 @@ def extract_pairing_schedule(
 ) -> dict[str, Any] | None:
     """Extract sanitized pairing schedule from baseline-like report data."""
     if tensor_or_list_to_ints_fn is None:
-        from invarlock.cli.run_pairing_helpers import _tensor_or_list_to_ints
-
         tensor_or_list_to_ints_fn = _tensor_or_list_to_ints
 
     if not isinstance(report, dict):
@@ -229,11 +324,9 @@ def compute_provider_digest(
     compute_mask_positions_digest_fn: Any | None = None,
 ) -> dict[str, str] | None:
     """Compute provider digest (ids/tokenizer/masking) from report context."""
-    from invarlock.utils.digest import hash_json
+    from invarlock.utils import hash_json
 
     if compute_mask_positions_digest_fn is None:
-        from invarlock.cli.run_pairing_helpers import _compute_mask_positions_digest
-
         compute_mask_positions_digest_fn = _compute_mask_positions_digest
 
     windows = report.get("evaluation_windows") if isinstance(report, dict) else None
@@ -327,12 +420,8 @@ def validate_and_harvest_baseline_schedule(
     if canonical_dataset_id_fn is None:
         canonical_dataset_id_fn = _canonical_dataset_id
     if tensor_or_list_to_ints_fn is None:
-        from invarlock.cli.run_pairing_helpers import _tensor_or_list_to_ints
-
         tensor_or_list_to_ints_fn = _tensor_or_list_to_ints
     if hash_sequences_fn is None:
-        from invarlock.cli.run_pairing_helpers import _hash_sequences
-
         hash_sequences_fn = _hash_sequences
     if invarlock_error_cls is None:
         from invarlock.core.exceptions import InvarlockError

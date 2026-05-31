@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from invarlock.eval.providers.vision_text import (
+from invarlock.eval.data import (
     VisionTextProvider,
     _normalize_answers,
     _resolve_image_path,

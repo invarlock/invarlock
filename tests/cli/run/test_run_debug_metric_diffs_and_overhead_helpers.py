@@ -3,9 +3,9 @@ from __future__ import annotations
 from rich.console import Console
 
 from invarlock.cli import run_shell_output as run_output_mod
-from invarlock.core.run_guard_overhead_policy import normalize_guard_overhead_result
 from invarlock.core.run_policy import GUARD_OVERHEAD_THRESHOLD
-from invarlock.reporting.run_metric_utils import (
+from invarlock.reporting.report_overhead import normalize_guard_overhead_result
+from invarlock.reporting.run_report_metrics_contract import (
     format_debug_metric_diffs,
     merge_primary_metric_health,
 )

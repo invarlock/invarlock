@@ -150,6 +150,15 @@ def test_mapping_coercion_helpers_cover_data_dump_vars_and_fallbacks() -> None:
         def __init__(self) -> None:
             self.source = "vars"
 
+    class _DataRaisesAttributeError:
+        def __init__(self) -> None:
+            self.source = "vars-after-data"
+
+        def __getattribute__(self, name: str) -> object:
+            if name == "_data":
+                raise AttributeError(name)
+            return object.__getattribute__(self, name)
+
     class _WeirdDict:
         @property
         def __dict__(self):  # noqa: D401
@@ -161,8 +170,26 @@ def test_mapping_coercion_helpers_cover_data_dump_vars_and_fallbacks() -> None:
     assert policy.coerce_mapping(_WithData()) == {"source": "data"}
     assert policy.coerce_mapping(_WithDump()) == {"source": "dump"}
     assert policy.coerce_mapping(_WithVars()) == {"source": "vars"}
+    assert policy.coerce_mapping(_DataRaisesAttributeError()) == {
+        "source": "vars-after-data"
+    }
     assert policy.coerce_mapping(_WeirdDict()) == {}
     assert policy.coerce_mapping(object()) == {}
+
+
+def test_coerce_mapping_falls_through_when_data_attr_is_unreadable() -> None:
+    class _DataRaisesAttributeError:
+        def __init__(self) -> None:
+            self.source = "vars-after-data-error"
+
+        def __getattribute__(self, name: str) -> object:
+            if name == "_data":
+                raise AttributeError(name)
+            return object.__getattribute__(self, name)
+
+    assert policy.coerce_mapping(_DataRaisesAttributeError()) == {
+        "source": "vars-after-data-error"
+    }
 
 
 @pytest.mark.parametrize(

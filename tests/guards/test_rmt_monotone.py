@@ -1,6 +1,6 @@
 import pytest
 
-from invarlock.guards.rmt_math import rmt_growth_ratio, within_deadband
+from invarlock.guards.rmt_analysis import rmt_growth_ratio, within_deadband
 
 
 def test_rmt_growth_ratio_monotone() -> None:

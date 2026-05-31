@@ -10,7 +10,7 @@ from typer.testing import CliRunner
 
 from invarlock.cli.app import app
 from invarlock.cli.commands import report as report_mod
-from invarlock.reporting import report_console as console_mod
+from invarlock.reporting import report_summary as console_mod
 from invarlock.reporting.report_contract import ReportGenerationResult, generate_reports
 
 

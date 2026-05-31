@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from invarlock.eval.probes.post_attention import blend_neuron_scores
+from invarlock.eval.probes.importance import blend_neuron_scores
 
 torch = pytest.importorskip("torch")
 

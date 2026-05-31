@@ -1,20 +1,362 @@
 from __future__ import annotations
 
+import copy
+import importlib
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from invarlock.core.backend_inventory import (
     BACKEND_INVENTORY_FILENAME,
     write_backend_inventory_sidecar,
 )
+from invarlock.core.guard_evidence import GuardEvidence
 
-from . import report_files
 from .report_types import RunReport
 
+report_files = cast(Any, importlib.import_module("invarlock.reporting.report_files"))
 _NON_FATAL_EXCEPTIONS = (AttributeError, KeyError, OSError, TypeError, ValueError)
+
+
+def build_run_report_context(
+    *,
+    profile_normalized: str,
+    auto_config: Mapping[str, Any],
+    run_context: Mapping[str, Any],
+) -> dict[str, Any]:
+    run_section = run_context.get("run")
+    run_policy_context = dict(run_section) if isinstance(run_section, dict) else {}
+    eval_section = run_context.get("eval")
+    eval_policy_context = dict(eval_section) if isinstance(eval_section, dict) else {}
+    primary_metric_section = run_context.get("primary_metric")
+    primary_metric_context = (
+        dict(primary_metric_section) if isinstance(primary_metric_section, dict) else {}
+    )
+    assurance_section = run_context.get("assurance")
+    runtime_section = run_context.get("runtime")
+    guard_chain_observed = run_context.get("guard_chain_observed")
+    context = {
+        "profile": profile_normalized,
+        "auto": dict(auto_config),
+        "assurance": (
+            dict(assurance_section) if isinstance(assurance_section, dict) else {}
+        ),
+        "run": run_policy_context,
+        "eval": eval_policy_context,
+        "primary_metric": primary_metric_context,
+    }
+    if isinstance(runtime_section, dict):
+        context["runtime"] = dict(runtime_section)
+    if isinstance(guard_chain_observed, list) and all(
+        isinstance(item, str) for item in guard_chain_observed
+    ):
+        context["guard_chain_observed"] = list(guard_chain_observed)
+    return context
+
+
+def build_run_report_meta(
+    *,
+    model_id: str,
+    adapter: str,
+    resolved_device: Any,
+    commit_value: str,
+    seed_bundle: Mapping[str, Any],
+    auto_config: Mapping[str, Any],
+    guard_overhead_threshold: float,
+    model_profile: Any,
+    timestamp: str | None = None,
+    invarlock_version: str | None = None,
+    env_flags: Mapping[str, object] | None = None,
+    determinism_meta: Mapping[str, Any] | None = None,
+    pm_acceptance_range: tuple[float, float] | None = None,
+    pm_drift_band: tuple[float, float] | None = None,
+) -> dict[str, Any]:
+    adapter_lower = str(adapter or "").lower()
+    cert_lints = [
+        dict(lint) for lint in (getattr(model_profile, "cert_lints", ()) or ())
+    ]
+    if "multimodal" in adapter_lower:
+        cert_lints = []
+    meta_payload: dict[str, Any] = {
+        "model_id": model_id,
+        "adapter": adapter,
+        "device": str(resolved_device),
+        "commit": commit_value,
+        "seed": seed_bundle["python"],
+        "seeds": dict(seed_bundle),
+        "ts": timestamp or datetime.now().isoformat(),
+        "auto": dict(auto_config),
+        "guard_overhead_threshold": guard_overhead_threshold,
+        "model_profile": {
+            "family": getattr(model_profile, "family", ""),
+            "default_loss": getattr(model_profile, "default_loss", ""),
+            "module_selectors": getattr(model_profile, "module_selectors", {}),
+            "invariants": list(getattr(model_profile, "invariants", ()) or ()),
+            "cert_lints": cert_lints,
+        },
+    }
+    if invarlock_version:
+        meta_payload["invarlock_version"] = invarlock_version
+    if env_flags:
+        meta_payload["env_flags"] = dict(env_flags)
+    if determinism_meta:
+        meta_payload["determinism"] = dict(determinism_meta)
+    if pm_acceptance_range:
+        meta_payload["pm_acceptance_range"] = pm_acceptance_range
+    if pm_drift_band:
+        meta_payload["pm_drift_band"] = pm_drift_band
+    return meta_payload
+
+
+def build_run_report_data(
+    *,
+    canonical_dataset_id: str,
+    resolved_split: str,
+    seq_len: int,
+    stride: int,
+    preview_count: int,
+    final_count: int,
+    dataset_meta_context: Mapping[str, Any] | None,
+    tokenizer_hash: str | None,
+) -> tuple[dict[str, Any], str | None]:
+    data_payload: dict[str, Any] = {
+        "dataset": canonical_dataset_id,
+        "split": resolved_split,
+        "seq_len": seq_len,
+        "stride": stride,
+        "preview_n": preview_count,
+        "final_n": final_count,
+    }
+    resolved_tokenizer_hash = tokenizer_hash
+    if isinstance(dataset_meta_context, Mapping):
+        data_payload.update(dataset_meta_context)
+        dataset_tokenizer_hash = dataset_meta_context.get("tokenizer_hash")
+        if (
+            not resolved_tokenizer_hash
+            and isinstance(dataset_tokenizer_hash, str)
+            and dataset_tokenizer_hash
+        ):
+            resolved_tokenizer_hash = dataset_tokenizer_hash
+    return data_payload, resolved_tokenizer_hash
+
+
+def build_snapshot_provenance(
+    snapshot_provenance: Mapping[str, Any] | None,
+) -> dict[str, bool]:
+    snapshot_provenance = snapshot_provenance or {}
+    return {
+        "restore_failed": bool(snapshot_provenance.get("restore_failed")),
+        "reload_path_used": bool(snapshot_provenance.get("reload_path_used")),
+    }
+
+
+def build_edit_payload(
+    *,
+    core_edit: Mapping[str, Any] | None,
+    edit_name: str,
+    edit_label: str | None = None,
+) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    report_edit: dict[str, Any] = {}
+    context_edit: dict[str, Any] | None = None
+
+    if isinstance(core_edit, Mapping) and core_edit:
+        edit_deltas = core_edit.get("deltas", {})
+        if not isinstance(edit_deltas, Mapping):
+            edit_deltas = {}
+        report_deltas = copy.deepcopy(dict(edit_deltas))
+        report_deltas.setdefault("params_changed", edit_deltas.get("params_changed", 0))
+        report_deltas.setdefault("sparsity", edit_deltas.get("sparsity"))
+        report_deltas.setdefault("bitwidth_map", edit_deltas.get("bitwidth_map"))
+        report_deltas.setdefault(
+            "layers_modified", edit_deltas.get("layers_modified", 0)
+        )
+        report_edit.update(
+            {
+                "name": edit_name,
+                "plan_digest": core_edit.get("plan_digest", str(hash(str(core_edit)))),
+                "deltas": report_deltas,
+            }
+        )
+        for key in (
+            "plan",
+            "config",
+            "algorithm",
+            "algorithm_version",
+            "implementation",
+            "scope",
+            "ranking",
+            "grouping",
+            "budgets",
+            "seed",
+            "mask_digest",
+        ):
+            if key in core_edit:
+                report_edit[key] = copy.deepcopy(core_edit[key])
+        context_edit = {
+            "name": edit_name,
+            "params_changed": edit_deltas.get("params_changed", 0),
+            "layers_modified": edit_deltas.get("layers_modified", 0),
+        }
+
+    if edit_label:
+        report_edit["name"] = edit_label
+        report_edit["algorithm"] = edit_label
+        context_edit = dict(context_edit or {})
+        context_edit["name"] = edit_label
+
+    return report_edit, context_edit
+
+
+def merge_core_timing_metrics(
+    timings: Mapping[str, Any], core_metrics: Mapping[str, Any] | None
+) -> dict[str, Any]:
+    merged = dict(timings)
+    core_timings = (
+        core_metrics.get("timings") if isinstance(core_metrics, Mapping) else None
+    )
+    if not isinstance(core_timings, Mapping):
+        return merged
+    for key in ("prepare", "prepare_guards", "edit", "guards", "eval", "finalize"):
+        if key not in core_timings:
+            continue
+        try:
+            merged[key] = float(core_timings[key])
+        except (AttributeError, TypeError, ValueError, OverflowError):
+            merged[key] = core_timings[key]
+    return merged
+
+
+def build_metrics_payload(
+    *,
+    core_metrics: Mapping[str, Any] | None,
+    window_plan_context: Mapping[str, Any] | None,
+    dataset_meta_context: Mapping[str, Any] | None,
+    resolved_loss_type: str | None,
+    latency_default: float = 0.0,
+    memory_default: float = 0.0,
+) -> dict[str, Any]:
+    metrics = core_metrics if isinstance(core_metrics, Mapping) else {}
+    metrics_payload: dict[str, Any] = {
+        "latency_ms_per_tok": metrics.get("latency_ms_per_tok", latency_default),
+        "memory_mb_peak": metrics.get("memory_mb_peak", memory_default),
+        "spectral": {},
+        "rmt": {},
+        "invariants": {},
+    }
+    window_plan_ctx = window_plan_context
+    if isinstance(window_plan_ctx, Mapping):
+        metrics_payload["window_plan"] = dict(window_plan_ctx)
+        capacity_meta = window_plan_ctx.get("capacity")
+        if isinstance(capacity_meta, Mapping):
+            metrics_payload["window_capacity"] = dict(capacity_meta)
+        stats_section = metrics_payload.setdefault("stats", {})
+        stats_section.update(
+            {
+                "requested_preview": window_plan_ctx.get("requested_preview"),
+                "requested_final": window_plan_ctx.get("requested_final"),
+                "actual_preview": window_plan_ctx.get("actual_preview"),
+                "actual_final": window_plan_ctx.get("actual_final"),
+                "coverage_ok": window_plan_ctx.get("coverage_ok"),
+                "preview_total_tokens": window_plan_ctx.get("preview_total_tokens"),
+                "final_total_tokens": window_plan_ctx.get("final_total_tokens"),
+                "min_tokens_target": window_plan_ctx.get("min_tokens_target"),
+                "tokens_floor_met": window_plan_ctx.get("tokens_floor_met"),
+                "dedupe_adjustments": window_plan_ctx.get("dedupe_adjustments"),
+            }
+        )
+    optional_keys = [
+        "classification",
+        "logloss_preview",
+        "logloss_final",
+        "logloss_delta",
+        "logloss_preview_ci",
+        "logloss_final_ci",
+        "logloss_delta_ci",
+        "bootstrap",
+        "window_overlap_fraction",
+        "window_match_fraction",
+        "window_pairing_reason",
+        "window_pairing_preview",
+        "window_pairing_final",
+        "paired_windows",
+        "paired_delta_summary",
+        "primary_metric_tail",
+        "preview_total_tokens",
+        "final_total_tokens",
+        "masked_tokens_total",
+        "masked_tokens_preview",
+        "masked_tokens_final",
+        "timings",
+        "guard_timings",
+        "memory_snapshots",
+        "gpu_memory_mb_peak",
+        "gpu_memory_reserved_mb_peak",
+        "reduction",
+    ]
+    for key in optional_keys:
+        if key in metrics:
+            metrics_payload[key] = metrics[key]
+    metrics_payload["loss_type"] = resolved_loss_type
+    if metrics_payload.get("loss_type") is None and isinstance(
+        dataset_meta_context, Mapping
+    ):
+        metrics_payload["loss_type"] = dataset_meta_context.get(
+            "loss_type", resolved_loss_type
+        )
+    if isinstance(dataset_meta_context, Mapping):
+        for meta_key in (
+            "masked_tokens_total",
+            "masked_tokens_preview",
+            "masked_tokens_final",
+        ):
+            if (
+                meta_key not in metrics_payload
+                and dataset_meta_context.get(meta_key) is not None
+            ):
+                metrics_payload[meta_key] = dataset_meta_context[meta_key]
+    return metrics_payload
+
+
+def build_guard_entries(core_guards: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    if not isinstance(core_guards, Mapping):
+        return []
+    entries: list[dict[str, Any]] = []
+
+    for guard_name, guard_result in core_guards.items():
+        evidence = GuardEvidence.from_result(guard_name, guard_result)
+        if evidence is not None:
+            entries.append(evidence.as_report_entry())
+    return entries
+
+
+def build_flags_payload(core_guards: Mapping[str, Any] | None) -> dict[str, Any]:
+    guard_values = core_guards.values() if isinstance(core_guards, Mapping) else ()
+    return {
+        "guard_recovered": any(
+            not guard.get("passed", True)
+            for guard in guard_values
+            if isinstance(guard, Mapping)
+        ),
+        "rollback_reason": None,
+    }
+
+
+def build_artifacts_payload(
+    *,
+    event_path: Any,
+    mask_artifact_path: Any | None = None,
+) -> dict[str, Any]:
+    payload = {
+        "events_path": str(event_path) if event_path else "",
+        "logs_path": "",
+        "checkpoint_path": None,
+    }
+    if mask_artifact_path:
+        payload["masks_path"] = str(mask_artifact_path)
+    return payload
 
 
 @dataclass(frozen=True)
@@ -31,6 +373,12 @@ class RunReportPersistenceResult:
     report_path_out: str | None
     telemetry_saved_path: str | None = None
     telemetry_error: str | None = None
+
+
+@dataclass(frozen=True)
+class RunProvenanceResult:
+    missing_evaluation_windows_for_baseline: bool = False
+    missing_evaluation_windows_message: str | None = None
 
 
 def _detect_commit_value(cfg: Any) -> str:
@@ -97,6 +445,132 @@ def _collect_env_flags(
     except (AttributeError, RuntimeError, TypeError, ValueError, OSError):
         return {}
     return env_flags
+
+
+def _window_payload_has_signal(window_payload: Any) -> bool:
+    if not isinstance(window_payload, Mapping):
+        return False
+    for key in (
+        "window_ids",
+        "example_ids",
+        "logloss",
+        "input_ids",
+        "attention_masks",
+        "token_counts",
+        "masked_token_counts",
+        "actual_token_counts",
+        "labels",
+        "records",
+    ):
+        value = window_payload.get(key)
+        if isinstance(value, list) and value:
+            return True
+    return False
+
+
+def _evaluation_windows_have_signal(serialized_windows: Any) -> bool:
+    if not isinstance(serialized_windows, Mapping):
+        return False
+    return _window_payload_has_signal(serialized_windows.get("preview")) or (
+        _window_payload_has_signal(serialized_windows.get("final"))
+    )
+
+
+def finalize_run_provenance(
+    *,
+    report: dict[str, Any],
+    core_report: Any,
+    preview_records: list[dict[str, Any]],
+    final_records: list[dict[str, Any]],
+    use_mlm: bool,
+    preview_mask_counts: list[int] | None,
+    final_mask_counts: list[int] | None,
+    had_baseline: bool,
+    profile: str | None,
+    resolved_split: str | None,
+    used_fallback_split: bool,
+    baseline_report_data: dict[str, Any] | None,
+    serialize_evaluation_windows_fn: Any,
+    build_fallback_evaluation_windows_fn: Any,
+    compute_provider_digest_fn: Any,
+    enforce_provider_parity_fn: Any,
+) -> RunProvenanceResult:
+    """Finalize evaluation windows plus run provenance and provider parity."""
+
+    serialized_evaluation_windows = serialize_evaluation_windows_fn(
+        getattr(core_report, "evaluation_windows", None)
+    )
+    if _evaluation_windows_have_signal(serialized_evaluation_windows):
+        report["evaluation_windows"] = serialized_evaluation_windows
+    else:
+        try:
+            fallback_evaluation_windows = build_fallback_evaluation_windows_fn(
+                preview_records,
+                final_records,
+                use_mlm=use_mlm,
+                preview_mask_counts=preview_mask_counts,
+                final_mask_counts=final_mask_counts,
+            )
+            if fallback_evaluation_windows:
+                report["evaluation_windows"] = fallback_evaluation_windows
+        except _NON_FATAL_EXCEPTIONS:
+            pass
+        if (
+            "evaluation_windows" not in report
+            and had_baseline
+            and (profile or "").lower() in {"ci", "release"}
+        ):
+            return RunProvenanceResult(
+                missing_evaluation_windows_for_baseline=True,
+                missing_evaluation_windows_message=(
+                    "[INVARLOCK:E001] PAIRING-SCHEDULE-MISMATCH: baseline pairing "
+                    "requested but evaluation windows were not produced. Check "
+                    "capacity/pairing config."
+                ),
+            )
+
+    provenance = report.get("provenance")
+    if not isinstance(provenance, dict):
+        provenance = {}
+        report["provenance"] = provenance
+
+    try:
+        provenance["dataset_split"] = str(resolved_split)
+        provenance["split_fallback"] = bool(used_fallback_split)
+    except _NON_FATAL_EXCEPTIONS:
+        pass
+
+    try:
+        provider_digest = compute_provider_digest_fn(report)
+    except _NON_FATAL_EXCEPTIONS:
+        provider_digest = None
+    if not provider_digest:
+        return RunProvenanceResult()
+
+    provenance["provider_digest"] = provider_digest
+    provenance["digest_version"] = 1
+
+    if not isinstance(baseline_report_data, dict):
+        return RunProvenanceResult()
+
+    base_digest = None
+    base_provenance = baseline_report_data.get("provenance")
+    if isinstance(base_provenance, dict):
+        base_provider_digest = base_provenance.get("provider_digest")
+        if isinstance(base_provider_digest, dict):
+            base_digest = base_provider_digest
+    if base_digest is None:
+        try:
+            base_digest = compute_provider_digest_fn(baseline_report_data)
+        except _NON_FATAL_EXCEPTIONS:
+            base_digest = None
+
+    enforce_provider_parity_fn(
+        provider_digest,
+        base_digest,
+        profile=(str(profile).lower() if profile else None),
+    )
+    return RunProvenanceResult()
 
 
 def assemble_run_report(
@@ -393,6 +867,18 @@ def persist_run_report_outputs(
 __all__ = [
     "RunReportAssemblyResult",
     "RunReportPersistenceResult",
+    "RunProvenanceResult",
     "assemble_run_report",
+    "build_artifacts_payload",
+    "build_edit_payload",
+    "build_flags_payload",
+    "build_guard_entries",
+    "build_metrics_payload",
+    "build_run_report_context",
+    "build_run_report_data",
+    "build_run_report_meta",
+    "build_snapshot_provenance",
+    "finalize_run_provenance",
+    "merge_core_timing_metrics",
     "persist_run_report_outputs",
 ]

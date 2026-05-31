@@ -4,7 +4,7 @@ from typing import Any
 
 from invarlock.reporting import primary_metric_utils as primary_metric_utils_mod
 from invarlock.reporting import report_enrichment as report_enrichment_mod
-from invarlock.reporting import report_make_output as report_make_output_mod
+from invarlock.reporting import report_make as report_make_mod
 from invarlock.reporting import (
     report_primary_metric_policy as report_primary_metric_policy_mod,
 )
@@ -48,7 +48,7 @@ def _stub_finalize_dependencies(monkeypatch) -> None:
 def _finalize_report(evaluation_report: dict[str, Any], monkeypatch) -> list[dict]:
     _stub_finalize_dependencies(monkeypatch)
     diagnostics: list[dict] = []
-    report_make_output_mod._finalize_evaluation_report(
+    report_make_mod._finalize_evaluation_report(
         evaluation_report,
         report_map={},
         report={},
@@ -73,7 +73,7 @@ def _finalize_report(evaluation_report: dict[str, Any], monkeypatch) -> list[dic
 
 
 def test_build_evaluation_report_preserves_top_level_guard_outcomes() -> None:
-    report = report_make_output_mod._build_evaluation_report(
+    report = report_make_mod._build_evaluation_report(
         report_map={
             "guards": [
                 {"name": "spectral", "passed": True, "decision": "allow"},
@@ -115,9 +115,9 @@ def test_build_evaluation_report_preserves_top_level_guard_outcomes() -> None:
 
 
 def test_guard_outcome_collection_handles_malformed_entries() -> None:
-    assert report_make_output_mod._collect_guard_outcomes("not-a-list") == {}
+    assert report_make_mod._collect_guard_outcomes("not-a-list") == {}
 
-    outcomes = report_make_output_mod._collect_guard_outcomes(
+    outcomes = report_make_mod._collect_guard_outcomes(
         [
             object(),
             {"name": "unknown", "passed": False},
@@ -139,7 +139,7 @@ def test_guard_outcome_collection_handles_malformed_entries() -> None:
 def test_attach_top_level_guard_outcomes_skips_non_dict_sections() -> None:
     report = {"guards": [{"name": "rmt", "passed": True}], "rmt": "bad-section"}
 
-    report_make_output_mod._attach_top_level_guard_outcomes(report)
+    report_make_mod._attach_top_level_guard_outcomes(report)
 
     assert report["rmt"] == "bad-section"
 

@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import torch.nn as nn
 
-from invarlock.guards.variance import VarianceGuard
-from invarlock.guards.variance_prepare import prepare_guard
+from invarlock.guards.variance import VarianceGuard, prepare_guard
 
 
 class _TinyModel(nn.Module):

@@ -26,3 +26,10 @@ def test_fingerprint_targets_skips_noncallable_and_handles_non_tensor_values():
     fp = g._fingerprint_targets()
     # Either returns a hex string or None; ensure invocation succeeded
     assert fp is None or isinstance(fp, str)
+
+
+def test_fingerprint_targets_returns_hash():
+    guard = VarianceGuard()
+    guard._target_modules = {"transformer.h.0.mlp.c_proj": nn.Linear(2, 2, bias=False)}
+    fingerprint = guard._fingerprint_targets()
+    assert fingerprint is not None and isinstance(fingerprint, str) and fingerprint

@@ -8,13 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from invarlock.core.exceptions import InvarlockError
-from invarlock.core.run_orchestrator_execute_helpers import (
-    RunEventEmitter,
-    _AttemptDecision,
-    _AttemptExecutionState,
-    _RunExecutionState,
-)
-from invarlock.core.run_orchestrator_types import (
+from invarlock.core.run_orchestrator import (
     RunAttemptStartedEvent,
     RunAutoTuneAdjustmentEvent,
     RunEvaluationReportFailedEvent,
@@ -27,7 +21,12 @@ from invarlock.core.run_orchestrator_types import (
     RunTelemetryFailedEvent,
     RunTelemetrySavedEvent,
 )
-from invarlock.model_utils import set_seed
+from invarlock.core.run_orchestrator_execute_helpers import (
+    RunEventEmitter,
+    _AttemptDecision,
+    _AttemptExecutionState,
+    _RunExecutionState,
+)
 
 
 def _emit_attempt_start(
@@ -568,6 +567,8 @@ def _execute_attempt_core(
     halt: Any,
     record_timed_step: Any,
 ) -> _AttemptExecutionState:
+    from invarlock.core.determinism_policy import set_seed
+
     set_seed(int(seed_bundle.get("python") or seed_value))
     _emit_attempt_start(
         emit=emit,

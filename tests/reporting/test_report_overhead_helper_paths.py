@@ -81,6 +81,21 @@ def test_prepare_guard_overhead_returns_empty_for_non_mapping_input() -> None:
     assert passed is True
 
 
+def test_normalize_guard_overhead_marks_unreadable_ratio_as_not_evaluated(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        overhead,
+        "_coerce_non_bool_float",
+        lambda _value: (_ for _ in ()).throw(TypeError("bad ratio")),
+    )
+
+    payload = overhead.normalize_guard_overhead_result({"overhead_ratio": 1.0})
+
+    assert payload["evaluated"] is False
+    assert payload["passed"] is True
+
+
 def test_prepare_guard_overhead_handles_mode_skip_exceptions_and_preserves_errors() -> (
     None
 ):

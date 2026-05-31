@@ -1,22 +1,64 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 import torch.nn as nn
 
 from invarlock.core.types import GuardDiagnostic, GuardValidationResult
 
-from . import rmt_detection, rmt_result_contract
+from . import rmt_detection
 from .rmt_policy import apply_rmt_policy_overrides, compute_epsilon_violations
 
 __all__ = [
     "apply_rmt_detection_and_correction",
     "before_edit_rmt_guard",
     "after_edit_rmt_guard",
+    "build_after_edit_result",
+    "build_prepare_result",
     "finalize_rmt_guard",
     "prepare_rmt_guard",
     "validate_rmt_guard",
 ]
+
+
+def build_prepare_result(
+    *,
+    ready: bool,
+    baseline_metrics: Mapping[str, Any],
+    policy_applied: Mapping[str, Any],
+    preparation_time: float,
+    error: str | None = None,
+) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "ready": bool(ready),
+        "baseline_metrics": dict(baseline_metrics),
+        "policy_applied": dict(policy_applied),
+        "preparation_time": float(preparation_time),
+    }
+    if error is not None:
+        result["error"] = str(error)
+    return result
+
+
+def build_after_edit_result(
+    *,
+    edge_risk_by_module: Mapping[str, Any] | None = None,
+    edge_risk_by_family: Mapping[str, Any] | None = None,
+    analysis_source: str = "activations_edge_risk",
+    token_weight_total: int | None = None,
+    batches_used: int | None = None,
+) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "analysis_source": analysis_source,
+        "edge_risk_by_module": dict(edge_risk_by_module or {}),
+        "edge_risk_by_family": dict(edge_risk_by_family or {}),
+    }
+    if token_weight_total is not None:
+        result["token_weight_total"] = int(token_weight_total)
+    if batches_used is not None:
+        result["batches_used"] = int(batches_used)
+    return result
 
 
 def _typed_diagnostics(
@@ -118,7 +160,7 @@ def prepare_rmt_guard(
             guard._activation_required_reason = "activation_required"
             guard._activation_ready = False
             guard.prepared = False
-            return rmt_result_contract.build_prepare_result(
+            return build_prepare_result(
                 ready=False,
                 baseline_metrics={},
                 policy_applied=policy or {},
@@ -137,7 +179,7 @@ def prepare_rmt_guard(
                 guard._activation_required_reason = "activation_baseline_unavailable"
                 guard._activation_ready = False
                 guard.prepared = False
-                return rmt_result_contract.build_prepare_result(
+                return build_prepare_result(
                     ready=False,
                     baseline_metrics={},
                     policy_applied=policy or {},
@@ -146,7 +188,7 @@ def prepare_rmt_guard(
                 )
             guard._activation_ready = False
             guard.prepared = True
-            return rmt_result_contract.build_prepare_result(
+            return build_prepare_result(
                 ready=True,
                 baseline_metrics={},
                 policy_applied=policy or {},
@@ -162,7 +204,7 @@ def prepare_rmt_guard(
         guard._activation_ready = True
         guard.prepared = True
 
-        return rmt_result_contract.build_prepare_result(
+        return build_prepare_result(
             ready=True,
             baseline_metrics={
                 "edge_risk_by_family": dict(guard.baseline_edge_risk_by_family),
@@ -183,7 +225,7 @@ def prepare_rmt_guard(
             message=f"Failed to prepare RMT guard: {str(exc)}",
             error=str(exc),
         )
-        return rmt_result_contract.build_prepare_result(
+        return build_prepare_result(
             ready=False,
             baseline_metrics={},
             policy_applied=policy or {},
@@ -214,7 +256,7 @@ def after_edit_rmt_guard(guard: Any, model: nn.Module) -> None:
         if guard._require_activation and not guard._calibration_batches:
             guard._activation_required_failed = True
             guard._activation_required_reason = "activation_unavailable"
-            guard._last_result = rmt_result_contract.build_after_edit_result()
+            guard._last_result = build_after_edit_result()
             return
 
         current = (
@@ -226,7 +268,7 @@ def after_edit_rmt_guard(guard: Any, model: nn.Module) -> None:
             if guard._require_activation:
                 guard._activation_required_failed = True
                 guard._activation_required_reason = "activation_edge_risk_unavailable"
-            guard._last_result = rmt_result_contract.build_after_edit_result()
+            guard._last_result = build_after_edit_result()
             return
 
         guard.edge_risk_by_module = dict(current.get("edge_risk_by_module") or {})
@@ -240,7 +282,7 @@ def after_edit_rmt_guard(guard: Any, model: nn.Module) -> None:
             message=f"RMT detection failed: {str(exc)}",
             error=str(exc),
         )
-        guard._last_result = rmt_result_contract.build_after_edit_result()
+        guard._last_result = build_after_edit_result()
         guard.epsilon_violations = []
 
 
@@ -418,7 +460,7 @@ def finalize_rmt_guard(
             guard._last_result = dict(current)
 
     guard.epsilon_violations = compute_epsilon_violations(guard)
-    from ._contracts import guard_assert
+    from .policies import guard_assert
 
     for fam, eps in guard.epsilon_by_family.items():
         guard_assert(eps >= 0.0, f"rmt.epsilon[{fam}] must be >= 0")

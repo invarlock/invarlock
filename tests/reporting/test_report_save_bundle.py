@@ -5,9 +5,10 @@ import json
 from pathlib import Path
 
 import pytest
-
-from invarlock.reporting.report_bundle import save_evaluation_bundle
 from invarlock.reporting.report_files import save_report
+
+from invarlock.reporting import report_bundle as report_bundle_mod
+from invarlock.reporting.report_bundle import save_evaluation_bundle
 from invarlock.reporting.report_make import make_report
 from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
 
@@ -134,6 +135,119 @@ def test_save_report_bundle_can_defer_optional_rendering(tmp_path: Path, monkeyp
     assert not (tmp_path / "manifest.json").exists()
     assert not (tmp_path / "reviewer_summary.txt").exists()
     assert not (tmp_path / "guards_evidence.json").exists()
+
+
+def test_save_report_bundle_rejects_invalid_evaluation_report(tmp_path: Path):
+    with pytest.raises(ValueError, match="Invalid evaluation report"):
+        save_evaluation_bundle(
+            run_report=_minimal_run_report(),
+            output_dir=tmp_path,
+            evaluation_report={"schema_version": "not-valid"},
+        )
+
+
+def test_save_report_bundle_copies_inventory_and_invalid_runtime_manifest(
+    tmp_path: Path,
+):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    run_report_path = run_dir / "report.json"
+    run_report_path.write_text("{}", encoding="utf-8")
+    inventory_path = run_dir / "backend_inventory.json"
+    inventory_path.write_text('{"backend": "test"}', encoding="utf-8")
+    runtime_manifest_path = run_dir / RUNTIME_MANIFEST_FILENAME
+    runtime_manifest_path.write_text("{not-json", encoding="utf-8")
+
+    out = save_evaluation_bundle(
+        run_report=_minimal_run_report(),
+        output_dir=tmp_path / "out",
+        evaluation_report=make_report(_minimal_run_report(), _baseline_v1()),
+        source_run_path=run_report_path,
+    )
+
+    assert out["backend_inventory"].read_text(encoding="utf-8") == '{"backend": "test"}'
+    assert out["runtime_manifest"].read_text(encoding="utf-8") == "{not-json"
+
+
+def test_save_report_bundle_keeps_same_directory_source_sidecars(tmp_path: Path):
+    run_report_path = tmp_path / "report.json"
+    run_report_path.write_text("{}", encoding="utf-8")
+    inventory_path = tmp_path / "backend_inventory.json"
+    inventory_path.write_text('{"backend": "same-dir"}', encoding="utf-8")
+    runtime_manifest_path = tmp_path / RUNTIME_MANIFEST_FILENAME
+    runtime_manifest_path.write_text("{not-json", encoding="utf-8")
+
+    out = save_evaluation_bundle(
+        run_report=_minimal_run_report(),
+        output_dir=tmp_path,
+        evaluation_report=make_report(_minimal_run_report(), _baseline_v1()),
+        source_run_path=run_report_path,
+        render_optional=False,
+    )
+
+    assert out["backend_inventory"] == inventory_path
+    assert out["runtime_manifest"] == runtime_manifest_path
+    assert inventory_path.read_text(encoding="utf-8") == '{"backend": "same-dir"}'
+    assert runtime_manifest_path.read_text(encoding="utf-8") == "{not-json"
+
+
+def test_save_report_bundle_ignores_invalid_source_run_path(tmp_path: Path):
+    out = save_evaluation_bundle(
+        run_report=_minimal_run_report(),
+        output_dir=tmp_path / "out",
+        evaluation_report=make_report(_minimal_run_report(), _baseline_v1()),
+        source_run_path=tmp_path / "missing" / "report.json",
+        render_optional=False,
+    )
+
+    assert "runtime_manifest" not in out
+
+
+def test_save_report_bundle_records_generated_backend_inventory(
+    tmp_path: Path, monkeypatch
+):
+    generated_inventory = tmp_path / "generated_backend_inventory.json"
+
+    def _write_backend_inventory_sidecar(*_args, **_kwargs):
+        generated_inventory.write_text('{"backend": "generated"}', encoding="utf-8")
+        return generated_inventory
+
+    monkeypatch.setattr(
+        report_bundle_mod,
+        "write_backend_inventory_sidecar",
+        _write_backend_inventory_sidecar,
+    )
+
+    out = save_evaluation_bundle(
+        run_report=_minimal_run_report(),
+        output_dir=tmp_path,
+        evaluation_report=make_report(_minimal_run_report(), _baseline_v1()),
+        render_optional=False,
+    )
+
+    assert out["backend_inventory"] == generated_inventory
+    assert generated_inventory.exists()
+
+
+def test_write_report_manifest_is_best_effort(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(
+        report_bundle_mod,
+        "build_report_manifest_summary",
+        lambda *_: (_ for _ in ()).throw(ValueError("bad summary")),
+    )
+    saved_files: dict[str, Path] = {}
+
+    report_bundle_mod.write_report_manifest(
+        report=_minimal_run_report(),
+        output_path=tmp_path,
+        evaluation_report={},
+        report_json_path=tmp_path / "evaluation.report.json",
+        report_md_path=tmp_path / "evaluation_report.md",
+        saved_files=saved_files,
+    )
+
+    assert saved_files == {}
+    assert not (tmp_path / "manifest.json").exists()
 
 
 def test_save_report_requires_baseline(tmp_path: Path):

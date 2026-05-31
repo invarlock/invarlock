@@ -6,8 +6,6 @@ from invarlock.guards.rmt_analysis import (
     _iter_transformer_layers,
     capture_baseline_mp_stats,
     layer_svd_stats,
-)
-from invarlock.guards.rmt_math import (
     mp_bulk_edge,
     mp_bulk_edges,
     rmt_growth_ratio,

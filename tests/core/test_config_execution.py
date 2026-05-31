@@ -258,7 +258,7 @@ def test_run_from_config_delegates_when_container_default_requires_container(
 
     assert excinfo.value.code == 7
     assert seen["policy"] == runtime_security.build_runtime_security_policy()
-    assert seen["module_name"] == "invarlock.cli.internal_config_run"
+    assert seen["module_name"] == "invarlock.cli.config_execution"
     assert seen["plan"] == (
         "run",
         config_execution.ConfigExecutionRequest(config="configs/demo.yaml"),

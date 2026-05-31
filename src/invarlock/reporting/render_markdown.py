@@ -5,19 +5,15 @@ from typing import Any
 
 import yaml
 
-from .render_dataset_section import append_dataset_and_provenance_section
 from .render_guard_sections import (
     append_guard_check_details_section,
     append_guard_observability_sections,
 )
-from .render_helpers import _fmtv, _p, _short_digest
-from .render_primary_metric_section import (
-    append_primary_metric_section as _append_primary_metric_section,
-)
-from .report_console import (
+from .report_summary import build_quality_gates_summary, build_safety_dashboard_summary
+from .report_summary import (
     compute_report_hash as _compute_report_hash,
 )
-from .report_summary import build_quality_gates_summary, build_safety_dashboard_summary
+from .utils import _fmt_by_kind, _fmtv, _p, _short_digest
 
 _MODEL_CONTEXT_PARSE_EXCEPTIONS = (
     AttributeError,
@@ -84,6 +80,257 @@ def _is_non_assurance_report(evaluation_report: dict[str, Any]) -> bool:
     if assurance_verdict and assurance_verdict not in {"verified", "pass", "ok"}:
         return True
     return False
+
+
+def _is_estimated_metric(primary_metric: dict[str, Any]) -> bool:
+    try:
+        if bool(primary_metric.get("estimated")):
+            return True
+        return str(primary_metric.get("counts_source", "")).lower() == "pseudo_config"
+    except _MODEL_CONTEXT_PARSE_EXCEPTIONS:
+        return False
+
+
+def _format_secondary_metric_ratio(metric: dict[str, Any], kind: str) -> str:
+    ratio = metric.get("ratio_vs_baseline")
+    try:
+        if kind.startswith("ppl"):
+            if isinstance(ratio, int | float):
+                return f"{float(ratio):.3f}"
+            return "N/A"
+        return _fmt_by_kind(ratio, kind)
+    except _MODEL_CONTEXT_PARSE_EXCEPTIONS:
+        return "N/A"
+
+
+def _append_primary_metric_section(
+    lines: list[str], evaluation_report: dict[str, Any]
+) -> None:
+    primary_metric = evaluation_report.get("primary_metric")
+    if not isinstance(primary_metric, dict) or not primary_metric:
+        return
+
+    kind = primary_metric.get("kind", "unknown")
+    lines.append("## Primary Metric")
+    lines.append("")
+    unit = primary_metric.get("unit", "-")
+    paired = primary_metric.get("paired", False)
+    estimated_flag = _is_estimated_metric(primary_metric)
+    estimated_suffix = " (estimated)" if estimated_flag else ""
+
+    lines.append(f"- Kind: {kind} (unit: {unit}){estimated_suffix}")
+    gating_basis = primary_metric.get("gating_basis") or primary_metric.get("basis")
+    if gating_basis:
+        lines.append(f"- Basis: {gating_basis}")
+    if isinstance(paired, bool):
+        lines.append(f"- Paired: {paired}")
+    reps = primary_metric.get("reps")
+    if isinstance(reps, int | float):
+        lines.append(f"- Bootstrap Reps: {int(reps)}")
+    ci = primary_metric.get("ci") or primary_metric.get("display_ci")
+    if (
+        isinstance(ci, list | tuple)
+        and len(ci) == 2
+        and all(isinstance(value, int | float) for value in ci)
+    ):
+        lines.append(f"- CI: {ci[0]:.3f}–{ci[1]:.3f}")
+
+    preview = primary_metric.get("preview")
+    final = primary_metric.get("final")
+    ratio = primary_metric.get("ratio_vs_baseline")
+
+    lines.append("")
+    kind_name = str(kind).lower()
+    if estimated_flag and kind_name == "accuracy":
+        lines.append(
+            "- Note: Accuracy derived from pseudo counts (quick dev preset); use a labeled preset for measured accuracy."
+        )
+    lines.append("| Field | Value |")
+    lines.append("|-------|-------|")
+    lines.append(f"| Preview | {_fmt_by_kind(preview, str(kind))} |")
+    lines.append(f"| Final | {_fmt_by_kind(final, str(kind))} |")
+
+    if kind == "accuracy":
+        lines.append(f"| Δ vs Baseline | {_fmt_by_kind(ratio, str(kind))} |")
+        try:
+            baseline_point = primary_metric.get("baseline_point")
+        except _MODEL_CONTEXT_PARSE_EXCEPTIONS:
+            baseline_point = None
+        if isinstance(baseline_point, int | float) and baseline_point < 0.05:
+            lines.append("- Note: baseline < 5%; ratio suppressed; showing Δpp")
+    else:
+        try:
+            if isinstance(ratio, int | float):
+                lines.append(f"| Ratio vs Baseline | {float(ratio):.3f} |")
+            else:
+                lines.append("| Ratio vs Baseline | N/A |")
+        except _MODEL_CONTEXT_PARSE_EXCEPTIONS:
+            lines.append("| Ratio vs Baseline | N/A |")
+    lines.append("")
+
+    secondary_metrics = evaluation_report.get("secondary_metrics")
+    if not isinstance(secondary_metrics, list) or not secondary_metrics:
+        return
+
+    lines.append("## Secondary Metrics (informational)")
+    lines.append("")
+    lines.append("| Kind | Preview | Final | vs Baseline | CI |")
+    lines.append("|------|---------|-------|-------------|----|")
+    for metric in secondary_metrics:
+        if not isinstance(metric, dict):
+            continue
+        metric_kind = str(metric.get("kind", "?"))
+        preview_value = _fmt_by_kind(metric.get("preview"), metric_kind)
+        final_value = _fmt_by_kind(metric.get("final"), metric_kind)
+        ratio_value = _format_secondary_metric_ratio(metric, metric_kind)
+        ci = metric.get("display_ci") or metric.get("ci")
+        if isinstance(ci, tuple | list) and len(ci) == 2:
+            ci_value = f"{float(ci[0]):.3f}-{float(ci[1]):.3f}"
+        else:
+            ci_value = "–"
+        lines.append(
+            f"| {metric_kind} | {preview_value} | {final_value} | {ratio_value} | {ci_value} |"
+        )
+    lines.append("")
+
+
+def _dataset_hash_source_label(source: Any) -> str | None:
+    source_map = {
+        "explicit_preview_final_hashes": "provider-derived explicit preview/final hashes",
+        "explicit_token_ids": "content-derived token IDs",
+        "config_fallback": "config-derived fallback",
+    }
+    key = str(source or "").strip()
+    return source_map.get(key)
+
+
+def _append_dataset_and_provenance_section(
+    lines: list[str], evaluation_report: dict[str, Any]
+) -> None:
+    """Append the dataset/provenance Markdown block."""
+    dataset = evaluation_report.get("dataset", {}) or {}
+    provenance_info = evaluation_report.get("provenance", {}) or {}
+
+    has_dataset = isinstance(dataset, dict) and bool(dataset)
+    has_provenance = isinstance(provenance_info, dict) and bool(provenance_info)
+    if not (has_dataset or has_provenance):
+        return
+
+    lines.append("## Dataset and Provenance")
+    lines.append("")
+
+    if has_dataset:
+        provider = dataset.get("provider") or "unknown"
+        lines.append(f"- **Provider:** {provider}")
+        seq_len_raw = dataset.get("seq_len")
+        seq_len_val = (
+            int(seq_len_raw) if isinstance(seq_len_raw, int | float) else seq_len_raw
+        )
+        if seq_len_val is not None:
+            lines.append(f"- **Sequence Length:** {seq_len_val}")
+        windows_blk = (
+            dataset.get("windows", {})
+            if isinstance(dataset.get("windows"), dict)
+            else {}
+        )
+        win_prev = windows_blk.get("preview")
+        win_final = windows_blk.get("final")
+        if win_prev is not None and win_final is not None:
+            lines.append(f"- **Windows:** {win_prev} preview + {win_final} final")
+        if windows_blk.get("seed") is not None:
+            lines.append(f"- **Seed:** {windows_blk.get('seed')}")
+        hash_blk = (
+            dataset.get("hash", {}) if isinstance(dataset.get("hash"), dict) else {}
+        )
+        if hash_blk.get("preview_tokens") is not None:
+            lines.append(f"- **Preview Tokens:** {hash_blk.get('preview_tokens'):,}")
+        if hash_blk.get("final_tokens") is not None:
+            lines.append(f"- **Final Tokens:** {hash_blk.get('final_tokens'):,}")
+        if hash_blk.get("total_tokens") is not None:
+            lines.append(f"- **Total Tokens:** {hash_blk.get('total_tokens'):,}")
+        if hash_blk.get("dataset"):
+            lines.append(f"- **Dataset Hash:** {hash_blk.get('dataset')}")
+        hash_source = _dataset_hash_source_label(hash_blk.get("source"))
+        if hash_source:
+            lines.append(f"- **Hash Source:** {hash_source}")
+        tokenizer = dataset.get("tokenizer", {})
+        if isinstance(tokenizer, dict) and (
+            tokenizer.get("name") or tokenizer.get("hash")
+        ):
+            vocab_size = tokenizer.get("vocab_size")
+            vocab_suffix = (
+                f" (vocab {vocab_size})" if isinstance(vocab_size, int) else ""
+            )
+            lines.append(
+                f"- **Tokenizer:** {tokenizer.get('name', 'unknown')}{vocab_suffix}"
+            )
+            if tokenizer.get("hash"):
+                lines.append(f"  - Hash: {tokenizer['hash']}")
+            lines.append(
+                f"  - BOS/EOS: {tokenizer.get('bos_token')} / {tokenizer.get('eos_token')}"
+            )
+            if tokenizer.get("pad_token") is not None:
+                lines.append(f"  - PAD: {tokenizer.get('pad_token')}")
+            if tokenizer.get("add_prefix_space") is not None:
+                lines.append(
+                    f"  - add_prefix_space: {tokenizer.get('add_prefix_space')}"
+                )
+
+    if has_provenance:
+        baseline_info = provenance_info.get("baseline", {}) or {}
+        edited_info = provenance_info.get("edited", {}) or {}
+
+        if baseline_info or edited_info:
+            lines.append("")
+        if baseline_info:
+            lines.append(f"- **Baseline Run ID:** {baseline_info.get('run_id')}")
+            if baseline_info.get("report_hash"):
+                lines.append(f"  - Report Hash: `{baseline_info.get('report_hash')}`")
+            if baseline_info.get("report_path"):
+                lines.append(f"  - Report Path: {baseline_info.get('report_path')}")
+        if edited_info:
+            lines.append(f"- **Edited Run ID:** {edited_info.get('run_id')}")
+            if edited_info.get("report_hash"):
+                lines.append(f"  - Report Hash: `{edited_info.get('report_hash')}`")
+            if edited_info.get("report_path"):
+                lines.append(f"  - Report Path: {edited_info.get('report_path')}")
+
+        provider_digest = provenance_info.get("provider_digest")
+        if isinstance(provider_digest, dict) and provider_digest:
+            ids_d = provider_digest.get("ids_sha256")
+            tok_d = provider_digest.get("tokenizer_sha256")
+            mask_d = provider_digest.get("masking_sha256")
+
+            lines.append("- **Provider Digest:**")
+            if tok_d:
+                lines.append(
+                    f"  - tokenizer_sha256: `{_short_digest(tok_d)}` (full in JSON)"
+                )
+            if ids_d:
+                lines.append(f"  - ids_sha256: `{_short_digest(ids_d)}` (full in JSON)")
+            if mask_d:
+                lines.append(
+                    f"  - masking_sha256: `{_short_digest(mask_d)}` (full in JSON)"
+                )
+
+        confidence = evaluation_report.get("confidence", {}) or {}
+        if isinstance(confidence, dict) and confidence.get("label"):
+            lines.append(f"- **Confidence:** {confidence.get('label')}")
+
+        policy_digest = evaluation_report.get("policy_digest", {}) or {}
+        if isinstance(policy_digest, dict) and policy_digest:
+            policy_version = policy_digest.get("policy_version")
+            thresholds_hash = policy_digest.get("thresholds_hash")
+            if policy_version:
+                lines.append(f"- **Policy Version:** {policy_version}")
+            if isinstance(thresholds_hash, str) and thresholds_hash:
+                lines.append(
+                    f"- **Thresholds Digest:** `{_short_digest(thresholds_hash)}` (full in JSON)"
+                )
+            if policy_digest.get("changed"):
+                lines.append("- Note: policy changed")
+
+    lines.append("")
 
 
 def _append_report_warning_banners(
@@ -867,7 +1114,7 @@ def render_report_markdown(evaluation_report: dict[str, Any]) -> str:
 
     _append_model_context_sections(lines, evaluation_report)
 
-    append_dataset_and_provenance_section(lines, evaluation_report)
+    _append_dataset_and_provenance_section(lines, evaluation_report)
 
     # Structural Changes heading is printed with content later; avoid empty header here
 

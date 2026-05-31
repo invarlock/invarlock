@@ -3,13 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from invarlock.reporting.report_files import save_report
 
+from invarlock.core import guard_evidence as report_evidence_mod
 from invarlock.reporting import report_bundle as report_bundle_mod
-from invarlock.reporting import report_evidence as report_evidence_mod
-from invarlock.reporting import report_manifest as report_manifest_mod
 from invarlock.reporting import report_summary as report_summary_mod
 from invarlock.reporting.report_bundle import save_evaluation_bundle
-from invarlock.reporting.report_files import save_report
 from invarlock.reporting.report_types import create_empty_report
 from invarlock.reporting.run_report_formatters import to_html, to_markdown
 
@@ -117,7 +116,7 @@ def test_save_report_manifest_failures_do_not_abort_bundle(
     rp = _valid_run_report()
     monkeypatch.setattr(report_bundle_mod, "validate_report", lambda *_a, **_k: True)
     monkeypatch.setattr(
-        report_manifest_mod,
+        report_bundle_mod,
         "build_report_manifest_summary",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("boom")),
     )
@@ -157,7 +156,7 @@ def test_save_evaluation_bundle_uses_manifest_summary_view_model(
         return summary
 
     monkeypatch.setattr(
-        report_manifest_mod,
+        report_bundle_mod,
         "build_report_manifest_summary",
         fake_build_manifest_summary,
     )

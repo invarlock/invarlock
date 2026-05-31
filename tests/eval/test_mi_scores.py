@@ -5,7 +5,7 @@ from unittest.mock import patch
 import numpy as np
 import torch
 
-import invarlock.eval.probes.mi as mi_mod
+import invarlock.eval.probes.importance as mi_mod
 
 
 class TestMINeuronScores:
@@ -178,14 +178,25 @@ class TestModuleExports:
 
     def test_all_exports(self):
         """Test that __all__ contains expected functions."""
-        from invarlock.eval.probes.mi import __all__
+        from invarlock.eval.probes.importance import __all__
 
-        expected_exports = ["compute_neuron_mi_scores", "mi_neuron_scores"]
+        expected_exports = [
+            "blend_neuron_scores",
+            "compute_head_energy_scores",
+            "compute_neuron_mi_scores",
+            "compute_post_attention_head_scores",
+            "compute_wanda_neuron_scores",
+            "fft_head_energy",
+            "mi_neuron_scores",
+        ]
         assert set(__all__) == set(expected_exports)
 
     def test_function_imports(self):
         """Test that functions can be imported."""
-        from invarlock.eval.probes.mi import compute_neuron_mi_scores, mi_neuron_scores
+        from invarlock.eval.probes.importance import (
+            compute_neuron_mi_scores,
+            mi_neuron_scores,
+        )
 
         assert callable(compute_neuron_mi_scores)
         assert callable(mi_neuron_scores)

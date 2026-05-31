@@ -8,6 +8,13 @@ def test_predictive_gate_outcome_one_sided_pass():
     assert ok is True and reason == "ci_gain_met"
 
 
+def test_predictive_gate_outcome_pass_one_sided_zero_min_effect():
+    ok, reason = predictive_gate_outcome(
+        mean_delta=-0.1, delta_ci=(-0.2, -0.05), min_effect=0.0, one_sided=True
+    )
+    assert ok is True and reason == "ci_gain_met"
+
+
 def test_predictive_gate_outcome_two_sided_zero_in_ci_fails():
     ok, reason = predictive_gate_outcome(
         mean_delta=-0.1, delta_ci=(-0.2, 0.0), min_effect=0.0, one_sided=False

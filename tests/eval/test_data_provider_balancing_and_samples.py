@@ -5,9 +5,9 @@ import pytest
 
 import invarlock.eval.data_support as data_support_mod
 from invarlock.eval.data import (
+    Seq2SeqProvider,
     WikiText2Provider,
 )
-from invarlock.eval.providers.seq2seq import Seq2SeqProvider
 
 
 def _data_module_path() -> Path:
@@ -77,7 +77,7 @@ def test_seq2seq_provider_capacity(monkeypatch):
             }
 
     monkeypatch.setattr(
-        "invarlock.eval.providers.seq2seq.Seq2SeqProvider", DummySeq2Seq, raising=False
+        "invarlock.eval.data.Seq2SeqProvider", DummySeq2Seq, raising=False
     )
     provider = Seq2SeqProvider(n=1)
     cap = provider.estimate_capacity(tokenizer=None, seq_len=4, stride=2)

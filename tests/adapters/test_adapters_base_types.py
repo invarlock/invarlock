@@ -18,18 +18,16 @@ import torch.nn as nn
 from invarlock.adapters.base import (
     AdapterCache,
     AdapterConfig,
-    BaseAdapter,
-    DeviceManager,
-)
-from invarlock.adapters.base import PerformanceMetrics as BasePerformanceMetrics
-from invarlock.adapters.base_types import (
     AdapterState,
     AdapterType,
+    BaseAdapter,
     CacheConfig,
+    DeviceManager,
     DeviceType,
     MonitorConfig,
     PerformanceMetrics,
 )
+from invarlock.adapters.base import PerformanceMetrics as BasePerformanceMetrics
 
 
 class MockGPT2Model(nn.Module):

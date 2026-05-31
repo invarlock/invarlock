@@ -114,13 +114,13 @@ install_torch() {
     pack_run_cmd "${cmd[@]}"
 
     if [[ "${PACK_SKIP_TORCH_CHECK}" != "1" ]]; then
-        python "${REPO_DIR}/scripts/evidence_packs/python/torch_env_check.py"
+        python "${REPO_DIR}/scripts/evidence_packs/python/runtime_tools.py" torch-env
 
         if command -v nvidia-smi >/dev/null 2>&1; then
             local gpu_name=""
             gpu_name="$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 || true)"
             if [[ "${gpu_name}" == *"B200"* ]]; then
-                python "${REPO_DIR}/scripts/evidence_packs/python/torch_sm100_warning.py" || true
+                python "${REPO_DIR}/scripts/evidence_packs/python/runtime_tools.py" torch-sm100-warning || true
             fi
         fi
     fi
@@ -254,7 +254,10 @@ ensure_runtime_image() {
 verify_remote_stack() {
     log "Running evidence-pack remote smoke check"
     pack_activate_venv
-    local -a smoke_args=("${REPO_DIR}/scripts/evidence_packs/python/remote_setup_smoke.py")
+    local -a smoke_args=(
+        "${REPO_DIR}/scripts/evidence_packs/python/runtime_tools.py"
+        remote-setup-smoke
+    )
     if [[ "$(pack_runtime_image_flavor)" == "quant" ]]; then
         smoke_args+=(--module bitsandbytes --module gptqmodel)
     fi

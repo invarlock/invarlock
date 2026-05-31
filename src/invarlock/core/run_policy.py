@@ -3,13 +3,150 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
-from typing import Any
+import os
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
+from typing import Any, Protocol
 
 from invarlock.core.auto_tuning import resolve_tier_policies
-from invarlock.core.exceptions import ConfigError
+from invarlock.core.exceptions import ConfigError, InvarlockError
 
 GUARD_OVERHEAD_THRESHOLD = 0.01
+
+ToSerialisableDictFn = Callable[[Any], dict[str, Any]]
+
+
+def enforce_provider_parity(
+    subject_digest: dict | None,
+    baseline_digest: dict | None,
+    *,
+    profile: str | None,
+    invarlock_error_cls: type[InvarlockError] = InvarlockError,
+) -> None:
+    """Enforce tokenizer/masking parity rules for CI and release profiles."""
+
+    prof = (profile or "").strip().lower()
+    if prof not in {"ci", "release"}:
+        return
+
+    subject = subject_digest or {}
+    baseline = baseline_digest or {}
+    subj_ids = subject.get("ids_sha256")
+    base_ids = baseline.get("ids_sha256")
+    subj_tok = subject.get("tokenizer_sha256")
+    base_tok = baseline.get("tokenizer_sha256")
+    subj_proc = subject.get("processor_sha256")
+    base_proc = baseline.get("processor_sha256")
+    subj_mask = subject.get("masking_sha256")
+    base_mask = baseline.get("masking_sha256")
+    subject_surface = subj_tok if isinstance(subj_tok, str) and subj_tok else subj_proc
+    baseline_surface = base_tok if isinstance(base_tok, str) and base_tok else base_proc
+
+    if not (
+        isinstance(subj_ids, str)
+        and isinstance(base_ids, str)
+        and subj_ids
+        and base_ids
+        and isinstance(subject_surface, str)
+        and isinstance(baseline_surface, str)
+        and subject_surface
+        and baseline_surface
+    ):
+        raise invarlock_error_cls(
+            code="E004",
+            message="PROVIDER-DIGEST-MISSING: subject or baseline missing ids/model-surface digest",
+        )
+
+    if subj_ids != base_ids:
+        raise invarlock_error_cls(
+            code="E006",
+            message="IDS-DIGEST-MISMATCH: subject and baseline window IDs differ",
+        )
+
+    if subject_surface != baseline_surface:
+        raise invarlock_error_cls(
+            code="E002",
+            message=(
+                "TOKENIZER-DIGEST-MISMATCH: subject and baseline tokenization/processor "
+                "surfaces differ"
+            ),
+        )
+
+    if (
+        isinstance(subj_mask, str)
+        and isinstance(base_mask, str)
+        and subj_mask
+        and base_mask
+        and subj_mask != base_mask
+    ):
+        raise invarlock_error_cls(
+            code="E003",
+            message="MASK-PARITY-MISMATCH: mask positions differ under matched tokenizers",
+        )
+
+
+@dataclass(frozen=True)
+class TimingSummaryPayload:
+    timings: dict[str, float]
+    ordered_keys: tuple[str, ...]
+    memory_mb_peak: float | None
+    gpu_memory_mb_peak: float | None
+
+
+@dataclass(frozen=True)
+class RunExecutionRequest:
+    """Typed request contract for config-driven run execution."""
+
+    config: str
+    device: str | None = None
+    profile: str | None = None
+    out: str | None = None
+    edit: str | None = None
+    edit_label: str | None = None
+    tier: str | None = None
+    metric_kind: str | None = None
+    probes: int | None = None
+    until_pass: bool = False
+    max_attempts: int = 3
+    timeout: int | None = None
+    baseline: str | None = None
+    no_cleanup: bool = False
+    capture_timings: bool = False
+    telemetry: bool = False
+    prefer_local_files_only: bool = False
+    eval_device_override: str | None = None
+    determinism_mode: str | None = None
+    determinism_warn_only: bool = False
+    tiny_relax_enabled: bool = False
+    export_model_requested: bool = False
+    export_dir: str | None = None
+
+
+@dataclass(frozen=True)
+class RunExecutionConfigPayloads:
+    auto_config: dict[str, Any]
+    edit_config: dict[str, Any]
+
+
+class SupportsRunExecutionRequest(Protocol):
+    config: str
+    device: str | None
+    profile: str | None
+    out: str | None
+    edit: str | None
+    edit_label: str | None
+    tier: str | None
+    metric_kind: str | None
+    probes: int | None
+    until_pass: bool
+    max_attempts: int
+    timeout: int | None
+    baseline: str | None
+    no_cleanup: bool
+    timing: bool
+    progress: bool
+    telemetry: bool
+    prefer_local_files_only: bool
 
 
 def _coerce_optional_float(value: Any) -> float | None:
@@ -39,10 +176,7 @@ def coerce_mapping(obj: object) -> dict[str, Any]:
     """Convert config-like objects to plain dicts without hiding programming errors."""
     if isinstance(obj, dict):
         return obj
-    try:
-        raw = getattr(obj, "_data", None)
-    except AttributeError:
-        raw = None
+    raw = getattr(obj, "_data", None)
     if isinstance(raw, dict):
         return raw
     dumped = getattr(obj, "model_dump", None)
@@ -336,3 +470,496 @@ def choose_dataset_split(
                 return cand, True
         return sorted(avail)[0], True
     return "validation", True
+
+
+def env_flag(name: str, *, environ: Mapping[str, str] | None = None) -> bool:
+    source = environ if environ is not None else os.environ
+    return str(source.get(name, "")).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def env_text(name: str, *, environ: Mapping[str, str] | None = None) -> str | None:
+    source = environ if environ is not None else os.environ
+    value = source.get(name)
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    return stripped or None
+
+
+def build_run_execution_request(
+    request: SupportsRunExecutionRequest,
+    *,
+    environ: Mapping[str, str] | None = None,
+) -> RunExecutionRequest:
+    return RunExecutionRequest(
+        config=request.config,
+        device=request.device,
+        profile=request.profile,
+        out=request.out,
+        edit=request.edit,
+        edit_label=request.edit_label,
+        tier=request.tier,
+        metric_kind=request.metric_kind,
+        probes=request.probes,
+        until_pass=bool(request.until_pass),
+        max_attempts=int(request.max_attempts),
+        timeout=request.timeout,
+        baseline=request.baseline,
+        no_cleanup=bool(request.no_cleanup),
+        capture_timings=bool(request.timing or request.progress),
+        telemetry=bool(request.telemetry),
+        prefer_local_files_only=bool(request.prefer_local_files_only),
+        eval_device_override=env_text("INVARLOCK_EVAL_DEVICE", environ=environ),
+        determinism_mode=env_text("PACK_DETERMINISM", environ=environ)
+        or env_text("INVARLOCK_DETERMINISM", environ=environ),
+        determinism_warn_only=env_flag(
+            "INVARLOCK_DETERMINISM_WARN_ONLY", environ=environ
+        ),
+        tiny_relax_enabled=env_flag("INVARLOCK_TINY_RELAX", environ=environ),
+        export_model_requested=env_flag("INVARLOCK_EXPORT_MODEL", environ=environ),
+        export_dir=env_text("INVARLOCK_EXPORT_DIR", environ=environ),
+    )
+
+
+def _coerce_non_bool_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        resolved = float(value)
+    except (TypeError, ValueError):
+        return None
+    return resolved if math.isfinite(resolved) else None
+
+
+def build_timing_summary_payload(
+    *,
+    timings: Mapping[str, Any] | None,
+    total_duration: float | None,
+    report: Mapping[str, Any] | None,
+) -> TimingSummaryPayload | None:
+    """Normalize timing output into a deterministic summary payload."""
+    timings_for_summary: dict[str, float] = {}
+    for key, value in dict(timings or {}).items():
+        resolved = _coerce_non_bool_float(value)
+        if resolved is not None:
+            timings_for_summary[str(key)] = resolved
+    total_duration_value = _coerce_non_bool_float(total_duration)
+    if total_duration_value is not None:
+        timings_for_summary["total"] = max(0.0, total_duration_value)
+
+    has_breakdown = any(
+        key in timings_for_summary
+        for key in (
+            "prepare",
+            "prepare_guards",
+            "edit",
+            "guards",
+            "eval",
+            "finalize",
+        )
+    )
+
+    ordered_keys: list[str] = []
+    for key in (
+        "load_model",
+        "load_dataset",
+        "prepare",
+        "prepare_guards",
+        "edit",
+        "guards",
+        "eval",
+        "finalize",
+        "execute",
+        "total",
+    ):
+        if key == "execute" and has_breakdown:
+            continue
+        if key in {"prepare", "prepare_guards", "edit", "guards", "eval", "finalize"}:
+            if not has_breakdown:
+                continue
+        if key in timings_for_summary:
+            ordered_keys.append(key)
+
+    memory_mb_peak: float | None = None
+    gpu_memory_mb_peak: float | None = None
+    metrics_section = report.get("metrics", {}) if isinstance(report, Mapping) else {}
+    if isinstance(metrics_section, Mapping):
+        mem_peak = metrics_section.get("memory_mb_peak")
+        gpu_peak = metrics_section.get("gpu_memory_mb_peak")
+        resolved_mem_peak = _coerce_non_bool_float(mem_peak)
+        resolved_gpu_peak = _coerce_non_bool_float(gpu_peak)
+        if resolved_mem_peak is not None:
+            memory_mb_peak = resolved_mem_peak
+        if resolved_gpu_peak is not None:
+            gpu_memory_mb_peak = resolved_gpu_peak
+
+    if not timings_for_summary or not ordered_keys:
+        return None
+    return TimingSummaryPayload(
+        timings=timings_for_summary,
+        ordered_keys=tuple(ordered_keys),
+        memory_mb_peak=memory_mb_peak,
+        gpu_memory_mb_peak=gpu_memory_mb_peak,
+    )
+
+
+def _is_sequence_payload(value: Any) -> bool:
+    return isinstance(value, Sequence) and not isinstance(
+        value, (str, bytes, bytearray)
+    )
+
+
+def _list_payload(value: Any) -> list[Any]:
+    return list(value) if _is_sequence_payload(value) else []
+
+
+def _nested_list_payload(value: Any) -> list[list[Any]]:
+    if not _is_sequence_payload(value):
+        return []
+    payload: list[list[Any]] = []
+    for item in value:
+        if _is_sequence_payload(item):
+            payload.append(list(item))
+    return payload
+
+
+def _window_payload(window: Mapping[str, Any] | None) -> dict[str, Any]:
+    window_map = dict(window or {})
+    payload: dict[str, Any] = {
+        "window_ids": _list_payload(window_map.get("window_ids", [])),
+        "example_ids": [
+            str(value) for value in _list_payload(window_map.get("example_ids", []))
+        ],
+        "logloss": _list_payload(window_map.get("logloss", [])),
+        "input_ids": _nested_list_payload(window_map.get("input_ids", [])),
+        "attention_masks": _nested_list_payload(window_map.get("attention_masks", [])),
+        "token_counts": _list_payload(window_map.get("token_counts", [])),
+        "masked_token_counts": _list_payload(window_map.get("masked_token_counts", [])),
+        "actual_token_counts": _list_payload(window_map.get("actual_token_counts", [])),
+        "labels": _nested_list_payload(window_map.get("labels", [])),
+    }
+    records = window_map.get("records", [])
+    if isinstance(records, list):
+        payload["records"] = [
+            dict(record) for record in records if isinstance(record, Mapping)
+        ]
+    processor_sha = window_map.get("processor_sha256")
+    if isinstance(processor_sha, str) and processor_sha:
+        payload["processor_sha256"] = processor_sha
+    return payload
+
+
+def serialize_evaluation_windows(
+    evaluation_windows: Mapping[str, Any] | None,
+) -> dict[str, dict[str, Any]] | None:
+    """Serialize runner-provided evaluation windows into plain JSON-ready data."""
+    if not isinstance(evaluation_windows, Mapping) or not evaluation_windows:
+        return None
+    return {
+        "preview": _window_payload(
+            evaluation_windows.get("preview")
+            if isinstance(evaluation_windows.get("preview"), Mapping)
+            else None
+        ),
+        "final": _window_payload(
+            evaluation_windows.get("final")
+            if isinstance(evaluation_windows.get("final"), Mapping)
+            else None
+        ),
+    }
+
+
+def _token_count(record: Mapping[str, Any]) -> int:
+    try:
+        return int(len(record.get("input_ids", []) or []))
+    except (TypeError, ValueError, OverflowError):
+        return 0
+
+
+def _fallback_window_payload(
+    records: Sequence[Mapping[str, Any]],
+    *,
+    start_index: int,
+    use_mlm: bool,
+    mask_counts: Sequence[int] | None,
+) -> dict[str, Any]:
+    multimodal_records = [
+        dict(record)
+        for record in records
+        if "image_path" in record or "example_id" in record or "answers" in record
+    ]
+    if multimodal_records:
+        multimodal_payload: dict[str, Any] = {
+            "example_ids": [
+                str(record.get("example_id") or record.get("id") or "")
+                for record in multimodal_records
+            ],
+            "records": multimodal_records,
+        }
+        processor_sha = next(
+            (
+                str(record.get("processor_sha256"))
+                for record in multimodal_records
+                if isinstance(record.get("processor_sha256"), str)
+                and str(record.get("processor_sha256")).strip()
+            ),
+            None,
+        )
+        if processor_sha:
+            multimodal_payload["processor_sha256"] = processor_sha
+        return multimodal_payload
+
+    sequence_payload: dict[str, Any] = {
+        "window_ids": list(range(start_index, start_index + len(records))),
+        "input_ids": [list(record["input_ids"]) for record in records],
+        "attention_masks": [list(record["attention_mask"]) for record in records],
+        "token_counts": [_token_count(record) for record in records],
+    }
+    if use_mlm:
+        sequence_payload["masked_token_counts"] = list(mask_counts or [])
+        sequence_payload["labels"] = [
+            record.get("labels", [-100] * len(record["input_ids"]))
+            for record in records
+        ]
+    return sequence_payload
+
+
+def build_fallback_evaluation_windows(
+    preview_records: Sequence[Mapping[str, Any]],
+    final_records: Sequence[Mapping[str, Any]],
+    *,
+    use_mlm: bool,
+    preview_mask_counts: Sequence[int] | None = None,
+    final_mask_counts: Sequence[int] | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Build evaluation windows from assembled records when the runner omits them."""
+    preview_count = len(preview_records)
+    return {
+        "preview": _fallback_window_payload(
+            preview_records,
+            start_index=0,
+            use_mlm=use_mlm,
+            mask_counts=preview_mask_counts,
+        ),
+        "final": _fallback_window_payload(
+            final_records,
+            start_index=preview_count,
+            use_mlm=use_mlm,
+            mask_counts=final_mask_counts,
+        ),
+    }
+
+
+def _normalize_profile_checks(existing_checks: Any) -> list[str]:
+    if isinstance(existing_checks, list | tuple | set):
+        return [str(item) for item in existing_checks]
+    if existing_checks:
+        return [str(existing_checks)]
+    return []
+
+
+def _section_dict(cfg: Any, name: str) -> dict[str, Any]:
+    section_fn = getattr(cfg, "section", None)
+    if callable(section_fn):
+        try:
+            section = section_fn(name)
+        except (AttributeError, KeyError, TypeError):
+            section = None
+        if isinstance(section, dict):
+            return section
+    try:
+        value = getattr(cfg, name)
+    except (AttributeError, KeyError, TypeError):
+        value = None
+    if isinstance(value, Mapping):
+        return dict(value)
+    if hasattr(value, "__dict__"):
+        return {
+            key: item for key, item in vars(value).items() if not key.startswith("_")
+        }
+    return {}
+
+
+def _baseline_eval_windows(
+    baseline_report_data: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    if not isinstance(baseline_report_data, Mapping):
+        return None
+    evaluation_windows = baseline_report_data.get("evaluation_windows")
+    if not isinstance(evaluation_windows, Mapping):
+        return None
+    final = evaluation_windows.get("final")
+    if not isinstance(final, Mapping):
+        return None
+    window_ids = final.get("window_ids")
+    logloss = final.get("logloss")
+    if not isinstance(window_ids, list) or not isinstance(logloss, list):
+        return None
+    payload: dict[str, Any] = {
+        "final": {
+            "window_ids": list(window_ids or []),
+            "logloss": list(logloss or []),
+        }
+    }
+    token_counts = final.get("token_counts")
+    if isinstance(token_counts, list):
+        payload["final"]["token_counts"] = list(token_counts or [])
+    return payload
+
+
+def build_run_context_payload(
+    *,
+    cfg: Any,
+    profile: str | None,
+    pairing_schedule: dict[str, Any] | None,
+    seed_bundle: Mapping[str, Any],
+    plugin_provenance: Mapping[str, Any],
+    run_id: str,
+    baseline_report_data: Mapping[str, Any] | None,
+    pm_acceptance_range: Mapping[str, float] | tuple[float, float] | None,
+    pm_drift_band: Mapping[str, float] | tuple[float, float] | None,
+    guard_overhead_threshold: float,
+    model_profile: Any,
+    resolved_loss_type: str,
+    tiny_relax_enabled: bool,
+    to_serialisable_dict_fn: ToSerialisableDictFn,
+) -> dict[str, Any]:
+    guards_section = _section_dict(cfg, "guards")
+    eval_section = _section_dict(cfg, "eval")
+    guard_overrides = {
+        "spectral": to_serialisable_dict_fn(guards_section.get("spectral", {})),
+        "rmt": to_serialisable_dict_fn(guards_section.get("rmt", {})),
+        "variance": to_serialisable_dict_fn(guards_section.get("variance", {})),
+        "invariants": to_serialisable_dict_fn(guards_section.get("invariants", {})),
+    }
+
+    if getattr(model_profile, "invariants", None):
+        invariants_policy = guard_overrides.setdefault("invariants", {})
+        checks_list = _normalize_profile_checks(
+            invariants_policy.get("profile_checks", [])
+        )
+        for invariant in model_profile.invariants:
+            invariant_name = str(invariant)
+            if invariant_name not in checks_list:
+                checks_list.append(invariant_name)
+        invariants_policy["profile_checks"] = checks_list
+
+    run_context: dict[str, Any] = {
+        "eval": to_serialisable_dict_fn(eval_section),
+        "dataset": to_serialisable_dict_fn(cfg.dataset),
+        "guards": guard_overrides,
+        "profile": profile if profile else "",
+        "pairing_baseline": pairing_schedule,
+        "seeds": dict(seed_bundle),
+        "plugins": dict(plugin_provenance),
+        "run_id": run_id,
+    }
+    guard_order = guards_section.get("order")
+    if isinstance(guard_order, list) and all(
+        isinstance(item, str) for item in guard_order
+    ):
+        run_context["guard_chain_observed"] = list(guard_order)
+    if tiny_relax_enabled:
+        run_context["run"] = {"tiny_relax": True}
+
+    baseline_eval = _baseline_eval_windows(baseline_report_data)
+    if baseline_eval is not None:
+        run_context["baseline_eval_windows"] = baseline_eval
+
+    primary_metric: dict[str, Any] = {}
+    run_context["primary_metric"] = primary_metric
+    primary_metric["acceptance_range"] = pm_acceptance_range
+    run_context["pm_acceptance_range"] = pm_acceptance_range
+    if pm_drift_band:
+        primary_metric["drift_band"] = pm_drift_band
+        run_context["pm_drift_band"] = pm_drift_band
+    primary_metric["overhead_threshold"] = guard_overhead_threshold
+    run_context["guard_overhead_threshold"] = guard_overhead_threshold
+    run_context["model_profile"] = {
+        "family": getattr(model_profile, "family", ""),
+        "default_loss": getattr(model_profile, "default_loss", ""),
+        "module_selectors": getattr(model_profile, "module_selectors", {}),
+        "invariants": getattr(model_profile, "invariants", []),
+        "cert_lints": getattr(model_profile, "cert_lints", []),
+    }
+    extra_context = to_serialisable_dict_fn(_section_dict(cfg, "context"))
+    if isinstance(extra_context, dict):
+        run_context.update(extra_context)
+    assurance_section = to_serialisable_dict_fn(_section_dict(cfg, "assurance"))
+    if isinstance(assurance_section, dict) and assurance_section:
+        run_context["assurance"] = assurance_section
+    eval_context = run_context.get("eval")
+    if isinstance(eval_context, dict):
+        loss_context = eval_context.setdefault("loss", {})
+        if isinstance(loss_context, dict):
+            loss_context["resolved_type"] = resolved_loss_type
+
+    return run_context
+
+
+def _normalize_edit_plan(plan_obj: Any) -> dict[str, Any]:
+    if isinstance(plan_obj, dict):
+        return dict(plan_obj)
+    plan_data = getattr(plan_obj, "_data", None)
+    if isinstance(plan_data, dict):
+        return dict(plan_data)
+    if hasattr(plan_obj, "items"):
+        try:
+            return dict(plan_obj)
+        except (TypeError, ValueError):
+            return {}
+    return {}
+
+
+def build_run_execution_config_payloads(
+    *,
+    cfg: Any,
+    model_profile: Any,
+) -> RunExecutionConfigPayloads:
+    auto_section = _section_dict(cfg, "auto")
+    try:
+        auto_enabled = bool(auto_section.get("enabled"))
+    except (AttributeError, TypeError, ValueError):
+        auto_enabled = False
+    try:
+        auto_tier = auto_section.get("tier") or "balanced"
+    except (AttributeError, TypeError, ValueError):
+        auto_tier = "balanced"
+    try:
+        auto_probes = int(auto_section.get("probes", 0))
+    except (AttributeError, TypeError, ValueError):
+        auto_probes = 0
+    try:
+        auto_target_ratio = float(auto_section.get("target_pm_ratio", 2.0))
+    except (AttributeError, TypeError, ValueError):
+        auto_target_ratio = 2.0
+
+    auto_config = {
+        "enabled": auto_enabled,
+        "tier": auto_tier,
+        "probes": auto_probes,
+        "target_pm_ratio": auto_target_ratio,
+    }
+
+    edit_config: dict[str, Any] = {}
+    try:
+        plan_obj = getattr(cfg.edit, "plan", {})
+        if plan_obj:
+            edit_config = _normalize_edit_plan(plan_obj)
+    except (AttributeError, TypeError):
+        edit_config = {}
+
+    module_selectors = getattr(model_profile, "module_selectors", None)
+    if (
+        isinstance(module_selectors, dict)
+        and module_selectors
+        and "module_selectors" not in edit_config
+    ):
+        edit_config["module_selectors"] = {
+            key: list(values) for key, values in module_selectors.items()
+        }
+
+    return RunExecutionConfigPayloads(
+        auto_config=auto_config,
+        edit_config=edit_config,
+    )

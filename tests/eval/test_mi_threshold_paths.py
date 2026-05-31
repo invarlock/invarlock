@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-import invarlock.eval.probes.mi as mi_mod
+import invarlock.eval.probes.importance as mi_mod
 
 
 class _MiBlock(nn.Module):

@@ -121,10 +121,11 @@ def test_run_command_until_pass_auto_tune_head_budget_paths(tmp_path: Path) -> N
                     lambda **k: cfg,
                 ),
                 patch(
-                    "invarlock.cli.run_runtime.detect_model_profile", _detect_profile
+                    "invarlock.cli.run_runtime_exec.detect_model_profile",
+                    _detect_profile,
                 ),
                 patch(
-                    "invarlock.cli.run_runtime.resolve_tokenizer",
+                    "invarlock.cli.run_runtime_exec.resolve_tokenizer",
                     lambda *_a, **_k: _tok(),
                 ),
                 patch("invarlock.cli.device.resolve_device", lambda d: d),
@@ -139,7 +140,7 @@ def test_run_command_until_pass_auto_tune_head_budget_paths(tmp_path: Path) -> N
                 ),
                 patch("invarlock.cli.run_runtime_exec.execute_guarded_run", exec_stub),
                 patch(
-                    "invarlock.cli.run_artifact_output.postprocess_and_summarize",
+                    "invarlock.cli.run_execution.postprocess_and_summarize",
                     post_stub,
                 ),
                 patch("invarlock.core.retry.RetryController", RC),

@@ -4,7 +4,11 @@ import json
 
 import pytest
 
-from invarlock.reporting.telemetry import build_telemetry_payload, save_telemetry_report
+from invarlock.reporting.report_builder_support import (
+    build_telemetry_payload,
+    save_telemetry_report,
+    telemetry_summary_line,
+)
 
 
 def test_build_telemetry_payload_includes_timings_and_memory(tmp_path) -> None:
@@ -31,6 +35,13 @@ def test_build_telemetry_payload_includes_timings_and_memory(tmp_path) -> None:
     path = save_telemetry_report(report, tmp_path)
     saved = json.loads(path.read_text(encoding="utf-8"))
     assert saved["timings"]["eval"] == 2.0
+
+
+def test_build_telemetry_payload_ignores_non_mapping_sections() -> None:
+    payload = build_telemetry_payload({"meta": ["bad"], "metrics": "bad"})
+
+    assert set(payload) == {"generated_at"}
+    assert telemetry_summary_line({"telemetry": ["bad"]}) is None
 
 
 def test_save_telemetry_report_rejects_path_escape(tmp_path) -> None:

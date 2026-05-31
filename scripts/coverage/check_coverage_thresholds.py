@@ -11,28 +11,272 @@ import argparse
 import json
 import sys
 import xml.etree.ElementTree as ET
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-try:
-    from coverage_policy import (
-        CORE_FILES,
-        CORE_FLOOR_DEFAULT,
-        CORE_PREFIXES,
-        DEFAULT_FLOOR_DEFAULT,
-        THRESHOLDS,
-    )
-except ModuleNotFoundError:  # pragma: no cover - imported as scripts.coverage.*
-    from scripts.coverage.coverage_policy import (
-        CORE_FILES,
-        CORE_FLOOR_DEFAULT,
-        CORE_PREFIXES,
-        DEFAULT_FLOOR_DEFAULT,
-        THRESHOLDS,
-    )
+THRESHOLDS = {
+    "scripts/release/evidence_contracts.py": 0.95,
+    "src/invarlock/eval/data.py": 1.00,
+    "src/invarlock/eval/bootstrap.py": 1.00,
+    "src/invarlock/eval/probes/importance.py": 0.95,
+    "src/invarlock/eval/metrics.py": 1.00,
+    "src/invarlock/eval/metrics_activation.py": 0.95,
+    "src/invarlock/eval/metrics_runtime.py": 0.90,
+    "src/invarlock/eval/metrics_support.py": 1.00,
+    "src/invarlock/eval/bench_policy.py": 1.00,
+    "src/invarlock/eval/bench_runner.py": 0.90,
+    "src/invarlock/eval/primary_metric.py": 0.95,
+    "src/invarlock/eval/tail_stats.py": 1.00,
+    "src/invarlock/calibration/__init__.py": 0.95,
+    "src/invarlock/reporting/run_report_formatters.py": 0.95,
+    "src/invarlock/reporting/validate.py": 0.95,
+    "src/invarlock/reporting/report_types.py": 1.00,
+    "src/invarlock/reporting/dataset_hashing.py": 1.00,
+    "src/invarlock/reporting/report_make.py": 0.95,
+    "src/invarlock/reporting/report_primary_metric_policy.py": 0.95,
+    "src/invarlock/reporting/primary_metric_utils.py": 0.90,
+    "src/invarlock/reporting/utils.py": 1.00,
+    "src/invarlock/core/runner.py": 0.95,
+    "src/invarlock/guards/spectral.py": 1.00,
+    "src/invarlock/reporting/report_schema.py": 1.00,
+    "src/invarlock/public_contracts.py": 1.00,
+    "src/invarlock/policy_pack.py": 1.00,
+    "src/invarlock/evidence_pack.py": 1.00,
+    "src/invarlock/evidence_pack_edit_metadata.py": 1.00,
+    "src/invarlock/reporting/verify_output.py": 1.00,
+    "src/invarlock/cli/commands/policy.py": 1.00,
+    "src/invarlock/cli/commands/evidence_pack.py": 1.00,
+    "src/invarlock/core/runner_pairing.py": 1.00,
+    "src/invarlock/guards/variance_policy.py": 1.00,
+    "src/invarlock/guards/variance_results.py": 1.00,
+    "src/invarlock/guards/spectral_policy.py": 1.00,
+    "src/invarlock/guards/spectral_results.py": 1.00,
+    "src/invarlock/edits/quant_rtn.py": 0.95,
+    "src/invarlock/core/runner_eval_phase.py": 1.00,
+    "src/invarlock/core/runner_eval_windows.py": 0.95,
+    "src/invarlock/guards/variance_batching.py": 1.00,
+    "src/invarlock/guards/variance_evaluation.py": 0.95,
+    "src/invarlock/guards/variance.py": 1.00,
+    "src/invarlock/guards/variance_ops.py": 1.00,
+    "src/invarlock/guards/variance_scaling.py": 0.95,
+    "src/invarlock/guards/invariants.py": 0.95,
+    "src/invarlock/guards/spectral_control.py": 0.95,
+    "src/invarlock/guards/spectral_measurement.py": 0.95,
+    "src/invarlock/guards/rmt.py": 0.95,
+    "src/invarlock/guards/rmt_runtime.py": 1.00,
+    "src/invarlock/guards/policies.py": 1.00,
+    "src/invarlock/core/registry.py": 1.00,
+    "src/invarlock/core/assurance_contract.py": 1.00,
+    "src/invarlock/core/bootstrap.py": 1.00,
+    "src/invarlock/core/auto_tuning.py": 0.95,
+    "src/invarlock/core/checkpoint.py": 0.90,
+    "src/invarlock/core/api.py": 1.00,
+    "src/invarlock/core/retry.py": 0.90,
+    "src/invarlock/core/types.py": 0.95,
+    "src/invarlock/core/doctor_findings.py": 0.90,
+    "src/invarlock/core/evaluate_plan.py": 1.00,
+    "src/invarlock/cli/app.py": 1.00,
+    "src/invarlock/core/config_runtime.py": 1.00,
+    "src/invarlock/core/metric_provider_resolution.py": 0.95,
+    "src/invarlock/cli/commands/evaluate.py": 1.00,
+    "src/invarlock/cli/commands/verify.py": 1.00,
+    "src/invarlock/cli/commands/run.py": 1.00,
+    "src/invarlock/reporting/report_contract.py": 1.00,
+    "src/invarlock/cli/commands/calibrate.py": 0.95,
+    "src/invarlock/reporting/report_bundle.py": 1.00,
+    "src/invarlock/reporting/verify_contract.py": 0.95,
+    "src/invarlock/runtime_verify.py": 1.00,
+    "src/invarlock/runtime_security.py": 1.00,
+    "src/invarlock/runtime_security_helpers.py": 1.00,
+    "src/invarlock/adapters/hf_multimodal.py": 1.00,
+    "src/invarlock/evidence_pack_integrity.py": 0.95,
+    "src/invarlock/cli/run_config.py": 0.95,
+    "src/invarlock/cli/run_overhead.py": 1.00,
+    "src/invarlock/cli/run_pairing.py": 0.95,
+    "src/invarlock/core/run_policy.py": 1.00,
+    "src/invarlock/core/determinism_policy.py": 0.95,
+    "src/invarlock/core/events.py": 0.95,
+    "src/invarlock/core/runner_eval_metrics.py": 0.90,
+    "src/invarlock/core/runner_finalize.py": 0.95,
+    "src/invarlock/core/runner_guards.py": 0.95,
+    "src/invarlock/reporting/report_overhead.py": 0.95,
+    "src/invarlock/reporting/report_policy.py": 1.00,
+    "src/invarlock/reporting/report_provenance.py": 1.00,
+    "src/invarlock/reporting/report_validation.py": 0.95,
+    "src/invarlock/core/run_orchestrator_execute.py": 1.00,
+    "src/invarlock/reporting/verify_check_helpers_consistency.py": 0.95,
+    "src/invarlock/cli/run_execution_output.py": 1.0,
+    "src/invarlock/reporting/run_report_contract.py": 0.95,
+    "src/invarlock/reporting/report_builder_support.py": 1.0,
+    "src/invarlock/adapters/auto.py": 0.95,
+    "src/invarlock/core/backend_inventory.py": 1.00,
+    "src/invarlock/core/config_loader.py": 1.00,
+    "src/invarlock/core/error_utils.py": 1.00,
+    "src/invarlock/core/exceptions.py": 1.00,
+    "src/invarlock/core/report_inputs.py": 1.00,
+    "src/invarlock/core/run_orchestrator.py": 1.00,
+    "src/invarlock/core/run_orchestrator_execute_attempts.py": 0.90,
+    "src/invarlock/core/run_orchestrator_execute_helpers.py": 1.00,
+    "src/invarlock/core/run_provider_dataset_plan.py": 0.90,
+    "src/invarlock/core/run_snapshot_contract.py": 0.95,
+    "src/invarlock/core/runner_eval_metrics_multimodal.py": 1.00,
+    "src/invarlock/core/runner_eval_metrics_stats.py": 1.00,
+    "src/invarlock/core/doctor_preflight.py": 0.95,
+    "src/invarlock/core/evaluate_contract.py": 0.90,
+    "src/invarlock/core/plugins_inventory.py": 0.95,
+    "src/invarlock/core/run_baseline_evidence.py": 0.90,
+    "src/invarlock/guards/rmt_analysis.py": 0.95,
+    "src/invarlock/guards/spectral_runtime.py": 1.00,
+    "src/invarlock/guards/tier_config.py": 0.95,
+    "src/invarlock/cli/run_pairing_baseline.py": 0.90,
+    "src/invarlock/evidence_pack_support.py": 1.00,
+}
+
+THRESHOLDS = dict.fromkeys(THRESHOLDS, 1.00)
+
+CORE_FLOOR_DEFAULT = 0.90
+DEFAULT_FLOOR_DEFAULT = 0.90
+
+CORE_PREFIXES = (
+    "src/invarlock/core/",
+    "src/invarlock/guards/",
+    "src/invarlock/observability/",
+)
+
+CORE_FILES = (
+    "scripts/release/evidence_contracts.py",
+    "src/invarlock/eval/data.py",
+    "src/invarlock/eval/bootstrap.py",
+    "src/invarlock/eval/probes/importance.py",
+    "src/invarlock/eval/metrics.py",
+    "src/invarlock/eval/metrics_activation.py",
+    "src/invarlock/eval/metrics_runtime.py",
+    "src/invarlock/eval/metrics_support.py",
+    "src/invarlock/eval/bench_policy.py",
+    "src/invarlock/eval/bench_runner.py",
+    "src/invarlock/eval/primary_metric.py",
+    "src/invarlock/eval/tail_stats.py",
+    "src/invarlock/calibration/__init__.py",
+    "src/invarlock/reporting/run_report_formatters.py",
+    "src/invarlock/reporting/validate.py",
+    "src/invarlock/reporting/report_types.py",
+    "src/invarlock/reporting/dataset_hashing.py",
+    "src/invarlock/reporting/report_schema.py",
+    "src/invarlock/reporting/report_make.py",
+    "src/invarlock/reporting/report_primary_metric_policy.py",
+    "src/invarlock/reporting/primary_metric_utils.py",
+    "src/invarlock/reporting/utils.py",
+    "src/invarlock/edits/quant_rtn.py",
+    "src/invarlock/cli/commands/run.py",
+    "src/invarlock/cli/commands/evaluate.py",
+    "src/invarlock/reporting/report_contract.py",
+    "src/invarlock/cli/commands/calibrate.py",
+    "src/invarlock/cli/commands/policy.py",
+    "src/invarlock/reporting/verify_contract.py",
+    "src/invarlock/reporting/verify_output.py",
+    "src/invarlock/core/determinism_policy.py",
+    "src/invarlock/core/config_runtime.py",
+    "src/invarlock/cli/app.py",
+    "src/invarlock/core/doctor_findings.py",
+    "src/invarlock/core/evaluate_plan.py",
+    "src/invarlock/public_contracts.py",
+    "src/invarlock/policy_pack.py",
+    "src/invarlock/evidence_pack.py",
+    "src/invarlock/evidence_pack_edit_metadata.py",
+    "src/invarlock/runtime_verify.py",
+    "src/invarlock/cli/commands/evidence_pack.py",
+    "src/invarlock/runtime_security.py",
+    "src/invarlock/cli/run_config.py",
+    "src/invarlock/cli/run_pairing.py",
+    "src/invarlock/__init__.py",
+    "src/invarlock/adapters/auto.py",
+)
+
+COVERAGE_MODULE_FLAGS = ("--cov",)
+
+COVERAGE_INCLUDE_PATTERNS = (
+    "scripts/release/*.py",
+    "src/invarlock/eval/*",
+    "src/invarlock/guards/*",
+    "src/invarlock/calibration/*",
+    "src/invarlock/edits/quant_rtn.py",
+    "src/invarlock/cli/*",
+    "src/invarlock/cli/commands/*",
+    "src/invarlock/core/*",
+    "src/invarlock/reporting/*",
+    "src/invarlock/observability/*",
+    "src/invarlock/adapters/hf_multimodal.py",
+    "src/invarlock/adapters/auto.py",
+    "src/invarlock/__init__.py",
+    "src/invarlock/public_contracts.py",
+    "src/invarlock/policy_pack.py",
+    "src/invarlock/evidence_pack.py",
+    "src/invarlock/evidence_pack_edit_metadata.py",
+    "src/invarlock/evidence_pack_integrity.py",
+    "src/invarlock/evidence_pack_support.py",
+    "src/invarlock/runtime_security.py",
+    "src/invarlock/runtime_security_helpers.py",
+    "src/invarlock/runtime_verify.py",
+    "invarlock/eval/*",
+    "invarlock/guards/*",
+    "invarlock/calibration/*",
+    "invarlock/edits/quant_rtn.py",
+    "invarlock/cli/*",
+    "invarlock/cli/commands/*",
+    "invarlock/core/*",
+    "invarlock/reporting/*",
+    "invarlock/observability/*",
+    "invarlock/adapters/hf_multimodal.py",
+    "invarlock/adapters/auto.py",
+    "invarlock/__init__.py",
+    "invarlock/public_contracts.py",
+    "invarlock/policy_pack.py",
+    "invarlock/evidence_pack.py",
+    "invarlock/evidence_pack_edit_metadata.py",
+    "invarlock/evidence_pack_integrity.py",
+    "invarlock/evidence_pack_support.py",
+    "invarlock/runtime_security.py",
+    "invarlock/runtime_security_helpers.py",
+    "invarlock/runtime_verify.py",
+)
+
+_POLICY_ITEMS = (
+    "coverage-modules",
+    "coverage-include",
+    "threshold-count",
+    "core-prefixes",
+    "core-files",
+)
 
 
-def _parse_args() -> argparse.Namespace:
+def coverage_modules() -> str:
+    return " ".join(COVERAGE_MODULE_FLAGS)
+
+
+def coverage_include() -> str:
+    return ",".join(COVERAGE_INCLUDE_PATTERNS)
+
+
+def _print_policy_item(item: str) -> int:
+    if item == "coverage-modules":
+        print(coverage_modules())
+    elif item == "coverage-include":
+        print(coverage_include())
+    elif item == "threshold-count":
+        print(len(THRESHOLDS))
+    elif item == "core-prefixes":
+        print(" ".join(CORE_PREFIXES))
+    elif item == "core-files":
+        print(" ".join(CORE_FILES))
+    else:
+        raise AssertionError(f"Unhandled policy item: {item}")
+    return 0
+
+
+def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    core_floor_help = f"{CORE_FLOOR_DEFAULT:.0%}".replace("%", "%%")
+    default_floor_help = f"{DEFAULT_FLOOR_DEFAULT:.0%}".replace("%", "%%")
     parser = argparse.ArgumentParser(description="Enforce per-file coverage floors")
     parser.add_argument(
         "--coverage",
@@ -48,18 +292,19 @@ def _parse_args() -> argparse.Namespace:
         "--core-floor",
         type=float,
         default=CORE_FLOOR_DEFAULT,
-        help=f"Branch coverage floor for core modules (default: {CORE_FLOOR_DEFAULT:.0%})",
+        help=f"Branch coverage floor for core modules (default: {core_floor_help})",
     )
     parser.add_argument(
         "--default-floor",
         type=float,
         default=DEFAULT_FLOOR_DEFAULT,
         help=(
-            f"Branch coverage floor for non-core modules (default: {DEFAULT_FLOOR_DEFAULT:.0%}). "
+            "Branch coverage floor for non-core modules "
+            f"(default: {default_floor_help}). "
             "Note: non-core floors are only applied for files explicitly listed in THRESHOLDS."
         ),
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def _load_coverage_xml(path: Path) -> ET.Element:
@@ -192,8 +437,18 @@ def _write_json(
     json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
-def main() -> int:
-    args = _parse_args()
+def main(argv: Sequence[str] | None = None) -> int:
+    raw_args = list(sys.argv[1:] if argv is None else argv)
+    if raw_args and raw_args[0] in _POLICY_ITEMS:
+        if len(raw_args) > 1:
+            print(
+                f"Unexpected arguments after policy item: {' '.join(raw_args[1:])}",
+                file=sys.stderr,
+            )
+            return 2
+        return _print_policy_item(raw_args[0])
+
+    args = _parse_args(raw_args)
     report_path = Path(args.coverage)
     root = _load_coverage_xml(report_path)
     rates = _collect_branch_rates(root)

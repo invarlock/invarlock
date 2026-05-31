@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import torch.nn as nn
 
-from invarlock.core.run_report_payload_policy import build_guard_entries
 from invarlock.guards.rmt import RMTGuard
 from invarlock.guards.variance import VarianceGuard
+from invarlock.reporting.run_report_contract import build_guard_entries
 
 
 def test_rmt_activation_required_failure_emits_strict_blocking_shape() -> None:

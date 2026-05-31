@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from invarlock.reporting import render_helpers as render_helpers_mod
 from invarlock.reporting import render_markdown as render_markdown_mod
-from invarlock.reporting import report_console as console_mod
+from invarlock.reporting import report_summary as console_mod
+from invarlock.reporting import utils as render_helpers_mod
 
 
 def test_compute_console_validation_block_handles_guard(monkeypatch):

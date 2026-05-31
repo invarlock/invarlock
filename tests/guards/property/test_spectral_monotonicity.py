@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from hypothesis import given
 
-from invarlock.guards_ref.spectral_ref import spectral_decide
-from tests.guards.property.strategies import spectral_inputs
+from tests.guards.property.strategies import spectral_decide, spectral_inputs
 
 
 @given(spectral_inputs())

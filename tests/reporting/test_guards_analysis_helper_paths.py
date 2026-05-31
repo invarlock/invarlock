@@ -2,9 +2,13 @@ from __future__ import annotations
 
 from invarlock.reporting import guards_common as gc_mod
 from invarlock.reporting import guards_invariants as gi_mod
-from invarlock.reporting import guards_rmt as gr_mod
 from invarlock.reporting import guards_spectral as gs_mod
-from invarlock.reporting import guards_variance as gv_mod
+from invarlock.reporting import report_make as report_make_mod
+
+
+class _BadFloat(float):
+    def __float__(self) -> float:
+        raise ValueError("bad float")
 
 
 def test_measurement_contract_digest_handles_bad_str() -> None:
@@ -106,6 +110,27 @@ def test_extract_spectral_analysis_caps_applied_int_fallback() -> None:
     out = gs_mod._extract_spectral_analysis(report, baseline={})
     assert out["caps_applied"] == 0
     assert isinstance(out.get("max_caps"), int)
+
+
+def test_extract_spectral_analysis_defaults_without_guard() -> None:
+    out = gs_mod._extract_spectral_analysis({"guards": [], "meta": {}}, baseline={})
+    assert out["caps_applied"] == 0
+    assert out["summary"]["status"] in {"stable", "capped"}
+    assert "family_caps" in out
+
+
+def test_extract_spectral_analysis_with_empty_tier_defaults(monkeypatch) -> None:
+    monkeypatch.setattr(
+        gs_mod, "get_tier_policies", lambda *_a, **_k: {}, raising=False
+    )
+    report = {
+        "metrics": {"spectral": {}},
+        "guards": [],
+        "meta": {"model_id": "m"},
+    }
+    out = gs_mod._extract_spectral_analysis(report, baseline={"model_id": "m"})
+    assert isinstance(out, dict) and out.get("caps_applied", 0) == 0
+    assert "summary" in out
 
 
 def test_extract_spectral_analysis_baseline_metrics_spectral_not_dict() -> None:
@@ -255,12 +280,125 @@ def test_extract_rmt_analysis_edge_risk_paths_and_contract_hashes() -> None:
             }
         ]
     }
-    out = gr_mod._extract_rmt_analysis(report, baseline)
+    out = report_make_mod._extract_rmt_analysis(report, baseline)
     assert out["evaluated"] is True
     assert out["measurement_contract_match"] is True
     assert out["epsilon_violations"]
     assert out["families"]["attn"]["ratio"] == 2.0
     assert out["mode"] == "activation_edge_risk"
+
+
+def test_extract_rmt_analysis_numeric_fallback_and_explicit_violations(
+    monkeypatch,
+) -> None:
+    assert report_make_mod._to_float_or_none(_BadFloat(1.0)) is None
+
+    monkeypatch.setattr(
+        report_make_mod,
+        "get_tier_policies",
+        lambda: {
+            "balanced": {
+                "rmt": {
+                    "epsilon_default": _BadFloat(0.1),
+                    "epsilon_by_family": {"attn": 0.1},
+                }
+            }
+        },
+    )
+
+    report = {
+        "guards": [
+            {
+                "name": "rmt",
+                "policy": {"epsilon_by_family": {"attn": 0.3}},
+                "metrics": {
+                    "edge_risk_by_family_base": {
+                        "attn": 1.0,
+                        "ffn": 1.0,
+                    },
+                    "edge_risk_by_family": {"attn": 2.0, "ffn": 2.0},
+                    "epsilon_violations": [
+                        {"family": "attn", "edge_base": 1.0, "edge_cur": 1.2}
+                    ],
+                    "measurement_contract": {"kind": "  "},
+                },
+            }
+        ]
+    }
+
+    out = report_make_mod._extract_rmt_analysis(report, {})
+
+    assert out["evaluated"] is True
+    assert out["epsilon_violations"] == [
+        {"family": "attn", "edge_base": 1.0, "edge_cur": 1.2}
+    ]
+    assert out["mode"] == "activation_edge_risk"
+
+
+def test_extract_rmt_analysis_invalid_numeric_maps_and_contract_lookup_error(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        report_make_mod,
+        "get_tier_policies",
+        lambda: {"balanced": {"rmt": {"epsilon_default": "bad"}}},
+    )
+
+    class _BadMetrics(dict):
+        def get(self, key, default=None):  # type: ignore[override]
+            if key == "measurement_contract":
+                raise ValueError("contract failed")
+            return super().get(key, default)
+
+    report = {
+        "guards": [
+            {
+                "name": "rmt",
+                "policy": {"epsilon_by_family": {"attn": "bad"}},
+                "metrics": _BadMetrics(
+                    {
+                        "edge_risk_by_family_base": {"attn": "bad", "ffn": 1.0},
+                        "edge_risk_by_family": {"attn": 2.0, "ffn": "bad"},
+                    }
+                ),
+            }
+        ]
+    }
+
+    out = report_make_mod._extract_rmt_analysis(report, {})
+
+    assert out["evaluated"] is True
+    assert "measurement_contract" not in out
+    assert out["families"]["ffn"]["edge_base"] == 1.0
+
+
+def test_extract_rmt_analysis_ignores_non_mapping_metric_maps(monkeypatch) -> None:
+    monkeypatch.setattr(
+        report_make_mod,
+        "get_tier_policies",
+        lambda: {"balanced": {"rmt": {"epsilon_by_family": {"attn": 0.2}}}},
+    )
+
+    report = {
+        "guards": [
+            {
+                "name": "rmt",
+                "metrics": {
+                    "edge_risk_by_family_base": ["bad"],
+                    "edge_risk_by_family": ["bad"],
+                    "epsilon_by_family": ["bad"],
+                },
+            }
+        ]
+    }
+
+    out = report_make_mod._extract_rmt_analysis(report, {})
+
+    assert out["evaluated"] is True
+    assert out["edge_risk_by_family_base"] == {}
+    assert out["edge_risk_by_family"] == {}
+    assert out["epsilon_by_family"] == {}
+    assert out["families"]["attn"]["epsilon"] == 0.2
 
 
 def test_extract_spectral_analysis_uses_run_report_baseline_contract() -> None:
@@ -321,7 +459,7 @@ def test_extract_variance_analysis_provenance_window_ids_and_ratio_ci_fail() -> 
         ],
         "metrics": {"variance": {"gain": 0.1, "ppl_no_ve": 10.0, "ppl_with_ve": 9.0}},
     }
-    out = gv_mod._extract_variance_analysis(report)
+    out = report_make_mod._extract_variance_analysis(report)
     assert out["enabled"] is False
     assert out["gain"] == 0.1
     assert out["ppl_no_ve"] == 10.0
@@ -330,10 +468,43 @@ def test_extract_variance_analysis_provenance_window_ids_and_ratio_ci_fail() -> 
 
 
 def test_extract_variance_analysis_handles_non_dict_variance_metrics() -> None:
-    out = gv_mod._extract_variance_analysis(
+    out = report_make_mod._extract_variance_analysis(
         {"guards": [], "metrics": {"variance": ["bad"]}}
     )
     assert out["gain"] is None
+
+
+def test_extract_variance_analysis_ignores_non_dict_calibration() -> None:
+    report = {
+        "guards": [
+            {
+                "name": "variance",
+                "metrics": {"calibration": ["bad"], "gain": 0.2},
+                "policy": {"mode": "ab"},
+            }
+        ]
+    }
+
+    out = report_make_mod._extract_variance_analysis(report)
+
+    assert out["gain"] == 0.2
+    assert "calibration" not in out
+
+
+def test_extract_variance_analysis_ignores_bad_ratio_ci_values() -> None:
+    report = {
+        "guards": [
+            {
+                "name": "variance",
+                "metrics": {"ratio_ci": (_BadFloat(1.0), 2.0), "gain": 0.2},
+            }
+        ]
+    }
+
+    out = report_make_mod._extract_variance_analysis(report)
+
+    assert out["gain"] == 0.2
+    assert "ratio_ci" not in out
 
 
 def test_extract_variance_analysis_keeps_existing_window_ids() -> None:
@@ -345,5 +516,5 @@ def test_extract_variance_analysis_keeps_existing_window_ids() -> None:
             }
         ]
     }
-    out = gv_mod._extract_variance_analysis(report)
+    out = report_make_mod._extract_variance_analysis(report)
     assert out["ab_test"]["provenance"]["window_ids"] == [3, 1, 2]

@@ -64,7 +64,7 @@ def _common_patches_detect_ce():
             },
         ),
         patch(
-            "invarlock.cli.run_runtime.detect_model_profile",
+            "invarlock.cli.run_runtime_exec.detect_model_profile",
             lambda model_id=None, adapter=None: SimpleNamespace(
                 default_loss="ce",
                 model_id=model_id,
@@ -76,7 +76,7 @@ def _common_patches_detect_ce():
             ),
         ),
         patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
+            "invarlock.cli.run_runtime_exec.resolve_tokenizer",
             lambda prof: (
                 SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
                 "tokhash123",
@@ -200,7 +200,7 @@ def _runner_min():
 
 def _detect_loss(loss_type: str = "ce"):
     return patch(
-        "invarlock.cli.run_runtime.detect_model_profile",
+        "invarlock.cli.run_runtime_exec.detect_model_profile",
         lambda model_id, adapter: SimpleNamespace(
             default_loss=loss_type,
             model_id=model_id,
@@ -275,7 +275,7 @@ def test_guard_overhead_ratio_display_path(monkeypatch, tmp_path):
     monkeypatch.setattr("invarlock.core.registry.get_registry", lambda: DummyRegistry())
     monkeypatch.setattr("invarlock.core.runner.CoreRunner", lambda: DummyRunner())
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.validate_guard_overhead",
+        "invarlock.cli.run_runtime_exec.validate_guard_overhead",
         lambda *a, **k: _OverheadRatio(),
     )
     monkeypatch.setattr(
@@ -288,7 +288,7 @@ def test_guard_overhead_ratio_display_path(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.resolve_tokenizer",
+        "invarlock.cli.run_runtime_exec.resolve_tokenizer",
         lambda *_a, **_k: (
             SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
             "tokhash123",
@@ -384,7 +384,7 @@ def test_baseline_pairing_valid_schedule(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.resolve_tokenizer",
+        "invarlock.cli.run_runtime_exec.resolve_tokenizer",
         lambda *_a, **_k: (
             SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
             "tokhash123",
@@ -429,7 +429,7 @@ def test_baseline_missing_eval_windows_fallback(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(
-        "invarlock.cli.run_runtime.resolve_tokenizer",
+        "invarlock.cli.run_runtime_exec.resolve_tokenizer",
         lambda *_a, **_k: (
             SimpleNamespace(eos_token="</s>", pad_token="</s>", vocab_size=50000),
             "tokhash123",
@@ -481,7 +481,7 @@ def test_persist_ref_masks_positive(tmp_path: Path):
         stack.enter_context(patch("invarlock.core.runner.CoreRunner", _runner_min))
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.resolve_tokenizer",
+                "invarlock.cli.run_runtime_exec.resolve_tokenizer",
                 lambda *_: (
                     SimpleNamespace(
                         eos_token="</s>", pad_token="</s>", vocab_size=50000

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import builtins
 import json
-import sys
 import types
 from pathlib import Path
 from unittest.mock import patch
@@ -12,6 +11,7 @@ import pytest
 import typer
 import yaml
 
+import invarlock.calibration as calibration_mod
 from invarlock.cli.commands import calibrate as calibrate_mod
 from invarlock.cli.config_execution import RuntimeDelegationError
 
@@ -226,7 +226,7 @@ def test_calibrate_commands_exit_on_missing_optional_deps(
         fromlist=(),
         level: int = 0,
     ):
-        if name == "invarlock.calibration.spectral_null":
+        if name == "invarlock.calibration":
             exc = ModuleNotFoundError("missing torch")
             exc.name = "torch"
             raise exc
@@ -257,7 +257,7 @@ def test_calibrate_commands_exit_on_missing_optional_deps(
         fromlist=(),
         level: int = 0,
     ):
-        if name == "invarlock.calibration.variance_ve":
+        if name == "invarlock.calibration":
             exc = ModuleNotFoundError("missing transformers")
             exc.name = "transformers"
             raise exc
@@ -294,7 +294,7 @@ def test_null_sweep_runtime_flags_do_not_block_missing_dep_error(
         fromlist=(),
         level: int = 0,
     ):
-        if name == "invarlock.calibration.spectral_null":
+        if name == "invarlock.calibration":
             exc = ModuleNotFoundError("missing torch")
             exc.name = "torch"
             raise exc
@@ -339,7 +339,7 @@ def test_ve_sweep_runtime_flags_do_not_block_missing_dep_error(
         fromlist=(),
         level: int = 0,
     ):
-        if name == "invarlock.calibration.variance_ve":
+        if name == "invarlock.calibration":
             exc = ModuleNotFoundError("missing transformers")
             exc.name = "transformers"
             raise exc
@@ -393,7 +393,7 @@ def test_calibrate_commands_reraise_non_optional_missing_modules(
     monkeypatch.setattr(
         builtins,
         "__import__",
-        _missing_numpy("invarlock.calibration.spectral_null"),
+        _missing_numpy("invarlock.calibration"),
     )
     with pytest.raises(ModuleNotFoundError):
         calibrate_mod.null_sweep(
@@ -412,7 +412,7 @@ def test_calibrate_commands_reraise_non_optional_missing_modules(
     monkeypatch.setattr(
         builtins,
         "__import__",
-        _missing_numpy("invarlock.calibration.variance_ve"),
+        _missing_numpy("invarlock.calibration"),
     )
     with pytest.raises(ModuleNotFoundError):
         calibrate_mod.ve_sweep(
@@ -500,12 +500,12 @@ def test_null_sweep_emits_json_csv_md_and_tier_patch(tmp_path: Path) -> None:
 def test_ve_sweep_handles_reports_without_variance_guard(tmp_path: Path) -> None:
     cfg = _write_base_config(tmp_path)
     out = tmp_path / "out"
-    fake_module = types.SimpleNamespace(
-        summarize_ve_sweep_reports=lambda reports, **kwargs: {
+
+    def _fake_summarize_ve_sweep_reports(reports, **kwargs):  # noqa: ANN001, ARG001
+        return {
             "n_runs": len(reports),
             "recommendations": {"min_effect_lognll": 0.12},
         }
-    )
 
     def _fake_run_command(*, out: Path, tier: str, config: Path, **_kwargs) -> str:  # noqa: ARG001
         report_path = Path(out) / "report.json"
@@ -528,7 +528,11 @@ def test_ve_sweep_handles_reports_without_variance_guard(tmp_path: Path) -> None
             "get_tier_guard_config",
             return_value={"predictive_one_sided": True},
         ),
-        patch.dict(sys.modules, {"invarlock.calibration.variance_ve": fake_module}),
+        patch.object(
+            calibration_mod,
+            "summarize_ve_sweep_reports",
+            _fake_summarize_ve_sweep_reports,
+        ),
     ):
         calibrate_mod.ve_sweep(
             config=cfg,

@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.report_files import save_report
 
 from invarlock.core.exceptions import ValidationError
 from invarlock.reporting.report_bundle import save_evaluation_bundle
-from invarlock.reporting.report_files import save_report
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_types import create_empty_report
 from invarlock.reporting.run_report_formatters import (

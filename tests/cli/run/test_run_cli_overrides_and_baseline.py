@@ -50,7 +50,7 @@ output:
 def _common_ce():
     return (
         patch(
-            "invarlock.cli.run_runtime.detect_model_profile",
+            "invarlock.cli.run_runtime_exec.detect_model_profile",
             lambda model_id, adapter: SimpleNamespace(
                 default_loss="ce",
                 model_id=model_id,
@@ -62,7 +62,7 @@ def _common_ce():
             ),
         ),
         patch(
-            "invarlock.cli.run_runtime.resolve_tokenizer",
+            "invarlock.cli.run_runtime_exec.resolve_tokenizer",
             lambda model_profile: (
                 SimpleNamespace(
                     name_or_path="tok",
@@ -650,7 +650,7 @@ def test_baseline_masked_counts_propagated(tmp_path: Path):
         # Force MLM to enable masked token aggregation
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.detect_model_profile",
+                "invarlock.cli.run_runtime_exec.detect_model_profile",
                 lambda model_id, adapter: SimpleNamespace(
                     default_loss="mlm",
                     model_id=model_id,
@@ -664,7 +664,7 @@ def test_baseline_masked_counts_propagated(tmp_path: Path):
         )
         stack.enter_context(
             patch(
-                "invarlock.cli.run_runtime.resolve_tokenizer",
+                "invarlock.cli.run_runtime_exec.resolve_tokenizer",
                 lambda profile: (
                     SimpleNamespace(
                         mask_token_id=103,

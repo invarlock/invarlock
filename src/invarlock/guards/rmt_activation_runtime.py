@@ -248,9 +248,9 @@ def activation_edge_risk(
         return None
 
     try:
-        from . import rmt_math
+        from . import rmt_analysis
 
-        mp_edge_val = rmt_math.mp_bulk_edge(
+        mp_edge_val = rmt_analysis.mp_bulk_edge(
             int(mat.shape[0]), int(mat.shape[1]), whitened=False
         )
     except (AttributeError, RuntimeError, TypeError, ValueError):
@@ -339,9 +339,9 @@ def activation_svd_outliers(
 
     mat = mat / std
     m, n = mat.shape
-    from . import rmt_math
+    from . import rmt_analysis
 
-    mp_edge_val = rmt_math.mp_bulk_edge(m, n, whitened=False)
+    mp_edge_val = rmt_analysis.mp_bulk_edge(m, n, whitened=False)
     threshold = mp_edge_val * (1.0 + deadband) * margin
 
     try:

@@ -14,13 +14,7 @@ def test_structural_failure_report_marks_structural_detection(
     tmp_path: Path,
 ) -> None:
     repo_root = Path(__file__).resolve().parents[2]
-    script = (
-        repo_root
-        / "scripts"
-        / "evidence_packs"
-        / "python"
-        / "structural_failure_report.py"
-    )
+    script = repo_root / "scripts" / "evidence_packs" / "python" / "task_tools.py"
     source_report = tmp_path / "source.report.json"
     source_report.write_text(
         json.dumps(
@@ -113,6 +107,7 @@ def test_structural_failure_report_marks_structural_detection(
         [
             "python3",
             str(script),
+            "structural-failure-report",
             "--error-type",
             "inf_injection",
             "--source-report",

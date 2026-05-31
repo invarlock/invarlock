@@ -15,19 +15,17 @@ import invarlock.guards.rmt as rmt_mod
 from invarlock.core.exceptions import GuardError, ValidationError
 from invarlock.guards.rmt_analysis import (
     capture_baseline_mp_stats,
+    clip_full_svd,
     layer_svd_stats,
+    mp_bulk_edge,
+    mp_bulk_edges,
+    within_deadband,
 )
 from invarlock.guards.rmt_detection import (
     _apply_rmt_correction,
     rmt_detect,
     rmt_detect_report,
     rmt_detect_with_names,
-)
-from invarlock.guards.rmt_math import (
-    clip_full_svd,
-    mp_bulk_edge,
-    mp_bulk_edges,
-    within_deadband,
 )
 
 

@@ -106,6 +106,16 @@ def test_resolve_pm_acceptance_range_from_report_exception_paths(monkeypatch) ->
     assert out_ctx_complete == {"min": 0.98, "max": 1.02}
 
 
+def test_coerce_finite_float_local_handles_isfinite_errors(monkeypatch) -> None:
+    monkeypatch.setattr(
+        policy.math,
+        "isfinite",
+        lambda _value: (_ for _ in ()).throw(TypeError("bad isfinite")),
+    )
+
+    assert policy._coerce_finite_float_local(1.0) is None
+
+
 def test_resolve_pm_acceptance_range_from_alt_context_non_dict_and_nonpositive() -> (
     None
 ):

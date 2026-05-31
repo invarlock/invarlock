@@ -106,6 +106,8 @@ def test_validate_primary_metric_block_missing_preview_final_raises() -> None:
 
 
 def test_numeric_coercion_helpers_reject_bools_and_nonfinite_floats() -> None:
+    assert pm_mod._is_non_bool_number(1.0) is True  # noqa: SLF001
+    assert pm_mod._is_non_bool_number(True) is False  # noqa: SLF001
     assert _coerce_float(True) is None
     assert _coerce_int(False) is None
     assert _coerce_int(float("inf")) is None

@@ -7,8 +7,8 @@ from typing import Any
 
 import pytest
 
-from invarlock.eval import bench
-from invarlock.eval.bench_regression import BENCH_GOLDEN_ID, BENCH_GOLDEN_SHA256
+import invarlock.eval.bench_policy as bench
+from invarlock.eval.bench_runner import run_guard_effect_benchmark
 from invarlock.reporting.report_types import create_empty_report
 
 TESTS_ROOT = Path(__file__).resolve().parents[2]
@@ -50,10 +50,10 @@ def _assert_float_close(actual: Any, expected: Any, *, tol: float = 1e-9) -> Non
 
 def test_bench_golden_hash_and_changelog_guard() -> None:
     assert GOLDEN_PATH.is_file()
-    assert _sha256(GOLDEN_PATH) == BENCH_GOLDEN_SHA256
+    assert _sha256(GOLDEN_PATH) == bench.BENCH_GOLDEN_SHA256
     changelog = (REPO_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert BENCH_GOLDEN_ID in changelog
-    assert BENCH_GOLDEN_SHA256 in changelog
+    assert bench.BENCH_GOLDEN_ID in changelog
+    assert bench.BENCH_GOLDEN_SHA256 in changelog
 
 
 def test_bench_policy_regression_against_golden(tmp_path: Path, monkeypatch) -> None:
@@ -157,7 +157,7 @@ def test_bench_policy_regression_against_golden(tmp_path: Path, monkeypatch) -> 
         "invarlock.eval.bench_runner.execute_single_run", stub_execute_single_run
     )
 
-    bench.run_guard_effect_benchmark(
+    run_guard_effect_benchmark(
         edits=["quant_rtn"],
         tiers=["balanced", "conservative"],
         probes=[0],

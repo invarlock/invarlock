@@ -25,7 +25,7 @@ RUNTIME_IMAGE_DIGEST ?= sha256:local-runtime-image
 SECURITY_ARTIFACT_DIR ?= artifacts/supply-chain
 SECURITY_RUN ?= uv run --isolated --locked --extra security-ci
 DIST_RUN ?= uv run --isolated --locked --extra release-ci
-COVERAGE_POLICY := $(PYTHON) scripts/coverage/coverage_policy.py
+COVERAGE_POLICY := $(PYTHON) scripts/coverage/check_coverage_thresholds.py
 
 # Keep repo-wide coverage practical while still exercising the CLI command
 # surface that would otherwise pull the project floor below the real trust core.
@@ -37,6 +37,7 @@ COVERAGE_TESTS_RUN := \
 
 COVERAGE_TESTS_VERIFY := \
 	tests/cli/test_verify*.py tests/cli/test_cli_command_help_smoke.py \
+	tests/cli/test_runtime_verify_cli.py \
 	tests/cli/test_policy_commands.py tests/cli/test_evidence_pack_commands.py \
 	tests/cli/test_evidence_pack_commands_release_review.py
 
@@ -77,7 +78,7 @@ COVERAGE_TESTS_CLI_COMMANDS := \
 COVERAGE_TESTS_CLI_HELPERS := \
 	tests/cli/test_adapter_auto*.py tests/cli/test_no_color.py \
 	tests/cli/test_config_execution_request_roundtrip.py \
-	tests/cli/test_internal_config_run.py tests/cli/test_json_helpers.py \
+	tests/cli/test_config_execution_internal_entrypoint.py tests/cli/test_json_helpers.py \
 	tests/cli/test_runtime_launch_plan_contract.py \
 	tests/cli/test_overhead_extraction.py
 
@@ -126,7 +127,7 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/observability/health.py \
 	src/invarlock/observability/metrics.py \
 	src/invarlock/observability/utils.py \
-	src/invarlock/config.py \
+	src/invarlock/__init__.py \
 	src/invarlock/adapters/auto.py \
 	src/invarlock/core/config_loader.py \
 	src/invarlock/core/config_runtime.py \
@@ -140,31 +141,25 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/core/runner_eval_metrics_stats.py \
 	src/invarlock/core/runner_eval_metrics_multimodal.py \
 	src/invarlock/core/builtin_plugin_catalog.py \
-	src/invarlock/core/run_orchestrator_execute_seed.py \
+	src/invarlock/core/run_orchestrator.py \
+	src/invarlock/core/run_orchestrator_execute.py \
 	src/invarlock/core/run_orchestrator_execute_environment.py \
-	src/invarlock/core/run_orchestrator_execute_dataset.py \
 	src/invarlock/core/run_orchestrator_execute_attempts.py \
 	src/invarlock/core/run_orchestrator_execute_execution.py \
 	src/invarlock/core/run_orchestrator_execute_helpers.py \
-	src/invarlock/core/run_orchestrator_execute_pipeline.py \
 	src/invarlock/cli/__init__.py \
 	src/invarlock/cli/__main__.py \
-	src/invarlock/cli/_json.py \
 	src/invarlock/cli/app.py \
 	src/invarlock/cli/config_execution.py \
 	src/invarlock/cli/evaluate_output.py \
 	src/invarlock/cli/evaluate_phases.py \
-	src/invarlock/cli/internal_config_run.py \
-	src/invarlock/cli/runtime_launch_plan.py \
 	src/invarlock/cli/commands/evaluate.py \
 	src/invarlock/cli/commands/run.py \
 	src/invarlock/cli/commands/verify.py \
-	src/invarlock/cli/runtime_verify.py \
-	src/invarlock/eval/probes/mi.py \
-	src/invarlock/reporting/report_build_context.py \
-	src/invarlock/reporting/report_build_evidence.py \
+	src/invarlock/eval/probes/importance.py \
+	src/invarlock/reporting/report_builder_support.py \
 	src/invarlock/reporting/report_enrichment.py \
-	src/invarlock/reporting/report_make_output.py \
+	src/invarlock/reporting/report_make.py \
 	src/invarlock/reporting/report_primary_metric_policy.py \
 	src/invarlock/reporting/report_schema.py \
 	src/invarlock/reporting/report_types.py \
@@ -172,9 +167,7 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/reporting/verify_check_helpers_metrics.py \
 	src/invarlock/reporting/verify_contract.py \
 	src/invarlock/runtime_security.py \
-	src/invarlock/runtime_security_helpers.py \
-	src/invarlock/runtime_security_container.py \
-	src/invarlock/runtime_security_manifest.py
+	src/invarlock/runtime_security_helpers.py
 
 TEST_DIR_TARGETS := adapters calibration ci cli core docs edits eval fuzzing guards integration lint observability plugins evidence_packs reporting runtime scripts
 GROUPED_TEST_DIR_TARGETS := $(filter-out integration,$(TEST_DIR_TARGETS))
@@ -328,7 +321,10 @@ verify:  ## Run verification (pytest -q, runtime verifier, lint, format, strict 
 	$(MAKE) architecture-fragmentation-check
 	$(MAKE) guard-fallback-audit
 	PYTHONPATH=src $(PYTEST) -q
-	OMP_NUM_THREADS=1 SKIP_RUFF=1 INVARLOCK_PYTHON="$(PYTHON)" bash scripts/smoke/run_smoke_regression.sh
+	OMP_NUM_THREADS=1 PYTHONPATH=src $(PYTEST) -q tests/cli/test_cli_smoke.py tests/cli/test_app_version.py tests/cli/test_verify_json_shape.py
+	OMP_NUM_THREADS=1 PYTHONPATH=src $(PYTEST) -q tests/reporting/test_report_pm_only.py tests/core/test_default_providers.py
+	OMP_NUM_THREADS=1 PYTHONPATH=src $(PYTEST) -q tests/guards/property/test_variance_properties.py
+	OMP_NUM_THREADS=1 PYTHONPATH=src $(PYTEST) -q tests/integration/test_end_to_end_evaluate.py
 	$(MAKE) cli-smoke-core
 	$(MAKE) cli-smoke-advanced
 	$(MAKE) runtime-verify
@@ -336,7 +332,7 @@ verify:  ## Run verification (pytest -q, runtime verifier, lint, format, strict 
 	$(MAKE) contracts-check
 	$(MAKE) docs-lint-strict
 	@if [ -n "$$VERIFY_DOCS_API" ]; then \
-		$(PYTHON) scripts/docs/validate_docs_api_refs.py; \
+		$(PYTHON) scripts/docs/docs_check.py --api-refs; \
 	fi
 	@echo "Verification completed successfully"
 
@@ -536,7 +532,7 @@ dist-check:  ## Build wheel/sdist and validate distribution metadata
 
 release-evidence-check:  ## Validate required local release evidence artifacts
 	$(MAKE) ensure-python
-	$(PYTHON) scripts/release/check_release_evidence.py \
+	$(PYTHON) scripts/release/evidence_contracts.py release \
 		--root artifacts/release \
 		--dist dist \
 		--sbom $(SECURITY_ARTIFACT_DIR)/sbom.json
@@ -547,7 +543,7 @@ guard-validation-smoke:  ## Run deterministic synthetic guard-validation smoke
 
 empirical-guard-evidence-check:  ## Validate non-synthetic guard-evidence artifacts when present for release review
 	$(MAKE) ensure-python
-	$(PYTHON) scripts/release/check_empirical_guard_evidence.py --root "$(EMPIRICAL_GUARD_EVIDENCE_ROOT)"
+	$(PYTHON) scripts/release/evidence_contracts.py empirical --root "$(EMPIRICAL_GUARD_EVIDENCE_ROOT)"
 
 clean:  ## Clean build artifacts
 	rm -rf build/
@@ -602,7 +598,7 @@ docs:  ## Build docs with default mkdocs.yml (CI/networked)
 docs-ci:  ## Build documentation and run link checker
 	$(MAKE) ensure-python
 	$(MKDOCS) build --strict
-	$(PYTHON) scripts/docs/check_docs_links.py
+	$(PYTHON) scripts/docs/docs_check.py --links
 
 ## (Consolidated) Single docs-serve target defined above
 

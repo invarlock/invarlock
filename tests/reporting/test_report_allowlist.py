@@ -6,8 +6,8 @@ from invarlock.reporting import (
     report_primary_metric_policy as primary_metric_policy_mod,
 )
 from invarlock.reporting import report_provenance as provenance_mod
+from invarlock.reporting import report_schema as allowlist_mod
 from invarlock.reporting import report_schema as schema_mod
-from invarlock.reporting import report_validation_allowlist as allowlist_mod
 
 
 def test_load_validation_allowlist_prefers_contract_file(monkeypatch):
