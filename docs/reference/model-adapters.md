@@ -47,6 +47,24 @@ print(adapter.describe(model)["model_type"])
 > experimentation until supporting artifacts are attached. See the Model Family
 > Catalog for the authoritative family-by-family inventory.
 
+## Support Tiers
+
+Adapter capability and model-lane support are related but separate contracts.
+`contracts/adapter_capabilities.json` says what an adapter can do mechanically:
+load, snapshot/restore, expose modules to guards, and report runtime limits.
+`contracts/support_matrix.json` says which model/runtime/adapter lanes have
+public evidence support.
+
+| Tier | Applies to | Promise |
+| --- | --- | --- |
+| `published_basis` | Model/runtime/adapter lane | Public evidence fixture set with report, runtime-manifest, and evidence-pack provenance where available. |
+| `supported_experimental` | Model/runtime/adapter lane | Repo-included preset/config/test/smoke path exists, but no published-basis fixture set is claimed. |
+| `community_experimental` | Model/runtime/adapter lane | Path is usable for community experimentation without a maintained public evidence basis. |
+
+Do not infer `published_basis` from adapter availability alone. For example,
+`hf_causal` may be fully capable for a family while that family remains
+`supported_experimental` until public evidence artifacts are attached.
+
 ## Concepts
 
 - **Adapters hide model-specific logic**: they handle loading, structure description,

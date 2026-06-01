@@ -145,8 +145,10 @@ The HTML export keeps that same body content but adds a browser shell with:
 
 ### Concepts
 
-- **Schema stability**: v1 is a PM-only contract; breaking changes require a
-  schema-version bump.
+- **Schema stability**: v1 has a stable core around primary metric,
+  dataset/window metadata, artifacts, plugins, and report identity. Optional
+  policy, guard, provenance, telemetry, and confidence blocks are additive
+  unless promoted into the required core, which requires a schema-version bump.
 - **Validation allow-list**: only specific `validation.*` flags are accepted by
   the schema validator.
 - **Baseline pairing**: reports assume paired windows; verification enforces

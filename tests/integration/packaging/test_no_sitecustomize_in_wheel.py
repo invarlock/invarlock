@@ -42,6 +42,7 @@ def test_evidence_pack_repo_assets_not_in_wheel(tmp_path):
         assert "invarlock/_data/contracts/evidence_pack_manifest.schema.json" in names
         assert "invarlock/_data/contracts/policy_pack.schema.json" in names
         assert "invarlock/_data/contracts/runtime_manifest.schema.json" in names
+        assert "invarlock/_data/contracts/verify_output.schema.json" in names
         assert "invarlock/_data/contracts/support_matrix.json" in names
         assert "invarlock/_data/contracts/model_family_catalog.json" in names
         assert (

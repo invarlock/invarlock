@@ -8,7 +8,7 @@ from invarlock.core.metric_kind_contract import (
     load_metric_kind_catalog,
     normalize_metric_kind,
 )
-from invarlock.public_contracts import load_json_contract
+from invarlock.public_contracts import REPORT_SCHEMA_VERSION, load_json_contract
 
 
 class ValidationAllowlistContractError(RuntimeError):
@@ -89,10 +89,6 @@ else:
         jsonschema.SchemaError,
         jsonschema.ValidationError,
     )
-
-
-# Evaluation report schema version (PM-first canonical)
-REPORT_SCHEMA_VERSION = "v1"
 
 
 # Minimal JSON Schema describing the canonical shape of an evaluation report.

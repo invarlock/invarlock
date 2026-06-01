@@ -1,9 +1,11 @@
 import json
 from pathlib import Path
 
+import jsonschema
 from typer.testing import CliRunner
 
 from invarlock.cli.app import app
+from invarlock.public_contracts import load_verify_output_schema
 
 
 def test_verify_json_envelope_is_stable(tmp_path: Path):
@@ -40,3 +42,4 @@ def test_verify_json_envelope_is_stable(tmp_path: Path):
     assert obj.get("format_version") == "verify-v1"
     assert {"summary", "results"} <= set(obj.keys())
     assert "resolution" not in obj
+    jsonschema.validate(instance=obj, schema=load_verify_output_schema())

@@ -7,12 +7,77 @@ from pathlib import Path
 import pytest
 
 import invarlock.public_contracts as contracts
+from invarlock import evidence_pack_integrity, runtime_security_helpers
+from invarlock.cli import constants as cli_constants
+from invarlock.reporting import report_schema, verify_output
 from tests._repo_root import REPO_ROOT
+
+
+def test_public_subcontract_versions_are_single_sourced() -> None:
+    assert report_schema.REPORT_SCHEMA_VERSION == contracts.REPORT_SCHEMA_VERSION
+    assert (
+        evidence_pack_integrity.EVIDENCE_PACK_FORMAT
+        == contracts.EVIDENCE_PACK_FORMAT_VERSION
+    )
+    assert verify_output.FORMAT_VERIFY == contracts.VERIFY_OUTPUT_FORMAT_VERSION
+    assert (
+        runtime_security_helpers.RUNTIME_VERIFIER_CONTRACT_VERSION
+        == contracts.RUNTIME_MANIFEST_CONTRACT_VERSION
+    )
+
+    assert cli_constants.DOCTOR_FORMAT_VERSION == contracts.DOCTOR_OUTPUT_FORMAT_VERSION
+    assert (
+        cli_constants.PLUGINS_FORMAT_VERSION == contracts.PLUGINS_OUTPUT_FORMAT_VERSION
+    )
+    assert cli_constants.VERIFY_FORMAT_VERSION == contracts.VERIFY_OUTPUT_FORMAT_VERSION
+    assert (
+        cli_constants.RUNTIME_VERIFY_FORMAT_VERSION
+        == contracts.RUNTIME_VERIFY_OUTPUT_FORMAT_VERSION
+    )
+    assert (
+        cli_constants.POLICY_PACK_VERIFY_FORMAT_VERSION
+        == contracts.POLICY_PACK_VERIFY_OUTPUT_FORMAT_VERSION
+    )
+    assert (
+        cli_constants.EVIDENCE_PACK_VERIFY_FORMAT_VERSION
+        == contracts.EVIDENCE_PACK_VERIFY_OUTPUT_FORMAT_VERSION
+    )
+
+    subcontract_catalog = contracts.public_subcontract_catalog()
+    assert (
+        subcontract_catalog["report_schema"]["version"]
+        == contracts.REPORT_SCHEMA_VERSION
+    )
+    assert (
+        subcontract_catalog["evidence_pack_format"]["version"]
+        == contracts.EVIDENCE_PACK_FORMAT_VERSION
+    )
+    assert (
+        subcontract_catalog["verifier_output"]["version"]
+        == contracts.VERIFY_OUTPUT_FORMAT_VERSION
+    )
+    assert (
+        subcontract_catalog["runtime_manifest"]["version"]
+        == contracts.RUNTIME_MANIFEST_CONTRACT_VERSION
+    )
+    assert (
+        subcontract_catalog["cli_stability_policy"]["version"]
+        == contracts.CLI_STABILITY_POLICY_VERSION
+    )
+    assert (
+        subcontract_catalog["adapter_support_tiers"]["version"]
+        == contracts.ADAPTER_SUPPORT_TIER_POLICY_VERSION
+    )
+    assert (
+        subcontract_catalog["cli_stability_policy"]["stable_json_surfaces"]
+        == contracts.stable_cli_json_surfaces()
+    )
 
 
 def test_public_contract_loaders_and_catalog_round_trip() -> None:
     support_matrix = contracts.load_support_matrix()
     assert support_matrix["format_version"] == "support-matrix-v1"
+    assert contracts.support_tiers() == tuple(support_matrix["support_tiers"])
     assert {lane["lane_id"] for lane in contracts.published_basis_lanes()} == {
         "gpt2-causal-hf",
         "bert-mlm-hf",
@@ -135,6 +200,7 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
     assert (
         catalog["runtime_manifest"]["path"] == "contracts/runtime_manifest.schema.json"
     )
+    assert catalog["verify_output"]["path"] == "contracts/verify_output.schema.json"
     assert catalog["policy_pack"]["path"] == "contracts/policy_pack.schema.json"
 
     schema = contracts.load_policy_pack_schema()
@@ -147,6 +213,42 @@ def test_public_contract_loaders_and_catalog_round_trip() -> None:
         contracts.load_runtime_manifest_schema()["title"]
         == "InvarLock Runtime Manifest"
     )
+    verify_schema = contracts.load_verify_output_schema()
+    assert verify_schema["title"] == "InvarLock Verify JSON Output"
+    assert (
+        verify_schema["properties"]["format_version"]["const"]
+        == contracts.VERIFY_OUTPUT_FORMAT_VERSION
+    )
+
+
+def test_support_tier_descriptions_and_policy_pack_schema_are_in_sync() -> None:
+    support_matrix = contracts.load_support_matrix()
+    tiers = support_matrix["support_tiers"]
+    descriptions = support_matrix["support_tier_descriptions"]
+
+    assert set(descriptions) == set(tiers)
+    assert all(descriptions[tier] for tier in tiers)
+
+    policy_schema = contracts.load_policy_pack_schema()
+    enum = policy_schema["properties"]["compatibility"]["properties"]["support_tiers"][
+        "items"
+    ]["enum"]
+    assert enum == tiers
+
+    for lane in support_matrix["lanes"]:
+        assert lane["support_tier"] in tiers
+
+
+def test_support_tiers_returns_empty_for_malformed_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        contracts,
+        "_load_contract_or_raise",
+        lambda filename: {"support_matrix.json": {"support_tiers": "bad"}}[filename],
+    )
+
+    assert contracts.support_tiers() == ()
 
 
 def test_public_contract_paths_are_repo_relative() -> None:
@@ -456,6 +558,8 @@ def test_public_contract_helpers_raise_when_contracts_are_unavailable(
         contracts.ContractLoadError, match="runtime_manifest.schema.json"
     ):
         contracts.load_runtime_manifest_schema()
+    with pytest.raises(contracts.ContractLoadError, match="verify_output.schema.json"):
+        contracts.load_verify_output_schema()
     assert contracts.contract_reference("support_matrix.json") == {
         "path": "contracts/support_matrix.json",
         "load_error": "missing",
@@ -482,6 +586,7 @@ def test_public_contract_helpers_reject_non_mapping_payloads(monkeypatch) -> Non
         "adapter_capabilities.json": "unexpected",
         "plugin_compatibility.json": ["unexpected"],
         "runtime_manifest.schema.json": ["unexpected"],
+        "verify_output.schema.json": ["unexpected"],
         "policy_pack.schema.json": ["unexpected"],
         "evidence_pack_manifest.schema.json": ["unexpected"],
     }
@@ -509,6 +614,8 @@ def test_public_contract_helpers_reject_non_mapping_payloads(monkeypatch) -> Non
         contracts.ContractLoadError, match="runtime_manifest.schema.json"
     ):
         contracts.load_runtime_manifest_schema()
+    with pytest.raises(contracts.ContractLoadError, match="verify_output.schema.json"):
+        contracts.load_verify_output_schema()
 
 
 def test_public_contract_lane_and_adapter_helpers_cover_non_matching_entries(

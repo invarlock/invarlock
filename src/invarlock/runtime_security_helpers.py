@@ -16,6 +16,7 @@ from typing import Any
 
 from invarlock import runtime_security_paths as path_helpers
 from invarlock.core import config_loader as _config_loader
+from invarlock.public_contracts import RUNTIME_MANIFEST_CONTRACT_VERSION
 
 inspect_config_dependencies = _config_loader.inspect_config_dependencies
 
@@ -30,7 +31,7 @@ RUNTIME_IMAGE_ENV = "INVARLOCK_RUNTIME_IMAGE"
 RUNTIME_IMAGE_DIGEST_ENV = "INVARLOCK_RUNTIME_IMAGE_DIGEST"
 RUNTIME_MANIFEST_FILENAME = "runtime.manifest.json"
 RUNTIME_MANIFEST_VERSION = 1
-RUNTIME_VERIFIER_CONTRACT_VERSION = "runtime-manifest-v1"
+RUNTIME_VERIFIER_CONTRACT_VERSION = RUNTIME_MANIFEST_CONTRACT_VERSION
 RUNTIME_IMAGE_LOCAL_DEFAULT = "invarlock-runtime:local"
 RUNTIME_IMAGE_CUDA_LOCAL_DEFAULT = "invarlock-runtime:cuda-local"
 RUNTIME_IMAGE_DEFAULT = "ghcr.io/invarlock/invarlock-runtime:latest"
