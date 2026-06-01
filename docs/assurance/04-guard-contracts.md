@@ -153,9 +153,7 @@ InvarLock evaluates edits using **paired Δlog perplexity** against the baseline
 > See [Quality Gates (Acceptance)](#quality-gates-acceptance) for the run-level thresholds the CLI enforces on these statistics.
 
 $$
-\Delta_i =
-\log(\text{PPL}_{\text{subject final}, i})
-- \log(\text{PPL}_{\text{baseline final}, i})
+\Delta_i = \log(\text{PPL}_{\text{subject final}, i}) - \log(\text{PPL}_{\text{baseline final}, i})
 $$
 
 $$

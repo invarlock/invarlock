@@ -22,10 +22,10 @@ $r_f^{\text{cur}}/r_f^{\text{base}} - 1$).
 
 ### What is the edge risk score?
 
-For a (token×hidden) activation matrix $A$, the guard forms a whitened matrix
-$A'$ (centered and standardized), estimates its top singular value
-$\hat{\sigma}_{\max}(A')$ via a deterministic matvec estimator, and normalizes by
-the Marchenko–Pastur edge $\sigma_{\mathrm{MP}}(m,n)$ for the same shape:
+For a (token×hidden) activation matrix, the guard forms a whitened centered and
+standardized matrix, estimates its top singular value via a deterministic
+matvec estimator, and normalizes by the Marchenko–Pastur edge for the same
+shape:
 
 $$
 r = \frac{\hat{\sigma}_{\max}(A')}{\sigma_{\mathrm{MP}}(m,n)}

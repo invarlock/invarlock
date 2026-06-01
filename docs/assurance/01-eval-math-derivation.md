@@ -115,12 +115,23 @@ the point estimator converges to the population log‑ratio.
 
 ### Jensen inequality note
 
-Let $r_i = \exp(\Delta \ell_i) = \mathrm{PPL}^{(B)}_i / \mathrm{PPL}^{(A)}_i$. Then
-$\exp\big(\overline{\Delta \ell}_{\text{w}}\big)$ is the weighted geometric mean
-of $r_i$. By AM-GM (equivalently Jensen on $\log$), the weighted geometric mean
-is $\le$ the weighted arithmetic mean of $r_i$. The ratio of mean perplexities
-is a different quantity and can be larger or smaller; see the counter-example
-below.
+Let
+
+$$
+r_i = \exp(\Delta \ell_i) =
+\frac{\mathrm{PPL}^{(B)}_i}{\mathrm{PPL}^{(A)}_i}
+$$
+
+Then
+
+$$
+\exp\big(\overline{\Delta \ell}_{\text{w}}\big)
+$$
+
+is the weighted geometric mean of $r_i$. By AM-GM (equivalently Jensen on
+$\log$), the weighted geometric mean is $\le$ the weighted arithmetic mean of
+$r_i$. The ratio of mean perplexities is a different quantity and can be larger
+or smaller; see the counter-example below.
 
 ## Why log‑space vs ratio of means (counter‑example)
 
