@@ -1,8 +1,8 @@
 # Preset: Seq2Seq (synthetic pairs) — quick demo.
 
 model:
-  id: "sshleifer/tiny-gpt2"
-  adapter: "hf_causal"
+  id: "t5-small"
+  adapter: "hf_seq2seq"
   device: "auto"
 
 dataset:
