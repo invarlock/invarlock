@@ -4,7 +4,6 @@ import copy
 import hashlib
 import json
 import math
-import os
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -21,8 +20,14 @@ from invarlock.core.metric_kind_contract import is_ppl_metric_kind
 from invarlock.core.retry import RetryDiagnostic
 from invarlock.eval.primary_metric import compute_primary_metric_from_report
 
+from . import report_builder_telemetry as _report_builder_telemetry
 from .report_types import RunReport
 from .utils import _coerce_int, _sanitize_seed_bundle
+
+build_telemetry_payload = _report_builder_telemetry.build_telemetry_payload
+save_telemetry_report = _report_builder_telemetry.save_telemetry_report
+telemetry_summary_line = _report_builder_telemetry.telemetry_summary_line
+telemetry_output_enabled = _report_builder_telemetry.telemetry_output_enabled
 
 _NON_FATAL_EXCEPTIONS = (
     AttributeError,
@@ -43,104 +48,6 @@ _VALIDATION_EXCEPTIONS = (
     TypeError,
     ValueError,
 )
-
-
-def build_telemetry_payload(report: dict[str, Any]) -> dict[str, Any]:
-    """Build a structured telemetry payload from a run report."""
-    meta_in = report.get("meta", {}) if isinstance(report, dict) else {}
-    metrics_in = report.get("metrics", {}) if isinstance(report, dict) else {}
-
-    payload: dict[str, Any] = {"generated_at": datetime.now().isoformat()}
-
-    if isinstance(meta_in, dict):
-        payload["meta"] = {
-            "model_id": meta_in.get("model_id"),
-            "adapter": meta_in.get("adapter"),
-            "device": meta_in.get("device"),
-            "run_id": meta_in.get("run_id"),
-            "profile": meta_in.get("profile"),
-        }
-
-    if isinstance(metrics_in, dict):
-        timings = metrics_in.get("timings")
-        if isinstance(timings, dict):
-            payload["timings"] = timings
-
-        guard_timings = metrics_in.get("guard_timings")
-        if isinstance(guard_timings, dict):
-            payload["guard_timings"] = guard_timings
-
-        memory_snapshots = metrics_in.get("memory_snapshots")
-        if isinstance(memory_snapshots, list):
-            payload["memory_snapshots"] = memory_snapshots
-
-        memory_summary: dict[str, Any] = {}
-        for key in (
-            "memory_mb_peak",
-            "gpu_memory_mb_peak",
-            "gpu_memory_reserved_mb_peak",
-        ):
-            value = metrics_in.get(key)
-            if isinstance(value, int | float):
-                memory_summary[key] = float(value)
-        if memory_summary:
-            payload["memory"] = memory_summary
-
-        perf_metrics: dict[str, Any] = {}
-        for key in (
-            "latency_ms_per_tok",
-            "throughput_tok_per_s",
-            "eval_samples",
-            "total_tokens",
-        ):
-            value = metrics_in.get(key)
-            if isinstance(value, int | float):
-                perf_metrics[key] = float(value)
-        if perf_metrics:
-            payload["performance"] = perf_metrics
-
-    return payload
-
-
-def save_telemetry_report(
-    report: dict[str, Any],
-    output_dir: Path,
-    *,
-    filename: str = "telemetry.json",
-) -> Path:
-    """Write telemetry JSON payload to the output directory."""
-    payload = build_telemetry_payload(report)
-    filename_str = str(filename)
-    filename_path = Path(filename_str)
-    if (
-        not filename_str
-        or filename_path.is_absolute()
-        or filename_path.name != filename_str
-    ):
-        raise ValueError("telemetry filename must be a plain file name")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    path = output_dir / filename_path.name
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
-    return path
-
-
-def telemetry_summary_line(evaluation_report: dict[str, Any]) -> str | None:
-    telemetry = evaluation_report.get("telemetry")
-    if not isinstance(telemetry, dict):
-        return None
-    summary = telemetry.get("summary_line")
-    if isinstance(summary, str) and summary.strip():
-        return summary
-    return None
-
-
-def telemetry_output_enabled() -> bool:
-    return str(os.environ.get("INVARLOCK_TELEMETRY", "")).strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
 
 
 @dataclass(frozen=True)

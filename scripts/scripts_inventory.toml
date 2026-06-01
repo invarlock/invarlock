@@ -48,12 +48,15 @@ gpu = "never"
 invoked_by = ["make docs-check", "make verify", "CI"]
 description = "Documentation, assurance cross-reference, claim-surface, example, consistency, and link validation."
 paths = [
+  "scripts/docs/docs_claim_surface.py",
   "scripts/docs/docs_check.py",
   "scripts/docs/docs_lint.py",
   "scripts/docs/lint_assurance_xrefs.py",
   "scripts/docs/test_cli_examples.py",
   "scripts/docs/verify_live_examples.py",
   "scripts/docs/verify_markdown_bash_blocks.py",
+  "scripts/docs/verify_markdown_demo_inputs.py",
+  "scripts/docs/verify_markdown_rewrite.py",
   "scripts/docs/verify_notebooks_smoke.py",
 ]
 
@@ -104,6 +107,7 @@ gpu = "optional"
 invoked_by = ["make model-evidence-list", "make model-evidence-sweep", "manual remote campaigns"]
 description = "Model-evidence sweep planning, remote launch, command generation, and outputs."
 paths = [
+  "scripts/model_evidence/model_evidence_lanes.py",
   "scripts/model_evidence/model_evidence_sweep.py",
   "scripts/model_evidence/run_model_evidence_remote.py",
 ]

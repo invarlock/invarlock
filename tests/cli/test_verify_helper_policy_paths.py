@@ -3,7 +3,7 @@ from __future__ import annotations
 import importlib
 from pathlib import Path
 
-from tests.conftest import install_transformers_tokenizer_stub
+from tests.cli._support_transformers import install_transformers_tokenizer_stub
 
 
 def _import_verify_module():

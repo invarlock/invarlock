@@ -91,6 +91,12 @@ COVERAGE_TESTS_ADAPTERS := \
 	tests/adapters/test_hf_loading_helpers.py \
 	tests/adapters/test_hf_multimodal_adapter.py \
 	tests/adapters/test_adapter_errors.py \
+	tests/adapters/test_hf_causal_loader_fallback.py \
+	tests/adapters/test_hf_causal_variant_paths.py \
+	tests/adapters/test_hf_causal_phi_paths.py \
+	tests/adapters/test_hf_causal_gemma4_paths.py \
+	tests/adapters/test_hf_role_adapters.py \
+	tests/adapters/test_hf_causal_spec_contracts.py \
 	tests/adapters/test_adapters_hf_and_integration.py
 
 COVERAGE_TESTS_RUNTIME := \
@@ -145,6 +151,7 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/core/run_orchestrator_execute.py \
 	src/invarlock/core/run_orchestrator_execute_environment.py \
 	src/invarlock/core/run_orchestrator_execute_attempts.py \
+	src/invarlock/core/run_orchestrator_execute_attempt_results.py \
 	src/invarlock/core/run_orchestrator_execute_execution.py \
 	src/invarlock/core/run_orchestrator_execute_helpers.py \
 	src/invarlock/cli/__init__.py \
@@ -157,6 +164,7 @@ MYPY_TYPED_SURFACE := \
 	src/invarlock/cli/commands/run.py \
 	src/invarlock/cli/commands/verify.py \
 	src/invarlock/eval/probes/importance.py \
+	src/invarlock/reporting/report_builder_telemetry.py \
 	src/invarlock/reporting/report_builder_support.py \
 	src/invarlock/reporting/report_enrichment.py \
 	src/invarlock/reporting/report_make.py \

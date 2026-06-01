@@ -19,6 +19,21 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
+import invarlock.observability.metrics as metrics_mod
+from invarlock.observability.metrics import (
+    Counter,
+    Gauge,
+    Histogram,
+    MetricsRegistry,
+    MetricType,
+    MetricValue,
+    Timer,
+    create_operation_metrics,
+    create_resource_metrics,
+    summarize_memory_snapshots,
+)
+from tests.observability._support_time import FakeClock
+
 # =============================================================================
 # MetricType Tests
 # =============================================================================
@@ -30,7 +45,6 @@ class TestMetricType:
 
     def test_metric_types_exist(self):
         """Test all expected metric types exist."""
-        from invarlock.observability.metrics import MetricType
 
         assert MetricType.COUNTER.value == "counter"
         assert MetricType.GAUGE.value == "gauge"
@@ -58,7 +72,6 @@ class TestMetricValue:
 
     def test_creation(self):
         """Test creating a metric value."""
-        from invarlock.observability.metrics import MetricValue
 
         value = MetricValue(value=42.0, labels={"env": "test"}, timestamp=1000.0)
 
@@ -68,7 +81,6 @@ class TestMetricValue:
 
     def test_auto_timestamp(self):
         """Test timestamp is auto-set if not provided."""
-        from invarlock.observability.metrics import MetricValue
 
         before = time.time()
         value = MetricValue(value=1.0, labels={}, timestamp=None)
@@ -90,7 +102,6 @@ class TestCounter:
 
     def test_increment_default(self):
         """Test incrementing by default amount (1)."""
-        from invarlock.observability.metrics import Counter
 
         counter = Counter("test_counter", "A test counter")
 
@@ -102,7 +113,6 @@ class TestCounter:
 
     def test_increment_custom_amount(self):
         """Test incrementing by custom amount."""
-        from invarlock.observability.metrics import Counter
 
         counter = Counter("test_counter")
 
@@ -114,7 +124,6 @@ class TestCounter:
 
     def test_increment_with_labels(self):
         """Test incrementing with labels."""
-        from invarlock.observability.metrics import Counter
 
         counter = Counter("test_counter")
 
@@ -128,7 +137,6 @@ class TestCounter:
 
     def test_get_all(self):
         """Test getting all counter values."""
-        from invarlock.observability.metrics import Counter
 
         counter = Counter("test_counter")
 
@@ -143,7 +151,6 @@ class TestCounter:
 
     def test_reset(self):
         """Test resetting counter."""
-        from invarlock.observability.metrics import Counter
 
         counter = Counter("test_counter")
 
@@ -154,7 +161,6 @@ class TestCounter:
 
     def test_thread_safety(self):
         """Test counter is thread-safe."""
-        from invarlock.observability.metrics import Counter
 
         counter = Counter("test_counter")
         num_threads = 10
@@ -173,7 +179,6 @@ class TestCounter:
 
     def test_labels_to_key_conversion(self):
         """Test label key serialization is consistent."""
-        from invarlock.observability.metrics import Counter
 
         labels = {"env": "prod", "region": "us-east"}
         key = Counter._labels_to_key(labels)
@@ -184,7 +189,6 @@ class TestCounter:
 
     def test_key_to_labels_conversion(self):
         """Test key to labels deserialization."""
-        from invarlock.observability.metrics import Counter
 
         key = "env=prod|region=us-east"
         labels = Counter._key_to_labels(key)
@@ -193,7 +197,6 @@ class TestCounter:
 
     def test_empty_key_to_labels(self):
         """Test empty key returns empty labels."""
-        from invarlock.observability.metrics import Counter
 
         labels = Counter._key_to_labels("")
         assert labels == {}
@@ -210,7 +213,6 @@ class TestGauge:
 
     def test_set_value(self):
         """Test setting gauge value."""
-        from invarlock.observability.metrics import Gauge
 
         gauge = Gauge("test_gauge", "A test gauge")
 
@@ -222,7 +224,6 @@ class TestGauge:
 
     def test_increment(self):
         """Test incrementing gauge."""
-        from invarlock.observability.metrics import Gauge
 
         gauge = Gauge("test_gauge")
 
@@ -234,7 +235,6 @@ class TestGauge:
 
     def test_decrement(self):
         """Test decrementing gauge."""
-        from invarlock.observability.metrics import Gauge
 
         gauge = Gauge("test_gauge")
         gauge.set(10.0)
@@ -247,7 +247,6 @@ class TestGauge:
 
     def test_with_labels(self):
         """Test gauge with labels."""
-        from invarlock.observability.metrics import Gauge
 
         gauge = Gauge("test_gauge")
 
@@ -259,7 +258,6 @@ class TestGauge:
 
     def test_get_all(self):
         """Test getting all gauge values."""
-        from invarlock.observability.metrics import Gauge
 
         gauge = Gauge("test_gauge")
 
@@ -271,7 +269,6 @@ class TestGauge:
 
     def test_thread_safety(self):
         """Test gauge is thread-safe."""
-        from invarlock.observability.metrics import Gauge
 
         gauge = Gauge("test_gauge")
         gauge.set(0.0)
@@ -301,7 +298,6 @@ class TestHistogram:
 
     def test_observe(self):
         """Test observing values."""
-        from invarlock.observability.metrics import Histogram
 
         histogram = Histogram("test_histogram", "A test histogram")
 
@@ -315,7 +311,6 @@ class TestHistogram:
 
     def test_default_buckets(self):
         """Test default bucket configuration."""
-        from invarlock.observability.metrics import Histogram
 
         histogram = Histogram("test_histogram")
 
@@ -336,7 +331,6 @@ class TestHistogram:
 
     def test_custom_buckets(self):
         """Test custom bucket configuration."""
-        from invarlock.observability.metrics import Histogram
 
         custom_buckets = [1.0, 5.0, 10.0, 50.0, 100.0]
         histogram = Histogram("test_histogram", buckets=custom_buckets)
@@ -345,7 +339,6 @@ class TestHistogram:
 
     def test_bucket_counts(self):
         """Test bucket counting."""
-        from invarlock.observability.metrics import Histogram
 
         histogram = Histogram("test_histogram", buckets=[1.0, 5.0, 10.0])
 
@@ -361,7 +354,6 @@ class TestHistogram:
 
     def test_percentiles(self):
         """Test percentile calculation."""
-        from invarlock.observability.metrics import Histogram
 
         histogram = Histogram("test_histogram")
 
@@ -381,7 +373,6 @@ class TestHistogram:
 
     def test_percentile_empty(self):
         """Test percentile on empty histogram."""
-        from invarlock.observability.metrics import Histogram
 
         histogram = Histogram("test_histogram")
 
@@ -389,7 +380,6 @@ class TestHistogram:
 
     def test_get_stats(self):
         """Test comprehensive statistics."""
-        from invarlock.observability.metrics import Histogram
 
         histogram = Histogram("test_histogram")
 
@@ -410,7 +400,6 @@ class TestHistogram:
 
     def test_get_stats_empty(self):
         """Test stats on empty histogram."""
-        from invarlock.observability.metrics import Histogram
 
         histogram = Histogram("test_histogram")
 
@@ -419,7 +408,6 @@ class TestHistogram:
 
     def test_observations_limited(self):
         """Test observations are limited to 10000."""
-        from invarlock.observability.metrics import Histogram
 
         histogram = Histogram("test_histogram")
 
@@ -432,7 +420,6 @@ class TestHistogram:
 
     def test_with_labels(self):
         """Test histogram with labels."""
-        from invarlock.observability.metrics import Histogram
 
         histogram = Histogram("test_histogram")
 
@@ -458,7 +445,6 @@ class TestTimer:
 
     def test_record(self):
         """Test recording duration directly."""
-        from invarlock.observability.metrics import Timer
 
         timer = Timer("test_timer", "A test timer")
 
@@ -469,27 +455,29 @@ class TestTimer:
         assert stats["count"] == 2
         assert stats["sum"] == 4.0
 
-    def test_context_manager(self):
+    def test_context_manager(self, monkeypatch: pytest.MonkeyPatch):
         """Test using timer as context manager."""
-        from invarlock.observability.metrics import Timer
 
+        clock = FakeClock()
+        monkeypatch.setattr(metrics_mod.time, "time", clock.time)
         timer = Timer("test_timer")
 
         with timer.time():
-            time.sleep(0.1)
+            clock.advance(0.125)
 
         stats = timer.get_stats()
         assert stats["count"] == 1
         assert stats["mean"] >= 0.1
 
-    def test_context_manager_with_labels(self):
+    def test_context_manager_with_labels(self, monkeypatch: pytest.MonkeyPatch):
         """Test context manager with labels."""
-        from invarlock.observability.metrics import Timer
 
+        clock = FakeClock()
+        monkeypatch.setattr(metrics_mod.time, "time", clock.time)
         timer = Timer("test_timer")
 
         with timer.time(labels={"op": "test"}):
-            time.sleep(0.05)
+            clock.advance(0.125)
 
         stats = timer.get_stats(labels={"op": "test"})
         assert stats["count"] == 1
@@ -506,7 +494,6 @@ class TestMetricsRegistry:
 
     def test_register_counter(self):
         """Test registering a counter."""
-        from invarlock.observability.metrics import Counter, MetricsRegistry
 
         registry = MetricsRegistry()
 
@@ -517,7 +504,6 @@ class TestMetricsRegistry:
 
     def test_register_gauge(self):
         """Test registering a gauge."""
-        from invarlock.observability.metrics import Gauge, MetricsRegistry
 
         registry = MetricsRegistry()
 
@@ -528,7 +514,6 @@ class TestMetricsRegistry:
 
     def test_register_histogram(self):
         """Test registering a histogram."""
-        from invarlock.observability.metrics import Histogram, MetricsRegistry
 
         registry = MetricsRegistry()
 
@@ -538,7 +523,6 @@ class TestMetricsRegistry:
 
     def test_register_histogram_custom_buckets(self):
         """Test registering histogram with custom buckets."""
-        from invarlock.observability.metrics import MetricsRegistry
 
         registry = MetricsRegistry()
 
@@ -549,7 +533,6 @@ class TestMetricsRegistry:
 
     def test_register_timer(self):
         """Test registering a timer."""
-        from invarlock.observability.metrics import MetricsRegistry, Timer
 
         registry = MetricsRegistry()
 
@@ -559,7 +542,6 @@ class TestMetricsRegistry:
 
     def test_get_counter(self):
         """Test getting or creating counter."""
-        from invarlock.observability.metrics import MetricsRegistry
 
         registry = MetricsRegistry()
 
@@ -570,7 +552,6 @@ class TestMetricsRegistry:
 
     def test_get_gauge(self):
         """Test getting or creating gauge."""
-        from invarlock.observability.metrics import MetricsRegistry
 
         registry = MetricsRegistry()
 
@@ -581,7 +562,6 @@ class TestMetricsRegistry:
 
     def test_get_histogram(self):
         """Test getting or creating histogram."""
-        from invarlock.observability.metrics import MetricsRegistry
 
         registry = MetricsRegistry()
 
@@ -592,7 +572,6 @@ class TestMetricsRegistry:
 
     def test_get_timer(self):
         """Test getting or creating timer."""
-        from invarlock.observability.metrics import MetricsRegistry
 
         registry = MetricsRegistry()
 
@@ -603,7 +582,6 @@ class TestMetricsRegistry:
 
     def test_type_mismatch_error(self):
         """Test error when getting wrong metric type."""
-        from invarlock.observability.metrics import MetricsRegistry
 
         registry = MetricsRegistry()
         registry.register_counter("test_metric")
@@ -613,7 +591,6 @@ class TestMetricsRegistry:
 
     def test_register_duplicate_different_type(self):
         """Test registering same name with different type raises error."""
-        from invarlock.observability.metrics import MetricsRegistry
 
         registry = MetricsRegistry()
         registry.register_counter("test_metric")
@@ -623,7 +600,6 @@ class TestMetricsRegistry:
 
     def test_register_duplicate_same_type(self):
         """Test registering same name with same type returns existing."""
-        from invarlock.observability.metrics import MetricsRegistry
 
         registry = MetricsRegistry()
 
@@ -634,7 +610,6 @@ class TestMetricsRegistry:
 
     def test_get_all_metrics(self):
         """Test getting all metrics data."""
-        from invarlock.observability.metrics import MetricsRegistry
 
         registry = MetricsRegistry()
 
@@ -653,7 +628,6 @@ class TestMetricsRegistry:
 
     def test_clear_all(self):
         """Test clearing all metrics."""
-        from invarlock.observability.metrics import MetricsRegistry
 
         registry = MetricsRegistry()
         registry.register_counter("test_counter")
@@ -665,7 +639,6 @@ class TestMetricsRegistry:
 
     def test_remove_metric(self):
         """Test removing a specific metric."""
-        from invarlock.observability.metrics import MetricsRegistry
 
         registry = MetricsRegistry()
         registry.register_counter("test_counter")
@@ -679,7 +652,6 @@ class TestMetricsRegistry:
 
     def test_list_metrics(self):
         """Test listing all metric names."""
-        from invarlock.observability.metrics import MetricsRegistry
 
         registry = MetricsRegistry()
         registry.register_counter("counter1")
@@ -702,11 +674,6 @@ class TestMetricUtilities:
 
     def test_create_operation_metrics(self):
         """Test creating standard operation metrics."""
-        from invarlock.observability.metrics import (
-            MetricsRegistry,
-            create_operation_metrics,
-        )
-
         registry = MetricsRegistry()
 
         metrics = create_operation_metrics(registry, "edit")
@@ -723,11 +690,6 @@ class TestMetricUtilities:
 
     def test_create_resource_metrics(self):
         """Test creating standard resource metrics."""
-        from invarlock.observability.metrics import (
-            MetricsRegistry,
-            create_resource_metrics,
-        )
-
         registry = MetricsRegistry()
 
         metrics = create_resource_metrics(registry)
@@ -739,7 +701,6 @@ class TestMetricUtilities:
 
 
 def test_summarize_memory_snapshots_peaks():
-    from invarlock.observability.metrics import summarize_memory_snapshots
 
     snapshots = [
         {"phase": "prepare", "rss_mb": 10.0},

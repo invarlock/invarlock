@@ -25,26 +25,53 @@ class _CfgWrap:
         return self._payload
 
 
-def test_prepare_config_for_run_propagates_model_dump_failure_without_auto_adapter() -> (
-    None
-):
+def _quiet_console() -> Console:
+    return Console(file=StringIO(), force_terminal=False)
+
+
+def _default_config() -> _CfgWrap:
+    return _CfgWrap({"model": {}, "edit": {}, "auto": {}})
+
+
+def _events() -> tuple[list[tuple[str, str]], object]:
     events: list[tuple[str, str]] = []
 
     def _event_fn(console, tag: str, message: str, **kwargs) -> None:  # noqa: ARG001
         events.append((tag, message))
 
+    return events, _event_fn
+
+
+def _prepare_config(**overrides):
+    kwargs = {
+        "config_path": "config.yaml",
+        "profile": None,
+        "edit": None,
+        "tier": None,
+        "probes": None,
+        "console": _quiet_console(),
+        "event_fn": lambda *args, **kwargs: None,
+        "invarlock_config_cls": _CfgWrap,
+        "load_config_fn": lambda path: _default_config(),
+        "apply_profile_fn": lambda cfg, profile: cfg,
+        "apply_auto_adapter_fn": lambda cfg: cfg,
+    }
+    kwargs.update(overrides)
+    return run_config_mod.prepare_config_for_run(**kwargs)
+
+
+def test_prepare_config_for_run_propagates_model_dump_failure_without_auto_adapter() -> (
+    None
+):
+    events, event_fn = _events()
+
     with pytest.raises(RuntimeError, match="broken dump"):
-        run_config_mod.prepare_config_for_run(
-            config_path="config.yaml",
+        _prepare_config(
             profile="dev",
-            edit=None,
             tier="balanced",
-            probes=None,
-            console=Console(file=StringIO(), force_terminal=False),
-            event_fn=_event_fn,
+            event_fn=event_fn,
             invarlock_config_cls=lambda payload: payload,
             load_config_fn=lambda path: _BrokenConfig(),  # noqa: ARG005
-            apply_profile_fn=lambda cfg, profile: cfg,  # noqa: ARG005
         )
 
     assert ("INIT", "Loading configuration: config.yaml") in events
@@ -76,10 +103,7 @@ def test_apply_requested_edit_override_normalizes_non_mapping_edit_section() -> 
 
 
 def test_prepare_config_for_run_applies_profile_edit_and_auto_overrides() -> None:
-    events: list[tuple[str, str]] = []
-
-    def _event_fn(console, tag: str, message: str, **kwargs) -> None:  # noqa: ARG001
-        events.append((tag, message))
+    events, event_fn = _events()
 
     class Cfg:
         def model_dump(self) -> dict:
@@ -100,15 +124,12 @@ def test_prepare_config_for_run_applies_profile_edit_and_auto_overrides() -> Non
         auto_calls.append(cfg)
         return cfg
 
-    result = run_config_mod.prepare_config_for_run(
-        config_path="config.yaml",
+    result = _prepare_config(
         profile="release",
         edit="noop",
         tier="balanced",
         probes=3,
-        console=Console(file=StringIO(), force_terminal=False),
-        event_fn=_event_fn,
-        invarlock_config_cls=_CfgWrap,
+        event_fn=event_fn,
         load_config_fn=lambda path: Cfg(),  # noqa: ARG005
         apply_profile_fn=_apply_profile,
         apply_auto_adapter_fn=_apply_auto_adapter,
@@ -144,7 +165,7 @@ def test_prepare_config_for_run_uses_default_event_import_and_propagates_auto_ad
             edit=None,
             tier=None,
             probes=None,
-            console=Console(file=StringIO(), force_terminal=False),
+            console=_quiet_console(),
             load_config_fn=lambda path: _CfgWrap({"model": {}, "edit": {}, "auto": {}}),
             apply_profile_fn=lambda cfg, profile: cfg,  # noqa: ARG005
             apply_auto_adapter_fn=lambda cfg: (_ for _ in ()).throw(
@@ -173,9 +194,9 @@ def test_prepare_config_for_run_tolerates_default_auto_adapter_import_failure(
         edit=None,
         tier=None,
         probes=None,
-        console=Console(file=StringIO(), force_terminal=False),
+        console=_quiet_console(),
         event_fn=lambda *args, **kwargs: None,
-        load_config_fn=lambda path: _CfgWrap({"model": {}, "edit": {}, "auto": {}}),
+        load_config_fn=lambda path: _default_config(),
         apply_profile_fn=lambda cfg, profile: cfg,  # noqa: ARG005
     )
 
@@ -200,9 +221,9 @@ def test_prepare_config_for_run_propagates_default_auto_adapter_failure(
             edit=None,
             tier=None,
             probes=None,
-            console=Console(file=StringIO(), force_terminal=False),
+            console=_quiet_console(),
             event_fn=lambda *args, **kwargs: None,
-            load_config_fn=lambda path: _CfgWrap({"model": {}, "edit": {}, "auto": {}}),
+            load_config_fn=lambda path: _default_config(),
             apply_profile_fn=lambda cfg, profile: cfg,  # noqa: ARG005
         )
 
@@ -254,60 +275,37 @@ def test_prepare_config_for_run_error_paths(
 ) -> None:
     if code is None:
         with pytest.raises(RuntimeError, match="profile boom"):
-            run_config_mod.prepare_config_for_run(
-                config_path="config.yaml",
+            _prepare_config(
                 profile=profile,
-                edit=None,
                 tier=tier,
                 probes=probes,
-                console=Console(file=StringIO(), force_terminal=False),
-                event_fn=lambda *args, **kwargs: None,
-                invarlock_config_cls=_CfgWrap,
                 load_config_fn=load_config_fn,
                 apply_profile_fn=apply_profile_fn,
-                apply_auto_adapter_fn=lambda cfg: cfg,
             )
         return
 
     with pytest.raises(typer.Exit) as excinfo:
-        run_config_mod.prepare_config_for_run(
-            config_path="config.yaml",
+        _prepare_config(
             profile=profile,
-            edit=None,
             tier=tier,
             probes=probes,
-            console=Console(file=StringIO(), force_terminal=False),
-            event_fn=lambda *args, **kwargs: None,
-            invarlock_config_cls=_CfgWrap,
             load_config_fn=load_config_fn,
             apply_profile_fn=apply_profile_fn,
-            apply_auto_adapter_fn=lambda cfg: cfg,
         )
 
     assert excinfo.value.exit_code == code
 
 
 def test_prepare_config_for_run_shell_profile_failure_emits_fail_event() -> None:
-    events: list[tuple[str, str]] = []
-
-    def _event_fn(console, tag: str, message: str, **kwargs) -> None:  # noqa: ARG001
-        events.append((tag, message))
+    events, event_fn = _events()
 
     with pytest.raises(typer.Exit) as excinfo:
-        run_config_mod.prepare_config_for_run(
-            config_path="config.yaml",
+        _prepare_config(
             profile="release",
-            edit=None,
-            tier=None,
-            probes=None,
-            console=Console(file=StringIO(), force_terminal=False),
-            event_fn=_event_fn,
-            invarlock_config_cls=_CfgWrap,
-            load_config_fn=lambda path: _CfgWrap({"model": {}, "edit": {}, "auto": {}}),
+            event_fn=event_fn,
             apply_profile_fn=lambda cfg, profile: (_ for _ in ()).throw(
                 ValueError("profile boom")
             ),
-            apply_auto_adapter_fn=lambda cfg: cfg,
         )
 
     assert excinfo.value.exit_code == 1
@@ -340,10 +338,7 @@ def test_prepare_config_for_run_non_shell_profile_failure_raises_validation_erro
 def test_prepare_config_for_run_shell_edit_override_failure_emits_fail_event(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    events: list[tuple[str, str]] = []
-
-    def _event_fn(console, tag: str, message: str, **kwargs) -> None:  # noqa: ARG001
-        events.append((tag, message))
+    events, event_fn = _events()
 
     monkeypatch.setattr(
         run_config_mod,
@@ -352,18 +347,9 @@ def test_prepare_config_for_run_shell_edit_override_failure_emits_fail_event(
     )
 
     with pytest.raises(typer.Exit) as excinfo:
-        run_config_mod.prepare_config_for_run(
-            config_path="config.yaml",
-            profile=None,
+        _prepare_config(
             edit="quant_rtn",
-            tier=None,
-            probes=None,
-            console=Console(file=StringIO(), force_terminal=False),
-            event_fn=_event_fn,
-            invarlock_config_cls=_CfgWrap,
-            load_config_fn=lambda path: _CfgWrap({"model": {}, "edit": {}, "auto": {}}),
-            apply_profile_fn=lambda cfg, profile: cfg,
-            apply_auto_adapter_fn=lambda cfg: cfg,
+            event_fn=event_fn,
         )
 
     assert excinfo.value.exit_code == 2
@@ -377,18 +363,10 @@ def test_prepare_config_for_run_tier_probe_override_handles_model_dump_type_erro
         def model_dump(self) -> dict:
             raise TypeError("bad dump")
 
-    result = run_config_mod.prepare_config_for_run(
-        config_path="config.yaml",
-        profile=None,
-        edit=None,
+    result = _prepare_config(
         tier="balanced",
         probes=2,
-        console=Console(file=StringIO(), force_terminal=False),
-        event_fn=lambda *args, **kwargs: None,
-        invarlock_config_cls=_CfgWrap,
         load_config_fn=lambda path: _Cfg(),
-        apply_profile_fn=lambda cfg, profile: cfg,
-        apply_auto_adapter_fn=lambda cfg: cfg,
     )
 
     assert result.model_dump()["auto"] == {"tier": "balanced", "probes": 2}
@@ -403,7 +381,7 @@ def test_resolve_device_and_output_uses_cfg_defaults_and_rejects_bad_device() ->
         _Cfg(),
         device=None,
         out=None,
-        console=Console(file=StringIO(), force_terminal=False),
+        console=_quiet_console(),
         format_kv_line_fn=lambda label, value: f"{label}: {value}",
         device_resolution_note_fn=lambda target, resolved: "note",
         resolve_device_fn=lambda target: "cpu",
@@ -425,7 +403,7 @@ def test_resolve_device_and_output_falls_back_to_runs_and_rejects_invalid_device
         _Cfg(),
         device=None,
         out=None,
-        console=Console(file=StringIO(), force_terminal=False),
+        console=_quiet_console(),
         format_kv_line_fn=lambda label, value: f"{label}: {value}",
         device_resolution_note_fn=lambda target, resolved: "note",
         resolve_device_fn=lambda target: "cpu",
@@ -440,7 +418,7 @@ def test_resolve_device_and_output_falls_back_to_runs_and_rejects_invalid_device
             _Cfg(),
             device="cuda",
             out="outdir",
-            console=Console(file=StringIO(), force_terminal=False),
+            console=_quiet_console(),
             format_kv_line_fn=lambda label, value: f"{label}: {value}",
             device_resolution_note_fn=lambda target, resolved: "note",
             resolve_device_fn=lambda target: "cuda",
@@ -474,7 +452,7 @@ def test_resolve_device_and_output_uses_default_shell_helpers_and_propagates_cfg
             _Cfg(),
             device=None,
             out=None,
-            console=Console(file=StringIO(), force_terminal=False),
+            console=_quiet_console(),
             resolve_device_fn=lambda target: "cpu",
             validate_device_fn=lambda device: (True, ""),
         )
@@ -494,7 +472,7 @@ def test_resolve_device_and_output_handles_missing_cfg_device_attribute() -> Non
         _Cfg(),
         device=None,
         out=None,
-        console=Console(file=StringIO(), force_terminal=False),
+        console=_quiet_console(),
         format_kv_line_fn=lambda label, value: f"{label}: {value}",
         device_resolution_note_fn=lambda target, resolved: "note",
         resolve_device_fn=lambda target: "cpu",

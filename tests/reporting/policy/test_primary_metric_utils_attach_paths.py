@@ -12,28 +12,34 @@ from invarlock.reporting.primary_metric_utils import (
     _resolve_logspace_ci,
     attach_primary_metric,
 )
+from tests.reporting._support_primary_metric import (
+    baseline_ref,
+    classification_baseline_raw,
+    classification_report,
+    ppl_report,
+    window_report,
+)
 
 
 def test_attach_primary_metric_from_report_with_ppl_analysis():
     evaluation_report: dict[str, object] = {}
-    report = {
-        "metrics": {
+    report = window_report(
+        preview_logloss=(1.0, 2.0),
+        final_logloss=(2.0,),
+        preview_token_counts=(10, 10),
+        final_token_counts=(20,),
+        metrics={
             "primary_metric": {"kind": "ppl_mlm", "final": 4.0},
             "logloss_delta_ci": (0.1, 0.2),
         },
-        "evaluation_windows": {
-            "preview": {"logloss": [1.0, 2.0], "token_counts": [10, 10]},
-            "final": {"logloss": [2.0], "token_counts": [20]},
-        },
-    }
-    baseline_ref = {"primary_metric": {"final": 2.0}}
+    )
     ppl_analysis = {"unstable": True}
 
     attach_primary_metric(
         evaluation_report,
         report,
         baseline_raw=None,
-        baseline_ref=baseline_ref,
+        baseline_ref=baseline_ref(2.0),
         ppl_analysis=ppl_analysis,
     )
 
@@ -63,15 +69,9 @@ def test_resolve_logspace_ci_prefers_ppl_analysis_pairing_and_falls_back():
 
 def test_attach_ppl_analysis_fields_populates_mean_logloss_and_ci():
     pm_copy = {"kind": "ppl_causal"}
-    report = {
-        "evaluation_windows": {
-            "preview": {"logloss": [1.0, 2.0], "token_counts": [1, 1]},
-            "final": {"logloss": [3.0], "token_counts": [2]},
-        }
-    }
     _attach_ppl_analysis_fields(
         pm_copy,
-        report=report,
+        report=window_report(),
         metrics_map={"logloss_delta_ci": (0.1, 0.2)},
         ppl_analysis={
             "stats": {"pairing": "paired_baseline"},
@@ -88,12 +88,10 @@ def test_attach_ppl_analysis_fields_populates_mean_logloss_and_ci():
 def test_attach_ppl_analysis_fields_skips_non_finite_window_means():
     pm_preview = {"kind": "ppl_causal"}
     pm_final = {"kind": "ppl_causal"}
-    base_report = {
-        "evaluation_windows": {
-            "preview": {"logloss": [], "token_counts": []},
-            "final": {"logloss": [3.0], "token_counts": [2]},
-        }
-    }
+    base_report = window_report(
+        preview_logloss=(),
+        preview_token_counts=(),
+    )
     _attach_ppl_analysis_fields(
         pm_preview,
         report=base_report,
@@ -105,12 +103,7 @@ def test_attach_ppl_analysis_fields_skips_non_finite_window_means():
 
     _attach_ppl_analysis_fields(
         pm_final,
-        report={
-            "evaluation_windows": {
-                "preview": {"logloss": [1.0, 2.0], "token_counts": [1, 1]},
-                "final": {"logloss": [], "token_counts": []},
-            }
-        },
+        report=window_report(final_logloss=(), final_token_counts=()),
         metrics_map={},
         ppl_analysis=None,
     )
@@ -120,15 +113,8 @@ def test_attach_ppl_analysis_fields_skips_non_finite_window_means():
 
 def test_attach_primary_metric_classification_fallback(monkeypatch):
     evaluation_report: dict[str, object] = {}
-    report = {
-        "metrics": {
-            "classification": {"final": {"correct_total": 80, "total": 100}},
-        },
-        "meta": {"model_id": "awesome-vqa"},
-    }
-    baseline_raw = {
-        "metrics": {"classification": {"final": {"correct_total": 70, "total": 100}}}
-    }
+    report = classification_report({"correct_total": 80, "total": 100})
+    baseline_raw = classification_baseline_raw({"correct_total": 70, "total": 100})
     import invarlock.eval.primary_metric as pm_mod
 
     monkeypatch.setattr(
@@ -270,16 +256,11 @@ def test_attach_primary_metric_display_ci_defaults_and_marks_estimated():
 
 def test_attach_primary_metric_marks_nonfinite_as_degraded():
     evaluation_report: dict[str, object] = {}
-    report = {
-        "metrics": {
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "preview": 1.2,
-                "final": float("nan"),
-                "ratio_vs_baseline": float("inf"),
-            }
-        }
-    }
+    report = ppl_report(
+        preview=1.2,
+        final=float("nan"),
+        ratio_vs_baseline=float("inf"),
+    )
 
     attach_primary_metric(
         evaluation_report,
@@ -296,16 +277,7 @@ def test_attach_primary_metric_marks_nonfinite_as_degraded():
 
 def test_attach_primary_metric_skips_ratio_nan_without_baseline():
     evaluation_report: dict[str, object] = {}
-    report = {
-        "metrics": {
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "preview": 1.2,
-                "final": 1.2,
-                "ratio_vs_baseline": float("nan"),
-            }
-        }
-    }
+    report = ppl_report(preview=1.2, final=1.2, ratio_vs_baseline=float("nan"))
 
     attach_primary_metric(
         evaluation_report,
@@ -363,22 +335,13 @@ def test_finalize_primary_metric_snapshot_preserves_existing_degraded_reason():
 
 def test_attach_primary_metric_recomputes_ratio_without_marking_degraded():
     evaluation_report: dict[str, object] = {}
-    report = {
-        "metrics": {
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "preview": 1.2,
-                "final": 1.8,
-                "ratio_vs_baseline": float("nan"),
-            }
-        }
-    }
+    report = ppl_report(preview=1.2, final=1.8, ratio_vs_baseline=float("nan"))
 
     attach_primary_metric(
         evaluation_report,
         report,
         baseline_raw=None,
-        baseline_ref={"primary_metric": {"final": 1.5}},
+        baseline_ref=baseline_ref(1.5),
         ppl_analysis=None,
     )
 
@@ -423,22 +386,13 @@ def test_finalize_primary_metric_snapshot_marks_primary_metric_invalid():
 
 def test_attach_primary_metric_marks_non_finite_delta_when_baseline_is_zero() -> None:
     evaluation_report: dict[str, object] = {}
-    report = {
-        "metrics": {
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "preview": 1.2,
-                "final": 1.8,
-                "ratio_vs_baseline": float("nan"),
-            }
-        }
-    }
+    report = ppl_report(preview=1.2, final=1.8, ratio_vs_baseline=float("nan"))
 
     attach_primary_metric(
         evaluation_report,
         report,
         baseline_raw=None,
-        baseline_ref={"primary_metric": {"final": 0.0}},
+        baseline_ref=baseline_ref(0.0),
         ppl_analysis=None,
     )
 
@@ -488,14 +442,7 @@ def test_attach_primary_metric_retries_window_computation(monkeypatch):
 
 def test_attach_primary_metric_classification_numeric_baseline_ref(monkeypatch):
     evaluation_report: dict[str, object] = {}
-    report = {
-        "metrics": {
-            "classification": {
-                "final": 0.65,
-            },
-        },
-        "meta": {"model_id": "invarlock-base"},
-    }
+    report = classification_report(0.65, model_id="invarlock-base")
     baseline_ref = {
         "metrics": {
             "classification": {
@@ -529,22 +476,13 @@ def test_attach_primary_metric_classification_numeric_baseline_ref(monkeypatch):
 
 def test_attach_primary_metric_ignores_bool_baseline_reference() -> None:
     evaluation_report: dict[str, object] = {}
-    report = {
-        "metrics": {
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "preview": 3.0,
-                "final": 4.0,
-            }
-        }
-    }
-    baseline_ref = {"primary_metric": {"final": True}}
+    report = ppl_report(preview=3.0, final=4.0)
 
     attach_primary_metric(
         evaluation_report,
         report,
         baseline_raw=None,
-        baseline_ref=baseline_ref,
+        baseline_ref=baseline_ref(True),
         ppl_analysis=None,
     )
 
@@ -554,16 +492,7 @@ def test_attach_primary_metric_ignores_bool_baseline_reference() -> None:
 
 def test_attach_primary_metric_replaces_bool_display_ci_with_numeric_fallback() -> None:
     evaluation_report: dict[str, object] = {}
-    report = {
-        "metrics": {
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "preview": 1.5,
-                "final": 2.0,
-                "display_ci": [True, False],
-            }
-        }
-    }
+    report = ppl_report(preview=1.5, final=2.0, display_ci=[True, False])
 
     attach_primary_metric(
         evaluation_report,
@@ -588,13 +517,8 @@ def test_attach_primary_metric_classification_fallback_ignores_bool_baseline(
     monkeypatch,
 ) -> None:
     evaluation_report: dict[str, object] = {}
-    report = {
-        "metrics": {
-            "classification": {"final": {"correct_total": 8, "total": 10}},
-        },
-        "meta": {"model_id": "awesome-vqa"},
-    }
-    baseline_raw = {"metrics": {"classification": {"final": True}}}
+    report = classification_report({"correct_total": 8, "total": 10})
+    baseline_raw = classification_baseline_raw(True)
 
     import invarlock.eval.primary_metric as pm_mod
 
@@ -645,12 +569,7 @@ def test_attach_primary_metric_display_ci_default_when_no_numeric(monkeypatch):
 
 def test_attach_primary_metric_handles_bad_ppl_analysis(monkeypatch):
     evaluation_report: dict[str, object] = {}
-    report = {
-        "metrics": {
-            "primary_metric": {"kind": "ppl_causal", "final": 2.0},
-        }
-    }
-    baseline_ref = {"primary_metric": {"final": 1.0}}
+    report = ppl_report(final=2.0)
 
     import invarlock.eval.primary_metric as pm_mod
 
@@ -669,7 +588,7 @@ def test_attach_primary_metric_handles_bad_ppl_analysis(monkeypatch):
         evaluation_report,
         report,
         baseline_raw=None,
-        baseline_ref=baseline_ref,
+        baseline_ref=baseline_ref(1.0),
         ppl_analysis=Boom(),
     )
 
@@ -679,18 +598,13 @@ def test_attach_primary_metric_handles_bad_ppl_analysis(monkeypatch):
 
 def test_attach_primary_metric_uses_metrics_ci_when_stats_is_non_mapping() -> None:
     evaluation_report: dict[str, object] = {}
-    report = {
-        "metrics": {
-            "primary_metric": {"kind": "ppl_causal", "final": 2.0},
-            "logloss_delta_ci": (0.1, 0.2),
-        }
-    }
+    report = ppl_report(final=2.0, metrics_extra={"logloss_delta_ci": (0.1, 0.2)})
 
     attach_primary_metric(
         evaluation_report,
         report,
         baseline_raw=None,
-        baseline_ref={"primary_metric": {"final": 1.0}},
+        baseline_ref=baseline_ref(1.0),
         ppl_analysis={"stats": "bad"},
     )
 
@@ -704,15 +618,7 @@ def test_attach_primary_metric_uses_metrics_ci_when_stats_is_non_mapping() -> No
 
 def test_attach_primary_metric_handles_bad_ppl_analysis_stats_without_ci() -> None:
     evaluation_report: dict[str, object] = {}
-    report = {
-        "metrics": {
-            "primary_metric": {
-                "kind": "ppl_causal",
-                "final": 2.0,
-            },
-            "logloss_delta_ci": (0.1, 0.2),
-        }
-    }
+    report = ppl_report(final=2.0, metrics_extra={"logloss_delta_ci": (0.1, 0.2)})
 
     class _BoomStats(dict):
         def get(self, *_args, **_kwargs):  # type: ignore[override]
@@ -722,7 +628,7 @@ def test_attach_primary_metric_handles_bad_ppl_analysis_stats_without_ci() -> No
         evaluation_report,
         report,
         baseline_raw=None,
-        baseline_ref={"primary_metric": {"final": 1.0}},
+        baseline_ref=baseline_ref(1.0),
         ppl_analysis={"stats": _BoomStats()},
     )
 

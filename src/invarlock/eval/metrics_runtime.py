@@ -12,6 +12,24 @@ import torch.nn as nn
 
 from invarlock.core.exceptions import MetricsError, ValidationError
 from invarlock.eval.data_support import EvaluationWindow
+from invarlock.eval.metrics_runtime_resources import (
+    cleanup_memory_measurement_failure as _cleanup_memory_measurement_failure,
+)
+from invarlock.eval.metrics_runtime_resources import (
+    current_memory_mb as _current_memory_mb,
+)
+from invarlock.eval.metrics_runtime_resources import (
+    latency_validation_error as _latency_validation_error,
+)
+from invarlock.eval.metrics_runtime_resources import (
+    maybe_cuda_synchronize as _maybe_cuda_synchronize,
+)
+from invarlock.eval.metrics_runtime_resources import (
+    memory_measurement_baseline as _memory_measurement_baseline,
+)
+from invarlock.eval.metrics_runtime_resources import (
+    memory_validation_error as _memory_validation_error,
+)
 
 logger = logging.getLogger(__name__)
 _METRICS_RUNTIME_ERRORS = (
@@ -520,57 +538,6 @@ def compute_perplexity(
         ppl = float("inf")
 
     return ppl
-
-
-def _latency_validation_error(
-    reason: str, details: dict[str, object]
-) -> ValidationError:
-    return ValidationError(
-        code="E402",
-        message="METRICS-VALIDATION-FAILED",
-        details={"reason": reason, **details},
-    )
-
-
-def _memory_validation_error(
-    reason: str, details: dict[str, object]
-) -> ValidationError:
-    return ValidationError(
-        code="E402",
-        message="METRICS-VALIDATION-FAILED",
-        details={"reason": reason, **details},
-    )
-
-
-def _maybe_cuda_synchronize(device: torch.device) -> None:
-    if device.type == "cuda":
-        torch.cuda.synchronize()
-
-
-def _memory_measurement_baseline(device: torch.device) -> tuple[float, object | None]:
-    if device.type == "cuda":
-        torch.cuda.empty_cache()
-        baseline_memory = torch.cuda.memory_allocated() / (1024 * 1024)
-        torch.cuda.reset_peak_memory_stats()
-        return baseline_memory, None
-
-    import psutil
-
-    process = psutil.Process()
-    baseline_memory = process.memory_info().rss / (1024 * 1024)
-    return baseline_memory, process
-
-
-def _current_memory_mb(device: torch.device, process: object | None) -> float:
-    if device.type == "cuda":
-        return torch.cuda.memory_allocated() / (1024 * 1024)
-    assert process is not None
-    return process.memory_info().rss / (1024 * 1024)
-
-
-def _cleanup_memory_measurement_failure(device: torch.device) -> None:
-    if device.type == "cuda":
-        torch.cuda.empty_cache()
 
 
 @torch.no_grad()

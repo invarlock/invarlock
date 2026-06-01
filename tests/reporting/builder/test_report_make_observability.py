@@ -9,7 +9,7 @@ from invarlock.reporting import report_normalization as report_normalization_mod
 from invarlock.reporting import report_primary_metric_analysis as report_pm_analysis_mod
 from invarlock.reporting import report_schema as allowlist_mod
 from invarlock.reporting.report_make import make_report
-from tests.reporting.builder.test_report_full_context import _rich_run_report
+from tests.reporting.builder._support_full_context import _rich_run_report
 
 
 def test_make_evaluation_report_marks_tiny_relax() -> None:

@@ -7,10 +7,12 @@ from unittest.mock import patch
 
 import pytest
 
-from tests.cli.run.test_run_plugin_provenance_metrics import (
-    _cfg,
-    _common_ce,
-    run_command,
+from invarlock.cli.commands.run import run_command
+from tests.cli.run._support_run_plugins import (
+    plugin_provenance_cfg as _cfg,
+)
+from tests.cli.run._support_run_plugins import (
+    plugin_provenance_common_ce as _common_ce,
 )
 
 

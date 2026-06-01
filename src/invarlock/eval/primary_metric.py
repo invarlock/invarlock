@@ -20,6 +20,12 @@ import numpy as np
 
 from invarlock.core.bootstrap import compute_paired_delta_log_ci
 from invarlock.core.exceptions import ValidationError
+from invarlock.eval.primary_metric_accuracy import (
+    compute_accuracy_counts as compute_accuracy_counts,
+)
+from invarlock.eval.primary_metric_accuracy import (
+    infer_binary_label_from_ids as infer_binary_label_from_ids,
+)
 from invarlock.utils import (
     bootstrap_mean_statistics,
     percentile_interval_from_statistics,
@@ -758,45 +764,3 @@ def validate_primary_metric_block(block: dict[str, Any]) -> dict[str, Any]:
             code="E402", message="METRICS-VALIDATION-FAILED", details=details
         )
     return block
-
-
-# --- Classification helpers (deterministic smoke path) ----------------------
-
-
-def infer_binary_label_from_ids(input_ids: list[int]) -> int:
-    """Deterministic binary label from token ids (parity), for smoke usage.
-
-    This is a placeholder for provider-driven labels; it enables a stable,
-    model-agnostic accuracy path for tests and demos without dataset labels.
-    """
-    total = 0
-    for token in input_ids:
-        coerced = _coerce_int(token)
-        if coerced is None:
-            return 0
-        total += coerced
-    return int(total % 2)
-
-
-def compute_accuracy_counts(records: list[dict[str, Any]]) -> tuple[int, int]:
-    """Compute accuracy counts from records with measured correctness or input_ids.
-
-    Prefer explicit per-example correctness when present. Otherwise predict the
-    same as the inferred label for a perfect-accuracy smoke path.
-    Returns (correct_total, total).
-    """
-    correct = 0
-    total = 0
-    for rec in records:
-        explicit_correct = rec.get("correct") if isinstance(rec, dict) else None
-        if isinstance(explicit_correct, bool):
-            correct += int(explicit_correct)
-            total += 1
-            continue
-        seq = rec.get("input_ids") if isinstance(rec, dict) else None
-        if not isinstance(seq, list) or not seq:
-            continue
-        infer_binary_label_from_ids(seq)
-        correct += 1  # perfect prediction in smoke path
-        total += 1
-    return correct, total

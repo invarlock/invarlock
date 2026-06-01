@@ -8,12 +8,18 @@ from unittest.mock import patch
 import click
 import pytest
 
-from tests.cli.run.test_run_plugins_invariants_metrics_paths import (
-    _baseline_with_meta,
-    _common_ce,
-    _provider_min,
-    _write_cfg,
-    run_command,
+from invarlock.cli.commands.run import run_command
+from tests.cli.run._support_run_common import (
+    synthetic_provider_min as _provider_min,
+)
+from tests.cli.run._support_run_plugins import (
+    plugins_invariants_baseline_with_meta as _baseline_with_meta,
+)
+from tests.cli.run._support_run_plugins import (
+    plugins_invariants_common_ce as _common_ce,
+)
+from tests.cli.run._support_run_plugins import (
+    plugins_invariants_write_cfg as _write_cfg,
 )
 
 

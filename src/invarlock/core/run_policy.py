@@ -10,6 +10,30 @@ from typing import Any, Protocol
 
 from invarlock.core.auto_tuning import resolve_tier_policies
 from invarlock.core.exceptions import ConfigError, InvarlockError
+from invarlock.core.run_policy_timing import (
+    TimingSummaryPayload as TimingSummaryPayload,
+)
+from invarlock.core.run_policy_timing import (
+    build_timing_summary_payload as build_timing_summary_payload,
+)
+from invarlock.core.run_policy_windows import (
+    _fallback_window_payload as _fallback_window_payload,
+)
+from invarlock.core.run_policy_windows import (
+    _is_sequence_payload as _is_sequence_payload,
+)
+from invarlock.core.run_policy_windows import _list_payload as _list_payload
+from invarlock.core.run_policy_windows import (
+    _nested_list_payload as _nested_list_payload,
+)
+from invarlock.core.run_policy_windows import _token_count as _token_count
+from invarlock.core.run_policy_windows import _window_payload as _window_payload
+from invarlock.core.run_policy_windows import (
+    build_fallback_evaluation_windows as build_fallback_evaluation_windows,
+)
+from invarlock.core.run_policy_windows import (
+    serialize_evaluation_windows as serialize_evaluation_windows,
+)
 
 GUARD_OVERHEAD_THRESHOLD = 0.01
 
@@ -83,14 +107,6 @@ def enforce_provider_parity(
             code="E003",
             message="MASK-PARITY-MISMATCH: mask positions differ under matched tokenizers",
         )
-
-
-@dataclass(frozen=True)
-class TimingSummaryPayload:
-    timings: dict[str, float]
-    ordered_keys: tuple[str, ...]
-    memory_mb_peak: float | None
-    gpu_memory_mb_peak: float | None
 
 
 @dataclass(frozen=True)
@@ -519,235 +535,6 @@ def build_run_execution_request(
         export_model_requested=env_flag("INVARLOCK_EXPORT_MODEL", environ=environ),
         export_dir=env_text("INVARLOCK_EXPORT_DIR", environ=environ),
     )
-
-
-def _coerce_non_bool_float(value: Any) -> float | None:
-    if isinstance(value, bool):
-        return None
-    try:
-        resolved = float(value)
-    except (TypeError, ValueError):
-        return None
-    return resolved if math.isfinite(resolved) else None
-
-
-def build_timing_summary_payload(
-    *,
-    timings: Mapping[str, Any] | None,
-    total_duration: float | None,
-    report: Mapping[str, Any] | None,
-) -> TimingSummaryPayload | None:
-    """Normalize timing output into a deterministic summary payload."""
-    timings_for_summary: dict[str, float] = {}
-    for key, value in dict(timings or {}).items():
-        resolved = _coerce_non_bool_float(value)
-        if resolved is not None:
-            timings_for_summary[str(key)] = resolved
-    total_duration_value = _coerce_non_bool_float(total_duration)
-    if total_duration_value is not None:
-        timings_for_summary["total"] = max(0.0, total_duration_value)
-
-    has_breakdown = any(
-        key in timings_for_summary
-        for key in (
-            "prepare",
-            "prepare_guards",
-            "edit",
-            "guards",
-            "eval",
-            "finalize",
-        )
-    )
-
-    ordered_keys: list[str] = []
-    for key in (
-        "load_model",
-        "load_dataset",
-        "prepare",
-        "prepare_guards",
-        "edit",
-        "guards",
-        "eval",
-        "finalize",
-        "execute",
-        "total",
-    ):
-        if key == "execute" and has_breakdown:
-            continue
-        if key in {"prepare", "prepare_guards", "edit", "guards", "eval", "finalize"}:
-            if not has_breakdown:
-                continue
-        if key in timings_for_summary:
-            ordered_keys.append(key)
-
-    memory_mb_peak: float | None = None
-    gpu_memory_mb_peak: float | None = None
-    metrics_section = report.get("metrics", {}) if isinstance(report, Mapping) else {}
-    if isinstance(metrics_section, Mapping):
-        mem_peak = metrics_section.get("memory_mb_peak")
-        gpu_peak = metrics_section.get("gpu_memory_mb_peak")
-        resolved_mem_peak = _coerce_non_bool_float(mem_peak)
-        resolved_gpu_peak = _coerce_non_bool_float(gpu_peak)
-        if resolved_mem_peak is not None:
-            memory_mb_peak = resolved_mem_peak
-        if resolved_gpu_peak is not None:
-            gpu_memory_mb_peak = resolved_gpu_peak
-
-    if not timings_for_summary or not ordered_keys:
-        return None
-    return TimingSummaryPayload(
-        timings=timings_for_summary,
-        ordered_keys=tuple(ordered_keys),
-        memory_mb_peak=memory_mb_peak,
-        gpu_memory_mb_peak=gpu_memory_mb_peak,
-    )
-
-
-def _is_sequence_payload(value: Any) -> bool:
-    return isinstance(value, Sequence) and not isinstance(
-        value, (str, bytes, bytearray)
-    )
-
-
-def _list_payload(value: Any) -> list[Any]:
-    return list(value) if _is_sequence_payload(value) else []
-
-
-def _nested_list_payload(value: Any) -> list[list[Any]]:
-    if not _is_sequence_payload(value):
-        return []
-    payload: list[list[Any]] = []
-    for item in value:
-        if _is_sequence_payload(item):
-            payload.append(list(item))
-    return payload
-
-
-def _window_payload(window: Mapping[str, Any] | None) -> dict[str, Any]:
-    window_map = dict(window or {})
-    payload: dict[str, Any] = {
-        "window_ids": _list_payload(window_map.get("window_ids", [])),
-        "example_ids": [
-            str(value) for value in _list_payload(window_map.get("example_ids", []))
-        ],
-        "logloss": _list_payload(window_map.get("logloss", [])),
-        "input_ids": _nested_list_payload(window_map.get("input_ids", [])),
-        "attention_masks": _nested_list_payload(window_map.get("attention_masks", [])),
-        "token_counts": _list_payload(window_map.get("token_counts", [])),
-        "masked_token_counts": _list_payload(window_map.get("masked_token_counts", [])),
-        "actual_token_counts": _list_payload(window_map.get("actual_token_counts", [])),
-        "labels": _nested_list_payload(window_map.get("labels", [])),
-    }
-    records = window_map.get("records", [])
-    if isinstance(records, list):
-        payload["records"] = [
-            dict(record) for record in records if isinstance(record, Mapping)
-        ]
-    processor_sha = window_map.get("processor_sha256")
-    if isinstance(processor_sha, str) and processor_sha:
-        payload["processor_sha256"] = processor_sha
-    return payload
-
-
-def serialize_evaluation_windows(
-    evaluation_windows: Mapping[str, Any] | None,
-) -> dict[str, dict[str, Any]] | None:
-    """Serialize runner-provided evaluation windows into plain JSON-ready data."""
-    if not isinstance(evaluation_windows, Mapping) or not evaluation_windows:
-        return None
-    return {
-        "preview": _window_payload(
-            evaluation_windows.get("preview")
-            if isinstance(evaluation_windows.get("preview"), Mapping)
-            else None
-        ),
-        "final": _window_payload(
-            evaluation_windows.get("final")
-            if isinstance(evaluation_windows.get("final"), Mapping)
-            else None
-        ),
-    }
-
-
-def _token_count(record: Mapping[str, Any]) -> int:
-    try:
-        return int(len(record.get("input_ids", []) or []))
-    except (TypeError, ValueError, OverflowError):
-        return 0
-
-
-def _fallback_window_payload(
-    records: Sequence[Mapping[str, Any]],
-    *,
-    start_index: int,
-    use_mlm: bool,
-    mask_counts: Sequence[int] | None,
-) -> dict[str, Any]:
-    multimodal_records = [
-        dict(record)
-        for record in records
-        if "image_path" in record or "example_id" in record or "answers" in record
-    ]
-    if multimodal_records:
-        multimodal_payload: dict[str, Any] = {
-            "example_ids": [
-                str(record.get("example_id") or record.get("id") or "")
-                for record in multimodal_records
-            ],
-            "records": multimodal_records,
-        }
-        processor_sha = next(
-            (
-                str(record.get("processor_sha256"))
-                for record in multimodal_records
-                if isinstance(record.get("processor_sha256"), str)
-                and str(record.get("processor_sha256")).strip()
-            ),
-            None,
-        )
-        if processor_sha:
-            multimodal_payload["processor_sha256"] = processor_sha
-        return multimodal_payload
-
-    sequence_payload: dict[str, Any] = {
-        "window_ids": list(range(start_index, start_index + len(records))),
-        "input_ids": [list(record["input_ids"]) for record in records],
-        "attention_masks": [list(record["attention_mask"]) for record in records],
-        "token_counts": [_token_count(record) for record in records],
-    }
-    if use_mlm:
-        sequence_payload["masked_token_counts"] = list(mask_counts or [])
-        sequence_payload["labels"] = [
-            record.get("labels", [-100] * len(record["input_ids"]))
-            for record in records
-        ]
-    return sequence_payload
-
-
-def build_fallback_evaluation_windows(
-    preview_records: Sequence[Mapping[str, Any]],
-    final_records: Sequence[Mapping[str, Any]],
-    *,
-    use_mlm: bool,
-    preview_mask_counts: Sequence[int] | None = None,
-    final_mask_counts: Sequence[int] | None = None,
-) -> dict[str, dict[str, Any]]:
-    """Build evaluation windows from assembled records when the runner omits them."""
-    preview_count = len(preview_records)
-    return {
-        "preview": _fallback_window_payload(
-            preview_records,
-            start_index=0,
-            use_mlm=use_mlm,
-            mask_counts=preview_mask_counts,
-        ),
-        "final": _fallback_window_payload(
-            final_records,
-            start_index=preview_count,
-            use_mlm=use_mlm,
-            mask_counts=final_mask_counts,
-        ),
-    }
 
 
 def _normalize_profile_checks(existing_checks: Any) -> list[str]:

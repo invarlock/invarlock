@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 import typer
 
-from tests.conftest import install_transformers_tokenizer_stub
+from tests.cli._support_transformers import install_transformers_tokenizer_stub
 
 
 def _import_run_module():

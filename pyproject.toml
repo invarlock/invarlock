@@ -487,6 +487,8 @@ include = [
     "src/invarlock/cli/*",
     "src/invarlock/reporting/*",
     "src/invarlock/core/*",
+    "src/invarlock/adapters/hf_causal.py",
+    "src/invarlock/adapters/hf_causal_specs.py",
     "src/invarlock/adapters/hf_multimodal.py",
     "src/invarlock/public_contracts.py",
     "src/invarlock/policy_pack.py",

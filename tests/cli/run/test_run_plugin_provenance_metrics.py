@@ -9,30 +9,12 @@ import click
 import pytest
 
 from invarlock.cli.commands.run import run_command
-from tests.cli.run._support_run_common import (
-    common_ce_patches,
+from tests.cli.run._support_run_plugins import (
+    plugin_provenance_cfg as _cfg,
 )
-from tests.cli.run._support_run_common import (
-    write_base_run_config as _write_base_run_config,
+from tests.cli.run._support_run_plugins import (
+    plugin_provenance_common_ce as _common_ce,
 )
-
-
-def _cfg(tmp_path: Path, preview=4, final=4) -> Path:
-    return _write_base_run_config(
-        tmp_path,
-        preview,
-        final,
-        edit_name="structured",
-        eval_fields="  spike_threshold: 2.0\n",
-    )
-
-
-def _common_ce():
-    return common_ce_patches(
-        include_registry=True,
-        include_save_report=True,
-        tokenizer_vocab_size=1000,
-    )
 
 
 def _provider_simple():

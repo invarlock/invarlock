@@ -8,123 +8,15 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-import invarlock.evidence_pack as evidence_pack_mod
-import invarlock.evidence_pack_integrity as evidence_pack_integrity_mod
-from invarlock.reporting.verify_contract import VerifyExecutionResult, VerifyOutcome
-from invarlock.runtime_security import RUNTIME_MANIFEST_FILENAME
-
-__all__ = [
-    "RUNTIME_MANIFEST_FILENAME",
-    "VerifyExecutionResult",
-    "VerifyOutcome",
-    "_sign_pack",
-    "_write_json",
-    "_write_manifest_and_checksums",
-    "_write_pack_scaffold",
-    "evidence_pack_mod",
-]
-
-
-def _write_json(path: Path, payload: object) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
-
-
-def _sha256_bytes(data: bytes) -> str:
-    return evidence_pack_mod._sha256_bytes(data)
-
-
-def _digest(path: Path) -> str:
-    return evidence_pack_mod._sha256_file(path)
-
-
-def _write_pack_scaffold(pack_dir: Path) -> tuple[Path, Path, Path]:
-    report_path = (
-        pack_dir / "reports" / "model" / "clean" / "noop" / "evaluation.report.json"
-    )
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text("{}", encoding="utf-8")
-    _write_json(report_path.parent / RUNTIME_MANIFEST_FILENAME, {"ok": True})
-
-    final_verdict = pack_dir / "results" / "final_verdict.json"
-    environment = pack_dir / "metadata" / "environment.json"
-    _write_json(final_verdict, {"verdict": "PASS"})
-    _write_json(environment, {"platform": "test"})
-    return report_path, final_verdict, environment
-
-
-def _write_manifest_and_checksums(
-    pack_dir: Path,
-    *,
-    report_path: Path,
-    final_verdict: Path,
-    environment: Path,
-    manifest_overrides: dict[str, object] | None = None,
-    checksum_lines: list[str] | None = None,
-) -> None:
-    rel_report = str(report_path.relative_to(pack_dir)).replace("\\", "/")
-    rel_runtime = str(
-        (report_path.parent / RUNTIME_MANIFEST_FILENAME).relative_to(pack_dir)
-    ).replace("\\", "/")
-    rel_verdict = str(final_verdict.relative_to(pack_dir)).replace("\\", "/")
-    rel_environment = str(environment.relative_to(pack_dir)).replace("\\", "/")
-    if checksum_lines is None:
-        checksum_lines = [
-            f"{_sha256_bytes(final_verdict.read_bytes())}  {rel_verdict}",
-            f"{_sha256_bytes(environment.read_bytes())}  {rel_environment}",
-            f"{_sha256_bytes(report_path.read_bytes())}  {rel_report}",
-            f"{_sha256_bytes((report_path.parent / RUNTIME_MANIFEST_FILENAME).read_bytes())}  {rel_runtime}",
-        ]
-    checksums_path = pack_dir / "checksums.sha256"
-    checksums_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
-    manifest = {
-        "format": evidence_pack_mod.EVIDENCE_PACK_FORMAT,
-        "checksums_sha256": "checksums.sha256",
-        "checksums_sha256_digest": _sha256_bytes(checksums_path.read_bytes()),
-        "subject": {
-            "name": "final_verdict",
-            "path": rel_verdict,
-            "digest": _digest(final_verdict),
-        },
-        "environment": {
-            "path": rel_environment,
-            "digest": _digest(environment),
-        },
-    }
-    if manifest_overrides:
-        manifest.update(manifest_overrides)
-    _write_json(pack_dir / "manifest.json", manifest)
-
-
-def _sign_pack(
-    pack_dir: Path,
-    tmp_path: Path,
-    *,
-    record_manifest_fingerprint: bool = True,
-    manifest_fingerprint_override: str | None = None,
-) -> str:
-    key_root = (
-        tmp_path
-        / f"evidence-pack-signing-key-{len(list(tmp_path.glob('evidence-pack-signing-key-*.pem'))):02d}.pem"
-    )
-    private_key = key_root
-    public_key = key_root.with_name(f"{key_root.stem}.pub.pem")
-    fingerprint = evidence_pack_mod._generate_signing_keypair(
-        private_key,
-        public_key_path=public_key,
-    )
-    if record_manifest_fingerprint or manifest_fingerprint_override is not None:
-        manifest = json.loads((pack_dir / "manifest.json").read_text(encoding="utf-8"))
-        manifest["signing_key_fingerprint"] = (
-            fingerprint
-            if manifest_fingerprint_override is None
-            else manifest_fingerprint_override
-        )
-        _write_json(pack_dir / "manifest.json", manifest)
-    evidence_pack_mod._sign_manifest(
-        pack_dir / "manifest.json", signing_key_path=private_key
-    )
-    return fingerprint
+from tests.reporting._support_evidence_pack_paths import (
+    _digest,
+    _sign_pack,
+    _write_json,
+    _write_manifest_and_checksums,
+    _write_pack_scaffold,
+    evidence_pack_integrity_mod,
+    evidence_pack_mod,
+)
 
 
 def test_signature_warnings_to_errors_converts_signature_paths() -> None:

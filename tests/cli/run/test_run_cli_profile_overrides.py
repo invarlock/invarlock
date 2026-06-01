@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 import typer
 
-from tests.conftest import install_transformers_tokenizer_stub
+from tests.cli._support_transformers import install_transformers_tokenizer_stub
 
 
 def _write_yaml_cfg(path: Path, content: str) -> Path:

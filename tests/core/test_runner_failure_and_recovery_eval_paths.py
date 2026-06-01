@@ -6,7 +6,7 @@ import pytest
 
 from invarlock.core.api import RunConfig, RunReport
 from invarlock.core.runner import CoreRunner
-from tests.core.test_runner_failure_and_recovery_metrics import (
+from tests.core._support_runner_failure import (
     DummyAdapter,
     _toy_model_with_losses,
 )

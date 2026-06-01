@@ -6,12 +6,18 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from tests.cli.run.test_run_config_parsing_provider_and_export import (
-    _Cfg,
-    _core_report,
-    _detect_profile,
-    _tok,
-    run_command,
+from invarlock.cli.commands.run import run_command
+from tests.cli.run._support_run_config_parsing import (
+    ConfigParsingCfg as _Cfg,
+)
+from tests.cli.run._support_run_config_parsing import (
+    config_parsing_core_report as _core_report,
+)
+from tests.cli.run._support_run_config_parsing import (
+    config_parsing_detect_profile as _detect_profile,
+)
+from tests.cli.run._support_run_config_parsing import (
+    config_parsing_tokenizer as _tok,
 )
 
 

@@ -9,6 +9,13 @@ import torch.nn as nn
 import invarlock.guards.rmt_analysis as rmt_analysis
 from invarlock.guards import rmt_activation_runtime as runtime
 from invarlock.guards.rmt_runtime import build_after_edit_result, build_prepare_result
+from tests.guards.rmt._support_activation import (
+    ActivationGuardStub,
+    AdapterGenerationInputs,
+    TinyActivationModel,
+    activation_batch,
+    activation_kwargs,
+)
 
 
 class IndexedSource:
@@ -375,15 +382,8 @@ def test_compute_activation_edge_risk_returns_none_when_models_never_produce_sco
         def forward(self, input_ids, attention_mask=None):  # noqa: ANN001
             raise RuntimeError("boom")
 
-    kwargs = {
-        "allowed_suffixes": ("attn",),
-        "activation_sampling": None,
-        "estimator": None,
-        "deadband": 0.0,
-        "margin": 0.0,
-        "classify_family_fn": lambda name: "attn",
-    }
-    batch = {"input_ids": torch.ones((1, 2)), "attention_mask": torch.ones((1, 2))}
+    kwargs = activation_kwargs()
+    batch = activation_batch()
 
     assert (
         runtime.compute_activation_edge_risk(OneDimModel(), [batch], **kwargs) is None
@@ -418,13 +418,8 @@ def test_compute_activation_edge_risk_handles_attention_mask_typeerror_and_bad_h
 
     result = runtime.compute_activation_edge_risk(
         TypeErrorModel(),
-        [{"input_ids": torch.ones((1, 2)), "attention_mask": torch.ones((1, 2))}],
-        allowed_suffixes=("attn",),
-        activation_sampling=None,
-        estimator={"iters": 1, "init": "e0"},
-        deadband=0.0,
-        margin=0.0,
-        classify_family_fn=lambda name: "attn",
+        [activation_batch()],
+        **activation_kwargs(estimator={"iters": 1, "init": "e0"}),
     )
 
     assert result is not None
@@ -434,43 +429,21 @@ def test_compute_activation_edge_risk_handles_attention_mask_typeerror_and_bad_h
 
 
 def test_rmt_runtime_adapter_hook_resolution_and_adapter_paths() -> None:
-    class _Adapter:
-        def prepare_generation_inputs(self, batch, device):  # noqa: ANN001
-            return {
-                "input_ids": torch.ones((1, 2), device=device),
-                "attention_mask": torch.ones((1, 2), device=device),
-            }
-
-    class _HookModel(nn.Module):
-        def __init__(self) -> None:
-            super().__init__()
-            self.attn = nn.Linear(2, 2, bias=False)
-
-        def forward(self, input_ids, attention_mask=None):  # noqa: ANN001
-            _ = attention_mask
-            return self.attn(input_ids.float())
-
     assert runtime._resolve_adapter_hook(None, "prepare_generation_inputs") is None
     assert runtime._resolve_adapter_hook(Mock(), "prepare_generation_inputs") is None
     assert callable(
-        runtime._resolve_adapter_hook(_Adapter(), "prepare_generation_inputs")
+        runtime._resolve_adapter_hook(
+            AdapterGenerationInputs(), "prepare_generation_inputs"
+        )
     )
 
-    kwargs = {
-        "allowed_suffixes": ("attn",),
-        "activation_sampling": None,
-        "estimator": {"iters": 1, "init": "e0"},
-        "deadband": 0.0,
-        "margin": 0.0,
-        "classify_family_fn": lambda name: "attn",
-    }
     batch = {"id": "ex-1", "image_path": "/tmp/a.png", "answers": ["cat"]}
 
     risk = runtime.compute_activation_edge_risk(
-        _HookModel(),
+        TinyActivationModel(),
         [batch],
-        adapter=_Adapter(),
-        **kwargs,
+        adapter=AdapterGenerationInputs(),
+        **activation_kwargs(estimator={"iters": 1, "init": "e0"}),
     )
     assert risk is not None
     assert risk["batches_used"] == 1
@@ -479,27 +452,14 @@ def test_rmt_runtime_adapter_hook_resolution_and_adapter_paths() -> None:
 def test_compute_activation_edge_risk_none_weight_fallback_and_restore_paths(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    class _HookModel(nn.Module):
-        def __init__(self) -> None:
-            super().__init__()
-            self.attn = nn.Linear(2, 2, bias=False)
-
-        def forward(self, input_ids, attention_mask=None):  # noqa: ANN001
-            _ = attention_mask
-            return self.attn(input_ids.float())
-
-    kwargs = {
-        "allowed_suffixes": ("attn",),
-        "activation_sampling": None,
-        "estimator": {"iters": 1, "init": "e0"},
-        "deadband": 0.0,
-        "margin": 0.0,
-        "classify_family_fn": lambda name: "attn",
-    }
-    batch = {"input_ids": torch.ones((1, 2)), "attention_mask": torch.ones((1, 2))}
+    kwargs = activation_kwargs(estimator={"iters": 1, "init": "e0"})
+    batch = activation_batch()
 
     monkeypatch.setattr(runtime, "activation_edge_risk", lambda *_a, **_k: None)
-    assert runtime.compute_activation_edge_risk(_HookModel(), [batch], **kwargs) is None
+    assert (
+        runtime.compute_activation_edge_risk(TinyActivationModel(), [batch], **kwargs)
+        is None
+    )
 
     class WeirdInt:
         def __bool__(self) -> bool:
@@ -516,12 +476,14 @@ def test_compute_activation_edge_risk_none_weight_fallback_and_restore_paths(
     )
     monkeypatch.setattr(runtime, "batch_token_weight", lambda *_a, **_k: WeirdInt())
 
-    weighted = runtime.compute_activation_edge_risk(_HookModel(), [batch], **kwargs)
+    weighted = runtime.compute_activation_edge_risk(
+        TinyActivationModel(), [batch], **kwargs
+    )
     assert weighted is not None
     assert weighted["batches_used"] == 1
     assert weighted["token_weight_total"] == 2
 
-    class _RetryFailModel(_HookModel):
+    class _RetryFailModel(TinyActivationModel):
         def forward(self, input_ids, attention_mask=None):  # noqa: ANN001
             if attention_mask is not None:
                 raise TypeError("retry")
@@ -533,7 +495,7 @@ def test_compute_activation_edge_risk_none_weight_fallback_and_restore_paths(
     )
     assert retry_fail is None
 
-    model = _HookModel()
+    model = TinyActivationModel()
     model.eval()
     restored = runtime.compute_activation_edge_risk(model, [batch], **kwargs)
     assert restored is not None
@@ -541,43 +503,9 @@ def test_compute_activation_edge_risk_none_weight_fallback_and_restore_paths(
 
 
 def test_rmt_compute_activation_outliers_uses_adapter_generation_inputs() -> None:
-    class _Adapter:
-        def prepare_generation_inputs(self, batch, device):  # noqa: ANN001
-            return {
-                "input_ids": torch.ones((1, 2), device=device),
-                "attention_mask": torch.ones((1, 2), device=device),
-            }
-
-    class _Model(nn.Module):
-        def __init__(self) -> None:
-            super().__init__()
-            self.attn = nn.Linear(2, 2, bias=False)
-
-        def forward(self, input_ids, attention_mask=None):  # noqa: ANN001
-            _ = attention_mask
-            return self.attn(input_ids.float())
-
-    class _Guard:
-        adapter = _Adapter()
-        margin = 1.0
-        deadband = 0.0
-
-        def _get_activation_modules(self, model):  # noqa: ANN001
-            return runtime.get_activation_modules(model, allowed_suffixes=("attn",))
-
-        def _activation_svd_outliers(self, output, *, margin, deadband):  # noqa: ANN001
-            _ = output, margin, deadband
-            return 1, 2.0, 3.0
-
-        def _prepare_activation_inputs(self, batch, device):  # noqa: ANN001
-            return runtime.prepare_activation_inputs(batch, device)
-
-        def _batch_token_weight(self, input_ids, attention_mask):  # noqa: ANN001
-            return runtime.batch_token_weight(input_ids, attention_mask)
-
     out = runtime.compute_activation_outliers(
-        _Guard(),
-        _Model(),
+        ActivationGuardStub(adapter=AdapterGenerationInputs()),
+        TinyActivationModel(),
         [{"id": "ex-1", "image_path": "/tmp/a.png", "answers": ["cat"]}],
     )
 
@@ -587,22 +515,13 @@ def test_rmt_compute_activation_outliers_uses_adapter_generation_inputs() -> Non
 
 
 def test_compute_activation_outliers_failure_and_restore_paths() -> None:
-    class _Model(nn.Module):
-        def __init__(self) -> None:
-            super().__init__()
-            self.attn = nn.Linear(2, 2, bias=False)
-
-        def forward(self, input_ids, attention_mask=None):  # noqa: ANN001
-            _ = attention_mask
-            return self.attn(input_ids.float())
-
-    class _RetryFailModel(_Model):
+    class _RetryFailModel(TinyActivationModel):
         def forward(self, input_ids, attention_mask=None):  # noqa: ANN001
             if attention_mask is not None:
                 raise TypeError("retry")
             raise RuntimeError("boom")
 
-    class _RuntimeFailModel(_Model):
+    class _RuntimeFailModel(TinyActivationModel):
         def forward(self, input_ids, attention_mask=None):  # noqa: ANN001
             _ = input_ids, attention_mask
             raise RuntimeError("boom")
@@ -641,34 +560,16 @@ def test_compute_activation_outliers_failure_and_restore_paths() -> None:
             _ = attention_mask
             return self.attn(input_ids.float())
 
-    class _Guard:
-        adapter = None
-        margin = 1.0
-        deadband = 0.0
-
-        def _get_activation_modules(self, model):  # noqa: ANN001
-            return runtime.get_activation_modules(model, allowed_suffixes=("attn",))
-
-        def _activation_svd_outliers(self, output, *, margin, deadband):  # noqa: ANN001
-            _ = output, margin, deadband
-            raise RuntimeError("boom")
-
-        def _prepare_activation_inputs(self, batch, device):  # noqa: ANN001
-            return runtime.prepare_activation_inputs(batch, device)
-
-        def _batch_token_weight(self, input_ids, attention_mask):  # noqa: ANN001
-            return runtime.batch_token_weight(input_ids, attention_mask)
-
-    batch = {"input_ids": torch.ones((1, 2)), "attention_mask": torch.ones((1, 2))}
-    assert runtime.compute_activation_outliers(_Guard(), _Model(), [batch]) is not None
-
-    class _GuardNoHook(_Guard):
-        def _activation_svd_outliers(self, output, *, margin, deadband):  # noqa: ANN001
-            _ = output, margin, deadband
-            return 1, 2.0, 3.0
+    batch = activation_batch()
+    assert (
+        runtime.compute_activation_outliers(
+            ActivationGuardStub(raises=True), TinyActivationModel(), [batch]
+        )
+        is not None
+    )
 
     no_hook = runtime.compute_activation_outliers(
-        _GuardNoHook(), _RaisingHookModel(), [batch]
+        ActivationGuardStub(), _RaisingHookModel(), [batch]
     )
     assert no_hook is not None
     assert no_hook["outlier_count"] == 0
@@ -676,18 +577,20 @@ def test_compute_activation_outliers_failure_and_restore_paths() -> None:
     bad_handle_model = _BadHandleModel()
     bad_handle_model.eval()
     handled = runtime.compute_activation_outliers(
-        _GuardNoHook(), bad_handle_model, [batch]
+        ActivationGuardStub(), bad_handle_model, [batch]
     )
     assert handled is not None
     assert bad_handle_model.training is False
 
     assert (
-        runtime.compute_activation_outliers(_GuardNoHook(), _RetryFailModel(), [batch])
+        runtime.compute_activation_outliers(
+            ActivationGuardStub(), _RetryFailModel(), [batch]
+        )
         is None
     )
     assert (
         runtime.compute_activation_outliers(
-            _GuardNoHook(), _RuntimeFailModel(), [batch]
+            ActivationGuardStub(), _RuntimeFailModel(), [batch]
         )
         is None
     )
