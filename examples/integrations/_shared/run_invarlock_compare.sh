@@ -167,9 +167,11 @@ if [[ -n "$edit_label" ]]; then
 fi
 
 {
-  printf 'wrapper: %q ' "$0" "${original_args[@]}"
+  printf 'wrapper: '
+  printf '%q ' "$0" "${original_args[@]}"
   printf '\n'
-  printf 'evaluate: %q ' "${evaluate_cmd[@]}"
+  printf 'evaluate: '
+  printf '%q ' "${evaluate_cmd[@]}"
   printf '\n'
 } > "$report_out/run_command.txt"
 
@@ -188,7 +190,8 @@ verify_cmd=(
   "$report_json"
 )
 
-printf 'verify: %q ' "${verify_cmd[@]}" >> "$report_out/run_command.txt"
+printf 'verify: ' >> "$report_out/run_command.txt"
+printf '%q ' "${verify_cmd[@]}" >> "$report_out/run_command.txt"
 printf '> %q\n' "$verify_json" >> "$report_out/run_command.txt"
 
 "${verify_cmd[@]}" > "$verify_json"
@@ -200,7 +203,8 @@ if [[ "$render_html" -eq 1 ]]; then
     -o "$html_out"
     --force
   )
-  printf 'html: %q ' "${html_cmd[@]}" >> "$report_out/run_command.txt"
+  printf 'html: ' >> "$report_out/run_command.txt"
+  printf '%q ' "${html_cmd[@]}" >> "$report_out/run_command.txt"
   printf '\n' >> "$report_out/run_command.txt"
   "${html_cmd[@]}"
 fi

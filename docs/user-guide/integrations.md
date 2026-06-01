@@ -17,7 +17,8 @@ runtime package and should not add required dependencies to the core install.
 | Shared evidence wording | Present under `examples/integrations/_shared/evidence-scope.md`. |
 | Expected artifact checklist | Present under `examples/integrations/_shared/expected-artifacts.md`. |
 | Shared compare wrapper | Present under `examples/integrations/_shared/run_invarlock_compare.sh`. |
-| Target-specific examples | Added one target at a time after backend compatibility is validated. |
+| PEFT LoRA merge | Runnable example under `examples/integrations/peft_lora/`. |
+| Additional target-specific examples | Added one target at a time after backend compatibility is validated. |
 
 Browse the integration scaffold in the repository:
 <https://github.com/invarlock/invarlock/tree/staging/next/examples/integrations>
@@ -70,10 +71,37 @@ The generated local output should include:
 | `verify.json` | Machine-readable verifier result. |
 | `evaluation.html` | Human-readable report. |
 | `runtime.manifest.json` | Runtime provenance for strict container-backed runs. |
-| `run_command.txt` | Exact command used by the shared wrapper. |
+| `run_command.txt` | Wrapper invocation plus evaluate, verify, and render commands. |
 
 Generated reports, models, runs, HTML, and artifacts under
 `examples/integrations/**` are ignored by git.
+
+## PEFT LoRA Merge
+
+The first target example materializes a tiny PEFT LoRA-merged subject checkpoint
+and feeds it through the shared compare wrapper:
+
+```bash
+examples/integrations/peft_lora/run_tiny_peft_lora.sh \
+  --allow-network \
+  --force
+```
+
+This command requires PEFT in the example environment. It writes the merged
+subject checkpoint under `examples/integrations/peft_lora/models/` and the
+InvarLock artifacts under `examples/integrations/peft_lora/reports/`.
+The runner defaults to the `release` profile so strict verification has enough
+evaluation tokens for a stable primary-metric verdict.
+
+For host-side dependency bring-up, use:
+
+```bash
+examples/integrations/peft_lora/run_tiny_peft_lora.sh \
+  --allow-network \
+  --force \
+  --execution-mode host \
+  --assurance off
+```
 
 ## Public Evidence Anchors
 
