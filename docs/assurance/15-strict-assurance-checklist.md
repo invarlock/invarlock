@@ -1,5 +1,9 @@
 # Strict Assurance Checklist
 
+> **Plain language:** This is the reviewer checklist for deciding whether a
+> strict report and its sibling runtime manifest can be accepted as assurance
+> evidence.
+
 ## Overview
 
 | Aspect | Details |

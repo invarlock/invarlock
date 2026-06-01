@@ -4,6 +4,15 @@
 > devices are reviewed against small, documented pilot bands. We publish the
 > budgets and a reproducible check.
 
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Define the pilot review bands for comparing CPU, MPS, and CUDA evaluation ratios. |
+| **Audience** | Maintainers, release reviewers, and operators attaching cross-device evidence. |
+| **Contract scope** | Empirical drift review for matching reports; not a PyTorch cross-platform reproducibility guarantee. |
+| **Source of truth** | `scripts/smoke/check_device_drift.py`, report `primary_metric.*`, and runtime metadata under `meta.*`. |
+
 ## Claim
 
 With deterministic settings and identical evaluation schedules/policies,
@@ -80,6 +89,12 @@ python scripts/smoke/check_device_drift.py \
 - Window plans and seeds must match; schedule changes invalidate comparisons.
 - Bands are empirical and may vary slightly by model family; verify locally and
   adjust tolerance for CI accordingly.
+
+## Related Documentation
+
+- [Determinism Contracts](08-determinism-contracts.md)
+- [Guard Contracts & Primer](04-guard-contracts.md)
+- [Runtime Provenance Guide](../security/runtime-provenance-guide.md)
 
 ## References
 

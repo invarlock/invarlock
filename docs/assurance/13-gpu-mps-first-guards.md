@@ -1,5 +1,9 @@
 # GPU/MPS-First Guard Measurement Contracts
 
+> **Plain language:** Accelerator-friendly guard measurements are acceptable
+> only when their estimator settings, sampling policy, and measurement-contract
+> hashes are recorded so later verification can replay the same contract.
+
 ## Overview
 
 | Aspect | Details |

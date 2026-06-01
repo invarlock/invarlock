@@ -1,5 +1,9 @@
 # Trust Model
 
+> **Plain language:** A strict pass means one configured weight-edit regression
+> comparison met the declared report and provenance contract. It is not model
+> certification or a deployment safety claim.
+
 ## Overview
 
 | Aspect | Details |
