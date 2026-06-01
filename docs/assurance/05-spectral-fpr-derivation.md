@@ -13,7 +13,7 @@
 | **Purpose** | Explain how spectral guard family caps map to false-positive-rate interpretation under modeled nulls. |
 | **Audience** | Guard maintainers, calibration reviewers, and contributors changing spectral policy. |
 | **Contract scope** | Spectral z-score caps, multiple-testing policy, sentinel caps, and report observability. |
-| **Source of truth** | `src/invarlock/guards/spectral*.py`, `src/invarlock/_data/runtime/tiers.yaml`, and spectral assurance tests. |
+| **Source of truth** | `src/invarlock/guards/spectral*.py`, `runtime/tiers.yaml`, and spectral assurance tests. |
 
 ## Claim
 
@@ -124,7 +124,7 @@ Calibration values are derived from null-sweep runs using the order-statistic
 and parametric methods described in the tier calibration documentation
 ([09-tier-v1-calibration.md](09-tier-v1-calibration.md)). The calibrated κ
 values are stored in the packaged `tiers.yaml`
-(`src/invarlock/_data/runtime/tiers.yaml`; overrides use
+(`runtime/tiers.yaml`; overrides use
 `INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml`).
 
 To recalibrate, run null baselines (no edit) and collect per-family maximum

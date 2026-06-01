@@ -389,7 +389,7 @@ Guard threshold preset selecting the tier profile for a run.
 | Aspect | Details |
 | --- | --- |
 | **Options** | `conservative` (strictest), `balanced` (default), `aggressive` (loosest) |
-| **Source** | Packaged `src/invarlock/_data/runtime/tiers.yaml`; overrides use `INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml` |
+| **Source** | Packaged `runtime/tiers.yaml`; overrides use `INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml` |
 | **Related terms** | Policy Digest, Policy Overrides |
 | **report fields** | `auto.tier`, `resolved_policy.*` |
 | **See also** | [Tier Policy Catalog](../reference/tier-policy-catalog.md) |

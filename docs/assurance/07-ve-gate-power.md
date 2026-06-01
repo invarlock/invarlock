@@ -11,7 +11,7 @@
 | **Purpose** | Define when the variance guard may enable scaling and how the predictive gate is audited. |
 | **Audience** | Variance guard maintainers, calibration reviewers, and release reviewers checking VE evidence. |
 | **Contract scope** | Predictive paired delta-log-loss gates, tier sidedness, minimum effect, and enablement provenance. |
-| **Source of truth** | `src/invarlock/guards/variance*.py`, `src/invarlock/_data/runtime/tiers.yaml`, and variance assurance tests. |
+| **Source of truth** | `src/invarlock/guards/variance*.py`, `runtime/tiers.yaml`, and variance assurance tests. |
 
 ## Claim
 
@@ -58,12 +58,12 @@ cases; raise for stricter tiers.
 | balanced      | 0.02     | 0.012          | 0.03           | 0.0               | ✅ (one-sided)          | 1                      |
 | conservative  | 0.03     | 0.02           | 0.015          | 0.016             | ❌ (two-sided)          | 0                      |
 
-Values are stored in packaged `src/invarlock/_data/runtime/tiers.yaml` and
+Values are stored in packaged `runtime/tiers.yaml` and
 maintain VE responsiveness without triggering false positives under the chosen
 window budgets.
 
 > **Source of truth:** tier thresholds are drawn from packaged
-> `src/invarlock/_data/runtime/tiers.yaml`; overrides use
+> `runtime/tiers.yaml`; overrides use
 > `INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml`.
 >
 > **Note:** `max_adjusted_modules = 0` means no module-count cap is enforced in
@@ -74,7 +74,7 @@ window budgets.
 The `min_effect_lognll` values are derived from paired ΔlogNLL statistics on
 calibration windows using the half-width formula above with the appropriate
 z-quantile per tier. Calibrated values are stored in the packaged
-`src/invarlock/_data/runtime/tiers.yaml`. See the full calibration methodology in
+`runtime/tiers.yaml`. See the full calibration methodology in
 [09-tier-v1-calibration.md](09-tier-v1-calibration.md).
 
 To recalibrate, run null baselines (no edit) and compute the paired Δ standard

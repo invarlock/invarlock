@@ -17,7 +17,7 @@
 > and `src/invarlock/_data/public_evidence/published_basis/bert/evidence_pack_recipe.json`.
 >
 > For a key-by-key explanation of every value in the packaged tier file
-> (`src/invarlock/_data/runtime/tiers.yaml`; override path
+> (`runtime/tiers.yaml`; override path
 > `INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml`), see
 > [Tier Policy Catalog](../reference/tier-policy-catalog.md).
 
@@ -28,7 +28,7 @@
 | **Purpose** | Summarize the pilot calibration basis and the recipe for recalibrating tier policy values. |
 | **Audience** | Calibration owners, release reviewers, and contributors updating tier thresholds. |
 | **Contract scope** | Balanced and Conservative tier values for Spectral kappa, RMT epsilon, VE min-effect, and window sizing. |
-| **Source of truth** | `src/invarlock/_data/runtime/tiers.yaml`, public evidence fixtures, and the Tier Policy Catalog. |
+| **Source of truth** | `runtime/tiers.yaml`, public evidence fixtures, and the Tier Policy Catalog. |
 
 ## Spectral κ (z-caps) — Targets **and** Method
 
