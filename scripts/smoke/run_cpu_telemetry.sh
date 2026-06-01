@@ -5,14 +5,13 @@
 
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
+source "$SCRIPT_DIR/lib/smoke_common.sh"
 cd "$ROOT"
 
-PYTHON_BIN="${INVARLOCK_PYTHON:-}"
-if [[ -z "${PYTHON_BIN}" ]]; then
-  PYTHON_BIN="$(bash "$ROOT/scripts/select_workspace_python.sh")"
-fi
-export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
+PYTHON_BIN="$(smoke_select_python "$ROOT" "${INVARLOCK_PYTHON:-}")"
+smoke_setup_pythonpath "$ROOT"
 CLI=("$PYTHON_BIN" -m invarlock)
 
 OUT_ROOT="${ROOT}/reports/telemetry/cpu-ci"

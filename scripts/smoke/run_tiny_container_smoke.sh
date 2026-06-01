@@ -3,40 +3,25 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
+source "$SCRIPT_DIR/lib/smoke_common.sh"
 
 WORK_ROOT="${1:-$(mktemp -d -t invarlock_tiny_container_smoke.XXXXXX)}"
 MODEL_ID="${INVARLOCK_TINY_SMOKE_MODEL_ID:-sshleifer/tiny-gpt2}"
+MODEL_CACHE_NAME="models--${MODEL_ID//\//--}"
 MODE="${INVARLOCK_SMOKE_MODE:-container}"
 PROFILE="${INVARLOCK_SMOKE_PROFILE:-dev}"
 SMOKE_DEVICE="${INVARLOCK_SMOKE_DEVICE:-auto}"
 
-PYTHON_BIN="${INVARLOCK_PYTHON:-}"
-if [[ -z "$PYTHON_BIN" ]]; then
-  PYTHON_BIN="$(bash "$REPO_ROOT/scripts/select_workspace_python.sh")"
-fi
-export PYTHONPATH="$REPO_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
+PYTHON_BIN="$(smoke_select_python "$REPO_ROOT" "${INVARLOCK_PYTHON:-}")"
+smoke_setup_pythonpath "$REPO_ROOT"
 CLI=("$PYTHON_BIN" -m invarlock)
 
 export INVARLOCK_ALLOW_NETWORK="${INVARLOCK_ALLOW_NETWORK:-1}"
 export INVARLOCK_DEDUP_TEXTS="${INVARLOCK_DEDUP_TEXTS:-1}"
 export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
 
-host_gpu_visible() {
-  [[ -e /dev/nvidiactl ]] || command -v nvidia-smi >/dev/null 2>&1
-}
-
-seed_local_runtime_image() {
-  if host_gpu_visible && docker image inspect invarlock-runtime:cuda-local >/dev/null 2>&1; then
-    export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"
-    return 0
-  fi
-  if docker image inspect invarlock-runtime:local >/dev/null 2>&1; then
-    export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:local"
-  fi
-}
-
 if [[ "$MODE" == "container" && -z "${INVARLOCK_RUNTIME_IMAGE:-}" ]]; then
-  seed_local_runtime_image
+  smoke_seed_local_runtime_image "$SMOKE_DEVICE"
 fi
 
 mkdir -p "$WORK_ROOT"
@@ -50,20 +35,11 @@ HOST_HF_CACHE_ROOT="${INVARLOCK_SMOKE_HOST_HF_CACHE_ROOT:-${HF_HOME:-${HOME}/.ca
 DATA_FILE="$WORK_ROOT/smoke.jsonl"
 PRESET_PATH="$WORK_ROOT/tiny_smoke_preset.yaml"
 
-copy_cached_tree_if_present() {
-  local source_dir="$1"
-  local target_dir="$2"
-  if [[ -d "$source_dir" && ! -e "$target_dir" ]]; then
-    mkdir -p "$(dirname -- "$target_dir")"
-    cp -a "$source_dir" "$target_dir"
-  fi
-}
-
 seed_hf_cache_from_host() {
-  copy_cached_tree_if_present \
-    "$HOST_HF_CACHE_ROOT/hub/models--sshleifer--tiny-gpt2" \
-    "$SMOKE_CACHE_ROOT/hub/models--sshleifer--tiny-gpt2"
-  if [[ -d "$SMOKE_CACHE_ROOT/hub/models--sshleifer--tiny-gpt2" ]]; then
+  smoke_copy_cached_tree_if_present \
+    "$HOST_HF_CACHE_ROOT/hub/$MODEL_CACHE_NAME" \
+    "$SMOKE_CACHE_ROOT/hub/$MODEL_CACHE_NAME"
+  if [[ -d "$SMOKE_CACHE_ROOT/hub/$MODEL_CACHE_NAME" ]]; then
     export INVARLOCK_SMOKE_CACHE_COMPLETE=1
     return 0
   fi
@@ -75,52 +51,20 @@ prefetch_tiny_model_on_host() {
     return 1
   fi
   mkdir -p "$HOST_HF_CACHE_ROOT" "$HOST_HF_CACHE_ROOT/hub"
-  echo "[smoke] prefetching tiny GPT-2 into host HF cache"
-  HF_HOME="$HOST_HF_CACHE_ROOT" \
+  echo "[smoke] prefetching $MODEL_ID into host HF cache"
+  MODEL_ID="$MODEL_ID" \
+    HF_HOME="$HOST_HF_CACHE_ROOT" \
     HF_HUB_CACHE="$HOST_HF_CACHE_ROOT/hub" \
     "$PYTHON_BIN" - <<'PY'
+import os
+
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-MODEL_ID = "sshleifer/tiny-gpt2"
+MODEL_ID = os.environ["MODEL_ID"]
 
 AutoTokenizer.from_pretrained(MODEL_ID)
 AutoModelForCausalLM.from_pretrained(MODEL_ID)
 PY
-}
-
-resolve_container_engine() {
-  if command -v docker >/dev/null 2>&1; then
-    echo "docker"
-    return 0
-  fi
-  if command -v podman >/dev/null 2>&1; then
-    echo "podman"
-    return 0
-  fi
-  return 1
-}
-
-ensure_current_runtime_image() {
-  if [[ "$MODE" != "container" ]]; then
-    return 0
-  fi
-  if [[ -n "${INVARLOCK_RUNTIME_IMAGE:-}" \
-    && "${INVARLOCK_RUNTIME_IMAGE}" != "invarlock-runtime:local" \
-    && "${INVARLOCK_RUNTIME_IMAGE}" != "invarlock-runtime:cuda-local" ]]; then
-    return 0
-  fi
-  if ! command -v docker >/dev/null 2>&1 || ! command -v make >/dev/null 2>&1; then
-    return 0
-  fi
-  if host_gpu_visible; then
-    echo "[smoke] refreshing local CUDA container runtime image"
-    make runtime-image-cuda
-    export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"
-    return 0
-  fi
-  echo "[smoke] refreshing local container runtime image"
-  make runtime-image
-  export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:local"
 }
 
 seed_runtime_image_digest() {
@@ -134,7 +78,7 @@ seed_runtime_image_digest() {
     return 0
   fi
   local engine
-  engine="$(resolve_container_engine || true)"
+  engine="$(smoke_resolve_container_engine || true)"
   if [[ -z "$engine" ]]; then
     return 0
   fi
@@ -192,31 +136,8 @@ elif prefetch_tiny_model_on_host && seed_hf_cache_from_host; then
   export INVARLOCK_SMOKE_CACHE_SEEDED=1
 fi
 
-ensure_writable_hf_cache() {
-  local candidate_home="${HF_HOME:-$SMOKE_CACHE_ROOT}"
-  local candidate_datasets="${HF_DATASETS_CACHE:-${candidate_home}/datasets}"
-  local candidate_hub="${HF_HUB_CACHE:-${candidate_home}/hub}"
-
-  if mkdir -p "$candidate_home" "$candidate_datasets" "$candidate_hub" >/dev/null 2>&1 \
-    && touch "$candidate_datasets/.ivl_smoke_probe" >/dev/null 2>&1; then
-    rm -f "$candidate_datasets/.ivl_smoke_probe" >/dev/null 2>&1 || true
-    export HF_HOME="$candidate_home"
-    export HF_HUB_CACHE="$candidate_hub"
-    export HF_DATASETS_CACHE="$candidate_datasets"
-    unset TRANSFORMERS_CACHE
-    return 0
-  fi
-
-  export HF_HOME="$SMOKE_CACHE_ROOT"
-  export HF_HUB_CACHE="$SMOKE_CACHE_ROOT/hub"
-  export HF_DATASETS_CACHE="$SMOKE_CACHE_ROOT/datasets"
-  unset TRANSFORMERS_CACHE
-  mkdir -p "$HF_HOME" "$HF_HUB_CACHE" "$HF_DATASETS_CACHE"
-  echo "[smoke] falling back to writable HF cache under $HF_HOME"
-}
-
-ensure_writable_hf_cache
-ensure_current_runtime_image
+smoke_ensure_writable_hf_cache "$SMOKE_CACHE_ROOT"
+smoke_ensure_current_runtime_image "$MODE" "$SMOKE_DEVICE"
 seed_runtime_image_digest
 
 if [[ "${INVARLOCK_SMOKE_CACHE_COMPLETE:-0}" == "1" ]]; then
@@ -297,6 +218,7 @@ echo "[smoke] evaluation_report=$EVAL_REPORT"
 
 VERIFY_ARGS=(--runtime-provenance "$RUNTIME_PROVENANCE")
 
+VERIFY_RC=0
 "${CLI[@]}" verify "$EVAL_REPORT" "${VERIFY_ARGS[@]}" --profile "$PROFILE" --assurance off --json || VERIFY_RC=$?
 VERIFY_RC="${VERIFY_RC:-0}"
 echo "[smoke] verify_rc=$VERIFY_RC"
@@ -331,6 +253,7 @@ fi
   --profile "$PROFILE" \
   --json
 "${CLI[@]}" advanced evidence-pack inspect "$EVIDENCE_PACK_DIR" --json
+EVIDENCE_PACK_VERIFY_RC=0
 "${CLI[@]}" advanced evidence-pack verify "$EVIDENCE_PACK_DIR" --json || EVIDENCE_PACK_VERIFY_RC=$?
 EVIDENCE_PACK_VERIFY_RC="${EVIDENCE_PACK_VERIFY_RC:-0}"
 echo "[smoke] evidence_pack_verify_rc=$EVIDENCE_PACK_VERIFY_RC"

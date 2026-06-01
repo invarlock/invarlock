@@ -12,19 +12,23 @@ set -euo pipefail
 #   RUN=1 NET=1 bash scripts/smoke/run_tiny_all_matrix.sh   # allow network
 #
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
+source "$SCRIPT_DIR/lib/smoke_common.sh"
+
 RUN="${RUN:-0}"
 NET="${NET:-0}"
 TORCH_CPU_INDEX_URL="${TORCH_CPU_INDEX_URL:-https://download.pytorch.org/whl/cpu}"
 export TORCH_CPU_INDEX_URL
 
-PYTHON_BIN="${PYTHON_BIN:-$(bash scripts/select_workspace_python.sh)}"
+PYTHON_BIN="$(smoke_select_python "$REPO_ROOT" "${PYTHON_BIN:-}")"
 if ! "$PYTHON_BIN" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)' >/dev/null 2>&1; then
   echo "ERROR: scripts/smoke/run_tiny_all_matrix.sh requires Python 3.12+." >&2
   echo "Set PYTHON_BIN to a supported interpreter or activate a Python 3.12+ environment." >&2
   exit 2
 fi
 
-export PYTHONPATH="$(pwd)/src:${PYTHONPATH:-}"
+smoke_setup_pythonpath "$REPO_ROOT"
 CLI=("$PYTHON_BIN" -m invarlock.cli)
 
 render_cmd() {
@@ -32,47 +36,11 @@ render_cmd() {
 }
 
 run_cmd() {
-  "$@" || true
-}
-
-seed_local_runtime_image() {
-  if [[ -n "${INVARLOCK_RUNTIME_IMAGE:-}" ]]; then
-    return 0
-  fi
-  if [[ -e /dev/nvidiactl || -n "$(command -v nvidia-smi 2>/dev/null)" ]] \
-    && command -v docker >/dev/null 2>&1 \
-    && docker image inspect invarlock-runtime:cuda-local >/dev/null 2>&1; then
-    export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"
-    return 0
-  fi
-  if command -v docker >/dev/null 2>&1 \
-    && docker image inspect invarlock-runtime:local >/dev/null 2>&1; then
-    export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:local"
+  if ! "$@"; then
+    MATRIX_FAILURES=$((MATRIX_FAILURES + 1))
   fi
 }
-
-ensure_current_runtime_image() {
-  if [[ "$RUN" != "1" || "$NET" != "1" ]]; then
-    return 0
-  fi
-  if [[ -n "${INVARLOCK_RUNTIME_IMAGE:-}" \
-    && "${INVARLOCK_RUNTIME_IMAGE}" != "invarlock-runtime:local" \
-    && "${INVARLOCK_RUNTIME_IMAGE}" != "invarlock-runtime:cuda-local" ]]; then
-    return 0
-  fi
-  if ! command -v docker >/dev/null 2>&1 || ! command -v make >/dev/null 2>&1; then
-    return 0
-  fi
-  if [[ -e /dev/nvidiactl || -n "$(command -v nvidia-smi 2>/dev/null)" ]]; then
-    echo "[smoke] refreshing local CUDA container runtime image"
-    make runtime-image-cuda
-    export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"
-    return 0
-  fi
-  echo "[smoke] refreshing local container runtime image"
-  make runtime-image
-  export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:local"
-}
+MATRIX_FAILURES=0
 
 # Profile selection
 # - If caller set PROFILE, respect it.
@@ -122,12 +90,14 @@ else
   export HF_DATASETS_OFFLINE=1
 fi
 
-seed_local_runtime_image
-ensure_current_runtime_image
+smoke_seed_local_runtime_image "auto"
+if [ "$RUN" = "1" ] && [ "$NET" = "1" ]; then
+  smoke_ensure_current_runtime_image "container" "auto"
+fi
 
 # Ensure required Python deps are present when NET=1
 if [ "$NET" = "1" ]; then
-  "$PYTHON_BIN" - << 'PY' || true
+  "$PYTHON_BIN" - << 'PY'
 try:
     import google.protobuf  # noqa: F401
     import sentencepiece  # noqa: F401
@@ -196,7 +166,7 @@ echo "### GPT-2 Quant (demo edit)" >> "$TMP_DIR/checklist.md"
 QCFG="configs/overlays/edits/quant_rtn/tiny_demo.yaml"
 # Keep the quant demo on a smoke-friendly profile so strict CI parity checks do
 # not turn an example edit into a false red path.
-cmd=("${CLI[@]}" evaluate --baseline "$GPT2_ID" --subject "$GPT2_ID" --baseline-adapter hf_causal --subject-adapter hf_causal --profile "$QUANT_PROFILE" --tier balanced --device cpu --preset configs/presets/causal_lm/wikitext2_512.yaml --edit-config "$QCFG")
+cmd=("${CLI[@]}" evaluate --baseline "$GPT2_ID" --subject "$GPT2_ID" --baseline-adapter hf_causal --subject-adapter hf_causal --profile "$QUANT_PROFILE" --tier balanced --device cpu --preset configs/presets/causal_lm/wikitext2_512.yaml --edit-config "$QCFG" --assurance off)
 append "gpt2_eval_quant8_${QUANT_PROFILE}" "$(render_cmd "${cmd[@]}")"
 [ "$RUN" = "1" ] && run_cmd "${cmd[@]}"
 
@@ -214,3 +184,7 @@ echo >> "$TMP_DIR/checklist.md"
 echo
 echo "Checklist written to: $TMP_DIR/checklist.md"
 echo "Using profile: ${PROFILE} (INVARLOCK_TINY_RELAX=${INVARLOCK_TINY_RELAX:-0})"
+if [ "$RUN" = "1" ] && [ "$MATRIX_FAILURES" -gt 0 ]; then
+  echo "ERROR: ${MATRIX_FAILURES} matrix command(s) failed." >&2
+  exit 1
+fi
