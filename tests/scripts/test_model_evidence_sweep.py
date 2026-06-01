@@ -290,6 +290,40 @@ def test_model_evidence_sweep_dry_run_uses_lane_specific_verify_profile_when_omi
     payload = json.loads(proc.stdout)
     verify = payload[0]["verify"]
     assert verify[verify.index("--profile") + 1] == "dev"
+    evaluate = payload[0]["evaluate"]
+    assert evaluate[evaluate.index("--assurance") + 1] == "off"
+
+
+def test_model_evidence_sweep_container_dev_profile_disables_strict_assurance(
+    tmp_path: Path,
+) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "model_evidence" / "model_evidence_sweep.py"
+    output_root = tmp_path / "evidence-container-dev"
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--suite",
+            "repo-mentioned-gpu",
+            "--slug",
+            "gpt2_public",
+            "--output-root",
+            str(output_root),
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=repo_root,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(proc.stdout)
+    evaluate = payload[0]["evaluate"]
+    assert evaluate[evaluate.index("--profile") + 1] == "dev"
+    assert evaluate[evaluate.index("--assurance") + 1] == "off"
 
 
 def test_select_specs_sharding_is_stable() -> None:

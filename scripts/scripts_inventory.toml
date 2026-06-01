@@ -87,7 +87,7 @@ description = "Local smoke, runtime, tiny-model, and guard-validation entry poin
 paths = [
   "scripts/smoke/README.md",
   "scripts/smoke/check_device_drift.py",
-  "scripts/smoke/cli_exhaustive_smoke.sh",
+  "scripts/smoke/cli_smoke_matrix.sh",
   "scripts/smoke/cli_smoke_fast.sh",
   "scripts/smoke/cli_smoke_negative.sh",
   "scripts/smoke/gpt2_journey_helpers.py",

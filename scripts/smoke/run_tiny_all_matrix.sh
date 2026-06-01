@@ -42,6 +42,16 @@ run_cmd() {
 }
 MATRIX_FAILURES=0
 
+append_relaxed_assurance_args() {
+  case "$PROFILE" in
+    ci|release)
+      ;;
+    *)
+      cmd+=(--assurance off)
+      ;;
+  esac
+}
+
 # Profile selection
 # - If caller set PROFILE, respect it.
 # - Otherwise default to 'ci', but auto-switch to 'dev' when tiny relax is on.
@@ -157,6 +167,7 @@ do
   [ "$PRESET" = "omit" ] && tag="gpt2_eval_auto"
   cmd=("${CLI[@]}" evaluate --baseline "$GPT2_ID" --subject "$GPT2_ID" --baseline-adapter hf_causal --subject-adapter hf_causal --profile "$PROFILE" --tier balanced --device cpu)
   [ "$PRESET" != "omit" ] && cmd+=(--preset "$PRESET")
+  append_relaxed_assurance_args
   append "$tag" "$(render_cmd "${cmd[@]}")"
   if [ "$RUN" = "1" ]; then run_cmd "${cmd[@]}"; fi
 done
@@ -176,6 +187,7 @@ echo >> "$TMP_DIR/checklist.md"
 BERT_ID=${BERT_ID:-"sshleifer/tiny-distilroberta-base"}
 echo "## Encoder MLM" >> "$TMP_DIR/checklist.md"
 cmd=("${CLI[@]}" evaluate --baseline "$BERT_ID" --subject "$BERT_ID" --baseline-adapter hf_mlm --subject-adapter hf_mlm --profile "$PROFILE" --tier balanced --device cpu --preset configs/presets/masked_lm/wikitext2_128.yaml)
+append_relaxed_assurance_args
 append "bert_mlm_eval" "$(render_cmd "${cmd[@]}")"
 [ "$RUN" = "1" ] && run_cmd "${cmd[@]}"
 

@@ -220,7 +220,9 @@ Acceptance for these sentinels is load-path completion, not scientific PASS:
 
 - `evaluation.report.json` must be emitted for each sentinel
 - the public quant smoke must also produce `verify.json`
-- a primary-metric `FAIL` is acceptable for this infrastructure/load-path gate
+- evaluate and verify commands must exit zero
+- the helper defaults to `--profile dev --assurance off`; a primary-metric `FAIL`
+  inside the emitted report is acceptable for this infrastructure/load-path gate
 
 Use a fresh work tree on remote hosts. If you intentionally run from a checkout
 that is not the editable install used by `.venv`, either reinstall the checkout

@@ -145,7 +145,7 @@ def test_net_bootstrap_prefers_cpu_torch_before_hf_extra() -> None:
     assert cpu_torch_install in text
     assert hf_install in text
     assert text.index(cpu_torch_install) < text.index(hf_install)
-    assert '"$PYTHON_BIN" - << \'PY\' || true' not in text
+    assert "\"$PYTHON_BIN\" - << 'PY' || true" not in text
     assert 'HF_HOME="${HF_HOME:-$TMP_DIR/.hf}"' in text
     assert 'mkdir -p "$HF_HOME" "$HF_HUB_CACHE" "$HF_DATASETS_CACHE"' in text
 
@@ -172,8 +172,16 @@ def test_quant_demo_uses_dev_profile_by_default() -> None:
 
     assert 'QUANT_PROFILE="${QUANT_PROFILE:-dev}"' in text
     assert '--profile "$QUANT_PROFILE"' in text
-    assert "--edit-config \"$QCFG\" --assurance off" in text
+    assert '--edit-config "$QCFG" --assurance off' in text
     assert 'append "gpt2_eval_quant8_${QUANT_PROFILE}"' in text
+
+
+def test_relaxed_profile_evaluate_commands_disable_strict_assurance() -> None:
+    text = Path("scripts/smoke/run_tiny_all_matrix.sh").read_text(encoding="utf-8")
+
+    assert "append_relaxed_assurance_args()" in text
+    assert "cmd+=(--assurance off)" in text
+    assert text.count("append_relaxed_assurance_args") == 3
 
 
 def test_encoder_mlm_smoke_uses_stable_tiny_model() -> None:
@@ -190,7 +198,9 @@ def test_matrix_prefers_local_runtime_image_when_available() -> None:
     assert 'smoke_seed_local_runtime_image "auto"' in text
     assert 'smoke_ensure_current_runtime_image "container" "auto"' in text
     assert "docker image inspect invarlock-runtime:cuda-local" in common_text
-    assert 'export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"' in common_text
+    assert (
+        'export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"' in common_text
+    )
     assert "docker image inspect invarlock-runtime:local" in common_text
     assert 'export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:local"' in common_text
     assert 'echo "[smoke] refreshing local CUDA container runtime image"' in common_text

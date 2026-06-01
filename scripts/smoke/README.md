@@ -6,9 +6,9 @@ target when one exists.
 
 | Script | Primary caller | Network | Runtime mode | Main output |
 | --- | --- | --- | --- | --- |
-| `cli_smoke_fast.sh` | Manual CLI surface checks; lane in `cli_exhaustive_smoke.sh` | Optional | Host and container when available | Log file plus temporary reports under the work root |
-| `cli_smoke_negative.sh` | Manual negative-path CLI checks; lane in `cli_exhaustive_smoke.sh` | Never | Host | Fixture reports and verify outputs under the work root |
-| `cli_exhaustive_smoke.sh` | Manual lane dispatcher | Optional | Delegates per lane | Consolidated lane log |
+| `cli_smoke_fast.sh` | Manual CLI surface checks; lane in `cli_smoke_matrix.sh` | Optional | Host and container when available | Log file plus temporary reports under the work root |
+| `cli_smoke_negative.sh` | Manual negative-path CLI checks; lane in `cli_smoke_matrix.sh` | Never | Host | Fixture reports and verify outputs under the work root |
+| `cli_smoke_matrix.sh` | Manual lane dispatcher | Optional | Delegates per lane | Consolidated lane log |
 | `run_gpt2_user_journey_smoke.sh` | `.github/workflows/gpt2-smoke.yml`; realistic lane | Required unless cache is seeded | Host, container, or both | `journey-results.tsv`, `final_verdict.json`, reports, HTML |
 | `run_tiny_container_smoke.sh` | `.github/workflows/tiny-container-smoke.yml` | Required unless cache is seeded | Container by default; host with `INVARLOCK_SMOKE_MODE=local` | Evaluation report, HTML, optional evidence pack |
 | `run_tiny_all_matrix.sh` | Manual tiny model matrix | Optional; `NET=1` enables downloads | Container by default through `evaluate`; dry-run by default | `checklist.md`, and reports when `RUN=1` |
@@ -29,8 +29,7 @@ target when one exists.
   `gpt2_journey_helpers.py`; keep heavy JSON/TSV transforms out of shell.
 - `cli_smoke_fast.sh` remains the main future extraction candidate because it
   still owns several embedded fixtures and command result helpers.
-- `cli_exhaustive_smoke.sh` is a lane dispatcher. A future rename to
-  `cli_smoke_matrix.sh` would be clearer, but should be done separately with
-  reference updates.
+- `cli_smoke_matrix.sh` is a lane dispatcher. Keep it focused on orchestration;
+  lane behavior belongs in the lane scripts it invokes.
 - `run_cpu_telemetry.sh` is telemetry-oriented rather than a normal pass/fail
   CI smoke gate. Keep that distinction visible in docs and summaries.

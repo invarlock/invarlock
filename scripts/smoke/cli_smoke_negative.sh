@@ -233,7 +233,8 @@ run_capture \
   "$VERIFY_OUT/calibrate_missing_config.out" \
   "$CLI advanced calibrate null-sweep --config \"$WORK_ROOT/does-not-exist.yaml\"" \
   "2"
-assert_contains "$VERIFY_OUT/calibrate_missing_config.out" "does not exist"
+assert_contains "$VERIFY_OUT/calibrate_missing_config.out" "Invalid value for '--config'"
+assert_contains "$VERIFY_OUT/calibrate_missing_config.out" "does-not-exist.yaml"
 
 echo "[summary] $(ts) total=${TOTAL_COMMANDS} unexpected_failures=${UNEXPECTED_FAILURES}" | tee -a "$LOG_FILE"
 echo "[done] $(ts) Log captured to: $LOG_FILE"

@@ -16,7 +16,9 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def _read_result_rows(path: Path) -> list[dict[str, str]]:
@@ -58,7 +60,11 @@ def print_results_table(args: argparse.Namespace) -> int:
     print("| " + " | ".join(COLUMNS) + " |")
     print("| " + " | ".join("---" for _ in COLUMNS) + " |")
     for row in rows:
-        print("| " + " | ".join(_clean_table_cell(row.get(column, "")) for column in COLUMNS) + " |")
+        print(
+            "| "
+            + " | ".join(_clean_table_cell(row.get(column, "")) for column in COLUMNS)
+            + " |"
+        )
     print("")
     passed = sum(row.get("status") == "PASS" for row in rows)
     skipped = sum(row.get("status") == "SKIP" for row in rows)
@@ -106,7 +112,9 @@ def write_strict_bundle_fixture(args: argparse.Namespace) -> int:
     report_path = args.report
     report_path.parent.mkdir(parents=True, exist_ok=True)
 
-    spectral_contract = {"estimator": {"type": "power_iter", "iters": 4, "init": "ones"}}
+    spectral_contract = {
+        "estimator": {"type": "power_iter", "iters": 4, "init": "ones"}
+    }
     rmt_contract = {
         "estimator": {"type": "power_iter", "iters": 3, "init": "ones"},
         "activation_sampling": {
@@ -260,7 +268,9 @@ def append_child_results(args: argparse.Namespace) -> int:
             if not isinstance(row, dict):
                 continue
             out = {column: str(row.get(column, "") or "") for column in COLUMNS}
-            out["journey"] = f"{args.suite}/{out['journey']}" if out["journey"] else args.suite
+            out["journey"] = (
+                f"{args.suite}/{out['journey']}" if out["journey"] else args.suite
+            )
             writer.writerow(out)
     if payload.get("verdict") != "PASS" or failed:
         return 1

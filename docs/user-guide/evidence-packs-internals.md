@@ -704,7 +704,9 @@ Operational guidance for remote evidence-pack work:
   `scripts/evidence_packs/run_qwen14_sentinels.sh` from the same fresh work tree to
   validate saved-model direct evaluate and the public quant smoke. The sentinel
   helper reloads retained edit subject directories, so default cleanup mode is
-  not sufficient for this follow-up check.
+  not sufficient for this follow-up check. The helper defaults to
+  `--profile dev --assurance off` and requires evaluate/verify subprocesses to
+  exit zero.
 
 Recommended remote validation checklist after security-default changes:
 

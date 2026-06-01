@@ -79,6 +79,48 @@ test_config_generator_run_single_calibration_returns_runner_failure() {
     assert_rc "7" "${RUN_RC}" "calibration propagates config-runner failure"
 }
 
+test_config_generator_run_single_calibration_returns_report_conversion_failure() {
+    mock_reset
+
+    # shellcheck source=../config_generator.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/config/config_generator.sh"
+
+    INVARLOCK_DATASET="wikitext2"
+    INVARLOCK_TIER="balanced"
+    FLASH_ATTENTION_AVAILABLE="false"
+    PACK_DETERMINISM="throughput"
+    export INVARLOCK_DATASET INVARLOCK_TIER FLASH_ATTENTION_AVAILABLE PACK_DETERMINISM
+
+    _pack_run_from_config() {
+        local out=""
+        while [[ $# -gt 0 ]]; do
+            case "${1}" in
+                --out)
+                    out="${2:-}"
+                    shift 2
+                    ;;
+                *)
+                    shift
+                    ;;
+            esac
+        done
+        mkdir -p "${out}"
+        echo '{}' > "${out}/report.json"
+        return 0
+    }
+    _cmd_python() { return 12; }
+    estimate_model_params() { echo "7"; }
+
+    local run_dir="${TEST_TMPDIR}/calibration_conversion_failed/run_1"
+    local log_file="${TEST_TMPDIR}/calibration_conversion_failed.log"
+    mkdir -p "$(dirname "${run_dir}")"
+    : > "${log_file}"
+
+    run run_single_calibration "${TEST_TMPDIR}/model" "${run_dir}" 42 2 2 10 "${log_file}" 0 128 128 1
+    assert_rc "12" "${RUN_RC}" "calibration propagates report conversion failure"
+    assert_match "failed to generate evaluation\\.report\\.json" "$(cat "${log_file}")" "conversion failure is logged"
+}
+
 test_config_generator_run_invarlock_calibration_logs_moe_and_all_runs_failed() {
     mock_reset
 

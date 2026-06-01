@@ -21,7 +21,7 @@ Options:
   --out DIR           Sentinel output root (default: <run-dir>/sentinels/qwen14)
   --mode NAME         all|saved-model|public-quant (default: all)
   --device NAME       Device for evaluate (default: cuda)
-  --profile NAME      Evaluate/verify profile (default: ci)
+  --profile NAME      Evaluate/verify profile (default: dev)
   --baseline-adapter NAME  Baseline adapter selection (default: auto)
   --subject-adapter NAME   Subject adapter selection (default: auto)
   --help              Show this help
@@ -168,6 +168,7 @@ run_evaluate_sentinel() {
         --baseline-adapter "${baseline_adapter}" \
         --subject-adapter "${subject_adapter}" \
         --profile "${profile}" \
+        --assurance off \
         --preset "${staged_preset}" \
         --baseline-report "${staged_baseline_report}" \
         --device "${device}" \
@@ -176,11 +177,6 @@ run_evaluate_sentinel() {
         :
     else
         rc=$?
-    fi
-
-    if [[ ${rc} -ne 0 && -f "${out_dir}/evaluation.report.json" ]]; then
-        echo "WARNING: evaluate exited ${rc} but wrote ${out_dir}/evaluation.report.json; treating sentinel as load-path success" >&2
-        rc=0
     fi
 
     require_file "${out_dir}/evaluation.report.json" "evaluation report"
@@ -193,15 +189,13 @@ run_public_quant_verify() {
     local profile="$3"
 
     local rc=0
-    if invarlock verify --json --profile "${profile}" "${report_path}" > "${out_dir}/verify.json"; then
+    if invarlock verify --json --profile "${profile}" --assurance off "${report_path}" > "${out_dir}/verify.json"; then
         :
     else
         rc=$?
     fi
     require_file "${out_dir}/verify.json" "verify summary"
-    if [[ ${rc} -ne 0 ]]; then
-        echo "WARNING: verify exited ${rc} but wrote ${out_dir}/verify.json; treating sentinel as load-path success" >&2
-    fi
+    return "${rc}"
 }
 
 main() {
@@ -210,7 +204,7 @@ main() {
     local out_dir=""
     local mode="all"
     local device="cuda"
-    local profile="ci"
+    local profile="dev"
     local baseline_adapter="auto"
     local subject_adapter="auto"
 

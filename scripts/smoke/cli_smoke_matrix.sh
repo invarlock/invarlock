@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Exhaustive CLI smoke matrix for InvarLock.
+# CLI smoke lane matrix for InvarLock.
 #
 # The matrix is split into three lanes so fast command-surface coverage does not
 # get conflated with negative-path expectations or slower realistic runs.

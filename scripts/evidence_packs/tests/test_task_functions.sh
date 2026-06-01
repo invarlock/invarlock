@@ -772,6 +772,52 @@ test_task_evaluate_tasks_generate_evaluation_report_when_only_report_json_writte
     assert_file_exists "${model_output_dir}/reports/errors/cuda_assert/evaluation.report.json" "converted error report exists"
 }
 
+test_task_evaluate_tasks_return_conversion_failure_when_report_generation_fails() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
+    stub_resolve_edit_params
+
+    fixture_write "invarlock.create_report_for_evaluate" ""
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local baseline_dir="${model_output_dir}/models/baseline"
+    local log_file="${TEST_TMPDIR}/log.txt"
+    mkdir -p "$(dirname "${log_file}")"
+    : > "${log_file}"
+
+    _estimate_model_size() { echo "7"; }
+    _ensure_evaluate_baseline_report() { echo "${TEST_TMPDIR}/baseline_report.json"; }
+    echo "{}" > "${TEST_TMPDIR}/baseline_report.json"
+    _cmd_python() {
+        local script="$1"
+        shift || true
+        if [[ "${script}" == *"task_tools.py" && "${1:-}" == "evaluation-report" ]]; then
+            return 9
+        fi
+        return 0
+    }
+
+    local edit_dir="${model_output_dir}/models/quant_4bit_clean"
+    mkdir -p "${baseline_dir}"
+    write_minimal_validation_edit_artifact "${edit_dir}" "quant_rtn"
+    echo "{}" > "${baseline_dir}/config.json"
+    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
+
+    run task_evaluate_edit "${model_name}" 0 "quant_rtn:4:32:attn" clean 1 "${out}" "${log_file}"
+    assert_rc "9" "${RUN_RC}" "evaluate_EDIT returns report conversion failure"
+    assert_match "failed to generate evaluation\\.report\\.json" "$(cat "${log_file}")" "edit conversion failure is logged"
+
+    local error_dir="${model_output_dir}/models/error_cuda_assert"
+    mkdir -p "${error_dir}"
+    echo "{}" > "${error_dir}/config.json"
+
+    run task_evaluate_error "${model_name}" 0 cuda_assert "${out}" "${log_file}"
+    assert_rc "9" "${RUN_RC}" "evaluate_ERROR returns report conversion failure"
+}
+
 test_task_create_error_branches_cover_skip_missing_function_and_verify_paths() {
     mock_reset
     # shellcheck source=../task_functions.sh
@@ -2248,6 +2294,7 @@ test_task_calibration_run_guard_order_branches() {
     _get_invarlock_config() { echo "512:256:1:1:4"; }
 
     fixture_write "python3.create_report" ""
+    fixture_write "python3.stub" ""
     cat > "${TEST_TMPDIR}/fixtures/python3.capture_env_keys" <<'EOF'
 PYTHONPATH
 INVARLOCK_CONFIG_ROOT
@@ -2518,6 +2565,7 @@ test_task_calibration_run_exports_remote_code_allowance() {
     _plan_effective_ci_schedule() { echo '{"status":"selected"}'; }
     _apply_effective_ci_schedule() { echo "128:128:1:1"; }
     pack_remote_code_allowed() { return 0; }
+    fixture_write "python3.stub" ""
     _pack_run_from_config() {
         printf '%s\n' "${INVARLOCK_ALLOW_REMOTE_CODE-}" > "${env_log}"
         local out_dir=""
@@ -2567,6 +2615,51 @@ test_task_calibration_run_returns_config_runner_failure() {
 
     run task_calibration_run "${model_name}" 0 "1" "42" "${out}" "${log_file}"
     assert_rc "8" "${RUN_RC}" "calibration run returns config-runner failure"
+}
+
+test_task_calibration_run_returns_report_conversion_failure() {
+    mock_reset
+    # shellcheck source=../task_functions.sh
+    source "${TEST_ROOT}/scripts/evidence_packs/lib/tasks/task_functions.sh"
+
+    local out="${TEST_TMPDIR}/out"
+    local model_name="m"
+    local model_output_dir="${out}/${model_name}"
+    local baseline_dir="${model_output_dir}/models/baseline"
+    local log_file="${TEST_TMPDIR}/log.txt"
+    mkdir -p "${baseline_dir}" "$(dirname "${log_file}")"
+    echo "{}" > "${baseline_dir}/config.json"
+    echo "${baseline_dir}" > "${model_output_dir}/.baseline_path"
+    echo "mistralai/Mistral-7B-v0.1" > "${model_output_dir}/.model_id"
+    : > "${log_file}"
+
+    _estimate_model_size() { echo "7"; }
+    _get_model_size_from_name() { echo "7"; }
+    _get_invarlock_config() { echo "128:128:1:1:1"; }
+    _plan_effective_ci_schedule() { echo '{"status":"selected"}'; }
+    _apply_effective_ci_schedule() { echo "128:128:1:1"; }
+    _pack_run_from_config() {
+        local out_dir=""
+        while [[ $# -gt 0 ]]; do
+            case "${1}" in
+                --out)
+                    out_dir="${2:-}"
+                    shift 2
+                    ;;
+                *)
+                    shift
+                    ;;
+            esac
+        done
+        mkdir -p "${out_dir}"
+        printf '{"report":"ok"}\n' > "${out_dir}/report.json"
+        return 0
+    }
+    _cmd_python() { return 10; }
+
+    run task_calibration_run "${model_name}" 0 "1" "42" "${out}" "${log_file}"
+    assert_rc "10" "${RUN_RC}" "calibration run returns report conversion failure"
+    assert_match "failed to generate evaluation\\.report\\.json" "$(cat "${log_file}")" "calibration conversion failure is logged"
 }
 
 test_task_evaluate_edit_covers_effective_ci_and_staging_failure_branches() {
