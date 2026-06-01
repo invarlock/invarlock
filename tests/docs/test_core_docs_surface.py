@@ -191,6 +191,8 @@ def test_contract_reference_docs_freeze_versioned_json_and_packaged_public_evide
     normalized = " ".join(text.split())
 
     assert "Versioned sub-contracts" in text
+    assert "InvarLock is pre-1.0 as a package" in text
+    assert "stable within their declared contract versions" in text
     assert "Report schema" in text
     assert "Evidence-pack format" in text
     assert "Verifier output" in text

@@ -7,6 +7,9 @@ reports, verification, evidence packs, calibration artifacts, and policy packs.
 These contracts are intended to be consumed as-is by automation, review, and
 auditing workflows.
 
+InvarLock is pre-1.0 as a package, but the core evidence-artifact surfaces are
+versioned and intended to be stable within their declared contract versions.
+
 The public contract surface covers:
 
 - `evaluation.report.json` semantics and report schema validation
