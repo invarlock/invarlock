@@ -9,16 +9,15 @@ large reports, and downloaded datasets belong outside the repository.
 
 ## Current Status
 
-The shared scaffold is the only active surface in this first pass. Target
-directories should land one at a time after their runnable path or compatibility
-blocker is understood.
+The shared scaffold is active, and target directories land one at a time after
+their runnable path or compatibility blocker is understood.
 
 | Target | Initial status | First useful artifact |
 | --- | --- | --- |
 | GPTQModel | Backend validation pending | Post-GPTQ baseline-vs-subject comparison |
 | torchao | Save/load boundary validation pending | Post-quantization HF-loadable subject comparison |
 | LLM Compressor / vLLM | Compatibility validation pending | Compression sidecar evidence before deployment |
-| PEFT | Merged-subject path has public BYOE precedent | Base-vs-merged-adapter comparison |
+| PEFT | `runnable` via `peft_lora/` | Base-vs-merged-adapter comparison |
 | Hugging Face Optimum | Target path selection pending | Model-card evidence section for a quantized subject |
 | LM Evaluation Harness | Sidecar positioning pending | Task-eval artifacts beside InvarLock regression evidence |
 | bitsandbytes | Optional backend/platform validation pending | BNB-loaded subject provenance and report comparison |
@@ -31,6 +30,8 @@ blocker is understood.
   example should produce.
 - `_shared/run_invarlock_compare.sh` is a reusable baseline-vs-subject wrapper
   for HF-loadable paths.
+- `peft_lora/` materializes a tiny PEFT LoRA-merged subject checkpoint and
+  compares it against the baseline.
 
 ## Example Lifecycle
 
