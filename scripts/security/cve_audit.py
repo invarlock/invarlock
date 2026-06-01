@@ -20,6 +20,11 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
+try:
+    from scripts.security.run_pip_audit import load_pip_audit_allowlist
+except ImportError:  # pragma: no cover - direct script execution path
+    from run_pip_audit import load_pip_audit_allowlist
+
 OSV_BATCH_URL = "https://api.osv.dev/v1/querybatch"
 OSV_VULN_URL = "https://api.osv.dev/v1/vulns"
 DEFAULT_OUTPUT_JSON = "reports/security/cve-audit.json"
@@ -214,19 +219,14 @@ def collect_inventory(repo_root: Path) -> list[Component]:
 def load_allowlist(path: Path) -> dict[str, dict[str, str]]:
     if not path.exists():
         return {}
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    _owner, parsed_entries = load_pip_audit_allowlist(path)
     entries: dict[str, dict[str, str]] = {}
-    for raw in payload.get("entries", []):
-        if not isinstance(raw, dict):
-            continue
-        advisory = str(raw.get("advisory", "")).strip()
-        if not advisory:
-            continue
-        entries[advisory] = {
-            "expires": str(raw.get("expires", "")).strip(),
-            "owner": str(raw.get("owner", "")).strip(),
-            "tracking_issue": str(raw.get("tracking_issue", "")).strip(),
-            "reason": str(raw.get("reason", "")).strip(),
+    for entry in parsed_entries:
+        entries[entry.advisory] = {
+            "expires": entry.expires.isoformat(),
+            "owner": entry.owner,
+            "tracking_issue": entry.tracking_issue,
+            "reason": entry.reason,
         }
     return entries
 

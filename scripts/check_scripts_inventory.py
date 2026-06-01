@@ -194,7 +194,7 @@ def _reference_index(root: Path) -> dict[str, str]:
                 rel = _normalize_rel(path, root)
                 if rel == DEFAULT_INVENTORY.as_posix():
                     continue
-                if any(
+                if _path_is_ignored(rel) or any(
                     fnmatch.fnmatch(rel, pattern)
                     for pattern in IGNORED_REFERENCE_PATH_PATTERNS
                 ):

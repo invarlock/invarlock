@@ -33,14 +33,6 @@ require_cmd() {
     }
 }
 
-sha256_cmd() {
-    if command -v sha256sum >/dev/null 2>&1; then
-        echo "sha256sum"
-    else
-        echo "shasum -a 256"
-    fi
-}
-
 VERSION=""
 TAG=""
 REPO=""
@@ -130,6 +122,10 @@ fi
 
 if [[ -z "${BUNDLE_NAME}" ]]; then
     BUNDLE_NAME="invarlock-${VERSION}-offline-bundle"
+fi
+if [[ ! "${BUNDLE_NAME}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    echo "ERROR: bundle name may only contain letters, digits, dot, underscore, and dash." >&2
+    exit 2
 fi
 
 if [[ "${DRY_RUN}" == "1" ]]; then

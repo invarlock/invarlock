@@ -25,6 +25,33 @@ def test_public_evidence_audit_passes() -> None:
     assert module.check_public_evidence() == []
 
 
+def test_public_evidence_audit_respects_root_override(tmp_path: Path) -> None:
+    module = _load_audit_module()
+    evidence_root = tmp_path / "public_evidence"
+    artifact_dir = evidence_root / "fixtures" / "demo"
+    artifact_dir.mkdir(parents=True)
+    (evidence_root / "README.md").write_text("# public evidence\n", encoding="utf-8")
+    (artifact_dir / "evaluation.report.json").write_text("{}", encoding="utf-8")
+    (artifact_dir / "runtime.manifest.json").write_text("{}", encoding="utf-8")
+    (artifact_dir / "evidence.meta.json").write_text(
+        json.dumps(
+            {
+                "schema": module.SCHEMA,
+                "evidence_class": "contract_fixture",
+                "summary": "fixture report",
+                "artifact_paths": {
+                    "evaluation_report": "evaluation.report.json",
+                    "runtime_manifest": "runtime.manifest.json",
+                },
+                "verifier_commands": ["invarlock verify evaluation.report.json"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert module.check_public_evidence(evidence_root) == []
+
+
 def test_real_run_reports_and_signed_packs_verify_release_strict() -> None:
     real_run_dirs = sorted((REPO_ROOT / "public_evidence" / "real_runs").iterdir())
     assert real_run_dirs

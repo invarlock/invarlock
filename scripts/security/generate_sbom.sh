@@ -5,6 +5,8 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 SCOPE="environment"
 PYTHON_PATH=""
 OUTPUT_PATH="artifacts/supply-chain/sbom.json"
@@ -26,10 +28,18 @@ EOF
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --scope)
+      if [[ $# -lt 2 || "${2:-}" == --* ]]; then
+        echo "ERROR: --scope requires a value." >&2
+        exit 2
+      fi
       SCOPE="${2:-}"
       shift 2
       ;;
     --python)
+      if [[ $# -lt 2 || "${2:-}" == --* ]]; then
+        echo "ERROR: --python requires a value." >&2
+        exit 2
+      fi
       PYTHON_PATH="${2:-}"
       shift 2
       ;;
@@ -54,15 +64,42 @@ if [[ -z "${SCOPE}" ]]; then
   exit 2
 fi
 
+case "${SCOPE}" in
+  environment|tool-environment|install-surface) ;;
+  *)
+    echo "ERROR: --scope must be environment, tool-environment, or install-surface." >&2
+    exit 2
+    ;;
+esac
+
 if [[ "${SCOPE}" == "install-surface" && -z "${PYTHON_PATH}" ]]; then
   echo "ERROR: --python is required when --scope install-surface is used." >&2
   exit 2
 fi
 
 if [[ -z "${PYTHON_PATH}" ]]; then
-  PYTHON_PATH="$(command -v python3 || command -v python)"
+  if command -v python3 >/dev/null 2>&1; then
+    PYTHON_PATH="$(command -v python3)"
+  elif command -v python >/dev/null 2>&1; then
+    PYTHON_PATH="$(command -v python)"
+  else
+    echo "ERROR: no Python interpreter found on PATH." >&2
+    exit 127
+  fi
+elif [[ "${PYTHON_PATH}" != */* ]]; then
+  REQUESTED_PYTHON="${PYTHON_PATH}"
+  if ! PYTHON_PATH="$(command -v "${REQUESTED_PYTHON}")"; then
+    echo "ERROR: Python interpreter not found on PATH: ${REQUESTED_PYTHON}" >&2
+    exit 1
+  fi
+elif [[ ! -e "${PYTHON_PATH}" ]]; then
+  echo "ERROR: Python interpreter or environment not found: ${PYTHON_PATH}" >&2
+  exit 1
 fi
 
+if [[ "${OUTPUT_PATH}" != /* ]]; then
+  OUTPUT_PATH="${REPO_ROOT}/${OUTPUT_PATH}"
+fi
 OUTPUT_DIR="$(dirname "${OUTPUT_PATH}")"
 
 if ! command -v cyclonedx-py >/dev/null 2>&1; then

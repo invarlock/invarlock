@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Lightweight CPU-only telemetry sweep for CI profile edits.
-# Produces container-backed reports under reports/telemetry/cpu-ci with latency/memory metrics.
+# Produces container-backed reports with latency/memory metrics.
 
 set -euo pipefail
 
@@ -14,7 +14,7 @@ PYTHON_BIN="$(smoke_select_python "$ROOT" "${INVARLOCK_PYTHON:-}")"
 smoke_setup_pythonpath "$ROOT"
 CLI=("$PYTHON_BIN" -m invarlock)
 
-OUT_ROOT="${ROOT}/reports/telemetry/cpu-ci"
+OUT_ROOT="${INVARLOCK_CPU_TELEMETRY_OUT_ROOT:-${ROOT}/reports/telemetry/cpu-ci}"
 mkdir -p "${OUT_ROOT}"
 
 echo "=== CPU telemetry sweep (quant8 attention) ==="
@@ -26,8 +26,8 @@ TIER="${TIER:-balanced}"
 PRESET="${PRESET:-configs/presets/causal_lm/wikitext2_512.yaml}"
 EDIT_CFG="${EDIT_CFG:-configs/overlays/edits/quant_rtn/8bit_attn.yaml}"
 
-RUN_ROOT="${ROOT}/runs/telemetry_cpu/quant8"
-REPORT_ROOT="${OUT_ROOT}/quant8"
+RUN_ROOT="${INVARLOCK_CPU_TELEMETRY_RUN_ROOT:-${ROOT}/runs/telemetry_cpu/quant8}"
+REPORT_ROOT="${INVARLOCK_CPU_TELEMETRY_REPORT_ROOT:-${OUT_ROOT}/quant8}"
 
 smoke_seed_local_runtime_image "cpu"
 smoke_ensure_current_runtime_image "container" "cpu"

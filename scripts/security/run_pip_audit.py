@@ -25,7 +25,7 @@ class AllowlistEntry:
     reason: str
 
 
-def _load_allowlist(path: Path) -> tuple[str, list[AllowlistEntry]]:
+def load_pip_audit_allowlist(path: Path) -> tuple[str, list[AllowlistEntry]]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise SystemExit(f"Allowlist file must contain an object: {path}")
@@ -109,7 +109,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    owner, entries = _load_allowlist(Path(args.allowlist))
+    owner, entries = load_pip_audit_allowlist(Path(args.allowlist))
     print(f"Using pip-audit allowlist owned by {owner}", file=sys.stderr)
     for entry in entries:
         print(
@@ -128,6 +128,9 @@ def main(argv: list[str] | None = None) -> int:
 
     completed = subprocess.run(cmd, check=False)
     return completed.returncode
+
+
+_load_allowlist = load_pip_audit_allowlist
 
 
 if __name__ == "__main__":

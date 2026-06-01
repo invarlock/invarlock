@@ -294,6 +294,9 @@ def test_run_cpu_telemetry_uses_repo_selected_python() -> None:
     assert 'smoke_select_python "$ROOT"' in contents
     assert 'smoke_setup_pythonpath "$ROOT"' in contents
     assert 'CLI=("$PYTHON_BIN" -m invarlock)' in contents
+    assert "INVARLOCK_CPU_TELEMETRY_OUT_ROOT" in contents
+    assert "INVARLOCK_CPU_TELEMETRY_RUN_ROOT" in contents
+    assert "INVARLOCK_CPU_TELEMETRY_REPORT_ROOT" in contents
     assert (
         'PRESET="${PRESET:-configs/presets/causal_lm/wikitext2_512.yaml}"' in contents
     )
