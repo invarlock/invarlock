@@ -49,6 +49,7 @@ family/precision; verify on your setup.
 # Do not accept host-mode output as strict assurance evidence.
 # Baseline on CPU → report
 invarlock evaluate --allow-network --execution-mode host \
+  --assurance off \
   --baseline gpt2 \
   --subject gpt2 \
   --preset configs/presets/causal_lm/wikitext2_512.yaml \
@@ -59,6 +60,7 @@ invarlock evaluate --allow-network --execution-mode host \
 
 # Same schedule on MPS → report
 invarlock evaluate --allow-network --execution-mode host \
+  --assurance off \
   --baseline gpt2 \
   --subject gpt2 \
   --preset configs/presets/causal_lm/wikitext2_512.yaml \

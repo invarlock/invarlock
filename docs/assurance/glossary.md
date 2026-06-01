@@ -35,7 +35,7 @@
 | Canonical Guard Chain | invariants (pre) → spectral → RMT → variance → invariants (post) | `assurance.{guard_chain_observed,canonical_guard_chain}`, `validation.{invariants_pass,spectral_stable,rmt_stable}` |
 | κ (kappa) Threshold | Per-family spectral cap for z-score outliers | `spectral.family_caps.*.kappa` |
 | ε (epsilon) Band | RMT acceptance threshold for edge-risk | `rmt.epsilon_by_family.*` |
-| Guard Overhead | Performance cost of guards vs bare run | `guard_overhead.*` |
+| Guard Overhead | Primary-metric impact of guarded evaluation vs a bare control run | `guard_overhead.*` |
 | Measurement Contract | Estimator + sampling policy recorded in reports | `spectral.measurement_contract_hash` |
 
 ### Data Terms
@@ -87,8 +87,9 @@ Bias-corrected and accelerated bootstrap method for estimating confidence interv
 | **report fields** | `primary_metric.ci`, `primary_metric.reps`, `dataset.windows.stats.bootstrap` |
 | **See also** | [BCa Bootstrap Derivation](03-bca-bootstrap.md) |
 
-**Example:** BCa bootstrap with 2000 replicates produces `ci: [0.995, 1.008]` on
-paired ΔlogNLL, then exponentiated to ratio CI.
+**Example:** BCa bootstrap with 2000 replicates produces a log-space
+`ci: [-0.005, 0.008]` on paired ΔlogNLL, then exponentiates it to
+`display_ci: [0.995, 1.008]` for the ratio view.
 
 ---
 
@@ -180,7 +181,8 @@ auditable outcomes.
 
 #### Guard Overhead
 
-Performance impact of guard checks vs bare control run (no guards).
+Primary-metric impact of guard checks vs a bare control run (no guards).
+This is not a wall-clock latency benchmark.
 
 | Aspect | Details |
 | --- | --- |
