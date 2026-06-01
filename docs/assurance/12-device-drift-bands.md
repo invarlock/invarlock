@@ -10,7 +10,7 @@
 | --- | --- |
 | **Purpose** | Define the pilot review bands for comparing CPU, MPS, and CUDA evaluation ratios. |
 | **Audience** | Maintainers, release reviewers, and operators attaching cross-device evidence. |
-| **Contract scope** | Empirical drift review for matching reports; not a PyTorch cross-platform reproducibility guarantee. |
+| **Contract scope** | Empirical drift review for matching reports; PyTorch cross-platform reproducibility remains a separate platform concern. |
 | **Source of truth** | `scripts/smoke/check_device_drift.py`, report `primary_metric.*`, and runtime metadata under `meta.*`. |
 
 ## Claim
@@ -18,7 +18,7 @@
 With deterministic settings and identical evaluation schedules/policies,
 cross-device evaluation ratios are expected to stay within small empirical
 review bands relative to CPU (e.g., ≤ 0.5% MPS, ≤ 1.0% CUDA). These are pilot
-budgets, not a PyTorch cross-platform reproducibility guarantee.
+budgets for InvarLock report comparison.
 
 ## Budgets (expected)
 
@@ -31,10 +31,9 @@ Bands were empirically derived on pilot models. The repo ships and tests
 `scripts/smoke/check_device_drift.py`; CI enforces the checker behavior on fixtures,
 while real CPU/MPS/CUDA drift enforcement requires CI or release evidence to
 provide comparable reports from those devices. The checker compares absolute
-drift in `primary_metric.ratio_vs_baseline`; it assumes the reports have already
-passed normal verification and does not independently prove matching devices,
-seeds, policy digests, or window schedules. Actual values may vary slightly by
-family/precision; verify on your setup.
+drift in `primary_metric.ratio_vs_baseline`; report verification and provenance
+review establish matching devices, seeds, policy digests, and window schedules.
+Actual values may vary slightly by family/precision; verify on your setup.
 
 ## Determinism & Setup
 

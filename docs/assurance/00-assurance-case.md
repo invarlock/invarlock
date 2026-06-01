@@ -11,11 +11,11 @@
 | **Contract scope** | Assurance case v1.0 for one configured baseline, subject, dataset window plan, tier, profile, and runtime policy. |
 | **Source of truth** | This claim table, the linked assurance notes, `src/invarlock/core/assurance_contract.py`, and `src/invarlock/reporting/verify_contract.py`. |
 
-> **TL;DR:** InvarLock evaluates whether **weight edits** (quantization, pruning, etc.) regress a model beyond defined bounds. It does **not** evaluate content safety, alignment, or deployment security. The assurance case covers: (1) paired primary metrics with bootstrap CIs, (2) the canonical five-stage guard chain (`invariants` pre, `spectral`, `RMT`, `variance`, `invariants` post), (3) deterministic evaluation with full provenance. Each claim has tests and report evidence.
+> **TL;DR:** InvarLock evaluates whether **weight edits** (quantization, pruning, etc.) regress a model beyond defined bounds. The assurance case covers: (1) paired primary metrics with bootstrap CIs, (2) the canonical five-stage guard chain (`invariants` pre, `spectral`, `RMT`, `variance`, `invariants` post), (3) deterministic evaluation with full provenance. Content safety, alignment, and deployment security remain separate review domains. Each claim has tests and report evidence.
 
-> **Assurance boundary:** This is not model certification. The assurance case
-> supports a configured weight-edit regression review for one baseline,
-> subject, dataset window plan, tier, profile, and runtime policy.
+> **Assurance boundary:** The assurance case supports a configured weight-edit
+> regression review for one baseline, subject, dataset window plan, tier,
+> profile, and runtime policy.
 
 This note enumerates the explicit **assurance claims** the toolkit makes, the
 **evidence** included in-tree, and the **runtime contracts** that enforce each
@@ -31,11 +31,12 @@ pairing), see the [Glossary](glossary.md).
 We also list **observability**—the report fields that let reviewers verify
 the claim.
 
-## Scope, assumptions, and non‑goals
+## Scope, Assumptions, and Adjacent Domains
 
-InvarLock’s assurance case is intentionally narrow. It is about **regression risk
-from weight edits relative to a chosen baseline under a specific configuration**,
-not about global model safety.
+InvarLock’s assurance case is intentionally narrow. It is focused on
+**regression risk from weight edits relative to a chosen baseline under a
+specific configuration**. Content safety, alignment, and deployment security
+belong to separate review domains.
 
 ### In scope
 
@@ -52,20 +53,20 @@ not about global model safety.
 - Execution on **Linux/macOS** environments using the pinned HF/PyTorch stack
   and profiles documented in the configs and docs.
 
-### Out of scope (non‑goals)
+### Separate Review Domains
 
-- Preventing or detecting **content harms** (toxicity, bias, jailbreaks),
-  prompt‑level attacks, or alignment failures in general use.
-- Guaranteeing safety for **unrelated training changes**, new datasets, or new
-  architectures that fall outside the calibrated families and tiers.
-- Enforcing infrastructure or deployment hardening (authz, data governance,
-  access control); these live outside the InvarLock runtime.
-- Guaranteeing correctness on environments outside the stated support matrix
-  (e.g., native Windows, custom CUDA stacks, arbitrary dependency versions).
+- **Content-harm review** for toxicity, bias, jailbreak behavior, prompt-level
+  attacks, and alignment behavior in general use.
+- **Model-change review** for unrelated training changes, new datasets, or new
+  architectures outside calibrated families and tiers.
+- **Infrastructure and deployment review** for authz, data governance, access
+  control, and runtime hardening outside the InvarLock evaluation runtime.
+- **Platform qualification** for environments outside the stated support matrix
+  such as native Windows, custom CUDA stacks, or arbitrary dependency versions.
 
 The table below should be read with this scope in mind: each row is a claim
 about **paired evaluation and guard behavior for weight edits** under the
-documented tiers and environments, not a universal guarantee about model safety.
+documented tiers and environments.
 
 > For the end-to-end report lifecycle, see [One Run Lifecycle](../reference/one-run-lifecycle.md). Guard overhead evidence is detailed in [Guard Overhead Method](10-guard-overhead-method.md).
 
@@ -87,7 +88,7 @@ documented tiers and environments, not a universal guarantee about model safety.
 - The report verifier enforces **log‑space math** and **pairing** at runtime.
 - Observability fields make the assurance case auditable in reports and evidence packs.
 
-> Tier scope: Balanced and Conservative are the supported published assurance tiers. The Aggressive tier is research‑oriented and not covered by this assurance case. `none` is not a packaged runtime tier; report-policy compatibility treats it like Balanced if encountered, so it must not be used as a separate assurance claim.
+> Tier scope: Balanced and Conservative are the supported published assurance tiers. The Aggressive tier is research‑oriented and outside the current assurance case. `none` is omitted from packaged runtime tiers; report-policy compatibility treats it like Balanced if encountered, so it is unsuitable as a separate assurance claim.
 
 > 🔍 **Verify on your machine**
 >

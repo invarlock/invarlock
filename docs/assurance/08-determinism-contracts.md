@@ -64,7 +64,7 @@ ties the runtime contract back to reproducible maths:
 ## Assumptions & Scope
 
 - Applies to inference-only evaluation loops; training/edit algorithms may
-  introduce additional nondeterminism not covered here.
+  introduce additional nondeterminism governed by their own evidence surfaces.
 - Identical seeds, configs, and backend should yield identical numeric evidence,
   pairings, hashes, and policy/provenance digests after normalizing volatile
   artifact paths and timestamps. Raw report files can differ in generated-time

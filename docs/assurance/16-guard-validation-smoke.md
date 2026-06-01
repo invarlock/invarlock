@@ -1,8 +1,8 @@
 # Guard Validation Smoke
 
 > **Plain language:** The smoke command proves the synthetic guard-validation
-> harness still runs and records deterministic guard behavior; it does not
-> replace real model-family evidence.
+> harness still runs and records deterministic guard behavior. Real model-family
+> evidence remains a separate release-evidence surface.
 
 ## Overview
 
@@ -33,9 +33,10 @@ for checking that the release evidence path exists and stays deterministic.
 
 ## Interpretation
 
-The generated rows are not a substitute for real checkpoint validation. They
-do not prove thresholds for GPT-2, LLaMA, Qwen, BERT, or any other model family.
-They only provide a repeatable harness shape for:
+The generated rows provide a repeatable harness shape for synthetic validation
+and a release-evidence floor. Real checkpoint validation carries the
+model-family threshold evidence for GPT-2, LLaMA, Qwen, BERT, and other model
+families:
 
 - type-I error reporting
 - power reporting
@@ -63,8 +64,8 @@ synthetic smoke:
 
 Use `make empirical-guard-evidence-check` to validate a portable empirical
 guard-evidence manifest when real evidence is attached for release review.
-That checker does not replace `make guard-validation-smoke`; it validates the
-separate non-synthetic artifact bundle.
+That checker validates the separate non-synthetic artifact bundle; `make
+guard-validation-smoke` remains the deterministic smoke floor.
 
 ## Related Documentation
 

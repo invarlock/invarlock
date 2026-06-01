@@ -60,7 +60,7 @@ runs with signed, fingerprint-pinned evidence packs.
 - **Auditable evidence**: deterministic pairing metadata + policy digests in `evaluation.report.json`.
 - **CI/CD-friendly**: stable exit codes, `--json` outputs, and portable “evidence packs”.
 - **Offline-first**: network is disabled by default; enable downloads per command.
-- **Explicit assurance boundary**: the [trust model](docs/assurance/14-trust-model.md) states what a strict pass means and what it does not mean.
+- **Explicit assurance boundary**: the [trust model](docs/assurance/14-trust-model.md) states the scope of a strict pass.
 
 ## Who is this for?
 
@@ -172,7 +172,7 @@ Artifact model:
 run directory containing `report.json`, first build the reviewer bundle with
 `invarlock report generate --run <subject report.json> --baseline-run-report <baseline report.json> --format report -o <output-dir>`.
 `invarlock advanced runtime-verify` is narrower: it checks runtime manifest
-binding/provenance and does not replace the report/gate verifier.
+binding/provenance; report/gate verification remains the reviewer-facing gate.
 
 Example output (abridged; counts vary by profile/config):
 

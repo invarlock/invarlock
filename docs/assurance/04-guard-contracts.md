@@ -21,7 +21,7 @@
 - [4. Reproducibility Kit](#4-reproducibility-kit) — how to reproduce a report
 - [5. Device Tolerance Guidance](#5-device-tolerance-guidance) — expected drift across backends
 - [6. Threshold Rationale (Defaults)](#6-threshold-rationale-defaults) — why the defaults are what they are
-- [7. Known Limitations](#7-known-limitations) — what the assurance case does not cover
+- [7. Scope Boundaries](#7-scope-boundaries) — where the guard contract applies
 - [8. Coverage Reference](#8-coverage-reference) — tests that underpin this handbook
 
 This handbook captures the evidence claims that underpin InvarLock's guard
@@ -286,11 +286,12 @@ Detailed derivations are in the calibration appendix (`09-tier-v1-calibration.md
   sixth violation fires, `spectral.summary.caps_exceeded = true` and the guard
   aborts the run.
 
-## 7. Known Limitations
+## 7. Scope Boundaries
 
-- Claims apply to evaluation slices only; task-level accuracy is not guaranteed.
+- Claims apply to configured evaluation slices; task-level accuracy requires
+  task-specific evidence.
 - Dataset shift or tokenizer changes invalidate pairing schedules.
-- No adversarial robustness or gradient masking claims.
+- Adversarial robustness and gradient masking require separate evidence.
 - CUDA kernels outside deterministic mode may exceed drift tolerances.
 - Reference mask-based flows are conservative; stronger compression requires plugins.
 - Published assurance basis covers GPT-2 and BERT profiles.
