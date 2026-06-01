@@ -18,7 +18,7 @@ their runnable path or compatibility blocker is understood.
 | torchao | `runnable` via `torchao_int8_export/` | Post-quantization HF-loadable export comparison |
 | LLM Compressor / vLLM | Compatibility validation pending | Compression sidecar evidence before deployment |
 | PEFT | `runnable` via `peft_lora/` | Base-vs-merged-adapter comparison |
-| Hugging Face Optimum | Target path selection pending | Model-card evidence section for a quantized subject |
+| Hugging Face Optimum | `compatibility-investigation` via `optimum_onnx_export/` | ONNX deployment artifact compatibility report |
 | LM Evaluation Harness | `exploratory-host` via `lm_eval_harness/` | Task-eval sidecar artifacts beside InvarLock regression evidence |
 | bitsandbytes | Optional backend/platform validation pending | BNB-loaded subject provenance and report comparison |
 
@@ -37,6 +37,9 @@ their runnable path or compatibility blocker is understood.
   compares the export against the baseline.
 - `lm_eval_harness/` runs a tiny LM Evaluation Harness task and normalizes the
   task metrics as a sidecar artifact that can sit beside InvarLock evidence.
+- `optimum_onnx_export/` exports a tiny model with Optimum ONNX and records why
+  the ONNX Runtime artifact is sidecar deployment evidence rather than a direct
+  input to the shared HF checkpoint comparison wrapper.
 
 ## Example Lifecycle
 
