@@ -289,7 +289,11 @@ If you use InvarLock in scientific work, please cite it (canonical metadata is i
 
 ## Project status
 
-InvarLock is pre‑1.0. Until 1.0, minor releases may include breaking changes. See [`CHANGELOG.md`](CHANGELOG.md).
+InvarLock is pre-1.0 as a package, but the core evidence-artifact surfaces are
+versioned and intended to be stable within their declared contract versions.
+Minor releases may still change non-contract package APIs before 1.0. See
+[`docs/reference/contracts.md`](docs/reference/contracts.md) and
+[`CHANGELOG.md`](CHANGELOG.md).
 
 For guidance on where to ask questions, how to report bugs, and what to expect in terms of response times, see
 [`SUPPORT.md`](SUPPORT.md).

@@ -1,71 +1,43 @@
 # Guards Tests
 
-This directory contains tests for InvarLock's guard mechanisms—the safety systems
-that detect and validate model edits.
+This directory contains tests for InvarLock's guard mechanisms: invariants,
+spectral, RMT, and variance. Guards are a critical release-gate surface, so the
+suite favors behavior-local files and ratcheted coverage over a minimal file
+count.
 
 ## Organization
 
-This structure (many small, focused test modules) is intentional. Guards are a
-critical surface, and the test suite is optimized for targeted coverage and fast
-local iteration rather than a minimal file count.
-
-### Naming conventions
-
-| Area | Pattern | Notes |
-|------|---------|-------|
-| Variance guard | `test_variance_*.py` | Calibration, gates, scale computation, finalize paths, branch coverage |
-| Spectral guard | `test_spectral_*.py` | Prepare/after_edit flows, scope filters, multiple testing enforcement |
-| RMT guard | `test_rmt_*.py` | Detection/correction algorithms, helpers, verbose/edge branches |
-| Invariants guard | `test_invariants_*.py` | Structural checks, API/CLI/docs invariants |
-| Policies/tier config | `test_guard_policies.py`, `test_tier_config.py`, etc. | Runtime policy parsing and validation |
-
-## Guard Types
-
-### Variance Guard (`variance.py`)
-Data-driven variance equalization (DD-VE) for transformer blocks.
-Measures and scales projection weights to maintain stable residual stream dynamics.
-
-### Spectral Guard (`spectral.py`)
-Analyzes weight matrix spectra for anomalous changes indicating corruption or
-unexpected edits.
-
-### RMT Guard (`rmt.py`)
-Random Matrix Theory-based detection of meaningful vs. noise in weight changes.
-
-### Invariants Guard (`invariants.py`)
-Validates structural invariants like weight tying and architecture consistency.
+| Area | Directory | Notes |
+| --- | --- | --- |
+| Shared contracts | `contracts/` | Assurance shape, import safety, GPU-only contracts, and cross-guard regression matrices. |
+| Invariants | `invariants/` | Structural checks, profile behavior, CLI/docs invariants, and summary counts. |
+| Spectral | `spectral/` | Prepare/after-edit flow, measurement, policies, multiple-testing controls, and runtime paths. |
+| RMT | `rmt/` | Detection, correction, activation helpers, runtime finalize paths, and edge branches. |
+| Variance | `variance/` | Calibration, predictive A/B gate, scale computation, target resolution, and finalize paths. |
+| Policy | `policy/` | Guard fallback policy, tier config, and policy branch coverage. |
+| Property | `property/` | Hypothesis/property checks for monotonicity and selection behavior. |
+| Differential | `differential/` | Parity checks between reference and optimized guard decisions. |
 
 ## Running Tests
 
 ```bash
-# Fast variance tests only
-PYTHONPATH=src pytest tests/guards/test_variance_*.py -v
-
-# Full guard suite
-PYTHONPATH=src pytest tests/guards/ -v
-
-# Specific guard
-PYTHONPATH=src pytest tests/guards/test_spectral_*.py -v
-
-# Differential tests (guard implementation parity)
-PYTHONPATH=src pytest tests/guards/differential/ -v
-
-# Property-based guard tests
-PYTHONPATH=src pytest tests/guards/property/ -v
+PYTHONPATH=src pytest -q tests/guards
+PYTHONPATH=src pytest -q tests/guards/variance
+PYTHONPATH=src pytest -q tests/guards/spectral
+PYTHONPATH=src pytest -q tests/guards/rmt
+PYTHONPATH=src pytest -q tests/guards/invariants
+PYTHONPATH=src pytest -q tests/guards/property
+PYTHONPATH=src pytest -q tests/guards/differential
 ```
 
-## Markers
+Use the repository-wide pytest markers from `pyproject.toml` (`integration`,
+`slow`, `gpu`, `manual`, and related optional-dependency markers) only when a
+guard test genuinely needs that behavior.
 
-- `unit`: Focused unit tests (default)
-- `slow`: Long-running tests
-- `gpu`: Requires CUDA/MPS
+## Coverage
 
-## Coverage Targets
-
-Per CONTRIBUTING.md, guards are part of the critical surface:
-- **Target: ≥90% branch coverage** for all files in `src/invarlock/guards/`
-
-## Related Test Directories
-
-- `tests/guards/differential/` - Tests verifying parity between reference and optimized implementations
-- `tests/guards/property/` - Property-based tests using Hypothesis
+Guard modules are covered by `make coverage-enforce`. Critical guard files
+listed in `scripts/coverage/check_coverage_thresholds.py` are ratcheted to 100%
+per-file coverage; remaining guard modules are still covered by the core package
+floor. New guard behavior should add meaningful tests with the same change
+rather than lowering thresholds or relying on broad smoke coverage.

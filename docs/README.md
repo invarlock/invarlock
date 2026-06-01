@@ -21,7 +21,7 @@ running paired evaluation on text workflows plus the included image-text path.
 
 1. **[Getting Started](user-guide/getting-started.md)** – environment setup and the first `evaluate` → `verify` → `report html` loop.
 2. **[Quickstart](user-guide/quickstart.md)** – CLI highlights for common workflows.
-3. **[Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)** – baseline ↔ subject paired evaluation with guardchain.
+3. **[Compare & evaluate (BYOE)](user-guide/compare-and-evaluate.md)** – baseline ↔ subject paired evaluation with the guard chain.
 4. **[Primary Metric Smoke](user-guide/primary-metric-smoke.md)** – tiny examples for ppl/accuracy kinds.
 
 ### Choose Your Path
@@ -76,6 +76,7 @@ boundary. Advanced runtime-heavy workflows live under `invarlock advanced`.
 
 - [Reference Index](reference/index.md)
 - [CLI Reference](reference/cli.md)
+- [Public Contracts](reference/contracts.md)
 - [Tier Policy Tuning CLI (Calibration)](reference/calibration.md) — `invarlock advanced calibrate` for tier policy sweeps
 - [Configuration Schema](reference/config-schema.md)
 - [Guards](reference/guards.md)
@@ -191,7 +192,7 @@ configured acceptance envelopes even when aggressive compression is attempted.
 
 - Offline (default): mkdocs builds without contacting the Internet. Mermaid
   diagrams are disabled by default to keep builds fully local.
-  - Command: `mkdocs build` or run `make docs` without `--strict`.
+  - Command: `make docs` or `mkdocs build --strict`.
 - Online (enable networked assets explicitly): enable Mermaid diagrams (via CDN)
   and keep strict checks.
   - Command: `INVARLOCK_DOCS_MERMAID=1 mkdocs build --strict`
@@ -291,7 +292,7 @@ INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --allow-network \
 ```bash
 invarlock advanced plugins adapters
 invarlock advanced calibrate --help
-bash scripts/checks/verify_ci_matrix.sh
+make ci-matrix
 ```
 
 ### Production Evaluation
@@ -347,10 +348,10 @@ output:
 <!-- Quick CPU demos are intentionally omitted from this public docs index. -->
 
 ```bash
-NET=1 INCLUDE_MEASURED_CLS=1 RUN=0 bash scripts/smoke/run_tiny_all_matrix.sh
+bash scripts/smoke/run_tiny_all_matrix.sh
 ```
 
-Run with `RUN=1` to execute the matrix.
+Run with `RUN=1 NET=1` to execute the matrix and allow downloads.
 
 ---
 
