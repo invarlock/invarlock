@@ -9,6 +9,7 @@ import pytest
 def test_tiny_gpt2_matrix_dry_run(tmp_path: Path):
     env = os.environ.copy()
     env["RUN"] = "0"
+    env["NET"] = "0"
     env["GPT2_ID"] = "sshleifer/tiny-gpt2"
     env["TMP_DIR"] = str(tmp_path / "tmp")
     # The script should complete without executing any commands and write a checklist
@@ -22,6 +23,22 @@ def test_tiny_gpt2_matrix_dry_run(tmp_path: Path):
         "evaluate" in text
         and "--baseline-adapter hf_causal --subject-adapter hf_causal" in text
     )
+    assert "INVARLOCK_ALLOW_NETWORK=1" not in text
+    assert "HF_DATASETS_OFFLINE=1" in text
+
+
+def test_checklist_records_network_allowance_only_when_net_enabled(tmp_path: Path):
+    env = os.environ.copy()
+    env["RUN"] = "0"
+    env["NET"] = "1"
+    env["TMP_DIR"] = str(tmp_path / "tmp")
+
+    subprocess.check_call(["bash", "scripts/smoke/run_tiny_all_matrix.sh"], env=env)
+    checklist = Path(env["TMP_DIR"]) / "checklist.md"
+    text = checklist.read_text(encoding="utf-8")
+
+    assert "INVARLOCK_ALLOW_NETWORK=1" in text
+    assert "HF_DATASETS_OFFLINE=0" in text
 
 
 def _read_profile_from_checklist(path: str) -> str:
