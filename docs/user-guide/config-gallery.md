@@ -62,7 +62,8 @@ invarlock evaluate --allow-network --baseline bert-base-uncased --subject /path/
 
 | Preset | Use Case | Model Type | Dataset |
 | --- | --- | --- | --- |
-| `configs/presets/seq2seq/synth_64.yaml` | Quick seq2seq tests | T5 | Synthetic |
+| `configs/presets/seq2seq/synth_64.yaml` | Quick seq2seq tests | T5/BART-style encoder-decoder | Synthetic |
+| `configs/presets/seq2seq/synth_128.yaml` | Longer seq2seq smoke runs | T5/BART-style encoder-decoder | Synthetic |
 
 **When to use:** Encoder-decoder models. Synthetic data keeps runs offline and
 fast for smoke testing.
@@ -87,6 +88,16 @@ invarlock evaluate --allow-network --baseline gpt2 --subject gpt2 \
   --edit-config configs/overlays/edits/quant_rtn/8bit_attn.yaml \
   --profile ci
 ```
+
+## Model And Dataset Overlays
+
+These partial overlays are useful when composing local presets:
+
+| Overlay | Scope | Use Case |
+| --- | --- | --- |
+| `configs/overlays/models/hf_causal.yaml` | Model adapter | Hugging Face causal LM defaults |
+| `configs/overlays/models/hf_mlm.yaml` | Model adapter | Hugging Face masked LM defaults |
+| `configs/overlays/datasets/wikitext2.yaml` | Dataset | WikiText-2 validation windows |
 
 ## Profiles
 

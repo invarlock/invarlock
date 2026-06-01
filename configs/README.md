@@ -15,6 +15,19 @@ included in the wheel). Runtime policy is canonical and lives under
 - `configs/overrides/` — committed, copy-first examples for local guard overrides
 - `configs/local/` — ignored by git; for your working presets/overrides
 
+Preset families currently include:
+
+- `configs/presets/causal_lm/` — decoder-only text models
+- `configs/presets/masked_lm/` — BERT/RoBERTa-style masked language models
+- `configs/presets/seq2seq/` — T5/BART-style encoder-decoder smoke presets
+- `configs/presets/multimodal/` — multimodal model presets
+
+The simple model and dataset overlays are:
+
+- `configs/overlays/models/hf_causal.yaml`
+- `configs/overlays/models/hf_mlm.yaml`
+- `configs/overlays/datasets/wikitext2.yaml`
+
 ## Examples
 
 These repo-only examples assume a host-side checkout, so they use
@@ -41,6 +54,12 @@ INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --execution
   --baseline gpt2 --subject gpt2 --baseline-adapter auto --subject-adapter auto \
   --profile dev \
   --preset configs/presets/causal_lm/gpt2_smoke_128.yaml
+
+# Seq2seq smoke preset (synthetic pairs, T5-style adapter)
+INVARLOCK_ALLOW_NETWORK=1 INVARLOCK_DEDUP_TEXTS=1 invarlock evaluate --execution-mode host \
+  --baseline t5-small --subject t5-small --baseline-adapter hf_seq2seq --subject-adapter hf_seq2seq \
+  --profile dev \
+  --preset configs/presets/seq2seq/synth_64.yaml
 ```
 
 Runtime configs (canonical, in‑package) live under `src/invarlock/_data/runtime/`:
