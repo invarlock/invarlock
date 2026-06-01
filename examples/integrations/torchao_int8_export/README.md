@@ -1,6 +1,6 @@
 # torchao Int8 Export Integration Example
 
-Status: `runnable`
+Status: `runnable`; strict container evidence verified on CUDA.
 
 This example shows how to attach InvarLock regression evidence to a checkpoint
 created by an external `torchao` quantization workflow. It creates a tiny local
@@ -55,6 +55,8 @@ examples/integrations/torchao_int8_export/run_tiny_torchao_int8_export.sh \
 
 The runner defaults to the `release` profile so the strict verification path has
 enough evaluation tokens for a stable primary-metric verdict.
+Set `INVARLOCK_RUNTIME_IMAGE` and `INVARLOCK_RUNTIME_IMAGE_DIGEST` when the
+strict container artifact will be shared for review.
 
 ## Outputs
 
@@ -64,6 +66,9 @@ The runner writes generated outputs under ignored local directories:
 | --- | --- |
 | `models/tiny-llama-baseline/` | Deterministic tiny HF baseline checkpoint. |
 | `models/tiny-llama-torchao-int8-export/` | HF-loadable subject exported from the `torchao` quantization pass. |
+| `artifacts/tiny-torchao-int8-export-fixture/tiny_causal_text.jsonl` | Deterministic local text fixture for evaluation. |
+| `artifacts/tiny-torchao-int8-export-fixture/preset.yaml` | Generated preset pointing at the local fixture. |
+| `artifacts/tiny-torchao-int8-export-fixture/fixture_summary.json` | Fixture parameters and file hashes. |
 | `reports/tiny-torchao-int8-export/evaluation.report.json` | Canonical verifier input. |
 | `reports/tiny-torchao-int8-export/verify.json` | Machine-readable verifier result. |
 | `reports/tiny-torchao-int8-export/evaluation.html` | Human-readable report. |

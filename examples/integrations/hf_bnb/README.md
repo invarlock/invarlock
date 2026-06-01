@@ -1,12 +1,12 @@
 # hf_bnb Bitsandbytes Runtime-Load Integration Example
 
-Status: `runnable`
+Status: `runnable`; strict container evidence verified on CUDA.
 
 This example shows how to attach InvarLock regression evidence to a subject
-loaded through the built-in `hf_bnb` adapter. It compares a normal
-`hf_causal` baseline against the same checkpoint loaded with bitsandbytes 8-bit
-runtime quantization and records backend inventory alongside the evaluation
-report.
+loaded through the built-in `hf_bnb` adapter. By default it creates a tiny
+local Llama-style checkpoint, compares that checkpoint as a normal `hf_causal`
+baseline against the same checkpoint loaded with bitsandbytes 8-bit runtime
+quantization, and records backend inventory alongside the evaluation report.
 
 The subject is a runtime-loaded model, not a saved HF export. Use this example
 when the integration point is "load this checkpoint through bitsandbytes and
@@ -37,7 +37,8 @@ From the repository root:
 ```bash
 uv run --extra hf --extra gpu \
   examples/integrations/hf_bnb/run_tiny_hf_bnb_8bit.sh \
-  --allow-network
+  --allow-network \
+  --force
 ```
 
 The default path uses `--execution-mode host --assurance off` because
@@ -52,8 +53,10 @@ INVARLOCK_RUNTIME_IMAGE=invarlock-runtime:cuda-quant \
 uv run --extra hf --extra gpu \
   examples/integrations/hf_bnb/run_tiny_hf_bnb_8bit.sh \
   --allow-network \
+  --force \
   --execution-mode container \
-  --assurance strict
+  --assurance strict \
+  --device cuda
 ```
 
 Strict container evidence should use a digest-pinned runtime image when the
@@ -65,6 +68,7 @@ The runner writes generated outputs under ignored local directories:
 
 | Path | Role |
 | --- | --- |
+| `models/tiny-llama-bnb-baseline/` | Deterministic tiny HF checkpoint used as both dense baseline and bitsandbytes runtime-loaded subject. |
 | `artifacts/tiny-hf-bnb-8bit/tiny_causal_text.jsonl` | Deterministic local text fixture for the CI-sized comparison. |
 | `artifacts/tiny-hf-bnb-8bit/preset.yaml` | Generated preset pointing at the local fixture. |
 | `artifacts/tiny-hf-bnb-8bit/fixture_summary.json` | Fixture parameters and file hashes. |

@@ -10,8 +10,13 @@ InvarLock's hf_bnb adapter with bitsandbytes 8-bit runtime loading.
 
 Options:
   --baseline VALUE             Baseline model ID or local path.
-                               Default: sshleifer/tiny-gpt2
+                               Default: generated tiny local Llama checkpoint.
   --subject VALUE              Subject model ID or local path.
+                               Default: same as baseline.
+  --model-dir DIR              Generated local model directory when baseline and
+                               subject are not provided.
+                               Default: examples/integrations/hf_bnb/models/tiny-llama-bnb-baseline
+  --tokenizer-source VALUE     Tokenizer ID or local path for generated model.
                                Default: sshleifer/tiny-gpt2
   --fixture-dir DIR            Generated local JSONL/preset directory.
                                Default: examples/integrations/hf_bnb/artifacts/tiny-hf-bnb-8bit
@@ -25,6 +30,7 @@ Options:
                                execution mode.
   --device VALUE               Optional device override.
   --allow-network              Allow model downloads.
+  --force                      Replace the generated local model directory.
   --no-html                    Skip HTML rendering in the compare wrapper.
   -h, --help                   Show this help.
 
@@ -37,8 +43,10 @@ USAGE
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../../.." && pwd)"
 
-baseline="sshleifer/tiny-gpt2"
-subject="sshleifer/tiny-gpt2"
+baseline=""
+subject=""
+model_dir="$SCRIPT_DIR/models/tiny-llama-bnb-baseline"
+tokenizer_source="sshleifer/tiny-gpt2"
 fixture_dir="$SCRIPT_DIR/artifacts/tiny-hf-bnb-8bit"
 report_out="$SCRIPT_DIR/reports/tiny-hf-bnb-8bit"
 profile="ci"
@@ -48,6 +56,7 @@ assurance="off"
 runtime_provenance=""
 device=""
 allow_network=0
+force=0
 render_html=1
 
 while [[ $# -gt 0 ]]; do
@@ -58,6 +67,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --subject)
       subject="${2:-}"
+      shift 2
+      ;;
+    --model-dir)
+      model_dir="${2:-}"
+      shift 2
+      ;;
+    --tokenizer-source)
+      tokenizer_source="${2:-}"
       shift 2
       ;;
     --fixture-dir)
@@ -96,6 +113,10 @@ while [[ $# -gt 0 ]]; do
       allow_network=1
       shift
       ;;
+    --force)
+      force=1
+      shift
+      ;;
     --no-html)
       render_html=0
       shift
@@ -112,10 +133,19 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$baseline" || -z "$subject" || -z "$fixture_dir" || -z "$report_out" ]]; then
+if [[ -z "$fixture_dir" || -z "$report_out" ]]; then
   echo "Missing required baseline, subject, fixture, or report path." >&2
   usage >&2
   exit 2
+fi
+
+if [[ -z "$baseline" && -z "$subject" ]]; then
+  baseline="$model_dir"
+  subject="$model_dir"
+elif [[ -z "$baseline" ]]; then
+  baseline="$subject"
+elif [[ -z "$subject" ]]; then
+  subject="$baseline"
 fi
 
 PYTHON_BIN="${PYTHON_BIN:-}"
@@ -143,8 +173,26 @@ fi
 
 export PYTHONPATH="$REPO_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
 
-fixture_preset="$("$PYTHON_BIN" "$SCRIPT_DIR/prepare_tiny_hf_bnb_fixture.py" \
-  --output-dir "$fixture_dir")"
+fixture_cmd=(
+  "$PYTHON_BIN"
+  "$SCRIPT_DIR/prepare_tiny_hf_bnb_fixture.py"
+  --output-dir "$fixture_dir"
+  --model-id "$baseline"
+)
+if [[ "$baseline" == "$model_dir" && "$subject" == "$model_dir" ]]; then
+  fixture_cmd+=(
+    --model-dir "$model_dir"
+    --tokenizer-source "$tokenizer_source"
+  )
+fi
+if [[ "$allow_network" -eq 1 ]]; then
+  fixture_cmd+=(--allow-network)
+fi
+if [[ "$force" -eq 1 ]]; then
+  fixture_cmd+=(--force)
+fi
+
+fixture_preset="$("${fixture_cmd[@]}")"
 
 mkdir -p "$report_out"
 cp "$fixture_dir/fixture_summary.json" "$report_out/fixture_summary.json"

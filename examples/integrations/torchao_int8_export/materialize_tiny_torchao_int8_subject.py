@@ -14,6 +14,29 @@ from importlib import metadata
 from pathlib import Path
 from typing import Any
 
+TERMS = (
+    "invarlock",
+    "torchao",
+    "quantized",
+    "baseline",
+    "subject",
+    "regression",
+    "metric",
+    "window",
+    "evidence",
+    "runtime",
+    "loader",
+    "dataset",
+    "guard",
+    "report",
+    "verify",
+    "token",
+    "checkpoint",
+    "comparison",
+    "policy",
+    "profile",
+)
+
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -32,6 +55,11 @@ def _parse_args() -> argparse.Namespace:
         "--subject-dir",
         required=True,
         help="Directory where the exported subject checkpoint will be written.",
+    )
+    parser.add_argument(
+        "--fixture-dir",
+        required=True,
+        help="Directory where the generated local JSONL fixture will be written.",
     )
     parser.add_argument(
         "--tokenizer-source",
@@ -62,6 +90,11 @@ def _parse_args() -> argparse.Namespace:
         default=64,
         help="Tiny Llama context length.",
     )
+    parser.add_argument("--rows", type=int, default=860)
+    parser.add_argument("--terms-per-row", type=int, default=180)
+    parser.add_argument("--seq-len", type=int, default=256)
+    parser.add_argument("--preview-n", type=int, default=400)
+    parser.add_argument("--final-n", type=int, default=400)
     parser.add_argument(
         "--allow-network",
         action="store_true",
@@ -139,6 +172,99 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     )
 
 
+def _row_text(row_index: int, *, terms_per_row: int) -> str:
+    return " ".join(
+        f"{TERMS[(row_index + offset) % len(TERMS)]}-{row_index}-{offset}"
+        for offset in range(terms_per_row)
+    )
+
+
+def write_text_fixture(
+    output_dir: Path,
+    *,
+    model_id: str = "local-tiny-llama",
+    rows: int,
+    terms_per_row: int,
+    seq_len: int,
+    preview_n: int,
+    final_n: int,
+) -> dict[str, Any]:
+    if rows < preview_n + final_n:
+        raise ValueError("rows must be at least preview_n + final_n")
+    if terms_per_row < 1:
+        raise ValueError("terms_per_row must be positive")
+    if seq_len < 8:
+        raise ValueError("seq_len must be at least 8")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    data_path = output_dir / "tiny_causal_text.jsonl"
+    preset_path = output_dir / "preset.yaml"
+    summary_path = output_dir / "fixture_summary.json"
+
+    with data_path.open("w", encoding="utf-8") as handle:
+        for row_index in range(rows):
+            payload = {"text": _row_text(row_index, terms_per_row=terms_per_row)}
+            handle.write(json.dumps(payload, ensure_ascii=True) + "\n")
+
+    preset_text = f"""model:
+  id: "{model_id}"
+  adapter: "hf_causal"
+  device: "auto"
+
+dataset:
+  provider:
+    kind: "local_jsonl"
+    file: "{data_path}"
+    text_field: "text"
+    max_samples: {rows}
+  split: "validation"
+  seq_len: {seq_len}
+  stride: {seq_len}
+  preview_n: {preview_n}
+  final_n: {final_n}
+  seed: 43
+
+eval:
+  metric:
+    kind: "ppl_causal"
+  loss:
+    type: "causal"
+
+edit:
+  name: "noop"
+  plan: {{}}
+
+auto:
+  enabled: true
+  tier: "balanced"
+  probes: 0
+
+guards:
+  order: ["invariants", "spectral", "rmt", "variance", "invariants"]
+
+output:
+  dir: "runs"
+  save_model: false
+  save_report: true
+"""
+    preset_path.write_text(preset_text, encoding="utf-8")
+
+    summary: dict[str, Any] = {
+        "format_version": "torchao-fixture-v1",
+        "data_path": str(data_path),
+        "preset_path": str(preset_path),
+        "rows": rows,
+        "terms_per_row": terms_per_row,
+        "seq_len": seq_len,
+        "preview_n": preview_n,
+        "final_n": final_n,
+        "data_sha256": _sha256(data_path),
+        "preset_sha256": _sha256(preset_path),
+    }
+    _write_json(summary_path, summary)
+    return summary
+
+
 def _quantized_tensor_type(value: Any) -> str | None:
     value_type = type(value)
     fqcn = f"{value_type.__module__}.{value_type.__name__}"
@@ -203,6 +329,7 @@ def main() -> None:
     args = _parse_args()
     baseline_dir = Path(args.baseline_dir)
     subject_dir = Path(args.subject_dir)
+    fixture_dir = Path(args.fixture_dir)
     if baseline_dir.resolve() == subject_dir.resolve():
         raise SystemExit("--baseline-dir and --subject-dir must be different paths.")
     local_files_only = not bool(args.allow_network)
@@ -218,7 +345,18 @@ def main() -> None:
 
     random.seed(args.seed)
     torch.manual_seed(args.seed)
-    _prepare_output_dirs([baseline_dir, subject_dir], force=bool(args.force))
+    _prepare_output_dirs(
+        [baseline_dir, subject_dir, fixture_dir], force=bool(args.force)
+    )
+    fixture = write_text_fixture(
+        fixture_dir,
+        model_id=str(baseline_dir),
+        rows=int(args.rows),
+        terms_per_row=int(args.terms_per_row),
+        seq_len=int(args.seq_len),
+        preview_n=int(args.preview_n),
+        final_n=int(args.final_n),
+    )
 
     tokenizer = auto_tokenizer.from_pretrained(
         args.tokenizer_source,
@@ -295,6 +433,7 @@ def main() -> None:
             "intermediate_size": int(args.intermediate_size),
             "num_hidden_layers": 1,
         },
+        "fixture": fixture,
         "torchao": {
             "quantization": "Int8WeightOnlyConfig",
             "export_mode": "dequantized_hf_checkpoint",

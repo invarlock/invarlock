@@ -1,6 +1,6 @@
 # GPTQModel Integration Example
 
-Status: `runnable`
+Status: `runnable`; strict container runtime provenance verified on CUDA.
 
 This example shows how to attach InvarLock regression evidence to a checkpoint
 quantized by GPTQModel. It creates a deterministic tiny Llama-style Hugging Face
@@ -41,8 +41,9 @@ runtime loading is platform-dependent. In host mode the runner sets
 Torch compile failures during tiny smoke runs. It still runs the
 InvarLock evaluator, verifier, backend inventory, and HTML renderer.
 
-For a strict CUDA/container run, provide the quant runtime image and switch the
-runner to container mode:
+For a CUDA/container run that completes with runtime provenance verification,
+provide the quant runtime image, switch the runner to container mode, and keep
+the primary assurance verdict off:
 
 ```bash
 INVARLOCK_RUNTIME_IMAGE=invarlock-runtime:cuda-quant \
@@ -51,11 +52,15 @@ uv run --extra gptq \
   --allow-network \
   --force \
   --execution-mode container \
-  --assurance strict
+  --assurance off \
+  --runtime-provenance container \
+  --device cuda
 ```
 
-Strict container evidence should use a digest-pinned runtime image when the
-artifact is being shared for review.
+Use a digest-pinned runtime image when the artifact is being shared for review.
+The `--assurance strict` path is reserved for quantized-checkpoint guard
+contract work until spectral and variance coverage for GPTQ module targets is
+expanded.
 
 ## Outputs
 

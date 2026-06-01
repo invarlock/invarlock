@@ -28,6 +28,7 @@ def test_hf_bnb_runner_has_expected_adapter_contract() -> None:
     assert "--subject-adapter hf_bnb" in text
     assert "--edit-label hf_bnb_8bit_runtime_load" in text
     assert "prepare_tiny_hf_bnb_fixture.py" in text
+    assert "--model-dir" in text
     assert 'execution_mode="host"' in text
     assert 'assurance="off"' in text
 
@@ -38,6 +39,7 @@ def test_prepare_tiny_hf_bnb_fixture_writes_local_jsonl_and_preset(
     helper = _load_helper_module()
     summary = helper.write_fixture(
         tmp_path,
+        model_id="/tmp/local-tiny-llama",
         rows=6,
         terms_per_row=5,
         seq_len=32,
@@ -61,6 +63,7 @@ def test_prepare_tiny_hf_bnb_fixture_writes_local_jsonl_and_preset(
 
     preset = preset_path.read_text(encoding="utf-8")
     assert 'kind: "local_jsonl"' in preset
+    assert 'id: "/tmp/local-tiny-llama"' in preset
     assert f'file: "{data_path}"' in preset
     assert "seq_len: 32" in preset
     assert "preview_n: 3" in preset
