@@ -88,7 +88,7 @@ verified runtime-provenance result, not as a successful command exit alone.
 | `blocking_reasons` | empty list |
 
 The verifier JSON result must then include
-`verification.runtime_provenance.status = verified`.
+`results[*].verification.runtime_provenance.status = "verified"`.
 
 ## Evidence Pack Signer Authenticity
 

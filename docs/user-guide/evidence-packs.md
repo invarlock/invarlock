@@ -330,7 +330,8 @@ digest-backed evidence about the deployable artifact that was validated.
 
 Use `--determinism strict` to disable TF32 and cuDNN benchmarks and align with
 strict InvarLock presets. `--repeats N` reruns a single edit N times and records
-a drift summary in `results/determinism_repeats.json`.
+a drift summary in `analysis/determinism_repeats.json` in the run output; packed
+bundles copy it to `results/analysis/determinism_repeats.json`.
 
 ## Signing & Verification (Evidence vs Strict Signed Verification)
 

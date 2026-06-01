@@ -52,9 +52,10 @@ policy under `resolved_policy.spectral`.
   Conservative 220×220) so profiles can request stricter counts. These counts
   follow a half‑width sizing rule on the paired Δlog‑loss CI (power ≈ 50% at the
   boundary for the chosen `min_effect_lognll`), verified on pilot runs.
-- Release evidence must meet the requested counts; runs that under‑cover
-  preview/final windows or bootstrap replicates fail evaluation in CI/Release
-  profiles (see [Coverage & Pairing Plan](02-coverage-and-pairing.md)).
+- CI/Release profiles request stricter counts than the base tier floors. The
+  runtime/report gates enforce perfect pairing, zero overlap, and selected
+  tier-floor minima; reviewers should compare requested profile counts to the
+  recorded used counts when judging a release evidence package.
 
 **Spectral calibration provenance.** Aggregated null-run stats are derived from
 calibration runs. The repo ships the public published-basis reports and recipes
@@ -154,20 +155,24 @@ With 120 total modules distributed as: FFN=40, Attn=40, Embed=8, Other=32.
    - B(embed) = ⌊5 × 8/120 + 0.5⌋ = 1
    - B(other) = ⌊5 × 32/120 + 0.5⌋ = 1
 
-5. **Write local override:**
+5. **Write local override:** Start from
+   `configs/overrides/spectral_balanced_local.example.yaml`, copy it for local
+   editing, and update the calibrated caps.
 
    ```yaml
-   # configs/overrides/spectral_local.yaml
+   # Based on configs/overrides/spectral_balanced_local.example.yaml
    guards:
      spectral:
        family_caps:
-         ffn: 1.89
-         attn: 2.73
-         embed: 1.5
-         other: 1.2
+         ffn: {kappa: 1.89}
+         attn: {kappa: 2.73}
+         embed: {kappa: 1.5}
+         other: {kappa: 1.2}
    ```
 
-6. **Re-run with override:**
+6. **Re-run with override:** The command below uses the committed example path
+   for reproducibility; replace it with your edited local copy when trialing new
+   caps.
 
    ```bash
    # Calibration-only / non-assurance example.
@@ -177,7 +182,7 @@ With 120 total modules distributed as: FFN=40, Attn=40, Embed=8, Other=32.
      --baseline gpt2 \
      --subject gpt2 \
      --preset configs/presets/causal_lm/wikitext2_512.yaml \
-     --edit-config configs/overrides/spectral_local.yaml \
+     --edit-config configs/overrides/spectral_balanced_local.example.yaml \
      --profile ci \
      --tier balanced
    ```

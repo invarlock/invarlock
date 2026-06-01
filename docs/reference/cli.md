@@ -269,13 +269,15 @@ listed below.
 Subcommands:
 
 - `invarlock advanced evidence-pack`
-  - Inspect, build, and verify evidence packs
+  - Inspect, build, sign/keygen, and verify evidence packs
 - `invarlock advanced policy`
   - Build and verify policy-pack artifacts
 - `invarlock advanced plugins`
   - Read-only plugin discovery and explanation
 - `invarlock advanced calibrate`
   - Tier-policy calibration and sweep tooling
+- `invarlock advanced runtime-verify`
+  - Low-level runtime-manifest verification for an existing report
 
 Examples:
 
@@ -284,6 +286,7 @@ invarlock advanced evidence-pack verify <pack> --strict --report-assurance stric
 invarlock advanced policy verify policy-pack.json --json
 invarlock advanced plugins list --json
 invarlock advanced calibrate --help
+invarlock advanced runtime-verify --report reports/eval/evaluation.report.json --manifest reports/eval/runtime.manifest.json
 ```
 
 ## Plugins & Entry Points

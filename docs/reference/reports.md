@@ -281,11 +281,11 @@ fields while enforcing a small, stable core:
 **Required top‑level fields:**
 
 - `schema_version` — must equal `"v1"`.
-- `run_id` — non‑empty string (minimum length 4).
+- `run_id` — non‑empty string (minimum length 1).
 - `meta` — object (model/device/seeds; validator does not fix sub‑shape).
 - `dataset` — object with at least:
   - `provider`: string
-  - `seq_len`: integer ≥ 1
+  - `seq_len`: integer ≥ 0
   - `windows.preview`: integer ≥ 0
   - `windows.final`: integer ≥ 0
   - `windows.stats`: object (paired-window stats and coverage)
@@ -293,12 +293,12 @@ fields while enforcing a small, stable core:
 - `plugins` — object listing discovered adapters/edits/guards.
 - `primary_metric` — object (canonical primary metric snapshot).
 
-**Primary metric block (required):**
+**Primary metric block (object required, only `kind` required by schema):**
 
 - `primary_metric.kind`: string (e.g., `"ppl_causal"`, `"accuracy"`).
-- `primary_metric.preview` / `primary_metric.final`: numbers.
-- `primary_metric.ratio_vs_baseline`: number.
-- `primary_metric.display_ci`: two‑element numeric array `[lo, hi]`.
+- `primary_metric.preview` / `primary_metric.final`: numbers when available.
+- `primary_metric.ratio_vs_baseline`: number when available.
+- `primary_metric.display_ci`: two‑element numeric array `[lo, hi]` when available.
 - Additional optional fields: `unit`, `direction`, `ci`, `gating_basis`,
   `aggregation_scope`, `estimated`, etc.
 

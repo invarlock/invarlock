@@ -36,10 +36,12 @@ calibration data that accompany the InvarLock assurance notes.
 | **Spectral** | 2‑D layer weights (FFN, attention proj, embeddings) | Compute the spectral z-score under the fixed measurement contract; pass while `abs(z) ≤ κ_f` under the published family caps. Gaussian-tail FPR applies to calibrated high-kappa families; low sentinel caps are operational thresholds. Optional degeneracy proxies (stable-rank drift, norm collapse) may add WARN/ABORT depending on policy. | WARN when `abs(z) > κ_f`; abort if the cap budget would exceed `max_caps` (and for configured fatal degeneracy thresholds). | `invarlock.guards.spectral` |
 | **RMT** | Token‑weighted activations (sampled) | Compute a per‑module edge risk score on whitened activations under a fixed measurement contract; accept when baseline-relative growth stays within the calibrated ε-band per family. | report fails on ε‑band violations; catastrophic spikes in the primary metric are gated separately (`spike_threshold` = 2.0× for ppl‑like metrics). | `invarlock.guards.rmt` |
 | **Variance (VE)** | Paired ΔlogNLL with calibration windows | Enable VE only if the predictive CI upper bound ≤ −`min_effect_lognll` **and** mean Δ ≤ −`min_effect_lognll` (Balanced uses one‑sided CI; Conservative uses two‑sided CI). A CI entirely above +`min_effect_lognll` is treated as regression and VE stays off. | VE disabled, guard records reason; edit continues | `invarlock.guards.variance` |
-| **Bootstrap sanity** | Evaluation windows, token counts | Matching window IDs, zero overlap; BCa replicates ≥ requested | Abort evaluation and surface reason | `invarlock.reporting.report_make` |
+| **Bootstrap sanity** | Evaluation windows, token counts | Matching window IDs, zero overlap; BCa replicates ≥ selected tier floor | Abort or fail verification and surface reason | `invarlock.reporting.report_make` |
 
-Each guard logs its policy digest, metrics, and **measurement contract**; reports
-mirror those fields under `resolved_policy.*` and `spectral`/`rmt`/`variance` blocks.
+Reports record a report-level policy digest plus guard metrics. Spectral and RMT
+carry explicit measurement-contract evidence, and variance may include a
+variance-policy digest; these fields are mirrored under `resolved_policy.*` and
+the `spectral`/`rmt`/`variance` blocks.
 
 For the two guard formulas that are easiest to misread in a table:
 

@@ -15,7 +15,7 @@
 | **Primary commands** | `invarlock advanced calibrate null-sweep`, `invarlock advanced calibrate ve-sweep`. |
 | **Requires** | `invarlock[hf]` for HF workflows; base config YAML for each sweep type. |
 | **Network** | Offline by default; use `--allow-network` on calibration commands when a sweep needs model or dataset downloads. |
-| **Source of truth** | `src/invarlock/cli/commands/calibrate.py`, `src/invarlock/calibration/`. |
+| **Source of truth** | `src/invarlock/cli/commands/calibrate.py`, `src/invarlock/calibration.py`. |
 
 Smoke-sized configs are also shipped for maintainers who want to exercise the
 calibration command surface without a full policy-tuning campaign:

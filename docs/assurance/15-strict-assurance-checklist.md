@@ -92,7 +92,7 @@ judgment about policy allowances and bundle contents.
 - [ ] `assurance.runtime_provenance_verified` is `false` before verifier confirmation.
 - [ ] `assurance.blocking_reasons` is empty.
 - [ ] `invarlock verify --assurance strict` exits successfully and reports
-  `verification.runtime_provenance.status = verified`.
+  `results[*].verification.runtime_provenance.status = "verified"`.
 
 ## Related Documentation
 

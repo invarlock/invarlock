@@ -2,14 +2,16 @@
 
 > **Plain language:** Confidence intervals come from a paired, token‑weighted
 > BCa bootstrap on Δlog‑loss; the ratio CI is just the exponentiated Δlog CI.
-> When Δ is degenerate, or BCa’s acceleration term is undefined, we fall back
-> transparently.
+> When Δ is degenerate, or BCa’s acceleration term is undefined, the bootstrap
+> helper falls back to a deterministic interval path. Reports record the
+> configured bootstrap method/seed/replicate metadata and degenerate Δ summary;
+> acceleration fallback is not emitted as a separate evidence flag.
 
 ## Overview
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Document the paired token-weighted bootstrap method and its transparent fallback behavior. |
+| **Purpose** | Document the paired token-weighted bootstrap method and its fallback behavior. |
 | **Audience** | Statistics reviewers, report-verifier maintainers, and contributors changing CI computation. |
 | **Contract scope** | Paired delta-log-loss confidence intervals and ratio-CI conversion for report evidence. |
 | **Source of truth** | `src/invarlock/core/bootstrap.py`, `src/invarlock/core/runner_eval_metrics_stats.py`, and bootstrap tests. |
@@ -18,8 +20,9 @@
 
 Paired, token‑weighted BCa on Δlog‑loss yields a ratio CI by exponentiation.
 When Δ is degenerate or acceleration is undefined, the implementation falls
-back transparently (e.g., percentile CI or a collapsed interval) and records the
-fallback in report evidence.
+back to a percentile CI or collapsed interval. Reports record bootstrap
+configuration and degenerate Δ summaries, but do not currently tag every
+effective fallback method separately.
 
 ## Method (paired, token‑weighted)
 
@@ -39,7 +42,7 @@ Given per‑window token counts `t_i` and log‑losses `ℓ_i^A`, `ℓ_i^B`, def
   report pipeline as invalid/degraded pairing evidence.
 - Degenerate Δ (all equal values or a single pair): mark `degenerate=true`; CI
   collapses to `[μ, μ]` with `μ = mean(Δ)`.
-- Undefined acceleration (jackknife variance is zero): fall back to a percentile bootstrap CI.
+- Undefined acceleration (jackknife variance is zero): fall back to a percentile bootstrap CI; this acceleration fallback is not separately tagged in report metadata.
 
 ## Runtime Contract (report)
 
@@ -71,7 +74,7 @@ enforce minima strictly when pairing is established.
 - Paired windows and token weighting are required for the log‑space identities
   to hold.
 - Degenerate Δ cases are rare in practice at tier coverage; when they occur,
-  the report records the fallback explicitly.
+  the report records `paired_delta_summary.degenerate=true`.
 - Percentile and collapsed intervals are fallback evidence surfaces for
   auditability; they should not be treated as stronger than a normal BCa
   interval.

@@ -6,7 +6,7 @@
 | --- | --- |
 | **Purpose** | Environment-level toggles for network access, evaluation, snapshots, and docs tooling. |
 | **Audience** | CLI users and operators tuning runtime behavior. |
-| **Scope** | CLI commands and programmatic runs; config values override env when both are set. |
+| **Scope** | CLI commands and programmatic runs; precedence is setting-specific when env and config/CLI both exist. |
 | **Network** | Offline by default; network must be explicitly enabled. |
 | **Source of truth** | `docs/reference/env-vars.md`, `src/invarlock/cli/commands/*`, `src/invarlock/core/plugins_inventory.py`, `src/invarlock/runtime_security.py`, `src/invarlock/core/runner.py`. |
 
@@ -31,8 +31,8 @@ INVARLOCK_EVAL_DEVICE=cpu INVARLOCK_ALLOW_NETWORK=1 \
 
 **Precedence (conflict cases)**
 
-1. CLI/config values for assurance-critical policy (strictness, drift/acceptance bands, overhead skip, tiny relax).
-2. Env overrides only for explicitly env-scoped toggles (for example, downloads and calibration materialization).
+1. CLI/config values for assurance-critical policy (strictness, drift/acceptance bands, overhead skip).
+2. Env overrides only for explicitly env-scoped toggles (for example, downloads, calibration materialization, and tiny-relax smoke behavior).
 3. Packaged defaults when no explicit setting exists.
 
 ### Key override matrix
@@ -40,6 +40,7 @@ INVARLOCK_EVAL_DEVICE=cpu INVARLOCK_ALLOW_NETWORK=1 \
 | Setting | Env var | Config/CLI | Winner rule | How to confirm |
 | --- | --- | --- | --- | --- |
 | Calibration materialize | `INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE` | `context.eval.materialize_calibration` / `context.eval.allow_iterable_calibration` | Env wins. | Config shows in `report.context`; env is not recorded. |
+| Tiny relax | `INVARLOCK_TINY_RELAX` | `context.run.tiny_relax` | Either opt-in enables tiny-relax run/report policy. | Recorded in run context and surfaced through report validation. |
 | Network downloads | `INVARLOCK_ALLOW_NETWORK` | — | Env-only toggle. | Not recorded; rely on env. |
 | Offline datasets | `HF_DATASETS_OFFLINE` | — | Env-only toggle. | Not recorded; rely on env. |
 
@@ -74,11 +75,13 @@ calibration/config-runner commands that load models directly.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `INVARLOCK_BOOTSTRAP_BCA` | unset | Prefer BCa bootstrap CIs when sample size allows. |
-| `INVARLOCK_TINY_RELAX` | unset | Doctor-only hint for tiny local demos (does not drive assurance gates). |
+| `INVARLOCK_TINY_RELAX` | unset | Dev/demo compare-evaluate override for tiny smoke runs; records tiny-relax provenance and applies tiny-relax report-policy semantics. Do not use for production assurance. |
 | `INVARLOCK_EVAL_DEVICE` | unset | Force evaluation device (`cpu`, `cuda`, `mps`). |
 | `INVARLOCK_STORE_EVAL_WINDOWS` | `1` | Store token windows in reports (set `0` to disable). |
 | `INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE` | unset | Allow materializing iterables lacking `__len__`. |
+
+Bootstrap CI method and replicate counts are controlled by runtime profile,
+tier policy, and report policy. There is no public env var that forces BCa.
 
 ### Dataset preparation
 

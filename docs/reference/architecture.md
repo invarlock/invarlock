@@ -193,9 +193,9 @@ Report generation, validation, persistence, and rendering.
 | `report_contract.py` | Input loading and report-generation planning |
 | `report_overhead.py` | Guard-overhead normalization, summary building, and report shaping |
 | `report_summary.py` | Console validation blocks and shared executive-summary/view-model derivation for reporting surfaces |
-| `render.py` | Markdown rendering for evaluation reports |
+| `render_markdown.py` | Markdown rendering for evaluation reports |
 | `html.py` | HTML export with styling |
-| `evidence.py` | Evidence file normalization and attachment helpers |
+| `core/guard_evidence.py` | Canonical guard-evidence normalization before reporting assembly |
 | `report_builder_support.py` | Report build context, telemetry extraction, telemetry payloads, artifacts, and baseline references |
 
 ## Pipeline Flow

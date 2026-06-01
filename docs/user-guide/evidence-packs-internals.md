@@ -91,10 +91,10 @@ invarlock advanced evidence-pack verify ./evidence_pack_runs/subset_20250101_000
 - `lib/tasks/task_baseline.sh`: baseline setup, calibration, preset generation, and shared baseline report preparation.
 - `lib/tasks/task_edit_lifecycle.sh`: edit creation, batch edit creation, evaluation, and cleanup.
 - `lib/tasks/task_error_lifecycle.sh`: error-model creation, evaluation probes, structural-failure reports, and cleanup.
-- `lib/model_creation.sh`: edit and error-model creation helpers (`create_model_variant` dispatcher).
-- `lib/config_generator.sh`: InvarLock config generation and wrapper helpers.
+- `lib/tasks/model_creation.sh`: edit and error-model creation helpers (`create_model_variant` dispatcher).
+- `lib/config/config_generator.sh`: InvarLock config generation and wrapper helpers.
 - `lib/validation/validation_suite.sh`: validation orchestration, analysis setup, and verdict compilation.
-- `lib/fault_tolerance.sh`: error classification and retry/backoff logic.
+- `lib/core/fault_tolerance.sh`: error classification and retry/backoff logic.
 - `scripts/evidence_packs/python/manifest_writer.py`: evidence pack `manifest.json` writer.
 - `scripts/evidence_packs/python/preset_generator.py`: preset derivation + edit-type variants.
 
@@ -454,27 +454,25 @@ SETUP_BASELINE
 ## Task breakdown per model (defaults)
 
 Defaults: `DRIFT_CALIBRATION_RUNS=5`, `CLEAN_EDIT_RUNS=3`,
-`STRESS_EDIT_RUNS=2`, `RUN_ERROR_INJECTION=true`.
+`STRESS_EDIT_RUNS=2`, `RUN_ERROR_INJECTION=true`, and
+`PACK_USE_BATCH_EDITS=auto`.
 
-Batch path (default for small/medium):
-
-- Setup baseline: 1 task
-- Preset-derivation runs + preset generation: 6 tasks
-- Batch edits: 1 task
-- evaluate edits: 20 tasks
-- Error injection: 10 tasks
-
-Total: ~38 tasks/model (varies with overrides).
-
-Per-edit path (large/MoE or `PACK_USE_BATCH_EDITS=false`):
+The task graph is manifest-driven and may add eager baseline, reusable-baseline,
+and cleanup tasks. Use the generated queue summary as the authoritative count.
+At a high level, each model includes:
 
 - Setup baseline: 1 task
 - Preset-derivation runs + preset generation: 6 tasks
-- Create edits: 8 tasks
-- evaluate edits: 20 tasks
-- Error injection: 10 tasks
+- Edit creation: one batch task when grouped edit creation is explicitly
+  enabled, otherwise one creation task per edit
+- Edit evaluation: edit count × clean/stress run counts
+- Error injection: suite manifest scenarios (12 for `subset`, 15 for
+  `showcase`, `workshop3`, and `full` by default)
+- Cleanup tasks when cleanup mode is enabled
 
-Total: ~45 tasks/model (varies with overrides).
+`PACK_USE_BATCH_EDITS=auto` currently favors the per-edit path for
+cleanup-safe default runs. Set `PACK_USE_BATCH_EDITS=true` only when the reduced
+startup overhead is worth the lower task-level parallelism for that campaign.
 
 ## Execution phases
 
@@ -644,7 +642,8 @@ run_pack.sh
 - Verifies digest-backed manifest references (`subject`, `invocation.config_source`,
   `environment`, and `materials`) against on-pack files.
 - Verifies `checksums.sha256` (and thus all hashed artifacts).
-- Verifies the package-native Ed25519 signature bundle when present; `--strict` requires it.
+- Verifies the package-native Ed25519 signature bundle; a missing
+  `manifest.signature.json` is a signature failure by default.
 - Enforces signer authenticity when `--expected-fingerprint` or `--trust-store` is supplied.
 - Enforces “no extra files” semantics in `--strict` mode.
 - Runs `invarlock verify` across all bundled reports (JSON output optional) with
@@ -730,7 +729,7 @@ Common knobs for the setup script:
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `PACK_SUITE` | `subset` | Suite name (`subset` or `full`) |
+| `PACK_SUITE` | `subset` | Suite name (`subset`, `showcase`, `workshop3`, or `full`) |
 | `PACK_NET` | `0` | Enable network preflight/downloads |
 | `PACK_OUTPUT_DIR` | unset | Sets `OUTPUT_DIR` when provided |
 | `OUTPUT_DIR` | auto | `./evidence_pack_runs/<suite>_<timestamp>` via entrypoint |

@@ -234,13 +234,13 @@ calibration = [
 ### reports (canonical helpers)
 
 ```python
-from invarlock.reporting.render import render_report_markdown
+from invarlock.reporting.render_markdown import render_report_markdown
 from invarlock.reporting.report_make import make_report
 from invarlock.reporting.report_schema import validate_report
 
-report = make_report(report, baseline_report)
-validate_report(report)
-print(render_report_markdown(report))
+evaluation_report = make_report(report, baseline_report)
+validate_report(evaluation_report)
+print(render_report_markdown(evaluation_report))
 ```
 
 ### Exceptions
