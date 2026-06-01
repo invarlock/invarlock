@@ -113,7 +113,7 @@ this public docs index.
 - [Guard Overhead Method](assurance/10-guard-overhead-method.md)
 - [Policy Provenance & Digest](assurance/11-policy-provenance.md)
 - [Device Drift Bands](assurance/12-device-drift-bands.md)
-- [GPU/MPS-First Guards (Decision Memo)](assurance/13-gpu-mps-first-guards.md)
+- [GPU/MPS-First Guard Measurement Contracts](assurance/13-gpu-mps-first-guards.md)
 - [Guard Validation Smoke](assurance/16-guard-validation-smoke.md)
 - [Empirical Guard Evidence](assurance/17-empirical-guard-evidence.md)
 

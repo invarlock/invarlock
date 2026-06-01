@@ -213,7 +213,7 @@ packaged presets include it by default; remove a guard from the list to skip it.
 ## Related Documentation
 
 - [Tier Policy Catalog](tier-policy-catalog.md)
-- [GPU/MPS-First Guards (Decision Memo)](../assurance/13-gpu-mps-first-guards.md)
+- [GPU/MPS-First Guard Measurement Contracts](../assurance/13-gpu-mps-first-guards.md)
 - [Configuration Schema](config-schema.md)
 - [Environment Variables](env-vars.md)
 - [Guard Contracts & Primer](../assurance/04-guard-contracts.md)

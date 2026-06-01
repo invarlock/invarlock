@@ -1,33 +1,42 @@
-# GPU/MPS-First Guards (Decision Memo)
+# GPU/MPS-First Guard Measurement Contracts
 
 ## Overview
 
 | Aspect | Details |
 | --- | --- |
-| **Purpose** | Record the guard design decisions enabling large-model execution. |
-| **Audience** | Contributors and reviewers of guard measurement contracts. |
-| **Scope** | Spectral + RMT guard contracts, accelerator-first design. |
+| **Purpose** | Define the maintained measurement-contract expectations for accelerator-friendly spectral and RMT guards. |
+| **Audience** | Contributors, maintainers, and reviewers of guard evidence. |
+| **Scope** | Spectral + RMT guard contracts on CUDA/MPS-capable and CPU fallback paths. |
 | **Source of truth** | Guard implementations in `src/invarlock/guards/*.py`. |
 
-## Quick Start
+## Claim
 
-This is a decision memo; for implementation usage see [Guards](../reference/guards.md).
+Spectral and RMT guard evidence must remain reproducible without requiring full
+matrix decompositions on large models. The runtime therefore records bounded
+iterative estimator settings, sampling policy, and measurement-contract hashes
+for the guard evidence that `invarlock verify` later checks.
+
+For operational guard usage, see [Guards](../reference/guards.md).
 
 ## Concepts
 
-- **Accelerator-first**: guard math must run on CUDA/MPS without full SVD.
-- **Approximation-only**: iterative estimators and deterministic sampling.
+- **Accelerator-first**: guard math runs on CUDA/MPS-capable paths without full SVD.
+- **Bounded approximation**: iterative estimators and deterministic sampling replace
+  exact decompositions for large tensors.
 - **Measurement contracts**: estimator + sampling policy must be recorded in reports.
 
-## Reference
+## Runtime Contract
 
-### Goals
+Guard reports must preserve enough information for later verification:
 
-- Device-resident guard computation for large models.
-- Reproducible approximations with fixed budgets.
-- Contract binding enforced at verification time.
+- Spectral evidence records the estimator family, bounded iteration budget,
+  degeneracy proxies, and measurement-contract hash.
+- RMT evidence records activation edge-risk scoring, sampling policy, estimator
+  budget, and measurement-contract hash.
+- `invarlock verify` rejects missing measurement-contract hashes in CI/Release
+  assurance paths.
 
-### Decisions
+## Contract Details
 
 1. **Single evidence mode**: one canonical contract for each guard.
 2. **Spectral contract**: track `σ̂_max` and degeneracy proxies (stable-rank drift,
@@ -35,10 +44,10 @@ This is a decision memo; for implementation usage see [Guards](../reference/guar
 3. **RMT contract**: activation edge-risk score normalized by MP edge.
 4. **Verification gate**: reports must record the measurement contract and hash.
 
-### Non-goals
+## Non-goals
 
 - Full-spectrum or exact SVD computations.
-- reports missing measurement contracts.
+- Accepting reports missing measurement contracts in CI/Release assurance paths.
 
 ## Troubleshooting
 
