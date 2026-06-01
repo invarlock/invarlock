@@ -109,6 +109,8 @@
     "Mixtral",
     "torchao",
     "materializer",
+    "lmeval",
+    "perplexity",
     "subshells",
     "BLAS",
     "Hella",

@@ -19,6 +19,7 @@ runtime package and should not add required dependencies to the core install.
 | Shared compare wrapper | Present under `examples/integrations/_shared/run_invarlock_compare.sh`. |
 | PEFT LoRA merge | Runnable example under `examples/integrations/peft_lora/`. |
 | torchao int8 export | Runnable example under `examples/integrations/torchao_int8_export/`. |
+| LM Evaluation Harness sidecar | Exploratory host example under `examples/integrations/lm_eval_harness/`. |
 | Additional target-specific examples | Added one target at a time after backend compatibility is validated. |
 
 Browse the integration scaffold in the repository:
@@ -135,6 +136,36 @@ examples/integrations/torchao_int8_export/run_tiny_torchao_int8_export.sh \
   --execution-mode host \
   --assurance off
 ```
+
+## LM Evaluation Harness Sidecar
+
+The LM Evaluation Harness example records broad task metrics beside an
+InvarLock regression-evidence run. It does not generate
+`evaluation.report.json`, `verify.json`, or `evaluation.html`; those remain the
+outputs of the InvarLock compare path.
+
+Run a tiny baseline-only smoke task:
+
+```bash
+examples/integrations/lm_eval_harness/run_tiny_lm_eval_sidecar.sh \
+  --allow-network \
+  --force
+```
+
+Run the same sidecar with a subject checkpoint that is already HF-loadable:
+
+```bash
+examples/integrations/lm_eval_harness/run_tiny_lm_eval_sidecar.sh \
+  --baseline sshleifer/tiny-gpt2 \
+  --subject ./examples/integrations/peft_lora/models/tiny-gpt2-peft-lora-merged \
+  --allow-network \
+  --force
+```
+
+The runner writes raw LM Eval JSON plus
+`reports/tiny-lm-eval-sidecar/lm_eval_sidecar_summary.json`. Use that summary
+for task-score context after the matching InvarLock comparison has produced the
+release-gate artifacts.
 
 ## Public Evidence Anchors
 
