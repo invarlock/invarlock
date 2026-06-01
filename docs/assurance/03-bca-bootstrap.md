@@ -3,13 +3,14 @@
 > **Plain language:** Confidence intervals come from a paired, token‑weighted
 > BCa bootstrap on Δlog‑loss; the ratio CI is just the exponentiated Δlog CI.
 > When Δ is degenerate, or BCa’s acceleration term is undefined, we fall back
-> safely.
+> transparently.
 
 ## Claim
 
 Paired, token‑weighted BCa on Δlog‑loss yields a ratio CI by exponentiation.
 When Δ is degenerate or acceleration is undefined, the implementation falls
-back safely (e.g., percentile CI or a collapsed interval).
+back transparently (e.g., percentile CI or a collapsed interval) and records the
+fallback in report evidence.
 
 ## Method (paired, token‑weighted)
 
@@ -62,6 +63,9 @@ enforce minima strictly when pairing is established.
   to hold.
 - Degenerate Δ cases are rare in practice at tier coverage; when they occur,
   the report records the fallback explicitly.
+- Percentile and collapsed intervals are fallback evidence surfaces for
+  auditability; they should not be treated as stronger than a normal BCa
+  interval.
 
 ## References
 

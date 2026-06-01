@@ -1,14 +1,15 @@
 # Cross‑Device Drift Bands (CPU ↔ MPS ↔ CUDA)
 
 > **Plain language:** With deterministic settings, evaluation ratios across
-> devices stay within small, documented bands. We publish the budgets and a
-> reproducible check.
+> devices are reviewed against small, documented pilot bands. We publish the
+> budgets and a reproducible check.
 
 ## Claim
 
 With deterministic settings and identical evaluation schedules/policies,
-cross‑device evaluation ratios remain within small, documented bands relative to
-CPU (e.g., ≤ 0.5% MPS, ≤ 1.0% CUDA).
+cross-device evaluation ratios are expected to stay within small empirical
+review bands relative to CPU (e.g., ≤ 0.5% MPS, ≤ 1.0% CUDA). These are pilot
+budgets, not a PyTorch cross-platform reproducibility guarantee.
 
 ## Budgets (expected)
 
@@ -35,6 +36,8 @@ family/precision; verify on your setup.
 ## Reproducible Check
 
 ```bash
+# Calibration-only / non-assurance host-mode example.
+# Do not accept host-mode output as strict assurance evidence.
 # Baseline on CPU → report
 invarlock evaluate --allow-network --execution-mode host \
   --baseline gpt2 \
@@ -77,3 +80,7 @@ python scripts/smoke/check_device_drift.py \
 - Window plans and seeds must match; schedule changes invalidate comparisons.
 - Bands are empirical and may vary slightly by model family; verify locally and
   adjust tolerance for CI accordingly.
+
+## References
+
+- PyTorch. “Reproducibility.” <https://docs.pytorch.org/docs/2.12/notes/randomness.html>

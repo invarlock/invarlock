@@ -1,4 +1,4 @@
-# Tier v1.0 Calibration (Pilot + Method)
+# Tier Policy v1 Calibration (Pilot + Method)
 
 > **Plain language:** This appendix has two roles:
 > (1) the **pilot calibration lanes** that underpin the **Balanced** and
@@ -91,7 +91,7 @@ reproducibility and attach calibration reports to change proposals.
    $\mathrm{pTail}(\kappa)=2\big(1-\Phi(\kappa)\big)$, compare the proposed caps
    to modeled Gaussian tails for calibrated high-kappa families. Treat low
    Balanced `embed`/`other` caps as operational sentinels, not standalone
-   Gaussian-tail guarantees.
+   Gaussian-tail claims.
 
 5. **Keep these fixed (Balanced).** `multiple_testing: {method: bh, alpha: 0.05, m: 4}`, `deadband: 0.10`, `scope: all`, `max_caps: 5`, `max_spectral_norm: null`.
 
@@ -102,6 +102,8 @@ reproducibility and attach calibration reports to change proposals.
 Suppose you ran a baseline and extracted z-scores from the report:
 
 ```bash
+# Calibration-only / non-assurance example.
+# Do not accept host-mode output as strict assurance evidence.
 # 1. Run baseline
 invarlock evaluate --allow-network --execution-mode host \
   --baseline gpt2 \
@@ -160,6 +162,8 @@ With 120 total modules distributed as: FFN=40, Attn=40, Embed=8, Other=32.
 6. **Re-run with override:**
 
    ```bash
+   # Calibration-only / non-assurance example.
+   # Do not accept host-mode output as strict assurance evidence.
    invarlock evaluate --allow-network --execution-mode host \
      --baseline gpt2 \
      --subject gpt2 \
@@ -182,8 +186,12 @@ With 120 total modules distributed as: FFN=40, Attn=40, Embed=8, Other=32.
 * **Balanced** ε per family: `{ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01}`
 * **Conservative**: `{ffn: 0.01, attn: 0.01, embed: 0.01, other: 0.01}`
 
-Acceptance rule per family $f$: with baseline edge‑risk $r_f^{\text{base}}$ and current edge‑risk $r_f^{\text{cur}}$,
-$r_f^{\text{cur}} \le \left(1+\varepsilon(f)\right)\, r_f^{\text{base}}$.
+Acceptance rule per family $f$: with baseline edge risk
+$r_f^{\text{base}}$ and current edge risk $r_f^{\text{cur}}$:
+
+$$
+r_f^{\text{cur}} \le \left(1+\varepsilon(f)\right) r_f^{\text{base}}
+$$
 
 **Runtime visibility.** report fields under `rmt.*` report baseline/current edge‑risk, ε (default and by family), status, and `validation.rmt_stable`.
 
@@ -201,7 +209,8 @@ missing or zero baseline.
 1. Run **null** baselines (no edit) and compute per-family deltas
    $\Delta(f) = r_{\text{cur}}(f)/r_{\text{base}}(f) - 1$ (skip cases with
    $r_{\text{base}}(f)=0$).
-2. Set $\varepsilon(f) = \mathrm{Quantile}\big(\Delta(f);\ q\big)$ with $q \in [0.95, 0.99]$.
+2. Set $\varepsilon(f) = \mathrm{Quantile}(\Delta(f); q)$ with
+   $q \in [0.95, 0.99]$.
 3. Use a slightly larger ε for tiny families (discreteness: $b(f)\in\{0,1\}$ matters).
 
 ---
@@ -224,7 +233,18 @@ standard deviation across runs.
 
 ### How to recalibrate min-effect
 
-For paired ΔlogNLL with stdev $\hat{\sigma}$ over $n$ windows, $\text{min effect (logNLL)} \approx z \cdot \frac{\hat{\sigma}}{\sqrt{n}}$ with **Balanced** using one-sided $z = z_{0.95}$ and **Conservative** two-sided $z = z_{0.975}$. VE enables only if the predictive CI upper bound ≤ −`min_effect_lognll` and the mean Δ ≤ −`min_effect_lognll`; a CI entirely above +`min_effect_lognll` is treated as regression (VE stays off).
+For paired ΔlogNLL with standard deviation $\hat{\sigma}$ over $n$ windows:
+
+$$
+\text{min effect (logNLL)}
+\approx
+z \cdot \frac{\hat{\sigma}}{\sqrt{n}}
+$$
+
+Balanced uses one-sided $z = z_{0.95}$ and Conservative uses two-sided
+$z = z_{0.975}$. VE enables only if the predictive CI upper bound is at most
+`-min_effect_lognll` and the mean Δ is at most `-min_effect_lognll`; a CI
+entirely above `+min_effect_lognll` is treated as regression, so VE stays off.
 
 ---
 
@@ -255,8 +275,9 @@ unprofiled runs.
    safety margin, optionally lower α if warning rate is high; **keep** BH,
    deadband, scope, `max_caps`, and **no clamp** unless the change proposal says
    otherwise.
-3. **RMT ε.** From null runs, set $\varepsilon(f)$ to the q95–q99 quantile of $\big(g(f)/b(f) - 1\big)$ per family (adjust for small $b(f)$).
-4. **VE min-effect.** ($\approx z\,\hat{\sigma}/\sqrt{n}$) with tier-appropriate sidedness.
+3. **RMT ε.** From null runs, set $\varepsilon(f)$ to the q95–q99 quantile of
+   $g(f)/b(f) - 1$ per family (adjust for small $b(f)$).
+4. **VE min-effect.** Use $z\,\hat{\sigma}/\sqrt{n}$ with tier-appropriate sidedness.
 5. **Windows.** Size $n$ to hit the half-width target; enforce non-overlap and pairing.
 6. **Trial via override.** Write calibrated values to a local override YAML (e.g., `configs/overrides/spectral_balanced_local.example.yaml`, copied locally and edited) and merge it into a local run preset under `guards:` instead of editing the global tier. Re-run baseline + edits; pre-screen gates; then build reports.
 
@@ -271,6 +292,11 @@ unprofiled runs.
 
 - [Tier Policy Catalog](../reference/tier-policy-catalog.md) — Policy keys and where they appear in reports
 - [Guards Reference](../reference/guards.md) — Guard configuration options
+- [BCa Bootstrap](03-bca-bootstrap.md) — Primary-metric interval mechanics
+- [Spectral False-Positive Control](05-spectral-fpr-derivation.md) — Multiple-testing and spectral cap rationale
+- [RMT Epsilon Rule](06-rmt-epsilon-rule.md) — Activation edge-risk rule
+- [VE Predictive Gate](07-ve-gate-power.md) — Variance-effect threshold sizing
+- [Empirical Guard Evidence](17-empirical-guard-evidence.md) — Release evidence manifest scope
 
 ## References
 

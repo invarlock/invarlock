@@ -29,6 +29,7 @@ with `--expected-fingerprint` or a local trust store.
 A strict pass means one configured edited checkpoint comparison did not
 violate the InvarLock weight-edit regression contract for the selected
 baseline, subject, dataset windows, tier, profile, and runtime policy.
+It is not certification of the model or deployment.
 
 The current strict assurance contract requires:
 

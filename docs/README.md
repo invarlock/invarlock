@@ -109,7 +109,7 @@ this public docs index.
 - [RMT ε-Rule](assurance/06-rmt-epsilon-rule.md)
 - [VE Predictive Gate](assurance/07-ve-gate-power.md)
 - [Determinism Contracts](assurance/08-determinism-contracts.md)
-- [Tier v1.0 Calibration](assurance/09-tier-v1-calibration.md)
+- [Tier Policy v1 Calibration](assurance/09-tier-v1-calibration.md)
 - [Guard Overhead Method](assurance/10-guard-overhead-method.md)
 - [Policy Provenance & Digest](assurance/11-policy-provenance.md)
 - [Device Drift Bands](assurance/12-device-drift-bands.md)
@@ -121,7 +121,7 @@ Note: Every assurance claim is backed by automated tests and cross-referenced in
 the docs. See Guard Contracts → Coverage Reference
 (assurance/04-guard-contracts.md) for the test index.
 
-Calibration CSVs and proof reports referenced in these notes are produced by
+Calibration CSVs and evidence reports referenced in these notes are produced by
 local or CI runs (typically under `runs/null_sweeps/**` and
 `reports/calibration/**`) and are not committed to the repository. Attach them
 to change proposals or releases when you update calibration.
@@ -191,7 +191,9 @@ configured acceptance envelopes even when aggressive compression is attempted.
 ## Building Docs Offline vs Online
 
 - Offline (default): mkdocs builds without contacting the Internet. Mermaid
-  diagrams are disabled by default to keep builds fully local.
+  diagrams are disabled by default to keep builds fully local. The generated
+  HTML references MathJax so formulas render in browsers with network access;
+  MathJax is not fetched during the build.
   - Command: `make docs` or `mkdocs build --strict`.
 - Online (enable networked assets explicitly): enable Mermaid diagrams (via CDN)
   and keep strict checks.
@@ -199,9 +201,9 @@ configured acceptance envelopes even when aggressive compression is attempted.
 
 Notes
 
-- The configuration references CDNs (MathJax/Polyfill) via `extra_javascript` in
-  the generated HTML. These are not fetched at build time; they load when you
-  view the HTML in a browser with network access.
+- The configuration references MathJax via `extra_javascript` in the generated
+  HTML. This is required for Arithmatex formulas to render on the published
+  docs site.
 - The mermaid2 plugin pings the CDN; we gate it behind the
   `INVARLOCK_DOCS_MERMAID` environment variable to avoid network dependencies by
   default.

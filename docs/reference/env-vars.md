@@ -167,7 +167,6 @@ Strictness/tiny-relax/overhead-skip are also config/profile policy:
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `INVARLOCK_DOCS_MERMAID` | unset | Enable Mermaid diagrams in MkDocs. |
-| `INVARLOCK_DOCS_EXTRA_JS` | unset | Extra JavaScript URLs for docs build. |
 
 ## Troubleshooting
 

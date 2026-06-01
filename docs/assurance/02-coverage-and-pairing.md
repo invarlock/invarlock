@@ -16,7 +16,7 @@ pairing context exists, and report verification rejects invalid pairing.
 - **Non‑overlap:** set `seq_len == stride` so windows do not overlap.
 - **Deterministic:** record and reuse the seed bundle (`python`, `numpy`, `torch`) and bootstrap seed (when applicable).
 - **Dedupe:** deduplication is allowed for pilots/probes; **release evidence uses strict non‑overlap on the full plan**.
-- **Exact pairing:** preview/final counts must match and the edited run must reuse baseline window IDs; mixing schedules voids the paired Δlog guarantees.
+- **Exact pairing:** preview/final counts must match and the edited run must reuse baseline window IDs; mixing schedules invalidates the paired Δlog assumptions.
 
 ## Pairing Reuse (baseline → edited)
 
@@ -39,7 +39,7 @@ request higher counts):
 | Aggressive   | 140              | 140           |   800                |
 
 These minima are derived from half‑width targets on paired Δlog‑loss (see
-[Tier v1.0 Calibration](09-tier-v1-calibration.md)). CI/Release profiles treat
+[Tier Policy v1 Calibration](09-tier-v1-calibration.md)). CI/Release profiles treat
 shortfalls as hard errors; dev flows surface warnings but also record coverage
 in the generated report bundle.
 
@@ -64,6 +64,6 @@ in the generated report bundle.
 - Dataset or tokenizer changes that affect tokenization invalidate recorded
   pairing schedules.
 - Window pairing must be exact (ID reuse) and non‑overlapping; mixing schedules
-  voids paired Δlog guarantees.
+  invalidate paired Δlog assumptions.
 - This plan is calibrated for Linux/macOS environments and the tier profiles
-  documented in [Tier v1.0 Calibration](09-tier-v1-calibration.md).
+  documented in [Tier Policy v1 Calibration](09-tier-v1-calibration.md).

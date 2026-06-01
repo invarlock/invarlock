@@ -110,6 +110,6 @@ or prove every threshold is statistically final, and it does not replace
 - [Spectral False-Positive Control](05-spectral-fpr-derivation.md)
 - [RMT Epsilon Rule](06-rmt-epsilon-rule.md)
 - [VE Predictive Gate](07-ve-gate-power.md)
-- [Tier v1.0 Calibration](09-tier-v1-calibration.md)
+- [Tier Policy v1 Calibration](09-tier-v1-calibration.md)
 - [Calibration Reference](../reference/calibration.md)
 - [Evidence Packs](../user-guide/evidence-packs.md)

@@ -42,7 +42,8 @@ digest = hashlib.sha256(canonical.encode()).hexdigest()[:16]
 2) Recompute the digest locally (see pseudocode).
 3) Confirm it matches `policy_provenance.policy_digest` and `auto.policy_digest`.
 
-If the digest does not match, treat the evidence as stale or tampered and rerun evaluation.
+If the digest does not match, treat the evidence as drifted or altered and
+rerun evaluation. For tamper-evident distribution, use signed evidence packs.
 
 ## Notes
 

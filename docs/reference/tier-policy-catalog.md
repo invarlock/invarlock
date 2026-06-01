@@ -270,7 +270,7 @@ gate and min-effect semantics.
   semantics (Balanced) vs two-sided CI (Conservative); see
   `docs/assurance/07-ve-gate-power.md`.
 - `min_effect_lognll` *(calibrated)* — minimum absolute improvement required for
-  VE enablement; derived from `z·σ̂/√n` per tier, see
+  VE enablement; derived from $z\,\hat{\sigma}/\sqrt{n}$ per tier, see
   `docs/assurance/07-ve-gate-power.md`.
 - `deadband` *(policy)* — ignores small proposed adjustments (prevents
   “flicker”/tiny rescaling).

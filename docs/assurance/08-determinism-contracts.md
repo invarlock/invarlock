@@ -1,15 +1,17 @@
 # Determinism Contracts
 
 > **Plain language:** If we fix the seed bundle, record dataset/tokenizer
-> hashes, and keep the paired window schedule stable, every evaluation run is
-> reproducible within float tolerance—and we surface those checks in the
+> hashes, and keep the paired window schedule stable, evaluation runs should be
+> reproducible within float tolerance under the stated backend/version
+> preconditions—and we surface those checks in the
 > report.
 
 ## Claim
 
-With fixed seeds, dataset/tokenizer hashes, and a paired, non‑overlapping
-schedule, evaluation is reproducible (within float tolerance) and reports
-are stable.
+With fixed seeds, dataset/tokenizer hashes, a paired non-overlapping schedule,
+and a pinned backend stack, evaluation should be reproducible within float
+tolerance on the same backend. Cross-backend and cross-version results are
+empirical drift checks, not strict reproducibility claims.
 
 ## Derivation (sketch)
 
@@ -67,3 +69,7 @@ ties the runtime contract back to reproducible maths:
 - Some hardware backends (e.g., GPUs without deterministic kernels) may exceed
   float tolerances despite the flags; document deviations in the report
   metadata.
+
+## References
+
+- PyTorch. “Reproducibility.” <https://docs.pytorch.org/docs/2.12/notes/randomness.html>

@@ -40,8 +40,8 @@ Guard reports must preserve enough information for later verification:
 ## Contract Details
 
 1. **Single evidence mode**: one canonical contract for each guard.
-2. **Spectral contract**: track `σ̂_max` and degeneracy proxies (stable-rank drift,
-   row/col norm collapse).
+2. **Spectral contract**: track $\hat{\sigma}_{\max}$ and degeneracy proxies
+   (stable-rank drift, row/col norm collapse).
 3. **RMT contract**: activation edge-risk score normalized by MP edge.
 4. **Verification gate**: reports must record the measurement contract, hash,
    baseline hash, and match flag.

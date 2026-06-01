@@ -4,7 +4,7 @@
 > policy for per-family singular-value drift. Gaussian-tail FPR math applies to
 > the families whose kappas were calibrated for that model; low Balanced
 > `embed`/`other` caps are operational sentinels, not standalone <=5% FPR
-> guarantees.
+> claims.
 
 ## Claim
 
@@ -13,7 +13,7 @@ policy needed to interpret WARNs under the chosen null-modeling assumptions.
 For families whose kappas are calibrated against an approximately Gaussian null,
 the two-sided tail probability gives the expected false-positive rate. Families
 with intentionally low sentinel caps are still monitored and budgeted by
-`max_caps`, but they must not be cited as <=5% Gaussian-tail guarantees.
+`max_caps`, but they must not be cited as <=5% Gaussian-tail claims.
 
 ## Derivation (sketch)
 
@@ -41,8 +41,8 @@ rate.
 
 ## Assumptions & Scope
 
-- Baseline runs provide $(\mu_f, \sigma_f)$ per family $f \in
-  \{\text{ffn}, \text{attn}, \text{embed}, \text{other}\}$; when $\sigma_f = 0$
+- Baseline runs provide $(\mu_f, \sigma_f)$ per family
+  `f in {ffn, attn, embed, other}`; when $\sigma_f = 0$
   we fall back to the tier deadband δ.
 - Only 2‑D weight matrices (FFN blocks, attention projections, embeddings) are
   evaluated; **1‑D LayerNorm parameters are explicitly excluded** from spectral
@@ -86,8 +86,8 @@ summary.
   `spectral.family_caps`, and `spectral.families[family]` with `{max, mean,
   count, violations, kappa}`. `sigma_quantile` is the calibrated baseline
   percentile used to derive the reference target.
-- Tier files document multiple-testing metadata and the mapping
-  $\kappa_f \rightarrow$ modeled Gaussian tails. Sentinel caps should be audited
+- Tier files document multiple-testing metadata and the mapping from
+  $\kappa_f$ to modeled Gaussian tails. Sentinel caps should be audited
   as operational thresholds, not as FPR-controlled family caps.
 - Policy metadata records the multiple-testing method
   (`spectral.multiple_testing`) and the cap limit (`spectral.max_caps`, mirrored
@@ -132,3 +132,4 @@ the target. Validate that subsequent null runs stay within the published
 ## References
 
 - Benjamini, Y., & Hochberg, Y. (1995). “Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing.” *Journal of the Royal Statistical Society: Series B (Methodological)*, 57(1), 289–300. <https://doi.org/10.1111/j.2517-6161.1995.tb02031.x>
+- Dunn, O. J. (1961). “Multiple Comparisons among Means.” *Journal of the American Statistical Association*, 56(293), 52–64. <https://doi.org/10.1080/01621459.1961.10482090>

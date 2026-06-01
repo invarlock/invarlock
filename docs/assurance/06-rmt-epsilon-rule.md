@@ -98,5 +98,10 @@ use a slightly larger ε to avoid spurious failures.
 
 ## Background reading
 
+- Marchenko, V. A., & Pastur, L. A. (1967). “Distribution of eigenvalues for
+  some sets of random matrices.” *Mathematics of the USSR-Sbornik*, 1(4),
+  457–483.
+- Bai, Z. D., & Silverstein, J. W. (2010). *Spectral Analysis of Large
+  Dimensional Random Matrices* (2nd ed.). Springer.
 - Pennington, J., & Worah, P. (2017). “Nonlinear Random Matrix Theory for Deep Learning.” *Advances in Neural Information Processing Systems (NeurIPS)*. <https://papers.nips.cc/paper/6857-nonlinear-random-matrix-theory-for-deep-learning>
 - Martin, C. H., & Mahoney, M. W. (2021). “Implicit Self-Regularization in Deep Neural Networks: Evidence from Random Matrix Theory and Implications for Learning.” *Journal of Machine Learning Research*, 22(165), 1–73. Preprint: <https://arxiv.org/abs/1810.01075>
