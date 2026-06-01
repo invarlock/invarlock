@@ -1,4 +1,6 @@
 {
+  "name": "invarlock-public",
+  "private": true,
   "engines": {
     "node": ">=22.18.0"
   },

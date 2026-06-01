@@ -32,20 +32,23 @@ Please include as much of the following information as possible:
 
 ### Response Timeline
 
-- **Initial Response**: Within 72 hours of receiving your report
-- **Status Update**: Within 7 days with an assessment of the vulnerability
-- **Fix Timeline**: Dependent on severity:
-  - Critical: Within 7 days
-  - High: Within 30 days
-  - Medium: Within 90 days
-  - Low: Next scheduled release
+- **Initial Response**: We aim to acknowledge reports within a few business days.
+- **Status Updates**: We aim to share updates as assessment and remediation work
+  progresses, with timing based on severity, exploitability, and maintainer
+  availability.
+- **Fix Timeline**: Remediation timing depends on the scope and risk of the
+  issue. Critical or actively exploitable vulnerabilities are prioritized, while
+  lower-risk issues may be handled in a scheduled release.
 
 ### What to Expect
 
-1. **Acknowledgment**: We'll confirm receipt of your vulnerability report
-2. **Assessment**: We'll evaluate the issue and determine its severity
-3. **Fix Development**: We'll work on a fix and coordinate with you
-4. **Disclosure**: We'll publicly disclose the vulnerability after a fix is available
+1. **Acknowledgment**: We aim to confirm receipt of your vulnerability report.
+2. **Assessment**: We triage reports and assess severity based on available
+   information.
+3. **Fix Development**: When a fix is needed, we work on remediation and may
+   coordinate with the reporter when follow-up details are useful.
+4. **Disclosure**: Public disclosure, when appropriate, is coordinated around
+   user risk, fix availability, and release timing.
 
 ### Safe Harbor
 
