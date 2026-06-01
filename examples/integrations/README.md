@@ -19,7 +19,7 @@ their runnable path or compatibility blocker is understood.
 | LLM Compressor / vLLM | Compatibility validation pending | Compression sidecar evidence before deployment |
 | PEFT | `runnable` via `peft_lora/` | Base-vs-merged-adapter comparison |
 | Hugging Face Optimum | Target path selection pending | Model-card evidence section for a quantized subject |
-| LM Evaluation Harness | Sidecar positioning pending | Task-eval artifacts beside InvarLock regression evidence |
+| LM Evaluation Harness | `exploratory-host` via `lm_eval_harness/` | Task-eval sidecar artifacts beside InvarLock regression evidence |
 | bitsandbytes | Optional backend/platform validation pending | BNB-loaded subject provenance and report comparison |
 
 ## Shared Assets
@@ -35,6 +35,8 @@ their runnable path or compatibility blocker is understood.
 - `torchao_int8_export/` materializes a tiny local HF baseline, runs a `torchao`
   int8 weight-only quantization pass, exports a HF-loadable subject, and
   compares the export against the baseline.
+- `lm_eval_harness/` runs a tiny LM Evaluation Harness task and normalizes the
+  task metrics as a sidecar artifact that can sit beside InvarLock evidence.
 
 ## Example Lifecycle
 
