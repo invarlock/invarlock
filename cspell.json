@@ -73,6 +73,7 @@
     "Standardise",
     "Distil",
     "Qwen",
+    "PEFT",
     "virtualenv",
     "exfiltration",
     "sandboxing",
