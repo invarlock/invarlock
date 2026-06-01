@@ -173,8 +173,8 @@ Release verification requires validation.spectral_stable == true
 spectral did not pass
 ```
 
-That is the intended release-gate behavior: a clean summary metric is not enough
-when a guard detects unstable weight geometry.
+That is the intended release-gate behavior: guard stability is required even
+when the summary metric is clean.
 
 ## Policy failures
 

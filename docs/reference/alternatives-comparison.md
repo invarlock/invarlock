@@ -47,12 +47,12 @@ weights.
 2. Use lm-eval / LightEval for broad downstream benchmark confidence.
 3. Use an MLOps platform for tracking, monitoring, and dashboards.
 4. Use InvarLock at the release gate to produce a machine-verifiable report
-   that says a specific edited checkpoint did not exceed configured regression
+   that says a specific edited checkpoint stayed within configured regression
    and guard thresholds relative to a fixed baseline.
 
 ## Related Documentation
 
-- [Trust Model](../assurance/14-trust-model.md) — What a strict pass does and does not mean
+- [Trust Model](../assurance/14-trust-model.md) — Strict pass scope
 - [Strict Assurance Checklist](../assurance/15-strict-assurance-checklist.md) — Reviewer acceptance criteria
 - [Reports Reference](reports.md) — Schema, telemetry, and HTML export
 - [Guards Reference](guards.md) — Configuration and evidence

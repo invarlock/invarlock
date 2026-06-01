@@ -79,6 +79,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Standardized assurance document openings, glossary examples, math rendering,
   and README/doc references so public docs match the current implementation and
   render consistently on GitHub.
+- Reframed assurance-boundary prose around scoped evidence and configured
+  weight-edit regression reviews.
 - Updated repository surface metadata, security response wording, npm package
   identity metadata, and third-party notices to match the current packaged and
   optional dependency surfaces.
@@ -867,7 +869,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bumped `katex` from `0.16.27` to `0.16.28`.
 - Bumped `markdownlint-cli2` from `0.20.0` to `0.21.0`.
 
-- Replaced remaining certification wording with evaluation terminology in docs.
+- Replaced remaining legacy assurance-label wording with evaluation terminology
+  in docs.
 - Clarified calibration policy/preset guidance and aligned ASCII diagram connector formatting.
 
 ### Fixed
@@ -924,7 +927,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documentation CI can now be run on demand via `workflow_dispatch`.
 
 ### Fixed
-- CI: update workflow test paths after the report/certificate rename.
+- CI: update workflow test paths after the report artifact rename.
 - Tests: apply ruff-format to warning suppression coverage test.
 - CLI: `invarlock report explain` drift gate now prints the resolved drift band (no hard-coded threshold).
 - CLI: align `invarlock report` “ARTIFACTS” block so artifact paths start in the same column.
@@ -942,8 +945,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Proof packs: `verify_pack.sh --strict` (or `PACK_STRICT_MODE=1`) to fail closed on missing/invalid GPG signatures and unexpected pack contents.
 
 ### Changed
-- **Breaking:** Rename “certificate” → “report” across artifacts, docs, scripts, notebooks, and Python API surfaces.
-- **Breaking:** CLI terminology unified on `evaluate` (replaces `certify`).
+- **Breaking:** Rename legacy evaluation artifacts to “report” across artifacts,
+  docs, scripts, notebooks, and Python API surfaces.
+- **Breaking:** CLI terminology unified on `evaluate`.
 - Config: reject legacy HF v4 load keys `model.torch_dtype`, `model.load_in_8bit`, and `model.load_in_4bit`; use `model.dtype` and/or `model.quantization_config`.
 - Evaluation report bundle filenames updated (JSON: `evaluation.report.json`, Markdown: `evaluation_report.md`).
 - Presets: bump default WikiText-2 dataset seed for the causal LM preset from `42` → `43`.
@@ -961,7 +965,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Adapters: snapshot config serialization no longer emits deprecated attributes.
 - Scripts: CLI example validator ignores internal tool dirs and supports external paths.
 - CLI: keep `invarlock calibrate` import-safe so docs/example validation can run without torch installed.
-- Proof packs: fix `verify_pack.sh` cert discovery to verify `certs/**/evaluation.report.json`.
+- Proof packs: fix `verify_pack.sh` legacy report discovery for nested
+  `evaluation.report.json` files.
 - Proof packs: close a tamper-evidence gap by binding `checksums.sha256` to the signed manifest (and enforcing “no extra files” in strict verification).
 
 ## [0.3.7] - 2026-01-22
@@ -969,16 +974,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Role-based HuggingFace adapters with updated auto-routing (replaces model-name adapters).
 - Proof packs: v2 pack layout, scenarios manifest, and assurance verdict generation.
-- CLI flags: `invarlock run --edit-label` and `invarlock certify --baseline-report`.
+- CLI flags: `invarlock run --edit-label` and baseline-report reuse on the
+  retired evaluation command.
 - CI notebook smoke runner (`scripts/docs/verify_notebooks_smoke.py`).
 - Task-metric overrides, richer telemetry snapshots/reports, and CLI
   progress/NO_COLOR output refinements for longer-running evaluation flows.
 
 ### Changed
 - Proof-pack workflows hardened: baseline-report reuse, calibrate-only behavior, tuned-params hygiene, and improved task sizing/memory planning.
-- Evaluation certificate rendering was refreshed with revamped Markdown output,
-  richer HTML/glossary support, and the rename from “Safety Certificate” to
-  “Evaluation Certificate”.
+- Legacy evaluation artifact rendering was refreshed with revamped Markdown
+  output, richer HTML/glossary support, and updated report terminology.
 - Presets/overlays updated for new adapter roles and additional model families.
 - CI: bump `actions/download-artifact` to v7; remove the legacy B200 backend validation harness.
 
@@ -1015,7 +1020,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed B200 scheduling and evaluation reliability on constrained GPU hosts,
   including single-GPU runs, restored edit evaluation flow, and corrected
   metric parsing for generated reports.
-- Fixed degraded primary-metric and certificate handling so pairing
+- Fixed degraded primary-metric and legacy report handling so pairing
   mismatches, non-finite metrics, and degraded verdicts surface correctly
   through the generated artifacts.
 

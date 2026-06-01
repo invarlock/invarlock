@@ -96,7 +96,7 @@ judgment about policy allowances and bundle contents.
 
 ## Related Documentation
 
-- [Trust Model](14-trust-model.md) — What a strict pass does and does not mean
+- [Trust Model](14-trust-model.md) — Strict pass scope
 - [Assurance Case Overview](00-assurance-case.md) — Claims, evidence, and tests
 - [Runtime Provenance Guide](../security/runtime-provenance-guide.md) — Manifest requirements
 - [Failure Examples](../user-guide/failure-examples.md) — Common non-pass shapes

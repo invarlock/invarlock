@@ -22,7 +22,8 @@ policy needed to interpret WARNs under the chosen null-modeling assumptions.
 For families whose kappas are calibrated against an approximately Gaussian null,
 the two-sided tail probability gives the expected false-positive rate. Families
 with intentionally low sentinel caps are still monitored and budgeted by
-`max_caps`, but they must not be cited as <=5% Gaussian-tail claims.
+`max_caps`; cite them as operational thresholds rather than <=5% Gaussian-tail
+claims.
 
 ## Derivation (sketch)
 

@@ -10,7 +10,7 @@
 | --- | --- |
 | **Purpose** | Track non-synthetic guard evidence for spectral, RMT, and variance behavior on real model/checkpoint workflows. |
 | **Audience** | Maintainers, release reviewers, and calibration owners. |
-| **Contract scope** | Portable evidence manifests that point to real-run artifacts; not a substitute for the strict verifier report contract. |
+| **Contract scope** | Portable evidence manifests that point to real-run artifacts; strict report acceptance remains governed by the verifier report contract. |
 | **Source of truth** | `scripts/release/evidence_contracts.py empirical`, `scripts/model_evidence/model_evidence_sweep.py`, calibration commands, and evidence-pack scripts. |
 
 ## Maintainer Command
@@ -104,9 +104,9 @@ Passing the empirical checker means the release bundle contains portable
 manifest references that self-declare non-synthetic evidence with the required
 guard coverage. The checker validates manifest shape, required guard/model rows,
 declared evidence kinds/statuses, command markers, and relative nonempty
-artifact paths. It does not parse artifact contents, authenticate the producer,
-or prove every threshold is statistically final, and it does not replace
-`invarlock verify --assurance strict` for strict report acceptance.
+artifact paths. Artifact content review, producer authentication, statistical
+finality, and strict report acceptance are handled by their dedicated evidence
+and verifier gates.
 
 ## Related Documentation
 

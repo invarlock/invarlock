@@ -111,9 +111,9 @@ output, and map failures to exit codes.
 
 Shell support modules such as `cli/config_execution.py`, `cli/run_execution.py`,
 `cli/run_config.py`, `cli/run_pairing.py`, and `cli/run_overhead.py` belong to
-this boundary layer as well. They can perform
-CLI-facing adaptation and console/event rendering, but they must not become
-policy owners.
+this boundary layer as well. They can perform CLI-facing adaptation and
+console/event rendering; policy ownership stays in the core and reporting
+owners.
 
 | Command | Purpose | Primary Output |
 | --- | --- | --- |
@@ -336,9 +336,9 @@ tests. The intended invariants are:
   exports.
 - No `rmt_legacy` references in production source. RMT ownership lives in
   `rmt.py`, `rmt_analysis.py`, and `rmt_detection.py`.
-- No dependency-map orchestration in command shells. Public command owners must
-  stay thin and must not rebuild giant `deps` dictionaries or inject callables
-  to recreate removed indirection.
+- No dependency-map orchestration in command shells. Public command owners stay
+  thin and avoid giant `deps` dictionaries or injected callables that recreate
+  removed indirection.
 - No compatibility-only command signatures once a canonical owner contract
   exists. Example: lens-metric calculation takes a required `MetricsConfig`
   instead of deprecated per-call overrides.
@@ -363,10 +363,10 @@ verification and programmatic execution.
 | **Plugin architecture** | Entry points for guards, adapters, edits enable extension without core changes. | `importlib.metadata` discovery in `core/registry.py` |
 | **Log-space primary metrics** | Paired ΔlogNLL with BCa bootstrap avoids ratio math bias. | `core/bootstrap.py` implementation |
 
-Edit-stack neutral does not mean every edit stack is bundled as an InvarLock
-edit plugin. The stable production boundary is BYOE: an external quantization
-tool, pruner, adapter merge, or fine-tuning pipeline produces the subject
-checkpoint, and InvarLock validates the resulting baseline-vs-subject evidence.
+Edit-stack neutral means the stable production boundary is BYOE: an external
+quantization tool, pruner, adapter merge, or fine-tuning pipeline produces the
+subject checkpoint, and InvarLock validates the resulting
+baseline-vs-subject evidence.
 Built-in edit generation is limited to demo/smoke support.
 
 ## Module Dependencies
