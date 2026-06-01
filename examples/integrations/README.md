@@ -15,7 +15,7 @@ their runnable path or compatibility blocker is understood.
 | Target | Initial status | First useful artifact |
 | --- | --- | --- |
 | GPTQModel | Backend validation pending | Post-GPTQ baseline-vs-subject comparison |
-| torchao | Save/load boundary validation pending | Post-quantization HF-loadable subject comparison |
+| torchao | `runnable` via `torchao_int8_export/` | Post-quantization HF-loadable export comparison |
 | LLM Compressor / vLLM | Compatibility validation pending | Compression sidecar evidence before deployment |
 | PEFT | `runnable` via `peft_lora/` | Base-vs-merged-adapter comparison |
 | Hugging Face Optimum | Target path selection pending | Model-card evidence section for a quantized subject |
@@ -32,6 +32,9 @@ their runnable path or compatibility blocker is understood.
   for HF-loadable paths.
 - `peft_lora/` materializes a tiny PEFT LoRA-merged subject checkpoint and
   compares it against the baseline.
+- `torchao_int8_export/` materializes a tiny local HF baseline, runs a `torchao`
+  int8 weight-only quantization pass, exports a HF-loadable subject, and
+  compares the export against the baseline.
 
 ## Example Lifecycle
 

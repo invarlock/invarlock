@@ -18,6 +18,7 @@ runtime package and should not add required dependencies to the core install.
 | Expected artifact checklist | Present under `examples/integrations/_shared/expected-artifacts.md`. |
 | Shared compare wrapper | Present under `examples/integrations/_shared/run_invarlock_compare.sh`. |
 | PEFT LoRA merge | Runnable example under `examples/integrations/peft_lora/`. |
+| torchao int8 export | Runnable example under `examples/integrations/torchao_int8_export/`. |
 | Additional target-specific examples | Added one target at a time after backend compatibility is validated. |
 
 Browse the integration scaffold in the repository:
@@ -97,6 +98,38 @@ For host-side dependency bring-up, use:
 
 ```bash
 examples/integrations/peft_lora/run_tiny_peft_lora.sh \
+  --allow-network \
+  --force \
+  --execution-mode host \
+  --assurance off
+```
+
+## torchao Int8 Export
+
+The `torchao` example creates a deterministic tiny local HF baseline, applies a
+`torchao` int8 weight-only quantization pass, exports a dequantized HF-loadable
+subject checkpoint, and feeds the baseline/subject pair through the shared
+compare wrapper:
+
+```bash
+examples/integrations/torchao_int8_export/run_tiny_torchao_int8_export.sh \
+  --allow-network \
+  --force
+```
+
+This command requires `torchao` in the example environment. It writes the
+generated baseline and exported subject under
+`examples/integrations/torchao_int8_export/models/` and the InvarLock artifacts
+under `examples/integrations/torchao_int8_export/reports/`.
+
+The materializer records the native quantized HF save probe in
+`external_edit_summary.json`; the runnable comparison path uses the exported
+HF-loadable subject.
+
+For host-side dependency bring-up, use:
+
+```bash
+examples/integrations/torchao_int8_export/run_tiny_torchao_int8_export.sh \
   --allow-network \
   --force \
   --execution-mode host \
