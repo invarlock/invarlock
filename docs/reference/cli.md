@@ -114,6 +114,15 @@ invarlock report explain --evaluation-report reports/eval/evaluation.report.json
 Exit codes: `0=success`, `1=generic failure`, `2=usage/schema/config failure`,
 `3=hard abort` for profile-aware fail-closed paths.
 
+## Stable vs Experimental Commands
+
+| Stability class | Commands | Contract |
+| --- | --- | --- |
+| Stable core workflow | `invarlock evaluate`, `invarlock verify`, `invarlock report html`, `invarlock report explain`, `invarlock report validate`, `invarlock doctor`, `invarlock version` | Documented command names, documented options, exit-code meaning, and artifact paths are stable within the current CLI policy. |
+| Stable JSON automation | `invarlock doctor --json`, `invarlock verify --json`, `invarlock advanced runtime-verify --json`, `invarlock advanced plugins list --json`, `invarlock advanced plugins adapters --json`, `invarlock advanced evidence-pack verify --json`, `invarlock advanced policy verify --json` | Required envelope fields and `format_version` values are stable; optional fields are additive. |
+| Stable advanced verifiers | `invarlock advanced runtime-verify`, `invarlock advanced evidence-pack inspect`, `invarlock advanced evidence-pack verify`, `invarlock advanced policy build`, `invarlock advanced policy verify`, `invarlock advanced plugins list`, `invarlock advanced plugins adapters` | Public operational commands outside the core user loop. Their documented behavior is maintained, while additional subcommands may evolve faster. |
+| Experimental or maintainer-only | `invarlock advanced calibrate`, repo scripts under `scripts/`, package-internal config runners, undocumented flags, and local harness entrypoints | Useful for development, calibration, and release work, but not covered by the public CLI stability contract unless promoted here. |
+
 ## `invarlock evaluate`
 
 Purpose: compare a baseline against a subject and emit an evaluation report.

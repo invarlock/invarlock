@@ -214,6 +214,17 @@ def test_cli_docs_list_stable_cli_json_surfaces() -> None:
         assert format_version in text
 
 
+def test_cli_reference_lists_stable_and_experimental_command_classes() -> None:
+    text = _read("docs/reference/cli.md")
+
+    assert "Stable vs Experimental Commands" in text
+    assert "Stable core workflow" in text
+    assert "Stable JSON automation" in text
+    assert "Stable advanced verifiers" in text
+    assert "Experimental or maintainer-only" in text
+    assert "not covered by the public CLI stability contract" in text
+
+
 def test_byod_end_to_end_example_has_enough_rows_for_requested_windows() -> None:
     text = _read("docs/user-guide/bring-your-own-data.md")
     match = re.search(
