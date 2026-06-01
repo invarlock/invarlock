@@ -12,7 +12,7 @@ from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 
 _NOISY_WARNING_PATTERNS = (r".*loss_type=None.*unrecognized.*",)
 _LOG_MESSAGE_ERRORS = (RuntimeError, TypeError, ValueError)
@@ -193,7 +193,7 @@ def suppress_noisy_warnings(
                         category: type[Warning],
                         filename: str,
                         lineno: int,
-                        file: object | None = None,
+                        file: TextIO | None = None,
                         line: str | None = None,
                     ) -> None:
                         try:

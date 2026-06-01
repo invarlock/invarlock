@@ -4,13 +4,14 @@ Rendering and category dispatch helpers for the plugins CLI command.
 
 import json
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Literal, cast
 
 import typer
 from rich.markup import escape as _escape
 from rich.table import Table
 
 from invarlock.core.plugins_inventory import (
+    PluginCategory,
     adapter_inventory_json_items,
     combined_plugins_json_items,
     dataset_inventory_json_items,
@@ -30,7 +31,8 @@ from ..constants import PLUGINS_FORMAT_VERSION
 
 ExtrasChecker = Callable[[str, str], str]
 AdapterRowsLoader = Callable[[Any], list[dict[str, Any]]]
-GenericRowsLoader = Callable[[Any, str], list[dict[str, Any]]]
+GenericPluginCategory = Literal["guards", "edits"]
+GenericRowsLoader = Callable[[Any, GenericPluginCategory], list[dict[str, Any]]]
 ProviderRegistryLoader = Callable[[], dict[str, Any]]
 
 
@@ -102,11 +104,11 @@ def gather_adapter_rows(
 
 
 def gather_generic_rows(
-    registry: Any, plugin_type: str, *, extras_checker: ExtrasChecker
+    registry: Any, plugin_type: GenericPluginCategory, *, extras_checker: ExtrasChecker
 ) -> list[dict[str, Any]]:
     return gather_generic_inventory_rows(
         registry=registry,
-        plugin_type=plugin_type,
+        plugin_type=cast(PluginCategory, plugin_type),
         extras_checker=extras_checker,
     )
 
@@ -316,7 +318,9 @@ def _print_generic_verbose(
     console.print(table)
 
 
-def _print_generic_json(rows: list[dict[str, Any]], kind: str) -> None:
+def _print_generic_json(
+    rows: list[dict[str, Any]], kind: GenericPluginCategory
+) -> None:
     _emit_plugins_json(kind, generic_inventory_json_items(rows, kind=kind))
 
 
@@ -460,13 +464,14 @@ def _show_plugin_category(
         return
 
     if plugin_type in {"guards", "edits"}:
-        rows = generic_rows_loader(registry, plugin_type)
+        generic_type = cast(GenericPluginCategory, plugin_type)
+        rows = generic_rows_loader(registry, generic_type)
         if explain:
-            _explain_generic(explain, plugin_type, rows=rows, console=console)
+            _explain_generic(explain, generic_type, rows=rows, console=console)
             return
         rows = _filter_only_rows(rows, only)
         if json_out:
-            _print_generic_json(rows, plugin_type)
+            _print_generic_json(rows, generic_type)
         elif verbose:
             _print_generic_verbose(rows, title, console=console)
         else:
