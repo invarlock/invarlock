@@ -38,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   classified and auditable.
 - Added guard fault-injection seam documentation and regression coverage for
   spectral, RMT, variance, and fallback diagnostic paths.
+- Added public contract stability documentation for report schemas,
+  evidence-pack formats, verifier outputs, CLI stability classes, adapter
+  support tiers, and the pre-1.0 package stability posture.
 
 ### Changed
 
@@ -67,6 +70,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   edit implementations, edit metadata, artifact saving, artifact validation, and
   pack verification logic live in Python modules instead of brittle shell-only
   state handling.
+- Refactored smoke and maintenance scripts around shared helpers, clearer
+  runtime modes, explicit model-download behavior, and stronger exit/status
+  reporting for the tiny all-model matrix and evidence script flows.
+- Refactored source and test maintainability hotspots, including core source
+  helper extraction, run-command test helper consolidation, core test topology
+  cleanup, and validation-suite orchestration splits.
+- Standardized assurance document openings, glossary examples, math rendering,
+  and README/doc references so public docs match the current implementation and
+  render consistently on GitHub.
+- Updated repository surface metadata, security response wording, npm package
+  identity metadata, and third-party notices to match the current packaged and
+  optional dependency surfaces.
+- Updated dependency floors and tool pins, including Torch, `matplotlib`,
+  setuptools, `shellingham`, Ruff, markdownlint, and KaTeX.
 - Updated `CODEOWNERS` to use the organization `core-maintainers` team for
   protected ownership rules.
 - Updated the pre-commit workflow check context to report as `pre-commit`
@@ -106,6 +123,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stale file paths from the maintained check list.
 - Fixed stale workflow/check metadata after GitHub ruleset hardening so
   protected branches require current CI contexts only.
+- Fixed smoke configuration presets for seq2seq model paths and the tiny matrix
+  checklist network metadata.
+- Fixed public documentation to refer to the packaged runtime tier policy as
+  logical `runtime/tiers.yaml` while retaining the documented override path.
+- Fixed secret-scanning false positives on model architecture names without
+  changing adapter behavior.
 - Fixed reporting test import ordering to satisfy the active pre-commit gate.
 - Fixed additional guard and reporting compatibility edge cases, including
   variance fault-injection preservation, telemetry monkeypatch stability,
