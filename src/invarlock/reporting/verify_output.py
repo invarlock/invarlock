@@ -6,6 +6,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from invarlock.public_contracts import VERIFY_OUTPUT_FORMAT_VERSION
+
 _VERIFY_OUTPUT_EXCEPTIONS = (
     AttributeError,
     FileNotFoundError,
@@ -18,7 +20,7 @@ _VERIFY_OUTPUT_EXCEPTIONS = (
     ValueError,
 )
 
-FORMAT_VERIFY = "verify-v1"
+FORMAT_VERIFY = VERIFY_OUTPUT_FORMAT_VERSION
 
 
 def _is_non_bool_number(value: Any) -> bool:

@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InvarLock Verify JSON Output",
+  "type": "object",
+  "required": [
+    "format_version",
+    "summary",
+    "results"
+  ],
+  "properties": {
+    "format_version": {
+      "const": "verify-v1"
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "ok",
+        "reason"
+      ],
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "reason": {
+          "enum": [
+            "ok",
+            "policy_fail",
+            "malformed"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "evaluation_report": {
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "schema_version",
+          "kind",
+          "ok",
+          "reason",
+          "ratio_vs_baseline",
+          "ci"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "v1"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "reason": {
+            "enum": [
+              "ok",
+              "policy_fail",
+              "malformed"
+            ]
+          },
+          "ratio_vs_baseline": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "ci": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "number"
+                }
+              }
+            ]
+          },
+          "recompute": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "verification": {
+            "type": "object"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "error": {
+      "type": "object"
+    },
+    "resolution": {
+      "type": "object",
+      "properties": {
+        "exit_code": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

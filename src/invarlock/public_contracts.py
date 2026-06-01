@@ -12,6 +12,30 @@ PACKAGE_CONTRACTS_ROOT = importlib.resources.files("invarlock").joinpath(
     "_data", "contracts"
 )
 
+REPORT_SCHEMA_VERSION = "v1"
+EVIDENCE_PACK_FORMAT_VERSION = "evidence-pack-v1"
+RUNTIME_MANIFEST_CONTRACT_VERSION = "runtime-manifest-v1"
+DOCTOR_OUTPUT_FORMAT_VERSION = "doctor-v1"
+PLUGINS_OUTPUT_FORMAT_VERSION = "plugins-v1"
+VERIFY_OUTPUT_FORMAT_VERSION = "verify-v1"
+RUNTIME_VERIFY_OUTPUT_FORMAT_VERSION = "runtime-verify-v1"
+POLICY_PACK_VERIFY_OUTPUT_FORMAT_VERSION = "policy-pack-verify-v1"
+EVIDENCE_PACK_VERIFY_OUTPUT_FORMAT_VERSION = "evidence-pack-verify-v1"
+CLI_STABILITY_POLICY_VERSION = "cli-stability-v1"
+ADAPTER_SUPPORT_TIER_POLICY_VERSION = "adapter-support-tiers-v1"
+
+STABLE_CLI_JSON_SURFACES: dict[str, str] = {
+    "invarlock doctor --json": DOCTOR_OUTPUT_FORMAT_VERSION,
+    "invarlock verify --json": VERIFY_OUTPUT_FORMAT_VERSION,
+    "invarlock advanced runtime-verify --json": RUNTIME_VERIFY_OUTPUT_FORMAT_VERSION,
+    "invarlock advanced plugins list --json": PLUGINS_OUTPUT_FORMAT_VERSION,
+    "invarlock advanced plugins adapters --json": PLUGINS_OUTPUT_FORMAT_VERSION,
+    "invarlock advanced policy verify --json": POLICY_PACK_VERIFY_OUTPUT_FORMAT_VERSION,
+    "invarlock advanced evidence-pack verify --json": (
+        EVIDENCE_PACK_VERIFY_OUTPUT_FORMAT_VERSION
+    ),
+}
+
 
 class ContractLoadError(RuntimeError):
     """Raised when a shipped contract cannot be loaded from either contract root."""
@@ -164,9 +188,20 @@ def load_runtime_manifest_schema() -> dict[str, Any]:
     return _load_object_contract_or_raise("runtime_manifest.schema.json")
 
 
+def load_verify_output_schema() -> dict[str, Any]:
+    return _load_object_contract_or_raise("verify_output.schema.json")
+
+
 def support_lanes() -> list[dict[str, Any]]:
     lanes = load_support_matrix().get("lanes", [])
     return [lane for lane in lanes if isinstance(lane, dict)]
+
+
+def support_tiers() -> tuple[str, ...]:
+    tiers = load_support_matrix().get("support_tiers", [])
+    if not isinstance(tiers, list):
+        return ()
+    return tuple(tier for tier in tiers if isinstance(tier, str) and tier)
 
 
 def support_lane_by_id(lane_id: str) -> dict[str, Any] | None:
@@ -198,6 +233,45 @@ def published_basis_lanes() -> list[dict[str, Any]]:
         for lane in support_lanes()
         if lane.get("support_tier") == "published_basis"
     ]
+
+
+def stable_cli_json_surfaces() -> dict[str, str]:
+    return dict(STABLE_CLI_JSON_SURFACES)
+
+
+def public_subcontract_catalog() -> dict[str, dict[str, Any]]:
+    return {
+        "report_schema": {
+            "version": REPORT_SCHEMA_VERSION,
+            "source": "invarlock.reporting.report_schema.REPORT_JSON_SCHEMA",
+            "compatibility": "additive_within_v1",
+        },
+        "evidence_pack_format": {
+            "version": EVIDENCE_PACK_FORMAT_VERSION,
+            "source": "contracts/evidence_pack_manifest.schema.json",
+            "compatibility": "strict_format_match",
+        },
+        "verifier_output": {
+            "version": VERIFY_OUTPUT_FORMAT_VERSION,
+            "source": "contracts/verify_output.schema.json",
+            "compatibility": "additive_within_v1",
+        },
+        "runtime_manifest": {
+            "version": RUNTIME_MANIFEST_CONTRACT_VERSION,
+            "source": "contracts/runtime_manifest.schema.json",
+            "compatibility": "strict_contract_version_match",
+        },
+        "cli_stability_policy": {
+            "version": CLI_STABILITY_POLICY_VERSION,
+            "source": "docs/reference/cli.md",
+            "stable_json_surfaces": stable_cli_json_surfaces(),
+        },
+        "adapter_support_tiers": {
+            "version": ADAPTER_SUPPORT_TIER_POLICY_VERSION,
+            "source": "contracts/support_matrix.json",
+            "tiers": list(support_tiers()),
+        },
+    }
 
 
 def contract_reference(filename: str) -> dict[str, Any]:
@@ -244,6 +318,7 @@ def contract_catalog() -> dict[str, Any]:
         "console_labels": contract_reference("console_labels.json"),
         "metric_kinds": contract_reference("metric_kinds.json"),
         "runtime_manifest": contract_reference("runtime_manifest.schema.json"),
+        "verify_output": contract_reference("verify_output.schema.json"),
         "evidence_pack_manifest": contract_reference(
             "evidence_pack_manifest.schema.json"
         ),
@@ -254,7 +329,19 @@ def contract_catalog() -> dict[str, Any]:
 __all__ = [
     "CONTRACTS_ROOT",
     "PACKAGE_CONTRACTS_ROOT",
+    "ADAPTER_SUPPORT_TIER_POLICY_VERSION",
+    "CLI_STABILITY_POLICY_VERSION",
     "ContractLoadError",
+    "DOCTOR_OUTPUT_FORMAT_VERSION",
+    "EVIDENCE_PACK_FORMAT_VERSION",
+    "EVIDENCE_PACK_VERIFY_OUTPUT_FORMAT_VERSION",
+    "PLUGINS_OUTPUT_FORMAT_VERSION",
+    "POLICY_PACK_VERIFY_OUTPUT_FORMAT_VERSION",
+    "REPORT_SCHEMA_VERSION",
+    "RUNTIME_MANIFEST_CONTRACT_VERSION",
+    "RUNTIME_VERIFY_OUTPUT_FORMAT_VERSION",
+    "STABLE_CLI_JSON_SURFACES",
+    "VERIFY_OUTPUT_FORMAT_VERSION",
     "adapter_capability",
     "adapter_capability_map",
     "contract_catalog",
@@ -268,8 +355,12 @@ __all__ = [
     "load_policy_pack_schema",
     "load_evidence_pack_manifest_schema",
     "load_runtime_manifest_schema",
+    "load_verify_output_schema",
     "load_support_matrix",
     "published_basis_lanes",
+    "public_subcontract_catalog",
+    "stable_cli_json_surfaces",
     "support_lane_by_id",
     "support_lanes",
+    "support_tiers",
 ]

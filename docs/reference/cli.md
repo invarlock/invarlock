@@ -254,7 +254,8 @@ invarlock doctor --json
 ## `invarlock advanced`
 
 Purpose: advanced and maintenance-oriented workflows that are intentionally
-outside the core product contract.
+outside the core user loop, except for the explicitly versioned JSON contracts
+listed below.
 
 Subcommands:
 
@@ -322,15 +323,23 @@ invarlock advanced runtime-verify \
 
 ## JSON Output
 
-Stable machine-readable output is available on the verification and advanced
-plugin surfaces.
+Stable machine-readable output is available on these surfaces:
 
-- `invarlock verify --json`
-- `invarlock advanced plugins list --json`
-- `invarlock advanced evidence-pack verify --json`
-- `invarlock advanced policy verify --json`
+| Command | Format version | Stability |
+| --- | --- | --- |
+| `invarlock doctor --json` | `doctor-v1` | Required envelope fields are stable. |
+| `invarlock verify --json` | `verify-v1` | Required envelope fields and exit-code meaning are stable. |
+| `invarlock advanced runtime-verify --json` | `runtime-verify-v1` | Runtime-manifest verification envelope is stable. |
+| `invarlock advanced plugins list --json` | `plugins-v1` | Plugin catalog envelope and contract catalog keys are stable. |
+| `invarlock advanced plugins adapters --json` | `plugins-v1` | Adapter rows and contract catalog keys are stable. |
+| `invarlock advanced evidence-pack verify --json` | `evidence-pack-verify-v1` | Evidence-pack verification envelope is stable. |
+| `invarlock advanced policy verify --json` | `policy-pack-verify-v1` | Policy-pack verification envelope is stable. |
 
-These commands emit a single JSON object suitable for CI parsing.
+These commands emit a single JSON object suitable for CI parsing. Within a
+format version, new optional fields may be added and consumers should ignore
+unknown fields. Removing a required field, renaming a required field, changing a
+field type, or changing pass/fail exit-code meaning requires a new format
+version.
 
 ## Command Layout
 

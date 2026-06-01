@@ -14,7 +14,8 @@ task graph, scheduling, and artifact generation. It complements
 | Aspect | Details |
 | --- | --- |
 | Purpose | Hardware-agnostic Phase 0 validation harness for edit detection |
-| Version | `evidence-packs-v1` |
+| Harness version | `evidence-packs-v1` |
+| Manifest format | `evidence-pack-v1` |
 | Hardware | NVIDIA GPUs where models fit VRAM; multi-GPU recommended for `full` |
 | Models | `subset` (1 model), `showcase`/`workshop3` (3 models), or `full` (6 models); all ungated public |
 | Edits | Scenario-driven; default suites use 4 clean + 4 stress edit scenarios per model, and filtered manifests may select any subset |

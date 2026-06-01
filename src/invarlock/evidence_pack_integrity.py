@@ -12,14 +12,17 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
-from invarlock.public_contracts import load_evidence_pack_manifest_schema
+from invarlock.public_contracts import (
+    EVIDENCE_PACK_FORMAT_VERSION,
+    load_evidence_pack_manifest_schema,
+)
 
 try:  # pragma: no cover - exercised through tests/integration
     import jsonschema
 except ImportError:  # pragma: no cover
     jsonschema = None
 
-EVIDENCE_PACK_FORMAT = "evidence-pack-v1"
+EVIDENCE_PACK_FORMAT = EVIDENCE_PACK_FORMAT_VERSION
 MANIFEST_SIGNATURE_FILENAME = "manifest.signature.json"
 EVIDENCE_PACK_SIGNATURE_FORMAT = "evidence-pack-signature-v1"
 CONTROL_FILES = {

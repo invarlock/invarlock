@@ -5,6 +5,11 @@
     "supported_experimental",
     "community_experimental"
   ],
+  "support_tier_descriptions": {
+    "published_basis": "Public evidence fixture set with report, runtime-manifest, and evidence-pack provenance where available.",
+    "supported_experimental": "Repo ships preset/config/test/smoke paths, but the lane has not yet graduated to the published public evidence basis.",
+    "community_experimental": "Adapter/runtime path is available for community use without a maintained public evidence basis."
+  },
   "lanes": [
     {
       "lane_id": "gpt2-causal-hf",

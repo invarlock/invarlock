@@ -364,6 +364,13 @@ The manifest contract is published at `contracts/evidence_pack_manifest.schema.j
 `invarlock advanced evidence-pack verify` validates this schema before checksum and signature verification so
 malformed evidence packs fail deterministically.
 
+The current manifest format is `evidence-pack-v1`. The schema-required core is
+`format`, `checksums_sha256`, and `checksums_sha256_digest`; builder, subject,
+invocation, environment, material, signing, and nested report-verification
+fields are additive provenance fields. Strong distributable evidence should
+include those provenance fields even when a minimal schema-valid pack omits
+them.
+
 Installed wheels ship the public contracts and support package-native
 inspection, key generation, assembly, and verification via `invarlock advanced evidence-pack inspect`,
 `invarlock advanced evidence-pack keygen`, `invarlock advanced evidence-pack build`,

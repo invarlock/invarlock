@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from invarlock.public_contracts import stable_cli_json_surfaces
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 REMOVED_HOST_MODE_TOKEN = "trusted" + "-local"
 
@@ -188,6 +190,12 @@ def test_contract_reference_docs_freeze_versioned_json_and_packaged_public_evide
     text = _read("docs/reference/contracts.md")
     normalized = " ".join(text.split())
 
+    assert "Versioned sub-contracts" in text
+    assert "Report schema" in text
+    assert "Evidence-pack format" in text
+    assert "Verifier output" in text
+    assert "CLI stability policy" in text
+    assert "Adapter support tiers" in text
     assert 'format_version: "verify-v1"' in text
     assert 'format_version: "runtime-verify-v1"' in text
     assert 'format_version: "evidence-pack-verify-v1"' in text
@@ -196,6 +204,14 @@ def test_contract_reference_docs_freeze_versioned_json_and_packaged_public_evide
     assert "invarlock/_data/public_evidence/published_basis/" in text
     assert "maintained public contract carriers" in normalized
     assert "make_public_contract_bundle.py" not in text
+
+
+def test_cli_docs_list_stable_cli_json_surfaces() -> None:
+    text = _read("docs/reference/contracts.md") + "\n" + _read("docs/reference/cli.md")
+
+    for command, format_version in stable_cli_json_surfaces().items():
+        assert command in text
+        assert format_version in text
 
 
 def test_byod_end_to_end_example_has_enough_rows_for_requested_windows() -> None:
