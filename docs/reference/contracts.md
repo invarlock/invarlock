@@ -130,7 +130,7 @@ describes the public support tier for a model/runtime/adapter lane.
 | Tier | Meaning |
 | --- | --- |
 | `published_basis` | Maintained public evidence floor with report, runtime-manifest, and evidence-pack provenance where available. |
-| `supported_experimental` | Repo ships preset, calibration/config, targeted tests, and smoke/evidence paths, but no published-basis fixture set is claimed. |
+| `supported_experimental` | Repo ships preset/config/test/smoke paths, but no published-basis fixture set is claimed. |
 | `community_experimental` | Adapter/runtime path is usable for community experimentation without a maintained public evidence basis. |
 
 Policy packs that declare `compatibility.support_tiers` must use one of those

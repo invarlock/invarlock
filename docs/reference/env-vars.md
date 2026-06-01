@@ -65,9 +65,10 @@ INVARLOCK_EVAL_DEVICE=cpu INVARLOCK_ALLOW_NETWORK=1 \
 | --- | --- | --- |
 | `INVARLOCK_ALLOW_REMOTE_CODE` | unset | Explicitly allow remote model code execution. |
 
-`INVARLOCK_ALLOW_REMOTE_CODE` is the only environment gate for remote model
-code execution. Use `INVARLOCK_ALLOW_REMOTE_CODE=1` or `--allow-remote-code`
-when remote code is required.
+`INVARLOCK_ALLOW_REMOTE_CODE` is the public environment gate for remote model
+code execution. Use `INVARLOCK_ALLOW_REMOTE_CODE=1` for `invarlock evaluate`
+when remote code is required; `--allow-remote-code` is exposed on advanced
+calibration/config-runner commands that load models directly.
 
 ### Evaluation & pairing
 
@@ -174,7 +175,8 @@ Strictness/tiny-relax/overhead-skip are also config/profile policy:
 - **Multiple container engines installed**: set `INVARLOCK_CONTAINER_ENGINE=podman` or `INVARLOCK_CONTAINER_ENGINE=docker`.
 - **HF dataset cache lock/permission errors on local reruns**: set `INVARLOCK_HF_DATASETS_CACHE=/path/to/writable/cache` or let InvarLock retry under its own writable cache.
 - **Calibration iterables fail**: use `INVARLOCK_ALLOW_CALIBRATION_MATERIALIZE=1`.
-- **Third-party plugins missing**: set `INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=1` or use `--allow-third-party-plugins`.
+- **Third-party plugins missing**: set `INVARLOCK_ALLOW_THIRD_PARTY_PLUGINS=1`;
+  advanced plugin/calibration commands also expose `--allow-third-party-plugins`.
 
 ## Observability
 

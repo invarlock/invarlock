@@ -27,8 +27,13 @@ task graph, scheduling, and artifact generation. It complements
 
 ## Quick Start (Context)
 
+The suite wrappers fail closed unless remote model code has been explicitly
+approved. The examples below assume `INVARLOCK_ALLOW_REMOTE_CODE=1` is exported
+for the shell that launches `run_suite.sh` or `run_pack.sh`.
+
 ```bash
 # Run the subset suite (offline by default)
+export INVARLOCK_ALLOW_REMOTE_CODE=1
 ./scripts/evidence_packs/run_suite.sh --suite subset
 
 # Run the full suite and build an evidence pack
@@ -552,6 +557,7 @@ these sidecars into the packaged evidence pack under `reports/**/`.
 
 ```bash
 # Throughput (default)
+export INVARLOCK_ALLOW_REMOTE_CODE=1
 PACK_DETERMINISM=throughput ./scripts/evidence_packs/run_suite.sh --suite subset
 
 # Strict
@@ -812,7 +818,7 @@ Primary metric acceptance/drift gates should be configured via profile/config
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `PACK_BASELINE_STORAGE_MODE` | `snapshot_symlink` | Baseline storage mode (`snapshot_symlink`, `snapshot_copy`, or `save_pretrained`) |
+| `PACK_BASELINE_STORAGE_MODE` | `snapshot_copy` | Baseline storage mode for `run_suite.sh` and `run_pack.sh` (`snapshot_symlink`, `snapshot_copy`, or `save_pretrained`) |
 | `MIN_FREE_DISK_GB` | `200` | Disk pressure threshold |
 | `PACK_SKIP_DISK_PREFLIGHT` | `0` | Skip storage preflight |
 | `CUDA_MEMORY_FRACTION` | `0.92` | Target GPU memory fraction |
@@ -854,6 +860,7 @@ Primary metric acceptance/drift gates should be configured via profile/config
 If offline runs fail with “requires model revisions”, run a preflight:
 
 ```bash
+export INVARLOCK_ALLOW_REMOTE_CODE=1
 ./scripts/evidence_packs/run_suite.sh --suite subset --net 1
 ```
 
@@ -877,6 +884,7 @@ risk of partial artifacts.
 Increase the default or per-task timeout:
 
 ```bash
+export INVARLOCK_ALLOW_REMOTE_CODE=1
 TASK_TIMEOUT_DEFAULT=28800 ./scripts/evidence_packs/run_suite.sh --suite subset
 TASK_TIMEOUT_CREATE_EDIT=28800 ./scripts/evidence_packs/run_suite.sh --suite subset
 ```

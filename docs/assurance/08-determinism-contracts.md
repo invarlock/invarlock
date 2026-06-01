@@ -35,8 +35,10 @@ ties the runtime contract back to reproducible maths:
 
 ## Runtime Contract
 
-- Runs **abort** for CI/Release if pairing < 1.0, overlap > 0.0, or counts differ.
-- report contains seeds/hashes, pairing metrics, and policy tier/digest.
+- CI/Release runs hard-fail if a baseline pairing context exists and pairing is
+  incomplete, windows overlap, or counts differ.
+- report contains seeds/hashes, pairing metrics, coverage floors, bootstrap
+  metadata, and policy tier/digest.
 
 ## Observability
 

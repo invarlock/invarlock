@@ -33,7 +33,7 @@ by family/precision; verify on your setup.
 
 ```bash
 # Baseline on CPU → report
-INVARLOCK_ALLOW_HOST_EXECUTION=1 invarlock evaluate \
+invarlock evaluate --execution-mode host \
   --baseline gpt2 \
   --subject gpt2 \
   --preset configs/presets/causal_lm/wikitext2_512.yaml \
@@ -43,7 +43,7 @@ INVARLOCK_ALLOW_HOST_EXECUTION=1 invarlock evaluate \
   --report-out reports/baseline_cpu
 
 # Same schedule on MPS → report
-INVARLOCK_ALLOW_HOST_EXECUTION=1 invarlock evaluate \
+invarlock evaluate --execution-mode host \
   --baseline gpt2 \
   --subject gpt2 \
   --preset configs/presets/causal_lm/wikitext2_512.yaml \

@@ -42,10 +42,10 @@ print(adapter.describe(model)["model_type"])
 ```
 
 > Adapter availability is broader than the published assurance basis. GPT-2 and
-> BERT back the published calibrated basis; repo-included pilot configs
-> for Mistral 7B, Ministral 3 text-only, Qwen2 7B, Qwen2.5 7B, Qwen2.5 14B, and additional experimental families are for
-> experimentation until supporting artifacts are attached. See the Model Family
-> Catalog for the authoritative family-by-family inventory.
+> BERT back the published calibrated basis; current experimental lanes are
+> enumerated in `contracts/support_matrix.json`, with broader inventory in the
+> Model Family Catalog. Examples include Mistral 7B, Qwen2 7B, Qwen2.5 7B, and
+> Qwen2.5 14B; treat the contract files as authoritative for the complete list.
 
 ## Support Tiers
 
@@ -182,7 +182,7 @@ Adapter loaders pass through standard Hugging Face `from_pretrained` arguments:
 | --- | --- | --- |
 | `dtype` | Force `float16`/`bfloat16` | HF adapters |
 | `device_map` | Sharding/placement | HF adapters |
-| `trust_remote_code` | Enable custom model code only with explicit `--allow-remote-code` / `INVARLOCK_ALLOW_REMOTE_CODE=1` | HF adapters |
+| `trust_remote_code` | Enable custom model code only with `INVARLOCK_ALLOW_REMOTE_CODE=1` for public `evaluate`; advanced model-loading commands also expose `--allow-remote-code` | HF adapters |
 | `revision` | Pin model revision | HF adapters |
 | `cache_dir` | Cache location | HF adapters |
 

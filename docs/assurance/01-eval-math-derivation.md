@@ -148,7 +148,9 @@ InvarLock uses the exponential of the token‑weighted mean ΔlogNLL
   - `dataset.windows.stats.paired_delta_summary` records `{mean,std,degenerate}` for the paired Δ distribution.
   - `dataset.windows.stats.window_match_fraction == 1.0` and `dataset.windows.stats.window_overlap_fraction == 0.0`.
 
-- Runs **abort** in CI/Release profiles if preview/final counts differ or pairing < 1.0.
+- Runs hard-fail in CI/Release profiles when a baseline pairing context exists
+  and preview/final counts differ, pairing is incomplete, or windows overlap.
+  Verification also rejects invalid pairing in generated reports.
 
 ## Observability
 

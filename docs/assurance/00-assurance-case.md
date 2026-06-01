@@ -80,9 +80,11 @@ documented tiers and environments, not a universal guarantee about model safety.
 > 🔍 **Verify on your machine**
 >
 > ```bash
-> OMP_NUM_THREADS=1 conda run -n invarlock pytest -q
-> OMP_NUM_THREADS=1 conda run -n invarlock python scripts/docs/docs_check.py --links
-> OMP_NUM_THREADS=1 conda run -n invarlock mkdocs build --strict
+> make verify
+> make docs-check-build
+> make docs-lint-strict
 > ```
 >
-> Running the suite above mirrors the CI guardrails: it replays the assurance tests, regenerates tier tables, validates doc links, and ensures the MkDocs build stays clean.
+> Running the suite above exercises the repo-native verification and docs
+> guardrails: tests, runtime verifier, lint/format checks, strict docs build,
+> link checks, and strict docs lint.

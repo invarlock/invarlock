@@ -12,7 +12,9 @@
 > and `src/invarlock/_data/public_evidence/published_basis/bert/evidence_pack_recipe.json`.
 >
 > For a key-by-key explanation of every value in the packaged tier file
-> (`runtime/tiers.yaml`), see [Tier Policy Catalog](../reference/tier-policy-catalog.md).
+> (`src/invarlock/_data/runtime/tiers.yaml`; override path
+> `INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml`), see
+> [Tier Policy Catalog](../reference/tier-policy-catalog.md).
 
 ---
 
@@ -68,7 +70,7 @@ Suppose you ran a baseline and extracted z-scores from the report:
 
 ```bash
 # 1. Run baseline
-INVARLOCK_ALLOW_HOST_EXECUTION=1 invarlock evaluate \
+invarlock evaluate --execution-mode host \
   --baseline gpt2 \
   --subject gpt2 \
   --preset configs/presets/causal_lm/wikitext2_512.yaml \
@@ -115,7 +117,7 @@ With 120 total modules distributed as: FFN=40, Attn=40, Embed=8, Other=32.
 6. **Re-run with override:**
 
    ```bash
-   INVARLOCK_ALLOW_HOST_EXECUTION=1 invarlock evaluate \
+   invarlock evaluate --execution-mode host \
      --baseline gpt2 \
      --subject gpt2 \
      --preset configs/presets/causal_lm/wikitext2_512.yaml \
@@ -124,7 +126,8 @@ With 120 total modules distributed as: FFN=40, Attn=40, Embed=8, Other=32.
      --tier balanced
    ```
 
-7. **Verify.** Check `report.guards[spectral].metrics.warnings_count ≤ 5` on clean baselines.
+7. **Verify.** Check `spectral.summary.caps_applied <= max_caps` and
+   `spectral.summary.caps_exceeded == false` on clean baselines.
 
 ---
 

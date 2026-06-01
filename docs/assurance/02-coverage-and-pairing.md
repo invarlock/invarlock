@@ -8,8 +8,8 @@
 
 A valid evaluation schedule uses non‑overlapping, paired windows with fixed
 seeds and reuses the baseline window IDs for edited runs. The runner enforces
-tier‑based minima and aborts in CI/Release when pairing or coverage is
-insufficient.
+tier-based minima. CI/Release runs hard-fail pairing/count drift when a baseline
+pairing context exists, and report verification rejects invalid pairing.
 
 ## Window Selection (assumptions)
 
@@ -24,7 +24,8 @@ insufficient.
 - report lints pairing and overlap:
   - `dataset.windows.stats.window_match_fraction == 1.0`
   - `dataset.windows.stats.window_overlap_fraction == 0.0`
-- CI/Release abort if counts differ, pairing < 1.0, or overlap > 0.0.
+- CI/Release abort if counts differ, pairing < 1.0, or overlap > 0.0 when a
+  baseline pairing context exists.
 
 ## Tier Minima (runner defaults)
 
@@ -45,7 +46,10 @@ dev flows surface warnings but also record coverage in the container-backed repo
 
 - Window plan: `dataset.windows.stats.{requested_preview,requested_final,actual_preview,actual_final}`
 - Pairing/overlap: `dataset.windows.stats.{window_match_fraction,window_overlap_fraction,paired_windows}`
-- Bootstrap coverage: `dataset.windows.stats.bootstrap.{replicates,seed}` meets/exceeds the tier floor (profiles may request higher counts)
+- Coverage floors: `dataset.windows.stats.coverage.{preview,final}` meets/exceeds
+  the window tier floor (profiles may request higher counts)
+- Bootstrap metadata: `dataset.windows.stats.bootstrap.{method,alpha,replicates,seed}`
+  records the interval method, replicate count, and RNG seed
 
 ## Observability
 

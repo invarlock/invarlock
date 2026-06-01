@@ -35,7 +35,8 @@ Given per‑window token counts `t_i` and log‑losses `ℓ_i^A`, `ℓ_i^B`, def
 - Identity checks:
   - `primary_metric.display_ci == exp(primary_metric.ci)`
   - preview/final drift ratio is computed from `primary_metric.{preview,final}`
-- `dataset.windows.stats.bootstrap.{replicates,seed,method}`
+- `dataset.windows.stats.bootstrap.{replicates,seed,method,alpha}`
+- `dataset.windows.stats.coverage.{preview,final}` — tier-floor window coverage enforcement
 - `dataset.windows.stats.paired_delta_summary.{mean,std,degenerate}`
 
 ## Defaults & Tuning (tiers)

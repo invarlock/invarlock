@@ -123,7 +123,8 @@ immediate rollback regardless of other gates. See also
 **Sigma quantile (qσ)** controls the target sigma used for spectral monitoring.
 Balanced uses `sigma_quantile = 0.95`, Conservative `0.90` (see
 the packaged tiers configuration at
-`runtime/tiers.yaml`). reports expose this under
+`src/invarlock/_data/runtime/tiers.yaml`; overrides use
+`INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml`). reports expose this under
 `spectral.sigma_quantile`.
 Per-family z-caps use $\kappa_f$; defaults are defined in the packaged tiers
 configuration and summarized in the Threshold Rationale table below.
@@ -251,9 +252,11 @@ Detailed derivations are in the calibration appendix (`09-tier-v1-calibration.md
 - CUDA kernels outside deterministic mode may exceed drift tolerances.
 - Reference mask-based flows are conservative; stronger compression requires plugins.
 - Published assurance basis covers GPT-2 and BERT profiles.
-- The repo also ships pilot calibration configs for additional families such as
-  Mistral 7B, Qwen2 7B, Qwen2.5 7B, and Qwen2.5 14B; those configs are not part of the published
-  assurance basis until supporting artifacts are attached.
+- Additional supported-experimental lanes are defined in
+  `contracts/support_matrix.json`; those lanes are not part of the published
+  assurance basis until supporting artifacts are attached. Examples include
+  Mistral 7B, Qwen2 7B, Qwen2.5 7B, and Qwen2.5 14B; the contract file remains
+  authoritative and may include additional lanes.
 - Contributions for additional model families are welcome; attach pilot reports
   and summary CSVs (typically written under `reports/calibration/` when running
   the calibration scripts) to change proposals or release artifacts.
