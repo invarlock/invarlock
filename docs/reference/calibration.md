@@ -2,7 +2,7 @@
 
 > Scope note: this page covers **Tier Policy Tuning** via `invarlock advanced calibrate ...`.
 > It outputs `tiers_patch_*.yaml` recommendations for a reviewed tier-policy
-> override or the packaged source tier file (`src/invarlock/_data/runtime/tiers.yaml`).
+> override or the packaged source tier file (`runtime/tiers.yaml`).
 > For evidence-pack run-scoped preset derivation (`CALIBRATION_RUN -> GENERATE_PRESET`),
 > see [Evidence Pack Internals](../user-guide/evidence-packs-internals.md).
 

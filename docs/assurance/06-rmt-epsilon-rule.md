@@ -11,7 +11,7 @@
 | **Purpose** | Define the RMT edge-risk acceptance band and the report fields needed to audit it. |
 | **Audience** | RMT guard maintainers, calibration reviewers, and release reviewers checking activation evidence. |
 | **Contract scope** | Baseline-relative activation edge-risk growth, per-family epsilon bands, and report-verifier behavior. |
-| **Source of truth** | `src/invarlock/guards/rmt*.py`, `src/invarlock/_data/runtime/tiers.yaml`, and RMT assurance tests. |
+| **Source of truth** | `src/invarlock/guards/rmt*.py`, `runtime/tiers.yaml`, and RMT assurance tests. |
 
 ## Claim
 
@@ -69,7 +69,7 @@ inside `src/invarlock/guards/rmt.py`.
 - Conservative uses the same per-family ε defaults:
   $\epsilon_f = \{0.01, 0.01, 0.01, 0.01\}$.
   Values are recorded in the packaged `tiers.yaml`
-  (`src/invarlock/_data/runtime/tiers.yaml`) and surfaced in reports. Provide
+  (`runtime/tiers.yaml`) and surfaced in reports. Provide
   overrides via `INVARLOCK_CONFIG_ROOT/runtime/tiers.yaml` when needed.
 
 *Example:* with `r_base = 1.20` and ε = 0.01, the guard allows
@@ -78,7 +78,7 @@ inside `src/invarlock/guards/rmt.py`.
 ## Recalibration
 
 Calibration values are derived from null-sweep runs and stored in the packaged
-`src/invarlock/_data/runtime/tiers.yaml`. See the full calibration methodology in
+`runtime/tiers.yaml`. See the full calibration methodology in
 [09-tier-v1-calibration.md](09-tier-v1-calibration.md).
 
 To recalibrate, run null baselines (no edit) and compute per-family deltas
