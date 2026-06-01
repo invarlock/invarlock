@@ -129,6 +129,10 @@
     "safetensors",
     "lockfiles",
     "dequantize",
-    "dequantized"
+    "dequantized",
+    "Arithmatex",
+    "Sbornik",
+    "Silverstein",
+    "checksummed"
   ]
 }
