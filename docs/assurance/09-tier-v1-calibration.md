@@ -113,6 +113,7 @@ Suppose you ran a baseline and extracted z-scores from the report:
 # Do not accept host-mode output as strict assurance evidence.
 # 1. Run baseline
 invarlock evaluate --allow-network --execution-mode host \
+  --assurance off \
   --baseline gpt2 \
   --subject gpt2 \
   --preset configs/presets/causal_lm/wikitext2_512.yaml \
@@ -172,6 +173,7 @@ With 120 total modules distributed as: FFN=40, Attn=40, Embed=8, Other=32.
    # Calibration-only / non-assurance example.
    # Do not accept host-mode output as strict assurance evidence.
    invarlock evaluate --allow-network --execution-mode host \
+     --assurance off \
      --baseline gpt2 \
      --subject gpt2 \
      --preset configs/presets/causal_lm/wikitext2_512.yaml \
