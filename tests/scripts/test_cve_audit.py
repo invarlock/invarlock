@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from types import ModuleType
 
@@ -111,6 +112,31 @@ def test_findings_include_all_matched_advisories_and_allowlist_classified() -> N
     assert len(findings) == 1
     assert findings[0]["status"] == "accepted_until_2026-06-01"
     assert findings[0]["fixed_versions"] == ["2.7.0"]
+
+
+def test_load_allowlist_uses_strict_pip_audit_policy(tmp_path: Path) -> None:
+    module = _load_script_module()
+    allowlist = tmp_path / "allowlist.json"
+    allowlist.write_text(
+        json.dumps(
+            {
+                "owner": "security-maintainers",
+                "entries": [
+                    {
+                        "advisory": "GHSA-test-test-test",
+                        "owner": "security-maintainers",
+                        "expires": (date.today() + timedelta(days=7)).isoformat(),
+                        "tracking_issue": "https://github.com/example/repo/pull/1",
+                        "reason": "fixture",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SystemExit, match="must link to a GitHub tracking issue"):
+        module.load_allowlist(allowlist)
 
 
 def test_build_report_can_run_inventory_only(tmp_path: Path) -> None:

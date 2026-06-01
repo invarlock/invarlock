@@ -627,7 +627,8 @@ eval-loop:  ## Run automated evaluation loop (baseline + quant8 quickstart)
 
 ##@ Utilities
 ci-matrix:  ## Verify CI matrix
-	bash scripts/checks/verify_ci_matrix.sh
+	$(MAKE) ensure-python
+	$(PYTHON) scripts/checks/check_config_integrity.py --ci-matrix configs
 
 contracts-check:  ## Ensure packaged contracts match the repo contract source
 	$(MAKE) ensure-python

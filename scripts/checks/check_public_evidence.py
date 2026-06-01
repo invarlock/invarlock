@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -37,17 +38,17 @@ def _load_json(path: Path) -> tuple[dict[str, Any] | None, str | None]:
     return payload, None
 
 
-def _is_inside_special_dir(path: Path) -> bool:
-    parts = set(path.relative_to(PUBLIC_EVIDENCE_ROOT).parts)
+def _is_inside_special_dir(path: Path, root: Path) -> bool:
+    parts = set(path.relative_to(root).parts)
     return bool(parts & {"artifact_package", "evidence_pack"})
 
 
-def _artifact_dirs() -> set[Path]:
+def _artifact_dirs(root: Path) -> set[Path]:
     dirs: set[Path] = set()
-    for path in PUBLIC_EVIDENCE_ROOT.rglob("*"):
+    for path in root.rglob("*"):
         if not path.is_file() or path.name.startswith("."):
             continue
-        if _is_inside_special_dir(path):
+        if _is_inside_special_dir(path, root):
             continue
         if path.name in {
             "evaluation.report.json",
@@ -56,13 +57,16 @@ def _artifact_dirs() -> set[Path]:
             "evidence_pack_recipe.json",
         }:
             dirs.add(path.parent)
-    for manifest in PUBLIC_EVIDENCE_ROOT.rglob("evidence_pack/manifest.json"):
+    for manifest in root.rglob("evidence_pack/manifest.json"):
         dirs.add(manifest.parent.parent)
     return dirs
 
 
-def _relative(path: Path) -> str:
-    return path.relative_to(REPO_ROOT).as_posix()
+def _relative(path: Path, root: Path = REPO_ROOT) -> str:
+    try:
+        return path.relative_to(root).as_posix()
+    except ValueError:
+        return str(path)
 
 
 def _require_path(
@@ -130,12 +134,13 @@ def _check_signed_pack(
 
 def check_public_evidence(root: Path = PUBLIC_EVIDENCE_ROOT) -> list[str]:
     errors: list[str] = []
+    root = root.resolve()
     if not (root / "README.md").is_file():
-        errors.append("public_evidence/README.md is required")
+        errors.append(f"{_relative(root)}: README.md is required")
     if not root.is_dir():
         return [f"public evidence root not found: {root}"]
 
-    for artifact_dir in sorted(_artifact_dirs()):
+    for artifact_dir in sorted(_artifact_dirs(root)):
         meta_path = artifact_dir / META_FILENAME
         if not meta_path.is_file():
             errors.append(f"{_relative(artifact_dir)}: missing {META_FILENAME}")
@@ -191,8 +196,20 @@ def check_public_evidence(root: Path = PUBLIC_EVIDENCE_ROOT) -> list[str]:
     return errors
 
 
-def main() -> int:
-    errors = check_public_evidence()
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--root",
+        type=Path,
+        default=PUBLIC_EVIDENCE_ROOT,
+        help="Public evidence root to audit.",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parse_args(argv)
+    errors = check_public_evidence(args.root)
     if errors:
         for error in errors:
             print(error, file=sys.stderr)

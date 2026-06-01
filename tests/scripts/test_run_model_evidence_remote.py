@@ -51,6 +51,8 @@ def test_run_model_evidence_remote_dry_run_emits_tmux_launch_plan(
     )
     assert "/root/venvs/invarlock/bin/python" in payload["remote_python_candidates"]
     assert 'REPO_DIR=""' in payload["sync_command"]
+    assert "for candidate in $REPO_DIR/.venv/bin/python" in payload["sync_command"]
+    assert "'$REPO_DIR/.venv/bin/python'" not in payload["sync_command"]
     assert "git checkout staging/next" in payload["sync_command"]
     assert (
         "$PYTHON_BIN scripts/checks/sync_packaged_contracts.py --check"

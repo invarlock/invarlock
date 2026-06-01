@@ -1,5 +1,6 @@
 import json
 import re
+import subprocess
 import tomllib
 from datetime import date
 from pathlib import Path
@@ -300,6 +301,20 @@ def test_generate_sbom_script_exists():
     assert "cyclonedx-bom" in contents
     assert "--scope install-surface" in contents
     assert "SBOM written to" in contents
+
+
+def test_generate_sbom_rejects_unknown_scope_before_tool_lookup() -> None:
+    script_path = Path("scripts/security/generate_sbom.sh")
+
+    result = subprocess.run(
+        ["bash", str(script_path), "--scope", "unknown"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert "--scope must be environment" in result.stderr
 
 
 def test_pip_audit_allowlist_is_owned_and_time_boxed() -> None:

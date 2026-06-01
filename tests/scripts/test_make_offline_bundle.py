@@ -151,6 +151,48 @@ def test_make_offline_bundle_dry_run_writes_nothing(tmp_path: Path) -> None:
     assert not output_dir.exists()
 
 
+def test_make_offline_bundle_rejects_path_like_bundle_name(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script = repo_root / "scripts" / "release" / "make_offline_bundle.sh"
+    dist_dir = tmp_path / "dist"
+    provenance_dir = tmp_path / "provenance"
+    output_dir = tmp_path / "out"
+    sbom_path = tmp_path / "sbom.json"
+    _write(dist_dir / "invarlock-0.3.12-py3-none-any.whl", "wheel-bytes")
+    _write(provenance_dir / "bundle.jsonl", '{"provenance":"ok"}')
+    _write(sbom_path, '{"bomFormat":"CycloneDX","specVersion":"1.4"}')
+
+    proc = subprocess.run(
+        [
+            "bash",
+            str(script),
+            "--version",
+            "0.3.12",
+            "--tag",
+            "v0.3.12",
+            "--repo",
+            "invarlock/invarlock",
+            "--dist-dir",
+            str(dist_dir),
+            "--sbom",
+            str(sbom_path),
+            "--provenance-dir",
+            str(provenance_dir),
+            "--output-dir",
+            str(output_dir),
+            "--bundle-name",
+            "../escape",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert proc.returncode == 2
+    assert "bundle name may only contain" in proc.stderr
+
+
 def test_make_offline_bundle_requires_sigstore_bundle_per_artifact(
     tmp_path: Path,
 ) -> None:

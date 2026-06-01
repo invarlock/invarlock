@@ -132,10 +132,14 @@ def _run_subprocess(
             print(line, end="")
         returncode = process.wait()
     print(f"[live] Finished rc={returncode}: {' '.join(cmd)}", flush=True)
+    try:
+        display_log_path = str(log_path.relative_to(ROOT))
+    except ValueError:
+        display_log_path = str(log_path)
     return {
         "command": cmd,
         "returncode": int(returncode),
-        "log_path": str(log_path.relative_to(ROOT)),
+        "log_path": display_log_path,
     }
 
 
@@ -219,53 +223,66 @@ def main(argv: list[str] | None = None) -> int:
         "notebooks": None,
     }
     failures: list[str] = []
+    paths_requested = args.paths is not None
 
     if not args.skip_markdown:
         markdown_paths = _resolve_markdown_paths(args.paths)
-        markdown_cmd = [
-            sys.executable,
-            "scripts/docs/verify_markdown_bash_blocks.py",
-            "--output-root",
-            str(output_root / "markdown"),
-            "--execution-mode",
-            args.markdown_execution_mode,
-        ]
-        if markdown_paths:
-            markdown_cmd.extend(["--paths", *markdown_paths])
-        if args.skip_markdown_model_loading:
-            markdown_cmd.append("--skip-model-loading")
-        markdown_result = _run_subprocess(
-            markdown_cmd,
-            env=env,
-            log_path=output_root / "markdown" / "run.log",
-        )
-        summary["markdown"] = markdown_result
-        if markdown_result["returncode"] != 0:
-            failures.append("markdown")
+        if paths_requested and not markdown_paths:
+            summary["markdown"] = {
+                "skipped": True,
+                "reason": "no_markdown_paths_selected",
+            }
+        else:
+            markdown_cmd = [
+                sys.executable,
+                "scripts/docs/verify_markdown_bash_blocks.py",
+                "--output-root",
+                str(output_root / "markdown"),
+                "--execution-mode",
+                args.markdown_execution_mode,
+            ]
+            if markdown_paths:
+                markdown_cmd.extend(["--paths", *markdown_paths])
+            if args.skip_markdown_model_loading:
+                markdown_cmd.append("--skip-model-loading")
+            markdown_result = _run_subprocess(
+                markdown_cmd,
+                env=env,
+                log_path=output_root / "markdown" / "run.log",
+            )
+            summary["markdown"] = markdown_result
+            if markdown_result["returncode"] != 0:
+                failures.append("markdown")
 
     if not args.skip_notebooks:
         notebook_paths = _resolve_notebook_paths(args.paths)
-        notebook_cmd = [
-            sys.executable,
-            "scripts/docs/verify_notebooks_smoke.py",
-            "--out-root",
-            str(output_root / "notebooks"),
-            "--timeout-s",
-            str(args.notebook_timeout_s),
-        ]
-        if args.run_notebook_pip:
-            notebook_cmd.append("--run-pip")
-        if args.skip_notebook_model_loading:
-            notebook_cmd.append("--skip-model-loading")
-        notebook_cmd.extend(notebook_paths)
-        notebook_result = _run_subprocess(
-            notebook_cmd,
-            env=env,
-            log_path=output_root / "notebooks" / "run.log",
-        )
-        summary["notebooks"] = notebook_result
-        if notebook_result["returncode"] != 0:
-            failures.append("notebooks")
+        if paths_requested and not notebook_paths:
+            summary["notebooks"] = {
+                "skipped": True,
+                "reason": "no_notebook_paths_selected",
+            }
+        else:
+            notebook_cmd = [
+                sys.executable,
+                "scripts/docs/verify_notebooks_smoke.py",
+                "--out-root",
+                str(output_root / "notebooks"),
+                "--timeout-s",
+                str(args.notebook_timeout_s),
+            ]
+            if args.run_notebook_pip:
+                notebook_cmd.append("--run-pip")
+            if args.skip_notebook_model_loading:
+                notebook_cmd.append("--skip-model-loading")
+            notebook_cmd.extend(notebook_paths)
+            notebook_result = _run_subprocess(
+                notebook_cmd,
+                env=env,
+                log_path=output_root / "notebooks" / "run.log",
+            )
+            summary["notebooks"] = notebook_result
+            if notebook_result["returncode"] != 0:
+                failures.append("notebooks")
 
     summary["ok"] = not failures
     summary["failures"] = failures

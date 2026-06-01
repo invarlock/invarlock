@@ -183,7 +183,7 @@ def _remote_python(
     setup = [
         'PYTHON_BIN=""',
         "for candidate in "
-        + " ".join(shlex.quote(path) for path in candidate_paths)
+        + " ".join(_shell_path(path) for path in candidate_paths)
         + '; do if [ -x "$candidate" ]; then PYTHON_BIN="$candidate"; break; fi; done',
         'if [ -z "$PYTHON_BIN" ] && command -v python3.12 >/dev/null 2>&1; then PYTHON_BIN="$(command -v python3.12)"; fi',
         'if [ -z "$PYTHON_BIN" ] && command -v python3 >/dev/null 2>&1; then PYTHON_BIN="$(command -v python3)"; fi',

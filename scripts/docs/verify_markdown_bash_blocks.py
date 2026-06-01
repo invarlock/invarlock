@@ -241,12 +241,6 @@ def _should_stage_workspace_entry(path: Path) -> bool:
 
 
 def _stage_workspace_entry(source: Path, target: Path) -> None:
-    try:
-        os.symlink(source, target, target_is_directory=source.is_dir())
-        return
-    except OSError:
-        pass
-
     if source.is_dir():
         shutil.copytree(source, target, symlinks=True)
         return

@@ -133,6 +133,92 @@ def test_main_limits_paths_to_curated_subset(tmp_path: Path, monkeypatch) -> Non
     assert "notebooks/demo.ipynb" in calls[1]
 
 
+def test_main_with_markdown_only_paths_skips_notebook_surface(
+    tmp_path: Path, monkeypatch
+) -> None:
+    module = _load_script_module()
+    (tmp_path / "README.md").write_text("# root\n", encoding="utf-8")
+    module.ROOT = tmp_path
+    calls: list[list[str]] = []
+
+    def _fake_run_subprocess(cmd, **kwargs):
+        calls.append(list(cmd))
+        return {
+            "command": list(cmd),
+            "returncode": 0,
+            "log_path": "artifacts/run.log",
+        }
+
+    monkeypatch.setattr(module, "_run_subprocess", _fake_run_subprocess)
+
+    exit_code = module.main(
+        ["--paths", "README.md", "--output-root", str(tmp_path / "artifacts")]
+    )
+
+    assert exit_code == 0
+    assert len(calls) == 1
+    assert calls[0][1].endswith("verify_markdown_bash_blocks.py")
+    summary = json.loads(
+        (tmp_path / "artifacts" / "summary.json").read_text(encoding="utf-8")
+    )
+    assert summary["notebooks"]["reason"] == "no_notebook_paths_selected"
+
+
+def test_main_with_notebook_only_paths_skips_markdown_surface(
+    tmp_path: Path, monkeypatch
+) -> None:
+    module = _load_script_module()
+    notebooks = tmp_path / "notebooks"
+    notebooks.mkdir()
+    (notebooks / "demo.ipynb").write_text("{}", encoding="utf-8")
+    module.ROOT = tmp_path
+    calls: list[list[str]] = []
+
+    def _fake_run_subprocess(cmd, **kwargs):
+        calls.append(list(cmd))
+        return {
+            "command": list(cmd),
+            "returncode": 0,
+            "log_path": "artifacts/run.log",
+        }
+
+    monkeypatch.setattr(module, "_run_subprocess", _fake_run_subprocess)
+
+    exit_code = module.main(
+        [
+            "--paths",
+            "notebooks/demo.ipynb",
+            "--output-root",
+            str(tmp_path / "artifacts"),
+        ]
+    )
+
+    assert exit_code == 0
+    assert len(calls) == 1
+    assert calls[0][1].endswith("verify_notebooks_smoke.py")
+    summary = json.loads(
+        (tmp_path / "artifacts" / "summary.json").read_text(encoding="utf-8")
+    )
+    assert summary["markdown"]["reason"] == "no_markdown_paths_selected"
+
+
+def test_run_subprocess_records_external_log_path(tmp_path: Path) -> None:
+    module = _load_script_module()
+    repo_root = tmp_path / "repo"
+    external_root = tmp_path / "external"
+    repo_root.mkdir()
+    module.ROOT = repo_root
+
+    result = module._run_subprocess(
+        [sys.executable, "-c", "print('ok')"],
+        env={},
+        log_path=external_root / "run.log",
+    )
+
+    assert result["returncode"] == 0
+    assert result["log_path"] == str(external_root / "run.log")
+
+
 def test_default_notebook_inventory_requires_explicit_classification() -> None:
     module = _load_script_module()
     repo_root = Path(__file__).resolve().parents[2]
