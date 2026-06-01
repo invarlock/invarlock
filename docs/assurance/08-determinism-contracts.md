@@ -6,6 +6,15 @@
 > preconditions—and we surface those checks in the
 > report.
 
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | State the determinism preconditions and report evidence required for reproducible paired evaluation. |
+| **Audience** | Evaluation maintainers, CI/release reviewers, and operators comparing run evidence. |
+| **Contract scope** | Seed bundle, dataset/tokenizer hashes, paired schedules, backend flags, and drift boundaries. |
+| **Source of truth** | `src/invarlock/core/determinism_policy.py`, run/report provenance code, and determinism contract tests. |
+
 ## Claim
 
 With fixed seeds, dataset/tokenizer hashes, a paired non-overlapping schedule,

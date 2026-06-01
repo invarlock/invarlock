@@ -3,6 +3,15 @@
 > **Plain language:** The report embeds the exact policy evaluated and a
 > short digest so auditors can recompute and verify there was no silent drift.
 
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Define how resolved policies and override order are captured, digested, and audited in reports. |
+| **Audience** | Report verifier maintainers, release reviewers, and operators checking policy drift. |
+| **Contract scope** | `resolved_policy`, `policy_provenance`, policy digests, override ordering, and auditor recomputation. |
+| **Source of truth** | `src/invarlock/reporting/policy_utils.py`, report generation code, and policy digest tests. |
+
 ## Resolved Policy → Digest
 
 At runtime, the tier base (Balanced/Conservative/Aggressive) is resolved, guard‑level overrides are applied, and the result is materialized as `resolved_policy` in the report.

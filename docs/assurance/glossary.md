@@ -1,14 +1,21 @@
 # Glossary
 
+> **Plain language:** When reading a report or debugging a pipeline, use this
+> glossary to understand what each field means and where the term originated.
+
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Define key assurance, report, guard, data, policy, and provenance terms in one reference. |
+| **Audience** | Report readers, contributors, reviewers, and operators following cross-document terminology. |
+| **Contract scope** | Terminology only; runtime behavior is governed by the linked assurance docs and reference pages. |
+| **Source of truth** | This glossary, linked assurance notes, report schemas, and public contract data under `src/invarlock/_data/contracts/`. |
+
 > **TL;DR:** This glossary defines key terms used across InvarLock documentation,
 > reports, and code. Terms are grouped by domain (metrics, guards, data,
 > provenance) for quick reference. Each entry includes a definition, context,
 > and cross-references to relevant assurance documents.
-
-> **Plain language:** When reading a report or debugging a pipeline, use this
-> glossary to understand what each field means and where the term originated.
-
----
 
 ## Quick Reference Tables
 

@@ -4,6 +4,15 @@
 > Baseline and edited runs reuse the exact same windows. Tier‑based minima are
 > validated at runtime and surfaced in the report.
 
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Define the pairing, non-overlap, seed, and tier-floor requirements for evaluation windows. |
+| **Audience** | Evaluation pipeline maintainers, release reviewers, and operators preparing paired evidence. |
+| **Contract scope** | Baseline/subject window reuse, pairing statistics, coverage floors, and report-verifier checks. |
+| **Source of truth** | `src/invarlock/core/runner_pairing.py`, `src/invarlock/eval/window_planning.py`, and report pairing tests. |
+
 ## Claim
 
 A valid evaluation schedule uses non‑overlapping, paired windows with fixed

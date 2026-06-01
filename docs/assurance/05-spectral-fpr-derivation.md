@@ -6,6 +6,15 @@
 > `embed`/`other` caps are operational sentinels, not standalone <=5% FPR
 > claims.
 
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Explain how spectral guard family caps map to false-positive-rate interpretation under modeled nulls. |
+| **Audience** | Guard maintainers, calibration reviewers, and contributors changing spectral policy. |
+| **Contract scope** | Spectral z-score caps, multiple-testing policy, sentinel caps, and report observability. |
+| **Source of truth** | `src/invarlock/guards/spectral*.py`, `src/invarlock/_data/runtime/tiers.yaml`, and spectral assurance tests. |
+
 ## Claim
 
 The spectral guard monitors per-family z-scores and records the multiple-testing

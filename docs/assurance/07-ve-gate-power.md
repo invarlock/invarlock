@@ -4,6 +4,15 @@
 > ΔlogNLL shows a real improvement—Balanced needs a one-sided win, Conservative
 > needs a two-sided push—and the report explains why VE stayed on or off.
 
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Define when the variance guard may enable scaling and how the predictive gate is audited. |
+| **Audience** | Variance guard maintainers, calibration reviewers, and release reviewers checking VE evidence. |
+| **Contract scope** | Predictive paired delta-log-loss gates, tier sidedness, minimum effect, and enablement provenance. |
+| **Source of truth** | `src/invarlock/guards/variance*.py`, `src/invarlock/_data/runtime/tiers.yaml`, and variance assurance tests. |
+
 ## Claim
 
 VE proposes scales only when the **predictive** paired ΔlogNLL CI upper bound

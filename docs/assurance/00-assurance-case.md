@@ -1,8 +1,17 @@
 # Assurance Case Overview (v1.0)
 
-> **TL;DR:** InvarLock evaluates whether **weight edits** (quantization, pruning, etc.) regress a model beyond defined bounds. It does **not** evaluate content safety, alignment, or deployment security. The assurance case covers: (1) paired primary metrics with bootstrap CIs, (2) the canonical five-stage guard chain (`invariants` pre, `spectral`, `RMT`, `variance`, `invariants` post), (3) deterministic evaluation with full provenance. Each claim has tests and report evidence.
-
 > **Plain language:** This overview lists every assurance claim, the evidence we ship with the repo, and the runtime contracts that enforce each claim in CI/release review.
+
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Index the assurance claims, evidence notes, and runtime enforcement paths for weight-edit regression review. |
+| **Audience** | Maintainers, release reviewers, auditors, and contributors changing assurance-critical behavior. |
+| **Contract scope** | Assurance case v1.0 for one configured baseline, subject, dataset window plan, tier, profile, and runtime policy. |
+| **Source of truth** | This claim table, the linked assurance notes, `src/invarlock/core/assurance_contract.py`, and `src/invarlock/reporting/verify_contract.py`. |
+
+> **TL;DR:** InvarLock evaluates whether **weight edits** (quantization, pruning, etc.) regress a model beyond defined bounds. It does **not** evaluate content safety, alignment, or deployment security. The assurance case covers: (1) paired primary metrics with bootstrap CIs, (2) the canonical five-stage guard chain (`invariants` pre, `spectral`, `RMT`, `variance`, `invariants` post), (3) deterministic evaluation with full provenance. Each claim has tests and report evidence.
 
 > **Assurance boundary:** This is not model certification. The assurance case
 > supports a configured weight-edit regression review for one baseline,

@@ -5,6 +5,15 @@
 > When Δ is degenerate, or BCa’s acceleration term is undefined, we fall back
 > transparently.
 
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Document the paired token-weighted bootstrap method and its transparent fallback behavior. |
+| **Audience** | Statistics reviewers, report-verifier maintainers, and contributors changing CI computation. |
+| **Contract scope** | Paired delta-log-loss confidence intervals and ratio-CI conversion for report evidence. |
+| **Source of truth** | `src/invarlock/core/bootstrap.py`, `src/invarlock/core/runner_eval_metrics_stats.py`, and bootstrap tests. |
+
 ## Claim
 
 Paired, token‑weighted BCa on Δlog‑loss yields a ratio CI by exponentiation.

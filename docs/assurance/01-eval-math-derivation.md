@@ -5,6 +5,15 @@
 > exponentiating the same paired bootstrap; this note derives both facts in the
 > report's operating context.
 
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Derive the paired log-space primary-metric ratio and its displayed confidence interval. |
+| **Audience** | Report verifier maintainers, statistics reviewers, and contributors changing paired metric code. |
+| **Contract scope** | PPL-like metrics on paired evaluation windows with known token counts and non-overlapping schedules. |
+| **Source of truth** | `src/invarlock/core/bootstrap.py`, report pairing logic, and paired-CI contract tests. |
+
 ## Claim
 
 For ppl-like metrics on paired evaluation windows `i = 1..n` with token counts `t_i`, the reported

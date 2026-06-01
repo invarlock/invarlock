@@ -4,6 +4,15 @@
 > thresholds we enforce, and how those decisions appear in the report so
 > reviewers can trace every PASS or FAIL.
 
+## Overview
+
+| Aspect | Details |
+| --- | --- |
+| **Purpose** | Consolidate guard contracts, statistical assumptions, thresholds, and report evidence fields. |
+| **Audience** | Guard maintainers, release reviewers, and contributors changing guard policy or reporting. |
+| **Contract scope** | Invariants, Spectral, RMT, Variance, bootstrap sanity, calibration expectations, and report observability. |
+| **Source of truth** | Guard modules under `src/invarlock/guards/`, report guard renderers, packaged tiers, and assurance-contract tests. |
+
 **Contents:**
 
 - [1. Guard Contracts](#1-guard-contracts) — what each guard checks and how it fails
