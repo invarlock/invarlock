@@ -85,11 +85,14 @@ gpu = "optional"
 invoked_by = ["make verify", "make smoke-fast", "runtime smoke CI"]
 description = "Local smoke, runtime, tiny-model, and guard-validation entry points."
 paths = [
+  "scripts/smoke/README.md",
   "scripts/smoke/check_device_drift.py",
-  "scripts/smoke/cli_exhaustive_smoke.sh",
+  "scripts/smoke/cli_smoke_matrix.sh",
   "scripts/smoke/cli_smoke_fast.sh",
   "scripts/smoke/cli_smoke_negative.sh",
+  "scripts/smoke/gpt2_journey_helpers.py",
   "scripts/smoke/guard_validation_smoke.py",
+  "scripts/smoke/lib/smoke_common.sh",
   "scripts/smoke/run_cpu_telemetry.sh",
   "scripts/smoke/run_gpt2_user_journey_smoke.sh",
   "scripts/smoke/run_tiny_all_matrix.sh",

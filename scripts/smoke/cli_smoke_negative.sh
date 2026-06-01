@@ -9,16 +9,15 @@
 
 set -euo pipefail
 
-ts() { date +"%Y-%m-%dT%H:%M:%S%z"; }
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
+source "$SCRIPT_DIR/lib/smoke_common.sh"
+ts() { smoke_ts; }
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
-PYTHON_BIN="${INVARLOCK_PYTHON:-}"
-if [[ -z "${PYTHON_BIN}" ]]; then
-  PYTHON_BIN="$(bash "$ROOT/scripts/select_workspace_python.sh")"
-fi
-export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
+PYTHON_BIN="$(smoke_select_python "$ROOT" "${INVARLOCK_PYTHON:-}")"
+smoke_setup_pythonpath "$ROOT"
 printf -v CLI '%q ' "$PYTHON_BIN" -m invarlock
 CLI="${CLI% }"
 
@@ -30,16 +29,7 @@ echo "[info] $(ts) CLI runner: $CLI" | tee -a "$LOG_FILE"
 echo "[info] $(ts) Log file: $LOG_FILE"
 
 expected_exit_match() {
-  local actual="$1"
-  local expected_csv="${2:-0}"
-  local expected=""
-  IFS=',' read -r -a expected <<<"$expected_csv"
-  for expected in "${expected[@]}"; do
-    if [[ "$actual" == "$expected" ]]; then
-      return 0
-    fi
-  done
-  return 1
+  smoke_expected_exit_match "$@"
 }
 
 record_result() {
@@ -243,7 +233,8 @@ run_capture \
   "$VERIFY_OUT/calibrate_missing_config.out" \
   "$CLI advanced calibrate null-sweep --config \"$WORK_ROOT/does-not-exist.yaml\"" \
   "2"
-assert_contains "$VERIFY_OUT/calibrate_missing_config.out" "does not exist"
+assert_contains "$VERIFY_OUT/calibrate_missing_config.out" "Invalid value for '--config'"
+assert_contains "$VERIFY_OUT/calibrate_missing_config.out" "does-not-exist.yaml"
 
 echo "[summary] $(ts) total=${TOTAL_COMMANDS} unexpected_failures=${UNEXPECTED_FAILURES}" | tee -a "$LOG_FILE"
 echo "[done] $(ts) Log captured to: $LOG_FILE"

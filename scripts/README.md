@@ -13,7 +13,7 @@ The checked taxonomy lives in `scripts/scripts_inventory.toml`:
 - `docs-assurance`: docs, examples, links, and assurance cross-reference checks.
 - `coverage`: coverage surface selection and threshold checks.
 - `smoke-runtime`: local smoke, runtime, tiny-model, and guard-validation entry
-  points.
+  points. See `scripts/smoke/README.md` for the per-script smoke map.
 - `model-evidence`: model-evidence sweep planning and remote launch helpers.
 - `evidence-packs`: evidence-pack orchestration, helpers, and shell tests.
 - `release`: release evidence and offline-bundle helpers.

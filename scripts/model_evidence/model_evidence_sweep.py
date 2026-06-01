@@ -266,7 +266,9 @@ def build_evaluate_command(
         _command_path(lane_root / "report", execution_mode=execution_mode),
     ]
     if execution_mode == "host":
-        command.extend(["--execution-mode", "host", "--assurance", "off"])
+        command.extend(["--execution-mode", "host"])
+    if profile == "dev":
+        command.extend(["--assurance", "off"])
     return command
 
 

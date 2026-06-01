@@ -8,26 +8,28 @@
 
 set -euo pipefail
 
-ts() { date +"%Y-%m-%dT%H:%M:%S%z"; }
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
+source "$SCRIPT_DIR/lib/smoke_common.sh"
+ts() { smoke_ts; }
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
-PYTHON_BIN="${INVARLOCK_PYTHON:-}"
-if [[ -z "${PYTHON_BIN}" ]]; then
-  PYTHON_BIN="$(bash "$ROOT/scripts/select_workspace_python.sh")"
-fi
-export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
+PYTHON_BIN="$(smoke_select_python "$ROOT" "${INVARLOCK_PYTHON:-}")"
+smoke_setup_pythonpath "$ROOT"
 printf -v CLI '%q ' "$PYTHON_BIN" -m invarlock
 CLI="${CLI% }"
 
 LOG_FILE="${INVARLOCK_SMOKE_LOG_FILE:-$(mktemp -t invarlock_cli_fast_smoke.XXXXXX.log)}"
+WORK_ROOT="${1:-$(mktemp -d -t invarlock_cli_fast_smoke.XXXXXX.dir)}"
 TOTAL_COMMANDS=0
 UNEXPECTED_FAILURES=0
 SKIPPED_COMMANDS=0
 
+mkdir -p "$WORK_ROOT"
 echo "[info] $(ts) CLI runner: $CLI" | tee -a "$LOG_FILE"
 echo "[info] $(ts) Log file: $LOG_FILE"
+echo "[info] $(ts) Work root: $WORK_ROOT" | tee -a "$LOG_FILE"
 
 smoke_timeout() {
   local var_name="$1"
@@ -178,16 +180,7 @@ run_tiny_eval_parity() {
 }
 
 expected_exit_match() {
-  local actual="$1"
-  local expected_csv="${2:-0}"
-  local expected=""
-  IFS=',' read -r -a expected <<<"$expected_csv"
-  for expected in "${expected[@]}"; do
-    if [[ "$actual" == "$expected" ]]; then
-      return 0
-    fi
-  done
-  return 1
+  smoke_expected_exit_match "$@"
 }
 
 record_result() {
@@ -356,7 +349,8 @@ run "invarlock advanced plugins edits --json"    "$CLI advanced plugins edits --
 run "invarlock doctor --json"                    "$CLI doctor --json"
 
 # Extended: verify and evaluate with and without network
-TMP_DIR="$(mktemp -d -t invarlock_cli_smoke.XXXXXX.dir)"
+TMP_DIR="$WORK_ROOT/tmp"
+mkdir -p "$TMP_DIR"
 printf '%s\n' '{"verdict":"PASS","summary":{"status":"smoke"}}' >"$TMP_DIR/final_verdict.json"
 printf '%s\n' '{"commit":"smoke","branch":"staging/next"}' >"$TMP_DIR/source_repo.json"
 printf '%s\n' '{"platform":"cli-smoke","mode":"container-fixture"}' >"$TMP_DIR/environment.json"
@@ -653,7 +647,7 @@ OFFLINE_EVAL_ENV="$OFFLINE_ENV INVARLOCK_DEDUP_TEXTS=1 INVARLOCK_TINY_RELAX=1"
 
 if have_adapters_stack; then
   if have_smoke_model_cache; then
-    run_to "invarlock evaluate (offline, local)" "$EVALUATE_TIMEOUT_SECONDS" "$OFFLINE_EVAL_ENV $CLI evaluate --execution-mode host --baseline \"$SMOKE_MODEL_ID\" --subject \"$SMOKE_MODEL_ID\" --baseline-adapter auto --subject-adapter auto --profile dev --preset \"$SMOKE_PRESET\" --device cpu --out \"$TMP_DIR/report_offline_local\" --report-out \"$TMP_DIR/report_offline_local_out\""
+    run_to "invarlock evaluate (offline, local)" "$EVALUATE_TIMEOUT_SECONDS" "$OFFLINE_EVAL_ENV $CLI evaluate --execution-mode host --baseline \"$SMOKE_MODEL_ID\" --subject \"$SMOKE_MODEL_ID\" --baseline-adapter auto --subject-adapter auto --profile dev --assurance off --preset \"$SMOKE_PRESET\" --device cpu --out \"$TMP_DIR/report_offline_local\" --report-out \"$TMP_DIR/report_offline_local_out\""
   else
     skip_run "invarlock evaluate (offline, local)" "smoke model cache not available"
   fi
@@ -667,9 +661,9 @@ NET_EVAL_ENV="$NET_ENV INVARLOCK_DEDUP_TEXTS=1 INVARLOCK_TINY_RELAX=1"
 if have_adapters_stack; then
   if have_network_access; then
     if have_docker_daemon; then
-      run_to "invarlock evaluate (network, container)" "$EVALUATE_TIMEOUT_SECONDS" "$NET_EVAL_ENV $CLI evaluate --allow-network --baseline \"$SMOKE_MODEL_ID\" --subject \"$SMOKE_MODEL_ID\" --baseline-adapter auto --subject-adapter auto --profile dev --preset \"$SMOKE_PRESET\" --device cpu --out \"$TMP_DIR/report_net\" --report-out \"$TMP_DIR/report_net_out\""
-      run "invarlock verify (network container output)" "if [ -f \"$TMP_DIR/report_net_out/evaluation.report.json\" ]; then $CLI verify --json \"$TMP_DIR/report_net_out/evaluation.report.json\"; else echo '[skip] report missing'; fi"
-      run "invarlock report validate (network container output)" "if [ -f \"$TMP_DIR/report_net_out/evaluation.report.json\" ]; then $CLI report validate \"$TMP_DIR/report_net_out/evaluation.report.json\"; else echo '[skip] report missing'; fi"
+      run_to "invarlock evaluate (network, container)" "$EVALUATE_TIMEOUT_SECONDS" "$NET_EVAL_ENV $CLI evaluate --allow-network --baseline \"$SMOKE_MODEL_ID\" --subject \"$SMOKE_MODEL_ID\" --baseline-adapter auto --subject-adapter auto --profile dev --assurance off --preset \"$SMOKE_PRESET\" --device cpu --out \"$TMP_DIR/report_net\" --report-out \"$TMP_DIR/report_net_out\""
+      run "invarlock verify (network container output)" "if [ -f \"$TMP_DIR/report_net_out/evaluation.report.json\" ]; then $CLI verify --json \"$TMP_DIR/report_net_out/evaluation.report.json\"; else echo '[error] report missing'; exit 1; fi"
+      run "invarlock report validate (network container output)" "if [ -f \"$TMP_DIR/report_net_out/evaluation.report.json\" ]; then $CLI report validate \"$TMP_DIR/report_net_out/evaluation.report.json\"; else echo '[error] report missing'; exit 1; fi"
       run_to "invarlock advanced calibrate null-sweep (network, container)" "$CALIBRATE_NULL_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI advanced calibrate null-sweep --allow-network --config \"$SMOKE_CALIBRATE_NULL_CONFIG\" --out \"$TMP_DIR/calibrate_null\" --profile ci --device cpu --tier balanced --n-seeds 1 --seed-start 42"
       run_to "invarlock advanced calibrate ve-sweep (network, container)" "$CALIBRATE_VE_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI advanced calibrate ve-sweep --allow-network --config \"$SMOKE_CALIBRATE_VE_CONFIG\" --out \"$TMP_DIR/calibrate_ve\" --profile ci --device cpu --tier balanced --window 6 --n-seeds 1 --seed-start 42"
     else
@@ -679,9 +673,9 @@ if have_adapters_stack; then
       skip_run "invarlock advanced calibrate null-sweep (network, container)" "docker daemon not available"
       skip_run "invarlock advanced calibrate ve-sweep (network, container)" "docker daemon not available"
     fi
-    run_to "invarlock evaluate (network, local)" "$EVALUATE_TIMEOUT_SECONDS" "$NET_EVAL_ENV $CLI evaluate --allow-network --execution-mode host --baseline \"$SMOKE_MODEL_ID\" --subject \"$SMOKE_MODEL_ID\" --baseline-adapter auto --subject-adapter auto --profile dev --preset \"$SMOKE_PRESET\" --device cpu --out \"$TMP_DIR/report_net_local\" --report-out \"$TMP_DIR/report_net_local_out\""
-    run "invarlock verify (network local output)" "if [ -f \"$TMP_DIR/report_net_local_out/evaluation.report.json\" ]; then $CLI verify --runtime-provenance host --json \"$TMP_DIR/report_net_local_out/evaluation.report.json\"; else echo '[skip] report missing'; fi"
-    run "invarlock report validate (network local output)" "if [ -f \"$TMP_DIR/report_net_local_out/evaluation.report.json\" ]; then $CLI report validate \"$TMP_DIR/report_net_local_out/evaluation.report.json\"; else echo '[skip] report missing'; fi"
+    run_to "invarlock evaluate (network, local)" "$EVALUATE_TIMEOUT_SECONDS" "$NET_EVAL_ENV $CLI evaluate --allow-network --execution-mode host --baseline \"$SMOKE_MODEL_ID\" --subject \"$SMOKE_MODEL_ID\" --baseline-adapter auto --subject-adapter auto --profile dev --assurance off --preset \"$SMOKE_PRESET\" --device cpu --out \"$TMP_DIR/report_net_local\" --report-out \"$TMP_DIR/report_net_local_out\""
+    run "invarlock verify (network local output)" "if [ -f \"$TMP_DIR/report_net_local_out/evaluation.report.json\" ]; then $CLI verify --runtime-provenance host --json \"$TMP_DIR/report_net_local_out/evaluation.report.json\"; else echo '[error] report missing'; exit 1; fi"
+    run "invarlock report validate (network local output)" "if [ -f \"$TMP_DIR/report_net_local_out/evaluation.report.json\" ]; then $CLI report validate \"$TMP_DIR/report_net_local_out/evaluation.report.json\"; else echo '[error] report missing'; exit 1; fi"
     run_to "invarlock advanced calibrate null-sweep (network, host)" "$CALIBRATE_NULL_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI advanced calibrate null-sweep --allow-network --allow-host-execution --config \"$SMOKE_CALIBRATE_NULL_CONFIG\" --out \"$TMP_DIR/calibrate_null_host\" --profile ci --device cpu --tier balanced --n-seeds 1 --seed-start 42"
     run_to "invarlock advanced calibrate ve-sweep (network, host)" "$CALIBRATE_VE_TIMEOUT_SECONDS" "TOKENIZERS_PARALLELISM=false $CLI advanced calibrate ve-sweep --allow-network --allow-host-execution --config \"$SMOKE_CALIBRATE_VE_CONFIG\" --out \"$TMP_DIR/calibrate_ve_host\" --profile ci --device cpu --tier balanced --window 6 --n-seeds 1 --seed-start 42"
     if have_docker_daemon; then

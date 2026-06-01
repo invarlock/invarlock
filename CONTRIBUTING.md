@@ -76,17 +76,17 @@ For maintainer-facing CLI smoke coverage, use the lane scripts directly:
 ```bash
 bash scripts/smoke/cli_smoke_fast.sh
 bash scripts/smoke/cli_smoke_negative.sh
-INVARLOCK_SMOKE_LANES=realistic bash scripts/smoke/cli_exhaustive_smoke.sh
+INVARLOCK_SMOKE_LANES=realistic bash scripts/smoke/cli_smoke_matrix.sh
 
 # or dispatch the full matrix
-bash scripts/smoke/cli_exhaustive_smoke.sh
+bash scripts/smoke/cli_smoke_matrix.sh
 ```
 
 Lane intent:
 
 - `cli_smoke_fast.sh` covers broad command-surface and positive-path tiny-model flows
 - `cli_smoke_negative.sh` covers malformed, policy-fail, and fail-closed categories
-- `INVARLOCK_SMOKE_LANES=realistic cli_exhaustive_smoke.sh` wraps the GPT-2-sized smoke campaign
+- `INVARLOCK_SMOKE_LANES=realistic cli_smoke_matrix.sh` wraps the GPT-2-sized smoke campaign
 
 Delegated config execution and calibration internals re-enter through the
 package-internal `python -m invarlock.cli.config_execution` module, not a

@@ -6,9 +6,16 @@ from pathlib import Path
 import pytest
 
 
+def test_tiny_all_matrix_script_is_executable() -> None:
+    script = Path("scripts/smoke/run_tiny_all_matrix.sh")
+
+    assert os.access(script, os.X_OK)
+
+
 def test_tiny_gpt2_matrix_dry_run(tmp_path: Path):
     env = os.environ.copy()
     env["RUN"] = "0"
+    env["NET"] = "0"
     env["GPT2_ID"] = "sshleifer/tiny-gpt2"
     env["TMP_DIR"] = str(tmp_path / "tmp")
     # The script should complete without executing any commands and write a checklist
@@ -22,6 +29,22 @@ def test_tiny_gpt2_matrix_dry_run(tmp_path: Path):
         "evaluate" in text
         and "--baseline-adapter hf_causal --subject-adapter hf_causal" in text
     )
+    assert "INVARLOCK_ALLOW_NETWORK=1" not in text
+    assert "HF_DATASETS_OFFLINE=1" in text
+
+
+def test_checklist_records_network_allowance_only_when_net_enabled(tmp_path: Path):
+    env = os.environ.copy()
+    env["RUN"] = "0"
+    env["NET"] = "1"
+    env["TMP_DIR"] = str(tmp_path / "tmp")
+
+    subprocess.check_call(["bash", "scripts/smoke/run_tiny_all_matrix.sh"], env=env)
+    checklist = Path(env["TMP_DIR"]) / "checklist.md"
+    text = checklist.read_text(encoding="utf-8")
+
+    assert "INVARLOCK_ALLOW_NETWORK=1" in text
+    assert "HF_DATASETS_OFFLINE=0" in text
 
 
 def _read_profile_from_checklist(path: str) -> str:
@@ -122,6 +145,7 @@ def test_net_bootstrap_prefers_cpu_torch_before_hf_extra() -> None:
     assert cpu_torch_install in text
     assert hf_install in text
     assert text.index(cpu_torch_install) < text.index(hf_install)
+    assert "\"$PYTHON_BIN\" - << 'PY' || true" not in text
     assert 'HF_HOME="${HF_HOME:-$TMP_DIR/.hf}"' in text
     assert 'mkdir -p "$HF_HOME" "$HF_HUB_CACHE" "$HF_DATASETS_CACHE"' in text
 
@@ -136,9 +160,9 @@ def test_hf_extras_include_sentencepiece_for_runtime_tokenizer_support() -> None
 def test_matrix_uses_repo_python_selector_and_py312_floor() -> None:
     text = Path("scripts/smoke/run_tiny_all_matrix.sh").read_text(encoding="utf-8")
 
-    assert (
-        'PYTHON_BIN="${PYTHON_BIN:-$(bash scripts/select_workspace_python.sh)}"' in text
-    )
+    assert 'source "$SCRIPT_DIR/lib/smoke_common.sh"' in text
+    assert 'smoke_select_python "$REPO_ROOT"' in text
+    assert 'smoke_setup_pythonpath "$REPO_ROOT"' in text
     assert "requires Python 3.12+" in text
     assert 'CLI=("$PYTHON_BIN" -m invarlock.cli)' in text
 
@@ -148,7 +172,16 @@ def test_quant_demo_uses_dev_profile_by_default() -> None:
 
     assert 'QUANT_PROFILE="${QUANT_PROFILE:-dev}"' in text
     assert '--profile "$QUANT_PROFILE"' in text
+    assert '--edit-config "$QCFG" --assurance off' in text
     assert 'append "gpt2_eval_quant8_${QUANT_PROFILE}"' in text
+
+
+def test_relaxed_profile_evaluate_commands_disable_strict_assurance() -> None:
+    text = Path("scripts/smoke/run_tiny_all_matrix.sh").read_text(encoding="utf-8")
+
+    assert "append_relaxed_assurance_args()" in text
+    assert "cmd+=(--assurance off)" in text
+    assert text.count("append_relaxed_assurance_args") == 3
 
 
 def test_encoder_mlm_smoke_uses_stable_tiny_model() -> None:
@@ -160,15 +193,20 @@ def test_encoder_mlm_smoke_uses_stable_tiny_model() -> None:
 
 def test_matrix_prefers_local_runtime_image_when_available() -> None:
     text = Path("scripts/smoke/run_tiny_all_matrix.sh").read_text(encoding="utf-8")
+    common_text = Path("scripts/smoke/lib/smoke_common.sh").read_text(encoding="utf-8")
 
-    assert "docker image inspect invarlock-runtime:cuda-local" in text
-    assert 'export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"' in text
-    assert "docker image inspect invarlock-runtime:local" in text
-    assert 'export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:local"' in text
-    assert 'echo "[smoke] refreshing local CUDA container runtime image"' in text
-    assert 'echo "[smoke] refreshing local container runtime image"' in text
-    assert "make runtime-image-cuda" in text
-    assert "make runtime-image" in text
+    assert 'smoke_seed_local_runtime_image "auto"' in text
+    assert 'smoke_ensure_current_runtime_image "container" "auto"' in text
+    assert "docker image inspect invarlock-runtime:cuda-local" in common_text
+    assert (
+        'export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:cuda-local"' in common_text
+    )
+    assert "docker image inspect invarlock-runtime:local" in common_text
+    assert 'export INVARLOCK_RUNTIME_IMAGE="invarlock-runtime:local"' in common_text
+    assert 'echo "[smoke] refreshing local CUDA container runtime image"' in common_text
+    assert 'echo "[smoke] refreshing local container runtime image"' in common_text
+    assert "make runtime-image-cuda" in common_text
+    assert "make runtime-image" in common_text
 
 
 def test_run_mode_falls_back_to_python_module_when_console_script_missing(
@@ -216,6 +254,47 @@ def test_run_mode_falls_back_to_python_module_when_console_script_missing(
 
     calls = log_path.read_text(encoding="utf-8")
     assert "-m invarlock.cli evaluate" in calls
+
+
+def test_run_mode_reports_failures_after_completing_matrix(tmp_path: Path) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    log_path = tmp_path / "python_calls.log"
+    fake_python = bin_dir / "python"
+    fake_python.write_text(
+        "\n".join(
+            [
+                "#!/usr/bin/env bash",
+                f'echo "$@" >> {log_path}',
+                'case "$*" in',
+                '  *"--edit-config"*) exit 7 ;;',
+                "esac",
+                "exit 0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    fake_python.chmod(0o755)
+
+    env = os.environ.copy()
+    env["RUN"] = "1"
+    env["NET"] = "0"
+    env["TMP_DIR"] = str(tmp_path / "tmp")
+    env["PYTHON_BIN"] = str(fake_python)
+
+    result = subprocess.run(
+        ["bash", "scripts/smoke/run_tiny_all_matrix.sh"],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    calls = log_path.read_text(encoding="utf-8")
+    assert result.returncode == 1
+    assert "ERROR: 1 matrix command(s) failed." in result.stderr
+    assert "--edit-config" in calls
+    assert "hf_mlm" in calls
 
 
 pytestmark = pytest.mark.integration

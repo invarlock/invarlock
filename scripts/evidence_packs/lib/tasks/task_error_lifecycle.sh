@@ -422,9 +422,16 @@ PRESET_YAML
         local report_file=""
         report_file=$(find "${cert_dir}" -name "report*.json" -type f 2>/dev/null | sort | tail -1)
         if [[ -n "${report_file}" && -f "${report_file}" ]]; then
+            local conversion_rc=0
             _cmd_python "${SCRIPT_DIR}/../../python/task_tools.py" evaluation-report \
                 --report "${report_file}" \
-                --out "${cert_file}" >> "${log_file}" 2>&1 || true
+                --out "${cert_file}" >> "${log_file}" 2>&1 || conversion_rc=$?
+            if [[ ${conversion_rc} -ne 0 ]]; then
+                echo "  ERROR: failed to generate evaluation.report.json from ${report_file} (exit=${conversion_rc})" >> "${log_file}"
+                if [[ ${exit_code} -eq 0 ]]; then
+                    exit_code=${conversion_rc}
+                fi
+            fi
         fi
     fi
 

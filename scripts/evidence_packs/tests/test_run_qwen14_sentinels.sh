@@ -194,9 +194,6 @@ case "${cmd}" in
         cp "${baseline_report}" "${report_out}/observed_baseline_report.json"
         printf '{"ok":true}\n' > "${report_out}/evaluation.report.json"
         printf '{"report":"ok"}\n' > "${out}"
-        if [[ "${subject}" == *"quant_4bit_clean" ]]; then
-            exit 13
-        fi
         exit 0
         ;;
     verify)
@@ -211,6 +208,9 @@ case "${cmd}" in
                     profile="$2"
                     shift 2
                     ;;
+                --assurance)
+                    shift 2
+                    ;;
                 *)
                     report="$1"
                     shift
@@ -219,7 +219,7 @@ case "${cmd}" in
         done
         printf 'verify\t%s\t%s\n' "${profile}" "${report}" >> "${calls_file}"
         printf '{"ok":true}\n'
-        exit 17
+        exit 0
         ;;
     *)
         printf 'unexpected\t%s\n' "${cmd}" >> "${calls_file}"
@@ -235,7 +235,7 @@ EOF
         --run-dir "${run_dir}" \
         --model-name "${model_name}" \
         --out "${TEST_TMPDIR}/sentinels"
-    assert_rc "0" "${RUN_RC}" "sentinel script succeeds when reports are written"
+    assert_rc "0" "${RUN_RC}" "sentinel script succeeds when subprocesses pass and reports are written"
     assert_file_exists "${TEST_TMPDIR}/sentinels/quant_4bit_clean/evaluation.report.json" "quant report produced"
     assert_file_exists "${TEST_TMPDIR}/sentinels/quant_4bit_clean/verify.json" "quant verify output captured"
     assert_file_exists "${TEST_TMPDIR}/sentinels/prune_clean/evaluation.report.json" "prune report produced"
@@ -245,7 +245,7 @@ EOF
     assert_match "quant_4bit_clean.*runtime_inputs/calibrated_preset_${model_name}__quant_rtn\\.yaml" "${calls}" "quant sentinel stages the quant-specific preset"
     assert_match "prune_clean.*runtime_inputs/calibrated_preset_${model_name}\\.yaml" "${calls}" "prune sentinel stages the base preset"
     assert_match "runtime_inputs/baseline_report\\.json" "${calls}" "sentinel stages the baseline report"
-    assert_match "verify.*quant_4bit_clean/evaluation\\.report\\.json" "${calls}" "public quant verify runs"
+    assert_match "verify.*dev.*quant_4bit_clean/evaluation\\.report\\.json" "${calls}" "public quant verify runs with dev profile"
 
     local quant_preset
     quant_preset="$(cat "${TEST_TMPDIR}/sentinels/quant_4bit_clean/observed_preset.yaml")"
@@ -268,7 +268,7 @@ test_run_qwen14_sentinels_requires_inputs_and_rejects_bad_mode() {
     assert_rc "2" "${RUN_RC}" "invalid mode returns usage error"
 }
 
-test_run_qwen14_sentinels_evaluate_and_verify_warning_paths() {
+test_run_qwen14_sentinels_evaluate_and_verify_fail_on_nonzero_subprocesses() {
     mock_reset
 
     source ./scripts/evidence_packs/run_qwen14_sentinels.sh
@@ -318,12 +318,12 @@ EOF
 
     local out_dir="${TEST_TMPDIR}/sentinel"
     run run_evaluate_sentinel "${baseline_dir}" "${baseline_report}" "${subject_dir}" "${preset}" "${out_dir}" "auto" "auto" "ci" "cpu"
-    assert_rc "0" "${RUN_RC}" "evaluate sentinel treats non-zero exit with written report as success"
-    assert_match "treating sentinel as load-path success" "${RUN_ERR}" "evaluate warning is surfaced"
+    assert_rc "13" "${RUN_RC}" "evaluate sentinel returns non-zero evaluate exit even when a report was written"
+    assert_file_exists "${out_dir}/evaluation.report.json" "evaluate report remains available for debugging"
 
     run run_public_quant_verify "${out_dir}/evaluation.report.json" "${out_dir}" "ci"
-    assert_rc "0" "${RUN_RC}" "verify sentinel treats non-zero exit with written summary as success"
-    assert_match "treating sentinel as load-path success" "${RUN_ERR}" "verify warning is surfaced"
+    assert_rc "17" "${RUN_RC}" "verify sentinel returns non-zero verify exit even when a summary was written"
+    assert_file_exists "${out_dir}/verify.json" "verify summary remains available for debugging"
 }
 
 test_run_qwen14_sentinels_verify_success_path_writes_summary_without_warning() {
@@ -349,7 +349,7 @@ EOF
     run run_public_quant_verify "${out_dir}/evaluation.report.json" "${out_dir}" "ci"
     assert_rc "0" "${RUN_RC}" "verify success path returns zero"
     assert_file_exists "${out_dir}/verify.json" "verify summary is written"
-    if [[ "${RUN_ERR}" == *"treating sentinel as load-path success"* ]]; then
+    if [[ "${RUN_ERR}" == *"load-path success"* ]]; then
         fail_test "verify success path should not emit a warning"
     fi
 }

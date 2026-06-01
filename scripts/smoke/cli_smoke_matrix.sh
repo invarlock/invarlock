@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Exhaustive CLI smoke matrix for InvarLock.
+# CLI smoke lane matrix for InvarLock.
 #
 # The matrix is split into three lanes so fast command-surface coverage does not
 # get conflated with negative-path expectations or slower realistic runs.
@@ -11,10 +11,10 @@
 
 set -euo pipefail
 
-ts() { date +"%Y-%m-%dT%H:%M:%S%z"; }
-
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
+source "$SCRIPT_DIR/lib/smoke_common.sh"
+ts() { smoke_ts; }
 WORK_ROOT="${1:-$(mktemp -d -t invarlock_cli_smoke_matrix.XXXXXX.dir)}"
 LOG_FILE="${INVARLOCK_SMOKE_LOG_FILE:-$(mktemp -t invarlock_cli_smoke_matrix.XXXXXX.log)}"
 LANES_RAW="${INVARLOCK_SMOKE_LANES:-fast,negative,realistic}"
